@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, truncateSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { brotliCompressSync, constants } from "node:zlib";
@@ -13,6 +12,7 @@ import type { ModeName } from "./pageWorker";
 import { modeOrder, runMode, type ModeRun, type WorkerConfig } from "./runner";
 import { markdown, readModelMarkdown } from "./report";
 import { measureReadModel, type ReadModelShape } from "./readModel";
+import { buildProduction, buildTooling } from "./build";
 
 /**
  * `npm run perf:worker`: the engine-host comparison (TypeScript, the shipped
@@ -135,10 +135,6 @@ export function readModelLimitations(config: WorkerConfig): string[] {
   return lines;
 }
 
-function sh(cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env): void {
-  execFileSync(cmd, args, { cwd, stdio: "inherit", env });
-}
-
 interface Size { raw: number; brotli: number }
 
 /** Sizes in a production build, raw and Brotli 11: the engine worker chunk
@@ -217,8 +213,8 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const stampPaths = [join(dist, ".perf-build.json"), join(distPerf, ".perf-build.json")];
   const tree = buildTree(repo);
   if (!args.skipBuild) {
-    sh("npm", ["run", "build"], repo);
-    sh("npx", ["vite", "build", "--outDir", distPerf, "--emptyOutDir"], repo, { ...process.env, VC_TOOLING: "1" });
+    buildProduction(repo);
+    buildTooling(repo, distPerf);
     for (const p of stampPaths) writeFileSync(p, JSON.stringify(tree) + "\n");
   } else {
     const errs = stampErrors(stampPaths, tree);
