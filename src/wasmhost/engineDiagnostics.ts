@@ -1,6 +1,7 @@
 import type { EngineBootState } from "./engineBoot";
 import { parseEngineIdentity, type EngineIdentity } from "./engineIdentity";
 import { shortId, type ExpectedEnginePackage } from "./enginePackageRecord";
+import type { BuildMetadataResult } from "./buildSection";
 
 /**
  * The engine diagnostics report (#963): one plain-data answer to "which build
@@ -9,6 +10,14 @@ import { shortId, type ExpectedEnginePackage } from "./enginePackageRecord";
  * the shell was built to run (`__ENGINE_PACKAGE__`) and the record the engine
  * itself reports. Every input is optional, so the report builds, and copies,
  * when the engine never loaded.
+ *
+ * Two hashes appear and are different facts. The package id is a SHA-256 over
+ * the digests of the served glue and compiled binary (it says which files
+ * these are). The source hash is the hash of the Rust sources the binary was
+ * built from, stamped into the binary's `verticopolis.build` section by the
+ * build (it says which engine code those files came from). The core engine
+ * does not carry it, so a missing or malformed section leaves the engine
+ * running and the source hash unavailable.
  *
  * The text carries no tower, save or player data: versions, codes, digests and
  * the engine's own error text.
@@ -58,23 +67,48 @@ const MESSAGE_CAP = 300;
 const cap = (s: string): string =>
   s.length > MESSAGE_CAP ? `${s.slice(0, MESSAGE_CAP)}...` : s;
 
-/** The fields the engine's record and the shell's build record disagree on. */
+/** The fields the engine's record and the shell's build record disagree on.
+ *  The source hash is compared when the binary's section was read and the page
+ *  recorded one; the engine's own record has no part in it. */
 export function identityMismatches(
   identity: EngineIdentity,
   expected: ExpectedEnginePackage | null | undefined,
+  build?: BuildMetadataResult,
 ): string[] {
-  const crate = expected?.crate;
-  if (!crate) return [];
   const out: string[] = [];
-  if (crate.name !== identity.crate.name)
+  const crate = expected?.crate;
+  if (crate && crate.name !== identity.crate.name)
     out.push(
       `crate name (engine ${identity.crate.name}, this page was built for ${crate.name})`,
     );
-  if (crate.version !== identity.crate.version)
+  if (crate && crate.version !== identity.crate.version)
     out.push(
       `crate version (engine ${identity.crate.version}, this page was built for ${crate.version})`,
     );
+  if (
+    build?.state === "ok" &&
+    expected?.sources &&
+    build.sourceHash !== expected.sources
+  )
+    out.push(
+      `source hash (engine binary ${shortId(build.sourceHash)}, this page was built for ${shortId(expected.sources)})`,
+    );
   return out;
+}
+
+/** Why the source hash cannot be shown, or null when it can (or was not read). */
+function buildUnavailable(build: BuildMetadataResult | undefined): string | null {
+  if (build?.state === "missing")
+    return "its binary carries no build metadata section";
+  if (build?.state === "malformed")
+    return `its build metadata section is malformed (${build.why})`;
+  return null;
+}
+
+function buildValue(build: BuildMetadataResult): string {
+  if (build.state === "ok") return shortId(build.sourceHash);
+  if (build.state === "missing") return "unavailable (no build metadata section)";
+  return `unavailable (malformed: ${build.why})`;
 }
 
 function engineName(input: DiagnosticsInput): string {
@@ -94,7 +128,10 @@ export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
   const failure = boot?.failure ?? null;
   const identity = parseEngineIdentity(boot?.identity);
   const wasmRunning = !!host?.hosted || (boot?.engine === "wasm" && !failure);
-  const mismatches = identity ? identityMismatches(identity, expected) : [];
+  const mismatches = identity
+    ? identityMismatches(identity, expected, boot?.binary)
+    : [];
+  const noBuild = buildUnavailable(boot?.binary);
 
   let state: DiagnosticsState;
   let summary: string;
@@ -114,6 +151,9 @@ export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
   } else if (mismatches.length > 0) {
     state = "mismatch";
     summary = "The WASM engine does not match the build this page expected.";
+  } else if (noBuild) {
+    state = "unavailable";
+    summary = `The WASM engine is running, but ${noBuild}, so its source hash is unavailable.`;
   } else {
     state = "ok";
     summary = "The WASM engine is running and matches this build.";
@@ -138,15 +178,25 @@ export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
     rows.push({ label: "Errors not kept", value: String(host.droppedErrors) });
   if (expected) {
     rows.push({
-      label: "Package this page expects",
+      label: "Package id this page expects",
       value: shortId(expected.package),
     });
+    if (expected.sources)
+      rows.push({
+        label: "Source hash this page expects",
+        value: shortId(expected.sources),
+      });
     if (expected.crate)
       rows.push({
         label: "Crate this page expects",
         value: `${expected.crate.name} ${expected.crate.version}`,
       });
   }
+  if (boot?.binary)
+    rows.push({
+      label: "Source hash in the engine binary",
+      value: buildValue(boot.binary),
+    });
   if (identity) {
     rows.push({
       label: "Engine crate",

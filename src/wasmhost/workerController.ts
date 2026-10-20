@@ -3,6 +3,7 @@ import type { WasmHostApp } from "./startWasmHost";
 import { attachWorkerHost, type WorkerHost } from "./workerHost";
 import type { FromWorker, ToWorker } from "./workerProtocol";
 import { EngineBootError } from "./engineBoot";
+import type { BuildMetadataResult } from "./buildSection";
 import { recordHostError, type HostErrors } from "./hostErrors";
 
 /**
@@ -30,6 +31,8 @@ export interface SpawnedWorker {
   catalogs: { classic: string; modern: string };
   /** The engine's identity record as the worker read it (#963); undefined for a package without the call. */
   identity?: string;
+  /** What the binary's build section said, as the worker read it (#963). */
+  build?: BuildMetadataResult;
 }
 
 export interface WorkerHostStatus extends HostErrors {
@@ -68,12 +71,12 @@ export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, tim
   return new Promise<SpawnedWorker>((resolve, reject) => {
     // The ready timeout carries its code (`boot-timeout`), as the main-thread
     // load's limit does; every other start failure is an untyped error.
-    const fail = (message: string, timedOut = false) => {
+    const fail = (message: string, timedOut = false, build?: BuildMetadataResult) => {
       clearTimeout(timer);
       worker.onmessage = null;
       worker.onerror = null;
       worker.terminate();
-      reject(timedOut ? new EngineBootError("boot-timeout", message) : new Error(message));
+      reject(timedOut ? new EngineBootError("boot-timeout", message) : Object.assign(new Error(message), build ? { build } : {}));
     };
     const timer = setTimeout(() => fail(`the engine worker did not answer within ${timeoutMs} ms`, true), timeoutMs);
     worker.onmessage = (e) => {
@@ -82,9 +85,9 @@ export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, tim
         clearTimeout(timer);
         worker.onmessage = null;
         worker.onerror = null;
-        resolve({ worker, catalogs: msg.catalogs, identity: msg.identity });
+        resolve({ worker, catalogs: msg.catalogs, identity: msg.identity, build: msg.build });
       } else if (msg.type === "error") {
-        fail(msg.message);
+        fail(msg.message, false, msg.build);
       }
     };
     worker.onerror = (e) => fail(`the engine worker failed to start: ${e.message ?? "unknown error"}`);

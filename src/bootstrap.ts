@@ -14,6 +14,7 @@ import { refreshSplashVersion } from "./wasmhost/engineLabel";
 import { isHostFault } from "./wasmhost/hostFault";
 import { ENGINE_FAILURE_ID } from "./game/interactionState";
 import { bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState, type FallbackReason } from "./wasmhost/engineBoot";
+import type { BuildMetadataResult } from "./wasmhost/buildSection";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -220,7 +221,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
     // drops the experimental hosts from its bundle.
     const choice = __WASM_ONLY__ ? "wasm" : engineRequested();
     const mainThreadWasm = choice === "wasm" || choice === "wasm-frame";
-    const booted = mainThreadWasm ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: () => loadWasmEngine() }) : typescriptBoot();
+    const booted = mainThreadWasm ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: (onBuild) => loadWasmEngine(undefined, { onBuild }) }) : typescriptBoot();
     let engineWorker: SpawnedWorker | null = null;
     let workerHost: WorkerHostHandle | null = null;
     let bootState: EngineBootState = booted.state;
@@ -228,9 +229,11 @@ export function bootGame(create: () => BootApp): Promise<void> {
       try {
         engineWorker = await spawnEngineWorker(makeBrowserWorker, enginePackageUrl());
         if (engineWorker.identity !== undefined) bootState = { ...bootState, identity: engineWorker.identity };
+        if (engineWorker.build) bootState = { ...bootState, binary: engineWorker.build };
       } catch (e) {
         // Recorded with its reason, as a failed package load is (#874).
-        bootState = { ...bootState, failure: { stage: "load", reason: bootFailureReason(e), message: e instanceof Error ? e.message : String(e) } };
+        const workerBuild = (e as { build?: BuildMetadataResult } | null)?.build;
+        bootState = { ...bootState, ...(workerBuild ? { binary: workerBuild } : {}), failure: { stage: "load", reason: bootFailureReason(e), message: e instanceof Error ? e.message : String(e) } };
         console.error("[wasm-worker] the engine worker did not start; running on the TypeScript engine:", e);
       }
     }

@@ -4,6 +4,7 @@ import { readCatalog } from "../dualrun/catalog";
 import { attachWasmHost, refuseForeignCatalog, type WasmHost } from "./wasmHost";
 import { ENGINE_DIR, ENGINE_GLUE } from "./enginePackageNames";
 import { EngineBootError, type FallbackReason, type FallbackStage } from "./engineBoot";
+import { initEngineGlue, type EngineLoadOptions } from "./engineLoad";
 import { recordHostError, type HostErrors } from "./hostErrors";
 import type { FaultContext, HostFault } from "./hostFault";
 import { towerStateSig } from "../engine/UndoHistory";
@@ -111,9 +112,8 @@ export function enginePackageUrl(base = import.meta.env.BASE_URL, href = globalT
 /** Load and initialize the browser package. A package that loads but lacks
  *  what this shell calls is a mismatched package (a shell and an engine from
  *  different builds), coded so analytics tells it from a broken engine. */
-export async function loadWasmEngine(url = enginePackageUrl()): Promise<WasmModule> {
-  const mod = (await import(/* @vite-ignore */ url)) as { default: () => Promise<unknown> };
-  await mod.default();
+export async function loadWasmEngine(url = enginePackageUrl(), opts: EngineLoadOptions = {}): Promise<WasmModule> {
+  const { mod } = await initEngineGlue(url, opts);
   try {
     return checkBinding(mod);
   } catch (e) {

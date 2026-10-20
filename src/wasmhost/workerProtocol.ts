@@ -1,4 +1,5 @@
 import type { ShadowCommand } from "../dualrun/commands";
+import type { BuildMetadataResult } from "./buildSection";
 
 /**
  * The messages between the main thread and the engine worker
@@ -74,6 +75,8 @@ export interface ReadyReply {
   /** The engine's identity record (`engineIdentity()`, #963), for About. Absent
    *  from a package built before the call. */
   identity?: string;
+  /** What the binary's `verticopolis.build` section said (#963). */
+  build?: BuildMetadataResult;
 }
 
 /** The tower's engine exists; `view` is its first frame. */
@@ -129,6 +132,9 @@ export interface ErrorReply {
   seq?: number;
   fatal: boolean;
   message: string;
+  /** On a failed package load: what the binary's build section said, when it
+   *  had been read (#963). */
+  build?: BuildMetadataResult;
 }
 
 export type FromWorker = ReadyReply | LoadedReply | FrameReply | ErrorReply;

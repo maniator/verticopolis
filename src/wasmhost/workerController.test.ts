@@ -210,3 +210,39 @@ describe("spawnEngineWorker, engine identity (#963)", () => {
     expect(spawned.identity).toBeUndefined();
   });
 });
+
+describe("spawnEngineWorker, the engine binary's build metadata (#963)", () => {
+  const answering = (reply: FromWorker): EngineWorkerLike => {
+    const w: EngineWorkerLike = {
+      onmessage: null,
+      onerror: null,
+      postMessage() {
+        setTimeout(() => w.onmessage?.({ data: reply }), 0);
+      },
+      terminate() {},
+    };
+    return w;
+  };
+  const ok = { state: "ok", sourceHash: "a".repeat(64) } as const;
+
+  it("hands the worker's read of the section to the caller", async () => {
+    const reply: FromWorker = { type: "ready", catalogs: { classic: "c", modern: "m" }, build: ok };
+    expect((await spawnEngineWorker(() => answering(reply), "u")).build).toEqual(ok);
+  });
+
+  it("leaves it undefined for a worker that did not say", async () => {
+    const reply: FromWorker = { type: "ready", catalogs: { classic: "c", modern: "m" } };
+    expect((await spawnEngineWorker(() => answering(reply), "u")).build).toBeUndefined();
+  });
+
+  it("carries it on the rejection of a load that failed after the binary compiled", async () => {
+    const err = await spawnEngineWorker(() => answering({ type: "error", fatal: true, message: "link failed", build: ok }), "u").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toMatchObject({ message: "link failed", build: ok });
+  });
+
+  it("adds no build to a rejection that has none", async () => {
+    const err = await spawnEngineWorker(() => answering({ type: "error", fatal: true, message: "404" }), "u").catch((e: unknown) => e);
+    expect("build" in (err as object)).toBe(false);
+  });
+});

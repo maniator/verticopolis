@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { catalogFor } from "../engine/catalog";
 import { EngineBootError } from "./engineBoot";
+import { EMPTY_WASM, wasmFetch } from "./engineLoad.fixture";
 import { fakeModule } from "./fakeEngine.fixture";
 import { loadWasmEngine, startWasmHost, type HostFallback, type WasmHostApp } from "./startWasmHost";
 
@@ -138,7 +139,9 @@ describe("loadWasmEngine", () => {
   it("codes a package that lacks what this shell calls as a package mismatch", async () => {
     // A data URL module that loads and initializes but exports no Engine.
     const url = `data:text/javascript,${encodeURIComponent("export default async function init() {}")}`;
-    const err = await loadWasmEngine(url).catch((e: unknown) => e);
+    vi.stubGlobal("fetch", wasmFetch(EMPTY_WASM));
+    const err = await loadWasmEngine(url, { wasmUrl: "http://x/e.wasm" }).catch((e: unknown) => e);
+    vi.unstubAllGlobals();
     expect(err).toBeInstanceOf(EngineBootError);
     expect(err).toMatchObject({ reason: "package-mismatch", message: expect.stringContaining("no Engine class") });
   });

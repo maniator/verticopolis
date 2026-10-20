@@ -83,6 +83,75 @@ describe("Help diagnostics", () => {
     );
   });
 
+  it("copies the stamped source hash beside the one the page expects", async () => {
+    const sourceHash = "7".repeat(64);
+    g.__vcEngineBoot = {
+      build: "switchable",
+      engine: "wasm",
+      failure: null,
+      identity: JSON.stringify(IDENTITY_FIXTURE),
+      binary: { state: "ok", sourceHash },
+    };
+    g.__vcEngine = { status: { hosted: true } };
+    const writeText = vi.fn(async () => {});
+    stubClipboard(writeText);
+    const { ui } = makeUI();
+    ui.showHelp();
+    dialog()
+      .querySelector<HTMLButtonElement>('[data-act="copy-diagnostics"]')!
+      .click();
+    await flush();
+    expect((writeText.mock.calls[0] as unknown as [string])[0]).toContain(
+      "Source hash in the engine binary: 777777777777",
+    );
+  });
+
+  it("says the source hash is unavailable, and copies that, for a binary with no build section", async () => {
+    g.__vcEngineBoot = {
+      build: "switchable",
+      engine: "wasm",
+      failure: null,
+      identity: JSON.stringify(IDENTITY_FIXTURE),
+      binary: { state: "missing" },
+    };
+    g.__vcEngine = { status: { hosted: true } };
+    const writeText = vi.fn(async () => {});
+    stubClipboard(writeText);
+    const { ui } = makeUI();
+    ui.showHelp();
+    const block = dialog().querySelector(".help-diagnostics")!;
+    expect(block.getAttribute("data-state")).toBe("unavailable");
+    expect(block.textContent).toContain("no build metadata section");
+    dialog()
+      .querySelector<HTMLButtonElement>('[data-act="copy-diagnostics"]')!
+      .click();
+    await flush();
+    expect((writeText.mock.calls[0] as unknown as [string])[0]).toContain(
+      "Source hash in the engine binary: unavailable (no build metadata section)",
+    );
+  });
+
+  it("copies the failed binary's source hash when the engine never initialized", async () => {
+    g.__vcEngineBoot = {
+      build: "wasm-only",
+      engine: "none",
+      failure: { stage: "load", reason: "package-mismatch", message: "import mismatch" },
+      binary: { state: "ok", sourceHash: "8".repeat(64) },
+    };
+    const writeText = vi.fn(async () => {});
+    stubClipboard(writeText);
+    const { ui } = makeUI();
+    ui.showHelp();
+    dialog()
+      .querySelector<HTMLButtonElement>('[data-act="copy-diagnostics"]')!
+      .click();
+    await flush();
+    const copied = (writeText.mock.calls[0] as unknown as [string])[0];
+    expect(copied).toContain("Reason: package-mismatch");
+    expect(copied).toContain("Source hash in the engine binary: 888888888888");
+    expect(copied).not.toContain("Engine crate:");
+  });
+
   it("tells the player when the copy fails", async () => {
     stubClipboard(async () => {
       throw new Error("denied");

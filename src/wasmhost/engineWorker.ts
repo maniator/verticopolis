@@ -1,4 +1,6 @@
 import { checkBinding } from "../dualrun/binding";
+import { initEngineGlue } from "./engineLoad";
+import type { BuildMetadataResult } from "./buildSection";
 import { EngineWorkerCore } from "./workerCore";
 import type { FromWorker, ToWorker } from "./workerProtocol";
 
@@ -17,12 +19,15 @@ const post = (msg: FromWorker, transfer: Transferable[] = []) => scope.postMessa
 let core: EngineWorkerCore | null = null;
 let queue: ToWorker[] | null = [];
 let loading = false;
+/** What the binary's build section said, kept so a load that fails after the
+ *  binary compiled can still report it (#963). */
+let build: BuildMetadataResult | undefined;
 
 async function load(url: string): Promise<void> {
-  const mod = (await import(/* @vite-ignore */ url)) as { default: () => Promise<{ memory?: WebAssembly.Memory }> };
-  const exports = await mod.default();
-  const ready = new EngineWorkerCore(checkBinding(mod), post, () => exports?.memory?.buffer.byteLength ?? null);
-  post({ type: "ready", catalogs: ready.catalogs(), identity: ready.identity() });
+  const loaded = await initEngineGlue(url, { onBuild: (b) => (build = b) });
+  const exports = loaded.exports as { memory?: WebAssembly.Memory } | undefined;
+  const ready = new EngineWorkerCore(checkBinding(loaded.mod), post, () => exports?.memory?.buffer.byteLength ?? null);
+  post({ type: "ready", catalogs: ready.catalogs(), identity: ready.identity(), build });
   core = ready;
   const pending = queue ?? [];
   queue = null;
@@ -36,7 +41,7 @@ scope.onmessage = (e) => {
     loading = true;
     load(msg.url).catch((err: unknown) => {
       queue = null;
-      post({ type: "error", fatal: true, message: `could not load the WASM engine: ${err instanceof Error ? err.message : String(err)}` });
+      post({ type: "error", fatal: true, message: `could not load the WASM engine: ${err instanceof Error ? err.message : String(err)}`, ...(build ? { build } : {}) });
     });
     return;
   }

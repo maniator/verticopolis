@@ -12,6 +12,13 @@ const expected = (
   files: {},
   crate: { name: IDENTITY_FIXTURE.crate.name, version },
 });
+const SRC = "5".repeat(64);
+const OTHER_SRC = "6".repeat(64);
+const withSources = (sources = SRC): ExpectedEnginePackage => ({
+  ...expected(),
+  sources,
+});
+const stamped = { state: "ok", sourceHash: SRC } as const;
 const wasmBoot = (extra: Partial<EngineBootState> = {}): EngineBootState => ({
   build: "switchable",
   engine: "wasm",
@@ -57,7 +64,7 @@ describe("buildDiagnostics", () => {
       "3 (classic aaaa1111aaaa1111, modern bbbb2222bbbb2222)",
     ]);
     expect(row(r, "Conformance lock")).toEqual(["cccc3333cccc3333"]);
-    expect(row(r, "Package this page expects")).toEqual(["0123456789ab"]);
+    expect(row(r, "Package id this page expects")).toEqual(["0123456789ab"]);
     expect(row(r, "Mismatch")).toEqual([]);
   });
 
@@ -202,11 +209,93 @@ describe("buildDiagnostics", () => {
   });
 });
 
+describe("the source hash stamped in the engine binary", () => {
+  const run = (boot: EngineBootState, exp: ExpectedEnginePackage | null) =>
+    buildDiagnostics({ ...base, boot, host: { hosted: true }, expected: exp });
+
+  it("shows the stamped hash beside the one the page expects, apart from the package id", () => {
+    const r = run(wasmBoot({ binary: stamped }), withSources());
+    expect(r.state).toBe("ok");
+    expect(row(r, "Source hash in the engine binary")).toEqual(["555555555555"]);
+    expect(row(r, "Source hash this page expects")).toEqual(["555555555555"]);
+    expect(row(r, "Package id this page expects")).toEqual(["0123456789ab"]);
+  });
+
+  it("is a mismatch, naming the source hash, when the binary was built from other sources", () => {
+    const r = run(wasmBoot({ binary: { state: "ok", sourceHash: OTHER_SRC } }), withSources());
+    expect(r.state).toBe("mismatch");
+    expect(row(r, "Mismatch")).toEqual([
+      "source hash (engine binary 666666666666, this page was built for 555555555555)",
+    ]);
+  });
+
+  it("does not compare when the page recorded no source hash", () => {
+    const r = run(wasmBoot({ binary: stamped }), expected());
+    expect(r.state).toBe("ok");
+    expect(row(r, "Source hash in the engine binary")).toEqual(["555555555555"]);
+    expect(row(r, "Source hash this page expects")).toEqual([]);
+  });
+
+  it("is unavailable, with the reason, when the binary has no section", () => {
+    const r = run(wasmBoot({ binary: { state: "missing" } }), withSources());
+    expect(r.state).toBe("unavailable");
+    expect(r.summary).toContain("carries no build metadata section");
+    expect(row(r, "Source hash in the engine binary")).toEqual(["unavailable (no build metadata section)"]);
+    expect(row(r, "Engine crate")).toEqual(["example-engine 9.8.7"]);
+  });
+
+  it("is unavailable, with the reason, when the section is malformed", () => {
+    const r = run(wasmBoot({ binary: { state: "malformed", why: "not JSON" } }), withSources());
+    expect(r.state).toBe("unavailable");
+    expect(r.summary).toContain("malformed (not JSON)");
+    expect(row(r, "Source hash in the engine binary")).toEqual(["unavailable (malformed: not JSON)"]);
+  });
+
+  it("lets a crate mismatch outrank missing metadata", () => {
+    const r = run(wasmBoot({ binary: { state: "missing" } }), { ...withSources(), crate: { name: "example-engine", version: "0.0.1" } });
+    expect(r.state).toBe("mismatch");
+  });
+
+  it("leaves a healthy report alone when the binary was never read", () => {
+    const r = run(wasmBoot(), withSources());
+    expect(r.state).toBe("ok");
+    expect(row(r, "Source hash in the engine binary")).toEqual([]);
+  });
+
+  it("reports the failed binary's hash when the engine then did not load", () => {
+    const boot: EngineBootState = {
+      build: "switchable",
+      engine: "ts",
+      failure: { stage: "load", reason: "package-mismatch", message: "link failed" },
+      binary: stamped,
+    };
+    const r = buildDiagnostics({ ...base, boot, expected: withSources() });
+    expect(r.state).toBe("not-loaded");
+    expect(row(r, "Source hash in the engine binary")).toEqual(["555555555555"]);
+    expect(row(r, "Source hash this page expects")).toEqual(["555555555555"]);
+    expect(row(r, "Engine crate")).toEqual([]);
+  });
+
+  it("copies a missing section too, with no em-dash", () => {
+    const r = run(wasmBoot({ binary: { state: "missing" } }), withSources());
+    expect(r.text).toContain("Source hash in the engine binary: unavailable (no build metadata section)");
+    expect(r.text).not.toContain("—");
+  });
+});
+
 describe("identityMismatches", () => {
   const record = { ...IDENTITY_FIXTURE };
   it("is empty without an expected crate", () => {
     expect(identityMismatches(record, null)).toEqual([]);
     expect(identityMismatches(record, undefined)).toEqual([]);
+  });
+  it("compares the source hash only when the binary's section was read", () => {
+    const e = withSources();
+    expect(identityMismatches(record, e, { state: "ok", sourceHash: OTHER_SRC })).toHaveLength(1);
+    expect(identityMismatches(record, e, { state: "missing" })).toEqual([]);
+    expect(identityMismatches(record, e, { state: "malformed", why: "x" })).toEqual([]);
+    expect(identityMismatches(record, e, undefined)).toEqual([]);
+    expect(identityMismatches(record, expected(), { state: "ok", sourceHash: OTHER_SRC })).toEqual([]);
   });
   it("names the crate when the name differs", () => {
     const e = expected();
