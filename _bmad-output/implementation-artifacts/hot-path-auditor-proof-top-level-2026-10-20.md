@@ -68,9 +68,10 @@ on it. It was never pushed, has no pull request and will not be merged.
   by the top-level session at 21:31:17 UTC with the argument
   `7d13601^..7d13601` and "No spec file", in the main checkout detached at
   6e80645. Its `_bmad/custom/` overrides and its
-  `docs/performance/hot-path-review.md` are the ones this pull request carries,
-  apart from a later rewrap of the auditor prompt that changes no words and a
-  note in section 1 that #1092 has merged.
+  `docs/performance/hot-path-review.md` are those of 6e80645, this pull
+  request's head at the time. Round 6 of the review (e835716, 22:26 UTC) later
+  changed all four overrides and much of the page, so this run did not
+  exercise their current wording.
 - **Mode:** no-spec, so the skill skipped the Acceptance Auditor.
 - **Layers:** started by the review session through the Agent tool, in the
   background, each in a fresh context. The Blind Hunter got the diff only and
@@ -175,6 +176,25 @@ before any choice. There is no pull request for a throwaway commit, so under
 the record fact it is saved for whoever opens one; here, it is saved in this
 file.
 
+Appendix A marks HP-3, HP-4, HP-5 and HP-11 "clear" although their rows list
+pre-existing findings. Section 6 now says a row that lists any finding reads
+"finding (n)", pre-existing findings included, so the record reads:
+
+| Item | Result | What was checked | Findings and resolution |
+| --- | --- | --- | --- |
+| HP-1 | finding (1) | as appendix A | F1: `patch`, pending the owner |
+| HP-2 | finding (3: 1 new, 2 pre-existing) | as appendix A | F1 as above; P1 deferred by reference (#1158 A19); P4 deferred by reference (#1143 item 3, #1158 A2) |
+| HP-3 | finding (4, pre-existing) | as appendix A | P1, P2 (#1158 A27) and P3 (#859, #1158 A8) deferred by reference; P5 deferred as #1158 A28 |
+| HP-4 | finding (1, pre-existing) | as appendix A | P5 (#1158 A28) |
+| HP-5 | finding (2, pre-existing) | as appendix A | P4 by reference; P5 (#1158 A28) |
+| HP-6 | finding (1) | as appendix A | F1 |
+| HP-7 | finding (5, pre-existing) | as appendix A | P1 to P5, as above |
+| HP-8 | finding (1) | as appendix A | F1, always `patch` |
+| HP-9 | finding (1) | as appendix A | F1's remedy: `tower.get_unit` after the timer test |
+| HP-10 | clear for the F1 remedy | as appendix A | N1 is not a hot-path finding; it became triage #2 and #3 |
+| HP-11 | finding (1, pre-existing) | as appendix A | #1158 A26 by reference, whose cost #1131 measures |
+| HP-12 | n/a | as appendix A | none |
+
 Then the author's request, made in the run: "Defer F1. It is a perf nit, the
 owner has said perf work should not hold up gameplay fixes, and #1143 already
 tracks hot spots."
@@ -267,6 +287,9 @@ is appendix B, verbatim.
 
 ## Appendix A: the Hot-Path Auditor's reply, verbatim
 
+Verbatim, so its HP-3, HP-4, HP-5 and HP-11 rows keep their "clear" readings;
+step 4 gives the record as section 6 now reads it.
+
 **Hot-Path Auditor record: commit `7d136012` (`git diff 7d13601^..7d13601`), whole diff (`engine-rs/src/crowd/motion.rs`, +15/-1). Checked against the current `docs/performance/hot-path-review.md`.**
 
 | Item | Result | What was checked | Findings and resolution |
@@ -353,6 +376,9 @@ is appendix B, verbatim.
 - `venue_still_open` (motion.rs 229, added): hottest caller the Dwelling arm of `step`. Tier: per chunk. Multiplier: up to 140 Dwelling guests at a venue × U per call (F1).
 
 ## Appendix B: the independent verdict, verbatim
+
+Verbatim, so its table keeps the same "clear" readings for HP-3, HP-4, HP-5
+and HP-11 that step 4 corrects.
 
 Its headings are moved down two levels to fit this file; the text is
 unchanged.

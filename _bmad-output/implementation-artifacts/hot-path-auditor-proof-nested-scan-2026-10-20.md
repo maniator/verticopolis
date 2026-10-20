@@ -91,9 +91,9 @@ index 4ecfc0d..d176099 100644
 
 - **Skill:** `/gds-code-review` (engine work), launched through the Skill tool
   by a fresh agent at 20:34:15 UTC with the argument `7028513^..7028513`, in
-  the main checkout detached at a4b7ba3. Its `_bmad/custom/` overrides and
-  `docs/performance/hot-path-review.md` are identical to this branch at
-  490449c. The overrides did not change between then and the run; round 5
+  the main checkout detached at a4b7ba3 (a local commit, never pushed). Its
+  `_bmad/custom/` overrides and `docs/performance/hot-path-review.md` are
+  identical to this branch at 490449c. The overrides did not change between then and the run; round 5
   of the review (6612365) rewrote them later.
 - **Brief:** quoted in full in appendix A. It named the commit and the skill,
   said there was no spec, and told the agent to run unattended, to answer any
@@ -446,6 +446,10 @@ I read everything at the head commit (`git show 7028513:<path>`, `git grep … 7
 **Measurements:** none. All figures are section 4 estimates on the section 2 reference sizes. This is one chunk, so it needs no appendix.
 
 ## Appendix C: the saved record, verbatim
+
+Verbatim. Besides the HP-7 and HP-8 mistakes the verdict found, its HP-1 and
+HP-5 rows list findings under "clear"; section 6 now says a row that lists any
+finding reads "finding (n)".
 
 > # Hot-path review record: commit 7028513
 >

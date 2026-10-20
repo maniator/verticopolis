@@ -585,8 +585,9 @@ alone.
   false positive (section 7): code no entry point reaches, or work whose
   written estimate fits the tier's budget. That test does not apply to an
   added, ported or rewritten scan over its tier's budget, or a cache dropped,
-  removed or bypassed without the equivalent HP-8 asks for: those get fixed
-  unless the owner accepts the deferral in their own words.
+  removed or bypassed outside the two cases HP-8 allows (an equivalent the
+  record names, or the query itself gone): those get fixed unless the owner
+  accepts the deferral in their own words.
 - **Deep, adversarial review before merge, never deferred to "later."** The change gets a full
   adversarial review while its context is still loaded (before pushing, or
   immediately after opening/updating the PR), not left to a hypothetical

@@ -411,3 +411,28 @@ dismissing one is triage's call. The patches:
 Every round so far has found wording to fix, and a seventh would review
 round 6's. Whether to run it or send the PR to the independent review now,
 with the remaining gaps in #1203, is the owner's call.
+
+**Independent review** (review 5592860045 on #1168, CONDITIONAL GO at
+fddeb48). The owner's rules were met; five conditions were fixed in the
+follow-up's last commit:
+- the HP-8 table row names the PR by number, and the table's owner adds the
+  merge commit after the merge, since no PR can name its own;
+- the guard pins the section 1 bullets for #1092, #1157 and #1068, HP-8's
+  port-or-name rule and the table rule, the section 6 sentences on posting
+  and editing the record, sign-off on that commit and the carry rule, the
+  section 7 owner-acceptance sentences, three more `CLAUDE.md` auto-merge
+  phrases, the owner rules `CLAUDE.md`, `CONTRIBUTING.md` and the parity skill
+  restate, and the overrides' "then edit that comment"; it also keeps "why
+  not" out of HP-8 and the parity skill and "is exempt" out of section 1. All
+  21 mutations rebuilt from the reviewer's list now fail it;
+- proof 3 names 6e80645 as the source of its overrides and says round 6
+  changed them afterward;
+- section 6 and the auditor prompt say a row that lists any finding reads
+  "finding (n)", pre-existing findings included, and proof 3's step 4 gives
+  the record that way (its verbatim appendices keep their wording, with a
+  note);
+- the proof 1 comment on #1168 now says, as its record does, that triage
+  missed #1131.
+
+`CLAUDE.md` and `CONTRIBUTING.md` also name both HP-8 removals now, and
+proof 2 marks a4b7ba3 as local. The reviewer's other defers joined #1203.

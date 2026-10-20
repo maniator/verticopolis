@@ -39,9 +39,10 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   the independent reviewer is on the PR. Ported, rewritten, moved or inherited
   code is reviewed as new. A finding is fixed or deferred with evidence and an
   issue, and never dismissed as pre-existing; an added, ported or rewritten
-  scan over its tier's budget, or a cache dropped, removed or bypassed without
-  the equivalent HP-8 asks for, gets fixed unless the owner accepts the
-  deferral in their own words. Section 1
+  scan over its tier's budget, or a cache dropped, removed or bypassed outside
+  the two cases HP-8 allows (an equivalent the record names, or the query
+  itself gone), gets fixed unless the owner accepts the deferral in their own
+  words. Section 1
   also records the owner's scope decision for the pull requests that were open
   when the page merged.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,

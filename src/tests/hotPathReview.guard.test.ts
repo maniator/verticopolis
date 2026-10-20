@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { repoRoot } from "./guardFiles";
 import {
   AUTO_MERGE,
+  FORBIDDEN,
   NOT_HOT,
   PAGE,
   PAGE_CLAUSES,
@@ -14,6 +15,7 @@ import {
   SKILL_ROOTS,
   SKILLS,
   SUMMARIES,
+  SUMMARY_CLAUSES,
   SURFACES,
 } from "./hotPathReview.rules";
 
@@ -33,9 +35,12 @@ import {
  *   phrases, plus `on_complete`, the activation step, no prepend step, the
  *   empty base `on_complete` it replaces, the gds and bmad copies identical,
  *   and the step-file text the facts name;
- * - the `CLAUDE.md` auto-merge rule.
+ * - the `CLAUDE.md` auto-merge rule, and the owner rules `CLAUDE.md`,
+ *   `CONTRIBUTING.md` and the engine parity skill restate;
+ * - a few phrases that would reopen a closed exemption or HP-8's old escape
+ *   hatch, kept out of the sections and files that closed them.
  *
- * It checks phrases, so an added exception sentence passes it; catching that
+ * It checks phrases, so most added exception sentences pass it; catching those
  * is the review's job. For the other summaries it checks the link only.
  */
 
@@ -273,7 +278,9 @@ describe("hot-path review guard", () => {
             on_complete: string;
           };
           // Catches a prepend step in any TOML form, which tomlArray cannot.
-          expect(workflow.activation_steps_prepend ?? [], "prepend").toEqual([]);
+          expect(workflow.activation_steps_prepend ?? [], "prepend").toEqual(
+            [],
+          );
           expect(workflow.persistent_facts).toContain(
             "file:{project-root}/**/project-context.md",
           );
@@ -303,6 +310,29 @@ describe("hot-path review guard", () => {
   it("keeps the CLAUDE.md auto-merge rule that waits for a running review", () => {
     const text = flat(read("CLAUDE.md"));
     expect(AUTO_MERGE.filter((clause) => !text.includes(clause))).toEqual([]);
+  });
+
+  it("keeps the owner rules the summaries restate", () => {
+    for (const [rel, clauses] of Object.entries(SUMMARY_CLAUSES)) {
+      const text = flat(read(rel));
+      expect(
+        clauses.filter((clause) => !text.includes(clause)),
+        rel,
+      ).toEqual([]);
+    }
+  });
+
+  it("keeps closed exemptions and escape hatches closed", () => {
+    for (const [where, phrases] of Object.entries(FORBIDDEN)) {
+      const text = flat(
+        where.startsWith("## ") ? (sectionOf(page, where) ?? "") : read(where),
+      ).toLowerCase();
+      expect(text.length, where).toBeGreaterThan(0);
+      expect(
+        phrases.filter((phrase) => text.includes(phrase)),
+        where,
+      ).toEqual([]);
+    }
   });
 
   it("keeps the link inside AGENTS.md's Review guidelines and the template's Complexity section", () => {

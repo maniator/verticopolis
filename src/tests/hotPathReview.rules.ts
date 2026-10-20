@@ -84,6 +84,9 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
     "joins the engine build row",
     "A port or a rewrite changes every line it adds, so all of it is in scope",
     "keeps its independent review's GO at 3fa30a8c for the code that review covered",
+    "#1092 gets the checklist on its Rust simulation, TypeScript simulation and WASM host merge changes.",
+    "#1157 gets a focused assessment of its WASM binding, frame and identity changes",
+    "#1068 gets the checklist on its worker synchronization and Rust delta paths, with no exemption, and keeps its performance-evidence hold.",
     "any other hot-path change pushed to it gets the checklist",
     "A file being in scope is not a finding",
     "Every other pull request, whenever it was opened, gets the checklist on its next review, over its whole diff.",
@@ -99,11 +102,14 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
     "stays under about 1,000 item visits on the large tower",
     "Ported, rewritten or moved code is reviewed as if it were new.",
     '"pre-existing" and "no new regression" do not close a finding',
+    "port each one or name the Rust structure that answers the same query at the same cost or less",
     "Anything else is a dropped cache, which section 7 makes always `patch`",
     "does not close it",
     "Bypassing means computing what the cache holds without reading it",
     "Every other removal is a finding.",
     "the repository owner (maniator), the #1158 audit's assignee",
+    "names itself there by number, and its HP-8 review checks that",
+    "Once the PR merges, the table's owner replaces the number with the merge commit.",
     "a port that turns a cached read into a copy is an HP-8 finding",
   ],
   "## 4. Measuring": [
@@ -115,9 +121,13 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
   "## 6. Recording the review": [
     "| Item | Result | What was checked | Findings and resolution |",
     'A bare "checked" or "looks fine" does not count.',
+    'A row that lists any finding reads "finding (n)", pre-existing findings included',
     '"n/a" gives a reason tied to the diff.',
     "the record goes on it as a comment",
+    "each record names the commit it reviewed and the part of the diff it covers",
     "Whoever runs the review skill posts its record at step 4 of every round",
+    'then edits that comment to fill in the "Findings and resolution" column once the round\'s fixes are in',
+    "The independent reviewer puts its own table in each verdict, for the commit it reviewed.",
     "whoever opens the PR posts it there",
     "posts one record per group",
     "counts only when it covers the whole diff of the PR, or when the group records together cover it",
@@ -130,7 +140,9 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
     "who is not Copilot or Codex",
     "A NO-GO, or a verdict on an earlier commit, does not sign it off.",
     "and the independent reviewer confirms that on the PR",
-    "whose conditions it has confirmed met on the PR",
+    "has posted a GO on that commit, or a CONDITIONAL GO on it whose conditions it has confirmed met on the PR",
+    "A condition that needs a code change makes a new commit, which needs its own verdict.",
+    "The record and the verdict carry to a later commit only when that commit leaves the PR's own diff unchanged",
     "The PR's author requests the independent review",
     "changes nothing on a section 1 surface",
     "its record comes from the next round of the skill or from the independent reviewer's table",
@@ -148,7 +160,9 @@ export const PAGE_CLAUSES: Record<string, string[]> = {
     "Section 1's list of code that is not a hot path still comes first",
     "A path changed inside a function body makes it a rewrite",
     "Any other change to a moved function makes it a rewrite.",
-    "repository owner (maniator)",
+    "Deferring an always-`patch` finding needs the explicit acceptance of the repository owner (maniator)",
+    "The PR records it as a quote of the owner's own message, with its date and where they gave it",
+    "The independent reviewer checks the quote against its source before a GO",
     "neither a comment nor a review showing the owner as its author proves the acceptance on its own",
     "an acceptance another agent relays counts only as that quote",
     "gives no GO when it cannot",
@@ -172,7 +186,35 @@ export const AUTO_MERGE = [
   "On a hot-path diff, signed off also needs the section 6 record",
   "a completed independent review of that commit, which the PR's author requests",
   "there is no GO or CONDITIONAL GO without that record",
+  "when an independent review or a review-skill round has been requested or is running on the PR",
+  "the independent reviewer has posted a GO, or a CONDITIONAL GO whose conditions it has confirmed met",
+  "Do not arm auto-merge before the PR is signed off and CI is green",
 ];
+
+/** Owner rules the summaries restate, which an edit could otherwise weaken with every other test green. */
+export const SUMMARY_CLAUSES: Record<string, string[]> = {
+  "CLAUDE.md": [
+    "outside the two cases HP-8 allows",
+    "gets fixed unless the owner accepts the deferral in their own words",
+  ],
+  "CONTRIBUTING.md": [
+    "outside the two cases HP-8 allows",
+    "those get fixed unless the owner accepts the deferral in their own words",
+  ],
+  ".github/skills/engine-parity-review/SKILL.md": [
+    "carries each one over or names the Rust structure that answers the same query at the same cost or less",
+    "Anything else is a dropped cache, which is always `patch`",
+    "a reason in the PR or a comment in the port does not close it",
+    "apart from the two removals HP-8 allows",
+  ],
+};
+
+/** Phrases that would reopen a closed escape hatch or exemption, by the page section or file they must stay out of. */
+export const FORBIDDEN: Record<string, string[]> = {
+  "## 1. When it applies": ["is exempt", "with an exemption"],
+  "## 3. The checklist": ["why not"],
+  ".github/skills/engine-parity-review/SKILL.md": ["why not"],
+};
 
 /** Sentences of the Hot-Path Auditor prompt (section 9) the layer depends on. */
 export const PROMPT = [
@@ -182,6 +224,7 @@ export const PROMPT = [
   "Check that the change keeps every cache, index and counter either engine has on these paths (the HP-8 table) and computes nothing one already answers",
   "list the TypeScript caches, indexes and counters for the same function and its callees",
   "Report pre-existing code too, marked pre-existing.",
+  'A row that lists any finding, pre-existing ones included, reads "finding (n)".',
   "Output the section 6 table with a row for every item",
   "Put each finding in the row of every item it falls under",
   "trace callers outside it through the list of changed files and functions and the repository",
@@ -260,7 +303,8 @@ export const SKILLS: Skill[] = [
         "before any choice is offered",
         "only when that covers the whole diff of the PR",
         "names its group",
-        "as a comment in every round",
+        "The record names the commit reviewed and the part of the diff it covers",
+        "post the record on it as a comment in every round, then edit that comment to fill in the resolution column once the fixes are in",
         "{implementation_artifacts}",
         "whoever opens the PR posts it there",
         "Each defer in the record names its issue",
@@ -273,7 +317,7 @@ export const SKILLS: Skill[] = [
       "an appendix line for every changed or removed function",
       "names the groups still to review",
       "names its issue and backlog row",
-      "posted there as a comment",
+      "the record with its resolutions is posted there as a comment",
       "does not count as the deep review",
     ],
     activation: [

@@ -252,7 +252,8 @@ The table lists the caches, indexes and counters on the hot paths today: the
 TypeScript ones, and the Rust-only ones with "none" in the TypeScript column,
 with their Rust status at 9cd44d1 (`main` once #1139 merged) unless a row
 names a later commit. Each PR that adds, ports or removes one updates its row
-and names its merge commit there, and its HP-8 review checks that.
+and names itself there by number, and its HP-8 review checks that. Once the
+PR merges, the table's owner replaces the number with the merge commit.
 Between those PRs the table belongs to the repository owner (maniator), the
 #1158 audit's assignee, who corrects any row that has gone stale.
 
@@ -409,6 +410,8 @@ item, and Copilot and Codex are asked to:
 
 - Every item gets its own row. "Clear" names what was inspected (functions,
   call paths, both engines). A bare "checked" or "looks fine" does not count.
+- A row that lists any finding reads "finding (n)", pre-existing findings
+  included, and "clear" means the row lists none.
 - "n/a" gives a reason tied to the diff.
 - When the diff touches no hot-path surface (section 1), one line saying so
   replaces the table.
@@ -606,7 +609,8 @@ The Hot-Path Auditor's prompt:
 > row for every item, then the findings as a Markdown list. Put each finding in
 > the row of every item it falls under: an id scan where an index already
 > answers the query is HP-6 and HP-8, and a cost in inherited code on the traced
-> path is HP-7 as well. When you are given one chunk of a larger port, rewrite,
-> move, addition or removal, review that chunk, trace callers outside it through
-> the list of changed files and functions and the repository, and add the
-> section 6 appendix lines for its changed functions.
+> path is HP-7 as well. A row that lists any finding, pre-existing ones
+> included, reads "finding (n)". When you are given one chunk of a larger port,
+> rewrite, move, addition or removal, review that chunk, trace callers outside
+> it through the list of changed files and functions and the repository, and
+> add the section 6 appendix lines for its changed functions.
