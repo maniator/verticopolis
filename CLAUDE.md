@@ -17,7 +17,8 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   (population census, elevator/transport behavior, floor/lobby/view mapping), a
   gameplay-parity concern. Run both when a change also carries a big
   tooling/UI-plumbing surface.** Its adversarial layers (Blind Hunter →
-  Edge Case Hunter → Acceptance Auditor → triage) are the review. A self-read or
+  Edge Case Hunter → Acceptance Auditor → triage, plus the Hot-Path Auditor on a
+  hot-path diff) are the review. A self-read or
   a generic `/code-review` does **not** satisfy it. Fix every `patch` finding and
   record every `defer` finding in
   `_bmad-output/implementation-artifacts/backlog.md`. A PR is not "done"
@@ -30,10 +31,12 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md),**
   in Rust, TypeScript, the WASM binding, the hosts, ticks and rendering. The
   review skills load it and add a Hot-Path Auditor layer that traces callers
-  past the diff and prints one record row per item. Ported or inherited code
-  is reviewed as new, a port compares the TypeScript's caches first, and a
-  hot-path finding is fixed or deferred with evidence and an issue, never
-  dismissed as pre-existing. Significant engine PRs carry its complexity note.
+  past the diff. Every reviewer of a hot-path diff (the skills, the independent
+  reviewer, Copilot, Codex) prints its one-row-per-item record; without it
+  there is no GO and no sign-off. Ported or inherited code is reviewed as new.
+  A finding is fixed or deferred with evidence and an issue, never dismissed as
+  pre-existing, and new or ported scans and dropped TypeScript caches get fixed
+  unless the owner accepts the deferral.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
   `npm test`, `npm run build`. All four must be green. The build needs the
   engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a

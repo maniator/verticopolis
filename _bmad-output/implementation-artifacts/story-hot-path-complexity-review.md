@@ -14,10 +14,10 @@ review; project-context.md, Performance). The Rust port (#857) still shipped
 per-person and per-step scans of every unit in the tower, and dropped three
 TypeScript memos that predate it (`roomUnits` from #852, the noise memo from
 #403, and the staff ceiling from #469). Profiling found them in #1051 and
-#1139; review did not. On the large perf tower (43,358 units, about 38,000 of
-them floor and lobby tiles) `pick_x` alone walked every unit for each spawned
-person, and on the owner's Modern save `max_staff_for` still takes about a
-quarter of the bare step after #1139.
+#1139, after review had passed them. On the large perf tower (43,358 units,
+40,458 of them floor and lobby tiles) `pick_x` alone walked every unit for each
+spawned person, and on the owner's Modern save `max_staff_for` still took about
+a quarter of the bare step after #1139 (cloud profile at ab49f86, 2026-10-20).
 
 The rule missed them for reasons the text itself explains:
 
@@ -26,9 +26,9 @@ The rule missed them for reasons the text itself explains:
 - It asked for "new" nested scans. A port re-adds every line, but reviewers read
   a faithful port of an existing algorithm as "not new".
 - It looked at syntactic nesting in the diff. The scans sat inside helpers
-  (`max_staff_for`, `room_units`, `pick_x`), called from loops in other files,
-  so the per-person multiplier was invisible to a diff-only layer (Blind
-  Hunter has no project access by design).
+  (`max_staff_for`, `room_units`, `pick_x`), a few calls below the loops that
+  multiplied them, so nothing in the diff showed the per-person multiplier, and
+  the diff-only layer (Blind Hunter) has no project access by design.
 - Nothing asked the reviewer to compare against the TypeScript's existing
   optimizations. A Rust comment recorded the noise memo as skipped ("the
   TypeScript memo is pure") and no review challenged it.
@@ -80,7 +80,7 @@ The rule missed them for reasons the text itself explains:
     it.
 13. **AC13 Checked against the sweep.** Every audit finding maps to a
     checklist item that would have caught it. A finding no item catches means
-    the checklist changes, not the finding.
+    the checklist must change until it catches it.
 
 ## Constraints
 
@@ -93,11 +93,14 @@ The rule missed them for reasons the text itself explains:
 ## Files
 
 - New: `docs/performance/hot-path-review.md`, `_bmad/custom/gds-code-review.toml`,
-  `_bmad/custom/bmad-code-review.toml`, this story.
+  `_bmad/custom/bmad-code-review.toml`, `src/tests/hotPathReview.guard.test.ts`
+  (keeps the page's sections, the overrides and the summaries in step, and
+  runs the resolver), this story.
 - Updated (short summary plus link): `CLAUDE.md`, `AGENTS.md`,
   `CONTRIBUTING.md`, `_bmad-output/project-context.md`,
   `.github/copilot-instructions.md`, `.github/skills/engine-parity-review/SKILL.md`,
-  `.github/PULL_REQUEST_TEMPLATE.md`, `_bmad-output/implementation-artifacts/backlog.md`.
+  `.github/PULL_REQUEST_TEMPLATE.md`, `_bmad-output/implementation-artifacts/backlog.md`
+  (rows for #1158 and for #1143, which had none).
 
 ## Out of scope
 
@@ -106,3 +109,41 @@ The rule missed them for reasons the text itself explains:
 - Editing the installer-owned skill files under `.claude/skills/` and
   `.agents/skills/` (they are regenerated on install; the team override is the
   supported hook).
+
+## Review record
+
+**Round 1, `/gds-code-review`** (Blind Hunter, Edge Case Hunter, Acceptance
+Auditor; the hot-path gate found no hot-path surface in this diff, so no
+Hot-Path Auditor). About 40 findings after deduplication, all `patch` and all
+applied; no `defer`, no `decision_needed`. The main ones:
+
+- Facts: the large tower has 40,458 floor and lobby tiles and 2,900 rooms
+  (measured), steps are 1 to 20 game minutes (`quantumFor`), the Rust entry
+  point is `Simulation::advance_step`, and the public id accessors are
+  `get_unit` / `get_transport`.
+- Skill hooks: the gate ran as an activation step before any diff existed,
+  the step numbers collided with SKILL.md's activation steps, and nothing
+  covered the subagent fallback, the auditor's Markdown output, the
+  always-patch rule in triage, or a failed auditor at the status update. The
+  hooks now name the step files and cover each case, and
+  `src/tests/hotPathReview.guard.test.ts` runs the resolver and fails if the
+  hooks or the page's sections drift.
+- Scope: the trigger list missed per-frame and periodic code (analytics,
+  audio, autosave, the engine build profile), the auditor prompt traced callers
+  only inside the engines, and route searches were not named as walks.
+- Rules: HP-2 now gives one budget per tier, the multiplier list lives only in
+  HP-2, "bounded and small" needs a written estimate and a threshold, a finding
+  an open issue already lists is deferred by reference, and an owner-accepted
+  deferral of an always-patch finding is `decision_needed`.
+- Enforcement: the independent reviewer, Copilot and Codex are named in the
+  summaries, and a review of a hot-path diff without the record gives no GO
+  and no sign-off.
+- Records: the HP-8 table gained the id indexes, the staff counter, the
+  per-pass caches and a Rust status column; #1143 gained the backlog row it
+  lacked; #1158 gained risks and missing fields on every finding and two
+  corrected item mappings (A9, A19).
+- Prose: two "X, not Y" sentences rewritten, and the summaries trimmed.
+
+Dismissed: the TOML merge replacing base facts (the resolver appends; checked
+on all four skill copies), and a CI check that scans review comments for the
+record (the sign-off rule in `CLAUDE.md` covers it without new tooling).

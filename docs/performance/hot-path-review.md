@@ -3,69 +3,78 @@
 This page is the one checklist for reviewing algorithmic cost on the game's hot
 paths. `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`,
 `_bmad-output/project-context.md`, the Copilot review overlay, the engine parity
-skill and the pull request template link here and keep only a summary. Rule
-changes go here, and the summaries follow.
+skill and the pull request template point here and keep only a short summary.
+Rule changes go here, and the summaries follow.
 
 It exists because the rule it replaces did not stop the Rust port (#857) from
 shipping per-person and per-step scans of every unit in the tower, or from
 dropping caches the TypeScript engine already had. Profiling found them (#1051,
-#1139). Review should have. Section 8 shows which item catches each of those
-misses, and the audit in #1158 lists every one found in the Rust engine and the
-hosts.
+#1139), after review had passed them. Section 8 shows which item catches each of
+those misses, and the audit in #1158 lists every one found in the Rust engine
+and the hosts.
 
 ## 1. When it applies
 
 Apply the checklist to any change that adds, ports, rewrites, moves or calls
-code reachable from an entry point in section 2, on any of these surfaces:
+code reachable from an entry point in section 2. These paths always count as
+hot-path surfaces; so does any other file whose changed code an entry point
+calls:
 
 | Surface | Paths |
 | --- | --- |
-| Rust engine | `engine-rs/src/` |
+| Rust engine and its build | `engine-rs/src/`, `engine-rs/Cargo.toml`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh` |
 | TypeScript engine | `src/engine/` |
 | WASM binding | `engine-rs/src/wasm.rs`, `engine-rs/src/frame.rs`, `src/dualrun/` |
 | Hosts (main thread and worker) | `src/wasmhost/` |
-| Rendering and per-frame UI | `src/render/`, `src/presentation/`, `src/game/` (frame loop, build preview, HUD, inspector), `src/ui/` |
+| Saves (load per command, autosave on a timer) | `src/storage/` |
+| Rendering, frame loop and UI | `src/render/`, `src/presentation/`, `src/game/`, `src/ui/` |
+| Per-frame and periodic services | `src/analytics*.ts`, `src/audio/` |
 
 A port or a rewrite changes every line it adds, so all of it is in scope,
-including algorithms copied unchanged. A diff that touches none of these paths
+including algorithms copied unchanged. A diff that touches no hot-path surface
 records one line saying so (section 6).
 
 ## 2. Frequencies and sizes
 
 Cost is frequency times collection size. Use these reference numbers instead of
-guessing.
+guessing. Sizes were measured on 2026-10-20 at `main` c12bc1b; recount them
+with `buildLargeTower` and the fixture loaders in
+`src/tests/perfCompare/scenarios.ts` when they matter.
 
-**Entry points.** Rust names first, TypeScript second where they differ.
+**Entry points.** Rust names first, TypeScript second.
 
 | Tier | Entry point | How often |
 | --- | --- | --- |
-| Per frame | the host's frame read (`frame_view`, then `decodeFrame` or `applyRecords` in `src/wasmhost/`), render sync, HUD and panel refresh | every rendered frame |
-| Per step | `Sim::advance_step` / `Simulation.tick` sub-step: elevator demand (`accumulate`), the spawn step, construction | every step: 720 per game day at the hosts' 2-minute step, several per frame at 4x |
-| Per chunk | motion chunks of up to 2.5 game minutes inside a step: `elevator_calls`, `move_cars`, `motion::advance` | one or more per step |
-| Per hour | `on_hour`: presence, hotel checkout, housekeeping dispatch, satisfaction, move-ins, traffic income, elevator utilization, star evaluation | every 30 steps |
-| Per day | `on_day`: rent and maintenance, random events, VIP, milestones, nudges | every 720 steps |
-| Per command | place, remove, transport edits, load, and build preview (`canBuild` on every pointer move) | per player action; pointer moves arrive at frame rate. Every revision-keyed cache rebuilds after an edit, so its build cost counts here too |
+| Per frame | the host's frame read (`frame_view`, then `decodeFrame` or `applyRecords` in `src/wasmhost/`), render sync, `runFrame` in `src/game/frameLoop.ts`, build preview (`canBuild` on every pointer move) | every rendered frame |
+| Per step | `Simulation::advance_step` (`engine-rs/src/sim_loop.rs`) / `advanceStep` (`src/engine/sim/loop.ts`): elevator demand, the spawn step, construction | a step is 1 to 20 game minutes (`quantumFor` in `src/engine/sim/fixedStep.ts`), sized so about one runs per frame, at most `MAX_STEPS_PER_FRAME` (4); the perf harness steps 2 minutes, 720 per game day |
+| Per chunk | motion chunks of up to 2.5 game minutes inside a step: `elevator_calls`, `move_cars`, `motion::advance` | one per short step, up to 8 per 20-minute step |
+| Per hour | `on_hour`: presence, hotel checkout, housekeeping dispatch, satisfaction, move-ins, traffic income, elevator utilization, star evaluation | every 60 game minutes (30 steps in the perf harness) |
+| Per day | `on_day`: rent and maintenance, random events, VIP, milestones, nudges | every game day |
+| Per command | place, remove, transport edits, load | per player action. Every revision-keyed cache rebuilds after an edit, so its build cost counts here too |
+| Wall clock | HUD and panel refresh (about every 160 ms in `runFrame`), audio (about 6 per second), autosave (serializes the tower every 30 s) | fixed real-time cadence |
 
 **Collections.** The reference towers are the `perf:compare` scenarios
 ([`ts-vs-wasm.md`](ts-vs-wasm.md)) and the owner's Modern save
-`conformance/fixtures/split-tower-4.vctower`.
+`conformance/fixtures/split-tower-4.vctower`. The large tower is a benchmark:
+real towers can be bigger.
 
 | Collection | Size | Notes |
 | --- | --- | --- |
-| units, all (U) | 12,062 medium; 19,806 owner's save; 43,358 large | about 38,000 of the large tower's units are floor and lobby tiles, and any walk over `units` pays for every one |
-| rooms (R) | 1,699 on the owner's save | `room_units()` / `roomUnits` |
+| units, all (U) | 12,062 medium; 19,806 owner's save; 43,358 large | 40,458 of the large tower's units are floor and lobby tiles, and any walk over `units` pays for every one |
+| rooms (R) | 1,699 owner's save; 2,900 large | `room_units()` / `roomUnits` |
 | population | 3,240 medium; 6,019 owner's save; 17,322 large | census and statistical demand |
 | drawn people (P) | at most 140 (`MAX_PEOPLE`) | the crowd that walks and rides |
-| floors (F) | up to 110 (floors -9 to 100) | |
+| floors (F) | up to 110 (floors -9 to 100; floor 0 is the first basement) | |
 | transports (T) | up to 24 elevator shafts and 64 stair and escalator links | 8 cars per shaft |
 | x positions | 375 per floor (`LOT_WIDTH`) | |
+| route graph | segments and links across every floor | route searches, reachability and flood fills walk it |
 
 The effective cost of a scan is its own size times every loop and tier above
 it. Example: `max_staff_for` walks all U to count housekeeping units. It runs
 for each staff spawn attempt, inside a loop over candidate rooms and crews in
 `dispatch_housekeepers`, which runs every hour in shift and on every step that
-returns staff results. A cloud profile of the owner's save put it at 26% of the
-bare step (relative share only).
+returns staff results. A cloud native profile of the owner's save at ab49f86
+(2026-10-20) put it at 26% of the bare step, a relative share that #1143 tracks.
 
 ## 3. The checklist
 
@@ -74,25 +83,40 @@ Each item has an id so a review can record it (section 6).
 **HP-1 Trace callers to an entry point.** For every changed, added or ported
 function, name its callers up to an entry point in section 2 and write down the
 tier and every loop in between. A helper is as hot as its hottest caller. This
-needs the repository as well as the diff: search the callers in both engines.
+needs the repository as well as the diff: search the callers across every
+hot-path surface, both engines, the hosts and the frame loop included.
 
-**HP-2 Find whole-collection work under a multiplier.** Flag anything that
-touches every unit, room, floor, transport, person or tile inside work that
-runs per person, per unit, per room, per floor, per transport, per candidate,
-per step, per chunk or per frame. Work done inside a helper counts: a helper
-that scans is a scan. These idioms all count the same:
+**HP-2 Find whole-collection work under a multiplier.** The rule: flag any
+operation whose cost grows with a section 2 collection (units, rooms, floors,
+transports, people, tiles, x positions, the route graph) when it runs inside
+another loop or at a hot tier. The multipliers are per person, per unit, per
+room, per floor, per transport, per candidate, per step, per chunk and per
+frame; every other document refers to this list. Work inside a helper counts: a
+helper that scans is a scan, and a route search, reachability check or flood
+fill is a walk over the route graph. The idioms below are examples and the
+list is open:
 
-- TypeScript: `.find`, `.filter`, `.some`, `.every`, `.reduce`, `.map`,
-  `.includes` or `.indexOf` on arrays, `for (const u of tower.units)`,
-  `Array.from(map.values())`, spread copies.
-- Rust: `iter()` chains ending in `filter`, `find`, `position`, `any`, `all`,
-  `count`, `sum`, `min_by_key` / `max_by_key` or `collect`; `for u in
-  &tower.units`; `Vec::contains`; `retain`; `Vec::remove` and `Vec::insert`
-  (both shift the tail).
+- TypeScript: `.find`, `.findIndex`, `.filter`, `.some`, `.every`, `.reduce`,
+  `.map`, `.flatMap`, `.forEach`, `.includes` or `.indexOf` on arrays,
+  `for (const u of tower.units)`, `Object.values` / `keys` / `entries`,
+  `Array.from(map.values())`, `Math.max(...arr)`, `slice`, `concat` and spread
+  copies.
+- Rust: iterator chains using `filter`, `find`, `position`, `any`, `all`,
+  `count`, `sum`, `fold`, `for_each`, `min` / `max` (and the `_by_key` forms)
+  or `collect`; `for u in &tower.units` and `iter_mut`; walks over
+  `.values()` / `.keys()`; `Vec::contains`; `retain`; `extend`; `Vec::remove`
+  and `Vec::insert` (both shift the tail).
 
-One linear pass per entry point (once an hour, once per command) is usually
-fine. A linear pass per item of another collection is the finding. Two more
-patterns count here as well:
+What one pass may cost depends on the tier:
+
+- Per frame and per chunk: no walk over all units or tiles. Per-frame work
+  scales with what is drawn (HP-12).
+- Per step: no walk over all units. A pass over rooms needs a reason in the
+  record, and repeated passes in the same step are a finding.
+- Per hour, per day and per command: one linear pass is fine. A pass per item
+  of another collection is the finding.
+
+Two more patterns count at every tier:
 
 - the same walk repeated within one entry point (several `count_operational`
   or `total_population` calls in one hourly pass): compute it once and pass it
@@ -125,11 +149,12 @@ or container; a map that is iterated must already keep insertion order
 (`IndexMap`, `IndexSet` or `Vec`, engine parity checklist item 7).
 
 **HP-6 Look up by id, and keep removal linear.** Use `getUnit` / `getTransport`
-in TypeScript and `get_unit`, `by_id` or `transport_by_id` in Rust.
-`units.iter().position(|u| u.id == id)` and `units.find(u => u.id === id)` are
-the same finding in either language. Removal must not rebuild a whole index
-for each removed unit: a bulk sell, a demolish or a lobby placement removes many
-units in one command, so an O(U) rebuild per removal is O(k × U) per command.
+in TypeScript and `get_unit` / `get_transport` in Rust (the `by_id` and
+`transport_by_id` maps behind them). `units.iter().position(|u| u.id == id)`
+and `units.find(u => u.id === id)` are the same finding in either language.
+Removal must not rebuild a whole index for each removed unit: a bulk sell, a
+demolish or a lobby placement removes many units in one command, so an O(U)
+rebuild per removal is O(k × U) per command.
 
 **HP-7 Review inherited algorithms.** Ported, rewritten or moved code is
 reviewed as if it were new. "Same algorithm as the TypeScript", "faithful
@@ -142,25 +167,32 @@ conformance suite is already comparing the new code with the old.
 function, list the caches, indexes and counters the TypeScript version and its
 callees use, and port each one or say in the PR why not. A comment in the port
 saying a cache was skipped (for example because the TypeScript cache "is pure"
-or the value is "computed fresh") is itself a finding. The TypeScript caches
-today:
+or the value is "computed fresh") is itself a finding. The TypeScript caches,
+indexes and counters today, with their Rust status at c12bc1b:
 
-| What it caches | TypeScript | Keyed on |
-| --- | --- | --- |
-| rooms without floor and lobby tiles | `roomUnits`, `src/engine/tower/rooms.ts` | unit array, length, revision |
-| each floor's segment runs | `src/engine/tower/segments.ts` | revision |
-| housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision |
-| noise verdicts | `noiseMemo`, `src/engine/sim/satisfaction.ts` | revision |
-| served floors, staff components, stops, transport columns, floor bounds | `src/engine/Tower.ts` | revision |
-| passenger and staff routing graphs | `adjacency`, `staffAdjacency`, `src/engine/crowd/routing.ts` | revision |
-| shaft banks | `src/engine/crowd/shaftBanks.ts` | revision |
-| segments served | `segServed`, `src/engine/crowd/segmentGraph.ts` | revision |
-| queue view | `queueView`, `src/engine/Crowd.ts` | step and revision |
-| lobby reachability for services | `reachMemos`, `src/engine/sim/services.ts` | revision |
-| demand map | `demandMemo`, `src/engine/sim/demand.ts` | revision and game hour |
-| reachability during one move-in pass | `reachMemo`, `src/engine/sim/churn.ts` | one pass |
+| What it keeps | TypeScript | Keyed on | Rust at c12bc1b |
+| --- | --- | --- | --- |
+| units and transports by id | `byId`, `transportsById`, `src/engine/Tower.ts` | kept on every edit | `by_id`, `transport_by_id` |
+| rooms without floor and lobby tiles | `roomUnits`, `src/engine/tower/rooms.ts` | unit array, length, revision | missing; #1139 adds it |
+| each floor's segment runs | `src/engine/tower/segments.ts` | revision | ported (cloned on read, #859) |
+| housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision | missing; #1143 |
+| live staff count | `crowd.staffCount`, `src/engine/Crowd.ts` | counter | ported |
+| noise verdicts | `noiseMemo`, `src/engine/sim/satisfaction.ts` | revision | missing; #1139 adds it |
+| served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported (cloned on read, #859) |
+| stops, transport columns | `stopsCache` on `Tower`, `src/engine/tower/transport.ts` | revision | ported (cloned on read, #859) |
+| built floor bounds | `floorBounds`, `src/engine/Tower.ts` | revision | missing (A11 in #1158) |
+| passenger and staff routing graphs | `adjacency`, `staffAdjacency`, `src/engine/crowd/routing.ts` | revision | ported |
+| shaft banks | `src/engine/crowd/shaftBanks.ts` | revision | ported |
+| segments served | `segServed`, `src/engine/crowd/segmentGraph.ts` | revision | ported (`connected_set`) |
+| queue view | `queueView`, `src/engine/Crowd.ts` | step and revision | no counterpart yet; check before porting one |
+| floor reachable from the lobby (`floorReachable`) | `reachMemos`, `src/engine/sim/services.ts` | revision | ported (`reach_memo` in `sim.rs`); the per-segment check on split floors is uncached in both (#849, #1143) |
+| demand map (inspector reads) | `demandMemo`, `src/engine/sim/demand.ts` | revision and game hour | none (no inspector in Rust) |
+| reachability within one demand or income pass | `reachCache`, `src/engine/sim/demand.ts`, `src/engine/EconomySystem.ts` | one call | ported |
+| reachability during one move-in pass | `reachMemo`, `src/engine/sim/churn.ts` | one pass | ported |
 
-When a PR adds a cache to either engine, it adds a row here.
+A PR that adds, ports or removes a cache, index or counter in either engine
+updates its row here; a Rust-only cache gets a row with "none" in the
+TypeScript column.
 
 **HP-9 Name the remedy.** For each finding under HP-2 to HP-6, say which of
 these fixes it, in this order of preference:
@@ -177,43 +209,49 @@ changes no observable result:
 
 - Iteration stays in insertion order. No new iteration over a `HashMap` or
   `HashSet`, and no sort the other engine does not do.
-- The same random draws from the same three streams, in the same order.
-  Caching a value a draw depends on, or skipping a call that draws, moves every
-  later hash.
+- The same random draws from the same seeded streams (`engine-rs/src/rng.rs`,
+  `src/engine/rng.ts`), in the same order. Caching a value a draw depends on,
+  or skipping a call that draws, moves every later hash.
 - Events stay in the same order, gameplay results stay identical, and saves
   stay byte-identical.
 - The cache key covers every input. `revision` covers structural edits only
-  (place, remove, transport edits). Loading a save resets the cache (in Rust,
-  `Tower::reindex` resets `tower.memo`). A result that reads unit state,
+  (place, remove, transport edits). A result that reads unit state,
   occupancy, tenancy, the hour, the weekday, the star rating, settings or the
   crowd needs that input in its key, or a lifetime of one step or one pass. A
-  revision-keyed cache of anything else is a correctness bug.
+  revision-keyed cache of anything else is a correctness bug unless the lag is
+  bounded, documented beside the cache, and invisible to the simulation (as
+  `demandMemo`'s, which only the inspector reads).
+- Every new cache is reset on load: in Rust, keep it in `tower.memo`, which
+  `Tower::reindex` resets; in TypeScript, name where it resets. The hosts'
+  in-place merge (`src/wasmhost/merge.ts`) also replaces state under the
+  caches, so a cache it can see needs a merge test as well.
 - Evidence: the conformance lock (`conformance/expected.json`) unchanged, a
-  test for each invalidation input (edit, load, each non-structural input),
-  and, for engine hot paths, the seeded differential and a byte-identical save
-  on the reference saves.
+  test for each invalidation input (edit, load, merge, each non-structural
+  input), and, for engine hot paths, the seeded differential and a
+  byte-identical save on the reference saves.
 
 **HP-11 Check the WASM boundary and the hosts.** What crosses from Rust to
 JavaScript each frame should scale with what changed or what is drawn. Static
-tiles do not need to cross every frame. Look for one
-JavaScript object or one `Map` lookup per unit per frame, for `serialize`,
-`JSON.parse`, `deserialize` and a merge on every hour or revision, and for
-worker messages that copy what they could transfer. Name the tracking issue
-when one already covers it (#1045, #1049, #1050, #1068).
+tiles do not need to cross every frame. Look for one JavaScript object or one
+`Map` lookup per unit per frame, for `serialize`, `JSON.parse`, `deserialize`
+and a merge on every hour or revision, and for worker messages that copy what
+they could transfer. Name the issue or PR that already covers it when one does
+(#1045, #1049, #1050, #1068).
 
 **HP-12 Check rendering and UI refresh.** Per-frame work in renderers, the HUD
 and panels scales with what is on screen (camera bounds, `MAX_PEOPLE`) and
 stays flat as the tower grows. No walk over all units per frame, and DOM
-rebuilt on change only. Build preview runs on every pointer move, so cap checks there
-(`count_kind` / `countKind` over all units) count as per frame.
+rebuilt on change only. Build preview runs on every pointer move, so its cap
+checks (`count_kind` / `countKind` over all units) are per-frame work.
 
 ## 4. Measuring
 
 Rank findings by measured cost; Big-O alone does not set the priority. Walking
-1,699 rooms once an hour is cheap. The same walk for each drawn person in every chunk is not.
+2,900 rooms once an hour is cheap. The same walk for each drawn person in every
+chunk is not.
 
 - Estimate first: tier frequency times multipliers times collection size, with
-  the sizes in section 2. Write the estimate down.
+  the sizes in section 2 on the large tower. Write the estimate in the record.
 - Measure when the estimate matters. A native profile of the bare step on a
   reference save, or `npm run perf:compare`, gives relative shares. Numbers
   from a cloud machine are estimates and say so.
@@ -223,11 +261,12 @@ Rank findings by measured cost; Big-O alone does not set the priority. Walking
 
 ## 5. The PR complexity note
 
-A significant engine change carries this note in its description; the pull
-request template asks for it. Significant means it adds, ports or rewrites code
-on a per-frame, per-step, per-chunk or per-hour path in either engine, the
-binding or a host; adds or changes a cache; or changes what crosses the WASM
-boundary per frame or per hour.
+A PR that touches a hot-path surface (section 1) fills in this note, or writes
+"n/a" with a reason; the pull request template asks for it. A significant
+change must give every field: one that adds, ports or rewrites code on a
+per-frame, per-step, per-chunk or per-hour path in either engine, the binding,
+a host or rendering; adds or changes a cache; changes what crosses the WASM
+boundary; or adds per-command work that grows with the units placed or removed.
 
 ```markdown
 ### Complexity
@@ -242,69 +281,92 @@ boundary per frame or per hour.
 
 ## 6. Recording the review
 
-A review applies the checklist by recording it. The Hot-Path Auditor layer,
-the independent reviewer and Copilot each print this table:
+A review applies the checklist by recording it. The Hot-Path Auditor layer of
+the review skills, the independent reviewer, Copilot and Codex each print this
+table, one row per item:
 
-| Item | Result | What was checked | Finding and resolution |
+| Item | Result | What was checked | Findings and resolution |
 | --- | --- | --- | --- |
-| HP-1 | finding, clear or n/a | the functions and callers traced, and the entry points reached | |
-| HP-2 to HP-12 | one row each | | |
+| HP-1 | finding (n), clear or n/a | functions and callers traced, entry points reached | finding ids and their resolution |
+| HP-2 | | | |
+| HP-3 | | | |
+| HP-4 | | | |
+| HP-5 | | | |
+| HP-6 | | | |
+| HP-7 | | | |
+| HP-8 | | | |
+| HP-9 | | | |
+| HP-10 | | | |
+| HP-11 | | | |
+| HP-12 | | | |
 
-- Every item gets a row. "Clear" names what was inspected (functions, call
-  paths, both engines). A bare "checked" or "looks fine" does not count.
-- "n/a" gives a reason tied to the diff, such as "no code on a section 1
-  surface".
-- When the whole diff is outside section 1, one line saying so replaces the
-  table.
-- A review without the record is incomplete, and an independent reviewer cannot
-  give a GO on it.
+- Every item gets its own row. "Clear" names what was inspected (functions,
+  call paths, both engines). A bare "checked" or "looks fine" does not count.
+- "n/a" gives a reason tied to the diff.
+- When the diff touches no hot-path surface (section 1), one line saying so
+  replaces the table.
+- A review without the record is incomplete. An independent reviewer cannot
+  give a GO on it, and a Copilot or Codex review of a hot-path diff without it
+  does not count as sign-off.
 
 ## 7. Resolving a finding
 
 Every hot-path finding ends in one of two states before merge:
 
 1. **Fixed in the PR**, with HP-10 evidence that results are unchanged.
-2. **Deferred**, with all of: the estimate or profile (section 4), a GitHub
-   issue and backlog row (the backlog mirror rule in `CLAUDE.md`), and one
-   sentence on why it is not fixed now.
+2. **Deferred**, with the estimate or profile (section 4), one sentence on why
+   it is not fixed now, and a tracking issue with a backlog row (the backlog
+   mirror rule in `CLAUDE.md`). A pre-existing finding that an open issue
+   already lists (for example an item in #1158, #1143 or #859) is deferred by
+   reference: cite the issue and item, with no new issue or row.
 
 A finding is never dismissed for being pre-existing, for matching the
 TypeScript, or for sitting outside the diff. In BMAD/BMGD triage a hot-path
-finding is `patch` or `defer`. It is `dismiss` only when the reviewer shows it
-is a false positive: the code is not on a hot path, or the collection is
-bounded and small.
+finding is `patch` or `defer`. It is `dismiss` only when it is a false positive:
+the code is not reachable from an entry point, or the written section 4
+estimate shows the work stays under about 1,000 item visits per step or per
+frame on the large tower (per hour: under one walk over all units). "The
+collection is bounded" is not enough on its own, since every collection here is.
 
-Two kinds are always `patch`, and deferring one needs the owner's explicit
-acceptance on the PR on top of the evidence and issue above:
+Two kinds are always `patch`:
 
-- code the PR adds, ports or rewrites that puts a whole-collection walk under a
-  per-person, per-unit, per-room, per-candidate, per-chunk or per-frame
-  multiplier;
-- a port that drops a cache the TypeScript already has (HP-8).
+- code the PR adds, ports or rewrites that puts a whole-collection walk under
+  any HP-2 multiplier at a tier HP-2 does not allow;
+- a port that drops a cache, index or counter the TypeScript already has
+  (HP-8).
+
+Deferring one of those needs the owner's explicit acceptance on the PR, on top
+of the evidence and issue above. In triage it is `decision_needed` until the
+owner answers; without a spec, the reviewer asks the owner before closing
+triage.
 
 ## 8. Worked example: the misses #1139 found
 
 | What shipped in the Rust port | Why review passed it | Caught by |
 | --- | --- | --- |
-| `pick_x` / `pick_x_in_segment` walked every unit and built a `Vec` for each spawned person | the walk sat in a helper; the per-person loop was in another file | HP-1, HP-2, HP-3 |
+| `pick_x` / `pick_x_in_segment` walked every unit and built a `Vec` for each spawned person | the walk sat in a helper, a few calls below the per-person loop in `spawn_trips`, and no one traced the multiplier | HP-1, HP-2, HP-3 |
 | `room_units()` filtered every unit on each call, while TypeScript `roomUnits` had been cached since #852 | same algorithm as the TypeScript, minus the cache | HP-8, HP-2 |
 | `noise_afflicted` was recomputed per room and per probe; the Rust comment said the TypeScript cache "is pure" | the comment was read as a reason | HP-8 |
 | `max_staff_for` counted housekeeping units over every unit per staff spawn; TypeScript `staffCeiling` (#469) already ruled that out | a Rust iterator chain, while the old rule named only TypeScript idioms | HP-2, HP-8 |
 | route search built SipHash maps on every call | hashing and allocation, which the old rule never mentioned | HP-3, HP-5 |
-| `seg_reachable` ran a route search from every lobby segment for each room in a pass | inherited from the TypeScript, which has no cache either (#849) | HP-7, HP-9 |
+| `seg_reachable` ran a route search from every lobby segment for each room on a split floor, in the housekeeping, demand and income passes | inherited from the TypeScript, which caches whole-floor reachability and per-pass results but not the per-segment check (#849) | HP-2, HP-7 |
 | cached sets cloned on every read (#859), deferred at P3 | "parity unaffected", with no measurement | HP-3, section 7 |
 
 ## 9. How the review tools apply it
 
 - **`/gds-code-review` and `/bmad-code-review`** load this page through the
   team overrides `_bmad/custom/gds-code-review.toml` and
-  `_bmad/custom/bmad-code-review.toml`. When the diff touches a section 1
+  `_bmad/custom/bmad-code-review.toml`. When the diff touches a hot-path
   surface they run a fourth layer, the Hot-Path Auditor, beside Blind Hunter,
   Edge Case Hunter and Acceptance Auditor. It gets the diff and read access to
   the repository, because HP-1 cannot be done from the diff alone. Triage
-  follows section 7.
-- **Copilot** applies the same items inline, as the Performance dimension of
-  `.github/copilot-instructions.md`, and prints the section 6 table.
+  follows section 7. `src/tests/hotPathReview.guard.test.ts` keeps the
+  overrides, this page and the summaries that point to it in step.
+- **The quick-dev skills** run their own review loop, which does not replace
+  this one: hot-path work still goes through `/gds-code-review`.
+- **Copilot and Codex** apply the same items inline (the Performance dimension
+  of `.github/copilot-instructions.md` and the review guidelines in
+  `AGENTS.md`) and print the section 6 table.
 - **An independent reviewer** (a separate agent or person giving GO,
   CONDITIONAL GO or NO-GO) applies the checklist to the final commit and
   includes the table in the verdict. GO needs every row filled and every
@@ -317,14 +379,16 @@ The Hot-Path Auditor's prompt:
 > You are the Hot-Path Auditor. You have the diff and read access to the
 > repository. Apply `docs/performance/hot-path-review.md`, items HP-1 to HP-12,
 > to this change. For each changed, added or ported function, trace its callers
-> in both engines (`engine-rs/src/` and `src/engine/`) up to an entry point in
-> section 2 and record the tier and the loops in between. Flag whole-collection
-> work, allocations, clones, sorts, hashing and id scans under a multiplier,
-> including inside helpers the diff calls but does not change. For ported code,
-> list the TypeScript caches for the same function and its callees and check
-> that each was carried over. For each finding give the location, entry point
-> and tier, collection sizes from section 2, estimated complexity, the
-> TypeScript equivalent, the proposed remedy, and any risk to results or cache
-> invalidation (HP-10). Report pre-existing code too, marked pre-existing.
-> Output the section 6 table with a row for every item, then the findings as a
-> Markdown list.
+> across every hot-path surface in section 1 (both engines, the hosts, the
+> frame loop, rendering and UI) up to an entry point in section 2, and record
+> the tier and the loops in between. Flag whole-collection work, route
+> searches, allocations, clones, sorts, hashing and id scans under a
+> multiplier, including inside helpers the diff calls but does not change. For
+> ported code, list the TypeScript caches, indexes and counters for the same
+> function and its callees and check that each was carried over. For each
+> finding give the location, entry point and tier, collection sizes from
+> section 2, the section 4 estimate, the TypeScript equivalent, the proposed
+> remedy, any risk to results or cache invalidation (HP-10), and whether an
+> open issue already lists it. Report pre-existing code too, marked
+> pre-existing. Output the section 6 table with a row for every item, then the
+> findings as a Markdown list.

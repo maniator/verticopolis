@@ -67,14 +67,15 @@ not replace it.
     `gds-code-review` lens), and expect the same referee method once the
     Rust port of it lands.
 11. **Hot paths keep their cost down in both engines.** Apply
-    `docs/performance/hot-path-review.md` (HP-1 to HP-12) and print its
-    record table. On this seam two items matter most. HP-8: a port lists the
-    TypeScript caches, indexes and counters for the function and its callees,
-    and carries each one over or says why not; a comment that skips one is a
-    finding. HP-7: ported code is reviewed as new, so "the TypeScript does the
-    same" does not close a finding. An optimization on one side must leave the
-    lock, the RNG draw order and collection order untouched (items 2, 6 and
-    7).
+    [`docs/performance/hot-path-review.md`](../../../docs/performance/hot-path-review.md)
+    (HP-1 to HP-12). Print its record table when the diff touches a hot-path
+    surface (its section 1), or one line saying it does not. On this seam
+    two items matter most. HP-8: a port lists the TypeScript caches, indexes
+    and counters for the function and its callees, and carries each one over
+    or says why not; a comment that skips one is a finding. HP-7: ported code
+    is reviewed as new, so "the TypeScript does the same" does not close a
+    finding. An optimization on one side must leave the lock, the RNG draw
+    order and collection order untouched (items 2, 6 and 7).
 
 ## How to verify locally
 

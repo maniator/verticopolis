@@ -56,14 +56,15 @@ Internal-only work needs no bump.
 ## Complexity
 
 <!--
-Required for a significant engine change: code added, ported or rewritten on a
-per-frame, per-step, per-chunk or per-hour path in either engine, the WASM
-binding or a host; a new or changed cache; or a change to what crosses the WASM
-boundary. Fill in the note from docs/performance/hot-path-review.md section 5
-(hot paths and callers, sizes, complexity before and after, remaining scans and
-why, TypeScript caches compared, invalidation evidence, measurements).
-Delete this section only if the change touches no hot path.
+Any change to a hot-path surface (section 1 of docs/performance/hot-path-review.md:
+either engine, the WASM binding, the hosts, saves, rendering, the frame loop or UI)
+fills in the note from section 5 of that page: hot paths and callers, sizes,
+complexity before and after, remaining scans and why, TypeScript caches compared,
+invalidation evidence, measurements. Otherwise replace the line below with
+"n/a: <reason>".
 -->
+
+Hot paths touched, sizes, complexity before and after:
 
 ## Screenshots / recordings
 

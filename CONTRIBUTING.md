@@ -528,22 +528,17 @@ alone.
   `await`, broken call sites), cleanup (duplication, dead code, needless
   complexity), and **algorithmic complexity** (below). Fix what you find
   before opening or updating a PR.
-- **Hot paths get a complexity review.** The tick loop, the hosts and the
-  render/UI refresh run over the whole tower every step or frame, and towers get
-  large (up to about 43,000 units, most of them floor tiles, 24 shafts, 110
-  floors, thousands of people). The checklist is
-  [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md),
-  and it applies to Rust, TypeScript, the WASM binding, the worker and
-  main-thread hosts, simulation ticks and rendering. In short: trace each
-  changed function's callers up to its tick, step or frame entry point; treat a
-  whole-collection walk, clone, sort or rebuilt map under a per-person,
-  per-unit, per-floor, per-transport, per-step or per-frame multiplier as a
-  finding in either language, including inside helpers; review ported and
-  inherited code as new; compare against the TypeScript's caches before
-  porting; and keep results, RNG order and save bytes identical. Significant
-  engine changes carry the complexity note from section 5 of that page. A
-  hot-path finding is fixed, or deferred with evidence and a tracked issue; it
-  is never dismissed because it existed before.
+- **Hot paths get a complexity review.** The checklist is
+  [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md).
+  It covers Rust, TypeScript, the WASM binding, the hosts, simulation ticks and
+  rendering, and ported or inherited code as much as new code. Trace each
+  changed function's callers to its frame, step or hour entry point; a
+  whole-collection walk, clone, sort or rebuilt map under one of its
+  multipliers is a finding in either language, helpers included. Significant
+  engine changes carry its complexity note. A finding is fixed, or deferred
+  with evidence and a tracked issue, and never dismissed because it existed
+  before; new or ported scans and dropped TypeScript caches get fixed unless
+  the owner accepts the deferral.
 - **Deep, adversarial review before merge, never deferred to "later."** The change gets a full
   adversarial review while its context is still loaded (before pushing, or
   immediately after opening/updating the PR), not left to a hypothetical

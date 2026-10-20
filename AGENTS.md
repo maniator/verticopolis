@@ -94,8 +94,8 @@ resolving review threads). On top of that, in an agent session:
 - **MANDATORY: the deep review IS running the BMGD/BMAD review skill:
   `/gds-code-review` for gameplay/engine work, `/bmad-code-review` for anything
   else (storage, persistence, tooling, UI plumbing).** That skill's parallel
-  adversarial layers (Blind Hunter → Edge Case Hunter → Acceptance Auditor, then
-  triage) ARE the deep review. A self-read, a generic `/code-review`, or an
+  adversarial layers (Blind Hunter → Edge Case Hunter → Acceptance Auditor, plus
+  the Hot-Path Auditor on a hot-path diff, then triage) ARE the deep review. A self-read, a generic `/code-review`, or an
   ad-hoc subagent pass does **not** satisfy this and must not be reported as "the
   deep review". Actually invoke the skill, let it triage, then fix every
   `patch` finding and record every `defer` finding in
@@ -146,13 +146,14 @@ resolving review threads). On top of that, in an agent session:
   [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md).
   The team overrides `_bmad/custom/gds-code-review.toml` and
   `_bmad/custom/bmad-code-review.toml` load it into both review skills, which
-  then add a Hot-Path Auditor layer (diff plus repository access) whenever the
-  diff touches the engine, the binding, a host or rendering, and print one
-  record row per checklist item. A review without that record does not count
-  as the deep review. Triage a hot-path finding as `patch` or `defer` (with evidence, an
-  issue and a backlog row), never `dismiss` because the code was inherited.
-  When you port engine code, compare the TypeScript's caches first (HP-8), and
-  put the section 5 complexity note in the PR. The surrounding canon lives in
+  add a Hot-Path Auditor layer (diff plus repository access) on a hot-path diff
+  and print one record row per checklist item; a review without that record
+  does not count as the deep review. Triage a hot-path finding as `patch` or
+  `defer` under its section 7, never `dismiss` because the code was inherited.
+  When porting engine code, compare the TypeScript's caches first (HP-8) and
+  put the complexity note in the PR. Copilot and Codex reviewing a PR here
+  apply the checklist inline and print the same record, and an independent
+  reviewer's GO needs it. The surrounding canon lives in
   `_bmad-output/project-context.md` (Performance section).
 
 ## Testing discipline: shift-left and regression
