@@ -83,7 +83,7 @@ export interface FramesSummary {
   commandToFrameP95Ms: number | null;
   /** The smallest sample, which validation requires to be at least 0. */
   commandToFrameMinMs: number | null;
-  worker: { repliesPerSecond: number; messagesPerSecond: number; bytesPerSecond: number; staleReplies: number; merges: number; applyMsPerSecond: number; commandAckP50Ms: number | null; commandAckP95Ms: number | null } | null;
+  worker: { repliesPerSecond: number; messagesPerSecond: number; bytesPerSecond: number; staleReplies: number; merges: number; deltas?: number; deltasRefused?: number; approximateSaves?: number; applyMsPerSecond: number; commandAckP50Ms: number | null; commandAckP95Ms: number | null } | null;
   hostErrorsAdded: string[];
 }
 
@@ -188,6 +188,9 @@ export function summarizeFrames(f: Awaited<ReturnType<typeof framesRun>>): Frame
           bytesPerSecond: f.worker.bytesReceived / secs,
           staleReplies: f.worker.staleReplies,
           merges: f.worker.merges,
+          deltas: f.worker.deltas,
+          deltasRefused: f.worker.deltasRefused,
+          approximateSaves: f.worker.approximateSaves,
           applyMsPerSecond: f.worker.applyMs / secs,
           commandAckP50Ms: p(f.worker.commandAckMs, 0.5),
           commandAckP95Ms: p(f.worker.commandAckMs, 0.95),
