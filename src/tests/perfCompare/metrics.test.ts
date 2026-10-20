@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { processRun } from "./fixtures";
-import { aggregate, compareEngines } from "./metrics";
+import { aggregate, attributionShares, compareEngines } from "./metrics";
 
 const runs = () =>
   Array.from({ length: 8 }, (_, rep) => [processRun(rep, "ts", {}, 1 + rep * 0.001), processRun(rep, "wasm", {}, 2 + rep * 0.001)]).flat();
@@ -61,6 +61,40 @@ describe("aggregate", () => {
     expect(rows.filter((r) => r.metric === "cold game ready").map((r) => r.throttle)).toEqual(["1", "1"]);
     expect(rows.filter((r) => r.metric === "cold compile").map((r) => r.engine)).toEqual(["ts"]);
     expect(rows.find((r) => r.metric === "cold engine hosted")!.values).toHaveLength(8);
+  });
+
+  it("cuts the wrapped attribution pass into the host's parts, which add up to one", () => {
+    const attribution = { engineTickMs: 40, engineExportMs: 30, hostJsMs: 30, wrappedTotalMs: 100, merges: 3, engineTicks: 10, exportCalls: 20, exportsWrapped: 40, byExport: { serialize: { calls: 24, ms: 12 }, frameView: { calls: 10, ms: 18 } }, parseMs: 10, parseCalls: 50 };
+    const all = runs();
+    for (const r of all) if (r.engine === "wasm") r.scenarios.small.hosted["1"].attribution = attribution;
+    const rows = aggregate(all, ["small"], [1], null);
+    const share = (metric: string) => rows.find((r) => r.group === "sim-hosted" && r.metric === metric && r.engine === "wasm")!.values[0];
+    expect(share("share in the hourly serialize")).toBeCloseTo(0.12, 9);
+    expect(share("share in per-step sync reads")).toBeCloseTo(0.18, 9);
+    expect(share("share in JSON.parse")).toBeCloseTo(0.1, 9);
+    expect(share("share in merge and the rest of host JS")).toBeCloseTo(0.2, 9);
+    expect(share("serialize calls")).toBe(24);
+    const parts = ["share in the engine's tick", "share in the hourly serialize", "share in per-step sync reads", "share in JSON.parse", "share in merge and the rest of host JS"];
+    expect(parts.reduce((sum, m) => sum + share(m), 0)).toBeCloseTo(1, 9);
+  });
+
+  it("keeps the five shares at one when the timers overlap, and leaves stored results without the split out", () => {
+    const base = { engineTickMs: 40, engineExportMs: 30, hostJsMs: 30, wrappedTotalMs: 100, merges: 3, engineTicks: 10, exportCalls: 20, exportsWrapped: 40, byExport: { serialize: { calls: 24, ms: 12 } }, parseMs: 10, parseCalls: 50 };
+    const sum = (x: NonNullable<ReturnType<typeof attributionShares>>) => x.tick + x.serialize + x.syncReads + x.parse + x.merge;
+    // Parse longer than the host remainder, serialize longer than the exports: clamped into their own categories.
+    const overlap = attributionShares({ ...base, parseMs: 35, byExport: { serialize: { calls: 1, ms: 50 } } })!;
+    expect(sum(overlap)).toBeCloseTo(1, 9);
+    expect(overlap.parse).toBeCloseTo(0.3, 9);
+    expect(overlap.merge).toBe(0);
+    expect(overlap.serialize).toBeCloseTo(0.3, 9);
+    expect(overlap.syncReads).toBe(0);
+    // A hostJsMs clamped to zero still gives a sum of one.
+    expect(sum(attributionShares({ ...base, hostJsMs: 0, parseMs: 5 })!)).toBeCloseTo(1, 9);
+    expect(attributionShares({ ...base, engineTickMs: 0, engineExportMs: 0, hostJsMs: 0 })).toBeNull();
+    const old = { ...base } as Partial<typeof base>;
+    delete old.byExport;
+    expect(attributionShares(old as typeof base)).toBeNull();
+    expect(attributionShares({ ...base, parseMs: undefined } as unknown as typeof base)).toBeNull();
   });
 
   it("sums the served bytes per phase and leaves missing values out", () => {

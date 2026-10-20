@@ -8,6 +8,7 @@ import { gateBrowser, probeBrowser, type BrowserProbe } from "./browserProbe";
 import { checkExceptionFolder, exceptionMarker, resolveLaunch } from "./exceptionRegister";
 import { browserName, recordedGpuVerified, type BrowserLaunch } from "./renderer";
 import { aggregate, compareEngines, missingSamples } from "./metrics";
+import { measureChurn } from "./churn";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
 import { engineOrder, runProcess } from "./runner";
@@ -193,6 +194,10 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const mod = await loadWebPackage(join(distPerf, "engine"));
   const nodeChecks = scenarios.map((sc, i) => checkScenario(mod, sc, config.steps, config.dt, config.warmSteps, i % 2 === 0 ? "ts-first" : "wasm-first"));
   for (const c of nodeChecks) log(`  ${c.scenario}: ${c.match ? "engines agree" : "ENGINES DISAGREE"} (Node: ts ${c.nodeTsMs.toFixed(0)} ms, wasm ${c.nodeWasmMs.toFixed(0)} ms)`);
+  // Hourly save churn on the WASM engine; no TypeScript side, so an A/A pass
+  // of TypeScript has nothing to add and an A/A pass of WASM repeats it.
+  const churn = scenarios.map((sc) => measureChurn(mod, sc, Math.max(1, Math.floor((config.steps * config.dt) / 60)), config.dt, config.warmSteps));
+  for (const c of churn) log(`  ${c.scenario}: hourly save churn median ${(c.medianShare * 100).toFixed(1)}%, p95 ${(c.p95Share * 100).toFixed(1)}% of ${c.saveChars} characters`);
 
   const server = await startServer(distPerf);
   let browserVersion: string | null = runs.find((r) => r.browserVersion)?.browserVersion ?? null;
@@ -221,6 +226,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   // (the two ends only).
   for (const e of packageErrors(packageState(distPerf), packageState(dist), sourceHash, { files: environment.enginePackage, buildHash: environment.engineBuildHash })) validation.errors.push(e);
   if (environment.commit === "unknown") validation.errors.push("the commit could not be read (git failed), so the results cannot be tied to a tree");
+  if (environment.tree && !environment.tree.complete) validation.errors.push("git could not finish the working-tree record, so the run cannot be tied to a tree");
   if (environment.mainCommit && !environment.mainFetched) validation.warnings.push(`origin/main could not be fetched just now, so ${environment.mainCommit} is the ref as last fetched and may not be the latest main`);
   if (!environment.mainCommit) validation.warnings.push("origin/main is unknown here (no remote or no fetch), so whether this is a baseline of the latest main was not checked");
   for (const a of interruptedAttempts) validation.warnings.push(`rep ${a.rep} ${a.engine}: an attempt started at ${a.at} was interrupted (the run was stopped and resumed) and ran again; its partial measurements were not kept`);
@@ -248,6 +254,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     browser: { version: browserVersion, headless: true, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException, rendererExceptionSha256: launch.rendererExceptionSha256, rendererExceptionCommit: launch.rendererExceptionCommit, gpuVerified: recordedGpuVerified(launch.rendererException, runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer), runs.filter((r) => r.ok).map((r) => r.rendererEnd), runs.filter((r) => r.ok).map((r) => r.rendererEndCold)) },
     scenarios: scenarios.map((s) => ({ name: s.name, description: s.description, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
     nodeChecks,
+    churn,
     runs,
     bundle,
     toolingBundleTotals: toolingBundle.totals,
