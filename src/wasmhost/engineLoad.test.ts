@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { compileEngineBinary, engineBinaryUrl, initEngineGlue } from "./engineLoad";
 import { EMPTY_WASM, buildSectionWith, customSection, stampedWasm, wasmFetch, wasmWith } from "./engineLoad.fixture";
@@ -71,7 +71,8 @@ describe("compileEngineBinary", () => {
   });
 });
 
-describe("the built engine binary", () => {
+// Like the other package tests: it runs where the engine package is built (a local build, the e2e jobs) and skips in the plain unit job.
+describe.skipIf(!existsSync(resolve(__dirname, "../public/engine/BUILD.json")))("the built engine binary", () => {
   it("carries the source hash BUILD.json records, as the page reads it", async () => {
     const dir = resolve(__dirname, "../public/engine");
     const bytes = readFileSync(resolve(dir, ENGINE_WASM));
