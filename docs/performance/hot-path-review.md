@@ -201,7 +201,8 @@ updates the rows #1139 changes):
 | shaft banks | `src/engine/crowd/shaftBanks.ts` | revision | ported |
 | segments served | `segServed`, `src/engine/crowd/segmentGraph.ts` | revision | ported (`connected_set`) |
 | queue view | `queueView`, `src/engine/Crowd.ts` | step and revision | no counterpart yet; check before porting one |
-| floor reachable from the lobby (`floorReachable`) | `reachMemos`, `src/engine/sim/services.ts` | revision | ported (`reach_memo` in `sim.rs`); the per-segment check on split floors is uncached in both (#849, #1143) |
+| floor reachable from the lobby (`floorReachable`) | `reachMemos`, `src/engine/sim/services.ts` | revision | ported (`reach_memo` in `sim.rs`) |
+| segments reachable from a lobby (`segReachable`, behind `floorReachable` and the per-room checks) | none: one route search per lobby segment for each check (#849) | n/a in TypeScript; revision in Rust | Rust-only: a set of every segment reachable from a lobby, which answers as those searches do: `connected_set` (Modern) and `lobby_reach` (Classic walk budget), `engine-rs/src/crowd/graph.rs` (#1143) |
 | demand map (inspector reads) | `demandMemo`, `src/engine/sim/demand.ts` | revision and game hour | none (no inspector in Rust) |
 | reachability within one demand or income pass | `reachCache`, `src/engine/sim/demand.ts`, `src/engine/EconomySystem.ts` | one call | ported |
 | reachability during one move-in pass | `reachMemo`, `src/engine/sim/churn.ts` | one pass | ported |
