@@ -86,3 +86,21 @@ describe("a rewired room's crowd only grows", () => {
     }
   });
 });
+
+describe("a rewired room draws a fractional occupancy as the whole people the atlas reads", () => {
+  // `roomOccupants` rounds up, as `atlas/lookup.ts` does. A painter that read the
+  // raw count instead would draw 2 people for 2.5 where the atlas bakes 3, and the
+  // pure-function test above could not tell, so hold each painter to it.
+  it.each(CASES)("%s %s", (kind, subtype) => {
+    const hour = OPEN_HOUR[kind] ?? 12;
+    const cap = occupantCap(kind);
+    const base = { id: 7, floor: 12, x: 5, kind, subtype, state: "occupied", width: FACILITIES[kind].width, satisfaction: 0.8 };
+    for (const k of [1, 2, 3, 5].filter((n) => n <= cap)) {
+      const whole = draws({ ...base, occupants: k } as Unit, hour);
+      for (const frac of [k - 0.5, k - 0.01]) {
+        const part = draws({ ...base, occupants: frac } as Unit, hour);
+        expect([...part], `${kind} ${subtype ?? ""} at ${frac} people`).toEqual([...whole]);
+      }
+    }
+  });
+});

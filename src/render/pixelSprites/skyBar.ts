@@ -83,7 +83,7 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   }
 
   // Stool anchors: the 7px stool pitch is authored art, counted against the
-  // COUNTER at the tile it was drawn for and stepped at the current one. Read
+  // COUNTER's authored run and fitted into the screen run by `artRow`. Read
   // off the counter's pixel width it lost two stools when the tile narrowed, and
   // two patrons who were at the bar went undrawn with them. The counter's own
   // authored width is named rather than folded into the row's margins so the
@@ -106,7 +106,9 @@ export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
   // between two of those steps. The walk is bounded by the row it steps through.
   if (occ > 0) {
     const heads = new Set(stools);
-    let bartX = barX + Math.round(barW / 2) - 3;
+    // Whole pixels, so at a half-pixel origin he still lands on a stool column
+    // when he should dodge it.
+    let bartX = Math.round(barX + Math.round(barW / 2) - 3);
     for (let step = 0; step <= stools.length && heads.has(bartX); step++) bartX++;
     personStanding(ctx, bartX, floorY - 6, seed + 2);
   }

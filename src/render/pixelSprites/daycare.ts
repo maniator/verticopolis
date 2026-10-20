@@ -84,11 +84,13 @@ export function daycare(d: RoomCtx, u: Unit, x: number, y: number, w: number, h:
   // come off the mat's places.
   if (occ > 0) personStanding(ctx, shX - 6, floorY, seed + 2);
 
-  // Places on the mat: the 6px pitch is authored art, counted against the MAT at
-  // the tile it was drawn for and stepped at the current one. Read off the mat's
+  // Places on the mat: the 6px pitch is authored art, counted against the MAT's
+  // authored run and fitted into the screen run by `artRow`. Read off the mat's
   // pixel width the room lost two places when the tile narrowed, and two
   // children who were in the room went undrawn.
-  const places = artRow(matArtW - 3 - 4, matX0 + 3, matX1 - 4, 6, 1, 3);
+  // The row also stops short of the caregiver at the shelf's edge, which a
+  // narrow room (6 to 11 tiles) would otherwise seat a child under.
+  const places = artRow(matArtW - 3 - 4, matX0 + 3, Math.min(matX1 - 4, shX - 9), 6, 1, 3);
   // Who is sitting where: the hash scatters them, the occupancy says how many.
   // The old loop counted a hash-skipped place against the occupancy as if a
   // child were there, so a room with five children could show two.

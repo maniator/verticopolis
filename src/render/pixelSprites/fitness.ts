@@ -80,8 +80,8 @@ function drawWeights(ctx: CanvasRenderingContext2D, x: number, floorY: number, w
 
 function drawYoga(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: number, aw: number, look: FitnessLook, occ: number, seed: number): void {
   // A calm studio: mats laid on the floor, standing figures mid-pose, a plant.
-  // Mat anchors: the 12px pitch is authored art, counted at the tile it was
-  // drawn for and stepped at the current one. Read off the room's pixel width
+  // Mat anchors: the 12px pitch is authored art, counted against the authored
+  // run and fitted into the screen run by `artRow`. Read off the room's pixel width
   // the studio lost two mats when the tile narrowed, and two members standing on
   // them went undrawn. A class fills its mats from the front by design, which is
   // why this row counts in order rather than scattering like the others: every
@@ -105,9 +105,9 @@ function drawSpin(ctx: CanvasRenderingContext2D, x: number, floorY: number, w: n
   // A dim room of stationary bikes lit by an accent glow, riders on some.
   ctx.fillStyle = shade(look.accent, -30); // floor light wash
   ctx.fillRect(x + 2, floorY - 1, w - 4, 1);
-  // Bike anchors: the 8px pitch is authored art, counted at the tile it was
-  // drawn for and stepped at the current one, so a narrower tile tightens the
-  // row instead of wheeling a bike out of the studio.
+  // Bike anchors: the 8px pitch is authored art, counted against the authored
+  // run and fitted into the screen run by `artRow`, so a narrower tile tightens
+  // the row instead of wheeling a bike out of the studio.
   const bikes = artRow(aw - 5 - 9, x + 5, x + w - 9, 8, 1, 6);
   // Which bikes have riders: the hash scatters them, the occupancy says how
   // many. Rolling the hash per bike left riders who were in the class undrawn,

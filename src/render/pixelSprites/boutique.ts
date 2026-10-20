@@ -255,7 +255,7 @@ export function boutiqueBay(d: RoomCtx, u: Unit, x: number, y: number, w: number
   // Browsing customers filling back from the door when the shop is busy,
   // bounded by width (inset like the other containers so every figure stays
   // inside the room rect). The 7px shoulder-to-shoulder pitch is authored art,
-  // so the row is counted at the authored tile and stepped at the current one.
+  // so the row is counted against the authored run and fitted into the screen run.
   // Counted off the pixel width, the bay lost two standing spots when the tile
   // narrowed and two customers who were in the shop went undrawn.
   // The door-side figure sits a pixel further in than the shopfront chrome does:

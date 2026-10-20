@@ -103,13 +103,14 @@ drawn with, and the nightclub's dancers (6px figures at a 6px pitch) came out a
 pixel through each other.
 
 **Approval-gate judgment (party ruling, owner delegated the call): the overlap
-is a defect, not a taste call.** The same alternating pitch is treated as a
+is a defect, and the call is made.** The same alternating pitch is treated as a
 defect on #812's monitor wall, and the overlap is worst at full occupancy, when
 the player is looking. So the club's dancer row now runs from a pixel left of
 the lit strip to just clear of the DJ booth, while its count still comes off the
-strip. That is the one placement change in this fix: a packed club spills off
-the lit floor onto floor that was empty, which reads correctly. Every other
-row keeps its place in its room.
+strip. A packed club spills off the lit floor onto floor that was empty, which
+reads correctly. Three other placements move with the fix: the executive's
+corner anchors, the boutique's door figure and the club row's start. Every
+other row keeps its place in its room.
 
 ## Open items
 

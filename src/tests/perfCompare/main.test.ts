@@ -10,7 +10,7 @@ import { engineOrder, frameSummary, stepSummary } from "./runner";
 describe("parseArgs", () => {
   it("defaults to ten repetitions and both throttles", () => {
     const a = parseArgs([]);
-    expect(a).toEqual({ reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, throttles: null });
+    expect(a).toEqual({ reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, throttles: null, aa: null });
     expect(makeConfig(a, ["small"])).toMatchObject({ reps: 10, steps: 720, dt: 2, throttles: [1, 4], speed: 3, quick: false });
   });
   it("reads every flag, and --quick lowers the default reps only", () => {
@@ -31,6 +31,11 @@ describe("parseArgs", () => {
     expect(() => parseArgs(["--throttles", "1,Infinity"])).toThrow(/from 1 to 20/);
     expect(() => parseArgs(["--reps", "3", "--reps", "5"])).toThrow(/--reps is given twice/);
     expect(parseArgs(["--resume", "d"]).resume).toBe("d");
+    expect(parseArgs(["--aa", "wasm"]).aa).toBe("wasm");
+    expect(makeConfig(parseArgs(["--aa", "ts"]), ["small"]).aa).toBe("ts");
+    expect(makeConfig(parseArgs([]), ["small"]).aa).toBeNull();
+    expect(() => parseArgs(["--aa", "rust"])).toThrow(/ts or wasm/);
+    expect(() => parseArgs(["--aa", "ts", "--aa", "wasm"])).toThrow(/--aa is given twice/);
     expect(() => parseArgs(["--resume", "d", "--out", "e"])).toThrow(/takes no --out/);
   });
 });
@@ -60,13 +65,28 @@ describe("outputDir", () => {
   const env = { commitShort: "abc1234", dirty: false };
   it("names a new folder by date and commit and never reuses one", () => {
     const taken = new Set(["/r/docs/performance/results/2026-10-13-abc1234", "/r/docs/performance/results/2026-10-13-abc1234-2"]);
-    expect(outputDir("/r", { out: null, quick: false, skipBuild: false }, "2026-10-14", env, () => false)).toBe("/r/docs/performance/results/2026-10-14-abc1234");
-    expect(outputDir("/r", { out: null, quick: false, skipBuild: false }, "2026-10-13", env, (p) => taken.has(p))).toBe("/r/docs/performance/results/2026-10-13-abc1234-3");
+    expect(outputDir("/r", { out: null, quick: false, skipBuild: false, aa: null }, "2026-10-14", env, () => false)).toBe("/r/docs/performance/results/2026-10-14-abc1234");
+    expect(outputDir("/r", { out: null, quick: false, skipBuild: false, aa: null }, "2026-10-13", env, (p) => taken.has(p))).toBe("/r/docs/performance/results/2026-10-13-abc1234-3");
   });
   it("marks quick and dirty runs, and refuses an existing --out", () => {
-    expect(outputDir("/r", { out: null, quick: true, skipBuild: true }, "2026-10-13", { commitShort: "abc1234", dirty: true }, () => false)).toBe("/r/docs/performance/results/2026-10-13-abc1234-quick-skipbuild-dirty");
-    expect(outputDir("/r", { out: "x", quick: false, skipBuild: false }, "d", env, () => false)).toBe("/r/x");
-    expect(() => outputDir("/r", { out: "x", quick: false, skipBuild: false }, "d", env, () => true)).toThrow(/never overwritten/);
+    expect(outputDir("/r", { out: null, quick: true, skipBuild: true, aa: null }, "2026-10-13", { commitShort: "abc1234", dirty: true }, () => false)).toBe("/r/docs/performance/results/2026-10-13-abc1234-quick-skipbuild-dirty");
+    expect(outputDir("/r", { out: "x", quick: false, skipBuild: false, aa: null }, "d", env, () => false)).toBe("/r/x");
+    expect(outputDir("/r", { out: null, quick: false, skipBuild: false, aa: "wasm" }, "2026-10-14", env, () => false)).toBe("/r/docs/performance/results/2026-10-14-abc1234-aa-wasm");
+    expect(() => outputDir("/r", { out: "x", quick: false, skipBuild: false, aa: null }, "d", env, () => true)).toThrow(/never overwritten/);
+  });
+  it("makes an A/A folder's own name say so, even under --out", () => {
+    expect(() => outputDir("/r", { out: "x", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/containing aa-ts/);
+    expect(() => outputDir("/r", { out: "run-aa-wasm-1", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/containing aa-ts/);
+    expect(outputDir("/r", { out: "run-aa-ts-1", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toBe("/r/run-aa-ts-1");
+  });
+  it("checks the folder's own name, and refuses an A/A name for a comparison", () => {
+    expect(() => outputDir("/r/aa-ts", { out: "x", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/containing aa-ts/);
+    expect(() => outputDir("/r", { out: "aa-ts/x", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/containing aa-ts/);
+    expect(outputDir("/r", { out: "keep/aa-ts-3", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toBe("/r/keep/aa-ts-3");
+    expect(() => outputDir("/r", { out: "run-aa-wasm", quick: false, skipBuild: false, aa: null }, "d", env, () => false)).toThrow(/names an A\/A folder/);
+    expect(() => outputDir("/r", { out: "run-AA-TS", quick: false, skipBuild: false, aa: null }, "d", env, () => false)).toThrow(/names an A\/A folder/);
+    expect(outputDir("/r", { out: "run-AA-TS-1", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toBe("/r/run-AA-TS-1");
+    expect(() => outputDir("/r", { out: "x-aa-wasm-aa-ts", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/also names the aa-wasm marker/);
   });
 });
 
@@ -108,6 +128,16 @@ describe("loadCheckpoint", () => {
     expect(cp.resumes).toEqual([{ at: "r1", runsFromCheckpoint: 1 }]);
     expect(cp.startedAt).toBe("2026-10-14T00:00:00.000Z");
     expect(cutTo).toBe(Buffer.byteLength(text.slice(0, text.lastIndexOf("\n") + 1)));
+  });
+  it("refuses a run line that ran another engine than the configuration calls for", () => {
+    const aaExpected = { ...expected, config: { ...config, aa: "wasm" as const } };
+    const aaMeta = JSON.stringify({ ...aaExpected, startedAt: "x" });
+    const line = (engine: "ts" | "wasm", ran?: "ts" | "wasm") => JSON.stringify({ ...processRun(0, engine), ...(ran ? { ranEngine: ran } : {}) }) + "\n";
+    const good = loadCheckpoint("d", aaExpected, files({ [M]: aaMeta, [R]: line("ts", "wasm") + line("wasm", "wasm") }));
+    expect(good.runs).toHaveLength(2);
+    expect(() => loadCheckpoint("d", aaExpected, files({ [M]: aaMeta, [R]: line("ts") }))).toThrow(/ran ts where this run's configuration calls for wasm/);
+    expect(() => loadCheckpoint("d", aaExpected, files({ [M]: aaMeta, [R]: line("wasm", "ts") }))).toThrow(/ran ts where/);
+    expect(() => loadCheckpoint("d", expected, files({ [M]: meta, [R]: line("wasm", "ts") }))).toThrow(/ran ts where this run's configuration calls for wasm/);
   });
   it("refuses a bad line before the end, a dirty start, any mismatch, final results, or no checkpoint", () => {
     const at = files({ [M]: meta });

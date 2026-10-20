@@ -19,7 +19,7 @@ import { TILE } from "../scale";
 const authoredSeats = (authoredSpan: number, margins: number, pitch: number): number =>
   Math.max(0, Math.floor((authoredSpan - margins) / pitch) + 1);
 
-describe("artRow measures capacity by the authored room, not by the tile", () => {
+describe("artRow measures capacity by the authored room", () => {
   it("counts a room by the tiles it covers, so a narrower tile cannot cost a slot", () => {
     // The invariant issue #813 broke. At the 11px tile a 12-tile bay fitted 18
     // browsing customers at a 7px pitch; counting those 7px slots off the
@@ -85,7 +85,7 @@ describe("artRow measures capacity by the authored room, not by the tile", () =>
     for (const spots of [artRow(120, 50, 53, 7)]) expect(new Set(spots).size).toBe(spots.length);
   });
 
-  it("keeps fractional inputs inside the run, and distinct (the preview pages produce them)", () => {
+  it("keeps fractional inputs inside the run, and distinct (a fractional origin produces them)", () => {
     // Distinctness is the load-bearing half. With fractional ends the first
     // anchor rounds while the far edge floors, which let the column window come
     // out one wider than the run, and the row repeated its last anchor: two
