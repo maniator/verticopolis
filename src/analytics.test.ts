@@ -393,6 +393,19 @@ const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
   economy_action: { action: "demolish", detail: "sell" },
   emergency_choice: { kind: "fireRescue", decision: "accept" },
   session_emergencies: { fires: 1, firesGutRooms: 2, bombs: 0 },
+  engine_status: {
+    trigger: "settle",
+    engine_requested: "wasm",
+    engine: "wasm",
+    build: "switchable",
+    fallback_reason: "none",
+    fallback_stage: "none",
+    fallbacks: 0,
+    writer_latched: false,
+    page_life: "p-1",
+    version: "1.0.0",
+    sha: "abc1234",
+  },
 };
 
 describe("the platform and distribution-channel dimensions ride every event", () => {

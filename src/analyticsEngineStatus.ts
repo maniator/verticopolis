@@ -1,0 +1,222 @@
+import { trackEvent, type GameplayEvents } from "./analyticsCore";
+import { APP_VERSION } from "./appVersion";
+import type { BootStage, FallbackReason, FallbackStage } from "./wasmhost/engineBoot";
+import type { EngineChoice } from "./wasmhost/engineChoice";
+
+/**
+ * The reliability instrument (release plan 4.1, step A1; issue #1081): one
+ * `engine_status` row per page life saying which engine runs, whether it fell
+ * back and why, and whether the engine save writer turned itself off. The
+ * Reliability row of #945 counts these rows through the governed definition in
+ * `scripts/engine-reliability.mjs`; what each field means, why it is collected
+ * and how long it is kept is in `docs/analytics-data-map.md`.
+ *
+ * Every value is a code from a closed list in our code. No row carries an error
+ * message, a stack, a tower name or a path: an engine message can quote a
+ * tower name, and a hand-edited save controls it. The messages stay on the
+ * console and on `window.__vcEngineBoot`; this module is never handed one
+ * (`EngineSettle.failure` takes the stage and the code only). A boot that
+ * throws still reaches `$exception`, as any uncaught error does.
+ *
+ * When rows go out:
+ * - `settle`, once per page life, after boot has picked its engine and the
+ *   first tower is hosted or refused. A fallback before this point is in the
+ *   boot state the settle row reads, so it is not sent on its own.
+ * - `fallback`, on each later fallback (a tower the host refused at a load, a
+ *   new game or an undo restore; #874 adds the runtime traps).
+ * - `writer-latch`, when the engine save writer turns itself off.
+ * - `summary`, at a hide, only when the cap below dropped a row since the last
+ *   row went out, so the count it carries is the true one. It is outside the
+ *   cap: at most one per hide, and only after a drop.
+ *
+ * The cap drops repeats only. The first row of a reason this page life has not
+ * sent yet, and the latch-off row, always go out, so every reason reaches the
+ * by-reason count and a page life sends at most the cap plus one row per code.
+ *
+ * The #841 lesson: a capped stream must not lose the size of a loop. Every row
+ * carries `fallbacks`, the running count for this page life, and a page life
+ * whose rows were capped reports its count at the next hide. A loop across
+ * reloads is a new page life each time, with its own settle row, so the cap
+ * never hides it.
+ */
+
+/** What the page life runs when a row is sent. `ts-fallback` is a switchable
+ *  build back on TypeScript after asking for the engine; `none` is a wasm-only
+ *  build that stopped, since it has no other engine. */
+export const ENGINE_KINDS = ["ts", "wasm", "wasm-frame", "wasm-worker", "ts-fallback", "none"] as const;
+export type EngineKind = (typeof ENGINE_KINDS)[number];
+
+/** Why a row was sent; see the module comment. */
+export const ENGINE_STATUS_TRIGGERS = ["settle", "fallback", "writer-latch", "summary"] as const;
+export type EngineStatusTrigger = (typeof ENGINE_STATUS_TRIGGERS)[number];
+
+/** The bundle kind (see `src/build/engineBundle.ts`). */
+export const ENGINE_BUILDS = ["switchable", "wasm-only"] as const;
+export type EngineBuild = (typeof ENGINE_BUILDS)[number];
+
+/** Every field an `engine_status` row carries, in the order the data map lists
+ *  them. Checked against the event's type below, so the map's guard test reads
+ *  the real field set. */
+export const ENGINE_STATUS_FIELDS = [
+  "trigger",
+  "engine_requested",
+  "engine",
+  "build",
+  "fallback_reason",
+  "fallback_stage",
+  "fallbacks",
+  "writer_latched",
+  "page_life",
+  "version",
+  "sha",
+] as const satisfies readonly (keyof GameplayEvents["engine_status"])[];
+type MissingField = Exclude<keyof GameplayEvents["engine_status"], (typeof ENGINE_STATUS_FIELDS)[number]>;
+const everyField: [MissingField] extends [never] ? true : MissingField = true;
+void everyField;
+
+/** Rows past `settle` one page life may send before repeats are dropped. A
+ *  real fallback is human-paced (a load, a new game, an undo), but a runtime
+ *  trap can repeat, and a flood would spend the ingest route's per-IP budget
+ *  and lose the session's other events (the reason `crash` is capped). The
+ *  count survives the cap through the `summary` row. */
+export const MAX_ENGINE_STATUS_ROWS = 10;
+
+/** What boot settled on, from its published state (`window.__vcEngineBoot`). */
+export interface EngineSettle {
+  build: EngineBuild;
+  requested: EngineChoice;
+  failure: { stage: BootStage; reason: FallbackReason } | null;
+}
+
+/** The boot stage of a failure, as analytics names it. A failure the settle
+ *  row reads is at the load or the first tower. `host` (a later tower a
+ *  wasm-only build lost) never reaches it, since the host reports that one
+ *  itself, with `adopt` or `undo`; it is mapped only so the table is total. */
+const STAGE_OF_BOOT: Record<BootStage, FallbackStage> = { load: "load", start: "start", host: "adopt" };
+
+/** The engine a page life runs. */
+export function engineKind(build: EngineBuild, requested: EngineChoice, failed: boolean): EngineKind {
+  if (failed) return build === "wasm-only" ? "none" : "ts-fallback";
+  return requested;
+}
+
+interface Status {
+  build: EngineBuild;
+  requested: EngineChoice;
+  engine: EngineKind;
+  reason: FallbackReason;
+  stage: FallbackStage;
+  fallbacks: number;
+}
+
+let status: Status | null = null;
+/** A latch-off before boot settled; the settle row carries it. */
+let writerLatched = false;
+let rowsSent = 0;
+/** The fallback reasons a row has carried this page life. */
+const reasonsSent = new Set<FallbackReason>();
+/** A row the cap dropped since the last row went out. */
+let dropped = false;
+let pageLife: string | undefined;
+
+/** The page-life id: minted at the page life's first row, held in memory
+ *  only, so a reload starts a new one while the relay's session id carries
+ *  over. */
+function pageLifeId(): string {
+  if (pageLife !== undefined) return pageLife;
+  try {
+    pageLife = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : fallbackId();
+  } catch {
+    pageLife = fallbackId();
+  }
+  return pageLife;
+}
+
+function fallbackId(): string {
+  return `p-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function send(s: Status, trigger: EngineStatusTrigger): void {
+  trackEvent("engine_status", {
+    trigger,
+    engine_requested: s.requested,
+    engine: s.engine,
+    build: s.build,
+    fallback_reason: s.reason,
+    fallback_stage: s.stage,
+    fallbacks: s.fallbacks,
+    writer_latched: writerLatched,
+    page_life: pageLifeId(),
+    version: APP_VERSION,
+    sha: __APP_SHA__,
+  });
+}
+
+/** Send a row after `settle`. Past the cap a repeat is dropped and
+ *  remembered, so the next hide reports the count; a row that says something
+ *  new (`novel`) still goes out. */
+function sendCapped(s: Status, trigger: EngineStatusTrigger, novel: boolean): void {
+  if (rowsSent >= MAX_ENGINE_STATUS_ROWS && !novel) {
+    dropped = true;
+    return;
+  }
+  rowsSent++;
+  dropped = false;
+  reasonsSent.add(s.reason);
+  send(s, trigger);
+}
+
+/** Boot has picked its engine: send the page life's `settle` row. Once per
+ *  page life; a second call is ignored. */
+export function noteEngineSettled(settle: EngineSettle): void {
+  if (status) return;
+  const failed = settle.failure !== null;
+  status = {
+    build: settle.build,
+    requested: settle.requested,
+    engine: engineKind(settle.build, settle.requested, failed),
+    reason: settle.failure?.reason ?? "none",
+    stage: settle.failure ? STAGE_OF_BOOT[settle.failure.stage] : "none",
+    fallbacks: failed ? 1 : 0,
+  };
+  reasonsSent.add(status.reason);
+  send(status, "settle");
+}
+
+/** A fallback after boot settled: a tower the host would not take, or (with
+ *  #874) a trap. Before `settle` it is ignored, because the boot state the
+ *  settle row reads already holds it. */
+export function noteEngineFallback(fallback: { reason: FallbackReason; stage: FallbackStage }): void {
+  if (!status) return;
+  status.fallbacks++;
+  status.reason = fallback.reason;
+  status.stage = fallback.stage;
+  status.engine = engineKind(status.build, status.requested, true);
+  sendCapped(status, "fallback", !reasonsSent.has(fallback.reason));
+}
+
+/** The engine save writer turned itself off (`vctowerWriter.ts`). Reported
+ *  once; before `settle` the settle row carries it. */
+export function noteEngineWriterLatched(): void {
+  if (writerLatched) return;
+  writerLatched = true;
+  if (status) sendCapped(status, "writer-latch", true);
+}
+
+/** At a tab hide or page hide: report the true count if the cap dropped a
+ *  row since the last one went out. */
+export function flushEngineStatus(): void {
+  if (!status || !dropped) return;
+  dropped = false;
+  send(status, "summary");
+}
+
+/** Test hook: forget the page life. */
+export function resetEngineStatus(): void {
+  status = null;
+  writerLatched = false;
+  rowsSent = 0;
+  reasonsSent.clear();
+  dropped = false;
+  pageLife = undefined;
+}

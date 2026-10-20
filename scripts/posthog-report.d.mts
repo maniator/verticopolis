@@ -1,6 +1,7 @@
 // Type surface for the pure helpers scripts/posthog-report.mjs exports for unit
 // testing. The script itself stays plain dependency-free JS; these signatures
-// only describe the functions src/posthog-report.test.ts imports.
+// only describe the functions src/posthog-report.test.ts and
+// scripts/engine-reliability.mjs import.
 
 /** A tagged query result: `ok` plus either the raw PostHog JSON or a hint. */
 export interface QueryResult {
@@ -34,3 +35,5 @@ export function totalsByEvent(res: QueryResult, events: string[]): Record<string
 export function depthRow(res: QueryResult): DepthRow;
 export function breakdownRows(res: QueryResult): Array<{ key: string; events: number; sessions: number }> | null;
 export function countRow(res: QueryResult): { events: number; sessions: number; skipped?: boolean; hint?: string };
+/** POST one HogQL query to the project. Never throws; `scripts/engine-reliability.mjs` reuses it. */
+export function runQuery(query: string): Promise<QueryResult>;
