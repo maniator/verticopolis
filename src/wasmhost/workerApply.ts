@@ -1,7 +1,7 @@
 import { Simulation } from "../engine/Simulation";
 import type { FrameHeader } from "./frameView";
 import { mergeSimulation } from "./merge";
-import { adoptTelemetry, isTelemetryDocument, type TelemetryDocument } from "./telemetry";
+import { adoptTelemetry, isTelemetryDocument, parseCommuteStress, type TelemetryDocument } from "./telemetry";
 import type { MergePayload } from "./workerProtocol";
 
 /**
@@ -15,6 +15,7 @@ export interface ParsedMerge {
   fresh: Simulation;
   telemetry: TelemetryDocument;
   housekeeping: { cleaned: number; leftover: number } | null;
+  commute: [number, number][];
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -28,7 +29,8 @@ export function parseMerge(m: MergePayload): ParsedMerge {
   if (!isTelemetryDocument(telemetry)) throw new Error("merge: the telemetry is not the engine's shape");
   const housekeeping = m.housekeeping ? (JSON.parse(m.housekeeping) as { cleaned: number; leftover: number }) : null;
   if (housekeeping && (typeof housekeeping.cleaned !== "number" || typeof housekeeping.leftover !== "number")) throw new Error("merge: the housekeeping report is not the engine's shape");
-  return { fresh, telemetry, housekeeping };
+  const commute = parseCommuteStress(m.commute);
+  return { fresh, telemetry, housekeeping, commute };
 }
 
 /** A JSON array from a reply whose every item passes `isItem`, or an error
@@ -78,6 +80,7 @@ export function mergeSave(sim: Simulation, m: ParsedMerge, h: FrameHeader): void
   }
   adoptTelemetry(sim, m.telemetry);
   sim.economy.adoptHousekeepingReport(m.housekeeping);
+  sim.crowd.adoptCommuteStress(m.commute);
 }
 
 /** The header fields a fresh reply sets, as the main-thread host sets them. */
@@ -103,4 +106,24 @@ export const structuredCloneOf = <T>(v: T): T => (v == null ? v : (JSON.parse(JS
 export function restoreOwn(sim: Simulation, name: string, desc: PropertyDescriptor | undefined): void {
   if (desc) Object.defineProperty(sim, name, desc);
   else delete (sim as unknown as Record<string, unknown>)[name];
+}
+
+/** The reply watchdog (see `REPLY_TIMEOUT_MS`): `arm` starts or restarts the
+ *  timer for the reply in flight, `disarm` stops it. A hidden or frozen page
+ *  can run an overdue timer before the reply queued behind it, so the
+ *  watchdog waits for a visible page before it calls the worker stuck. */
+export function replyWatchdog(timeoutMs: number, fatal: (message: string) => void): { arm: (what: string) => void; disarm: () => void } {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = (what: string): void => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if ((globalThis as { document?: { hidden?: boolean } }).document?.hidden) arm(what);
+      else fatal(`the worker did not answer ${what} within ${timeoutMs} ms`);
+    }, timeoutMs);
+  };
+  const disarm = (): void => {
+    clearTimeout(timer);
+    timer = undefined;
+  };
+  return { arm, disarm };
 }

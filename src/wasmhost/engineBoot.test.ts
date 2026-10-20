@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { WasmModule } from "../dualrun/binding";
-import { engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState } from "./engineBoot";
+import { EngineBootError, FALLBACK_REASONS, FALLBACK_STAGES, bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState } from "./engineBoot";
 
 const mod = (withWriter = true) => ({ Engine: class {}, ...(withWriter ? { encodeVctower: () => new Uint8Array() } : {}) }) as unknown as WasmModule;
 const quiet = () => ({ error: vi.fn() });
@@ -19,7 +19,7 @@ describe("loadBootEngine, switchable build", () => {
   it("falls back to the TypeScript engine on a load failure, with the reason in the console", async () => {
     const log = quiet();
     const r = await loadBootEngine({ wasmOnly: false, load: async () => Promise.reject(new Error("404")), log });
-    expect(r).toEqual({ module: null, state: { build: "switchable", engine: "ts", failure: { stage: "load", message: "404" } } });
+    expect(r).toEqual({ module: null, state: { build: "switchable", engine: "ts", failure: { stage: "load", reason: "boot-error", message: "404" } } });
     expect(log.error).toHaveBeenCalledWith(expect.stringContaining("running on the TypeScript engine"), expect.any(Error));
   });
 
@@ -39,7 +39,7 @@ describe("loadBootEngine, wasm-only build", () => {
   it("reports a load failure as a failure, never as the TypeScript engine", async () => {
     const log = quiet();
     const r = await loadBootEngine({ wasmOnly: true, load: async () => Promise.reject(new Error("CompileError: bad magic")), log });
-    expect(r).toEqual({ module: null, state: { build: "wasm-only", engine: "none", failure: { stage: "load", message: "CompileError: bad magic" } } });
+    expect(r).toEqual({ module: null, state: { build: "wasm-only", engine: "none", failure: { stage: "load", reason: "boot-error", message: "CompileError: bad magic" } } });
     expect(log.error).toHaveBeenCalledWith(expect.stringContaining("no other engine"), expect.any(Error));
   });
 
@@ -48,7 +48,7 @@ describe("loadBootEngine, wasm-only build", () => {
     try {
       const pending = loadBootEngine({ wasmOnly: true, load: () => new Promise<WasmModule>(() => {}), log: quiet(), timeoutMs: 1000 });
       await vi.advanceTimersByTimeAsync(1000);
-      expect((await pending).state.failure).toEqual({ stage: "load", message: "the engine package did not load within 1 second" });
+      expect((await pending).state.failure).toEqual({ stage: "load", reason: "boot-timeout", message: "the engine package did not load within 1 second" });
     } finally {
       vi.useRealTimers();
     }
@@ -56,20 +56,41 @@ describe("loadBootEngine, wasm-only build", () => {
 
   it("names a thrown non-Error", async () => {
     const r = await loadBootEngine({ wasmOnly: true, load: async () => Promise.reject("offline"), log: quiet() });
-    expect(r.state.failure).toEqual({ stage: "load", message: "offline" });
+    expect(r.state.failure).toEqual({ stage: "load", reason: "boot-error", message: "offline" });
   });
 
   it("refuses a package without the engine's save writer", async () => {
     const r = await loadBootEngine({ wasmOnly: true, load: async () => mod(false), log: quiet() });
     expect(r.module).toBeNull();
-    expect(r.state).toMatchObject({ engine: "none", failure: { stage: "load", message: expect.stringContaining("encodeVctower") } });
+    expect(r.state).toMatchObject({ engine: "none", failure: { stage: "load", reason: "package-mismatch", message: expect.stringContaining("encodeVctower") } });
+  });
+});
+
+describe("fallback reason codes", () => {
+  it("keeps the lists closed, with none first and the runtime codes reserved", () => {
+    expect(FALLBACK_REASONS).toEqual(["none", "boot-timeout", "boot-error", "package-mismatch", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"]);
+    expect(FALLBACK_STAGES).toEqual(["none", "load", "start", "adopt", "undo"]);
+  });
+
+  it("takes a typed failure's own code, reads a link failure as a mismatched package, and calls the rest a boot error", () => {
+    expect(bootFailureReason(new EngineBootError("boot-timeout", "slow"))).toBe("boot-timeout");
+    expect(bootFailureReason(new EngineBootError("package-mismatch", "old glue"))).toBe("package-mismatch");
+    expect(bootFailureReason(new WebAssembly.LinkError("import object field 'wbg' is not a Function"))).toBe("package-mismatch");
+    expect(bootFailureReason(new WebAssembly.CompileError("bad magic"))).toBe("boot-error");
+    expect(bootFailureReason(new Error("404"))).toBe("boot-error");
+    expect(bootFailureReason("offline")).toBe("boot-error");
+  });
+
+  it("reports a glue and binary that do not link as a package mismatch", async () => {
+    const r = await loadBootEngine({ wasmOnly: false, load: async () => Promise.reject(new WebAssembly.LinkError("bad import")), log: quiet() });
+    expect(r.state.failure).toMatchObject({ stage: "load", reason: "package-mismatch" });
   });
 });
 
 describe("failBoot and publishBootState", () => {
   it("marks a wasm-only build as running no engine, and a switchable one as back on TypeScript", () => {
-    expect(failBoot({ build: "wasm-only", engine: "wasm", failure: null }, "host", "trap")).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "host", message: "trap" } });
-    expect(failBoot({ build: "switchable", engine: "wasm", failure: null }, "start", "x")).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", message: "x" } });
+    expect(failBoot({ build: "wasm-only", engine: "wasm", failure: null }, "host", "attach-refused", "trap")).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "attach-refused", message: "trap" } });
+    expect(failBoot({ build: "switchable", engine: "wasm", failure: null }, "start", "boot-error", "x")).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", reason: "boot-error", message: "x" } });
   });
 
   it("publishes the state for tooling", () => {
@@ -82,23 +103,23 @@ describe("failBoot and publishBootState", () => {
 
 describe("engineFailureCopy", () => {
   it("says what happened, why, and what to try, with the offline step only offline", () => {
-    const online = engineFailureCopy({ stage: "load", message: "404" }, true);
+    const online = engineFailureCopy({ stage: "load", reason: "boot-error", message: "404" }, true);
     expect(online.headline).toMatch(/could not start/);
     expect(online.reason).toBe("404");
     expect(online.steps[0]).toMatch(/^Reload the page/);
     expect(online.steps.some((s) => /offline/.test(s))).toBe(false);
-    const offline = engineFailureCopy({ stage: "load", message: "404" }, false);
+    const offline = engineFailureCopy({ stage: "load", reason: "boot-error", message: "404" }, false);
     expect(offline.steps.some((s) => /You appear to be offline/.test(s))).toBe(true);
   });
 
   it("tells a mid-game stop apart from a failed start", () => {
-    const host = engineFailureCopy({ stage: "host", message: "x" }, true);
+    const host = engineFailureCopy({ stage: "host", reason: "attach-refused", message: "x" }, true);
     expect(host.headline).toMatch(/stopped running this tower, so the game has stopped/);
     expect(host.steps[0]).toMatch(/continue from your last save/);
   });
 
   it("keeps the copy free of em-dashes", () => {
-    const all = [engineFailureCopy({ stage: "host", message: "" }, false), engineFailureCopy({ stage: "load", message: "" }, false)].flatMap((c) => [c.headline, ...c.steps]);
+    const all = [engineFailureCopy({ stage: "host", reason: "attach-refused", message: "" }, false), engineFailureCopy({ stage: "load", reason: "boot-error", message: "" }, false)].flatMap((c) => [c.headline, ...c.steps]);
     for (const line of all) expect(line).not.toMatch(/\u2014/);
   });
 });

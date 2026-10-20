@@ -1,7 +1,9 @@
 import type { Simulation } from "../engine/Simulation";
 import { checkBinding, type WasmModule } from "../dualrun/binding";
-import { attachWasmHost, type WasmHost } from "./wasmHost";
+import { readCatalog } from "../dualrun/catalog";
+import { attachWasmHost, refuseForeignCatalog, type WasmHost } from "./wasmHost";
 import { ENGINE_DIR, ENGINE_GLUE } from "./enginePackageNames";
+import { EngineBootError, type FallbackReason, type FallbackStage } from "./engineBoot";
 
 /**
  * The app side of the WASM switch: load the browser package, host the
@@ -19,7 +21,19 @@ export interface WasmHostStatus {
   starts: number;
   /** Whether the current tower runs on the engine (false after a refusal). */
   hosted: boolean;
+  /** Towers left on the TypeScript engine (or, in a wasm-only build, the
+   *  stop) so far, every one counted where `errors` keeps only the first 50. */
+  fallbacks: number;
+  /** The code and stage of the latest fallback, as analytics reports it
+   *  (`engine_status`); null while there has been none. */
+  lastFallback: HostFallback | null;
   errors: string[];
+}
+
+/** A fallback as codes only: the message stays in `errors` and the log. */
+export interface HostFallback {
+  reason: FallbackReason;
+  stage: FallbackStage;
 }
 
 export interface WasmHostApp {
@@ -44,26 +58,38 @@ export function enginePackageUrl(base = import.meta.env.BASE_URL, href = globalT
   return new URL(`${base}${ENGINE_DIR}${ENGINE_GLUE}`, href).href;
 }
 
-/** Load and initialize the browser package. */
+/** Load and initialize the browser package. A package that loads but lacks
+ *  what this shell calls is a mismatched package (a shell and an engine from
+ *  different builds), coded so analytics tells it from a broken engine. */
 export async function loadWasmEngine(url = enginePackageUrl()): Promise<WasmModule> {
   const mod = (await import(/* @vite-ignore */ url)) as { default: () => Promise<unknown> };
   await mod.default();
-  return checkBinding(mod);
+  try {
+    return checkBinding(mod);
+  } catch (e) {
+    throw new EngineBootError("package-mismatch", e instanceof Error ? e.message : String(e));
+  }
 }
 
 export interface WasmHostOptions {
   /** A wasm-only build: a tower the host refuses is fatal, never left on the
    *  TypeScript engine. */
   strict?: boolean;
-  /** Called once, in strict mode, with the reason the host could not hold a tower. */
-  onFatal?: (message: string) => void;
+  /** Called once, in strict mode, with the reason the host could not hold a
+   *  tower and its code (`attach-refused`, or `package-mismatch` for a
+   *  package whose catalogs this build cannot draw). */
+  onFatal?: (message: string, reason: FallbackReason) => void;
   /** When the read model follows the engine (`attachWasmHost`'s option):
    *  "step" (the default) or the experimental "frame" (`?engine=wasm-frame`). */
   sync?: "step" | "frame";
+  /** Called with the codes of every tower the host would not take, the first
+   *  one included, after the status records it. A throw is reported, never
+   *  passed back into the adopt. */
+  onFallback?: (fallback: HostFallback) => void;
 }
 
 export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Console, "info" | "error"> = console, opts: WasmHostOptions = {}): WasmHostHandle {
-  const status: WasmHostStatus = { engine: "wasm", starts: 0, hosted: false, errors: [] };
+  const status: WasmHostStatus = { engine: "wasm", starts: 0, hosted: false, fallbacks: 0, lastFallback: null, errors: [] };
   let host: WasmHost | null = null;
   let fatal = false;
   const noteError = (message: string) => {
@@ -84,7 +110,37 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
       noteError(`letting go of the last tower: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
-  const follow = (sim: Simulation) => {
+  // Whether the package's catalogs are foreign to this build: the attach
+  // reads both and refuses every tower then, and the cause is a shell and an
+  // engine from different deploys (#1046), so the code is `package-mismatch`.
+  // Only a catalog the engine handed over and this build rejects (its version,
+  // its shape, another world) counts. A catalog call that throws or returns no
+  // JSON is the engine failing, which stays `attach-refused` and is asked
+  // again at the next refusal. A verdict is kept: the package cannot change
+  // under the page.
+  let foreign: boolean | undefined;
+  const foreignPackage = (): boolean => {
+    if (foreign !== undefined) return foreign;
+    if (typeof mod.catalog !== "function") return (foreign = true);
+    for (const mode of ["classic", "modern"] as const) {
+      let text: string;
+      try {
+        text = mod.catalog(mode);
+        JSON.parse(text);
+      } catch {
+        return false;
+      }
+      try {
+        refuseForeignCatalog(readCatalog({ catalog: () => text }, mode));
+      } catch {
+        return (foreign = true);
+      }
+    }
+    return (foreign = false);
+  };
+  // `stage` says which tower this is: the first one (`start`), a load or a
+  // new game (`adopt`), or an undo restore (`undo`).
+  const follow = (sim: Simulation, stage: FallbackStage) => {
     release();
     try {
       host = attachWasmHost(sim, mod, { sync: opts.sync });
@@ -94,18 +150,25 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     } catch (e) {
       const message = `not hosting this tower: ${e instanceof Error ? e.message : String(e)}`;
       noteError(message);
+      status.fallbacks++;
+      status.lastFallback = { reason: foreignPackage() ? "package-mismatch" : "attach-refused", stage };
+      try {
+        opts.onFallback?.(status.lastFallback);
+      } catch (err) {
+        log.error(`[wasm] reporting the fallback failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
       if (opts.strict && !fatal) {
         fatal = true;
         // The stop is reported, never thrown into the adopt that caused it.
         try {
-          opts.onFatal?.(message);
+          opts.onFatal?.(message, status.lastFallback.reason);
         } catch (err) {
           log.error(`[wasm] stopping the game failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     }
   };
-  follow(app.sim);
+  follow(app.sim, "start");
 
   const adopt = app.adoptSim;
   const ownAdopt = Object.getOwnPropertyDescriptor(app, "adoptSim");
@@ -123,7 +186,7 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     try {
       adopt.call(this, sim, preserveHistory);
     } finally {
-      if (!stopped) follow(app.sim);
+      if (!stopped) follow(app.sim, preserveHistory ? "undo" : "adopt");
     }
   };
   Object.defineProperty(app, "adoptSim", { value: wrappedAdopt, configurable: true, writable: true });

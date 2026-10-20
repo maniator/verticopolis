@@ -18,10 +18,15 @@ import { TOWER_FILE_MAGIC, toBase64 } from "./saveCompression";
 export type VctowerWriter = (json: string, appVersion: string, savedAtMs: number) => string;
 
 let engineWriter: VctowerWriter | null = null;
+/** Told once when the engine writer turns itself off (the S2 latch-off), so
+ *  boot can report it (`engine_status`, `writer_latched`). */
+let onLatchOff: (() => void) | null = null;
 
-/** Write through the engine from now on, or (with null) through fflate. */
-export function setEngineWriter(writer: VctowerWriter | null): void {
+/** Write through the engine from now on, or (with null) through fflate.
+ *  `onLatch` hears about a latch-off once; it is replaced by the next call. */
+export function setEngineWriter(writer: VctowerWriter | null, onLatch: (() => void) | null = null): void {
   engineWriter = writer;
+  onLatchOff = writer ? onLatch : null;
 }
 
 /** Saves past this size skip the engine: it parses and re-prints the whole
@@ -43,7 +48,15 @@ export function packVctower(json: string, bytes: Uint8Array, stamp: { appVersion
       throw new Error("the engine wrote no .vctower file");
     } catch (e) {
       engineWriter = null;
+      const latched = onLatchOff;
+      onLatchOff = null;
       console.error("[wasm] the engine did not write this save; writing saves on the TypeScript side from now on:", e);
+      // Reported, never allowed to cost the save it is reporting on.
+      try {
+        latched?.();
+      } catch {
+        /* best-effort report */
+      }
     }
   }
   return TOWER_FILE_MAGIC + "\n" + toBase64(deflateSync(bytes, { level: 1 })) + "\n";
