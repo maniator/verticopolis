@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use serde_json::{json, Value};
 use verticopolis_engine::facilities::{Kind, FACILITIES};
 use verticopolis_engine::rng::Rng;
-use verticopolis_engine::scenario::{run_scenario, RunError, Scenario};
+use verticopolis_engine::scenario::{run_scenario, run_scenario_detailed, RunError, Scenario};
 
 const LEFT: i64 = 150;
 const RIGHT: i64 = 230;
@@ -119,7 +119,11 @@ fn main() {
         } else if roll < 86 {
             let dt = [1, 3, 10, 20, 60][rng.int(0, 4) as usize];
             let times = rng.int(5, 240);
-            json!({"op": "tick", "dt": dt, "times": times, "checkpointEvery": (times / 4).max(1)})
+            // A checkpoint every in-game hour of the run (`60 / dt` ticks), or
+            // every quarter of a short run, so the compare localizes a
+            // divergence to the hour at the latest.
+            let hour = 60 / dt;
+            json!({"op": "tick", "dt": dt, "times": times, "checkpointEvery": hour.min((times / 4).max(1))})
         } else if roll < 89 {
             json!({"op": "startFire"})
         } else if roll < 91 {
@@ -169,7 +173,10 @@ fn main() {
         }
     }
     commands.push(json!({"op": "checkpoint", "label": "end"}));
-    let final_run = run(&commands);
+    let final_scenario = scenario_value(&commands);
+    let final_text = serde_json::to_string(&final_scenario).unwrap();
+    let (final_run, details) =
+        run_scenario_detailed(&Scenario::parse(&final_text).unwrap(), &suite);
     assert!(final_run.error.is_none(), "{:?}", final_run.error);
     std::fs::create_dir_all(&out).expect("out dir");
     let scenario_path = out.join(format!("{id}.json"));
@@ -181,11 +188,16 @@ fn main() {
     let checkpoints: Vec<Value> = final_run
         .checkpoints
         .iter()
-        .map(|c| json!({"label": c.label, "state": c.state, "crowd": c.crowd}))
+        .map(|c| json!({"label": c.label, "state": c.state, "crowd": c.crowd, "events": c.events}))
         .collect();
     std::fs::write(
         out.join(format!("{id}.rs.json")),
         serde_json::to_string_pretty(&checkpoints).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(
+        out.join(format!("{id}.rs.detail.json")),
+        serde_json::to_string(&details).unwrap(),
     )
     .unwrap();
     println!(
