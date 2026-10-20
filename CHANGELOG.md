@@ -13,9 +13,13 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.39.0
+## 2.41.0
 
 - A save made while an exterminator is booked now remembers which rooms were booked, so after a reload the treatment covers the same rooms as if you had kept playing.
+
+## 2.39.0
+
+- Reaching TOWER while an emergency or an update prompt is waiting for your answer no longer freezes the game, and a saved tower that was stuck this way now continues. The question comes first, then the congratulations. A tab that is already frozen needs to be closed and the game reopened to pick up the fix.
 
 ## 2.38.0
 
