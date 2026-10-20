@@ -46,6 +46,36 @@ const SERVED_CATEGORIES: Category[] = ["html", "app-js", "css", "wasm-glue", "wa
 /** A verdict needs this many samples per side; below it, "inconclusive". */
 export const MIN_VERDICT_N = 6;
 
+/** The attribution pass cut into five parts: the engine step, the hourly serialize, the other per-step export reads, JSON.parse, and the rest of the host JavaScript (merge into the read model and the like). */
+export interface AttributionShares {
+  tick: number;
+  serialize: number;
+  syncReads: number;
+  parse: number;
+  merge: number;
+}
+
+type Attribution = NonNullable<ProcessRun["scenarios"][string]["hosted"][string]["attribution"]>;
+
+/**
+ * The five shares of one attribution pass. They add to one by construction:
+ * each part is clamped into the time its category owns (serialize inside the
+ * exports, parse inside the host JavaScript) and the denominator is the sum
+ * of the three categories. Null for a pass with no time or for a stored
+ * result from before the split (no `byExport` or `parseMs`).
+ */
+export function attributionShares(a: Attribution): AttributionShares | null {
+  if (!a.byExport || !Number.isFinite(a.parseMs)) return null;
+  const tick = Math.max(0, a.engineTickMs);
+  const exports = Math.max(0, a.engineExportMs);
+  const host = Math.max(0, a.hostJsMs);
+  const total = tick + exports + host;
+  if (!(total > 0)) return null;
+  const serialize = Math.min(exports, Math.max(0, a.byExport.serialize?.ms ?? 0));
+  const parse = Math.min(host, Math.max(0, a.parseMs));
+  return { tick: tick / total, serialize: serialize / total, syncReads: (exports - serialize) / total, parse: parse / total, merge: (host - parse) / total };
+}
+
 function picks(scenarios: readonly string[], throttles: readonly string[]): Pick[] {
   const out: Pick[] = [];
   const slow = String(Math.max(...throttles.map(Number)));
@@ -98,10 +128,27 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
         if (mode === "hosted") {
           // Shares of the wrapped attribution pass's own step time (the
           // wrappers cost time, so its milliseconds are not the timed pass's).
-          const share = (key: "engineTickMs" | "engineExportMs" | "hostJsMs") => (r: ProcessRun) => { const a = r.scenarios[s]?.hosted[t]?.attribution; return a && a.wrappedTotalMs > 0 ? a[key] / a.wrappedTotalMs : null; };
-          step("share in the engine's tick", "ratio", "lower", share("engineTickMs"), ["wasm"]);
-          step("share in exports the host reads", "ratio", "lower", share("engineExportMs"), ["wasm"]);
-          step("share in host JS sync", "ratio", "lower", share("hostJsMs"), ["wasm"]);
+          // Every share row below comes from `attributionShares`, so the
+          // rows of one pass share one denominator and add to one; the
+          // medians across repetitions do not add to one exactly.
+          const part = (...keys: (keyof AttributionShares)[]) => (r: ProcessRun) => {
+            const a = r.scenarios[s]?.hosted[t]?.attribution;
+            const shares = a ? attributionShares(a) : null;
+            return shares ? keys.reduce((sum, k) => sum + shares[k], 0) : null;
+          };
+          step("share in the engine's tick", "ratio", "lower", part("tick"), ["wasm"]);
+          step("share in exports the host reads", "ratio", "lower", part("serialize", "syncReads"), ["wasm"]);
+          step("share in host JS sync", "ratio", "lower", part("parse", "merge"), ["wasm"]);
+          // The same pass cut the way the release plan names the host's
+          // work: the engine step, the per-step sync reads, the hourly
+          // serialize, and the host JS split into JSON.parse and the rest
+          // (the merge into the read model and everything else, which also
+          // holds the host JavaScript around the per-step sync reads).
+          step("share in the hourly serialize", "ratio", "lower", part("serialize"), ["wasm"]);
+          step("share in per-step sync reads", "ratio", "lower", part("syncReads"), ["wasm"]);
+          step("share in JSON.parse", "ratio", "lower", part("parse"), ["wasm"]);
+          step("share in merge and the rest of host JS", "ratio", "lower", part("merge"), ["wasm"]);
+          step("serialize calls", "count", "lower", (r) => { const a = r.scenarios[s]?.hosted[t]?.attribution; return a?.byExport ? (a.byExport.serialize?.calls ?? 0) : null; }, ["wasm"]);
         }
       }
       for (const [group, slot] of [["frames", "frames"], ["frames-audio", "framesAudio"]] as const) {
