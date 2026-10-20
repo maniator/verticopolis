@@ -124,7 +124,11 @@ export function pairedDifferences(a: { reps: readonly number[]; values: readonly
   const diffs: number[] = [];
   a.reps.forEach((rep, i) => {
     const j = b.reps.indexOf(rep);
-    if (j >= 0) diffs.push(a.values[i] - b.values[j]);
+    if (j < 0) return;
+    const x: unknown = a.values[i];
+    const y: unknown = b.values[j];
+    // A results file holds a damaged value as null, and null minus a number is a finite, wrong difference: only two real numbers make one.
+    diffs.push(typeof x === "number" && typeof y === "number" ? x - y : Number.NaN);
   });
   return diffs;
 }
@@ -142,7 +146,7 @@ export interface PairedDifference {
 /** The median of a minus b, paired by repetition number, with the 95% order-statistic interval of the median; null when nothing pairs or a difference is not a finite number. The one definition the M4 and M5 gates and their report cells read. */
 export function pairedDifference(a: { reps: readonly number[]; values: readonly number[] }, b: { reps: readonly number[]; values: readonly number[] }): PairedDifference | null {
   const diffs = pairedDifferences(a, b);
-  // A damaged value (a JSON null reads as NaN) leaves the row without a statistic, thin or not.
+  // A damaged value (a JSON null) leaves the row without a statistic, thin or not.
   if (!diffs.length || !diffs.every(Number.isFinite)) return null;
   const s = summarize(diffs);
   return { n: s.n, median: s.median, ciLow: s.medianCiLow, ciHigh: s.medianCiHigh };

@@ -45,10 +45,13 @@ describe("coldStartDifferenceLines", () => {
   });
 
   it("leaves a row with a damaged value without a statistic, thin or not, instead of throwing", () => {
-    const thin = [row("ts", "1", [10, 20, 30]), row("wasm", "1", [11, Number.NaN, 31])];
+    // A results file writes NaN as null, so the rows go through JSON as they would on disk.
+    const disk = (rows: MetricRow[]): MetricRow[] => JSON.parse(JSON.stringify(rows));
+    const thin = disk([row("ts", "1", [10, 20, 30]), row("wasm", "1", [11, Number.NaN, 31])]);
     expect(coldStartDifferenceLines(thin, null)).toEqual([]);
     expect(coldStartDifference({ metrics: thin }, "1")).toBeNull();
-    const full = [row("ts", "1", Array(10).fill(10)), row("wasm", "1", [...Array(9).fill(11), Number.NaN])];
+    const full = disk([row("ts", "1", Array(10).fill(10)), row("wasm", "1", [...Array(9).fill(11), Number.NaN])]);
+    expect(full[1].values[9]).toBeNull();
     expect(coldStartDifferenceLines(full, null)).toEqual([]);
     expect(coldStartDifference({ metrics: full }, "1")).toBeNull();
   });
