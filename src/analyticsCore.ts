@@ -1,6 +1,9 @@
 import { analyticsAdapter, type EventProps } from "./analyticsAdapter";
 import { APP_VERSION } from "./appVersion";
 import { telemetryHostAllowed } from "./telemetry";
+import type { EngineBuild, EngineKind, EngineStatusTrigger } from "./analyticsEngineStatus";
+import type { FallbackReason, FallbackStage } from "./wasmhost/engineBoot";
+import type { EngineChoice } from "./wasmhost/engineChoice";
 
 /**
  * Gameplay analytics core: the typed event vocabulary, the cross-cutting common
@@ -201,6 +204,30 @@ export interface GameplayEvents {
    *  ZERO so "fraction of sessions that had a fire" has its denominator. Counts
    *  only, never a currency figure. */
   session_emergencies: { fires: number; firesGutRooms: number; bombs: number };
+  /** The reliability instrument (`analyticsEngineStatus.ts`, issue #1081):
+   *  which engine this page life runs, whether it fell back and why, and
+   *  whether the engine save writer turned itself off. Every value is a code
+   *  from a closed list; no error text is ever sent. One `settle` row per page
+   *  life, then a row per later fallback or latch-off (capped at 10), and a
+   *  `summary` at a hide when the cap dropped one.
+   *
+   *  Count it through `scripts/engine-reliability.mjs`, never by rows: a page
+   *  life sends several, `fallbacks` is a running count (take its highest per
+   *  `page_life`), and a session (`distinct_id`) spans several page lives. Its
+   *  fields, purpose and retention are in `docs/analytics-data-map.md`. */
+  engine_status: {
+    trigger: EngineStatusTrigger;
+    engine_requested: EngineChoice;
+    engine: EngineKind;
+    build: EngineBuild;
+    fallback_reason: FallbackReason;
+    fallback_stage: FallbackStage;
+    fallbacks: number;
+    writer_latched: boolean;
+    page_life: string;
+    version: string;
+    sha: string;
+  };
 }
 
 /** The closed set of gameplay economy actions {@link import("./analyticsActions").trackEconomyAction}

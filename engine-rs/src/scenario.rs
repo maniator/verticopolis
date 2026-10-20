@@ -7,6 +7,8 @@ use crate::clock::GameMode;
 use crate::econ::rent_of;
 use crate::facilities::Kind;
 use crate::gameplay::batch_json;
+use crate::scenario_detail::checkpoint_detail;
+pub use crate::scenario_detail::CheckpointDetail;
 use crate::sim::Simulation;
 pub use crate::snapshot::state_view;
 use crate::suite::fixture_path;
@@ -563,7 +565,18 @@ pub struct Run {
 /// Run a scenario from the conformance directory `suite` ([`fixture_path`]),
 /// collecting checkpoints until it finishes or the port cannot continue.
 pub fn run_scenario(s: &Scenario, suite: &std::path::Path) -> Run {
-    run_scenario_inner(s, suite, None).0
+    run_scenario_inner(s, suite, None, None).0
+}
+
+/// [`run_scenario`], also recording a [`CheckpointDetail`] at every
+/// checkpoint (the seeded differential's wider compare).
+pub fn run_scenario_detailed(
+    s: &Scenario,
+    suite: &std::path::Path,
+) -> (Run, Vec<CheckpointDetail>) {
+    let mut details = Vec::new();
+    let run = run_scenario_inner(s, suite, None, Some(&mut details)).0;
+    (run, details)
 }
 
 /// Run a scenario up to (and including) the checkpoint `label`, returning
@@ -573,7 +586,7 @@ pub fn run_scenario_until(
     suite: &std::path::Path,
     label: &str,
 ) -> Result<Simulation, String> {
-    let (run, sim) = run_scenario_inner(s, suite, Some(label));
+    let (run, sim) = run_scenario_inner(s, suite, Some(label), None);
     match (sim, run.error) {
         (Some(sim), _) => Ok(sim),
         (None, Some(RunError::Failed { index, what })) => {
@@ -590,7 +603,9 @@ fn run_scenario_inner(
     s: &Scenario,
     suite: &std::path::Path,
     stop_at: Option<&str>,
+    details: Option<&mut Vec<CheckpointDetail>>,
 ) -> (Run, Option<Simulation>) {
+    let details = std::cell::RefCell::new(details);
     let mut out = Vec::new();
     let mut sim = match start_sim(&s.start, suite) {
         Ok(sim) => sim,
@@ -629,6 +644,9 @@ fn run_scenario_inner(
         }
         let mut events = std::mem::take(&mut *carried.borrow_mut());
         events.extend(sim.gameplay.drain());
+        if let Some(d) = details.borrow_mut().as_mut() {
+            d.push(checkpoint_detail(sim, &label));
+        }
         out.push(Checkpoint {
             label,
             state: digest(&state_view(sim)),
