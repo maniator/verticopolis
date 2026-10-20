@@ -1,0 +1,42 @@
+import { announceLive } from "./game/liveRegion";
+
+/**
+ * The loading line on the boot cover (#1132). Booting on the WASM engine waits
+ * for its package before the app exists, and the cover is a plain sky until
+ * then. After a short wait (so a cached or fast load never flashes it) the
+ * cover says the engine is loading, and a screen reader hears it through
+ * `#a11y-live`. After a longer wait it says why a first visit takes a while.
+ * The line goes when the load settles; the cover itself goes with the splash
+ * or a boot message (`hideBootCover` in bootstrap.ts).
+ */
+export const ENGINE_LOADING_DELAY_MS = 1200;
+export const ENGINE_SLOW_AFTER_MS = 6000;
+export const ENGINE_LOADING_TEXT = "Loading the game engine...";
+export const ENGINE_SLOW_TEXT = "The first visit downloads the engine once. Later visits start faster.";
+
+/** Start the wait; the returned function ends it and removes anything shown. */
+export function showEngineLoading(doc: Document = document): () => void {
+  let line: HTMLElement | null = null;
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  const show = () => {
+    const cover = doc.getElementById("boot-cover");
+    if (!cover) return;
+    line = doc.createElement("p");
+    line.className = "boot-loading";
+    line.textContent = ENGINE_LOADING_TEXT;
+    cover.appendChild(line);
+    announceLive(ENGINE_LOADING_TEXT);
+  };
+  const slow = () => {
+    if (line) line.textContent = `${ENGINE_LOADING_TEXT} ${ENGINE_SLOW_TEXT}`;
+  };
+  timers.push(setTimeout(show, ENGINE_LOADING_DELAY_MS), setTimeout(slow, ENGINE_SLOW_AFTER_MS));
+  return () => {
+    for (const t of timers) clearTimeout(t);
+    line?.remove();
+    // The region only held our announcement; leave a later one alone.
+    const live = doc.getElementById("a11y-live");
+    if (line && live?.textContent === ENGINE_LOADING_TEXT) live.textContent = "";
+    line = null;
+  };
+}

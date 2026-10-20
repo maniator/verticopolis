@@ -1,0 +1,101 @@
+# Story: verified engine load (#985 criterion 5, slice 2)
+
+Status: in progress (slice 2a). Design:
+`_bmad-output/planning-artifacts/design/design-engine-package-set-consistency-2026-10-15.md`
+(sections 5.3 to 5.5, 6, 10, 11). Slice 1 (#1103) shipped the record, the
+verifier and the precache integrity. This story wires the verifier into every
+route that loads the engine.
+
+## Why
+
+A page that loads the WASM glue from one deploy and the binary from another
+(or a corrupted cache entry) runs a mixed engine. Slice 1 can tell the bytes
+apart but nothing calls it. #985 criterion 5 is a 3.0 release blocker.
+
+## Split
+
+The design is too large for one reviewable PR, and the wasm-only flip needs
+only the second half. Both halves are required before #985 can close.
+
+**2a, the gate (this PR).** Every load route fetches, verifies and
+instantiates the same bytes.
+
+**2b, recovery and proof.** Reason-specific failure screens, Copy Diagnostics
+and Repair engine files, cache-key rotation at the first schema 2 worker, the
+`unverifiable` analytics code (needs the owner's production OK), the install
+race, eviction, repair and first-install e2e specs, and the pre-registered
+load-cost measurement on the owner's PC (booked until about 02:00 UTC on
+2026-10-21).
+
+## 2a acceptance criteria
+
+1. **One verified loader.** `loadEngineModule` (new, `src/wasmhost/`)
+   fetches `BUILD.json`, the glue and the binary through
+   `verifyEnginePackage`, imports the glue from a Blob made of the verified
+   bytes, calls `init({ module_or_path })` with the verified binary, and
+   revokes the Blob URL when the import settles. No file is fetched twice.
+2. **Three routes use it.** The main-thread boot (`loadWasmEngine`), the
+   engine worker (`engineWorker.ts`, which also covers the respawn path) and
+   the dual run's worker (`dualrun/worker.ts`). No other module imports the
+   glue by URL.
+3. **The deadline is the loader's.** `loadBootEngine` hands the load an
+   `AbortSignal` and aborts it at the existing 90 s limit. The loader checks
+   the signal after every await and before the import and the init, and a
+   result that arrives after the deadline is dropped.
+4. **Failure codes.** A refusal keeps the closed `FALLBACK_REASONS` list as it
+   is: `mismatch` reports `package-mismatch`, `load-failed` and `unverifiable`
+   report `boot-error`, the deadline reports `boot-timeout`. The boot state's
+   `failure` also carries the package detail (kind, file, both ids, whether a
+   worker controlled the page), codes and hex ids only, never in analytics.
+   A new `unverifiable` code waits for the owner (2b).
+5. **Builds.** A switchable build that is refused stays on the TypeScript
+   engine (existing behavior, one `console.error`). A wasm-only build stops
+   with the existing engine failure screen. The screens' copy is 2b.
+6. **The shell carries the id.** `__ENGINE_PACKAGE__` is referenced by the
+   shipped loader chunk, and `scripts/verify-precache.ts` fails the build when
+   a chunk carries another id, when no chunk carries it, or when the
+   development-only skip survives into `dist/`.
+7. **The dev skip cannot ship.** `import.meta.env.DEV` skips verification so
+   `npm run wasm:build` during a dev session does not need a restart. The
+   branch holds a unique marker string, and `verify-precache` (run by
+   `postbuild`) fails when that string is in any emitted file.
+8. **Real second build.** The offline e2e builds deployment B with a second
+   `vite build` (a public folder with the salted package), so B's shell
+   carries B's id. The existing update spec then proves B's engine runs with
+   no fallback.
+9. **Tamper e2e.** A tampered precache entry (binary, then glue) is refused
+   with the boot state naming both ids; an uncontrolled page routed to a
+   salted binary is refused; a persisting mismatch causes no reload loop.
+10. **Hot path.** The loader runs once per page life and once per worker
+    (checklist `docs/performance/hot-path-review.md`): one linear pass over
+    about 1.45 MB for the digests, no per-frame or per-step code.
+11. **Version.** Minor bump (opt-in players on `?engine=wasm` see refusals,
+    and `sw.js` and the shell change).
+
+## Code classification
+
+Permanent host infrastructure: the loader, the failure detail, the shell id
+check, the dev-skip guard, the e2e deployments.
+
+Temporary, removed with the TypeScript engine (line added to "What it
+removes" in `story-engine-retire-typescript.md`): the switchable build's
+branch that keeps the game on the TypeScript engine after a refused package
+(`loadBootEngine`'s `!wasmOnly` path and its tests). Nothing new is added for
+it in 2a; the code already exists and this slice only gives it a reason.
+
+## Coordination
+
+- #963 stamps a `verticopolis.build` wasm custom section in
+  `scripts/wasm-build.ts` before any digest is taken, and adds an optional
+  `crate` key and `sources` to the expected record. This slice reads
+  `BUILD.json` and never writes it; it changes neither the record nor the
+  digest code, and the e2e fixture recomputes B's record with
+  `engineBuildRecord`.
+- #874 (merged) owns the runtime fallback; this slice only feeds it a reason.
+
+## Out of scope for 2a
+
+Failure copy, Copy Diagnostics, Repair, cache-key rotation, the
+`unverifiable` code, eviction, install-race and first-install specs, the load
+measurement, Safari and Firefox passes (a merge condition for the wasm-only
+flip, design section 11).

@@ -1593,6 +1593,19 @@ ul.slots .slot-actions .btn {
   z-index: 50;
   background: var(--splash-sky);
 }
+/* The loading line the boot flow adds after a short wait on the WASM engine
+   (src/engineLoading.ts). */
+.boot-loading {
+  position: absolute;
+  left: 50%;
+  bottom: 18%;
+  max-width: min(32em, 86vw);
+  margin: 0;
+  transform: translateX(-50%);
+  text-align: center;
+  color: #cdd3da;
+  font: 15px/1.5 system-ui, sans-serif;
+}
 .splash-stars,
 .splash-sun,
 .splash-skyline {
