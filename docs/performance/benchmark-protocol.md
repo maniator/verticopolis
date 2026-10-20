@@ -254,13 +254,18 @@ A run proves it measured the commit it names.
    `git -c diff.suppressBlankEmpty=false -c core.compression=-1 -c core.quotepath=true diff HEAD --binary --full-index --no-color --no-ext-diff --no-textconv --no-renames --src-prefix=a/ --dst-prefix=b/ -U3 --inter-hunk-context=0 --diff-algorithm=myers --indent-heuristic -O/dev/null --ignore-submodules=none -- . ':(exclude)docs/performance/results'`
    with `GIT_DIFF_OPTS` removed from git's environment, so the machine's git
    config and environment do not change it and the same command piped to
-   `sha256sum` reproduces it. With `core.autocrlf=true` git normalizes
-   tracked files to LF before it diffs them, so the tracked hash matches
-   across a CRLF and an LF checkout. Untracked files are hashed as the raw
-   bytes on disk, so a CRLF checkout can hash an untracked file differently
-   from an LF one. A symlink is hashed by its target text. The record is
-   **incomplete** (and the run void) when git fails, a file cannot be read or
-   is over 256 MiB; the report says so instead of printing "none". It holds
+   `sha256sum` reproduces it (on Windows, run the command from Git Bash so
+   the bytes are not re-encoded). The hash identifies a tree on one machine
+   under one git configuration; it is not promised to match another
+   machine's. With `core.autocrlf=true` git normalizes tracked files to LF
+   before it diffs them, and untracked files are hashed as the raw bytes on
+   disk, so a CRLF checkout can hash an untracked file differently from an LF
+   one. A symlink is hashed by its target text. The record is **incomplete**
+   (and the run void) when git fails, a file cannot be read or is over
+   256 MiB; the report says so instead of printing "none", and
+   `perf:compare` records a validation error for it. `perf:worker` prints the
+   same report text and does not validate, so a `perf:worker` run with an
+   incomplete record is void by this rule and must be discarded. It holds
    what git reports: ignored files and a mode change under
    `core.fileMode=false` fall outside it (backlog row #1123).
    A tree holding exactly RUN-0a's patch (SHA-256 `cf781ee6…d73a1`) on
@@ -341,16 +346,16 @@ every desktop metric at both throttles. A speed metric passes only when the
 bound below 1.0 is "beat". Tolerances come from measured noise (section 6.1),
 never from a number picked to pass.
 
-| # | Metric | Scenarios | Pass rule |
-| --- | --- | --- | --- |
-| M1 | Bare engine, 720 steps | medium, large; 1x, 4x | Ratio upper bound at most 1 + δ |
-| M2 | Hosted main-thread time, 720 steps | medium, large; 1x, 4x | As M1 |
-| M3 | Frame time p99, and 1% low FPS | medium, large; 1x, 4x | As M1, for each |
-| M4 | Main-thread blocking (long tasks past 50 ms) | large; 1x, 4x | Paired difference upper bound at most ε |
-| M5 | Cold start to ready | 1x, 4x | Paired difference upper bound at most that throttle's ε |
-| M6 | Peak JS heaps plus WASM linear memory | large; 1x, 4x | Ratio upper bound at most 1.25 (a memory ceiling, outside δ) |
-| M7 | 5,000+ population fixture in `npm run perf` | CI | A CI tripwire, read on the candidate commit's CI run. Not a desktop metric |
-| M8 | Scripted build-and-demolish scene (PF2) | large; 1x, 4x | Frame p99 as M1, long tasks as M4. Own δ and ε, fixed when PF2 lands |
+| # | Metric | Scenarios | Pass rule | Harness |
+| --- | --- | --- | --- | --- |
+| M1 | Bare engine, 720 steps | medium, large; 1x, 4x | Ratio upper bound at most 1 + δ | `perf:compare` |
+| M2 | Hosted main-thread time, 720 steps | medium, large; 1x, 4x | As M1 | `perf:compare` |
+| M3 | Frame time p99, and 1% low FPS | medium, large; 1x, 4x | As M1, for each | `perf:compare` |
+| M4 | Main-thread blocking (long tasks past 50 ms) | large; 1x, 4x | Paired difference upper bound at most ε | `perf:worker` |
+| M5 | Cold start to ready | 1x, 4x | Paired difference upper bound at most that throttle's ε | `perf:compare` |
+| M6 | Peak JS heaps plus WASM linear memory | large; 1x, 4x | Ratio upper bound at most 1.25 (a memory ceiling, outside δ) | — |
+| M7 | 5,000+ population fixture in `npm run perf` | CI | A CI tripwire, read on the candidate commit's CI run. Not a desktop metric | — |
+| M8 | Scripted build-and-demolish scene (PF2) | large; 1x, 4x | Frame p99 as M1, long tasks as M4. Own δ and ε, fixed when PF2 lands | — |
 
 M5 replaces the old fixed 500 ms cold-start allowance, which would let a
 measured regression pass. A failed verdict stands: a run is repeated only
@@ -367,8 +372,9 @@ noise the tolerance has to cover.
    verdict runs' count: a pass with another count does not pool with them) on
    the medium and large scenarios. How many passes per engine is a parameter of
    `perf:calibrate` (`--min-passes`, default 5), because step 3 ties the count
-   to a coverage limit the owner sets (OD-7).
-2. Each ratio family gets its own δ: M1 and M2 (times), M3 (frames). The
+   to a coverage limit the owner sets (an open amendment to OD-4).
+2. Each ratio family gets its own δ: one for M1 (time), one for M2 (time) and
+   one for M3 (frames). The
    value is the smallest round number that clears the largest A/A upper bound
    across both engines and both throttles. ε does the same for the paired
    differences: one ε for M4's long tasks, and one for M5's cold start at each
@@ -376,13 +382,14 @@ noise the tolerance has to cover.
    the median paired difference (WASM slot minus TypeScript slot, one-sided).
    Not yet: the verdict report has to print that same statistic before M5 can
    be judged against ε.
-3. **Coverage.** For passes that are exchangeable, the chance that a fresh
-   pass lands above the largest of n passes is 1/(n + 1) (before rounding).
+3. **Coverage.** For passes that are exchangeable, on average over
+   the draw of the passes, a fresh pass lands above the largest of n passes
+   with probability 1/(n + 1) (before rounding).
    `perf:calibrate` computes that from the engine with the fewest passes and
    states it as the guarantee. A 5% limit needs at least 20 passes per
    engine. Five passes guarantee only 1/6, about 16.7%, so with five the tool
    reports the calibration as not adoptable unless the owner restates the
-   limit under OD-7 (`--exceedance-limit`). A leave-one-out check runs beside
+   limit (`--exceedance-limit`; the amendment to OD-4). A leave-one-out check runs beside
    it: it leaves each pass out in turn and asks whether that pass lands above
    the candidate the others set. Only the largest pass can, so it reads 0 or
    1 and flags a single outlier the other passes do not cover. It does not
@@ -477,11 +484,14 @@ was raised, and every family has a candidate inside its cap with the
 guarantee under the limit and a clean leave-one-out. `calibration.md` opens
 with the window of the passes (earliest and latest start) and the commit,
 because it is a snapshot, and calls the numbers provisional: it covers M1,
-M2, M3 and M5, M4's long-task ε needs `perf:worker` A/A passes (`perf:worker`
+M2, M3 and M5; M4's long-task ε needs `perf:worker` A/A passes (`perf:worker`
 has no `--aa` yet, follow-up #1111), and nothing in it sets a tolerance until
 the owner adopts the numbers.
 
-Three limits stay open, so the calibration is not complete:
+Two limits stay open, so the calibration is not complete (the harness for each
+metric is the last column of the table above: a tolerance calibrated on one
+harness's noise is not applied to the other's ratios, and RUN-0a's reference
+figures come from `perf:worker`):
 
 - **δ and ε are adopted only from `perf:calibrate`'s output.** RUN-0b collects
   the folders. Nobody reads values off them by hand.
@@ -489,11 +499,6 @@ Three limits stay open, so the calibration is not complete:
   `perf:worker` has no `--aa` (follow-up #1111), so the long-task ε stays
   uncalibrated until that lands. RUN-1 needs M4, so #1111 and its A/A passes
   land before RUN-1, either inside RUN-0b or as a follow-on campaign.
-- **The harness for each metric.** δ and ε for M1, M2, M3 and M5 are
-  calibrated on `perf:compare` noise, so a verdict on those metrics reads
-  `perf:compare`. M4 reads `perf:worker`. RUN-0a's reference figures come from
-  `perf:worker`, and a tolerance calibrated on one harness's noise is not
-  applied to the other's ratios.
 
 ## 7. Scheduled runs
 
@@ -570,7 +575,7 @@ npm.cmd ci
 npm.cmd run wasm:build
 npm.cmd run perf:worker  -- --reps 10 --viewport 1280x720 --out docs/performance/results/<date>-<sha>-run0b-worker-1280x720
 npm.cmd run perf:compare -- --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b
-# A/A passes: as many per engine as section 6.1 step 3 asks for (OD-7), same flags.
+# A/A passes: as many per engine as section 6.1 step 3 asks for (an open amendment to OD-4), same flags.
 # Calibrate them with:
 # npm.cmd run perf:calibrate -- <folders> --out docs/performance/results/<date>-<sha>-calibration
 npm.cmd run perf:compare -- --aa ts   --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-ts-1
@@ -606,9 +611,9 @@ hour's churn, both from `perf:compare`:
   separately and carry no timers.
 - **Churn.** The "Hourly save churn" section is the share of the save's unit
   text that changes from one in-game hour to the next on the WASM engine in
-  Node. The denominator is the unit text of both hours' saves plus the text
-  of units that disappeared (a unit that disappears counts as changed at its
-  old size). The hours are 60 in-game minutes of steps counted from the end of
+  Node. The denominator is the unit text of the later hour's save plus the text
+  of units that disappeared since the earlier hour (a unit that disappears
+  counts as changed at its old size). The hours are 60 in-game minutes of steps counted from the end of
   the warm-up steps, so they start where the scenario starts and not at a clock
   hour (the medium tower starts at :57.47). Every window holds one hour pass,
   at the same position, but that position is the scenario's own. A step that

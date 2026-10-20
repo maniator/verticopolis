@@ -30,15 +30,16 @@ const sha256 = (data: string | Buffer): string => createHash("sha256").update(da
 const EXCLUDE = [":(exclude)docs/performance/results"];
 
 /**
- * Settings that change the diff text, pinned so the same patch hashes the same
- * on every machine: configuration through `-c` before the subcommand, the rest
- * through flags. (`GIT_DIFF_OPTS` is removed from git's environment by the
- * caller.) The hash covers git's raw output bytes, so `git diff <these flags>
- * | sha256sum` reproduces it. Line endings stay as git reports them: with
- * `core.autocrlf=true` git normalizes tracked files to LF before diffing, but
- * untracked files are hashed as the raw bytes on disk, so a CRLF checkout can
- * hash its untracked files differently from an LF one. The hash identifies a
- * tree on one machine and one git configuration.
+ * Settings that change the diff text, pinned so a machine's own git
+ * configuration does not alter it: configuration through `-c` before the
+ * subcommand, the rest through flags. (`GIT_DIFF_OPTS` is removed from git's
+ * environment by the caller.) The hash covers git's raw output bytes, so `git
+ * diff <these flags> | sha256sum` reproduces it. Line endings stay as git
+ * reports them: with `core.autocrlf=true` git normalizes tracked files to LF
+ * before diffing, but untracked files are hashed as the raw bytes on disk, so
+ * a CRLF checkout can hash its untracked files differently from an LF one. The
+ * hash identifies a tree on one machine under one git configuration; it is not
+ * promised to match another machine's.
  */
 const DIFF_CONFIG = ["-c", "diff.suppressBlankEmpty=false", "-c", "core.compression=-1", "-c", "core.quotepath=true"];
 const DIFF_FLAGS = ["--binary", "--full-index", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "--src-prefix=a/", "--dst-prefix=b/", "-U3", "--inter-hunk-context=0", "--diff-algorithm=myers", "--indent-heuristic", "-O/dev/null", "--ignore-submodules=none"];

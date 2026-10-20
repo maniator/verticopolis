@@ -24,7 +24,7 @@ const cell = (m: Metric | undefined): string => {
   return `${fmt(s.median, m!.unit)}${ci}`;
 };
 
-/** Metrics the gate judges by an additive paired difference, not a ratio (protocol section 5, M4: a zero TypeScript reference has no ratio). Their gate cell says so; the harness does not report that difference yet (#1111). */
+/** Metrics the gate judges by an additive paired difference (protocol section 5, M4: a zero TypeScript reference has no ratio). Their gate cell says so; the harness does not report that difference yet (#1111). */
 const DIFFERENCE_GATED = /^main-thread blocking/;
 
 const ratioCell = (r: Ratio | undefined): string => {

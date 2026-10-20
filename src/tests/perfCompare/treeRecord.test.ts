@@ -28,7 +28,7 @@ describe("treeRecord", () => {
     expect(t.complete).toBe(true);
   });
 
-  it("hashes git's raw bytes, not decoded text", () => {
+  it("hashes git's raw bytes without decoding them", () => {
     const bytes = Buffer.from([0x64, 0xff, 0xfe, 0x0a]);
     const t = treeRecord(git({ ...clean, status: " M a\n", diff: bytes, "ls-files": "" }), () => null);
     expect(t.diffSha256).toBe(createHash("sha256").update(bytes).digest("hex"));

@@ -13,7 +13,9 @@ import type { CompareResults } from "./types";
  * required of each engine (default 5, as the protocol says today) and
  * `--exceedance-limit` the coverage limit the stated guarantee must be under
  * (default 0.05); the report states the guarantee for the count used. The
- * owner's OD-7 decision sets the real values.
+ * owner's decision (an open amendment to OD-4) sets the real values; a run
+ * with fewer passes or a looser limit than the defaults is never adoptable
+ * and exits 1.
  */
 export function parseCalibrateArgs(argv: string[]): { folders: string[]; out: string; minPassesPerEngine?: number; exceedanceLimit?: number } {
   const folders: string[] = [];
@@ -58,7 +60,7 @@ export function main(argv: string[], repo: string, now: () => string = () => new
     const text = readFileSync(file);
     let results: CompareResults;
     try {
-      results = JSON.parse(text.toString("utf8")) as CompareResults;
+      results = JSON.parse(text.toString("utf8").replace(/^\uFEFF/, "")) as CompareResults;
     } catch (e) {
       throw new Error(`${file} is not valid JSON: ${(e as Error).message}`);
     }

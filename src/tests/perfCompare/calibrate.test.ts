@@ -35,7 +35,7 @@ interface Spec {
   args?: string[];
   browserVersion?: string;
   exception?: string | null;
-  gpuVerified?: boolean;
+  gpuVerified?: boolean | null;
   tree?: unknown;
   throttles?: number[];
   startedAt?: string;
@@ -50,6 +50,9 @@ const cmp = (group: string, metric: string, scenario: string, throttle: string, 
 function pass(i: number, s: Spec = {}): Folder {
   const reps = s.reps ?? 10;
   const upper = s.upper ?? 1.01;
+  // Unset means the verified card; null means no WebGL read at all.
+  const renderer = s.renderer === undefined ? RTX : s.renderer;
+  const webgl = renderer === null ? null : { renderer, vendor: "v" };
   const scenarios = s.scenarios ?? ["small", "medium", "large"];
   const comparisons = scenarios.flatMap((sc) =>
     ["1", "4"].flatMap((t) => [cmp("sim-raw", "total for fixed duration", sc, t, upper, s.pairs), cmp("sim-hosted", "total for fixed duration", sc, t, upper, s.pairs), cmp("frames", "frame time p99", sc, t, upper, s.pairs), cmp("frames", "1% low FPS", sc, t, upper, s.pairs)]),
@@ -59,10 +62,10 @@ function pass(i: number, s: Spec = {}): Folder {
   return {
     folder: `aa-${i}`,
     results: {
-      startedAt: s.startedAt ?? `2026-10-21T0${i % 10}:00:00Z${i}`,
+      startedAt: s.startedAt ?? new Date(Date.UTC(2026, 9, 21, 0, i)).toISOString(),
       config: { aa: s.engine === undefined ? alternate(i) : s.engine, reps, scenarios, throttles: s.throttles ?? [1, 4], quick: s.quick ?? false, dt: 2, steps: 720 },
-      browser: { version: s.browserVersion ?? "141.0.1", executable: null, channel: s.channel ?? null, args: s.args ?? [], rendererException: s.exception ?? null, gpuVerified: s.gpuVerified },
-      runs: [{ ok: true, page: { webgl: s.renderer === null ? null : { renderer: s.renderer ?? RTX, vendor: "v" } }, rendererEnd: s.rendererEnd === undefined ? (s.renderer ?? (s.renderer === null ? null : RTX)) : s.rendererEnd, ...(s.rendererEndCold === undefined ? {} : { rendererEndCold: s.rendererEndCold }) }],
+      browser: { version: s.browserVersion ?? "141.0.1", executable: null, channel: s.channel ?? null, args: s.args ?? [], rendererException: s.exception ?? null, gpuVerified: "gpuVerified" in s ? s.gpuVerified : true },
+      runs: [{ ok: true, page: { webgl }, rendererEnd: s.rendererEnd === undefined ? renderer : s.rendererEnd, rendererEndCold: "rendererEndCold" in s ? s.rendererEndCold : renderer }],
       comparisons,
       metrics: ["1", "4"].flatMap((t) => [startup("ts", t), startup("wasm", t)]),
       validation: { ok: s.ok ?? true, errors: [], warnings: [] },
@@ -76,15 +79,16 @@ const fam = (c: ReturnType<typeof calibrate>, id: string) => c.families.find((f)
 
 describe("calibrate", () => {
   it("adopts round candidates when enough quiet passes agree", () => {
-    const c = calibrate(many(10, (i) => ({ upper: 1.005 + (i % 3) * 0.002, coldDiff: i % 2 })));
+    const c = calibrateWith(many(40, (i) => ({ upper: 1.005 + (i % 3) * 0.002, coldDiff: i % 2 })));
     expect(c.problems).toEqual([]);
     expect(c.adoptable).toBe(true);
+    expect(c.protocolDefaults).toBe(true);
     expect(fam(c, "M1").candidate).toBeCloseTo(0.01, 9);
-    expect(fam(c, "M1").exceedance).toEqual({ leaveOneOut: 0, of: 10, share: 0 });
+    expect(fam(c, "M1").exceedance).toEqual({ leaveOneOut: 0, of: 40, share: 0 });
     expect(fam(c, "M5-1x").unit).toBe("ms");
     expect(fam(c, "M5-1x").candidate! % 5).toBe(0);
     expect(c.tsColdStartMs["1"]).toBeGreaterThan(400);
-    expect(c.passes).toHaveLength(10);
+    expect(c.passes).toHaveLength(40);
   });
 
   it("reads 1% low FPS as TypeScript over WASM, so its lower bound sets the value", () => {
@@ -104,13 +108,15 @@ describe("calibrate", () => {
     expect(c.problems.join("\n")).toMatch(/M2: the candidate 0\.06 is above its cap 0\.05/);
   });
 
-  it("counts a pass the others would not cover as a leave-one-out exceedance, and says what it checks", () => {
-    // A 5% limit: one uncovered pass in ten is 10%.
-    const c = calibrateWith(many(10, (i) => ({ upper: i === 3 ? 1.03 : 1.01 })), { exceedanceLimit: 0.05 });
+  it("reports the leave-one-out reading beside each candidate without letting it block adoption", () => {
+    const c = calibrate(many(10, (i) => ({ upper: i === 3 ? 1.03 : 1.01 })), { exceedanceLimit: 0.05 });
     expect(fam(c, "M1").exceedance).toEqual({ leaveOneOut: 1, of: 10, share: 0.1 });
-    expect(fam(c, "M1").passesExceedanceLimit).toBe(false);
-    expect(c.problems.join("\n")).toMatch(/M1: the largest pass \(0\.030\) is above the candidate the other 9 passes set, so one pass is not covered by the rest \(leave-one-out: 1 of 10\)/);
-    expect(c.adoptable).toBe(false);
+    expect(c.problems.join("\n")).not.toMatch(/leave-one-out|not covered by the rest/);
+    // One noisy pass among 39 quiet ones sets the candidate (still under the cap) and raises no problem: the guarantee is what counts.
+    const noisy = calibrateWith(many(40, (i) => ({ upper: i === 7 ? 1.04 : 1.005 })));
+    expect(fam(noisy, "M1").candidate).toBeCloseTo(0.04, 9);
+    expect(noisy.problems).toEqual([]);
+    expect(noisy.adoptable).toBe(true);
   });
 
   it("holds a cold-start candidate to 5% of TypeScript's median cold start", () => {
@@ -155,7 +161,9 @@ describe("calibrate", () => {
     expect(c.excluded).toHaveLength(4);
     expect(c.excluded[0].reason).toMatch(/start time, commit and engine of ts-0 \(one pass saved twice\)/);
     // Two real passes of one engine started at different times are two passes.
-    expect(calibrate([pass(0, { engine: "ts", startedAt: "a" }), pass(1, { engine: "ts", startedAt: "b" })]).passes).toHaveLength(2);
+    expect(calibrate([pass(0, { engine: "ts", startedAt: "2026-10-21T00:00:00.000Z" }), pass(1, { engine: "ts", startedAt: "2026-10-21T00:01:00.000Z" })]).passes).toHaveLength(2);
+    // A pass with no readable start time cannot be checked for being a copy, so it is left out.
+    expect(calibrate([pass(0, { engine: "ts", startedAt: "later" })]).excluded[0].reason).toMatch(/startedAt is missing/);
   });
 
   it("refuses quick runs, another machine, a missing clean flag and a bad engine name", () => {
@@ -166,8 +174,17 @@ describe("calibrate", () => {
     expect(text).toMatch(/aa-8: it is a --quick run/);
     expect(text).toMatch(/aa-10: not an A\/A pass/);
     expect(text).toMatch(/aa-7: it ran on a dirty tree, or does not say it was clean/);
-    expect(text).toMatch(/the passes differ in machine or runtime/);
+    expect(text).toMatch(/the passes differ in machine or runtime: cpuModel;/);
     expect(c.adoptable).toBe(false);
+  });
+
+  it("names the toolchain field that one pass recorded as unknown", () => {
+    const folders = many(10);
+    for (const f of folders) (f.results as { environment: { rust: string | null } }).environment.rust = "rustc 1.88.0";
+    (folders[3].results as { environment: { rust: string | null } }).environment.rust = null;
+    const text = calibrate(folders).problems.join("\n");
+    expect(text).toMatch(/the passes differ in machine or runtime: rust;/);
+    expect(text).toMatch(/recorded as unknown in one pass/);
   });
 
   it("refuses to pool passes that differ in repetitions, scenarios, throttles or any run parameter", () => {
@@ -175,8 +192,9 @@ describe("calibrate", () => {
     const steps = many(10);
     (steps[3].results as { config: { steps: number } }).config.steps = 90;
     expect(text(steps)).toMatch(/differ in run parameters/);
-    // 10-rep and 30-rep passes do not pool: a 30-rep delta is too tight for a 10-rep verdict run.
-    expect(text([...many(9), pass(9, { reps: 30 })])).toMatch(/differ in run parameters \(repetitions, scenarios, throttles/);
+    // Only 10-rep passes count: a 30-rep delta is too tight for a 10-rep verdict run, and an 11-rep one pools with nothing.
+    expect(text([...many(9), pass(9, { reps: 30 })])).toMatch(/aa-9: 30 repetitions; the verdict runs use 10/);
+    expect(text([...many(9), pass(9, { reps: 11 })])).toMatch(/aa-9: 11 repetitions; the verdict runs use 10/);
     expect(text([...many(9), pass(9, { scenarios: ["medium", "large"] })])).toMatch(/differ in run parameters/);
     expect(text([...many(9), pass(9, { throttles: [1, 4, 6] })])).toMatch(/differ in run parameters/);
     // The same set in another order is the same set.
@@ -269,16 +287,38 @@ describe("calibrate", () => {
     expect(passesForLimit(0.05)).toBe(20);
     expect(passesForLimit(0.2)).toBe(5);
     expect(passesForLimit(0.17)).toBe(5);
-    // Twenty per engine meet 5%, and leave-one-out cannot fail there: only the largest pass can be uncovered, and the largest of 40 is one in 40.
+    // Twenty per engine meet 5%; asking for 20 (stricter than the default 5) is not a relaxation.
     const twenty = calibrateWith(many(40, (i) => ({ upper: 1.005 + (i % 3) * 0.002 })), { minPassesPerEngine: 20 });
     expect(twenty.guarantee).toBeCloseTo(1 / 21, 9);
     expect(twenty.problems).toEqual([]);
     expect(twenty.adoptable).toBe(true);
     expect(twenty.minPassesPerEngine).toBe(20);
-    // The count is a parameter: a lower required count is reported as what it is.
-    const three = calibrate(many(6), { minPassesPerEngine: 3, exceedanceLimit: 0.3 });
-    expect(three.guarantee).toBeCloseTo(1 / 4, 9);
-    expect(three.problems).toEqual([]);
+    expect(twenty.protocolDefaults).toBe(true);
+  });
+
+  it("never calls a looser pass count or limit adoptable, and says it needs the owner", () => {
+    for (const [name, options] of [["fewer passes", { minPassesPerEngine: 2, exceedanceLimit: 0.34 }], ["a looser limit", { exceedanceLimit: 0.17 }], ["both", { minPassesPerEngine: 3, exceedanceLimit: 0.3 }]] as const) {
+      const c = calibrateWith(many(10), options);
+      expect(c.protocolDefaults, name).toBe(false);
+      expect(c.adoptable, name).toBe(false);
+      expect(c.problems.join("\n"), name).toMatch(/looser than the protocol's 5 passes and 5%; the pass count and limit are the owner's to settle \(an open amendment to OD-4\)/);
+      expect(calibrationMarkdown(c, "2026-10-21T00:00:00Z"), name).toContain("**Looser than the protocol's parameters.**");
+    }
+    // Even a set that would pass every other check stays not adoptable under a looser limit.
+    const forty = calibrateWith(many(40), { exceedanceLimit: 0.06 });
+    expect(forty.problems).toHaveLength(1);
+    expect(forty.adoptable).toBe(false);
+  });
+
+  it("records what the passes share, so a verdict run can check it matches", () => {
+    const c = calibrateWith(many(40), {});
+    expect(c.pool).toMatchObject({ commit: "abc1234def", browser: { channel: null, args: [], version: "141.0.1", renderers: [RTX] }, config: { reps: 10, aa: null } });
+    expect(c.pool!.machine).toMatchObject({ cpuModel: "cpu-a" });
+    const md = calibrationMarkdown(c, "2026-10-21T00:00:00Z");
+    expect(md).toMatch(/## What the passes share[\s\S]*Commit abc1234def[\s\S]*Browser: executable default headless shell, channel default, switches none, version 141\.0\.1, renderer ANGLE/);
+    const other = calibrateWith(many(40, () => ({ channel: "chrome", args: ["--use-angle=d3d11"] })), {});
+    expect(other.pool!.browser).toMatchObject({ channel: "chrome", args: ["--use-angle=d3d11"] });
+    expect(calibrateWith([]).pool).toBeNull();
   });
 
   it("has no candidate when a pass lacks a cell", () => {
@@ -290,15 +330,18 @@ describe("calibrate", () => {
   });
 
   it("writes a report that leads with its window, says what it covers and what it leaves out", () => {
-    const md = calibrationMarkdown(calibrate(many(10)), "2026-10-21T00:00:00Z");
-    expect(md.split("\n")[2]).toMatch(/^> \*\*Snapshot of A\/A passes started 2026-10-21T00:00:00Z0 to 2026-10-21T09:00:00Z9, commit abc1234; computed 2026-10-21T00:00:00Z\.\*\* The live numbers come from `npm run perf:calibrate`.*calibrate\.test\.ts/);
-    expect(md).toContain("Provisional: it covers M1, M2, M3 and M5, M4's long-task ε needs `perf:worker` A/A passes (#1111)");
-    expect(md).toContain("nothing here sets a tolerance until the owner adopts the numbers under OD-7");
+    const md = calibrationMarkdown(calibrateWith(many(40)), "2026-10-21T00:00:00Z");
+    expect(md.split("\n")[2]).toMatch(/^> \*\*Snapshot of A\/A passes started 2026-10-21T00:00:00\.000Z to 2026-10-21T00:39:00\.000Z, commit abc1234; computed 2026-10-21T00:00:00Z\.\*\* The live numbers come from `npm run perf:calibrate`.*calibrate\.test\.ts/);
+    expect(md).toContain("Provisional: it covers M1, M2, M3 and M5; M4's long-task ε needs `perf:worker` A/A passes (#1111)");
+    expect(md).toContain("nothing here sets a tolerance until the owner adopts the numbers (OD-4");
     expect(md).toContain("**Candidates pass every check of this tool.** They are provisional");
-    expect(md).toContain("With 5 passes of the engine that has the fewest, and passes that are exchangeable, the chance that a fresh pass lands above a candidate (before rounding) is at most 1/6 = 16.7%. The limit is 20%");
+    expect(md).toContain("With 20 passes of the engine that has the fewest, and passes that are exchangeable, the chance that a fresh pass lands above a candidate (before rounding) is at most 1/21 = 4.8%. The limit is 5%");
+    expect(md).toContain("The leave-one-out column below is informational");
     expect(md).toMatch(/\| M1 \| δ \| 0\.0[0-9]+ \| 0\.050 \|/);
     expect(md).toMatch(/\| M5-4x \| ε \| [1-9]\d*\.0 ms \|/);
-    expect(md).toContain("Scope: the medium and large scenarios at 1x and 4x.");
+    // A folder name with a pipe stays in its cell.
+    const piped = calibrateWith([...many(40)].map((f, i) => (i === 0 ? { ...f, folder: "a|b" } : f)));
+    expect(calibrationMarkdown(piped, "x")).toContain("| a\\|b | ts |");
     expect(md).toContain("M1, M2 and M3 each get their own δ");
     expect(md).toContain("results.json SHA-256 (canonical)");
     expect(calibrationMarkdown(calibrate(many(2)), "t")).toContain("**Not adoptable yet.**");
@@ -324,27 +367,29 @@ describe("perf:calibrate", () => {
     expect(() => parseCalibrateArgs(["a", "--fast"])).toThrow(/unknown argument --fast/);
   });
 
+
   it("writes calibration.json and calibration.md, never over an existing folder", () => {
     const repo = mkdtempSync(join(tmpdir(), "calibrate-"));
     dirs.push(repo);
-    const names = many(10).map((f, i) => {
+    const names = many(40).map((f, i) => {
       mkdirSync(join(repo, `aa-${i}`));
       writeFileSync(join(repo, `aa-${i}`, "results.json"), JSON.stringify(f.results));
       return `aa-${i}`;
     });
     const limit = ["--exceedance-limit", "0.2"];
-    // The protocol's own 5% limit is not met by five passes per engine, so the default run says so.
-    expect(main([...names, "--out", "strict"], repo)).toBe(1);
-    expect(main([...names, "--out", "cal", ...limit], repo, () => "2026-10-21T00:00:00Z")).toBe(0);
+    // Twenty passes per engine meet the protocol's 5%; a looser limit is the owner's call, so it exits 1.
+    expect(main([...names, "--out", "loose", ...limit], repo)).toBe(1);
+    expect(main(names.slice(0, 10).concat(["--out", "strict"]), repo)).toBe(1);
+    expect(main([...names, "--out", "cal"], repo, () => "2026-10-21T00:00:00Z")).toBe(0);
     expect(JSON.parse(readFileSync(join(repo, "cal", "calibration.json"), "utf8")).adoptable).toBe(true);
     expect(readFileSync(join(repo, "cal", "calibration.md"), "utf8")).toContain("# δ and ε calibration");
-    expect(() => main([...names, "--out", "cal", ...limit], repo)).toThrow(/never overwritten/);
+    expect(() => main([...names, "--out", "cal"], repo)).toThrow(/never overwritten/);
     expect(() => main(["missing", "--out", "cal2"], repo)).toThrow(/has no results.json/);
-    expect(main(names.slice(0, 3).concat(["--out", "cal3", ...limit]), repo)).toBe(1);
+    expect(main(names.slice(0, 3).concat(["--out", "cal3"]), repo)).toBe(1);
     // A folder copied under another name is one pass, and the record keeps each input's hash.
     mkdirSync(join(repo, "copy"));
     writeFileSync(join(repo, "copy", "results.json"), readFileSync(join(repo, "aa-0", "results.json")));
-    expect(main([...names, "copy", "--out", "cal4", ...limit], repo)).toBe(1);
+    expect(main([...names, "copy", "--out", "cal4"], repo)).toBe(1);
     const cal = JSON.parse(readFileSync(join(repo, "cal4", "calibration.json"), "utf8"));
     expect(cal.excluded).toEqual([{ folder: "copy", reason: expect.stringMatching(/identical to aa-0's/), sha256: cal.passes[0].sha256 }]);
     expect(cal.passes[0].sha256).toMatch(/^[0-9a-f]{64}$/);
@@ -353,7 +398,7 @@ describe("perf:calibrate", () => {
     const original = JSON.parse(readFileSync(join(repo, "aa-1", "results.json"), "utf8")) as Record<string, unknown>;
     const reordered = Object.fromEntries(Object.entries(original).reverse());
     writeFileSync(join(repo, "resaved", "results.json"), JSON.stringify(reordered, null, 4).replace(/\n/g, "\r\n"));
-    expect(main([...names, "resaved", "--out", "cal7", ...limit], repo)).toBe(1);
+    expect(main([...names, "resaved", "--out", "cal7"], repo)).toBe(1);
     expect(JSON.parse(readFileSync(join(repo, "cal7", "calibration.json"), "utf8")).excluded).toEqual([{ folder: "resaved", reason: expect.stringMatching(/identical to aa-1's/), sha256: expect.stringMatching(/^[0-9a-f]{64}$/) }]);
     expect(stable({ b: 1, a: [2, { d: 1, c: 2 }] })).toBe(stable({ a: [2, { c: 2, d: 1 }], b: 1 }));
     mkdirSync(join(repo, "bad"));
@@ -361,5 +406,10 @@ describe("perf:calibrate", () => {
     expect(() => main(["bad", "--out", "cal5"], repo)).toThrow(/is not a perf:compare results.json/);
     writeFileSync(join(repo, "bad", "results.json"), "{");
     expect(() => main(["bad", "--out", "cal6"], repo)).toThrow(/not valid JSON/);
+    // A UTF-8 byte order mark (PowerShell 5.1 writes one) does not abort the run.
+    mkdirSync(join(repo, "bom"));
+    writeFileSync(join(repo, "bom", "results.json"), `\uFEFF${JSON.stringify(many(1)[0].results)}`);
+    expect(main([...names, "bom", "--out", "cal8"], repo)).toBe(1);
+    expect(JSON.parse(readFileSync(join(repo, "cal8", "calibration.json"), "utf8")).excluded[0].reason).toMatch(/identical to aa-0/);
   });
 });
