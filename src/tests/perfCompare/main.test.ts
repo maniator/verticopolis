@@ -84,6 +84,9 @@ describe("outputDir", () => {
     expect(() => outputDir("/r", { out: "aa-ts/x", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/containing aa-ts/);
     expect(outputDir("/r", { out: "keep/aa-ts-3", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toBe("/r/keep/aa-ts-3");
     expect(() => outputDir("/r", { out: "run-aa-wasm", quick: false, skipBuild: false, aa: null }, "d", env, () => false)).toThrow(/names an A\/A folder/);
+    expect(() => outputDir("/r", { out: "run-AA-TS", quick: false, skipBuild: false, aa: null }, "d", env, () => false)).toThrow(/names an A\/A folder/);
+    expect(outputDir("/r", { out: "run-AA-TS-1", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toBe("/r/run-AA-TS-1");
+    expect(() => outputDir("/r", { out: "x-aa-wasm-aa-ts", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/also names the aa-wasm marker/);
   });
 });
 

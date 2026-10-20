@@ -9,36 +9,53 @@ describe("aggregate", () => {
   it("collects one value per successful repetition, with its rep", () => {
     const all = runs();
     all[3] = { ...all[3], ok: false, error: "x" }; // rep 1 wasm
-    const rows = aggregate(all, ["small"], [1]);
+    const rows = aggregate(all, ["small"], [1], null);
     const hostedWasm = rows.find((r) => r.group === "sim-hosted" && r.metric === "total for fixed duration" && r.engine === "wasm")!;
     expect(hostedWasm.values).toHaveLength(7);
     expect(hostedWasm.reps).toEqual([0, 2, 3, 4, 5, 6, 7]);
     expect(hostedWasm.summary!.median).toBeCloseTo(200.4, 6);
   });
 
+  const aaRuns = (ran: "ts" | "wasm") =>
+    Array.from({ length: 8 }, (_, rep) => (["ts", "wasm"] as const).map((slot) => ({ ...processRun(rep, ran, {}, 1 + rep * 0.001 + (slot === "wasm" ? 0.0005 : 0)), engine: slot, ranEngine: ran }))).flat();
+
   it("keeps a row the A/A engine produces in both slots, drops the other engine's and the cold WASM load", () => {
-    const aaWasm = aggregate(runs().map((r) => ({ ...r, ranEngine: "wasm" as const })), ["small"], [1], "wasm");
+    const aaWasm = aggregate(aaRuns("wasm"), ["small"], [1], "wasm");
     expect(aaWasm.some((r) => r.group === "wasm-load")).toBe(false);
-    expect(aaWasm.filter((r) => r.metric === "WASM linear memory").map((r) => r.engine)).toEqual(["ts", "wasm"]);
-    const aaTs = aggregate(runs().map((r) => ({ ...r, ranEngine: "ts" as const })), ["small"], [1], "ts");
+    for (const metric of ["WASM linear memory", "cold engine hosted", "cold wasm fetch (resource timing)", "cold wasm compile and instantiate (boot path)"]) {
+      const slots = aaWasm.filter((r) => r.metric === metric);
+      expect(slots.map((r) => r.engine), metric).toEqual(["ts", "wasm"]);
+      expect(slots.every((r) => r.values.length === 8), metric).toBe(true);
+    }
+    const comps = compareEngines(aaWasm, [], "wasm");
+    for (const metric of ["WASM linear memory", "cold engine hosted"]) expect(comps.some((c) => c.metric === metric && c.n.pairs === 8), metric).toBe(true);
+    const aaTs = aggregate(aaRuns("ts"), ["small"], [1], "ts");
     expect(aaTs.some((r) => r.group === "wasm-load" || r.metric === "WASM linear memory" || r.metric === "cold engine hosted")).toBe(false);
     expect(aaTs.some((r) => r.metric === "step median")).toBe(true);
-    expect(aggregate(runs(), ["small"], [1]).some((r) => r.group === "wasm-load")).toBe(true);
+    expect(aggregate(runs(), ["small"], [1], null).some((r) => r.group === "wasm-load")).toBe(true);
   });
 
-  it("gives an A/A comparison no verdict word and no boot-order exclusion", () => {
-    const rows = aggregate(runs().map((r) => ({ ...r, ranEngine: "ts" as const })), ["small"], [1], "ts");
+  it("gives an A/A comparison no verdict word, compares the boot-order rows, and names slots in skip reasons", () => {
+    const rows = aggregate(aaRuns("ts"), ["small"], [1], "ts");
     const skipped: string[] = [];
     const comps = compareEngines(rows, skipped, "ts");
     expect(new Set(comps.map((c) => c.verdict))).toEqual(new Set(["A/A"]));
     expect(comps.some((c) => c.metric === "cold DOMContentLoaded")).toBe(true);
-    expect(skipped.some((x) => /boot order/.test(x))).toBe(false);
-    expect(skipped.every((x) => !/TypeScript|WASM/.test(x))).toBe(true);
-    expect(compareEngines(aggregate(runs(), ["small"], [1]), [], null).some((c) => c.verdict === "A/A")).toBe(false);
+    expect(skipped.some((x) => /boot order/i.test(x))).toBe(false);
+    expect(skipped.length).toBeGreaterThan(0);
+    expect(skipped.some((x) => x.includes('slot "ts" median is 0, slot "wasm" median 0'))).toBe(true);
+    expect(skipped.some((x) => /(typescript|wasm) median/i.test(x))).toBe(false);
+    expect(compareEngines(aggregate(runs(), ["small"], [1], null), [], null).some((c) => c.verdict === "A/A")).toBe(false);
+  });
+
+  it("clears only the boot-order reason in an A/A pass", () => {
+    const withReason = aggregate(aaRuns("ts"), ["small"], [1], "ts").filter((r) => r.noVerdict);
+    expect(withReason).toEqual([]);
+    expect(aggregate(runs(), ["small"], [1], null).some((r) => /^boot order/.test(r.noVerdict ?? ""))).toBe(true);
   });
 
   it("measures engine-specific metrics on that engine only", () => {
-    const rows = aggregate(runs(), ["small"], [1]);
+    const rows = aggregate(runs(), ["small"], [1], null);
     expect(rows.filter((r) => r.metric === "WASM linear memory").map((r) => r.engine)).toEqual(["wasm"]);
     // No throttle above 1x: no throttled cold-start rows to collide with the 1x ones.
     expect(rows.filter((r) => r.metric === "cold game ready").map((r) => r.throttle)).toEqual(["1", "1"]);
@@ -49,19 +66,19 @@ describe("aggregate", () => {
   it("sums the served bytes per phase and leaves missing values out", () => {
     const all = runs();
     all[0].warm = null;
-    const rows = aggregate(all, ["small"], [1]);
+    const rows = aggregate(all, ["small"], [1], null);
     expect(rows.find((r) => r.metric === "cold bytes served total" && r.engine === "ts")!.values[0]).toBe(1500);
     expect(rows.find((r) => r.metric === "cold bytes served before ready" && r.engine === "ts")!.values[0]).toBe(1000);
     expect(rows.find((r) => r.metric === "warm game ready" && r.engine === "ts")!.values).toHaveLength(7);
     expect(rows.find((r) => r.metric === "first visit with service worker, bytes served" && r.engine === "wasm")!.values[0]).toBe(2000);
     expect(rows.find((r) => r.metric === "cold before ready: html" && r.engine === "ts")!.values[0]).toBe(0);
-    expect(aggregate(all, ["small"], [1, 4]).find((r) => r.metric === "cold game ready" && r.throttle === "4" && r.engine === "ts")!.values[0]).toBe(1200);
+    expect(aggregate(all, ["small"], [1, 4], null).find((r) => r.metric === "cold game ready" && r.throttle === "4" && r.engine === "ts")!.values[0]).toBe(1200);
     expect(rows.find((r) => r.metric === "JS heap + WASM linear memory" && r.engine === "wasm")!.values[0]).toBe(9e6);
     expect(rows.find((r) => r.group === "frames-audio" && r.metric === "mean FPS" && r.engine === "ts")!.values).toHaveLength(8);
   });
 
   it("has a null summary when nothing was measured", () => {
-    const rows = aggregate([processRun(0, "ts", { wasmCold: null })], ["small"], [1]);
+    const rows = aggregate([processRun(0, "ts", { wasmCold: null })], ["small"], [1], null);
     expect(rows.find((r) => r.metric === "cold compile")!.summary).toBeNull();
   });
 });
@@ -69,8 +86,8 @@ describe("aggregate", () => {
 describe("compareEngines", () => {
   it("gives the boot-order page events no verdict, keeping both engines' values", () => {
     const skipped: string[] = [];
-    const rows = aggregate(runs(), ["small"], [1, 4]);
-    const comps = compareEngines(rows, skipped);
+    const rows = aggregate(runs(), ["small"], [1, 4], null);
+    const comps = compareEngines(rows, skipped, null);
     for (const m of ["cold DOMContentLoaded", "cold load event", "warm DOMContentLoaded", "warm load event"]) {
       expect(comps.find((c) => c.metric === m)).toBeUndefined();
       expect(rows.filter((r) => r.metric === m && r.throttle === "1").map((r) => r.engine).sort()).toEqual(["ts", "wasm"]);
@@ -79,25 +96,25 @@ describe("compareEngines", () => {
     expect(comps.find((c) => c.metric === "cold game ready")).toBeDefined();
   });
   it("honors a no-verdict reason carried by the WASM row alone", () => {
-    const rows = aggregate(runs(), ["small"], [1]).map((r) => (r.metric === "cold game ready" && r.engine === "wasm" ? { ...r, noVerdict: "test reason" } : r));
+    const rows = aggregate(runs(), ["small"], [1], null).map((r) => (r.metric === "cold game ready" && r.engine === "wasm" ? { ...r, noVerdict: "test reason" } : r));
     const skipped: string[] = [];
-    expect(compareEngines(rows, skipped).find((c) => c.metric === "cold game ready")).toBeUndefined();
+    expect(compareEngines(rows, skipped, null).find((c) => c.metric === "cold game ready")).toBeUndefined();
     expect(skipped).toContain("startup - 1x cold game ready: test reason");
   });
   it("skips a zero TypeScript median and says so", () => {
     const skipped: string[] = [];
-    const comps = compareEngines(aggregate(runs(), ["small"], [1, 4]), skipped);
+    const comps = compareEngines(aggregate(runs(), ["small"], [1, 4], null), skipped, null);
     expect(comps.find((c) => c.metric === "frames over 200 ms (game time clamped)")).toBeUndefined();
     expect(skipped.some((x) => x.includes("frames over 200 ms"))).toBe(true);
     // One zero among the TypeScript repetitions is enough for no ratio.
     const some = runs();
     some[0].scenarios.small.frames["1"].clampedFrames = 0;
     for (const r of some.slice(1)) r.scenarios.small.frames["1"].clampedFrames = 3;
-    expect(compareEngines(aggregate(some, ["small"], [1])).find((c) => c.group === "frames" && c.metric === "frames over 200 ms (game time clamped)")).toBeUndefined();
+    expect(compareEngines(aggregate(some, ["small"], [1], null), [], null).find((c) => c.group === "frames" && c.metric === "frames over 200 ms (game time clamped)")).toBeUndefined();
   });
 
   it("reports wasm / ts with the metric's direction", () => {
-    const comps = compareEngines(aggregate(runs(), ["small"], [1]));
+    const comps = compareEngines(aggregate(runs(), ["small"], [1], null), [], null);
     const hosted = comps.find((c) => c.group === "sim-hosted" && c.metric === "total for fixed duration")!;
     expect(hosted.ratio).toBeCloseTo(2, 2);
     expect(hosted.verdict).toBe("wasm slower");
@@ -115,7 +132,7 @@ describe("compareEngines", () => {
       r.scenarios.small.memory.jsHeapUsedBytes = 3e6;
       return r;
     });
-    const comps = compareEngines(aggregate(all, ["small"], [1]));
+    const comps = compareEngines(aggregate(all, ["small"], [1], null), [], null);
     expect(comps.find((c) => c.metric === "cold bytes served before ready")!.verdict).toBe("wasm smaller");
     expect(comps.find((c) => c.metric === "JS heap used")!.verdict).toBe("wasm larger");
     expect(comps.find((c) => c.metric === "share of frame time in sim.tick")!.verdict).toBe("wasm higher");
@@ -123,10 +140,10 @@ describe("compareEngines", () => {
   });
 
   it("is inconclusive with one sample per side", () => {
-    const comps = compareEngines(aggregate([processRun(0, "ts"), processRun(0, "wasm", {}, 2)], ["small"], [1]));
+    const comps = compareEngines(aggregate([processRun(0, "ts"), processRun(0, "wasm", {}, 2)], ["small"], [1], null), [], null);
     // Five a side is still under the floor, even with a clear difference.
     const five = Array.from({ length: 5 }, (_, rep) => [processRun(rep, "ts"), processRun(rep, "wasm", {}, 2)]).flat();
-    expect(compareEngines(aggregate(five, ["small"], [1])).find((c) => c.group === "sim-hosted" && c.metric === "total for fixed duration")!.verdict).toBe("inconclusive");
+    expect(compareEngines(aggregate(five, ["small"], [1], null), [], null).find((c) => c.group === "sim-hosted" && c.metric === "total for fixed duration")!.verdict).toBe("inconclusive");
     expect(comps.find((c) => c.group === "sim-hosted" && c.metric === "total for fixed duration")!.verdict).toBe("inconclusive");
   });
 });

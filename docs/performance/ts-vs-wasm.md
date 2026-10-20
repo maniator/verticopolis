@@ -481,7 +481,7 @@ A full run takes about 2.5 hours on this machine and writes a new folder
 under `docs/performance/results/<date>-<commit>/`. It never overwrites an existing
 folder, and it marks quick, A/A (`-aa-<engine>`), `--skip-build` and dirty runs in the folder name.
 `--quick` gives a 2-repetition smoke run. A stopped run continues with
-`--resume <folder>` on the same commit and machine.
+`--resume <folder>` on the same commit and machine (an A/A folder repeats `--aa <engine>`).
 
 To compare a later run with this one, open the two folders' `comparisons.csv`
 files side by side. Each row is keyed by group, scenario, throttle and metric.

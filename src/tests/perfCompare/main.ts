@@ -3,9 +3,10 @@ import { basename, join, resolve } from "node:path";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
 import { buildTree, collectEnvironment, ENGINE_PACKAGE_FILES, packageState, type Environment, type PackageState } from "./env";
+import { buildLimitations } from "./limitations";
 import { aggregate, compareEngines, missingSamples } from "./metrics";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
-import { comparisonsCsv, markdownReport, preThree, rawCsv, summaryCsv } from "./report";
+import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
 import { engineOrder, runProcess } from "./runner";
 import { buildScenarios } from "./scenarios";
 import { startServer } from "./server";
@@ -93,10 +94,6 @@ export function makeConfig(args: Args, scenarioNames: string[]): CompareConfig {
   };
 }
 
-/** What an A/A folder's other limitations leave unsaid: they describe two engines. */
-export const aaLimitation = (aa: EngineName): string =>
-  `An A/A pass: ${aa === "wasm" ? "WASM" : "TypeScript"} ran in both slots, so the limitations below that describe a cross-engine comparison (the TypeScript read model, boot order, the incremental WASM download) do not apply to this folder's ratios. Rows only the ${aa === "wasm" ? "TypeScript" : "WASM"} engine produces are left out, and so are the cold WASM load steps.`;
-
 /** The five files of a results folder. Every one of them carries the A/A
  *  marker when `results.config.aa` is set. */
 export function writeResultFiles(out: string, results: CompareResults): void {
@@ -107,30 +104,6 @@ export function writeResultFiles(out: string, results: CompareResults): void {
   writeFileSync(join(out, "comparisons.csv"), comparisonsCsv(results.comparisons, aa));
   writeFileSync(join(out, "report.md"), markdownReport(results));
 }
-
-const STATIC_LIMITATIONS = [
-  "One machine, headless Chromium in a container. Spread is reported (CV, order-statistic intervals of the median, order-statistic intervals of the paired median ratios); results from other hardware, browsers or a GPU will differ.",
-  "Frame rates come from a software WebGL rasterizer (see the WebGL renderer row), so render cost is much higher than on a GPU device and dominates the frame. The simulation-only rows are unaffected by rendering.",
-  "Both engines run on the main thread. The WASM host keeps a TypeScript read model of the tower, refreshed from the engine's frame view after every step and from a full save merge whenever the tower revision moves or an in-game hour passes (src/wasmhost/wasmHost.ts). The hosted rows include that cost; the bare-engine rows do not.",
-  "The step driver (the frame loop's owed-minute math and fixed step) is the TypeScript host's for both engines (#867), and commands still run on both the read model and the engine (#954). This benchmark times ticks, which the engine alone runs when hosted; it does not time player commands.",
-  "Pages are served cross-origin isolated (COOP/COEP) so performance.now() resolves to about 5 microseconds instead of 100. The production site is not isolated; isolation does not change how either engine executes.",
-  "Transfer sizes are what this harness's server sent: Brotli quality 11 or gzip level 9 static compression, Cache-Control per vercel.json. A CDN's compression levels and protocol overhead differ; headers are not counted.",
-  "CPU throttling is Chromium's DevTools emulation (the renderer is paused in slices), not a slower CPU: it scales CPU time but not memory bandwidth or cache behavior. A fixed CPU probe runs under each throttle before every scenario's timed passes, at the start of each frame block and just after the throttled cold start, and must show at least half the nominal slowdown or the run fails. A probe shows the throttle held at that moment, not at every moment after it.",
-  "Memory is measured per scenario in its own freshly loaded page, after the save is loaded and two in-game hours run, then a forced GC through the DevTools protocol. WASM linear memory only grows, so each WASM figure is that page's high-water mark, which includes the boot tower the page hosted before the save was loaded. The JS heap leaves linear memory out, so the comparable row is JS heap plus linear memory. Process PSS sums the browser's processes (Linux only).",
-  "Frame-time accounting times sim.tick and ui.update directly; the rest of each frame (the Excalibur canvas render, the compositor, GC and idle time until the next frame) is reported as one remainder. Render cost is therefore not isolated from idle time.",
-  "Ratios are paired by repetition (the two engines' processes ran back to back, order alternating) with a distribution-free 95% interval of the median ratio, and a verdict needs six pairs. Every row is its own 95% interval, so across the report's many rows a few verdicts can be wrong by chance; read single borderline rows with that in mind.",
-  "Startup is measured to the moment the app publishes its tooling handle (window.game) and to the first frame after it; it uses a VC_TOOLING=1 build of the same sources, which only adds that handle. The before-ready and after-ready byte split is cut where a 10 ms poll first sees the handle. The 4x cold start runs in a second fresh context of the same browser process (fresh HTTP cache, warm process).",
-  "Gameplay frame windows are wall-clock time, so the slower engine simulates fewer in-game minutes in them; the achieved sim speed is reported beside every frame row. A frame over 200 ms is handed 1 ms of elapsed time by Excalibur, so rows with clamped frames (counted in the frames-over-200-ms row) understate the simulation's share.",
-  "Audio-off means the game's audio never started (no gesture, so the Tone.js chunk never loads); audio-on starts it the way a first click does, unmuted, with Chromium's autoplay policy relaxed for both engines. Headless Chromium plays to no device, so the audio thread's cost on real output hardware may differ.",
-  "The WASM attribution (engine tick, exports the host reads, host JS) comes from a separate pass with wrappers on every method of the engine, never from the timed pass; the wrappers' own bookkeeping outside their timed window lands in the host JS share, so that share is an upper bound. The bare-engine (raw) rows tick a detached Engine and do not include the host's read-model sync.",
-  "The incremental WASM download counts the engine package (binary, loader, BUILD.json). The WASM host code (src/wasmhost) is inside the shared app chunks and is counted there for both configurations (backlog row perf-compare-host-js-share).",
-  "Node timings (outcome check table) are a secondary data point on Node's V8; the engine order alternates by scenario.",
-  "Every result directory is named by date and commit so later runs can be compared with it.",
-];
-
-/** The pre-cutover framing, added to the limitations only for an app
- *  version before 3.0.0 (the header follows the same rule). */
-export const PRE_THREE_LIMITATION = "This is a pre-3.0 baseline of an engine still being cut over (#945), not release performance.";
 
 export async function main(argv: readonly string[], repo: string): Promise<number> {
   const args = parseArgs(argv);
@@ -271,7 +244,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     metrics,
     comparisons,
     validation,
-    limitations: [...(config.aa ? [aaLimitation(config.aa)] : []), ...STATIC_LIMITATIONS, ...(preThree(environment.appVersion) ? [PRE_THREE_LIMITATION] : []), ...(renderer ? [`WebGL renderer in these runs: ${renderer}.`] : [])],
+    limitations: buildLimitations(config.aa, environment.appVersion, renderer),
   };
 
   writeResultFiles(out, results);
@@ -330,10 +303,14 @@ export function packageErrors(perf: PackageState, prod: PackageState, sourceHash
  */
 export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild" | "aa">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync): string {
   if (args.out) {
-    // The folder's own name carries the marker, not a parent directory's.
+    // Only the folder's own name counts, and in lower case, because the results are written on case-insensitive disks too.
     const name = basename(resolve(repo, args.out));
-    if (args.aa && !name.includes(`aa-${args.aa}`)) throw new Error(`--aa ${args.aa} needs an --out folder name containing aa-${args.aa}, so the folder cannot be mistaken for a comparison`);
-    if (!args.aa && /aa-(ts|wasm)/.test(name)) throw new Error(`--out ${name} names an A/A folder, but this run is a comparison; pass --aa ts|wasm or pick another name`);
+    const lower = name.toLowerCase();
+    if (args.aa) {
+      const other = args.aa === "ts" ? "wasm" : "ts";
+      if (!lower.includes(`aa-${args.aa}`)) throw new Error(`--aa ${args.aa} needs an --out folder name containing aa-${args.aa}, so the folder cannot be mistaken for a comparison`);
+      if (lower.includes(`aa-${other}`)) throw new Error(`--aa ${args.aa} cannot write to ${name}, which also names the aa-${other} marker`);
+    } else if (/aa-(ts|wasm)/.test(lower)) throw new Error(`--out ${name} names an A/A folder, but this run is a comparison; pass --aa ts|wasm or pick another name`);
     const out = resolve(repo, args.out);
     if (exists(out)) throw new Error(`${out} already exists; results are never overwritten`);
     return out;

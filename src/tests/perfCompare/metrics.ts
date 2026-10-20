@@ -123,15 +123,15 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
   return out;
 }
 
-export function aggregate(runs: readonly ProcessRun[], scenarios: readonly string[], throttles: readonly number[], aa: EngineName | null = null): MetricRow[] {
+export function aggregate(runs: readonly ProcessRun[], scenarios: readonly string[], throttles: readonly number[], aa: EngineName | null): MetricRow[] {
   const rows: MetricRow[] = [];
   const good = runs.filter((r) => r.ok);
   for (const p of picks(scenarios, throttles.map(String))) {
     // An A/A pass has one engine in both slots. A row only the other engine
     // produces has nothing to calibrate; a row the A/A engine produces keeps
     // both slots, so a WASM-only metric is still compared slot to slot.
-    // The cold WASM load measures a fixed download, not a slot's engine, so
-    // it never pairs with itself.
+    // The cold WASM load times a fixed download that no slot's engine
+    // changes, so it has nothing to calibrate.
     if (aa && (p.group === "wasm-load" || (p.engines && !p.engines.includes(aa)))) continue;
     for (const engine of aa && p.engines ? (["ts", "wasm"] as EngineName[]) : p.engines ?? (["ts", "wasm"] as EngineName[])) {
       const values: number[] = [];
@@ -145,7 +145,7 @@ export function aggregate(runs: readonly ProcessRun[], scenarios: readonly strin
         }
       }
       // Both slots ran one engine, so the boot-order caveat between engines does not apply.
-      const noVerdict = aa ? undefined : p.noVerdict;
+      const noVerdict = aa && p.noVerdict === BOOT_ORDER ? undefined : p.noVerdict;
       rows.push({ group: p.group, scenario: p.scenario, throttle: p.throttle, metric: p.metric, unit: p.unit, better: p.better, engine, values, reps, summary: values.length ? summarize(values) : null, ...(noVerdict ? { noVerdict } : {}) });
     }
   }
@@ -158,7 +158,7 @@ export function aggregate(runs: readonly ProcessRun[], scenarios: readonly strin
  *  ratio's interval against a 5% equivalence band (stats.verdict), in the
  *  metric's own direction: "faster"/"slower" for times and rates, "smaller"/
  *  "larger" for bytes. */
-export function compareEngines(rows: readonly MetricRow[], skipped: string[] = [], aa: EngineName | null = null): Comparison[] {
+export function compareEngines(rows: readonly MetricRow[], skipped: string[], aa: EngineName | null): Comparison[] {
   const out: Comparison[] = [];
   const key = (r: MetricRow) => `${r.group}|${r.scenario}|${r.throttle}|${r.metric}`;
   const byKey = new Map<string, Partial<Record<EngineName, MetricRow>>>();
@@ -172,7 +172,7 @@ export function compareEngines(rows: readonly MetricRow[], skipped: string[] = [
       skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: ${noVerdict}`);
       continue;
     }
-    // In an A/A pass the labels name slots, not engines.
+    // In an A/A pass the two labels name slots.
     const base = aa ? 'slot "ts"' : "TypeScript";
     const other = aa ? 'slot "wasm"' : "WASM";
     if (ts.summary.median === 0) {

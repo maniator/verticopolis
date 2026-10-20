@@ -108,7 +108,7 @@ and large scenarios with their pinned scenario hashes.
 | `npm.cmd run perf:compare -- --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-<label>` | Startup, hosted and bare engine, frames with and without audio, memory, transfer and build sizes. Run it after `perf:worker`; `--skip-build` checks the builds on disk are this commit's |
 
 Other flags both accept: `--quick` (a 2-rep smoke test that never counts),
-`--resume DIR` (continue a run that stopped; it keeps its own folder),
+`--resume DIR` (continue a run that stopped; it keeps its own folder, and an A/A folder resumes with `--aa <engine>` repeated),
 `--scenarios a,b`. `perf:compare` also takes `--throttles 1,4` and
 `--aa ts|wasm` (section 6.1);
 `perf:worker` also takes `--read-model` (Node only, no browser).
@@ -218,8 +218,9 @@ Four things keep an A/A folder from passing for a comparison:
 - The folder's own name (the last path segment) must contain `aa-<engine>`. It
   gains `-aa-<engine>` without `--out`, `--out` is refused without it, and a
   run without `--aa` refuses an `aa-ts` or `aa-wasm` name.
-- The cross-engine limitations in the report are replaced by a note saying
-  they do not apply.
+- The limitations that describe two different engines are left out of the
+  report and replaced by a note. The WASM-only ones stay in an `--aa wasm`
+  folder.
 
 Which rows an A/A folder keeps: a metric both engines produce is kept for both
 slots. A metric only one engine produces is kept for both slots when that
@@ -227,9 +228,9 @@ engine is the A/A engine (`--aa wasm` keeps the WASM linear memory, the
 engine-hosted and fetch/compile startup rows and the attribution shares) and
 left out when it is the other one. The cold WASM load steps are left out of
 both modes. An `--aa ts` pass still runs that probe, on the verdict run's
-schedule, so the page lifecycle matches. Boot order differs between engines,
-not between two slots of one engine, so DOMContentLoaded and the load event
-are compared in an A/A folder. An `--aa ts` pass still needs the WASM package
+schedule, so the page lifecycle matches. Boot order differs only when the two
+slots run different engines, so DOMContentLoaded and the load event are
+compared in an A/A folder. An `--aa ts` pass still needs the WASM package
 and the Node check of both engines to pass, because the harness validates the
 whole setup.
 
@@ -240,7 +241,13 @@ Two limits are open, so the calibration is not complete:
   folders. Nobody reads values off them by hand.
 - **M4's ε has no A/A source yet.** `perf:compare` measures no long tasks and
   `perf:worker` has no `--aa` (follow-up #1111), so the long-task ε stays
-  uncalibrated until that lands.
+  uncalibrated until that lands. RUN-1 needs M4, so #1111 and its A/A passes
+  land before RUN-1, either inside RUN-0b or as a follow-on campaign.
+- **The harness for each metric.** The reference figures of RUN-0a come from
+  `perf:worker`, and the calibration summary reads `perf:compare` folders. A
+  tolerance calibrated on one harness's noise is not applied to the other's
+  ratios, so the summary calibrates per harness and the table in section 6
+  names the harness for each metric (recorded in #1110).
 
 ## 7. Scheduled runs
 
@@ -318,6 +325,7 @@ npm.cmd run perf:compare -- --aa ts   --reps 10 --skip-build --out docs/performa
 npm.cmd run perf:compare -- --aa wasm --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-wasm-1
 ```
 
+Start RUN-0b only after A5's design rule is committed (plan section 5.2).
 RUN-0b also records the shipping host's main-thread cost split (engine step,
 per-step sync, hourly serialize, parse and merge) and each hour's churn. Not
 yet: the harness reports the first three partly (`perf:worker` times the
@@ -328,6 +336,8 @@ hosts; the split into sync, serialize and merge is B3's harness PR).
 1. Validate the folder (section 4), then compare the identity (section 3).
 2. Commit the folder on a branch through a PR. The PR body names the command,
    the machine state notes, the validation result and the verdict against the
-   pass rule in section 6, written before the run.
+   pass rule in section 6, written before the run. An A/A folder has no
+   verdict; its PR names the command, the validation result and the pass
+   number.
 3. A run's report never claims more than its folder shows. Anything that
    rests on clamped frames says so.
