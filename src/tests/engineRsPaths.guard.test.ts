@@ -82,7 +82,9 @@ describe("engine-rs.yml engine path lists", () => {
  */
 
 const root = resolve(here, "..", "..");
-const read = (rel: string): string => readFileSync(resolve(root, rel), "utf8");
+/** A repo file as text, with Windows line endings folded so the patterns below stay simple. */
+const read = (rel: string): string =>
+  readFileSync(resolve(root, rel), "utf8").replace(/\r\n/g, "\n");
 
 /** Suites in `typescriptSide` that never touch the engine package, so the plain `test` job runs them. */
 const NO_ENGINE_PACKAGE: Record<string, string> = {
@@ -95,11 +97,24 @@ const NO_ENGINE_PACKAGE: Record<string, string> = {
   "src/tests/perfCompare/page.integration.test.ts":
     "the browser digest helper, TypeScript only",
 };
+/** What a suite that uses the engine package mentions; the exempt ones must not. */
+const ENGINE_USE =
+  /wasmEngine|hasWasmPackage|attachWasmHost|verticopolis_engine|loadWebPackage|checkScenario/;
 
 function integrationFiles(): string[] {
   return (readdirSync(resolve(root, "src"), { recursive: true }) as string[])
     .map((f) => `src/${f.split("\\").join("/")}`)
     .filter((f) => f.endsWith(".integration.test.ts"));
+}
+
+/** A vitest exclude glob as a regular expression: `**` crosses directories, `*` does not. */
+function globToRegExp(glob: string): RegExp {
+  const body = glob
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*\//g, "@@ANYDIR@@")
+    .replace(/\*/g, "[^/]*")
+    .replace(/@@ANYDIR@@/g, "(?:.*/)?");
+  return new RegExp(`^${body}$`);
 }
 
 /** The files `wasmParityProjects` leaves to the TypeScript side. */
@@ -108,40 +123,54 @@ function typescriptSideFiles(viteConfig: string): string[] {
     viteConfig,
   );
   if (!block) throw new Error("vite.config.ts: typescriptSide list not found");
-  const globs = [...block[1].matchAll(/^ +"\*\*\/([^"]+)",$/gm)].map(
-    (m) => m[1],
-  );
+  const entries = block[1]
+    .split("\n")
+    .filter((l) => l.trim() !== "" && !l.trim().startsWith("//"));
   const files = integrationFiles();
-  return globs.flatMap((g) => {
-    const hits = files.filter((f) =>
-      g.includes("*")
-        ? f.includes(`/${g.split("/")[0]}/`) && f.endsWith(g.split("*")[1])
-        : f.endsWith(`/${g}`),
-    );
+  return entries.flatMap((line) => {
+    const glob = /^ +"([^"]+)",$/.exec(line)?.[1];
+    if (!glob)
+      throw new Error(
+        `vite.config.ts typescriptSide: cannot read the entry ${JSON.stringify(line)}`,
+      );
+    const re = globToRegExp(glob);
+    const hits = files.filter((f) => re.test(f));
     if (hits.length === 0)
       throw new Error(
-        `vite.config.ts typescriptSide entry matches no file: ${g}`,
+        `vite.config.ts typescriptSide entry matches no file: ${glob}`,
       );
     return hits;
   });
 }
 
-/** The positional file filters of the `test:wasm` script. */
-function testWasmFilters(script: string): string[] {
-  const args = script.replace(/^.*?vitest run\s+/, "").split(/\s+/);
+/** The positional file filters and the projects of the `test:wasm` script. */
+function testWasmArgs(script: string): {
+  filters: string[];
+  projects: string[];
+} {
+  const args = script
+    .replace(/^VC_REQUIRE_WASM=1 vitest run\s+/, "")
+    .split(/\s+/);
   const filters: string[] = [];
+  const projects: string[] = [];
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--project") i++;
-    else if (!args[i].startsWith("-")) filters.push(args[i]);
+    if (args[i] === "--project") projects.push(args[++i]);
+    else if (args[i].startsWith("-"))
+      throw new Error(
+        `test:wasm gained the option ${args[i]}; teach this guard what it takes`,
+      );
+    else filters.push(args[i]);
   }
-  return filters;
+  return { filters, projects };
 }
+
+/** Vitest matches a filter as a case-insensitive substring of the file path. */
+const matches = (file: string, filters: string[]): boolean =>
+  filters.some((x) => file.toLowerCase().includes(x.toLowerCase()));
 
 /** Suites handed to the TypeScript side that no `test:wasm` filter reaches and that need the package. */
 function unrun(files: string[], filters: string[]): string[] {
-  return files.filter(
-    (f) => !(f in NO_ENGINE_PACKAGE) && !filters.some((x) => f.includes(x)),
-  );
+  return files.filter((f) => !(f in NO_ENGINE_PACKAGE) && !matches(f, filters));
 }
 
 describe("the host suites run in test:wasm", () => {
@@ -149,11 +178,16 @@ describe("the host suites run in test:wasm", () => {
   const script = (
     JSON.parse(read("package.json")) as { scripts: Record<string, string> }
   ).scripts["test:wasm"];
-  const filters = testWasmFilters(script);
+  const { filters, projects } = testWasmArgs(script);
 
   it("finds the lists", () => {
     expect(files.length).toBeGreaterThan(10);
     expect(filters).toContain("wasmHost");
+  });
+
+  it("requires the package and runs the plain integration project, where the handed-over suites live", () => {
+    expect(script).toMatch(/^VC_REQUIRE_WASM=1 vitest run /);
+    expect(projects).toEqual(["integration"]);
   });
 
   it("matches every typescriptSide suite that needs the engine package", () => {
@@ -162,17 +196,17 @@ describe("the host suites run in test:wasm", () => {
 
   it("covers the six host suites and the perf-compare engine check by name", () => {
     for (const name of [
-      "wasmHostAnalyticsBridge",
-      "wasmHostLogText",
-      "wasmHostTelemetry",
-      "wasmWorkerHost",
-      "wasmWorkerLifecycle",
-      "wasmWorkerSaves",
-      "perfCompare/scenarios.integration",
+      "src/tests/integration/wasmHostAnalyticsBridge.integration.test.ts",
+      "src/tests/integration/wasmHostLogText.integration.test.ts",
+      "src/tests/integration/wasmHostTelemetry.integration.test.ts",
+      "src/tests/integration/wasmWorkerHost.integration.test.ts",
+      "src/tests/integration/wasmWorkerLifecycle.integration.test.ts",
+      "src/tests/integration/wasmWorkerSaves.integration.test.ts",
+      "src/tests/perfCompare/scenarios.integration.test.ts",
     ])
       expect(
-        files.some((f) => f.includes(name)) &&
-          filters.some((x) => `src/x/${name}`.includes(x)),
+        matches(name, filters),
+        `${name} is matched by a test:wasm filter`,
       ).toBe(true);
   });
 
@@ -185,17 +219,49 @@ describe("the host suites run in test:wasm", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("only lists suites in the exemption table that still exist and are still handed over", () => {
-    for (const f of Object.keys(NO_ENGINE_PACKAGE)) expect(files).toContain(f);
+  it("keeps the exemption table honest: each file is still handed over and still leaves the engine alone", () => {
+    for (const f of Object.keys(NO_ENGINE_PACKAGE)) {
+      expect(files).toContain(f);
+      expect(
+        read(f),
+        `${f} now uses the engine package; drop it from the exemptions`,
+      ).not.toMatch(ENGINE_USE);
+    }
   });
 
-  it("runs in the test-wasm-parity job, which every PR and every push to main runs", () => {
+  describe("in test.yml", () => {
     const yaml = read(".github/workflows/test.yml");
-    const job =
-      /\n {2}test-wasm-parity:\n([\s\S]*?)(?=\n {2}[a-z][\w-]*:\n)/.exec(yaml);
-    if (!job) throw new Error("test.yml: test-wasm-parity job not found");
-    expect(job[1]).toMatch(/run: npm run test:wasm\n/);
-    // A path filter on the workflow would stop it running on a PR that touches only other files.
-    expect(yaml.split("\njobs:")[0]).not.toMatch(/^ +paths(-ignore)?:/m);
+    const triggers = yaml.split("\njobs:")[0];
+    const jobs = yaml.split("\njobs:")[1];
+    const job = (name: string): string => {
+      const m = new RegExp(
+        `\\n {2}${name}:[^\\n]*\\n([\\s\\S]*?)(?=\\n {2}[a-z][\\w-]*:[^\\n]*\\n|$)`,
+      ).exec(jobs);
+      if (!m) throw new Error(`test.yml: job ${name} not found`);
+      return m[1];
+    };
+
+    it("runs on every PR and every push to main, with no path filter", () => {
+      expect(triggers).toMatch(/^ {2}push:\n {4}branches: \[main\]\n/m);
+      expect(triggers).toMatch(/^ {2}pull_request:\n {4}branches: \[main\]\n/m);
+      expect(triggers).not.toMatch(/^ +paths(-ignore)?:/m);
+    });
+
+    it("test-wasm-parity runs test:wasm on its unitWasm leg, past a failed earlier step", () => {
+      const body = job("test-wasm-parity");
+      expect(body).toMatch(/project: \[[^\]]*\bunitWasm\b/);
+      expect(body).not.toMatch(/^ {4}(if|continue-on-error):/m);
+      const step =
+        /^ {6}- name: Host suites on the WASM engine\n((?: {8}[^\n]*\n)+)/m.exec(
+          body,
+        );
+      if (!step)
+        throw new Error("test-wasm-parity: the host suites step is gone");
+      expect(step[1]).toMatch(
+        /^ {8}if: \$\{\{ !cancelled\(\) && matrix\.project == 'unitWasm' \}\}$/m,
+      );
+      expect(step[1]).toMatch(/^ {8}run: npm run test:wasm$/m);
+      expect(step[1]).not.toMatch(/continue-on-error/);
+    });
   });
 });

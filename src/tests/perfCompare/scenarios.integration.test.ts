@@ -7,7 +7,8 @@ import { buildScenarios } from "./scenarios";
 import { wasmRequired } from "../conformance/wasmEngine";
 
 const PKG = resolve(import.meta.dirname, "../../public/engine");
-const hasPkg = existsSync(resolve(PKG, "verticopolis_engine_bg.wasm"));
+const hasPkg = ["verticopolis_engine_bg.wasm", "verticopolis_engine.js"].every((f) => existsSync(resolve(PKG, f)));
+if (wasmRequired() && !hasPkg) throw new Error("VC_REQUIRE_WASM=1 but src/public/engine/ is not built; run npm run wasm:build");
 
 describe("the comparison's scenarios", () => {
   const scenarios = buildScenarios();
