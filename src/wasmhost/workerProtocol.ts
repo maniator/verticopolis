@@ -1,4 +1,5 @@
 import type { ShadowCommand } from "../dualrun/commands";
+import type { DeltaText } from "./saveSyncRules";
 
 /**
  * The messages between the main thread and the engine worker
@@ -80,14 +81,29 @@ export interface LoadedReply {
   view: Float64Array;
 }
 
-/** The full-save half of a frame, sent when the tower's revision or the
- *  engine's hour pass moved since the last one sent, or when asked for. */
+/** The full-save half of a frame, sent when the tower's revision moved
+ *  since the last one sent, when asked for, or on an hour pass a delta
+ *  cannot carry (the engine cannot describe it, or a command ran since the
+ *  last sync). */
 export interface MergePayload {
   save: string;
   telemetry: string;
   housekeeping: string | null;
+  /** This save's number in the tower's sync sequence (#1045): every full
+   *  save and every delta the worker sends takes the next one. */
+  sync: number;
   /** `commuteStress()`: the per-origin commute-stress rows. */
   commute: string;
+}
+
+/** The hourly half of a frame when only the hour pass moved (#1045): the
+ *  engine's `saveDelta` text (the changed unit records and the save's other
+ *  keys), taken against the save or delta numbered `base`. The main thread
+ *  applies it only when `base` is the last one it applied, and asks for a
+ *  full save otherwise. */
+export interface DeltaPayload extends DeltaText {
+  base: number;
+  sync: number;
 }
 
 /** The answer to a frame request. `view` is the engine's frame view, its
@@ -108,9 +124,11 @@ export interface FrameReply {
   log: string | null;
   pending: string | null;
   merge: MergePayload | null;
+  /** Set instead of `merge` when only the hour pass moved. */
+  delta: DeltaPayload | null;
   /** Changed commute rows when this reply carries no full merge. */
   commute?: string | null;
-  workMs: { ops: number; reply: number };
+  workMs: { ops: number; reply: number; save: number };
   /** The worker's WASM linear memory, when the entry point can read it. */
   memoryBytes: number | null;
 }
