@@ -1,6 +1,6 @@
 ---
 name: engine-parity-review
-description: 'Review guidance for a pull request that touches the simulation (src/engine), its Rust port (engine-rs), the conformance suite (conformance/), the save loaders (src/storage) or the TDT import and export: the two-engine rule, the lock, the loader table, the canon caps, and what the hashes do and do not prove. Use when any of those paths changes.'
+description: 'Review guidance for a pull request that touches the simulation (src/engine), its Rust port (engine-rs), the conformance suite (conformance/), the save loaders (src/storage) or the TDT import and export: the two-engine rule, the lock, the loader table, the canon caps, hot-path cost across both engines, and what the hashes do and do not prove. Use when any of those paths changes.'
 ---
 
 # Engine parity review
@@ -66,6 +66,15 @@ not replace it.
     seeds and table layouts. Treat a change there as engine work (the
     `gds-code-review` lens), and expect the same referee method once the
     Rust port of it lands.
+11. **Hot paths keep their cost down in both engines.** Apply
+    `docs/performance/hot-path-review.md` (HP-1 to HP-12) and print its
+    record table. On this seam two items matter most. HP-8: a port lists the
+    TypeScript caches, indexes and counters for the function and its callees,
+    and carries each one over or says why not; a comment that skips one is a
+    finding. HP-7: ported code is reviewed as new, so "the TypeScript does the
+    same" does not close a finding. An optimization on one side must leave the
+    lock, the RNG draw order and collection order untouched (items 2, 6 and
+    7).
 
 ## How to verify locally
 
@@ -83,6 +92,7 @@ TypeScript view of a loader case, for a field-by-field diff.
 ## Where the rules live
 
 - `CONTRIBUTING.md`, "Two engines, one simulation": the binding rules.
+- `docs/performance/hot-path-review.md`: the hot-path complexity checklist.
 - `conformance/README.md`: the scenario format, the hash definition, the
   fixtures and the loader table.
 - `engine-rs/README.md`: the crate layout, the referee and the coverage floor.

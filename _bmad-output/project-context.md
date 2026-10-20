@@ -176,9 +176,14 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   `getTransport` (O(1) indexes), never `units.find` / `transports.find`; hoist tower-wide facts
   and per-tick maps **out** of per-unit / per-person loops; keep running counters instead of
   re-deriving them by scanning; and memoize per-`revision` work (see `Tower.stopsOf`) rather than
-  recomputing it per call. **The deep review must reject any new `.find` / `.filter` / `.some` (or
+  recomputing it per call. **The deep review must reject any `.find` / `.filter` / `.some` (or
   other full-collection scan) nested inside a loop over another collection on a per-tick or
-  per-frame path**. Call it out the same as a correctness bug.
+  per-frame path**. Call it out the same as a correctness bug. The same holds for the Rust engine,
+  the WASM binding, the hosts and rendering, for ported and inherited code as well as new code,
+  and for scans hidden inside helpers. The canonical checklist (items HP-1 to HP-12, the per-item
+  record a review prints, the PR complexity note, and how a finding is resolved) is
+  `docs/performance/hot-path-review.md`; the review skills load it through
+  `_bmad/custom/gds-code-review.toml` and `_bmad/custom/bmad-code-review.toml`.
 - **Excalibur physics is deliberately disabled** (nothing uses it; enabled, it froze phones on
   big towers at high speed). Do not re-enable it.
 - **Never draw one oversized surface**: tall shafts and the ground plane are tiled into

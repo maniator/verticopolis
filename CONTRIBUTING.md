@@ -528,14 +528,22 @@ alone.
   `await`, broken call sites), cleanup (duplication, dead code, needless
   complexity), and **algorithmic complexity** (below). Fix what you find
   before opening or updating a PR.
-- **No Big-O regressions on hot paths.** The tick loop and render/UI refresh run
-  over the whole tower every step, and towers get large (hundreds of units,
-  dozens of shafts, ~100 floors, thousands of person-trips). Look entities up by
-  id via `Tower.getUnit` / `getTransport`, never `units.find` / `transports.find`.
-  Hoist tower-wide facts out of per-unit/per-person loops, keep running counters
-  instead of re-scanning, and memoize per-`revision` work. A new `.find` /
-  `.filter` / `.some` nested in a loop over another collection on a per-tick or
-  per-frame path is a review-blocking finding, the same as a correctness bug.
+- **Hot paths get a complexity review.** The tick loop, the hosts and the
+  render/UI refresh run over the whole tower every step or frame, and towers get
+  large (up to about 43,000 units, most of them floor tiles, 24 shafts, 110
+  floors, thousands of people). The checklist is
+  [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md),
+  and it applies to Rust, TypeScript, the WASM binding, the worker and
+  main-thread hosts, simulation ticks and rendering. In short: trace each
+  changed function's callers up to its tick, step or frame entry point; treat a
+  whole-collection walk, clone, sort or rebuilt map under a per-person,
+  per-unit, per-floor, per-transport, per-step or per-frame multiplier as a
+  finding in either language, including inside helpers; review ported and
+  inherited code as new; compare against the TypeScript's caches before
+  porting; and keep results, RNG order and save bytes identical. Significant
+  engine changes carry the complexity note from section 5 of that page. A
+  hot-path finding is fixed, or deferred with evidence and a tracked issue; it
+  is never dismissed because it existed before.
 - **Deep, adversarial review before merge, never deferred to "later."** The change gets a full
   adversarial review while its context is still loaded (before pushing, or
   immediately after opening/updating the PR), not left to a hypothetical

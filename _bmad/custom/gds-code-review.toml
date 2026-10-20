@@ -1,0 +1,20 @@
+# Team override for gds-code-review, merged over the installer-owned
+# .claude/skills/gds-code-review/customize.toml (and its .agents copy, which Copilot
+# loads). Arrays append to the base list; on_complete replaces the empty base.
+#
+# It wires in the hot-path complexity review. The checklist itself lives in
+# docs/performance/hot-path-review.md; change the rule there, and keep this
+# file to the hooks that make the review apply it.
+
+[workflow]
+
+persistent_facts = [
+  "file:{project-root}/docs/performance/hot-path-review.md",
+  "Hot-path layer: when the diff touches a surface listed in section 1 of docs/performance/hot-path-review.md (engine-rs/src/, src/engine/, src/dualrun/, src/wasmhost/, src/render/, src/presentation/, src/game/, src/ui/), Step 2 launches a fourth parallel layer, the Hot-Path Auditor, with the diff and read access to the repository, using the prompt in section 9 of that page. Step 3 normalizes its findings like the Edge Case Hunter's (source hotpath) and classifies every hot-path finding by section 7: patch or defer, never dismissed for being pre-existing, for matching the TypeScript, or for sitting outside the diff; a defer needs an estimate or profile, a GitHub issue and a backlog row. Step 4 prints the section 6 record table (one row per HP item) with the findings. If the Hot-Path Auditor fails or returns no table, add it to failed_layers and report the review as incomplete.",
+]
+
+activation_steps_append = [
+  "Hot-path gate: once Step 1 has the diff, check its changed paths against section 1 of docs/performance/hot-path-review.md and say whether this run includes the Hot-Path Auditor layer. If it does, the review is incomplete without that layer's section 6 record table.",
+]
+
+on_complete = "Before closing, confirm the hot-path record: the section 6 table from docs/performance/hot-path-review.md with every HP item filled, or one line saying the diff touches no hot-path surface. Every hot-path defer names its GitHub issue."

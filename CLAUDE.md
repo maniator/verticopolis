@@ -26,6 +26,14 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   invariants (e.g. build caps, transport pooling, economy math). Green quality
   gates are **not** a substitute for the review skill, and "the diff is tiny" is
   not an exemption.
+- **Hot paths get the complexity checklist,
+  [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md),**
+  in Rust, TypeScript, the WASM binding, the hosts, ticks and rendering. The
+  review skills load it and add a Hot-Path Auditor layer that traces callers
+  past the diff and prints one record row per item. Ported or inherited code
+  is reviewed as new, a port compares the TypeScript's caches first, and a
+  hot-path finding is fixed or deferred with evidence and an issue, never
+  dismissed as pre-existing. Significant engine PRs carry its complexity note.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
   `npm test`, `npm run build`. All four must be green. The build needs the
   engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a

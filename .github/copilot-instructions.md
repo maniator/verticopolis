@@ -95,6 +95,13 @@ don't claim a skill was invoked:
   inline yourself rather than invoking anything.
 - **Apply the review dimensions in the “Code review” section below,** scoped to
   the implicated lenses. Prefer a few high-signal findings over filler.
+- **Run the hot-path checklist when the diff touches a hot-path surface**
+  (`engine-rs/src/`, `src/engine/`, `src/dualrun/`, `src/wasmhost/`,
+  `src/render/`, `src/presentation/`, `src/game/`, `src/ui/`). This is the
+  skills' fourth layer, the Hot-Path Auditor: apply items HP-1 to HP-12 of
+  [`docs/performance/hot-path-review.md`](../docs/performance/hot-path-review.md)
+  inline, reading callers in the checked-out repository, and print its
+  section 6 table with one row per item. See the Performance dimension below.
 - **Include in every review (ideally as the last line) the exact marker**
   `Reviewed against Verticopolis conventions (.github/copilot-instructions.md).`
   so it stays reliably searchable as confirmation this overlay was applied, even
@@ -127,6 +134,16 @@ just the obvious lines in the diff, and flag anything CI wouldn't catch:
   SimTower parity model; watch for dead spots and exploits.
 - **Security:** untrusted input (saves, persistence) must degrade
   gracefully and never crash or trust foreign data.
+- **Performance on hot paths:** apply
+  [`docs/performance/hot-path-review.md`](../docs/performance/hot-path-review.md)
+  to Rust, TypeScript, the WASM binding, the hosts, simulation ticks and
+  rendering. Trace each changed function's callers to its frame, step, chunk,
+  hour or command entry point. Flag whole-collection walks, clones, sorts,
+  rebuilt maps and id scans under a per-person, per-unit, per-floor,
+  per-transport, per-step or per-frame multiplier, in either language and
+  inside helpers. Review ported and inherited code as new, and check a port
+  against the TypeScript's caches (HP-8). A finding is fixed, or deferred with
+  evidence and an issue; it is never waved through as pre-existing.
 
 See [`CONTRIBUTING.md`](../CONTRIBUTING.md) → "Code review" for the
 deep-review-before-merge policy every change must meet;

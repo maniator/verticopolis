@@ -87,8 +87,8 @@ pair took the same approach, and two of the four PRs were closed. To stop that:
 ## Code review: the agent workflow
 
 Follow [CONTRIBUTING.md](./CONTRIBUTING.md) → **Code review** for the review
-requirements every change must meet (self-review, no Big-O regressions on hot
-paths, the deep adversarial review before merge, re-requesting Copilot, and
+requirements every change must meet (self-review, the hot-path complexity
+review, the deep adversarial review before merge, re-requesting Copilot, and
 resolving review threads). On top of that, in an agent session:
 
 - **MANDATORY: the deep review IS running the BMGD/BMAD review skill:
@@ -142,7 +142,17 @@ resolving review threads). On top of that, in an agent session:
 
   For larger or higher-risk changes, convene several of these as a party
   (`bmad-party-mode`) so the perspectives challenge each other.
-- The full canon and rationale for the hot-path performance rules live in
+- **Hot-path complexity review.** The checklist is
+  [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md).
+  The team overrides `_bmad/custom/gds-code-review.toml` and
+  `_bmad/custom/bmad-code-review.toml` load it into both review skills, which
+  then add a Hot-Path Auditor layer (diff plus repository access) whenever the
+  diff touches the engine, the binding, a host or rendering, and print one
+  record row per checklist item. A review without that record does not count
+  as the deep review. Triage a hot-path finding as `patch` or `defer` (with evidence, an
+  issue and a backlog row), never `dismiss` because the code was inherited.
+  When you port engine code, compare the TypeScript's caches first (HP-8), and
+  put the section 5 complexity note in the PR. The surrounding canon lives in
   `_bmad-output/project-context.md` (Performance section).
 
 ## Testing discipline: shift-left and regression
