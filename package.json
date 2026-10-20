@@ -35,6 +35,7 @@
     "atlas": "tsx scripts/export-atlas.ts",
     "gen:events": "node scripts/gen-gameplay-events.ts",
     "wasm:build": "node scripts/wasm-build.ts",
+    "engine:compat": "node scripts/engine-compat.ts",
     "test:wasm": "VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost wasmWorker chargeBindingRaw perfCompare/scenarios.integration",
     "test:wasm:parity": "VC_REQUIRE_WASM=1 vitest run --project integrationWasm --project unitWasm"
   },

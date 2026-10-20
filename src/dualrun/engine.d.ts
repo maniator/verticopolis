@@ -362,6 +362,17 @@ export function catalog(mode: string): string;
 export function encodeVctower(save_json: string, app_version: string, saved_at_ms: number): string;
 
 /**
+ * Which engine this is and which contracts it speaks, as canonical JSON in
+ * the shape of `verticopolis_engine::identity::identity`: the record's
+ * schema, the crate's name and version, the save version it writes and the
+ * oldest it loads, the frame layout version, the catalog version with each
+ * mode's digest, and the conformance lock digest. It needs no running game
+ * and holds no build hash: a hash of the sources cannot be compiled into
+ * them, so the served package's `BUILD.json` records it.
+ */
+export function engineIdentity(): string;
+
+/**
  * `exportTdt(saveJson)`: the `.TDT` bytes for a serialized game (what
  * `serialize` returns). A tower the format cannot hold is a JavaScript error
  * with the player-readable message.

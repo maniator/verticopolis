@@ -265,6 +265,18 @@ pub fn catalog(mode: &str) -> Result<String, JsError> {
     catalog_text(mode).map_err(err)
 }
 
+/// Which engine this is and which contracts it speaks, as canonical JSON in
+/// the shape of `verticopolis_engine::identity::identity`: the record's
+/// schema, the crate's name and version, the save version it writes and the
+/// oldest it loads, the frame layout version, the catalog version with each
+/// mode's digest, and the conformance lock digest. It needs no running game
+/// and holds no build hash: a hash of the sources cannot be compiled into
+/// them, so the served package's `BUILD.json` records it.
+#[wasm_bindgen(js_name = engineIdentity)]
+pub fn engine_identity() -> String {
+    crate::identity::identity_json()
+}
+
 /// One running simulation. Construct with `newGame`, `fromSave` or
 /// `fromVctower`; drive it with the command methods; read it back with
 /// `serialize` and the two hashed views.
