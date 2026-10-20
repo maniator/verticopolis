@@ -1,9 +1,10 @@
 import type { Simulation } from "../engine/Simulation";
 import { checkBinding, type WasmModule } from "../dualrun/binding";
-import { readCatalog } from "../dualrun/catalog";
-import { attachWasmHost, refuseForeignCatalog, type WasmHost } from "./wasmHost";
+import { attachWasmHost, type WasmHost } from "./wasmHost";
+import { catalogVerdict } from "./foreignCatalog";
 import { ENGINE_DIR, ENGINE_GLUE } from "./enginePackageNames";
 import { EngineBootError, type FallbackReason, type FallbackStage } from "./engineBoot";
+import { loadEngineModule } from "./loadEngineModule";
 import { recordHostError, type HostErrors } from "./hostErrors";
 import type { FaultContext, HostFault } from "./hostFault";
 import { towerStateSig } from "../engine/UndoHistory";
@@ -108,12 +109,12 @@ export function enginePackageUrl(base = import.meta.env.BASE_URL, href = globalT
   return new URL(`${base}${ENGINE_DIR}${ENGINE_GLUE}`, href).href;
 }
 
-/** Load and initialize the browser package. A package that loads but lacks
- *  what this shell calls is a mismatched package (a shell and an engine from
- *  different builds), coded so analytics tells it from a broken engine. */
-export async function loadWasmEngine(url = enginePackageUrl()): Promise<WasmModule> {
-  const mod = (await import(/* @vite-ignore */ url)) as { default: () => Promise<unknown> };
-  await mod.default();
+/** Load and initialize the browser package through the byte check
+ *  (loadEngineModule). A package that passes it but lacks what this shell
+ *  calls is a mismatched package too (a shell and an engine from different
+ *  builds), coded so analytics tells it from a broken engine. */
+export async function loadWasmEngine(url = enginePackageUrl(), signal?: AbortSignal): Promise<WasmModule> {
+  const { mod } = await loadEngineModule(url, { signal });
   try {
     return checkBinding(mod);
   } catch (e) {
@@ -169,33 +170,17 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
       status.hosted = false;
     }
   };
-  // Whether the package's catalogs are foreign to this build: the attach
-  // reads both and refuses every tower then, and the cause is a shell and an
-  // engine from different deploys (#1046), so the code is `package-mismatch`.
-  // Only a catalog the engine handed over and this build rejects (its version,
-  // its shape, another world) counts. A catalog call that throws or returns no
-  // JSON is the engine failing, which stays `attach-refused` and is asked
-  // again at the next refusal. A verdict is kept: the package cannot change
-  // under the page.
+  // Whether the package's catalogs are foreign to this build (see
+  // catalogVerdict). A verdict is kept: the package cannot change under the
+  // page. An engine that will not hand its catalogs over has none, and is
+  // asked again at the next refusal.
   let foreign: boolean | undefined;
   const foreignPackage = (): boolean => {
     if (foreign !== undefined) return foreign;
-    if (typeof mod.catalog !== "function") return (foreign = true);
-    for (const mode of ["classic", "modern"] as const) {
-      let text: string;
-      try {
-        text = mod.catalog(mode);
-        JSON.parse(text);
-      } catch {
-        return false;
-      }
-      try {
-        refuseForeignCatalog(readCatalog({ catalog: () => text }, mode));
-      } catch {
-        return (foreign = true);
-      }
-    }
-    return (foreign = false);
+    const read = mod.catalog;
+    const verdict = catalogVerdict(typeof read === "function" ? (mode) => read(mode) : undefined);
+    if (verdict === "failing") return false;
+    return (foreign = verdict === "foreign");
   };
   // Record a fallback: a tower the host would not take, or a fault.
   const fallBack = (message: string, reason: FallbackReason, stage: FallbackStage) => {

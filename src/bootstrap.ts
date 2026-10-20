@@ -13,7 +13,9 @@ import { noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "
 import { refreshSplashVersion } from "./wasmhost/engineLabel";
 import { isHostFault } from "./wasmhost/hostFault";
 import { ENGINE_FAILURE_ID } from "./game/interactionState";
-import { bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState, type FallbackReason } from "./wasmhost/engineBoot";
+import { showEngineLoading } from "./engineLoading";
+import { catalogVerdict } from "./wasmhost/foreignCatalog";
+import { bootFailure, bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState, type FallbackReason } from "./wasmhost/engineBoot";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -220,7 +222,9 @@ export function bootGame(create: () => BootApp): Promise<void> {
     // drops the experimental hosts from its bundle.
     const choice = __WASM_ONLY__ ? "wasm" : engineRequested();
     const mainThreadWasm = choice === "wasm" || choice === "wasm-frame";
-    const booted = mainThreadWasm ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: () => loadWasmEngine() }) : typescriptBoot();
+    // The cover says so after a short wait, when the package takes a while (#1132).
+    const stopLoadingLine = mainThreadWasm || choice === "wasm-worker" ? showEngineLoading() : () => {};
+    const booted = mainThreadWasm ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: (signal) => loadWasmEngine(undefined, signal) }) : typescriptBoot();
     let engineWorker: SpawnedWorker | null = null;
     let workerHost: WorkerHostHandle | null = null;
     let bootState: EngineBootState = booted.state;
@@ -229,10 +233,11 @@ export function bootGame(create: () => BootApp): Promise<void> {
         engineWorker = await spawnEngineWorker(makeBrowserWorker, enginePackageUrl());
       } catch (e) {
         // Recorded with its reason, as a failed package load is (#874).
-        bootState = { ...bootState, failure: { stage: "load", reason: bootFailureReason(e), message: e instanceof Error ? e.message : String(e) } };
+        bootState = { ...bootState, failure: bootFailure("load", e) };
         console.error("[wasm-worker] the engine worker did not start; running on the TypeScript engine:", e);
       }
     }
+    stopLoadingLine();
     publishBootState(bootState);
     // Start the gameplay session clock (foreground time + funnel state) only once
     // the game can run: a no-WebGL visitor bails above, and a wasm-only build
@@ -266,13 +271,18 @@ export function bootGame(create: () => BootApp): Promise<void> {
       const wasmModule = booted.module;
       if (!__WASM_ONLY__ && engineWorker) {
         try {
+          const catalogs = engineWorker.catalogs;
           workerHost = startWorkerHost(app as unknown as WasmHostApp, engineWorker, () => spawnEngineWorker(makeBrowserWorker, enginePackageUrl()));
           engineWorker = null; // the host owns it now
           // startWorkerHost reports a refused first tower on its status. That
           // tower stays on TypeScript, recorded as the main-thread host records
           // it (#874); the host follows every later adopt either way.
           const { hosted, lastError } = workerHost.status;
-          bootState = hosted ? { ...bootState, engine: "wasm" } : failBoot(bootState, "start", "attach-refused", lastError ?? "the worker host did not take the first tower");
+          // A package whose catalogs this build cannot draw is a mismatched
+          // one (#1086), as the main-thread host codes it; the worker sent
+          // its catalogs when it answered ready.
+          const refusal = catalogVerdict((mode) => catalogs[mode]) === "foreign" ? "package-mismatch" : "attach-refused";
+          bootState = hosted ? { ...bootState, engine: "wasm" } : failBoot(bootState, "start", refusal, lastError ?? "the worker host did not take the first tower");
           publishBootState(bootState);
           refreshSplashVersion();
         } catch (e) {

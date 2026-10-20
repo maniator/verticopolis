@@ -10,7 +10,16 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // The WASM engine switch: the request and the package load are stubbed so the
 // fallback (package fails to load, the game boots on the TypeScript engine)
 // can be asserted without a package.
-const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm" | "wasm-worker", loadError: null as Error | null, module: null as unknown, workerError: null as Error | null }));
+const wasmStub = vi.hoisted(() => ({
+  requested: "ts" as "ts" | "wasm" | "wasm-worker",
+  loadError: null as Error | null,
+  module: null as unknown,
+  workerError: null as Error | null,
+  /** The catalogs the stubbed worker answers ready with; null for this build's own. */
+  workerCatalogs: null as { classic: string; modern: string } | null,
+  /** A load the test settles itself, to hold the boot while it looks at the cover. */
+  pending: null as { promise: Promise<unknown>; fail(e: Error): void } | null,
+}));
 vi.mock("./wasmhost/engineChoice", async (importOriginal) => {
   const real = await importOriginal<typeof import("./wasmhost/engineChoice")>();
   return { ...real, engineRequested: () => wasmStub.requested };
@@ -20,6 +29,7 @@ vi.mock("./wasmhost/startWasmHost", async (importOriginal) => {
   return {
     ...real,
     loadWasmEngine: vi.fn(async () => {
+      if (wasmStub.pending) return wasmStub.pending.promise;
       if (wasmStub.module) return wasmStub.module;
       throw wasmStub.loadError ?? new Error("no package in this test");
     }),
@@ -34,7 +44,10 @@ vi.mock("./wasmhost/workerController", async (importOriginal) => {
     ...real,
     spawnEngineWorker: vi.fn(async () => {
       if (wasmStub.workerError) throw wasmStub.workerError;
-      return { worker: { terminate: vi.fn() }, catalogs: { classic: "{}", modern: "{}" } };
+      // The catalogs of a package that fits this build, unless the test sets others.
+      const { fakeModule } = await import("./wasmhost/fakeEngine.fixture");
+      const catalog = fakeModule().catalog as (mode: string) => string;
+      return { worker: { terminate: vi.fn() }, catalogs: wasmStub.workerCatalogs ?? { classic: catalog("classic"), modern: catalog("modern") } };
     }),
     startWorkerHost: vi.fn(() => ({ status: { hosted: true, errors: [] as string[] }, stop: vi.fn() })),
   };
@@ -51,6 +64,7 @@ import { SaveGame } from "./storage/SaveGame";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { HOST_ERROR_HISTORY } from "./wasmhost/hostErrors";
 import { EngineBootError } from "./wasmhost/engineBoot";
+import { ENGINE_LOADING_DELAY_MS, ENGINE_LOADING_TEXT } from "./engineLoading";
 
 
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */
@@ -362,6 +376,19 @@ describe("bootGame engine_status", () => {
       () => ({ status: { hosted: false, errors: [`not hosting this tower: ${secret}`], lastError: `not hosting this tower: ${secret}`, droppedErrors: 0 }, stop: vi.fn() }) as never,
     );
     expect(await settled()).toMatchObject({ engine: "ts-fallback", fallback_reason: "attach-refused", fallback_stage: "start" });
+    // The same refusal on a package whose catalogs this build cannot draw is a
+    // mismatched package (#1086); catalogs the worker could not hand over are not.
+    const refusedTower = () =>
+      vi.mocked(startWorkerHost).mockImplementationOnce(
+        () => ({ status: { hosted: false, errors: ["not hosting this tower"], lastError: "not hosting this tower", droppedErrors: 0 }, stop: vi.fn() }) as never,
+      );
+    wasmStub.workerCatalogs = { classic: "{}", modern: "{}" };
+    refusedTower();
+    expect(await settled()).toMatchObject({ fallback_reason: "package-mismatch", fallback_stage: "start" });
+    wasmStub.workerCatalogs = { classic: "not json", modern: "not json" };
+    refusedTower();
+    expect(await settled()).toMatchObject({ fallback_reason: "attach-refused", fallback_stage: "start" });
+    wasmStub.workerCatalogs = null;
     expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret|player|vctower/);
   });
 
@@ -417,6 +444,35 @@ describe("bootGame engine_status", () => {
       await expect(boot()).rejects.toThrow(/did not start/);
       expect(engineRows()).toEqual([expect.objectContaining({ engine: "none", fallback_reason: "package-mismatch", fallback_stage: "load" })]);
       expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret/);
+    });
+
+    it("says the engine is loading after a wait, and the failure copy replaces the line when the load times out (#1132)", async () => {
+      stubWebGL();
+      vi.stubGlobal("__WASM_ONLY__", true);
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.useFakeTimers();
+      document.body.innerHTML = '<div id="boot-cover"></div><div id="a11y-live"></div><div id="stage"></div>';
+      let fail!: (e: Error) => void;
+      wasmStub.pending = { promise: new Promise((_, reject) => (fail = reject)), fail: (e) => fail(e) };
+      try {
+        const run = boot().catch((e: unknown) => e);
+        await vi.advanceTimersByTimeAsync(ENGINE_LOADING_DELAY_MS - 100);
+        expect(document.querySelector(".boot-loading"), "a fast load never shows the line").toBeNull();
+        await vi.advanceTimersByTimeAsync(200);
+        expect(document.querySelector("#boot-cover .boot-loading")?.textContent).toBe(ENGINE_LOADING_TEXT);
+        await vi.advanceTimersByTimeAsync(100);
+        expect(document.getElementById("a11y-live")?.textContent, "and it is announced").toBe(ENGINE_LOADING_TEXT);
+        wasmStub.pending.fail(new EngineBootError("boot-timeout", "the engine package did not load within 90 seconds"));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(await run).toBeInstanceOf(Error);
+        expect(document.querySelector(".boot-loading")).toBeNull();
+        expect(document.getElementById("boot-cover")).toBeNull();
+        expect(document.getElementById("engine-failure")?.textContent).toContain("the engine package did not load within 90 seconds");
+        expect(document.getElementById("a11y-live")?.textContent).toBe("");
+      } finally {
+        wasmStub.pending = null;
+        vi.useRealTimers();
+      }
     });
 
     it("reports a first tower the strict host refused as a stop at the start", async () => {

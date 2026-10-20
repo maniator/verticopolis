@@ -20,3 +20,7 @@ export const ENGINE_BUILD_RECORD = "BUILD.json";
  *  same name as ENGINE_THIRD_PARTY in src/build/rustNotices.ts; the test
  *  holds them equal). */
 export const ENGINE_THIRD_PARTY_RECORD = "THIRD-PARTY.json";
+/** The line a development serve logs when it loads the engine without the byte
+ *  check (loadEngineModule.ts). It is the marker scripts/verify-precache.ts
+ *  looks for: a production bundle that holds it still carries the skip. */
+export const DEV_SKIP_MARKER = "development serve: the engine package is not verified";

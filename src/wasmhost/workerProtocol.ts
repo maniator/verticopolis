@@ -1,4 +1,5 @@
 import type { ShadowCommand } from "../dualrun/commands";
+import type { FallbackReason, PackageFailure } from "./engineBoot";
 
 /**
  * The messages between the main thread and the engine worker
@@ -126,6 +127,11 @@ export interface ErrorReply {
   seq?: number;
   fatal: boolean;
   message: string;
+  /** The code of a failed load (`package-mismatch` for a binding the shell
+   *  cannot use, #1086) and, when the byte check refused the package, its
+   *  detail (#985). Absent on every other error. */
+  reason?: FallbackReason;
+  package?: PackageFailure;
 }
 
 export type FromWorker = ReadyReply | LoadedReply | FrameReply | ErrorReply;

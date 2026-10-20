@@ -1,4 +1,5 @@
 import type { WasmModule } from "../dualrun/binding";
+import { EnginePackageError, type PackageFailureDetail, type PackageFailureKind } from "./enginePackageCheck";
 
 /**
  * How boot gets its engine, for both build modes (see
@@ -41,11 +42,19 @@ export type FallbackReason = (typeof FALLBACK_REASONS)[number];
 export const FALLBACK_STAGES = ["none", "load", "start", "adopt", "undo"] as const;
 export type FallbackStage = (typeof FALLBACK_STAGES)[number];
 
+/** Why the byte check refused the engine package, as plain data (so a worker
+ *  can send it): the kind, the file, both package ids and whether a service
+ *  worker controlled the page (#985). Hex ids and codes only; the boot state
+ *  carries it for tooling and support, and analytics never does. */
+export type PackageFailure = PackageFailureDetail & { kind: PackageFailureKind };
+
 export interface EngineBootFailure {
   stage: BootStage;
   /** The code analytics reports; never derived from `message`. */
   reason: FallbackReason;
   message: string;
+  /** Set when the byte check refused the package. */
+  package?: PackageFailure;
 }
 
 /** A boot failure that already knows its code: the load's time limit, a
@@ -53,11 +62,21 @@ export interface EngineBootFailure {
  *  running engine is `boot-error` (see {@link bootFailureReason}). */
 export class EngineBootError extends Error {
   readonly reason: FallbackReason;
-  constructor(reason: FallbackReason, message: string) {
+  readonly package?: PackageFailure;
+  constructor(reason: FallbackReason, message: string, pkg?: PackageFailure) {
     super(message);
     this.name = "EngineBootError";
     this.reason = reason;
+    if (pkg) this.package = pkg;
   }
+}
+
+/** The code for a refused package. A set that disagrees with the shell is a
+ *  mismatch. Files that did not arrive and a browser that cannot hash are
+ *  `boot-error` for now: the closed list has no code of their own until the
+ *  owner approves one (#985 slice 2b), and the boot state keeps the kind. */
+export function packageFailureReason(kind: PackageFailureKind): FallbackReason {
+  return kind === "mismatch" ? "package-mismatch" : "boot-error";
 }
 
 /** The code for a failure on the way to a running engine. A glue and binary
@@ -65,8 +84,24 @@ export class EngineBootError extends Error {
  *  engine itself may be sound. Every other untyped failure is `boot-error`. */
 export function bootFailureReason(e: unknown): FallbackReason {
   if (e instanceof EngineBootError) return e.reason;
+  if (e instanceof EnginePackageError) return packageFailureReason(e.kind);
   if (typeof WebAssembly !== "undefined" && e instanceof WebAssembly.LinkError) return "package-mismatch";
   return "boot-error";
+}
+
+/** The package detail of a failure, when the byte check refused the package. */
+export function packageFailureOf(e: unknown): PackageFailure | undefined {
+  if (e instanceof EnginePackageError) return { kind: e.kind, ...e.detail };
+  if (e instanceof EngineBootError) return e.package;
+  return undefined;
+}
+
+const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** A boot failure built from what was thrown. */
+export function bootFailure(stage: BootStage, e: unknown): EngineBootFailure {
+  const pkg = packageFailureOf(e);
+  return { stage, reason: bootFailureReason(e), message: messageOf(e), ...(pkg ? { package: pkg } : {}) };
 }
 
 export interface EngineBootState {
@@ -81,7 +116,9 @@ export interface EngineBootState {
 
 export interface EngineBootOptions {
   wasmOnly: boolean;
-  load: () => Promise<WasmModule>;
+  /** Loads the engine. The signal fires at the time limit; the loader checks
+   *  it after each step and drops a result that arrives later. */
+  load: (signal: AbortSignal) => Promise<WasmModule>;
   log?: Pick<Console, "error">;
   /** How long the load may take before boot gives up on it (ms). */
   timeoutMs?: number;
@@ -93,10 +130,14 @@ export interface EngineBootOptions {
  *  leave a wasm-only boot on a blank page with no message. */
 export const ENGINE_LOAD_TIMEOUT_MS = 90_000;
 
-function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+function withTimeout<T>(work: Promise<T>, ms: number, expire: () => void): Promise<T> {
   return new Promise<T>((done, fail) => {
     const seconds = Math.round(ms / 1000);
-    const timer = setTimeout(() => fail(new EngineBootError("boot-timeout", `the engine package did not load within ${seconds} ${seconds === 1 ? "second" : "seconds"}`)), ms);
+    const timer = setTimeout(() => {
+      // The attempt is terminal before the timeout is published.
+      expire();
+      fail(new EngineBootError("boot-timeout", `the engine package did not load within ${seconds} ${seconds === 1 ? "second" : "seconds"}`));
+    }, ms);
     work.then(
       (v) => {
         clearTimeout(timer);
@@ -115,8 +156,6 @@ export interface EngineBootResult {
   state: EngineBootState;
 }
 
-const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
-
 /** A switchable build's boot when the WASM engine was not asked for. Boot
  *  takes it without awaiting, so a TypeScript boot stays synchronous. */
 export function typescriptBoot(): EngineBootResult {
@@ -130,15 +169,16 @@ export async function loadBootEngine(opts: EngineBootOptions): Promise<EngineBoo
   const build = opts.wasmOnly ? "wasm-only" : "switchable";
   let mod: WasmModule;
   try {
-    mod = await withTimeout(opts.load(), opts.timeoutMs ?? ENGINE_LOAD_TIMEOUT_MS);
+    const attempt = new AbortController();
+    mod = await withTimeout(opts.load(attempt.signal), opts.timeoutMs ?? ENGINE_LOAD_TIMEOUT_MS, () => attempt.abort());
   } catch (e) {
     if (!opts.wasmOnly) {
       // The fallback is recorded with its reason (#874) as well as logged.
       log.error("[wasm] the engine package did not load; running on the TypeScript engine:", e);
-      return { module: null, state: { build, engine: "ts", failure: { stage: "load", reason: bootFailureReason(e), message: messageOf(e) } } };
+      return { module: null, state: { build, engine: "ts", failure: bootFailure("load", e) } };
     }
     log.error("[wasm] the engine package did not load, and this build has no other engine:", e);
-    return { module: null, state: { build, engine: "none", failure: { stage: "load", reason: bootFailureReason(e), message: messageOf(e) } } };
+    return { module: null, state: { build, engine: "none", failure: bootFailure("load", e) } };
   }
   // Saves go through the engine's own writer (#935). A switchable build keeps
   // the TypeScript writer for a package without one; a wasm-only build needs it.

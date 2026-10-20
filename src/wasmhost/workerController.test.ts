@@ -161,6 +161,34 @@ describe("worker controller (fake engine)", () => {
     await expect(spawnEngineWorker(crashing, "u")).rejects.not.toBeInstanceOf(EngineBootError);
   });
 
+  it("keeps a refused package's kind and ids when the worker's byte check refuses it (#985)", async () => {
+    const package_ = { kind: "mismatch" as const, file: "wasm" as const, expected: "aaaaaaaaaaaa", found: "bbbbbbbbbbbb", expectedPackage: "111111111111", servedPackage: "222222222222", controlled: true };
+    const refusing = (kind: "mismatch" | "load-failed"): EngineWorkerLike => {
+      const w = fakeWorker();
+      w.postMessage = () => {
+        setTimeout(() => w.onmessage?.({ data: { type: "error", fatal: true, message: "could not load the WASM engine: refused", package: { ...package_, kind } } }), 0);
+      };
+      return w;
+    };
+    const mismatch = await spawnEngineWorker(() => refusing("mismatch"), "x").catch((e: unknown) => e);
+    expect(mismatch).toBeInstanceOf(EngineBootError);
+    expect(mismatch).toMatchObject({ reason: "package-mismatch", package: { kind: "mismatch", servedPackage: "222222222222" } });
+    const missing = await spawnEngineWorker(() => refusing("load-failed"), "x").catch((e: unknown) => e);
+    expect(missing).toMatchObject({ reason: "boot-error", package: { kind: "load-failed" } });
+  });
+
+  it("keeps the code a worker gave a failed load, a binding the shell cannot use included (#1086)", async () => {
+    const coded = (reason: "package-mismatch" | "boot-error"): EngineWorkerLike => {
+      const w = fakeWorker();
+      w.postMessage = () => {
+        setTimeout(() => w.onmessage?.({ data: { type: "error", fatal: true, message: "could not load the WASM engine: the WASM binding lacks Engine", reason } }), 0);
+      };
+      return w;
+    };
+    expect(await spawnEngineWorker(() => coded("package-mismatch"), "x").catch((e: unknown) => e)).toMatchObject({ reason: "package-mismatch" });
+    expect(await spawnEngineWorker(() => coded("boot-error"), "x").catch((e: unknown) => e)).toMatchObject({ reason: "boot-error" });
+  });
+
   it("codes a worker that never answers ready as a boot timeout", async () => {
     const silent: EngineWorkerLike = { onmessage: null, onerror: null, postMessage() {}, terminate: vi.fn() };
     const err = await spawnEngineWorker(() => silent, "u", 5).catch((e: unknown) => e);

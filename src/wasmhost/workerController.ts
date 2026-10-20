@@ -2,7 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { WasmHostApp } from "./startWasmHost";
 import { attachWorkerHost, type WorkerHost } from "./workerHost";
 import type { FromWorker, ToWorker } from "./workerProtocol";
-import { EngineBootError } from "./engineBoot";
+import { EngineBootError, packageFailureReason, type FallbackReason, type PackageFailure } from "./engineBoot";
 import { recordHostError, type HostErrors } from "./hostErrors";
 
 /**
@@ -66,12 +66,16 @@ export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, tim
   return new Promise<SpawnedWorker>((resolve, reject) => {
     // The ready timeout carries its code (`boot-timeout`), as the main-thread
     // load's limit does; every other start failure is an untyped error.
-    const fail = (message: string, timedOut = false) => {
+    const fail = (message: string, timedOut = false, coded?: { reason?: FallbackReason; package?: PackageFailure }) => {
       clearTimeout(timer);
       worker.onmessage = null;
       worker.onerror = null;
       worker.terminate();
-      reject(timedOut ? new EngineBootError("boot-timeout", message) : new Error(message));
+      // A load the worker coded keeps its code and, for a refused package,
+      // its kind and ids, so the boot state names them.
+      const reason = coded?.reason ?? (coded?.package ? packageFailureReason(coded.package.kind) : undefined);
+      if (timedOut) reject(new EngineBootError("boot-timeout", message));
+      else reject(reason ? new EngineBootError(reason, message, coded?.package) : new Error(message));
     };
     const timer = setTimeout(() => fail(`the engine worker did not answer within ${timeoutMs} ms`, true), timeoutMs);
     worker.onmessage = (e) => {
@@ -82,7 +86,7 @@ export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, tim
         worker.onerror = null;
         resolve({ worker, catalogs: msg.catalogs });
       } else if (msg.type === "error") {
-        fail(msg.message);
+        fail(msg.message, false, msg);
       }
     };
     worker.onerror = (e) => fail(`the engine worker failed to start: ${e.message ?? "unknown error"}`);
