@@ -25,8 +25,8 @@ import type { Sample } from "./samples";
  * Settled rooms are painted at two different offsets inside a larger region
  * canvas, so any art that depends on where its region starts fails here.
  * Every sampled settled kind is held to that: room details seed from the
- * room's floor and column (`src/render/originSeeds.test.ts` sweeps every room
- * kind and subtype for it).
+ * room's floor and column (`src/render/originSeedsSweep.integration.test.ts`
+ * sweeps every room kind and subtype for it).
  */
 
 export interface SampleResult {

@@ -31,9 +31,9 @@ import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./servic
  * in `serviceScale.test.ts` cover a caller that is not.
  */
 
-/** Staff appearance depends on room geography, not the compositor draw origin.
- *  `geoVariant` reads the world's lowest floor and lot width, so the shirts
- *  follow those too; both are constant for the shipped catalog. */
+/** Staff appearance depends on room geography alone. `geoVariant` reads the
+ *  world's lowest floor and lot width, so the shirts follow those too; both
+ *  are constant for the shipped catalog. */
 function staffSeed(u: Pick<Unit, "kind" | "floor" | "x">): number {
   return geoVariant(u, 6, 997);
 }

@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 2.38.0
 
-- Staff shirts, the sky bar's window lights and a few other room details no longer change depending on where the room sits in the tower.
+- Staff shirts, the sky bar's window lights and a few other small room details now stay the same across the whole room. They no longer shift with how the tower is drawn.
 
 ## 2.37.0
 

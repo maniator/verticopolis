@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { facilityFloors } from "../engine/facilities";
 import type { FacilityKind, Unit } from "../engine/types";
-import { OFFSETS, crop, paintAt, paintPastSeam, rasterCtx, tail, unitOf } from "../tests/originSeedsHarness";
+import { OFFSETS, crop, paintAt, paintPastSeam, parseColor, rasterCtx, tail, unitOf } from "../tests/originSeedsHarness";
 import { skylineWindowLit } from "./pixelSprites/skyBar";
 import { FLOOR, TILE } from "./scale";
 
@@ -51,14 +51,13 @@ describe("room details follow the room wherever it is painted (#915)", () => {
         // origin, matches the same part of the whole room.
         const w = unit.width * TILE;
         const h = facilityFloors(unit.kind) * FLOOR;
-        for (const [dx, dy] of [[3 * TILE, 0], [TILE + 3, FLOOR]] as const) {
+        for (const [dx, dy] of [[3 * TILE, 0], [TILE + 3, 0], [TILE + 3, FLOOR]] as const) {
           if (dy >= h) continue;
           expect(paintPastSeam(unit, dx, dy, lit), `past a seam at ${dx},${dy}`).toEqual(tail(first, w, h, dx, dy));
         }
       });
     }
   }
-
 
   it("still varies the details from room to room", () => {
     // The seeds moved to the room's floor and column; placements of one kind
@@ -95,6 +94,28 @@ describe("room details follow the room wherever it is painted (#915)", () => {
         paintAt(unitOf(kind, { subtype, occupants: 0, floor, x }), 0, 0, true).join(","))));
       expect(looks.size, `${kind}/${subtype}`).toBeGreaterThan(1);
     }
+  });
+
+  it("an empty sky bar still lights different windows in different rooms", () => {
+    // With nobody at the bar no figure carries the variety, so the skyline
+    // band is the painter bound to `skylineWindowLit`. Its lit windows are the
+    // pixels in the warm and pale window colors; a bar with none, or the same
+    // picture in every room, would mean the seed no longer reaches them.
+    const w = 12 * TILE;
+    const h = FLOOR;
+    const winBot = h - Math.max(3, Math.round(h * 0.12)) - 9;
+    const lights = new Set(["#f0d070", "#f0a850", "#d0d0f0"].map((c) => parseColor(c).slice(0, 3).join(",")));
+    const band = (floor: number, x: number): number[] =>
+      paintAt(unitOf("skyBar", { occupants: 0, width: 12, floor, x }), 0, 0, true).slice(3 * w * 4, winBot * w * 4);
+    const lit = (px: number[]): number => {
+      let n = 0;
+      for (let i = 0; i < px.length; i += 4) if (lights.has(px.slice(i, i + 3).join(","))) n++;
+      return n;
+    };
+    const rooms = [5, 12, 27, 43, 61].flatMap((floor) => [17, 64, 131, 208].map((x) => band(floor, x)));
+    for (const px of rooms) expect(lit(px)).toBeGreaterThan(0);
+    expect(new Set(rooms.map((px) => px.join(","))).size).toBeGreaterThan(1);
+    expect(new Set(rooms.map(lit)).size).toBeGreaterThan(1);
   });
 
   it("the comparison catches a detail that follows the draw origin", () => {

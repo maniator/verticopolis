@@ -135,7 +135,9 @@ bumps it. New frames or optional fields do not.
 - `animations`: frame names in play order, the seconds each holds (`dt`), and
   whether the last frame loops into the first.
 - `signature`: which inputs are baked into frames, which a frontend composes,
-  which animate, and the exact rule for each (`signature.rules`).
+  which animate, and the exact rule for each (`signature.rules`). The rules
+  are prose for whoever ports a reader; one that stops applying is removed
+  without a schema bump.
 - `variants`: the sampled placements behind each room variant.
 - `data`: small tables (the sky color at each quarter hour, the skyline fills,
   the shirt colors, the person build sizes, the sampled seeds, the recycling
