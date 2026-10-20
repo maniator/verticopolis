@@ -3,6 +3,7 @@ import { browserName, rendererBanners, rendererSummary } from "../perfCompare/re
 import type { Metric, Ratio } from "./analysis";
 import type { ReadModelResults, WorkerResults } from "./main";
 import type { ModeName } from "./pageWorker";
+import { aaBanner } from "./aa";
 import type { ReadModelShape, Slice, Spread } from "./readModel";
 
 /** report.md for a `perf:worker` run: the snapshot header, the medians per
@@ -27,10 +28,11 @@ const cell = (m: Metric | undefined): string => {
 /** Metrics the gate judges by an additive paired difference (protocol section 5, M4: a zero TypeScript reference has no ratio). Their gate cell says so; the harness does not report that difference yet (#1111). */
 const DIFFERENCE_GATED = /^main-thread blocking/;
 
-const ratioCell = (r: Ratio | undefined): string => {
+/** `verdict` false for an A/A folder, which has no verdict words: the interval is the data. */
+const ratioCell = (r: Ratio | undefined, verdict = true): string => {
   if (!r) return "";
   const ci = r.ciLow !== null && r.ciHigh !== null ? ` [${r.ciLow.toFixed(2)}, ${r.ciHigh.toFixed(2)}]` : "";
-  return `${r.ratio.toFixed(2)}x${ci} ${r.verdict}${r.zeroReference ? ` (${r.zeroReference} zero)` : ""}${r.unthrottled ? " †" : ""}`;
+  return `${r.ratio.toFixed(2)}x${ci}${verdict ? ` ${r.verdict}` : ""}${r.zeroReference ? ` (${r.zeroReference} zero)` : ""}${r.unthrottled ? " †" : ""}`;
 };
 
 /** A count, or a mean of counts, to one decimal when it is not whole. */
@@ -68,9 +70,11 @@ export function markdown(res: WorkerResults): string {
   const modes = res.config.modes;
   const env = res.environment;
   const lines: string[] = [];
-  lines.push("# Worker host benchmark (npm run perf:worker)");
+  const aa = res.config.aa ?? null;
+  lines.push(aa ? `# Worker host A/A pass (npm run perf:worker -- --aa ${aa})` : "# Worker host benchmark (npm run perf:worker)");
   lines.push("");
   lines.push(`> **Snapshot, measured ${res.startedAt} to ${res.generatedAt} on commit \`${env.commitShort}\` (app ${env.appVersion})${env.dirty ? ", dirty tree" : ""}.** Live numbers: re-run \`npm run perf:worker\` (src/tests/perfWorker/, its arithmetic pinned by src/tests/perfWorker/analysis.test.ts). ${res.validation.ok ? "Validation passed." : "VALIDATION FAILED: see the end of this report."}`);
+  if (aa) lines.push("", aaBanner(aa));
   for (const banner of rendererBanners(res.browser, res.config.quick)) lines.push("", banner);
   lines.push("");
   if (treeSummary(env.tree, env.dirty)) lines.push(`- Working tree: ${treeSummary(env.tree, env.dirty)}`);
@@ -100,7 +104,7 @@ export function markdown(res: WorkerResults): string {
     const gate = present.includes("ts") && present.includes("wasm");
     const cols: [ModeName, ModeName][] = [...present.filter((m) => m !== "wasm" && !(gate && m === "ts")).map((m) => [m, "wasm"] as [ModeName, ModeName]), ...(present.includes("wasm-worker") && present.includes("wasm-frame") ? [["wasm-worker", "wasm-frame"] as [ModeName, ModeName]] : [])];
     const row = (cells: string[]) => `| ${cells.join(" | ")} |`;
-    const header = ["scenario", "throttle", "metric", ...(gate ? ["gate: wasm / ts (rates: ts / wasm)"] : []), ...present, ...cols.map(([a, b]) => `${a} / ${b}`)];
+    const header = ["scenario", "throttle", "metric", ...(gate ? [aa ? "slot wasm / slot ts (rates: ts / wasm)" : "gate: wasm / ts (rates: ts / wasm)"] : []), ...present.map((m) => (aa ? `slot ${m}` : m)), ...cols.map(([a, b]) => `${a} / ${b}`)];
     lines.push(row(header));
     lines.push(row(header.map(() => "---")));
     for (const k of keys) {
@@ -108,7 +112,7 @@ export function markdown(res: WorkerResults): string {
       const of = (mode: ModeName) => rows.find((m) => m.scenario === scenario && m.throttle === throttle && m.metric === metric && m.mode === mode);
       const ratio = (mode: ModeName, against: ModeName) => res.ratios.find((r) => r.scenario === scenario && r.throttle === throttle && r.metric === metric && r.mode === mode && r.against === against);
       const higher = (of("wasm") ?? rows.find((m) => m.scenario === scenario && m.throttle === throttle && m.metric === metric))?.better === "higher";
-      lines.push(row([scenario, `${throttle}x`, `${metric} (${unit})`, ...(gate ? [DIFFERENCE_GATED.test(metric) ? "no ratio: gated by a paired difference (#1111)" : ratioCell(higher ? ratio("ts", "wasm") : ratio("wasm", "ts"))] : []), ...present.map((m) => cell(of(m))), ...cols.map(([a, b]) => ratioCell(ratio(a, b)))]));
+      lines.push(row([scenario, `${throttle}x`, `${metric} (${unit})`, ...(gate ? [DIFFERENCE_GATED.test(metric) ? "no ratio: gated by a paired difference (#1111)" : ratioCell(higher ? ratio("ts", "wasm") : ratio("wasm", "ts"), !aa)] : []), ...present.map((m) => cell(of(m))), ...cols.map(([a, b]) => ratioCell(ratio(a, b), !aa))]));
     }
     lines.push("");
   }

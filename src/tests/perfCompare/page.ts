@@ -83,6 +83,32 @@ export function installProbes(): void {
   });
 }
 
+/**
+ * Init script: report a WebGL context lost on any canvas in the page through
+ * the binding the harness exposes on the browser context (`contextLoss.ts`).
+ * The renderer reads come from a new canvas, so a GPU process that restarted
+ * mid-run still reads the same hardware adapter there while the game's own
+ * context is gone (#1136). `webglcontextlost` does not bubble, so the
+ * listener sits on the document in the capture phase. A canvas that was never
+ * attached, such as the one `webglRenderer` makes and releases, never reaches
+ * the document.
+ */
+export function watchContextLoss(): void {
+  const w = window as any;
+  document.addEventListener(
+    "webglcontextlost",
+    (e: Event) => {
+      const c = e.target as { id?: string; width?: number; height?: number } | null;
+      try {
+        w.__perfContextLost?.({ at: Math.round(performance.now()), id: String(c?.id ?? ""), width: Number(c?.width ?? 0), height: Number(c?.height ?? 0) });
+      } catch {
+        /* the binding goes away with the page */
+      }
+    },
+    true,
+  );
+}
+
 export interface PageInfo {
   /** What actually runs the live tower: "wasm" only when the host holds it
    *  with no errors and the live sim is the hosted instance. */

@@ -1,6 +1,7 @@
 import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
 import { processTreePss } from "./env";
-import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, wasmColdLoad, wasmMemoryBytes, webglRenderer, type PageInfo } from "./page";
+import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, wasmColdLoad, wasmMemoryBytes, watchContextLoss, webglRenderer, type PageInfo } from "./page";
+import { trackContextLoss } from "./contextLoss";
 import { audioStatus, measureFrames, startAudio, type FrameRun } from "./pageFrames";
 import { simRun, type SimRun } from "./pageSim";
 import type { PerfServer, ServedRequest } from "./server";
@@ -140,7 +141,7 @@ async function throttle(cdp: CDPSession, rate: number): Promise<void> {
   await cdp.send("Emulation.setCPUThrottlingRate", { rate });
 }
 
-async function newContext(browser: Browser, config: CompareConfig, serviceWorkers: "allow" | "block"): Promise<BrowserContext> {
+async function newContext(browser: Browser, config: CompareConfig, serviceWorkers: "allow" | "block", onLoss: (line: string) => void): Promise<BrowserContext> {
   const ctx = await browser.newContext({ viewport: config.viewport, deviceScaleFactor: 1, serviceWorkers });
   // tsx compiles this harness with esbuild's keepNames, which wraps inner
   // functions in a `__name(fn, "name")` helper. The functions Playwright
@@ -148,6 +149,8 @@ async function newContext(browser: Browser, config: CompareConfig, serviceWorker
   // page gets an identity stand-in before anything else runs.
   await ctx.addInitScript({ content: "globalThis.__name = (fn) => fn;" });
   await ctx.addInitScript(installProbes);
+  await ctx.addInitScript(watchContextLoss);
+  await trackContextLoss(ctx, onLoss);
   return ctx;
 }
 
@@ -212,6 +215,10 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     wasmCold: null,
     audio: null,
     firstVisitWithServiceWorker: null,
+    contextLost: [],
+  };
+  const noteLoss = (line: string): void => {
+    run.contextLost?.push(line);
   };
   const engineUrl = `${server.url}/engine/verticopolis_engine.js`;
   const url = `${server.url}/?engine=${engine}`;
@@ -243,7 +250,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     // starts from a full collection. Both engines get the same flags.
     browser = await chromium.launch(launchOptions(opts.executablePath, opts.launch));
     run.browserVersion = browser.version();
-    const ctx = await newContext(browser, config, "block");
+    const ctx = await newContext(browser, config, "block", noteLoss);
     const page = await ctx.newPage();
     listen(page);
     const cdp = await ctx.newCDPSession(page);
@@ -347,7 +354,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     // (fresh HTTP cache), throttled before navigation and again at commit,
     // with the CPU probe run under it to show the throttle held.
     if (slowRate > 1) {
-      const slow = await newContext(browser, config, "block");
+      const slow = await newContext(browser, config, "block", noteLoss);
       const slowPage = await slow.newPage();
       listen(slowPage);
       const slowCdp = await slow.newCDPSession(slowPage);
@@ -391,7 +398,8 @@ async function firstVisit(browser: Browser, config: CompareConfig, server: PerfS
   let sw: BrowserContext | null = null;
   sink.side = result.onlinePageErrors;
   try {
-    sw = await newContext(browser, config, "allow");
+    // A side measurement with no frames in it: a loss here fails nothing.
+    sw = await newContext(browser, config, "allow", () => {});
     const page = await sw.newPage();
     listen(page);
     server.take();

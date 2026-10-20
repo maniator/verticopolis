@@ -114,18 +114,10 @@ fn abs_seed(seed: i32) -> usize {
 }
 
 pub fn pick_x(tower: &Tower, floor: i64, seed: i32) -> i64 {
-    let mut tiles: Vec<i64> = Vec::new();
-    for u in &tower.units {
-        if u.kind.is_structural() && u.floor == floor {
-            for i in 0..u.width {
-                tiles.push(u.x + i);
-            }
-        }
+    match tower.structural_tiles(floor) {
+        Some(tiles) if !tiles.is_empty() => tiles[abs_seed(seed) % tiles.len()],
+        _ => 2 + (abs_seed(seed) % 40) as i64,
     }
-    if tiles.is_empty() {
-        return 2 + (abs_seed(seed) % 40) as i64;
-    }
-    tiles[abs_seed(seed) % tiles.len()]
 }
 
 pub fn pick_x_in_segment(tower: &Tower, floor: i64, seed: i32, anchor_x: i64) -> i64 {
@@ -141,21 +133,17 @@ pub fn pick_x_in_segment(tower: &Tower, floor: i64, seed: i32, anchor_x: i64) ->
             break;
         }
     }
-    let mut tiles: Vec<i64> = Vec::new();
-    for u in &tower.units {
-        if u.kind.is_structural() && u.floor == floor {
-            for i in 0..u.width {
-                let x = u.x + i;
-                if x >= lo && x <= hi {
-                    tiles.push(x);
-                }
-            }
-        }
-    }
-    if tiles.is_empty() {
+    // The tiles inside [lo, hi] in pickX's order, counted and then indexed
+    // in place rather than copied out.
+    let Some(tiles) = tower.structural_tiles(floor) else {
+        return anchor_x;
+    };
+    let in_run = |x: &&i64| **x >= lo && **x <= hi;
+    let n = tiles.iter().filter(in_run).count();
+    if n == 0 {
         return anchor_x;
     }
-    tiles[abs_seed(seed) % tiles.len()]
+    *tiles.iter().filter(in_run).nth(abs_seed(seed) % n).unwrap()
 }
 
 pub fn inside_x(crowd: &mut Crowd, u: &Unit, inset: i64) -> i64 {

@@ -1,6 +1,7 @@
 import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
 import { processTreePss } from "../perfCompare/env";
-import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, webglRenderer } from "../perfCompare/page";
+import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, watchContextLoss, webglRenderer } from "../perfCompare/page";
+import { trackContextLoss } from "../perfCompare/contextLoss";
 import type { PerfServer } from "../perfCompare/server";
 import type { Scenario } from "../perfCompare/scenarios";
 import { frameStats, quantile } from "../perfCompare/stats";
@@ -37,6 +38,8 @@ export interface WorkerConfig {
   scenarios: string[];
   modes: ModeName[];
   quick: boolean;
+  /** `--aa ts|wasm`: an A/A pass, the same mode in both slots ("ts" and "wasm"). Absent in results written before A/A passes existed. */
+  aa?: "ts" | "wasm" | null;
 }
 
 export interface Startup {
@@ -115,7 +118,10 @@ export interface ScenarioResult {
 
 export interface ModeRun {
   rep: number;
+  /** The slot the run is recorded under: the mode itself, or in an A/A pass ("ts" or "wasm") a label for the first or second slot. */
   mode: ModeName;
+  /** The mode this process was asked to run and the page reported holding the tower: `config.aa ?? mode`. Absent in results written before A/A passes existed, where it equals `mode`. */
+  ranMode?: ModeName;
   order: number;
   ok: boolean;
   error: string | null;
@@ -126,6 +132,8 @@ export interface ModeRun {
   rendererEnd?: string | null;
   /** The same read after the throttled cold start, kept apart so it cannot hide a change after the frames; absent for a run without a cold start. */
   rendererEndCold?: string | null;
+  /** The WebGL contexts lost in the run's pages; see ProcessRun.contextLost. */
+  contextLost?: string[];
   cold: Startup | null;
   warm: Startup | null;
   cold4x: Startup | null;
@@ -197,11 +205,13 @@ export function summarizeFrames(f: Awaited<ReturnType<typeof framesRun>>): Frame
   };
 }
 
-async function newContext(browser: Browser, config: WorkerConfig, serviceWorkers: "allow" | "block"): Promise<BrowserContext> {
+async function newContext(browser: Browser, config: WorkerConfig, serviceWorkers: "allow" | "block", onLoss: (line: string) => void): Promise<BrowserContext> {
   const ctx = await browser.newContext({ viewport: config.viewport, deviceScaleFactor: 1, serviceWorkers });
   // See perfCompare/runner.ts: esbuild's keepNames helper the page lacks.
   await ctx.addInitScript({ content: "globalThis.__name = (fn) => fn;" });
   await ctx.addInitScript(installProbes);
+  await ctx.addInitScript(watchContextLoss);
+  await trackContextLoss(ctx, onLoss);
   return ctx;
 }
 
@@ -304,9 +314,14 @@ export interface RunnerOptions {
   log: (line: string) => void;
 }
 
-export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, order: number): Promise<ModeRun> {
+/** `slot` is the mode the run is recorded under; in an A/A pass (`config.aa`) both slots run the same mode, which is the one every page check and measurement below uses. */
+export async function runMode(opts: RunnerOptions, rep: number, slot: ModeName, order: number): Promise<ModeRun> {
   const { server, config, scenarios, log } = opts;
-  const run: ModeRun = { rep, mode, order, ok: false, error: null, pageErrors: [], browserVersion: null, page: null, cold: null, warm: null, cold4x: null, cpuProbe: null, scenarios: {}, offline: null };
+  const mode: ModeName = config.aa ?? slot;
+  const run: ModeRun = { rep, mode: slot, ranMode: mode, order, ok: false, error: null, pageErrors: [], browserVersion: null, page: null, cold: null, warm: null, cold4x: null, cpuProbe: null, scenarios: {}, offline: null, contextLost: [] };
+  const noteLoss = (line: string): void => {
+    run.contextLost?.push(line);
+  };
   const url = `${server.url}/?engine=${mode}`;
   const engineUrl = `${server.url}/engine/verticopolis_engine.js`;
   const sink = { side: null as string[] | null };
@@ -324,7 +339,7 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
   try {
     browser = await chromium.launch(launchOptions(opts.executablePath, opts.launch));
     run.browserVersion = browser.version();
-    const ctx = await newContext(browser, config, "block");
+    const ctx = await newContext(browser, config, "block", noteLoss);
     const page = await ctx.newPage();
     listen(page);
     const cdp = await ctx.newCDPSession(page);
@@ -398,7 +413,7 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
     await ctx.close();
 
     if (slowRate > 1) {
-      const slow = await newContext(browser, config, "block");
+      const slow = await newContext(browser, config, "block", noteLoss);
       const slowPage = await slow.newPage();
       listen(slowPage);
       const slowCdp = await slow.newCDPSession(slowPage);
@@ -440,7 +455,8 @@ async function offline(browser: Browser, config: WorkerConfig, url: string, mode
   };
   let ctx: BrowserContext | null = null;
   try {
-    ctx = await newContext(browser, config, "allow");
+    // A side measurement with no frames in it: a loss here fails nothing.
+    ctx = await newContext(browser, config, "allow", () => {});
     const page = await ctx.newPage();
     listen(page);
     await page.goto(url, { waitUntil: "commit" });

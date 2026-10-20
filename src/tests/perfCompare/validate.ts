@@ -1,5 +1,6 @@
 import type { NodeCheck } from "./nodeCheck";
 import { rendererFinding } from "./renderer";
+import { contextLossFinding } from "./contextLoss";
 import type { CompareConfig, EngineName, ProcessRun, StepSummary } from "./types";
 
 /**
@@ -173,6 +174,7 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
   const gl = rendererFinding(good.map((r) => r.page?.webgl?.renderer), good.map((r) => r.rendererEnd), { quick: config.quick, exception: rendererException, lateEnds: good.map((r) => r.rendererEndCold) });
   errors.push(...gl.errors);
   warnings.push(...gl.warnings);
+  errors.push(...contextLossFinding(good.map((r) => r.contextLost)));
   const coarse = good.filter((r) => (r.page?.timerResolutionMs ?? Infinity) > 0.02);
   if (coarse.length) warnings.push(`${coarse.length} process(es) had a timer coarser than 20 microseconds; per-step quantiles there are quantized`);
 
