@@ -211,6 +211,69 @@ test.describe("never falls back to the TypeScript engine", () => {
     expect(await page.evaluate(() => (window as any).game.sim.clock.minutes)).toBe(after.minutes);
   });
 
+  test("an engine that traps mid-game stops the game instead of running it on TypeScript (#874)", async ({ page }) => {
+    const errors = pageErrors(page);
+    await page.goto("/");
+    await hostedGame(page);
+    await page.evaluate(() => (window as any).game.setSpeed(1));
+    // The real tick runs, then the call traps and every later call on the
+    // engine throws, as a poisoned wasm-bindgen object does.
+    await page.evaluate(() => {
+      const engine = (window as any).__vcEngine.current().engine;
+      const proto = Object.getPrototypeOf(engine);
+      const real = engine.tick.bind(engine);
+      Object.defineProperty(engine, "tick", {
+        value: (dt: number) => {
+          real(dt);
+          for (const key of Object.getOwnPropertyNames(proto)) {
+            if (key === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function") continue;
+            Object.defineProperty(engine, key, {
+              value: () => {
+                throw new Error("recursive use of an object detected which would lead to unsafe aliasing in rust");
+              },
+              configurable: true,
+              writable: true,
+            });
+          }
+          throw new WebAssembly.RuntimeError("unreachable");
+        },
+        configurable: true,
+        writable: true,
+      });
+    });
+    const failure = page.locator("#engine-failure");
+    await expect(failure).toBeVisible({ timeout: 30_000 });
+    await expect(failure).toHaveAttribute("data-stage", "host");
+    expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "host" } });
+    const after = await page.evaluate(() => {
+      const w = window as any;
+      const sim = w.game.sim;
+      return {
+        hosted: !!w.__vcEngine.status.hosted,
+        reason: w.__vcEngine.status.lastFallback?.reason,
+        speed: w.game.speed,
+        minutes: sim.clock.minutes as number,
+        // The frozen host's own save, which answers with the restore point.
+        hostSave: Object.prototype.hasOwnProperty.call(sim, "serialize"),
+        saved: typeof sim.serialize().minutes === "number",
+      };
+    });
+    // Stopped on the engine's last state: a save still answers (the restore
+    // point), and no TypeScript tick moves the tower.
+    expect(after).toMatchObject({ hosted: false, reason: "trap-tick", speed: 0, hostSave: true, saved: true });
+    await page.keyboard.press("3");
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => (window as any).game.speed)).toBe(0);
+    expect(await page.evaluate(() => (window as any).game.sim.clock.minutes)).toBe(after.minutes);
+    // Even a speed set directly moves nothing: the frozen tower's tick is its own.
+    await page.evaluate(() => (window as any).game.setSpeed(3));
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => (window as any).game.sim.clock.minutes)).toBe(after.minutes);
+    // The fault is the only error the page reports: a failed fallback report
+    // or a failed stop would show here.
+    expect(errors.filter((e) => !/the WASM engine failed during a tick: unreachable/.test(e))).toEqual([]);
+  });
+
   /** Install the worker and reload under it, so the engine package is in
    *  the precache, then change the cached binary with `edit`. */
   async function installThen(page: Page, edit: (url: string) => Promise<boolean>): Promise<void> {
