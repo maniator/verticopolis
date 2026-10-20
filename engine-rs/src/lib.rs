@@ -54,6 +54,7 @@ pub mod tdt;
 pub use tdt::{export_tdt, import_tdt};
 pub mod telemetry;
 pub mod tower;
+mod tower_index;
 pub mod tower_query;
 #[cfg(feature = "wasm")]
 pub mod wasm;

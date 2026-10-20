@@ -114,14 +114,7 @@ fn abs_seed(seed: i32) -> usize {
 }
 
 pub fn pick_x(tower: &Tower, floor: i64, seed: i32) -> i64 {
-    let mut tiles: Vec<i64> = Vec::new();
-    for u in &tower.units {
-        if u.kind.is_structural() && u.floor == floor {
-            for i in 0..u.width {
-                tiles.push(u.x + i);
-            }
-        }
-    }
+    let tiles = tower.structural_tiles(floor);
     if tiles.is_empty() {
         return 2 + (abs_seed(seed) % 40) as i64;
     }
@@ -141,21 +134,15 @@ pub fn pick_x_in_segment(tower: &Tower, floor: i64, seed: i32, anchor_x: i64) ->
             break;
         }
     }
-    let mut tiles: Vec<i64> = Vec::new();
-    for u in &tower.units {
-        if u.kind.is_structural() && u.floor == floor {
-            for i in 0..u.width {
-                let x = u.x + i;
-                if x >= lo && x <= hi {
-                    tiles.push(x);
-                }
-            }
-        }
-    }
-    if tiles.is_empty() {
+    // The tiles inside [lo, hi] in pickX's order, counted and then indexed
+    // in place rather than copied out.
+    let tiles = tower.structural_tiles(floor);
+    let in_run = |x: &&i64| **x >= lo && **x <= hi;
+    let n = tiles.iter().filter(in_run).count();
+    if n == 0 {
         return anchor_x;
     }
-    tiles[abs_seed(seed) % tiles.len()]
+    *tiles.iter().filter(in_run).nth(abs_seed(seed) % n).unwrap()
 }
 
 pub fn inside_x(crowd: &mut Crowd, u: &Unit, inset: i64) -> i64 {
