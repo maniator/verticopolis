@@ -50,26 +50,59 @@ describe("pending exterminator persistence", () => {
     expect([paid, later].map((id) => restored.tower.getUnit(id)!.state)).toEqual(["empty", "empty"]);
   });
 
-  it("ignores orphan and Classic lists and does not turn malformed lists into free treatment", () => {
+  it("bills no rooms for a list that is not an array", () => {
+    for (const bad of ["bad", null, { 0: 1 }]) {
+      const { sim, paid } = booked();
+      const raw = sim.serialize() as unknown as Record<string, unknown>;
+      raw.exterminationRoomIds = bad;
+      const restored = Simulation.deserialize(raw as unknown as SerializedGame);
+      expect(restored.exterminationRoomIds).toEqual([]);
+      restored.clock.minutes += 1440;
+      resolveExtermination(restored);
+      expect(restored.tower.getUnit(paid)!.state).toBe("infested");
+      expect(restored.exterminationDueDay).toBeUndefined();
+    }
+  });
+
+  it("ignores a list without a due day or in Classic", () => {
     const { sim, paid } = booked();
     const raw = sim.serialize();
-    (raw as unknown as Record<string, unknown>).exterminationRoomIds = "bad";
-    const restored = Simulation.deserialize(raw);
-    expect(restored.exterminationRoomIds).toEqual([]);
-    restored.clock.minutes += 1440;
-    resolveExtermination(restored);
-    expect(restored.tower.getUnit(paid)!.state).toBe("infested");
     delete raw.exterminationDueDay;
+    expect(raw.exterminationRoomIds).toEqual([paid]);
     expect(Simulation.deserialize(raw).exterminationRoomIds).toBeUndefined();
     raw.mode = "classic";
     raw.exterminationDueDay = 1;
     expect(Simulation.deserialize(raw).exterminationRoomIds).toBeUndefined();
   });
 
+  it("skips a billed room demolished before the treatment", () => {
+    const { sim, paid, later } = booked();
+    const restored = Simulation.deserialize(sim.serialize());
+    const x = restored.tower.getUnit(paid)!.x;
+    expect(restored.tower.removeUnit(paid)).toBeDefined();
+    const rebuilt = restored.tower.place("hotelSingle", 2, x).unitId!;
+    expect(rebuilt).not.toBe(paid);
+    restored.tower.getUnit(rebuilt)!.state = "infested";
+    restored.clock.minutes += 1440;
+    resolveExtermination(restored);
+    expect([rebuilt, later].map((id) => restored.tower.getUnit(id)!.state)).toEqual(["infested", "infested"]);
+    expect(restored.exterminationDueDay).toBeUndefined();
+    expect(restored.exterminationRoomIds).toBeUndefined();
+  });
+
   it("normalizes raw ids without coercion and bounds unique retained ids", () => {
     expect(coerceExterminationRoomIds([1, 1, 2.5, "2", null, true, -1, 0, NaN, Infinity, 2 ** 31, 3])).toEqual([1, 3]);
     expect(coerceExterminationRoomIds(null)).toEqual([]);
     expect(coerceExterminationRoomIds(undefined)).toBeUndefined();
-    expect(coerceExterminationRoomIds(Array.from({ length: UNIT_CAP + 5 }, (_, i) => i + 1))).toHaveLength(UNIT_CAP);
+  });
+
+  it("keeps the first UNIT_CAP valid unique ids", () => {
+    // The same list as the Rust test: invalid entries and a repeat just short
+    // of the cap count for nothing, and the cap keeps the first.
+    const head = [2 ** 31 - 1, 0, -1, 2.5, "2", null, true, 2 ** 31];
+    const body = Array.from({ length: UNIT_CAP - 2 }, (_, i) => i + 1);
+    const ids = coerceExterminationRoomIds([...head, ...body, 1, UNIT_CAP - 1, UNIT_CAP, UNIT_CAP + 1])!;
+    expect(ids).toHaveLength(UNIT_CAP);
+    expect(ids).toEqual([2 ** 31 - 1, ...body, UNIT_CAP - 1]);
   });
 });

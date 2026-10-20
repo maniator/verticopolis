@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.35.1
+
+- A booked exterminator now treats the same rooms after you save and reload as it would have if you had kept playing.
+
 ## 2.35.0
 
 - The Sprite Gallery now shows every room, shaft, and elevator at the same proportions as your tower.

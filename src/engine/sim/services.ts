@@ -160,7 +160,7 @@ export function callExterminator(sim: Simulation): ExterminatorResult {
   sim.exterminationDueDay = sim.clock.day + 1;
   // Remember exactly which rooms were billed, so an overnight-escalated wing is
   // NOT swept up for the price of today's smaller count. The billed set is
-  // saved too, so loading or attaching a host keeps the same treatment.
+  // saved with the due day, so a reload or a host attach treats the same rooms.
   sim.exterminationRoomIds = ids;
   sim.emit(
     `🧹 Exterminator booked for ${rooms} infested room(s): $${cost.toLocaleString("en-US")} charged. The rooms clear tomorrow.`,

@@ -43,8 +43,8 @@ export function mergeSimulation(target: Simulation, fresh: Simulation, marks: Me
     t[key] = f[key];
   }
   target.clock.minutes = fresh.clock.minutes;
-  // Optional properties absent on the fresh instance must clear too, so a
-  // completed or cancelled booking cannot retain an earlier room list.
+  // The loop copies the fresh instance's own keys only; set the billed rooms
+  // outright so a treatment the engine landed clears them here too.
   target.exterminationRoomIds = fresh.exterminationRoomIds;
   target.events.loadState(fresh.events.saveState());
   target.events.restore(fresh.tower.units.filter((u) => u.state === "fire").map((u) => u.id));

@@ -8,8 +8,10 @@ import { INFEST_DAYS } from "../economy/housekeeping";
 import { subtypeListFor } from "../retailSubtypes";
 import { UNIT_CAP } from "./deserializeGuards";
 
-/** Missing means a legacy tower-wide booking. A present malformed list
- * authorizes no rooms. Bound valid unique ids by the whole lot's capacity. */
+/** The billed room ids a save carries for a pending booking. Missing means a
+ * legacy save, whose treatment clears every infested room. Any other value
+ * that is not an array bills no rooms, and an array keeps its valid unique
+ * ids, the first UNIT_CAP of them. */
 export function coerceExterminationRoomIds(value: unknown): number[] | undefined {
   if (value === undefined) return undefined;
   const ids = new Set<number>();

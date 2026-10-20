@@ -5,9 +5,7 @@ import { coerceCalendarKind, type CalendarKind } from "../calendar";
 
 import { rentConfig } from "../econConfig";
 import { snapToLadder } from "../gameRules";
-
 import { Ledger } from "../Ledger";
-
 import { MILESTONES } from "../milestones";
 import { canonicalSubtype, subtypeListFor } from "../retailSubtypes";
 import { FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isFacilityKind, isFixedSpanTransport, isHotelKind, maxCarsFor } from "../facilities";
@@ -59,8 +57,7 @@ export function serialize(sim: Simulation): SerializedGame {
     lastVipNagDay: sim.lastVipNagDay,
     treasuresFound: sim.treasuresFound,
     exterminationDueDay: sim.exterminationDueDay,
-    ...(sim.exterminationDueDay !== undefined && sim.exterminationRoomIds !== undefined
-      ? { exterminationRoomIds: [...sim.exterminationRoomIds] } : {}),
+    ...(sim.exterminationDueDay !== undefined && sim.exterminationRoomIds ? { exterminationRoomIds: [...sim.exterminationRoomIds] } : {}),
     events: sim.events.saveState(),
     excavated: [...sim.excavated],
     blockbusters: sim.economy.blockbusterIds,

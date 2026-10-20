@@ -30,7 +30,8 @@ const LEGACY_CONDO_DEFAULT_PRICE: f64 = 120_000.0;
 const OLDEST_SAVE_VERSION: i64 = 1;
 /// `MAX_SAVE_INFLATED_BYTES` (saveCompression.ts).
 const MAX_SAVE_INFLATED_BYTES: u64 = 32 * 1024 * 1024;
-const UNIT_CAP: usize = 2 * (LOT_WIDTH as usize) * ((MAX_FLOOR - MIN_FLOOR + 1) as usize);
+pub(crate) const UNIT_CAP: usize =
+    2 * (LOT_WIDTH as usize) * ((MAX_FLOOR - MIN_FLOOR + 1) as usize);
 const LOT: i64 = LOT_WIDTH;
 
 // ---- vctowerContainer.ts ----------------------------------------------------

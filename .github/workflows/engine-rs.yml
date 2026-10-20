@@ -28,6 +28,7 @@ on:
       - "src/wasmhost/**"
       - "src/tests/integration/wasmHost.integration.test.ts"
       - "src/tests/integration/wasmHostCatalog.integration.test.ts"
+      - "src/tests/integration/wasmHostExtermination.integration.test.ts"
       - "e2e/wasmEngine.spec.ts"
       - "src/game/frameLoop.ts"
       - "src/tests/integration/loaderCases.integration.test.ts"
@@ -119,6 +120,7 @@ jobs:
             case "$f" in src/wasmhost/*) engine=true ;; esac
             case "$f" in src/tests/integration/wasmHost.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/wasmHostCatalog.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/wasmHostExtermination.integration.test.ts) engine=true ;; esac
             case "$f" in e2e/wasmEngine.spec.ts) engine=true ;; esac
             case "$f" in src/game/frameLoop.ts) engine=true ;; esac
             case "$f" in src/tests/integration/loaderCases.integration.test.ts) engine=true ;; esac
