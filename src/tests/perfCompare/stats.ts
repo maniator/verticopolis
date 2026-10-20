@@ -119,6 +119,16 @@ export function summarize(values: readonly number[]): Summary {
   };
 }
 
+/** The differences a minus b, paired by repetition number: a repetition missing from either side drops out, so a thin or reordered row cannot shift a pair. */
+export function pairedDifferences(a: { reps: readonly number[]; values: readonly number[] }, b: { reps: readonly number[]; values: readonly number[] }): number[] {
+  const diffs: number[] = [];
+  a.reps.forEach((rep, i) => {
+    const j = b.reps.indexOf(rep);
+    if (j >= 0) diffs.push(a.values[i] - b.values[j]);
+  });
+  return diffs;
+}
+
 export interface FrameStats {
   frames: number;
   medianMs: number;
