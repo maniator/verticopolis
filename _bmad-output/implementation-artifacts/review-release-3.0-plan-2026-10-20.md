@@ -423,3 +423,14 @@ hold. It found 16 more; all are patched.
 | CP-14 | The transcript dropped OD-7's condition, and the memlog credited the flip-PR placement to the owner | patch | The transcript is reworded; the memlog gets a new correcting line (append-only) |
 | CP-15 | R7 still spoke of "inconclusive"; no PF5 edge to stage 3; no PF5 row in 9.8; M7 had no exit | patch | R7 restated; the graph edge, the 9.8 row and M7's exit added |
 | CP-16 | ECH25 appeared under two findings | patch | Marked as its first and second halves |
+
+## After the confirming pass: the exception register's home
+
+A coordination edit, made after the confirming pass so that this plan and
+#902's PR agree. Neither the plan nor the cutover plan named a path or a
+format for the exception register, and #902's PR opens it. Section 10's
+Sign-off row now names `_bmad-output/planning-artifacts/release-3.0-exception-register.md`
+and the entry format that PR uses, A2 opens it, 9.5 and the matrix list it
+as a shared file, and section 12 lists the path and format as a plan choice.
+The plan does not create the file. No review pass ran on this edit: it adds
+a path and a format and changes no rule.

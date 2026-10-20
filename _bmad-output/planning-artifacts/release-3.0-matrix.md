@@ -43,7 +43,7 @@ when the owner approves the reconciled plan at the final review; until then
 | ID | Work | Issue / PR | Gate rows | Lane | Depends on | Changes the key | Label now → plan | State 2026-10-20 | Next step |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | A1 | Reliability signal: engine, fallback reason, size gate flag, latch-off, divergence count, arm and stage; governed definition with the split into early telemetry and eligible sessions, per-arm crash rates, and the exact bound computed in the tested script (OD-2); data map (A1 creates it); #841 check | new issue on approval (S16's signal half) | Reliability, Analytics, Deployment | WS-A | none (runtime reasons with A3) | no | new → P1 | Not started | Spec, then draft PR; production needs the owner's separate OK (plan 13) |
-| A2 | S5: a booking survives attach in both engines; S4's booking-case test (#874 stays open until it merges) | #902 | Saves | WS-A | A3 (the owner's 2026-10-16 order); B1 merged (parity setup files) | yes | P2 → P1 | Recovered patch, no PR | Apply `wasm-authority.patch` on `8f3a143`, merge `main`, draft PR early; merge after A3 |
+| A2 | S5: a booking survives attach in both engines; S4's booking-case test (#874 stays open until it merges); its PR opens the exception register with the rollback loss | #902 | Saves | WS-A | A3 (the owner's 2026-10-16 order); B1 merged (parity setup files) | yes | P2 → P1 | Recovered patch, no PR | Apply `wasm-authority.patch` on `8f3a143`, merge `main`, draft PR early; merge after A3 |
 | A3 | S4: runtime fallback; engine refusals of commands the instance accepted reported; last error kept | #874, #1059 (#1020 if same code) | End to end, Reliability | WS-A | B1 merged | yes (binding) | P2 → P1; P3 → P1; P3 | Boot fallback only | After B1 merges |
 | A4 | The staged cohort: stages 1 to 3 (10%, 25%, 50%), the bucket draw with its read-back check, the config module, the `arm` and `stage` fields, the size gate (off at stage 3), stop signals, help sentence | new issue on approval (OD-1, plan 4.1) | Reliability | WS-A; its fields, each stage and each drop-back on the owner's approval | A1; stage 1: stage 0, A3 with its forced-trap spec, A2; stage 3: A5 and a protocol run passing M2 to M6 at 1x and 4x | no | new → P1 | Decided as stages; not built | Spec after A3 |
 | A5 | S6: getters, result shapes, per-step sync and hourly merge removed (design A or B from RUN-0b by a rule written first, OD-9 (ii)); cue-timing test, and #965 if that test fails | #868 | Authority, Performance, Unit and integration | WS-A | RUN-0b (design input); lane order after A2 | yes | P2 → P1 | Partial | The design rule now, committed before RUN-0b; the code after A2 |
@@ -70,7 +70,7 @@ when the owner approves the reconciled plan at the final review; until then
 | RS1 | Rendering stack | PR #817 (#812), PR #831 (#813), PR #1039 (#915) | none | WS-R | a spare thread after WS-P and WS-C while WS-D waits for S6, or after WS-D; parks at a PR boundary when WS-D needs `src/render`; no merge between a protocol run's scheduling and its commit | no | P1; P2; P3 | Open; #1039 conflicts with its base | Stack order, versions per plan 9.7 |
 | X1 | Analytics close-out | #879, #873 | Analytics | Release | S1 (done) | #879 yes | P3; P2 | Open | Fix or exception register; engine-side changes (#879's pins in `gameplay.rs`) before the freeze; #873's analytics half before the candidate deploy (a tail path) |
 | X2 | Rollback rehearsal, including a deploy rollback to the last release before #902 | #945 | Rollback | Release | the switchable build (OD-5), candidate | no | n/a | Not started | Script at Phase D |
-| X3 | Flip PR edits: CLAUDE.md source of truth, CONTRIBUTING build line and 3.0.0's compatibility policy (OD-6), `engineChoice.ts`, gallery and baselines from the WASM engine (#878), exception register | #945 | Source of truth, Sign-off | Release | everything | no | P1 | n/a | Owner approval |
+| X3 | Flip PR edits: CLAUDE.md source of truth, CONTRIBUTING build line and 3.0.0's compatibility policy (OD-6), `engineChoice.ts`, gallery and baselines from the WASM engine (#878), the exception register (`release-3.0-exception-register.md`, opened by A2's PR) attached | #945 | Source of truth, Sign-off | Release | everything | no | P1 | n/a | Owner approval |
 
 ## Held, after the flip, or out of path
 
@@ -102,6 +102,7 @@ when the owner approves the reconciled plan at the final review; until then
 | `src/ui/**`, `src/game/**` catalog reads | WS-D | |
 | The About and Diagnostics UI (#963); `src/build/workboxGlob.ts`, `scripts/verify-precache.ts` (#985 criteria 5 and 7) | WS-C | |
 | `scripts/wasm-build.ts`, `src/wasmhost/engineAssets.ts`, `src/wasmhost/enginePackageNames.ts` | WS-C (C1) | WS-P (#932's feature split) |
+| `_bmad-output/planning-artifacts/release-3.0-exception-register.md` | WS-A (A2's PR opens it) | After A2 merges, each lane that adds an entry (B6 for S12, A6 for #1067, the release lane for S14); the release lane attaches it at the sign-off |
 
 Shared by every lane and held by none: the locks (`conformance/expected.json`,
 `catalog-digests.json` and the rest), regenerated on rebase and never merged

@@ -1099,7 +1099,7 @@ plumbing and for every recovered patch.
 | Step | Work | Recovered input | Notes |
 | --- | --- | --- | --- |
 | A1 | The reliability instrument (4.1): host status fields, analytics fields, the governed definition and its test (with the split into early telemetry and eligible sessions, the per-arm crash rates, and the exact bound computed in the tested script, OD-2), the analytics data map (A1 creates it) and its entries, the #841 check | none | `src/analytics*`; the new data map; `WasmHostStatus` in `src/wasmhost/startWasmHost.ts` and the boot state in `engineBoot.ts`; a `telemetry.ts` edit, if needed, waits for #1062. Sending the new fields to production needs the owner's separate OK (section 13) |
-| A2 | S5 #902: booked rooms survive attach in both engines | `wasm-authority.patch` | The patch touches `merge.ts`, `load.rs`, `services.rs`, `sim.rs`, `src/engine/sim/*`, `serializedGame.ts`, a new conformance scenario and the parity setup (`src/tests/parity/wasmHostSetup*`); it does not touch `wasmHost.ts`. Draft PR early; merges after A3 (the owner's 2026-10-16 order on #945 queues #902 after #874: the same host and save paths) and after #1062 (shared parity setup). Engine-semantic; lock change, no save-version bump; the rollback loss goes in the exception register |
+| A2 | S5 #902: booked rooms survive attach in both engines | `wasm-authority.patch` | The patch touches `merge.ts`, `load.rs`, `services.rs`, `sim.rs`, `src/engine/sim/*`, `serializedGame.ts`, a new conformance scenario and the parity setup (`src/tests/parity/wasmHostSetup*`); it does not touch `wasmHost.ts`. Draft PR early; merges after A3 (the owner's 2026-10-16 order on #945 queues #902 after #874: the same host and save paths) and after #1062 (shared parity setup). Engine-semantic; lock change, no save-version bump; its PR opens the exception register (section 10, Sign-off) with the rollback loss as the first entry |
 | A3 | S4 #874: throw, panic and stall fallback with re-adoption; engine refusals of commands the instance accepted are reported; #1059's last error; #1020's edges if they sit in the same code | `wasm-integration.patch` (#1059 code and tests only) | After #1062 merges (`wasmHost.ts`). A1's runtime reasons ship here. Nothing in WS-A merges ahead of it except A1 and docs-only specs (A5's design rule), though #902's draft may open earlier (risk R19); S4's booking-case test lands with A2, and #874 stays open until A2 merges (the cutover plan's S4 row lists S5 as a dependency for that case; the owner's later order on #945 wins) |
 | A4 | The staged cohort (OD-1, 4.1): the bucket draw with its read-back check, the config module that holds the share constant and the size gate's threshold, the `arm` and `stage` fields, the size gate, the stop signals in A1's report, and the help-text sentence | none | Its fields need the owner's production OK, as A1's do. Each stage and each drop-back ships only on the owner's approval; stage 1 waits for stage 0, A3's forced-trap spec and A2; stage 3 waits for A5 and a protocol run passing M2 to M6 at 1x and 4x, and takes the size gate off |
 | A5 | S6 #868: getters and result shapes; remove the per-step sync and the hourly merge (design from RUN-0b, OD-9 (ii)); audio cue-timing test, and #965 if that test fails | `saveDelta` from #1068 only if RUN-0b's evidence picks design A | A5's spec commits the rule below before RUN-0b runs; the design is then chosen from RUN-0b before code; RUN-1 measures it |
@@ -1203,6 +1203,7 @@ live matrix lists the current holder.
 | `src/ui/**`, `src/game/**` catalog reads | WS-D | |
 | The About and Diagnostics UI (#963); `src/build/workboxGlob.ts`, `scripts/verify-precache.ts` (#985 criteria 5 and 7) | WS-C | |
 | `scripts/wasm-build.ts`, `src/wasmhost/engineAssets.ts`, `src/wasmhost/enginePackageNames.ts` | WS-C (C1) | WS-P (#932's feature split) |
+| `_bmad-output/planning-artifacts/release-3.0-exception-register.md` | WS-A (A2's PR opens it) | After A2 merges, each lane that adds an entry (B6 for S12, A6 for #1067, the release lane for S14); the release lane attaches it at the sign-off |
 
 **Regenerated and shared files**, which any lane may change and none holds:
 
@@ -1313,7 +1314,7 @@ with its evidence.
 | Version identity | About and Copy Diagnostics show UI version and commit, the active engine with any fallback reason, and the binding's identity record, including mismatch and unavailable (#963) | UI and e2e tests | Not met: lost work |
 | Source of truth | The flip PR names `engine-rs` in CLAUDE.md for rules, caps and tuning. **Proposed:** it also corrects CONTRIBUTING's 3.0.0 build line (7.3) and documents 3.0.0's compatibility policy (7.4) | The flip PR | At the flip |
 | Coverage | `vite.config.ts` floors and the Rust line floor hold | CI | Holding on `8f3a143` |
-| Sign-off | The owner approves with the exception register attached | #945 | Owner only |
+| Sign-off | The owner approves with the exception register attached. **Proposed:** the register is `_bmad-output/planning-artifacts/release-3.0-exception-register.md`, which A2's PR (#902) opens with the rollback loss. Each entry gives its source, its status, what is lost, its size, why it is accepted, and the check that keeps it that size, and stays proposed until the owner approves it here | #945 | Owner only |
 
 ## 11. Risk register
 
@@ -1392,7 +1393,9 @@ approves this revision:
   of the late-game fixture, with #864 off the path (5.3);
 - #1005 to P1 and the cold-start fix as PF5 (5.3, section 8);
 - A5's one-threshold design rule, committed before RUN-0b (9.1);
-- 7.4's policy content, and its place in the flip PR.
+- 7.4's policy content, and its place in the flip PR;
+- the exception register's path and entry format, with A2's PR opening it
+  (section 10, Sign-off).
 
 **Still the owner's:**
 
