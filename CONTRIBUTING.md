@@ -530,15 +530,16 @@ alone.
   before opening or updating a PR.
 - **Hot paths get a complexity review.** The checklist is
   [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md).
-  It covers Rust, TypeScript, the WASM binding, the hosts, simulation ticks and
-  rendering, and ported or inherited code as much as new code. Trace each
-  changed function's callers to its frame, step or hour entry point; a
-  whole-collection walk, clone, sort or rebuilt map under one of its
-  multipliers is a finding in either language, helpers included. Significant
-  engine changes carry its complexity note. A finding is fixed, or deferred
-  with evidence and a tracked issue, and never dismissed because it existed
-  before; new or ported scans and dropped TypeScript caches get fixed unless
-  the owner accepts the deferral.
+  It covers Rust, TypeScript, the WASM binding, the hosts, simulation ticks,
+  rendering and the other surfaces its section 1 lists, and ported, moved or
+  inherited code as much as new code. Trace each changed function's callers to
+  an entry point (its section 2); a whole-collection walk, clone, sort or
+  rebuilt map under one of its multipliers is a finding in either language,
+  helpers included. A significant change (its section 5) carries the
+  complexity note in the PR. A finding is fixed, or deferred with evidence and
+  a tracked issue, and never dismissed because it existed before; a new,
+  ported or moved scan over its tier's budget, or a dropped TypeScript cache,
+  gets fixed unless the owner accepts the deferral.
 - **Deep, adversarial review before merge, never deferred to "later."** The change gets a full
   adversarial review while its context is still loaded (before pushing, or
   immediately after opening/updating the PR), not left to a hypothetical

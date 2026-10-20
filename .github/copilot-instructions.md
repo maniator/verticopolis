@@ -133,8 +133,9 @@ just the obvious lines in the diff, and flag anything CI wouldn't catch:
   SimTower parity model; watch for dead spots and exploits.
 - **Security:** untrusted input (saves, persistence) must degrade
   gracefully and never crash or trust foreign data.
-- **Performance on hot paths:** apply the same checklist to Rust, TypeScript,
-  the WASM binding, the hosts, simulation ticks and rendering. Flag
+- **Performance on hot paths:** apply the same checklist to every surface its
+  section 1 lists (Rust, TypeScript, the WASM binding, the hosts, simulation
+  ticks, rendering, saves, UI, analytics, audio and the engine build). Flag
   whole-collection walks, route searches, clones, sorts, rebuilt maps and id
   scans under any HP-2 multiplier, in either language and inside helpers.
   Review ported and inherited code as new, and check a port against the

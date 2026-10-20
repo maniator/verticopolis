@@ -152,9 +152,18 @@ resolving review threads). On top of that, in an agent session:
   `defer` under its section 7, never `dismiss` because the code was inherited.
   When porting engine code, compare the TypeScript's caches first (HP-8) and
   put the complexity note in the PR. Copilot and Codex reviewing a PR here
-  apply the checklist inline and print the same record, and an independent
-  reviewer's GO needs it. The surrounding canon lives in
+  apply the checklist inline and are asked to print the same record (see
+  Review guidelines below), and an independent reviewer's GO needs it. The surrounding canon lives in
   `_bmad-output/project-context.md` (Performance section).
+
+## Review guidelines
+
+For any reviewer that reads this file, Codex included: on a diff that touches a
+hot-path surface (section 1 of
+[`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md)),
+apply items HP-1 to HP-12, trace callers in the repository, and print the
+section 6 record with one row per item. Report pre-existing findings too, and
+resolve each one under section 7.
 
 ## Testing discipline: shift-left and regression
 

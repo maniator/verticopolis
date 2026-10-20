@@ -17,8 +17,8 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   (population census, elevator/transport behavior, floor/lobby/view mapping), a
   gameplay-parity concern. Run both when a change also carries a big
   tooling/UI-plumbing surface.** Its adversarial layers (Blind Hunter →
-  Edge Case Hunter → Acceptance Auditor → triage, plus the Hot-Path Auditor on a
-  hot-path diff) are the review. A self-read or
+  Edge Case Hunter → Acceptance Auditor, plus the Hot-Path Auditor on a
+  hot-path diff, then triage) are the review. A self-read or
   a generic `/code-review` does **not** satisfy it. Fix every `patch` finding and
   record every `defer` finding in
   `_bmad-output/implementation-artifacts/backlog.md`. A PR is not "done"
@@ -29,14 +29,16 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   not an exemption.
 - **Hot paths get the complexity checklist,
   [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md),**
-  in Rust, TypeScript, the WASM binding, the hosts, ticks and rendering. The
-  review skills load it and add a Hot-Path Auditor layer that traces callers
-  past the diff. Every reviewer of a hot-path diff (the skills, the independent
-  reviewer, Copilot, Codex) prints its one-row-per-item record; without it
-  there is no GO and no sign-off. Ported or inherited code is reviewed as new.
-  A finding is fixed or deferred with evidence and an issue, never dismissed as
-  pre-existing, and new or ported scans and dropped TypeScript caches get fixed
-  unless the owner accepts the deferral.
+  in Rust, TypeScript, the WASM binding, the hosts, ticks, rendering and the
+  other surfaces its section 1 lists. The review skills load it and add a
+  Hot-Path Auditor layer that traces callers past the diff. The skills and the
+  independent reviewer print its one-row-per-item record, and Copilot and Codex
+  are asked to; without a record on the PR there is no GO and no sign-off.
+  Ported, moved or inherited code is reviewed as new. A finding is fixed or
+  deferred with evidence and an issue, and never dismissed as pre-existing; a
+  new, ported or moved scan over its tier's budget, or a dropped TypeScript
+  cache, gets fixed unless the owner accepts the deferral. PRs opened before
+  the page merged keep the review they had.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
   `npm test`, `npm run build`. All four must be green. The build needs the
   engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a
