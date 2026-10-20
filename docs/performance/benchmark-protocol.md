@@ -542,9 +542,9 @@ was raised, and every family has a candidate inside its cap with the
 guarantee under the limit and the protocol's pass count and limit in use. `calibration.md` opens
 with the window of the passes (earliest and latest start) and the commit,
 because it is a snapshot, and calls the numbers provisional: it covers M1,
-M2, M3 and M5; M4's long-task ε comes from `perf:worker --aa` passes, which it
-does not read yet (follow-up #1111), and nothing in it sets a tolerance until
-the owner adopts the numbers.
+M2, M3 and M5 from `perf:compare` folders, and M4 when `perf:worker --aa`
+folders are given beside them, and nothing in it sets a tolerance until the
+owner adopts the numbers.
 
 The harness for each metric is the last column of the table above: a tolerance
 calibrated on one harness's noise is not applied to the other's ratios, and
@@ -552,17 +552,49 @@ RUN-0a's reference figures come from `perf:worker`. Nobody reads δ or ε off
 the folders by hand: RUN-0b collects them and the values come from
 `perf:calibrate`'s output.
 
-One limit stays open, so the calibration is not complete:
+**M4's ε** comes from `perf:worker --aa ts|wasm` passes (`perf:compare`
+measures no long tasks): the same mode in both slots (labeled `ts` and
+`wasm`), each run recording the slot and the mode it ran, validation by the
+mode that ran, a marked folder (an `--out` name must carry `aa-ts` or
+`aa-wasm`), an `aa` column in both CSVs, no verdict words, and
+`perf:before-after` refuses such a folder. `perf:calibrate` takes those
+folders in the same command as the `perf:compare` ones (it tells them apart by
+`config.modes`) and computes M4 in `src/tests/perfWorker/calibrateM4.ts`:
 
-- **M4's ε is not calibrated yet.** `perf:compare` measures no long tasks, so
-  its A/A source is `perf:worker --aa ts|wasm`: the same mode in both slots
-  (labelled `ts` and `wasm`), each run recording the slot and the mode it ran,
-  validation by the mode that ran, a marked folder (an `--out` name must carry
-  `aa-ts` or `aa-wasm`), an `aa` column in both CSVs, no verdict words, and
-  `perf:before-after` refuses such a folder. `perf:calibrate` does not read
-  these folders yet (the rest of #1111), and the A/A passes themselves wait
-  for the owner's PC. RUN-1 needs M4, so the passes land before RUN-1, either
-  inside RUN-0b or as a follow-on campaign.
+- A pass's value is the one-sided upper bound of the median paired difference
+  (slot `wasm` minus slot `ts`, paired by repetition, at least 10 pairs) of the
+  large tower's "main-thread blocking (long tasks past 50 ms)" row, in ms, at
+  each of 1x and 4x, and the larger of the two. A throttle with fewer than 10
+  pairs leaves its pass without a value and M4 without a candidate.
+- The candidate is the largest value across passes, rounded up to 5 ms, and a
+  candidate above the 50 ms cap is not adopted.
+- A worker folder is screened as a `perf:compare` one is: A/A, validation
+  ok, a clean recorded tree, not `--quick`, 10 repetitions, the large scenario
+  at 1x and 4x, a verified hardware renderer at all three reads, and no
+  WebGL context loss. A folder that records no context-loss field comes from a
+  harness older than #1136 and is left out (`perf:worker` writes the field
+  from PR #1172 on, so M4 cannot be calibrated before that PR is in: every
+  earlier folder is left out). A `perf:compare` folder is not asked for the
+  field; its renderer check rejects a recorded loss. The passes are pooled
+  only if they share commit, machine, browser, engine build and run
+  parameters, and the pass-count and coverage checks (including the open
+  amendment to OD-4) are the ones M1 to M5 use.
+- When one command takes both kinds of folder, the two sets must also share
+  a machine, a browser and an engine build with each other. The banner names
+  both windows and both commits, the headline and the exit code come from
+  the combined result, and every problem of either half is listed under
+  Problems. `calibration.json` names the families a partial run cannot speak
+  for in `missingFamilies`.
+- The exit code is 0 only when every kind of folder given passes. A command
+  given only `perf:worker` folders reports M4 alone, and a command given only
+  `perf:compare` folders reports M1, M2, M3 and M5 and says M4 is missing; the
+  calibration is complete when one command (or the committed pair of reports)
+  covers all five.
+- 4x on the main-thread hosts throttles the engine and the page together, so
+  the A/A passes use `--aa ts` and `--aa wasm`, not the worker host.
+
+The A/A passes themselves wait for the owner's PC. RUN-1 needs M4, so the
+passes land before RUN-1, either inside RUN-0b or as a follow-on campaign.
 
 ### 6.2 BEFORE/AFTER comparison of a candidate PR
 

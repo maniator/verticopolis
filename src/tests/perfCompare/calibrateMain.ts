@@ -1,15 +1,19 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { calibrate, calibrationMarkdown, stable } from "./calibrate";
+import { calibrateM4, isWorkerResults, m4Markdown, type WorkerPass } from "../perfWorker/calibrateM4";
+import { calibrate, calibrationMarkdown, stable, type Calibration } from "./calibrate";
+import { halvesProblems } from "./calibratePool";
 import type { CompareResults } from "./types";
 
 /**
  * `npm run perf:calibrate -- <folder>... --out <dir> [--min-passes N]
  * [--exceedance-limit X]`: the δ and ε candidates from A/A result folders
- * (benchmark-protocol.md section 6.1). Writes calibration.json and
- * calibration.md into the new `--out` folder (never an existing one) and
- * exits 0 only when every check passes. `--min-passes` is the passes
+ * (benchmark-protocol.md section 6.1). A `perf:compare` folder feeds M1, M2,
+ * M3 and M5; a `perf:worker` folder feeds M4's long-task ε, and one command
+ * takes both kinds. Writes calibration.json and calibration.md into the new
+ * `--out` folder (never an existing one) and exits 0 only when every check
+ * passes for every kind of folder given. `--min-passes` is the passes
  * required of each engine (default 5, as the protocol says today) and
  * `--exceedance-limit` the coverage limit the stated guarantee must be under
  * (default 0.05); the report states the guarantee for the count used. The
@@ -58,23 +62,36 @@ export function main(argv: string[], repo: string, now: () => string = () => new
     const file = join(dir, "results.json");
     if (!existsSync(file)) throw new Error(`${dir} has no results.json`);
     const text = readFileSync(file);
-    let results: CompareResults;
+    let results: CompareResults | WorkerPass;
     try {
-      results = JSON.parse(text.toString("utf8").replace(/^\uFEFF/, "")) as CompareResults;
+      results = JSON.parse(text.toString("utf8").replace(/^\uFEFF/, "")) as CompareResults | WorkerPass;
     } catch (e) {
       throw new Error(`${file} is not valid JSON: ${(e as Error).message}`);
     }
     const r = results as Partial<CompareResults> | null;
-    if (!r || !r.config || !r.environment || !Array.isArray(r.comparisons) || !Array.isArray(r.metrics) || !r.validation) throw new Error(`${file} is not a perf:compare results.json (config, environment, comparisons, metrics or validation is missing)`);
+    const worker = isWorkerResults(r);
+    if (!r || !r.config || !r.environment || !Array.isArray(r.metrics) || !r.validation || (!worker && !Array.isArray(r.comparisons))) throw new Error(`${file} is not a perf:compare or perf:worker results.json (config, environment, comparisons, metrics or validation is missing)`);
     // The hash is of the parsed JSON with sorted keys, so a copy re-saved with
     // other line endings, indentation or key order is the same pass.
-    return { folder: f, results, sha256: createHash("sha256").update(stable(results)).digest("hex") };
+    return { folder: f, worker, results, sha256: createHash("sha256").update(stable(results)).digest("hex") };
   });
-  const result = calibrate(folders, { minPassesPerEngine: args.minPassesPerEngine, exceedanceLimit: args.exceedanceLimit });
+  const opts = { minPassesPerEngine: args.minPassesPerEngine, exceedanceLimit: args.exceedanceLimit };
+  const compareFolders = folders.filter((f) => !f.worker) as { folder: string; results: CompareResults; sha256: string }[];
+  const workerFolders = folders.filter((f) => f.worker) as { folder: string; results: WorkerPass; sha256: string }[];
+  const compare: Calibration | null = compareFolders.length ? calibrate(compareFolders, opts) : null;
+  const m4 = workerFolders.length ? calibrateM4(workerFolders, opts) : null;
+  // Passes of the two kinds in one report must share a machine, a browser and an engine build.
+  const across = compare?.pool && m4?.pool ? halvesProblems(compare.pool, m4.pool) : [];
+  const m4Problems = (m4?.problems ?? []).map((p) => `perf:worker folders: ${p}`);
+  const adoptable = (compare?.adoptable ?? true) && (m4?.adoptable ?? true) && across.length === 0;
+  const problems = [...(compare?.problems ?? []), ...m4Problems, ...across];
+  // Which families this run cannot speak for, so a partial run does not read as a complete one.
+  const missingFamilies = [...(compare ? [] : ["M1", "M2", "M3", "M5-1x", "M5-4x"]), ...(m4 ? [] : ["M4"])];
   mkdirSync(out, { recursive: true });
   const generatedAt = now();
-  writeFileSync(join(out, "calibration.json"), JSON.stringify({ generatedAt, ...result }, null, 1) + "\n");
-  writeFileSync(join(out, "calibration.md"), calibrationMarkdown(result, generatedAt));
-  process.stdout.write(`perf:calibrate: wrote ${out} (${result.adoptable ? "adoptable" : `not adoptable: ${result.problems.length} problem(s)`})\n`);
-  return result.adoptable ? 0 : 1;
+  writeFileSync(join(out, "calibration.json"), JSON.stringify({ generatedAt, ...(compare ?? {}), m4, missingFamilies, problems, adoptable }, null, 1) + "\n");
+  const mixed = m4 ? { m4Window: m4.window, m4Commits: [...new Set(m4.passes.map((p) => p.commit.slice(0, 7)))], adoptable, problems: [...m4Problems, ...across] } : null;
+  writeFileSync(join(out, "calibration.md"), [compare ? calibrationMarkdown(compare, generatedAt, mixed) : null, m4 ? m4Markdown(m4, generatedAt, compare !== null) : null].filter((x) => x !== null).join("\n"));
+  process.stdout.write(`perf:calibrate: wrote ${out} (${adoptable ? "adoptable" : `not adoptable: ${problems.length} problem(s)`})\n`);
+  return adoptable ? 0 : 1;
 }
