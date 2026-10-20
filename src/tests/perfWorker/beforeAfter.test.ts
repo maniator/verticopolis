@@ -149,6 +149,81 @@ describe("compareRuns", () => {
   });
 });
 
+describe("compareRuns, the checks the first review asked for", () => {
+  it("derives the unthrottled label from the mode and throttle, not from the stored field", () => {
+    const strip = (r: WorkerResults): WorkerResults => ({ ...r, metrics: r.metrics.map(({ unthrottled: _u, ...m }) => m as Metric) });
+    const c = compareRuns(strip(before()), strip(after()));
+    expect(row(c, "wasm-worker", "main-thread time, 720 steps", "4").unthrottled).toBe("worker");
+    expect(row(c, "wasm-worker", "main-thread time, 720 steps", "1").unthrottled).toBeUndefined();
+    expect(comparisonMarkdown(c, "t")).toMatch(/wasm-worker †/);
+  });
+
+  it("does not call a row controlled when pairs left the ratio for a zero denominator", () => {
+    const a = after({ scale: { "wasm-worker": 1.2 } });
+    const fps = a.metrics.find((m) => m.mode === "wasm-worker" && m.metric === "mean FPS")!;
+    fps.values = fps.values.map((v, i) => (i < 2 ? 0 : v));
+    const s = row(compareRuns(before(), a, { minPairs: 6 }), "wasm-worker", "mean FPS");
+    expect(s.zeroReference).toBe(2);
+    expect(s.status).toBe("zero-ref");
+  });
+
+  it("voids a subject row when a control's interval reaches past the tolerance, though its median sat still", () => {
+    const c = compareRuns(before(), after({ wobble: 0.2, scale: { "wasm-worker": 1.2 } }));
+    expect(row(c, "ts", "main-thread time, 720 steps").status).toBe("control-noisy");
+    const s = row(c, "wasm-worker", "main-thread time, 720 steps");
+    expect(s.status).toBe("void");
+    expect(s.voidedBy.join(" ")).toMatch(/interval/);
+  });
+
+  it("measures drift the same way on both sides of 1.0", () => {
+    const slow = row(compareRuns(before(), after({ scale: { ts: 1.06 }, scaleOnly: "main-thread time, 720 steps" })), "ts", "main-thread time, 720 steps");
+    const fast = row(compareRuns(before(), after({ scale: { ts: 1 / 1.06 }, scaleOnly: "main-thread time, 720 steps" })), "ts", "main-thread time, 720 steps");
+    expect(slow.status).toBe("control-drift");
+    expect(fast.status).toBe("control-drift");
+    expect(row(compareRuns(before(), after({ scale: { ts: 1.04 }, scaleOnly: "main-thread time, 720 steps" })), "ts", "main-thread time, 720 steps").status).toBe("control-ok");
+  });
+
+  it("refuses repeated or out-of-range repetitions, mismatched lengths and non-finite values", () => {
+    const withMetric = (edit: (m: Metric) => void): string[] => {
+      const a = after();
+      edit(a.metrics[0]);
+      return compareRuns(before(), a).problems;
+    };
+    expect(withMetric((m) => (m.reps = m.reps.map(() => 0))).join(" ")).toMatch(/repeat or fall outside/);
+    expect(withMetric((m) => (m.values = m.values.slice(1))).join(" ")).toMatch(/do not line up/);
+    expect(withMetric((m) => (m.values = m.values.map((v, i) => (i === 0 ? (null as unknown as number) : v)))).join(" ")).toMatch(/not a finite number/);
+    expect(withMetric((m) => (m.reps = m.reps.map((x) => x + 5))).join(" ")).toMatch(/repeat or fall outside/);
+  });
+
+  it("refuses the same results twice and a start time it cannot read", () => {
+    expect(compareRuns(before(), before()).problems.join(" ")).toMatch(/same results/);
+    expect(compareRuns(before(), after({ startedAt: "garbage" })).problems.join(" ")).toMatch(/no readable start time/);
+    expect(compareRuns(before(), after({ startedAt: "2026-10-21T11:00:00Z" })).problems.join(" ")).toMatch(/overlapped/);
+  });
+
+  it("names a metric one run lacks, and one whose unit differs, instead of dropping it", () => {
+    const a = after();
+    a.metrics = a.metrics.filter((m) => !m.metric.startsWith("full-save"));
+    a.metrics.find((m) => m.mode === "ts" && m.metric === "mean FPS")!.unit = "ms";
+    const c = compareRuns(before(), a);
+    expect(c.missing.join("\n")).toMatch(/full-save merges.*only in BEFORE/);
+    expect(c.missing.join("\n")).toMatch(/mean FPS: unit or direction differs/);
+    expect(comparisonMarkdown(c, "t")).toMatch(/## Metrics not compared/);
+  });
+
+  it("refuses subject and control lists that leave nothing to compare", () => {
+    expect(compareRuns(before(), after(), { subjects: ["ts"] }).problems.join(" ")).toMatch(/ts is both a control and a subject/);
+    expect(compareRuns(before(), after(), { subjects: [] }).problems.join(" ")).toMatch(/no subject mode/);
+    expect(compareRuns(before(), after(), { controls: [], subjects: ["wasm-worker"] }).problems.join(" ")).toMatch(/none of the control modes/);
+  });
+
+  it("takes medians over the paired repetitions", () => {
+    const s = row(compareRuns(before(), after({ skipRep: 3 })), "wasm-worker", "main-thread time, 720 steps");
+    expect(s.pairs).toBe(9);
+    expect(s.beforeMedian).toBeCloseTo(800, 0);
+  });
+});
+
 describe("output", () => {
   it("writes csv and a report that says what the comparison cannot tell", () => {
     const c = compareRuns(before(), after({ scale: { "wasm-worker": 1.2 } }));

@@ -531,15 +531,37 @@ rates. The interval is the distribution-free order-statistic one from
 `perfCompare/stats.ts`.
 
 The two runs happen hours apart, so the machine can drift between them. The
-`ts`, `wasm` and `wasm-frame` modes run code the candidate does not touch and
-act as controls. When a control row of a metric is more than the tolerance
-(5%, the cap on δ in section 6.1, until the owner adopts the calibrated one)
-away from 1.0, the subject rows of that metric are marked VOID and the
-report names the control that moved. A metric no control measures is marked
-uncontrolled. The command exits 1 when the two runs cannot be compared at all
-(different scenarios, parameters, builds of the engine, browser versions, a
-dirty tree, an unverified renderer, fewer than 10 repetitions, or AFTER
-started before BEFORE), and writes the reasons into `comparison.md`.
+`ts`, `wasm` and `wasm-frame` modes are the default controls: they stand for
+code the candidate does not touch, and `--controls` replaces the list (pass
+`--controls ts` when the candidate changes the WASM engine or its host, since
+`wasm` and `wasm-frame` then move with it). A control row that moved more than
+the tolerance from 1.0 in either direction (a ratio above 1.05 or below
+1/1.05 by default), or whose interval reaches past it, voids the subject rows
+of that metric: the report marks them VOID and names the control. The
+tolerance is 5%, the cap on δ in section 6.1, until the owner adopts the
+calibrated value (`--tolerance`, above 0 and at most 0.5), so an effect
+smaller than it cannot be told from allowed drift. A metric no control
+measures is marked uncontrolled, and a row that dropped pairs for a zero
+denominator is marked so instead of controlled. The status `ok` in the files
+only means no control moved: it is not a verdict. A row needs at least 10
+pairs (`--min-pairs`, never below 6); the report states the number used.
+Metrics one run lacks, or whose unit or direction differs, are listed under
+"Metrics not compared".
+
+The command exits 1 when the two runs cannot be compared at all, and writes
+the reasons into `comparison.md`: either run failed validation, was `--quick`,
+ran on a dirty tree, declared a renderer exception or did not record
+`gpuVerified: true`; the runs differ in scenarios, run parameters, machine,
+runtime, browser or renderer; a metric's repetitions repeat, fall outside the
+run or do not match its values; the two results are the same file; AFTER
+started before BEFORE finished; or the subject and control lists leave
+nothing to compare. A different engine build or commit is the point of the
+comparison and is not refused. It exits 2 for a usage error, an unreadable
+or malformed folder, or an `--out` folder that already exists, and 0
+otherwise. Folder arguments and `--out` resolve against the repository root.
+The `results.json` SHA-256 in the report is over the canonical form
+(`stable()` in `perfCompare/calibrate.ts`), so it is not the `sha256sum` of
+the file.
 
 What it does not do, so a reader does not assume it:
 

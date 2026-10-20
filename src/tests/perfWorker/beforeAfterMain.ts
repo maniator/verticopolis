@@ -51,7 +51,7 @@ export function parseBeforeAfterArgs(argv: string[]): BeforeAfterArgs {
     else if (arg === "--subjects") options.subjects = modes(arg, value);
     else if (arg === "--tolerance") {
       const x = Number(value);
-      if (!(x > 0 && x < 1)) throw new Error("--tolerance needs a number above 0 and below 1");
+      if (!(x > 0 && x <= 0.5)) throw new Error("--tolerance needs a number above 0 and at most 0.5");
       options.tolerance = x;
     } else if (arg === "--min-pairs") {
       const n = Number(value);
@@ -89,8 +89,9 @@ const fmt = (v: number | null, unit: string): string => {
 };
 const ratioText = (r: Row): string => (r.ratio === null ? "n/a" : `${r.ratio.toFixed(2)}x${r.ciLow !== null && r.ciHigh !== null ? ` [${r.ciLow.toFixed(2)}, ${r.ciHigh.toFixed(2)}]` : ""}${r.zeroReference ? ` (${r.zeroReference} zero)` : ""}`);
 const diffText = (r: Row): string => (r.diffMedian === null ? "n/a" : `${fmt(r.diffMedian, r.unit)}${r.diffCiLow !== null && r.diffCiHigh !== null ? ` [${fmt(r.diffCiLow, r.unit)}, ${fmt(r.diffCiHigh, r.unit)}]` : ""}`);
+const tolText = (t: number): string => `${Number((t * 100).toFixed(2))}%`;
 const statusText = (r: Row): string => {
-  const plain: Record<Row["status"], string> = { ok: "controlled", void: `VOID (control moved: ${r.voidedBy.join(", ")})`, uncontrolled: "no control for this metric", thin: "too few pairs", "control-drift": "CONTROL MOVED", "control-ok": "within tolerance" };
+  const plain: Record<Row["status"], string> = { ok: "controlled", void: `VOID (control moved: ${r.voidedBy.join(", ")})`, uncontrolled: "no control for this metric", thin: "too few pairs", "zero-ref": `${r.zeroReference} pair(s) had a zero denominator and left the ratio; read the difference`, "control-drift": "CONTROL MOVED", "control-noisy": "CONTROL TOO NOISY TO VOUCH", "control-ok": "within tolerance" };
   return plain[r.status];
 };
 
@@ -109,13 +110,15 @@ export function comparisonMarkdown(c: BeforeAfter, generatedAt: string): string 
     L.push("**The runs cannot be compared.** No ratio was computed.", "", ...c.problems.map((p) => `- ${p}`), "");
     return L.join("\n");
   }
-  L.push(`Ratios are paired by repetition number (rep i of BEFORE with rep i of AFTER, ${c.before.reps} pairs), written so that above 1.0 is worse: AFTER over BEFORE for times, memory and counts, BEFORE over AFTER for rates. Intervals are the distribution-free 95% order-statistic interval of the median ratio. The difference column is the median of AFTER minus BEFORE in the metric's unit, for metrics that are often zero.`, "");
-  L.push(`**Controls:** ${o.controls.join(", ")}. A control row that moved by more than ${(o.tolerance * 100).toFixed(0)}% between the runs voids the subject rows of the same metric: the machine, the browser or the load moved, not the code. The tolerance is the cap on δ in protocol section 6.1 until \`perf:calibrate\` has an adopted value.`, "");
-  L.push(`Rows: ${c.counts.ok} controlled, ${c.counts.void} void, ${c.counts.uncontrolled} with no control, ${c.counts.thin} with too few pairs; controls: ${c.counts["control-ok"]} within tolerance, ${c.counts["control-drift"]} moved, ${c.rows.filter((r) => r.role === "control" && r.status === "thin").length} thin.`, "");
-  const drift = c.rows.filter((r) => r.role === "control" && (r.status === "control-drift" || r.status === "thin"));
+  L.push(`Ratios are paired by repetition number (rep i of BEFORE with rep i of AFTER, up to ${c.before.reps} pairs; the median columns are over the paired repetitions), written so that above 1.0 is worse: AFTER over BEFORE for times, memory and counts, BEFORE over AFTER for rates. Intervals are the distribution-free 95% order-statistic interval of the median ratio. The difference column is the median of AFTER minus BEFORE in the metric's unit, for metrics that are often zero.`, "");
+  L.push(`**Controls:** ${o.controls.join(", ")}. A control row that moved by more than ${tolText(o.tolerance)} between the runs, or whose interval reaches past it, voids the subject rows of the same metric: the machine, the browser or the load moved, not the code. The tolerance is the cap on δ in protocol section 6.1 until \`perf:calibrate\` has an adopted value, and a candidate effect smaller than it cannot be told from allowed drift. Rows need at least ${o.minPairs} pairs. A row marked controlled is not a verdict: it only means no control moved. The controls run the same code as the candidate unless the candidate leaves it alone; pass \`--controls ts\` when it changes the WASM engine or its host.`, "");
+  const thinControls = c.rows.filter((r) => r.role === "control" && r.status === "thin").length;
+  L.push(`Rows (subjects): ${c.counts.ok} controlled, ${c.counts.void} void, ${c.counts.uncontrolled} with no control, ${c.counts["zero-ref"]} with a zero denominator, ${c.counts.thin - thinControls} with too few pairs; controls: ${c.counts["control-ok"]} within tolerance, ${c.counts["control-drift"]} moved, ${c.counts["control-noisy"]} too noisy, ${thinControls} thin.`, "");
+  if (c.missing.length) L.push("## Metrics not compared", "", ...c.missing.map((m) => `- ${m}`), "");
+  const drift = c.rows.filter((r) => r.role === "control" && (r.status === "control-drift" || r.status === "control-noisy" || r.status === "thin"));
   if (drift.length) {
     L.push("## Controls that moved or are thin", "", "| scenario | throttle | metric | mode | ratio | status |", "| --- | --- | --- | --- | --- | --- |");
-    for (const r of drift) L.push(`| ${r.scenario} | ${r.throttle}x | ${r.metric} (${r.unit}) | ${r.mode} | ${ratioText(r)} | ${statusText(r)} |`);
+    for (const r of drift) L.push(`| ${r.scenario} | ${r.throttle}x | ${r.metric} (${r.unit}) | ${r.mode}${r.unthrottled ? " †" : ""} | ${ratioText(r)} | ${statusText(r)} |`);
     L.push("");
   }
   const groups = [...new Set(c.rows.filter((r) => r.role === "subject").map((r) => r.group))];
@@ -124,7 +127,7 @@ export function comparisonMarkdown(c: BeforeAfter, generatedAt: string): string 
     for (const r of c.rows.filter((x) => x.role === "subject" && x.group === g)) L.push(`| ${r.scenario} | ${r.throttle}x | ${r.metric} (${r.unit}) | ${r.mode}${r.unthrottled ? " †" : ""} | ${fmt(r.beforeMedian, r.unit)} | ${fmt(r.afterMedian, r.unit)} | ${ratioText(r)} | ${diffText(r)} | ${statusText(r)} |`);
     L.push("");
   }
-  if (c.rows.some((r) => r.unthrottled)) L.push("† The engine worker was not CPU-throttled at this throttle (DevTools cannot throttle a worker); both runs share that, so the ratio is valid between them.", "");
+  if (c.rows.some((r) => r.unthrottled)) L.push("† The engine worker was not CPU-throttled at this throttle (DevTools cannot throttle a worker); both runs share that, so a ratio between them compares like with like, but throttled controls do not vouch for the worker thread's own speed.", "");
   L.push("## Inputs", "", "| Run | Commit | Engine build hash | results.json SHA-256 (canonical) |", "| --- | --- | --- | --- |", `| BEFORE | ${c.before.commit} | ${c.before.engineBuildHash ?? "n/a"} | ${c.before.sha256 ?? "n/a"} |`, `| AFTER | ${c.after.commit} | ${c.after.engineBuildHash ?? "n/a"} | ${c.after.sha256 ?? "n/a"} |`, "");
   L.push("## What this comparison cannot tell", "", "- Anything the two runs' validation did not cover: it adds no check of the delta oracle, save fidelity, event order or crash recovery, which are tests.", "- Whether a 4x worker row would hold on a CPU that is really 4x slower: the worker thread is not throttled (†).", "- An hourly main-thread spike beyond the per-batch maximum and the frame-time p99 rows (no separate hour-pass row yet).", "");
   return L.join("\n");
@@ -137,11 +140,11 @@ export function main(argv: string[], repo: string, now: () => string = () => new
   const before = load(repo, args.before);
   const after = load(repo, args.after);
   const c = compareRuns(before.results, after.results, { controls: DEFAULT_CONTROLS, ...args.options }, { before: before.sha256, after: after.sha256 });
-  mkdirSync(out, { recursive: true });
   const generatedAt = now();
-  writeFileSync(join(out, "comparison.json"), JSON.stringify({ generatedAt, ...c }, null, 1) + "\n");
-  writeFileSync(join(out, "comparison.csv"), comparisonCsv(c));
-  writeFileSync(join(out, "comparison.md"), comparisonMarkdown(c, generatedAt));
-  process.stdout.write(`perf:before-after: wrote ${out} (${c.problems.length ? `cannot compare: ${c.problems.length} problem(s)` : `${c.counts.ok} controlled, ${c.counts.void} void, ${c.counts.uncontrolled} uncontrolled, ${c.counts["control-drift"]} control(s) moved`})\n`);
+  // Render everything before the folder exists, so a late throw leaves nothing half-written to block a rerun.
+  const files: [string, string][] = [["comparison.json", JSON.stringify({ generatedAt, ...c }, null, 1) + "\n"], ["comparison.csv", comparisonCsv(c)], ["comparison.md", comparisonMarkdown(c, generatedAt)]];
+  mkdirSync(out, { recursive: false });
+  for (const [name, text] of files) writeFileSync(join(out, name), text);
+  process.stdout.write(`perf:before-after: wrote ${out} (${c.problems.length ? `cannot compare: ${c.problems.length} problem(s)` : `${c.counts.ok} controlled, ${c.counts.void} void, ${c.counts.uncontrolled} uncontrolled, ${c.counts["zero-ref"]} with a zero denominator, ${c.counts["control-drift"] + c.counts["control-noisy"]} control(s) moved or noisy, ${c.missing.length} metric(s) not compared`})\n`);
   return c.problems.length ? 1 : 0;
 }
