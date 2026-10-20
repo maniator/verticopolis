@@ -252,7 +252,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     if (warm.sample.engineActive !== engine) throw new Error(`warm start: requested the ${engine} engine but ${warm.sample.engineActive} is active`);
     const unthrottledProbe = await ev(page, "cpu probe", cpuProbe, undefined);
     run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: null, rate: slowRate, timed: {} };
-    log(`  rep ${rep} ${engine}: cold ready ${cold.sample.gameReadyMs?.toFixed(0)} ms, warm ready ${warm.sample.gameReadyMs?.toFixed(0)} ms`);
+    log(`  rep ${rep} ${slot}: cold ready ${cold.sample.gameReadyMs?.toFixed(0)} ms, warm ready ${warm.sample.gameReadyMs?.toFixed(0)} ms`);
 
     const memory = await memoryPass(page, cdp, opts, engine, engineUrl);
     await freshPage(page, engine, "timed passes boot");
@@ -293,7 +293,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
           await throttle(cdp, 1);
         }
         await expectEngine(page, engine, `${sc.name} ${t}x`);
-        log(`  rep ${rep} ${engine} ${sc.name} ${t}x: hosted ${scenarioRun.hosted[t].totalMs.toFixed(0)} ms, raw ${scenarioRun.raw[t].totalMs.toFixed(0)} ms`);
+        log(`  rep ${rep} ${slot} ${sc.name} ${t}x: hosted ${scenarioRun.hosted[t].totalMs.toFixed(0)} ms, raw ${scenarioRun.raw[t].totalMs.toFixed(0)} ms`);
       }
     }
     // The WASM package's load steps, before any audio runs.
@@ -309,7 +309,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
       if ((await ev(page, "audio status", audioStatus, undefined)).started) throw new Error("audio was running in a fresh page");
       if (block === "on") {
         run.audio = await ev(page, "start audio", startAudio, 15_000);
-        log(`  rep ${rep} ${engine}: audio ${run.audio.started ? "started" : "DID NOT START"} (contexts: ${run.audio.contexts.join(", ") || "none"})`);
+        log(`  rep ${rep} ${slot}: audio ${run.audio.started ? "started" : "DID NOT START"} (contexts: ${run.audio.contexts.join(", ") || "none"})`);
         if (!run.audio.started || !run.audio.contexts.includes("running")) continue;
       }
       for (const sc of scenarios) {
@@ -321,7 +321,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
             if (rate > 1 && sc === scenarios[0]) await probe(page, `frames-${block}:${rate}`);
             const f = frameSummary(await ev(page, `${sc.name} frames (audio ${block})`, measureFrames, { windowMs: config.frameWindowMs, warmMs: config.frameWarmMs, speed: config.speed }));
             (block === "on" ? run.scenarios[sc.name].framesAudio : run.scenarios[sc.name].frames)[String(rate)] = f;
-            log(`  rep ${rep} ${engine} ${sc.name} ${rate}x audio ${block}: frames median ${f.medianMs.toFixed(1)} ms (${f.frames} frames, ${f.clampedFrames} over ${CLAMP_FRAME_MS} ms, ${f.simMinutesPerSecond.toFixed(1)} sim-min/s)`);
+            log(`  rep ${rep} ${slot} ${sc.name} ${rate}x audio ${block}: frames median ${f.medianMs.toFixed(1)} ms (${f.frames} frames, ${f.clampedFrames} over ${CLAMP_FRAME_MS} ms, ${f.simMinutesPerSecond.toFixed(1)} sim-min/s)`);
           } finally {
             await throttle(cdp, 1);
           }
@@ -352,7 +352,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     run.ok = true;
   } catch (e) {
     run.error = e instanceof Error ? e.message : String(e);
-    log(`  rep ${rep} ${engine}: FAILED: ${run.error}`);
+    log(`  rep ${rep} ${slot}: FAILED: ${run.error}`);
   }
   // Auxiliary, after the measurements are final: a first visit with the
   // service worker allowed, then an offline reload. Nothing in it can mark

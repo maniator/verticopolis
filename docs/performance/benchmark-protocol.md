@@ -197,10 +197,15 @@ noise the tolerance has to cover.
 6. RUN-3 repeats one A/A pass per engine beside the verdict. An A/A pass
    outside δ or ε goes to the owner, who decides whether RUN-3 stands.
 
-Not yet: the harness has no A/A mode and no calibration script. B3's harness
-PR adds `--aa ts|wasm` (the engine in both slots, tagged in `results.json` so
-it can never be read as a verdict) and a calibration summary that applies the
-steps above to a set of A/A folders.
+`perf:compare --aa ts|wasm` runs one engine in both slots. `results.json`
+records it in `config.aa`, each run records the slot (`engine`) and the engine
+that ran (`ranEngine`), and the report opens with a banner saying it is not a
+comparison. The slot labels stay `ts` and `wasm`, and every ratio is slot
+`wasm` over slot `ts`, so an A/A folder reads with the same tools as a real
+one. Validation judges each run by the engine that ran and refuses a folder
+whose runs do not match `config.aa`. Without `--out`, the folder name gains
+`-aa-<engine>`. Not yet: the calibration summary that applies the steps above
+to a set of A/A folders; until it lands, the folders are read by hand.
 
 ## 7. Scheduled runs
 
@@ -260,7 +265,7 @@ committed interval.
 
 ### RUN-0b, exact steps
 
-Run it only after the harness PR with A/A mode and the cost split is merged;
+Run it only after the harness PR with the cost split is merged (A/A mode has landed);
 the commands are completed in that PR's description. The shape:
 
 ```powershell
@@ -273,7 +278,7 @@ npm.cmd ci
 npm.cmd run wasm:build
 npm.cmd run perf:worker  -- --reps 10 --viewport 1280x720 --out docs/performance/results/<date>-<sha>-run0b-worker-1280x720
 npm.cmd run perf:compare -- --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b
-# A/A passes (not yet): five or more per engine, same flags
+# A/A passes: five or more per engine, same flags
 npm.cmd run perf:compare -- --aa ts   --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-ts-1
 npm.cmd run perf:compare -- --aa wasm --reps 10 --skip-build --out docs/performance/results/<date>-<sha>-run0b-aa-wasm-1
 ```
