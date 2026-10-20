@@ -65,4 +65,55 @@ design section 11, a CSP note for `blob:` scripts.
 
 ## /gds-code-review round
 
-(Appended below once the engine-boot pass is triaged.)
+Run on the diff after the bmad round's fixes, with the engine boot as the
+focus. Layers: Blind Hunter (diff only), Edge Case Hunter (engine boot walk),
+Acceptance Auditor (story and design). No finding touched simulation
+behavior, save fidelity, which engine is adopted, or the `engine_status`
+codes; all three confirmed the same bytes run on the main thread, the engine
+worker (respawn included) and the dual-run worker.
+
+Fixed (`patch`):
+
+- The backlog gained blank lines around the #1132 row, which ended the table
+  for `backlogIssueMirror.test.ts` and `backlog-priority-labels.yml`, so 19
+  rows were no longer checked or label-synced. Removed.
+- A wasm-only boot failure threw an error whose message held the refused
+  package's file and digests, and the exception tracker groups by message. It
+  now names the code and kind only (the detail stays on the console and in
+  `__vcEngineBoot`).
+- A worker's failed-load reply is held to the load codes (`boot-error`,
+  `package-mismatch`, `boot-timeout`) and its package detail is rebuilt from
+  known values (kind and file from their lists, ids as 12 hex digits).
+- `loadWasmEngine` took no options, so its tests went through the dev skip.
+  It takes them now, and two tests cover the verified route (the code for a
+  binding the shell cannot use, and the deadline signal).
+- The fast-load e2e skipped on nearly every machine (it timed from
+  navigation). It now warms the HTTP cache, times from when boot settles, and
+  holds only a load that beat the delay to the claim.
+- E2E: the spy also counts `new WebAssembly.Module` and `Instance`; the
+  uncontrolled-route tests send the new `Content-Length`; the no-reload test
+  counts `load` events, not same-document navigations; the update spec builds
+  deployment B only on the projects that run it.
+- The slow-load note is announced too. The CHANGELOG no longer says the game
+  "tells you why". The #1132 and #1086 backlog text matches the code. Smaller
+  copy and comment fixes (the dual-run worker's comment, the loader's doc
+  comment, one spelling).
+- A test pins that the glue has no imports of its own and reads its URL only
+  for the default binary path, since a Blob URL has no folder.
+
+Deferred (added to the #985 row): an engine that finishes compiling after the
+deadline stays in memory (the streaming load did the same); the perf
+harness's raw WASM mode still imports the glue by URL; the shell-id check
+accepts any chunk that carries the id.
+
+Dismissed: the temp-folder leak when deployment B's build throws
+(`startDeployments` removes it).
+
+## Verification
+
+`npm run typecheck`, `npm run lint`, `npm test` (413 files, 5710 tests), and
+`VC_TOOLING=1 npm run build` (switchable) and `VC_TOOLING=1 VC_ENGINE=wasm npm
+run build` (wasm-only) green. E2E: `engineIntegrity`, `bootLoading`,
+`offlineUpdate` and `wasmOnly` on the wasm-only lane (21 tests), and the first
+three on `chromium-wasm` against the switchable build (10 tests). One tamper
+spec failed once on `chromium-wasm` and passed on five reruns; watch it in CI.
