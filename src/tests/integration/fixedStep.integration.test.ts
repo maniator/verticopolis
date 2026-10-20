@@ -6,6 +6,7 @@ import { Simulation } from "../../engine/Simulation";
 import { drainFixedSteps, quantumFor } from "../../engine/sim/fixedStep";
 import { paceFactor } from "../../engine/timePacing";
 import type { SerializedGame } from "../../engine/types";
+import { atEngineFrameCadence } from "../parity/typescriptOnly";
 
 /** Decode a `.vctower` container (magic line + base64 deflate-raw JSON). */
 function decodeVctower(text: string): SerializedGame {
@@ -77,6 +78,7 @@ describe("engine fixed time step: the tower is the same at any frame rate", () =
   ] as const;
   for (const [label, rate, steadyClock] of cases) {
     it(`${label}: 30, 60, 144 Hz and a jittery frame source end byte-identical`, () => {
+      atEngineFrameCadence("the fixture is ticked frame by frame and only the final save, the engine's own while hosted, is compared");
       const runs = [steady(30), steady(60), steady(144), jittery()].map((f) => play(rate, f, steadyClock));
       for (const r of runs) {
         // Nothing was dropped: every run stepped the whole owed day.
@@ -91,6 +93,7 @@ describe("engine fixed time step: the tower is the same at any frame rate", () =
   }
 
   it("a host too slow for the step budget falls behind on the same step sequence", () => {
+    atEngineFrameCadence("the fixture is ticked frame by frame and only the final save, the engine's own while hosted, is compared");
     // 12 Hz at the fastest speed owes more per frame than the step budget
     // covers, so its debt hits the host's 30-minute catch-up cap and the excess
     // is dropped. It must still take exactly the steps a 60 Hz host takes, just
@@ -105,6 +108,7 @@ describe("engine fixed time step: the tower is the same at any frame rate", () =
   });
 
   it("the frame-rate-derived stepping it replaces did diverge (why this exists)", () => {
+    atEngineFrameCadence("the fixture is ticked frame by frame and only the final save, the engine's own while hosted, is compared");
     // The pre-fixed-step host loop: step min(20, acc) with acc carrying the
     // fractional frame-derived minutes. Same save, same owed total, two
     // monitor rates: the step sequences differ, and so does the tower.
