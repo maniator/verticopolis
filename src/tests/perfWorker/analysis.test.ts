@@ -140,8 +140,8 @@ describe("perf:worker analysis", () => {
     const mixed = runs().map((r, i) => ({ ...r, page: { crossOriginIsolated: true, userAgent: "ua", webgl: { renderer: i === 0 ? "ANGLE (AMD, AMD Radeon RX 6800 Direct3D11, D3D11)" : RTX, vendor: "v" } }, rendererEnd: i === 0 ? "ANGLE (AMD, AMD Radeon RX 6800 Direct3D11, D3D11)" : RTX }));
     expect(validate(config, mixed).errors.join()).toMatch(/different WebGL renderers/);
     const fell = withRenderer(RTX, "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)");
-    expect(validate({ ...config, quick: true }, fell).errors.join()).toMatch(/renderer changed during/);
-    expect(validate(config, fell, "EX-4").errors.join()).toMatch(/renderer changed during/);
+    expect(validate({ ...config, quick: true }, fell).errors.join()).toMatch(/renderer changed after the frames in/);
+    expect(validate(config, fell, "EX-4").errors.join()).toMatch(/renderer changed after the frames in/);
     expect(validate(config, withRenderer(RTX, null)).errors.join()).toMatch(/none after the frames/);
   });
 
@@ -196,6 +196,8 @@ describe("perf:worker analysis", () => {
       expect(readFileSync(join(dir, "runs.jsonl"), "utf8").endsWith("\n")).toBe(true);
       expect(() => loadWorkerCheckpoint(dir, { ...meta, commit: "other" })).toThrow(/its commit differs/);
       expect(() => loadWorkerCheckpoint(dir, { ...meta, config: makeConfig(parseArgs(["--reps", "6", "--viewport", "1280x720"]), ["small"]) })).toThrow(/its config differs from this run's \(viewport; pass the options the run started with\)/);
+      // The refusal names the machine keys that differ (channel, switches, renderer, exception), so the resume can repeat them.
+      expect(() => loadWorkerCheckpoint(dir, { ...meta, machine: { cpu: "a", channel: "chrome", args: ["--use-angle=d3d11"] } })).toThrow(/its machine differs from this run's \(channel, args; run on the machine and browser the run started with\)/);
       expect(() => loadWorkerCheckpoint(dir, { ...meta, dirty: true })).toThrow(/clean tree/);
       writeFileSync(join(dir, "checkpoint.json"), JSON.stringify({ ...meta, dirty: true, startedAt: "x" }));
       expect(() => loadWorkerCheckpoint(dir, meta)).toThrow(/started on a dirty tree/);

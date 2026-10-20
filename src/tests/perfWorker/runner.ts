@@ -124,6 +124,8 @@ export interface ModeRun {
   page: { crossOriginIsolated: boolean; userAgent: string; webgl: { renderer: string; vendor: string } | null } | null;
   /** The renderer read again from a new context after the frames; see ProcessRun.rendererEnd. */
   rendererEnd?: string | null;
+  /** The same read after the throttled cold start, kept apart so it cannot hide a change after the frames; absent for a run without a cold start. */
+  rendererEndCold?: string | null;
   cold: Startup | null;
   warm: Startup | null;
   cold4x: Startup | null;
@@ -407,7 +409,7 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
       });
       // The throttle held in this context too.
       run.cpuProbe.timed[`cold:${slowRate}`] = await ev(slowPage, "cpu probe", cpuProbe, undefined);
-      run.rendererEnd = (await ev(slowPage, "renderer after the cold start", webglRenderer, undefined))?.renderer ?? null;
+      run.rendererEndCold = (await ev(slowPage, "renderer after the cold start", webglRenderer, undefined))?.renderer ?? null;
       await slow.close();
     }
     run.ok = true;

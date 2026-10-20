@@ -44,7 +44,7 @@ export function rendererLimitation(renderers: readonly string[], exception: stri
     const kind = classifyRenderer(renderer);
     if (kind === "hardware") out.push(`WebGL renderer in these runs: ${renderer}. Frame rates are for this GPU; other GPUs and displays will differ. The simulation-only rows do not depend on rendering.`);
     else if (kind === "software") out.push(`WebGL renderer in these runs: ${renderer}. That is a software rasterizer: render cost dominates the frame, the frame rows are invalid, and the CPU load may have moved the simulation rows. A protocol run fails validation on it.`);
-    else if (kind === "virtual") out.push(`WebGL renderer in these runs: ${renderer}. That is a virtual display adapter that is not the GPU, so the frame rows are invalid. A protocol run fails validation on it.`);
+    else if (kind === "virtual") out.push(`WebGL renderer in these runs: ${renderer}. That is a virtual display adapter and no GPU, so the frame rows are invalid. A protocol run fails validation on it.`);
     else out.push(`WebGL renderer in these runs: ${renderer}. It does not name a hardware adapter, so the frame rows are not verified GPU evidence. A protocol run fails validation on it.`);
   }
   if (renderers.length === 0) out.push("No WebGL renderer was recorded, so the frame rows are not verified GPU evidence. A protocol run fails validation on it.");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { browserLaunch, browserName, classifyRenderer, gpuVerified, launchOptions, rendererBanners, rendererFinding, rendererSummary, type BrowserLaunch } from "./renderer";
+import { browserLaunch, browserName, classifyRenderer, gpuVerified, launchOptions, recordedGpuVerified, rendererBanners, rendererFinding, rendererSummary, type BrowserLaunch } from "./renderer";
 import { gateBrowser } from "./browserProbe";
 import { rendererLimitation } from "./limitations";
 import { machineOf } from "./main";
@@ -23,6 +23,19 @@ describe("classifyRenderer", () => {
   });
   it("calls everything unrecognized, masked or empty unknown, never hardware", () => {
     for (const s of ["null", "undefined", "NULL", "   ", "", "Disabled", "WebKit WebGL", "Google Inc.", "Apple GPU", "NVIDIA", "AMD", "Intel", "ANGLE (Intel)", "Intel, or similar", "ANGLE (NVIDIA, Direct3D11 vs_5_0 ps_5_0, D3D11)", "ANGLE (Mystery Vendor, Thing 9000)", "ANGLE (Google, Vulkan 1.3.0 (renamed), driver)", null, undefined]) expect(classifyRenderer(s), String(s)).toBe("unknown");
+  });
+});
+
+describe("classifyRenderer, versions and driver builds", () => {
+  it("does not take a version number, a driver build or a year for a device", () => {
+    for (const s of ["ANGLE (NVIDIA, Direct3D11 vs_5_0 ps_5_0, D3D11-31.0.15.3623)", "ANGLE (AMD, Vulkan 1.3.260 (AMD), radv)", "ANGLE (Intel, Vulkan 1.3.255 (Unknown Device), Intel open-source Mesa driver)", "Intel 2024", "NVIDIA 31.0.15.3623", "WebKit WebGL, or similar", "NVIDIA GeForce, or similar"]) {
+      expect(classifyRenderer(s), s).toBe("unknown");
+    }
+  });
+  it("still names a device that sits beside a version", () => {
+    for (const s of ["ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11-31.0.15.3623)", "ANGLE (AMD, Vulkan 1.3.260 (AMD Radeon RX 6800 (RADV NAVI21)), radv)", "NVIDIA A100-SXM4-40GB 535.104.05"]) {
+      expect(classifyRenderer(s), s).toBe("hardware");
+    }
   });
 });
 
@@ -51,6 +64,24 @@ describe("rendererFinding", () => {
       expect(f.warnings.length, String(bad)).toBeGreaterThan(0);
     }
   });
+  it("keeps a missing renderer an error under an exception, and a warning only for a quick run without one", () => {
+    for (const [s, e] of [[[null], [null]], [[], []]] as const) {
+      expect(rendererFinding(s, e, { quick: false, exception: "EX-4" }).errors.length).toBeGreaterThan(0);
+      expect(rendererFinding(s, e, { quick: true, exception: "EX-4" }).errors.length).toBeGreaterThan(0);
+      expect(rendererFinding(s, e, { quick: true }).errors).toEqual([]);
+    }
+  });
+  it("holds the read after the throttled cold start to the same rules, apart from the read after the frames", () => {
+    // The cold-start read cannot overwrite a bad read after the frames: both are checked.
+    expect(rendererFinding([RTX], [null], { quick: false, lateEnds: [RTX] }).errors.join()).toMatch(/none after the frames/);
+    expect(rendererFinding([RTX], [SWIFT], { quick: false, lateEnds: [RTX] }).errors.join()).toMatch(/renderer changed after the frames/);
+    expect(rendererFinding([RTX], [RTX], { quick: false, lateEnds: [null] }).errors.join()).toMatch(/none after the cold start/);
+    expect(rendererFinding([RTX], [RTX], { quick: true, exception: "EX-4", lateEnds: [AMD] }).errors.join()).toMatch(/different WebGL renderers/);
+    // A run with no cold start has no late read to miss.
+    expect(rendererFinding([RTX, RTX], [RTX, RTX], { quick: false, lateEnds: [RTX, undefined] })).toEqual({ errors: [], warnings: [] });
+    expect(gpuVerified([RTX], [RTX], [null])).toBe(false);
+    expect(gpuVerified([RTX], [RTX], [RTX])).toBe(true);
+  });
   it("keeps a start read with no end read an error in every mode, since that is how a dead GPU process looks", () => {
     for (const opts of [full, { quick: true }, { quick: false, exception: "EX-4" }]) expect(rendererFinding([RTX], [null], opts).errors.join()).toMatch(/none after the frames/);
     expect(rendererFinding([null], [null], { quick: true }).errors).toEqual([]);
@@ -63,8 +94,8 @@ describe("rendererFinding", () => {
   it("fails different renderers and a renderer that changed mid-run in every mode", () => {
     for (const opts of [full, { quick: true }, { quick: false, exception: "EX-4" }]) {
       expect(rendererFinding([RTX, AMD], [RTX, AMD], opts).errors.join()).toMatch(/different WebGL renderers/);
-      expect(rendererFinding([RTX, RTX], [RTX, SWIFT], opts).errors.join()).toMatch(/renderer changed during 1 process run/);
-      // Every read counts, not only the start reads: one process starting on no string and ending on another adapter.
+      expect(rendererFinding([RTX, RTX], [RTX, SWIFT], opts).errors.join()).toMatch(/renderer changed after the frames in 1 process run/);
+      // Every read counts, the later ones as well as the start reads: one process starting on no string and ending on another adapter.
       expect(rendererFinding([RTX, null], [RTX, AMD], opts).errors.join()).toMatch(/different WebGL renderers/);
     }
   });
@@ -139,6 +170,8 @@ describe("report helpers", () => {
     expect(browserName(null, "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe")).toBe("Microsoft Edge");
     expect(browserName(null, "C:\\Users\\n\\AppData\\Local\\ms-playwright\\chromium-1228\\chrome-win64\\chrome.exe")).toBe("Chromium");
     expect(browserName(null, null)).toBe("Chromium");
+    expect(browserName(null, "C:\\tools\\chrome-for-testing\\chrome-win64\\chrome.exe")).toBe("Chromium");
+    expect(browserName(null, "D:\\pw-copy\\chrome-win64\\chrome.exe")).toBe("Chromium");
   });
   it("shows the start and end renderers only when they differ", () => {
     const run = (a: string | null, b: string | null, ok = true) => ({ ok, page: { webgl: a ? { renderer: a } : null }, rendererEnd: b });
@@ -148,7 +181,7 @@ describe("report helpers", () => {
     expect(rendererSummary([run(null, null)])).toBe("none");
   });
   it("leads with a banner for a declared exception, and for a smoke run whose GPU was not verified", () => {
-    expect(rendererBanners({ rendererException: "EX-4", rendererExceptionSha256: "ab12" }, false).join()).toMatch(/Renderer exception EX-4 declared.*ab12.*not verified GPU evidence/);
+    expect(rendererBanners({ rendererException: "EX-4", rendererExceptionSha256: "ab12", rendererExceptionCommit: "0123456789abcdef" }, false).join()).toMatch(/Renderer exception EX-4 declared.*ab12.*origin\/main at 0123456789ab.*not verified GPU evidence/);
     expect(rendererBanners({ gpuVerified: false }, true).join()).toMatch(/Smoke run.*no frame row in it is GPU evidence/);
     expect(rendererBanners({ gpuVerified: true }, true)).toEqual([]);
     expect(rendererBanners({ gpuVerified: false }, false)).toEqual([]);
@@ -157,6 +190,9 @@ describe("report helpers", () => {
   it("marks a run GPU-verified only for good hardware reads at both ends, with no allowance", () => {
     expect(gpuVerified([RTX, RTX], [RTX, RTX])).toBe(true);
     expect(gpuVerified([], [])).toBe(false);
+    // A declared exception records false even when every read was hardware.
+    expect(recordedGpuVerified(null, [RTX], [RTX], [RTX])).toBe(true);
+    expect(recordedGpuVerified("EX-4", [RTX], [RTX], [RTX])).toBe(false);
     expect(gpuVerified([RTX], [null])).toBe(false);
     expect(gpuVerified([SWIFT], [SWIFT])).toBe(false);
     expect(gpuVerified([RTX, AMD], [RTX, AMD])).toBe(false);

@@ -241,7 +241,7 @@ export function validate(config: WorkerConfig, runs: readonly ModeRun[], rendere
     }
   }
   const okRuns = runs.filter((r) => r.ok);
-  const gl = rendererFinding(okRuns.map((r) => r.page?.webgl?.renderer), okRuns.map((r) => r.rendererEnd), { quick: config.quick, exception: rendererException });
+  const gl = rendererFinding(okRuns.map((r) => r.page?.webgl?.renderer), okRuns.map((r) => r.rendererEnd), { quick: config.quick, exception: rendererException, lateEnds: okRuns.map((r) => r.rendererEndCold) });
   errors.push(...gl.errors);
   warnings.push(...gl.warnings);
   return { errors, warnings };

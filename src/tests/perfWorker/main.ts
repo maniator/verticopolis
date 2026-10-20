@@ -1,5 +1,5 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, truncateSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { brotliCompressSync, constants } from "node:zlib";
 import { readdirSync } from "node:fs";
 import { engineSourceHash } from "../../wasmhost/packageHash";
@@ -7,8 +7,8 @@ import { buildTree, collectEnvironment, packageState, type Environment } from ".
 import { machineOf, packageErrors, stampErrors } from "../perfCompare/main";
 import { gateBrowser, probeBrowser } from "../perfCompare/browserProbe";
 import { rendererLimitation } from "../perfCompare/limitations";
-import { resolveLaunch } from "../perfCompare/exceptionRegister";
-import { browserName, gpuVerified } from "../perfCompare/renderer";
+import { checkExceptionFolder, exceptionMarker, resolveLaunch } from "../perfCompare/exceptionRegister";
+import { browserName, recordedGpuVerified } from "../perfCompare/renderer";
 import { buildScenarios } from "../perfCompare/scenarios";
 import { startServer } from "../perfCompare/server";
 import { aggregate, ratios, validate, type Metric, type Ratio } from "./analysis";
@@ -117,7 +117,7 @@ export function limitations(config: WorkerConfig, renderers: readonly string[] =
   const firsts = Array.from({ length: k }, (_, i) => Math.floor(config.reps / k) + (i < config.reps % k ? 1 : 0));
   const firstText = firsts.every((n) => n === firsts[0]) ? `each mode first ${firsts[0]} time(s)` : `modes first between ${Math.min(...firsts)} and ${Math.max(...firsts)} times`;
   return [
-  "One machine and one headless Chromium. The renderer line says whether the page used the GPU; a software rasterizer fails validation in a protocol run, because render cost then dominates every frame and the FPS rows say more about the CPU than about GPU-backed frame rates.",
+  "One machine and one headless browser (its name and version are in the Browser row). The renderer line says whether the page used the GPU; a software rasterizer fails validation in a protocol run, because render cost then dominates every frame and the FPS rows say more about the CPU than about GPU-backed frame rates.",
   "CPU throttling is DevTools emulation of the renderer process. The engine worker runs in the same renderer process, so the 4x rows slow it too; whether emulation throttles a worker thread exactly as it throttles the main thread was not measured.",
   `Hosted rows run ${config.steps} steps of ${config.dt} minutes in batches of ${config.batch} (the frame loop's cap is 4) with no rendering. Wall time includes the worker host's wait for each reply; main-thread time counts the steps, the flushes and the time applying replies, and leaves the worker's own time out (reported apart). The browser's unpacking of each reply (the structured clone of its strings, the full save's included) runs on the main thread before the host sees the reply and is not in the hosted main-thread rows; the frames rows (frame times, long tasks) include it.`,
   "The worker host keeps one batch in flight. A frame that finds a batch still out takes no steps (the frame loop banks its minutes under the 30-minute cap), so on a tower the engine cannot step in real time the worker host simulates fewer minutes per second rather than queueing work; the sim-minutes-per-second row shows it.",
@@ -180,7 +180,7 @@ export interface WorkerResults {
   generatedAt: string;
   config: WorkerConfig;
   environment: Environment;
-  browser: { version: string | null; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null; rendererExceptionSha256?: string | null; gpuVerified?: boolean };
+  browser: { version: string | null; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null; rendererExceptionSha256?: string | null; rendererExceptionCommit?: string | null; gpuVerified?: boolean };
   scenarios: { name: string; sha256: string; population: number; units: number; transports: number; saveBytes: number }[];
   scripts: ReturnType<typeof scriptSizes>;
   runs: ModeRun[];
@@ -255,7 +255,8 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     log(`perf:worker: resuming ${out} with ${runs.length} finished run(s)${cp.retried ? `; ${cp.retried} failed run(s) will run again` : ""}`);
   } else {
     const day = started.slice(0, 10);
-    out = args.out ? resolve(repo, args.out) : resolve(repo, "docs/performance/results", `${day}-${environment.commitShort}-worker${args.quick ? "-quick" : ""}${launch.rendererException ? `-exception-${launch.rendererException.toLowerCase()}` : ""}${environment.dirty ? "-dirty" : ""}`);
+    if (args.out) checkExceptionFolder(basename(resolve(repo, args.out)), launch.rendererException);
+    out = args.out ? resolve(repo, args.out) : resolve(repo, "docs/performance/results", `${day}-${environment.commitShort}-worker${args.quick ? "-quick" : ""}${launch.rendererException ? `-${exceptionMarker(launch.rendererException)}` : ""}${environment.dirty ? "-dirty" : ""}`);
     if (existsSync(out)) throw new Error(`${out} already exists; results are never overwritten`);
     mkdirSync(out, { recursive: true });
     writeFileSync(join(out, "checkpoint.json"), JSON.stringify({ ...meta, startedAt }, null, 1) + "\n");
@@ -295,7 +296,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     generatedAt: new Date().toISOString(),
     config,
     environment,
-    browser: { version: runs.find((r) => r.browserVersion)?.browserVersion ?? null, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException, rendererExceptionSha256: launch.rendererExceptionSha256, gpuVerified: gpuVerified(runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer), runs.filter((r) => r.ok).map((r) => r.rendererEnd)) },
+    browser: { version: runs.find((r) => r.browserVersion)?.browserVersion ?? null, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException, rendererExceptionSha256: launch.rendererExceptionSha256, rendererExceptionCommit: launch.rendererExceptionCommit, gpuVerified: recordedGpuVerified(launch.rendererException, runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer), runs.filter((r) => r.ok).map((r) => r.rendererEnd), runs.filter((r) => r.ok).map((r) => r.rendererEndCold)) },
     scenarios: scenarios.map((s) => ({ name: s.name, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
     scripts,
     runs,
@@ -303,7 +304,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     ratios: ratios(metrics, config.modes),
     readModel,
     validation: { ok: v.errors.length === 0, ...v },
-    limitations: limitations(config, [...new Set(runs.filter((r) => r.ok).flatMap((r) => [r.page?.webgl?.renderer, r.rendererEnd]).filter((x): x is string => !!x))], launch.rendererException),
+    limitations: limitations(config, [...new Set(runs.filter((r) => r.ok).flatMap((r) => [r.page?.webgl?.renderer, r.rendererEnd, r.rendererEndCold]).filter((x): x is string => !!x))], launch.rendererException),
   };
   writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 1) + "\n");
   writeFileSync(join(out, "metrics.csv"), metricsCsv(results.metrics));

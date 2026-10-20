@@ -170,7 +170,7 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
   if (viewports.size > 1) errors.push(`the runs used different viewports: ${[...viewports].join(", ")}`);
   const isolation = new Set(good.map((r) => r.page?.crossOriginIsolated ?? null));
   if (isolation.size > 1) errors.push("some runs were cross-origin isolated and some were not");
-  const gl = rendererFinding(good.map((r) => r.page?.webgl?.renderer), good.map((r) => r.rendererEnd), { quick: config.quick, exception: rendererException });
+  const gl = rendererFinding(good.map((r) => r.page?.webgl?.renderer), good.map((r) => r.rendererEnd), { quick: config.quick, exception: rendererException, lateEnds: good.map((r) => r.rendererEndCold) });
   errors.push(...gl.errors);
   warnings.push(...gl.warnings);
   const coarse = good.filter((r) => (r.page?.timerResolutionMs ?? Infinity) > 0.02);

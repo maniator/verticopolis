@@ -5,8 +5,8 @@ import { analyzeBundle } from "./bundle";
 import { buildTree, collectEnvironment, ENGINE_PACKAGE_FILES, packageState, type Environment, type PackageState } from "./env";
 import { buildLimitations } from "./limitations";
 import { gateBrowser, probeBrowser, type BrowserProbe } from "./browserProbe";
-import { resolveLaunch } from "./exceptionRegister";
-import { browserName, gpuVerified, type BrowserLaunch } from "./renderer";
+import { checkExceptionFolder, exceptionMarker, resolveLaunch } from "./exceptionRegister";
+import { browserName, recordedGpuVerified, type BrowserLaunch } from "./renderer";
 import { aggregate, compareEngines, missingSamples } from "./metrics";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
@@ -235,7 +235,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   validation.ok = validation.errors.length === 0;
   const bundle = analyzeBundle(dist);
   const toolingBundle = analyzeBundle(distPerf);
-  const renderers = [...new Set(runs.filter((r) => r.ok).flatMap((r) => [r.page?.webgl?.renderer, r.rendererEnd]).filter((x): x is string => !!x))];
+  const renderers = [...new Set(runs.filter((r) => r.ok).flatMap((r) => [r.page?.webgl?.renderer, r.rendererEnd, r.rendererEndCold]).filter((x): x is string => !!x))];
   const results: CompareResults = {
     schema: 1,
     startedAt: meta.startedAt,
@@ -245,7 +245,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     issue: "maniator/verticopolis#972",
     config,
     environment,
-    browser: { version: browserVersion, headless: true, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException, rendererExceptionSha256: launch.rendererExceptionSha256, gpuVerified: gpuVerified(runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer), runs.filter((r) => r.ok).map((r) => r.rendererEnd)) },
+    browser: { version: browserVersion, headless: true, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException, rendererExceptionSha256: launch.rendererExceptionSha256, rendererExceptionCommit: launch.rendererExceptionCommit, gpuVerified: recordedGpuVerified(launch.rendererException, runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer), runs.filter((r) => r.ok).map((r) => r.rendererEnd), runs.filter((r) => r.ok).map((r) => r.rendererEndCold)) },
     scenarios: scenarios.map((s) => ({ name: s.name, description: s.description, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
     nodeChecks,
     runs,
@@ -317,6 +317,7 @@ export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skip
     // Only the folder's own name counts, and in lower case, because the results are written on case-insensitive disks too.
     const name = basename(resolve(repo, args.out));
     const lower = name.toLowerCase();
+    checkExceptionFolder(name, rendererException);
     if (args.aa) {
       const other = args.aa === "ts" ? "wasm" : "ts";
       if (!lower.includes(`aa-${args.aa}`)) throw new Error(`--aa ${args.aa} needs an --out folder name containing aa-${args.aa}, so the folder cannot be mistaken for a comparison`);
@@ -326,7 +327,7 @@ export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skip
     if (exists(out)) throw new Error(`${out} already exists; results are never overwritten`);
     return out;
   }
-  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${args.skipBuild ? "-skipbuild" : ""}${rendererException ? `-exception-${rendererException.toLowerCase()}` : ""}${env.dirty ? "-dirty" : ""}`);
+  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${args.skipBuild ? "-skipbuild" : ""}${rendererException ? `-${exceptionMarker(rendererException)}` : ""}${env.dirty ? "-dirty" : ""}`);
   let out = base;
   for (let n = 2; exists(out); n++) out = `${base}-${n}`;
   return out;

@@ -2,8 +2,10 @@ import { chromium, type Browser } from "playwright";
 import { webglRenderer } from "./page";
 import { browserName, launchOptions, rendererFinding, type BrowserLaunch } from "./renderer";
 
-/** How long the start-of-run probe may take, from launch to the renderer read. */
+/** How long the start-of-run probe may take, from the launch call to the renderer read: one deadline over both. */
 export const PROBE_TIMEOUT_MS = 60_000;
+/** The most the browser's close may add after the deadline. */
+export const CLOSE_TIMEOUT_MS = 5_000;
 
 /** What one throwaway launch shows before a run starts: the build and the adapter. */
 export interface BrowserProbe {
@@ -21,18 +23,37 @@ export interface BrowserProbe {
  * machine identity).
  */
 export async function probeBrowser(executablePath: string | null, launch: BrowserLaunch, timeoutMs = PROBE_TIMEOUT_MS): Promise<BrowserProbe> {
-  const browser = await chromium.launch({ ...launchOptions(executablePath, launch), timeout: timeoutMs });
+  let browser: Browser | undefined;
+  let abandoned = false;
   let timer: NodeJS.Timeout | undefined;
   // A driver that hangs while it creates a context would stall the run before
-  // any build, with no message: the timeout turns that into an error.
+  // any build, with no message: the one deadline turns that into an error,
+  // whether the hang is in the launch or in the read.
   const hung = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`the browser probe did not finish in ${timeoutMs / 1000} s (a GPU driver that hangs at context creation looks like this)`)), timeoutMs);
+    timer = setTimeout(() => {
+      abandoned = true;
+      reject(new Error(`the browser probe did not finish in ${timeoutMs / 1000} s (a GPU driver that hangs at context creation looks like this)`));
+    }, timeoutMs);
   });
+  const probe = async (): Promise<BrowserProbe> => {
+    browser = await chromium.launch({ ...launchOptions(executablePath, launch), timeout: timeoutMs });
+    if (abandoned) {
+      // The launch outlived the deadline; the caller has moved on, so close this browser here.
+      await browser.close().catch(() => {});
+      throw new Error("the browser probe was abandoned");
+    }
+    return read(browser);
+  };
   try {
-    return await Promise.race([read(browser), hung]);
+    return await Promise.race([probe(), hung]);
   } finally {
     clearTimeout(timer);
-    await browser.close().catch(() => {});
+    // The close gets a short bound of its own, so a hung browser cannot hold the run.
+    let closeTimer: NodeJS.Timeout | undefined;
+    const gaveUp = new Promise<void>((resolve) => (closeTimer = setTimeout(resolve, CLOSE_TIMEOUT_MS)));
+    await Promise.race([browser?.close().catch(() => {}), gaveUp]);
+    clearTimeout(closeTimer);
+    if (!browser) abandoned = true;
   }
 }
 

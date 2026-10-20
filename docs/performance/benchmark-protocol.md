@@ -55,7 +55,7 @@ will refuse passes that differ in them and passes without a verified GPU.
 What the references ran, from their committed `results.json` files: the two
 2026-10-15 folders (`2026-10-15-e25ec01-worker` and
 `2026-10-15-e25ec01c-worker-1280x720`) ran the full bundled Chromium binary
-(`...\ms-playwright\chromium-1228\chrome-win64\chrome.exe`, user agent
+(`.../ms-playwright/chromium-1228/chrome-win64/chrome.exe`, user agent
 `HeadlessChrome/149.0.0.0`), reached through `PW_CHROMIUM_PATH`, and got ANGLE
 on Direct3D 11 with the RTX 3060. RUN-0a ran Playwright's default headless
 shell (`executable: null`, `HeadlessChrome/149.0.7827.55`) and got SwiftShader.
@@ -89,12 +89,19 @@ p99 and every frame-bound part of M1 to M8 invalid, and it may have moved the
 bare-step rows too (see the folder's `READING.md`).
 
 The harness fails closed. A full run passes the renderer check only when the
-WebGL renderer, read at the start of each browser process and again at its
-end (after the frames and the throttled cold start), names a hardware adapter:
+WebGL renderer, read at the start of each browser process, after its frames
+and again after its throttled cold start (the reads are kept apart, so a
+later read cannot hide an earlier one), names a hardware adapter:
 a string with a known device family (GeForce, RTX, Radeon, Iris, UHD, Arc,
 Apple M-series, Adreno, Mali and the like), or a vendor word beside a model
 number, and no software or virtual-adapter word. A bare vendor word names no
-device. The probe asks for the high-performance adapter, as the game does.
+device. Version numbers, driver builds (`D3D11-31.0.15.3623`, `Vulkan 1.3.260`)
+and years do not count as model numbers, and Firefox's masked strings ending in
+`, or similar` are refused. A generic Intel string with no model (`Intel(R) HD
+Graphics`, `Intel(R) Graphics`, `Mesa Intel(R) Graphics (RPL-P)`) fails closed
+too: the check cannot tell it from a masked one. If a real run reports one,
+the owner names it in the decision that settles #1115. The probe asks for the
+high-performance adapter, as the game does.
 These are all errors in a full run:
 
 - a software rasterizer (SwiftShader, llvmpipe, WARP, Microsoft Basic Render
@@ -103,18 +110,21 @@ These are all errors in a full run:
   Microsoft Basic Display Adapter and the like);
 - a string that does not name a device, including a masked string, `null`, an
   empty string, a bare vendor and an unrecognized vendor;
-- no renderer recorded at the start of any process, or none at the end of a
-  process that had none at the start;
+- no renderer recorded at the start of any process, or none at a later read of
+  a process that had none at the start;
 - different renderers across processes or across the reads of one process,
   whichever read they come from;
-- a renderer read at the start and none at the end, which is how a GPU process
-  that died mid-run looks.
+- a renderer read at the start and none at a later read, which is how a GPU
+  process that died mid-run looks.
 
-A `--quick` smoke run turns the first three into warnings so the cloud smoke
+A `--quick` smoke run turns the first four into warnings so the cloud smoke
 still works, and its report says at the top that no frame row in it is GPU
-evidence. The last three stay errors in every mode. The same check runs on a
-throwaway browser launch before the builds, with a 60-second limit, so a
-setting that does not reach the GPU stops a full run in seconds. The launch
+evidence. A register exception turns the first three into warnings (below) and
+leaves the missing renderer an error. The last two stay errors in every mode,
+quick or excepted. The same check runs on a throwaway browser launch before
+the builds, under one 60-second deadline from the launch call through the
+read, plus at most 5 seconds for the close, so a setting that does not reach
+the GPU stops a full run in seconds. The launch
 reads a blank page, so it cannot see a process whose game page later falls
 back to software; the end read catches that after the run (a page-level start
 check that stops such a run early is tracked in the backlog).
@@ -122,18 +132,27 @@ check that stops such a run early is tracked in the backlog).
 An exception is an entry of the release exception register
 (`_bmad-output/planning-artifacts/release-3.0-exception-register.md`) that is
 **approved** and names #1115. Only the owner approves an entry. A run declares
-one with `PW_RENDERER_EXCEPTION=EX-<n>`, and the harness reads the entry
-before it builds anything: an id that is not in the register, an entry that is
-only proposed or rejected, an entry about something else and a tree without
-the register all stop the run. With a valid entry, the first three errors
-become warnings that name it. `results.json` records the id and the entry's
-SHA-256 (`browser.rendererException`, `browser.rendererExceptionSha256`) and
-puts both in the machine identity, the folder name gains
-`-exception-ex-<n>`, the report leads with a banner, and
-`browser.gpuVerified` is `false`. `gpuVerified` is `true` only when every good
-run passed the check with no exception and no `--quick` allowance, so a
-consumer such as `perf:calibrate` can refuse a run on that flag alone. A run
-under an exception is GPU evidence only as far as the entry says.
+one with `PW_RENDERER_EXCEPTION=EX-<n>`, and the harness reads the entry from
+`origin/main` (`git show`) before it builds anything, so a branch or an
+uncommitted edit cannot approve its own exception. The register in the working
+tree must match main's, line endings aside, and main's commit is recorded.
+Exactly one entry must carry the id (`## EX-<n>` followed by a colon or
+space, ending at the next level-1 or level-2 heading, with code fences and HTML
+comments ignored), it must have exactly one `- **Status:**` line whose whole
+value is `approved`, and it must name `#1115`. An id that is not in the
+register, an entry that is only proposed, rejected or "approved in principle",
+an entry about something else, a tree whose register differs from main's and a
+main that cannot be read all stop the run. With a valid entry, the first three
+errors become warnings that name it. `results.json` records the id, the entry's
+SHA-256 and main's commit (`browser.rendererException`,
+`browser.rendererExceptionSha256`, `browser.rendererExceptionCommit`) and puts
+the first two in the machine identity, an `--out` folder name must contain
+`exception-ex-<n>` (the default name has it), the report leads with a banner,
+and `browser.gpuVerified` is `false` for every run that declared an
+exception, whatever it read. `gpuVerified` is `true` only when every good run
+passed the check with no exception and no `--quick` allowance, so a consumer
+such as `perf:calibrate` can refuse a run on that flag alone. A run under an
+exception is GPU evidence only as far as the entry says.
 
 The harness does not force the GPU. When the browser comes up on a software
 rasterizer, choose the browser for the next run through the environment
@@ -147,11 +166,13 @@ which print the product, version and renderer before anything builds:
   not both. An empty `PW_CHROMIUM_PATH` counts as unset.
 - `PW_CHROMIUM_ARGS` takes only switches that choose how the GPU is reached:
   `--use-angle=<backend>`, `--use-gl=<backend>`, `--ignore-gpu-blocklist` and
-  `--enable-gpu-rasterization`. Names are read in lower case (Chromium on
+  `--enable-gpu-rasterization` (without it Chromium may rasterize on the CPU
+  with a GPU present, which is the question itself). Names are read in lower case (Chromium on
   Windows lowercases them), values must be plain words, and a switch given
   twice is refused. Everything else is refused, because it replaces the
   harness's own switches or changes what is measured (feature lists,
-  `--enable-zero-copy` and other raster-path switches, process-model and
+  `--enable-zero-copy` and other switches that change how frames are made once
+  the GPU is reached, process-model and
   compositor switches, a debugging port, extensions, a proxy, an unlocked
   frame rate). Playwright already passes `--no-sandbox`.
 - Both are parsed before any build or results folder exists, so a mistake
@@ -162,8 +183,8 @@ which print the product, version and renderer before anything builds:
   the machine identity that `--resume` checks.
 
 Which of these brings the GPU up on the owner's PC is not known from the
-cloud. The PC probe (`pc-probe-1125-gpu`) settles it, and its notes say what
-was set. Backlog row #1115 closes only after a PC report names a hardware
+cloud. The PC probe for #1125 (a project file, `pc-probe-1125-gpu.md`, not in the
+repo) settles it, and its notes say what was set. Backlog row #1115 closes only after a PC report names a hardware
 renderer, this section names the counting build, channel and switches, and the
 references have been run again where those differ.
 

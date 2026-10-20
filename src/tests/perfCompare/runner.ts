@@ -352,7 +352,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
       run.cold4x = c4.sample;
       if (c4.sample.engineActive !== engine) throw new Error(`${slowRate}x cold start: requested the ${engine} engine but ${c4.sample.engineActive} is active`);
       run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: await ev(slowPage, "cpu probe", cpuProbe, undefined), rate: slowRate, timed: run.cpuProbe?.timed ?? {} };
-      run.rendererEnd = (await ev(slowPage, "renderer after the cold start", webglRenderer, undefined))?.renderer ?? null;
+      run.rendererEndCold = (await ev(slowPage, "renderer after the cold start", webglRenderer, undefined))?.renderer ?? null;
       await slow.close();
     }
     run.ok = true;
