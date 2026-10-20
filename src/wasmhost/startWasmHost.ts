@@ -177,8 +177,8 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
   let foreign: boolean | undefined;
   const foreignPackage = (): boolean => {
     if (foreign !== undefined) return foreign;
-    const read = mod.catalog;
-    const verdict = catalogVerdict(typeof read === "function" ? (mode) => read(mode) : undefined);
+    // Called as a method, so the binding keeps its `this`.
+    const verdict = catalogVerdict(typeof mod.catalog === "function" ? (mode) => mod.catalog?.(mode) ?? "" : undefined);
     if (verdict === "failing") return false;
     return (foreign = verdict === "foreign");
   };

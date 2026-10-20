@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { WASM_ONLY_PROJECT, onWasm } from "./helpers";
 import { expectControlledWithEngine, hostedGame, installWorker } from "./offlineHelpers";
@@ -24,7 +25,10 @@ test.beforeEach(({}, info) => test.skip(!onWasm(info.project.name), "the engine 
 test.setTimeout(90_000);
 
 const dist = new URL("../dist/engine/BUILD.json", import.meta.url);
-const built = JSON.parse(readFileSync(dist, "utf8")) as { package: string; files: Record<string, { sha256: string; bytes: number }> };
+type BuildRecord = { package: string; files: Record<string, { sha256: string; bytes: number }> };
+// Read on first use, so a project that skips the file never needs dist/engine.
+let record: BuildRecord | undefined;
+const built = new Proxy({} as BuildRecord, { get: (_, key: keyof BuildRecord) => (record ??= JSON.parse(readFileSync(dist, "utf8")) as BuildRecord)[key] });
 const short = (id: string) => id.slice(0, 12);
 
 /** A valid WebAssembly custom section: the binary still validates, so only
@@ -148,7 +152,9 @@ test("the precache holds exactly the package the shell was built with, and the p
       out[path] = { sha256: hex(await crypto.subtle.digest("SHA-256", body)), bytes: body.byteLength };
     }
     return out;
-  }, [ENGINE_PATH.glue, ENGINE_PATH.wasm]);
+  }, [ENGINE_PATH.glue, ENGINE_PATH.wasm, ENGINE_PATH.record]);
+  const onDisk = readFileSync(dist);
+  expect(cached[ENGINE_PATH.record], "the cached record is the one dist/ was built with").toEqual({ sha256: createHash("sha256").update(onDisk).digest("hex"), bytes: onDisk.byteLength });
   expect(cached["engine/verticopolis_engine.js"]).toEqual(built.files["verticopolis_engine.js"]);
   expect(cached["engine/verticopolis_engine_bg.wasm"]).toEqual(built.files["verticopolis_engine_bg.wasm"]);
   // A good boot moves the spies, so the refusals below are not passing on a dead spy.
@@ -167,6 +173,7 @@ test.describe("a tampered precache is refused", () => {
     const failure = await expectRefused(page, "wasm");
     // The size differs, so the check refuses before hashing.
     expect(failure.package?.found).toBeNull();
+    expect(failure.package?.servedPackage, "the record that came with it names the shell's own package").toBe(short(built.package));
     expect(failure.package?.expected).toBe(short(built.files["verticopolis_engine_bg.wasm"].sha256));
     expect(failure.package?.controlled).toBe(true);
   });
@@ -180,6 +187,7 @@ test.describe("a tampered precache is refused", () => {
     expect(failure.package?.expected).toBe(short(built.files["verticopolis_engine.js"].sha256));
     expect(failure.package?.found, "the digest that arrived is reported").toMatch(/^[0-9a-f]{12}$/);
     expect(failure.package?.found).not.toBe(failure.package?.expected);
+    expect(failure.package?.servedPackage).toBe(short(built.package));
   });
 
   test("a record that names another package", async ({ page }) => {
@@ -195,13 +203,13 @@ test.describe("a tampered precache is refused", () => {
     await spy(page);
     await installed(page);
     await tamperCache(page, "wasm", "salt");
+    const seen = navigations(page);
     await page.reload();
     await expectRefused(page, "wasm");
-    const seen = navigations(page);
     // Long enough for a reload loop to show, and past the browser's own
     // worker update check (about two seconds after a load).
     await page.waitForTimeout(5_000);
-    expect(seen.count, "the page stays where it is until the player reloads").toBe(0);
+    expect(seen.count, "only the player's own reload; the page adds none").toBe(1);
   });
 });
 

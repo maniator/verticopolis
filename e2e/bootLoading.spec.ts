@@ -2,7 +2,7 @@
 import { test, expect } from "@playwright/test";
 import { onWasm } from "./helpers";
 import { hostedGame } from "./offlineHelpers";
-import { ENGINE_LOADING_TEXT } from "../src/engineLoading";
+import { ENGINE_LOADING_DELAY_MS, ENGINE_LOADING_TEXT } from "../src/engineLoading";
 
 /**
  * The boot cover tells the player the engine is loading when the download is
@@ -38,5 +38,9 @@ test("a fast load never shows the line", async ({ page }) => {
   });
   await page.goto("/");
   await hostedGame(page);
-  expect(await page.evaluate(() => (window as any).__loadingLines)).toBe(0);
+  const { lines, at } = await page.evaluate(() => ({ lines: (window as any).__loadingLines as number, at: performance.now() }));
+  // On a machine too slow to load inside the delay the line is right to show;
+  // the test says nothing then.
+  test.skip(at >= ENGINE_LOADING_DELAY_MS, `the game took ${Math.round(at)} ms to come up, past the ${ENGINE_LOADING_DELAY_MS} ms delay`);
+  expect(lines).toBe(0);
 });

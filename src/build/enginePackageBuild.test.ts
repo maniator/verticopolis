@@ -204,6 +204,14 @@ describe("shellProblems", () => {
     expect(shellProblems(d, true)).toEqual([]);
   });
 
+  it.each([
+    ["a backtick-quoted member", (id: string) => `x={\`package\`:\`${id}\`}`],
+    ["a JSON string with escaped quotes", (id: string) => `x=JSON.parse("{\\"package\\":\\"${id}\\"}")`],
+  ])("reads %s", (_name, make) => {
+    expect(shellProblems(distWith({ "assets/index-1.js": make(record.package) }), true)).toEqual([]);
+    expect(shellProblems(distWith({ "assets/index-1.js": make(OTHER) }), true).join("\n")).toContain(`carries engine package id ${OTHER.slice(0, 12)}`);
+  });
+
   it("reports a shell built for another package, and names both ids", () => {
     const d = distWith({ "assets/index-1.js": chunkWith(OTHER) });
     const problems = shellProblems(d, true).join("\n");

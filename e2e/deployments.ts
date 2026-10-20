@@ -93,6 +93,15 @@ function manifestOf(sw: string): { revisionOf(url: string): string; entries: num
 
 const REPO = fileURLToPath(new URL("..", import.meta.url));
 
+/** `VC_ENGINE` for a build that has the first build's engine mode. Spelled out
+ *  both ways, so a changed default cannot give the second deployment another
+ *  shell; a `version.json` that names neither is an error. */
+function engineModeOf(engineBuild: string | undefined): "wasm" | "switchable" {
+  if (engineBuild === "wasm-only") return "wasm";
+  if (engineBuild === "switchable") return "switchable";
+  throw new Error(`version.json names no engine build (found ${JSON.stringify(engineBuild)}), so the second deployment cannot match the first`);
+}
+
 /** Build the second deployment in a new folder under `into`: a copy of the
  *  public folder with the first build's engine package salted and recorded,
  *  built into `B/` by the same `vite build` as the first, in the same modes. */
@@ -115,16 +124,18 @@ function makeSecond(dist: string, into: string): { dir: string; packageId: strin
   const built = spawnSync(process.execPath, [join(REPO, "node_modules", "vite", "bin", "vite.js"), "build", "--outDir", dir, "--emptyOutDir"], {
     cwd: REPO,
     encoding: "utf8",
-    timeout: 240_000,
+    timeout: 200_000,
     env: {
       ...process.env,
+      // The e2e builds A with the tooling handle too (specs drive `window.game`).
       VC_TOOLING: "1",
       VC_PUBLIC_DIR: publicDir,
       // The same engine mode as the first build, or the wrong shell is served.
-      VC_ENGINE: firstVersion.engineBuild === "wasm-only" ? "wasm" : "",
+      VC_ENGINE: engineModeOf(firstVersion.engineBuild),
     },
   });
-  if (built.status !== 0) throw new Error(`the second deployment's vite build failed (${built.status ?? built.signal}):\n${(built.stderr || built.stdout).split("\n").slice(-30).join("\n")}`);
+  if (built.error) throw built.error;
+  if (built.status !== 0) throw new Error(`the second deployment's vite build failed (${built.status ?? built.signal}):\n${(built.stderr || built.stdout || "").split("\n").slice(-30).join("\n")}`);
   // The second shell must check the second package, or the update would
   // prove nothing about the loader.
   const unsound = shellProblems(dir, true);

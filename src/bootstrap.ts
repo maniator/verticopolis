@@ -281,8 +281,11 @@ export function bootGame(create: () => BootApp): Promise<void> {
           // A package whose catalogs this build cannot draw is a mismatched
           // one (#1086), as the main-thread host codes it; the worker sent
           // its catalogs when it answered ready.
-          const refusal = catalogVerdict((mode) => catalogs[mode]) === "foreign" ? "package-mismatch" : "attach-refused";
-          bootState = hosted ? { ...bootState, engine: "wasm" } : failBoot(bootState, "start", refusal, lastError ?? "the worker host did not take the first tower");
+          if (hosted) bootState = { ...bootState, engine: "wasm" };
+          else {
+            const refusal = catalogVerdict((mode) => catalogs[mode]) === "foreign" ? "package-mismatch" : "attach-refused";
+            bootState = failBoot(bootState, "start", refusal, lastError ?? "the worker host did not take the first tower");
+          }
           publishBootState(bootState);
           refreshSplashVersion();
         } catch (e) {

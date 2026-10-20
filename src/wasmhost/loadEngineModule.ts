@@ -6,7 +6,8 @@ import type { ExpectedEnginePackage } from "./enginePackageRecord";
  * The one place that turns the served engine package into a running module
  * (#985 criterion 5). The main-thread boot, the engine worker and the dual
  * run's worker all load through it, so no route runs bytes the shell was not
- * built for. Design: _bmad-output/planning-artifacts/design/
+ * built for (a development serve excepted, below). Design:
+ * _bmad-output/planning-artifacts/design/
  * design-engine-package-set-consistency-2026-10-15.md, section 5.3.
  *
  * It fetches `BUILD.json`, the glue and the binary once each, refuses unless

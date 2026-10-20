@@ -344,7 +344,7 @@ export async function runMode(opts: RunnerOptions, rep: number, mode: ModeName, 
       await ev(page, "drop stash", () => { (window as unknown as { __perfStash?: unknown }).__perfStash = {}; }, undefined);
       await cdp.send("HeapProfiler.collectGarbage");
       const heap = (await cdp.send("Runtime.getHeapUsage")) as { usedSize: number };
-      const wasm = await ev(page, "engine memory", engineMemory, { engineUrl });
+      const wasm = await ev(page, "engine memory", engineMemory, undefined);
       const memory: MemorySample = {
         mainHeapUsedBytes: heap.usedSize,
         workerHeapUsedBytes: mode === "wasm-worker" ? await workerHeapBytes(browser) : null,

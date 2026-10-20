@@ -141,11 +141,11 @@ export function engineDistProblems(distDir: string, manifest: string): string[] 
 function emittedScripts(dir: string): string[] {
   return readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter((e) => e.isFile() && /\.(?:js|mjs|html)$/.test(e.name))
-    .map((e) => relative(dir, resolve(e.parentPath, e.name)).split(sep).join("/"));
+    .map((e) => relative(dir, resolve(e.parentPath ?? (e as { path?: string }).path ?? dir, e.name)).split(sep).join("/"));
 }
 
 /** A package id as an object literal's `package` member, bare or quoted key. */
-const PACKAGE_MEMBER = /["']?\bpackage["']?\s*:\s*["']([0-9a-f]{64})["']/g;
+const PACKAGE_MEMBER = /\\?["'`]?\bpackage\\?["'`]?\s*:\s*\\?["'`]([0-9a-f]{64})\\?["'`]/g;
 
 /**
  * What is wrong with the shell in a built `dist/`, as sentences (an empty list
