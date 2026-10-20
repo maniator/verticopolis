@@ -26,6 +26,7 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
 import { engineBuildRecord } from "../src/wasmhost/enginePackageRecord.ts";
+import { BUILD_SECTION, customSectionsOf, parseBuildMetadata, stampBuildSection } from "../src/wasmhost/buildSection.ts";
 import { cargoPackage } from "../src/build/engineCompat.ts";
 import { ENGINE_BUILD_RECORD, ENGINE_GLUE, ENGINE_PACKAGE, ENGINE_WASM } from "../src/wasmhost/engineAssets.ts";
 import { ENGINE_THIRD_PARTY, checkToolchain, engineThirdParty } from "./engine-third-party.ts";
@@ -82,11 +83,23 @@ const run = (cmd: string, args: string[]) => execFileSync(cmd, args, { cwd: crat
 rmSync(resolve(crate, "pkg"), { recursive: true, force: true });
 run("cargo", ["rustc", "--locked", "--release", "--lib", "--target", "wasm32-unknown-unknown", "--features", FEATURES, "--crate-type", "cdylib"]);
 const wasm = `target/wasm32-unknown-unknown/release/${target.lib}.wasm`;
+// The hash of the sources both binaries are stamped with and BUILD.json records.
+// It covers the sources only, so stamping a binary with it cannot change it.
+const sources = which === "engine" ? engineSourceHash(crate) : "";
+/** Append the build metadata section to a binary wasm-bindgen wrote, then read
+ *  it back from the file, so a section the pipeline dropped or garbled stops
+ *  the build. This runs before any digest of the file is taken (#963). */
+function stamp(file: string): void {
+  writeFileSync(file, stampBuildSection(readFileSync(file), sources));
+  const back = parseBuildMetadata(customSectionsOf(readFileSync(file), BUILD_SECTION));
+  if (back.state !== "ok" || back.sourceHash !== sources) throw new Error(`${file} does not carry the ${BUILD_SECTION} section after stamping`);
+}
 run("wasm-bindgen", ["--target", "nodejs", "--out-dir", "pkg", wasm]);
 writeFileSync(resolve(crate, "pkg/package.json"), '{ "type": "commonjs" }\n');
 for (const f of [`${target.lib}.js`, `${target.lib}_bg.wasm`]) {
   if (!existsSync(resolve(crate, "pkg", f))) throw new Error(`wasm-bindgen did not write ${target.dir}/pkg/${f}`);
 }
+if (which === "engine") stamp(resolve(crate, "pkg", `${target.lib}_bg.wasm`));
 if (which === "engine") {
   // The browser build, served beside the app from src/public/engine/ (the WASM
   // host and the dual run's worker load it by URL). It is build output, not
@@ -103,7 +116,7 @@ if (which === "engine") {
   // The web target's own declaration is not needed next to the served files.
   rmSync(resolve(web, "verticopolis_engine.d.ts"), { force: true });
   rmSync(resolve(web, "verticopolis_engine_bg.wasm.d.ts"), { force: true });
-  const sources = engineSourceHash(crate);
+  stamp(resolve(web, ENGINE_WASM));
   // Schema 2 (#985 criterion 5): `sources` keeps its meaning, and `package`
   // and `files` name the exact glue and binary bytes, so the page can refuse a
   // glue or binary from another build.

@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { cargoPackage } from "../build/engineCompat";
 import { engineSourceHash } from "./packageHash";
+import { BUILD_SECTION, customSectionsOf, parseBuildMetadata } from "./buildSection";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const BUILD = resolve(ROOT, "src/public/engine/BUILD.json");
@@ -20,6 +22,19 @@ describe.skipIf(!existsSync(BUILD))("the served engine package", () => {
   it("names the crate it was built from (run npm run wasm:build after a Cargo.toml change)", () => {
     const built = JSON.parse(readFileSync(BUILD, "utf8")) as { crate?: unknown };
     expect(built.crate).toEqual(cargoPackage(readFileSync(resolve(ROOT, "engine-rs/Cargo.toml"), "utf8")));
+  });
+
+  it("carries the build metadata section in both binaries, equal to BUILD.json's sources (stamped before the digests)", () => {
+    const built = JSON.parse(readFileSync(BUILD, "utf8")) as { sources: string; files: Record<string, { sha256: string; bytes: number }> };
+    for (const f of ["src/public/engine/verticopolis_engine_bg.wasm", "engine-rs/pkg/verticopolis_engine_bg.wasm"]) {
+      const bytes = readFileSync(resolve(ROOT, f));
+      expect(parseBuildMetadata(customSectionsOf(bytes, BUILD_SECTION)), f).toEqual({ state: "ok", sourceHash: built.sources });
+    }
+    // BUILD.json describes the stamped bytes, so the section cannot have been added after the digests.
+    const served = readFileSync(resolve(ROOT, "src/public/engine/verticopolis_engine_bg.wasm"));
+    const entry = built.files["verticopolis_engine_bg.wasm"];
+    expect(entry.bytes).toBe(served.length);
+    expect(entry.sha256).toBe(createHash("sha256").update(served).digest("hex"));
   });
 
   it("ships the loader and the binary beside the app", () => {

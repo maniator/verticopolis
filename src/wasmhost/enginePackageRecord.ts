@@ -49,6 +49,10 @@ export interface ExpectedEnginePackage {
   files: EngineFiles;
   /** The crate this shell was built to run, a label for About and diagnostics (#963); the check never reads it. */
   crate?: EngineCrateRecord;
+  /** The hash of the Rust sources of the package this shell was built with
+   *  (`BUILD.json`'s `sources`), for About to compare with the hash stamped in
+   *  the binary (#963). A label: the package check never reads it. */
+  sources?: string;
 }
 
 /** A SHA-256 as 64 lowercase hex digits. */
@@ -93,6 +97,7 @@ export function expectedOf(record: EnginePackageRecord): ExpectedEnginePackage {
     package: record.package,
     files: { [ENGINE_GLUE]: { ...record.files[ENGINE_GLUE] }, [ENGINE_WASM]: { ...record.files[ENGINE_WASM] } },
     ...(record.crate ? { crate: { ...record.crate } } : {}),
+    sources: record.sources,
   };
 }
 

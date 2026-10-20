@@ -130,7 +130,7 @@ describe("the crate entry", () => {
   });
 
   it("rides into the part of the record the shell compiles in, beside the package and files", () => {
-    expect(expectedOf(withCrate())).toEqual({ package: record().package, files: record().files, crate });
+    expect(expectedOf(withCrate())).toEqual({ package: record().package, files: record().files, crate, sources: record().sources });
     expect("crate" in expectedOf(record())).toBe(false);
   });
 });
@@ -139,8 +139,8 @@ describe("shortId and expectedOf", () => {
   it("shows the first 12 digits", () => {
     expect(shortId("0123456789abcdef".repeat(4))).toBe("0123456789ab");
   });
-  it("keeps the package and the files and drops the sources hash", () => {
+  it("keeps the package and the files, and carries the sources hash as a label", () => {
     const r = record();
-    expect(expectedOf(r)).toEqual({ package: r.package, files: r.files });
+    expect(expectedOf(r)).toEqual({ package: r.package, files: r.files, sources: r.sources });
   });
 });
