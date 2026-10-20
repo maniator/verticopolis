@@ -22,7 +22,7 @@ function run(rep: number, mode: ModeName, scale: number, over: Partial<ModeRun> 
   const frames = { frames: 60, meanFps: 10 / scale, medianMs: 100, p95Ms: 150, p99Ms: 190, onePercentLowFps: 5, simMinutesPerSecond: 50, clampedFrames: 0, longTasks: 3, blockingMs: 20 * scale, commands: 5, commandsUnanswered: 0, commandToFrameP50Ms: 30, commandToFrameP95Ms: 40, commandToFrameMinMs: 20, hostErrorsAdded: [],
     worker: mode === "wasm-worker" ? { repliesPerSecond: 9, messagesPerSecond: 20, bytesPerSecond: 5000, staleReplies: 0, merges: 2, applyMsPerSecond: 3, commandAckP50Ms: 4, commandAckP95Ms: 6 } : null };
   return {
-    rep, mode, order: 0, ok: true, error: null, pageErrors: [], browserVersion: "141", page: null,
+    rep, mode, order: 0, ok: true, error: null, pageErrors: [], browserVersion: "141", page: { crossOriginIsolated: true, userAgent: "ua", webgl: { renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)", vendor: "Google Inc. (NVIDIA)" } }, rendererEnd: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)",
     cold: { mode, gameReadyMs: 100, modeReadyMs: 200 * scale, firstFrameMs: 300, bytesBeforeReady: 1000, requestsBeforeReady: 9, wasmRequests: mode === "ts" || mode === "wasm-worker" ? 0 : 1 },
     warm: null, cold4x: null, cpuProbe: { unthrottledMs: 100, timed: { "small:4": 390 } },
     scenarios: { small: { raw: mode === "ts" || mode === "wasm" ? { "1": { engine: mode === "ts" ? "ts" : "wasm", totalMs: 80 * scale, startDigest: "s", endDigest: "e" }, "4": { engine: mode === "ts" ? "ts" : "wasm", totalMs: 320 * scale, startDigest: "s", endDigest: "e" } } : {}, memory: { mainHeapUsedBytes: 10, workerHeapUsedBytes: mode === "wasm-worker" ? 5 : null, mainWasmBytes: mode === "wasm" || mode === "wasm-frame" ? 7 : null, workerWasmBytes: mode === "wasm-worker" ? 7 : null, processPssBytes: 100 }, hosted: { "1": hosted(1), "4": hosted(4) }, frames: { "1": frames, "4": frames } } },
@@ -116,6 +116,41 @@ describe("perf:worker analysis", () => {
     expect(definitions(config).length).toBeGreaterThan(20);
   });
 
+  const RTX = "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)";
+  const withRenderer = (renderer: string | null, end: string | null | undefined = renderer) => runs().map((r) => ({ ...r, page: { crossOriginIsolated: true, userAgent: "ua", webgl: renderer === null ? null : { renderer, vendor: "v" } }, rendererEnd: end }));
+
+  it("passes a hardware renderer read before and after the frames with no renderer finding", () => {
+    const v = validate(config, runs());
+    expect(v.errors.join()).not.toMatch(/renderer/i);
+    expect(v.warnings.join()).not.toMatch(/renderer/i);
+  });
+
+  it("fails closed on a full run unless the GPU is verified, and only warns on a quick run", () => {
+    const bad: [string, string | null][] = [["software", "llvmpipe (LLVM 15.0.7, 256 bits)"], ["virtual", "VMware SVGA 3D"], ["null text", "null"], ["masked", "WebKit WebGL"], ["unnamed", "ANGLE (Mystery Vendor, Thing 9000)"], ["missing", null]];
+    for (const [label, renderer] of bad) {
+      const set = withRenderer(renderer);
+      expect(validate(config, set).errors.length, label).toBeGreaterThan(0);
+      const quick = validate({ ...config, quick: true }, set);
+      expect(quick.errors.filter((e) => /renderer/i.test(e)), label).toEqual([]);
+      expect(quick.warnings.join(), label).toMatch(/renderer|rasterizer|adapter/i);
+    }
+  });
+
+  it("fails mixed renderers and a renderer that changed after the frames, even under a quick run or an exception", () => {
+    const mixed = runs().map((r, i) => ({ ...r, page: { crossOriginIsolated: true, userAgent: "ua", webgl: { renderer: i === 0 ? "ANGLE (AMD, AMD Radeon RX 6800 Direct3D11, D3D11)" : RTX, vendor: "v" } }, rendererEnd: i === 0 ? "ANGLE (AMD, AMD Radeon RX 6800 Direct3D11, D3D11)" : RTX }));
+    expect(validate(config, mixed).errors.join()).toMatch(/different WebGL renderers/);
+    const fell = withRenderer(RTX, "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)");
+    expect(validate({ ...config, quick: true }, fell).errors.join()).toMatch(/renderer changed after the frames in/);
+    expect(validate(config, fell, "EX-4").errors.join()).toMatch(/renderer changed after the frames in/);
+    expect(validate(config, withRenderer(RTX, null)).errors.join()).toMatch(/none after the frames/);
+  });
+
+  it("turns the failures into warnings, naming the entry, when a register exception is declared", () => {
+    const v = validate(config, withRenderer("llvmpipe (LLVM 15.0.7, 256 bits)"), "EX-4");
+    expect(v.errors.filter((e) => /renderer|rasterizer/i.test(e))).toEqual([]);
+    expect(v.warnings.join()).toMatch(/exception EX-4: .*software rasterizer/);
+  });
+
   it("separates the worker placement from the sync changes, and counts the pairs a zero reference dropped", () => {
     const rs = ratios(aggregate(config, runs()), config.modes);
     const placement = rs.find((r) => r.metric === "wall time, 720 steps" && r.throttle === "1" && r.mode === "wasm-worker" && r.against === "wasm-frame")!;
@@ -161,6 +196,8 @@ describe("perf:worker analysis", () => {
       expect(readFileSync(join(dir, "runs.jsonl"), "utf8").endsWith("\n")).toBe(true);
       expect(() => loadWorkerCheckpoint(dir, { ...meta, commit: "other" })).toThrow(/its commit differs/);
       expect(() => loadWorkerCheckpoint(dir, { ...meta, config: makeConfig(parseArgs(["--reps", "6", "--viewport", "1280x720"]), ["small"]) })).toThrow(/its config differs from this run's \(viewport; pass the options the run started with\)/);
+      // The refusal names the machine keys that differ (channel, switches, renderer, exception), so the resume can repeat them.
+      expect(() => loadWorkerCheckpoint(dir, { ...meta, machine: { cpu: "a", channel: "chrome", args: ["--use-angle=d3d11"] } })).toThrow(/its machine differs from this run's \(channel, args; run on the machine and browser the run started with\)/);
       expect(() => loadWorkerCheckpoint(dir, { ...meta, dirty: true })).toThrow(/clean tree/);
       writeFileSync(join(dir, "checkpoint.json"), JSON.stringify({ ...meta, dirty: true, startedAt: "x" }));
       expect(() => loadWorkerCheckpoint(dir, meta)).toThrow(/started on a dirty tree/);
