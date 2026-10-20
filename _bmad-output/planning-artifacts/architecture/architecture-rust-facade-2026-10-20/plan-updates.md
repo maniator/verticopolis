@@ -50,7 +50,8 @@ Amendments:
   exception; review R2). Keep the one result shape and the engine-only log
   and events.
 - **AD-4:** the structural snapshot moves from Deferred into the rule, with
-  its layout version beside the frame's.
+  its layout version beside the frame's; labels and subtypes travel as unit
+  metadata under their own revision.
 - **AD-8:** add "the undo signature comes from an engine change counter".
 - **Deferred:** remove "the merge read model" (AD-9 removes it) and
   "structural snapshot shape" (now in AD-4).
@@ -83,10 +84,14 @@ Amendments:
 > **Acceptance**
 >
 > 1. A `SimPort` with a `TsSim` and a `RustSim` adapter; `app.sim` is the
->    port; no production code outside the fallback module reaches the
->    `Simulation` module at run time (import ratchet).
+>    port; no production module under `src/` reaches the `Simulation`
+>    module except the adapter that hosts the TypeScript engine (its arm and
+>    the fallback, loaded lazily) and tooling kept out of player builds,
+>    checked on the source import graph (a shrink-only ratchet) and on the
+>    player bundle.
 > 2. The view: a structural snapshot rebuilt on a revision change (floor and
->    lobby tiles as runs), a dynamic frame of the drawn people, cars and
+>    lobby tiles as runs), unit metadata (labels, subtypes) under its own
+>    revision, a test that no view field changes without its revision, a dynamic frame of the drawn people, cars and
 >    changed units only (engine dirty marks, no walk over all units per
 >    frame), the header with the unlocked kinds, exported layout widths and
 >    version checked on load.
@@ -179,12 +184,12 @@ mirror issue (plain title, a type label and a P label):
 
 | Story | GH | Type | Priority | Notes |
 | --- | --- | --- | --- | --- |
-| `facade-port` (slice 1) | new | task | P1 | Port, view interfaces, `TsSim`, import ratchet |
+| `facade-port` (slice 1) | new | task | P1 | Port, view interfaces, `TsSim`, import-graph ratchet over `src/` |
 | `facade-commands` (slice 2) | #954 | task | P1 | existing row, retitled |
 | `facade-renderer-view` (slice 3) | new | task | P1 | Rendering thread |
 | `facade-panels` (slices 4, 6b, 6c) | #868 | task | P1 | existing row, retitled |
 | `facade-lifecycle` (slice 5) | new | task | P1 | Runtime thread |
-| `facade-engine-view` (slice 6a) | #1049 retargeted | enhancement | P1 | changed units and the structural snapshot |
+| `facade-engine-view` (slice 6a) | #1049 retargeted | enhancement | P1 | changed units, the structural snapshot and unit metadata |
 | `facade-rustsim` (slices 7, 8) | new | task | P1 | behind `?engine=wasm-facade` |
 | `facade-mirror-removal` (slice 11) | new | task | P1 | after a release on slice 10 |
 | `engine-load-memory-peak` (slice 13) | new | enhancement | P1 | M6 |

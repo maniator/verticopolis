@@ -261,15 +261,25 @@ interface SimPort {
 ### 5.2 The view
 
 The view is data, never a simulation: no method on it can change money, the
-tower or a rule. It has four parts, each versioned.
+tower or a rule. It has five parts, each versioned.
 
 - **Header** (every frame): clock, money, star, population, weather, log
-  sequence, pending choice, the tower revision and meal-overlay revision,
-  and the unlocked kinds keyed on the star. Most of it is today's
+  sequence, pending choice, the tower, unit-metadata and meal-overlay
+  revisions, and the unlocked kinds keyed on the star. Most of it is today's
   `frameView` header.
 - **Structure** (rebuilt when `tower.revision` moves): units and transports
-  with their ids, kinds, geometry, subtype and labels, plus an id-to-slot
-  index built once per snapshot. Floor and lobby tiles, 40,083 of the large
+  with their ids, kinds and geometry, plus an id-to-slot index built once
+  per snapshot. A field belongs here only if every write to it moves the
+  revision.
+- **Unit metadata** (refreshed when its own revision moves): each unit's
+  label and subtype. Neither moves `tower.revision` today: the editor's
+  rename (`set_label`), a move-in's company, gym or clinic name, a vacate
+  and a fire all rewrite the label, and churn re-themes a subtype while
+  bumping only the meal-overlay revision. In the engine one setter owns each
+  of those writes, bumps a metadata revision carried in the header, and
+  records the unit's id; when the revision moves, the view fetches the
+  metadata of just the units changed since its last read, so the cost
+  scales with what changed. Floor and lobby tiles, 40,083 of the large
   tower's 43,358 units, can travel as runs per floor so the snapshot scales
   with rooms (HP-11). The renderer already rebuilds structure only on a
   revision change (`towerSyncSchedule.ts`).
@@ -462,12 +472,31 @@ What B adds:
 - **A port contract suite** run against `TsSim` and `RustSim` (and later
   `RustWorkerSim`): the same scripted game gives the same command results
   and the same view after every caught-up frame.
-- **A guard that the healthy path holds no `Simulation`**: an import-graph
-  check extending #1118's ratchet (no runtime import of the `Simulation`
-  module from `src/ui`, `src/game`, `src/render` outside the fallback
-  module), and a `chromium-wasm` e2e assertion, on the tooling build, that
-  no `Simulation` was constructed and `Simulation.deserialize` was never
-  called during normal play.
+- **A guard that the healthy path holds no `Simulation`**, in three
+  layers. A source check walks the static import graph from every
+  production entry (the page and the worker) across all of `src/`, the
+  folders #1118's ratchet skips (`src/storage`, `src/wasmhost`,
+  `src/dualrun`) included, and fails when `src/engine/Simulation.ts` is
+  reachable except through the adapter that hosts the TypeScript engine
+  (the `?engine=ts` arm and the post-fault fallback) or a tooling-only
+  module the `engineBundle` guard keeps out of player builds (the dual run,
+  the parity harness). It starts in slice 1 as a shrink-only ratchet naming
+  today's edges (among them `src/storage/SaveGame.ts`,
+  `src/game/saveLoad.ts`, `src/game/appHistory.ts`, the constants
+  `src/game/facilityDiagnostics.ts` takes from the module, and the hosts in
+  `src/wasmhost/`). By slice 10 only the exceptions remain, plus the mirror
+  hosts until they go (`?engine=wasm-mirror` at slice 11, the worker host's
+  merge path at slice 12), each loaded lazily. A check on the player bundle,
+  from slice 10, fails when an entry chunk or anything it imports
+  statically contains `src/engine/Simulation.ts`. A `chromium-wasm` e2e
+  assertion, on the tooling build, checks that normal play constructs,
+  executes and deserializes no `Simulation`.
+- **A view freshness test** (slice 6a): a seeded session rebuilds the whole
+  view from scratch after each step and compares it with the view kept
+  current by revisions, changed units and metadata. A field that changed
+  while the revision guarding it did not fails the test, and a source check
+  keeps writes to `label` and `subtype` inside their setters (the save
+  loader excepted).
 - **Per-command tests** that the result is the engine's (#954's list), and
   per-getter differential tests (section 5.4).
 - **A forced-trap test** that the fallback starts from a restore point plus

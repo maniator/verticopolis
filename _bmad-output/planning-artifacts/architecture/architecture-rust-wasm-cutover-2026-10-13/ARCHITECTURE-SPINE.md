@@ -139,7 +139,9 @@ host; nothing in `src/ui` calls the binding directly.
   and a layout version, consumers check both, and a layout change bumps the
   version. The structural snapshot (units and transports rebuilt when the
   tower's revision moves, floor and lobby tiles as runs) is part of the
-  read model, with its layout version beside the frame's. The engine's identity (crate version, build hash, protocol, frame
+  read model, with its layout version beside the frame's. A unit field that
+  can change without the revision (label, subtype) travels as unit metadata
+  under its own revision, written through one engine setter. The engine's identity (crate version, build hash, protocol, frame
   layout and save format versions, catalog and lock digests) is one
   versioned record built in Rust and read through the binding; a frontend
   shows it beside its own app version and hardcodes none of it (#963).
@@ -196,10 +198,12 @@ host; nothing in `src/ui` calls the binding directly.
   cached slices). The view holds no rule and decides nothing. Saves, undo,
   loads and imports use engine bytes. The TypeScript engine runs only after
   a fault, started from an engine-written restore point and its transient
-  sidecar, behind the same port. A guard fails the build when production
-  code outside the fallback module reaches the `Simulation` module at run
-  time, and runtime and e2e checks fail when normal play constructs,
-  executes or deserializes one. The parity projects and the dual run keep
+  sidecar, behind the same port. A source check over the static imports of
+  every production module under `src/`, and a check on the player bundle,
+  fail when anything reaches the `Simulation` module except the adapter
+  that hosts the TypeScript engine (its own arm and the fallback, loaded
+  lazily) or tooling kept out of player builds; runtime and e2e checks fail
+  when normal play constructs, executes or deserializes one. The parity projects and the dual run keep
   the mirror host as a test and tooling harness, kept out of player builds.
 - **Owner decision (2026-10-20):** adopted (F1 to F9, 21:40 UTC); the design
   and slice plan are
