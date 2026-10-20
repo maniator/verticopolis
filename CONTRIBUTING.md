@@ -539,9 +539,10 @@ alone.
   complexity note in the PR, and the review posts the page's section 6 record
   on the PR. A finding is fixed, or deferred with evidence and a tracked issue,
   and never dismissed because it existed before; it is dismissed only as a
-  false positive, when the written estimate fits the tier's budget (section
-  7). An added, ported or rewritten scan over its tier's budget, or a dropped
-  or removed cache, gets fixed unless the owner accepts the deferral.
+  false positive (section 7): code no entry point reaches, or work whose
+  written estimate fits the tier's budget. An added, ported or rewritten scan
+  over its tier's budget, or a dropped, removed or bypassed cache, gets fixed
+  unless the owner accepts the deferral.
 - **Deep, adversarial review before merge, never deferred to "later."** The change gets a full
   adversarial review while its context is still loaded (before pushing, or
   immediately after opening/updating the PR), not left to a hypothetical

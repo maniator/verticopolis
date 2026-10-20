@@ -1,6 +1,6 @@
 # Team override for gds-quick-dev, merged over the installer-owned
 # .claude/skills/gds-quick-dev/customize.toml (the .agents copy is identical).
-# Arrays append to the base list.
+# Arrays append to the base list; on_complete replaces the empty base.
 #
 # Quick-dev runs its own review in step-04-review.md (planned route) or
 # step-oneshot.md (one-shot route). On a hot-path change that loop does not
@@ -12,5 +12,7 @@
 [workflow]
 
 persistent_facts = [
-  "Hot-path review: when the change touches a surface in section 1 (When it applies) of docs/performance/hot-path-review.md, read that page before step-04-review.md (or step-oneshot.md on the one-shot route). In the Classify step of either file, a hot-path finding is never reject unless section 7 (Resolving a finding) calls it a false positive; otherwise it is patch or defer by section 7, and on the step-04-review.md route intent_gap and bad_spec still apply as usual. A finding section 7 calls always patch stays patch. If the author wants to defer it instead, treat it as intent_gap on step-04-review.md and HALT for the human on step-oneshot.md, until the repository owner accepts the deferral as section 7 describes. This loop does not replace the deep review: the change still goes through /gds-code-review or /bmad-code-review, whichever CLAUDE.md names, before merge.",
+  "Hot-path review: when the change touches a surface in section 1 (When it applies) of docs/performance/hot-path-review.md, read that page before step-04-review.md (or step-oneshot.md on the one-shot route). In the Classify step of either file, a hot-path finding is never reject unless section 7 (Resolving a finding) calls it a false positive; otherwise it is patch or defer by section 7, and intent_gap and bad_spec are only for findings that are not hot-path findings. A finding section 7 calls always patch stays patch. If the author wants to defer it instead, HALT for the human on either route without reverting any code, and keep it patch until the repository owner accepts the deferral as section 7 describes. This loop does not replace the deep review: before the change is done and before merge it still goes through the review skill CLAUDE.md names for it (/gds-code-review or /bmad-code-review, or both when CLAUDE.md asks for both).",
 ]
+
+on_complete = "If the change touched a surface in section 1 (When it applies) of docs/performance/hot-path-review.md, say before closing that it is not done until the review skill CLAUDE.md names (/gds-code-review or /bmad-code-review, or both) has run on it and its hot-path record is on the PR."

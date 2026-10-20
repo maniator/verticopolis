@@ -18,14 +18,24 @@ and the hosts.
 Apply the checklist to any change that adds, ports, rewrites, moves or removes
 production code reachable from an entry point in section 2, or makes such code
 call something new. These paths always count as hot-path surfaces; so does any
-other production file whose changed code an entry point calls. Tests
-(`*.test.ts`, `src/tests/`, `e2e/`, `engine-rs/tests/`, the
-`engine-rs/src/*_tests.rs` files and Rust `#[cfg(test)]` modules), fixtures,
-docs and tooling are not hot paths, even inside a path below.
+other production file whose changed code an entry point calls. These are not
+hot paths, even inside a path below:
+
+- tests: `*.test.ts`, `src/tests/`, `e2e/`, `engine-rs/tests/`, the
+  `*_tests.rs` files under `engine-rs/src/` and Rust `#[cfg(test)]` modules;
+- test fixtures and helpers: `*.fixture.ts` and `src/ui/testing/`;
+- the engine's command-line tools in `engine-rs/src/bin/` (conformance, dump,
+  fuzz and TDT), and docs;
+- code that runs once per session, such as module setup, WASM instantiation or
+  reading the engine identity, since no section 2 tier calls it. A load is a
+  command, so the load path counts.
+
+The engine build files in the table do count: they set the cost of every
+engine path at once (HP-11).
 
 | Surface | Paths |
 | --- | --- |
-| Rust engine and its build | `engine-rs/src/`, `engine-rs/Cargo.toml`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh` |
+| Rust engine and its build | `engine-rs/src/`, `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock`, `scripts/wasm-build.ts`, `scripts/build-engine-wasm.sh` |
 | TypeScript engine | `src/engine/` |
 | WASM binding | `engine-rs/src/wasm.rs`, `engine-rs/src/frame.rs`, `src/dualrun/` |
 | Hosts (main thread and worker) | `src/wasmhost/` |
@@ -38,12 +48,27 @@ A port or a rewrite changes every line it adds, so all of it is in scope,
 including algorithms copied unchanged. A diff that touches no hot-path surface
 records one line saying so (section 6).
 
-This page took effect when it merged (2026-10-20, 19:49 UTC). One PR keeps the
-review it already had: #1139 (the bare-step indexes for #1051), at the owner's
-request. Hot-path code pushed to #1139 after that time gets the checklist, and
-a cost #1139 ships that no open issue lists is added to #1158. Every other PR,
-including those opened before the page merged (#1068, #1092 and #1157 among
-them), gets the checklist on its next review, over its whole diff.
+This page took effect when it merged (2026-10-20, 19:49 UTC). For the pull
+requests open then, the owner set the scope on 2026-10-20 at 20:16 UTC (quoted
+on #1168):
+
+- #1139 (the bare-step indexes for #1051) keeps its independent review's GO at
+  3fa30a8c for the code that review covered. A docs-only results commit on it
+  does not restart the hot-path review; any other hot-path change pushed to it
+  gets the checklist.
+- #1092 gets the checklist on its Rust simulation, TypeScript simulation and
+  WASM host merge changes.
+- #1157 gets a focused assessment of its WASM binding, frame and identity
+  changes, which separates code that runs once per session from hot paths.
+- #1068 gets the checklist on its worker synchronization and Rust delta paths,
+  with no exemption, and keeps its performance-evidence hold.
+
+Each of these records the complexity note (section 5) and the section 6 table
+when its diff touches a surface above, in proportion to what it changed. A
+file being in scope is not a finding: a finding needs code that runs at a
+section 2 tier, and the review asks for no refactoring that a finding does not
+justify. Every other pull request, whenever it was opened, gets the checklist
+on its next review, over its whole diff.
 
 ## 2. Frequencies and sizes
 
@@ -126,9 +151,11 @@ may cost depends on the tier:
 
 - Per frame and per chunk: no walk over any collection that grows with the
   tower (units, tiles, rooms, population, the route graph). Per-frame work
-  scales with what is drawn (HP-12).
+  scales with what is drawn (HP-12). A step runs up to 8 chunks, so a
+  per-chunk pass also counts once per chunk toward its step.
 - Per step: no walk over units, tiles, population or the route graph. One pass
-  over rooms, with constant work per room, is allowed when the record says why
+  over rooms (about 2,900 visits on the large tower), with constant work per
+  room, is allowed when the record says why
   no index, counter or per-revision cache can answer it (for example, a check
   that reads each room's live state). Repeated passes in the same step, and
   per-room work that walks other tiles or runs a route search, are findings.
@@ -136,11 +163,16 @@ may cost depends on the tier:
   constant work per item, is fine. A pass per item of another collection is a
   finding, and so is per-item work that probes other tiles or runs a route
   search, unless the section 4 estimate puts the whole pass under about 50,000
-  visits on the large tower (the per-step allowance of about 1,000 visits comes
-  to 60,000 over an hour of one-minute steps).
+  visits on the large tower, about what the one linear pass over its 43,358
+  units that this tier allows already costs.
 - Wall clock: the HUD and panel refresh follows HP-12 (it scales with what is
   on screen), audio follows the per-step budget, and autosave may make one
   linear pass.
+
+A pass over a small collection (the 110 floors, the 24 shafts and their cars,
+the 64 stair and escalator links, the drawn crowd) is fine at any tier while
+one occurrence of the tier stays under about 1,000 item visits on the large
+tower, the work per item included.
 
 Two more patterns count at every tier:
 
@@ -200,11 +232,22 @@ section 7 makes always `patch`; a reason in the PR body or a comment in the
 port (for example that the TypeScript cache "is pure" or the value is
 "computed fresh") does not close it. The same holds outside a port: a change
 that removes or bypasses a cache, index or counter either engine has (a
-refactor that undoes one of #1139's caches, say) is an HP-8 finding. The
-TypeScript caches, indexes and counters on the hot paths today, with their
-Rust status at c12bc1b. #1139 changes the `roomUnits` and `noiseMemo` rows;
-when it merges, a docs-only PR updates those two rows and the commit in this
-paragraph, and #1158 carries that task until it is done:
+refactor that undoes one of #1139's caches, say) is an HP-8 finding.
+Bypassing means computing what the cache holds without reading it, such as a
+new scan where the cache already answers the query. Removing one is not a
+finding when the change replaces it with a structure the record names that
+answers the same query at the same cost or less, or deletes every caller that
+read it (as retiring the TypeScript engine will).
+
+The table lists the caches, indexes and counters on the hot paths today: the
+TypeScript ones, and the Rust-only ones with "none" in the TypeScript column,
+with their Rust status at c12bc1b. Each PR that adds, ports or removes one
+updates its row, and its HP-8 review checks that. Between those PRs the table
+belongs to the owner of the #1158 audit (its assignee). #1139 changes the
+`roomUnits` and `noiseMemo` rows: when it merges, the #1158 owner opens a
+docs-only PR that updates those two rows and the commit above, and marks
+#1158's items for #1139 (A5 to A7) as landed. #1158 and its backlog row carry
+that task until it is done.
 
 | What it keeps | TypeScript | Keyed on | Rust at c12bc1b |
 | --- | --- | --- | --- |
@@ -229,10 +272,6 @@ paragraph, and #1158 carries that task until it is done:
 | demand map (inspector reads) | `demandMemo`, `src/engine/sim/demand.ts` | revision and game hour | none (no inspector in Rust) |
 | reachability within one demand or income pass | `reachCache`, `src/engine/sim/demand.ts`, `src/engine/EconomySystem.ts` | one call | ported |
 | reachability during one move-in pass | `reachMemo`, `src/engine/sim/churn.ts` | one pass | ported |
-
-A PR that adds, ports or removes a cache, index or counter in either engine
-updates its row here; a Rust-only cache gets a row with "none" in the
-TypeScript column.
 
 **HP-9 Name the remedy.** For each finding under HP-2 to HP-6, say which of
 these fixes it, in this order of preference:
@@ -297,8 +336,10 @@ Rank findings by measured cost, using Big-O as a guide. Walking
 2,900 rooms once an hour is cheap. The same walk for each drawn person in every
 chunk is not.
 
-- Estimate first: tier frequency times multipliers times collection size, with
-  the sizes in section 2 on the large tower. Write the estimate in the record.
+- Estimate first: the visits in one occurrence of the tier (one step, frame,
+  hourly pass or command), as multipliers times collection sizes with the work
+  per item, using the sizes in section 2 on the large tower; then say how
+  often the tier runs. Write the estimate in the record.
 - Measure when the estimate matters. A native profile of the bare step on a
   reference save, or `npm run perf:compare`, gives relative shares. Numbers
   from a cloud machine are estimates and say so.
@@ -353,21 +394,35 @@ item, and Copilot and Codex are asked to:
 - "n/a" gives a reason tied to the diff.
 - When the diff touches no hot-path surface (section 1), one line saying so
   replaces the table.
-- When the change has a PR, the record goes on it as a comment, posted again
-  (or edited in place) after each review round, with the resolution column
-  filled in once the fixes are in. The review skills post it from step 4; the
-  independent reviewer includes it in the verdict.
-- A port or rewrite that changes more than about 1,000 lines of hot-path code
+- When the change has a PR, the record goes on it as a comment, and each
+  record names the commit it reviewed and the part of the diff it covers.
+  Whoever runs the review skill posts its record at step 4 of every round,
+  then edits that comment to fill in the "Findings and resolution" column once
+  the round's fixes are in. The independent reviewer puts its own table in
+  each verdict, for the commit it reviewed. A review run before the PR exists
+  saves its record under `_bmad-output/implementation-artifacts/` and posts it
+  when the PR opens. A "no hot-path surface" line counts only when it covers
+  the whole diff of the PR.
+- A port, rewrite or addition of more than about 1,000 lines of hot-path code
   adds an appendix to the record with one line per changed function: the
   function, its hottest caller, the tier and the multiplier. The review skills
   split such a diff by module, or into chunks of about 1,000 lines, and run one
-  Hot-Path Auditor per chunk; the review is not complete, and gives no GO,
-  until every chunk has its table.
+  Hot-Path Auditor per chunk, each given its chunk and the whole diff for
+  context, and each returning its table and its appendix lines; the record
+  merges them. The review is not complete, and gives no GO or CONDITIONAL GO,
+  until every chunk has its table and every changed function its appendix
+  line.
 - A review without the record is incomplete, and an independent reviewer
   cannot give a GO or a CONDITIONAL GO on it. When a Copilot or Codex review of a hot-path diff
   leaves the table out, its findings still count, but its sign-off covers the
   hot-path part only once a record from the review skill or the independent
   reviewer is on the PR.
+- A hot-path PR is signed off only when the record for its final commit is on
+  the PR and its independent review is complete: the reviewer (Copilot, or the
+  independent reviewer standing in for it) has posted its verdict on that
+  commit. A merge of `main` that leaves the PR's own diff unchanged keeps the
+  verdict. A review that is still running is not complete, and auto-merge
+  stays off until both hold (`CLAUDE.md`).
 
 ## 7. Resolving a finding
 
@@ -377,7 +432,9 @@ Every hot-path finding ends in one of two states before merge:
 2. **Deferred**, with the estimate or profile (section 4), one sentence on why
    it is not fixed now, and a tracking issue with a backlog row (the backlog
    mirror rule in `CLAUDE.md`). Pre-existing findings from one review may
-   share one issue and row. A pre-existing finding in code the PR does not
+   share one issue and row, or join an open issue that already has a row
+   (such as the #1158 audit) as new items in its body, with the row's notes
+   updated. A pre-existing finding in code the PR does not
    change or only moves, which an open issue with a backlog row already lists (for example
    an item in #1158, #1143 or #859), is deferred by reference: cite the issue
    and item, with no new issue or row, since that row already records it.
@@ -386,12 +443,13 @@ A finding is never dismissed for being pre-existing, for matching the
 TypeScript, or for sitting outside the diff. In BMAD/BMGD triage a hot-path
 finding is `patch` or `defer`. It is `dismiss` only when it is a false positive:
 the code is not reachable from an entry point, or the written section 4
-estimate shows the work fits the HP-2 budget for its tier (for example the one
-per-step pass over rooms whose reason is in the record, or one pass per hour
-with constant work per item) or stays under the HP-2 visit counts on the large
-tower: about 1,000 item visits per step or per frame, and about 50,000 per
-hourly, daily or per-command pass, counted per occurrence with the work per
-item included. "The collection is bounded" is not enough on its own, since every
+estimate shows the work is a pass HP-2 allows at its tier: for example the one
+per-step pass over rooms whose reason is in the record, a pass over a small
+collection under about 1,000 item visits per occurrence, or an hourly, daily
+or per-command pass under about 50,000 visits, counted per occurrence on the
+large tower with the work per item included. A pass HP-2 rules out at its tier
+(a per-step route search, a per-frame walk over rooms) is a finding whatever
+its count. "The collection is bounded" is not enough on its own, since every
 collection here is.
 
 Two kinds are always `patch`, even when an open issue already lists them:
@@ -401,18 +459,25 @@ Two kinds are always `patch`, even when an open issue already lists them:
 - a change that drops, removes or bypasses a cache, index or counter either
   engine has, in a port or not (HP-8).
 
-Code the PR only moves, with no change to the moved lines (for example a split
-of an oversized file under the file-size ratchet), is reviewed as new (HP-7),
-and its findings count as pre-existing: deferred by reference when an open
-issue lists them, otherwise with a new issue and row.
+A move changes only where code lives (for example a split of an oversized file
+under the file-size ratchet): the moved lines stay identical apart from
+visibility (`pub`, `export`), `use` and `import` lines and module paths. Moved
+code is reviewed as new (HP-7), and its findings count as pre-existing:
+deferred by reference when an open issue lists them, otherwise with a new
+issue and row. Any other change to a moved function makes it a rewrite.
 
 Deferring an always-`patch` finding needs the explicit acceptance of the
-repository owner (maniator), on top of the evidence and issue above. It is
-recorded on the PR as their comment or review; when they gave it elsewhere,
-the PR quotes it with its date and where it was given, and the independent
-reviewer confirms it. In triage it is `decision_needed` until the owner
-answers, in spec mode and no-spec mode alike. A session user who is not the
-owner cannot settle it.
+repository owner (maniator), on top of the evidence and issue above. The PR
+records it in the owner's own words: a review they submit, or a quote of their
+message with its date and where they gave it. Agents here post with the
+owner's account, so a comment showing the owner as its author does not prove
+the acceptance on its own; the independent reviewer checks it against its
+source before a GO. In triage the finding is `decision_needed` until the owner
+answers, in spec mode and no-spec mode alike, and no later choice in the run
+(resolving a decision, walking through or skipping patches) dismisses, defers
+or drops it without that acceptance. A session user who is not the owner
+cannot settle it. While it waits, the run handles the other findings and
+reports this one as pending.
 
 ## 8. Worked example: what the Rust port shipped
 
@@ -433,21 +498,23 @@ owner cannot settle it.
   `_bmad/custom/bmad-code-review.toml`. When the diff touches a hot-path
   surface they run a fourth layer, the Hot-Path Auditor, beside Blind Hunter,
   Edge Case Hunter and Acceptance Auditor. It gets the diff and read access to
-  the repository, because HP-1 cannot be done from the diff alone. Triage
-  follows section 7. `src/tests/hotPathReview.guard.test.ts` keeps this
-  page's headings, its section 1 paths and the clauses of sections 6 and 7 the
-  overrides rely on, the overrides themselves (the gds and bmad copies
-  identical) and the step anchors they name in step. For the summaries it
-  checks only that each one links here (inside `AGENTS.md`'s Review guidelines
-  and the template's Complexity section too); it does not check their
-  wording.
+  the repository at the diff's head commit, because HP-1 cannot be done from
+  the diff alone. Triage follows section 7.
+  `src/tests/hotPathReview.guard.test.ts` keeps in step this page's headings,
+  its section 1 surfaces and paths, the clauses of HP-2, HP-8 and sections 6
+  and 7 the overrides rely on, the auditor prompt, the overrides themselves
+  (each fact once, with its load-bearing phrases, and the gds and bmad copies
+  identical) and the step anchors they name. For the summaries it checks only
+  that each one links here (inside `AGENTS.md`'s Review guidelines and the
+  template's Complexity section too); it does not check their wording.
 - **The quick-dev skills** run their own review loop, which does not replace
   this one: hot-path work still goes through the review skill `CLAUDE.md`
   names for it (`/gds-code-review` or `/bmad-code-review`). The overrides
   `_bmad/custom/gds-quick-dev.toml` and `_bmad/custom/bmad-quick-dev.toml` say
-  so inside a quick-dev run, in both its planned and its one-shot route, and
+  so inside a quick-dev run, in both its planned and its one-shot route. They
   keep its classify steps from rejecting a hot-path finding that is not a
-  false positive.
+  false positive, and make it stop for the owner, without reverting code, when
+  the author wants to defer an always-`patch` finding.
 - **Copilot and Codex** apply the same items inline (the Performance dimension
   of `.github/copilot-instructions.md`, and the `## Review guidelines` section
   of `AGENTS.md`, which Codex reads) and are asked to print the section 6
@@ -455,14 +522,16 @@ owner cannot settle it.
 - **An independent reviewer** (a separate agent or person giving GO,
   CONDITIONAL GO or NO-GO) applies the checklist to the final commit and
   includes the table in the verdict. GO and CONDITIONAL GO need every row
-  filled; GO also needs every finding fixed or deferred under section 7.
+  filled, and the appendix on a large port, rewrite or addition; GO also needs
+  every finding fixed or deferred under section 7.
 - **`.github/skills/engine-parity-review/SKILL.md`** item 11 points here for
   changes on the engine seam.
 
 The Hot-Path Auditor's prompt:
 
 > You are the Hot-Path Auditor. You have the diff and read access to the
-> repository. Apply `docs/performance/hot-path-review.md`, items HP-1 to HP-12,
+> repository; read it at the diff's head commit (`git show <commit>:<path>`
+> when the checkout is elsewhere). Apply `docs/performance/hot-path-review.md`, items HP-1 to HP-12,
 > to this change. For each changed, added or ported function, trace its callers
 > across every hot-path surface in section 1 (both engines, the hosts, the
 > frame loop, rendering and UI) up to an entry point in section 2, and record
@@ -476,4 +545,6 @@ The Hot-Path Auditor's prompt:
 > remedy, any risk to results or cache invalidation (HP-10), and whether an
 > open issue already lists it. Report pre-existing code too, marked
 > pre-existing. Output the section 6 table with a row for every item, then the
-> findings as a Markdown list.
+> findings as a Markdown list. When you are given one chunk of a larger port,
+> rewrite or addition, review that chunk with the rest of the diff as context,
+> and add the section 6 appendix lines for its changed functions.
