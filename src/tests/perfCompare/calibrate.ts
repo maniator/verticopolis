@@ -188,7 +188,7 @@ function shapeProblem(r: Pass): string | null {
 }
 
 /** Why the working-tree record cannot vouch for a clean tree, or null. */
-function treeProblem(r: Pass): string | null {
+export function treeProblem(r: Pick<Pass, "environment">): string | null {
   if (r.environment.dirty !== false) return "it ran on a dirty tree, or does not say it was clean";
   const t = r.environment.tree;
   if (!t) return "it has no working-tree record, so a clean tree is not proven";

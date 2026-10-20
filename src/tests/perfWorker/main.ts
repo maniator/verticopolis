@@ -119,7 +119,7 @@ export function limitations(config: WorkerConfig, renderers: readonly string[] =
   const firstText = firsts.every((n) => n === firsts[0]) ? `each mode first ${firsts[0]} time(s)` : `modes first between ${Math.min(...firsts)} and ${Math.max(...firsts)} times`;
   return [
   "One machine and one headless browser (its name and version are in the Browser row). The renderer line says whether the page used the GPU; a software rasterizer fails validation in a protocol run, because render cost then dominates every frame and the FPS rows say more about the CPU than about GPU-backed frame rates.",
-  "CPU throttling is DevTools emulation of the renderer process. The engine worker runs in the same renderer process, so the 4x rows slow it too; whether emulation throttles a worker thread exactly as it throttles the main thread was not measured.",
+  "CPU throttling is DevTools emulation of the page's main thread. Chromium refuses it on worker targets and a page-level throttle leaves a dedicated worker nearly unthrottled (probed on Chromium 141: a busy loop took 41 ms at 1x and 44 to 58 ms with the page at 4x, 7 to 41% slower against about 4x on the main thread). So at a throttle above 1x the worker host's main thread ran throttled and its engine thread did not; its rows are marked † and carry an `unthrottled` column in the CSVs. A comparison of the worker host with a main-thread host at that throttle favors the worker. Two runs of the same mode are comparable with each other.",
   `Hosted rows run ${config.steps} steps of ${config.dt} minutes in batches of ${config.batch} (the frame loop's cap is 4) with no rendering. Wall time includes the worker host's wait for each reply; main-thread time counts the steps, the flushes and the time applying replies, and leaves the worker's own time out (reported apart). The browser's unpacking of each reply (the structured clone of its strings, the full save's included) runs on the main thread before the host sees the reply and is not in the hosted main-thread rows; the frames rows (frame times, long tasks) include it.`,
   "The worker host keeps one batch in flight. A frame that finds a batch still out takes no steps (the frame loop banks its minutes under the 30-minute cap), so on a tower the engine cannot step in real time the worker host simulates fewer minutes per second rather than queueing work; the sim-minutes-per-second row shows it.",
   "Command latency times a tower rename (relayed by every host, read by nothing in the simulation) from the call to the clock inside the first frame callback that runs once the engine's answer is in the read model. The main-thread hosts answer in the call, so their figure is the wait for the next frame callback. One command is in flight at a time, one per second. A negative sample fails validation.",
@@ -195,17 +195,17 @@ export interface WorkerResults {
 }
 
 export function metricsCsv(metrics: readonly Metric[]): string {
-  const rows = ["group,scenario,throttle,metric,unit,mode,n,median,ci_low,ci_high,mean,cv,values"];
+  const rows = ["group,scenario,throttle,metric,unit,mode,n,median,ci_low,ci_high,mean,cv,unthrottled,values"];
   for (const m of metrics) {
     const s = m.summary;
-    rows.push([m.group, m.scenario, m.throttle, m.metric, m.unit, m.mode, s?.n ?? 0, s?.median ?? "", s?.medianCiLow ?? "", s?.medianCiHigh ?? "", s?.mean ?? "", s?.cv ?? "", m.values.join(" ")].map(csvField).join(","));
+    rows.push([m.group, m.scenario, m.throttle, m.metric, m.unit, m.mode, s?.n ?? 0, s?.median ?? "", s?.medianCiLow ?? "", s?.medianCiHigh ?? "", s?.mean ?? "", s?.cv ?? "", m.unthrottled ?? "", m.values.join(" ")].map(csvField).join(","));
   }
   return rows.join("\n") + "\n";
 }
 
 export function ratiosCsv(rs: readonly Ratio[]): string {
-  const rows = ["group,scenario,throttle,metric,mode,against,ratio,ci_low,ci_high,pairs,zero_reference,verdict"];
-  for (const r of rs) rows.push([r.group, r.scenario, r.throttle, r.metric, r.mode, r.against, r.ratio, r.ciLow ?? "", r.ciHigh ?? "", r.n, r.zeroReference, r.verdict].map(csvField).join(","));
+  const rows = ["group,scenario,throttle,metric,mode,against,ratio,ci_low,ci_high,pairs,zero_reference,verdict,unthrottled"];
+  for (const r of rs) rows.push([r.group, r.scenario, r.throttle, r.metric, r.mode, r.against, r.ratio, r.ciLow ?? "", r.ciHigh ?? "", r.n, r.zeroReference, r.verdict, r.unthrottled ?? ""].map(csvField).join(","));
   return rows.join("\n") + "\n";
 }
 

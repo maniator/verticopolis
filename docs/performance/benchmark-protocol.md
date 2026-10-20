@@ -531,6 +531,170 @@ One limit stays open, so the calibration is not complete:
   uncalibrated until that lands. RUN-1 needs M4, so #1111 and its A/A passes
   land before RUN-1, either inside RUN-0b or as a follow-on campaign.
 
+### 6.2 BEFORE/AFTER comparison of a candidate PR
+
+A candidate (for example #1068) is measured against `main` in two full
+`perf:worker` runs on the PC, BEFORE on `main` and AFTER on the candidate,
+with the same machine, browser, GPU check and flags. Both runs use a
+confirmed hardware renderer (the fail-closed check of section 1: no
+`--quick`, no renderer exception), `--scenarios medium,large`, the default
+throttles (1x and 4x) and `--reps 10`, which is the protocol's minimum for a
+verdict. Build each commit with the engine package first and run from a clean
+tree (section 3).
+
+```powershell
+# On main, then on the candidate commit; same shell, same environment.
+npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --scenarios medium,large --out docs/performance/results/<date>-<sha>-before-worker-1280x720
+npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --scenarios medium,large --out docs/performance/results/<date>-<sha>-after-worker-1280x720
+
+# A light attribution pass on main only (the cost split and the WASM churn rows).
+npm.cmd run perf:compare -- --reps 3 --scenarios medium,large --throttles 1 --skip-build --out docs/performance/results/<date>-<sha>-attribution-main
+
+# The comparison. Folder order matters: BEFORE first, then AFTER.
+npm.cmd run perf:before-after -- docs/performance/results/<before folder> docs/performance/results/<after folder> --out docs/performance/results/<date>-<sha>-before-after
+```
+
+Both commits need the harness of #1124 and #1125 (the working-tree record and
+the renderer checks): `perf:before-after` refuses a run that records no
+`gpuVerified: true` or no clean tree record, so a build from before them
+produces folders the comparison cannot use. For a candidate such as #1068,
+build BEFORE and AFTER from `main` after those two PRs and put the candidate on
+top of that. The results record no harness hash, so check by hand that the two
+commits measure with the same code: `git diff <BEFORE commit> <AFTER commit> --
+src/tests/perfWorker src/tests/perfCompare scripts/perf-worker.ts` must be empty
+apart from tests (`*.test.ts`) and the comparison tool itself
+(`beforeAfter*.ts`). That covers every file that measures, including
+`perfCompare/stats.ts` (the 1% low and frame percentiles), `perfCompare/page.ts`
+(the long-task probe behind blocking time) and `perfWorker/build.ts`, along with
+the runner files. A candidate that edits them is measured with the BEFORE
+harness copied onto it, or not at all (backlog row #1141 would record the hash
+and make the tool check this). One exception, ruled for the #1068 pair on
+2026-10-20: a measured commit may add counters or fields to the measuring files
+when the diff between the two harness states is additions only, the independent
+reviewer confirms that at both commits, the additions stay outside the timed
+regions (a new non-test file that only a comparison or reporting tool reads,
+such as #1068's `crossRun.ts`, is covered when nothing the measuring code runs
+imports it), rows that only the candidate's run has are never cited as ratios (the
+comparison does not pair them), the readout names every addition, and a
+same-commit pair is run first to show the additions leave the numbers alone.
+
+The controls assume the candidate leaves the code they run alone. The readout
+lists every file the candidate changes that a control mode runs, and says why
+that does not move the control. For #1068 this includes the move of the
+TypeScript load path out of `src/engine/sim/serialization.ts`, which the `ts`
+mode runs for its startup rows.
+
+`perf:before-after` pairs repetition i of BEFORE with repetition i of AFTER
+for every metric and mode, and writes `comparison.json`, `comparison.csv` and
+`comparison.md`. The argument order sets the roles (BEFORE first), whichever run
+happened first; the two runs must not overlap in time. It reads each ratio so
+that above 1.0 is worse: AFTER over BEFORE for times and memory,
+BEFORE over AFTER for rates and frame rates. The interval is the
+distribution-free order-statistic one from `perfCompare/stats.ts` (at least
+95%; 97.9% at 10 pairs). Counts, main-thread blocking and any metric with a
+zero denominator in a pair have no ratio: the row is read on the per-repetition
+difference with its interval, signed so that positive is worse in either
+direction, as section 5 already gates M4. A blocking row that goes from 0 to
+400 ms in every repetition reads 400 ms [400, 400] and is never reported as too few pairs.
+
+The two runs happen hours apart, so the machine can drift between them. The
+default controls are `ts`, `wasm` and `wasm-frame` for two runs of one build
+(an A/A pair) and `ts` alone when the commit or the engine build differs, because a
+candidate that changes the WASM engine or its host moves the WASM modes too;
+`--controls` replaces the list and a subject that is also a control is a usage
+error. A control is judged on its median: a ratio above 1.05 or below 1/1.05
+by default voids the subject rows of that metric, in either direction, even
+when the control has too few pairs for an interval. Main-thread blocking is
+judged on its median difference against a fixed 50 ms, the cap section 5 puts
+on ε for M4, until the owner adopts a calibrated value; counts and metrics
+with a zero denominator are judged on the difference against the tolerance
+share of the control's own size, so any change from zero voids. The tolerance
+is 5%, the cap on δ in section 6.1, until the owner adopts the calibrated value
+(`--tolerance`, above 0 and at most 0.5; a value above 5% prints a banner in
+the report), so an effect smaller than it cannot be told from allowed drift.
+
+A control on a metric that a cap or a floor can pin (the frame-loop rates and
+times, main-thread blocking and counts) whose values all lie within a third of
+the tolerance of each other across both runs (for blocking, within a tenth of
+the 50 ms) is flat: a rate pinned at its cap, a time at a floor, blocking that
+stays at zero. Heap sizes, byte counts and the hosted and bare CPU times are
+never flat, however precise, because a baseline that moved would show there. It could not
+have shown drift, so it does not vouch, the report lists it as `CONTROL FLAT`,
+and a subject row that only flat controls cover is uncontrolled with a note
+saying so. A control whose median held but whose interval reaches past the
+tolerance is called noisy. It still vouches, but a subject row that only noisy
+controls cover has its own status (`noisy-controlled`) and its own count.
+
+Two figures sit beside each ratio row, and they assume different things. The
+raw ratio assumes the machine drifted no more than the control's median shows.
+The net-of-control ratio, the subject's per-repetition ratio over the middle of
+the vouching controls' per-repetition ratios with its own interval, assumes the
+drift is common to the subject and the control and carries the control's
+scatter. The net is wider than the raw interval when the control's scatter is
+independent of the subject's and narrower when they share it, so neither is
+the better figure by rule. Only a ratio row with a vouching control that has a
+per-repetition ratio has a net; a row without one says why in its notes. A
+metric no control measures is marked uncontrolled. Void comes before too few
+pairs. The status `ok` in the files only means no control moved: it is not a
+verdict. A row needs at least 10 pairs (`--min-pairs`, never below 6); the
+report states the number used and each row's pair count.
+
+At 4x the `wasm-worker` rows are daggered. They read "controlled (main thread
+only)" because the throttled controls vouch for the main thread, and the
+worker's engine thread was barely throttled (the probe: a busy loop took 41 ms
+at 1x and 44 to 58 ms with the page at 4x, 7 to 41% slower, against about 4x on
+the main thread). Compare such a row only with another run of the same mode.
+
+Metrics one run lacks, or has values for on one side only, or whose unit or
+direction differs, are listed under "Metrics not compared". Rows that no run
+has data for (PSS off Linux, the bare-engine rows of hosts that do not measure
+them) are left out and counted. The report lists the modes that are neither
+control nor subject.
+
+The command exits 1 when the two runs cannot be compared at all, and writes
+the reasons into `comparison.md`: either run failed validation (including
+listed errors), was `--quick` or does not say it was not, ran on a dirty tree,
+declared a renderer exception or did not record `gpuVerified: true`; any of its
+three renderer reads (at the start, after the frames and after the cold
+start) is not verified hardware; the runs differ in scenarios, run parameters,
+machine, runtime, browser or renderer; a metric's repetitions repeat, fall
+outside the run or do not match its values, or a metric is listed twice; the
+two results have the same content; the runs overlap or have no readable times; or
+no subject metric is in both runs. A different engine build or commit is the
+point of the comparison and is not refused. It exits 2 for a usage error
+(including a subject that is also a control), an unreadable or malformed
+folder, or an `--out` folder that already exists, and writes nothing then. It
+exits 0 whenever the runs could be compared: void, uncontrolled and regressed
+rows are in the files and the exit code says nothing about them. Folder
+arguments and `--out` resolve against the repository root. The `results.json`
+SHA-256 in the report is over the canonical form (`stable()` in
+`perfCompare/calibrate.ts`), so it is not the `sha256sum` of the file.
+
+For the evaluation of #1068, `perf:before-after` is the one governed
+comparison: its output is where a readout takes the before and after figures
+for throughput, 1% low FPS, main-thread blocking and memory from. The
+TypeScript-baseline figures (each run's own `wasm-worker` over `ts` ratios) come
+from that run's `perf:worker` report, so nobody computes them by hand. #1068's own `perf:worker-diff`
+(`crossRun.ts`) is not cited in a readout. Memory is read once per scenario at
+1x only, so there is no 4x memory row.
+
+What it does not do, so a reader does not assume it:
+
+- **No check of the delta oracle, save fidelity, event order or crash
+  recovery.** The comparison adds nothing to the validation of the two runs
+  and those properties belong to tests. The readout cites the candidate's
+  tests by name and CI run: on `main` today `src/tests/integration/wasmWorkerHost.integration.test.ts`,
+  `wasmWorkerLifecycle.integration.test.ts`, `wasmWorkerSaves.integration.test.ts`
+  and `e2e/wasmWorker.spec.ts`, plus any delta-oracle and read-model tests the
+  candidate adds (for #1068, `wasmWorkerDelta.integration.test.ts`).
+- **No real 4x worker throttle.** CDP CPU throttling does not reach a Web
+  Worker (measured on Chromium 141), so the `wasm-worker` rows at 4x have a
+  barely throttled engine thread. Those rows carry a dagger in both reports and
+  the CSV `unthrottled` column says `worker`.
+- **No separate hour-pass spike row.** The hourly main-thread spike is read
+  from the per-batch maximum and the frame-time p99 rows.
+- **No GPU driver version check.** The runs do not record it.
+
 ## 7. Scheduled runs
 
 | Run | Commit | Purpose |
