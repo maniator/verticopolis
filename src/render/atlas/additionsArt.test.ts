@@ -71,8 +71,11 @@ describe("the recycling center's fill breaks", () => {
     // 14 bags and 65 gauge rows, the second row past 0.5, amber past 0.7,
     // FULL at 1. No bag and row ever arrive together: bag k comes at
     // (k - 0.5) / 14 and row j at (j - 0.5) / 65, and 65(2k - 1) is odd
-    // while 14(2j - 1) is even. The 33rd row arrives at exactly 0.5.
-    // The oddness argument above holds only for this pair, so pin the pair.
+    // while 14(2j - 1) is even. The oddness argument holds only for this pair,
+    // so pin the pair. The two threshold looks stay separate breaks for a float
+    // reason: the 33rd row arrives at exactly 0.5 and the 46th at exactly 0.7
+    // (0.7 * 65 is 45.5 in floats), while the stacked row and amber use strict
+    // comparisons and so first show at the next float up from each.
     expect([RECYCLING_PILE_SLOTS, RECYCLING_GAUGE_ROWS]).toEqual([14, 65]);
     expect(RECYCLE_BREAKS).toHaveLength(RECYCLING_PILE_SLOTS + RECYCLING_GAUGE_ROWS + 3);
     for (let i = 0; i < RECYCLE_BREAKS.length; i++) {
