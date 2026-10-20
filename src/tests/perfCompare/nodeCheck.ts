@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { posix, resolve, win32 } from "node:path";
+import { pathToFileURL } from "node:url";
 import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../engine/serializedGame";
 import { crowdView, stateView } from "../../engine/conformanceView";
@@ -31,10 +32,16 @@ export interface NodeCheck {
   nodeWasmMs: number;
 }
 
+/** The glue's `file:` URL. A dynamic `import()` takes a URL, and Node reads the
+ *  `C:` of a raw Windows path as a URL scheme (ERR_UNSUPPORTED_ESM_URL_SCHEME). */
+export function glueFileUrl(dir: string, windows: boolean = process.platform === "win32"): string {
+  return pathToFileURL((windows ? win32 : posix).resolve(dir, "verticopolis_engine.js"), { windows }).href;
+}
+
 /** Load the browser package's glue in Node from a directory holding
  *  `verticopolis_engine.js` and `verticopolis_engine_bg.wasm`. */
 export async function loadWebPackage(dir: string): Promise<WasmModule> {
-  const glue = (await import(resolve(dir, "verticopolis_engine.js"))) as { initSync(arg: { module: BufferSource }): unknown };
+  const glue = (await import(/* @vite-ignore */ glueFileUrl(dir))) as { initSync(arg: { module: BufferSource }): unknown };
   glue.initSync({ module: readFileSync(resolve(dir, "verticopolis_engine_bg.wasm")) });
   return checkBinding(glue);
 }
