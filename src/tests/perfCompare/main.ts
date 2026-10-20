@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { engineSourceHash } from "../../wasmhost/packageHash";
@@ -13,6 +12,7 @@ import { startServer } from "./server";
 import type { CompareConfig, CompareResults, ProcessRun } from "./types";
 import type { Environment as Env } from "./env";
 import { validateResults } from "./validate";
+import { buildProduction, buildTooling } from "../perfWorker/build";
 
 /**
  * `npm run perf:compare` (issue #972): build the production app and a
@@ -110,10 +110,6 @@ const STATIC_LIMITATIONS = [
  *  version before 3.0.0 (the header follows the same rule). */
 export const PRE_THREE_LIMITATION = "This is a pre-3.0 baseline of an engine still being cut over (#945), not release performance.";
 
-function sh(cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env): void {
-  execFileSync(cmd, args, { cwd, stdio: "inherit", env });
-}
-
 export async function main(argv: readonly string[], repo: string): Promise<number> {
   const args = parseArgs(argv);
   const startedAt = new Date().toISOString();
@@ -129,9 +125,9 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const tree = buildTree(repo);
   if (!args.skipBuild) {
     log("perf:compare: production build (npm run build)");
-    sh("npm", ["run", "build"], repo);
+    buildProduction(repo);
     log("perf:compare: tooling build of the same sources (VC_TOOLING=1) into dist-perf/");
-    sh("npx", ["vite", "build", "--outDir", distPerf, "--emptyOutDir"], repo, { ...process.env, VC_TOOLING: "1" });
+    buildTooling(repo, distPerf);
     for (const p of stampPaths) writeFileSync(p, JSON.stringify(tree) + "\n");
   }
   for (const d of [dist, distPerf]) if (!existsSync(join(d, "index.html"))) throw new Error(`no build at ${d}; run without --skip-build`);
