@@ -1,9 +1,10 @@
 import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
 import { processTreePss } from "./env";
-import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, wasmColdLoad, wasmMemoryBytes, type PageInfo } from "./page";
+import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, wasmColdLoad, wasmMemoryBytes, webglRenderer, type PageInfo } from "./page";
 import { audioStatus, measureFrames, startAudio, type FrameRun } from "./pageFrames";
 import { simRun, type SimRun } from "./pageSim";
 import type { PerfServer, ServedRequest } from "./server";
+import { launchOptions, type BrowserLaunch } from "./renderer";
 import type { Scenario } from "./scenarios";
 import { frameStats, quantile } from "./stats";
 import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun, StartupSample, StepSummary } from "./types";
@@ -30,6 +31,7 @@ export interface RunnerOptions {
   config: CompareConfig;
   scenarios: Scenario[];
   executablePath: string | null;
+  launch: BrowserLaunch;
   log: (line: string) => void;
 }
 
@@ -236,7 +238,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     // Autoplay without a gesture, so the audio-on block can start audio the
     // way a player's first click would; --expose-gc so every timed loop
     // starts from a full collection. Both engines get the same flags.
-    browser = await chromium.launch({ headless: true, args: ["--autoplay-policy=no-user-gesture-required", "--js-flags=--expose-gc"], ...(opts.executablePath ? { executablePath: opts.executablePath } : {}) });
+    browser = await chromium.launch(launchOptions(opts.executablePath, opts.launch));
     run.browserVersion = browser.version();
     const ctx = await newContext(browser, config, "block");
     const page = await ctx.newPage();
@@ -245,7 +247,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
 
     const cold = await startup(page, server, () => page.goto(url, { waitUntil: "commit" }));
     run.cold = cold.sample;
-    run.page = { crossOriginIsolated: cold.info.crossOriginIsolated, timerResolutionMs: cold.info.timerResolutionMs, userAgent: cold.info.userAgent, viewport: cold.info.viewport, webgl: cold.info.webgl };
+    run.page = { crossOriginIsolated: cold.info.crossOriginIsolated, timerResolutionMs: cold.info.timerResolutionMs, userAgent: cold.info.userAgent, viewport: cold.info.viewport, webgl: await ev(page, "renderer", webglRenderer, undefined) };
     if (cold.sample.engineActive !== engine) throw new Error(`requested the ${engine} engine but ${cold.sample.engineActive} is active (host: ${JSON.stringify(cold.info.host)})`);
     const warm = await startup(page, server, () => page.reload({ waitUntil: "commit" }));
     run.warm = warm.sample;
@@ -329,6 +331,9 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
       }
       await expectEngine(page, engine, `frames (audio ${block})`);
     }
+    // The adapter again, from a new context, once every frame is measured (and
+    // once more after the throttled cold start below when there is one).
+    run.rendererEnd = (await ev(page, "renderer after the frames", webglRenderer, undefined))?.renderer ?? null;
     await ctx.close();
 
     // A cold start under the heaviest configured throttle: a fresh context
@@ -347,6 +352,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
       run.cold4x = c4.sample;
       if (c4.sample.engineActive !== engine) throw new Error(`${slowRate}x cold start: requested the ${engine} engine but ${c4.sample.engineActive} is active`);
       run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: await ev(slowPage, "cpu probe", cpuProbe, undefined), rate: slowRate, timed: run.cpuProbe?.timed ?? {} };
+      run.rendererEndCold = (await ev(slowPage, "renderer after the cold start", webglRenderer, undefined))?.renderer ?? null;
       await slow.close();
     }
     run.ok = true;

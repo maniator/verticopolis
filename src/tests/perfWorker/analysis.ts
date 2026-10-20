@@ -1,3 +1,4 @@
+import { rendererFinding } from "../perfCompare/renderer";
 import { pairedRatio, summarize, verdict, type Summary } from "../perfCompare/stats";
 import type { ModeName } from "./pageWorker";
 import type { ModeRun, WorkerConfig } from "./runner";
@@ -180,7 +181,7 @@ export function ratios(metrics: readonly Metric[], modes: readonly ModeName[]): 
 /** Fail-closed checks over the runs: every run finished on its mode, no
  *  host error, every throttle held, and every mode and repetition started
  *  and ended each scenario's hosted run on the same state digest. */
-export function validate(config: WorkerConfig, runs: readonly ModeRun[]): { errors: string[]; warnings: string[] } {
+export function validate(config: WorkerConfig, runs: readonly ModeRun[], rendererException: string | null = null): { errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
   for (let rep = 0; rep < config.reps; rep++) {
@@ -260,5 +261,9 @@ export function validate(config: WorkerConfig, runs: readonly ModeRun[]): { erro
       if (ends.size > 1) errors.push(`${sc} ${t}x: the modes or repetitions ended in ${ends.size} different states (${[...ends].join(", ")}); the hosts must be deterministic and agree`);
     }
   }
+  const okRuns = runs.filter((r) => r.ok);
+  const gl = rendererFinding(okRuns.map((r) => r.page?.webgl?.renderer), okRuns.map((r) => r.rendererEnd), { quick: config.quick, exception: rendererException, lateEnds: okRuns.map((r) => r.rendererEndCold) });
+  errors.push(...gl.errors);
+  warnings.push(...gl.warnings);
   return { errors, warnings };
 }

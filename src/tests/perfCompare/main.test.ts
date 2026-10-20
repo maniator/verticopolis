@@ -71,6 +71,8 @@ describe("outputDir", () => {
   it("marks quick and dirty runs, and refuses an existing --out", () => {
     expect(outputDir("/r", { out: null, quick: true, skipBuild: true, aa: null }, "2026-10-13", { commitShort: "abc1234", dirty: true }, () => false)).toBe("/r/docs/performance/results/2026-10-13-abc1234-quick-skipbuild-dirty");
     expect(outputDir("/r", { out: "x", quick: false, skipBuild: false, aa: null }, "d", env, () => false)).toBe("/r/x");
+    // A declared renderer exception marks the folder, so it cannot pass for GPU evidence at a glance.
+    expect(outputDir("/r", { out: null, quick: false, skipBuild: false, aa: null }, "2026-10-14", env, () => false, "EX-4")).toBe("/r/docs/performance/results/2026-10-14-abc1234-exception-ex-4");
     expect(outputDir("/r", { out: null, quick: false, skipBuild: false, aa: "wasm" }, "2026-10-14", env, () => false)).toBe("/r/docs/performance/results/2026-10-14-abc1234-aa-wasm");
     expect(() => outputDir("/r", { out: "x", quick: false, skipBuild: false, aa: null }, "d", env, () => true)).toThrow(/never overwritten/);
   });

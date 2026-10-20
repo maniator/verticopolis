@@ -4,7 +4,7 @@ import { startWorkerHost, spawnEngineWorker, type WorkerHostHandle } from "../..
 import type { WasmHostApp } from "../../wasmhost/startWasmHost";
 import { stepGate, settleEngine } from "../../wasmhost/stepGate";
 import { activeEngine, engineSuffix } from "../../wasmhost/engineLabel";
-import { hasWasmPackage, wasm } from "../conformance/wasmEngine";
+import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import { buildScenarios } from "../perfCompare/scenarios";
 import { drain, spawned, testWorker, until, type TestWorker } from "../wasmWorker/channel";
 import { script, type Hosted } from "../wasmWorker/hostDriver";
@@ -47,6 +47,8 @@ function driven(handle: WorkerHostHandle, a: WasmHostApp): Hosted {
 }
 
 const save = () => buildScenarios()[0].save;
+
+if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 describe.skipIf(!hasWasmPackage())("worker host lifecycle", () => {
   it("starts through the ready handshake and publishes its handle and label", async () => {
