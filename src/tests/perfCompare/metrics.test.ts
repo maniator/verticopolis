@@ -16,14 +16,25 @@ describe("aggregate", () => {
     expect(hostedWasm.summary!.median).toBeCloseTo(200.4, 6);
   });
 
-  it("leaves out the rows only one engine produces in an A/A pass, and words its differences as noise", () => {
-    const aa = runs().map((r) => ({ ...r, ranEngine: "wasm" as const }));
-    const rows = aggregate(aa, ["small"], [1], "wasm");
-    expect(rows.some((r) => r.group === "wasm-load" || r.metric === "WASM linear memory")).toBe(false);
-    expect(aggregate(aa, ["small"], [1]).some((r) => r.group === "wasm-load")).toBe(true);
-    const words = compareEngines(rows, [], "wasm").map((c) => c.verdict);
-    expect(words).toContain("outside band");
-    expect(words.some((w) => /^wasm (faster|slower|smaller|larger|lower|higher|fewer|more)$/.test(w))).toBe(false);
+  it("keeps a row the A/A engine produces in both slots, drops the other engine's and the cold WASM load", () => {
+    const aaWasm = aggregate(runs().map((r) => ({ ...r, ranEngine: "wasm" as const })), ["small"], [1], "wasm");
+    expect(aaWasm.some((r) => r.group === "wasm-load")).toBe(false);
+    expect(aaWasm.filter((r) => r.metric === "WASM linear memory").map((r) => r.engine)).toEqual(["ts", "wasm"]);
+    const aaTs = aggregate(runs().map((r) => ({ ...r, ranEngine: "ts" as const })), ["small"], [1], "ts");
+    expect(aaTs.some((r) => r.group === "wasm-load" || r.metric === "WASM linear memory" || r.metric === "cold engine hosted")).toBe(false);
+    expect(aaTs.some((r) => r.metric === "step median")).toBe(true);
+    expect(aggregate(runs(), ["small"], [1]).some((r) => r.group === "wasm-load")).toBe(true);
+  });
+
+  it("gives an A/A comparison no verdict word and no boot-order exclusion", () => {
+    const rows = aggregate(runs().map((r) => ({ ...r, ranEngine: "ts" as const })), ["small"], [1], "ts");
+    const skipped: string[] = [];
+    const comps = compareEngines(rows, skipped, "ts");
+    expect(new Set(comps.map((c) => c.verdict))).toEqual(new Set(["A/A"]));
+    expect(comps.some((c) => c.metric === "cold DOMContentLoaded")).toBe(true);
+    expect(skipped.some((x) => /boot order/.test(x))).toBe(false);
+    expect(skipped.every((x) => !/TypeScript|WASM/.test(x))).toBe(true);
+    expect(compareEngines(aggregate(runs(), ["small"], [1]), [], null).some((c) => c.verdict === "A/A")).toBe(false);
   });
 
   it("measures engine-specific metrics on that engine only", () => {

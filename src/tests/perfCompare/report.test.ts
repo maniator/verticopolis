@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { config, processRun } from "./fixtures";
 import { aggregate, compareEngines } from "./metrics";
+import { writeResultFiles } from "./main";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { comparisonsCsv, csvCell, fmt, markdownReport, preThree, rawCsv, summaryCsv, toCsv } from "./report";
 import type { CompareResults } from "./types";
 
@@ -29,14 +33,14 @@ describe("fmt", () => {
   });
 });
 
-function results(ok: boolean): CompareResults {
-  const runs = Array.from({ length: 6 }, (_, rep) => [processRun(rep, "ts"), processRun(rep, "wasm", {}, 2)]).flat();
-  const metrics = aggregate(runs, ["small"], [1]);
+function results(ok: boolean, aa: "ts" | "wasm" | null = null): CompareResults {
+  const runs = Array.from({ length: 6 }, (_, rep) => [processRun(rep, "ts"), processRun(rep, "wasm", {}, 2)]).flat().map((r) => (aa ? { ...r, ranEngine: aa } : r));
+  const metrics = aggregate(runs, ["small"], [1], aa);
   return {
     schema: 1,
     generatedAt: "2026-10-13T00:00:00.000Z",
     issue: "maniator/verticopolis#972",
-    config: config({ reps: 6 }),
+    config: config({ reps: 6, aa }),
     environment: {
       commit: "abc1234def",
       commitShort: "abc1234",
@@ -67,7 +71,7 @@ function results(ok: boolean): CompareResults {
     runs,
     bundle: null,
     metrics,
-    comparisons: compareEngines(metrics),
+    comparisons: compareEngines(metrics, [], aa),
     validation: { ok, errors: ok ? [] : ["boom"], warnings: ["careful"] },
     limitations: ["one machine"],
   };
@@ -93,17 +97,39 @@ describe("markdownReport", () => {
     expect(md).not.toContain("A/A pass");
   });
 
-  it("opens an A/A pass with a banner and marks its CSVs", () => {
-    const r = results(true);
-    const md = markdownReport({ ...r, config: { ...r.config, aa: "wasm" } });
+  it("opens an A/A pass with a banner, slot-neutral wording and no verdicts", () => {
+    const r = results(true, "wasm");
+    const md = markdownReport(r);
     expect(md).toContain("**A/A pass.** Both slots ran the WASM engine.");
-    expect(markdownReport({ ...r, config: { ...r.config, aa: "ts" } })).toContain("Both slots ran the TypeScript engine.");
-    expect(md).toMatch(/\| ts \(ran ts\) \|/);
+    expect(markdownReport(results(true, "ts"))).toContain("Both slots ran the TypeScript engine.");
+    expect(md).toContain("# A/A calibration results: abc1234");
+    expect(md).toContain("npm run perf:compare -- --aa wasm");
+    expect(md).toMatch(/\| ts \(ran wasm\) \|/);
+    expect(md).toContain("slot wasm / slot ts, paired (95% CI)");
+    expect(md).not.toMatch(/Verdict|equivalent|outside band|wasm (faster|slower)|TypeScript median|WASM median/);
+    expect(md).not.toMatch(/No engine comparison/);
+    expect(md).toContain("slot ts: ts; slot wasm: ts");
     expect(summaryCsv(r.metrics, "wasm").split("\n")[1]).toMatch(/,wasm$/);
     expect(summaryCsv(r.metrics, "wasm").split("\n")[0]).toMatch(/,aa$/);
     expect(rawCsv(r.metrics, "ts").split("\n")[0]).toMatch(/,value,aa$/);
     expect(comparisonsCsv(r.comparisons, "ts").split("\n")[0]).toMatch(/,n_pairs,aa$/);
+    expect(comparisonsCsv(r.comparisons, "wasm")).toMatch(/,A\/A,\d+,\d+,\d+,wasm/);
     expect(summaryCsv(r.metrics)).not.toMatch(/,aa\n/);
+  });
+
+  it("marks every file of an A/A folder, and none of a comparison folder", () => {
+    const dir = mkdtempSync(join(tmpdir(), "perf-aa-"));
+    try {
+      writeResultFiles(dir, results(true, "wasm"));
+      expect(JSON.parse(readFileSync(join(dir, "results.json"), "utf8")).config.aa).toBe("wasm");
+      for (const f of ["metrics.csv", "raw.csv", "comparisons.csv"]) expect(readFileSync(join(dir, f), "utf8").split("\n")[0]).toMatch(/,aa$/);
+      expect(readFileSync(join(dir, "report.md"), "utf8")).toContain("**A/A pass.**");
+      writeResultFiles(dir, results(true));
+      for (const f of ["metrics.csv", "raw.csv", "comparisons.csv"]) expect(readFileSync(join(dir, f), "utf8").split("\n")[0]).not.toMatch(/,aa$/);
+      expect(readFileSync(join(dir, "report.md"), "utf8")).not.toContain("A/A pass");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("writes CSVs with one row per metric, value and comparison", () => {

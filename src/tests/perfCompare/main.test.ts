@@ -79,6 +79,12 @@ describe("outputDir", () => {
     expect(() => outputDir("/r", { out: "run-aa-wasm-1", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/containing aa-ts/);
     expect(outputDir("/r", { out: "run-aa-ts-1", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toBe("/r/run-aa-ts-1");
   });
+  it("checks the folder's own name, and refuses an A/A name for a comparison", () => {
+    expect(() => outputDir("/r/aa-ts", { out: "x", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/containing aa-ts/);
+    expect(() => outputDir("/r", { out: "aa-ts/x", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/containing aa-ts/);
+    expect(outputDir("/r", { out: "keep/aa-ts-3", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toBe("/r/keep/aa-ts-3");
+    expect(() => outputDir("/r", { out: "run-aa-wasm", quick: false, skipBuild: false, aa: null }, "d", env, () => false)).toThrow(/names an A\/A folder/);
+  });
 });
 
 describe("stampErrors", () => {
@@ -126,7 +132,7 @@ describe("loadCheckpoint", () => {
     const line = (engine: "ts" | "wasm", ran?: "ts" | "wasm") => JSON.stringify({ ...processRun(0, engine), ...(ran ? { ranEngine: ran } : {}) }) + "\n";
     const good = loadCheckpoint("d", aaExpected, files({ [M]: aaMeta, [R]: line("ts", "wasm") + line("wasm", "wasm") }));
     expect(good.runs).toHaveLength(2);
-    expect(() => loadCheckpoint("d", aaExpected, files({ [M]: aaMeta, [R]: line("ts") }))).toThrow(/ran undefined where this run's configuration calls for wasm/);
+    expect(() => loadCheckpoint("d", aaExpected, files({ [M]: aaMeta, [R]: line("ts") }))).toThrow(/ran ts where this run's configuration calls for wasm/);
     expect(() => loadCheckpoint("d", aaExpected, files({ [M]: aaMeta, [R]: line("wasm", "ts") }))).toThrow(/ran ts where/);
     expect(() => loadCheckpoint("d", expected, files({ [M]: meta, [R]: line("wasm", "ts") }))).toThrow(/ran ts where this run's configuration calls for wasm/);
   });

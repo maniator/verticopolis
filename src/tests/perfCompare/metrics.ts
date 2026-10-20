@@ -127,10 +127,13 @@ export function aggregate(runs: readonly ProcessRun[], scenarios: readonly strin
   const rows: MetricRow[] = [];
   const good = runs.filter((r) => r.ok);
   for (const p of picks(scenarios, throttles.map(String))) {
-    // An A/A pass has one engine in both slots, so a row only one engine
-    // produces has no pair to compare and nothing to calibrate.
-    if (aa && p.engines) continue;
-    for (const engine of p.engines ?? (["ts", "wasm"] as EngineName[])) {
+    // An A/A pass has one engine in both slots. A row only the other engine
+    // produces has nothing to calibrate; a row the A/A engine produces keeps
+    // both slots, so a WASM-only metric is still compared slot to slot.
+    // The cold WASM load measures a fixed download, not a slot's engine, so
+    // it never pairs with itself.
+    if (aa && (p.group === "wasm-load" || (p.engines && !p.engines.includes(aa)))) continue;
+    for (const engine of aa && p.engines ? (["ts", "wasm"] as EngineName[]) : p.engines ?? (["ts", "wasm"] as EngineName[])) {
       const values: number[] = [];
       const reps: number[] = [];
       for (const r of good) {
@@ -141,7 +144,9 @@ export function aggregate(runs: readonly ProcessRun[], scenarios: readonly strin
           reps.push(r.rep);
         }
       }
-      rows.push({ group: p.group, scenario: p.scenario, throttle: p.throttle, metric: p.metric, unit: p.unit, better: p.better, engine, values, reps, summary: values.length ? summarize(values) : null, ...(p.noVerdict ? { noVerdict: p.noVerdict } : {}) });
+      // Both slots ran one engine, so the boot-order caveat between engines does not apply.
+      const noVerdict = aa ? undefined : p.noVerdict;
+      rows.push({ group: p.group, scenario: p.scenario, throttle: p.throttle, metric: p.metric, unit: p.unit, better: p.better, engine, values, reps, summary: values.length ? summarize(values) : null, ...(noVerdict ? { noVerdict } : {}) });
     }
   }
   return rows;
@@ -167,9 +172,12 @@ export function compareEngines(rows: readonly MetricRow[], skipped: string[] = [
       skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: ${noVerdict}`);
       continue;
     }
+    // In an A/A pass the labels name slots, not engines.
+    const base = aa ? 'slot "ts"' : "TypeScript";
+    const other = aa ? 'slot "wasm"' : "WASM";
     if (ts.summary.median === 0) {
       // No ratio against zero (a byte count of 0, no clamped frames).
-      skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: TypeScript median is 0, WASM median ${wasm.summary.median}`);
+      skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: ${base} median is 0, ${other} median ${wasm.summary.median}`);
       continue;
     }
     // Pair the two engines by repetition; a repetition missing on either
@@ -188,14 +196,15 @@ export function compareEngines(rows: readonly MetricRow[], skipped: string[] = [
     // would keep only the repetitions where TypeScript did worst, so the
     // whole metric goes without a ratio instead (reported per engine).
     if (pairs.some(([, b]) => b === 0)) {
-      skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: a TypeScript repetition is 0, so no ratio`);
+      skipped.push(`${ts.group} ${ts.scenario} ${ts.throttle}x ${ts.metric}: a ${base} repetition is 0, so no ratio`);
       continue;
     }
     const r = pairedRatio(pairs);
     const v = r.n < MIN_VERDICT_N ? "inconclusive" : verdict(r);
     let word: Comparison["verdict"] = v === "equivalent" ? "equivalent" : "inconclusive";
-    // The same engine ran in both slots, so a difference is noise to size.
-    if (aa && (v === "higher" || v === "lower")) word = "outside band";
+    // The same engine ran in both slots, so any difference is noise to size
+    // and carries no verdict word; the interval bounds are the result.
+    if (aa) word = "A/A";
     else if (v === "higher" || v === "lower") {
       const wasmBetter = (v === "lower") === (ts.better === "lower");
       if (ts.unit === "bytes") word = v === "lower" ? "wasm smaller" : "wasm larger";

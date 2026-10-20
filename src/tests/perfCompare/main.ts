@@ -1,5 +1,5 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
 import { buildTree, collectEnvironment, ENGINE_PACKAGE_FILES, packageState, type Environment, type PackageState } from "./env";
@@ -95,7 +95,18 @@ export function makeConfig(args: Args, scenarioNames: string[]): CompareConfig {
 
 /** What an A/A folder's other limitations leave unsaid: they describe two engines. */
 export const aaLimitation = (aa: EngineName): string =>
-  `An A/A pass: ${aa === "wasm" ? "WASM" : "TypeScript"} ran in both slots, so the limitations below that describe a cross-engine comparison (the TypeScript read model, boot order, the incremental WASM download) do not apply to this folder's ratios, and the wasm-load, WASM-memory and attribution rows are left out.`;
+  `An A/A pass: ${aa === "wasm" ? "WASM" : "TypeScript"} ran in both slots, so the limitations below that describe a cross-engine comparison (the TypeScript read model, boot order, the incremental WASM download) do not apply to this folder's ratios. Rows only the ${aa === "wasm" ? "TypeScript" : "WASM"} engine produces are left out, and so are the cold WASM load steps.`;
+
+/** The five files of a results folder. Every one of them carries the A/A
+ *  marker when `results.config.aa` is set. */
+export function writeResultFiles(out: string, results: CompareResults): void {
+  const aa = results.config.aa;
+  writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 1) + "\n");
+  writeFileSync(join(out, "metrics.csv"), summaryCsv(results.metrics, aa));
+  writeFileSync(join(out, "raw.csv"), rawCsv(results.metrics, aa));
+  writeFileSync(join(out, "comparisons.csv"), comparisonsCsv(results.comparisons, aa));
+  writeFileSync(join(out, "report.md"), markdownReport(results));
+}
 
 const STATIC_LIMITATIONS = [
   "One machine, headless Chromium in a container. Spread is reported (CV, order-statistic intervals of the median, order-statistic intervals of the paired median ratios); results from other hardware, browsers or a GPU will differ.",
@@ -263,11 +274,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     limitations: [...(config.aa ? [aaLimitation(config.aa)] : []), ...STATIC_LIMITATIONS, ...(preThree(environment.appVersion) ? [PRE_THREE_LIMITATION] : []), ...(renderer ? [`WebGL renderer in these runs: ${renderer}.`] : [])],
   };
 
-  writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 1) + "\n");
-  writeFileSync(join(out, "metrics.csv"), summaryCsv(metrics, config.aa));
-  writeFileSync(join(out, "raw.csv"), rawCsv(metrics, config.aa));
-  writeFileSync(join(out, "comparisons.csv"), comparisonsCsv(comparisons, config.aa));
-  writeFileSync(join(out, "report.md"), markdownReport(results));
+  writeResultFiles(out, results);
   // results.json now holds every run; the checkpoint files are spent.
   rmSync(join(out, CHECKPOINT_RUNS), { force: true });
   rmSync(join(out, CHECKPOINT_META), { force: true });
@@ -323,7 +330,10 @@ export function packageErrors(perf: PackageState, prod: PackageState, sourceHash
  */
 export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild" | "aa">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync): string {
   if (args.out) {
-    if (args.aa && !args.out.includes(`aa-${args.aa}`)) throw new Error(`--aa ${args.aa} needs an --out name containing aa-${args.aa}, so the folder cannot be mistaken for a comparison`);
+    // The folder's own name carries the marker, not a parent directory's.
+    const name = basename(resolve(repo, args.out));
+    if (args.aa && !name.includes(`aa-${args.aa}`)) throw new Error(`--aa ${args.aa} needs an --out folder name containing aa-${args.aa}, so the folder cannot be mistaken for a comparison`);
+    if (!args.aa && /aa-(ts|wasm)/.test(name)) throw new Error(`--out ${name} names an A/A folder, but this run is a comparison; pass --aa ts|wasm or pick another name`);
     const out = resolve(repo, args.out);
     if (exists(out)) throw new Error(`${out} already exists; results are never overwritten`);
     return out;
@@ -438,7 +448,8 @@ export function loadCheckpoint(
     if (entry.started) started.push(entry.started as { rep: number; engine: string; at: string });
     else if (entry.resumed) resumes.push({ at: String(entry.resumed), runsFromCheckpoint: Number(entry.runsFromCheckpoint) });
     else if (typeof entry.rep === "number" && (entry.engine === "ts" || entry.engine === "wasm") && typeof entry.scenarios === "object" && entry.scenarios !== null) {
-      if ((entry.ranEngine ?? entry.engine) !== (expected.config.aa ?? entry.engine)) throw new Error(`cannot resume ${dir}: line ${i + 1} of ${CHECKPOINT_RUNS} ran ${String(entry.ranEngine)} where this run's configuration calls for ${expected.config.aa ?? entry.engine}`);
+      const ran = entry.ranEngine ?? entry.engine;
+      if (ran !== (expected.config.aa ?? entry.engine)) throw new Error(`cannot resume ${dir}: line ${i + 1} of ${CHECKPOINT_RUNS} ran ${String(ran)} where this run's configuration calls for ${expected.config.aa ?? entry.engine}`);
       runs.push(entry as unknown as ProcessRun);
     }
     else throw bad();

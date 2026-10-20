@@ -297,7 +297,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
       }
     }
     // The WASM package's load steps, before any audio runs.
-    if (slot === "ts" && !config.aa) run.wasmCold = await ev(page, "wasm cold load", wasmColdLoad, { wasmUrl: `${server.url}/engine/verticopolis_engine_bg.wasm`, jsUrl: engineUrl, scenario: scenarios[0].name });
+    if (engine === "ts") run.wasmCold = await ev(page, "wasm cold load", wasmColdLoad, { wasmUrl: `${server.url}/engine/verticopolis_engine_bg.wasm`, jsUrl: engineUrl, scenario: scenarios[0].name });
 
     // Gameplay frames: an audio-off block and an audio-on block, each in a
     // fresh page, their order alternating by repetition so neither always
