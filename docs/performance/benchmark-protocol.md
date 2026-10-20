@@ -290,6 +290,25 @@ goes first). A failed repetition is re-run and the report says how many were.
 Every desktop metric runs at **1x and 4x** CPU throttle, on the small, medium
 and large scenarios with their pinned scenario hashes.
 
+`perf:compare` opens a fresh page for every scenario and engine in the timed
+simulation passes and in each gameplay-frames block (#1162). Before that change
+it ran every scenario after the first in a page an earlier scenario had used,
+and the TypeScript engine ran slower there: most likely JIT state left by the
+earlier tower, though a reload in the same tab keeps the renderer process, so
+the cause is not settled. On the owner's PC the large tower took 1,441 ms on the
+TypeScript engine after medium (the #1051 before pass, main `06a6dcb`, 1x, bare
+engine, 2026-10-20) against 705 ms in a page of its own with `perf:worker`; the
+WASM engine was not affected. The bias favors WASM. Every `perf:compare`
+result from before the change is affected on its medium and large rows (the
+default run is small, medium, large): the timed simulation rows, the gameplay
+frames and the audio-on frames. Memory, startup, transfer, build size and the
+first scenario's rows are not. The committed folder `2026-10-14-01c6153` (small,
+medium, large) and the figures that `ts-vs-wasm.md` takes from it are such
+results, on their medium and large rows. So are the #1051 PC passes (`06a6dcb`
+and `a532572`, medium then large), on their large rows only, since medium was
+their first scenario. Re-run before citing a cross-engine ratio on a scenario
+after the first.
+
 | Command (PowerShell) | What it measures |
 | --- | --- |
 | `npm.cmd run perf:worker -- --reps 10 --viewport 1280x720 --out docs/performance/results/<date>-<sha>-<label>-worker-1280x720` | Bare engine, the four hosts, frames, memory and traffic. Always pass `--viewport 1280x720`: the harness default is 640x360, and the committed desktop acceptance run (`2026-10-15-e25ec01c-worker-1280x720`) used 1280x720. `perf:compare` renders at 1280x720 fixed and has no `--viewport` flag |
