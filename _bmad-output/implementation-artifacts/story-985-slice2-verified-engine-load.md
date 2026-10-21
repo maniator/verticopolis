@@ -108,7 +108,7 @@ retirement story.
 ## Out of scope for 2a
 
 Failure copy (slice 2b-1), Repair, cache-key rotation, the
-the respawn latch, eviction, install-race and first-install specs, the load
+respawn latch, eviction, install-race and first-install specs, the load
 measurement, Safari and Firefox passes (a merge condition for the wasm-only
 flip, design section 11).
 
