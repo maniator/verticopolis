@@ -27,7 +27,9 @@ async function startWorker(): Promise<{ posted: FromWorker[]; send: (msg: unknow
   };
 }
 
-describe("the engine worker entry point, when the glue fails to load (#963)", () => {
+// These run as a development serve (the unit tests do), which skips the byte check and loads through
+// engineLoad.ts; workerPackageCheck.test.ts covers the production route.
+describe("the engine worker entry point on the development route, when the glue fails to load (#963)", () => {
   // A scheme node cannot import fails at once, like a 404 on a small glue file, while the binary's fetch is still in flight.
   const GLUE = "http://x/engine/verticopolis_engine.js";
   const slowBinary = () => {
