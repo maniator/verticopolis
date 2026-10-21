@@ -357,8 +357,10 @@ Claude Code (the facade lane's thread), 2026-10-20.
   the slice that removes it.
 - `Simulation.population` is a scan over the rooms
   (`routing.totalPopulation`). The header reads it only when its
-  `population` is read, once per header object; slice 3 reads `view.header`
-  once per frame and keeps it, and the PR's hot-path record says so.
+  `population` is read, once per header object. Slice 3 reads `population`
+  at most once per step or per HUD tick, or has the adapter memoize it per
+  step, and never per frame (the independent review's C2); `view.ts` says so
+  on the field.
 
 ### File List
 

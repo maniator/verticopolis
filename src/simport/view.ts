@@ -26,6 +26,9 @@ export interface HeaderView {
   readonly money: number;
   /** 1 to 5 stars, 6 for TOWER. */
   readonly star: number;
+  /** The TypeScript engine walks every room to answer this (O(R), about
+   *  330 µs on the large tower), so a reader takes it at most once per step
+   *  or per HUD tick, or keeps one header for that span, and never per frame. */
   readonly population: number;
   readonly weather: WeatherKind;
   /** The bulletin log's monotonic cursor. */
@@ -48,6 +51,11 @@ export interface PendingChoiceView {
 }
 
 export interface TowerView {
+  /** Every unit, the bare floor and lobby tiles included (about 40,000 of the
+   *  large tower's 43,358). A Rust adapter builds this array at most once per
+   *  revision, never per read. A reader that needs only rooms, or the
+   *  structure, does not walk it per frame or per step; a room list and
+   *  structure runs come with #1253. */
   readonly units: ReadonlyArray<UnitView>;
   readonly transports: ReadonlyArray<TransportView>;
   readonly revision: number;
