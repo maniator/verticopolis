@@ -219,6 +219,7 @@ describe.skipIf(!hasWasmPackage())("the facade's command answers match the TypeS
           expect(raw.previewRentBatch(kind, '"default"', false)).toBeUndefined();
           expect(JSON.parse(engine.validateTransport(kind as never, 150, 1, 3))).toEqual({ ok: false, reason: "Unknown facility." });
           expect(engine.placeTransportDryRun(kind as never, 150, 1, 3)).toBe(false);
+          expect(JSON.parse(engine.canBuild(kind as never, 2, 150))).toEqual({ ok: false, reason: "Unknown facility.", cost: 0 });
           expect(JSON.parse(engine.build(kind as never, 2, 150))).toEqual({ ok: false, reason: "Unknown facility." });
           expect(JSON.parse(engine.buildTransport(kind as never, 150, 1, 3))).toEqual({ ok: false, reason: "Unknown facility." });
         }

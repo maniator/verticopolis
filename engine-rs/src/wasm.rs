@@ -427,8 +427,13 @@ impl Engine {
     /// base price. An unknown kind answers the way TypeScript does, with
     /// "Unknown facility." and a cost of 0.
     #[wasm_bindgen(js_name = canBuild)]
-    pub fn can_build(&self, kind: &str, floor: i32, x: i32) -> String {
-        let Ok(kind) = parse_kind(kind) else {
+    pub fn can_build(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] kind: JsValue,
+        floor: i32,
+        x: i32,
+    ) -> String {
+        let Ok(kind) = parse_kind(&kind.as_string().unwrap_or_default()) else {
             return can_build_json(false, Some(facade_commands::UNKNOWN_FACILITY), 0.0);
         };
         let c = self.sim.can_build(kind, floor.into(), x.into());
