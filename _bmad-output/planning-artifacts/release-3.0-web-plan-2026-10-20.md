@@ -515,7 +515,7 @@ slowest path.
 | 12 | The stage-1 run must be "the exact stage-1 build", but `main` keeps deploying, and slices 2, 4 and 5 touch the shared app path for every player | Rule: cut the stage-1 commit on Oct 24 or 25; host-path merges between the cut and the stage-1 deploy wait; during stages 1 and 2, a merge to `src/wasmhost`, `src/dualrun`, `src/simport` or `src/game/frameLoop.ts` gets a medium-tower recheck on the PC (about 45 min) before the next deploy, or the owner's waiver |
 | 13 | The roundtable's GO packet asks for an answer on drop-back pre-approval (4c) that 1.2 condition 6 already gives, and lists #1126 as merged | 1.3.5 |
 | 14 | Opt-in testers count toward nothing, so targeted opt-in testing does not shorten the engaged floors | 1.3.1 levers |
-| 15 | Slice 8's "recovery point refused" line and #1114's `fault_source` are new production fields outside the analytics packet, which would mean two more approval rounds | 1.3.9, item 1: fold both into the packet |
+| 15 | Slice 8's "recovery point refused" line and #1114's `fault_source` were new production fields outside the analytics packet, which would have meant two more approval rounds | Folded into the packet as item 8 (revision 3); 1.3.9, item 1 |
 | 16 | #1239's TypeScript twins (`countKind` and the escalator office walk in `transport.ts`) have no tracker of their own now that #1264 merged | Triage keeps #1239 open for them or files a row |
 | 17 | #921, #926, #900 and #932 still have no lane | 1.3.5 concurrent table; the coordinator assigns them before November |
 
@@ -527,12 +527,14 @@ soak, slice 10 only after slice 9, outreach drafts only, the merge rule, R3
 and R6.
 
 1. **The analytics packet** (A4 and #1090, by Oct 22; it blocks the stage-1
-   floors). `release-3.0/cohort-a4/analytics-packet-a4-1090.md`, seven items
-   in one decision, including the engaged unit for the 1,000 and the floors,
-   all attempts for stop signals, `wasm-mirror`, and item 7 (sessions that
-   never ran the engine stay outside the all-attempts N). Recommended:
-   approve, and fold in slice 8's refused-point line and #1114's
-   `fault_source` so there is one approval.
+   floors). `release-3.0/cohort-a4/analytics-packet-a4-1090.md` (revision
+   3), eight items in one decision, including the engaged unit for the 1,000
+   and the floors, all attempts for stop signals, `wasm-mirror`, item 7
+   (sessions that never ran the engine stay outside the all-attempts N), and
+   item 8, which folds in #1114's `fault_source` and slice 8's
+   `recovery_refused` count so there is one approval. Recommended: approve,
+   with every fallback counted in the rate whatever its source and the rate
+   also printed by source.
 2. **The size gate's rule and threshold.** Rule now, so the bracket run
    measures it: population **or** floors (recommended), both already on
    `boot`. Threshold on Oct 26 or 27 from the bracket run, with its excluded
