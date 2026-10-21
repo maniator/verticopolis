@@ -13,7 +13,9 @@ import { noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "
 import { refreshSplashVersion } from "./wasmhost/engineLabel";
 import { isHostFault } from "./wasmhost/hostFault";
 import { ENGINE_FAILURE_ID } from "./game/interactionState";
-import { bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState, type FallbackReason } from "./wasmhost/engineBoot";
+import { showEngineLoading } from "./engineLoading";
+import { catalogVerdict } from "./wasmhost/foreignCatalog";
+import { bootFailure, bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState, type FallbackReason } from "./wasmhost/engineBoot";
 import type { BuildMetadataResult } from "./wasmhost/buildSection";
 import { liveDiagnostics } from "./wasmhost/engineDiagnosticsLive";
 import { copyText } from "./ui/copyText";
@@ -254,7 +256,9 @@ export function bootGame(create: () => BootApp): Promise<void> {
     // drops the experimental hosts from its bundle.
     const choice = __WASM_ONLY__ ? "wasm" : engineRequested();
     const mainThreadWasm = choice === "wasm" || choice === "wasm-frame";
-    const booted = mainThreadWasm ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: (onBuild) => loadWasmEngine(undefined, { onBuild }) }) : typescriptBoot();
+    // The cover says so after a short wait, when the package takes a while (#1132).
+    const stopLoadingLine = mainThreadWasm || choice === "wasm-worker" ? showEngineLoading() : () => {};
+    const booted = mainThreadWasm ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: (signal, onBuild) => loadWasmEngine(undefined, signal, { onBuild }) }) : typescriptBoot();
     let engineWorker: SpawnedWorker | null = null;
     let workerHost: WorkerHostHandle | null = null;
     let bootState: EngineBootState = booted.state;
@@ -266,10 +270,11 @@ export function bootGame(create: () => BootApp): Promise<void> {
       } catch (e) {
         // Recorded with its reason, as a failed package load is (#874).
         const workerBuild = (e as { build?: BuildMetadataResult } | null)?.build;
-        bootState = { ...bootState, ...(workerBuild ? { binary: workerBuild } : {}), failure: { stage: "load", reason: bootFailureReason(e), message: e instanceof Error ? e.message : String(e) } };
+        bootState = { ...bootState, ...(workerBuild ? { binary: workerBuild } : {}), failure: bootFailure("load", e) };
         console.error("[wasm-worker] the engine worker did not start; running on the TypeScript engine:", e);
       }
     }
+    stopLoadingLine();
     publishBootState(bootState);
     // Start the gameplay session clock (foreground time + funnel state) only once
     // the game can run: a no-WebGL visitor bails above, and a wasm-only build
@@ -291,7 +296,11 @@ export function bootGame(create: () => BootApp): Promise<void> {
       // A fixed deploy is the way out of a broken or stale engine package:
       // with no tower running there is nothing to save, so take it at once.
       registerPWA({ onUpdateAvailable: (activate) => void activate() });
-      throw new Error(`the WASM engine did not start (${bootState.failure.stage}): ${bootState.failure.message}`);
+      // This error reaches the exception tracker, which groups by message, so a
+      // refused package is named by its code and kind, never by its file or
+      // digests (those stay on the console and in `__vcEngineBoot`).
+      const f = bootState.failure;
+      throw new Error(`the WASM engine did not start (${f.stage}): ${f.package ? `${f.reason}, ${f.package.kind}` : f.message}`);
     }
     // Whether the game exists: a boot that throws before it does sends no
     // row, even when its engine had already failed to load (the error itself
@@ -303,13 +312,21 @@ export function bootGame(create: () => BootApp): Promise<void> {
       const wasmModule = booted.module;
       if (!__WASM_ONLY__ && engineWorker) {
         try {
+          const catalogs = engineWorker.catalogs;
           workerHost = startWorkerHost(app as unknown as WasmHostApp, engineWorker, () => spawnEngineWorker(makeBrowserWorker, enginePackageUrl()));
           engineWorker = null; // the host owns it now
           // startWorkerHost reports a refused first tower on its status. That
           // tower stays on TypeScript, recorded as the main-thread host records
           // it (#874); the host follows every later adopt either way.
           const { hosted, lastError } = workerHost.status;
-          bootState = hosted ? { ...bootState, engine: "wasm" } : failBoot(bootState, "start", "attach-refused", lastError ?? "the worker host did not take the first tower");
+          // A package whose catalogs this build cannot draw is a mismatched
+          // one (#1086), as the main-thread host codes it; the worker sent
+          // its catalogs when it answered ready.
+          if (hosted) bootState = { ...bootState, engine: "wasm" };
+          else {
+            const refusal = catalogVerdict((mode) => catalogs[mode]) === "foreign" ? "package-mismatch" : "attach-refused";
+            bootState = failBoot(bootState, "start", refusal, lastError ?? "the worker host did not take the first tower");
+          }
           publishBootState(bootState);
           refreshSplashVersion();
         } catch (e) {

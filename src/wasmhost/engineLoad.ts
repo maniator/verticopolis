@@ -15,6 +15,13 @@ import { ENGINE_WASM } from "./enginePackageNames";
 
 type GlueModule = { default: (init?: { module_or_path: WebAssembly.Module }) => Promise<unknown> };
 
+/** Compile engine binary bytes already in hand (the verified loader's, see
+ *  loadEngineModule.ts) and read their build metadata. */
+export async function compileEngineBytes(bytes: Uint8Array): Promise<{ module: WebAssembly.Module; build: BuildMetadataResult }> {
+  const module = await WebAssembly.compile(bytes as BufferSource);
+  return { module, build: parseBuildMetadata(WebAssembly.Module.customSections(module, BUILD_SECTION)) };
+}
+
 /** Fetch and compile the engine binary and read its build metadata. A binary
  *  served as `application/wasm` compiles as it streams in; one served as
  *  anything else (a server with no wasm MIME type) compiles from its bytes,

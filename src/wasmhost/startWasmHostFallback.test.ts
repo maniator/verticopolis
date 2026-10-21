@@ -358,7 +358,7 @@ describe("loadWasmEngine", () => {
     const url = `data:text/javascript,${encodeURIComponent("export default async function init() {}")}`;
     // The bytes path: this file runs in a DOM environment whose Response is not the engine's own.
     vi.stubGlobal("fetch", wasmFetch(EMPTY_WASM, { type: "application/octet-stream" }));
-    const err = await loadWasmEngine(url, { wasmUrl: "http://x/e.wasm" }).catch((e: unknown) => e);
+    const err = await loadWasmEngine(url, undefined, { wasmUrl: "http://x/e.wasm" }).catch((e: unknown) => e);
     vi.unstubAllGlobals();
     expect(err).toBeInstanceOf(EngineBootError);
     expect(err).toMatchObject({ reason: "package-mismatch", message: expect.stringContaining("no Engine class") });

@@ -71,13 +71,32 @@ pub enum Command {
         floor: i64,
         x: i64,
         kind: Option<String>,
+        #[serde(rename = "expectFail")]
+        expect_fail: Option<bool>,
     },
     #[serde(rename = "adjustRent")]
-    AdjustRent { floor: i64, x: i64, dir: i64 },
+    AdjustRent {
+        floor: i64,
+        x: i64,
+        dir: i64,
+        #[serde(rename = "expectFail")]
+        expect_fail: Option<bool>,
+    },
     #[serde(rename = "setNoRate")]
-    SetNoRate { floor: i64, x: i64 },
+    SetNoRate {
+        floor: i64,
+        x: i64,
+        #[serde(rename = "expectFail")]
+        expect_fail: Option<bool>,
+    },
     #[serde(rename = "setCars")]
-    SetCars { floor: i64, x: i64, cars: i64 },
+    SetCars {
+        floor: i64,
+        x: i64,
+        cars: i64,
+        #[serde(rename = "expectFail")]
+        expect_fail: Option<bool>,
+    },
     #[serde(rename = "addCar")]
     AddCar {
         floor: i64,
@@ -112,13 +131,22 @@ pub enum Command {
         reason: Option<String>,
     },
     #[serde(rename = "startFire")]
-    StartFire,
+    StartFire {
+        #[serde(rename = "expectFail")]
+        expect_fail: Option<bool>,
+    },
     #[serde(rename = "bombThreat")]
     BombThreat,
     #[serde(rename = "evaluateStar")]
     EvaluateStar,
     #[serde(rename = "setSchedule")]
-    SetSchedule { floor: i64, x: i64, schedule: Value },
+    SetSchedule {
+        floor: i64,
+        x: i64,
+        schedule: Value,
+        #[serde(rename = "expectFail")]
+        expect_fail: Option<bool>,
+    },
     #[serde(rename = "callExterminator")]
     CallExterminator {
         #[serde(rename = "expectFail")]
@@ -301,10 +329,25 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
             ("expectFail", "bool?"),
             ("reason", "str?"),
         ],
-        "setNoRate" => &AT,
-        "sell" => &[("floor", "int"), ("x", "int"), ("kind", "kind?")],
-        "adjustRent" => &[("floor", "int"), ("x", "int"), ("dir", "dir")],
-        "setCars" => &[("floor", "int"), ("x", "int"), ("cars", "count")],
+        "setNoRate" => &[("floor", "int"), ("x", "int"), ("expectFail", "bool?")],
+        "sell" => &[
+            ("floor", "int"),
+            ("x", "int"),
+            ("kind", "kind?"),
+            ("expectFail", "bool?"),
+        ],
+        "adjustRent" => &[
+            ("floor", "int"),
+            ("x", "int"),
+            ("dir", "dir"),
+            ("expectFail", "bool?"),
+        ],
+        "setCars" => &[
+            ("floor", "int"),
+            ("x", "int"),
+            ("cars", "count"),
+            ("expectFail", "bool?"),
+        ],
         "addCar" | "removeCar" => &[("floor", "int"), ("x", "int"), ("reason", "str?")],
         "extendTransport" => &[
             ("floor", "int"),
@@ -322,7 +365,8 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
             ("shaft", "bool?"),
             ("reason", "str?"),
         ],
-        "startFire" | "bombThreat" | "evaluateStar" | "reload" | "toggleAutoBridge" => &[],
+        "startFire" => &[("expectFail", "bool?")],
+        "bombThreat" | "evaluateStar" | "reload" | "toggleAutoBridge" => &[],
         "setFilmPolicy" => &[("floor", "int"), ("x", "int"), ("policy", "policy")],
         "rerollSubtype" | "clearStops" => &AT,
         "resizeTransport" => &[
@@ -347,7 +391,12 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
         ],
         "callExterminator" => &[("expectFail", "bool?"), ("reason", "str?")],
         "resolveChoice" => &[("accept", "bool"), ("kind", "choice?")],
-        "setSchedule" => &[("floor", "int"), ("x", "int"), ("schedule", "obj")],
+        "setSchedule" => &[
+            ("floor", "int"),
+            ("x", "int"),
+            ("schedule", "obj"),
+            ("expectFail", "bool?"),
+        ],
         "tick" => &[
             ("dt", "count"),
             ("times", "count?"),
@@ -775,7 +824,12 @@ fn run_scenario_inner(
                     )
                     .map_err(failed)?;
                 }
-                Command::Sell { floor, x, kind } => {
+                Command::Sell {
+                    floor,
+                    x,
+                    kind,
+                    expect_fail,
+                } => {
                     if let Some(kind) = kind {
                         let here = sim
                             .tower
@@ -789,15 +843,31 @@ fn run_scenario_inner(
                             )));
                         }
                     }
+                    // A refusal needs something on the tile to refuse: a sell at
+                    // a bare tile is a bad address, as for the ops that look up
+                    // a unit first.
+                    if expect_fail.unwrap_or(false)
+                        && sim.tower.unit_at(*floor, *x).is_none()
+                        && sim.tower.transport_at(*floor, *x).is_none()
+                    {
+                        return Err(failed(format!(
+                            "no unit or transport at floor {floor}, x {x}"
+                        )));
+                    }
                     expect_ok(
                         sim.sell_at(*floor, *x),
-                        false,
+                        expect_fail.unwrap_or(false),
                         &format!("sell @ {floor},{x}"),
                         None,
                     )
                     .map_err(failed)?;
                 }
-                Command::SetSchedule { floor, x, schedule } => {
+                Command::SetSchedule {
+                    floor,
+                    x,
+                    schedule,
+                    expect_fail,
+                } => {
                     let id = sim
                         .tower
                         .transport_at(*floor, *x)
@@ -805,13 +875,18 @@ fn run_scenario_inner(
                         .ok_or_else(|| failed(format!("no transport at floor {floor}, x {x}")))?;
                     expect_ok(
                         sim.tower.set_schedule(id, schedule),
-                        false,
+                        expect_fail.unwrap_or(false),
                         &format!("setSchedule @ {floor},{x}"),
                         Some("not an elevator"),
                     )
                     .map_err(failed)?;
                 }
-                Command::SetCars { floor, x, cars } => {
+                Command::SetCars {
+                    floor,
+                    x,
+                    cars,
+                    expect_fail,
+                } => {
                     let id = sim
                         .tower
                         .transport_at(*floor, *x)
@@ -827,7 +902,7 @@ fn run_scenario_inner(
                         == Some(*cars);
                     expect_ok(
                         ok && landed,
-                        false,
+                        expect_fail.unwrap_or(false),
                         &format!("setCars {cars} @ {floor},{x}"),
                         None,
                     )
@@ -926,7 +1001,12 @@ fn run_scenario_inner(
                         }
                     }
                 }
-                Command::AdjustRent { floor, x, dir } => {
+                Command::AdjustRent {
+                    floor,
+                    x,
+                    dir,
+                    expect_fail,
+                } => {
                     if *dir != 1 && *dir != -1 {
                         return Err(failed(format!("adjustRent dir {dir} is not 1 or -1")));
                     }
@@ -942,13 +1022,17 @@ fn run_scenario_inner(
                     };
                     expect_ok(
                         moved,
-                        false,
+                        expect_fail.unwrap_or(false),
                         &format!("adjustRent {dir} @ {floor},{x}"),
                         Some("rent did not move"),
                     )
                     .map_err(failed)?;
                 }
-                Command::SetNoRate { floor, x } => {
+                Command::SetNoRate {
+                    floor,
+                    x,
+                    expect_fail,
+                } => {
                     let id = sim
                         .tower
                         .unit_at(*floor, *x)
@@ -956,18 +1040,18 @@ fn run_scenario_inner(
                         .ok_or_else(|| failed(format!("no unit at floor {floor}, x {x}")))?;
                     expect_ok(
                         sim.set_no_rate(id),
-                        false,
+                        expect_fail.unwrap_or(false),
                         &format!("setNoRate @ {floor},{x}"),
                         None,
                     )
                     .map_err(failed)?;
                 }
-                Command::StartFire => {
+                Command::StartFire { expect_fail } => {
                     let before = sim.events.count();
                     sim.start_fire();
                     expect_ok(
                         sim.events.count() > before,
-                        false,
+                        expect_fail.unwrap_or(false),
                         "startFire",
                         Some("nothing caught fire"),
                     )
