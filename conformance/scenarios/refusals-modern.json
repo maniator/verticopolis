@@ -17,14 +17,16 @@
       "kind": "floor",
       "floor": 2,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Lay a lobby on the ground line first to open your tower."
     },
     {
       "op": "build",
       "kind": "floor",
       "floor": 101,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Outside the buildable range."
     },
     {
       "op": "buildRow",
@@ -45,7 +47,8 @@
       "kind": "lobby",
       "floor": 1,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Structure already here."
     },
     {
       "op": "buildTransport",
@@ -63,91 +66,104 @@
       "kind": "office",
       "floor": 3,
       "x": 100,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Rooms must sit on the floor below: no floating overhangs."
     },
     {
       "op": "build",
       "kind": "office",
       "floor": 2,
       "x": 370,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Off the edge of the lot."
     },
     {
       "op": "build",
       "kind": "office",
       "floor": 1,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "The ground floor is a lobby concourse. Build rooms on floor 2 and up."
     },
     {
       "op": "build",
       "kind": "parking",
       "floor": 2,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Parking Space unlocks at 3★."
     },
     {
       "op": "build",
       "kind": "office",
       "floor": -1,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Office can't be built in the basement."
     },
     {
       "op": "build",
       "kind": "security",
       "floor": 2,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Security unlocks at 2★."
     },
     {
       "op": "build",
       "kind": "hotelSuite",
       "floor": 2,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Suite unlocks at 3★."
     },
     {
       "op": "build",
       "kind": "weddingHall",
       "floor": 2,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Wedding Hall unlocks at 5★."
     },
     {
       "op": "build",
       "kind": "metro",
       "floor": -1,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Metro Station unlocks at 4★."
     },
     {
       "op": "build",
       "kind": "foodHall",
       "floor": 2,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Food Hall unlocks at 3★."
     },
     {
       "op": "build",
       "kind": "lobby",
       "floor": 2,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Lobbies only go on the ground floor and every 15th floor (15, 30, 45…)."
     },
     {
       "op": "build",
       "kind": "floor",
       "floor": 4,
       "x": 170,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Floors and lobbies must sit on the story below: no floating overhangs."
     },
     {
       "op": "build",
       "kind": "floor",
       "floor": 3,
       "x": 100,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Floors and lobbies must sit on the story below: no floating overhangs."
     },
     {
       "op": "buildTransport",
@@ -155,7 +171,8 @@
       "x": 180,
       "bottom": 1,
       "top": 3,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Stairway links exactly two floors."
     },
     {
       "op": "buildTransport",
@@ -163,7 +180,8 @@
       "x": 190,
       "bottom": 2,
       "top": 2,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Transport needs height."
     },
     {
       "op": "buildTransport",
@@ -171,7 +189,8 @@
       "x": 374,
       "bottom": 1,
       "top": 2,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Off the edge of the lot."
     },
     {
       "op": "buildTransport",
@@ -179,7 +198,8 @@
       "x": 190,
       "bottom": 1,
       "top": 40,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "This elevator can span at most 30 floors (31 stops)."
     },
     {
       "op": "buildTransport",
@@ -187,7 +207,8 @@
       "x": 162,
       "bottom": 1,
       "top": 2,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Transport shafts cannot overlap."
     },
     {
       "op": "buildTransport",
@@ -195,7 +216,8 @@
       "x": 200,
       "bottom": 1,
       "top": 2,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Express Elevator unlocks at 3★."
     },
     {
       "op": "buildTransport",
@@ -203,7 +225,8 @@
       "x": 190,
       "bottom": 3,
       "top": 4,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Transport must run through built floors. Lay floors first."
     },
     {
       "op": "buildTransport",
@@ -211,7 +234,8 @@
       "x": 200,
       "bottom": 1,
       "top": 2,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Escalator unlocks at 3★."
     },
     {
       "op": "build",
@@ -224,7 +248,8 @@
       "kind": "office",
       "floor": 2,
       "x": 172,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Something is already here."
     },
     {
       "op": "setMoney",
@@ -235,7 +260,8 @@
       "kind": "office",
       "floor": 2,
       "x": 190,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Not enough money."
     },
     {
       "op": "buildTransport",
@@ -243,7 +269,8 @@
       "x": 200,
       "bottom": 1,
       "top": 2,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Not enough money."
     },
     {
       "op": "checkpoint",

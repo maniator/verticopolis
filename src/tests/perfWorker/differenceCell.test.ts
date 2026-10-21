@@ -35,7 +35,7 @@ describe("differenceCell", () => {
     const ts = metric("ts", [10, 20, 30], [0, 1, 2]);
     const wasm = metric("wasm", [31, 11, 99], [2, 0, 7]);
     expect(pairedDifferences(wasm, ts)).toEqual([1, 1]);
-    expect(differenceCell(wasm, ts)).toBe("1.00 (no interval), 2 pairs (wasm minus ts)");
+    expect(differenceCell(wasm, ts)).toBe("1.00 (no interval), 2 pairs (wasm minus ts), below the gate's minimum of 10 pairs");
   });
 
   it("says n/a when a side is missing or nothing pairs", () => {

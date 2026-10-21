@@ -171,13 +171,14 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 ## Performance & platform gotchas
 - **Hot paths get a complexity review, and it is a review gate.** The tick loop
   (`Simulation.tick` → `Crowd`, `ElevatorDispatch`, `EconomySystem`), the hosts and the render/UI
-  refresh run over the whole tower every step or frame, and the reference towers hold 12,062 to
-  43,358 units (most of the large one floor tiles), 110 floors and thousands of people. Look up
+  refresh run over the whole tower every step or frame, and towers reach tens of thousands of units
+  (most of them floor tiles), up to 110 floors and thousands of people (the page's section 2 has
+  the measured reference sizes and their date). Look up
   entities by id (`Tower.getUnit` / `getTransport`, `get_unit` / `get_transport`), hoist
   tower-wide facts out of per-unit and per-person loops, keep counters instead of re-scanning, and
   memoize per-`revision` work (see `Tower.stopsOf`). The checklist,
   `docs/performance/hot-path-review.md` (HP-1 to HP-12), applies to Rust and TypeScript alike, to
-  ported and inherited code, and to scans hidden in helpers. The deep review flags a
+  ported, rewritten, moved and inherited code, and to scans hidden in helpers. The deep review flags a
   whole-collection scan under any HP-2 multiplier and resolves it under that page's section 7:
   fixed, or deferred with evidence and an issue, never dismissed as pre-existing. The review
   skills load the page through `_bmad/custom/gds-code-review.toml` and

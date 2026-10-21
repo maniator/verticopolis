@@ -2,8 +2,9 @@
 //! answer equals the walk it replaced, after each kind of layout edit.
 
 use crate::clock::GameMode;
-use crate::crowd::spawn::{pick_x, pick_x_in_segment};
+use crate::crowd::spawn::{max_staff_for, pick_x, pick_x_in_segment};
 use crate::facilities::Kind;
+use crate::housekeeping::HK_MAIDS_PER_UNIT;
 use crate::sim::Simulation;
 use crate::tower::{Tower, UnitState};
 
@@ -195,6 +196,88 @@ fn a_list_changed_behind_the_revision_rebuilds_rather_than_overruns() {
     tower.units.truncate(tower.units.len() - 1);
     assert_eq!(tower.revision, revision);
     assert_matches_walks(&tower);
+}
+
+/// `maxStaffFor` as the walk over every unit counted it.
+fn walked_staff_ceiling(tower: &Tower) -> i64 {
+    let crews = tower
+        .units
+        .iter()
+        .filter(|u| u.kind == Kind::Housekeeping)
+        .count() as i64;
+    crews * HK_MAIDS_PER_UNIT
+}
+
+fn assert_ceiling(tower: &Tower, crews: i64) {
+    assert_eq!(walked_staff_ceiling(tower), crews * HK_MAIDS_PER_UNIT);
+    assert_eq!(max_staff_for(tower), crews * HK_MAIDS_PER_UNIT);
+    // The second read is a memo hit and must give the same answer.
+    assert_eq!(max_staff_for(tower), crews * HK_MAIDS_PER_UNIT);
+}
+
+#[test]
+fn the_staff_ceiling_follows_every_crew_edit() {
+    let mut tower = stacked();
+    assert_ceiling(&tower, 0);
+    let first = must(tower.place(Kind::Housekeeping, 2, 100));
+    assert_ceiling(&tower, 1);
+    let second = must(tower.place(Kind::Housekeeping, 3, 100));
+    assert_ceiling(&tower, 2);
+    // Other edits move the revision and leave the count as it is.
+    must(tower.place(Kind::Office, 2, 120));
+    must(tower.place_transport(Kind::ElevatorStandard, 130, 1, 4));
+    assert_ceiling(&tower, 2);
+    assert!(tower.remove_unit(first).is_some());
+    assert_ceiling(&tower, 1);
+    // A swap that keeps the unit count: a crew goes and a tile comes, with
+    // no read in between, so only the revision tells.
+    let count = tower.units.len();
+    assert!(tower.remove_unit(second).is_some());
+    must(tower.place(Kind::Floor, 5, 100));
+    assert_eq!(tower.units.len(), count);
+    assert_ceiling(&tower, 0);
+    // Unit state is not an input: a crew under construction or gutted by a
+    // fire still counts, as `maxStaffFor` counts every housekeeping unit. A
+    // state change keeps the memo, and a rebuild in each state counts the
+    // same.
+    let crew = must(tower.place(Kind::Housekeeping, 4, 100));
+    assert_ceiling(&tower, 1);
+    for state in [UnitState::Construction, UnitState::Gutted, UnitState::Fire] {
+        tower.get_unit_mut(crew).unwrap().state = state;
+        assert_ceiling(&tower, 1);
+        tower.reindex();
+        assert_ceiling(&tower, 1);
+    }
+}
+
+#[test]
+fn a_reload_recounts_the_staff_ceiling() {
+    let mut sim = Simulation::new_game(7, GameMode::Classic);
+    sim.tower = stacked();
+    must(sim.tower.place(Kind::Housekeeping, 2, 100));
+    must(sim.tower.place(Kind::Housekeeping, 3, 100));
+    assert_ceiling(&sim.tower, 2);
+    let loaded = crate::load::deserialize(&sim.serialize()).expect("the save loads");
+    assert_ceiling(&loaded.tower, 2);
+    // Pin the reset itself: a list assigned wholesale, as a load does, with
+    // one crew fewer but the same unit count and revision, still reads the
+    // memo's old answer until `reindex` resets it.
+    let mut units = sim.tower.units.clone();
+    let floor_three = units
+        .iter()
+        .position(|u| u.kind == Kind::Housekeeping && u.floor == 3)
+        .unwrap();
+    units[floor_three].kind = Kind::Security;
+    let (count, revision) = (sim.tower.units.len(), sim.tower.revision);
+    sim.tower.units = units;
+    assert_eq!(
+        (sim.tower.units.len(), sim.tower.revision),
+        (count, revision)
+    );
+    assert_eq!(walked_staff_ceiling(&sim.tower), HK_MAIDS_PER_UNIT);
+    assert_eq!(max_staff_for(&sim.tower), 2 * HK_MAIDS_PER_UNIT);
+    sim.tower.reindex();
+    assert_ceiling(&sim.tower, 1);
 }
 
 /// Every unit's memoized noise answer equals a fresh scan.

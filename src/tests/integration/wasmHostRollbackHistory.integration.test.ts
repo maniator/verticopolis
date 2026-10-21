@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { hasWasmPackage, wasmRequired } from "../conformance/wasmEngine";
 import { FrameDriver } from "../dualrun/dualRunHarness";
 import { freePoisoned, trapAfter } from "./wasmTraps";
-import { LOST, REPLACED, SET_UP, UNDONE, expectRolledBack, lastGood, offices, settle, setUp, tally } from "./wasmRollback";
+import { LOST, OLDER, REPLACED, SET_UP, UNDONE, expectRolledBack, lastGood, offices, settle, setUp, tally } from "./wasmRollback";
 
 /**
  * Undo, redo and the undo capture when the engine traps inside them, on the
@@ -289,4 +289,33 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
     }
   });
 
+  it("clears the undo trail when the recovery goes back past the newest point (#1126)", async () => {
+    const { a, h, engine } = setUp(75);
+    const load = vi.spyOn(Simulation, "deserialize");
+    try {
+      const sim = a.sim;
+      a.captureUndo("Build office");
+      expect(sim.build("office", 2, 190).ok).toBe(true);
+      a.commitUndo();
+      h.current()!.syncStructure(); // a merge covers the office: the older point
+      expect(sim.build("office", 2, 180).ok).toBe(true);
+      sim.serialize(); // a hosted save covers the second: the newest point
+      trapAfter(engine(), "tick");
+      sim.tick(1);
+      load.mockImplementationOnce(() => {
+        throw new Error("the newest point does not load");
+      });
+      await settle();
+      expect(h.status.restorePoint).toEqual({ point: "merge", skipped: 1 });
+      expect(a.sim.log[a.sim.log.length - 1].text).toBe(OLDER);
+      expect(offices(a)).toEqual([170, 190]);
+      // The trail is gone, the step older than the tower with it.
+      a.undo();
+      expect(a.toasts).toEqual(["Nothing to undo."]);
+      expect(offices(a)).toEqual([170, 190]);
+    } finally {
+      load.mockRestore();
+      h.stop();
+    }
+  });
 });
