@@ -42,11 +42,12 @@ const RIGHT = 260;
 const ROOMS_FROM = LEFT + 32;
 /** The run of rooms on a story, then the slot a housekeeping unit takes. */
 const RUN: readonly FacilityKind[] = ["hotelSingle", "hotelDouble", "hotelSuite"];
+const RUN_WIDTH = RUN.reduce((sum, kind) => sum + FACILITIES[kind].width, 0);
 const RUNS_PER_FLOOR = 4;
 /** The wing stands past a gap at the tower's right edge, on stories 2 to
  *  `WING_TOP`, which all lie in the first service zone. */
 const WING_FROM = RIGHT + 10;
-const WING_TO = WING_FROM + RUNS_PER_FLOOR * 20;
+const WING_TO = WING_FROM + RUNS_PER_FLOOR * RUN_WIDTH;
 /** A standard elevator on the wing's far edge, so its guests can reach the
  *  lobby and stay. Standard elevators are not part of the staff network, so
  *  the crews still have no route there. */
