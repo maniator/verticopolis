@@ -347,11 +347,12 @@ bands and 14 express) and all 64 stairs and escalator links, and most of its
 rooms are vacant. A rule that counts only people would let it onto the slowest path.
 Its rows are reported rows at the stage-1 bracket run, slice 9 and RUN-1;
 whether they bind at RUN-3 is the owner's decision. The `hotel-heavy` tower is a Modern tower
-of 852 booked hotel rooms on 61 stories with 24 housekeeping units. Guests
+of 852 booked hotel rooms total (732 in the main 61-story tower and 120 in its low wing),
+with 24 housekeeping units. Guests
 ride standard elevators that serve every floor, but the staff network is split
 into three service-elevator zones and only the first two have crews, so 276 of
 the rooms (32%) are out of every crew's reach: `staffConnected` fails for them
-on every dispatch. A low wing beside the tower, joined to it only along the lobby row, has 120 more rooms on crewed stories
+on every dispatch. The 120-room wing beside the tower, joined to it only along the lobby row, has rooms on crewed stories
 with no staff transport of its own (one standard elevator lets its guests reach
 the lobby and stay): `staffConnected` says yes, but every dispatch to the wing
 ends in `no-route`, about 62,000 times on the first day and about 140,000 on
