@@ -5,11 +5,20 @@ name: Update perf baseline
 # the committed numbers are captured on the identical browser and (as far as CI
 # hardware allows) comparable to the gate's measurements. A local sandbox with
 # variable CPU is never the arbiter, exactly as with the visual baselines.
-# Trigger by pushing so the HEAD commit's message contains "[update-perf-baseline]"
-# (only the head commit of the push is checked); the refreshed baseline comes back
-# as a bot commit on the same branch. Review those numbers before relying on them:
-# that commit IS the blessing of a new perf truth, and it should be minted on the
-# pre-E5 render path (the E5-S0 commit) so later live-view PRs measure against it.
+# The file holds one entry per engine (#900), and a run mints ONE engine: push
+# so the HEAD commit's message contains "[update-perf-baseline:wasm]" or
+# "[update-perf-baseline:ts]" (only the head commit of the push is checked), or
+# dispatch the workflow with the engine as its input. The run measures that
+# engine's Playwright project only, five times, and makes the entry from the
+# median of the passes (scripts/perf-baseline-mint.ts); every other engine's
+# entry stays exactly the committed one, and the refreshed entry comes back as
+# a bot commit on the same branch. The run's summary also shows how the passes
+# spread around their median, the A/A reading M7's tolerances are calibrated
+# from (#900), and the passes are kept as an artifact. A bare "[update-perf-baseline]" names no engine
+# and fails. Review those numbers before relying on them: that commit IS the
+# blessing of a new perf truth. The TypeScript entry was minted on the pre-E5
+# render path (the E5-S0 commit) so later live-view PRs measure against it, so
+# re-mint it only on purpose.
 #
 # The bot pushes with GITHUB_TOKEN, which never triggers workflows, so the baseline
 # commit itself gets no CI run; push once more after pulling it to get a green
@@ -19,6 +28,18 @@ on:
   push:
     branches-ignore: [main]
   workflow_dispatch:
+    inputs:
+      engine:
+        description: "The engine whose entry to mint; the other engine's entry stays as committed"
+        type: choice
+        options: [wasm, ts]
+        default: wasm
+        required: true
+      passes:
+        description: "How many times to measure the engine; the entry is each value's median"
+        type: number
+        default: 5
+        required: true
 
 concurrency:
   group: regen-perf-baseline-${{ github.ref }}
@@ -34,13 +55,54 @@ permissions:
 
 jobs:
   # Pin the container to the repo's Playwright version so the baseline is minted
-  # against the EXACT Chromium the perf gate (test.yml) measures with.
+  # against the EXACT Chromium the perf gate (test.yml) measures with, and
+  # resolve which engine this run mints. The prefix match below also catches a
+  # bare or misspelled marker, so the engine step can refuse it out loud.
   resolve-image:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[update-perf-baseline]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[update-perf-baseline')
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.pin.outputs.image }}
+      engine: ${{ steps.engine.outputs.engine }}
+      project: ${{ steps.engine.outputs.project }}
+      passes: ${{ steps.engine.outputs.passes }}
     steps:
+      # The commit message and the input reach the shell as environment
+      # variables, never spliced into the script.
+      - id: engine
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_ENGINE: ${{ inputs.engine }}
+          INPUT_PASSES: ${{ inputs.passes }}
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          passes=5
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            named="$INPUT_ENGINE"
+            passes="$INPUT_PASSES"
+          else
+            named=""
+            for e in ts wasm; do
+              case "$MESSAGE" in *"[update-perf-baseline:$e]"*) named="$named $e" ;; esac
+            done
+          fi
+          set -- $named
+          if [ "$#" -ne 1 ]; then
+            echo "::error::name exactly one engine to mint: [update-perf-baseline:wasm] or [update-perf-baseline:ts] (a run mints one engine and keeps the other's entry)"
+            exit 1
+          fi
+          case "$1" in
+            ts) project=chromium ;;
+            wasm) project=chromium-wasm ;;
+            *) echo "::error::unknown engine \"$1\""; exit 1 ;;
+          esac
+          case "$passes" in
+            [1-9] | 1[0-9] | 20) ;;
+            *) echo "::error::passes must be a whole number from 1 to 20; got \"$passes\""; exit 1 ;;
+          esac
+          echo "engine=$1" >> "$GITHUB_OUTPUT"
+          echo "passes=$passes" >> "$GITHUB_OUTPUT"
+          echo "project=$project" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -53,7 +115,7 @@ jobs:
   # from the Actions cache (or build and cache it) for the branch tip the jobs
   # below check out, and hand it to them: their container has no Rust toolchain.
   engine-wasm:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[update-perf-baseline]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[update-perf-baseline')
     runs-on: ubuntu-latest
     # A cache miss compiles the crate (a few minutes); anything near this is a hang.
     timeout-minutes: 30
@@ -75,6 +137,8 @@ jobs:
   update:
     needs: [resolve-image, engine-wasm]
     runs-on: ubuntu-latest
+    # Up to 20 passes of a few minutes each in the container.
+    timeout-minutes: 90
     # Earns write: it pushes the refreshed baseline. The write token is only
     # ever exposed to the credentialed push step below, never to the steps
     # that execute branch code (see persist-credentials on the checkout).
@@ -121,11 +185,33 @@ jobs:
         env:
           VC_TOOLING: "1"
 
-      - name: Capture perf baseline
-        run: npm run perf:capture
+      # Only the named engine's project runs. Each pass records its
+      # measurement in perf-passes/ and leaves the baseline file alone.
+      - name: Measure the engine
+        run: npm run perf:capture -- --project="$PROJECT" --repeat-each="$PASSES"
+        env:
+          PROJECT: ${{ needs.resolve-image.outputs.project }}
+          PASSES: ${{ needs.resolve-image.outputs.passes }}
+          PERF_PASSES_DIR: perf-passes
+
+      - name: Mint the entry from the passes
+        run: npx tsx scripts/perf-baseline-mint.ts "$ENGINE" perf-passes "$PASSES"
+        env:
+          ENGINE: ${{ needs.resolve-image.outputs.engine }}
+          PASSES: ${{ needs.resolve-image.outputs.passes }}
+
+      - name: Keep the passes
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-passes-${{ needs.resolve-image.outputs.engine }}
+          path: perf-passes/
+          if-no-files-found: warn
 
       - name: Commit refreshed baseline
         id: commit
+        env:
+          ENGINE: ${{ needs.resolve-image.outputs.engine }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -135,7 +221,7 @@ jobs:
             echo "committed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "Update perf baseline from CI"
+          git commit -m "Update the $ENGINE perf baseline from CI"
           echo "committed=true" >> "$GITHUB_OUTPUT"
 
       # The only step whose commands receive the write token, and every

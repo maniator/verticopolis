@@ -1,10 +1,10 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
-import { buildToStar, tsOnlyOnWasm } from "./helpers";
+import { buildToStar, expectEngineHosted, onWasm } from "./helpers";
 import { benchmarkUiUpdate, measureSimSpeed, checkNodeIdentity } from "./perf-harness";
-import { aboveFloor, withinCeiling } from "../src/tests/perfBudget";
+import { budgetChecks, crossEngineLines, formatBaselineFile, harnessOf, parseBaselineFile, withBaseline, type BaselineFile, type PerfEngine, type PerfMeasurement } from "../src/tests/perfBaseline";
 
 /**
  * The E5-S0 perf gate (BLOCKING, ahead of any live-view migration). It holds a
@@ -20,11 +20,22 @@ import { aboveFloor, withinCeiling } from "../src/tests/perfBudget";
  * assertions (first-run bootstrap) so the harness is never gated on a file it just
  * created; E5-S1 additionally asserts the file exists so the gate can never stay
  * silently inert (see the backlog note).
+ *
+ * The spec runs on both engines (#900): `chromium` on the TypeScript engine and
+ * `chromium-wasm` on the WASM engine. The file holds one entry per engine
+ * (src/tests/perfBaseline.ts), each run is held to its own engine's entry, and
+ * a capture writes only the engine it ran. On the WASM engine the run is also
+ * read against the TypeScript entry and printed (M7's reading), which fails
+ * nothing.
  */
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const BASELINE_PATH = path.join(dir, "perf", "baseline.json");
 const CAPTURE = process.env.PERF_CAPTURE === "1";
+// A mint run (update-perf-baseline.yml) sets this with PERF_CAPTURE=1 and
+// `--repeat-each`: each pass records its measurement here, and
+// scripts/perf-baseline-mint.ts makes the engine's entry from all of them.
+const PASSES_DIR = process.env.PERF_PASSES_DIR;
 // The committed baseline is minted on CI hardware, so comparing against it is
 // only meaningful there: a slower local machine would always fail and a faster
 // one would hide regressions. Mirror of the visual-snapshot convention
@@ -46,15 +57,8 @@ const SPEED = 3;
 const SPEED_MINUTES_PER_SEC = 120;
 const SPEED_WINDOW_MS = 4000;
 const SPEED_WINDOWS = 5;
-// Tolerances. (A) median may rise at most 5% and p95 at most 10% (the plan's
-// numbers). (B) may fall at most 10% below baseline: it is the noisiest signal
-// (a throttled end-to-end rate), so the floor carries runner-jitter headroom
-// wider than (A)'s, while a genuine catch-up-spiral regression tanks B far more
-// than 10% and is still caught. Locally (a noisier shared sandbox than CI) the
-// three metrics held to ~1% / ~5% / ~4% run-to-run, comfortably inside these.
-const A_MEDIAN_TOL = 1.05;
-const A_P95_TOL = 1.1;
-const B_FLOOR_TOL = 0.9;
+// The tolerances live with the baseline file's helpers (PERF_TOLERANCES in
+// src/tests/perfBaseline.ts).
 
 // benchmarkUiUpdate rounds n up to whole batches; a non-divisible configuration
 // would silently run more pumps than N_PUMPS while the metadata check still
@@ -63,9 +67,13 @@ if (N_PUMPS % A_BATCH !== 0) {
   throw new Error(`N_PUMPS (${N_PUMPS}) must be divisible by A_BATCH (${A_BATCH})`);
 }
 
-interface Baseline {
-  uiUpdate: { medianMs: number; p95Ms: number; meanMs: number; n: number; batch: number };
-  simSpeed: { simMinutesPerRealSecond: number; cpuThrottle: number; speed: number; windowMs: number; windows: number };
+/** The engine the page booted, and on WASM whether the host still runs the
+ *  tower: a run that fell back to TypeScript must not be held to, or mint,
+ *  the WASM entry (and the reverse). */
+async function expectEngine(page: Page, engine: PerfEngine): Promise<void> {
+  const booted = await page.evaluate(() => (window as unknown as { __vcEngineBoot?: { engine?: string } }).__vcEngineBoot?.engine ?? null);
+  expect(booted, `the page must boot the ${engine} engine this project measures`).toBe(engine);
+  await expectEngineHosted(page);
 }
 
 test.describe("E5-S0 perf gate @perf", () => {
@@ -77,7 +85,7 @@ test.describe("E5-S0 perf gate @perf", () => {
   test.setTimeout(180_000);
 
   test("ui.update cost, end-to-end speed, and node identity clear the committed baseline @perf", async ({ page }) => {
-    tsOnlyOnWasm("e2e/perf/baseline.json was measured on the TypeScript engine, so the WASM engine has no baseline to clear yet");
+    const engine: PerfEngine = onWasm(test.info().project.name) ? "wasm" : "ts";
     await page.goto("/");
     await page.waitForFunction(() => {
       const g = (window as unknown as { game?: { sim?: unknown; ui?: unknown } }).game;
@@ -86,6 +94,7 @@ test.describe("E5-S0 perf gate @perf", () => {
     // Build the deterministic large tower (TOWER-rank: ~100 floors, thousands of
     // occupants), the committed "large-tower fixture" for the benchmark.
     await page.evaluate(buildToStar, 6);
+    await expectEngine(page, engine);
 
     // (A) isolated render cost (batched, change-path).
     const uiUpdate = await page.evaluate(benchmarkUiUpdate, { n: N_PUMPS, batch: A_BATCH });
@@ -141,10 +150,13 @@ test.describe("E5-S0 perf gate @perf", () => {
       await client.send("Emulation.setCPUThrottlingRate", { rate: 1 });
     }
 
-    const current: Baseline = {
+    const current: PerfMeasurement = {
       uiUpdate,
       simSpeed: { simMinutesPerRealSecond, cpuThrottle: CPU_THROTTLE, speed: SPEED_MINUTES_PER_SEC, windowMs: SPEED_WINDOW_MS, windows: SPEED_WINDOWS },
     };
+    // The engine must still be the one measured after the timed windows: a
+    // host fault mid-run would leave TypeScript numbers on the WASM project.
+    await expectEngine(page, engine);
 
     // The status leaf spans are textContent writes and must never be replaced;
     // a live-view regression that rebuilds them fails here.
@@ -155,20 +167,28 @@ test.describe("E5-S0 perf gate @perf", () => {
     // pre-E5 innerHTML reparse rebuilt them; that regression now fails here).
     expect(nodeIdentity.towerStatsChildStable, "the tower-stats grid children keep their identity across pumps").toBe(true);
 
-    if (CAPTURE || !fs.existsSync(BASELINE_PATH)) {
+    if (CAPTURE && PASSES_DIR) {
+      fs.mkdirSync(PASSES_DIR, { recursive: true });
+      fs.writeFileSync(path.join(PASSES_DIR, `${engine}-${test.info().repeatEachIndex}.json`), JSON.stringify({ engine, ...current }) + "\n");
+      return;
+    }
+    const file: BaselineFile = fs.existsSync(BASELINE_PATH) ? parseBaselineFile(fs.readFileSync(BASELINE_PATH, "utf8")) : {};
+    const baseline = file[engine];
+    if (CAPTURE || !baseline) {
       // In enforce mode a missing baseline is a hard failure, not a bootstrap:
-      // otherwise deleting baseline.json would silently disable the gate in CI.
-      // The bootstrap capture-and-skip remains for local runs and for the
-      // capture workflow itself (PERF_CAPTURE=1).
+      // otherwise deleting baseline.json, or an engine's entry, would silently
+      // disable the gate in CI. The bootstrap capture-and-skip remains for
+      // local runs and for the capture workflow itself (PERF_CAPTURE=1), which
+      // writes this engine's entry and keeps the others.
       expect(
         CAPTURE || !ENFORCE,
-        `no committed baseline at ${BASELINE_PATH}; mint one with the update-perf-baseline workflow`,
+        `no committed ${engine} baseline in ${BASELINE_PATH}; mint one with [update-perf-baseline:${engine}]`,
       ).toBe(true);
       fs.mkdirSync(path.dirname(BASELINE_PATH), { recursive: true });
-      fs.writeFileSync(BASELINE_PATH, JSON.stringify(current, null, 2) + "\n");
+      fs.writeFileSync(BASELINE_PATH, formatBaselineFile(withBaseline(file, { engine, ...current })));
       test.info().annotations.push({
         type: "perf-baseline",
-        description: `captured baseline (not asserted): ${JSON.stringify(current)}`,
+        description: `captured ${engine} baseline (not asserted): ${JSON.stringify(current)}`,
       });
       return;
     }
@@ -179,26 +199,20 @@ test.describe("E5-S0 perf gate @perf", () => {
       // stop (see the ENFORCE note at the top).
       test.info().annotations.push({
         type: "perf-measured",
-        description: `measured (comparison skipped outside CI; PERF_ENFORCE=1 to compare): ${JSON.stringify(current)}`,
+        description: `measured ${engine} (comparison skipped outside CI; PERF_ENFORCE=1 to compare): ${JSON.stringify(current)}`,
       });
       return;
     }
 
-    const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, "utf8")) as Baseline;
+    // Every CI run prints what it measured, so the runs of one commit give an
+    // A/A spread, and M7's reading comes before this engine's own budgets so a
+    // failing budget still leaves both in the log.
+    console.log(`perf ${engine}: ${JSON.stringify(current)}`);
+    if (engine === "wasm") for (const line of crossEngineLines(current, file)) console.log(line);
     // The baseline is only comparable if it was minted with the SAME harness
     // parameters; a constant change (or a stale file) must demand a re-mint via
-    // [update-perf-baseline], never a silent apples-to-oranges comparison.
-    expect(
-      {
-        n: baseline.uiUpdate.n,
-        batch: baseline.uiUpdate.batch,
-        cpuThrottle: baseline.simSpeed.cpuThrottle,
-        speed: baseline.simSpeed.speed,
-        windowMs: baseline.simSpeed.windowMs,
-        windows: baseline.simSpeed.windows,
-      },
-      "baseline metadata must match the harness parameters; re-mint with [update-perf-baseline]",
-    ).toEqual({
+    // [update-perf-baseline:<engine>], never a silent apples-to-oranges comparison.
+    expect(harnessOf(baseline), `the ${engine} baseline's metadata must match the harness parameters; re-mint with [update-perf-baseline:${engine}]`).toEqual({
       n: N_PUMPS,
       batch: A_BATCH,
       cpuThrottle: CPU_THROTTLE,
@@ -206,24 +220,10 @@ test.describe("E5-S0 perf gate @perf", () => {
       windowMs: SPEED_WINDOW_MS,
       windows: SPEED_WINDOWS,
     });
-    // (A) median must not rise more than 5%; p95 not more than 10%. The
-    // comparisons go through withinCeiling/aboveFloor (src/tests/perfBudget.ts),
-    // which widen the computed budget by a documented 1e-9 relative epsilon: a
-    // strict <= against `baseline * tol` once failed a docs-only diff by 4e-13 ms
-    // of float-representation noise at the exact boundary (AUD-009). The
-    // effective tolerances stay 5%/10%.
-    expect(
-      withinCeiling(uiUpdate.medianMs, baseline.uiUpdate.medianMs, A_MEDIAN_TOL),
-      `ui.update median ${uiUpdate.medianMs.toFixed(4)}ms vs baseline ${baseline.uiUpdate.medianMs.toFixed(4)}ms (x${A_MEDIAN_TOL})`,
-    ).toBe(true);
-    expect(
-      withinCeiling(uiUpdate.p95Ms, baseline.uiUpdate.p95Ms, A_P95_TOL),
-      `ui.update p95 ${uiUpdate.p95Ms.toFixed(4)}ms vs baseline ${baseline.uiUpdate.p95Ms.toFixed(4)}ms (x${A_P95_TOL})`,
-    ).toBe(true);
-    // (B) end-to-end speed must be at least the baseline (same speed or faster).
-    expect(
-      aboveFloor(simMinutesPerRealSecond, baseline.simSpeed.simMinutesPerRealSecond, B_FLOOR_TOL),
-      `sim-min/s ${simMinutesPerRealSecond.toFixed(2)} vs baseline ${baseline.simSpeed.simMinutesPerRealSecond.toFixed(2)} (x${B_FLOOR_TOL})`,
-    ).toBe(true);
+    // (A) median must not rise more than 5%; p95 not more than 10%. (B)
+    // end-to-end speed must be at least the baseline (same speed or faster),
+    // within its 10% floor. budgetChecks (src/tests/perfBaseline.ts) carries
+    // the float-safe comparisons and the tolerances.
+    for (const check of budgetChecks(current, baseline)) expect(check.ok, check.message).toBe(true);
   });
 });

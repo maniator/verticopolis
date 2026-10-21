@@ -38,6 +38,8 @@ node_modules
 /test-results/
 /playwright-report/
 /playwright/.cache/
+# The perf baseline mint's passes (update-perf-baseline.yml, PERF_PASSES_DIR).
+/perf-passes/
 # E2E capture output (milestones.spec.ts): per-run artifacts, uploaded by CI,
 # never committed (the committed docs/screenshots gallery comes only from the
 # pinned-container pipeline).
