@@ -20,6 +20,7 @@ on:
       - "src/tests/integration/conformanceWasmTdt.integration.test.ts"
       - "src/tests/integration/conformanceWasmCanBuild.integration.test.ts"
       - "src/tests/integration/conformanceWasmVctower.integration.test.ts"
+      - "src/tests/integration/conformanceWasmSaves.integration.test.ts"
       - "src/tests/integration/dualRunDay.integration.test.ts"
       - "src/tests/integration/dualRunEdits.integration.test.ts"
       - "src/tests/integration/chargeBindingRaw.integration.test.ts"
@@ -112,6 +113,7 @@ jobs:
             case "$f" in src/tests/integration/conformanceWasmTdt.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/conformanceWasmCanBuild.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/conformanceWasmVctower.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/conformanceWasmSaves.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/dualRunDay.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/dualRunEdits.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/chargeBindingRaw.integration.test.ts) engine=true ;; esac

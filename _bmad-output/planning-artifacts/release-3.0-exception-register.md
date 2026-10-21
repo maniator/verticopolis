@@ -36,3 +36,52 @@ approves an exception.
   cutover plan's section 6 Rollback row only flips the default back on the
   same build, which keeps the field and cannot show the loss, so the check
   binds once the owner approves that plan.
+
+## EX-2: the engine's raw save text differs from the TypeScript writer's in number form and in a transport's key order
+
+- **Source:** the Saves audit (#1236), `conformanceWasmSaves.integration.test.ts`.
+- **Status:** proposed (2026-10-21). Awaiting the owner's decision at the
+  #945 sign-off, together with the question below.
+- **What differs:** the Saves row of #945 says "byte for byte through the
+  engine". The audit compares canonical JSON (keys sorted), where every
+  fixture and loader case matches, and the file the engine writes, which is
+  the TypeScript writer's text except for one thing. The raw text differs in
+  two ways:
+  - **Number form (the binding's `serialize()` text only).** It prints an
+    integer-valued double with a trailing `.0` (`"money":13551601.0` where
+    TypeScript writes `13551601`): 634 to 1,474 numbers per fixture, text
+    0.2% to 0.4% longer. The `.vctower` writer re-prints numbers the
+    JavaScript way (`js_json`), so a written file has the same numbers and
+    the same length as the TypeScript writer's.
+  - **Key order inside a transport (files and text).** TypeScript writes a
+    transport's keys where its object history put them. `carLoad` comes
+    before `load` when a save carries it (`src/engine/sim/serialization.ts:409`)
+    and after it when dispatch appends it on the first tick
+    (`ElevatorDispatch.ts:130`); the stairs in the `split-tower-4` fixture
+    come out with their keys sorted. The Rust serializer has one fixed order.
+- **What a player sees:** nothing. A file the engine writes loads to the same
+  tower in both engines.
+- **Is raw equality achievable?**
+  - **Number form:** yes, by printing `serialize()` through `js_json`, but
+    that costs about 1.5 times as much per call (24 ms to 36 ms on
+    `split-tower-4`, measured by the independent reviewer in Node), and
+    `serialize()` is on the hosted merge path every revision change
+    (`wasmHost.ts:286`, `workerCore.ts:133`, the #1051 frame path). Every
+    consumer of that text runs `JSON.parse` on it, so nothing reads the form.
+    I tried it and reverted it for that reason.
+  - **Key order:** not without a data-model change. No fixed Rust order
+    matches both histories, so matching would mean a per-transport order
+    record in the Rust transport, set at load and in dispatch, plus a
+    serializer that reads it. That touches `engine-rs/` (it moves the
+    seeded-replay window key) and `load.rs`, which the Saves audit and A8
+    lanes own, to change where keys sit in a file no reader compares.
+- **Case for accepting:** the text form is the binding's own and no reader
+  compares it, the written file already matches, and the order record costs
+  engine data-model state and a window restart for a position nothing reads.
+- **Decision for the owner:** is canonical JSON equality (with the written
+  file) the criterion for the Saves row, or must the raw text match as well?
+  If it must, this entry is not enough and the serializer changes instead.
+- **Check:** the Saves audit pins both differences (the binding text carries
+  `.0`; the written file equals the TypeScript writer's text once each
+  transport's keys are sorted), so a fix of either fails the test and this
+  entry has to be removed or rewritten.
