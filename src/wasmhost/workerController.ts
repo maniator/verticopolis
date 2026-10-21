@@ -2,7 +2,8 @@ import type { Simulation } from "../engine/Simulation";
 import type { WasmHostApp } from "./startWasmHost";
 import { attachWorkerHost, type WorkerHost } from "./workerHost";
 import type { FromWorker, ToWorker } from "./workerProtocol";
-import { EngineBootError } from "./engineBoot";
+import { isControlled } from "./enginePackageCheck";
+import { EngineBootError, LOAD_FAILURE_REASONS, cleanBuildMetadata, cleanPackageFailure, packageFailureReason, type FallbackReason, type PackageFailure } from "./engineBoot";
 import type { BuildMetadataResult } from "./buildSection";
 import { recordHostError, type HostErrors } from "./hostErrors";
 
@@ -73,13 +74,24 @@ export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, tim
     // load's limit does; every other start failure is an untyped error.
     // What the worker said about the binary before it failed or went quiet.
     let seen: BuildMetadataResult | undefined;
-    const fail = (message: string, timedOut = false, build?: BuildMetadataResult) => {
+    const fail = (message: string, timedOut = false, coded?: { reason?: FallbackReason; package?: PackageFailure; build?: BuildMetadataResult }) => {
       clearTimeout(timer);
       worker.onmessage = null;
       worker.onerror = null;
       worker.terminate();
-      const known = build ?? seen;
-      const error = timedOut ? new EngineBootError("boot-timeout", message) : new Error(message);
+      // A load the worker coded keeps its code and, for a refused package,
+      // its kind and ids, so the boot state names them.
+      // `controlled` is the page's: a worker's own navigator can read false
+      // under a controlled page, and Repair keys off this value.
+      const refused = cleanPackageFailure(coded?.package);
+      const detail = refused && { ...refused, controlled: isControlled(globalThis.navigator) };
+      const sent = coded?.reason && LOAD_FAILURE_REASONS.includes(coded.reason) ? coded.reason : undefined;
+      const reason = sent ?? (detail ? packageFailureReason(detail.kind) : undefined);
+      const known = cleanBuildMetadata(coded?.build) ?? seen;
+      let error: Error;
+      if (timedOut) error = new EngineBootError("boot-timeout", message);
+      else if (reason) error = new EngineBootError(reason, message, detail);
+      else error = new Error(message);
       reject(known ? Object.assign(error, { build: known }) : error);
     };
     const timer = setTimeout(() => fail(`the engine worker did not answer within ${timeoutMs} ms`, true), timeoutMs);
@@ -89,11 +101,11 @@ export function spawnEngineWorker(make: () => EngineWorkerLike, url: string, tim
         clearTimeout(timer);
         worker.onmessage = null;
         worker.onerror = null;
-        resolve({ worker, catalogs: msg.catalogs, identity: msg.identity, build: msg.build });
+        resolve({ worker, catalogs: msg.catalogs, identity: msg.identity, build: cleanBuildMetadata(msg.build) });
       } else if (msg.type === "build") {
-        seen = msg.build;
+        seen = cleanBuildMetadata(msg.build);
       } else if (msg.type === "error") {
-        fail(msg.message, false, msg.build);
+        fail(msg.message, false, msg);
       }
     };
     worker.onerror = (e) => fail(`the engine worker failed to start: ${e.message ?? "unknown error"}`);
