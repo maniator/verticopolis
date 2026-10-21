@@ -37,7 +37,8 @@ export function readCatalog(mod: Pick<WasmModule, "catalog">, mode: GameMode, ve
   try {
     c = JSON.parse(mod.catalog(mode));
   } catch (e) {
-    throw new Error(`the engine returned no ${mode} catalog: ${e instanceof Error ? e.message : String(e)}`);
+    // The cause keeps a trap a trap for the host (#1113).
+    throw Object.assign(new Error(`the engine returned no ${mode} catalog: ${e instanceof Error ? e.message : String(e)}`), { cause: e });
   }
   if (!isRecord(c)) throw new Error("the engine returned no catalog");
   if (c.version !== version) throw new Error(`the engine's catalog is version ${String(c.version)}; expected version ${version}`);

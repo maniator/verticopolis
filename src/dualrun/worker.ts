@@ -1,3 +1,4 @@
+import { loadEngineModule } from "../wasmhost/loadEngineModule";
 import { checkBinding } from "./binding";
 import type { ShadowCommand } from "./commands";
 import { ShadowEngine } from "./shadow";
@@ -35,8 +36,10 @@ let gen: number | undefined;
 let queue: ShadowCommand[] | null = [];
 
 async function load(url: string): Promise<void> {
-  const mod = (await import(/* @vite-ignore */ url)) as { default: () => Promise<unknown> };
-  await mod.default();
+  // Through the same loader as the game's own load, so a production build
+  // checks the bytes and the tooling never compares against a mixed package
+  // either. (A development serve skips the check, as the game's load does.)
+  const { mod } = await loadEngineModule(url);
   shadow = new ShadowEngine(checkBinding(mod));
   post({ type: "ready" });
   const pending = queue ?? [];

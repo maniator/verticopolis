@@ -166,24 +166,31 @@ test.describe("never falls back to the TypeScript engine", () => {
     await expectStopped(page, "load");
   });
 
-  test("an engine glue from another build stops boot", async ({ page }) => {
-    // A glue that loads but lacks the binding's surface, as a glue from a
-    // mismatched build would.
+  test("an engine glue from another build stops boot, refused by the byte check", async ({ page }) => {
+    // A glue that would load but lacks the binding's surface, as a glue from a
+    // mismatched build would. The shell was built for other bytes, so the
+    // package check refuses it before anything is imported.
     await page.route("**/engine/verticopolis_engine.js", (r) =>
       r.fulfill({ status: 200, contentType: "text/javascript", body: "export default async function init() {}\nexport class Engine {}\n" }),
     );
     await page.goto("/");
     const text = await expectStopped(page, "load");
-    expect(text).toContain("the WASM binding lacks");
+    expect(text).toContain("this build expects");
+    expect(await bootState(page)).toMatchObject({ failure: { reason: "package-mismatch", package: { kind: "mismatch", file: "glue" } } });
   });
 
   test("an engine that loads but cannot host the first tower stops the game at start", async ({ page }) => {
     // A glue with the whole binding surface (so it passes the binding check)
-    // but no catalog, which the host reads before it builds an engine.
+    // but no catalog, which the host reads before it builds an engine. The
+    // byte check would refuse such a file, so it is swapped in after the
+    // check, in the Blob the loader imports.
     const methods = INSTANCE_METHODS.map((m) => `Engine.prototype.${m} = function () { throw new Error("stub"); };`).join("\n");
     const statics = STATIC_METHODS.map((m) => `Engine.${m} = function () { throw new Error("stub"); };`).join("\n");
     const glue = `export default async function init() {}\nexport function encodeVctower() { return ""; }\nexport class Engine {}\n${methods}\n${statics}\n`;
-    await page.route("**/engine/verticopolis_engine.js", (r) => r.fulfill({ status: 200, contentType: "text/javascript", body: glue }));
+    await page.addInitScript((stub) => {
+      const create = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = (obj: Blob | MediaSource) => (obj instanceof Blob && obj.type === "text/javascript" ? create(new Blob([stub], { type: "text/javascript" })) : create(obj));
+    }, glue);
     await page.goto("/");
     const failure = page.locator("#engine-failure");
     await expect(failure).toBeVisible({ timeout: 30_000 });

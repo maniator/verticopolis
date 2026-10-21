@@ -11,7 +11,8 @@
       "kind": "metro",
       "floor": -9,
       "x": 0,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Build next to the tower. You can't build in midair."
     },
     {
       "op": "build",
@@ -24,7 +25,8 @@
       "kind": "metro",
       "floor": -7,
       "x": 0,
-      "expectFail": true
+      "expectFail": true,
+      "reason": "Only 1 Metro Station allowed per tower."
     },
     {
       "op": "checkpoint",

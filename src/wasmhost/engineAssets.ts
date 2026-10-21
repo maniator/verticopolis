@@ -11,16 +11,14 @@
  * `runtime: false` is precached anyway. engineAssets.test.ts fails when the
  * app source or the package build names an engine file this list lacks.
  *
- * Today the game fetches two files: the glue, which the host and the dual run
- * import by URL (enginePackageUrl in startWasmHost.ts), and the binary, which
- * the host fetches and compiles itself from the same folder (engineBinaryUrl
- * in engineLoad.ts, #963) and hands to the glue's init. The glue's own default,
- * `new URL("verticopolis_engine_bg.wasm", import.meta.url)`, names the same
- * URL and stays in the glue for any caller that does not pass a module.
- * `BUILD.json` is listed as a
- * run-time file and precached with them because the package check
- * (enginePackageCheck.ts, #985's criterion 5) reads it once the loader is
- * wired to it. `THIRD-PARTY.json` is read only at
+ * Today the game fetches three files, all through the verified loader
+ * (loadEngineModule.ts, #985's criterion 5): the glue (enginePackageUrl in
+ * startWasmHost.ts names it), the binary beside it, and `BUILD.json`, whose
+ * record the loader checks both against. The loader hashes the bytes, compiles
+ * the binary itself (reading its build section, engineLoad.ts, #963) and hands
+ * the compiled module to the glue's `init`, so the glue never fetches the
+ * binary itself.
+ * `THIRD-PARTY.json` is read only at
  * build and test time (the notices in src/build/rustNotices.ts), so it stays
  * out of the precache. Each run-time file is listed in the workbox glob by its
  * own path where the pattern matches no `.json` (see the note in
@@ -50,9 +48,9 @@ export interface EngineFile {
 /** Every file the package build leaves in `src/public/engine/`. Add a new
  *  one here in the same change that writes it. */
 export const ENGINE_PACKAGE: readonly EngineFile[] = [
-  { name: ENGINE_GLUE, runtime: true, readBy: "the WASM host and the dual run's worker, imported by URL (startWasmHost.ts)" },
-  { name: ENGINE_WASM, runtime: true, readBy: "the page (engineLoad.ts fetches and compiles it, then passes it to the glue's init); the glue names the same URL as its default" },
-  { name: ENGINE_BUILD_RECORD, runtime: true, readBy: "the page, once the loader runs enginePackageCheck.ts (it hashes the glue and binary against this record); also the build, CI's package cache and packageHash.test.ts" },
+  { name: ENGINE_GLUE, runtime: true, readBy: "the WASM host, the engine worker and the dual run's worker, through the verified loader (loadEngineModule.ts), which imports the checked bytes" },
+  { name: ENGINE_WASM, runtime: true, readBy: "the verified loader (loadEngineModule.ts), which fetches and hashes it and passes the bytes to the glue's init" },
+  { name: ENGINE_BUILD_RECORD, runtime: true, readBy: "the verified loader (enginePackageCheck.ts hashes the glue and binary against this record); also the build, CI's package cache and packageHash.test.ts" },
   { name: ENGINE_THIRD_PARTY_RECORD, runtime: false, readBy: "the third-party notices build (scripts/gen-third-party-notices.ts)" },
 ];
 

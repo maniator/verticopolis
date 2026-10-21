@@ -127,8 +127,19 @@ const servedGlue = (page: Page): Promise<string> => servedByWorker(page, "engine
  *  fetches, and Playwright's offline flag does not stop them. */
 const isUpdateCheck = (path: string): boolean => path === "/sw.js" || /^\/workbox-[\w-]+\.js$/.test(path);
 
-test("an update replaces the engine files in the cache, and the updated game plays with no network", async ({ browser }) => {
+// The second deployment is a full `vite build`. It runs here, with a budget of
+// its own, so the build does not eat into the test's.
+test.beforeAll(async () => {
+  // A project that skips the test builds nothing.
+  if (!onWasm(test.info().project.name)) return;
+  test.setTimeout(300_000);
   deployments = await startDeployments();
+});
+test.afterAll(async () => {
+  await deployments?.close();
+});
+
+test("an update replaces the engine files in the cache, and the updated game plays with no network", async ({ browser }) => {
   let context: BrowserContext | undefined;
   try {
     const first = await installedFirst(browser);
@@ -184,10 +195,6 @@ test("an update replaces the engine files in the cache, and the updated game pla
       await expectEngineHosted(page);
     });
   } finally {
-    try {
-      await context?.close();
-    } finally {
-      await deployments.close();
-    }
+    await context?.close();
   }
 });

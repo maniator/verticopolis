@@ -161,4 +161,24 @@ describe("loader conformance table", () => {
         .toEqual({ id: lock.cases[i].id, expected: lock.cases[i].expected, input: digest(lock.cases[i].input), knownDivergence: lock.cases[i].knownDivergence });
     }
   });
+
+  // The billed-room cases (#902) where the loader ignores or empties the list
+  // agree with their plain counterparts, so the Rust replay, which matches
+  // every hash, agrees on them too.
+  it("loads an ignored billed-room list as no list, and every list that authorizes no room alike", () => {
+    /** A case's hash, refusing a missing id and a save that does not load,
+     *  either of which would make two hashes agree for the wrong reason. */
+    const hash = (id: string): string => {
+      const found = cases.find((c) => c.id === id);
+      if (!found) throw new Error(`no loader case ${id}`);
+      expect(found.expected, id).not.toBe("throws");
+      return found.expected;
+    };
+    expect(hash("exterminator-orphan-list")).toBe(hash("modern-roundtrip"));
+    expect(hash("exterminator-classic-list")).toBe(hash("classic-roundtrip"));
+    expect(hash("exterminator-null-list")).toBe(hash("exterminator-invalid-list"));
+    expect(hash("exterminator-empty-list")).toBe(hash("exterminator-invalid-list"));
+    expect(hash("exterminator-invalid-list")).not.toBe(hash("exterminator-legacy-list-absent"));
+    expect(hash("exterminator-booked-ids")).not.toBe(hash("exterminator-empty-list"));
+  });
 });

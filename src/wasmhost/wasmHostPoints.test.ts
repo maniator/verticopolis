@@ -111,7 +111,7 @@ describe("restore points on the main-thread host (#874)", () => {
     sim.tick(1);
     expect(host.fault?.reason).toBe("trap-tick");
     expect(host.lostEdits).toBe(1);
-    expect(host.restore().money).not.toBe(5);
+    expect(host.restore().sim.money).not.toBe(5);
     expect(sim.drainGameplayEvents()).toEqual([]);
     sim.money = 7; // the frozen read model counts it and relays nothing
     expect(host.lostEdits).toBe(2);
@@ -177,7 +177,7 @@ describe("restore points on the main-thread host (#874)", () => {
     engine.failOn = "tick";
     sim.tick(1);
     expect(host.fault?.reason).toBe("trap-tick");
-    expect(host.restore().clock.minutes).toBe(pointAt);
+    expect(host.restore().sim.clock.minutes).toBe(pointAt);
     host.detach();
   });
 
@@ -222,7 +222,7 @@ describe("restore points on the main-thread host (#874)", () => {
     sim.money = 200; // the second edit traps
     expect(host.fault?.reason).toBe("trap-command");
     // The point is the second capture: the first edit stays, the second goes.
-    expect(host.restore().money).toBe(100);
+    expect(host.restore().sim.money).toBe(100);
     expect((sim.serialize() as { money: number }).money).toBe(100);
     host.detach();
   });

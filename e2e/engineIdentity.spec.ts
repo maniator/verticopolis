@@ -26,8 +26,8 @@ async function buildRecord(page: Page): Promise<Record> {
   return (await res.json()) as Record;
 }
 
-/** Serve the real binary with one same-length text swap (the last match, where the build stamps its section), so it still compiles
- *  and links but its build section reads differently. */
+/** Serve the real binary with one same-length text swap (the last match, where the build stamps its section). The binary is then
+ *  not the one this build's record names, so the byte check refuses it before it compiles. */
 async function swapInBinary(page: Page, from: string, to: string): Promise<void> {
   expect(to).toHaveLength(from.length);
   await page.route(WASM, async (route: Route) => {
@@ -96,34 +96,23 @@ test("the worker host reports the same stamped hash", async ({ page }) => {
   expect(await copyDiagnostics(page)).toContain("WASM engine (worker)");
 });
 
-test("a binary built from other sources is a mismatch that names the source hash", async ({ page }) => {
+// A binary that is not the one this shell was built for never runs (the byte
+// check, #985), so its build section is never read: the states "mismatch",
+// "no section" and "malformed section" are reachable only on a development serve,
+// which skips the check. buildSection.test.ts and engineDiagnostics.test.ts
+// cover how each is read and drawn.
+test("a binary built from other sources is refused before it runs, and About says the engine did not load", async ({ page }) => {
   const record = await buildRecord(page);
   const tampered = `${record.sources.startsWith("0") ? "1" : "0"}${record.sources.slice(1)}`;
   await swapInBinary(page, record.sources, tampered);
   await page.goto("/?engine=wasm");
-  await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted, undefined, { timeout: 30_000 });
+  await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure, undefined, { timeout: 30_000 });
+  const boot = await page.evaluate(() => (window as any).__vcEngineBoot);
+  expect(boot.failure).toMatchObject({ stage: "load", reason: "package-mismatch", package: { kind: "mismatch", file: "wasm" } });
+  expect(boot.binary, "a refused binary is never compiled, so its section is never read").toBeUndefined();
   await openHelp(page);
-  expect(await state(page)).toBe("mismatch");
-  const copied = await copyDiagnostics(page);
-  expect(copied).toContain(`Mismatch: source hash (engine binary ${short(tampered)}, this page was built for ${short(record.sources)})`);
-});
-
-test("a binary with no build section keeps running and says the source hash is unavailable", async ({ page }) => {
-  await swapInBinary(page, "verticopolis.build", "verticopolis.buile");
-  await page.goto("/?engine=wasm");
-  await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted, undefined, { timeout: 30_000 });
-  await openHelp(page);
-  expect(await state(page)).toBe("unavailable");
-  expect(await copyDiagnostics(page)).toContain("Source hash in the engine binary: unavailable (no build metadata section)");
-});
-
-test("a build section from another schema is malformed, and the engine keeps running", async ({ page }) => {
-  await swapInBinary(page, '"schema":1', '"schema":2');
-  await page.goto("/?engine=wasm");
-  await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted, undefined, { timeout: 30_000 });
-  await openHelp(page);
-  expect(await state(page)).toBe("unavailable");
-  expect(await copyDiagnostics(page)).toContain("Source hash in the engine binary: unavailable (malformed: not schema 1)");
+  expect(await state(page)).toBe("not-loaded");
+  expect(await copyDiagnostics(page)).toContain("Reason: package-mismatch");
 });
 
 test("an engine that never loads still copies the page's expected crate and the reason", async ({ page }) => {
@@ -147,6 +136,6 @@ test("a binary that never arrives is not-loaded, with no source hash to report",
   await openHelp(page);
   expect(await state(page)).toBe("not-loaded");
   const copied = await copyDiagnostics(page);
-  expect(copied).toContain("failed to fetch Wasm: 404");
+  expect(copied).toContain("came back with HTTP 404");
   expect(copied).not.toContain("Source hash in the engine binary");
 });

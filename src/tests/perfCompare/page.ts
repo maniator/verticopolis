@@ -46,8 +46,9 @@ export function installProbes(): void {
     };
   }
   // Time the engine package's compile and instantiate on the app's own boot
-  // path (wasm-bindgen's loader calls instantiateStreaming, or instantiate
-  // as its fallback): the first call's start and end.
+  // path: the first call's start and end. The verified loader compiles the
+  // hashed bytes itself and the glue instantiates that module, so this times
+  // the instantiate; the compile is not in it.
   const wa = WebAssembly as any;
   for (const name of ["instantiateStreaming", "instantiate"]) {
     const orig = wa[name];
@@ -60,7 +61,13 @@ export function installProbes(): void {
         marks.wasmInstantiateStart = t;
         marks.wasmInstantiateVia = name === "instantiateStreaming" ? 1 : 2;
         p.then(
-          () => (marks.wasmInstantiateEnd = performance.now()),
+          (r) => {
+            marks.wasmInstantiateEnd = performance.now();
+            // The app's own instance (the loader imports the glue from a Blob,
+            // so the harness cannot import it by URL to reach the instance).
+            const inst = (r as { instance?: { exports?: { memory?: unknown } } }).instance ?? (r as { exports?: { memory?: unknown } });
+            w.__perfWasmMemory = inst.exports?.memory;
+          },
           () => (marks.wasmInstantiateEnd = -1),
         );
       }
@@ -253,18 +260,15 @@ export function adoptScenario(name: string): AdoptResult {
   return { adoptMs, engineActive: hosted ? "wasm" : "ts", starts: Number(h?.status?.starts ?? 0), population: g.sim.population };
 }
 
-/** Size of the engine's linear memory, when the page hosts the tower on it
- *  (the loader's init returns the instance the app already made). The runner
- *  calls it on the WASM process only, so a TypeScript page never loads it. */
-export async function wasmMemoryBytes(engineUrl: string): Promise<number | null> {
+/** Size of the engine's linear memory, when the page hosts the tower on it:
+ *  the memory of the first instance the page made, which the probe above
+ *  kept. The runner calls it on the WASM process only. */
+export function wasmMemoryBytes(): number | null {
   const w = window as any;
   if (!w.__vcEngine?.status?.hosted) return null;
-  const before = w.__perfMarks?.wasmInstantiateCalls ?? 0;
-  const mod = await import(/* @vite-ignore */ engineUrl);
-  const exports = await mod.default();
-  // A second instantiate would mean this read a fresh module, not the app's.
-  if ((w.__perfMarks?.wasmInstantiateCalls ?? 0) !== before || before === 0) throw new Error("the WASM memory read did not reach the instance the app booted");
-  return (exports.memory as WebAssembly.Memory).buffer.byteLength;
+  const memory = w.__perfWasmMemory as WebAssembly.Memory | undefined;
+  if (!memory) throw new Error("the WASM memory read found no instance the app booted");
+  return memory.buffer.byteLength;
 }
 
 export interface WasmColdLoad {
@@ -281,9 +285,10 @@ export interface WasmColdLoad {
  * fresh page): download the bytes,
  * compile them, instantiate the glue (a cache-busted copy, so it is a fresh
  * module), and build the first Engine from a fixed scenario's save. This is a
- * step-by-step stand-in: the app itself streams the compile
- * (compileStreaming, then instantiates the compiled module; engineLoad.ts),
- * which the boot-path probe times on the WASM process.
+ * step-by-step stand-in: the app compiles the bytes it has already downloaded
+ * and hashed (the verified loader, #985; engineLoad.ts reads their build
+ * section), then instantiates that module, which the boot-path probe times on
+ * the WASM process.
  */
 export async function wasmColdLoad(arg: { wasmUrl: string; jsUrl: string; scenario: string }): Promise<WasmColdLoad> {
   const save = (window as any).__perfSaves[arg.scenario] as string;

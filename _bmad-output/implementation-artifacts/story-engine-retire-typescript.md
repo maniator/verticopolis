@@ -60,6 +60,7 @@ list, such as anything merged or opened after its snapshot (each PR adds its
 own line: the PR, the files, and why the fallback needs them):
 
 - **Benchmark parity tooling that runs the TypeScript engine** (#1124, the cost-split, churn and calibration PR, with #1108's A/A mode): `perf:compare --aa ts` and the TypeScript slot of every `perf:compare` run (`src/tests/perfCompare/{runner,validate,metrics,limitations}.ts`), the TypeScript side of the Node check (`nodeCheck.ts`), `perf:calibrate`'s `ts` passes and cold-start cap, and the `perf:worker` `ts` mode and its gate column (`src/tests/perfWorker/`). The WASM-only parts (the export cost split, hourly churn, the working-tree record, calibration of WASM A/A passes) stay as permanent benchmark infrastructure. Removing the TypeScript engine retires the comparison, so these go with it or collapse to WASM-only runs.
+- **#985 slice 2a (the verified engine load, PR linked on #985).** The switchable build's branch that leaves the game on the TypeScript engine after a refused engine package: `loadBootEngine`'s `!wasmOnly` path in `src/wasmhost/engineBoot.ts` (the `engine: "ts"` result for a refused package, with its tests in `engineBoot.test.ts` and `bootstrapEngine.test.ts`) and the `chromium-wasm` assertions in `e2e/engineIntegrity.spec.ts` that expect the game on TypeScript (`expectRefused`'s non-wasm-only branch), plus the `!__WASM_ONLY__` worker-host branch in `src/bootstrap.ts` that gives a refused first tower its catalog verdict with its `workerCatalogs` cases in `src/bootstrapEngine.test.ts` (`catalogVerdict` itself stays: the main-thread host uses it too). Nothing else in the slice depends on the TypeScript engine: the loader (`loadEngineModule.ts`), the failure detail, the shell id check and the loading line stay.
 - PR #831 (room occupant seats): `roomOccupants` in `src/render/pixelSprites/common.ts` imports `visibleOccupants` from the TypeScript engine (through `engine/Crowd`), and `residential.ts`, `food.ts`, `clinic.ts` and `sprites/facilities/venue.ts` import it directly. After the removal, each reads the engine read model's visible-occupant count instead (backlog row `room-painters-read-ts-engine`, #1106). The PR cuts the render importers of `visibleOccupants` from 11 files on main to these five.
 
 - **#1101 (#874, the runtime fallback).** They exist to re-adopt a faulted
@@ -148,6 +149,36 @@ own line: the PR, the files, and why the fallback needs them):
     and "in a command", which the fallback needs). The attach cases stay,
     without their read-model assertions (they go with the merge's copy) and
     their TypeScript steps after the detach.
+
+- **The recovery correctness set (#1113, #1126, #1149;
+  `spec-1113-1126-1149-recovery-correctness.md`).** Temporary, with the
+  re-adoption:
+  - `RestorePoints.restore`'s `skipped` count, the `RestoredPoint` shape
+    `WasmHost.restore` answers with, and `WasmHostStatus.restorePoint`;
+  - the player lines `OLDER` and `SWAP_FAILED` in `startWasmHost.ts`, and
+    the undo trail cleared after an older point (`WasmHostApp.clearUndo`,
+    `GameApp.clearUndo` in `main.ts`);
+  - the frozen tower's closed event buffer in `wasmHost.ts`'s faulted detach,
+    with the frozen tower's own tick;
+  - the tests: the `skipped` case in `hostFault.test.ts`; the older-point
+    and failed-swap cases in `startWasmHostRecovery.test.ts` (with its
+    `clearUndo` stub); in
+    `wasmHostFallback.integration.test.ts`, "goes back to the merge when the
+    newest point does not load..." and "says the swap failed when the
+    recovery's adopt throws..."; the `OLDER` and `SWAP_FAILED` exports in
+    `wasmRollback.ts`.
+
+  What stays, because a Rust-only build latches on the same signal:
+  `isEngineTrap`, `letEngineGo`, `ShadowEngine.abandon`, the latch in
+  `startWasmHost`'s `follow` (an attach, the catalog check, a release) with
+  `WasmHostStatus.latched` and `onFallback`'s `latched` argument, the boot's
+  writer off on `latched`, the engine freed on a refused attach and let go
+  after a fault, the attach's single frame read, and their
+  tests (the trap cases in `hostFault.test.ts` and
+  `startWasmHostFallback.test.ts`, the attach-trap cases in
+  `bootstrapEngine.test.ts`, the single-read case in
+  `wasmHostFrame.test.ts`, and the real-engine
+  `wasmHostAttachTrap.integration.test.ts`).
 
 ## Sequence it sits in
 
