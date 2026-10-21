@@ -1,5 +1,6 @@
 import type { ShadowCommand } from "../dualrun/commands";
 import type { BuildMetadataResult } from "./buildSection";
+import type { FallbackReason, PackageFailure } from "./engineBoot";
 
 /**
  * The messages between the main thread and the engine worker
@@ -132,6 +133,11 @@ export interface ErrorReply {
   seq?: number;
   fatal: boolean;
   message: string;
+  /** The code of a failed load (`package-mismatch` for a binding the shell
+   *  cannot use, #1086) and, when the byte check refused the package, its
+   *  detail (#985). Absent on every other error. */
+  reason?: FallbackReason;
+  package?: PackageFailure;
   /** On a failed package load: what the binary's build section said, when it
    *  had been read (#963). */
   build?: BuildMetadataResult;

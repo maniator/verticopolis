@@ -162,7 +162,11 @@ state hash.
   new game with the default calendar and automatic bridging on
   (`newGame(seed, mode)`). The optional `star` sets the game's star before the
   first command, so what unlocks above one star is in reach (the fuzzer uses
-  it); a game with no `star` opens at one.
+  it); a game with no `star`, or a `star` of 1, opens at one. Above one, every
+  runner saves the founded game, raises the star and loads it back, so the
+  start is a loaded game (a load grants the milestones of its star and sets
+  the boundary markers from the clock, and the `tower_founded` event is not
+  emitted) and the three runners agree on it.
 - `{ "fixture": "conformance/fixtures/file.vctower", "mode"?: "classic" | "modern" }`:
   a save file inside the suite (the name starts with `conformance/` and has no
   empty, `.` or `..` step), loaded the way an import loads
@@ -229,7 +233,8 @@ not a list of objects, if it has an unknown op or an unknown field anywhere
 ill-typed:
 
 - `id` and `description`, `fixture`, and `label` are non-empty strings.
-- `seed` is a whole number from 0 to 4294967295.
+- `seed` is a whole number from 0 to 4294967295, and the optional `star` is a
+  whole number from 1 to 5.
 - `floor`, `x`, `from`, `to`, `bottom` and `top` are whole numbers, and a
   `buildRow`'s `from` is not past its `to`.
 - `dt`, `times`, `checkpointEvery` and `cars` are whole numbers above zero.

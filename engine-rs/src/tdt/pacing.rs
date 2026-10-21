@@ -60,6 +60,27 @@ pub fn frame_for_minute_of_day(minute_of_day: f64) -> f64 {
     0.0
 }
 
+/// `paceFactor`: how fast sim minutes should accumulate per unit of real time
+/// at `minute_of_day`, relative to uniform pacing (1.0 everywhere). A
+/// non-finite minute is neutral.
+pub fn pace_factor(minute_of_day: f64) -> f64 {
+    if !minute_of_day.is_finite() {
+        return 1.0;
+    }
+    let m = wrap(minute_of_day - DAY_START_MINUTE, 24.0 * 60.0);
+    let mut frame_start = 0.0;
+    let mut minute_start = 0.0;
+    for (frame_end, minute_end) in PERIODS {
+        if m < minute_end {
+            let rate = (minute_end - minute_start) / (frame_end - frame_start);
+            return rate / ((24.0 * 60.0) / FRAMES_PER_DAY);
+        }
+        frame_start = frame_end;
+        minute_start = minute_end;
+    }
+    1.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

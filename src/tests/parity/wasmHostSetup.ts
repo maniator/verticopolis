@@ -11,7 +11,7 @@ import { LOG_RING_CAP } from "../../engine/sim/constants";
 import { coerceLog } from "../../engine/sim/coerce";
 import type { LogEntry } from "../../engine/types";
 import { fingerprint } from "./fingerprint";
-import { WASM_PARITY_FLAG, REFRESH_HOOK, frameCadenceRequested, clearFrameCadence, noteHostedTick } from "./typescriptOnly";
+import { WASM_PARITY_FLAG, REFRESH_HOOK, STATS_HOOK, frameCadenceRequested, clearFrameCadence, noteHostedTick } from "./typescriptOnly";
 
 /**
  * The setup file of the `integrationWasm` and `unitWasm` vitest projects
@@ -132,6 +132,7 @@ const hostedTickWrapper = function (this: Simulation, dt: number): void {
 /** Counters a test or a report can read: hosts started, re-hosts after an
  *  un-relayed edit, ticks run on the engine. */
 export const parityStats = { hosts: 0, rehosts: 0, ticks: 0, merges: 0 };
+(globalThis as Record<string, unknown>)[STATS_HOOK] = parityStats;
 
 /** The instance's own state view (its `serialize` is the engine's while
  *  hosted, so the prototype's is used here). */

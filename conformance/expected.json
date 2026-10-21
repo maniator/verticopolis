@@ -470,6 +470,13 @@
       {"label":"t+2880","state":"113454dd564ec6b3","crowd":"9866b65d33c9acde","events":"4f53cda18c2baa0c"},
       {"label":"final","state":"113454dd564ec6b3","crowd":"9866b65d33c9acde","events":"4f53cda18c2baa0c"}
     ],
+    "refusals-star4-classic": [
+      {"label":"start","state":"9f2e32e4d081cd40","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},
+      {"label":"t+60","state":"1a0dd343a8b42860","crowd":"f73848e692a130eb","events":"94bf2dbc093e001e"},
+      {"label":"t+120","state":"55c9fd018064850c","crowd":"b6a2317a7105c0d0","events":"4f53cda18c2baa0c"},
+      {"label":"settled","state":"55c9fd018064850c","crowd":"b6a2317a7105c0d0","events":"4f53cda18c2baa0c"},
+      {"label":"final","state":"55c9fd018064850c","crowd":"b6a2317a7105c0d0","events":"4f53cda18c2baa0c"}
+    ],
     "star-climb-classic": [
       {"label":"start","state":"95cd144e1fd2ad1c","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},
       {"label":"two-stars","state":"1f8abe6d66a4d321","crowd":"7cb294222cbe0188","events":"a9318e8eb969a541"},

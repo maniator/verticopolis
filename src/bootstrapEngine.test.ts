@@ -19,7 +19,7 @@ vi.mock("./wasmhost/startWasmHost", async (importOriginal) => {
   const real = await importOriginal<typeof import("./wasmhost/startWasmHost")>();
   return {
     ...real,
-    loadWasmEngine: vi.fn(async (_url?: string, opts?: { onBuild?: (b: unknown) => void }) => {
+    loadWasmEngine: vi.fn(async (_url?: string, _signal?: AbortSignal, opts?: { onBuild?: (b: unknown) => void }) => {
       if (wasmStub.binary) opts?.onBuild?.(wasmStub.binary);
       if (wasmStub.module) return wasmStub.module;
       throw wasmStub.loadError ?? new Error("no package in this test");
@@ -35,7 +35,8 @@ vi.mock("./wasmhost/workerController", async (importOriginal) => {
     ...real,
     spawnEngineWorker: vi.fn(async () => {
       if (wasmStub.workerError) throw Object.assign(wasmStub.workerError, wasmStub.binary ? { build: wasmStub.binary } : {});
-      return { worker: { terminate: vi.fn() }, catalogs: { classic: "{}", modern: "{}" }, ...(wasmStub.binary ? { build: wasmStub.binary } : {}) };
+      const catalog = (await import("./wasmhost/fakeEngine.fixture")).fakeModule().catalog as (m: string) => string; // this build's own catalogs
+      return { worker: { terminate: vi.fn() }, catalogs: { classic: catalog("classic"), modern: catalog("modern") }, ...(wasmStub.binary ? { build: wasmStub.binary } : {}) };
     }),
     startWorkerHost: vi.fn(() => ({ status: { hosted: true, errors: [] as string[] }, stop: vi.fn() })),
   };

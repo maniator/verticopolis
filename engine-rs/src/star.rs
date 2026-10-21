@@ -43,7 +43,7 @@ impl Simulation {
     }
 
     /// `cumulativeStarGates(rung)`: every gate's met flag.
-    fn cumulative_gates_met(&self, rung: i64) -> bool {
+    pub(crate) fn cumulative_gates_met(&self, rung: i64) -> bool {
         if rung >= 3 && !self.has_operational(Kind::Security) {
             return false;
         }
@@ -108,16 +108,18 @@ impl Simulation {
     }
 
     pub fn highest_floor(&self) -> i64 {
-        self.tower.units.iter().map(|u| u.floor).fold(1, i64::max)
+        self.tower.floor_bounds().1
     }
 
     pub fn lowest_floor(&self) -> i64 {
-        self.tower.units.iter().map(|u| u.floor).fold(1, i64::min)
+        self.tower.floor_bounds().0
     }
 
-    fn every_occupied_floor_served(&self) -> bool {
+    pub(crate) fn every_occupied_floor_served(&self) -> bool {
         let mut saw_one = false;
-        for u in &self.tower.units {
+        // Tiles have no population, so the room index lists every unit this
+        // scan can count, in the same order (#1237).
+        for u in self.tower.room_units() {
             if !is_tenant_floor_unit(u) {
                 continue;
             }
@@ -129,8 +131,8 @@ impl Simulation {
         saw_one
     }
 
-    fn no_leasable_vacancy(&self) -> bool {
-        !self.tower.units.iter().any(|u| {
+    pub(crate) fn no_leasable_vacancy(&self) -> bool {
+        !self.tower.room_units().any(|u| {
             u.state == UnitState::Empty
                 && (u.kind == Kind::Office || u.kind == Kind::Condo || u.kind.is_hotel())
         })
