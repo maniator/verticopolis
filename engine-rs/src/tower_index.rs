@@ -9,8 +9,8 @@
 //!
 //! They are keyed on `revision` and the unit count. Every placement and
 //! removal bumps the revision, a load ends in `reindex`, which resets the
-//! memo and bumps it too, and no other path adds, removes, moves or resizes
-//! a unit. The count guards one case only: a list cut behind the revision
+//! memo and bumps it too, and no other path adds, removes, moves, resizes or
+//! retypes a unit (the census reads each unit's kind and floor). The count guards one case only: a list cut behind the revision
 //! rebuilds instead of indexing past its end. A change that keeps the count
 //! and skips the bump would be served stale; no production path makes one.
 //! (`roomUnits` in `tower/rooms.ts` also keys on the array's identity. Here
@@ -143,3 +143,7 @@ impl Tower {
 #[cfg(test)]
 #[path = "tower_index_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tower_census_tests.rs"]
+mod census_tests;
