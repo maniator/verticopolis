@@ -19,20 +19,22 @@ zero-second page load can never become a clean success:
    fell back on `package-mismatch` did not; the overall rate counts those on
    its own line), and an override to an uncounted WASM host is in no
    population. The
-   fault rate is over these sessions. A `wasm`-arm session whose every page
-   life the player's opt-out (a setting or the URL choosing TypeScript) or a
-   safety suppression (`safety_suppressed`, or `selected_by: safety`) moved to
-   TypeScript is counted in the WASM arm's row as its own figure, outside the
-   rate's N: it never ran the engine, so counting it would make the rate look
-   cleaner than the engine is. This departs from #1197's wording, which keeps
-   them in the denominator, so the report also prints the rate with them in
-   N, and the owner decides which reading the gate uses. A suppressed page
+   fault rate is over these sessions. Every `wasm`-arm session with a page
+   life that the player's opt-out (a setting or the URL choosing TypeScript)
+   or a safety suppression (`safety_suppressed`, or `selected_by: safety`)
+   moved to TypeScript is counted in the WASM arm's row, whether or not it
+   also ran the engine. One that never ran the engine is outside the rate's
+   N, since counting it would make the rate look cleaner than the engine is.
+   This departs from #1197's wording, which keeps them in the denominator, so
+   the report also prints the rate with them in N; which reading the gate
+   uses is pending the owner. A suppressed page
    life that carries an engine-fault reason (the boot that detected a crash
    loop, A4's `unclean-exit`) is a fault, never a move off. Sessions only on
    an uncounted WASM host are counted on their own line. Every engine fault counts here,
    whether or not the player engaged; a page life with an `attempt` row and no
    `settle` row is counted as having left before its first tower (it may be a
-   crash during the load; nothing tells the two apart).
+   crash during the load; nothing tells the two apart), and every population
+   carries a second, pessimistic bound that counts it as a fault.
    **Eligible attempts** is the cohort below without the engagement
    condition, so a fault that stopped the player engaging, which the cohort
    cannot hold, still shows beside it.
@@ -46,8 +48,14 @@ zero-second page load can never become a clean success:
    choice), not safety-suppressed, not size-gated, settled with the engine
    running. Engaged: an `engaged` row whose `engine` is a WASM engine. A fault
    in any of the session's eligible page lives counts, before engagement too.
-3. **Candidate tail.** The engaged cohort restricted to page lives on the
-   commits the candidate review names (`--tail-shas`).
+   The cohort's rate and bound are conditional on engagement; which bound the
+   gate reads is pending the owner. A session with an override page life (a
+   setting or the URL chose the engine, in any page life) is in no eligible
+   population: overridden sessions never qualify. Its faults stay in all
+   attempts, and the report counts the sessions left out.
+3. **Candidate tail.** The eligible attempts and the engaged cohort
+   restricted to page lives on the commits the candidate review names
+   (`--tail-shas`), so a failure before engagement on the candidate shows.
 
 Also: early telemetry by build, arm and stage; the cohort by build; per stage
 and assigned arm, sessions with a settled page life (until both arms send the
@@ -130,7 +138,10 @@ game unpaused and the game clock advancing in each counted second
 
 - Each rule above pinned in `src/engine-reliability-cohorts.test.ts` and
   `src/engine-reliability-cohorts-report.test.ts`: overrides
-  in the all-attempts denominator and never eligible; a pre-engagement fault in
+  in the all-attempts denominator and never eligible, and a session with an
+  override page life in either order in no eligible population; an opt-out
+  counted in the WASM arm when the session also ran the engine; the tail's
+  attempts row; the pessimistic bound; a pre-engagement fault in
   the denominator and outside the cohort; a fault before engagement in an
   engaged session counted; engagement after a fallback (`engine: ts-fallback`)
   not engaged; no eligible commits means an empty cohort; tail subset; arm of

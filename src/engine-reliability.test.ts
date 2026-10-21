@@ -416,7 +416,7 @@ describe("renderReliabilityMarkdown", () => {
     // The overall rate is early telemetry, which plan 4.1 (OD-2) never
     // publishes as a reliability figure; release evidence is only the engaged
     // eligible cohort (#1090).
-    for (const lead of ["**Snapshot** of the last 30 days to 2026-10-20 12:00 (UTC), production only", "node scripts/engine-reliability.mjs", "src/engine-reliability.test.ts", "**This overall rate is early telemetry, not release evidence**", "**A lower bound.**"]) {
+    for (const lead of ["**Snapshot** of the last 30 days to 2026-10-20 12:00 (UTC), production only", "node scripts/engine-reliability.mjs", "src/engine-reliability.test.ts", "**This overall rate is early telemetry**", "**A lower bound.**"]) {
       const at = md.indexOf(lead);
       expect(at, lead).toBeGreaterThan(-1);
       expect(at, lead).toBeLessThan(firstFigure);

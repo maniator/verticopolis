@@ -19,6 +19,7 @@ import {
   STAGES,
   buildCrashSessionsQuery,
   buildPageLivesQuery,
+  pageLivesFromRows,
   parseArgs,
   renderReliabilityMarkdown,
   summarizeReliability,
@@ -183,7 +184,7 @@ describe("the engaged eligible cohort", () => {
     const lives = Array.from({ length: 1000 }, (_, i) => life({ session: `s${i}` }));
     const c = run(lives);
     expect(c.eligible.n).toBe(1000);
-    // 1,000 clean sessions show about 0.30%, not 0.1%.
+    // 1,000 clean sessions show about 0.30%; 0.1% takes about 3,000.
     expect(c.eligible.upper95).toBeCloseTo(upperBound(0, 1000) as number, 12);
     expect(c.eligible.upper95 as number).toBeGreaterThan(0.0029);
   });
@@ -226,9 +227,20 @@ describe("the all-attempts safety denominator", () => {
     expect(c.eligible.n).toBe(0);
   });
 
-  it("keeps a session that faulted and then opted out in the rate", () => {
-    const c = run([life({ session: "a", engaged: false, ...fault, firstSeen: "2026-12-01 11:00:00" }), life({ session: "a", requested: "ts", selectedBy: "setting", engaged: false })]);
-    expect(c.attempts).toMatchObject({ sessions: 1, faults: 1, movedOff: 0 });
+  it("keeps a session that faulted and then opted out in the rate, and still shows its opt-out", () => {
+    const optOut = (session: string, over: Partial<PageLife> = {}) => life({ session, requested: "ts", selectedBy: "setting", engaged: false, ...over });
+    const c = run([life({ session: "a", engaged: false, ...fault, firstSeen: "2026-12-01 11:00:00" }), optOut("a")]);
+    expect(c.attempts).toMatchObject({ sessions: 1, faults: 1, movedOff: 1, movedOffNeverRan: 0, overrides: 1 });
+    // Only a session that never ran the engine joins N in #1197's reading.
+    expect(c.attemptsWithMovedOff.n).toBe(1);
+    // An engaged cohort page life, then an opt-out: the opt-out shows in the
+    // WASM arm, and the overridden session leaves the cohort.
+    const engaged = run([life({ session: "b", firstSeen: "2026-12-01 11:00:00" }), optOut("b")]);
+    expect(engaged.attempts.byArm).toEqual([expect.objectContaining({ arm: "wasm", sessions: 1, overrides: 1, movedOff: 1, movedOffNeverRan: 0 })]);
+    expect(engaged.eligible).toMatchObject({ n: 0, overridden: 1 });
+    // The opt-out must be in the `wasm` arm, and so must the session.
+    expect(run([life({ session: "c", firstSeen: "2026-12-01 11:00:00" }), optOut("c", { assignedArm: "ts" })]).attempts.movedOff).toBe(0);
+    expect(run([life({ session: "d", assignedArm: "ts", requested: "ts", firstSeen: "2026-12-01 11:00:00" }), optOut("d")]).attempts.movedOff).toBe(0);
   });
 
   it("counts page lives with a value the game never sends on their own line, in no population", () => {
@@ -335,6 +347,25 @@ describe("the all-attempts safety denominator", () => {
   });
 });
 
+describe("overridden sessions", () => {
+  it("never qualify, with the override first or second, clean or faulting, and their faults stay in all attempts", () => {
+    for (const trapped of [false, true]) {
+      const o = life({ session: "a", selectedBy: "url", engaged: false, ...(trapped ? { fallbacks: 1, reasons: ["trap-command"] } : {}) });
+      const orders = { first: [o, life({ session: "a", firstSeen: "2026-12-01 13:00:00" })], second: [life({ session: "a", firstSeen: "2026-12-01 11:00:00" }), o] };
+      for (const [order, lives] of Object.entries(orders)) {
+        const c = run(lives, { tailShas: [SHA] });
+        const label = `${trapped ? "trapped" : "clean"} override ${order}`;
+        expect(c.attempts, label).toMatchObject({ sessions: 1, faults: trapped ? 1 : 0, overrides: 1 });
+        for (const k of ["eligibleAttempts", "eligible", "tailAttempts", "tail"] as const) expect(c[k], `${label}: ${k}`).toMatchObject({ n: 0, faults: 0, overridden: 1 });
+      }
+    }
+  });
+
+  it("count apart from sessions that were never eligible", () => {
+    expect(run([life({ selectedBy: "url" })]).eligible).toMatchObject({ n: 0, overridden: 0 });
+  });
+});
+
 describe("the tail", () => {
   it("is the engaged eligible cohort on the candidate's commits", () => {
     const lives = [life({ session: "a" }), life({ session: "b", sha: "def5678", ...fault })];
@@ -344,11 +375,50 @@ describe("the tail", () => {
     expect(run(lives, { eligibleShas: [SHA, "def5678"] }).tail.n).toBe(0);
   });
 
+  it("has an attempts row that holds the failures before engagement", () => {
+    const boots = Array.from({ length: 100 }, (_, i) => life({ session: `f${i}`, engaged: false, ...fault }));
+    const clean = Array.from({ length: 50 }, (_, i) => life({ session: `c${i}` }));
+    const c = run([...boots, ...clean], { tailShas: [SHA] });
+    expect(c.tail).toMatchObject({ n: 50, faults: 0 });
+    expect(c.tailAttempts).toMatchObject({ n: 150, faults: 100 });
+    // A trap on the tail commit before the session engaged on another commit.
+    const other = run([life({ session: "a", sha: "def5678", engaged: false, ...fault, firstSeen: "2026-12-01 11:00:00" }), life({ session: "a" })], { eligibleShas: [SHA, "def5678"], tailShas: ["def5678"] });
+    expect(other.tail.n).toBe(0);
+    expect(other.tailAttempts).toMatchObject({ n: 1, faults: 1 });
+    expect(other.eligible).toMatchObject({ n: 1, faults: 1 });
+  });
+
   it("must sit inside the eligible commits on the command line", () => {
     expect(parseArgs(["--eligible-shas", "abc1234,def5678", "--tail-shas", "def5678"])).toMatchObject({ eligibleShas: ["abc1234", "def5678"], tailShas: ["def5678"] });
     expect(() => parseArgs(["--tail-shas", "def5678"])).toThrow(/--eligible-shas does not name/);
     // A short and a full form of one commit name the same build.
     expect(parseArgs(["--eligible-shas", "abc1234", "--tail-shas", "abc1234ff"]).tailShas).toEqual(["abc1234ff"]);
     expect(() => parseArgs(["--eligible-shas", "xyz"])).toThrow(/--eligible-shas cannot hold/);
+  });
+});
+
+describe("the pessimistic bound and the remaining columns", () => {
+  it("counts a page life that left before a tower as a fault, once per session", () => {
+    const lives = [...Array.from({ length: 960 }, (_, i) => life({ session: `s${i}` })), ...Array.from({ length: 40 }, (_, i) => life({ session: `e${i}`, settled: false, engaged: false }))];
+    const c = run(lives);
+    expect(c.eligibleAttempts).toMatchObject({ n: 1000, faults: 0, faultsOrLeft: 40, leftBeforeTower: 40, upper95Pessimistic: upperBound(40, 1000) });
+    expect(c.attempts).toMatchObject({ sessions: 1000, faultsOrLeft: 40, upper95Pessimistic: upperBound(40, 1000) });
+    expect(c.eligible).toMatchObject({ n: 960, faultsOrLeft: 0 });
+    const both = run([life({ session: "a", ...fault }), life({ session: "a", settled: false, engaged: false })]);
+    expect(both.eligibleAttempts).toMatchObject({ faults: 1, faultsOrLeft: 1 });
+  });
+
+  it("charges only crash loops on eligible commits to the cohort, and counts its latch-offs", () => {
+    const loop = { selectedBy: "safety", safetySuppressed: true, engaged: false, reasons: ["boot-error"], firstSeen: "2026-12-01 13:00:00" };
+    const c = run([life({ session: "a" }), life({ session: "a", sha: "def5678", ...loop })]);
+    expect(c.eligible).toMatchObject({ n: 1, faults: 0 });
+    expect(c.attempts.faults).toBe(1);
+    expect(run([life({ writerLatched: true })]).eligible).toMatchObject({ n: 1, latched: 1 });
+  });
+
+  it("needs both cohort fields, and maps the suppression flag from the row", () => {
+    expect(run([life({ assignedArm: "none" }), life({ session: "b", stage: "none" })]).cohortFields).toEqual({ with: 0, of: 2 });
+    const [on, off] = pageLivesFromRows([{ session_id: "s", page_life: "p", safety_suppressed: true }, { session_id: "s", page_life: "q", safety_suppressed: false }]);
+    expect([on.safetySuppressed, off.safetySuppressed]).toEqual([true, false]);
   });
 });

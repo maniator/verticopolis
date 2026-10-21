@@ -12,11 +12,14 @@ export declare const COMPARED_ARMS: string[];
 export interface CohortCount {
   n: number;
   faults: number;
+  faultsOrLeft: number;
   latched: number;
   leftBeforeTower: number;
+  overridden: number;
   byEngagement: { command: number; play: number; unknown: number; none: number };
   rate: number | null;
   upper95: number | null;
+  upper95Pessimistic: number | null;
   byBuild: Array<{ build: string; sessions: number; faults: number; upper95: number | null }>;
 }
 
@@ -24,11 +27,13 @@ export interface AttemptRow {
   arm: string;
   sessions: number;
   faults: number;
+  faultsOrLeft: number;
   engaged: number;
   faultNotEngaged: number;
   leftBeforeTower: number;
   overrides: number;
   movedOff: number;
+  movedOffNeverRan: number;
   latched: number;
 }
 
@@ -48,13 +53,14 @@ export interface Coverage {
 }
 
 export interface CohortsSummary {
-  attempts: AttemptRow & { rate: number | null; upper95: number | null; byArm: AttemptRow[] };
-  attemptsWithMovedOff: { n: number; faults: number; rate: number | null; upper95: number | null; latched: number; leftBeforeTower: number };
+  attempts: AttemptRow & { rate: number | null; upper95: number | null; upper95Pessimistic: number | null; byArm: AttemptRow[] };
+  attemptsWithMovedOff: { n: number; faults: number; rate: number | null; upper95: number | null; upper95Pessimistic: number | null; latched: number; leftBeforeTower: number };
   uncountedHostSessions: number;
   uncountedHostFaults: number;
   comparisonEngagedRows: Record<string, Coverage>;
   eligibleAttempts: CohortCount;
   eligible: CohortCount;
+  tailAttempts: CohortCount;
   tail: CohortCount;
   comparison: Array<{ stage: string; wasm: ArmRow; ts: ArmRow; crashDifference: [number, number] | null }>;
   changed: ArmRow;

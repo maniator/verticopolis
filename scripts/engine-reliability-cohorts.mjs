@@ -2,64 +2,70 @@
  * The cohorts of the governed reliability definition (#1090; the owner's
  * direction of 2026-10-20, section 5), beside the overall rate in
  * `engine-reliability.mjs`. `src/engine-reliability-cohorts.test.ts` and
- * `src/engine-reliability-cohorts-report.test.ts` pin
- * every rule; change a rule here and in the tests together, or not at all.
+ * `src/engine-reliability-cohorts-report.test.ts` pin every rule; change a
+ * rule here and in the tests together, or not at all.
  *
- * Three populations, kept apart so a failure before engagement never turns
+ * The populations are kept apart so a failure before engagement never turns
  * into missing data and a zero-second page load never turns into a clean
  * success. Only recognized page lives count (the overall rate's rule); the
  * rest are counted on their own line. The narrowing flags (`--shas`,
- * `--versions`, `--builds`, `--arms`) apply to the overall rate, not here.
+ * `--versions`, `--builds`, `--arms`) apply only to the overall rate.
  *
  * - ALL ATTEMPTS, the safety denominator: every session with a page life that
- *   asked for a counted WASM host and that the size gate did not move to
- *   TypeScript, overrides included; a settled page life must have run the
- *   engine. Its fault rate is over those sessions. A
- *   `wasm`-arm session whose every page life the player's opt-out (a setting
- *   or the URL choosing TypeScript) or a safety suppression moved to
- *   TypeScript is counted in the WASM arm's row as its own figure, outside
- *   the rate's N: it never ran the engine, so it cannot fault, and counting
- *   it would make the rate look cleaner than the engine is. This departs from
- *   #1197's wording (moved-off sessions in the denominator), so the report
- *   also prints the rate with them in N. A suppressed page life that carries
- *   an engine-fault reason (the boot that detected a crash loop) is a fault on
- *   the host it names, size gate or not, never a move off, and a same-session
- *   loop on an eligible commit is charged to the cohorts too. Sessions on an
- *   uncounted WASM host are counted on their own line. A session's arm is that of its first page life in the
- *   window that carries an arm (`none`, a build with no cohort, is skipped).
- *   Every engine fault counts, engaged or not; a page life with an `attempt`
- *   row and no `settle` row left before its first tower, which may be a crash
- *   while the package loaded and is reported beside the faults.
+ *   asked for a counted WASM host, overrides included; a settled page life
+ *   must have run the engine, and a size-gated one counts only when it
+ *   faulted or engaged on the engine. Every `wasm`-arm session with a page
+ *   life that an opt-out (a setting or the URL choosing TypeScript) or a
+ *   safety suppression moved to TypeScript is counted in the WASM arm's row;
+ *   one that never ran the engine is outside the rate's N, since it cannot
+ *   fault and would make the rate look cleaner than the engine is. #1197
+ *   words it the other way, so the report also prints the rate with them in
+ *   N; which reading the gate uses is pending the owner. A suppressed page
+ *   life with an engine-fault reason (the boot that detected a crash loop) is
+ *   a fault on the host it names, size gate or not, never a move off, and a
+ *   same-session loop on an eligible commit is charged to the cohorts too.
+ *   Sessions on an uncounted WASM host are counted on their own line. A
+ *   session's arm is that of its first page life in the window that carries
+ *   one (`none`, a build with no cohort, is skipped). Every engine fault
+ *   counts, engaged or not; a page life with an `attempt` row and no `settle`
+ *   row left before its first tower, which may be a crash while the package
+ *   loaded: it is reported beside the faults, and a second, pessimistic bound
+ *   counts it as one.
+ * - No session with an override page life (a setting or the URL chose the
+ *   engine, in any page life) is in the eligible populations below, since
+ *   overridden sessions never qualify. Its faults stay in all attempts, and
+ *   the report counts the sessions left out.
  * - ELIGIBLE ATTEMPTS: the `wasm`-arm sessions with an eligible page life
- *   (below) that settled or made an attempt, engaged or not. It is the
- *   cohort's denominator before the engagement condition, so a fault that
- *   stopped the player engaging, which the cohort cannot hold, shows here.
- * - The ENGAGED ELIGIBLE COHORT, the proposed release count: a session in the
- *   `wasm` arm with an eligible page life that engaged on the engine. A page
+ *   (below) that settled or made an attempt, engaged or not: the cohort's
+ *   denominator before the engagement condition, so a fault that stopped the
+ *   player engaging shows here.
+ * - The ENGAGED ELIGIBLE COHORT, the proposed release count: a `wasm`-arm
+ *   session with an eligible page life that engaged on the engine. A page
  *   life is eligible on the production host (`wasm`), on a commit the gate
- *   review names (one that carries S4, S9 and the slice-10 facade, where the
- *   old mirror host cannot run under `wasm`), at stage 3, chosen by the cohort (not a setting, a URL or
- *   the safety latch), not safety-suppressed, not size-gated, settled, and
- *   having run the engine (a settle that already fell back on
- *   `package-mismatch` alone did not). It engaged when its `engaged` row says
- *   a WASM engine was running. A fault in any eligible page life of an engaged
- *   session counts, one before the engagement included; a page life of such a
- *   session that left before its first tower is counted beside it.
- * - The TAIL: the engaged cohort on the commits the candidate review names.
+ *   review names (one with S4, S9 and the slice-10 facade, where the old
+ *   mirror host cannot run under `wasm`), at stage 3, chosen by the cohort
+ *   (a setting, a URL or the safety latch never qualifies), not suppressed,
+ *   not size-gated, settled, and having run the engine (a settle that already
+ *   fell back on `package-mismatch` alone did not). It engaged when its
+ *   `engaged` row says a WASM engine was running. A fault in any eligible
+ *   page life of the session counts, one before the engagement included.
+ *   Its rate and bounds are conditional on engagement; which bound the gate
+ *   reads is pending the owner.
+ * - The TAIL: the eligible attempts and the engaged cohort on the commits the
+ *   candidate review names.
  *
  * The arm comparison reads, by stage and assigned arm, every session with a
  * settled page life (until both arms send the `attempt` row) and none that
- * was size-gated (the
- * gate is computed in both arms, and `$exception` rows carry no page life, so
- * the whole session is left out), overrides, opt-outs and suppressions
- * included: sessions, the share that engaged on any engine, engine-fault
- * fallback sessions and `$exception` sessions of any source, with the 95%
- * interval of the crash-rate difference (Newcombe's hybrid score interval).
- * Sessions whose arm or stage changed between page lives are reported apart.
- * The stop signals are a repeated engine-fault reason on one build in two
- * sessions and a writer latch-off, both read from every recognized page life
- * (any host, size gate or arm), and a crash-rate difference (wasm minus ts) whose interval
- * lies above zero at some stage. A repeated engine or host `$exception` is not
+ * was size-gated (the gate is computed in both arms, and `$exception` rows
+ * carry no page life, so the whole session is left out), overrides, opt-outs
+ * and suppressions included: sessions, the share that engaged on any engine,
+ * engine-fault sessions and `$exception` sessions of any source, with the
+ * 95% interval of the crash-rate difference (Newcombe's hybrid score
+ * interval). Sessions whose arm or stage changed are reported apart. The stop
+ * signals are a repeated engine-fault reason on one build in two sessions and
+ * a writer latch-off, both read from every recognized page life (any host,
+ * size gate or arm), and a crash-rate difference (wasm minus ts) whose
+ * interval lies above zero at some stage. A repeated `$exception` is not
  * evaluated: production stacks are minified and the rows carry no commit.
  *
  * The A4 fields (`stage`, `assigned_arm`, `selected_by`, `safety_suppressed`,
@@ -67,8 +73,8 @@
  * yet. Absent, they read as `none`, `none`, `default`, false, false, no
  * attempt row and not engaged, so nothing is eligible and the report says so
  * at its top. A row counts as measured on a build (commit and bundle) once
- * any page life of that build sent it: the rows are code, and a page life
- * that left early or never engaged sends none by design.
+ * any page life of that build sent it: a page life that left early or never
+ * engaged sends none by design.
  *
  * This module and `engine-reliability.mjs` import each other; every
  * cross-reference is read inside a function, and must stay so (a module-scope
@@ -106,14 +112,13 @@ export function isFault(pl) {
   return pl.fallbacks > 0 && (faultReasons.length > 0 || pl.reasons.length === 0);
 }
 
-/** Whether a settled page life ran the engine: one whose settle row already
- *  fell back on `package-mismatch` alone never did. An `engaged` row proves a
- *  tower ran when the settle row was lost. */
 /** Whether a page life got past its settle row: settled, or a row that only
  *  comes after it (an engaged row, a later fallback or a latch-off) proves it
  *  did when the settle row was lost. */
 const pastSettle = (pl) => pl.settled || pl.engaged || pl.fallbacks > pl.settleFallbacks || pl.writerLatched;
 
+/** Whether a page life ran the engine: one whose settle row already fell
+ *  back on `package-mismatch` alone never did. */
 export const ranEngine = (pl) => pastSettle(pl) && !(pl.settleFallbacks > 0 && !isFault(pl) && pl.reasons.includes("package-mismatch"));
 
 const leftBeforeTower = (pl) => pl.attempted && !pastSettle(pl);
@@ -186,22 +191,29 @@ const buildKey = (pl) => `${pl.version} (${pl.sha}, ${pl.build})`;
  *  engaged on the engine (or any such page life, without `engagedOnly`);
  *  `pickLoading` finds the ones that left before a tower, and `pickLoop` the
  *  crash loops a suppressed boot of the same session detected (a same-tab
- *  reload keeps the session), which are charged to it as faults. */
+ *  reload keeps the session), which are charged to it as faults. A session
+ *  with an override page life never qualifies; `overridden` counts those. */
 function cohort(sessions, pick, pickLoading, pickLoop, engagedOnly = true) {
-  const out = { n: 0, faults: 0, latched: 0, leftBeforeTower: 0, byEngagement: { command: 0, play: 0, unknown: 0, none: 0 } };
+  const out = { n: 0, faults: 0, faultsOrLeft: 0, latched: 0, leftBeforeTower: 0, overridden: 0, byEngagement: { command: 0, play: 0, unknown: 0, none: 0 } };
   const byBuild = new Map();
   for (const s of sessions) {
     if (s.arm !== "wasm") continue;
     const lives = s.lives.filter(pick);
     const engaged = lives.filter(engagedOnEngine);
     if (engagedOnly ? !engaged.length : !lives.length) continue;
+    if (s.lives.some(isOverride)) {
+      out.overridden++;
+      continue;
+    }
     out.n++;
     const loops = s.lives.filter(pickLoop);
-    if (lives.some(engineFault) || loops.length) out.faults++;
+    const fault = lives.some(engineFault) || loops.length > 0;
+    const left = s.lives.some((pl) => leftBeforeTower(pl) && pickLoading(pl));
+    if (fault) out.faults++;
+    if (fault || left) out.faultsOrLeft++;
     if (lives.some((pl) => pl.writerLatched)) out.latched++;
-    if (s.lives.some((pl) => leftBeforeTower(pl) && pickLoading(pl))) out.leftBeforeTower++;
-    // `none` is a session that did not engage; an engaged row with no route
-    // is `unknown`.
+    if (left) out.leftBeforeTower++;
+    // `none` never engaged; an engaged row with no route is `unknown`.
     const by = engaged[0]?.engagedBy;
     out.byEngagement[!engaged.length ? "none" : by === "command" || by === "play" ? by : "unknown"]++;
     // A build holds the session only where it engaged or faulted, so a page
@@ -217,8 +229,16 @@ function cohort(sessions, pick, pickLoading, pickLoop, engagedOnly = true) {
     ...out,
     rate: out.n ? out.faults / out.n : null,
     upper95: upperBound(out.faults, out.n),
+    upper95Pessimistic: upperBound(out.faultsOrLeft, out.n),
     byBuild: [...byBuild.values()].map((b) => ({ build: b.build, sessions: b.sessions.size, faults: b.faults.size, upper95: upperBound(b.faults.size, b.sessions.size) })).sort((a, b) => a.build.localeCompare(b.build)),
   };
+}
+
+/** The all-attempts row with the moved-off sessions that never ran the
+ *  engine in N as clean sessions (#1197's wording). */
+function withMovedOff(t) {
+  const n = t.sessions + t.movedOffNeverRan;
+  return { n, faults: t.faults, rate: n ? t.faults / n : null, upper95: upperBound(t.faults, n), upper95Pessimistic: upperBound(t.faultsOrLeft, n), latched: t.latched, leftBeforeTower: t.leftBeforeTower };
 }
 
 /** Wilson score interval for k of n at 95%. */
@@ -272,23 +292,18 @@ export function summarizeCohorts(allLives, opts = {}) {
   const unrecognizedSessions = new Set(allLives.filter((pl) => !recognized(pl)).map((pl) => pl.session)).size;
   const sessions = bySession(pageLives);
 
-  // A page life asked for the engine on a counted host, unless the size gate
-  // or a safety suppression moved it to TypeScript, and ran it if it settled
-  // (a settle that already fell back on `package-mismatch` never did; the
-  // overall rate counts those on its mismatch line). An opt-out is a setting
-  // or URL choice of TypeScript in the `wasm` arm; a choice of a counted host
-  // is an override that asked for the engine, and a choice of an uncounted
-  // WASM host is in no population here.
-  // A suppressed page life that carries an engine-fault reason (a detected
-  // crash loop) counts as an attempt with a fault, never as a move off.
-  // A page life the size gate touched still counts when the engine ran in it
-  // later (a gated load, then a new game on the engine that engaged or
-  // trapped); a gated page life with neither shows nothing either way. A crash
-  // loop counts on the host its suppressed row names (A4: the selection
-  // before safety), size gate or not: large towers are the likeliest
-  // to take the engine down. Opt-outs belong to the production host.
-  // A crash loop's row names the host chosen before safety (A4); one that
-  // names `ts` in the `wasm` arm belongs to the production host.
+  // A page life asked for the engine on a counted host unless a suppression
+  // moved it to TypeScript, and ran it if it settled (a settle that fell back
+  // on `package-mismatch` alone never did; the overall rate counts those). A
+  // size-gated page life counts only once the engine faulted or engaged in it
+  // (a gated load, then a new game on the engine). An opt-out is a setting or
+  // URL choice of TypeScript in the `wasm` arm, and belongs to the production
+  // host; a choice of an uncounted WASM host is in no population here. A
+  // suppressed page life with an engine-fault reason (a detected crash loop)
+  // is an attempt with a fault on the host its row names (A4: the selection
+  // before safety), size gate or not, since large towers are the likeliest to
+  // take the engine down; one that names `ts` in the `wasm` arm belongs to
+  // the production host.
   const loopHost = (pl) => hosts.includes(pl.requested) || (pl.requested === "ts" && pl.assignedArm === "wasm" && hosts.includes(ELIGIBLE_HOST));
   const asked = (pl) =>
     (hosts.includes(pl.requested) && !isSuppressed(pl) && (pl.settled ? ranEngine(pl) : pl.attempted) && (!pl.sizeGated || engineFault(pl) || engagedOnEngine(pl))) || (suppressedFault(pl) && loopHost(pl));
@@ -297,30 +312,38 @@ export function summarizeCohorts(allLives, opts = {}) {
   let uncountedHostSessions = 0;
   let uncountedHostFaults = 0;
   const attemptsByArm = new Map();
-  const blank = (arm) => ({ arm, sessions: 0, faults: 0, engaged: 0, faultNotEngaged: 0, leftBeforeTower: 0, overrides: 0, movedOff: 0, latched: 0 });
+  const blank = (arm) => ({ arm, sessions: 0, faults: 0, faultsOrLeft: 0, engaged: 0, faultNotEngaged: 0, leftBeforeTower: 0, overrides: 0, movedOff: 0, movedOffNeverRan: 0, latched: 0 });
   const rowOf = (arm) => attemptsByArm.get(arm) ?? attemptsByArm.set(arm, blank(arm)).get(arm);
   const totals = blank("all");
   const repeats = new Map();
   for (const s of sessions) {
     const lives = s.lives.filter(asked);
+    // An opt-out shows in the WASM arm, whether the session ran the engine or not.
+    const wasMovedOff = s.arm === "wasm" && s.lives.some(movedOff);
     if (!lives.length) {
       if (s.lives.some(uncountedWasm)) {
         uncountedHostSessions++;
         if (s.lives.some((pl) => uncountedWasm(pl) && engineFault(pl))) uncountedHostFaults++;
-      }
-      else if (s.arm === "wasm" && s.lives.some(movedOff)) for (const t of [rowOf(s.arm), totals]) t.movedOff++;
+      } else if (wasMovedOff)
+        for (const t of [rowOf(s.arm), totals]) {
+          t.movedOff++;
+          t.movedOffNeverRan++;
+        }
       continue;
     }
     const fault = lives.some(engineFault);
     const engaged = lives.some(engagedOnEngine);
+    const left = lives.some(leftBeforeTower);
     const row = rowOf(s.arm);
     for (const t of [row, totals]) {
       t.sessions++;
       if (fault) t.faults++;
+      if (fault || left) t.faultsOrLeft++;
       if (engaged) t.engaged++;
       if (fault && !engaged) t.faultNotEngaged++;
-      if (lives.some(leftBeforeTower)) t.leftBeforeTower++;
-      if (lives.some(isOverride)) t.overrides++;
+      if (left) t.leftBeforeTower++;
+      if (s.lives.some(isOverride)) t.overrides++;
+      if (wasMovedOff) t.movedOff++;
       if (lives.some((pl) => pl.writerLatched)) t.latched++;
     }
   }
@@ -336,8 +359,7 @@ export function summarizeCohorts(allLives, opts = {}) {
     }
   }
 
-  // Settled page lives only: the TypeScript arm sends no `attempt` row yet,
-  // so an early exit would count in one arm alone.
+  // Settled page lives only: the TypeScript arm sends no `attempt` row yet.
   const compared = (s) => s.lives.some((pl) => pl.settled) && !s.lives.some((pl) => pl.sizeGated);
   const steady = sessions.filter((s) => !s.changed && compared(s));
   const stages = [...new Set(steady.filter((s) => COMPARED_ARMS.includes(s.arm)).map((s) => s.stage))].sort();
@@ -349,8 +371,7 @@ export function summarizeCohorts(allLives, opts = {}) {
     faults: inArm.filter((s) => s.lives.some(engineFault)).length,
     crashes: inArm.filter((s) => crashSessions.has(s.id)).length,
   });
-  // Sessions the size gate left out, by stage and arm, so an asymmetric gate
-  // shows (the gate must be computed in both arms).
+  // Sessions the size gate left out, by stage and arm: an asymmetric gate shows.
   const gatedOut = (stage, arm) => sessions.filter((s) => !s.changed && s.arm === arm && s.stage === stage && s.lives.some((pl) => pl.settled) && s.lives.some((pl) => pl.sizeGated)).length;
   const comparison = stages.map((stage) => {
     const [w, t] = COMPARED_ARMS.map((arm) => armRow(steady.filter((s) => s.arm === arm && s.stage === stage), stage, arm));
@@ -364,8 +385,7 @@ export function summarizeCohorts(allLives, opts = {}) {
   const eligible = (pl) => isEligible(pl, eligibleShas);
   const loading = (pl) => isEligible(pl, eligibleShas, true);
   const inTail = (pl) => tailShas.length > 0 && shaMatches(pl.sha, tailShas);
-  // A crash loop on an eligible commit, stage and arm, detected in the same
-  // session.
+  // A same-session crash loop on an eligible commit, stage and arm.
   const loop = (pl) => suppressedFault(pl) && (pl.requested === ELIGIBLE_HOST || pl.requested === "ts") && pl.stage === ELIGIBLE_STAGE && pl.assignedArm === "wasm" && shaMatches(pl.sha, eligibleShas);
   const stopSignals = [
     ...[...repeats.entries()].filter(([, ids]) => ids.size >= 2).map(([key, ids]) => `engine fault ${code(key)} in ${plural(ids.size, "session")}`),
@@ -375,9 +395,8 @@ export function summarizeCohorts(allLives, opts = {}) {
   const attemptable = pageLives.filter((pl) => hosts.includes(pl.requested));
 
   return {
-    attempts: { ...totals, rate: totals.sessions ? totals.faults / totals.sessions : null, upper95: upperBound(totals.faults, totals.sessions), byArm: [...attemptsByArm.values()].sort((a, b) => a.arm.localeCompare(b.arm)) },
-    // #1197's literal reading: moved-off `wasm`-arm sessions in N as clean.
-    attemptsWithMovedOff: { n: totals.sessions + totals.movedOff, faults: totals.faults, rate: totals.sessions + totals.movedOff ? totals.faults / (totals.sessions + totals.movedOff) : null, upper95: upperBound(totals.faults, totals.sessions + totals.movedOff), latched: totals.latched, leftBeforeTower: totals.leftBeforeTower },
+    attempts: { ...totals, rate: totals.sessions ? totals.faults / totals.sessions : null, upper95: upperBound(totals.faults, totals.sessions), upper95Pessimistic: upperBound(totals.faultsOrLeft, totals.sessions), byArm: [...attemptsByArm.values()].sort((a, b) => a.arm.localeCompare(b.arm)) },
+    attemptsWithMovedOff: withMovedOff(totals),
     uncountedHostSessions,
     uncountedHostFaults,
     // Whether each compared arm's page lives are on a build that sends the
@@ -385,6 +404,7 @@ export function summarizeCohorts(allLives, opts = {}) {
     comparisonEngagedRows: Object.fromEntries(COMPARED_ARMS.map((arm) => [arm, buildCoverage(steady.filter((x) => x.arm === arm).flatMap((x) => x.lives.filter((pl) => pl.settled)), (pl) => pl.engaged)])),
     eligibleAttempts: cohort(sessions, loading, loading, loop, false),
     eligible: cohort(sessions, eligible, loading, loop),
+    tailAttempts: cohort(sessions, (pl) => loading(pl) && inTail(pl), (pl) => loading(pl) && inTail(pl), (pl) => loop(pl) && inTail(pl), false),
     tail: cohort(sessions, (pl) => eligible(pl) && inTail(pl), (pl) => loading(pl) && inTail(pl), (pl) => loop(pl) && inTail(pl)),
     comparison,
     changed,
@@ -430,32 +450,35 @@ const byBuildTable = (title, rows) => [
 /** The cohorts' section of the report, as Markdown lines. */
 export function renderCohortsMarkdown(c, meta) {
   const tailLabel = meta.tailShas.length ? meta.tailShas.map(code).join(", ") : "no commits named";
-  const pop = (label, r) => `| ${label} | ${r.n ?? r.sessions} | ${r.faults} | ${pct(r.rate)} | ${pct(r.upper95)} | ${r.latched} | ${share(r.leftBeforeTower, r.n ?? r.sessions)} |`;
+  const pop = (label, r) => `| ${label} | ${r.n ?? r.sessions} | ${r.faults} | ${pct(r.rate)} | ${pct(r.upper95)} | ${pct(r.upper95Pessimistic)} | ${r.latched} | ${share(r.leftBeforeTower, r.n ?? r.sessions)} |`;
+  const conditional = "rate and bounds conditional on engagement; which bound the gate reads is pending the owner";
   return [
     "",
     "## Release evidence and safety",
     "",
-    "> The all-attempts denominator is the safety count: every engine fault in a page life that asked for a counted host is in it, before engagement too, and so is a crash loop a suppressed boot detected. `wasm`-arm sessions that never ran the engine (opted out to TypeScript or suppressed) are outside its N; the next row puts them in N as #1197 words it. The first reading departs from #1197's wording; which one the gate uses is the owner's decision. A page life that left before a tower sits in N without a fault (some may be crashes during the load); the last column shows how many. The engaged eligible cohort is the proposed release count; it holds only sessions that engaged, so a fault that stopped a player engaging is outside it and inside the eligible attempts row: read the rows together. \`--shas\`, \`--versions\`, \`--builds\` and \`--arms\` apply to the overall rate above, not here; \`--hosts\` applies to both. Each session's arm is that of its first page life in the window that carries one. A page life still loading when this ran counts as having left before a tower, and one that left may have crashed while the engine loaded. Sessions are not independent, so each bound is optimistic.",
+    "> The all-attempts denominator is the safety count: every engine fault in a page life that asked for a counted host is in it, before engagement too, and so is a crash loop a suppressed boot detected. `wasm`-arm sessions that never ran the engine (opted out to TypeScript or suppressed) are outside its N; the next row puts them in N as #1197 words it. The first reading departs from #1197's wording; which one the gate uses is pending the owner. A page life that left before a tower sits in N without a fault (some may be crashes during the load); the last column shows how many, and the pessimistic bound counts each as a fault, so the two bounds bracket the engine. A session with an override page life (a setting or the URL chose the engine) is in no eligible row, since overridden sessions never qualify; its faults stay in all attempts. The engaged rows hold only sessions that engaged, so a fault that stopped a player engaging is outside them and inside the attempts rows: read the rows together. \`--shas\`, \`--versions\`, \`--builds\` and \`--arms\` apply only to the overall rate above; \`--hosts\` applies to both. Each session's arm is that of its first page life in the window that carries one. A page life still loading when this ran counts as having left before a tower, and one that left may have crashed while the engine loaded. Sessions are not independent, so each bound is optimistic.",
     "",
-    "| Population | Sessions | Faults | Fault rate | 95% upper bound | Latch-offs | Left before a tower |",
-    "| --- | --- | --- | --- | --- | --- | --- |",
+    "| Population | Sessions | Faults | Fault rate | 95% upper bound | 95% upper bound, early exits as faults | Latch-offs | Left before a tower |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
     pop("All attempts (safety denominator)", c.attempts),
-    pop("All attempts, moved-off `wasm`-arm sessions in N (#1197's wording)", c.attemptsWithMovedOff),
+    pop("All attempts, moved-off `wasm`-arm sessions that never ran the engine in N (#1197's wording)", c.attemptsWithMovedOff),
     pop("Eligible attempts (engaged or not)", c.eligibleAttempts),
-    pop("Engaged eligible cohort (proposed release count)", c.eligible),
-    pop(`Candidate tail (${tailLabel})`, c.tail),
+    pop(`Engaged eligible cohort (proposed release count; ${conditional})`, c.eligible),
+    pop(`Candidate tail attempts (${tailLabel}; engaged or not)`, c.tailAttempts),
+    pop(`Candidate tail, engaged (${tailLabel}; ${conditional})`, c.tail),
     "",
-    `Engaged by: command ${c.eligible.byEngagement.command}, 30 s of play ${c.eligible.byEngagement.play}, no route ${c.eligible.byEngagement.unknown}. Sessions with a page life carrying a value the game never sends (that page life is in no count; the session's others still count): ${c.unrecognizedSessions}. \`$exception\` sessions in the window: ${c.crashSessions}. Sessions with a page life on an uncounted WASM host and none counted here (widen \`--hosts\` to count them): ${c.uncountedHostSessions}, ${c.uncountedHostFaults} of them with an engine fault. Eligible attempts that did not engage: ${share(c.eligibleAttempts.byEngagement.none, c.eligibleAttempts.n)}.`,
+    `Engaged by: command ${c.eligible.byEngagement.command}, 30 s of play ${c.eligible.byEngagement.play}, no route ${c.eligible.byEngagement.unknown}. Sessions with a page life carrying a value the game never sends (that page life is in no count; the session's others still count): ${c.unrecognizedSessions}. \`$exception\` sessions in the window: ${c.crashSessions}. Sessions with a page life on an uncounted WASM host and none counted here (widen \`--hosts\` to count them): ${c.uncountedHostSessions}, ${c.uncountedHostFaults} of them with an engine fault. Eligible attempts that did not engage: ${share(c.eligibleAttempts.byEngagement.none, c.eligibleAttempts.n)}. Sessions left out of the eligible rows for an override page life: ${c.eligibleAttempts.overridden} of the eligible attempts, ${c.eligible.overridden} of the engaged cohort, ${c.tailAttempts.overridden} of the tail attempts.`,
     "",
     "Blind spots: a trap the host catches reports through `engine_status`, not `$exception`, so the crash comparison understates engine failures (the engine-fault column holds them); `$exception` is not split into engine and host code; a crash loop detected after a same-tab reload is charged to its session's cohorts when one of the session's page lives that crashed is in the window, but one detected in a new tab is a new session, so it cannot be charged to the session that crashed, and the cohort never sees it; a tab the browser kills after its first rows (out of memory, a hang) sends nothing more and reads clean unless a crash loop is detected; the comparison reads settled page lives only, so early exits are outside it in both arms, and since the load before a tower is mostly WASM-arm time, the WASM crash rate there reads low and the crash-difference signal fires late.",
     ...byBuildTable("Engaged eligible cohort by build", c.eligible.byBuild),
-    ...byBuildTable("Candidate tail by build", c.tail.byBuild),
+    ...byBuildTable("Candidate tail attempts by build", c.tailAttempts.byBuild),
+    ...byBuildTable("Candidate tail, engaged, by build", c.tail.byBuild),
     "",
     "### All attempts by assigned arm",
     "",
-    "| Arm | Sessions | Engaged on the engine | Did not engage | Faults | Faulted, never engaged | Left before a tower | Overrides | Opted out or suppressed (never ran the engine; outside the rate) |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-    ...c.attempts.byArm.map((r) => `| ${code(r.arm)} | ${r.sessions} | ${share(r.engaged, r.sessions)} | ${share(r.sessions - r.engaged, r.sessions)} | ${r.faults} | ${r.faultNotEngaged} | ${share(r.leftBeforeTower, r.sessions)} | ${r.overrides} | ${r.movedOff} |`),
+    "| Arm | Sessions | Engaged on the engine | Did not engage | Faults | Faulted, never engaged | Left before a tower | Overrides | Opted out or suppressed (any page life) | Of those, never ran the engine (outside the rate) |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...c.attempts.byArm.map((r) => `| ${code(r.arm)} | ${r.sessions} | ${share(r.engaged, r.sessions)} | ${share(r.sessions - r.engaged, r.sessions)} | ${r.faults} | ${r.faultNotEngaged} | ${share(r.leftBeforeTower, r.sessions)} | ${r.overrides} | ${r.movedOff} | ${r.movedOffNeverRan} |`),
     "",
     "### Arm comparison by stage (overrides, opt-outs and suppressions included; sessions with a size-gated page life left out in both arms)",
     "",

@@ -37,10 +37,19 @@ describe("the arm comparison and the stop signals", () => {
 
   it("reports sessions whose arm or stage changed apart from both arms", () => {
     const c = run(
-      [life({ session: "a", assignedArm: "ts", requested: "ts", firstSeen: "2026-12-01 10:00:00" }), life({ session: "a" }), life({ session: "b", stage: "2", firstSeen: "2026-12-01 10:00:00" }), life({ session: "b" })],
+      [
+        life({ session: "a", assignedArm: "ts", requested: "ts", firstSeen: "2026-12-01 10:00:00" }),
+        life({ session: "a" }),
+        life({ session: "b", stage: "2", firstSeen: "2026-12-01 10:00:00" }),
+        life({ session: "b" }),
+        // A changed session with a size-gated page life is in no gated count.
+        life({ session: "g", assignedArm: "ts", requested: "ts", firstSeen: "2026-12-01 10:00:00" }),
+        life({ session: "g", sizeGated: true }),
+        life({ session: "w" }),
+      ],
       { crashSessions: new Set(["a"]) },
     );
-    expect(c.comparison.every((s) => s.wasm.sessions === 0 && s.ts.sessions === 0)).toBe(true);
+    expect(c.comparison.map((s) => [s.stage, s.wasm.sessions, s.ts.sessions, s.wasm.sizeGatedOut, s.ts.sizeGatedOut])).toEqual([["3", 1, 0, 0, 0]]);
     expect(c.changed).toMatchObject({ sessions: 2, crashes: 1 });
   });
 
@@ -70,6 +79,10 @@ describe("the arm comparison and the stop signals", () => {
     const ts = Array.from({ length: 200 }, (_, i) => life({ session: `t${i}`, assignedArm: "ts", requested: "ts" }));
     const crashed = new Set(wasm.slice(0, 40).map((pl) => pl.session));
     expect(run([...wasm, ...ts], { crashSessions: crashed }).stopSignals).toEqual(["at stage `3` the WASM arm's crash rate is above the TypeScript arm's (the 95% interval lies above zero)"]);
+    // An interval that spans zero raises nothing.
+    const few = run([...wasm.slice(0, 20), ...ts.slice(0, 20)], { crashSessions: new Set(["w0"]) });
+    expect(few.comparison[0].crashDifference?.[0]).toBeLessThan(0);
+    expect(few.stopSignals).toEqual([]);
   });
 });
 
@@ -87,6 +100,10 @@ describe("the report", () => {
       expect(md.indexOf(lead), lead).toBeGreaterThan(-1);
       expect(md.indexOf(lead), lead).toBeLessThan(first);
     }
+  });
+
+  it("keeps every row caveat when nothing asked for the engine", () => {
+    expect(cohortCaveats(run([]), { eligibleShas: [SHA] })).toEqual([caveats[1], caveats[2], caveats[3]].map((lead) => expect.stringContaining(lead)));
   });
 
   it("keeps a caveat while a page life is on a build that never sent the row", () => {
@@ -114,12 +131,17 @@ describe("the report", () => {
     const md = renderReliabilityMarkdown(summarizeReliability([life()]), { ...meta, cohorts: c, eligibleShas: [SHA], tailShas: [] });
     for (const lead of caveats) expect(md).not.toContain(lead);
     expect(md).toContain("| All attempts (safety denominator) | 1 |");
-    expect(md).toContain("| Engaged eligible cohort (proposed release count) | 1 |");
+    expect(md).toContain("| Engaged eligible cohort (proposed release count; rate and bounds conditional on engagement; which bound the gate reads is pending the owner) | 1 |");
+    expect(md).toContain("| Candidate tail attempts (no commits named; engaged or not) | 0 |");
+    expect(md).toContain("| Candidate tail, engaged (no commits named; rate and bounds conditional on engagement; which bound the gate reads is pending the owner) | 0 |");
+    expect(md).toContain("95% upper bound, early exits as faults");
+    expect(md).toContain("Sessions left out of the eligible rows for an override page life: 0 of the eligible attempts");
     expect(md).toContain("| `2.50.0 (abc1234, switchable)` | 1 | 0 |");
     expect(md).toContain("| Eligible attempts (engaged or not) | 1 |");
-    expect(md).toContain("### Candidate tail by build");
+    expect(md).toContain("### Candidate tail attempts by build");
+    expect(md).toContain("### Candidate tail, engaged, by build");
     expect(md).toContain("no route 0");
-    expect(md).toContain("| All attempts, moved-off `wasm`-arm sessions in N (#1197's wording) | 1 |");
+    expect(md).toContain("| All attempts, moved-off `wasm`-arm sessions that never ran the engine in N (#1197's wording) | 1 |");
     expect(md).toContain("Blind spots: a trap the host catches");
     expect(md).toContain("`$exception` sessions in the window: 0");
     expect(md).toContain("- none of the evaluated signals");

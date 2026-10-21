@@ -160,23 +160,33 @@ counts the sessions with a settled page life that ran the engine (one whose
 settle row already fell back on `package-mismatch` alone did not); a session
 is a fault when any of those page lives fell back for a reason other than
 `package-mismatch`, which is reported on its own line; overrides and the
-`unassigned` arm are left out unless asked for; the bound is the exact
+`unassigned` arm are left out unless asked for, and safety-suppressed page
+lives (which run TypeScript) are always left out and counted on their own
+line; the bound is the exact
 one-sided 95% Clopper-Pearson bound, by build and by arm as well. That rate is
 early telemetry. The proposed release count (#1090; whether it replaces
 #945's "1,000 engine sessions" is the owner's decision) is the engaged
 eligible cohort: sessions in the `wasm` arm, on the production host, chosen by
 the cohort, at stage 3, not safety-suppressed and not size-gated, on commits
 the gate review names, that engaged on the engine; a fault in any of their
-eligible page lives counts, one before the engagement too. Beside it, the
-eligible attempts row holds the same sessions engaged or not, so a fault that
-stopped a player engaging still shows, and the all-attempts safety denominator
-holds every session that asked for the engine, overrides and sessions that
-never engaged included. Opt-outs and safety suppressions are counted in the
-WASM arm's row as their own figure, outside its fault rate, since they never
-ran the engine; the report also prints the rate with them in N, as #1197
-words it, and the owner decides which reading the gate uses. A crash loop that
-a suppressed boot detects counts as a fault. The report also gives the candidate tail's bound, an arm
-comparison by stage with the crash-rate interval, and the stop signals. Every
+eligible page lives counts, one before the engagement too. Its rate and bound
+are conditional on engagement, and which bound the gate reads is pending the
+owner. A session with an override page life (a setting or the URL chose the
+engine) never qualifies; the report counts the sessions it left out. Beside
+the cohort, the eligible attempts row holds the same sessions engaged or not,
+so a fault that stopped a player engaging still shows, and the all-attempts
+safety denominator holds every session that asked for the engine, overrides
+and sessions that never engaged included; a size-gated page life is in it
+only when the engine faulted or engaged in it. Every WASM-arm session with an
+opt-out or a safety suppression is counted in the WASM arm's row, whether or
+not it also ran the engine; one that never ran the engine is outside the
+fault rate's N, and the report also prints the rate with those in N, as #1197
+words it (which reading the gate uses is pending the owner). A crash loop that
+a suppressed boot detects counts as a fault. Each population carries a second,
+pessimistic bound that counts a page life that left before its first tower as
+a fault. The report also gives the candidate tail's attempts and engaged rows,
+an arm comparison by stage with the crash-rate interval, and the stop
+signals. Every
 rate is a lower bound: the relay has no offline queue and a per-IP limit, a
 tab closed or crashed while the engine loads sends nothing until the `attempt`
 row ships (and with it, is counted as having left, since nothing tells a crash
