@@ -18,7 +18,7 @@ describe("the fuzz corpus", () => {
     // The Rust replay writes its records by file name, so the id must match.
     expect(scenario.id).toBe(stem);
     expect(scenario.description.length).toBeGreaterThan(40);
-    expect(scenario.description).not.toMatch(/—/);
+    expect(scenario.description).not.toMatch(/\u2014/);
     expect(readFileSync(file, "utf8").endsWith("\n")).toBe(true);
     expect(runScenario(scenario).length).toBeGreaterThan(1);
   });
