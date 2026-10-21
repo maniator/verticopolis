@@ -100,7 +100,10 @@ describe("markdownReport", () => {
     expect(md).toContain("## Simulation only, engine as the app hosts it");
     expect(md).toMatch(/\| small \| 1x \| total for fixed duration \| 100 ms \| 200 ms \| 2\.00x \(2\.00 to 2\.00\) \| wasm slower \| 6\/6\/6 \|/);
     expect(md).toContain("ts: ts; wasm: ts");
-    expect(md).toMatch(/No engine comparison for cold DOMContentLoaded, cold load event, warm DOMContentLoaded, warm load event: boot order differs between engines/);
+    expect(md).toMatch(/No engine comparison for cold DOMContentLoaded, cold load event, cold engine loaded, warm DOMContentLoaded, warm load event, warm engine loaded: boot order differs between engines/);
+    expect(md).toMatch(/No engine comparison for cold loaded to ready, warm loaded to ready, cold loaded to ready \(saved tower\): the span covers different work on each engine/);
+    expect(md).toContain("Reported, not gates (#1254)");
+    expect(md).toContain("| cold game ready (saved tower) | small | 1x |");
     expect(md).toContain("- one machine");
     expect(markdownReport(results(true))).toContain("**Validation: passed.**");
     expect(md).not.toContain("A/A pass");
