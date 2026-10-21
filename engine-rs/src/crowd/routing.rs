@@ -219,6 +219,28 @@ pub fn bfs_route(adj: &AdjGraph, from: i64, to: i64) -> Option<Route> {
     None
 }
 
+/// A state of the Classic walk-budget search: (floor, walkRun, runCap);
+/// `None` is the NO_CAP sentinel (Infinity).
+pub(super) type WalkState = (i64, i64, Option<i64>);
+
+/// One edge of the walk-budget search: the state it leads to, or `None`
+/// when the edge is a walkway the budget refuses.
+#[inline]
+pub(super) fn walk_budget_step(s: WalkState, edge: &Edge) -> Option<WalkState> {
+    let Some(wk) = edge.walk_kind else {
+        return Some((edge.f, 0, None));
+    };
+    let w = wk.walkway_willingness()?;
+    let cap = match s.2 {
+        Some(c) => c.min(w),
+        None => w,
+    };
+    if s.1 + 1 > cap {
+        return None;
+    }
+    Some((edge.f, s.1 + 1, Some(cap)))
+}
+
 /// The Classic router with the contiguous-walk budget.
 pub fn bfs_route_walk_budget(adj: &AdjGraph, from: i64, to: i64) -> Option<Route> {
     if from == to {
@@ -227,8 +249,7 @@ pub fn bfs_route_walk_budget(adj: &AdjGraph, from: i64, to: i64) -> Option<Route
             shafts: vec![],
         });
     }
-    // (floor, walkRun, runCap); None is the NO_CAP sentinel (Infinity).
-    type St = (i64, i64, Option<i64>);
+    type St = WalkState;
     let origin: St = (from, 0, None);
     let mut prev: HashMap<St, (St, i64, i64)> = HashMap::new();
     let mut seen: HashSet<St> = HashSet::new();
@@ -239,20 +260,8 @@ pub fn bfs_route_walk_budget(adj: &AdjGraph, from: i64, to: i64) -> Option<Route
         for &s in &frontier {
             let Some(edges) = adj.get(&s.0) else { continue };
             for edge in edges {
-                let ns: St = if let Some(wk) = edge.walk_kind {
-                    let Some(w) = wk.walkway_willingness() else {
-                        continue;
-                    };
-                    let cap = match s.2 {
-                        Some(c) => c.min(w),
-                        None => w,
-                    };
-                    if s.1 + 1 > cap {
-                        continue;
-                    }
-                    (edge.f, s.1 + 1, Some(cap))
-                } else {
-                    (edge.f, 0, None)
+                let Some(ns) = walk_budget_step(s, edge) else {
+                    continue;
                 };
                 if !seen.insert(ns) {
                     continue;

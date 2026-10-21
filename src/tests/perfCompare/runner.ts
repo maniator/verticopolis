@@ -169,7 +169,7 @@ async function freshPage(page: Page, engine: EngineName, where: string): Promise
 
 /** The memory pass: each scenario in a fresh page, so no scenario's WASM
  *  memory or heap carries another's (or a bare engine's) high-water mark. */
-async function memoryPass(page: Page, cdp: CDPSession, opts: RunnerOptions, engine: EngineName, engineUrl: string): Promise<Record<string, { adoptMs: number; memory: MemorySummary }>> {
+async function memoryPass(page: Page, cdp: CDPSession, opts: RunnerOptions, engine: EngineName): Promise<Record<string, { adoptMs: number; memory: MemorySummary }>> {
   const out: Record<string, { adoptMs: number; memory: MemorySummary }> = {};
   for (const sc of opts.scenarios) {
     await freshPage(page, engine, `${sc.name} memory pass boot`);
@@ -186,7 +186,7 @@ async function memoryPass(page: Page, cdp: CDPSession, opts: RunnerOptions, engi
     );
     await cdp.send("HeapProfiler.collectGarbage");
     const heap = (await cdp.send("Runtime.getHeapUsage")) as { usedSize: number; totalSize: number };
-    const wasmBytes = engine === "wasm" ? await page.evaluate(wasmMemoryBytes, engineUrl) : null;
+    const wasmBytes = engine === "wasm" ? await page.evaluate(wasmMemoryBytes) : null;
     const pss = processTreePss(process.pid, /chrom|headless_shell/i);
     await expectEngine(page, engine, `${sc.name} memory pass`);
     out[sc.name] = { adoptMs: adopt.adoptMs, memory: { jsHeapUsedBytes: heap.usedSize, jsHeapTotalBytes: heap.totalSize, wasmMemoryBytes: wasmBytes, processPssBytes: pss?.bytes ?? null, processes: pss?.processes ?? null } };
@@ -266,7 +266,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: null, rate: slowRate, timed: {} };
     log(`  rep ${rep} ${slot}: cold ready ${cold.sample.gameReadyMs?.toFixed(0)} ms, warm ready ${warm.sample.gameReadyMs?.toFixed(0)} ms`);
 
-    const memory = await memoryPass(page, cdp, opts, engine, engineUrl);
+    const memory = await memoryPass(page, cdp, opts, engine);
 
     // Timed simulation passes, each scenario in a page of its own (see
     // scenarioPages.ts). Per scenario and throttle the order is the same on

@@ -1,5 +1,6 @@
 import { checkBinding } from "../dualrun/binding";
-import { initEngineGlue } from "./engineLoad";
+import { EngineBootError, bootFailureReason, packageFailureOf } from "./engineBoot";
+import { loadEngineModule } from "./loadEngineModule";
 import type { BuildMetadataResult } from "./buildSection";
 import { EngineWorkerCore } from "./workerCore";
 import type { FromWorker, ToWorker } from "./workerProtocol";
@@ -24,14 +25,26 @@ let loading = false;
 let build: BuildMetadataResult | undefined;
 
 async function load(url: string): Promise<void> {
-  const loaded = await initEngineGlue(url, {
+  // The same byte check as the main thread's (the respawn path loads here
+  // too); a refusal reaches the main thread with its detail.
+  const { mod, exports } = await loadEngineModule(url, {
     onBuild: (b) => {
       build = b;
       post({ type: "build", build: b });
     },
   });
-  const exports = loaded.exports as { memory?: WebAssembly.Memory } | undefined;
-  const ready = new EngineWorkerCore(checkBinding(loaded.mod), post, () => exports?.memory?.buffer.byteLength ?? null);
+  let binding: ReturnType<typeof checkBinding>;
+  try {
+    binding = checkBinding(mod);
+  } catch (e) {
+    // A package that passes the byte check but lacks what this shell calls is
+    // a mismatched one, as the main-thread load codes it.
+    throw new EngineBootError("package-mismatch", e instanceof Error ? e.message : String(e));
+  }
+  const ready = new EngineWorkerCore(binding, post, () => exports?.memory?.buffer.byteLength ?? null);
+  // No catalog function at all is a foreign package, as the main-thread host
+  // codes it (catalogVerdict).
+  if (typeof binding.catalog !== "function") throw new EngineBootError("package-mismatch", "the WASM binding exports no catalog");
   post({ type: "ready", catalogs: ready.catalogs(), identity: ready.identity(), build });
   core = ready;
   const pending = queue ?? [];
@@ -46,7 +59,8 @@ scope.onmessage = (e) => {
     loading = true;
     load(msg.url).catch((err: unknown) => {
       queue = null;
-      post({ type: "error", fatal: true, message: `could not load the WASM engine: ${err instanceof Error ? err.message : String(err)}`, ...(build ? { build } : {}) });
+      const refused = packageFailureOf(err);
+      post({ type: "error", fatal: true, message: `could not load the WASM engine: ${err instanceof Error ? err.message : String(err)}`, reason: bootFailureReason(err), ...(refused ? { package: refused } : {}), ...(build ? { build } : {}) });
     });
     return;
   }
