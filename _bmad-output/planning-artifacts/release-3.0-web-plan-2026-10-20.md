@@ -3,7 +3,9 @@
 > **Snapshot, written 2026-10-20 against `main` at `8f3a143` (app 2.35.0),
 > revised the same day after its adversarial review (section 14), after
 > the owner's decisions (section 12), and after the owner's evening direction
-> on Rust authority and when reliability evidence starts (section 1.2).** PR,
+> on Rust authority and when reliability evidence starts (section 1.2);
+> revised again on 2026-10-21 for the owner's consistency and feasibility pass
+> (section 1.3, which carries its own snapshot line).** PR,
 > branch, issue and label states drift after this. The live release matrix is
 > the tracking issue proposed in section 9.6; until it exists, #945 and the PRs
 > named below are the live source. Every performance figure here is historical,
@@ -192,7 +194,373 @@ point, R6a, back to the owner) are in the review's section 5.7.
 | (b) | The 1,000 eligible sessions (4.1) | The first eligible session | At least 1,000, every failure triaged, the bound stated as achieved | Not restarted by later builds; reported by build, and a fallback whose cause was fixed still counts |
 | (c) | The observation period on the final candidate build (the tail, 4.1) | The candidate deploy at stage 3, after the freeze | At least 14 nights and 100 eligible sessions on the candidate deploys, every failure triaged, no latch-off | A merge to the tail's paths or a new key; any other engine, host, fallback or telemetry change is assessed (condition 4) |
 | (d) | The 14-night seeded replay (4.2) | The freeze, on the candidate engine's key | 14 counted green nights on one key | A new key or an engine-output failure |
-| (e) | Slice 11, the mirror-code cleanup | One release after slice 10 | The old mirror host and its flag leave production code; the parity projects and the dual run keep the mirror as a test and tooling harness | Not a prerequisite for (a) or (b); it touches the tail's paths, so it lands before the freeze where practical (condition 5) |
+| (e) | Slice 11, the mirror-code cleanup | After the stage-3 soak: the first stage-3 release on the facade, run with no stop signal (1.3.2; this replaced "one release after slice 10" on 2026-10-21) | The old mirror host and its flag leave production code; the parity projects and the dual run keep the mirror as a test and tooling harness | Not a prerequisite for (a) or (b); it touches the tail's paths, so it lands before the freeze (condition 5, 1.3.2) |
+
+### 1.3 The reconciled execution plan (owner direction, 2026-10-21 02:51 UTC)
+
+> **Snapshot, 2026-10-21 at about 03:15 UTC, against `main` at `22d1d1d`
+> (app 2.45.0, engine crate 0.4.1). It does not refresh.** Live state is
+> #1104. Release-date projections are the 3.0 Rollout Calendar (version 3,
+> https://claude.ai/artifact/TRpMs87xrN6e1YGDdh1ndi, with its copy and
+> `calendar-variants.py` in the project files under
+> `release-3.0/rollout-schedule/`), which reuses the traffic projection's
+> revision 3 (`release-3.0/traffic-projection/proj3.py`). Every day count in
+> this section is a projection from those scripts. None is a deadline, a
+> measurement or evidence.
+
+The owner reviewed the seven-day sprint plan, the calendar's scenario C and
+the decisions roundtable, and asked for a consistency and feasibility pass
+before any projected date is treated as a commitment. His direction is a
+planning preference: it authorizes no stage, no gate change, no new
+analytics field and no post. This section carries it. Where it changes an
+earlier statement in this plan, the earlier text now points here.
+
+#### 1.3.1 Scenario C as modified
+
+| Assumption | Value | Source |
+| --- | --- | --- |
+| Ramp | 0, 10, 25, then 50%; each stage and each drop-back on the owner's explicit approval | 1.2 condition 6 |
+| Stage minimums | 14 days for stages 1 and 2; Schedule B's 7-day minimums are not adopted | owner, 02:51 UTC |
+| Stage floors | 30 (stage 1) and 100 (stage 2) **engaged** engine sessions in the WASM arm; the 1,000 count engaged eligible sessions | owner's stated direction, 02:51 UTC; binding once the analytics packet is approved and its rows are live (1.3.9, item 1) |
+| Early-stage testing | Targeted opt-in testers (large towers, long-running saves, offline PWAs, phones). Opt-in sessions are `selected_by: setting`: early telemetry that counts toward no floor and no part of the 1,000 | owner, 02:51 UTC; packet section 4 |
+| Outreach | None before stage 3. Drafts only; each post on the owner's approval | owner, 02:51 UTC |
+| Size gate | Stages 1 and 2 only; the projection's placeholder gates 16% of sessions | revision 3 |
+| Stage-3 entry | Unchanged from 4.1: stage 2 moved on, slices 1 to 8 and 10 merged, slice 10 deployed, the cue-timing test green, a committed protocol run passing M2 to M6 at 1x and 4x, S9 complete, the `attempt` and `engaged` rows live | 4.1, 1.2 |
+
+Projected dates at today's traffic, stage 1 starting Oct 27:
+
+| Milestone | Projection | Notes |
+| --- | --- | --- |
+| Stage 1 (10%, size gate) | Oct 27 to Nov 22 (26 days) | The engaged floor binds; the 14-day minimum does not |
+| Stage 2 (25%, size gate) | Nov 22 to Dec 26 (34 days) | Same |
+| Stage 3 opens (50%, facade, no size gate) | Dec 26 | Jan 2 if the measured threshold gates 25% of sessions; Jan 7 at 30% |
+| Slice 10 deployed | Target before stage 2 starts (about Nov 22); latest about Dec 12 | 1.3.5 |
+| Stage-3 soak, then slice 11 | Dec 26 to about Jan 2; slice 11 merges about Jan 2 | 1.3.2 |
+| Freeze-ready | About Jan 2 | Every key-moving item merged |
+| Gate review, by traffic case | Twice July Jan 17; July strength Feb 25; July conservative Apr 11; one smaller post Apr 24; no post May 16 (2027) | Freeze per option F2 (1.3.2); the first post on stage-3 day 3 and a second a week later |
+
+Under engaged floors the session floors set the length of stages 1 and 2,
+while the 14-day minimums never bind: about 60 days together. The levers that keep every rule:
+
+- **A higher measured threshold.** A threshold that gates fewer sessions
+  shortens both stages in proportion (16% gated gives Dec 26; 25% gives Jan
+  2).
+- **Slice 10 early in stage 1, then the facade's own threshold.** If the
+  facade's PC run supports a threshold that covers every tower, the gated
+  share drops and stage 3 can open up to about 9 days sooner (Dec 17 in the
+  calendar's engaged-floor case, which assumes no gate for the whole of
+  stages 1 and 2).
+- **Invitations that ask testers to play on Automatic.** A tester who keeps
+  Automatic and lands in the WASM arm (10% or 25% of them) is an ordinary
+  cohort session and counts. A tester who picks the Rust engine in Settings
+  is an opt-in and counts toward nothing, by the packet's reading. Each
+  invitation is outreach and needs the owner's approval.
+
+No floor is lowered, no minimum shortened and no opt-in counted in any of
+these.
+
+#### 1.3.2 The stage-3 soak, slice 11 and the freeze
+
+**The contradiction.** The calendar's scenario C froze the candidate on
+stage 3's first day. The roundtable (item 3) put slice 11 after one release
+of slice 10 at stage 3 with no host-fault stop signal, and before the freeze.
+Both cannot hold. The owner chose to keep the soak.
+
+**The sequence.**
+
+1. Stage 3 opens on a facade build that is not frozen. Eligible sessions
+   count from its first day under 1.2's conditions; nothing in them waits for
+   slice 11 (1.2 condition 3).
+2. **The soak** (proposed definition, the owner's to approve): the first
+   stage-3 release on the facade runs at least 7 nights and at least 50
+   engaged eligible sessions with none of 4.1's stop signals. A stop signal
+   restarts the soak on the release that fixes it. At today's traffic stage 3
+   yields about 7.1 engaged eligible sessions a day, so 50 takes about 7
+   days. The calendar shows a 14-night, 100-session soak as a sensitivity: it
+   moves only the twice-July review, to Jan 26.
+3. Slice 11 (#1223) is written and reviewed during the soak, merges after
+   it, and is the last change to the tail's paths before the candidate
+   deploy. Its merge is assessed under 1.2 condition 4.
+4. **The freeze.** Every key-moving item is merged by the end of the soak
+   (freeze-ready, about Jan 2). The freeze itself, and the candidate deploy
+   with it, follow one of two options.
+
+| | F1: freeze at the earliest point | F2: freeze when about 28 days remain (recommended) |
+| --- | --- | --- |
+| When | Soak end plus slice 11, about stage-3 day 8 (Jan 3) | When the weekly projection, recomputed from the governed counts, shows about 28 days left to the 1,000 (14 nights, 100 tail sessions, and room for one restart); never before the F1 point |
+| Gate review | Twice July Jan 17; July strength Feb 25; today's traffic May 16 | The same in every projected case. Freeze dates: twice July Jan 3, July strength Jan 28, conservative Mar 14, one smaller post Mar 27, no post Apr 18 |
+| Engine frozen for | Until the review (1.3.8, item 7): about 7 weeks at July strength, about 4.5 months at today's traffic | About 4 weeks |
+| A stage-3 engine fix | Restarts the tail and the replay window | Lands without a restart until the freeze |
+| Risk | Months of frozen engine while stage 3 runs large towers on the facade for the first time | A traffic surge after a late planned freeze can delay the review by up to about 4 weeks; fewer of the 1,000 run on the final candidate, which no rule requires |
+
+**Effect on the windows.** The 14-night seeded replay (4.2) and the
+observation period (4.1) both start at the freeze and run side by side. Under
+F2 they finish about 22 days after it at today's traffic (14 nights, and
+about 100 sessions at 7.1 a day); a post during them shortens the session
+half. The posts land on stage-3 day 3 (inside the soak, while the mirror
+rollback still exists, so a fault surfaces before the freeze) and a week
+later.
+
+**What restarts what** stays as 4.1, 4.2 and 1.2 condition 4 write it: a
+merge to the tail's paths or a new key restarts the tail; a new key or an
+engine-output failure restarts the replay; the 1,000 are never restarted.
+
+#### 1.3.3 Which sessions must run on the frozen candidate
+
+Only the observation period's sessions. The approved text:
+
+- 1.2's table, row (b): the 1,000 eligible sessions start at "the first
+  eligible session" and are "not restarted by later builds; reported by
+  build, and a fallback whose cause was fixed still counts".
+- Row (c) and 4.1's "observation period on the candidate build": the tail
+  runs on the candidate deploys, for "at least 14 nights and 100 eligible
+  sessions", and "its sessions also count toward the 1,000".
+- OD-2 (section 12): "an observation period on the candidate build", kept
+  apart from the 1,000.
+
+So the 1,000 are counted across every eligible stage-3 facade build, by
+build, and the frozen candidate must carry at least 14 nights and 100
+eligible sessions. The 100-session floor and the 14 nights counted from the
+first candidate deploy at stage 3 are still among the plan's choices awaiting
+the owner's final review (section 12). The calendar's earlier line that
+"every counted session runs on the frozen candidate" described a side effect
+of a day-one freeze and was never a requirement; version 3 withdraws it.
+
+Requiring all 1,000 on the frozen candidate would be a stricter rule and the
+owner's call. Its cost: counting would wait for the freeze, and any fix during
+the tail would make a new candidate and, under 1.2 condition 4, put the whole
+count at risk of a restart, which at today's traffic is months.
+
+#### 1.3.4 Statistics, stated precisely
+
+The report states an **observed rate** (failures over sessions) and, beside
+it, the **exact one-sided 95% upper bound** (Clopper-Pearson). The bound is
+what the data rules out; it does not estimate the rate, and the count never
+shows a true rate below the bound.
+
+| Eligible sessions | Engine-fault fallbacks | Observed rate | One-sided 95% upper bound |
+| --- | --- | --- | --- |
+| 1,000 | 0 | 0% | 0.30% |
+| 1,000 | 1 | 0.10% | 0.47% |
+| 1,000 | 2 | 0.20% | 0.63% |
+| 100 (the tail alone) | 0 | 0% | 2.95% |
+| about 2,995 | 0 | 0% | 0.10% |
+
+Zero failures in 1,000 bounds the rate at about 0.30%. It does not show the
+rate is under 0.1%; that takes about 2,995 clean sessions. The bound is also
+optimistic, since sessions from one device are not independent, and the rate
+is a lower bound, since the relay keeps no offline queue (4.1).
+
+Under the analytics packet (1.3.9, item 1) the report prints four lines: the
+gate's bound over engaged eligible sessions; the all-attempts safety line,
+which keeps failures before engagement; the engagement rate (engaged over
+attempts) and early-exit rate by arm, with the interval of the difference,
+so a WASM arm that loses players early cannot look healthier by dropping
+them; and the share of WASM-arm browsers under a safety suppression. How
+large an engagement gap counts as material is the owner's call after the
+first readout.
+
+#### 1.3.5 October 27 and the critical path
+
+The owner keeps Oct 27 as the target for the stage-1 GO decision and a
+facade readiness review, without forcing either. Slice 10 is not approved
+until slice 9 passes its Windows protocol run. Under 1.3.1 the facade has
+about four weeks of slack before stage 3's entry: slice 10 deployed by about
+Nov 22 keeps all of stage 2 on stage 3's host, and about Dec 12 is the latest
+that leaves RUN-1 and one fix-and-rerun before Dec 26. A slice 9 in early
+November costs nothing.
+
+States at about 03:15 UTC on Oct 21. "Merge" means merged with a merge
+commit on an independent GO at the exact head and green CI. Live states are
+in #1104.
+
+**Stage-1 path (target: the GO decision on Oct 27)**
+
+| Item | Lane | Depends on | Issue / PR | Review | CI | Measurement | Realistic |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A4 implementation (policy, Settings choice, boot, stickiness e2e; telemetry off) | Cohort | #1230 (merged) | #1197; PR #1266 | With reviewer 1 | Running | none | Oct 22 to 23 |
+| Clean-refusal page life, before any stage above 0 | Cohort | #1266 | #1258 | Not started | n/a | none | Oct 23 to 25 |
+| Analytics packet approved | Owner | the packet | `release-3.0/cohort-a4/analytics-packet-a4-1090.md` | n/a | n/a | n/a | Needed by Oct 22 |
+| #1090 governed definition | Projection | #1185 (merged) | #1090; PR #1232 | Conditional GO earlier; carry needed | Running | none | Oct 22 to 23 |
+| Shared `engaged` detector and `attempt` row, with the ts/wasm parity e2e | Projection with Cohort | packet; #1232 | #1090 | Not started | n/a | none | Oct 23 to 25 |
+| A4 fields PR (data map first, Help/Privacy copy, `COHORT_TELEMETRY` on, stage 0) | Cohort | packet; detector | #1197 | Not started | n/a | none | Oct 24 to 26, live Oct 26 to 28 |
+| Size gate with `size_gated` and `trigger: size-gate` | Cohort | gate rule (1.3.9, item 2) | #1197 | Not started | n/a | the bracket run | Code Oct 24 to 26; threshold Oct 26 to 27 |
+| Package integrity: slice 2a and the `unverifiable` line merged (#1183, #1185 at `22d1d1d`); slice 2b specs (tamper, install race, eviction, repair) | Offline | #1185 (merged) | #985; 2b not opened | Merged on GO | Green | none | 2b Oct 22 to 26 |
+| Recovery follow-up (items 1 to 5 of #1230's review) | Runtime | #1230 (merged) | #1126 | Confirming pass | n/a | none | Oct 21 to 22 |
+| #874 restore points on the PC | PC | #1101 (merged) | `release-3.0/pc-run-874-restore-points.md` | n/a | n/a | `perf:restore`, 10 reps, 1x and 4x | Running tonight; readout Oct 21 |
+| Saves audit on WASM; #858 and #856 | Evidence; Saves audit | none | #1236, PR #1238; #858, #856 | Draft | Running | none | #1238 Oct 21 to 23; B6 Oct 23 to 27 |
+| Bracket and many-unit fixtures | Evidence (perf tooling) | none | #1270 | Not started | n/a | builds the fixtures | Must merge by Oct 24 |
+| Stage-1 cut and the GPU-verified bracket run | PC | the cut; fixtures | #1197 | n/a | n/a | 1.3.6 | Oct 25 (rerun Oct 26) |
+| Size threshold and its excluded share, from governed data | Cohort with Projection | the bracket run | #1197 | n/a | n/a | the share from `boot`'s population and floors | Oct 26 to 27 |
+| Drop-back PR prepared (one constant); a named daily reader | Cohort; Coordinator | #1266 | #1197 | n/a | n/a | none | Oct 26 |
+| The 11-item GO packet, linked | Cohort with Coordinator | all of the above | #1197 | n/a | n/a | n/a | Oct 27 at the earliest; Oct 28 to 31 if the packet approval or the bracket run slips |
+
+The roundtable's item 10 asks for "the owner's answer on pre-approval
+(4c)". That answer exists: 1.2 condition 6 and 4.1 put every drop-back on the
+owner's explicit approval, with none pre-approved. The packet item is the
+prepared drop-back PR alone. Item 2 lists #1126 as merged; it closes with the
+Runtime lane's follow-up PR.
+
+**Facade path (target: a readiness review on Oct 27; slice 9's readout
+realistically Oct 29 to Nov 4)**
+
+| Item | Lane | Depends on | Issue / PR | Review | CI | Measurement | Realistic |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Spike 0 | PC; Facade | none | #1196 (never merges) | n/a | n/a | T1 to T4 at 1x | Run ends about 03:05 UTC; readout Oct 21 |
+| Slice 1, the port | Facade | #1184 | #1208; PR #1245 | GO at `c88d27b`; carry after a merge of `main` | Green at `c88d27b` | none | Oct 21 |
+| 6a, the engine view | Facade engine view | slice 1 for the RustSim reader | #1213 | Not opened | n/a | conformance, compat guard | Oct 22 to 24 |
+| 6b wrappers (Rust half merged in #1228) | Facade panel getters | 6a's `wasm.rs` block | #1214; patches held | n/a | n/a | differential test | Oct 23 to 25 |
+| 6c, four families | Facade diagnostics facts | 6a | #1215; PR #1255 (family 1, crate 0.6.0) | Draft | Green | differential per family | Oct 26 to 29 (long pole) |
+| #1237, engine reads that walk every unit | Rust bare-step performance | none | #1237 | Not started | n/a | slice 9 lists the stats report and the three overlays at top speed | Oct 22 to 24 |
+| #1239's TypeScript twins (the Rust half merged in #1264, `67ca193`) | Rust step hotspots or Facade | #1264 | #1239 | n/a | n/a | none | Before slice 7 |
+| Slice 2, commands through the port | Facade commands | slice 1 | #1209 | Review skill round 1 | n/a | none | Oct 22 to 23 |
+| Slice 4, panels through the port (4a to 4d; 4e waits for #1237) | Facade panels | slices 1 and 2 | #1211 | Review skill rounds | n/a | none | 4a Oct 22 to 23; 4b to 4d Oct 23 to 26; 4e after #1237 |
+| Slice 3, the renderer reads the view | Rendering | spike 0's go; slice 5 for 3b | #1210 | n/a | n/a | visual baselines, drift gate | 3a Oct 23 to 24; 3b Oct 26 to 28 |
+| Slice 5, app lifecycle | Runtime | #1126 follow-up; slice 1 | #1212 | n/a | n/a | none | Oct 23 to 26 |
+| A8, load-time memory (slice 13) | Rust save-load memory peak | none | #1225 | PR not opened | n/a | load peak before and after on the PC | Oct 22 to 24 |
+| M5 W1 harness (must be in slice 9's commit) | Rust engine cold start | none | #1254 | PR not opened | n/a | P1 on the PC, about 90 min | Oct 22 to 23 |
+| Slice 7, RustSim behind its flag; cue-timing test | Facade | 2 to 6, 6a to 6d, #1237, #1239 | #1217 | n/a | n/a | none | Oct 26 to 30 |
+| Slice 8, fallback from the Rust recovery point | Runtime with Facade | slice 7; R6a | #1218 | n/a | n/a | the 50 ms save budget on the PC | Oct 27 to Nov 1 |
+| Slice 9, the PC protocol run | PC | 8, 13, W1; the tolerance rule (1.3.9, item 3) | #1220 | n/a | n/a | 1.3.6 | Best Oct 26 (reserved); realistic Oct 29 to Nov 4 |
+| Slice 10, the facade becomes the WASM host | Facade | slice 9 passing; owner approval | #1222 | n/a | n/a | RUN-1 after it | Target before about Nov 22 |
+
+**Concurrent work that lands before stage 3 or the freeze**
+
+| Item | Lane | Issue / PR | State | Realistic |
+| --- | --- | --- | --- | --- |
+| #1143 item 3, route hashing | Rust step hotspots | PR #1265 | Draft, CI running | Oct 21 to 22 |
+| #1143 item 4, spawn floors | Rust step hotspots | #1143 | Review layers running | Oct 22 to 24 |
+| #1143 items 5 to 7 | Hotspots; bare-step | #1143 | Not started | Oct 24 to 30 |
+| #1143 item 8 | Rust bare-step performance | #1143 | Not started | Before the freeze |
+| B2 slices 2c and 3; the freeze guard | Evidence | #1085; PRs #1256, #1267 | Drafts | Oct 22 to Nov 7 |
+| B5, the step driver (crate 0.5.0) | Evidence | #867; PR #1233 | Draft | Oct 22 to 25 |
+| Cold start fixes W2 to W4 | Rust engine cold start | #1254 | Started | Oct 23 to Nov 7 |
+| TDT prerequisites | TDT import compatibility | #885, #886, #887, #920 | Waiting on the owner's saves | Two to three weeks after the saves |
+| UI reads the catalog | Not assigned | #921, #926 | No lane | Before the freeze |
+| CI perf baseline; TDT cost | Not assigned | #900, #932 | No lane | Before RUN-3 |
+| D5 | Runtime | #1064, #1065, #1066 | After slice 5 | Before the freeze |
+| Analytics close-out | Evidence | #873, #879 | Exception proposal coming | Fixed or excepted before the candidate deploy |
+
+**Oct 27, realistically.** The stage-1 GO packet can be complete on Oct 27 if
+the analytics packet is approved by Oct 22, the fixtures merge by Oct 24 and
+the bracket run happens on Oct 25; each of those slipping moves the GO decision
+into Oct 28 to 31. The facade readiness review on Oct 27 can show slices 1 to
+6 and A8 mostly merged and slices 7 and 8 in review; slice 9's readout is
+more likely Oct 29 to Nov 4, which costs nothing under 1.3.1. The #1143 fixes
+1 to 4 and A8 can merge before Oct 27; their PC before-and-after numbers are
+optimization evidence. Hosted acceptance comes only from a protocol run, and
+there is no release speed claim until one passes.
+
+#### 1.3.6 PC capacity and reruns
+
+One machine (Ryzen 5 5600X, RTX 3060, Windows 11), runs in series, timed
+runs only when nothing else runs, local models never during a timed run.
+Lengths below come from the runs already made (the #1051 before pass took 95
+minutes for medium and large, both engines, 1x and 4x, 10 repetitions).
+
+| When (UTC) | Run | Length | Priority | If it fails or is void |
+| --- | --- | --- | --- | --- |
+| Oct 21, to about 03:05 | Spike 0 (#1196) | about 75 to 90 min | 1 | A void run (GPU check, dirty tree, identity) reruns the same night |
+| Oct 21, about 03:20 to 09:30 | Large-fresh (#1051, #1162); #874 restore points; smoke `85789b5`; Y' (#1068 evaluation, held); restore Balanced | about 60 to 75, 45 to 90, short, about 92 min | 2, 1, 3, 4 | Y' yields to anything above it |
+| Oct 21 to 22 | M5 P1 after W1 merges | about 90 min | 2 | Next free slot |
+| Oct 23 | #1143 and A8 before and after (bare step, load peak) | about 2 to 3 h | 3 | Moves a day; optimization evidence only |
+| Oct 25 | Stage-1 bracket: small, two bracket towers, medium, the many-unit tower; both engines; 1x and 4x; 10 repetitions; frames, 1% lows, long tasks, command-to-frame, cold start, memory, units beside population | about 5 to 6 h | 1 | Rerun Oct 26, which pushes slice 9 to Oct 27 or later |
+| Oct 26 (held) | Slice 9: facade, TypeScript and today's host, medium and large, the many-unit tower as a reported row, 1x and 4x, plus the save budget and #1237's overlays | about 6 to 8 h | 1 | A miss stops the facade after slice 8 and goes to the owner; a fix and rerun costs at least 1 to 3 days. If slice 8 is not ready, the slot goes to the calibration passes |
+| Nights from Oct 28 | δ and ε calibration passes (protocol 6.1; RUN-0b's A/A role) | about 1.5 h per pass per engine: 15 h for 5 per engine, 30 h for 10, 60 h for 20 | 1 before RUN-1 | 1.3.9, item 3 |
+| After slice 10 | RUN-1 on the deployed build | about 6 to 8 h | 1 | Stage 3 waits; one fix and rerun fits before Dec 26 if slice 10 deploys by about Dec 12 |
+
+Committed time from Oct 21 to Oct 27 is about 25 hours, inside the week. The
+calibration campaign does not fit in it, and RUN-1 needs it (protocol 6.1
+step 5), so it runs on November nights.
+
+#### 1.3.7 Fixtures beyond population
+
+The size gate and the harness towers are all population-based (small 729,
+medium 3,240, large 17,322 people). Several costs scale with units instead:
+#1237's reads that walk every unit, #1239's per-move scans, today's host
+sending every unit every frame (#1158 A22), the hourly merge and the restore
+point (save size), the structural snapshot (6a) and the load peak (A8). A
+tower with many units and few people passes a population gate onto the
+slowest path.
+
+- **Fixtures** (#1270, P1, perf tooling, owned by the Evidence lane, which
+  owns `src/tests/perf*`): two bracket towers between small and medium for
+  the threshold run, and a many-unit, low-population tower: tall full-width
+  floors, lobbies, the 24-shaft elevator pool and the 64-link stairs and
+  escalator pool at their caps, rooms mostly vacant, a unit count near the
+  large tower's 43,358 and a population in the hundreds. Built through the
+  engine's own commands, so every cap in `src/engine/facilities.ts` holds.
+- **Where they run:** the stage-1 bracket (Oct 25), slice 9, RUN-1 and RUN-3
+  as reported rows. Making the many-unit tower bind at RUN-3 changes the
+  Performance row's scenarios and is the owner's call (1.3.9, item 6).
+- **The gate rule:** `boot` already reports `population` and `floors`, so a
+  gate on population **or** floors needs no new field and its excluded share
+  can be read from governed data (1.3.9, item 2).
+
+#### 1.3.8 Contradictions, missing dependencies and gaps found
+
+| # | Finding | Reconciled by |
+| --- | --- | --- |
+| 1 | Calendar scenario C froze on stage 3's first day; the roundtable put slice 11 after a stage-3 soak and before the freeze | 1.3.2; calendar version 3; this plan's 1.2 row (e) |
+| 2 | The calendar said every counted session runs on the frozen candidate; the approved text requires only the observation subset | 1.3.3; withdrawn in calendar version 3 |
+| 3 | #945's body still says "1,000 consenting engine sessions in the TypeScript-default release", "fallback under 0.1%", "cold load within +500 ms" and "one release on the TypeScript default"; #1104 and this plan run on the OD-1, OD-2, OD-4 and OD-7 amendments, which bind only at the owner's final review | 1.3.9, item 4 |
+| 4 | 1.2 row (e) and #1223 say slice 11 lands "one release after slice 10"; the soak puts it after stage 3's first facade release | Row (e) here; the facade lane updates #1223 and the slice plan |
+| 5 | The seven-day plan keys slice 10 to "Nov 17 (A) or Nov 4 (B)" | 1.3.5: before about Nov 22, latest about Dec 12 |
+| 6 | #1104's eligible-session note quotes revision 1 (about 110 days); revision 3 with engaged sessions says about 141 days at today's traffic | Triage updates #1104 |
+| 7 | 4.2 ends the freeze on `main` when the replay and the tail end, but the flip rechecks the window's key, so in practice the engine stays frozen from the freeze to the review | 1.3.2, option F2 |
+| 8 | Engaged floors count only once the `attempt` and `engaged` rows are live; if they are not live on stage 1's first day, stage 1 runs longer | 1.3.5 stage-1 path; the packet approval by Oct 22 |
+| 9 | Slice 9's verdict and RUN-1 need δ and ε calibrated from A/A passes on the GPU-verified harness; none has run, the pass count and coverage limit are an open amendment to OD-4, and the campaign is 15 to 60 PC hours | 1.3.6; 1.3.9, item 3 |
+| 10 | The bracket run needs towers between small and medium, and the many-unit tower, which do not exist | 1.3.7; #1270 |
+| 11 | The size gate on population lets a many-unit, low-population tower onto today's host in stages 1 and 2 | 1.3.7; 1.3.9, item 2 |
+| 12 | The stage-1 run must be "the exact stage-1 build", but `main` keeps deploying, and slices 2, 4 and 5 touch the shared app path for every player | Rule: cut the stage-1 commit on Oct 24 or 25; host-path merges between the cut and the stage-1 deploy wait; during stages 1 and 2, a merge to `src/wasmhost`, `src/dualrun`, `src/simport` or `src/game/frameLoop.ts` gets a medium-tower recheck on the PC (about 45 min) before the next deploy, or the owner's waiver |
+| 13 | The roundtable's GO packet asks for an answer on drop-back pre-approval (4c) that 1.2 condition 6 already gives, and lists #1126 as merged | 1.3.5 |
+| 14 | Opt-in testers count toward nothing, so targeted opt-in testing does not shorten the engaged floors | 1.3.1 levers |
+| 15 | Slice 8's "recovery point refused" line and #1114's `fault_source` are new production fields outside the analytics packet, which would mean two more approval rounds | 1.3.9, item 1: fold both into the packet |
+| 16 | #1239's TypeScript twins (`countKind` and the escalator office walk in `transport.ts`) have no tracker of their own now that #1264 merged | Triage keeps #1239 open for them or files a row |
+| 17 | #921, #926, #900 and #932 still have no lane | 1.3.5 concurrent table; the coordinator assigns them before November |
+
+#### 1.3.9 Owner decisions still open, blockers first
+
+Decisions already made stay made: the 14-day minimums, no Schedule B, the
+0/10/25/50 ramp, every stage and drop-back on the owner's approval, slice 11's
+soak, slice 10 only after slice 9, outreach drafts only, the merge rule, R3
+and R6.
+
+1. **The analytics packet** (A4 and #1090, by Oct 22; it blocks the stage-1
+   floors). `release-3.0/cohort-a4/analytics-packet-a4-1090.md`, seven items
+   in one decision, including the engaged unit for the 1,000 and the floors,
+   all attempts for stop signals, `wasm-mirror`, and item 7 (sessions that
+   never ran the engine stay outside the all-attempts N). Recommended:
+   approve, and fold in slice 8's refused-point line and #1114's
+   `fault_source` so there is one approval.
+2. **The size gate's rule and threshold.** Rule now, so the bracket run
+   measures it: population **or** floors (recommended), both already on
+   `boot`. Threshold on Oct 26 or 27 from the bracket run, with its excluded
+   share.
+3. **δ and ε for slice 9 and RUN-1** (an open amendment to OD-4). Slice 9:
+   pre-register the caps (δ 0.05; ε 50 ms of blocking, or 5% of TypeScript's
+   cold start) as a provisional bar for the slice-10 decision only, marked as
+   uncalibrated. RUN-1 and RUN-3: calibrate with 10 passes per engine (a
+   stated 9% chance that an identical-engine pass exceeds the tolerance,
+   about 30 PC hours) as recommended, against 5 (17%, 15 hours) or 20 (5%, the
+   protocol's default limit, 60 hours).
+4. **#945's text.** Approve the section 10 amendments (OD-7's final review)
+   with the engaged unit, the soak and the tail's 100-session floor, and
+   replace #945's stale rows with them, keeping the old text below for the
+   record. Needed before stage 3; recommended now, so #945 and #1104 cannot
+   disagree.
+5. **The soak's definition and the freeze option:** 7 nights and 50 engaged
+   eligible sessions (recommended) or 14 and 100; F2 (recommended) or F1.
+   Needed by December.
+6. **The many-unit tower at RUN-3:** reported (recommended until RUN-1 shows
+   its size) or binding on M3 and M4.
+7. **Slice 10 for the live cohort:** after slice 9 passes, before stage 2
+   starts if possible; stage 1's 14 days carry across the host change
+   (recommended, since stages 1 and 2 are early telemetry).
+
+Still open on their own cards and not repeated here: R6a, A7's real-save
+list, #1114's field (item 1 folds it in), the #1068 recommendation when it
+arrives, #873's exception when it is proposed, and EX-1 at the sign-off.
 
 ## 2. Where things stand (from the takeover inventory)
 
@@ -523,7 +891,11 @@ remain.
   | 3 | 50%, without the size gate | Stage 2 has moved on (its host reliability conditions held), S6 (A5) is complete, which under AD-9 means slices 1 to 8 and 10 have merged, slice 10 has deployed the facade as the WASM host (1.2), and the audio cue-timing test is green on it, and the last committed protocol run (RUN-1, RUN-2, or a run repeated after a fix) shows M2 to M6 passing at 1x and 4x on the medium and large towers | The flip, or a drop-back |
 
   A stage that stays below its move-on floor for 30 days goes to the owner,
-  who keeps it, moves it on or drops it back.
+  who keeps it, moves it on or drops it back. The owner's direction of
+  2026-10-21 counts the stage 1 and 2 floors in engaged engine sessions and
+  the 1,000 in engaged eligible sessions, with every attempt kept in the
+  safety denominator; it binds once the analytics packet is approved and its
+  rows are live, and opt-in sessions count toward no floor (1.3.1, 1.3.9).
 
 - **Stop signals.** A writer latch-off, an engine-fault fallback that repeats
   (the same reason on the same build in two sessions), a repeat crash from
@@ -1535,7 +1907,11 @@ approves this revision:
 - A5's one-threshold design rule, committed before RUN-0b (9.1);
 - 7.4's policy content, and its place in the flip PR;
 - the exception register's path and entry format, with A2's PR opening it
-  (section 10, Sign-off).
+  (section 10, Sign-off);
+- from the 2026-10-21 reconciliation (1.3): the soak's definition (7 nights
+  and 50 engaged eligible sessions), freeze option F2, the stage-1 cut rule
+  (1.3.8, row 12), the size gate on population or floors, and 10 A/A passes
+  per engine for RUN-1 and RUN-3 (1.3.9).
 
 **Still the owner's:**
 
@@ -1562,6 +1938,10 @@ approves this revision:
   after two calibration rounds (4.1, 5.2, 5.3);
 - any cleanup of the PC's worktrees and patches (D4);
 - the candidate deploy, gate exceptions, the 3.0.0 flip and its publish;
+- the open decisions listed in 1.3.9, blockers first: the analytics packet,
+  the size gate's rule, δ and ε for slice 9 and RUN-1, #945's text, the soak
+  and freeze option, the many-unit tower at RUN-3, and slice 10's timing for
+  the live cohort;
 - the final review of this plan, and merging this PR.
 
 **The questions as they were put** (superseded by the decisions above):
