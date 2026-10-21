@@ -101,6 +101,7 @@ tier 2, the harness a host uses to prove conformance.
 | --- | --- |
 | Start a game | `sim::Simulation::new_game(seed, GameMode::Classic)`, or `new_game_with(seed, mode, calendar, start_unbridged)` |
 | Advance time | `sim.tick(dt_minutes)`: any `dt`, split into steps that never skip an hour. Same seed, same commands and the same sequence of `dt` give the same game |
+| Drive time from frames | `stepper.advance(&mut sim, dt_ms, minutes_per_second, steady_clock, step)` on a `fixed_step::FrameStepper::default()`: the frame loop the web host runs, for a Rust host that drives the engine itself. It owes each frame's minutes (paced by the canon day curve, or flat with the steady clock), caps the carry at `MAX_CATCHUP_MINUTES`, and cuts what is owed into whole quanta sized from the sim's own clock (`quantum_for`, at most `MAX_STEPS_PER_FRAME` a frame), so the tower is the same at any frame rate. Use it instead of choosing your own `dt`. Given the same frames, the ticks it cuts and the carry it keeps match the browser's frame loop bit for bit (`engine-rs/tests/data/fixed-step-cases.json` records them). Two kinds of rule live in the browser's host, outside that loop: Excalibur turns any frame over 200 ms into 1 ms before the loop sees it, and the host zeroes the carry (`stepper.acc_minutes = 0.0`) when the player changes speed (even when the change is undone before the next frame) or toggles the steady clock, while a blocking modal is open, and once the engine has stopped. A host that wants the browser's tower applies these before calling `advance` |
 | Quote a placement | `sim.can_build(kind, floor, x)`: `{ ok, reason, cost }`, the dry run `build` makes, with the full price. `sim.can_build_transport(kind, x, bottom, top)` is the same for a shaft, the dry run `build_transport` makes: an elevator costs the catalog `cost` plus `transportFloorCost` for each floor past its first, stairs and escalators the catalog `cost`. The price is a shaft's only when the kind is a transport and `top` is above `bottom`; the engine refuses anything else |
 | Player commands | `build`, `build_transport`, `sell_at`, `toggle_auto_bridge` (`build.rs`); `add_car`, `remove_car`, `extend_transport`, `remove_facility` (`charges.rs`), which charge or refund and report the money moved, with `begin_extend` and `end_extend` around a drag so `extend_transport` bills a wiggle once against the engine-held mark; `adjust_rent`, `set_no_rate`, `price_unit`, `apply_rent_batch` (`rent.rs`); `resolve_choice`, `set_film_policy` (`events.rs`) |
 | Read state | the public fields (`money`, `star`, `clock`, `tower`, `crowd`, `log`, ...) and `population()`; read them, never write them |
@@ -184,5 +185,6 @@ unavailable, never as a failure of the engine.
 - **Not covered yet** (stages in #980): tier 2 is behind its feature and
   tier 1 is pinned by name, but tier 3 is still `pub` (narrowing it to
   `pub(crate)` or hiding it, and getters for the fields a host reads, are
-  the rest of stage 4), and the fixed-step driver the web host uses is
-  TypeScript (#867).
+  the rest of stage 4), and the web host still runs its own TypeScript fixed-step driver (the Rust
+  one in `fixed_step` is matched to it by recorded frame sequences, and the web
+  host does not call it yet; #867).
