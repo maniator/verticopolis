@@ -51,7 +51,7 @@ office rule. On the owner's save (U 19,806, R 1,699, T 64) that is about
 - [x] Tests in `tower_census_tests.rs`; the staff-ceiling tests untouched.
 - [x] Hot-path inventory row (`docs/performance/hot-path-review.md`).
 - [x] `/gds-code-review` and the HP-1..HP-12 record.
-- [ ] The independent review.
+- [ ] The independent review (PR #1264).
 
 ## Dev Agent Record
 
