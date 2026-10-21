@@ -44,6 +44,8 @@ pub mod satisfaction;
 pub mod scenario;
 #[cfg(any(test, feature = "conformance"))]
 pub mod scenario_detail;
+#[cfg(test)]
+mod scenario_reason_tests;
 pub mod schedule;
 pub mod services;
 pub mod sim;

@@ -111,8 +111,20 @@ export class ShadowEngine {
   }
 
   free(): void {
-    this.engine?.free();
+    const engine = this.engine;
     this.engine = null;
+    engine?.free();
+  }
+
+  /** Let the engine go without a call into the module, for a module that
+   *  trapped (#1113): wasm-bindgen's JavaScript-only half of `free` zeroes
+   *  the handle and takes it off the finalizer, so the garbage collector
+   *  never frees it into the module either. Its memory stays with the
+   *  module, which is not used again. */
+  abandon(): void {
+    const engine = this.engine as { __destroy_into_raw?: () => number } | null;
+    this.engine = null;
+    engine?.__destroy_into_raw?.();
   }
 }
 

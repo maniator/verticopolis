@@ -173,9 +173,9 @@ Commands run in order. Units and shafts are named by a tile they cover
 | op | fields | effect |
 | -- | ------ | ------ |
 | `setMoney` | `amount` | Set the treasury directly (a harness command). |
-| `build` | `kind`, `floor`, `x`, `expectFail?` | Build through the normal money-aware path. |
+| `build` | `kind`, `floor`, `x`, `expectFail?`, `reason?` | Build through the normal money-aware path. |
 | `buildRow` | `kind`, `floor`, `from`, `to` | `build` at every `x` from `from` to `to`, inclusive. |
-| `buildTransport` | `kind`, `x`, `bottom`, `top`, `expectFail?` | Build a shaft. |
+| `buildTransport` | `kind`, `x`, `bottom`, `top`, `expectFail?`, `reason?` | Build a shaft. |
 | `sell` | `floor`, `x`, `kind?` | Sell the unit at that tile; with `kind`, an error unless that is what the tile holds. |
 | `adjustRent` | `floor`, `x`, `dir` (`1` or `-1`) | Step a unit's rent. |
 | `setNoRate` | `floor`, `x` | Set a unit to no rate (the Classic price ladder only). |
@@ -191,12 +191,12 @@ Commands run in order. Units and shafts are named by a tile they cover
 | `bombThreat` | | Run a bomb threat at once: `EventSystem.bombThreat`, which charges the sweep when the tower has Security and detonates when it has none, with no ransom choice. |
 | `evaluateStar` | | Run the star evaluation. |
 | `resolveChoice` | `accept`, `kind?` | Answer the pending player choice (`resolveChoice`): `true` pays the fire rescue or the ransom, `false` declines (the fire burns on; Security searches for the bomb, and with no Security it detonates). An error when no choice is pending, when `kind` (`fireRescue` or `bombThreat`) is not the pending kind, or when `accept` is set and the treasury cannot pay (the engine would treat that as a decline). |
-| `callExterminator` | `expectFail?` | Book the Modern exterminator (`callExterminator`); a refusal (Classic, a booking pending, no infested room, short of funds) is an error unless `expectFail` is set. |
+| `callExterminator` | `expectFail?`, `reason?` | Book the Modern exterminator (`callExterminator`); a refusal (Classic, a booking pending, no infested room, short of funds) is an error unless `expectFail` is set. |
 | `toggleAutoBridge` | | Flip the Modern bridging preference (`toggleAutoBridge`); an error in Classic, where it never flips. |
 | `setFilmPolicy` | `floor`, `x`, `policy` | Set the cinema at that tile to `auto`, `feature` or `blockbuster`; an error on anything but a cinema. |
 | `rerollSubtype` | `floor`, `x` | Draw a fresh retail variety for the unit at that tile off the main rng; an error on a kind with no varieties. |
 | `applyRentBatch` | `kind`, `target`, `onlyDefaultPriced?` | Batch reprice every unit of `kind` to `target` (a number, `default` or `noRate`); an error on an unpriced kind, a `noRate` target off the Classic ladder, or when no unit of that kind exists. |
-| `resizeTransport` | `floor`, `x`, `bottom`, `top`, `expectFail?` | Grow or shrink the shaft at that tile to the span (`Tower.resizeTransport`), laying floor behind newly served floors. |
+| `resizeTransport` | `floor`, `x`, `bottom`, `top`, `expectFail?`, `reason?` | Grow or shrink the shaft at that tile to the span (`Tower.resizeTransport`), laying floor behind newly served floors. |
 | `clearStops` | `floor`, `x` | Every floor stops again on the shaft at that tile (an express keeps its lobby-only rule). |
 | `setStop` | `floor`, `x`, `stopFloor`, `stop` | Serve or skip `stopFloor` on the shaft at that tile; an error outside the span or for an express stop off a lobby. |
 | `priceUnit` | `floor`, `x`, `target` | Set the unit's price to `target` through the one choke point every price write takes; an error when the unit is not repriceable. |
@@ -212,6 +212,14 @@ land, or, when `reason` is given, be refused with exactly that copy; either
 way the balance must move by exactly the `delta` the command reports, and a
 refusal must report a delta of 0.
 
+The four ops that take `expectFail` (`build`, `buildTransport`, `resizeTransport`,
+`callExterminator`) also take an optional `reason`. With `expectFail`, a
+`reason` pins the refusal: both runners error when the engine refuses for any
+other copy, so a port that checks its gates in another order fails even when
+it refuses the same commands. A `reason` without `expectFail` is an error. The
+reason is not part of any checkpoint hash. Every refusal in the committed
+scenarios carries one.
+
 A scenario is refused before it runs if it is not an object, if `commands` is
 not a list of objects, if it has an unknown op or an unknown field anywhere
 (scenario, `start`, `start.newGame` or command), or if a field is missing or
@@ -222,7 +230,7 @@ ill-typed:
 - `floor`, `x`, `from`, `to`, `bottom` and `top` are whole numbers, and a
   `buildRow`'s `from` is not past its `to`.
 - `dt`, `times`, `checkpointEvery` and `cars` are whole numbers above zero.
-- `dir` is 1 or -1, `amount` is a finite number, `expectFail` is a boolean.
+- `dir` is 1 or -1, `amount` is a finite number, `expectFail` is a boolean, `reason` a non-empty string.
 - a `resolveChoice` `kind` is `fireRescue` or `bombThreat`.
 - a `policy` is `auto`, `feature` or `blockbuster`; a batch `target` is a
   finite number, `default` or `noRate`; `stopFloor` is a whole number,
