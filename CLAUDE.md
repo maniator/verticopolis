@@ -32,13 +32,19 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   in Rust, TypeScript, the WASM binding, the hosts, ticks, rendering and the
   other surfaces its section 1 lists. The review skills load it and add a
   Hot-Path Auditor layer that traces callers past the diff. The skills and the
-  independent reviewer print its one-row-per-item record, and Copilot and Codex
-  are asked to; without a record on the PR there is no GO and no sign-off.
-  Ported, moved or inherited code is reviewed as new. A finding is fixed or
-  deferred with evidence and an issue, and never dismissed as pre-existing; a
-  new, ported or moved scan over its tier's budget, or a dropped TypeScript
-  cache, gets fixed unless the owner accepts the deferral. PRs opened before
-  the page merged keep the review they had.
+  independent reviewer post its one-row-per-item record (its section 6) on the
+  PR each round, and Copilot and Codex are asked to print it. On a hot-path
+  diff there is no GO or CONDITIONAL GO without that record, and a Copilot or
+  Codex sign-off covers the hot-path part only once a record from the skill or
+  the independent reviewer is on the PR. Ported, rewritten, moved or inherited
+  code is reviewed as new. A finding is fixed or deferred with evidence and an
+  issue, and never dismissed as pre-existing; an added, ported or rewritten
+  scan over its tier's budget, or a cache dropped, removed or bypassed outside
+  the two cases HP-8 allows (an equivalent the record names, or the query
+  itself gone), gets fixed unless the owner accepts the deferral in their own
+  words. Section 1
+  also records the owner's scope decision for the pull requests that were open
+  when the page merged.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
   `npm test`, `npm run build`. All four must be green. The build needs the
   engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a
@@ -118,14 +124,24 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 - **Resolve Copilot/Codex PR review threads** once addressed. Actually mark
   each thread **Resolved** (`resolve_review_thread`); a reply alone does NOT
   clear it, and unresolved threads block merge under branch protection.
-- **Enable auto-merge only after Copilot has signed off and CI is green, never
+- **Enable auto-merge only after the PR is signed off and CI is green, never
   speculatively.** Signed off means Copilot has reviewed the PR and left no
   blocking finding unresolved (an approval, or a review whose comments are all
-  addressed and marked resolved). CI green means every required check has
-  passed, the screenshot drift check included. Do not arm auto-merge before
-  both hold, and do not arm it early so it fires the moment the checks pass.
-  Once both hold, auto-merge using a merge commit (never a squash-merge, per
-  the merge-commits-only rule above) may be armed without asking again.
+  addressed and marked resolved), and no other review is outstanding: when an
+  independent review or a review-skill round has been requested or is running
+  on the PR, hot-path or not, auto-merge stays off until that review has
+  finished on the final commit (the independent reviewer has posted a GO, or a
+  CONDITIONAL GO whose conditions it has confirmed met, and the skill's `patch`
+  findings are fixed). On a hot-path diff, signed off also needs the section 6
+  record of `docs/performance/hot-path-review.md` for the final commit on the
+  PR and a completed independent review of that commit, which the PR's author
+  requests; the page's section 6 says when a record and a verdict carry to a
+  later commit. A reviewer that is still running has not
+  signed off. CI green means every required check has passed, the screenshot
+  drift check included. Do not arm auto-merge before the PR is signed off and
+  CI is green, and do not arm it early so it fires the moment the checks pass.
+  Once both are true, auto-merge using a merge commit (never a squash-merge,
+  per the merge-commits-only rule above) may be armed without asking again.
   If Copilot raises a finding or a required check fails, hold the PR and fix it
   rather than let it merge.
 - **When the automated PR reviewers are down, loop the BMGD/BMAD review skill
