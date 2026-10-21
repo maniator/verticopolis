@@ -1503,7 +1503,7 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     });
     expect(last(f.sfx)).toBe("error");
 
-    office.state = "vacant"; // the fire clears, and the same cursor can remove it
+    office.state = "empty"; // the fire clears, and the same cursor can remove it
     keyboard.commitCursor();
     expect(sim.tower.getUnit(pick.id)).toBeUndefined();
     expect(last(announced)).toBe(`Bulldozed ${FACILITIES.office.name}`);
