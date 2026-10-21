@@ -554,15 +554,19 @@ and R6.
 
 1. **The analytics packet** (A4 and #1090, by Oct 22; it blocks the stage-1
    floors). `release-3.0/cohort-a4/analytics-packet-a4-1090.md` (revision
-   4), eight items in one decision, including the engaged unit for the 1,000
+   5), ten items in one decision, including the engaged unit for the 1,000
    and the floors (its section 3 counts the floors at their own stage, as
    1.3.1 does), all attempts for stop signals, `wasm-mirror`, item 7
-   (sessions that never ran the engine stay outside the all-attempts N), and
+   (sessions that never ran the engine stay outside the all-attempts N),
    item 8, which folds in #1114's `fault_source` (sent on guarded-path and
    attach fallbacks only) and slice 8's `recovery_refused` count so there is
-   one approval. Recommended: approve,
-   with every fallback counted in the rate whatever its source and the rate
-   also printed by source.
+   one approval, and items 9 and 10 from the review of #1266: the sticky
+   safety path waits for the cohort's fields, so stage 0 boots as on main
+   and `engine_requested` keeps meaning the request (route (a), in #1266
+   now), and a `package-mismatch` after the load counts as build scope.
+   Recommended: approve, with every fallback counted in the rate whatever
+   its source, the rate also printed by source, route (a) for item 9 and
+   yes on item 10.
 2. **The size gate's measure and threshold.** The measure now, so the
    bracket run measures it: units, as 4.1 writes (closest to the costs, but
    its excluded share needs a new `boot` field); population, as the
