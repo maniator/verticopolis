@@ -141,17 +141,18 @@ mod tests {
     }
 
     /// The segment ids to check: every run on every floor, the ids a
-    /// position off every run carries (one per tile, or with `sample` only
-    /// those past each lot edge and next to each run), the off-run
-    /// sentinel, and every node of the routing graph (a landing over no
-    /// tile carries an id no run starts at). Sorted, so the order does not
-    /// depend on the graph's hash map.
+    /// position off every run carries (one per tile on a floor with a run,
+    /// or with `sample` only those past each lot edge and next to each run;
+    /// past the lot edges alone on an empty floor), the off-run sentinel,
+    /// and every node of the routing graph (a landing over no tile carries
+    /// an id no run starts at). Sorted, so the order does not depend on the
+    /// graph's hash map.
     fn every_segment(crowd: &mut Crowd, tower: &Tower, sample: bool) -> Vec<i64> {
         let mut segs = vec![NO_SEGMENT];
         for floor in MIN_FLOOR - 1..=MAX_FLOOR + 1 {
             let runs = tower.segments_of(floor);
             segs.extend(runs.iter().map(|r| seg_id(floor, r.0)));
-            let xs: Vec<i64> = if sample {
+            let xs: Vec<i64> = if sample || runs.is_empty() {
                 let edges = runs.iter().flat_map(|r| [r.0 - 1, r.1 + 1]);
                 [-1, 0, LOT_WIDTH].into_iter().chain(edges).collect()
             } else {
@@ -265,6 +266,38 @@ mod tests {
         let reached = assert_matches_searches(&mut mixed);
         assert!(reached.contains(&floor_seg(&mixed, 5, 150)));
         assert!(!reached.contains(&floor_seg(&mixed, 6, 150)));
+    }
+
+    #[test]
+    fn a_ride_starts_a_new_walk() {
+        // Three flights of stairs to floor 4, an elevator to floor 6, then
+        // eight escalators. The ride clears both the three flights walked and
+        // the stairs' budget of four, so the escalators' seven apply: floor
+        // 13 is in reach and floor 14 is not. A ride that kept the run, the
+        // budget or both would stop the walkers at floor 7 or 10.
+        let mut sim = bare_tower(GameMode::Classic, 15);
+        for (x, bottom) in [(100, 1), (112, 2), (124, 3)] {
+            assert!(
+                sim.tower
+                    .place_transport(Kind::Stairs, x, bottom, bottom + 1)
+                    .ok
+            );
+        }
+        assert!(
+            sim.tower
+                .place_transport(Kind::ElevatorStandard, 140, 4, 6)
+                .ok
+        );
+        for bottom in 6..14 {
+            let x = if bottom % 2 == 0 { 150 } else { 170 };
+            let placed = sim
+                .tower
+                .place_transport(Kind::Escalator, x, bottom, bottom + 1);
+            assert!(placed.ok, "escalator at floor {bottom}");
+        }
+        let reached = assert_matches_searches(&mut sim);
+        assert!(reached.contains(&floor_seg(&sim, 13, 150)));
+        assert!(!reached.contains(&floor_seg(&sim, 14, 150)));
     }
 
     #[test]
@@ -401,7 +434,8 @@ mod tests {
             let mut sim = crate::load::deserialize(&raw).expect("loads");
             // An off-run position has its own id per tile, and the old
             // searches walk the whole graph for each unreachable one, so the
-            // fixtures check a sample of those; the small towers check all.
+            // fixtures check a sample of those; the small towers check every
+            // tile of every floor with a run.
             let reached = check_segments(&mut sim, true);
             let upstairs = reached.iter().filter(|&&s| floor_of_seg(s) > 1).count();
             assert!(upstairs > 10, "{name}: {upstairs} segments above the lobby");
