@@ -251,14 +251,17 @@ while the 14-day minimums never bind: about 60 days together. The levers that ke
   share drops and stage 3 can open up to about 9 days sooner (Dec 17 in the
   calendar's engaged-floor case, which assumes no gate for the whole of
   stages 1 and 2).
-- **Invitations that ask testers to play on Automatic.** A tester who keeps
-  Automatic and lands in the WASM arm (10% or 25% of them) is an ordinary
-  cohort session and counts. A tester who picks the Rust engine in Settings
-  is an opt-in and counts toward nothing, by the packet's reading. Each
-  invitation is outreach and needs the owner's approval.
 
-No floor is lowered, no minimum shortened and no opt-in counted in any of
-these.
+No floor is lowered, no minimum shortened and no opt-in counted in either.
+
+What an invitation asks testers to do is the owner's call (1.3.9, item 8),
+because it decides whether recruited testers count. A tester who picks the
+Rust engine in Settings is an opt-in and counts toward nothing, by the
+packet's reading. A tester asked only to play, on Automatic, cannot be told
+apart from any other player (no identifier is kept), so one who lands in the
+WASM arm (10% or 25% of them) counts like any cohort session; the draw stays
+random across both arms, but the floors would then include players recruited
+for large towers, long saves, offline use and phones.
 
 #### 1.3.2 The stage-3 soak, slice 11 and the freeze
 
@@ -395,7 +398,7 @@ in #1104.
 | Saves audit on WASM; #858 and #856 | Evidence; Saves audit | none | #1236 (PR #1238 merged `b35127c`); #858, #856 | #1238 merged | Green | none | B6 Oct 23 to 27 |
 | Bracket and many-unit fixtures | Evidence (perf tooling) | none | #1270 | Not started | n/a | builds the fixtures | Must merge by Oct 24 |
 | Stage-1 cut and the GPU-verified bracket run | PC | the cut; fixtures | #1197 | n/a | n/a | 1.3.6 | Oct 25 (rerun Oct 26) |
-| Size threshold and its excluded share, from governed data | Cohort with Projection | the bracket run | #1197 | n/a | n/a | the share from `boot`'s population and floors | Oct 26 to 27 |
+| Size threshold and its excluded share, from governed data | Cohort with Projection | the bracket run | #1197 | n/a | n/a | the share from `boot`'s population and floors, for the tower each page life opens with (1.3.7) | Oct 26 to 27 |
 | Drop-back PR prepared (one constant); a named daily reader | Cohort; Coordinator | #1266 | #1197 | n/a | n/a | none | Oct 26 |
 | The 11-item GO packet, linked | Cohort with Coordinator | all of the above | #1197 | n/a | n/a | n/a | Oct 27 at the earliest; Oct 28 to 31 if the packet approval or the bracket run slips |
 
@@ -508,8 +511,11 @@ slowest path.
   Performance row's scenarios and is the owner's call (1.3.9, item 6).
 - **The gate rule:** `boot` reports `population` and `floors` and not units
   (`docs/analytics-data-map.md`). A gate on population **or** floors needs no
-  new field, its excluded share can be read from governed data, and floors
-  stand in for units on tall towers. 4.1's unit threshold tracks the costs
+  new field, and floors stand in for units on tall towers. Before stage 1,
+  `boot` gives the excluded share for the tower each page life opens with;
+  a tower loaded or imported later in the same page life is not in that
+  estimate, which the GO packet states. Once the gate ships, the live share
+  is the share of page lives with `size_gated` set, whichever tower set it. 4.1's unit threshold tracks the costs
   best, but its excluded share cannot be measured before stage 1 without a
   new `boot` field, which is the owner's approval. The choice is 1.3.9, item
   2; until he makes it, 4.1's text stands.
@@ -531,7 +537,7 @@ slowest path.
 | 11 | 4.1 sets the size gate on units; the roundtable (4b) recommended population, which would let a many-unit, low-population tower onto today's host in stages 1 and 2; and `boot` reports no units, so a unit gate's excluded share cannot be read from governed data | 1.3.7; 1.3.9, item 2; 4.1's size-gate text points there |
 | 12 | The stage-1 run must be "the exact stage-1 build", but `main` keeps deploying, and slices 2, 4 and 5 touch the shared app path for every player | Rule (a plan choice): cut the stage-1 commit on Oct 24 or 25, and the bracket run measures its build. If anything that changes the shipped app bundle or the WASM package merges between the cut and stage 1's activation, the commit to be activated gets a medium and large recheck on the PC, both engines, 1x and 4x (about 1.5 h), and a result outside the bracket run's noise reruns the bracket before the GO. During stages 1 and 2, a merge that changes the WASM package (`engine-rs/`, the WASM build inputs, the lockfile) or the hosted frame path (`src/wasmhost`, `src/dualrun`, `src/simport`, `src/game/frameLoop.ts`, the renderer) gets a medium-tower recheck on the PC before it merges, or the owner's waiver. Such merges are batched: one recheck of a combined commit (main plus the waiting merges, at most once a day) covers the batch, which then merges together; 1.3.6 carries the load |
 | 13 | The roundtable's GO packet asks for an answer on drop-back pre-approval (4c) that 1.2 condition 6 already gives, and lists #1126 as merged | 1.3.5 |
-| 14 | Opt-in testers count toward nothing, so targeted opt-in testing does not shorten the engaged floors | 1.3.1 levers |
+| 14 | Opt-in testers count toward nothing, so targeted opt-in testing does not shorten the engaged floors; testers asked to play on Automatic would count, which is a separate choice | 1.3.1; 1.3.9, item 8 |
 | 15 | Slice 8's "recovery point refused" line and #1114's `fault_source` were new production fields outside the analytics packet, which would have meant two more approval rounds | Folded into the packet as item 8 (revision 4); 1.3.9, item 1 |
 | 16 | #1239's TypeScript twins (`countKind` and the escalator office walk in `transport.ts`) have no tracker of their own now that #1264 merged | Triage keeps #1239 open for them or files a row |
 | 17 | #921, #926, #900 and #932 still have no lane | 1.3.5 concurrent table; the coordinator assigns them before November |
@@ -585,6 +591,11 @@ and R6.
 7. **Slice 10 for the live cohort:** after slice 9 passes, before stage 2
    starts if possible; stage 1's 14 days carry across the host change
    (recommended, since stages 1 and 2 are early telemetry).
+8. **What tester invitations ask** (each invitation is already his to
+   approve): pick the Rust engine in Settings, so recruited testers count
+   toward nothing (recommended, since it keeps the floors to ordinary
+   players and matches "opt-in testing"), or play on Automatic, so those in
+   the WASM arm count and the floors fill faster with a recruited mix.
 
 Still open on their own cards and not repeated here: R6a, A7's real-save
 list, the #1068 recommendation when it arrives, #873's exception when it is
@@ -1983,8 +1994,8 @@ approves this revision:
 - the candidate deploy, gate exceptions, the 3.0.0 flip and its publish;
 - the open decisions listed in 1.3.9, blockers first: the analytics packet,
   the size gate's measure, δ and ε for slice 9 and RUN-1, #945's text, the soak
-  and freeze option, the many-unit tower at RUN-3, and slice 10's timing for
-  the live cohort;
+  and freeze option, the many-unit tower at RUN-3, slice 10's timing for the
+  live cohort, and what tester invitations ask;
 - the final review of this plan, and merging this PR.
 
 **The questions as they were put** (superseded by the decisions above):
