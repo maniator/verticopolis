@@ -198,8 +198,8 @@ point, R6a, back to the owner) are in the review's section 5.7.
 
 ### 1.3 The reconciled execution plan (owner direction, 2026-10-21 02:51 UTC)
 
-> **Snapshot, 2026-10-21 at about 03:15 UTC, against `main` at `22d1d1d`
-> (app 2.45.0, engine crate 0.4.1). It does not refresh.** Live state is
+> **Snapshot, 2026-10-21 at about 03:15 UTC, against `main` at `12b82d7`
+> (app 2.45.0, engine crate 0.5.0). It does not refresh.** Live state is
 > #1104. Release-date projections are the 3.0 Rollout Calendar (version 3,
 > https://claude.ai/artifact/TRpMs87xrN6e1YGDdh1ndi, with its copy and
 > `calendar-variants.py` in the project files under
@@ -388,7 +388,7 @@ in #1104.
 | Package integrity: slice 2a and the `unverifiable` line merged (#1183, #1185 at `22d1d1d`); slice 2b specs (tamper, install race, eviction, repair) | Offline | #1185 (merged) | #985; 2b not opened | Merged on GO | Green | none | 2b Oct 22 to 26 |
 | Recovery follow-up (items 1 to 5 of #1230's review) | Runtime | #1230 (merged) | #1126 | Confirming pass | n/a | none | Oct 21 to 22 |
 | #874 restore points on the PC | PC | #1101 (merged) | `release-3.0/pc-run-874-restore-points.md` | n/a | n/a | `perf:restore`, 10 reps, 1x and 4x | Running tonight; readout Oct 21 |
-| Saves audit on WASM; #858 and #856 | Evidence; Saves audit | none | #1236, PR #1238; #858, #856 | Draft | Running | none | #1238 Oct 21 to 23; B6 Oct 23 to 27 |
+| Saves audit on WASM; #858 and #856 | Evidence; Saves audit | none | #1236 (PR #1238 merged `b35127c`); #858, #856 | #1238 merged | Green | none | B6 Oct 23 to 27 |
 | Bracket and many-unit fixtures | Evidence (perf tooling) | none | #1270 | Not started | n/a | builds the fixtures | Must merge by Oct 24 |
 | Stage-1 cut and the GPU-verified bracket run | PC | the cut; fixtures | #1197 | n/a | n/a | 1.3.6 | Oct 25 (rerun Oct 26) |
 | Size threshold and its excluded share, from governed data | Cohort with Projection | the bracket run | #1197 | n/a | n/a | the share from `boot`'s population and floors | Oct 26 to 27 |
@@ -406,7 +406,7 @@ realistically Oct 29 to Nov 4)**
 
 | Item | Lane | Depends on | Issue / PR | Review | CI | Measurement | Realistic |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Spike 0 | PC; Facade | none | #1196 (never merges) | n/a | n/a | T1 to T4 at 1x | Run ends about 03:05 UTC; readout Oct 21 |
+| Spike 0 | PC; Facade | none | #1196 (never merges) | n/a | n/a | T1 to T4 at 1x | Passed 03:10 UTC: frame p99 0.99x and 1.01x of TypeScript on medium and large at 1x, no long tasks; slice 3 unblocked. It never timed a structural edit, which slice 9 now adds |
 | Slice 1, the port | Facade | #1184 | #1208; PR #1245 | GO at `c88d27b`; carry after a merge of `main` | Green at `c88d27b` | none | Oct 21 |
 | 6a, the engine view | Facade engine view | slice 1 for the RustSim reader | #1213 | Not opened | n/a | conformance, compat guard | Oct 22 to 24 |
 | 6b wrappers (Rust half merged in #1228) | Facade panel getters | 6a's `wasm.rs` block | #1214; patches held | n/a | n/a | differential test | Oct 23 to 25 |
@@ -415,25 +415,25 @@ realistically Oct 29 to Nov 4)**
 | #1239's TypeScript twins (the Rust half merged in #1264, `67ca193`) | Rust step hotspots or Facade | #1264 | #1239 | n/a | n/a | none | Before slice 7 |
 | Slice 2, commands through the port | Facade commands | slice 1 | #1209 | Review skill round 1 | n/a | none | Oct 22 to 23 |
 | Slice 4, panels through the port (4a to 4d; 4e waits for #1237) | Facade panels | slices 1 and 2 | #1211 | Review skill rounds | n/a | none | 4a Oct 22 to 23; 4b to 4d Oct 23 to 26; 4e after #1237 |
-| Slice 3, the renderer reads the view | Rendering | spike 0's go; slice 5 for 3b | #1210 | n/a | n/a | visual baselines, drift gate | 3a Oct 23 to 24; 3b Oct 26 to 28 |
+| Slice 3, the renderer reads the view | Rendering | spike 0 (passed); slice 5 for 3b | #1210 | n/a | n/a | visual baselines, drift gate | 3a Oct 23 to 24; 3b Oct 26 to 28 |
 | Slice 5, app lifecycle | Runtime | #1126 follow-up; slice 1 | #1212 | n/a | n/a | none | Oct 23 to 26 |
 | A8, load-time memory (slice 13) | Rust save-load memory peak | none | #1225 | PR not opened | n/a | load peak before and after on the PC | Oct 22 to 24 |
 | M5 W1 harness (must be in slice 9's commit) | Rust engine cold start | none | #1254 | PR not opened | n/a | P1 on the PC, about 90 min | Oct 22 to 23 |
 | Slice 7, RustSim behind its flag; cue-timing test | Facade | 2 to 6, 6a to 6d, #1237, #1239 | #1217 | n/a | n/a | none | Oct 26 to 30 |
 | Slice 8, fallback from the Rust recovery point | Runtime with Facade | slice 7; R6a | #1218 | n/a | n/a | the 50 ms save budget on the PC | Oct 27 to Nov 1 |
-| Slice 9, the PC protocol run | PC | 8, 13, W1; the tolerance rule (1.3.9, item 3) | #1220 | n/a | n/a | 1.3.6 | Best Oct 26 (reserved); realistic Oct 29 to Nov 4 |
+| Slice 9, the PC protocol run | PC | 8, 13, W1; the tolerance rule (1.3.9, item 3) | #1220 | n/a | n/a | 1.3.6, plus a structural edit timed on the large tower | Best Oct 26 (reserved); realistic Oct 29 to Nov 4 |
 | Slice 10, the facade becomes the WASM host | Facade | slice 9 passing; owner approval | #1222 | n/a | n/a | RUN-1 after it | Target before about Nov 22 |
 
 **Concurrent work that lands before stage 3 or the freeze**
 
 | Item | Lane | Issue / PR | State | Realistic |
 | --- | --- | --- | --- | --- |
-| #1143 item 3, route hashing | Rust step hotspots | PR #1265 | Draft, CI running | Oct 21 to 22 |
-| #1143 item 4, spawn floors | Rust step hotspots | #1143 | Review layers running | Oct 22 to 24 |
+| #1143 items 1 to 3 | Rust step hotspots | #1235, #1246, #1265 | Merged (item 3 at `9c7a323`) | Done |
+| #1143 item 4, spawn floors | Rust step hotspots | #1143 | PR opening | Oct 22 to 24 |
 | #1143 items 5 to 7 | Hotspots; bare-step | #1143 | Not started | Oct 24 to 30 |
 | #1143 item 8 | Rust bare-step performance | #1143 | Not started | Before the freeze |
 | B2 slices 2c and 3; the freeze guard | Evidence | #1085; PRs #1256, #1267 | Drafts | Oct 22 to Nov 7 |
-| B5, the step driver (crate 0.5.0) | Evidence | #867; PR #1233 | Draft | Oct 22 to 25 |
+| B5, the step driver (crate 0.5.0) | Evidence | #867; PR #1233 | Merged `12b82d7` | Done |
 | Cold start fixes W2 to W4 | Rust engine cold start | #1254 | Started | Oct 23 to Nov 7 |
 | TDT prerequisites | TDT import compatibility | #885, #886, #887, #920 | Waiting on the owner's saves | Two to three weeks after the saves |
 | UI reads the catalog | Not assigned | #921, #926 | No lane | Before the freeze |
@@ -460,12 +460,12 @@ minutes for medium and large, both engines, 1x and 4x, 10 repetitions).
 
 | When (UTC) | Run | Length | Priority | If it fails or is void |
 | --- | --- | --- | --- | --- |
-| Oct 21, to about 03:05 | Spike 0 (#1196) | about 75 to 90 min | 1 | A void run (GPU check, dirty tree, identity) reruns the same night |
+| Oct 21, to 03:10 | Spike 0 (#1196) | about 75 to 90 min | 1 | Done; passed |
 | Oct 21, about 03:20 to 09:30 | Large-fresh (#1051, #1162); #874 restore points; smoke `85789b5`; Y' (#1068 evaluation, held); restore Balanced | about 60 to 75, 45 to 90, short, about 92 min | 2, 1, 3, 4 | Y' yields to anything above it |
 | Oct 21 to 22 | M5 P1 after W1 merges | about 90 min | 2 | Next free slot |
-| Oct 23 | #1143 and A8 before and after (bare step, load peak) | about 2 to 3 h | 3 | Moves a day; optimization evidence only |
+| Oct 23 | #1143 and A8 before and after (bare step, load peak; the hotspot lane's #1143 run file) | about 2 to 3 h | 3 | Moves a day; optimization evidence only |
 | Oct 25 | Stage-1 bracket: small, two bracket towers, medium, the many-unit tower; both engines; 1x and 4x; 10 repetitions; frames, 1% lows, long tasks, command-to-frame, cold start, memory, units beside population | about 5 to 6 h | 1 | Rerun Oct 26, which pushes slice 9 to Oct 27 or later |
-| Oct 26 (held) | Slice 9: facade, TypeScript and today's host, medium and large, the many-unit tower as a reported row, 1x and 4x, plus the save budget and #1237's overlays | about 6 to 8 h | 1 | A miss stops the facade after slice 8 and goes to the owner; a fix and rerun costs at least 1 to 3 days. If slice 8 is not ready, the slot goes to the calibration passes |
+| Oct 26 (held) | Slice 9: facade, TypeScript and today's host, medium and large, the many-unit tower as a reported row, 1x and 4x, plus the save budget, #1237's overlays and a structural edit on the large tower | about 6 to 8 h | 1 | A miss stops the facade after slice 8 and goes to the owner; a fix and rerun costs at least 1 to 3 days. If slice 8 is not ready, the slot goes to the calibration passes |
 | Nights from Oct 28 | δ and ε calibration passes (protocol 6.1; RUN-0b's A/A role) | about 1.5 h per pass per engine: 15 h for 5 per engine, 30 h for 10, 60 h for 20 | 1 before RUN-1 | 1.3.9, item 3 |
 | After slice 10 | RUN-1 on the deployed build | about 6 to 8 h | 1 | Stage 3 waits; one fix and rerun fits before Dec 26 if slice 10 deploys by about Dec 12 |
 
