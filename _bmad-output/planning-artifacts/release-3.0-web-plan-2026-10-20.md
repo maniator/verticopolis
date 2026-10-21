@@ -513,7 +513,8 @@ slowest path.
 - **The gate rule:** `boot` reports `population` and `floors` and not units
   (`docs/analytics-data-map.md`). A gate on population **or** floors needs no
   new field, and floors stand in for units on tall towers. It takes two
-  cutoffs, one per measure, each set from the fixtures (1.3.9, item 2). Before stage 1,
+  cutoffs, one per measure, each set from the fixtures, and a rule for the
+  tall, populous corner that no fixture measures (1.3.9, item 2). Before stage 1,
   `boot` gives the excluded share for the tower each page life opens with;
   a tower loaded or imported later in the same page life is not in that
   estimate, which the GO packet states. Once the gate ships, the live share
@@ -580,9 +581,23 @@ and R6.
    from the bracket run, and neither sits above a fixture he accepts from
    that run. The population cutoff is the population of the largest
    population-sized fixture (small, the two brackets, medium) he accepts.
-   The floor cutoff is the floor count of the many-unit tower if he accepts
-   it, otherwise the floor count of the tallest fixture he accepts. The GO
-   packet gives the excluded share above each cutoff and above either.
+   The two cutoffs are each bounded on their own axis but not jointly. The
+   many-unit tower will be about as tall as the large tower, so a floor
+   cutoff at its floor count would admit, for example, a tower of that
+   height with medium's population, which no fixture measures. Three ways
+   to close that corner: (a) a corner fixture (the many-unit tower's height
+   with the population cutoff's population) in the bracket run, so the
+   floor cutoff can sit at the many-unit tower's floor count with the
+   corner measured; it adds a tower to #1270 by Oct 24 and about an hour to
+   the Oct 25 run, so it needs his choice by Oct 23; (b) the floor cutoff
+   is the floor count of the fixture that sets the population cutoff, so every admitted tower is
+   no taller and no more populous than a measured one, at the cost of a
+   larger gated share, which lengthens stages 1 and 2 (1.3.1); or (c) the
+   floor cutoff is the many-unit tower's floor count if he accepts it, and
+   the GO packet states the unmeasured corner as a risk he accepts.
+   Recommended: (b), since it needs no new fixture and no PC time; (a) can
+   replace it later on his approval. The GO packet gives the excluded share
+   above each cutoff and above either.
    Population alone or units alone takes one cutoff, set the same way on
    its own axis. Choosing units adds a `boot` field to the analytics
    packet, and the GO waits until it is live.
@@ -1979,8 +1994,9 @@ approves this revision:
   and 50 engaged eligible sessions), freeze option F2, the post timing the
   projections assume (stage-3 day 3 and a week later, each post on its own
   approval), the stage-1 cut rule with its activation recheck (1.3.8, row
-  12), the size gate on population or floors (a cutoff for each) in place
-  of 4.1's units, slice
+  12), the size gate on population or floors (a cutoff for each, the
+  floor cutoff taken from the fixture that sets the population cutoff) in
+  place of 4.1's units, slice
   9's provisional bar (the caps, marked
   uncalibrated, for the slice-10 decision only), the 50 ms long-task bar on a
   structural edit at 1x on the large and many-unit towers as part of slice
