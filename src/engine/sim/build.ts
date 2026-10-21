@@ -2,7 +2,7 @@ import type { Simulation } from "../Simulation";
 
 import { ECON, rentConfig } from "../econConfig";
 import { removeFacility } from "./charges";
-import { whole } from "../request";
+import { UNKNOWN_FACILITY, whole } from "../request";
 import { storeRent } from "./constants";
 
 import { FACILITIES, buildMinutes, facilityFloors, isElevatorKind, isFacilityKind } from "../facilities";
@@ -18,7 +18,7 @@ import type { FacilityKind, WeatherKind } from "../types";
  * that would be created. Used for build previews and by {@link build}.
  */
 export function canBuild(sim: Simulation, kind: FacilityKind, floor: number, x: number): { ok: boolean; reason?: string; cost: number } {
-  if (!isFacilityKind(kind)) return { ok: false, reason: "Unknown facility.", cost: 0 };
+  if (!isFacilityKind(kind)) return { ok: false, reason: UNKNOWN_FACILITY, cost: 0 };
   // Ground floor is lobby-only (1994 canon): the Floor tool on floor 1 costs and
   // validates as a lobby. One coercion at the build boundary keeps cost,
   // validation, and the preview (which also calls canBuild) in agreement.
@@ -205,6 +205,7 @@ export function buildTransport(sim: Simulation,
   bottom: number,
   top: number,
 ): { ok: boolean; reason?: string } {
+  if (!isFacilityKind(kind)) return { ok: false, reason: UNKNOWN_FACILITY };
   const f = FACILITIES[kind];
   if (!sim.isUnlocked(kind)) {
     return { ok: false, reason: `${f.name} unlocks at ${f.minStar}★.` };
