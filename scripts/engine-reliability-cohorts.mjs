@@ -350,8 +350,7 @@ export function summarizeCohorts(allLives, opts = {}) {
     }
   }
   // Repeats read every recognized page life (any host, size gate or arm), as
-  // the latch-off signal does: a fault in the shared engine core can show
-  // through any host.
+  // the latch-off signal does: a shared-core fault can show through any host.
   for (const pl of pageLives.filter(engineFault)) {
     const reasons = pl.reasons.filter((x) => x !== "package-mismatch");
     for (const r of reasons.length ? reasons : ["no reason sent"]) {
@@ -361,10 +360,11 @@ export function summarizeCohorts(allLives, opts = {}) {
     }
   }
 
-  // Settled page lives only: the TypeScript arm sends no `attempt` row yet.
+  // Settled page lives only: the TypeScript arm sends no `attempt` row yet. A
+  // stage whose settled sessions were all size-gated still gets its rows.
   const compared = (s) => s.lives.some((pl) => pl.settled) && !s.lives.some((pl) => pl.sizeGated);
   const steady = sessions.filter((s) => !s.changed && compared(s));
-  const stages = [...new Set(steady.filter((s) => COMPARED_ARMS.includes(s.arm)).map((s) => s.stage))].sort();
+  const stages = [...new Set(sessions.filter((s) => !s.changed && COMPARED_ARMS.includes(s.arm) && s.lives.some((pl) => pl.settled)).map((s) => s.stage))].sort();
   const armRow = (inArm, stage, arm) => ({
     stage,
     arm,

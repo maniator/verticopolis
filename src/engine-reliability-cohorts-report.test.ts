@@ -32,7 +32,11 @@ describe("the arm comparison and the stop signals", () => {
       life({ session: "w3", stage: "2" }),
     ];
     const c = run(lives, { crashSessions: new Set(["w1"]) });
-    expect(c.comparison.map((s) => [s.stage, s.wasm.sessions, s.wasm.crashes, s.ts.sessions])).toEqual([["2", 1, 0, 0]]);
+    // Stage 3 holds only gated sessions; it still gets its rows and counts.
+    expect(c.comparison.map((s) => [s.stage, s.wasm.sessions, s.wasm.crashes, s.ts.sessions, s.wasm.sizeGatedOut, s.ts.sizeGatedOut])).toEqual([
+      ["2", 1, 0, 0, 0, 0],
+      ["3", 0, 0, 0, 2, 1],
+    ]);
   });
 
   it("reports sessions whose arm or stage changed apart from both arms", () => {
