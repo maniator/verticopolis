@@ -1,6 +1,6 @@
 # Story facade.3: The renderer and HUD read the view (3a types, 3b frame data)
 
-Status: in progress (3a ready for a PR; 3b waits for gates)
+Status: in progress (3a-1 is PR #1291; 3a-2 next; 3b waits for gates)
 
 Slice 3 of the Rust-backed facade
 (`_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/slice-plan.md`),
@@ -33,7 +33,7 @@ TypeScript arm keeps drawing exactly what it draws now.
 
 If spike 0 misses its pre-registered thresholds, the facade pauses before the
 gated rows and the owner decides. Everything above the gate stays valid either
-way, because it changes types and narrows reads, not what is drawn.
+way, because it changes types and narrows reads while what is drawn stays the same.
 
 ## Acceptance criteria
 
@@ -86,13 +86,14 @@ Counted by a grep for `sim.` on the engine handle, test files excluded.
 | --- | --- | --- | --- |
 | `tower.units`, `transports`, `getUnit`, `getTransport`, `unitAt`, `highestFloor`, `lowestFloor`, `revision`, `mealOverlayRevision` | `towerReconcile`, `towerCrowd`, `towerInputCamera`, `towerRegions`, `towerWalkerBuild`, `towerScenery`, `towerSyncSchedule`, `towerOverlay` | `view.tower` | exists |
 | `crowd.people` | `towerCrowd`, `towerInputCamera` | `view.crowd` | exists |
-| `weather` | `towerScene`, `towerInputCamera` | `header.weather` | exists |
-| `clock.minuteOfDay`, `hour`, `minute`, `isNight()`, `isEvening()` | `towerCrowd`, `TowerEngine`, `towerScenery`, `towerInputCamera` | `header.minuteOfDay`, `header.minutes`; hour, minute, night and evening are pure functions of it | derive in `src/render/clockView.ts`, pinned against `Clock` by a test |
+| `weather` | `towerScene`, `towerOverlay`, `towerInputCamera` | `header.weather` | exists |
+| `clock.minuteOfDay`, `hour`, `minute`, `isNight()`, `isEvening()`, `isMorning()` | `towerCrowd`, `TowerEngine`, `towerScene`, `towerOverlay`, `towerSyncSchedule`, `towerScenery`, `towerInputCamera` | `header.minuteOfDay`, `header.minutes`; hour, minute, night and evening are pure functions of it | derive in `src/render/clockView.ts`, pinned against `Clock` by a test |
 | `population` | `towerCrowd` | `header.population` | exists, at most once per step |
-| `santaFxSeq`, `vipFxSeq`, `explosionFx{seq,x,floor}`, `thiefFx{seq,caught,floor}`, `treasureFx{seq,x,floor}` | `towerOverlay` | none | **needs a view member** (`view.fx`) |
+| `santaFxSeq`, `vipFxSeq`, `explosionFx{seq,x,floor}`, `thiefFx{seq,caught,floor}`, `treasureFx{seq,x,floor}` | `towerOverlay`, `towerScene` | none | **needs a view member** (`view.fx`) |
 | `rng.initialSeed` | `towerScenery` | none | **needs** `view.sceneSeed` (a number that does not change for a tower) |
-| `towerCatalog(sim)` (mode catalog) | `towerRegions`, `towerInputCamera`, `towerCrowd`, `towerOverlay`, `towerReconcile` | none | **needs** `view.catalog` (the tower's catalog) |
-| `functionalParkingSet()`, `parkingUsage(n)`, `recyclingFill()` | `towerReconcile` (hourly) | none | **needs** a facility-usage slice, hourly |
+| `towerCatalog(sim)` (mode catalog) | `towerRegions`, `towerInputCamera`, `towerCrowd`, `towerOverlay`, `towerReconcile`, `towerWalkerBuild`, `towerScene` (`bindSceneWorld`) | none | **needs** `view.catalog` (the tower's catalog) |
+| `functionalParkingSet()` (a `Tower` method), `parkingUsage(n)`, `recyclingFill()` | `towerReconcile` (hourly) | none | **needs** a facility-usage slice, hourly (the set belongs on `view.tower` or the slice, not the sim handle) |
+| `tower.transports` | `towerShaftNumbers` | `view.tower.transports` | exists |
 | `positionReachable(floor, tileX)` | `towerCrowd` (a spawn probe, memoized per revision) | none | **needs** a reachability query, or the walker probe moves onto the frame |
 | `congestion()`, `crowd.queueView(tower)` | `TowerEngine` (per frame) | none | 3b slice members |
 | `floorHeatmap(mode)`, `peakCongestion()` | `towerOverlay` (only while an overlay is on) | none | 3b slice members |
@@ -106,10 +107,9 @@ edit it; I send the exact member list and keep the render side behind
 
 ## Tasks
 
-- 3a-1: change the imports and annotations (33 files), remove the unread
-  fabricated fields, run `tsc`, the render tests and the atlas verify. Done on
-  the branch; the PR opens when #1245 merges, because CI runs only against
-  `main`.
+- 3a-1: change the imports and annotations (35 files), remove the unread
+  fabricated fields, run `tsc`, the render tests and the atlas verify. Done; PR
+  #1291.
 - 3a-2: write `RenderSim`, `clockView.ts` with its `Clock` parity test, move
   `bindSceneWorld`, `setSim` and the scene modules onto it, have the adapter
   implement it. Needs the facade thread's view members; until then `RenderSim`
@@ -143,7 +143,7 @@ edit it; I send the exact member list and keep the render side behind
 
 | Risk | Catch |
 | --- | --- |
-| A painter reads a field the view lacks and the type change hides it behind `any` or a cast | `tsc` fails on a missing member; grep the 33 files for `as Unit`, `as any` and bracket access; none are added |
+| A painter reads a field the view lacks and the type change hides it behind `any` or a cast | `tsc` fails on a missing member; grep the 35 files for `as Unit`, `as any` and bracket access; none are added |
 | An atlas bake or a scene fixture depended on a field the literal set (`satisfaction`, `everOccupied`, `pendingIncome`, `load`) | those fields are not on the view, so no consumer can read them; the atlas verify and the visual baselines compare pixels before and after |
 | The view hands out the live objects, so a renderer could still mutate them | the view types are `readonly`; the type test from slice 1 pins assignability; no render file writes a field (a grep for assignments to `u.`, `t.` fields) |
 | `population` walks every room (about 330 µs on the large tower, cloud estimate) and a per-frame header read multiplies it | AC 3 and its test; the header object stays one per step |
@@ -192,3 +192,12 @@ None. No player-visible change.
 | camera | Yes, `view.camera { tile, floor, zoom }`, read only; `setView` is the command. |
 
 Slice 3 adds the `view.ts` lines, the `TsSim` fills and assertions in its own fixture. `contract.fixture.ts` stays with the facade lane.
+
+## Review notes (3a-1)
+
+- `TowerEngine.ts` sits at the 500-line ceiling (one blank line was dropped
+  to stay under it). 3a-2 retypes `sim` there and splits the file first.
+- The deep review (blind, edge case, acceptance, hot-path layers) found one
+  missed file (`towerReconcile.ts`), a mangled section banner in
+  `sprites/transport.ts`, a stale doc comment and the mapping-table gaps
+  above. All are fixed in this PR.

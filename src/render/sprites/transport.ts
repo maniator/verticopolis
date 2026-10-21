@@ -7,7 +7,7 @@ import { layerBreak, layerEnd } from "../pixelSprites/layers";
 import type { CarArrow } from "../carIndicator";
 import { shade, shadeAlpha } from "./common";
 
-// ---- TransportView ----------------------------------------------------------
+// ---- Transport ----------------------------------------------------------
 
 export function drawTransport(
   ctx: CanvasRenderingContext2D,

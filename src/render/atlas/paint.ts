@@ -59,7 +59,7 @@ export interface UnitPaint {
   dead?: boolean;
 }
 
-/** Build the engine-shaped unit a {@link UnitPaint} describes. */
+/** Build the unit view a {@link UnitPaint} describes. */
 export function unitOf(s: UnitPaint): UnitView {
   return {
     id: s.id,
