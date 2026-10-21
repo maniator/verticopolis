@@ -23,6 +23,12 @@ class FakeEngine {
   serialize(): string { return this.save; }
   tick(): void { this.ticks++; }
   free(): void { this.freed = true; }
+  /** Let go without a call into the module (#1113). */
+  abandoned = false;
+  __destroy_into_raw(): number {
+    this.abandoned = true;
+    return 1;
+  }
   pendingChoice(): string | undefined { return undefined; }
   logSince(): string { return "[]"; }
   elevatorTelemetry(): string { return '{"util":[],"hourly":[],"origins":[]}'; }
@@ -208,7 +214,8 @@ describe("startWasmHost", () => {
     expect(a.sim).toBe(next);
     expect(handle.status).toMatchObject({ starts: 1, hosted: false, fallbacks: 1, lastFallback: { reason: "other", stage: "start" } });
     expect(handle.status.errors).toEqual(["the WASM engine failed while letting a tower go: unreachable executed"]);
-    expect(trapped.freed).toBe(true);
+    // After a fault the module is not called again, its free included (#1113).
+    expect(trapped).toMatchObject({ freed: false, abandoned: true });
     expect(mod.engines).toHaveLength(1); // the loaded tower stays on TypeScript
     expect(next.drainGameplayEvents()).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
     expect(next.gameplayEventsDropped).toBe(0);
@@ -227,7 +234,7 @@ describe("startWasmHost", () => {
     const logged = sim.log.length;
     handle.stop();
     expect(handle.status.errors).toEqual(["the WASM engine failed while letting a tower go: unreachable executed"]);
-    expect(mod.engines[0].freed).toBe(true);
+    expect(mod.engines[0]).toMatchObject({ freed: false, abandoned: true });
     expect(handle.status.hosted).toBe(false);
     // The stopped tower is frozen, and its save is the newest restore point.
     const minutes = sim.clock.minutes;

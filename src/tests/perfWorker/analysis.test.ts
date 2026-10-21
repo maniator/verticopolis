@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { csvField, limitations, readModelLimitations, loadWorkerCheckpoint, makeConfig, metricsCsv, parseArgs, ratiosCsv, scriptSizes } from "./main";
-import { markdown, num, pct, readModelMarkdown, readModelSection, slices } from "./report";
+import { differenceCell, markdown, num, pct, readModelMarkdown, readModelSection, slices } from "./report";
 import { Simulation } from "../../engine/Simulation";
 import { serializeUnit } from "../../engine/sim/coerce";
 import { FRAME_UNIT_FIELDS, churn, composition, measureReadModel, spread, summarizeMerges, type MergePass } from "./readModel";
@@ -146,7 +146,9 @@ describe("perf:worker analysis", () => {
     // The ratio the other columns carry for a rate is the opposite one, so the gate cell differs from it.
     expect(cells("mean FPS")[4]).not.toEqual(cells("mean FPS")[cells("mean FPS").length - 2]);
     // M4 is gated by a paired difference, so its gate cell carries no ratio or verdict.
-    expect(cells("main-thread blocking")[4]).toMatch(/^no ratio: gated by a paired difference/);
+    const blocking = (mode: "ts" | "wasm") => metrics.find((m) => m.scenario === "small" && m.throttle === "1" && m.metric.startsWith("main-thread blocking") && m.mode === mode)!;
+    expect(cells("main-thread blocking")[4]).toBe(differenceCell(blocking("wasm"), blocking("ts")));
+    expect(cells("main-thread blocking")[4]).toMatch(/6 pairs \(wasm minus ts\), below the gate.s minimum of 10 pairs$/);
     // Every table row has as many cells as its header and delimiter row, with or without the extra ratio columns.
     const countCells = (l: string) => l.replace(/\\\|/g, "").split("|").length;
     const rectangular = (text: string) => {

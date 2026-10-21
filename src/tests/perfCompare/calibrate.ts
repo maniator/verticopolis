@@ -1,5 +1,5 @@
-import { duplicateCheck, poolIdentity, poolProblems, rendererProblem, stable, treeProblem, type PoolIdentity, type PoolPass } from "./calibratePool";
-import { summarize } from "./stats";
+import { duplicateCheck, lossRecordProblem, poolIdentity, poolProblems, rendererProblem, stable, treeProblem, type PoolIdentity, type PoolPass } from "./calibratePool";
+import { MIN_REPS, pairedDifference, summarize } from "./stats";
 import type { CompareResults, EngineName } from "./types";
 
 export { stable, treeProblem };
@@ -46,8 +46,7 @@ export const EPSILON_STEP_MS = 5;
 /** The long-task ε cap: 50 ms of blocking, one 100 ms task (protocol 6.1 step 4). */
 export const LONG_TASK_CAP_MS = 50;
 export const DEFAULT_MIN_PASSES_PER_ENGINE = 5;
-/** The repetitions every pass must have: the verdict runs use 10, and a pass with another count does not pool with them. */
-export const MIN_REPS = 10;
+export { MIN_REPS };
 export const SCENARIOS = ["medium", "large"];
 export const THROTTLES = ["1", "4"];
 
@@ -120,18 +119,13 @@ function ratioCell(p: Pass, group: string, metric: string, scenario: string, thr
 }
 
 /** The upper bound of the paired difference (slot wasm minus slot ts) of cold start to ready, in ms. */
-function coldStartDifference(p: Pass, throttle: string): number | null {
+export function coldStartDifference(p: Pick<Pass, "metrics">, throttle: string): number | null {
   const row = (engine: EngineName) => p.metrics.find((m) => m.group === "startup" && m.metric === "cold game ready" && m.throttle === throttle && m.engine === engine);
   const a = row("wasm");
   const b = row("ts");
   if (!a || !b) return null;
-  const diffs: number[] = [];
-  a.reps.forEach((rep, i) => {
-    const j = b.reps.indexOf(rep);
-    if (j >= 0) diffs.push(a.values[i] - b.values[j]);
-  });
-  if (diffs.length < MIN_REPS) return null;
-  return summarize(diffs).medianCiHigh;
+  const d = pairedDifference(a, b);
+  return d && d.n >= MIN_REPS ? d.ciHigh : null;
 }
 
 export function family(id: Family["id"], kind: Family["kind"], unit: Family["unit"], values: (number | null)[], cap: number | null, step: number, limit: number): Family {
@@ -225,6 +219,7 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
     }
     const tree = treeProblem(results);
     const renderer = rendererProblem(results);
+    const lossRecord = lossRecordProblem(results);
     if (engine !== "ts" && engine !== "wasm") leave('not an A/A pass (config.aa is not "ts" or "wasm")');
     else if (!results.validation.ok) leave("its validation failed");
     else if (tree) leave(tree);
@@ -232,6 +227,7 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
     else if (results.config.reps !== MIN_REPS) leave(`${results.config.reps} repetitions; the verdict runs use ${MIN_REPS}, and a pass with another count does not pool with them`);
     else if (SCENARIOS.some((s) => !results.config.scenarios.includes(s)) || THROTTLES.some((t) => !results.config.throttles.map(String).includes(t))) leave("it lacks the medium and large scenarios at 1x and 4x");
     else if (renderer) leave(`its renderer is not verified hardware (${renderer})`);
+    else if (lossRecord) leave(lossRecord);
     else {
       used.push({ folder, engine, results });
       passes.push({ folder, engine, commit: results.environment.commit, reps: results.config.reps, startedAt: results.startedAt ?? null, sha256: sha256 ?? null });

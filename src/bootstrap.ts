@@ -364,14 +364,17 @@ export function bootGame(create: () => BootApp): Promise<void> {
             sync: !__WASM_ONLY__ && choice === "wasm-frame" ? "frame" : "step",
             // A later tower the host would not take is a fallback of its own;
             // the first one is in the boot state the settle row reads. A
-            // running engine's fault (#874) also turns the engine save writer
-            // off, since a trapped module may be corrupt.
-            onFallback: (fallback) => {
-              if (isHostFault(fallback.reason)) {
+            // fallback that latches hosting off (a running engine's fault,
+            // #874, or a trap while a tower attaches, #1113) also turns the
+            // engine save writer off, since a trapped module may be corrupt.
+            // A fault's code says so too, should a caller leave `latched` off.
+            onFallback: (fallback, latched) => {
+              if (latched || isHostFault(fallback.reason)) {
                 setEngineWriter(null);
                 // The boot state tooling and support read says so too (a
-                // wasm-only build records it through onFatal).
-                if (!__WASM_ONLY__) stopForEngine("host", fallback.reason, handle?.status.lastError ?? fallback.reason);
+                // wasm-only build records it through onFatal, and a first
+                // tower's is recorded below, with its message).
+                if (!__WASM_ONLY__ && !starting) stopForEngine("host", fallback.reason, handle?.status.lastError ?? fallback.reason);
               }
               noteEngineFallback(fallback);
             },
@@ -381,8 +384,10 @@ export function bootGame(create: () => BootApp): Promise<void> {
           if (!handle.status.hosted && !bootState.failure) stopForEngine("start", handle.status.lastFallback?.reason ?? "attach-refused", handle.status.lastError ?? "the host did not take the first tower");
           // A switchable build keeps the engine writer and label even when its
           // first tower stayed on TypeScript: the host follows every later
-          // adopt, so the next tower it holds saves through the engine.
-          hosted = !(__WASM_ONLY__ && bootState.failure);
+          // adopt, so the next tower it holds saves through the engine. Not
+          // when that tower's engine trapped: no later tower is hosted, and
+          // the module is not asked again (#1113).
+          hosted = !(__WASM_ONLY__ && bootState.failure) && !handle.status.latched;
         } catch (e) {
           stopForEngine("start", bootFailureReason(e), e instanceof Error ? e.message : String(e));
           console.error(__WASM_ONLY__ ? "[wasm] did not start, and this build has no other engine:" : "[wasm] did not start; running on the TypeScript engine:", e);

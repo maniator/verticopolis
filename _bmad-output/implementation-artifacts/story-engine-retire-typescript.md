@@ -150,6 +150,36 @@ own line: the PR, the files, and why the fallback needs them):
     without their read-model assertions (they go with the merge's copy) and
     their TypeScript steps after the detach.
 
+- **The recovery correctness set (#1113, #1126, #1149;
+  `spec-1113-1126-1149-recovery-correctness.md`).** Temporary, with the
+  re-adoption:
+  - `RestorePoints.restore`'s `skipped` count, the `RestoredPoint` shape
+    `WasmHost.restore` answers with, and `WasmHostStatus.restorePoint`;
+  - the player lines `OLDER` and `SWAP_FAILED` in `startWasmHost.ts`, and
+    the undo trail cleared after an older point (`WasmHostApp.clearUndo`,
+    `GameApp.clearUndo` in `main.ts`);
+  - the frozen tower's closed event buffer in `wasmHost.ts`'s faulted detach,
+    with the frozen tower's own tick;
+  - the tests: the `skipped` case in `hostFault.test.ts`; the older-point
+    and failed-swap cases in `startWasmHostRecovery.test.ts` (with its
+    `clearUndo` stub); in
+    `wasmHostFallback.integration.test.ts`, "goes back to the merge when the
+    newest point does not load..." and "says the swap failed when the
+    recovery's adopt throws..."; the `OLDER` and `SWAP_FAILED` exports in
+    `wasmRollback.ts`.
+
+  What stays, because a Rust-only build latches on the same signal:
+  `isEngineTrap`, `letEngineGo`, `ShadowEngine.abandon`, the latch in
+  `startWasmHost`'s `follow` (an attach, the catalog check, a release) with
+  `WasmHostStatus.latched` and `onFallback`'s `latched` argument, the boot's
+  writer off on `latched`, the engine freed on a refused attach and let go
+  after a fault, the attach's single frame read, and their
+  tests (the trap cases in `hostFault.test.ts` and
+  `startWasmHostFallback.test.ts`, the attach-trap cases in
+  `bootstrapEngine.test.ts`, the single-read case in
+  `wasmHostFrame.test.ts`, and the real-engine
+  `wasmHostAttachTrap.integration.test.ts`).
+
 ## Sequence it sits in
 
 See the roadmap's "Order and gates" section:

@@ -147,13 +147,16 @@ resolving review threads). On top of that, in an agent session:
   The team overrides `_bmad/custom/gds-code-review.toml` and
   `_bmad/custom/bmad-code-review.toml` load it into both review skills, which
   add a Hot-Path Auditor layer (diff plus repository access) on a hot-path diff
-  and print one record row per checklist item; a review without that record
-  does not count as the deep review. Triage a hot-path finding as `patch` or
-  `defer` under its section 7, never `dismiss` because the code was inherited.
-  When porting engine code, compare the TypeScript's caches first (HP-8) and
-  put the complexity note in the PR. Copilot and Codex reviewing a PR here
+  and print one record row per checklist item, which goes on the PR as a
+  comment; a review without that record does not count as the deep review.
+  Ported, rewritten, moved or inherited code is reviewed as new. Triage a
+  hot-path finding as `patch` or `defer` under its section 7, never `dismiss`
+  because the code was inherited. Keep every cache, index and counter either
+  engine has, or replace it as HP-8 allows; when porting engine code, compare
+  the TypeScript's caches first, and put the complexity note in the PR. Copilot and Codex reviewing a PR here
   apply the checklist inline and are asked to print the same record (see
-  Review guidelines below), and an independent reviewer's GO needs it. The surrounding canon lives in
+  Review guidelines below), and an independent reviewer's GO or CONDITIONAL GO
+  needs it. The surrounding canon lives in
   `_bmad-output/project-context.md` (Performance section).
 
 ## Review guidelines
@@ -162,8 +165,10 @@ For any reviewer that reads this file, Codex included: on a diff that touches a
 hot-path surface (section 1 of
 [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md)),
 apply items HP-1 to HP-12, trace callers in the repository, and print the
-section 6 record with one row per item. Report pre-existing findings too, and
-resolve each one under section 7.
+section 6 record with one row per item. Report pre-existing findings too,
+marking each one `patch` or `defer` under section 7 (for a pre-existing one,
+name the open issue that lists it, if any); the author resolves them. A
+review skill run posts the record on the PR.
 
 ## Testing discipline: shift-left and regression
 

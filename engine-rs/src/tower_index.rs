@@ -3,7 +3,8 @@
 //! lobby tiles: a 100-floor tower has tens of thousands of them and a few
 //! thousand rooms. `roomUnits` walks past every tile to reach the rooms, and
 //! `pickX` and `pickXInSegment` walk every unit to list one floor's tiles,
-//! once or twice for each person spawned. These indexes answer from one walk
+//! once or twice for each person spawned. `maxStaffFor` counted every unit
+//! for each staff spawn attempt (#1143). These indexes answer from one walk
 //! per tower revision.
 //!
 //! They are keyed on `revision` and the unit count. Every placement and
@@ -15,18 +16,20 @@
 //! (`roomUnits` in `tower/rooms.ts` also keys on the array's identity. Here
 //! only a load replaces the list, and it reindexes.)
 //!
-//! Both hand out shared slices rather than borrows of the memo, so a caller
-//! can hold one while it makes any other memoized query. The slices are
-//! `Arc`, which fits #1051's rule against WASM threads, atomics and
-//! `SharedArrayBuffer`: the wasm32 build enables no atomics
-//! (`scripts/wasm-build.ts`), so the count compiles to plain loads and
-//! stores in unshared memory, as the `OnceLock` in `fflate.rs` already does.
-//! `Arc` also keeps `Tower` `Send`, as it was on `main`, though nothing needs
-//! that today and nothing here runs on another thread.
+//! The room and tile indexes hand out shared slices rather than borrows of
+//! the memo, so a caller can hold one while it makes any other memoized
+//! query. The slices are `Arc`, which fits #1051's rule against WASM
+//! threads, atomics and `SharedArrayBuffer`: the wasm32 build enables no
+//! atomics (`scripts/wasm-build.ts`), so the reference count compiles to
+//! plain loads and stores in unshared memory, as the `OnceLock` in
+//! `fflate.rs` already does. `Arc` also keeps `Tower` `Send`, as it was on
+//! `main`, though nothing needs that today and nothing here runs on another
+//! thread.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::facilities::Kind;
 use crate::tower::{Tower, Unit};
 
 /// What an index was built from: the tower revision and the unit count.
@@ -67,6 +70,25 @@ impl Tower {
             .collect();
         self.memo.borrow_mut().rooms = Some((key, rooms.clone()));
         rooms
+    }
+
+    /// How many housekeeping units the tower has: the crews behind
+    /// `maxStaffFor`'s ceiling (`staffCeiling` in `crowd/spawn.ts`). Counted
+    /// over the room index, since a housekeeping unit is never a tile.
+    pub(crate) fn housekeeping_units(&self) -> i64 {
+        let key = self.index_key();
+        let cached = self.memo.borrow().crews;
+        if let Some((built, crews)) = cached {
+            if built == key {
+                return crews;
+            }
+        }
+        let crews = self
+            .room_units()
+            .filter(|u| u.kind == Kind::Housekeeping)
+            .count() as i64;
+        self.memo.borrow_mut().crews = Some((key, crews));
+        crews
     }
 
     /// The structural tiles of `floor` in the order `pickX` lists them, or

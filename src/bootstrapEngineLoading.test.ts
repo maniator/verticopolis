@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bootGame } from "./bootstrap";
 import { EngineBootError } from "./wasmhost/engineBoot";
+import { EnginePackageError } from "./wasmhost/enginePackageCheck";
 import { ENGINE_LOADING_DELAY_MS, ENGINE_LOADING_TEXT } from "./engineLoading";
 import { resetEngineStatus } from "./analyticsEngineStatus";
 
@@ -10,6 +11,7 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 // A package load the test settles itself, to hold the boot while it looks at the cover.
 const held = vi.hoisted(() => ({ fail: (_e: Error) => {} }));
+const noop = held.fail;
 vi.mock("./wasmhost/engineChoice", async (importOriginal) => ({ ...(await importOriginal<typeof import("./wasmhost/engineChoice")>()), engineRequested: () => "wasm" }));
 vi.mock("./wasmhost/startWasmHost", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./wasmhost/startWasmHost")>()),
@@ -57,5 +59,15 @@ describe("bootGame, the engine loading line (#1132)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("sends a refused package to the exception tracker by code and kind, not by digest", async () => {
+    stubWebGL();
+    vi.stubGlobal("__WASM_ONLY__", true);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const run = bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() }))).catch((e: unknown) => e);
+    await vi.waitFor(() => expect(held.fail).not.toBe(noop));
+    held.fail(new EnginePackageError("mismatch", "the wasm is not the file expected (aaaaaaaaaaaa)", { file: "wasm", expected: null, found: "aaaaaaaaaaaa", expectedPackage: null, servedPackage: null, controlled: false }));
+    expect(((await run) as Error).message).toMatch(/\(load\): package-mismatch, mismatch$/);
   });
 });

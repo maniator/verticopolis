@@ -122,6 +122,7 @@ jobs:
       - name: Run ${{ matrix.project }} on the WASM engine
         env:
           VC_REQUIRE_WASM: "1"
+          VC_LOG_TEST_STARTS: "1"
         run: npx vitest run --project ${{ matrix.project }}
 
       # The integrationWasm project hands some suites to the TypeScript side
