@@ -158,9 +158,9 @@ first tower is today.
 A healthy detach runs every step even when one throws (`runEach`, now in
 `hostFault.ts`). A lone error is thrown as it is. Several are thrown as one
 new error whose message names them all, the first trap's first (or else the
-first error's), with the trap itself as its cause, so `isEngineTrap` finds
-it however deep it sat. So `release` latches on a trap in the free behind a
-clean throw, and the log keeps both (follow-up).
+first error's), with the trap itself as its cause, found through up to three
+wrappers, as deep as `isEngineTrap` reads. So `release` latches on a trap in
+the free behind a clean throw, and the log keeps both (follow-up).
 
 The worker host needs none of this: a failure terminates its worker, and the
 next tower starts a fresh one with its own instance (`workerController.ts`).
@@ -206,6 +206,17 @@ when no point loads, even if a newer point would load by then. That takes a
 point that loaded once failing to load again, which only a page short of
 memory does, and a newer point would put the tower ahead of a save the
 player already holds.
+
+A `STUCK` recovery in which no point ever loaded leaves no point chosen, so
+a later undo's own snapshot (a save of the frozen tower) throws "no point
+loads" after the undo has taken its step off the trail: that step is lost,
+and the error reaches the page's error handler. It stays as it is (#1278's
+independent review, F2, which predates this follow-up): it takes the attach
+save or a merge's save failing to load, though TypeScript wrote the one and
+loaded the other, and the tower is already frozen, with the `STUCK` line
+telling the player to load a save or start a new tower. A `STUCK` reached
+after the answered point fails again keeps that point chosen, so its saves
+still answer with it.
 
 The events stay as they are: the events up to the newest point left the
 host once, so an edit the recovery took away still has its event in the
