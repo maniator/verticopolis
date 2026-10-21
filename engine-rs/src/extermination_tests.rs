@@ -128,6 +128,20 @@ fn ids_keep_the_first_unit_cap_valid_unique_values() {
 }
 
 #[test]
+fn an_integral_float_id_is_kept() {
+    // A writer that keeps ids as doubles saves a room as `5.0`, which the
+    // loader keeps as the integer. A loader that read ids with `as_i64()`
+    // (None for a float) would drop them, and this fails.
+    let (sim, paid, _) = booked();
+    let other = paid + 1000; // never `paid`, so the dedupe keeps both
+    let mut raw = sim.serialize();
+    raw["exterminationRoomIds"] = json!([paid as f64, other as f64]);
+    assert!(raw["exterminationRoomIds"][0].is_f64() && raw["exterminationRoomIds"][1].is_f64());
+    let ids = deserialize(&raw).unwrap().extermination_room_ids.unwrap();
+    assert_eq!(ids, vec![paid, other]);
+}
+
+#[test]
 fn a_billed_room_demolished_before_the_treatment_is_skipped() {
     let (sim, paid, later) = booked();
     let mut loaded = deserialize(&sim.serialize()).unwrap();

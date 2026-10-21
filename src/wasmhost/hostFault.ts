@@ -47,6 +47,53 @@ export function hostFault(path: HostFaultReason, context: FaultContext, error: u
   return { reason, message: `the WASM engine failed ${where}: ${error instanceof Error ? error.message : String(error)}` };
 }
 
+/** wasm-bindgen's error for a call on an object a trap left borrowed. */
+const POISONED = "recursive use of an object detected";
+
+/**
+ * Whether a throw from the engine is a trap, after which the module may be
+ * corrupt and must not be called again (#1113): a `WebAssembly.RuntimeError`
+ * (a Rust panic or abort), wasm-bindgen's borrow error that every later call
+ * on a trapped object throws, or a stack overflow, which unwinds through the
+ * module and leaves its stack pointer where it stopped. A stack overflow in
+ * the host's own TypeScript looks the same and latches too: it cannot be told
+ * apart, and latching is the safe side. A wrapper that keeps the throw as its
+ * `cause` (the catalog read) is classed by it, and another realm's errors by
+ * their name. Anything else is a clean answer: the engine's own `Result::Err`
+ * (a plain `Error`) or a check in the host's TypeScript. Narrow on purpose:
+ * one the test misses is only left a refusal, as before.
+ */
+export function isEngineTrap(error: unknown): boolean {
+  for (let e = error, depth = 0; typeof e === "object" && e !== null && depth < 4; e = (e as { cause?: unknown }).cause, depth++) {
+    if (typeof WebAssembly !== "undefined" && e instanceof WebAssembly.RuntimeError) return true;
+    const { name, message } = e as { name?: unknown; message?: unknown };
+    if (name === "RuntimeError") return true;
+    if (typeof message !== "string") continue;
+    if (message.includes(POISONED)) return true;
+    if ((name === "RangeError" && /maximum call stack size exceeded/i.test(message)) || (name === "InternalError" && /too much recursion/i.test(message))) return true;
+  }
+  return false;
+}
+
+/** Let the engine a refused attach built go, and answer what to throw: the
+ *  refusal, or for a trap in the free behind it an error that names both and
+ *  has the trap as its cause, which the caller latches on (#1113). After a
+ *  trap the engine is let go without a call into the module; a free that
+ *  throws has already taken the handle off wasm-bindgen's finalizer. */
+export function letEngineGo(shadow: { free(): void; abandon(): void }, refusal: unknown): unknown {
+  if (isEngineTrap(refusal)) {
+    shadow.abandon();
+    return refusal;
+  }
+  try {
+    shadow.free();
+  } catch (e) {
+    const text = (x: unknown) => (x instanceof Error ? x.message : String(x));
+    if (isEngineTrap(e)) return Object.assign(new Error(`${text(e)}, while freeing the engine after a refusal: ${text(refusal)}`), { cause: e });
+  }
+  return refusal;
+}
+
 /** Freezes a host on the first throw from its engine and reports it. */
 export class FaultLatch {
   fault: HostFault | null = null;
@@ -85,6 +132,13 @@ export class FaultLatch {
 /** Which restore point a fresh tower came from. */
 export type RestorePointKind = "latest" | "merge" | "attach";
 
+/** The point a recovery loaded, and how many newer points failed to load
+ *  before it (#1126). */
+export interface RestoredPoint {
+  point: RestorePointKind;
+  skipped: number;
+}
+
 /**
  * The engine-written saves a faulted host can go back to, newest first: the
  * latest save the host read, the last merge's save, and the save the engine
@@ -93,12 +147,16 @@ export type RestorePointKind = "latest" | "merge" | "attach";
  * structural command, and the game reads one for every undo capture (before
  * each edit gesture), autosave and export.
  *
- * So a fallback loses everything since the newest of those: the game time
- * since it (up to a game hour while the clock runs) and the commands since
- * it. Those are the edit under way, and the edit before it when that one
- * has not merged yet (paused, or a command with no structural change) and
- * the next capture's own save is what traps, plus any action that takes no
- * undo capture (an emergency answer, an exterminator call, a rename).
+ * So a fallback loses everything since the newest of those: the play since
+ * it and the commands since it. The 30-second autosave keeps that to about
+ * 30 seconds of play while its timer fires on time, and an hour pass's
+ * merge to a game hour at most; the owner's bound is 30 seconds of play
+ * (R6, 2026-10-20), which this code does not measure or enforce (the
+ * facade's restore points do, slice 8). The commands lost are the edit
+ * under way, and the edit before it when that one has not merged yet
+ * (paused, or a command with no structural change) and the next capture's
+ * own save is what traps, plus any action that takes no undo capture (an
+ * emergency answer, an exterminator call, a rename).
  *
  * Events are emitted once when a fallback goes back to the newest point,
  * because the host moves the engine's pending events behind its own just
@@ -107,7 +165,8 @@ export type RestorePointKind = "latest" | "merge" | "attach";
  * fallback replays the time after it on the TypeScript engine, which emits
  * that time's events, and none of them had left the host (see `wasmHost.ts`).
  * A fallback to an older point, when the newest does not load, can emit the
- * events between the two again.
+ * events between the two again; the recovery records the point it loaded
+ * and says so (#1126).
  *
  * Temporary compatibility code, but for `newestSave`: the points exist to
  * re-adopt a tower on the TypeScript engine, and go when the TypeScript
@@ -150,17 +209,20 @@ export class RestorePoints {
     return out;
   }
 
-  /** A fresh TypeScript tower from the newest point that loads. Throws the
-   *  first point's error when none does. */
-  restore(): { sim: Simulation; point: RestorePointKind } {
+  /** A fresh TypeScript tower from the newest point that loads, with the
+   *  number of newer points that did not. Throws the first point's error
+   *  when none does. */
+  restore(): RestoredPoint & { sim: Simulation } {
     let first: unknown = null;
+    let skipped = 0;
     for (const [point, text] of this.candidates()) {
       try {
         const sim = Simulation.deserialize(JSON.parse(text));
         this.chosen = text;
-        return { sim, point };
+        return { sim, point, skipped };
       } catch (e) {
         first ??= e;
+        skipped++;
       }
     }
     throw first;

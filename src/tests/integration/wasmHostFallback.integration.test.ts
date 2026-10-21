@@ -5,6 +5,7 @@ import { startWasmHost, type WasmHostApp, type WasmHostHandle, type WasmHostOpti
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import { FIXTURES, FrameDriver, loadFixture } from "../dualrun/dualRunHarness";
 import { freePoisoned, trapAfter } from "./wasmTraps";
+import { OLDER, SWAP_FAILED } from "./wasmRollback";
 
 /**
  * The runtime fallback (#874; spec-874-runtime-fallback.md) on the real
@@ -66,7 +67,8 @@ describe.skipIf(!hasWasmPackage())("WASM host runtime fallback (#874)", () => {
       const before = { minutes: sim.clock.minutes, units: sim.tower.units.length };
       const merges = h.current()!.merges;
       expect(merges).toBeGreaterThan(0);
-      trapAfter(h.current()!.engine, "build");
+      const engine = h.current()!.engine;
+      trapAfter(engine, "build");
       // The caller gets the instance's answer, and nothing throws.
       expect(sim.build("office", 2, 175).ok).toBe(true);
       expect(h.status).toMatchObject({ hosted: false, fallbacks: 1, lastFallback: { reason: "trap-command", stage: "start" } });
@@ -79,6 +81,10 @@ describe.skipIf(!hasWasmPackage())("WASM host runtime fallback (#874)", () => {
       const save = sim.serialize();
       expect(save.units).toHaveLength(before.units);
       await settle();
+      // The faulted engine was let go without a call into the module: its
+      // handle is zeroed, and the fault is the only error.
+      expect((engine as unknown as { __wbg_ptr: number }).__wbg_ptr).toBe(0);
+      expect(h.status.errors).toHaveLength(1);
       expect(a.adopted).toHaveLength(1);
       const fresh = a.sim;
       expect(fresh).not.toBe(sim);
@@ -269,6 +275,70 @@ describe.skipIf(!hasWasmPackage())("WASM host runtime fallback (#874)", () => {
       expect(a.sim).toBe(loaded);
       expect(a.adopted).toEqual([loaded]);
       expect(h.status.hosted).toBe(false);
+    } finally {
+      h.stop();
+    }
+  });
+});
+
+describe.skipIf(!hasWasmPackage())("WASM host recovery before the flip (#1126, #1149)", () => {
+  it("goes back to the merge when the newest point does not load, says so, and counts the lost edit's event (#1126)", async () => {
+    const a = app(Simulation.newGame(64, "classic"));
+    const h = host(a);
+    const load = vi.spyOn(Simulation, "deserialize");
+    try {
+      const sim = a.sim;
+      const delivered: GameplayEvent[] = [...sim.drainGameplayEvents()];
+      sim.money = 1e9;
+      expect(sim.build("lobby", 1, 180).ok).toBe(true);
+      sim.tick(1); // merges the first lobby: the older point
+      expect(sim.build("lobby", 1, 181).ok).toBe(true);
+      sim.serialize(); // a hosted save covers the second: the newest point
+      delivered.push(...sim.drainGameplayEvents());
+      trapAfter(h.current()!.engine, "tick");
+      sim.tick(1);
+      load.mockImplementationOnce(() => {
+        throw new Error("the newest point does not load");
+      });
+      await settle();
+      const fresh = a.sim;
+      expect(fresh).not.toBe(sim);
+      expect(h.status.restorePoint).toEqual({ point: "merge", skipped: 1 });
+      expect(fresh.log[fresh.log.length - 1]).toMatchObject({ text: OLDER, kind: "bad" });
+      expect(fresh.tower.units.filter((u) => u.kind === "lobby")).toHaveLength(1);
+      delivered.push(...fresh.drainGameplayEvents());
+      // The second lobby's event left the host with the newest point, so the
+      // game has it though the tower went back before it: the cost the
+      // status and the line now name.
+      expect(delivered.filter((e) => e.name === "facility_placed")).toHaveLength(2);
+      expect(delivered.filter((e) => e.name === "tower_founded")).toHaveLength(1);
+    } finally {
+      load.mockRestore();
+      h.stop();
+    }
+  });
+
+  it("says the swap failed when the recovery's adopt throws, and the stuck tower's edits send nothing (#1149)", async () => {
+    const a = app(Simulation.newGame(65, "classic"));
+    const adopt = a.adoptSim.bind(a);
+    a.adoptSim = (next: Simulation, keep?: boolean) => {
+      if (keep) throw new Error("the app broke");
+      adopt(next);
+    };
+    const h = host(a);
+    try {
+      const sim = a.sim;
+      const delivered: GameplayEvent[] = [...sim.drainGameplayEvents()];
+      smallTower(sim); // thirty lobbies, held until a point covers them
+      sim.tick(1); // the merge covers them
+      trapAfter(h.current()!.engine, "tick");
+      sim.tick(1);
+      await settle();
+      expect(a.sim).toBe(sim);
+      expect(sim.log[sim.log.length - 1]).toMatchObject({ text: SWAP_FAILED, kind: "bad" });
+      expect(sim.build("lobby", 1, 200).ok).toBe(true); // an edit on the stuck tower
+      delivered.push(...sim.drainGameplayEvents());
+      expect(delivered.filter((e) => e.name === "facility_placed")).toHaveLength(30);
     } finally {
       h.stop();
     }

@@ -655,13 +655,12 @@ pub fn spawn_staff(
     StaffSpawn::Sent
 }
 
+/// `maxStaffFor`. It runs for every staff spawn attempt inside
+/// housekeeping's loop over rooms and crews, so the crews come from a
+/// memoized count (`Tower::housekeeping_units`, keyed on revision and unit
+/// count) where the TypeScript keeps `staffCeiling` per revision (#1143).
 pub fn max_staff_for(tower: &Tower) -> i64 {
-    tower
-        .units
-        .iter()
-        .filter(|u| u.kind == Kind::Housekeeping)
-        .count() as i64
-        * HK_MAIDS_PER_UNIT
+    tower.housekeeping_units() * HK_MAIDS_PER_UNIT
 }
 
 /// `spawnStep`.

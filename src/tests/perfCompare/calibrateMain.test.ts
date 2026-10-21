@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { stable } from "./calibrate";
 import { main, parseCalibrateArgs } from "./calibrateMain";
 import { many } from "./calibrateFixture";
@@ -120,7 +120,14 @@ describe("perf:calibrate", () => {
     expect(apart.problems).toHaveLength(1);
     expect(apart.problems[0]).toMatch(/perf:compare passes \(commit [0-9a-f]{7}\) and the perf:worker passes \(commit fff9999\) differ in machine or runtime; browser/);
     // A worker-only run says which families it cannot speak for.
-    expect(main([...worker(3, "-c"), "--out", "alone"], repo)).toBe(0);
+    const written: string[] = [];
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => (written.push(String(chunk)), true));
+    try {
+      expect(main([...worker(3, "-c"), "--out", "alone"], repo)).toBe(0);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(written.join("")).toContain("(adoptable; partial, no folders for M1, M2, M3, M5-1x, M5-4x)");
     expect(JSON.parse(readFileSync(join(repo, "alone", "calibration.json"), "utf8")).missingFamilies).toEqual(["M1", "M2", "M3", "M5-1x", "M5-4x"]);
   });
 });

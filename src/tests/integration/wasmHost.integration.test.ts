@@ -222,9 +222,9 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     const kept = sim.drainGameplayEvents();
     expect(kept[0]).toEqual({ name: "tower_founded", payload: { mode: "modern" } });
     expect(kept.filter((e) => e.name === "facility_placed")).toHaveLength(0);
-    expect(host.restore().tower.units.filter((u) => u.kind === "lobby")).toHaveLength(0);
+    expect(host.restore().sim.tower.units.filter((u) => u.kind === "lobby")).toHaveLength(0);
     expect(sim.gameplayEventsDropped).toBe(0);
-    expect(() => host.engine.mode()).toThrow(); // freed
+    expect(() => host.engine.mode()).toThrow(); // let go: its handle is zeroed (#1113)
   });
 
   it("counts a batch it cannot read as dropped, while hosted and at detach", () => {
@@ -298,9 +298,9 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     expect(sim.drainGameplayEvents()).toEqual([]);
     expect(sim.gameplayEventsDropped).toBe(0);
     // The fallback's tower has the three, without the two built after.
-    const fresh = host.restore();
+    const fresh = host.restore().sim;
     expect(fresh.tower.units.filter((u) => u.kind === "lobby")).toHaveLength(3);
-    expect(() => host.engine.mode()).toThrow(); // freed by the detach
+    expect(() => host.engine.mode()).toThrow(); // let go by the detach (#1113)
   });
 
   // A paused player builds, then undoes before anything drains: the app swaps

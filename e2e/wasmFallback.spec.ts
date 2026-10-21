@@ -45,7 +45,8 @@ async function trapAfter(page: Page, method: string): Promise<void> {
     const real = engine[name].bind(engine);
     const poison = () => {
       for (const key of Object.getOwnPropertyNames(proto)) {
-        if (key === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function") continue;
+        // wasm-bindgen's `__destroy_into_raw` is JavaScript only and never traps.
+        if (key === "constructor" || key === "__destroy_into_raw" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function") continue;
         Object.defineProperty(engine, key, {
           value: () => {
             throw new Error("recursive use of an object detected which would lead to unsafe aliasing in rust");
