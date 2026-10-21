@@ -277,8 +277,13 @@ fn housekeeping_coverage_counts_reach_dirt_and_infestation() {
     put(&mut sim, Kind::HotelSingle, 3, 170);
     put(&mut sim, Kind::HotelSingle, 4, 160);
     put(&mut sim, Kind::Housekeeping, 3, 180);
+    put(&mut sim, Kind::Housekeeping, 4, 180);
     shaft(&mut sim, Kind::ElevatorStandard, 152, 1, 4);
     settle(&mut sim, 4 * 24);
+    // A crew still under construction does not count, and does not reach
+    // floor 4.
+    let unbuilt = id_at(&sim, 4, 180);
+    sim.tower.get_unit_mut(unbuilt).unwrap().state = UnitState::Construction;
     let room = id_at(&sim, 3, 160);
     let far = id_at(&sim, 4, 160);
     let quiet = id_at(&sim, 3, 170);

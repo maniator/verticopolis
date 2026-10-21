@@ -177,6 +177,13 @@ Sonnet 5.5 (high)
   speed, so `statsReport` and the three overlays go on the slice 9 PC list
   (#1220) at top speed; a frame-time or long-task impact makes the fix required
   before 50/50.
+- **Gate on per-tick callers (independent review, 2026-10-21).** `tower_stats`
+  and `peak_congestion_hotspot` run per UI tick once the HUD reads them, and
+  they still pay `highest_floor` / `lowest_floor` (two walks over all units,
+  no `floorBounds` cache, A11) and `functional_parking_set` (a walk over all
+  units to seed the flood). No PR may give either a per-tick caller (slice 4
+  #1211, slice 7 #1217) until those two #1237 items are on `main`, or Naftali
+  accepts the deferral on that PR.
 - **For the binding and slice 4.** The wrappers bind eight methods; the five
   small getters (`next_star_requirements`, `milestone_progress`,
   `next_star_threshold`, `income_breakdown`, `elevator_stats`) are reached

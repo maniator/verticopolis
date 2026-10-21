@@ -30,4 +30,6 @@ pub mod unit_detail;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_gates;
+#[cfg(test)]
 mod tests_overlays;

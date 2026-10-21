@@ -43,7 +43,7 @@ impl Simulation {
     }
 
     /// `cumulativeStarGates(rung)`: every gate's met flag.
-    fn cumulative_gates_met(&self, rung: i64) -> bool {
+    pub(crate) fn cumulative_gates_met(&self, rung: i64) -> bool {
         if rung >= 3 && !self.has_operational(Kind::Security) {
             return false;
         }

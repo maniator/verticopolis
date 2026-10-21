@@ -154,3 +154,34 @@ fn the_milestone_id_table_matches_the_milestone_tests() {
     let ids: Vec<&str> = sim.milestone_tests().iter().map(|(id, _, _)| *id).collect();
     assert_eq!(ids, super::progress::MILESTONE_IDS);
 }
+
+#[test]
+fn a_tall_room_gives_its_upper_floor_a_cell_over_its_span() {
+    let mut sim = founded(GameMode::Modern, 3);
+    shaft(&mut sim, Kind::ElevatorStandard, 152, 1, 3);
+    // A cinema is two floors tall, and building it lays the tiles of the floor
+    // above. Selling a tile there sells the cinema, so floor 4's extent can
+    // only come from the tiles, the cinema, or both; either way it spans the
+    // cinema.
+    put(&mut sim, Kind::Cinema, 3, 170);
+    settle(&mut sim, 6);
+    let u = sim
+        .tower
+        .units
+        .iter()
+        .find(|u| u.kind == Kind::Cinema)
+        .expect("the cinema");
+    let (x0, x1) = (u.x, u.x + u.width - 1);
+    let cells = heat(&sim, HeatmapMode::Congestion);
+    let upper = cells
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["floor"] == 4)
+        .map(|c| (c["minX"].clone(), c["maxX"].clone()));
+    assert_eq!(
+        upper,
+        Some((json!(x0), json!(x1))),
+        "the upper floor spans the cinema"
+    );
+}
