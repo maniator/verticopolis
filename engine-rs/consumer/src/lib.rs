@@ -17,6 +17,7 @@ use verticopolis_engine::catalog::{catalog, CATALOG_VERSION};
 use verticopolis_engine::charges::ExtendEnd;
 use verticopolis_engine::clock::GameMode;
 use verticopolis_engine::facilities::Kind;
+use verticopolis_engine::fixed_step::FrameStepper;
 use verticopolis_engine::frame::{
     frame_view, header, log_since, person, transport, unit, CAR_RECORD, FRAME_HEADER, PERSON_FIXED,
     TRANSPORT_FIXED, UNIT_RECORD, UNKNOWN_ROUTINE,
@@ -324,13 +325,17 @@ fn event_catalog() -> Result<Value, String> {
     Ok(c)
 }
 
-/// Advance `minutes` of game time in one-minute frames, the way a frame loop
-/// would, draining and checking the gameplay events after every frame.
-/// Returns the number of events drained.
+/// Advance `minutes` of game time in one-minute frames through the engine's
+/// frame stepper (`FrameStepper::advance`, the way a Rust host drives time),
+/// draining and checking the gameplay events after every frame. Returns the
+/// number of events drained.
 pub fn advance(sim: &mut Simulation, minutes: u32, events: &Value) -> Result<usize, String> {
     let mut n = 0;
+    let mut frames = FrameStepper::default();
     for _ in 0..minutes {
-        sim.tick(1.0);
+        // One real second at one game minute per second, on the steady clock,
+        // owes exactly one game minute.
+        frames.advance(sim, 1000.0, 1.0, true, true);
         for e in sim.gameplay.drain() {
             check_event(events, &e.to_json())?;
             n += 1;
