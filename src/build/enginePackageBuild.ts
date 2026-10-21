@@ -39,7 +39,28 @@ export function readExpectedPackage(publicDir: string, mode: "build" | "other"):
   }
   const parsed = parseEngineRecord(readText(file));
   if (!parsed.ok) throw new Error(`${ENGINE_DIR}${ENGINE_BUILD_RECORD} is not a usable schema 2 record (${parsed.why}); rebuild the package with npm run wasm:build`);
-  return expectedOf(parsed.record);
+  return { ...expectedOf(parsed.record), revisions: revisionsOf(dir) };
+}
+
+/** The MD5 of each file Workbox gives a revision: its precache entry's revision
+ *  is the MD5 of the file, and Repair names the entry's cache key with it. */
+export function revisionsOf(engineDir: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const name of [ENGINE_GLUE, ENGINE_WASM, ENGINE_BUILD_RECORD]) {
+    const file = resolve(engineDir, name);
+    if (existsSync(file)) out[name] = createHash("md5").update(readFileSync(file)).digest("hex");
+  }
+  return out;
+}
+
+/** The `revision` of each entry in the precache manifest, by URL. */
+export function manifestRevisions(manifest: string): Map<string, string | undefined> {
+  const found = new Map<string, string | undefined>();
+  for (const m of manifest.matchAll(/\{[^{}]*\}/g)) {
+    const url = KEY("url").exec(m[0])?.[2]?.replace(/^\.?\//, "");
+    if (url) found.set(url, KEY("revision").exec(m[0])?.[2]);
+  }
+  return found;
 }
 
 /** The Workbox `integrity` value for some bytes. */
@@ -133,6 +154,28 @@ export function engineDistProblems(distDir: string, manifest: string): string[] 
     const have = integrity.get(url);
     if (!have) problems.push(`precache entry ${url} carries no integrity, so a body from another build could enter the precache`);
     else if (existsSync(file) && have !== integrityOf(readFileSync(file))) problems.push(`precache entry ${url} carries an integrity that is not the digest of the file in dist/`);
+  }
+  // Repair names the running build's cache keys by revision, so each engine
+  // entry's revision must be the MD5 of the file the shell was built with.
+  const revisions = manifestRevisions(manifest);
+  const md5 = revisionsOf(resolve(distDir, ENGINE_DIR));
+  for (const url of INTEGRITY_FILES) {
+    const want = md5[url.slice(ENGINE_DIR.length)];
+    if (revisions.has(url) && revisions.get(url) !== want) problems.push(`precache entry ${url} has revision ${revisions.get(url) ?? "none"}, not the MD5 of the file in dist/ (${want}), so Repair would name another cache key`);
+  }
+  return problems;
+}
+
+/**
+ * What is wrong with the precache revisions the shell carries, as sentences:
+ * Repair names the running build's cache keys by the revisions compiled into
+ * its scripts, so each engine file's MD5 must appear in one of them.
+ */
+export function shellRevisionProblems(distDir: string): string[] {
+  const texts = emittedScripts(distDir).map((f) => readFileSync(resolve(distDir, f), "utf8"));
+  const problems: string[] = [];
+  for (const [name, md5] of Object.entries(revisionsOf(resolve(distDir, ENGINE_DIR)))) {
+    if (!texts.some((t) => t.includes(md5))) problems.push(`no script in dist/ carries the precache revision of ${ENGINE_DIR}${name}, so Repair could not name its cache key`);
   }
   return problems;
 }

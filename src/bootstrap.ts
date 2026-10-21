@@ -19,6 +19,8 @@ import { bootFailure, bootFailureReason, engineFailureCopy, failBoot, loadBootEn
 import type { BuildMetadataResult } from "./wasmhost/buildSection";
 import { liveDiagnostics } from "./wasmhost/engineDiagnosticsLive";
 import { copyText } from "./ui/copyText";
+import { pageControlled, repairOffered } from "./wasmhost/engineRepair";
+import { runEngineRepair } from "./engineRepairControl";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -149,7 +151,8 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
   // An open modal dialog sits in the top layer above any z-index and makes
   // the rest of the page inert, the Reload button included, so close it.
   for (const dialog of Array.from(document.querySelectorAll("dialog[open]"))) (dialog as HTMLDialogElement).close();
-  const copy = engineFailureCopy(state.failure, online, typeof window === "undefined" || window.isSecureContext !== false);
+  const offerRepair = repairOffered(state.failure, pageControlled());
+  const copy = engineFailureCopy(state.failure, online, { secure: typeof window === "undefined" || window.isSecureContext !== false, repair: offerRepair });
   showBootMessage(
     html`<div id=${ENGINE_FAILURE_ID} data-stage=${state.failure.stage} role="alert" aria-live="assertive">
       <p><b>${copy.headline}</b></p>
@@ -158,6 +161,10 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
         ${copy.steps.map((step) => html`<li>${step}</li>`)}
       </ul>
       <p>
+        ${offerRepair
+          ? html`<button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="repair-engine" @click=${runEngineRepair}>Repair engine files</button>
+              <span class="engine-failure-repair-status" role="status" aria-live="polite" style="margin:0 .5em;opacity:.8"></span>`
+          : nothing}
         <button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="copy-diagnostics" @click=${copyEngineDiagnostics}>Copy diagnostics</button>
         <span class="engine-failure-copy-status" role="status" aria-live="polite" style="margin-left:.5em;opacity:.8"></span>
       </p>
