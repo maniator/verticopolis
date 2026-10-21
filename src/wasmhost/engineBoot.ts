@@ -73,6 +73,12 @@ export class EngineBootError extends Error {
   }
 }
 
+/** The message a wasm-only build logs and records when the package has no
+ *  save writer. It reads as a developer note, so the player gets
+ *  {@link NO_SAVE_WRITER_COPY} for it. */
+export const NO_SAVE_WRITER_MESSAGE = "the engine package has no save writer (encodeVctower); rebuild it";
+const NO_SAVE_WRITER_COPY = "The engine cannot save towers. Reload after the game is updated.";
+
 /** The codes a failed load can carry: the rest of the closed list is for a
  *  fault in a running engine or for no fault at all. */
 export const LOAD_FAILURE_REASONS: readonly FallbackReason[] = ["boot-error", "package-mismatch", "unverifiable", "boot-timeout"];
@@ -240,7 +246,7 @@ export async function loadBootEngine(opts: EngineBootOptions): Promise<EngineBoo
   // Saves go through the engine's own writer (#935). A switchable build keeps
   // the TypeScript writer for a package without one; a wasm-only build needs it.
   if (opts.wasmOnly && !mod.encodeVctower) {
-    const message = "the engine package has no save writer (encodeVctower); rebuild it";
+    const message = NO_SAVE_WRITER_MESSAGE;
     log.error(`[wasm] ${message}`);
     return { module: null, state: { build, engine: "none", failure: { stage: "load", reason: "package-mismatch", message }, ...binaryField() } };
   }
@@ -267,17 +273,38 @@ export interface EngineFailureCopy {
   steps: string[];
 }
 
+/** The sentence the player reads for a refused or failed engine load (#985):
+ *  one per cause, from the code and the package detail, never from the
+ *  message. Null when the cause has no sentence of its own, and the message
+ *  stands. */
+function loadFailureSentence(failure: EngineBootFailure): string | null {
+  if (failure.stage !== "load") return null;
+  const pkg = failure.package;
+  if (failure.reason === "boot-timeout") return "The engine took too long to load. Try Reload when your connection is ready.";
+  if (failure.reason === "unverifiable" || pkg?.kind === "unverifiable") return "This browser connection cannot verify the engine files. Open the game using HTTPS.";
+  if (failure.reason === "package-mismatch" && pkg) {
+    const id = (v: string | null | undefined) => v ?? "unavailable";
+    return `The engine files do not match this version of the game. The engine was not started. (expected ${id(pkg.expectedPackage)}, found ${id(pkg.servedPackage)})`;
+  }
+  if (failure.reason === "package-mismatch" && failure.message === NO_SAVE_WRITER_MESSAGE) return NO_SAVE_WRITER_COPY;
+  if (pkg?.kind === "load-failed") return "The engine files could not be loaded. Connect to the internet and try Reload.";
+  return null;
+}
+
 export function engineFailureCopy(failure: EngineBootFailure, online: boolean): EngineFailureCopy {
   const host = failure.stage === "host";
   const headline = host ? "The game engine stopped running this tower, so the game has stopped." : "The game engine could not start, so the game cannot run.";
-  const steps = [
-    host
-      ? "Reload the page to continue from your last save. Changes since that save may be lost."
-      : "Reload the page to try again. Your saved towers stay in this browser.",
-  ];
+  const sentence = loadFailureSentence(failure);
+  // Reloading cannot repair a browser that cannot verify the files, so its
+  // first step is the connection, not Reload.
+  const insecure = failure.reason === "unverifiable" || failure.package?.kind === "unverifiable";
+  let first = "Reload the page to try again. Your saved towers stay in this browser.";
+  if (host) first = "Reload the page to continue from your last save. Changes since that save may be lost.";
+  else if (insecure) first = "Open the game over HTTPS, then reload. Your saved towers stay in this browser.";
+  const steps = [first];
   if (!online) {
     steps.push("You appear to be offline. If the game was updated since this device last opened it, connect to the internet and reload once so the new engine can download.");
   }
   steps.push("If it keeps happening, update your browser or try another one.");
-  return { headline, reason: failure.message, steps };
+  return { headline, reason: sentence ?? failure.message, steps };
 }

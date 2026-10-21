@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { WasmModule } from "../dualrun/binding";
-import { EngineBootError, FALLBACK_REASONS, FALLBACK_STAGES, bootFailure, bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, packageFailureOf, publishBootState, typescriptBoot, type EngineBootState } from "./engineBoot";
+import { EngineBootError, FALLBACK_REASONS, FALLBACK_STAGES, bootFailure, bootFailureReason, NO_SAVE_WRITER_MESSAGE, engineFailureCopy, failBoot, loadBootEngine, packageFailureOf, publishBootState, typescriptBoot, type EngineBootState } from "./engineBoot";
 import { EnginePackageError, type PackageFailureKind } from "./enginePackageCheck";
 
 const mod = (withWriter = true) => ({ Engine: class {}, ...(withWriter ? { encodeVctower: () => new Uint8Array() } : {}) }) as unknown as WasmModule;
@@ -187,6 +187,23 @@ describe("engineFailureCopy", () => {
     expect(online.steps.some((s) => /offline/.test(s))).toBe(false);
     const offline = engineFailureCopy({ stage: "load", reason: "boot-error", message: "404" }, false);
     expect(offline.steps.some((s) => /You appear to be offline/.test(s))).toBe(true);
+  });
+
+  it("gives each load cause its own sentence, from the code and the package detail and never the message (#985)", () => {
+    const detail = { file: "wasm" as const, expected: null, found: null, expectedPackage: "111111111111", servedPackage: "222222222222", controlled: true };
+    const copy = (reason: Parameters<typeof engineFailureCopy>[0]["reason"], pkg?: { kind: PackageFailureKind }) =>
+      engineFailureCopy({ stage: "load", reason, message: "SECRET internal detail", ...(pkg ? { package: { ...detail, ...pkg } } : {}) }, true);
+    expect(copy("package-mismatch", { kind: "mismatch" }).reason).toBe("The engine files do not match this version of the game. The engine was not started. (expected 111111111111, found 222222222222)");
+    expect(engineFailureCopy({ stage: "load", reason: "package-mismatch", message: "m", package: { kind: "mismatch", file: "glue", expected: null, found: null, expectedPackage: null, servedPackage: null, controlled: false } }, true).reason).toMatch(/\(expected unavailable, found unavailable\)$/);
+    expect(copy("boot-error", { kind: "load-failed" }).reason).toBe("The engine files could not be loaded. Connect to the internet and try Reload.");
+    expect(copy("boot-timeout").reason).toBe("The engine took too long to load. Try Reload when your connection is ready.");
+    const unverifiable = copy("unverifiable", { kind: "unverifiable" });
+    expect(unverifiable.reason).toBe("This browser connection cannot verify the engine files. Open the game using HTTPS.");
+    expect(unverifiable.steps[0]).toMatch(/over HTTPS/);
+    expect(engineFailureCopy({ stage: "load", reason: "package-mismatch", message: NO_SAVE_WRITER_MESSAGE }, true).reason).toBe("The engine cannot save towers. Reload after the game is updated.");
+    // A cause with no sentence of its own keeps its message, and no sentence leaks the message.
+    expect(copy("boot-error").reason).toBe("SECRET internal detail");
+    for (const c of [copy("package-mismatch", { kind: "mismatch" }), copy("boot-timeout"), unverifiable]) expect(JSON.stringify(c)).not.toContain("SECRET");
   });
 
   it("tells a mid-game stop apart from a failed start", () => {
