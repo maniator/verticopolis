@@ -3,15 +3,13 @@
  * Rust engine through its WASM binding, serializes to the bytes the TypeScript
  * engine writes for the same input.
  *
- * "Byte for byte" here means the canonical JSON: keys sorted and every number
- * re-printed in JavaScript form. The raw text is not compared, because it
- * differs in two known ways (EX-2, proposed, and the owner has not yet said
- * whether canonical equality is the row's criterion): the order of a
- * transport's keys follows the history of the TypeScript object (`carLoad`
- * lands after `load` when dispatch adds it and before it when a save carries
- * it), and the binding's `serialize()` prints an integer-valued double with a
- * trailing `.0` where JavaScript prints `13551601`. The raw-form test below
- * pins both, with their size.
+ * "Byte for byte" here means the canonical JSON (keys sorted). The raw text is
+ * not compared key for key, because the order of a transport's keys follows
+ * the history of the TypeScript object (`carLoad` lands after `load` when
+ * dispatch adds it and before it when a save carries it). That is EX-2,
+ * proposed; the owner has not yet said whether canonical equality is the
+ * row's criterion. The raw-form test below pins that the text is otherwise
+ * the same length, numbers included.
  *
  * - Every `.vctower` fixture, loaded the way an import loads it (`fromVctower`
  *   against `SaveGame.import`).
@@ -109,22 +107,20 @@ describe.runIf(run)("saves audit: the Rust engine loads what the web loads, byte
     }
   });
 
-  // EX-2 (proposed): the raw text is not equal. The binding's `serialize()`
-  // prints an integer-valued double with a trailing `.0`, so its text is a
-  // little longer than the TypeScript writer's; the file the engine writes
-  // from it (`encodeVctower` re-prints numbers the JavaScript way) has the
-  // same length as the file made from the TypeScript text, and differs only
-  // in the key order inside transports. A fix removes the entry.
-  it.each(fixtures)("%s: the raw text differs from the TypeScript writer's only in number form, and the written file only in key order", async (name) => {
+  // The raw text prints numbers as JavaScript does, so it is as long as the
+  // TypeScript writer's. EX-2 (proposed) is what is left: the order of
+  // `carLoad` against `load` inside a transport follows the TypeScript
+  // object's history, so the raw text is not byte-equal. A fix removes the
+  // entry.
+  it.each(fixtures)("%s: the raw text is as long as the TypeScript writer's and differs only in transport key order", async (name) => {
     const text = readFileSync(resolve(FIXTURES, name), "utf8");
     const ts = JSON.stringify((await SaveGame.import(text)).serialize());
     const engine = wasm().Engine.fromVctower(text);
     try {
       const rust = engine.serialize();
-      const dotZero = (rust.match(/\d\.0(?=[,}\]])/g) ?? []).length;
-      expect(rust, name).not.toBe(ts);
-      expect(dotZero, name).toBeGreaterThan(0);
-      expect(rust.length - ts.length, name).toBeGreaterThan(0);
+      expect(rust.match(/\d\.0(?=[,}\]])/g) ?? [], name).toEqual([]);
+      expect(rust.length, name).toBe(ts.length);
+      expect(canonical(rust), name).toBe(canonical(ts));
       const stamp = 1_760_000_000_123;
       const fileOfRust = jsonOfFile(rustSaves().encodeVctower(rust, "3.0.0", stamp));
       const fileOfTs = jsonOfFile(rustSaves().encodeVctower(ts, "3.0.0", stamp));

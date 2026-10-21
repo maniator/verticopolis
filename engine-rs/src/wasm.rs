@@ -353,9 +353,10 @@ impl Engine {
         Ok(Engine { sim })
     }
 
-    /// `serialize()` as JSON text.
+    /// `serialize()` as JSON text, printed the way `JSON.stringify` prints the
+    /// TypeScript engine's save (an integer-valued double without `.0`).
     pub fn serialize(&self) -> String {
-        self.sim.serialize().to_string()
+        crate::canonical::js_json(&self.sim.serialize())
     }
 
     /// The hashed state view: the saved game minus prose, as canonical JSON.

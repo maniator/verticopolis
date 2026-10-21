@@ -37,46 +37,39 @@ approves an exception.
   same build, which keeps the field and cannot show the loss, so the check
   binds once the owner approves that plan.
 
-## EX-2: the engine's raw save text differs from the TypeScript writer's in number form and, inside a transport, in key order
+## EX-2: inside a transport, the engine's raw save text puts `carLoad` where the TypeScript writer's history put it
 
 - **Source:** the Saves audit (#1236), `conformanceWasmSaves.integration.test.ts`.
 - **Status:** proposed (2026-10-21). Awaiting the owner's decision at the
   #945 sign-off, together with the question below.
 - **What differs:** the Saves row of #945 says "byte for byte through the
-  engine". The audit compares canonical JSON (keys sorted, numbers
-  re-printed in JavaScript form), where every fixture and loader case
-  matches. The raw text does not match, in two ways:
-  - **Number form (binding text only).** `Engine.serialize()` prints an
-    integer-valued double with a trailing `.0` (`"money":13551601.0` where
-    TypeScript writes `13551601`). That is 634 to 1,474 numbers per fixture,
-    and the binding text is 1,268 to 2,948 bytes longer (0.2% to 0.4%).
-  - **Key order inside a transport (files and text).** The order of
-    `carLoad` against `load` follows the history of the TypeScript object
-    (`carLoad` lands after `load` when dispatch adds it and before it when a
-    save carries it); the Rust serializer has one fixed order.
-- **What a player sees:** nothing. The file the engine writes from its own
-  text re-prints numbers the JavaScript way, so it is the same length as the
-  file made from the TypeScript text, and it loads to the same tower in both
-  engines. Only the position of two keys in a transport differs.
-- **Is raw equality achievable?** The number form is: the binding could print
-  numbers through the same `js_json` form `encode_vctower` already uses. The
-  key order is not without a data-model change. TypeScript writes a
-  transport's `carLoad` where its object history put it: a save that carries
-  `carLoad` gets it from the loader's object literal
-  (`src/engine/sim/serialization.ts:409`), and a transport that lacks it gets
-  it appended on the first dispatch tick (`ElevatorDispatch.ts:130`), after
-  `load`. No fixed Rust order matches both, so matching would mean a
+  engine". The audit compares canonical JSON (keys sorted), where every
+  fixture and loader case matches. The raw text matches in length and in
+  every number (the binding's `serialize()` prints numbers as JavaScript
+  does since the audit's first review round), and differs in one thing: the
+  order of `carLoad` against `load` inside a transport. TypeScript writes
+  `carLoad` where its object history put it: a save that carries it gets it
+  from the loader's object literal (`src/engine/sim/serialization.ts:409`),
+  before `load`, and a transport that lacks it gets it appended on the first
+  dispatch tick (`ElevatorDispatch.ts:130`), after `load`. The Rust
+  serializer has one fixed order.
+- **What a player sees:** nothing. The file the engine writes is the same
+  length as the file made from the TypeScript text and loads to the same
+  tower in both engines. Only the position of two keys in a transport
+  differs, first at byte 104,662 of the split-tower fixture.
+- **Is raw equality achievable?** Not without a data-model change. No fixed
+  Rust order matches both histories, so matching would mean a
   per-transport order flag in the Rust transport, set at load and in
   dispatch, plus a serializer that reads it. That touches `engine-rs/` (it
   moves the seeded-replay window key) and `load.rs`, which the Saves audit
-  and A8 lanes own, to change where two keys sit in a file no reader compares.
+  and A8 lanes own, to change where two keys sit in a file no reader
+  compares.
 - **Why accepted:** the order flag costs engine data-model state and a
-  window restart for a position nothing reads, and the number form is the
-  binding's own text, which no reader compares byte for byte.
+  window restart for a position nothing reads.
 - **Decision for the owner:** is canonical JSON equality the criterion for
-  the Saves row, or must the raw text match? If raw, this entry is not
-  enough and the serializer changes instead.
-- **Check:** the Saves audit pins both differences with their size (the
-  raw text is longer and carries `.0` numbers; the written file has the same
-  length and the same canonical JSON), so a change in either direction fails
-  the test and this entry has to be removed or rewritten.
+  the Saves row, or must the key order match as well? If it must, this entry
+  is not enough and the serializer changes instead.
+- **Check:** the Saves audit pins the state of things (raw text equal in
+  length and numbers, equal as canonical JSON, same-length written file), so
+  a change in either direction fails the test and this entry has to be
+  removed or rewritten.

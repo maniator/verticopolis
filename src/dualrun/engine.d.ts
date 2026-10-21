@@ -252,7 +252,8 @@ export class Engine {
      */
     sellAt(floor: number, x: number): boolean;
     /**
-     * `serialize()` as JSON text.
+     * `serialize()` as JSON text, printed the way `JSON.stringify` prints the
+     * TypeScript engine's save (an integer-valued double without `.0`).
      */
     serialize(): string;
     /**
