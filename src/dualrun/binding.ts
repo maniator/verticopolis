@@ -1,4 +1,4 @@
-import type { Engine, catalog, encodeVctower, engineIdentity } from "./engine";
+import type { Engine, catalog, encodeVctower, engineIdentity, viewLayout } from "./engine";
 
 /**
  * The WASM binding's surface, as wasm-bindgen declares it from
@@ -21,6 +21,11 @@ export interface WasmModule {
    *  package built before it still runs, and About says the identity is
    *  unavailable. */
   engineIdentity?: typeof engineIdentity;
+  /** The renderer-facing view's layout as JSON (facade slice 6a, #1213).
+   *  Optional here, as the catalog is, so a test double need not carry it;
+   *  a real package has it beside the view's instance methods, which
+   *  `checkBinding` requires. */
+  viewLayout?: typeof viewLayout;
 }
 
 /** Every method the adapters call on an instance, and on the class. Each
@@ -36,7 +41,8 @@ export const INSTANCE_METHODS = [
   "stateDigest", "crowdDigest", "frameView", "logSince", "elevatorTelemetry", "seedElevatorTelemetry", "advanceClock",
   "seedLoopMemos", "loopMemos", "housekeepingReport", "commuteStress", "commuteStressRevision", "drainGameplayEvents", "gameplayEventsPending",
   "gameplayEventsDropped", "addCar", "removeCar", "beginExtend", "extendTransport", "endExtend", "removeFacility", "towerSetCars",
-  "towerResizeTransport", "previewRentBatch", "validateTransport", "placeTransportDryRun",
+  "towerResizeTransport", "previewRentBatch", "validateTransport", "placeTransportDryRun", "viewStructure", "viewFrame",
+  "unitMetaSince", "towerSignature",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 
