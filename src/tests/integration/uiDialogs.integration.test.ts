@@ -1827,9 +1827,9 @@ describe("showSettings: the Settings dialog", () => {
     expect(dialog().querySelector("#set-auto-bridge")).toBeNull();
   });
 
-  it("follows the callback across toggles for the Modern bridging switch", () => {
+  it("follows the callback across toggles for the Modern bridging switch", async () => {
     let on = true;
-    const toggle = vi.fn(() => (on = !on));
+    const toggle = vi.fn(async () => (on = !on));
     const { ui, cb } = makeUI({
       getMode: () => "modern" as const,
       isAutoBridge: vi.fn(() => on),
@@ -1840,8 +1840,24 @@ describe("showSettings: the Settings dialog", () => {
     expect(sw.checked).toBe(true); // initial live state
     sw.click();
     expect(cb.onToggleAutoBridge).toHaveBeenCalledTimes(1);
+    await toggle.mock.results[0].value;
     expect(sw.checked).toBe(false);
     sw.click();
+    await toggle.mock.results[1].value;
+    expect(sw.checked).toBe(true);
+  });
+
+  it("sets the Modern bridging switch to the engine's answer once the toggle settles", async () => {
+    // The engine kept bridging on (a refused toggle): the click's own uncheck
+    // must not stick once the answer arrives.
+    const toggle = vi.fn(async () => true);
+    const { ui } = makeUI({ getMode: () => "modern" as const, isAutoBridge: vi.fn(() => true), onToggleAutoBridge: toggle });
+    ui.showSettings();
+    const sw = dialog().querySelector<HTMLInputElement>("#set-auto-bridge")!;
+    sw.click();
+    expect(sw.checked).toBe(false); // the browser's own toggle, before the answer
+    await toggle.mock.results[0].value;
+    await Promise.resolve();
     expect(sw.checked).toBe(true);
   });
 
@@ -2219,7 +2235,7 @@ describe("showBatchPricingDialog — set-all rent/price with a reset confirm", (
     const { ui } = makeUI();
     const band = { default: 10000, min: 5000, max: 20000, step: 1000 };
     const preview = vi.fn(() => ({ ...result }));
-    const apply = vi.fn(() => ({ ...result }));
+    const apply = vi.fn(async () => ({ ...result }));
     const onApplied = vi.fn();
     ui.showBatchPricingDialog(
       { kind: "office", kindLabel: "Office", options: { shape: "band", band } },
@@ -2246,10 +2262,13 @@ describe("showBatchPricingDialog — set-all rent/price with a reset confirm", (
     expect(preview.mock.calls.length).toBeGreaterThan(1);
   });
 
-  it("Apply commits and reports a summary, then closes", () => {
+  it("Apply commits and reports a summary, then closes", async () => {
     const { apply, onApplied } = open();
     dialog().querySelector<HTMLButtonElement>("#bp-apply")!.click();
     expect(apply).toHaveBeenCalledOnce();
+    // The summary and the close wait for the engine's answer.
+    expect(onApplied).not.toHaveBeenCalled();
+    await apply.mock.results[0].value;
     expect(onApplied).toHaveBeenCalledWith(expect.stringContaining("Set 3 offices"));
     expect(dialog().open).toBe(false);
   });
@@ -2307,7 +2326,7 @@ describe("showBatchPricingDialog — the Classic ladder variant (rung picker + a
     const { ui } = makeUI();
     const options = CLASSIC_RULES.priceOptions("office")!;
     const preview = vi.fn(() => ({ ...result }));
-    const apply = vi.fn(() => ({ ...result }));
+    const apply = vi.fn(async () => ({ ...result }));
     const onApplied = vi.fn();
     ui.showBatchPricingDialog({ kind: "office", kindLabel: "Office", options }, { preview, apply, onApplied });
     return { preview, apply, onApplied };
@@ -2334,16 +2353,17 @@ describe("showBatchPricingDialog — the Classic ladder variant (rung picker + a
     expect(dialog().querySelector("#bp-preview")!.textContent).toBe("Set 9 of 12 offices to Low ($5,000).");
   });
 
-  it("Apply on a rung commits once and reports the pinned summary", () => {
+  it("Apply on a rung commits once and reports the pinned summary", async () => {
     const { apply, onApplied } = openLadder();
     pick("3");
     applyBtn().click();
     expect(apply).toHaveBeenCalledWith(15_000, { onlyDefaultPriced: false });
+    await apply.mock.results[0].value;
     expect(onApplied).toHaveBeenCalledWith("Set 9 offices to High ($15,000).");
     expect(dialog().open).toBe(false);
   });
 
-  it("batch No Rate is armed: first click relabels to Confirm No Rate, second applies", () => {
+  it("batch No Rate is armed: first click relabels to Confirm No Rate, second applies", async () => {
     const { apply, onApplied } = openLadder();
     pick("noRate");
     expect(dialog().querySelector("#bp-preview")!.textContent).toBe(
@@ -2354,6 +2374,7 @@ describe("showBatchPricingDialog — the Classic ladder variant (rung picker + a
     expect(apply).not.toHaveBeenCalled();
     applyBtn().click(); // confirms
     expect(apply).toHaveBeenCalledWith("noRate", { onlyDefaultPriced: false });
+    await apply.mock.results[0].value;
     expect(onApplied).toHaveBeenCalledWith("Took 9 offices off the market (No Rate).");
   });
 
@@ -2396,15 +2417,16 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
           lobby: lobbySet.has(floor),
           endpoint: floor === 1 || floor === top,
         })),
-      setServe: vi.fn((floor: number, serve: boolean) => {
+      // Async like the real port: the dialog re-reads once the answer settles.
+      setServe: vi.fn(async (floor: number, serve: boolean) => {
         if (floor === 1 || floor === top) return; // endpoints always stop
         if (serve) served.add(floor);
         else served.delete(floor);
       }),
-      expressStops: vi.fn(() => {
+      expressStops: vi.fn(async () => {
         served = new Set([1, top, ...lobbies]);
       }),
-      allStops: vi.fn(() => {
+      allStops: vi.fn(async () => {
         served = new Set(Array.from({ length: top }, (_, i) => i + 1));
       }),
     };
@@ -2897,7 +2919,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(row[9]).toBe(3);
   });
 
-  it("a Serve toggle applies live, refreshes the rows, and re-snaps the working homes", () => {
+  it("a Serve toggle applies live, refreshes the rows, and re-snaps the working homes", async () => {
     const stops = fakeStops();
     const { apply } = open({ stops, current: { homeFloors: [5, 1, 1, 1] } });
     // Uncheck floor 5: the port mutates, the grid refreshes, car 1's home snaps off it.
@@ -2907,6 +2929,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     serve5.checked = false;
     serve5.dispatchEvent(new Event("change", { bubbles: true }));
     expect(stops.setServe).toHaveBeenCalledWith(5, false);
+    await new Promise((r) => setTimeout(r, 0)); // the rows refresh once the engine answers
     const row5 = Array.from(rows()).find((r) => r.querySelector(".es-cell-floor")!.textContent!.includes("5"))!;
     expect(row5.classList.contains("es-skipped")).toBe(true);
     expect(row5.querySelectorAll(".es-chip")).toHaveLength(0);
@@ -2923,18 +2946,22 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(dialog().open).toBe(false); // closed at once: no schedule edit pending
   });
 
-  it("the bulk stop quick actions ride the port and announce", () => {
+  it("the bulk stop quick actions ride the port and announce once it answers", async () => {
     const announce = vi.fn();
     const stops = fakeStops();
     open({ stops, announce });
+    const flush = () => new Promise((r) => setTimeout(r, 0));
     const quick = dialog().querySelectorAll<HTMLButtonElement>(".es-quick .btn");
     quick[0].click(); // Express (lobbies)
     expect(stops.expressStops).toHaveBeenCalledOnce();
+    expect(announce).not.toHaveBeenCalledWith("Stops set to lobbies only.");
+    await flush();
     expect(announce).toHaveBeenLastCalledWith("Stops set to lobbies only.");
     // The grid follows: non-lobby floors read skipped now.
     expect(dialog().querySelectorAll(".es-grid-row.es-skipped").length).toBeGreaterThan(0);
     quick[1].click(); // All stops
     expect(stops.allStops).toHaveBeenCalledOnce();
+    await flush();
     expect(announce).toHaveBeenLastCalledWith("Stopping at every floor.");
     expect(dialog().querySelectorAll(".es-grid-row.es-skipped")).toHaveLength(0);
   });

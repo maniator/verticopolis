@@ -14,6 +14,7 @@ import { SaveLoad } from "../../game/saveLoad";
 import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
 import { render, type TemplateResult } from "lit-html";
+import { createTsSim } from "../../simport/tsSim";
 
 const CAT = catalogFor("classic");
 
@@ -93,6 +94,7 @@ describe("BuildActions (the money boundary)", () => {
     f = fakes();
     build = new BuildActions({
       getSim: () => sim,
+      port: createTsSim(() => sim),
       ui: f.ui,
       audio: f.audio,
       selectedId: () => null,
@@ -100,77 +102,77 @@ describe("BuildActions (the money boundary)", () => {
     });
   });
 
-  it("tryRemoveUnit pays the shared resale refund on sell", () => {
+  it("tryRemoveUnit pays the shared resale refund on sell", async () => {
     const before = sim.money;
-    expect(build.tryRemoveUnit(office, "sell")).toBe(true);
+    expect(await build.tryRemoveUnit(office, "sell")).toBe(true);
     expect(sim.money - before).toBe(resaleRefund("office"));
     expect(sim.tower.units.some((u) => u.id === office.id)).toBe(false);
   });
 
-  it("removeTransportWithRefund pays the one shared shaft resale", () => {
+  it("removeTransportWithRefund pays the one shared shaft resale", async () => {
     const before = sim.money;
-    expect(build.removeTransportWithRefund(lift, "sell")).toBe(true);
+    expect(await build.removeTransportWithRefund(lift, "sell")).toBe(true);
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
     expect(sim.tower.transports.some((t) => t.id === lift.id)).toBe(false);
   });
 
-  it("removeTransportWithRefund reports a refusal (the shaft already gone) and pays nothing", () => {
+  it("removeTransportWithRefund reports a refusal (the shaft already gone) and pays nothing", async () => {
     expect(sim.tower.removeTransport(lift.id)).toBeDefined();
     const before = sim.money;
-    expect(build.removeTransportWithRefund(lift, "bulldoze")).toBe(false);
+    expect(await build.removeTransportWithRefund(lift, "bulldoze")).toBe(false);
     expect(sim.money).toBe(before);
   });
 
-  it("reports each shell removal to the engine with the gesture as its method, and a refusal as none", () => {
+  it("reports each shell removal to the engine with the gesture as its method, and a refusal as none", async () => {
     // The analytics bridge sends demolish from these; the shell no longer does.
     const removals = () => sim.drainGameplayEvents().filter((e) => e.name === "facility_removed");
     removals();
-    expect(build.tryRemoveUnit(office, "bulldoze")).toBe(true);
-    expect(build.removeTransportWithRefund(lift, "sell")).toBe(true);
-    expect(build.removeTransportWithRefund(lift, "bulldoze")).toBe(false);
+    expect(await build.tryRemoveUnit(office, "bulldoze")).toBe(true);
+    expect(await build.removeTransportWithRefund(lift, "sell")).toBe(true);
+    expect(await build.removeTransportWithRefund(lift, "bulldoze")).toBe(false);
     expect(removals().map((e) => e.payload)).toEqual([
       { kind: "office", method: "bulldoze" },
       { kind: "elevatorStandard", method: "sell" },
     ]);
   });
 
-  it("tryRemoveUnit surfaces the engine's refusal: a burning unit stays, no refund", () => {
+  it("tryRemoveUnit surfaces the engine's refusal: a burning unit stays, no refund", async () => {
     office.state = "fire";
     const before = sim.money;
-    expect(build.tryRemoveUnit(office, "sell")).toBe(false);
+    expect(await build.tryRemoveUnit(office, "sell")).toBe(false);
     expect(sim.money).toBe(before);
     expect(f.toasts).toEqual([{ text: "You can't sell a burning unit. Call fire rescue or let it burn out.", kind: "bad" }]);
     expect(f.sfx).toEqual(["error"]);
     expect(sim.tower.getUnit(office.id)).toBe(office);
   });
 
-  it("paintBrush reports honestly: already-built strip vs the engine's refusal", () => {
+  it("paintBrush reports honestly: already-built strip vs the engine's refusal", async () => {
     // The fixture's floor-2 strip already carries floor under the whole brush.
-    const already = build.paintBrush("floor", 20, 2);
+    const already = await build.paintBrush("floor", 20, 2);
     expect(already.placed).toBe(0);
     expect(already.reason).toBe("Floor already built here");
     // A broke player painting fresh tiles gets the engine's reason instead.
     sim.money = 0;
-    const broke = build.paintBrush("floor", 20, 3);
+    const broke = await build.paintBrush("floor", 20, 3);
     expect(broke.placed).toBe(0);
     expect(broke.reason).toBe("Not enough money.");
   });
 
-  it("a press aimed past the lot line onto a built edge says so (#513 sibling: the silent boundary)", () => {
+  it("a press aimed past the lot line onto a built edge says so (#513 sibling: the silent boundary)", async () => {
     // Build the left edge out with lobby, the way a wall-to-wall tower has it.
-    expect(build.paintBrush("lobby", 3, 1).placed).toBeGreaterThan(0);
+    expect((await build.paintBrush("lobby", 3, 1)).placed).toBeGreaterThan(0);
     f.toasts.length = 0;
     f.sfx.length = 0;
     // A press beyond the lot clamps onto the edge column; every clamped tile
     // already carries lobby, so before the fix this was a silent dead click.
-    const edge = build.paintBrush("lobby", -5, 1);
+    const edge = await build.paintBrush("lobby", -5, 1);
     expect(edge.placed).toBe(0);
     expect(edge.reason).toBe("That's the edge of the lot.");
     expect(f.toasts).toEqual([{ text: "That's the edge of the lot.", kind: "bad" }]);
     expect(f.sfx).toEqual(["error"]); // refusal toasts always pair with the sfx
     // The same dead press ON the lot keeps today's quiet already-built report.
     f.toasts.length = 0;
-    const on = build.paintBrush("lobby", 3, 1);
+    const on = await build.paintBrush("lobby", 3, 1);
     expect(on.placed).toBe(0);
     expect(on.reason).toBe("Lobby already built here");
     expect(f.toasts).toEqual([]);
@@ -178,7 +180,7 @@ describe("BuildActions (the money boundary)", () => {
     // boundary only claims presses nothing else blocked.
     f.toasts.length = 0;
     sim.money = 0;
-    const brokeOff = build.paintBrush("floor", 900, 3);
+    const brokeOff = await build.paintBrush("floor", 900, 3);
     expect(brokeOff.placed).toBe(0);
     expect(brokeOff.reason).not.toBe("That's the edge of the lot.");
     expect(f.toasts).toEqual([]);
@@ -203,6 +205,7 @@ describe("EditorActions (editor-card money paths)", () => {
     root = document.createElement("div");
     const build = new BuildActions({
       getSim: () => sim,
+      port: createTsSim(() => sim),
       ui: f.ui,
       audio: f.audio,
       selectedId: () => sel?.id ?? null,
@@ -210,6 +213,7 @@ describe("EditorActions (editor-card money paths)", () => {
     });
     editor = new EditorActions({
       getSim: () => sim,
+      port: createTsSim(() => sim),
       ui: {
         toast: f.ui.toast,
         showBatchPricingDialog: () => {},
@@ -229,11 +233,11 @@ describe("EditorActions (editor-card money paths)", () => {
     });
   });
 
-  it("sell (unit) pays the resale refund, clears the selection, commits the undo step", () => {
+  it("sell (unit) pays the resale refund, clears the selection, commits the undo step", async () => {
     sel = { type: "unit", id: office.id };
     render(unitEditorTemplate(sim, office), root);
     const before = sim.money;
-    editor.handleEditAction("sell", root);
+    await editor.handleEditAction("sell", root);
     expect(sim.money - before).toBe(resaleRefund("office"));
     expect(sim.tower.units.some((u) => u.id === office.id)).toBe(false);
     expect(sel).toBeNull();
@@ -242,17 +246,17 @@ describe("EditorActions (editor-card money paths)", () => {
     expect(f.sfx).toContain("sell");
   });
 
-  it("sell (transport) routes through the one shared refund path", () => {
+  it("sell (transport) routes through the one shared refund path", async () => {
     sel = { type: "transport", id: lift.id };
     render(transportEditorTemplate(sim, lift), root);
     const before = sim.money;
-    editor.handleEditAction("sell", root);
+    await editor.handleEditAction("sell", root);
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
     expect(sim.tower.transports.some((t) => t.id === lift.id)).toBe(false);
     expect(sel).toBeNull();
   });
 
-  it("mobile editor folds in the card's diagnostics and drops the duplicate access row", () => {
+  it("mobile editor folds in the card's diagnostics and drops the duplicate access row", async () => {
     const { sim, office } = fixture();
     const mobile = renderedCard(unitEditorTemplate(sim, office, true));
     const desktop = renderedCard(unitEditorTemplate(sim, office, false));
@@ -269,7 +273,7 @@ describe("EditorActions (editor-card money paths)", () => {
     expect(desktop.querySelector('[data-field="diagnostics"]')).toBeNull();
   });
 
-  it("mobile editor keeps the access row for a zero-population service kind (no diagnostics access line)", () => {
+  it("mobile editor keeps the access row for a zero-population service kind (no diagnostics access line)", async () => {
     const sim = new Simulation();
     for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
@@ -283,7 +287,7 @@ describe("EditorActions (editor-card money paths)", () => {
     expect(renderedCard(unitEditorTemplate(sim, sec, true)).textContent).toContain("Elevator access");
   });
 
-  it("mobile editor folds the retail patronage block into a shop's panel", () => {
+  it("mobile editor folds the retail patronage block into a shop's panel", async () => {
     const sim = new Simulation();
     for (let x = 10; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 10; x < 40; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
@@ -295,36 +299,36 @@ describe("EditorActions (editor-card money paths)", () => {
     expect(renderedCard(unitEditorTemplate(sim, shop, false)).textContent).not.toContain("patronage");
   });
 
-  it("rentUp/rentDown clamp a real office to the ends of the Classic ladder", () => {
+  it("rentUp/rentDown clamp a real office to the ends of the Classic ladder", async () => {
     sel = { type: "unit", id: office.id };
     render(unitEditorTemplate(sim, office), root);
     // A default Simulation is Classic: nudges step whole rungs and clamp at
     // the ladder ends (High $15,000 / Very Low $2,000), never the Modern band.
-    for (let i = 0; i < 100; i++) editor.handleEditAction("rentUp", root);
+    for (let i = 0; i < 100; i++) await editor.handleEditAction("rentUp", root);
     expect(rentOf(office)).toBe(15_000);
-    for (let i = 0; i < 200; i++) editor.handleEditAction("rentDown", root);
+    for (let i = 0; i < 200; i++) await editor.handleEditAction("rentDown", root);
     expect(rentOf(office)).toBe(2_000);
   });
 
-  it("addcar charges and removecar refunds the half-back car resale", () => {
+  it("addcar charges and removecar refunds the half-back car resale", async () => {
     sel = { type: "transport", id: lift.id };
     render(transportEditorTemplate(sim, lift), root);
     const cars0 = lift.cars;
     const before = sim.money;
-    editor.handleEditAction("addcar", root);
+    await editor.handleEditAction("addcar", root);
     expect(lift.cars).toBe(cars0 + 1);
     expect(sim.money).toBe(before - ECON.addCarCost);
-    editor.handleEditAction("removecar", root);
+    await editor.handleEditAction("removecar", root);
     expect(lift.cars).toBe(cars0);
     expect(sim.money).toBe(before - ECON.addCarCost + carResaleRefund());
   });
 
-  it("extendUp refuses when broke: toast, error sfx, shaft unchanged", () => {
+  it("extendUp refuses when broke: toast, error sfx, shaft unchanged", async () => {
     sel = { type: "transport", id: lift.id };
     render(transportEditorTemplate(sim, lift), root);
     sim.money = 0;
     const { top, bottom } = lift;
-    editor.handleEditAction("extendUp", root);
+    await editor.handleEditAction("extendUp", root);
     expect(lift.top).toBe(top);
     expect(lift.bottom).toBe(bottom);
     expect(f.toasts).toEqual([{ text: "Not enough money.", kind: "bad" }]);
@@ -355,7 +359,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
     });
   });
 
-  it("newGame adopts a fresh sim (the dep's shape forbids preserving the undo trail)", () => {
+  it("newGame adopts a fresh sim (the dep's shape forbids preserving the undo trail)", async () => {
     // SaveLoadDeps.adoptSim deliberately takes no preserveHistory flag — the
     // type itself now guarantees a tower swap through this module invalidates
     // the undo history, so Undo can never resurrect the abandoned tower.
@@ -379,7 +383,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
     expect(vi.mocked(f.ui.sayVisibly).mock.calls[0][0]).toMatch(/^Import failed: /);
   });
 
-  it("Quick Save surfaces a quota failure honestly: failure toast, no success toast, no escaped throw (AUD-010)", () => {
+  it("Quick Save surfaces a quota failure honestly: failure toast, no success toast, no escaped throw (AUD-010)", async () => {
     // Instance spy, the storage suite's idiom: prototype spies do not re-arm
     // reliably after a mockRestore in the same file.
     const spy = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
@@ -406,7 +410,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
     localStorage.clear();
   });
 
-  it("a camera-stamp throw (context-lost engine) reaches the same failure toast, never the click handler", () => {
+  it("a camera-stamp throw (context-lost engine) reaches the same failure toast, never the click handler", async () => {
     // getView -> engine.viewState() can throw on a disposed/context-lost
     // engine; the manual path's no-escaped-throw contract covers the stamp
     // too, while the silent path still propagates it to its own callers.
@@ -427,7 +431,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
     expect(() => throwing.save(true)).toThrow(/context lost/);
   });
 
-  it("the SILENT save path still throws on a storage failure (saveBeforeUpdate's callers rely on it)", () => {
+  it("the SILENT save path still throws on a storage failure (saveBeforeUpdate's callers rely on it)", async () => {
     // saveBeforeUpdate must not reload on a failed write, and the context-loss
     // flush words the failure on the crash screen: both catch the throw
     // themselves, so the quota guard on the manual path must not swallow it.
@@ -470,7 +474,7 @@ describe("InspectorController (✕-dismissal latch)", () => {
     liftPick = { type: "transport", id: lift.id, kind: "elevatorStandard" };
   });
 
-  it("resetLatch spends the dismissal: the peek path's fresh-intent seam re-raises the card (#696)", () => {
+  it("resetLatch spends the dismissal: the peek path's fresh-intent seam re-raises the card (#696)", async () => {
     inspector.inspectPicked(officePick);
     inspector.dismiss();
     const calls = shown.length;
@@ -487,7 +491,7 @@ describe("InspectorController (✕-dismissal latch)", () => {
     expect(last(shown)).toContain(FACILITIES.office.name);
   });
 
-  it("dismiss latches the target: same-facility hover picks stay closed, null picks don't spend it", () => {
+  it("dismiss latches the target: same-facility hover picks stay closed, null picks don't spend it", async () => {
     inspector.inspectPicked(officePick);
     expect(last(shown)).toContain(FACILITIES.office.name);
     expect(anchor).toEqual({ x: office.x + office.width, left: office.x, floor: office.floor });
@@ -502,7 +506,7 @@ describe("InspectorController (✕-dismissal latch)", () => {
     expect(last(shown)).toBeNull();
   });
 
-  it("picking a DIFFERENT facility spends the latch", () => {
+  it("picking a DIFFERENT facility spends the latch", async () => {
     inspector.inspectPicked(officePick);
     inspector.dismiss();
     inspector.inspectPicked(liftPick); // different facility opens…
@@ -511,7 +515,7 @@ describe("InspectorController (✕-dismissal latch)", () => {
     expect(last(shown)).toContain(FACILITIES.office.name);
   });
 
-  it("clear() and resetLatch() drop the latch (tower swap / explicit tap)", () => {
+  it("clear() and resetLatch() drop the latch (tower swap / explicit tap)", async () => {
     inspector.inspectPicked(officePick);
     inspector.dismiss();
     inspector.clear(); // adoptSim path: recycled ids must not stay muted
@@ -542,6 +546,7 @@ describe("KeyboardPlay (commit announcements)", () => {
     const f = fakes();
     const build = new BuildActions({
       getSim: () => sim,
+      port: createTsSim(() => sim),
       ui: f.ui,
       audio: f.audio,
       selectedId: () => null,
@@ -560,19 +565,15 @@ describe("KeyboardPlay (commit announcements)", () => {
       return t ? { type: "transport", id: t.id, kind: t.kind } : null;
     };
     // Mirrors placeSimpleBuild in src/game/buildPreview.ts: the injected gesture-shared placement.
-    const placeSimpleBuild = (kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null => {
+    const placeSimpleBuild = (kind: FacilityKind, tile: number, floor: number): Promise<PlaceOutcome> | null => {
       if (kind === "floor" || kind === "lobby") {
-        const r = build.paintBrush(kind, tile, floor);
-        return { what: "paint", ok: r.placed > 0, reason: r.reason };
+        return build.paintBrush(kind, tile, floor).then((r) => ({ what: "paint", ok: r.placed > 0, reason: r.reason }));
       }
       if (isFixedSpanTransport(kind)) {
-        const r = build.tryBuildTransport(kind, snapX(CAT, kind, tile), floor, floor + 1);
-        return { what: "flight", ok: r.ok, reason: r.reason };
+        return build.tryBuildTransport(kind, snapX(CAT, kind, tile), floor, floor + 1).then((r) => ({ what: "flight", ok: r.ok, reason: r.reason }));
       }
       if (FACILITIES[kind].transport) return null;
-      const before = sim.tower.units.length;
-      build.tryBuild(kind, floor, snapX(CAT, kind, tile));
-      return { what: "room", ok: sim.tower.units.length > before };
+      return build.tryBuild(kind, floor, snapX(CAT, kind, tile)).then((ok) => ({ what: "room", ok }));
     };
     const fakeEngine = {
       ensureVisible: () => {},
@@ -581,6 +582,7 @@ describe("KeyboardPlay (commit announcements)", () => {
     };
     keyboard = new KeyboardPlay({
       getSim: () => sim,
+      port: createTsSim(() => sim),
       engine: () => fakeEngine,
       audio: f.audio,
       ui: f.ui,
@@ -598,56 +600,56 @@ describe("KeyboardPlay (commit announcements)", () => {
     undoLog = [];
   });
 
-  it("paint commit announces the announceForPlacement paint line", () => {
+  it("paint commit announces the announceForPlacement paint line", async () => {
     keyboard.moveCursor(0, 0); // first move reveals the cursor at (mid, 1)
     keyboard.moveCursor(0, 1); // up to floor 2, above the lobby strip
     tool = { type: "build", kind: "floor" };
-    keyboard.commitCursor(); // paints on floor 3 support? no — floor 2 already built…
+    await keyboard.commitCursor(); // paints on floor 3 support? no — floor 2 already built…
     // …so the honest line is the "already built here" reason, verbatim.
     expect(last(announced)).toBe(announceForPlacement({ what: "paint", ok: false, reason: "Floor already built here" }, CAT, "floor", 2));
     keyboard.moveCursor(0, 1); // floor 3: fresh tiles above the strip
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(last(announced)).toBe(announceForPlacement({ what: "paint", ok: true }, CAT, "floor", 3));
     expect(last(announced)).toBe("Placed Floor on floor 3");
   });
 
-  it("flight commit announces the announceForPlacement flight line", () => {
+  it("flight commit announces the announceForPlacement flight line", async () => {
     keyboard.moveCursor(0, 0); // (mid, 1)
     tool = { type: "build", kind: "stairs" };
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(last(announced)).toBe(announceForPlacement({ what: "flight", ok: true, reason: "" }, CAT, "stairs", 1));
     expect(last(announced)).toBe(`${FACILITIES.stairs.name} built, floors 1 to 2`);
   });
 
-  it("room commit announces the announceForPlacement room line", () => {
+  it("room commit announces the announceForPlacement room line", async () => {
     keyboard.moveCursor(0, 0);
     keyboard.moveCursor(0, 1); // (mid, 2) — on the built floor strip
     tool = { type: "build", kind: "office" };
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(last(announced)).toBe(announceForPlacement({ what: "room", ok: true }, CAT, "office", 2));
     expect(last(announced)).toBe("Placed Office");
   });
 
-  it("keyboard build and bulldoze bracket undo like the mouse gestures", () => {
+  it("keyboard build and bulldoze bracket undo like the mouse gestures", async () => {
     // Undo parity: mouse paths capture on press and commit on release; the
     // keyboard used to skip both, fusing keyboard edits into the previous
     // mouse gesture's undo entry.
     keyboard.moveCursor(0, 0);
     keyboard.moveCursor(0, 1);
     tool = { type: "build", kind: "office" };
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(undoLog).toEqual(["capture:Build Office", "commit"]);
     undoLog.length = 0;
     tool = { type: "bulldoze" };
-    keyboard.commitCursor(); // office sits under the cursor
+    await keyboard.commitCursor(); // office sits under the cursor
     expect(undoLog).toEqual(["capture:Bulldoze", "commit"]);
     undoLog.length = 0;
-    keyboard.commitCursor(); // nothing left here — no capture for a no-op
+    await keyboard.commitCursor(); // nothing left here — no capture for a no-op
     expect(last(announced)).toBe("Nothing to bulldoze here");
     expect(undoLog).toEqual([]);
     // Inspect commits never touch undo.
     tool = { type: "inspect" };
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(undoLog).toEqual([]);
   });
 });
@@ -668,7 +670,7 @@ describe("InspectorController (data-rich cards: parking, recycling, notice)", ()
     return { inspector, shown };
   }
 
-  it("a parking ramp shows the tower-wide demand line; a chained space reads connected, an orphan reads dead", () => {
+  it("a parking ramp shows the tower-wide demand line; a chained space reads connected, an orphan reads dead", async () => {
     const sim = new Simulation();
     for (let x = 10; x < 46; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 10; x < 46; x++) expect(sim.tower.place("floor", 0, x).ok).toBe(true);
@@ -689,7 +691,7 @@ describe("InspectorController (data-rich cards: parking, recycling, notice)", ()
     expect(last(shown)).toContain("dead");
   });
 
-  it("a recycling center shows its fill and the capacity/demand verdict", () => {
+  it("a recycling center shows its fill and the capacity/demand verdict", async () => {
     const sim = new Simulation();
     for (let x = 10; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (const f of [0, -1]) for (let x = 10; x < 40; x++) expect(sim.tower.place("floor", f, x).ok).toBe(true);
@@ -702,7 +704,7 @@ describe("InspectorController (data-rich cards: parking, recycling, notice)", ()
     expect(last(shown)).toMatch(/demand met|Over capacity/);
   });
 
-  it("a tenant on notice spells out the cause, a time bound, and the recovery target", () => {
+  it("a tenant on notice spells out the cause, a time bound, and the recovery target", async () => {
     const { sim, office } = fixture();
     office.state = "vacating";
     office.vacateReason = "rent";

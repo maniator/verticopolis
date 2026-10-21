@@ -189,9 +189,11 @@ export function runFrame(app: GameApp, dtMs: number): void {
         // The player answered (accept/decline). The engine reports the
         // resolution (emergency_resolved, source player) and the bridge sends
         // emergency_choice from it; a timed-out auto-decline carries source
-        // timeout and reports nothing.
-        app.sim.resolveChoice(opt);
-        app.shownChoice = false;
+        // timeout and reports nothing. The freeze latch holds until the engine
+        // has answered, so no frame sees the choice still pending and asks again.
+        void app.port.command({ op: "resolveChoice", accept: opt === "accept" }).then(() => {
+          app.shownChoice = false;
+        });
       });
     }
     // No `else` to clear shownChoice when the sim auto-resolves a choice: the
@@ -260,7 +262,7 @@ export function emitMealRushes(app: GameApp, minutesBeforeTicks: number): void {
     });
     if (!fire) return;
     app.lastMealRushDay[kind] = dayOfKind;
-    app.sim.emit(text, "info");
+    void app.port.command({ op: "emit", text, kind: "info" });
   };
   // Breakfast at 07:00, dinner at 18:00, lunch at 12:00. Order matches the
   // day so a slow-motion frame that crosses two boundaries emits both.

@@ -26,11 +26,12 @@ import { presetSchedule, autoTuneSchedule, scheduleAdvice, stagingSummary, recom
 export interface ScheduleStopsPort {
   /** The live span rows, DESCENDING (top first). Re-read after every toggle. */
   read(): FloorRow[];
-  /** Toggle one floor's stop (its own undo step). No-op refusals are silent. */
-  setServe(floor: number, serve: boolean): void;
+  /** Toggle one floor's stop (its own undo step). No-op refusals are silent.
+   *  Settles once the engine has answered; the dialog re-reads after that. */
+  setServe(floor: number, serve: boolean): Promise<void>;
   /** The bulk actions folded in from the editor card (standard/service only). */
-  expressStops(): void;
-  allStops(): void;
+  expressStops(): Promise<void>;
+  allStops(): Promise<void>;
 }
 
 export interface ScheduleDialogCtx {
@@ -73,7 +74,7 @@ const PRESET_LABEL: Record<SchedulePreset, string> = {
 export function showElevatorScheduleDialog(
   ui: UI,
   ctx: ScheduleDialogCtx,
-  cb: { apply: (schedule: ElevatorSchedule) => void },
+  cb: { apply: (schedule: ElevatorSchedule) => Promise<void> },
 ): void {
   // Each day's measured curve arms the assists only once genuinely warmed (#466);
   // a cold curve is withheld from the authoring model entirely, so advice and
@@ -365,8 +366,8 @@ export function showElevatorScheduleDialog(
       announce(`Standard Floor Departure: ${sfd} seconds.`);
       after();
     },
-    onServe: (floor, serve) => {
-      ctx.stops.setServe(floor, serve);
+    onServe: async (floor, serve) => {
+      await ctx.stops.setServe(floor, serve);
       afterStops();
       // Announce what actually happened: the engine can refuse (endpoints,
       // the express lobby lock), and the re-read rows are the truth.
@@ -375,13 +376,13 @@ export function showElevatorScheduleDialog(
       if (now === serve) announce(serve ? `Floor ${fl} served.` : `Floor ${fl} skipped.`);
       else announce(`Floor ${fl} must stay a stop.`);
     },
-    onExpressStops: () => {
-      ctx.stops.expressStops();
+    onExpressStops: async () => {
+      await ctx.stops.expressStops();
       announce("Stops set to lobbies only.");
       afterStops();
     },
-    onAllStops: () => {
-      ctx.stops.allStops();
+    onAllStops: async () => {
+      await ctx.stops.allStops();
       announce("Stopping at every floor.");
       afterStops();
     },
@@ -450,7 +451,7 @@ export function showElevatorScheduleDialog(
       rerender();
     },
     onOk: () => {
-      cb.apply({
+      void cb.apply({
         activeCars: {
           weekday: [...state.schedule.activeCars.weekday!],
           weekend: [...state.schedule.activeCars.weekend!],

@@ -39,10 +39,11 @@ export interface BatchPricingDialogCtx {
   options: PriceOptions;
 }
 
-/** The engine operations the dialog drives. */
+/** The engine operations the dialog drives. `apply` is a command, so it
+ *  resolves once the engine has answered; the summary waits for it. */
 export interface BatchPricingDialogCb {
   preview: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
-  apply: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
+  apply: (target: BatchTarget, opts: BatchRentOptions) => Promise<BatchRentResult>;
   onApplied: (summary: string) => void;
 }
 
@@ -127,9 +128,11 @@ export function showBatchPricingDialog(ui: UI, ctx: BatchPricingDialogCtx, cb: B
         rerender();
         return;
       }
-      const r = cb.apply(targetOf(), optsOf());
-      cb.onApplied(`Set ${r.changed} ${noun} to ${batchPriceText(tctx, targetOf())}.`);
-      ui.closeModal();
+      const target = targetOf();
+      return cb.apply(target, optsOf()).then((r) => {
+        cb.onApplied(`Set ${r.changed} ${noun} to ${batchPriceText(tctx, target)}.`);
+        ui.closeModal();
+      });
     },
     onCancel: () => ui.closeModal(),
   };
@@ -148,7 +151,7 @@ function showBatchRungDialog(
   rungs: readonly PriceRung[],
   cb: {
     preview: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
-    apply: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
+    apply: (target: BatchTarget, opts: BatchRentOptions) => Promise<BatchRentResult>;
     onApplied: (summary: string) => void;
   },
 ): void {
@@ -212,13 +215,15 @@ function showBatchRungDialog(
         rerender();
         return;
       }
-      const r = cb.apply(targetOf(), optsOf());
-      const summary =
-        state.choice === "noRate"
-          ? `Took ${r.changed} ${noun} off the market (No Rate).`
-          : `Set ${r.changed} ${noun} to ${rungs[state.choice].label} ($${rungs[state.choice].value.toLocaleString()}).`;
-      cb.onApplied(summary);
-      ui.closeModal();
+      const choice = state.choice;
+      return cb.apply(targetOf(), optsOf()).then((r) => {
+        const summary =
+          choice === "noRate"
+            ? `Took ${r.changed} ${noun} off the market (No Rate).`
+            : `Set ${r.changed} ${noun} to ${rungs[choice].label} ($${rungs[choice].value.toLocaleString()}).`;
+        cb.onApplied(summary);
+        ui.closeModal();
+      });
     },
     onCancel: () => ui.closeModal(),
   };

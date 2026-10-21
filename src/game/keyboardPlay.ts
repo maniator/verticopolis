@@ -6,6 +6,7 @@ import type { Tool, UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import { announceForPlacement, snapX, stepCursor, type PlaceOutcome } from "../ui/placement";
 import type { BuildActions } from "./buildActions";
+import type { SimPort } from "../simport/port";
 import { towerCatalog } from "../engine/towerCatalog";
 
 /**
@@ -17,12 +18,15 @@ import { towerCatalog } from "../engine/towerCatalog";
  * {@link BuildActions} and placeSimpleBuild paths as mouse and touch, so all
  * three gestures stay pinned to one contract.
  *
- * Never stores a Simulation — adoptSim() swaps the live instance, so every
- * method asks `deps.getSim()` fresh.
+ * Commands go through the port (AD-9); a commit or bulldoze resolves once the
+ * engine has answered and its undo step is closed. Never stores a Simulation:
+ * adoptSim() swaps the live instance, so every read asks `deps.getSim()` fresh.
  */
 export interface KeyboardPlayDeps {
   /** The live simulation (never cached — adoptSim swaps the instance). */
   getSim(): Simulation;
+  /** The port every command goes through; it follows adoptSim itself. */
+  port: SimPort;
   /** The live renderer (never cached: context-loss recovery swaps the
    *  instance, same contract as getSim). */
   engine(): Pick<TowerEngine, "ensureVisible" | "preview" | "transportPreview">;
@@ -47,8 +51,9 @@ export interface KeyboardPlayDeps {
   /** The inspectable/bulldozable entity at a cell (room or transport), if any. */
   pickedAt(floor: number, tile: number): Picked | null;
   selectPicked(p: Picked | null): void;
-  /** The gesture-independent placement shared with tap and click. */
-  placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null;
+  /** The gesture-independent placement shared with tap and click: null at
+   *  once for a drag-sized shaft, otherwise the engine's outcome. */
+  placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): Promise<PlaceOutcome> | null;
   updateBuildPreview(tile: number, floor: number): void;
 }
 
@@ -110,7 +115,7 @@ export class KeyboardPlay {
     this.deps.announce(`Cursor: ${loc}, column ${c.tile}. ${here ? catalogFacility(towerCatalog(this.deps.getSim()), here.kind).name : "Empty"}.`);
   }
 
-  commitCursor(): void {
+  async commitCursor(): Promise<void> {
     if (!this.kbCursor) {
       this.moveCursor(0, 0); // first press: just reveal the cursor
       return;
@@ -124,7 +129,7 @@ export class KeyboardPlay {
       return;
     }
     if (tool.type === "bulldoze") {
-      this.bulldozeCursor();
+      await this.bulldozeCursor();
       return;
     }
     if (tool.type !== "build") return;
@@ -133,8 +138,9 @@ export class KeyboardPlay {
     // commits): without this, Ctrl+Z fused a keyboard build into the previous
     // mouse gesture and keyboard builds were never individually undoable.
     this.deps.captureUndo(`Build ${catalogFacility(towerCatalog(this.deps.getSim()), kind).name}`);
-    const placed = this.deps.placeSimpleBuild(kind, c.tile, c.floor);
-    if (placed) {
+    const placing = this.deps.placeSimpleBuild(kind, c.tile, c.floor);
+    if (placing) {
+      const placed = await placing;
       this.deps.announce(announceForPlacement(placed, towerCatalog(this.deps.getSim()), kind, c.floor));
       this.refreshCursorPreview();
     } else if (this.deps.isTransportTool()) {
@@ -147,9 +153,12 @@ export class KeyboardPlay {
       } else {
         const bottom = Math.min(this.kbAnchor.floor, c.floor);
         const top = Math.max(this.kbAnchor.floor, c.floor);
-        const res = this.deps.getSim().buildTransport(kind, this.kbAnchor.tile, bottom, top);
+        const x = this.kbAnchor.tile;
+        // The anchor is spent as the shaft is ordered, so a second Enter
+        // before the answer starts a new one.
         this.kbAnchor = null;
         this.deps.engine().transportPreview = null;
+        const res = await this.deps.port.command({ op: "buildTransport", kind, x, bottom, top });
         if (res.ok) {
           this.deps.audio.sfx("build");
           this.deps.announce(`${catalogFacility(towerCatalog(this.deps.getSim()), kind).name} built, floors ${bottom} to ${top}`);
@@ -164,7 +173,7 @@ export class KeyboardPlay {
     this.deps.commitUndo();
   }
 
-  bulldozeCursor(): void {
+  async bulldozeCursor(): Promise<void> {
     const c = this.kbCursor;
     if (!c) return;
     const p = this.deps.pickedAt(c.floor, c.tile);
@@ -174,7 +183,7 @@ export class KeyboardPlay {
     }
     const name = catalogFacility(towerCatalog(this.deps.getSim()), p.kind).name;
     this.deps.captureUndo("Bulldoze");
-    this.deps.build.bulldozePicked(p);
+    await this.deps.build.bulldozePicked(p);
     this.deps.commitUndo();
     this.deps.announce(`Bulldozed ${name}`);
     this.refreshCursorPreview();

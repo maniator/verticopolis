@@ -58,7 +58,7 @@ test("the car, extend and removal commands charge inside the WASM engine", async
     return !!w.__vcEngine?.status.hosted && !!w.game;
   }, undefined, { timeout: 30_000 });
   await page.evaluate(() => document.getElementById("splash")?.remove());
-  const result = await page.evaluate(() => {
+  const result = await page.evaluate(async () => {
     const g = (window as any).game;
     const engine = (window as any).__vcEngine.current().engine;
     g.sim.money = 1e9;
@@ -79,20 +79,21 @@ test("the car, extend and removal commands charge inside the WASM engine", async
     const controlWrites = writes;
     writes = 0;
     const steps: { step: string; ok: boolean; delta: number; engineMoved: number; agree: boolean }[] = [];
-    const run = (step: string, act: () => { ok: boolean; delta?: number }) => {
+    type Answer = { ok: boolean; delta?: number };
+    const run = async (step: string, act: () => Answer | Promise<Answer>) => {
       const engineBefore = engine.money();
       const pageBefore = g.sim.money;
-      const res = act();
+      const res = await act();
       steps.push({ step, ok: res.ok, delta: res.delta ?? g.sim.money - pageBefore, engineMoved: engine.money() - engineBefore, agree: engine.money() === g.sim.money });
     };
     if (setupOk) {
-      run("add car", () => g.sim.addCar(shaft.id));
-      run("remove car", () => g.sim.removeCar(shaft.id));
-      run("remove last car", () => g.sim.removeCar(shaft.id));
-      run("extend up", () => g.sim.extendTransport(shaft.id, "up", 3));
-      // The removal helpers return a bare boolean, so the delta is the page's own change.
-      run("sell office", () => ({ ok: g.build.tryRemoveUnit(office, "sell") }));
-      run("bulldoze shaft", () => ({ ok: g.build.removeTransportWithRefund(shaft, "bulldoze") }));
+      await run("add car", () => g.sim.addCar(shaft.id));
+      await run("remove car", () => g.sim.removeCar(shaft.id));
+      await run("remove last car", () => g.sim.removeCar(shaft.id));
+      await run("extend up", () => g.sim.extendTransport(shaft.id, "up", 3));
+      // The removal helpers answer a bare boolean, so the delta is the page's own change.
+      await run("sell office", async () => ({ ok: await g.build.tryRemoveUnit(office, "sell") }));
+      await run("bulldoze shaft", async () => ({ ok: await g.build.removeTransportWithRefund(shaft, "bulldoze") }));
     }
     engine.setMoney = setMoney;
     const kinds = (JSON.parse(engine.serialize()) as { units: { kind: string }[] }).units.map((u) => u.kind);

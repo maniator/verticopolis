@@ -5,6 +5,7 @@ import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot, showTowerPi
 import { SaveGame } from "../storage/SaveGame";
 import { catalogFor } from "../engine/catalog";
 import { useTowerCatalogSource } from "../engine/towerCatalog";
+import { createTsSim } from "../simport/tsSim";
 import type { CatalogEconomy } from "../engine/catalogTypes";
 
 /**
@@ -88,6 +89,8 @@ function makeApp(sim: SimShape) {
   const engine = { viewState: vi.fn(() => ({ camera: "VIEW" })) };
   const app = {
     sim,
+    // The real adapter over the fake sim, so a command lands on its spies.
+    port: createTsSim(() => sim as unknown as Simulation),
     ui,
     engine,
     adoptSim: vi.fn(),
@@ -155,39 +158,39 @@ describe("confirmExterminate refusals surfaced by the confirm callback", () => {
   ];
 
   for (const { reason, cost, message } of cases) {
-    it(`emits "${message}" for reason "${reason}"`, () => {
+    it(`emits "${message}" for reason "${reason}"`, async () => {
       const res: Refusal = { ok: false, reason, ...(cost !== undefined ? { cost } : {}) };
       const sim = makeSim({ callExterminator: vi.fn(() => res) });
       const { app, ui } = makeApp(sim);
       fireExterminate(app, ui);
       expect(ui.confirmModal).toHaveBeenCalledTimes(1);
-      const onConfirm = ui.confirmModal.mock.calls[0][2] as () => void;
-      onConfirm();
+      const onConfirm = ui.confirmModal.mock.calls[0][2] as () => Promise<void>;
+      await onConfirm();
       expect(sim.callExterminator).toHaveBeenCalledTimes(1);
       expect(sim.emit).toHaveBeenCalledExactlyOnceWith(message, "bad");
     });
   }
 
-  it("funds refusal falls back to the computed cost when the result omits one", () => {
+  it("funds refusal falls back to the computed cost when the result omits one", async () => {
     // recovery 100 + 50/room * 2 infested = 200.
     const sim = makeSim({ callExterminator: vi.fn(() => ({ ok: false, reason: "funds" })) });
     const { app, ui } = makeApp(sim);
     fireExterminate(app, ui);
-    (ui.confirmModal.mock.calls[0][2] as () => void)();
+    await (ui.confirmModal.mock.calls[0][2] as () => Promise<void>)();
     expect(sim.emit).toHaveBeenCalledExactlyOnceWith("Not enough funds to book the exterminator ($200).", "bad");
   });
 
-  it("emits nothing extra and reopens stats on a successful dispatch", () => {
+  it("emits nothing extra and reopens stats on a successful dispatch", async () => {
     const sim = makeSim({ callExterminator: vi.fn(() => ({ ok: true })) });
     const { app, ui } = makeApp(sim);
     fireExterminate(app, ui);
-    (ui.confirmModal.mock.calls[0][2] as () => void)();
+    await (ui.confirmModal.mock.calls[0][2] as () => Promise<void>)();
     expect(sim.emit).not.toHaveBeenCalled();
     // showStats runs again after the confirm (initial open + reopen).
     expect(ui.showStats).toHaveBeenCalledTimes(2);
   });
 
-  it("bails with a reason before confirming when the tower cleared between render and click", () => {
+  it("bails with a reason before confirming when the tower cleared between render and click", async () => {
     // Rooms cleared after the modal rendered: infested is now 0, so the handler
     // says why instead of opening a confirm dialog.
     const sim = makeSim();
@@ -198,9 +201,13 @@ describe("confirmExterminate refusals surfaced by the confirm callback", () => {
     handlers.exterminate();
     expect(ui.confirmModal).not.toHaveBeenCalled();
     expect(sim.emit).toHaveBeenCalledExactlyOnceWith("No infested rooms left to treat.", "bad");
+    // Stats reopens once the engine has logged the line.
+    expect(ui.showStats).toHaveBeenCalledTimes(1);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(ui.showStats).toHaveBeenCalledTimes(2);
   });
 
-  it("reports the exterminator unavailable when the recovery rule vanished", () => {
+  it("reports the exterminator unavailable when the recovery rule vanished", async () => {
     const sim = makeSim();
     const { app, ui } = makeApp(sim);
     showStats(app);
@@ -209,6 +216,8 @@ describe("confirmExterminate refusals surfaced by the confirm callback", () => {
     handlers.exterminate();
     expect(ui.confirmModal).not.toHaveBeenCalled();
     expect(sim.emit).toHaveBeenCalledExactlyOnceWith("The exterminator is unavailable.", "bad");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(ui.showStats).toHaveBeenCalledTimes(2);
   });
 });
 
