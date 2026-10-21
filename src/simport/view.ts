@@ -1,5 +1,6 @@
 import type { PersonState } from "../engine/crowd/person";
-import type { FacilityKind, UnitState, WeatherKind } from "../engine/types";
+import type { CalendarKind } from "../engine/calendar";
+import type { FacilityKind, GameMode, UnitState, WeatherKind } from "../engine/types";
 
 /**
  * What the game reads from the simulation to draw it and to fill the HUD,
@@ -38,6 +39,13 @@ export interface HeaderView {
   readonly revision: number;
   /** Moves whenever the meal overlay's inputs change. */
   readonly mealOverlayRevision: number;
+  /** The tower's rule set. Fixed at founding and stored as the save stores
+   *  it; a panel derives the rules from it (`headerClock.ts`). */
+  readonly mode: GameMode;
+  /** The calendar a Modern tower chose at founding, stored as the save
+   *  stores it (a Classic tower always runs the canon calendar whatever this
+   *  says); with `mode` it gives the clock's day names (`headerClock.ts`). */
+  readonly modernCalendar: CalendarKind;
 }
 
 /** An emergency waiting on the player's answer. */

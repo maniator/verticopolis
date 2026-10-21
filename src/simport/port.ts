@@ -40,8 +40,9 @@ export interface SimPort {
   query<Q extends Query>(q: Q): Promise<QueryResult<Q>>;
   /** The last answer to an equal query, for a reader that cannot wait;
    *  `undefined` when there is none. It may be out of date, so ask again.
-   *  Answers about a replaced tower are dropped, and the adapter may drop
-   *  the least recently used placement answers. */
+   *  Answers about a replaced tower are dropped, and the adapter keeps a
+   *  bounded number per question (placements, cards), dropping the least
+   *  recently used. */
   cached<Q extends Query>(q: Q): QueryResult<Q> | undefined;
   /** The tower's save, as the engine-format JSON the game stores. */
   save(): Promise<string>;
