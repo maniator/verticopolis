@@ -17,9 +17,12 @@ import type { FacilityKind, Unit } from "../../engine/types";
  *    read off a measured curve instead of guessed between two points;
  *  - a tower with the large tower's unit count and a population in the hundreds.
  *
- * Every placement goes through the engine's own `Tower` commands and is
- * asserted, so a rule or cap change that refuses one fails here instead of
- * quietly benchmarking a smaller tower than described.
+ * Floors, lobbies and shafts go through the engine's own `Tower` commands and
+ * are asserted, so a rule or cap change that refuses one fails here instead of
+ * quietly benchmarking a smaller tower than described. The many-unit tower's
+ * rooms are placed the same way but a room that does not fit is skipped, and
+ * occupancy is written to the unit state directly (as `buildSmallTower` does);
+ * the tests bound the resulting people and units.
  */
 
 export const must = (label: string, r: { ok: boolean; reason?: string }): void => {

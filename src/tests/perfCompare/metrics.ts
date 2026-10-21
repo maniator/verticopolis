@@ -1,5 +1,5 @@
 import { pairedRatio, summarize, verdict } from "./stats";
-import type { Comparison, EngineName, MetricRow, ProcessRun } from "./types";
+import type { Comparison, EngineName, MetricRow, ProcessRun, StartupSample } from "./types";
 import type { ServedRequest } from "./server";
 import { categorize, type Category } from "./bundle";
 
@@ -31,6 +31,29 @@ interface Pick {
  *  These events time boot ordering, so they get no cross-engine verdict
  *  (docs/performance/ts-vs-wasm.md, Startup). */
 const BOOT_ORDER = "boot order differs between engines: WASM awaits its package before building the app, so these page events fire at different points of boot";
+
+/** From the engine loaded (boot publishing its state, just before the app
+ *  is created) to the game being ready: the app's creation on both engines,
+ *  plus the host attach on WASM (#1254). Null when either mark is missing or
+ *  the mark came after ready, which would mean boot no longer publishes
+ *  before it creates the app (pageProbes.test.ts guards that order). */
+const loadedToReady = (s: StartupSample | null | undefined): number | null => (s && typeof s.gameReadyMs === "number" && typeof s.engineLoadedMs === "number" && s.engineLoadedMs <= s.gameReadyMs ? s.gameReadyMs - s.engineLoadedMs : null);
+
+/** The split after the engine loaded covers different work on each engine. */
+const SPLIT = "the span covers different work on each engine: the app's creation on TypeScript, the creation plus the host attach on WASM (#1254); its paired difference is reported under M5's lines";
+
+/** Engine caveats that do not apply when both slots ran one engine. */
+const ENGINE_CAVEATS: readonly string[] = [BOOT_ORDER, SPLIT];
+
+/** The saved-tower start's row names (#1254). */
+export const SAVED_READY = "cold game ready (saved tower)";
+export const SAVED_SPLIT = "cold loaded to ready (saved tower)";
+
+/** The startup rows printed with M5's paired difference outside any gate
+ *  (report.ts, #1254): when the engine loaded (on WASM, the end of the
+ *  package load), the warm start, the split after the engine loaded, and the
+ *  cold start with each scenario's save. Named here, beside the rows. */
+export const REPORTED_DIFFERENCES: readonly string[] = ["cold engine loaded", "warm engine loaded", "warm game ready", "cold loaded to ready", "warm loaded to ready", SAVED_READY, SAVED_SPLIT];
 
 const bytes = (served: readonly ServedRequest[] | undefined): number | null => (served ? served.reduce((s, x) => s + x.bytes, 0) : null);
 
@@ -90,6 +113,8 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
     p("engine hosted", "ms", (r) => r[phase]?.engineHostedMs, ["wasm"]);
     p("wasm fetch (resource timing)", "ms", (r) => r[phase]?.wasmFetchMs, ["wasm"]);
     p("wasm compile and instantiate (boot path)", "ms", (r) => r[phase]?.wasmInstantiateMs, ["wasm"]);
+    p("engine loaded", "ms", (r) => r[phase]?.engineLoadedMs, undefined, BOOT_ORDER);
+    p("loaded to ready", "ms", (r) => loadedToReady(r[phase]), undefined, SPLIT);
     if (phase === "cold4x") return;
     out.push({ group: "transfer", scenario: "-", throttle: "1", metric: `${phase} bytes served before ready`, unit: "bytes", better: "lower", value: (r) => bytes(r[phase]?.servedBeforeReady) });
     out.push({ group: "transfer", scenario: "-", throttle: "1", metric: `${phase} bytes served total`, unit: "bytes", better: "lower", value: (r) => { const a = bytes(r[phase]?.servedBeforeReady); const b = bytes(r[phase]?.servedAfterReady); return a === null || b === null ? null : a + b; } });
@@ -102,6 +127,14 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
   startup("cold");
   startup("warm");
   if (slow !== "1") startup("cold4x");
+  // The cold start with each scenario's save in the autosave slot (#1254),
+  // reported beside M5 and gating nothing. A row without a sample (a failed
+  // check, an older result) adds nothing.
+  for (const s of scenarios) {
+    const saved = (metric: string, value: Pick["value"], noVerdict?: string) => out.push({ group: "startup", scenario: s, throttle: "1", metric, unit: "ms", better: "lower", value, noVerdict });
+    saved(SAVED_READY, (r) => r.coldSaved?.[s]?.sample?.gameReadyMs);
+    saved(SAVED_SPLIT, (r) => loadedToReady(r.coldSaved?.[s]?.sample), SPLIT);
+  }
   // Only visits whose service worker activated and that ran on the
   // requested engine count.
   out.push({ group: "transfer", scenario: "-", throttle: "1", metric: "first visit with service worker, bytes served", unit: "bytes", better: "lower", value: (r) => { const f = r.firstVisitWithServiceWorker; return f?.swActive && f.onlineEngineActive === (r.ranEngine ?? r.engine) ? bytes(f.served) : null; } });
@@ -191,8 +224,8 @@ export function aggregate(runs: readonly ProcessRun[], scenarios: readonly strin
           reps.push(r.rep);
         }
       }
-      // Both slots ran one engine, so the boot-order caveat between engines does not apply.
-      const noVerdict = aa && p.noVerdict === BOOT_ORDER ? undefined : p.noVerdict;
+      // Both slots ran one engine, so the caveats between engines do not apply.
+      const noVerdict = aa && p.noVerdict && ENGINE_CAVEATS.includes(p.noVerdict) ? undefined : p.noVerdict;
       rows.push({ group: p.group, scenario: p.scenario, throttle: p.throttle, metric: p.metric, unit: p.unit, better: p.better, engine, values, reps, summary: values.length ? summarize(values) : null, ...(noVerdict ? { noVerdict } : {}) });
     }
   }
