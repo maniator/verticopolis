@@ -178,3 +178,17 @@ code path; the independent review comes through the coordinator
 ## Version
 
 None. No player-visible change.
+
+## Facade lane decisions (2026-10-21)
+
+| Proposal | Decision |
+| --- | --- |
+| `view.fx` | Yes, in 3a. Fields also go in the dynamic frame (ask 6a). |
+| `sceneSeed` | Yes, a founding constant on `HeaderView` beside slice 4's `mode` and `modernCalendar`. Agree the `readHeader` merge order with Facade panels. 6a puts it in the snapshot header. |
+| catalog | No view member. Use the catalog handle plus `header.mode`. `towerCatalog` reads only `tower.mode`; its per-tower cache is a `WeakMap` keyed by the tower object. |
+| usage | Yes, `view.usage`, valid per sim hour and keyed by it. Rust getter from 6b or 6c (ask both). |
+| reachability | Yes, a per-revision view (for example the unreachable room ids). Rust side is 6c's facts. |
+| 3b slices | Yes, each with a differential test and a hot-path row showing O(visible) per frame or a per-step cache. |
+| camera | Yes, `view.camera { tile, floor, zoom }`, read only; `setView` is the command. |
+
+Slice 3 adds the `view.ts` lines, the `TsSim` fills and assertions in its own fixture. `contract.fixture.ts` stays with the facade lane.
