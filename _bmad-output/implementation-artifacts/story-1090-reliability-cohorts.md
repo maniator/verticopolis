@@ -38,9 +38,11 @@ zero-second page load can never become a clean success:
    **Eligible attempts** is the cohort below without the engagement
    condition, so a fault that stopped the player engaging, which the cohort
    cannot hold, still shows beside it.
-2. **Engaged eligible cohort (the 1,000-session gate's unit, and the stage 1
-   and 2 floors' unit: the owner's direction of 2026-10-21).** A session with
-   at least one
+2. **Engaged eligible cohort (the 1,000-session gate's unit: the owner's
+   direction of 2026-10-21).** The same direction counts the stage 1 and 2
+   floors in engaged sessions at their own stage; this cohort admits stage 3
+   only, so it is not that count, and no report row computes it yet (#1268).
+   A session with at least one
    eligible page life that engaged on the engine. Eligible page life: the
    production host (`wasm`), a commit the gate review names as eligible
    (`--eligible-shas`: S4, S9 and the slice-10 facade in the build, and no
