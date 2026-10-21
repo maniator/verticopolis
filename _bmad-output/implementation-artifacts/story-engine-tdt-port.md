@@ -156,16 +156,20 @@ the Rust port through WASM in `npm run test:wasm`, with its side runners in
 `src/tests/fixtures/tdtDifferentialInputs.ts`. This paragraph is the one
 place its counts are recorded; the #885 backlog row and the test header
 point here. The default CI run uses round trips of every fixture and lock
-save, 6 seeded played towers, 63 of the 67 edge saves (the 4 known to
-diverge run under `VC_TDT_DIFF_KNOWN=1`), NaN and Infinity in a sampled
-set of numeric fields, 2 forged values per field on one base save, and 240
-mutations (1,070 exports and 533 imports, about 20 seconds; 207 of the 240
-mutations parse on both sides). The full-scale run
-(`VC_TDT_DIFF_N=25000`) builds 126 towers, tries all 22 forged values per
-field on two bases and runs 25,000 mutations: 25,413 imports and 25,020
-exports, 0 divergences (a unit's forged floor, x and width run only under
-`VC_TDT_DIFF_KNOWN=1`, #884). The 27,106 forged export saves cited in
-round 3 above are a different run, the Edge Case Hunter's own.
+save, 6 seeded played towers, all 72 edge saves (#887 closed the 4 that used
+to diverge and added 4 at the engine's JSON nesting limit), NaN and Infinity
+in a sampled set of numeric fields with the live pairing (the TypeScript
+exporter takes the object, the Rust one its JSON text), 2 forged values per
+field on one base save, and 240 mutations (1,185 exports and 562 imports,
+about 30 seconds; 205 of the 240 mutations parse on both sides; counts at
+the #887 PR after its second review round, 2026-10-21). Under
+`VC_TDT_DIFF_KNOWN=1` the only divergences left are a unit's floor, x and
+width (#884). The full-scale run (`VC_TDT_DIFF_N=25000`) builds 126 towers,
+tries all 22 forged values per field on two bases and runs 25,000 mutations:
+25,442 imports and 25,150 exports, 0 divergences, about 16 minutes (a unit's
+forged floor, x and width run only under `VC_TDT_DIFF_KNOWN=1`, #884; counts
+at the same point). The 27,106 forged export saves cited in round 3 above
+are a different run, the Edge Case Hunter's own.
 
 First confirming pass on the differential test (`/gds-code-review`,
 2026-10-10, on the differential test and the raw-site reader): all three

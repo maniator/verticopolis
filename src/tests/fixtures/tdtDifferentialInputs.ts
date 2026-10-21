@@ -116,7 +116,19 @@ export function edgeSaves(base: SerializedGame): [string, unknown][] {
   without("no-transports", "transports");
   patch("mode-unknown", { mode: "arcade" });
   patch("units-null", { units: null });
+  // The refusal quotes the kind; the engine reads a lone surrogate escape as
+  // U+FFFD (`load::parse_save_json`), and the TypeScript exporter must too.
+  patch("kind-lone-surrogate", { units: [{ id: 1, kind: "x\uD800", floor: 2, x: 0, width: 9 }] });
   patch("money-string", { money: "100" });
+  // The engine's JSON reader refuses 128 nested arrays and objects, the root
+  // included, and names the 128th bracket's UTF-8 byte column; the TypeScript
+  // exporter refuses with the same message. The deep ones sit in a field the
+  // exporter reads and beside a `toString` key.
+  const nested = (n: number): unknown => (n === 0 ? 0 : [nested(n - 1)]);
+  patch("nesting-127", { extra: nested(126) });
+  patch("nesting-128", { extra: nested(127) });
+  patch("nesting-128-after-unicode", { towerName: "é塔🏢", extra: nested(127) });
+  patch("nesting-3000", { minutes: nested(3000), extra: { toString: 0 } });
   return out;
 }
 

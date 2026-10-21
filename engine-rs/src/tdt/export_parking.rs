@@ -6,6 +6,15 @@ use indexmap::IndexMap;
 use super::export_gather::{FloorKey, GatheredRoom};
 use crate::facilities::Kind;
 
+/// A stall's `x` as the sort reads it: NaN after every number.
+fn sort_x(x: f64) -> f64 {
+    if x.is_nan() {
+        f64::INFINITY
+    } else {
+        x
+    }
+}
+
 pub fn connected_stall_count(rooms: &[GatheredRoom]) -> i64 {
     let mut by_floor: IndexMap<FloorKey, Vec<(f64, f64, bool)>> = IndexMap::new();
     for u in rooms {
@@ -23,7 +32,13 @@ pub fn connected_stall_count(rooms: &[GatheredRoom]) -> i64 {
     }
     let mut connected = 0;
     for arr in by_floor.values_mut() {
-        arr.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        // NaN sorts last, as in TypeScript: left unordered, it makes the
+        // comparison inconsistent and the two sorts disagree on the order.
+        arr.sort_by(|a, b| {
+            sort_x(a.0)
+                .partial_cmp(&sort_x(b.0))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         let mut linked: Vec<bool> = arr.iter().map(|it| it.2).collect();
         for i in 1..arr.len() {
             if !linked[i] && linked[i - 1] && arr[i - 1].0 + arr[i - 1].1 >= arr[i].0 {

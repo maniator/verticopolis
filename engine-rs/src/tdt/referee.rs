@@ -214,4 +214,22 @@ mod tests {
             .collect();
         assert!(failures.is_empty(), "{}", failures.join("\n"));
     }
+
+    /// Six of `forged-transport-entries`' seven entries have no kind, and the
+    /// codec drops all six, the count the TypeScript report gives
+    /// (`tdtExportForged`).
+    #[test]
+    fn the_forged_transport_entries_drop_six() {
+        let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("conformance");
+        let lock = read_lock(&suite.join("tdt-cases.json")).expect("lock");
+        let case = lock
+            .export
+            .iter()
+            .find(|c| c.id == "export-forged-transport-entries")
+            .expect("the lock pins forged-transport-entries");
+        let built = build_tdt(case.save.as_ref().expect("an embedded save")).expect("bytes");
+        assert_eq!(built.stats.transports_dropped, 6);
+    }
 }
