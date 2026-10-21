@@ -22,7 +22,7 @@ import type { FacilityKind, Unit } from "../../engine/types";
  * quietly benchmarking a smaller tower than described.
  */
 
-const must = (label: string, r: { ok: boolean; reason?: string }): void => {
+export const must = (label: string, r: { ok: boolean; reason?: string }): void => {
   if (!r.ok) throw new Error(`${label} refused: ${r.reason}`);
 };
 

@@ -36,7 +36,7 @@ describe("choosing scenarios (#1270)", () => {
   });
 
   it("lists every kind and flags a name it does not know", () => {
-    expect(SCENARIO_NAMES).toEqual(["small", "bracket-a", "bracket-b", "medium", "large", "many-unit"]);
+    expect(SCENARIO_NAMES).toEqual(["small", "bracket-a", "bracket-b", "medium", "large", "many-unit", "hotel-heavy"]);
     expect(unknownScenarios(["small", "huge", "many-unit"])).toEqual(["huge"]);
     expect(unknownScenarios([])).toEqual([]);
   });
