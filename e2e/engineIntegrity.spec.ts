@@ -129,7 +129,9 @@ async function expectRefused(page: Page, file: "glue" | "wasm" | "build-record")
     await expect(failure).toBeVisible();
     await expect(failure).toHaveAttribute("role", "alert");
     await expect(page.locator("#boot-fallback button:not([data-act])")).toBeFocused();
-    await expect(failure, "the screen says what is wrong and carries the ids it knows").toContainText("The engine files do not match this version of the game. The engine was not started. (expected ");
+    await expect(failure, "the screen says what is wrong and carries the ids, or the file that differs").toContainText(
+      /The engine files do not match this version of the game\. The engine was not started\. \((expected [0-9a-f]{12}, found [0-9a-f]{12}|[a-z ]+ differs from the record)\)/,
+    );
     expect(await page.evaluate(() => !!(window as any).game)).toBe(false);
   } else {
     // The default build keeps the game on the TypeScript engine.

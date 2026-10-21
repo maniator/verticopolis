@@ -117,12 +117,17 @@ flip, design section 11).
 Slice 2b is split into four small PRs so each gets its own review:
 
 1. **2b-1, failure screens.** `engineFailureCopy` gives each load cause its own
-   sentence (design 5.4): `mismatch` with the package ids it knows (or an
-   "unavailable" label), `load-failed`, `timeout`, `unverifiable` (HTTPS, and the
-   first step is not Reload) and the missing save writer. The sentence is chosen
-   from the code and the package detail, never from the message. Copy
-   Diagnostics already renders on every stop screen. No player sees these
-   screens until the wasm-only build ships, so there is no version bump.
+   sentence (design 5.4): `mismatch` with the package ids it knows (an
+   "unavailable" label for the rest, and the file that differs when both sides
+   name the same package), `load-failed` (with a corrected-deployment sentence
+   when the build carries no package, and no "connect to the internet" for an
+   online player), `timeout`, `unverifiable` (HTTPS on an insecure connection,
+   a plain retry on a secure one) and the missing save writer, which carries a
+   `cause` of its own. The sentence comes from the code, the cause and the
+   package detail. Every failure at the load stage has one; a start or host
+   failure keeps its message. Copy Diagnostics already renders on every stop
+   screen. No player sees these screens until the wasm-only build ships, so
+   there is no version bump.
 2. **2b-2, Repair.** The **Repair engine files** action, offered when a worker
    controls the page and the reason is `mismatch` or `load-failed` (design 5.4,
    "Corrupted-entry recovery"): replace the running build's three engine keys in
