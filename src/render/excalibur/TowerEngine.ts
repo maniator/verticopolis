@@ -4,7 +4,6 @@ import type { FacilityKind, SerializedView } from "../../engine/types";
 import type { UnitView, TransportView } from "../../simport/view";
 import { PinchTracker } from "../pinchTracker";
 import type { DrawCtx } from "../sprites";
-
 // World-scale constants live in ../scale (pure); re-exported for consumers.
 import { FLOOR, TILE } from "../scale";
 
