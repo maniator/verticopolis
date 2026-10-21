@@ -117,14 +117,14 @@ const BUILDERS: Record<ScenarioName, () => Scenario> = {
   "many-unit": () => describeSave("many-unit", "many units, few people: the large tower's shell with about 500 people (fixtureTowers: buildManyUnitTower)", buildManyUnitTower({ seed: 13, population: 500 }).serialize()),
 };
 
-/** Build the named towers, in size order, or the default three when no names
- *  are given. A name that is not a tower is left out; callers compare the count
- *  against what they asked for. */
+/** The names that are not a tower the harnesses can run. */
 export function unknownScenarios(names: readonly string[]): string[] {
   return names.filter((n) => !(SCENARIO_NAMES as readonly string[]).includes(n));
 }
 
-/** The towers named, in size order, or the three default kinds with no names. */
+/** The named towers, in `SCENARIO_NAMES` order, or the three default kinds when
+ *  no names are given. A name that is not a tower is left out; callers check
+ *  `unknownScenarios` first. */
 export function buildScenarios(names?: readonly string[] | null): Scenario[] {
   const wanted = names ?? DEFAULT_SCENARIOS;
   return SCENARIO_NAMES.filter((n) => wanted.includes(n)).map((n) => BUILDERS[n]());

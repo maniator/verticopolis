@@ -121,6 +121,28 @@ describe("validateResults", () => {
     expect(v.errors).toEqual(expect.arrayContaining(["rep 1 ts: 2 process runs recorded, expected one", "rep 0 ts: no warm start sample", "rep 0 wasm: small raw at 1x missing", "rep 0 wasm: small frames at 1x missing"]));
   });
 
+  it("warns about a saved-tower start with no sample, and fails nothing (#1254)", () => {
+    const runs = good();
+    const row = runs[1].coldSaved!.small;
+    runs[0] = { ...runs[0], coldSaved: {} };
+    runs[1] = { ...runs[1], coldSaved: { small: { ...row, sample: null, error: "the boot did not load the seeded tower", pageErrors: ["console: x"] } } };
+    const v = validateResults(config(), runs, [node()]);
+    expect(v.errors).toEqual([]);
+    expect(v.warnings).toEqual(expect.arrayContaining(["rep 0 ts: the small saved-tower cold start is missing; its saved-tower rows have no sample from it", "rep 0 wasm: the small saved-tower cold start has no sample (the boot did not load the seeded tower); its saved-tower rows have no sample from it", "rep 0 wasm: the small saved-tower cold start logged 1 page error(s), first: console: x"]));
+    // Its page errors stay off the repetition's own list, which the run checks.
+    expect(v.warnings.some((w) => w.startsWith("rep 0 wasm: 1 page error"))).toBe(false);
+  });
+
+  it("accepts results from before the saved-tower starts, and names seeds that differ across a resume", () => {
+    const old = good().map((r) => ({ ...r, coldSaved: undefined }));
+    const v = validateResults(config(), old, [node()]);
+    expect(v.ok).toBe(true);
+    expect(v.warnings.some((w) => /saved-tower/.test(w))).toBe(false);
+    const resumed = good();
+    resumed[0] = { ...resumed[0], coldSaved: { small: { ...resumed[0].coldSaved!.small, seedSha256: "seed-repacked" } } };
+    expect(validateResults(config(), resumed, [node()]).warnings).toContain("small: the saved-tower starts booted 2 different autosave seeds (a resumed run packs the seed again, with a new write time), and their rows pool them");
+  });
+
   it("fails on a Node mismatch or a missing Node check", () => {
     expect(validateResults(config(), good(), [node(false)]).errors[0]).toMatch(/Node conformance check found the engines disagree/);
     expect(validateResults(config(), good(), []).errors).toContain("small: no Node conformance check ran");

@@ -12,6 +12,7 @@ import { measureChurn } from "./churn";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
 import { engineOrder, runProcess } from "./runner";
+import { autosaveSeed, checkAutosaveSeeds } from "./savedStart";
 import { SCENARIO_NAMES, buildScenarios, unknownScenarios } from "./scenarios";
 import { startServer } from "./server";
 import type { CompareConfig, CompareResults, EngineName, ProcessRun } from "./types";
@@ -199,6 +200,9 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   // of TypeScript has nothing to add and an A/A pass of WASM repeats it.
   const churn = scenarios.map((sc) => measureChurn(mod, sc, Math.max(1, Math.floor((config.steps * config.dt) / 60)), config.dt, config.warmSteps));
   for (const c of churn) log(`  ${c.scenario}: hourly save churn median ${(c.medianShare * 100).toFixed(1)}%, p95 ${(c.p95Share * 100).toFixed(1)}% of ${c.saveChars} characters`);
+  // The saved-tower starts' seeds, packed and read back before any browser runs (#1254).
+  checkAutosaveSeeds(scenarios);
+  log(`perf:compare: each scenario's autosave seed loads back as its tower (${scenarios.map((s) => `${s.name} ${autosaveSeed(s).sha256.slice(0, 12)}`).join(", ")})`);
 
   const server = await startServer(distPerf);
   let browserVersion: string | null = runs.find((r) => r.browserVersion)?.browserVersion ?? null;

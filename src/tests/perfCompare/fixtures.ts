@@ -56,6 +56,7 @@ export function startupSample(engine: EngineName, over: Partial<StartupSample> =
     glueFetchMs: engine === "wasm" ? 2 : null,
     wasmInstantiateMs: engine === "wasm" ? 40 : null,
     wasmInstantiateVia: engine === "wasm" ? "instantiateStreaming" : null,
+    engineLoadedMs: engine === "wasm" ? 150 : 40,
     servedBeforeReady: [{ path: "/", status: 200, bytes: 1000, encoding: "br" }],
     servedAfterReady: [{ path: "/x.js", status: 200, bytes: 500, encoding: "br" }],
     ...over,
@@ -76,6 +77,7 @@ export function processRun(rep: number, engine: EngineName, over: Partial<Proces
     cold: startupSample(engine),
     warm: startupSample(engine),
     cold4x: startupSample(engine, { gameReadyMs: 1200 }),
+    coldSaved: { small: { sample: startupSample(engine, { gameReadyMs: 600 }), error: null, seedSha256: "seed-small", renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)", pageErrors: [], contextLost: [] } },
     cpuProbe: { unthrottledMs: 50, throttledMs: 200, rate: 4, timed: {} },
     scenarios: {
       small: {

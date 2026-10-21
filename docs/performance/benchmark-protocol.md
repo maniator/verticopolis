@@ -322,7 +322,8 @@ and large scenarios with their pinned scenario hashes.
 people. Three more are named on purpose with `--scenarios` and never run by
 default, so an existing run keeps its meaning. Each is a save built in Node
 through the engine's own commands (every cap in `src/engine/facilities.ts`
-holds, and each placement is asserted) and handed unchanged to both engines
+holds, and the floors, shafts and walkways are asserted; occupancy is written
+to the unit state, and the tests bound the people and units) and handed unchanged to both engines
 (`src/tests/perfCompare/fixtureTowers.ts`):
 
 | Name | People | Units | Transports | Save bytes | What it is for |
