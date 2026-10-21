@@ -47,6 +47,7 @@ pub enum Command {
         x: i64,
         #[serde(rename = "expectFail")]
         expect_fail: Option<bool>,
+        reason: Option<String>,
     },
     #[serde(rename = "buildRow")]
     BuildRow {
@@ -63,6 +64,7 @@ pub enum Command {
         top: i64,
         #[serde(rename = "expectFail")]
         expect_fail: Option<bool>,
+        reason: Option<String>,
     },
     #[serde(rename = "sell")]
     Sell {
@@ -121,6 +123,7 @@ pub enum Command {
     CallExterminator {
         #[serde(rename = "expectFail")]
         expect_fail: Option<bool>,
+        reason: Option<String>,
     },
     #[serde(rename = "resolveChoice")]
     ResolveChoice { accept: bool, kind: Option<String> },
@@ -145,6 +148,7 @@ pub enum Command {
         top: i64,
         #[serde(rename = "expectFail")]
         expect_fail: Option<bool>,
+        reason: Option<String>,
     },
     #[serde(rename = "clearStops")]
     ClearStops { floor: i64, x: i64 },
@@ -281,6 +285,7 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
             ("floor", "int"),
             ("x", "int"),
             ("expectFail", "bool?"),
+            ("reason", "str?"),
         ],
         "buildRow" => &[
             ("kind", "place"),
@@ -294,6 +299,7 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
             ("bottom", "int"),
             ("top", "int"),
             ("expectFail", "bool?"),
+            ("reason", "str?"),
         ],
         "setNoRate" => &AT,
         "sell" => &[("floor", "int"), ("x", "int"), ("kind", "kind?")],
@@ -325,6 +331,7 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
             ("bottom", "int"),
             ("top", "int"),
             ("expectFail", "bool?"),
+            ("reason", "str?"),
         ],
         "setStop" => &[
             ("floor", "int"),
@@ -338,7 +345,7 @@ fn op_spec(op: &str) -> Option<&'static [(&'static str, &'static str)]> {
             ("target", "target"),
             ("onlyDefaultPriced", "bool?"),
         ],
-        "callExterminator" => &[("expectFail", "bool?")],
+        "callExterminator" => &[("expectFail", "bool?"), ("reason", "str?")],
         "resolveChoice" => &[("accept", "bool"), ("kind", "choice?")],
         "setSchedule" => &[("floor", "int"), ("x", "int"), ("schedule", "obj")],
         "tick" => &[
@@ -495,6 +502,30 @@ fn expect_ok(ok: bool, expect_fail: bool, what: &str, reason: Option<&str>) -> R
     } else {
         format!("{what} failed: {}", reason.unwrap_or("no reason"))
     })
+}
+
+/// A result against `expectFail` and, when the scenario names a `reason`, the
+/// exact refusal reason, so an engine that refuses for another reason (or
+/// checks the gates in another order) fails.
+fn expect_outcome(
+    ok: bool,
+    got: Option<&str>,
+    expect_fail: &Option<bool>,
+    want: &Option<String>,
+    what: &str,
+) -> Result<(), String> {
+    let fail = expect_fail.unwrap_or(false);
+    if want.is_some() && !fail {
+        return Err(format!("{what}: a reason needs expectFail"));
+    }
+    expect_ok(ok, fail, what, got)?;
+    match want {
+        Some(w) if got != Some(w.as_str()) => Err(format!(
+            "{what} was refused for {:?}, expected {w:?}",
+            got.unwrap_or("no reason")
+        )),
+        _ => Ok(()),
+    }
 }
 
 /// The buffered events may be hashed: none was pushed out of a full ring
@@ -696,13 +727,15 @@ fn run_scenario_inner(
                     floor,
                     x,
                     expect_fail,
+                    reason,
                 } => {
                     let r = sim.build(kind_of(kind)?, *floor, *x);
-                    expect_ok(
+                    expect_outcome(
                         r.ok,
-                        expect_fail.unwrap_or(false),
-                        &format!("build {kind} @ {floor},{x}"),
                         r.reason.as_deref(),
+                        expect_fail,
+                        reason,
+                        &format!("build {kind} @ {floor},{x}"),
                     )
                     .map_err(failed)?;
                 }
@@ -730,13 +763,15 @@ fn run_scenario_inner(
                     bottom,
                     top,
                     expect_fail,
+                    reason,
                 } => {
                     let r = sim.build_transport(kind_of(kind)?, *x, *bottom, *top);
-                    expect_ok(
+                    expect_outcome(
                         r.ok,
-                        expect_fail.unwrap_or(false),
-                        &format!("buildTransport {kind} @ x{x} {bottom}-{top}"),
                         r.reason.as_deref(),
+                        expect_fail,
+                        reason,
+                        &format!("buildTransport {kind} @ x{x} {bottom}-{top}"),
                     )
                     .map_err(failed)?;
                 }
@@ -989,14 +1024,16 @@ fn run_scenario_inner(
                     bottom,
                     top,
                     expect_fail,
+                    reason,
                 } => {
                     let id = transport_id_at(&sim, *floor, *x).map_err(failed)?;
                     let r = sim.resize_transport(id, *bottom, *top);
-                    expect_ok(
+                    expect_outcome(
                         r.ok,
-                        expect_fail.unwrap_or(false),
-                        &format!("resizeTransport @ {floor},{x} to {bottom}-{top}"),
                         r.reason.as_deref(),
+                        expect_fail,
+                        reason,
+                        &format!("resizeTransport @ {floor},{x} to {bottom}-{top}"),
                     )
                     .map_err(failed)?;
                 }
@@ -1082,13 +1119,17 @@ fn run_scenario_inner(
                     }
                     sim.resolve_choice(*accept);
                 }
-                Command::CallExterminator { expect_fail } => {
+                Command::CallExterminator {
+                    expect_fail,
+                    reason,
+                } => {
                     let r = sim.call_exterminator();
-                    expect_ok(
+                    expect_outcome(
                         r.is_ok(),
-                        expect_fail.unwrap_or(false),
-                        "callExterminator",
                         r.err().map(|e| e.reason()),
+                        expect_fail,
+                        reason,
+                        "callExterminator",
                     )
                     .map_err(failed)?;
                 }

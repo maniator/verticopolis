@@ -72,9 +72,14 @@ not replace it.
     surface (its section 1), or one line saying it does not. On this seam
     two items matter most. HP-8: a port lists the TypeScript caches, indexes
     and counters for the function and its callees, and carries each one over
-    or says why not; a comment that skips one is a finding. HP-7: ported code
-    is reviewed as new, so "the TypeScript does the same" does not close a
-    finding. An optimization on one side must leave the lock, the RNG draw
+    or names the Rust structure that answers the same query at the same cost
+    or less. Anything else is a dropped cache, which is always `patch`, and a
+    reason in the PR or a comment in the port does not close it. Outside a
+    port the same holds: a change that removes or bypasses a cache, index or
+    counter either engine has is always `patch`, apart from the two removals
+    HP-8 allows (an equivalent named in the record, or the query itself gone).
+    HP-7: ported, rewritten and moved code is reviewed as new, so "the
+    TypeScript does the same" does not close a finding. An optimization on one side must leave the lock, the RNG draw
     order and collection order untouched (items 2, 6 and 7).
 
 ## How to verify locally

@@ -1,6 +1,6 @@
 import { coverageChecks, DEFAULT_EXCEEDANCE_LIMIT, DEFAULT_MIN_PASSES_PER_ENGINE, EPSILON_STEP_MS, family, LONG_TASK_CAP_MS, MIN_REPS, THROTTLES, type CalibrateOptions, type Family } from "../perfCompare/calibrate";
 import { duplicateCheck, lossRecordProblem, poolIdentity, poolProblems, rendererProblem, treeProblem, type PoolIdentity, type PoolPass } from "../perfCompare/calibratePool";
-import { pairedDifferences, summarize } from "../perfCompare/stats";
+import { pairedDifference } from "../perfCompare/stats";
 import type { EngineName } from "../perfCompare/types";
 import type { Metric } from "./analysis";
 
@@ -52,9 +52,8 @@ export function blockingDifference(p: Pick<WorkerPass, "metrics">, throttle: str
   const a = row("wasm");
   const b = row("ts");
   if (!a || !b) return null;
-  const diffs = pairedDifferences(a, b);
-  if (diffs.length < MIN_REPS) return null;
-  return summarize(diffs).medianCiHigh;
+  const d = pairedDifference(a, b);
+  return d && d.n >= MIN_REPS ? d.ciHigh : null;
 }
 
 /** Why a results.json cannot be read as a `perf:worker` pass, or null. */
