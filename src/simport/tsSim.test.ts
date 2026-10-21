@@ -21,7 +21,10 @@ describePortContract(
 describe("TsSim over the live instance", () => {
   it("hands out the live tower and crowd, and reads the header from the instance", () => {
     const sim = newSeededGame(7, "modern");
+    // Past the first midnight, so the clock's two readings differ.
+    sim.clock.minutes = 1440 + 9 * 60;
     const port = createTsSim(() => sim);
+    expect(port.view.header.minuteOfDay).toBeLessThan(port.view.header.minutes);
     expect(port.view.tower).toBe(sim.tower);
     expect(port.view.crowd).toBe(sim.crowd);
     expect(port.view.header).toEqual({
@@ -122,6 +125,16 @@ describe("TsSim over the live instance", () => {
     expect(await port.command({ op: "resolveChoice", accept: true })).toEqual({ ok: true, delta: -40_000 });
     expect(sim.pendingChoice).toBeNull();
     expect(await port.command({ op: "resolveChoice", accept: true })).toEqual({ ok: false, delta: 0 });
+    // A decline pays nothing.
+    sim.events.pending = { kind: "fireRescue", cost: 40_000, message: "fire" };
+    expect(await port.command({ op: "resolveChoice", accept: false })).toEqual({ ok: true, delta: 0 });
+    expect(sim.pendingChoice).toBeNull();
+  });
+
+  it("refuses express stops on a shaft that does not exist", async () => {
+    const sim = newSeededGame(7, "modern");
+    const port = createTsSim(() => sim);
+    expect(await port.command({ op: "setExpressStops", id: -1 })).toEqual({ ok: false, delta: 0 });
   });
 
   it("books the exterminator, with its price, the rooms and the charge", async () => {
