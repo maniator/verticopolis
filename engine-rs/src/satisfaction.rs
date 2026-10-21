@@ -304,7 +304,7 @@ impl Simulation {
     }
 
     /// `nearNightclub`.
-    fn near_nightclub(&self, floor: i64) -> bool {
+    pub(crate) fn near_nightclub(&self, floor: i64) -> bool {
         self.tower.units.iter().any(|c| {
             c.kind == Kind::Nightclub
                 && c.is_operational()
