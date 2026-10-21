@@ -180,13 +180,74 @@ describe("failBoot and publishBootState", () => {
 
 describe("engineFailureCopy", () => {
   it("says what happened, why, and what to try, with the offline step only offline", () => {
-    const online = engineFailureCopy({ stage: "load", reason: "boot-error", message: "404" }, true);
+    const online = engineFailureCopy({ stage: "start", reason: "attach-refused", message: "404" }, true);
     expect(online.headline).toMatch(/could not start/);
     expect(online.reason).toBe("404");
     expect(online.steps[0]).toMatch(/^Reload the page/);
     expect(online.steps.some((s) => /offline/.test(s))).toBe(false);
-    const offline = engineFailureCopy({ stage: "load", reason: "boot-error", message: "404" }, false);
+    const offline = engineFailureCopy({ stage: "start", reason: "attach-refused", message: "404" }, false);
     expect(offline.steps.some((s) => /You appear to be offline/.test(s))).toBe(true);
+  });
+
+  it("gives each load cause its own sentence, from the code, the cause and the package detail (#985)", () => {
+    const detail = { file: "wasm" as const, expected: null, found: null, expectedPackage: "111111111111", servedPackage: "222222222222", controlled: true };
+    const load = (reason: Parameters<typeof engineFailureCopy>[0]["reason"], extra: Partial<Parameters<typeof engineFailureCopy>[0]> = {}, online = true, secure = true) =>
+      engineFailureCopy({ stage: "load", reason, message: "SECRET internal detail", ...extra }, online, secure);
+    const mismatch = "The engine files do not match this version of the game. The engine was not started.";
+    expect(load("package-mismatch", { package: { ...detail, kind: "mismatch" } }).reason).toBe(`${mismatch} (expected 111111111111, found 222222222222)`);
+    // Ids that are not known read as unavailable, and a mismatch with no detail at all (a link error, a dropped worker detail) still gets the sentence.
+    expect(load("package-mismatch", { package: { ...detail, kind: "mismatch", expectedPackage: null, servedPackage: null } }).reason).toBe(`${mismatch} (expected unavailable, found unavailable)`);
+    expect(load("package-mismatch").reason).toBe(`${mismatch} (expected unavailable, found unavailable)`);
+    // The same package id on both sides means one file differs, so the ids would only repeat.
+    expect(load("package-mismatch", { package: { ...detail, kind: "mismatch", servedPackage: "111111111111" } }).reason).toBe(`${mismatch} (the engine binary differs from the record)`);
+    // A load-failed detail wins over the code that carries it.
+    expect(load("package-mismatch", { package: { ...detail, kind: "load-failed" } }).reason).toBe("The engine files could not be loaded. Try Reload.");
+    // Any other load failure, with no detail at all included, reads as the files not loading.
+    expect(load("boot-error", { package: { ...detail, kind: "load-failed" } }).reason).toBe("The engine files could not be loaded. Try Reload.");
+    expect(load("boot-error").reason).toBe("The engine files could not be loaded. Try Reload.");
+    expect(load("boot-error", {}, false).reason).toBe("The engine files could not be loaded. Connect to the internet and try Reload.");
+    expect(load("boot-error", { package: { ...detail, kind: "load-failed", expectedPackage: null } }).reason).toMatch(/published without them, so a corrected deployment is needed\.$/);
+    expect(load("boot-timeout").reason).toBe("The engine took too long to load. Try Reload when your connection is ready.");
+    expect(load("boot-timeout", { package: { ...detail, kind: "mismatch" } }).reason).toMatch(/took too long/);
+  });
+
+  it("tells an insecure connection to use HTTPS, and a hashing failure on a secure one to try again (#985)", () => {
+    const failure = (extra: object) => ({ stage: "load" as const, reason: "unverifiable" as const, message: "SECRET", ...extra });
+    const insecure = engineFailureCopy(failure({}), false, false);
+    expect(insecure.reason).toBe("This browser connection cannot verify the engine files. Open the game using HTTPS.");
+    expect(insecure.steps[0]).toMatch(/^Open the game using HTTPS/);
+    expect(insecure.steps.some((s) => /offline/.test(s)), "an offline hint does not fit here").toBe(false);
+    const pkg = { kind: "unverifiable" as const, file: "wasm" as const, expected: null, found: null, expectedPackage: null, servedPackage: null, controlled: false };
+    expect(engineFailureCopy({ stage: "load", reason: "boot-error", message: "x", package: pkg }, true, false).reason).toMatch(/Open the game using HTTPS\.$/);
+    const secure = engineFailureCopy(failure({}), true, true);
+    expect(secure.reason).toBe("This browser could not check the engine files. Try Reload, or try another browser.");
+    expect(secure.steps[0]).toMatch(/^Reload the page/);
+    // Only the load stage has these sentences; a later stage keeps its message and its own first step.
+    const start = engineFailureCopy({ stage: "start", reason: "unverifiable", message: "kept" }, true, false);
+    expect(start.reason).toBe("kept");
+    expect(start.steps[0]).toMatch(/^Reload the page/);
+  });
+
+  it("words the missing save writer from its cause, and a boot that refuses for it sets that cause", async () => {
+    expect(engineFailureCopy({ stage: "load", reason: "package-mismatch", message: "any wording", cause: "no-save-writer" }, true).reason).toBe("The engine cannot save towers. Reload after the game is updated.");
+    const r = await loadBootEngine({ wasmOnly: true, log: quiet(), load: async () => mod(false) });
+    expect(r.state.failure).toMatchObject({ stage: "load", reason: "package-mismatch", cause: "no-save-writer" });
+    const copy = engineFailureCopy(r.state.failure!, true);
+    expect(copy.reason).toBe("The engine cannot save towers. Reload after the game is updated.");
+    expect(JSON.stringify(copy)).not.toMatch(/rebuild it|encodeVctower/);
+  });
+
+  it("keeps the failure message on the screen only for a stage that has no sentence of its own", () => {
+    expect(engineFailureCopy({ stage: "host", reason: "attach-refused", message: "kept message" }, true).reason).toBe("kept message");
+    expect(engineFailureCopy({ stage: "start", reason: "attach-refused", message: "kept message" }, true).reason).toBe("kept message");
+    const sentences = [
+      engineFailureCopy({ stage: "load", reason: "boot-error", message: "SECRET" }, true),
+      engineFailureCopy({ stage: "load", reason: "boot-timeout", message: "SECRET" }, true),
+      engineFailureCopy({ stage: "load", reason: "package-mismatch", message: "SECRET" }, true),
+      engineFailureCopy({ stage: "load", reason: "unverifiable", message: "SECRET" }, true, false),
+      engineFailureCopy({ stage: "load", reason: "package-mismatch", message: "SECRET", cause: "no-save-writer" }, true),
+    ];
+    for (const c of sentences) expect(JSON.stringify(c)).not.toContain("SECRET");
   });
 
   it("tells a mid-game stop apart from a failed start", () => {
