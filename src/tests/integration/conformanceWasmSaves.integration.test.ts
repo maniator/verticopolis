@@ -138,6 +138,8 @@ describe.runIf(run)("saves audit: the Rust engine loads what the web loads, byte
       const fileOfRust = jsonOfFile(rustSaves().encodeVctower(rust, "3.0.0", stamp));
       const fileOfTs = jsonOfFile(rustSaves().encodeVctower(ts, "3.0.0", stamp));
       expect(fileOfRust.length, name).toBe(fileOfTs.length);
+      // Numbers printed the JavaScript way: re-printing changes nothing.
+      expect(JSON.stringify(JSON.parse(fileOfRust)), name).toBe(fileOfRust);
       const a = JSON.stringify(transportKeysSorted(JSON.parse(fileOfRust)));
       const b = JSON.stringify(transportKeysSorted(JSON.parse(fileOfTs)));
       expect(a, name).toBe(b);
