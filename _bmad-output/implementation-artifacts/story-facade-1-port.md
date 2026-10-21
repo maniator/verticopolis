@@ -167,9 +167,10 @@ in while they do.
   - [x] the synthetic-graph self-test
 - [x] Gates and records (AC 8 to 10)
   - [x] the four gates, coverage, `test:wasm:parity`
-  - [ ] the HP record in the PR body
+  - [x] the HP record on the PR (a section 6 comment) and the complexity
+        note in the PR body
   - [x] `/bmad-code-review` (all four layers), fixes, backlog rows for defers
-  - [ ] a confirming review pass on the fixed diff
+  - [x] a confirming review pass on the fixed diff (round 3)
 
 ## Dev Notes
 
