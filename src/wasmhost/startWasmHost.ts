@@ -247,13 +247,13 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     });
   };
   // Temporary compatibility code: removed with the TypeScript simulation.
-  const REPLACED = "The WASM engine stopped, so the game runs on the TypeScript engine now.";
-  const LOST = "The WASM engine stopped, so some of your recent changes were lost. The game runs on the TypeScript engine now.";
-  const STUCK = "The WASM engine stopped, and the tower could not go back to a good state. Load a save or start a new tower to keep playing.";
-  const SWAP_FAILED = "The WASM engine stopped, and the tower could not switch to the TypeScript engine, so it is frozen and changes to it are not saved. Load a save or start a new tower to keep playing.";
-  const OLDER = "The WASM engine stopped, so the tower went back to an earlier good state. Your changes since then were undone and the undo history was cleared. The tower runs on the TypeScript engine now.";
-  const RESTORED = "The WASM engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.";
-  const UNDONE = "The WASM engine stopped, so the tower went back to its last good state and your recent changes were undone. It runs on the TypeScript engine now.";
+  const REPLACED = "The Rust engine stopped, so the game runs on the TypeScript engine now.";
+  const LOST = "The Rust engine stopped, so some of your recent changes were lost. The game runs on the TypeScript engine now.";
+  const STUCK = "The Rust engine stopped, and the tower could not go back to a good state. Load a save or start a new tower to keep playing.";
+  const SWAP_FAILED = "The Rust engine stopped, and the tower could not switch to the TypeScript engine, so it is frozen and changes to it are not saved. Load a save or start a new tower to keep playing.";
+  const OLDER = "The Rust engine stopped, so the tower went back to an earlier good state. Your changes since then were undone and the undo history was cleared. The tower runs on the TypeScript engine now.";
+  const RESTORED = "The Rust engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.";
+  const UNDONE = "The Rust engine stopped, so the tower went back to its last good state and your recent changes were undone. It runs on the TypeScript engine now.";
   const say = (sim: Simulation, line: string) => {
     try {
       sim.emit(line, "bad");
@@ -364,7 +364,7 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
   // code stays `attach-refused`: a new one needs the owner's production OK.
   const latch = (trap: unknown, stage: FallbackStage) => {
     faulted = true;
-    fallBack(`not hosting this tower or any later one, since the WASM engine trapped: ${trap instanceof Error ? trap.message : String(trap)}`, "attach-refused", stage, true);
+    fallBack(`not hosting this tower or any later one, since the Rust engine trapped: ${trap instanceof Error ? trap.message : String(trap)}`, "attach-refused", stage, true);
   };
   const follow = (sim: Simulation, stage: FallbackStage) => {
     release();

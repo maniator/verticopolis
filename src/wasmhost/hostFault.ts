@@ -44,7 +44,7 @@ export function hostFault(path: HostFaultReason, context: FaultContext, error: u
   let reason = path;
   if (context === "undo") reason = "trap-undo";
   else if (context === "capture" && path === "other") reason = "trap-command";
-  return { reason, message: `the WASM engine failed ${where}: ${error instanceof Error ? error.message : String(error)}` };
+  return { reason, message: `the Rust engine failed ${where}: ${error instanceof Error ? error.message : String(error)}` };
 }
 
 /** wasm-bindgen's error for a call on an object a trap left borrowed. */
