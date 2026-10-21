@@ -47,6 +47,8 @@ pub mod scenario;
 pub mod scenario_detail;
 #[cfg(test)]
 mod scenario_reason_tests;
+#[cfg(test)]
+mod scenario_tune_tests;
 pub mod schedule;
 pub mod services;
 pub mod sim;

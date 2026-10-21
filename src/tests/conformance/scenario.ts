@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { CHARGE_OPS, applyCharge, tsCharges, type ChargeCommand, type ChargeEngine } from "./chargeOps";
+import { TUNE_OPS, applyTune, expectOk, expectOutcome, type TuneCommand } from "./tuneOps";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Simulation } from "../../engine/Simulation";
@@ -37,17 +38,12 @@ export type Command =
   | { op: "build"; kind: FacilityKind; floor: number; x: number; expectFail?: boolean; reason?: string }
   | { op: "buildRow"; kind: FacilityKind; floor: number; from: number; to: number }
   | { op: "buildTransport"; kind: FacilityKind; x: number; bottom: number; top: number; expectFail?: boolean; reason?: string }
-  | ({ op: "sell"; kind?: FacilityKind } & At)
-  | ({ op: "adjustRent"; dir: 1 | -1 } & At)
-  | ({ op: "setNoRate" } & At)
-  | ({ op: "setCars"; cars: number } & At)
   | ChargeCommand
-  | { op: "startFire" }
+  | TuneCommand
   | { op: "bombThreat" }
   | { op: "evaluateStar" }
   | { op: "callExterminator"; expectFail?: boolean; reason?: string }
   | { op: "resolveChoice"; accept: boolean; kind?: "fireRescue" | "bombThreat" }
-  | ({ op: "setSchedule"; schedule: Record<string, unknown> } & At)
   | { op: "toggleAutoBridge" }
   | ({ op: "setFilmPolicy"; policy: "auto" | "feature" | "blockbuster" } & At)
   | ({ op: "rerollSubtype" } & At)
@@ -82,17 +78,12 @@ const OPS: Record<Command["op"], Spec> = {
   build: { kind: "place", floor: "int", x: "int", expectFail: "bool?", reason: "str?" },
   buildRow: { kind: "place", floor: "int", from: "int", to: "int" },
   buildTransport: { kind: "shaft", x: "int", bottom: "int", top: "int", expectFail: "bool?", reason: "str?" },
-  sell: { ...AT, kind: "kind?" },
-  adjustRent: { ...AT, dir: "dir" },
-  setNoRate: AT,
-  setCars: { ...AT, cars: "count" },
   ...CHARGE_OPS,
-  startFire: {},
+  ...TUNE_OPS,
   bombThreat: {},
   evaluateStar: {},
   callExterminator: { expectFail: "bool?", reason: "str?" },
   resolveChoice: { accept: "bool", kind: "choice?" },
-  setSchedule: { ...AT, schedule: "obj" },
   toggleAutoBridge: {},
   setFilmPolicy: { ...AT, policy: "policy" },
   rerollSubtype: AT,
@@ -280,18 +271,6 @@ function transportAt(e: ScenarioEngine, at: At) {
   return t;
 }
 
-function expectOk(ok: boolean, expectFail: boolean | undefined, what: string, reason?: string): void {
-  if (ok === !expectFail) return;
-  throw new Error(`${what} ${ok ? "succeeded but was expected to fail" : `failed: ${reason ?? "no reason"}`}`);
-}
-
-/** A result against the command's `expectFail` and, when it names a `reason`, the exact refusal reason, so an engine that refuses for another reason (or checks the gates in another order) fails. */
-function expectOutcome(r: Outcome, c: { expectFail?: boolean; reason?: string }, what: string): void {
-  if (c.reason !== undefined && !c.expectFail) throw new Error(`${what}: a reason needs expectFail`);
-  expectOk(r.ok, c.expectFail, what, r.reason);
-  if (c.reason !== undefined && r.reason !== c.reason) throw new Error(`${what} was refused for ${JSON.stringify(r.reason ?? "no reason")}, expected ${JSON.stringify(c.reason)}`);
-}
-
 /** `carry` keeps the events of an engine a `reload` replaces, since a save
  *  carries none and the next checkpoint must still count them. */
 function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clock: { minutes: number }, carry: (events: unknown[]) => void): ScenarioEngine {
@@ -313,35 +292,8 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
       expectOutcome(r, c, `buildTransport ${c.kind} @ x${c.x} ${c.bottom}-${c.top}`);
       break;
     }
-    case "sell": {
-      // An optional kind pins what the tile holds, so a scenario that says it
-      // sells a housekeeping crew cannot quietly sell whatever sits there.
-      if (c.kind !== undefined) {
-        const here = e.unitAt(c.floor, c.x)?.kind ?? e.transportAt(c.floor, c.x)?.kind;
-        if (here !== c.kind) throw new Error(`sell @ ${c.floor},${c.x}: expected ${c.kind}, found ${here ?? "nothing"}`);
-      }
-      expectOk(e.sellAt(c.floor, c.x), false, `sell @ ${c.floor},${c.x}`);
-      break;
-    }
-    case "adjustRent": {
-      const u = unitAt(e, c);
-      const moved = e.adjustRent(u.id, c.dir) !== null && unitAt(e, c).rent !== u.rent;
-      expectOk(moved, false, `adjustRent ${c.dir} @ ${c.floor},${c.x}`, "rent did not move");
-      break;
-    }
-    case "setNoRate": expectOk(e.setNoRate(unitAt(e, c).id), false, `setNoRate @ ${c.floor},${c.x}`); break;
-    case "setCars": {
-      const t = transportAt(e, c);
-      expectOk(e.setCars(t.id, c.cars) && transportAt(e, c).cars === c.cars, false, `setCars ${c.cars} @ ${c.floor},${c.x}`);
-      break;
-    }
     case "addCar": case "removeCar": case "beginExtend": case "extendTransport": case "endExtend": case "removeFacility": applyCharge(e, c); break;
-    case "startFire": {
-      const before = e.fires();
-      e.startFire();
-      expectOk(e.fires() > before, false, "startFire", "nothing caught fire");
-      break;
-    }
+    case "sell": case "adjustRent": case "setNoRate": case "setCars": case "setSchedule": case "startFire": applyTune(e, c); break;
     case "bombThreat": e.bombThreat(); break;
     case "evaluateStar": e.evaluateStar(); break;
     case "toggleAutoBridge": {
@@ -376,9 +328,6 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
       expectOk(matched !== null && matched > 0, false, `applyRentBatch ${c.kind}`, matched === null ? "not a priced kind or target" : "no unit of that kind");
       break;
     }
-    case "setSchedule":
-      expectOk(e.setSchedule(transportAt(e, c).id, c.schedule), false, `setSchedule @ ${c.floor},${c.x}`, "not an elevator");
-      break;
     case "callExterminator": {
       const r = e.callExterminator();
       expectOutcome(r, c, "callExterminator");
