@@ -1,3 +1,4 @@
+import { SCENARIO_NAMES } from "../perfCompare/scenarios";
 import { quantile, summarize } from "../perfCompare/stats";
 import type { RestoreRun, Workload } from "./page";
 
@@ -8,7 +9,7 @@ export interface MeasuredRun extends RestoreRun {
 }
 
 export const WORKLOADS: readonly Workload[] = ["plain", "drag", "click", "edits"];
-const SCENARIO_ORDER = ["small", "medium", "large"];
+const SCENARIO_ORDER: readonly string[] = SCENARIO_NAMES;
 
 /** One row of the report: a scenario, a workload and a throttle, over the
  *  repetitions. Times are medians across repetitions of each run's own

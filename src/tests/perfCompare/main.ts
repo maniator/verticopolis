@@ -13,7 +13,7 @@ import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
 import { engineOrder, runProcess } from "./runner";
 import { autosaveSeed, checkAutosaveSeeds } from "./savedStart";
-import { buildScenarios } from "./scenarios";
+import { SCENARIO_NAMES, buildScenarios, unknownScenarios } from "./scenarios";
 import { startServer } from "./server";
 import type { CompareConfig, CompareResults, EngineName, ProcessRun } from "./types";
 import type { Environment as Env } from "./env";
@@ -141,9 +141,9 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   }
   for (const d of [dist, distPerf]) if (!existsSync(join(d, "index.html"))) throw new Error(`no build at ${d}; run without --skip-build`);
 
-  const all = buildScenarios();
-  const scenarios = args.scenarios ? all.filter((s) => args.scenarios!.includes(s.name)) : all;
-  if (args.scenarios && scenarios.length !== args.scenarios.length) throw new Error(`unknown scenario in ${args.scenarios.join(",")}; expected ${all.map((s) => s.name).join(",")}`);
+  const unknown = unknownScenarios(args.scenarios ?? []);
+  if (unknown.length) throw new Error(`unknown scenario ${unknown.join(",")}; expected ${SCENARIO_NAMES.join(",")}`);
+  const scenarios = buildScenarios(args.scenarios);
   const config = makeConfig(args, scenarios.map((s) => s.name));
   const sourceHash = existsSync(join(repo, "engine-rs/src")) ? engineSourceHash(join(repo, "engine-rs")) : null;
   const environment = collectEnvironment(repo, distPerf, sourceHash);
