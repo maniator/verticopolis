@@ -3,11 +3,15 @@
  * Rust engine through its WASM binding, serializes to the bytes the TypeScript
  * engine writes for the same input.
  *
- * "Byte for byte" here means the canonical JSON (keys sorted, numbers in the
- * engine's own form): the order of a transport's keys follows the history of
- * the TypeScript object (`carLoad` lands after `load` when dispatch adds it
- * and before it when a save carries it), so the key order is not a contract
- * and the Rust serializer's fixed order is not compared.
+ * "Byte for byte" here means the canonical JSON: keys sorted and every number
+ * re-printed in JavaScript form. The raw text is not compared, because it
+ * differs in two known ways (EX-2, proposed, and the owner has not yet said
+ * whether canonical equality is the row's criterion): the order of a
+ * transport's keys follows the history of the TypeScript object (`carLoad`
+ * lands after `load` when dispatch adds it and before it when a save carries
+ * it), and the binding's `serialize()` prints an integer-valued double with a
+ * trailing `.0` where JavaScript prints `13551601`. The raw-form test below
+ * pins both, with their size.
  *
  * - Every `.vctower` fixture, loaded the way an import loads it (`fromVctower`
  *   against `SaveGame.import`).
@@ -16,8 +20,9 @@
  *   `knownDivergence` cases (#858) are pinned as still different, so a fix
  *   flips them here and the entry has to be removed on purpose.
  * - Text that is not plain ASCII (astral characters, combining marks, a lone
- *   surrogate, the last a known gap: EX-2) in the tower name, and a save of exactly 32 MiB and one byte
- *   more, through the engine's reader and writer.
+ *   surrogate) in the tower name, read the way the web reads save text
+ *   (`parseSaveJson`), and a save of exactly 32 MiB and one byte more,
+ *   through the engine's reader and writer.
  *
  * A difference names the fixture and the first field that differs. Skips
  * without the WASM package, like the rest of `npm run test:wasm`.
@@ -29,7 +34,7 @@ import type { Engine, encodeVctower } from "../../dualrun/engine";
 import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../engine/types";
 import { SaveGame } from "../../storage/SaveGame";
-import { MAX_SAVE_INFLATED_BYTES, STORE_MAGIC, TOWER_FILE_MAGIC, fromBase64, inflateCapped } from "../../storage/saveCompression";
+import { MAX_SAVE_INFLATED_BYTES, STORE_MAGIC, TOWER_FILE_MAGIC, fromBase64, inflateCapped, parseSaveJson } from "../../storage/saveCompression";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
@@ -52,6 +57,9 @@ const rustSaves = (): RustSaves => wasm() as unknown as RustSaves;
 
 const run = hasWasmPackage() || wasmRequired();
 
+/** The save JSON text inside a `.vctower` file. */
+const jsonOfFile = (file: string): string => new TextDecoder().decode(inflateCapped(fromBase64(file.slice(TOWER_FILE_MAGIC.length).replace(/\s+/g, ""))));
+
 /** The path of the first value that differs between two parsed saves, or null. */
 export function firstDifference(a: unknown, b: unknown, path = "$"): string | null {
   if (Object.is(a, b)) return null;
@@ -71,9 +79,9 @@ export function firstDifference(a: unknown, b: unknown, path = "$"): string | nu
 /** The save as canonical JSON text, the form both engines' saves compare in. */
 const canonical = (save: string): string => canonicalJson(JSON.parse(save));
 
-/** What each engine serializes for one save text. */
+/** What each engine serializes for one save text, read the way the web reads it. */
 function bothSerialize(save: string): { ts: string; rust: string } {
-  const ts = JSON.stringify(Simulation.deserialize(JSON.parse(save) as SerializedGame).serialize());
+  const ts = JSON.stringify(Simulation.deserialize(parseSaveJson(save) as SerializedGame).serialize());
   const engine = wasm().Engine.fromSave(save);
   try {
     return { ts, rust: engine.serialize() };
@@ -96,6 +104,32 @@ describe.runIf(run)("saves audit: the Rust engine loads what the web loads, byte
       const rust = engine.serialize();
       expect(firstDifference(JSON.parse(web), JSON.parse(rust)), name).toBeNull();
       expect(canonical(rust)).toBe(canonical(web));
+    } finally {
+      engine.free();
+    }
+  });
+
+  // EX-2 (proposed): the raw text is not equal. The binding's `serialize()`
+  // prints an integer-valued double with a trailing `.0`, so its text is a
+  // little longer than the TypeScript writer's; the file the engine writes
+  // from it (`encodeVctower` re-prints numbers the JavaScript way) has the
+  // same length as the file made from the TypeScript text, and differs only
+  // in the key order inside transports. A fix removes the entry.
+  it.each(fixtures)("%s: the raw text differs from the TypeScript writer's only in number form, and the written file only in key order", async (name) => {
+    const text = readFileSync(resolve(FIXTURES, name), "utf8");
+    const ts = JSON.stringify((await SaveGame.import(text)).serialize());
+    const engine = wasm().Engine.fromVctower(text);
+    try {
+      const rust = engine.serialize();
+      const dotZero = (rust.match(/\d\.0(?=[,}\]])/g) ?? []).length;
+      expect(rust, name).not.toBe(ts);
+      expect(dotZero, name).toBeGreaterThan(0);
+      expect(rust.length - ts.length, name).toBeGreaterThan(0);
+      const stamp = 1_760_000_000_123;
+      const fileOfRust = jsonOfFile(rustSaves().encodeVctower(rust, "3.0.0", stamp));
+      const fileOfTs = jsonOfFile(rustSaves().encodeVctower(ts, "3.0.0", stamp));
+      expect(fileOfRust.length, name).toBe(fileOfTs.length);
+      expect(canonicalJson(JSON.parse(fileOfRust)), name).toBe(canonicalJson(JSON.parse(fileOfTs)));
     } finally {
       engine.free();
     }
@@ -132,24 +166,21 @@ describe.runIf(run)("saves audit: text and size edges through the engine", () =>
     expect(canonical(rust)).toBe(canonical(ts));
   });
 
-  // EX-2 (proposed): a Rust string cannot hold a lone surrogate, so the engine
-  // loads one as U+FFFD where the TypeScript engine keeps it. Everything else
-  // in the save is equal. A fix (or a change of the engine's string type)
-  // flips this test and the exception entry has to go.
-  it("a lone surrogate in the tower name loads as U+FFFD in the engine and is kept in TypeScript (EX-2)", () => {
+  // The web reads save text through `parseSaveJson`, which repairs a lone
+  // surrogate escape to U+FFFD as the engine's loader does, so the character
+  // loads the same in both. (`Simulation.deserialize` on a raw `JSON.parse`
+  // would keep the half character, but no web reader calls it that way.)
+  it("a lone surrogate in the tower name loads as U+FFFD in both engines through the web's reader", () => {
     const text = JSON.stringify({ ...base(), towerName: "a\uD800b" });
     expect(text).toContain("\\ud800");
     const { ts, rust } = bothSerialize(text);
-    const tsSave = JSON.parse(ts) as { towerName: string };
-    const rustSave = JSON.parse(rust) as { towerName: string };
-    expect(tsSave.towerName).toBe("a\uD800b");
-    expect(rustSave.towerName).toBe("a\uFFFDb");
-    rustSave.towerName = tsSave.towerName;
-    expect(firstDifference(tsSave, rustSave)).toBeNull();
+    expect((JSON.parse(ts) as { towerName: string }).towerName).toBe("a\uFFFDb");
+    expect(firstDifference(JSON.parse(ts), JSON.parse(rust))).toBeNull();
+    expect(canonical(rust)).toBe(canonical(ts));
   });
 
   const CAP = MAX_SAVE_INFLATED_BYTES;
-  const jsonOf = (file: string): string => new TextDecoder().decode(inflateCapped(fromBase64(file.slice(TOWER_FILE_MAGIC.length).replace(/\s+/g, ""))));
+  const jsonOf = jsonOfFile;
   const STAMP_AT = 1_760_000_000_123;
 
   /** A fixture tower whose stamped save is `bytes` long, as the web writer stamps it. */

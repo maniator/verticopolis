@@ -37,23 +37,46 @@ approves an exception.
   same build, which keeps the field and cannot show the loss, so the check
   binds once the owner approves that plan.
 
-## EX-2: a lone surrogate in a text field loads as U+FFFD in the engine
+## EX-2: the engine's raw save text differs from the TypeScript writer's in number form and, inside a transport, in key order
 
 - **Source:** the Saves audit (#1236), `conformanceWasmSaves.integration.test.ts`.
-- **Status:** proposed (2026-10-20). Awaiting the owner's decision at the
-  #945 sign-off.
-- **What is lost:** a save whose tower name (or another text field) holds an
-  unpaired UTF-16 surrogate, written as a `\ud800` style escape, opens in the
-  TypeScript engine with the character kept and in the Rust engine with
-  U+FFFD (the replacement character) in its place. A Rust string cannot hold
-  the unpaired half. Every other field of the save loads the same.
-- **Size:** one character of a name, only in a hand-edited or forged save, or
-  text pasted from a source that already broke a pair. The game's own text
-  input and writers never produce one, and no crash, refusal or other data
-  loss follows. The fixtures and the loader table have none.
-- **Why accepted:** keeping it would mean carrying text as UTF-16 (or a
-  lossy byte form) through the engine for a character that no input path
-  makes.
-- **Check:** the Saves audit pins the difference, so a change in either
-  direction fails the test and this entry has to be removed or rewritten.
-
+- **Status:** proposed (2026-10-21). Awaiting the owner's decision at the
+  #945 sign-off, together with the question below.
+- **What differs:** the Saves row of #945 says "byte for byte through the
+  engine". The audit compares canonical JSON (keys sorted, numbers
+  re-printed in JavaScript form), where every fixture and loader case
+  matches. The raw text does not match, in two ways:
+  - **Number form (binding text only).** `Engine.serialize()` prints an
+    integer-valued double with a trailing `.0` (`"money":13551601.0` where
+    TypeScript writes `13551601`). That is 634 to 1,474 numbers per fixture,
+    and the binding text is 1,268 to 2,948 bytes longer (0.2% to 0.4%).
+  - **Key order inside a transport (files and text).** The order of
+    `carLoad` against `load` follows the history of the TypeScript object
+    (`carLoad` lands after `load` when dispatch adds it and before it when a
+    save carries it); the Rust serializer has one fixed order.
+- **What a player sees:** nothing. The file the engine writes from its own
+  text re-prints numbers the JavaScript way, so it is the same length as the
+  file made from the TypeScript text, and it loads to the same tower in both
+  engines. Only the position of two keys in a transport differs.
+- **Is raw equality achievable?** The number form is: the binding could print
+  numbers through the same `js_json` form `encode_vctower` already uses. The
+  key order is not without a data-model change. TypeScript writes a
+  transport's `carLoad` where its object history put it: a save that carries
+  `carLoad` gets it from the loader's object literal
+  (`src/engine/sim/serialization.ts:409`), and a transport that lacks it gets
+  it appended on the first dispatch tick (`ElevatorDispatch.ts:130`), after
+  `load`. No fixed Rust order matches both, so matching would mean a
+  per-transport order flag in the Rust transport, set at load and in
+  dispatch, plus a serializer that reads it. That touches `engine-rs/` (it
+  moves the seeded-replay window key) and `load.rs`, which the Saves audit
+  and A8 lanes own, to change where two keys sit in a file no reader compares.
+- **Why accepted:** the order flag costs engine data-model state and a
+  window restart for a position nothing reads, and the number form is the
+  binding's own text, which no reader compares byte for byte.
+- **Decision for the owner:** is canonical JSON equality the criterion for
+  the Saves row, or must the raw text match? If raw, this entry is not
+  enough and the serializer changes instead.
+- **Check:** the Saves audit pins both differences with their size (the
+  raw text is longer and carries `.0` numbers; the written file has the same
+  length and the same canonical JSON), so a change in either direction fails
+  the test and this entry has to be removed or rewritten.
