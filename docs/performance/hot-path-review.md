@@ -265,7 +265,8 @@ Between those PRs the table belongs to the repository owner (maniator), the
 | rooms without floor and lobby tiles | `roomUnits`, `src/engine/tower/rooms.ts` | unit array, length, revision | ported (`room_index`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1139) |
 | floor and lobby tiles per floor, for `pickX` | none (`pickX` walks every unit, #539) | revision and unit count | `structural_tiles`, `engine-rs/src/tower_index.rs` (#1139) |
 | each floor's segment runs | `src/engine/tower/segments.ts` | revision | ported (cloned on read, #859) |
-| housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision | ported (`housekeeping_units`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1143) |
+| housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision | ported (`housekeeping_units`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1143; now reads the census below) |
+| per-kind unit counts for the build caps, floors that hold an office | none (`countKind` and the Classic escalator office check walk every unit, A24 in #1158 and #1239) | revision and unit count | `census`, `engine-rs/src/tower_index.rs` (#1264) |
 | nearest crew and crew order per floor in one dispatch | `distByFloor`, `crewOrderByFloor`, `src/engine/economy/housekeeping.ts` | one pass | `dist_by_floor` ported; crew order missing, so the crews are cloned and sorted per room (A12 in #1158) |
 | live staff count | `crowd.staffCount`, `src/engine/Crowd.ts` | counter | ported |
 | riders per car | `crowd.carRiders`, `src/engine/Crowd.ts` | counter | ported (`car_riders`) |
@@ -277,7 +278,8 @@ Between those PRs the table belongs to the repository owner (maniator), the
 | shaft banks | `src/engine/crowd/shaftBanks.ts` | revision | ported |
 | segments served | `segServed`, `src/engine/crowd/segmentGraph.ts` | revision | ported (`connected_set`) |
 | queue view | `queueView`, `src/engine/Crowd.ts` | step and revision | no counterpart yet; check before porting one |
-| floor reachable from the lobby (`floorReachable`) | `reachMemos`, `src/engine/sim/services.ts` | revision | ported (`reach_memo` in `sim.rs`); the per-segment check on split floors is uncached in both (#849, #1143) |
+| floor reachable from the lobby (`floorReachable`) | `reachMemos`, `src/engine/sim/services.ts` | revision | ported (`reach_memo` in `sim.rs`) |
+| segments reachable from a lobby (`segReachable`, behind `floorReachable` and the per-room checks) | none: one route search per lobby segment for each check (#849) | n/a in TypeScript; revision in Rust | Rust-only: a set of every segment reachable from a lobby, which answers as those searches do: `connected_set` (Modern) and `lobby_reach` (Classic walk budget), `engine-rs/src/crowd/graph.rs` (#1143) |
 | commute averages revision (the hosts key their copies on it) | none (the TypeScript reads `commuteWaitByFloor` in place) | counter | `commute_revision`, `engine-rs/src/crowd/mod.rs` |
 | meal overlay revision (the frame header carries it and the renderer keys its overlay on it every frame) | `mealOverlayRevision`, `src/engine/Tower.ts` | counter | `meal_overlay_revision`, `engine-rs/src/tower.rs` |
 | excavated basement tiles | `excavated` (a `Set`), `src/engine/Simulation.ts` | kept on every dig and load | a `Vec` searched linearly on each dig and load (`build.rs`, `load.rs`; #1173) |

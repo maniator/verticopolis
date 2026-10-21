@@ -362,8 +362,12 @@ impl Tower {
     }
 
     pub fn count_kind(&self, kind: Kind) -> i64 {
-        self.units.iter().filter(|u| u.kind == kind).count() as i64
-            + self.transports.iter().filter(|t| t.kind == kind).count() as i64
+        let placed = if kind.is_structural() {
+            self.units.iter().filter(|u| u.kind == kind).count() as i64
+        } else {
+            self.census().kinds[kind as usize]
+        };
+        placed + self.transports.iter().filter(|t| t.kind == kind).count() as i64
     }
 
     fn span_every(
@@ -1007,11 +1011,7 @@ impl Tower {
         }
         if kind == Kind::Escalator && !self.allows_escalator_on_office_floors {
             for fl in [bottom, top] {
-                if self
-                    .units
-                    .iter()
-                    .any(|u| u.kind == Kind::Office && u.floor == fl)
-                {
+                if self.has_office_on(fl) {
                     return PlaceResult::fail(
                         "Escalators can't serve office floors. They link commercial floors only.",
                     );
