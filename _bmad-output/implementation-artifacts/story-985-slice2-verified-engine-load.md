@@ -132,11 +132,17 @@ Slice 2b is split into four small PRs so each gets its own review:
    controls the page and the reason is `mismatch` or `load-failed` (design 5.4,
    "Corrupted-entry recovery"): replace the running build's three engine keys in
    place after the digests match, one registration update, never delete first.
+   Done in this slice; the record is `review-offline-package-slice2b2-2026-10-21.md`.
+   The Repair fetch carries a `vc-repair` parameter, because a plain fetch of an
+   engine URL from a controlled page is answered by the precache route from the
+   damaged entry. The revisions are compiled into the shell as
+   `__ENGINE_PACKAGE__.revisions`.
 3. **2b-3, cache-key rotation.** Design section 8: change the engine cache keys
    with the first schema 2 worker, or purge the three engine keys at its first
    activation, so a mixed set stored by a pre-integrity worker does not survive
    the update.
-4. **2b-4, remaining e2e.** Install race, eviction, repair, first install, plus
+4. **2b-4, remaining e2e.** Install race, eviction, first install, Repair with a
+   waiting build or another tab and with an online save kept, plus
    the respawn refusal latch and the deferred notes on the #985 row. The
    load-cost measurement on the owner's PC runs alongside and is not a merge
    condition.

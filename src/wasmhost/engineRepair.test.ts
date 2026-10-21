@@ -22,8 +22,14 @@ const expected = {
 const SCOPE = "https://game.example/";
 
 /** A Cache Storage over a map, recording every write. */
-function fakeCaches(failPut = false) {
+const CACHE = `workbox-precache-v2-${SCOPE}`;
+function fakeCaches(failPutAt = 0, seeded = true) {
   const stores = new Map<string, Map<string, Uint8Array>>();
+  if (seeded) {
+    // The worker's own precache, holding another revision's entry, beside an unrelated cache.
+    stores.set(CACHE, new Map([[`${BASE}${ENGINE_WASM}?__WB_REVISION__=other`, enc("waiting build")]]));
+    stores.set("workbox-precache-v2-https://other.example/", new Map([["https://other.example/x", enc("x")]]));
+  }
   const puts: Array<{ cache: string; key: string; type: string | null }> = [];
   const api = {
     has: async (name: string) => stores.has(name),
@@ -32,7 +38,7 @@ function fakeCaches(failPut = false) {
       const map = stores.get(name)!;
       return {
         put: async (req: RequestInfo | URL, res: Response) => {
-          if (failPut) throw new DOMException("quota", "QuotaExceededError");
+          if (failPutAt && puts.length + 1 >= failPutAt) throw new DOMException("quota", "QuotaExceededError");
           let key: string;
           if (typeof req === "string") key = req;
           else if (req instanceof URL) key = req.href;
@@ -75,7 +81,11 @@ describe("repairEnginePackage", () => {
       `${BASE}${ENGINE_BUILD_RECORD}?__WB_REVISION__=${md5(recordBytes)}`,
     ]);
     expect(c.puts[1].type).toBe("application/wasm");
-    expect([...c.stores.get(`workbox-precache-v2-${SCOPE}`)!.values()][1]).toEqual(wasm);
+    expect(c.stores.get(CACHE)!.get(`${BASE}${ENGINE_WASM}?__WB_REVISION__=${md5(wasm)}`)).toEqual(wasm);
+    // A waiting build's entry under another revision, and other caches, are as they were.
+    expect(c.stores.get(CACHE)!.get(`${BASE}${ENGINE_WASM}?__WB_REVISION__=other`)).toEqual(enc("waiting build"));
+    expect(c.stores.get("workbox-precache-v2-https://other.example/")!.size).toBe(1);
+    expect([...c.stores.keys()].sort()).toEqual([CACHE, "workbox-precache-v2-https://other.example/"]);
   });
 
   it("writes nothing when a file does not match the digest, whichever file it is", async () => {
@@ -84,7 +94,6 @@ describe("repairEnginePackage", () => {
       const r = await repairEnginePackage({ expected, engineBase: BASE, scope: SCOPE, digest: browserDigest(webcrypto as unknown as Crypto), caches: c.api, fetch: served({ [name]: bad }) });
       expect(r, name).toEqual({ ok: false, reason: "mismatch", file: name });
       expect(c.puts, `${name} left the old entries as they were`).toEqual([]);
-      expect(c.stores.size).toBe(0);
     }
   });
 
@@ -106,7 +115,7 @@ describe("repairEnginePackage", () => {
   });
 
   it("reports a browser that will not store the files", async () => {
-    const c = fakeCaches(true);
+    const c = fakeCaches(1);
     const r = await repairEnginePackage({ expected, engineBase: BASE, scope: SCOPE, digest: browserDigest(webcrypto as unknown as Crypto), caches: c.api, fetch: served() });
     expect(r).toEqual({ ok: false, reason: "cache" });
   });
@@ -120,6 +129,28 @@ describe("repairEnginePackage", () => {
     }
   });
 
+  it("does not create the worker's precache when it is absent", async () => {
+    const c = fakeCaches(0, false);
+    expect(await repairEnginePackage({ expected, engineBase: BASE, scope: SCOPE, digest: browserDigest(webcrypto as unknown as Crypto), caches: c.api, fetch: served() })).toEqual({ ok: false, reason: "unavailable" });
+    expect(c.stores.size).toBe(0);
+    expect(c.puts).toEqual([]);
+  });
+
+  it("reports a write that fails partway as a cache failure, with the earlier entries replaced", async () => {
+    const c = fakeCaches(2);
+    expect(await repairEnginePackage({ expected, engineBase: BASE, scope: SCOPE, digest: browserDigest(webcrypto as unknown as Crypto), caches: c.api, fetch: served() })).toEqual({ ok: false, reason: "cache" });
+    expect(c.puts.map((p) => p.key)).toEqual([`${BASE}${ENGINE_GLUE}?__WB_REVISION__=${md5(glue)}`]);
+    expect(repairMessage({ ok: false, reason: "cache" })).not.toMatch(/Nothing was changed/);
+  });
+
+  it("refuses a record with the right package id and damaged entries", async () => {
+    const damaged = { ...record, files: { ...record.files, [ENGINE_WASM]: { ...record.files[ENGINE_WASM], sha256: "c".repeat(64) } } };
+    const c = fakeCaches();
+    const r = await repairEnginePackage({ expected, engineBase: BASE, scope: SCOPE, digest: browserDigest(webcrypto as unknown as Crypto), caches: c.api, fetch: served({ [ENGINE_BUILD_RECORD]: enc(JSON.stringify(damaged)) }) });
+    expect(r).toEqual({ ok: false, reason: "mismatch", file: ENGINE_BUILD_RECORD });
+    expect(c.puts).toEqual([]);
+  });
+
   it("asks for one registration update after a repair, and a failing update does not undo it", async () => {
     const update = vi.fn(async () => {
       throw new Error("offline");
@@ -129,7 +160,11 @@ describe("repairEnginePackage", () => {
     expect(update).toHaveBeenCalledTimes(1);
     const fail = run({ update, fetch: served({ [ENGINE_GLUE]: 500 }) });
     expect(await fail.result).toMatchObject({ ok: false });
-    expect(update, "no update check when nothing was repaired").toHaveBeenCalledTimes(1);
+    expect(update, "no update check when nothing arrived").toHaveBeenCalledTimes(1);
+    // Files from the server that are not this shell's may mean a newer game: look for it.
+    const stale = run({ update, fetch: served({ [ENGINE_GLUE]: enc("export default 1;\n") }) });
+    expect(await stale.result).toMatchObject({ ok: false, reason: "mismatch" });
+    expect(update).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -140,11 +175,17 @@ describe("precacheKey", () => {
 });
 
 describe("repairOffered", () => {
+  const detail = { kind: "mismatch" as const, file: "wasm" as const, expected: null, found: null, expectedPackage: "111111111111", servedPackage: "222222222222", controlled: true };
   const f = (over: Partial<EngineBootFailure>): EngineBootFailure => ({ stage: "load", reason: "package-mismatch", message: "m", ...over });
   it("offers Repair for files that did not match or did not arrive, only under a controlling worker", () => {
     expect(repairOffered(f({}), true)).toBe(true);
-    expect(repairOffered(f({ reason: "boot-error" }), true)).toBe(true);
+    expect(repairOffered(f({ reason: "boot-error", package: { ...detail, kind: "load-failed" } }), true)).toBe(true);
+    expect(repairOffered(f({ package: { ...detail, kind: "mismatch" } }), true)).toBe(true);
     expect(repairOffered(f({}), false)).toBe(false);
+  });
+  it("does not offer it when the files were right or the build has no package to repair from", () => {
+    expect(repairOffered(f({ reason: "boot-error" }), true), "a compile error or out-of-memory with correct files").toBe(false);
+    expect(repairOffered(f({ reason: "boot-error", package: { ...detail, kind: "load-failed", expectedPackage: null } }), true)).toBe(false);
   });
   it("does not offer it for a timeout, an unverifiable connection, a missing save writer or a later stage", () => {
     expect(repairOffered(f({ reason: "boot-timeout" }), true)).toBe(false);
@@ -159,8 +200,8 @@ describe("repairOffered", () => {
 describe("repairMessage and pageControlled", () => {
   it("says what happened, and that a failure changed nothing", () => {
     expect(repairMessage({ ok: true, written: [] })).toMatch(/repaired.*Reload/);
-    for (const reason of ["fetch", "mismatch", "cache", "unavailable"] as const) expect(repairMessage({ ok: false, reason })).toMatch(/Nothing was changed/);
-    for (const m of [repairMessage({ ok: true, written: [] }), repairMessage({ ok: false, reason: "fetch" })]) expect(m).not.toMatch(/—/);
+    for (const reason of ["fetch", "mismatch", "unavailable"] as const) expect(repairMessage({ ok: false, reason })).toMatch(/Nothing was changed/);
+    for (const m of [repairMessage({ ok: true, written: [] }), repairMessage({ ok: false, reason: "fetch" })]) expect(m).not.toMatch(/\u2014/);
   });
   it("reads whether a worker controls the page without throwing", () => {
     expect(typeof pageControlled()).toBe("boolean");

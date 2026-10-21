@@ -19,15 +19,16 @@ const repairButton = (page: Page) => page.locator('#engine-failure [data-act="re
 const status = (page: Page) => page.locator("#engine-failure .engine-failure-repair-status");
 const refused = (page: Page) => page.waitForFunction(() => (window as any).__vcEngineBoot?.failure?.reason === "package-mismatch", undefined, { timeout: 30_000 });
 
-/** The engine entries of the cache, as url -> byte length. */
-async function engineEntries(page: Page): Promise<Record<string, number>> {
+/** The engine entries of the cache, as cache and url -> SHA-256 of the body. */
+async function engineEntries(page: Page): Promise<Record<string, string>> {
   return page.evaluate(async () => {
-    const out: Record<string, number> = {};
+    const out: Record<string, string> = {};
+    const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
     for (const name of await caches.keys()) {
       const cache = await caches.open(name);
       for (const request of await cache.keys()) {
         if (!new URL(request.url).pathname.startsWith("/engine/")) continue;
-        out[`${name} ${request.url}`] = (await (await cache.match(request))!.arrayBuffer()).byteLength;
+        out[`${name} ${request.url}`] = hex(await crypto.subtle.digest("SHA-256", await (await cache.match(request))!.arrayBuffer()));
       }
     }
     return out;
@@ -46,6 +47,10 @@ test("repairs a corrupted cached binary in place, and the next Reload boots the 
   await refused(page);
   await expect(repairButton(page)).toBeVisible();
   await expect(page.locator("#engine-failure")).toContainText(/press Repair engine files to download a fresh copy/);
+  // Reload alone does not help: the precache hands back the damaged entry.
+  await page.reload();
+  await refused(page);
+  expect(await engineEntries(page), "a reload leaves the damaged entry as it was").toEqual(damaged);
 
   await repairButton(page).click();
   await expect(status(page)).toHaveText("Engine files repaired. Press Reload to try again.");
@@ -119,7 +124,12 @@ test("other cache entries are left alone", async ({ page }) => {
       const out: string[] = [];
       for (const name of await caches.keys()) {
         const cache = await caches.open(name);
-        for (const request of await cache.keys()) if (!new URL(request.url).pathname.startsWith("/engine/")) out.push(`${name} ${request.url}`);
+        for (const request of await cache.keys()) {
+          if (new URL(request.url).pathname.startsWith("/engine/")) continue;
+          const body = await (await cache.match(request))!.arrayBuffer();
+          const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", body))].map((x) => x.toString(16).padStart(2, "0")).join("");
+          out.push(`${name} ${request.url} ${digest}`);
+        }
       }
       return out.sort();
     });

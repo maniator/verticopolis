@@ -297,4 +297,14 @@ describe("shellRevisionProblems", () => {
     writeFileSync(join(d, "assets/index-1.js"), `x={revisions:${all.replace(md5(wasm), "0".repeat(32))}}`);
     expect(shellRevisionProblems(d).join("\n")).toContain(`precache revision of ${ENGINE_DIR}${ENGINE_WASM}`);
   });
+
+  it("does not count the worker's own manifest as the shell carrying the revisions", () => {
+    const d = pkg();
+    mkdirSync(join(d, "assets"), { recursive: true });
+    const manifest = Object.values(revisionsOf(join(d, ENGINE_DIR))).map((revision) => `{url:"x",revision:"${revision}"}`);
+    writeFileSync(join(d, "sw.js"), `precacheAndRoute([${manifest.join(",")}])`);
+    writeFileSync(join(d, "workbox-abc123.js"), manifest.join(","));
+    writeFileSync(join(d, "assets/index-1.js"), "x={}");
+    expect(shellRevisionProblems(d)).toHaveLength(3);
+  });
 });

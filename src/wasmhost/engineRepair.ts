@@ -1,6 +1,6 @@
 import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "./enginePackageNames";
 import { browserDigest, isControlled, type VerifyOptions } from "./enginePackageCheck";
-import { parseEngineRecord, type ExpectedEnginePackage } from "./enginePackageRecord";
+import { canonicalFilesJson, parseEngineRecord, type ExpectedEnginePackage } from "./enginePackageRecord";
 import type { EngineBootFailure } from "./engineBoot";
 
 /**
@@ -16,7 +16,8 @@ import type { EngineBootFailure } from "./engineBoot";
  * waiting worker's entries (other revisions), the shell and audio entries,
  * IndexedDB, localStorage and saves are left alone, and it never deletes
  * first. All three files are fetched and checked before any is written, so a
- * failed fetch or digest leaves every old entry as it was.
+ * failed fetch or digest leaves every old entry as it was. A write that fails
+ * partway (a full quota) can leave earlier ones replaced; each was checked.
  *
  * Permanent host infrastructure: the wasm-only build relies on it.
  */
@@ -66,8 +67,14 @@ const hex = (bytes: Uint8Array) => Array.from(bytes, (b) => b.toString(16).padSt
  *  of the files does not change. */
 export function repairOffered(failure: EngineBootFailure, controlled: boolean): boolean {
   if (!controlled || failure.stage !== "load" || failure.cause !== undefined) return false;
-  if (failure.package?.kind === "unverifiable" || failure.reason === "unverifiable" || failure.reason === "boot-timeout") return false;
-  return failure.reason === "package-mismatch" || failure.reason === "boot-error";
+  const pkg = failure.package;
+  // A build published without an engine package has nothing to repair from.
+  if (pkg && pkg.expectedPackage === null) return false;
+  if (pkg) return pkg.kind === "mismatch" || pkg.kind === "load-failed";
+  // No package detail: a glue and binary that fail to link are a mismatch.
+  // Any other untyped load failure (a compile error, an out-of-memory)
+  // happens with correct files, which a fresh copy does not change.
+  return failure.reason === "package-mismatch";
 }
 
 /** The page's own check of whether a worker controls it. */
@@ -103,6 +110,10 @@ export async function repairEnginePackage(opts: RepairOptions = {}): Promise<Rep
   const engineBase = opts.engineBase ?? new URL(`${import.meta.env.BASE_URL}${ENGINE_DIR}`, globalThis.location?.href ?? "http://localhost/").href;
   const revisions = expected?.revisions;
   if (!expected || !revisions || !digest || !store || !scope || FILES.some((f) => !revisions[f])) return { ok: false, reason: "unavailable" };
+  const cacheName = `${PRECACHE_PREFIX}${scope}`;
+  // Never create the precache: without the worker's own cache there is
+  // nothing for a repaired entry to replace.
+  if (!(await safely(() => store.has(cacheName)))) return { ok: false, reason: "unavailable" };
   const doFetch = opts.fetch ?? ((url, init) => fetch(url, init));
 
   // Fetch and check all three first; nothing is written until every file is right.
@@ -120,24 +131,41 @@ export async function repairEnginePackage(opts: RepairOptions = {}): Promise<Rep
     } catch {
       return { ok: false, reason: "fetch", file: name };
     }
-    if (!(await fits(name, body, expected, digest))) return { ok: false, reason: "mismatch", file: name };
+    if (!(await fits(name, body, expected, digest))) {
+      // The server may already serve a newer game than this shell: ask the
+      // worker to look for it, so the player is not left with only Reload.
+      await requestUpdate(opts);
+      return { ok: false, reason: "mismatch", file: name };
+    }
     fresh.push({ name, key: precacheKey(url, revisions[name]), body, type: res.headers.get("content-type") ?? "" });
   }
 
   try {
-    const cache = await store.open(`${PRECACHE_PREFIX}${scope}`);
+    const cache = await store.open(cacheName);
     for (const f of fresh) await cache.put(f.key, new Response(f.body as BufferSource, { status: 200, headers: f.type ? { "content-type": f.type } : {} }));
   } catch {
     return { ok: false, reason: "cache" };
   }
-  // One update check, so a newer deployment's worker can install. A failure
-  // here does not undo the repair.
+  await requestUpdate(opts);
+  return { ok: true, written: fresh.map((f) => f.name) };
+}
+
+/** One registration update check, so a newer deployment's worker can install.
+ *  A failure here changes no outcome. */
+async function requestUpdate(opts: RepairOptions): Promise<void> {
   try {
     await opts.update?.();
   } catch {
-    /* the repair stands */
+    /* the outcome stands */
   }
-  return { ok: true, written: fresh.map((f) => f.name) };
+}
+
+async function safely(f: () => Promise<boolean>): Promise<boolean> {
+  try {
+    return await f();
+  } catch {
+    return false;
+  }
 }
 
 /** Whether `body` is the file this shell was built for. */
@@ -145,7 +173,10 @@ async function fits(name: string, body: Uint8Array, expected: ExpectedEnginePack
   try {
     if (name === ENGINE_BUILD_RECORD) {
       const parsed = parseEngineRecord(new TextDecoder().decode(body));
-      return parsed.ok && parsed.record.package === expected.package;
+      if (!parsed.ok || parsed.record.package !== expected.package) return false;
+      // The loader recomputes the id from the entries, so repair does too:
+      // a record with the right id and damaged entries would be refused again.
+      return hex(await digest(new TextEncoder().encode(canonicalFilesJson(parsed.record.files)))) === parsed.record.package;
     }
     const want = expected.files[name];
     return !!want && body.length === want.bytes && hex(await digest(body)) === want.sha256;
@@ -167,9 +198,9 @@ export function repairMessage(result: RepairResult): string {
     case "fetch":
       return "Could not download the engine files. Nothing was changed. Check your connection and try again.";
     case "mismatch":
-      return "The server sent engine files that do not match this version of the game. Nothing was changed.";
+      return "The server sent engine files that do not match this version of the game. Nothing was changed. If the game was just updated, wait a moment and reload.";
     case "cache":
-      return "This browser would not store the engine files. Nothing was changed.";
+      return "This browser would not store all the engine files. Some may have been replaced. Try Repair again or Reload.";
     default:
       return "Repair is not available here. Nothing was changed.";
   }

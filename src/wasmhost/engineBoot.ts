@@ -329,7 +329,7 @@ export function engineFailureCopy(failure: EngineBootFailure, online: boolean, c
         : "Connect to the internet before repairing engine files. Then press Repair engine files and reload.",
     );
   }
-  if (!online && !insecure && !repair) {
+  if (!online && !insecure) {
     steps.push("You appear to be offline. If the game was updated since this device last opened it, connect to the internet and reload once so the new engine can download.");
   }
   steps.push("If it keeps happening, update your browser or try another one.");
