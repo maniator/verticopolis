@@ -2,6 +2,7 @@
 //! which saves never carry. The conformance suite hashes them separately.
 
 pub mod banks;
+pub(crate) mod fasthash;
 pub mod graph;
 pub mod landing;
 pub mod meals;
