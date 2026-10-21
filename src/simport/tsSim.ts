@@ -3,6 +3,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { FacilityKind } from "../engine/types";
 import { findCatalogFacility } from "../engine/catalogTypes";
 import { towerCatalog } from "../engine/towerCatalog";
+import { wellFormed as wellFormedText } from "../engine/wellFormed";
 import { settleEngine, stepGate } from "../wasmhost/stepGate";
 import { runBrush } from "./brush";
 import type { Command, CommandOp, CommandResult, CommandResults } from "./commands";
@@ -34,11 +35,14 @@ import type { HeaderView, SimView } from "./view";
  * A command whose shape is wrong (`wellFormed` in `request.ts`) is refused
  * before the instance sees it, so the relay never forwards it.
  *
- * Engine types come in through `import type` only. The one runtime edge into
- * `src/engine/` is the catalog handle (#921), which names the tower's
- * facility kinds and which the retirement inventory moves out of the engine.
+ * Engine types come in through `import type` only. The runtime edges into
+ * `src/engine/` are the catalog handle (#921), which names the tower's
+ * facility kinds and which the retirement inventory moves out of the engine,
+ * and the text repair `wellFormed`, which retires with this adapter.
  */
 export function createTsSim(getSim: () => Simulation): SimPort {
+  /** Whether a value names a facility in the live tower's catalog. */
+  const isKind = (kind: unknown): boolean => typeof kind === "string" && findCatalogFacility(towerCatalog(getSim()), kind as FacilityKind) !== undefined;
   // Kept per tower, so a swap starts with none and a replaced tower is not
   // held alive by its answers.
   const answers = new WeakMap<Simulation, Answers>();
@@ -66,7 +70,7 @@ export function createTsSim(getSim: () => Simulation): SimPort {
     command<C extends Command>(c: C): Promise<CommandResult<C>> {
       try {
         const sim = getSim();
-        if (!wellFormed(c, (kind) => typeof kind === "string" && findCatalogFacility(towerCatalog(sim), kind as FacilityKind) !== undefined)) {
+        if (!wellFormed(c, isKind)) {
           return Promise.resolve({ ...unchanged(sim, c), ok: false, reason: INVALID_COMMAND, delta: 0 } as CommandResult<C>);
         }
         const before = sim.money;
@@ -233,16 +237,21 @@ const COMMANDS: { readonly [K in CommandOp]: Handler<K> } = {
     sim.autoBridge = c.value;
     return { ok: true, value: sim.autoBridge };
   },
+  // Text is repaired as the Rust engine reads it (a lone surrogate becomes
+  // U+FFFD, `engine/wellFormed.ts`), so both engines keep the same name and line.
   setTowerName: (sim, c) => {
-    sim.tower.towerName = c.name;
+    sim.tower.towerName = wellFormedText(c.name);
     return { ok: true };
   },
   setView: (sim, c) => {
-    sim.view = c.view;
+    // A copy of the camera's own fields: the tower never holds the caller's object.
+    const v = c.view;
+    if (v === null) sim.view = null;
+    else sim.view = v.zoom === undefined ? { tile: v.tile, floor: v.floor } : { tile: v.tile, floor: v.floor, zoom: v.zoom };
     return { ok: true };
   },
   emit: (sim, c) => {
-    sim.emit(c.text, c.kind);
+    sim.emit(wellFormedText(c.text), c.kind);
     return { ok: true };
   },
 };

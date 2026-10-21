@@ -122,16 +122,16 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
 
   it("paintFloorRun drags one continuous run on a floor, resets across floors, and clearPaint drops the anchor", async () => {
     // Fresh anchor: a single tile, not a brush strip.
-    build.paintFloorRun("floor", 12, 3);
+    await build.paintFloorRun("floor", 12, 3);
     expect(sim.tower.structureKindAt(3, 12)).toBe("floor");
     expect(sim.tower.structureKindAt(3, 13)).toBeUndefined();
     // Same-floor drag: every cell between the anchor and the pointer fills in.
-    build.paintFloorRun("floor", 18, 3);
+    await build.paintFloorRun("floor", 18, 3);
     for (let x = 13; x <= 18; x++) expect(sim.tower.structureKindAt(3, x)).toBe("floor");
     // Cross-floor move resets the anchor: floor 4 is empty, so the new cursor
     // lays ONE tile (no run dragged over from the floor-3 anchor at column 18,
     // and no bridge, since floor 4 has no other floor to reach yet).
-    build.paintFloorRun("floor", 12, 4);
+    await build.paintFloorRun("floor", 12, 4);
     expect(sim.tower.structureKindAt(4, 12)).toBe("floor");
     for (let x = 13; x <= 17; x++) expect(sim.tower.structureKindAt(4, x)).toBeUndefined();
     // clearPaint (pointer released): the next paint anchors fresh, so it does
@@ -140,7 +140,7 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     // engine auto-floors between the seed and the floor-4 neighbor at 12), which
     // is a separate mechanism from the drag run.
     build.clearPaint();
-    build.paintFloorRun("floor", 15, 4);
+    await build.paintFloorRun("floor", 15, 4);
     expect(sim.tower.structureKindAt(4, 15)).toBe("floor");
     for (let x = 13; x <= 14; x++) expect(sim.tower.structureKindAt(4, x)).toBe("floor");
   });
@@ -154,7 +154,7 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     expect(sim.tower.structureKindAt(3, strip[0] - 1)).toBeUndefined();
     expect(sim.tower.structureKindAt(3, last(strip) + 1)).toBeUndefined();
     // The stamp anchors the run: a drag extends from the strip with no gap.
-    build.paintFloorRun("floor", last(strip) + 3, 3);
+    await build.paintFloorRun("floor", last(strip) + 3, 3);
     for (let x = last(strip) + 1; x <= last(strip) + 3; x++) {
       expect(sim.tower.structureKindAt(3, x)).toBe("floor");
     }
@@ -177,7 +177,7 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     expect(seeded).toHaveLength(1);
     expect(seeded[0].x).toBe(6); // the seed lands where the tap pointed
     // The seed recorded the run anchor: the drag chains flush from it.
-    build.paintFloorRun("parking", 34, 0);
+    await build.paintFloorRun("parking", 34, 0);
     const w = FACILITIES.parking.width;
     const xs = sim.tower.units
       .filter((u) => u.kind === "parking")
@@ -192,8 +192,8 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     sim.money = 1e9;
     for (let x = 0; x < 40; x++) sim.tower.place("floor", 0, x); // a basement floor (B1) to build on
     // Drag the parking tool across the floor from x=6.
-    build.paintFloorRun("parking", 6, 0);
-    build.paintFloorRun("parking", 34, 0);
+    await build.paintFloorRun("parking", 6, 0);
+    await build.paintFloorRun("parking", 34, 0);
     const spaces = sim.tower.units.filter((u) => u.kind === "parking");
     expect(spaces.length).toBeGreaterThan(1); // a CHAIN, not one module
     const w = FACILITIES.parking.width;
@@ -272,7 +272,7 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     expect(cleared).toBe(1);
   });
 
-  it("bulldozePicked on a burning unit refuses — loud toasts, the quiet drag path doesn't", async () => {
+  it("bulldozePicked on a burning unit refuses: loud toasts, the quiet drag path doesn't", async () => {
     office.state = "fire";
     await build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }, true); // drag step
     expect(f.toasts).toEqual([]);
@@ -312,7 +312,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     ctx: { kind: string; kindLabel: string; options: PriceOptions };
     cb: {
       preview: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
-      apply: (target: BatchTarget, opts: BatchRentOptions) => Promise<BatchRentResult>;
+      apply: (target: BatchTarget, opts: BatchRentOptions) => Promise<BatchRentResult | null>;
       onApplied: (summary: string) => void;
     };
   } | null;
@@ -504,7 +504,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     // Apply commits exactly what preview showed, inside its own undo step.
     undo = { captures: [], commits: 0 };
     const a = await batchDlg!.cb.apply(high, {});
-    expect(a.changed).toBe(1);
+    expect(a?.changed).toBe(1);
     expect(rentOf(office)).toBe(high);
     expect(undo.captures).toEqual(["Set prices"]);
     expect(undo.commits).toBe(1);
@@ -514,6 +514,10 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(last(f.toasts)).toEqual({ text: "1 office repriced", kind: "good" });
     expect(last(announced)).toBe("1 office repriced");
     expect(refreshed).toBeGreaterThan(0);
+    // A refused apply says why and hands the dialog nothing to summarize.
+    expect(await batchDlg!.cb.apply(Number.NaN, {})).toBeNull();
+    expect(last(f.toasts)).toEqual({ text: "That request is not valid.", kind: "bad" });
+    expect(rentOf(office)).toBe(high);
   });
 
   it("batchKind on a kind without a rent band does nothing", async () => {
@@ -550,6 +554,13 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(last(f.sfx)).toBe("build");
     expect(last(announced)).toBe("Elevator schedule saved.");
     expect(refreshed).toBeGreaterThan(0);
+    // A refused write says so instead of "saved".
+    vi.spyOn(sim.tower, "setSchedule").mockReturnValueOnce(false);
+    const spoken = announced.length;
+    await scheduleDlg!.cb.apply({ activeCars: { weekday: [], weekend: [] }, waitingCarResponse: 0, standardFloorDeparture: 0, homeFloors: [] });
+    expect(last(f.sfx)).toBe("error");
+    expect(last(f.toasts)).toEqual({ text: "That schedule could not be saved.", kind: "bad" });
+    expect(announced.length).toBe(spoken);
   });
 
   it("schedule on a non-elevator transport (stairs) does nothing", async () => {
@@ -589,7 +600,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(undo.commits).toBe(2);
   });
 
-  it("an express is locked to lobbies: the engine refuses a non-lobby stop and clearStops stays lobby-only", async () => {
+  it("an express is locked to lobbies: the engine refuses a non-lobby stop and clearStops stays lobby-only", () => {
     const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
     expect(r.ok).toBe(true);
     const ex = sim.tower.transports.find((t) => t.id === r.transportId)!;
@@ -604,7 +615,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(ex.skipFloors).toEqual([2, 3]);
   });
 
-  it("a forged non-lobby express stop is coerced back to lobby-only on load", async () => {
+  it("a forged non-lobby express stop is coerced back to lobby-only on load", () => {
     const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
     expect(r.ok).toBe(true);
     const data = sim.serialize();
@@ -618,7 +629,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(ex.skipFloors).toEqual([2, 3]);
   });
 
-  it("coercion scrubs a forged endpoint out of an express skip list (endpoints always stop)", async () => {
+  it("coercion scrubs a forged endpoint out of an express skip list (endpoints always stop)", () => {
     const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
     expect(r.ok).toBe(true);
     const data = sim.serialize();
@@ -630,7 +641,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(ex.skipFloors).toEqual([2, 3]);
   });
 
-  it("no card carries stop-config buttons anymore: Schedule… is the one config surface (#464)", async () => {
+  it("no card carries stop-config buttons anymore: Schedule… is the one config surface (#464)", () => {
     const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
     expect(r.ok).toBe(true);
     const ex = sim.tower.transports.find((t) => t.id === r.transportId)!;
@@ -645,7 +656,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(renderedCard(transportEditorTemplate(sim, ex)).textContent).toContain("lobbies and sky lobbies");
   });
 
-  it("the express Stops readout reports a deliberately skipped (sky) lobby honestly", async () => {
+  it("the express Stops readout reports a deliberately skipped (sky) lobby honestly", () => {
     // A legacy/forged save may skip an interior sky lobby (coerceExpressStops
     // preserves it), so the readout must not overstate "lobbies and sky lobbies".
     const s = new Simulation();
@@ -858,7 +869,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     return reload;
   }
 
-  it("save writes the autosave slot and toasts; silent mode saves without feedback", async () => {
+  it("save writes the autosave slot and toasts; silent mode saves without feedback", () => {
     saveLoad.save();
     expect(SaveGame.hasSave()).toBe(true);
     // Trailing time is locale-formatted (digits, separators, and any AM/PM vary
@@ -899,7 +910,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     }
   });
 
-  it("load adopts the saved tower; with nothing saved it only toasts", async () => {
+  it("load adopts the saved tower; with nothing saved it only toasts", () => {
     saveLoad.load();
     expect(adopted).toHaveLength(0);
     expect(f.toasts).toEqual([{ text: "No saved tower found.", kind: "bad" }]);
@@ -912,7 +923,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(last(f.toasts)).toEqual({ text: "Tower loaded.", kind: "good" });
   });
 
-  it("saveBeforeUpdate behind the first-run splash saves nothing (the boot sim is throwaway)", async () => {
+  it("saveBeforeUpdate behind the first-run splash saves nothing (the boot sim is throwaway)", () => {
     const splash = document.createElement("div");
     splash.id = "splash";
     document.body.appendChild(splash);
@@ -921,7 +932,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(f.toasts).toEqual([]);
   });
 
-  it("saveBeforeUpdate in play flushes the autosave silently (the modal already told the player)", async () => {
+  it("saveBeforeUpdate in play flushes the autosave silently (the modal already told the player)", () => {
     saveLoad.saveBeforeUpdate();
     expect(SaveGame.hasSave()).toBe(true);
     expect(f.toasts).toEqual([]);
@@ -968,7 +979,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(f.toasts).toEqual([{ text: "Tower imported.", kind: "good" }]);
   });
 
-  it("exportLegacy: the reverse fidelity report shows first; nothing downloads until the primary", async () => {
+  it("exportLegacy: the reverse fidelity report shows first; nothing downloads until the primary", () => {
     sim.money = 1_234_567;
     saveLoad.exportLegacy();
     expect(f.downloads).toHaveLength(0); // two-step contract
@@ -985,7 +996,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(bytes[1]).toBe(0x24);
   });
 
-  it("exportLegacy: a Modern tower is refused with the rules message, nothing shown or downloaded", async () => {
+  it("exportLegacy: a Modern tower is refused with the rules message, nothing shown or downloaded", () => {
     saveLoad.newGame("modern");
     sim = adopted[0];
     f.toasts.length = 0;
@@ -999,14 +1010,14 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     );
   });
 
-  it("importLegacy: a garbage buffer toasts a typed message and never reaches the sim", async () => {
+  it("importLegacy: a garbage buffer toasts a typed message and never reaches the sim", () => {
     saveLoad.importLegacy(new ArrayBuffer(4), "tiny.TDT");
     expect(adopted).toHaveLength(0);
     expect(f.importReports).toHaveLength(0);
     expect(f.toasts).toEqual([{ text: "This file is too small to be a SimTower save.", kind: "bad" }]);
   });
 
-  it("importLegacy: a valid .TDT shows the fidelity report first; nothing adopted until Open", async () => {
+  it("importLegacy: a valid .TDT shows the fidelity report first; nothing adopted until Open", () => {
     const bytes = buildTdt({ balance: 12345, level: 3 });
     saveLoad.importLegacy(bytes.buffer as ArrayBuffer, "LEGACY.TDT");
     expect(adopted).toHaveLength(0); // report up, tower not adopted yet
@@ -1029,7 +1040,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(last(f.toasts)).toEqual({ text: "Tower imported and saved to slot 1.", kind: "good" });
   });
 
-  it("importLegacy: a corrupt-but-present slot is NOT treated as free (raw presence wins)", async () => {
+  it("importLegacy: a corrupt-but-present slot is NOT treated as free (raw presence wins)", () => {
     // A slot whose payload no longer parses may still be recoverable by a
     // later build; the import's fresh-slot copy must skip it, not reuse it.
     localStorage.setItem("simtower-clone-slot-1", "VCZ1:not-really-deflate");
@@ -1040,7 +1051,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(last(f.toasts).text).toBe("Tower imported and saved to slot 2.");
   });
 
-  it("importLegacy: with every slot full, nothing is overwritten and the toast says so", async () => {
+  it("importLegacy: with every slot full, nothing is overwritten and the toast says so", () => {
     for (let n = 1; n <= 3; n++) SaveGame.saveSlot(n, sim);
     const before = [1, 2, 3].map((n) => localStorage.getItem(`simtower-clone-slot-${n}`));
     saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "FULL.TDT");
@@ -1050,7 +1061,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(last(f.toasts).text).toMatch(/All save slots are full/);
   });
 
-  it("first mid-game context loss: autosave written, then in-place recovery is attempted (no crash screen)", async () => {
+  it("first mid-game context loss: autosave written, then in-place recovery is attempted (no crash screen)", () => {
     const reload = stubReload();
     saveLoad.recoverFromContextLoss();
     expect(SaveGame.hasSave()).toBe(true); // no splash → the tower was flushed first
@@ -1072,7 +1083,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(sim.log.some((e) => e.text.includes("recovered on the spot"))).toBe(true);
   });
 
-  it("a failed in-place recovery falls back to the crash screen; reload stays the player's choice", async () => {
+  it("a failed in-place recovery falls back to the crash screen; reload stays the player's choice", () => {
     const reload = stubReload();
     saveLoad.recoverFromContextLoss();
     expect(recoveries).toHaveLength(1);
@@ -1099,7 +1110,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  it("a second loss within 90s of the last one is a repeat: crash screen immediately, no recovery attempt", async () => {
+  it("a second loss within 90s of the last one is a repeat: crash screen immediately, no recovery attempt", () => {
     stubReload();
     sessionStorage.setItem("vc-gl-lost-reload", String(Date.now()));
     saveLoad.recoverFromContextLoss();
@@ -1109,7 +1120,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(SaveGame.hasSave()).toBe(true); // the tower is still saved first
   });
 
-  it("a loss soon after a successful in-place recovery is a repeat (the loss stamp, not a reload, anchors the window)", async () => {
+  it("a loss soon after a successful in-place recovery is a repeat (the loss stamp, not a reload, anchors the window)", () => {
     stubReload();
     saveLoad.recoverFromContextLoss();
     recoveries[0](true); // first loss recovered in place, no reload anywhere
@@ -1121,7 +1132,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(crashScreens[0].crash.recoveryFailed).toBe(false);
   });
 
-  it("a loss more than 90s after the previous one leaves the repeat window: recovery is attempted again", async () => {
+  it("a loss more than 90s after the previous one leaves the repeat window: recovery is attempted again", () => {
     stubReload();
     sessionStorage.setItem("vc-gl-lost-reload", String(Date.now() - 91_000));
     saveLoad.recoverFromContextLoss();
@@ -1129,7 +1140,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(recoveries).toHaveLength(1); // treated as a fresh first loss
   });
 
-  it("the repeat window re-anchors when the recovery COMPLETES, so a slow background restore doesn't defeat it", async () => {
+  it("the repeat window re-anchors when the recovery COMPLETES, so a slow background restore doesn't defeat it", () => {
     stubReload();
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
@@ -1149,7 +1160,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     }
   });
 
-  it("with sessionStorage unavailable the in-memory shadow still trips the repeat guard (no endless recover loop)", async () => {
+  it("with sessionStorage unavailable the in-memory shadow still trips the repeat guard (no endless recover loop)", () => {
     stubReload();
     vi.stubGlobal("sessionStorage", {
       getItem: () => {
@@ -1168,7 +1179,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(crashScreens[0].crash.repeat).toBe(true);
   });
 
-  it("a recovery that resolves under an already-open crash screen stays quiet (no contradictory success toast)", async () => {
+  it("a recovery that resolves under an already-open crash screen stays quiet (no contradictory success toast)", () => {
     stubReload();
     saveLoad.recoverFromContextLoss();
     // A parallel loss flow put the crash card up while the rebuild ran.
@@ -1185,7 +1196,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     }
   });
 
-  it("a tower swap during the recovery wait keeps the saved-tower claim out of the new tower's bulletin", async () => {
+  it("a tower swap during the recovery wait keeps the saved-tower claim out of the new tower's bulletin", () => {
     stubReload();
     const simAtLoss = sim;
     saveLoad.recoverFromContextLoss();
@@ -1197,7 +1208,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(simAtLoss.log.some((e) => e.text.includes("recovered on the spot"))).toBe(false);
   });
 
-  it("a context loss whose save fails says so on the screen, keeps the prior tower, and blames storage", async () => {
+  it("a context loss whose save fails says so on the screen, keeps the prior tower, and blames storage", () => {
     const reload = stubReload();
     // A prior autosave exists (the tower was flushed before the crash).
     sim.money = 555_000;
@@ -1225,7 +1236,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     spy.mockRestore();
   });
 
-  it("a context-loss with storage fully disabled (save AND hasSave throw) still shows the screen", async () => {
+  it("a context-loss with storage fully disabled (save AND hasSave throw) still shows the screen", () => {
     // Storage disabled (SecurityError), not merely full: BOTH the write and the
     // hasSave() read throw. The catch must not re-throw before the screen shows.
     const saveSpy = vi.spyOn(SaveGame, "save").mockImplementationOnce(() => {
@@ -1242,7 +1253,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     hasSaveSpy.mockRestore();
   });
 
-  it("a first-session context-loss save failure (no prior save) makes no false safety claim", async () => {
+  it("a first-session context-loss save failure (no prior save) makes no false safety claim", () => {
     // No prior autosave (crash before the 30s timer fired) AND storage is full.
     const spy = vi.spyOn(SaveGame, "save").mockImplementationOnce(() => {
       throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
@@ -1254,7 +1265,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     spy.mockRestore();
   });
 
-  it("saveBeforeUpdate propagates a storage failure so the update flow pauses instead of reloading", async () => {
+  it("saveBeforeUpdate propagates a storage failure so the update flow pauses instead of reloading", () => {
     // The update path in main.ts wraps saveBeforeUpdate in try/catch and, on a
     // throw, pauses the update rather than reloading (which would cost progress).
     // That contract lives here: a failed flush must surface as a throw.
@@ -1265,7 +1276,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     spy.mockRestore();
   });
 
-  it("a non-storage save error (e.g. a serialize/compression bug) is not blamed on storage", async () => {
+  it("a non-storage save error (e.g. a serialize/compression bug) is not blamed on storage", () => {
     sim.money = 111_000;
     SaveGame.save(sim); // a prior autosave exists
     // A non-storage failure (not a quota/security DOMException) must not be
@@ -1280,7 +1291,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     spy.mockRestore();
   });
 
-  it("a context loss behind the splash shows the screen without persisting the boot sim", async () => {
+  it("a context loss behind the splash shows the screen without persisting the boot sim", () => {
     const splash = document.createElement("div");
     splash.id = "splash";
     document.body.appendChild(splash);
@@ -1297,7 +1308,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
 });
 
 describe("InspectorController (stale-pick hygiene)", () => {
-  it("a pick whose entity has been removed hides the card instead of rendering a ghost", async () => {
+  it("a pick whose entity has been removed hides the card instead of rendering a ghost", () => {
     const { sim, office, lift } = fixture();
     // Only the null (hide) calls matter here, so record the raw values; the
     // card itself is a lit template since E6-S2.
@@ -1385,7 +1396,7 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     });
   });
 
-  it("the cursor clamps at all four grid bounds and reads basements as B-floors", async () => {
+  it("the cursor clamps at all four grid bounds and reads basements as B-floors", () => {
     expect(keyboard.cursor()).toBeNull(); // not revealed yet
     keyboard.moveCursor(-100_000, 0);
     expect(keyboard.cursor()).toEqual({ tile: 0, floor: 1 });
@@ -1407,7 +1418,7 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     expect(last(announced)).toMatch(/^Cursor: floor 1/);
   });
 
-  it("inspect commit announces the selection — or the honest nothing", async () => {
+  it("inspect commit announces the selection, or the honest nothing", async () => {
     keyboard.moveCursor(0, 0); // (mid, 1)
     keyboard.moveCursor(-5, 1); // (mid-5, 2) — inside the office (mid-10 .. mid-2)
     await keyboard.commitCursor();
@@ -1502,7 +1513,7 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     expect(previewCalls).toEqual([]);
   });
 
-  it("without a pending anchor the cursor delegates its preview to the shared build preview", async () => {
+  it("without a pending anchor the cursor delegates its preview to the shared build preview", () => {
     tool = { type: "build", kind: "office" };
     keyboard.moveCursor(0, 0);
     keyboard.moveCursor(0, 1);

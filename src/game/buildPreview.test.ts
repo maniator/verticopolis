@@ -127,9 +127,11 @@ describe("placeSimpleBuild", () => {
 
   it("room: reports ok from the engine's answer to the build", async () => {
     const { sim } = fixture();
+    const before0 = sim.tower.units.length;
     const tryBuild = vi.fn(async (kind: string, floor: number, x: number) => sim.build(kind as never, floor, x).ok);
     const { app } = makeApp(sim, buildTool("office"), { build: { tryBuild } });
     expect(await placeSimpleBuild(app, "office", 21, 2)).toEqual({ what: "room", ok: true });
+    expect(sim.tower.units.length).toBe(before0 + 1);
     expect(tryBuild).toHaveBeenCalledWith("office", 2, snapX(CAT, "office", 21));
     // A refused build (the same spot again) reports not placed.
     expect(await placeSimpleBuild(app, "office", 21, 2)).toEqual({ what: "room", ok: false });

@@ -58,7 +58,8 @@ export function showSettings(ui: UI): void {
   if (modern) {
     const ab = box.querySelector<HTMLInputElement>("#set-auto-bridge")!;
     ab.checked = ui.cb.isAutoBridge();
-    ab.addEventListener("change", () => void ui.cb.onToggleAutoBridge().then((on) => (ab.checked = on)));
+    // The switch shows what the engine answered; on a fault it falls back to the live preference.
+    ab.addEventListener("change", () => void ui.cb.onToggleAutoBridge().then((on) => (ab.checked = on), () => (ab.checked = ui.cb.isAutoBridge())));
   }
   // The controller wires every stateful control above; the plain Close action is
   // the one [data-act] button, so wireActions binds it (its loud lookup throws at

@@ -22,8 +22,10 @@ const MAX_FRAME_ERRORS = 5;
 /** Close the gesture's undo step once the commands it issued have been
  *  answered, or at once when it issued none, so the step holds their effect
  *  on any port. A rejected command skips the commit, as a throw did before
- *  commands went through the port, and the rejection reaches the error
- *  reporting. The promise is returned so a test can await the gesture. */
+ *  commands went through the port: the open capture is replaced by the next
+ *  gesture's, so no half step is recorded, and the rejection is left
+ *  unhandled for the error tracking (`analyticsErrors.ts`) to report. The
+ *  promise is returned so a test can await the gesture. */
 function commitAfter(app: GameApp, pending: Promise<unknown> | null): Promise<void> | undefined {
   if (!pending) {
     app.commitUndo();
@@ -96,8 +98,12 @@ export function wireEngine(app: GameApp): void {
         // you drag (onActionMove), floating the ghost above the thumb to aim.
         app.buildAnchor = { tile, floor, oTile: tile, oFloor: floor, lifting: false };
         updateBuildPreview(app, tile, floor, false); // false: red ghost carries validity, no DOM reason card on touch
-      } else if (placeSimpleBuild(app, app.tool.kind, tile, floor) === null) {
-        app.transportStart = { x: snapX(towerCatalog(app.sim), app.tool.kind, tile), floor };
+      } else {
+        // A drag-sized shaft anchors here; anything else places on the press
+        // and settles on its own (onActionUp closes the undo step).
+        const placing = placeSimpleBuild(app, app.tool.kind, tile, floor);
+        if (placing) void placing;
+        else app.transportStart = { x: snapX(towerCatalog(app.sim), app.tool.kind, tile), floor };
       }
     }
   };
@@ -125,7 +131,7 @@ export function wireEngine(app: GameApp): void {
       }
       // For a wide unit (parking) each tile-step re-attempts a build; overlaps
       // fail silently, so successful placements land flush → a contiguous chain.
-      app.build.paintFloorRun(kind, tile, floor);
+      void app.build.paintFloorRun(kind, tile, floor);
     } else if (app.buildAnchor) {
       // Touch room-build drag. The lift latches once this is a deliberate drag
       // (moved to a different floor, or a couple of tiles across), not a tap's

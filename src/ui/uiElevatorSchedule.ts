@@ -187,10 +187,9 @@ export function showElevatorScheduleDialog(
   // presets keep their hands off hand-set homes, and Auto-tune seeds staging only
   // while this is false (spec §5.2/§14.3).
   let homesDirty = !!ctx.current?.homeFloors && ctx.current.homeFloors.length > 0;
-  // Whether ANY schedule edit has landed since open: arms the Cancel discard guard.
-  // Stop edits (Serve toggles) do NOT arm it: they applied live and Cancel cannot
-  // take them back (each has its own undo step instead).
-
+  // `state.dirty` (any schedule edit since open) arms the Cancel discard guard; stop
+  // edits do not, since they applied live and each has its own undo step.
+  let applying = false; // one OK per open, held while the engine answers
   // The template's `hourly`/`hasMeasured` are DAY-SCOPED (#466): the ghost and
   // the "line up" fallback follow the day tab, so an unmeasured weekend shows no
   // ghost even while the weekday curve is warm. `recompute` keeps them current.
@@ -366,8 +365,10 @@ export function showElevatorScheduleDialog(
       announce(`Standard Floor Departure: ${sfd} seconds.`);
       after();
     },
+    // A stop edit settles after the engine answers; a closed dialog skips the repaint.
     onServe: async (floor, serve) => {
       await ctx.stops.setServe(floor, serve);
+      if (!box.isConnected) return;
       afterStops();
       // Announce what actually happened: the engine can refuse (endpoints,
       // the express lobby lock), and the re-read rows are the truth.
@@ -378,11 +379,13 @@ export function showElevatorScheduleDialog(
     },
     onExpressStops: async () => {
       await ctx.stops.expressStops();
+      if (!box.isConnected) return;
       announce("Stops set to lobbies only.");
       afterStops();
     },
     onAllStops: async () => {
       await ctx.stops.allStops();
+      if (!box.isConnected) return;
       announce("Stopping at every floor.");
       afterStops();
     },
@@ -451,6 +454,8 @@ export function showElevatorScheduleDialog(
       rerender();
     },
     onOk: () => {
+      if (applying) return;
+      applying = true;
       void cb.apply({
         activeCars: {
           weekday: [...state.schedule.activeCars.weekday!],
@@ -459,8 +464,7 @@ export function showElevatorScheduleDialog(
         waitingCarResponse: state.schedule.waitingCarResponse,
         standardFloorDeparture: state.schedule.standardFloorDeparture,
         homeFloors: [...state.schedule.homeFloors],
-      });
-      ui.closeModal();
+      }).finally(() => box.isConnected && ui.closeModal());
     },
     onCancel: () => {
       // A dirty working copy takes two presses: the first arms "Discard changes?",

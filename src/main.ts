@@ -60,7 +60,8 @@ import type { SimPort } from "./simport/port";
  */
 class GameApp implements GameAppPorts {
   sim: Simulation;
-  /** The simulation as the game drives it (AD-9); follows every adoptSim swap. */ readonly port: SimPort = createTsSim(() => this.sim);
+  /** The simulation as the game drives it (AD-9); follows every adoptSim swap. */
+  readonly port: SimPort = createTsSim(() => this.sim);
   engine: TowerEngine;
   audio = new AudioEngine();
   ui: UI;
@@ -316,8 +317,6 @@ class GameApp implements GameAppPorts {
   }
 
   renameTower(name: string): void {
-    // The original callback was an assignment expression `(name) => (… = name)`;
-    // as a void method the returned string is dropped, which no caller used.
     void this.port.command({ op: "setTowerName", name });
   }
 

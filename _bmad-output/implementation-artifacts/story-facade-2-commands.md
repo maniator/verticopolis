@@ -27,9 +27,11 @@ files. This slice moves the ones in the game's command paths:
 `main.ts` (`renameTower`). The command paths reach two more files through
 `BuildActions`: `placeSimpleBuild` in `buildPreview.ts` and the gesture
 handlers in `engineWiring.ts`. The lifecycle writes in the same inventory row
-(`view =` before a save, the `emit` after a load, `adoptSim`'s auto-bridge
-carry, in `saveLoad.ts`, `appBoot.ts`, `startWasmHost.ts`,
-`legacyImportAdopt.ts`, `appModals.ts` `saveToSlot` and `main.ts` `adoptSim`)
+(the camera stamped before a save in `saveLoad.ts` and `appModals.ts`
+`saveToSlot`; the bulletins in `appBoot.ts` (an unreadable save at boot),
+`legacyImportAdopt.ts` (an imported 1994 tower) and `saveLoad.ts` (a
+recovered graphics reset); the bridging preference `main.ts` `adoptSim`
+keeps on an undo or redo restore; and the host's own in `startWasmHost.ts`)
 belong to slice 5 (#1212), agreed with the Runtime thread on 2026-10-21.
 
 **Ownership agreed before editing (2026-10-21, 01:59 to 02:00 UTC).**
@@ -54,17 +56,22 @@ belong to slice 5 (#1212), agreed with the Runtime thread on 2026-10-21.
 | An awaited command reorders feedback or undo | every call site | `TsSim` applies a command at once and resolves in a microtask of the same task, so sound, toast and undo land in the same task as today. Each handler that brackets its own command with undo awaits the command before `commitUndo`. Tests await every controller method |
 | A drag issues commands faster than an async adapter answers | `onActionMove` paint and bulldoze steps | Drag steps are fire-and-forget (`void`); the port runs them in issue order (port contract). The paint anchor is set before the command is issued, so the next step never reads a stale anchor |
 | A command's result is read before it settles | after-command reads | Audit (Dev Notes): every read of the command's effect comes after `await`, and reads of the effect use `port.view` |
-| The brush changes order or charges | `paintBrush` | One port command over the brush's tile list, run by one shared loop (`src/simport/brush.ts`) that `TsSim` calls with `sim.build` per tile: the same builds in the same order, so the relay forwards the same calls and parity is unchanged. No tick can fall between its tiles |
+| The brush changes order or charges | `paintBrush` | One port command over the brush's tile list, run by one shared loop (`src/simport/brush.ts`) that `TsSim` calls with `sim.build` per tile: the builds of today's loop, pass by pass in the same order, so the relay forwards the same calls and parity is unchanged. No tick can fall between its tiles |
 | A TypeScript pre-check decides a refusal the engine owns | the stops dialog | The endpoint and express-lobby pre-checks go; the engine's answer decides, and an unchanged tower leaves no undo step (`UndoHistory.commit` compares signatures) |
 | A thrown command becomes a rejection | engine faults | The port rejects with the error; floating promises reach `analyticsErrors.ts`'s `unhandledrejection` listener, which reports them as it reports `error`. The fault-in-a-command path is #1218 (slice 8) |
 | Test churn hides a lost assertion | 230 test call sites | Each test awaits the controller method or flushes the queue; no assertion is removed or weakened. The coverage ratchet holds |
 
 **Hot path.** Commands run per user action, never per frame, except
 `emitMealRushes` (per frame, issuing a command only on the frame a bulletin
-fires) and drag steps (per pointer move). Each command costs one result
-object and one promise; the brush is one command per stamp instead of one
+fires) and drag steps (per pointer move). Each command costs the port's shape
+check (constant work, one check per tile for a brush of at most 32), one
+result object and one promise; the kind check is one closure per port over
+the per-catalog index. The brush is one command per stamp instead of one
 build call per tile at the call site (same engine work). No query moves here,
-so build-preview cost is unchanged (slice 4 owns it).
+so build-preview cost is unchanged (slice 4 owns it). The review's Hot-Path
+Auditor patched two inherited costs on the touched paths: the meal-rush
+census now runs only on a frame where a rush is due, and a placed transport
+is no longer diagnosed. The rest are deferred with issues (Completion Notes).
 
 ## Acceptance Criteria
 
@@ -86,11 +93,13 @@ so build-preview cost is unchanged (slice 4 owns it).
 3. **The paint brush is one command.** `{ op: "paintBrush"; kind; floor;
    tiles }` answers `{ ok, reason?, delta, placed }`: `placed` tiles laid,
    `ok` when at least one was, `reason` the last refusal the engine gave, and
-   `delta` the balance's change over the whole brush. The loop is
-   `runBrush` in `src/simport/brush.ts`, today's loop moved unchanged (skip a
-   tile already of this kind, let a lobby brush upgrade plain floor, repeat
-   while a pass laid something). `view.types.test.ts` lists it as a port-level
-   composite of `build` in the drift check.
+   `delta` the balance's change over the whole brush. `kind` is `"floor"` or
+   `"lobby"` (`BrushKind`). The loop is `runBrush` in `src/simport/brush.ts`,
+   today's loop moved (skip a tile already of this kind, let a lobby brush
+   upgrade plain floor, repeat while a pass laid something), so the brush
+   lays what its passes' builds, issued one by one, lay.
+   `view.types.test.ts` lists it as a port-level composite of `build` in the
+   drift check.
 4. **Results replace re-reads.** `placeSimpleBuild` reports a room's `ok`
    from the build's answer (it compared `units.length` before and after); the
    brush's "already built here" check reads `port.view` after the command
@@ -102,21 +111,35 @@ so build-preview cost is unchanged (slice 4 owns it).
    `reason` and named fields as before.
 6. **Async contract held at the UI seams.** `onToggleAutoBridge` resolves to
    the preference in force (the settings checkbox sets itself when it
-   settles); the batch pricing dialog's `apply` is awaited before its summary;
-   the emergency dialog clears `shownChoice` once `resolveChoice` settles.
+   settles, and falls back to the live preference if the command fails); the
+   batch pricing dialog's `apply` is awaited before its summary, runs once
+   per open and closes without a summary on a refusal; the schedule dialog
+   closes once `setSchedule` has answered, takes one OK, says so when the
+   engine refuses, and a stop toggle that answers after the dialog closed
+   repaints nothing; the emergency dialog clears `shownChoice` once
+   `resolveChoice` settles, whether it answered or failed.
 7. **The command contract.** `src/simport/commandContract.fixture.ts` exports
    `describeCommandContract(name, makePort, opts)`, with
    `describePortContract`'s `restarts` option. Per command: the accepted path
    (result shape, `delta` equals the balance's change, the effect on `view`);
    each refusal path (no state change, `delta` 0, the engine's `reason`, no
    gameplay event and no log line); malformed input (a non-integer or NaN
-   number, an unknown op or kind, a bad direction, end, method, policy or
-   flag, a non-string label, name or bulletin) refused without a throw,
+   number, a number outside the 32-bit range the Rust binding takes, an
+   unknown op or kind (`constructor` and `__proto__` included), a bad
+   direction, end, method, policy or flag, a brush with a hole or more than
+   32 tiles, a non-string label, name or bulletin) refused without a throw,
    with the engine's own "That request is not valid.", by the port's shape
    check (`src/simport/request.ts`) before the engine sees it; a schedule
-   stays the engine's to harden, whatever it is; issue order across
-   back-to-back commands; the brush atomic against steps and equal to the
-   same builds issued one by one. `src/simport/tsSimCommands.test.ts` runs it over `TsSim`;
+   stays the engine's to harden, whatever it is (a non-object clears it); a
+   tower name or bulletin with half a surrogate pair kept with U+FFFD, as the
+   Rust engine reads it (`engine/wellFormed.ts`); a stop on an endpoint
+   answered and changing nothing; a camera kept as a copy of its own fields;
+   issue order across back-to-back commands; the brush atomic against steps,
+   equal to its passes' builds issued one by one (a lobby brush with bridging
+   off takes three passes), and a repeated column laid once.
+   `src/simport/tsSimCommands.test.ts` runs it over `TsSim`, with the paths a
+   founded tower cannot reach (Classic, a cinema, an express shaft's stops)
+   ticked so the parity host sees them;
    `npm run test:wasm:parity` runs it on the WASM mirror host, where a
    divergence between the two engines fails the case. Slice 7 runs it over
    `RustSim`.
@@ -127,7 +150,9 @@ so build-preview cost is unchanged (slice 4 owns it).
    coverage ratchet holds; every file stays under 500 lines.
 9. **Forward requirements recorded.** On #1217 and #1224: the brush is one
    synchronous engine call sequence on `RustSim` and one message on the
-   worker, with no step between its tiles.
+   worker, with no step between its tiles; `RustSim` runs the port's shape
+   check before the binding; and the UI hazards of a port that answers later
+   (#1273) are settled before either ships.
 10. **Review.** `/gds-code-review` with the Hot-Path Auditor layer, every
     `patch` fixed, every `defer` in the backlog with an issue; the HP record
     in the PR body; the independent review through the coordinator. No
@@ -135,22 +160,24 @@ so build-preview cost is unchanged (slice 4 owns it).
 
 ## Tasks / Subtasks
 
-- [ ] Port wiring (AC 1): `GameApp.port`, `GameAppPorts.port`, controller deps
-- [ ] `paintBrush` (AC 3): `commands.ts` member, `brush.ts`, `TsSim` handler,
+- [x] Port wiring (AC 1): `GameApp.port`, `GameAppPorts.port`, controller deps
+- [x] `paintBrush` (AC 3): `commands.ts` member, `brush.ts`, `TsSim` handler,
       drift-check exclusion
-- [ ] Call sites (AC 2, 4, 5, 6)
-  - [ ] `buildActions.ts`, `buildPreview.ts` `placeSimpleBuild`
-  - [ ] `engineWiring.ts` command handlers
-  - [ ] `keyboardPlay.ts`
-  - [ ] `editorActions.ts`, `uiBatchPricing.ts` `apply`
-  - [ ] `appModals.ts` exterminator
-  - [ ] `uiCallbacks.ts`, `UI.ts`, `uiSettings.ts` auto-bridge
-  - [ ] `frameLoop.ts` emergency answer and meal rush
-  - [ ] `main.ts` `renameTower`
-- [ ] Guard (AC 2): `src/tests/commandSites.guard.test.ts`
-- [ ] Command contract (AC 7) and its `TsSim` test
-- [ ] Existing tests await the controllers
-- [ ] Gates, parity, file sizes (AC 8)
+- [x] Port shape check (AC 7): `src/simport/request.ts`, run by `TsSim`
+- [x] Call sites (AC 2, 4, 5, 6)
+  - [x] `buildActions.ts`, `buildPreview.ts` `placeSimpleBuild`
+  - [x] `engineWiring.ts` command handlers
+  - [x] `keyboardPlay.ts`, `inputKeys.ts`
+  - [x] `editorActions.ts`, `uiBatchPricing.ts` `apply`, `uiElevatorSchedule.ts`
+  - [x] `appModals.ts` exterminator
+  - [x] `uiCallbacks.ts`, `UI.ts`, `uiSettings.ts` auto-bridge
+  - [x] `frameLoop.ts` emergency answer and meal rush
+  - [x] `main.ts` `renameTower`
+- [x] Guard (AC 2): `src/tests/commandSites.guard.test.ts`
+- [x] Command contract (AC 7) and its `TsSim` test; `contract.fixture.ts`
+      exports its helpers
+- [x] Existing tests and e2e specs await the controllers
+- [x] Gates, parity, file sizes (AC 8)
 - [ ] Forward requirements on #1217 and #1224 (AC 9)
 - [ ] `/gds-code-review`, fixes, HP record (AC 10)
 
@@ -198,7 +225,10 @@ commit across a drag (down, move, up), which slice 5 queues on the port.
 
 - American English, no em-dashes, plain prose in comments, no "X, not Y".
 - 500-line ceiling (`main.ts` sits at 499 after the port field).
-- Engine types through `import type` only in `src/simport/`.
+- Engine values in `src/simport/` only where the adapter needs them: `TsSim`
+  reads the catalog handle (`towerCatalog`, `findCatalogFacility`) for the
+  shape check's kind test and `engine/wellFormed.ts` to repair text as the
+  Rust engine reads it; `request.ts` and `brush.ts` import types only.
 - No closing keyword on #868 or #954.
 
 ### What it removes (temporary TypeScript)
@@ -226,4 +256,48 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
 
 ### Completion Notes List
 
+- Malformed commands are refused at the port (`wellFormed` in
+  `request.ts`), because the two engines read them differently: the Rust
+  binding's glue turns NaN into 0 for a whole-number parameter and throws on a
+  kind it does not know, where the TypeScript engine built at a NaN floor.
+- `/gds-code-review` round 1 (Blind Hunter, Edge Case Hunter, Acceptance
+  Auditor, Hot-Path Auditor) on 007703e. Patched: the batch and schedule
+  dialogs' refusals, double applies and close order; the emergency latch on a
+  failed command; transport diagnosis only on a refusal; the shape check's
+  32-bit range, holes, tile cap and exhaustive value lists; `BrushKind`; text
+  repaired as the Rust engine reads it; the camera copied; the settings
+  switch on a failed toggle; `paintFloorRun` settling on its steps; the guard
+  on the syntax tree; contract cases for multi-pass and repeated-column
+  brushes, endpoint stops, unreadable schedules and the camera; the adapter
+  tests ticked on the parity host; the meal-rush census only when a rush is
+  due; one kind-check closure per port.
+- Deferred, each with an issue: the UI hazards of a port that answers later
+  (#1273, row `facade-async-command-hazards`); the keyboard bulldoze
+  announcement after a refusal (#1274, pre-existing); the TypeScript
+  `removeUnit` scan (#1170 item, Rust half #1158 A17, callers added there);
+  `bridgeFillPlan` three times per build (#347, notes updated); the cap
+  checks' unit walks (#1239, #1158 A24); the undo capture's JSON round trip on
+  the WASM host (#1212). F2 is a defer rather than an always-patch rewrite
+  because `runBrush` keeps the per-tile builds of the loop it replaced and
+  adds no walk of its own.
+
 ### File List
+
+- `src/simport/request.ts` (new), `brush.ts` (new), `commands.ts`, `tsSim.ts`
+- `src/simport/commandContract.fixture.ts` (new), `tsSimCommands.test.ts`
+  (new), `contract.fixture.ts`, `view.types.test.ts`
+- `src/tests/commandSites.guard.test.ts` (new)
+- `src/main.ts`, `src/game/appBoot.ts`, `appModals.ts`, `buildActions.ts`,
+  `buildPreview.ts`, `editorActions.ts`, `engineWiring.ts`, `frameLoop.ts`,
+  `inputKeys.ts`, `keyboardPlay.ts`, `uiCallbacks.ts`
+- `src/ui/UI.ts`, `uiBatchPricing.ts`, `uiElevatorSchedule.ts`,
+  `uiSettings.ts`
+- Tests: `src/game/appModals.test.ts`, `buildPreview.test.ts`,
+  `engineWiring.test.ts`, `frameLoop.test.ts`, `uiCallbacks.test.ts`;
+  `src/tests/uiFixture.ts`; `src/tests/integration/gameControllers`,
+  `gameControllersCoverage`, `towerCongratsDialogs` and `uiDialogs`
+  integration tests
+- e2e: `auto-floor.spec.ts`, `offlineHelpers.ts`, `wasmEngine.spec.ts`
+- `_bmad-output/implementation-artifacts/backlog.md` (rows
+  `facade-async-command-hazards`, `keyboard-bulldoze-refusal-announce`; notes
+  on `auto-floor-bridge-distance` and `ts-render-ui-hotpath-sweep`)

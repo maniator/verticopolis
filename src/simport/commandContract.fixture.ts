@@ -16,16 +16,19 @@ import { INVALID_COMMAND } from "./request";
  * the view or in the save. A refusal moves nothing: `delta` is 0, the save is
  * unchanged and no gameplay event or log line appears. A malformed command
  * (the port's own check, `request.ts`) is refused the same way with the
- * engine's reason, and never throws. The brush lays exactly what the same
- * builds issued one by one lay, and back-to-back commands run in issue order.
+ * engine's reason, and never throws. The brush lays exactly what its passes'
+ * builds, issued one by one, lay, and back-to-back commands run in issue
+ * order.
  *
  * `describePortContract` already runs the accepted paths of `build`,
  * `buildTransport`, `removeFacility`, the extend gesture, the cars, `setStop`,
- * `setSchedule`, `setLabel`, `adjustRent`, `callExterminator` and `emit`.
- * Three accepted paths need a tower the port cannot found: a pending
- * emergency (`resolveChoice`), a cinema (`setFilmPolicy`, 3 stars) and a
- * Classic tower (`setNoRate`, and the auto-bridge refusals). The adapter's
- * own tests run those (`tsSimCommands.test.ts` for `TsSim`).
+ * `setSchedule`, `setLabel`, `adjustRent` and `emit`, and `callExterminator`
+ * on a clean tower. Four accepted paths need a tower the port cannot found:
+ * a pending emergency (`resolveChoice`), an infested room
+ * (`callExterminator`), 3 stars (`setFilmPolicy` on a cinema, an express
+ * shaft's stops) and a Classic tower (`setNoRate`, and the auto-bridge
+ * refusals). The adapter's own tests run those (`tsSim.test.ts` and
+ * `tsSimCommands.test.ts` for `TsSim`).
  *
  * Each case ticks once before its first command and once after its last, so
  * the parity project's Rust host sees every command, and `restarts` makes a
@@ -69,6 +72,15 @@ export function describeCommandContract(name: string, makePort: () => SimPort, o
       expect(view.tower.getTransport(t.shaft)?.skipFloors).toEqual([2]);
       expect(await send({ op: "clearStops", id: t.shaft })).toMatchObject({ ok: true });
       expect(view.tower.getTransport(t.shaft)?.skipFloors ?? []).toEqual([]);
+      // An endpoint always stops: skipping it is answered as done and changes
+      // nothing, so the undo history records no step for it.
+      const unskipped = await port.save();
+      expect(await send({ op: "setStop", id: t.shaft, floor: 3, stop: false })).toEqual({ ok: true, delta: 0 });
+      expect(await port.save()).toBe(unskipped);
+      // A schedule the engine cannot read clears the shaft's schedule.
+      expect(await send({ op: "setSchedule", id: t.shaft, schedule: { waitingCarResponse: 7 } })).toMatchObject({ ok: true });
+      expect(await send({ op: "setSchedule", id: t.shaft, schedule: "every floor" })).toMatchObject({ ok: true });
+      expect(mustFind((await saved(port)).transports, (s) => s.id === t.shaft).schedule).toBeUndefined();
 
       const off = await send({ op: "toggleAutoBridge" });
       expect(off).toMatchObject({ ok: true, value: false });
@@ -78,9 +90,21 @@ export function describeCommandContract(name: string, makePort: () => SimPort, o
 
       expect(await send({ op: "setTowerName", name: "Contract Tower" })).toMatchObject({ ok: true });
       expect((await saved(port)).towerName).toBe("Contract Tower");
+      // Half of an emoji's surrogate pair is kept as U+FFFD, as the Rust engine reads it.
+      expect(await send({ op: "setTowerName", name: "Tower \uD83C" })).toMatchObject({ ok: true });
+      expect((await saved(port)).towerName).toBe("Tower \uFFFD");
+      expect(await send({ op: "emit", text: "Bulletin \uDF06" })).toMatchObject({ ok: true });
+      const log = (await saved(port)).log ?? [];
+      expect(log[log.length - 1]?.text).toBe("Bulletin \uFFFD");
       const camera = { tile: t.mid, floor: 3, zoom: 2 };
-      expect(await send({ op: "setView", view: camera })).toMatchObject({ ok: true });
+      // The tower keeps the camera's fields only, and a copy of them.
+      expect(await send({ op: "setView", view: { ...camera, pan: 9 } as typeof camera })).toMatchObject({ ok: true });
       expect((await saved(port)).view).toEqual(camera);
+      expect(await send({ op: "setView", view: { tile: t.mid, floor: 2 } })).toMatchObject({ ok: true });
+      expect((await saved(port)).view).toEqual({ tile: t.mid, floor: 2 });
+      expect(await send({ op: "setView", view: camera })).toMatchObject({ ok: true });
+      camera.floor = 4;
+      expect((await saved(port)).view).toEqual({ ...camera, floor: 3 });
       expect(await send({ op: "setView", view: null })).toMatchObject({ ok: true });
       expect((await saved(port)).view ?? null).toBeNull();
       port.tick(1);
@@ -134,6 +158,35 @@ export function describeCommandContract(name: string, makePort: () => SimPort, o
       for (const x of tiles) expect(queued.view.tower.structureKindAt(1, x)).toBe("lobby");
     });
 
+    it("repeats its passes while one lays a tile, and lays a repeated column once", async () => {
+      const brushed = start(makePort);
+      const oneByOne = start(makePort);
+      const mid = lobbyCenter(brushed);
+      const right = lobbyRight(brushed, mid);
+      for (const port of [brushed, oneByOne]) expect(await sender(port)({ op: "setAutoBridge", value: false })).toMatchObject({ value: false });
+      brushed.drainEvents({ release: true });
+      oneByOne.drainEvents({ release: true });
+
+      // Without bridging, a lobby tile must touch the tower: each pass lays
+      // the one tile next to the last, so three passes lay all three.
+      const lobby = await sender(brushed)({ op: "paintBrush", kind: "lobby", floor: 1, tiles: [right + 2, right + 1, right] });
+      const passes = [right + 2, right + 1, right, right + 2, right + 1, right + 2];
+      const builds: CommandResult<{ op: "build"; kind: "lobby"; floor: number; x: number }>[] = [];
+      for (const x of passes) builds.push(await sender(oneByOne)({ op: "build", kind: "lobby", floor: 1, x }));
+      expect(builds.map((b) => b.ok)).toEqual([false, false, true, false, true, true]);
+      expect(lobby).toMatchObject({ ok: true, placed: 3, reason: builds[0].reason });
+      expect(lobby.delta).toBe(builds.reduce((sum, b) => sum + b.delta, 0));
+
+      const floor = await sender(brushed)({ op: "paintBrush", kind: "floor", floor: 2, tiles: [right - 1, right - 1, right - 2] });
+      const single = [await sender(oneByOne)({ op: "build", kind: "floor", floor: 2, x: right - 1 }), await sender(oneByOne)({ op: "build", kind: "floor", floor: 2, x: right - 2 })];
+      expect(floor).toEqual({ ok: true, placed: 2, delta: single[0].delta + single[1].delta });
+
+      expect(brushed.drainEvents({ release: true })).toEqual(oneByOne.drainEvents({ release: true }));
+      expect(await brushed.save()).toBe(await oneByOne.save());
+      brushed.tick(1);
+      oneByOne.tick(1);
+    });
+
     it("refuses each command it cannot run, and moves nothing", async () => {
       const port = start(makePort);
       const t = await furnish(port);
@@ -184,13 +237,21 @@ export function describeCommandContract(name: string, makePort: () => SimPort, o
         { op: "build", kind: "office", floor: 4, x: t.mid + 0.5 },
         { op: "build", kind: "office", floor: 4, x: "5" },
         { op: "build", kind: "castle", floor: 4, x: t.mid },
+        { op: "build", kind: "constructor", floor: 4, x: t.mid },
+        { op: "build", kind: "__proto__", floor: 4, x: t.mid },
+        { op: "build", kind: "office", floor: 4, x: 2 ** 31 },
+        { op: "__proto__" },
         { op: "paintBrush", kind: "floor", floor: 4, tiles: "abc" },
         { op: "paintBrush", kind: "floor", floor: 4, tiles: [t.mid, 1.5] },
         { op: "paintBrush", kind: "office", floor: 4, tiles: [t.mid] },
+        // eslint-disable-next-line no-sparse-arrays
+        { op: "paintBrush", kind: "floor", floor: 4, tiles: [t.mid, , t.mid + 1] },
+        { op: "paintBrush", kind: "floor", floor: 4, tiles: Array.from({ length: 33 }, () => t.mid) },
         { op: "buildTransport", kind: "elevatorStandard", x: Number.NaN, bottom: 1, top: 2 },
         { op: "buildTransport", kind: "lift", x: t.mid, bottom: 1, top: 2 },
         { op: "removeFacility", id: Number.NaN, method: "sell" },
         { op: "removeFacility", id: t.office, method: "explode" },
+        { op: "removeFacility", id: t.office, method: "toString" },
         { op: "beginExtend", id: "1" },
         { op: "extendTransport", id: t.shaft, end: "sideways", targetFloor: 4 },
         { op: "extendTransport", id: t.shaft, end: "up", targetFloor: 3.5 },
@@ -206,6 +267,7 @@ export function describeCommandContract(name: string, makePort: () => SimPort, o
         { op: "setNoRate", id: Number.POSITIVE_INFINITY },
         { op: "priceUnit", id: t.office, target: Number.NaN },
         { op: "applyRentBatch", kind: "castle", target: "default" },
+        { op: "applyRentBatch", kind: "constructor", target: "default" },
         { op: "applyRentBatch", kind: "office", target: "highest" },
         { op: "applyRentBatch", kind: "office", target: "default", onlyDefaultPriced: "yes" },
         { op: "setFilmPolicy", id: t.office, policy: "matinee" },
@@ -239,8 +301,8 @@ export function describeCommandContract(name: string, makePort: () => SimPort, o
         port.command({ op: "clearStops", id: t.shaft }),
         port.command({ op: "setTowerName", name: "First" }),
         port.command({ op: "setTowerName", name: "Second" }),
-        port.command({ op: "toggleAutoBridge" }),
-        port.command({ op: "toggleAutoBridge" }),
+        port.command({ op: "setAutoBridge", value: false }),
+        port.command({ op: "setAutoBridge", value: true }),
       ];
       const results = await Promise.all(order);
       expect(results.map((r) => r.ok)).toEqual([true, true, true, true, true, true]);
@@ -296,6 +358,8 @@ interface SavedSettings {
   towerName?: string;
   view?: unknown;
   units: { id: number; rent?: number }[];
+  transports: { id: number; schedule?: unknown }[];
+  log?: { text: string }[];
 }
 
 async function saved(port: SimPort): Promise<SavedSettings> {

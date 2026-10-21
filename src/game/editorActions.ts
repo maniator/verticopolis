@@ -156,8 +156,9 @@ export class EditorActions {
             return;
           }
           this.deps.captureUndo("Set elevator schedule");
-          await this.deps.port.command({ op: "setSchedule", id: shaft.id, schedule });
+          const res = await this.deps.port.command({ op: "setSchedule", id: shaft.id, schedule });
           this.deps.commitUndo();
+          if (!res.ok) return this.refuse(res.reason ?? "That schedule could not be saved.");
           this.deps.audio.sfx("build");
           this.deps.announce("Elevator schedule saved.");
           this.deps.refreshEditor();
@@ -213,9 +214,13 @@ export class EditorActions {
           this.deps.captureUndo("Set prices");
           const res = await this.deps.port.command({ op: "applyRentBatch", kind, target, onlyDefaultPriced: opts.onlyDefaultPriced });
           this.deps.commitUndo();
-          // The dialog offers only priced kinds and their targets, so the
-          // engine answers with a tally.
-          return res.batch!;
+          // The dialog offers only priced kinds and their targets, so a refusal
+          // is the engine's call; say why and let the dialog close unsummed.
+          if (!res.ok || !res.batch) {
+            this.refuse(res.reason ?? "Those prices could not be set.");
+            return null;
+          }
+          return res.batch;
         },
         onApplied: (summary) => {
           this.deps.audio.sfx("build");

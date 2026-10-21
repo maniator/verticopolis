@@ -191,7 +191,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
         // emergency_choice from it; a timed-out auto-decline carries source
         // timeout and reports nothing. The freeze latch holds until the engine
         // has answered, so no frame sees the choice still pending and asks again.
-        void app.port.command({ op: "resolveChoice", accept: opt === "accept" }).then(() => {
+        void app.port.command({ op: "resolveChoice", accept: opt === "accept" }).finally(() => {
           app.shownChoice = false;
         });
       });
@@ -240,11 +240,7 @@ export function emitMealRushes(app: GameApp, minutesBeforeTicks: number): void {
   // every frame. Same defensive posture as timePacing's finite guards.
   if (!Number.isFinite(after) || !Number.isFinite(minutesBeforeTicks)) return;
   const cal = app.sim.clock.calendar;
-  // Tenant-count floor: silence bulletins in a very small tower (1-star lot
-  // with a handful of rooms), so the log does not chatter through the early
-  // game. 30 occupied tenants is a modest bar; a mid-star tower clears it.
-  const tenants = app.sim.tower.totalPopulation();
-  if (tenants < 30) return;
+  let tenants: number | undefined;
   // Emit each meal's bulletin once per day at the START of its window.
   // Anchoring on the frame START keeps the crossing check correct for a
   // single huge frame that leaps past the hour boundary; the calendar-aware
@@ -261,6 +257,12 @@ export function emitMealRushes(app: GameApp, minutesBeforeTicks: number): void {
       lastFiredDay: app.lastMealRushDay[kind],
     });
     if (!fire) return;
+    // Tenant-count floor: silence bulletins in a very small tower (1-star lot
+    // with a handful of rooms), so the log does not chatter through the early
+    // game. 30 occupied tenants is a modest bar; a mid-star tower clears it.
+    // Counted only when a rush is due, so a frame without one walks no units.
+    tenants ??= app.sim.tower.totalPopulation();
+    if (tenants < 30) return;
     app.lastMealRushDay[kind] = dayOfKind;
     void app.port.command({ op: "emit", text, kind: "info" });
   };

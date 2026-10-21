@@ -87,10 +87,11 @@ test("the car, extend and removal commands charge inside the WASM engine", async
       steps.push({ step, ok: res.ok, delta: res.delta ?? g.sim.money - pageBefore, engineMoved: engine.money() - engineBefore, agree: engine.money() === g.sim.money });
     };
     if (setupOk) {
-      await run("add car", () => g.sim.addCar(shaft.id));
-      await run("remove car", () => g.sim.removeCar(shaft.id));
-      await run("remove last car", () => g.sim.removeCar(shaft.id));
-      await run("extend up", () => g.sim.extendTransport(shaft.id, "up", 3));
+      // Through the port, as the editor sends them.
+      await run("add car", () => g.port.command({ op: "addCar", id: shaft.id }));
+      await run("remove car", () => g.port.command({ op: "removeCar", id: shaft.id }));
+      await run("remove last car", () => g.port.command({ op: "removeCar", id: shaft.id }));
+      await run("extend up", () => g.port.command({ op: "extendTransport", id: shaft.id, end: "up", targetFloor: 3 }));
       // The removal helpers answer a bare boolean, so the delta is the page's own change.
       await run("sell office", async () => ({ ok: await g.build.tryRemoveUnit(office, "sell") }));
       await run("bulldoze shaft", async () => ({ ok: await g.build.removeTransportWithRefund(shaft, "bulldoze") }));

@@ -1,4 +1,5 @@
 import type { FacilityKind } from "../engine/types";
+import type { BrushKind } from "./commands";
 
 /** One build's answer, as the engines give it. */
 export interface BrushBuild {
@@ -24,7 +25,7 @@ export interface BrushBuild {
  * command, so no step runs between the tiles.
  */
 export function runBrush(
-  kind: FacilityKind,
+  kind: BrushKind,
   floor: number,
   tiles: ReadonlyArray<number>,
   structureKindAt: (floor: number, x: number) => "floor" | "lobby" | undefined,

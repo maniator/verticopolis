@@ -57,6 +57,7 @@ src/render/pixelSprites/food.ts Crowd
 src/render/pixelSprites/residential.ts Crowd
 src/render/sprites/facilities/venue.ts Crowd
 src/render/sprites/transport.ts facilities
+src/simport/tsSim.ts wellFormed # the TypeScript adapter repairs command text as the Rust binding reads it (facade slice 2); it retires with src/engine/
 src/ui/templates/editor.ts facilities gameRules residentialRentals types
 src/ui/templates/inspector.ts facilities types
 src/ui/templates/stats.ts Ledger facilities types

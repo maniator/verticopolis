@@ -5,6 +5,7 @@ import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import type { SimPort } from "../simport/port";
+import type { BrushKind } from "../simport/commands";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
 import { towerCatalog } from "../engine/towerCatalog";
 
@@ -62,10 +63,11 @@ export class BuildActions {
     return res.ok;
   }
 
-  /** Place a transport span with the usual build/error feedback. Prefers the
-   *  build's own failure reason (e.g. "Not enough money.") and falls back to
-   *  the placement diagnosis when the build didn't say why. Returns the
-   *  outcome (with the shown reason) for callers that also announce it. */
+  /** Place a transport span with the usual build/error feedback. On a refusal
+   *  it prefers the build's own reason (e.g. "Not enough money.") and falls
+   *  back to the placement diagnosis when the build didn't say why; a placed
+   *  span is not diagnosed. Returns the outcome (with the shown reason) for
+   *  callers that also announce it. */
   async tryBuildTransport(
     kind: FacilityKind,
     x: number,
@@ -74,7 +76,7 @@ export class BuildActions {
   ): Promise<{ ok: boolean; reason: string }> {
     const res = await this.deps.port.command({ op: "buildTransport", kind, x, bottom, top });
     this.deps.audio.sfx(res.ok ? "build" : "error");
-    const reason = res.reason ?? (await this.transportReason(kind, x, bottom, top));
+    const reason = res.reason ?? (res.ok ? "" : await this.transportReason(kind, x, bottom, top));
     if (!res.ok) this.deps.ui.toast(reason, "bad");
     return { ok: res.ok, reason };
   }
@@ -90,12 +92,12 @@ export class BuildActions {
   }
 
   /** Lay a brush strip; resolves to how many tiles were actually placed and,
-   *  when zero, why. Zero is always the not-placed path for callers — the
+   *  when zero, why. Zero is always the not-placed path for callers; the
    *  reason just distinguishes a harmless no-op (the strip already carries
    *  this kind: "already built here") from a real refusal (no support, no
    *  money), which carries the engine's reason. The strip is one port command
    *  (`paintBrush`), so no step falls between its tiles. */
-  async paintBrush(kind: FacilityKind, tile: number, floor: number): Promise<{ placed: number; reason?: string }> {
+  async paintBrush(kind: BrushKind, tile: number, floor: number): Promise<{ placed: number; reason?: string }> {
     const tiles = brushTiles(tile);
     // The run anchor is gesture state, set as the press lands so a drag step
     // that arrives before the answer extends from it.
@@ -164,8 +166,9 @@ export class BuildActions {
    * (as in the original) instead of scattered slabs when the drag moves fast.
    * Cells are built outward from the anchor so each is adjacent to existing
    * structure; midair cells simply fail to place, exactly as you'd expect.
+   * Settles once the engine has answered every step; the anchor moves at once.
    */
-  paintFloorRun(kind: FacilityKind, tile: number, floor: number): void {
+  paintFloorRun(kind: FacilityKind, tile: number, floor: number): Promise<void> {
     if (!this.paint || this.paint.floor !== floor) {
       // snapX (not clampTile) so a wide unit's FOOTPRINT stays on-lot: a tap at
       // the right edge left-shifts to fit instead of silently failing off-lot.
@@ -173,22 +176,24 @@ export class BuildActions {
       // Record the SNAPPED anchor (what was actually placed), so a later drag-run
       // extends from the placed unit, not an off-lot raw tile near the edge.
       const seedX = snapX(towerCatalog(this.deps.getSim()), kind, tile);
-      void this.tryBuild(kind, floor, seedX, true);
+      const seeded = this.tryBuild(kind, floor, seedX, true);
       this.paint = { tile: seedX, floor };
-      return;
+      return seeded.then(() => undefined);
     }
-    // Quiet drag steps: issued in order and not awaited, so the port runs
+    // Quiet drag steps: issued in order before any answer, so the port runs
     // them back to back and the anchor below moves at once.
+    const steps: Promise<boolean>[] = [];
     for (const x of dragRunTiles(this.paint.tile, tile)) {
       // snapX each column so a WIDE unit near the right edge still lands on-lot
       // (its footprint would otherwise run off; width-1 floor/lobby is unchanged).
-      void this.tryBuild(kind, floor, snapX(towerCatalog(this.deps.getSim()), kind, x), true);
+      steps.push(this.tryBuild(kind, floor, snapX(towerCatalog(this.deps.getSim()), kind, x), true));
     }
     // Record the SNAPPED anchor (what actually landed), not the raw pointer tile:
     // for a wide kind near the right edge snapX left-shifts the placement, so a
     // raw anchor would make the next drag step recompute from an off-lot column
     // and misfire. Identical to `tile` for width-1 floor/lobby.
     this.paint = { tile: snapX(towerCatalog(this.deps.getSim()), kind, tile), floor };
+    return Promise.all(steps).then(() => undefined);
   }
 
   /**

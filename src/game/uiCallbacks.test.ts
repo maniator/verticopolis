@@ -156,6 +156,16 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(cb.isSteadyClock()).toBe(true);
   });
 
+  it("the bridging switch is a port command that resolves to the engine's answer", async () => {
+    const { ports } = makePorts();
+    const cb = createUICallbacks(ports);
+    // The fake engine answers false while the live sim still reads true: the
+    // switch takes the answer.
+    expect(await cb.onToggleAutoBridge()).toBe(false);
+    expect(ports.port.command).toHaveBeenCalledExactlyOnceWith({ op: "toggleAutoBridge" });
+    expect(cb.isAutoBridge()).toBe(true);
+  });
+
   it("onboarding, rename, stats, inspector close", () => {
     const { ports } = makePorts();
     const cb = createUICallbacks(ports);

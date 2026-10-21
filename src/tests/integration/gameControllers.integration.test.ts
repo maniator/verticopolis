@@ -256,7 +256,7 @@ describe("EditorActions (editor-card money paths)", () => {
     expect(sel).toBeNull();
   });
 
-  it("mobile editor folds in the card's diagnostics and drops the duplicate access row", async () => {
+  it("mobile editor folds in the card's diagnostics and drops the duplicate access row", () => {
     const { sim, office } = fixture();
     const mobile = renderedCard(unitEditorTemplate(sim, office, true));
     const desktop = renderedCard(unitEditorTemplate(sim, office, false));
@@ -273,7 +273,7 @@ describe("EditorActions (editor-card money paths)", () => {
     expect(desktop.querySelector('[data-field="diagnostics"]')).toBeNull();
   });
 
-  it("mobile editor keeps the access row for a zero-population service kind (no diagnostics access line)", async () => {
+  it("mobile editor keeps the access row for a zero-population service kind (no diagnostics access line)", () => {
     const sim = new Simulation();
     for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
@@ -287,7 +287,7 @@ describe("EditorActions (editor-card money paths)", () => {
     expect(renderedCard(unitEditorTemplate(sim, sec, true)).textContent).toContain("Elevator access");
   });
 
-  it("mobile editor folds the retail patronage block into a shop's panel", async () => {
+  it("mobile editor folds the retail patronage block into a shop's panel", () => {
     const sim = new Simulation();
     for (let x = 10; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 10; x < 40; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
@@ -359,7 +359,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
     });
   });
 
-  it("newGame adopts a fresh sim (the dep's shape forbids preserving the undo trail)", async () => {
+  it("newGame adopts a fresh sim (the dep's shape forbids preserving the undo trail)", () => {
     // SaveLoadDeps.adoptSim deliberately takes no preserveHistory flag — the
     // type itself now guarantees a tower swap through this module invalidates
     // the undo history, so Undo can never resurrect the abandoned tower.
@@ -383,7 +383,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
     expect(vi.mocked(f.ui.sayVisibly).mock.calls[0][0]).toMatch(/^Import failed: /);
   });
 
-  it("Quick Save surfaces a quota failure honestly: failure toast, no success toast, no escaped throw (AUD-010)", async () => {
+  it("Quick Save surfaces a quota failure honestly: failure toast, no success toast, no escaped throw (AUD-010)", () => {
     // Instance spy, the storage suite's idiom: prototype spies do not re-arm
     // reliably after a mockRestore in the same file.
     const spy = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
@@ -410,7 +410,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
     localStorage.clear();
   });
 
-  it("a camera-stamp throw (context-lost engine) reaches the same failure toast, never the click handler", async () => {
+  it("a camera-stamp throw (context-lost engine) reaches the same failure toast, never the click handler", () => {
     // getView -> engine.viewState() can throw on a disposed/context-lost
     // engine; the manual path's no-escaped-throw contract covers the stamp
     // too, while the silent path still propagates it to its own callers.
@@ -431,7 +431,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
     expect(() => throwing.save(true)).toThrow(/context lost/);
   });
 
-  it("the SILENT save path still throws on a storage failure (saveBeforeUpdate's callers rely on it)", async () => {
+  it("the SILENT save path still throws on a storage failure (saveBeforeUpdate's callers rely on it)", () => {
     // saveBeforeUpdate must not reload on a failed write, and the context-loss
     // flush words the failure on the crash screen: both catch the throw
     // themselves, so the quota guard on the manual path must not swallow it.
@@ -474,7 +474,7 @@ describe("InspectorController (✕-dismissal latch)", () => {
     liftPick = { type: "transport", id: lift.id, kind: "elevatorStandard" };
   });
 
-  it("resetLatch spends the dismissal: the peek path's fresh-intent seam re-raises the card (#696)", async () => {
+  it("resetLatch spends the dismissal: the peek path's fresh-intent seam re-raises the card (#696)", () => {
     inspector.inspectPicked(officePick);
     inspector.dismiss();
     const calls = shown.length;
@@ -491,7 +491,7 @@ describe("InspectorController (✕-dismissal latch)", () => {
     expect(last(shown)).toContain(FACILITIES.office.name);
   });
 
-  it("dismiss latches the target: same-facility hover picks stay closed, null picks don't spend it", async () => {
+  it("dismiss latches the target: same-facility hover picks stay closed, null picks don't spend it", () => {
     inspector.inspectPicked(officePick);
     expect(last(shown)).toContain(FACILITIES.office.name);
     expect(anchor).toEqual({ x: office.x + office.width, left: office.x, floor: office.floor });
@@ -506,7 +506,7 @@ describe("InspectorController (✕-dismissal latch)", () => {
     expect(last(shown)).toBeNull();
   });
 
-  it("picking a DIFFERENT facility spends the latch", async () => {
+  it("picking a DIFFERENT facility spends the latch", () => {
     inspector.inspectPicked(officePick);
     inspector.dismiss();
     inspector.inspectPicked(liftPick); // different facility opens…
@@ -515,7 +515,7 @@ describe("InspectorController (✕-dismissal latch)", () => {
     expect(last(shown)).toContain(FACILITIES.office.name);
   });
 
-  it("clear() and resetLatch() drop the latch (tower swap / explicit tap)", async () => {
+  it("clear() and resetLatch() drop the latch (tower swap / explicit tap)", () => {
     inspector.inspectPicked(officePick);
     inspector.dismiss();
     inspector.clear(); // adoptSim path: recycled ids must not stay muted
@@ -604,7 +604,7 @@ describe("KeyboardPlay (commit announcements)", () => {
     keyboard.moveCursor(0, 0); // first move reveals the cursor at (mid, 1)
     keyboard.moveCursor(0, 1); // up to floor 2, above the lobby strip
     tool = { type: "build", kind: "floor" };
-    await keyboard.commitCursor(); // paints on floor 3 support? no — floor 2 already built…
+    await keyboard.commitCursor(); // paints on floor 3 support? no: floor 2 already built…
     // …so the honest line is the "already built here" reason, verbatim.
     expect(last(announced)).toBe(announceForPlacement({ what: "paint", ok: false, reason: "Floor already built here" }, CAT, "floor", 2));
     keyboard.moveCursor(0, 1); // floor 3: fresh tiles above the strip
@@ -644,7 +644,7 @@ describe("KeyboardPlay (commit announcements)", () => {
     await keyboard.commitCursor(); // office sits under the cursor
     expect(undoLog).toEqual(["capture:Bulldoze", "commit"]);
     undoLog.length = 0;
-    await keyboard.commitCursor(); // nothing left here — no capture for a no-op
+    await keyboard.commitCursor(); // nothing left here, so no capture for a no-op
     expect(last(announced)).toBe("Nothing to bulldoze here");
     expect(undoLog).toEqual([]);
     // Inspect commits never touch undo.
@@ -670,7 +670,7 @@ describe("InspectorController (data-rich cards: parking, recycling, notice)", ()
     return { inspector, shown };
   }
 
-  it("a parking ramp shows the tower-wide demand line; a chained space reads connected, an orphan reads dead", async () => {
+  it("a parking ramp shows the tower-wide demand line; a chained space reads connected, an orphan reads dead", () => {
     const sim = new Simulation();
     for (let x = 10; x < 46; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 10; x < 46; x++) expect(sim.tower.place("floor", 0, x).ok).toBe(true);
@@ -691,7 +691,7 @@ describe("InspectorController (data-rich cards: parking, recycling, notice)", ()
     expect(last(shown)).toContain("dead");
   });
 
-  it("a recycling center shows its fill and the capacity/demand verdict", async () => {
+  it("a recycling center shows its fill and the capacity/demand verdict", () => {
     const sim = new Simulation();
     for (let x = 10; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (const f of [0, -1]) for (let x = 10; x < 40; x++) expect(sim.tower.place("floor", f, x).ok).toBe(true);
@@ -704,7 +704,7 @@ describe("InspectorController (data-rich cards: parking, recycling, notice)", ()
     expect(last(shown)).toMatch(/demand met|Over capacity/);
   });
 
-  it("a tenant on notice spells out the cause, a time bound, and the recovery target", async () => {
+  it("a tenant on notice spells out the cause, a time bound, and the recovery target", () => {
     const { sim, office } = fixture();
     office.state = "vacating";
     office.vacateReason = "rent";

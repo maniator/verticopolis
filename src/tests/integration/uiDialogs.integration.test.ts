@@ -1861,6 +1861,17 @@ describe("showSettings: the Settings dialog", () => {
     expect(sw.checked).toBe(true);
   });
 
+  it("puts the Modern bridging switch back on the live preference when the toggle fails", async () => {
+    const toggle = vi.fn(() => Promise.reject(new Error("engine fault")));
+    const { ui } = makeUI({ getMode: () => "modern" as const, isAutoBridge: vi.fn(() => true), onToggleAutoBridge: toggle });
+    ui.showSettings();
+    const sw = dialog().querySelector<HTMLInputElement>("#set-auto-bridge")!;
+    sw.click();
+    expect(sw.checked).toBe(false);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sw.checked).toBe(true);
+  });
+
   it("disables the Reduced motion switch with a (system) suffix when the OS forces it", () => {
     const original = window.matchMedia;
     window.matchMedia = (media: string) =>
@@ -2273,6 +2284,17 @@ describe("showBatchPricingDialog — set-all rent/price with a reset confirm", (
     expect(dialog().open).toBe(false);
   });
 
+  it("applies once while the engine answers, and closes without a summary on a refusal", async () => {
+    const { apply, onApplied } = open();
+    apply.mockImplementationOnce(async () => null as never);
+    dialog().querySelector<HTMLButtonElement>("#bp-apply")!.click();
+    dialog().querySelector<HTMLButtonElement>("#bp-apply")!.click();
+    expect(apply).toHaveBeenCalledOnce();
+    await apply.mock.results[0].value;
+    expect(onApplied).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
+
   it("a bulk Reset-to-default requires a confirming second click", () => {
     const { apply } = open();
     // Select "Reset to default" — set its radio and clear the sibling explicitly
@@ -2378,6 +2400,17 @@ describe("showBatchPricingDialog — the Classic ladder variant (rung picker + a
     expect(onApplied).toHaveBeenCalledWith("Took 9 offices off the market (No Rate).");
   });
 
+  it("applies a rung once while the engine answers, and closes without a summary on a refusal", async () => {
+    const { apply, onApplied } = openLadder();
+    apply.mockImplementationOnce(async () => null as never);
+    applyBtn().click();
+    applyBtn().click();
+    expect(apply).toHaveBeenCalledOnce();
+    await apply.mock.results[0].value;
+    expect(onApplied).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
+
   it("any other change disarms a pending No Rate confirm", () => {
     const { apply } = openLadder();
     pick("noRate");
@@ -2447,7 +2480,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   }
   function open(over: Partial<ScheduleDialogCtx> = {}) {
     const { ui } = makeUI();
-    const apply = vi.fn();
+    const apply = vi.fn(async (_schedule: any) => {});
     ui.showElevatorScheduleDialog(baseCtx(over), { apply });
     return { ui, apply };
   }
@@ -2486,8 +2519,10 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   const okBtn = () => dialog().querySelector<HTMLButtonElement>('[data-act="apply"]')!;
   const simText = () => dialog().querySelector(".es-sim")!.textContent!;
 
-  it("opens with every hour at the full fleet, homes at the base lobby, and the defaults", () => {
+  it("opens with every hour at the full fleet, homes at the base lobby, and the defaults", async () => {
     const { apply } = open();
+    okBtn().click();
+    // One OK per open, and the dialog closes once the engine has answered.
     okBtn().click();
     expect(apply).toHaveBeenCalledOnce();
     const s = apply.mock.calls[0][0];
@@ -2496,6 +2531,9 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(s.homeFloors).toEqual([1, 1, 1, 1]);
     expect(s.waitingCarResponse).toBe(0);
     expect(s.standardFloorDeparture).toBe(48);
+    expect(dialog().open).toBe(true);
+    await apply.mock.results[0].value;
+    await Promise.resolve();
     expect(dialog().open).toBe(false);
   });
 
@@ -2725,7 +2763,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     hourly[8] = 0.9;
     const { ui } = makeUI();
     const current = { activeCars: { weekday: Array(24).fill(1) } };
-    ui.showElevatorScheduleDialog(baseCtx({ hourly: { weekday: hourly }, current }), { apply: vi.fn() });
+    ui.showElevatorScheduleDialog(baseCtx({ hourly: { weekday: hourly }, current }), { apply: vi.fn(async () => {}) });
     const advice = dialog().querySelector(".es-advice");
     expect(advice).not.toBeNull();
     expect(advice!.textContent).toBe("This shaft is short at 08:00 on weekdays.");
@@ -2738,7 +2776,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     // which must read as one 00:00-23:00 span, not 24 comma'd stamps.
     const hourly = Array(24).fill(0.9);
     const { ui } = makeUI();
-    ui.showElevatorScheduleDialog(baseCtx({ hourly: { weekday: hourly }, current: { activeCars: { weekday: Array(24).fill(1) } } }), { apply: vi.fn() });
+    ui.showElevatorScheduleDialog(baseCtx({ hourly: { weekday: hourly }, current: { activeCars: { weekday: Array(24).fill(1) } } }), { apply: vi.fn(async () => {}) });
     expect(dialog().querySelector(".es-advice")!.textContent).toBe("This shaft is short at 00:00–23:00 on weekdays.");
   });
 
@@ -2797,7 +2835,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     const { ui } = makeUI();
     ui.showElevatorScheduleDialog(
       baseCtx({ hourly: { weekday: hourly }, current: { activeCars: { weekday: Array(24).fill(1), weekend: Array(24).fill(1) } } }),
-      { apply: vi.fn() },
+      { apply: vi.fn(async () => {}) },
     );
     expect(dialog().querySelector(".es-legend")).not.toBeNull();
     expect(dialog().querySelector(".es-advice")!.textContent).toContain("on weekdays");
@@ -2937,13 +2975,17 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(apply.mock.calls[0][0].homeFloors[0]).not.toBe(5); // snapped off the skipped floor
   });
 
-  it("stop edits do not arm the discard guard (they applied live; Cancel cannot take them back)", () => {
-    open();
+  it("stop edits do not arm the discard guard (they applied live; Cancel cannot take them back)", async () => {
+    const announce = vi.fn();
+    open({ announce });
     const serve = dialog().querySelectorAll<HTMLInputElement>(".es-grid input[type=checkbox]")[1];
     serve.checked = false;
     serve.dispatchEvent(new Event("change", { bubbles: true }));
     dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click();
     expect(dialog().open).toBe(false); // closed at once: no schedule edit pending
+    // The answer lands after the close: the gone dialog neither repaints nor speaks.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(announce).not.toHaveBeenCalled();
   });
 
   it("the bulk stop quick actions ride the port and announce once it answers", async () => {
