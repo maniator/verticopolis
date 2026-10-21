@@ -127,7 +127,7 @@ error does; see above.)
 | `engine_requested` | `ts`, `wasm`, `wasm-frame`, `wasm-worker` | The engine the page life asked for (`?engine=` or `vc.engine`; `ts` when neither is set). A wasm-only build always sends `wasm`, whatever the URL says. |
 | `engine` | `ts`, `wasm`, `wasm-frame`, `wasm-worker`, `ts-fallback`, `none` | What runs when the row is sent. `ts-fallback` is a switchable build back on TypeScript; `none` is a wasm-only build that stopped. After a fallback it stays `ts-fallback` for the rest of the page life. After a running engine's fault (#874) that is exact, since no later tower is hosted; after a refused tower the host can take a later one again, and no row reports that. |
 | `build` | `switchable`, `wasm-only` | The bundle kind (`src/build/engineBundle.ts`) |
-| `fallback_reason` | `none`, `boot-timeout`, `boot-error`, `package-mismatch`, `attach-refused`, `trap-command`, `trap-tick`, `trap-undo`, `other` | The latest fallback's reason. `package-mismatch` is a package this shell cannot use (engine files that are not the package this shell was built with, which the page's byte check refuses (#985), missing exports, a link error, a catalog of another version or one this build cannot draw, or, in a wasm-only build, no save writer), which is the deploy race (#1046), and sits outside the rate. (After the byte check has passed, a link error or a missing export is a broken build, not a mixed deploy, but it keeps this code for now.) `boot-error` also covers engine files that did not arrive whole or that the browser could not hash, until a code of their own is approved. `attach-refused` is a tower the host would not take, including an engine that could not hand over its catalog. `other` is a boot step outside the engine that failed after the worker host started, or, on a running engine, a save or the reads when a tower is let go. The three `trap-*` codes are a running engine's fault on the main-thread host (#874): a command (the undo capture's save just before an edit included), a tick, a frame sync or the per-frame event drain, and anything during an undo or redo. |
+| `fallback_reason` | `none`, `boot-timeout`, `boot-error`, `package-mismatch`, `unverifiable`, `attach-refused`, `trap-command`, `trap-tick`, `trap-undo`, `other` | The latest fallback's reason. `package-mismatch` is a package this shell cannot use (engine files that are not the package this shell was built with, which the page's byte check refuses (#985), missing exports, a link error, a catalog of another version or one this build cannot draw, or, in a wasm-only build, no save writer), which is the deploy race (#1046), and sits outside the rate. (After the byte check has passed, a link error or a missing export is a broken build, not a mixed deploy, but it keeps this code for now.) `unverifiable` is a browser that cannot hash the engine files (an insecure context, a disabled `crypto.subtle`, or a digest call that failed), so the page refuses to run them (#985): the files may be fine, so it sits outside the rate, on its own line, like `package-mismatch`. `boot-error` also covers engine files that did not arrive whole. `attach-refused` is a tower the host would not take, including an engine that could not hand over its catalog. `other` is a boot step outside the engine that failed after the worker host started, or, on a running engine, a save or the reads when a tower is let go. The three `trap-*` codes are a running engine's fault on the main-thread host (#874): a command (the undo capture's save just before an edit included), a tick, a frame sync or the per-frame event drain, and anything during an undo or redo. |
 | `fallback_stage` | `none`, `load`, `start`, `adopt`, `undo` | Where the latest fallback happened: loading the package, the first tower (or a boot step just after it, for `other`), a later tower (a load or new game) or an undo restore. For a running engine's fault, how the faulted tower was hosted |
 | `fallbacks` | integer | The running count for this page life. A reader takes its highest value per `page_life`, never the row count. |
 | `writer_latched` | boolean | The engine save writer turned itself off this page life (also `writerLatched` on `window.__vcEngineBoot`). A running engine's fault (#874) also turns the writer off, and is reported as that fallback rather than here |
@@ -157,42 +157,43 @@ lands in this table, with its reason, in the change that sends it.
 in production, as in the `session_lengths` view; a page life carrying a value
 the game never sends is left out and counted on its own line. The overall rate
 counts the sessions with a settled page life that ran the engine (one whose
-settle row already fell back on `package-mismatch` alone did not); a session
-is a fault when any of those page lives fell back for a reason other than
-`package-mismatch`, which is reported on its own line; overrides and the
-`unassigned` arm are left out unless asked for, and safety-suppressed page
+settle row already fell back on `package-mismatch` or `unverifiable` alone did
+not); a session is a fault when any of those page lives fell back for a reason
+other than those two, each of which is reported on its own line; overrides and
+the `unassigned` arm are left out unless asked for, and safety-suppressed page
 lives (which run TypeScript) are always left out and counted on their own
-line; the bound is the exact
-one-sided 95% Clopper-Pearson bound, by build and by arm as well. That rate is
-early telemetry. The 1,000-session gate counts (#1090; the owner's direction
-of 2026-10-21, which also counts the stage 1 and 2 floors this way) the engaged
-eligible cohort: sessions in the `wasm` arm, on the production host, chosen by
-the cohort, at stage 3, not safety-suppressed and not size-gated, on commits
-the gate review names, that engaged on the engine; a fault in any of their
-eligible page lives counts, one before the engagement too. Its rate and bound
-are conditional on engagement, so it is read beside the attempts rows, which
-keep every failure before engagement. A session with an override page life (a setting or the URL chose
+line; the bound is the exact one-sided 95% Clopper-Pearson bound, by build and
+by arm as well. That rate is early telemetry. The 1,000-session gate counts
+the engaged eligible cohort (#1090; the owner's direction of 2026-10-21):
+sessions in the `wasm` arm, on the production host, chosen by the cohort, at
+stage 3, not safety-suppressed and not size-gated, on commits the gate review
+names, that engaged on the engine; a fault in any of their eligible page lives
+counts, one before the engagement too. Its rate and bound are conditional on
+engagement, so it is read beside the attempts rows, which keep every failure
+before engagement. The stage 1 and 2 floors count engaged sessions at their
+own stage, by the same direction; the report does not compute that count yet
+(#1268). A session with an override page life (a setting or the URL chose
 either engine, an opt-out to TypeScript included) never qualifies; the report
-counts the sessions it left out and how many of them faulted. Beside
-the cohort, the eligible attempts row holds the same sessions engaged or not,
-so a fault that stopped a player engaging still shows, and the all-attempts
-safety denominator holds every session that asked for the engine, overrides
-and sessions that never engaged included; a size-gated page life is in it
-only when the engine faulted or engaged in it. Every WASM-arm session with an
+counts the sessions it left out and how many of them faulted. Beside the
+cohort, the eligible attempts row holds the same sessions engaged or not, so a
+fault that stopped a player engaging still shows, and the all-attempts safety
+denominator holds every session that asked for the engine, overrides and
+sessions that never engaged included; a size-gated page life is in it only
+when the engine faulted or engaged in it. Every WASM-arm session with an
 opt-out or a safety suppression is counted in the WASM arm's row, whether or
-not it also ran the engine; one that never ran the engine is outside the
-fault rate's N, and the report also prints the rate with those in N, as #1197
-words it (which reading the gate uses is pending the owner). A crash loop that
-a suppressed boot detects counts as a fault. Each population carries a second,
+not it also ran the engine; one that never ran the engine is outside the fault
+rate's N, and the report also prints the rate with those in N, as #1197 words
+it (which reading the gate uses is pending the owner). A crash loop that a
+suppressed boot detects counts as a fault. Each population carries a second,
 pessimistic bound that counts a page life that left before its first tower as
 a fault. The report also gives the candidate tail's attempts and engaged rows,
-an arm comparison by stage with the crash-rate interval, and the stop
-signals. Every
-rate is a lower bound: the relay has no offline queue and a per-IP limit, a
-tab closed or crashed while the engine loads sends nothing until the `attempt`
-row ships (and with it, is counted as having left, since nothing tells a crash
-from a close), and the worker host reports only its first tower. The scripts' header comments carry
-every rule and every gap.
+an arm comparison by stage with the crash-rate interval, and the stop signals.
+Every rate is a lower bound: the relay has no offline queue and a per-IP
+limit, a tab closed or crashed while the engine loads sends nothing until the
+`attempt` row ships (and with it, is counted as having left, since nothing
+tells a crash from a close), runtime traps are reported only from builds that
+carry #874, and the worker host reports only its first tower. The scripts'
+header comments carry every rule and every gap.
 
 ## Retention and deletion
 

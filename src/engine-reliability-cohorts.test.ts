@@ -256,6 +256,12 @@ describe("the all-attempts safety denominator", () => {
     expect(c.eligibleAttempts.n).toBe(0);
     // A mismatch met after the first tower ran the engine without a fault.
     expect(run([life({ fallbacks: 1, reasons: ["package-mismatch"] })]).attempts).toMatchObject({ sessions: 1, faults: 0 });
+    // A browser that cannot hash the engine files (#985) reads the same way, and never repeats.
+    const unverifiable = { fallbacks: 1, settleFallbacks: 1, reasons: ["unverifiable"], engaged: false };
+    const u = run([life({ session: "a", ...unverifiable }), life({ session: "b", ...unverifiable })]);
+    expect(u.attempts).toMatchObject({ sessions: 0, faults: 0 });
+    expect(u.stopSignals).toEqual([]);
+    expect(run([life({ fallbacks: 1, reasons: ["unverifiable"] })]).attempts).toMatchObject({ sessions: 1, faults: 0 });
   });
 
   it("puts an override to an uncounted WASM host in no population, never among the opt-outs", () => {

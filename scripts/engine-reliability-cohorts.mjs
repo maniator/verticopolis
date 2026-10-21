@@ -46,11 +46,12 @@
  *   where the old mirror host cannot run under `wasm`), at stage 3, chosen by
  *   the cohort (a setting, a URL or the safety latch never qualifies), not
  *   suppressed, not size-gated, settled, and having run the engine (a settle
- *   that already fell back on `package-mismatch` alone did not). It engaged
- *   when its `engaged` row says a WASM engine was running. A fault in any
- *   eligible page life of the session counts, one before the engagement
- *   included. Its rate and bounds are conditional on engagement, so it is read
- *   beside the attempts rows, which keep every failure before engagement.
+ *   that already fell back on `package-mismatch` or `unverifiable` alone did
+ *   not). It engaged when its `engaged` row says a WASM engine was running. A
+ *   fault in any eligible page life of the session counts, one before the
+ *   engagement included. Its rate and bounds are conditional on engagement, so
+ *   it is read beside the attempts rows, which keep every failure before
+ *   engagement.
  * - The TAIL: the eligible attempts and the engaged cohort on the commits the
  *   candidate review names.
  *
@@ -105,12 +106,12 @@ export const COMPARED_ARMS = ["wasm", "ts"];
 /** Whether the player or the URL chose this page life's engine. */
 export const isOverride = (pl) => OVERRIDE_SELECTIONS.includes(pl.selectedBy);
 
-/** Whether the page life fell back for an engine fault: any reason but
- *  `package-mismatch`, or no reason at all with its rows lost. */
-export function isFault(pl) {
-  const faultReasons = pl.reasons.filter((r) => r !== "package-mismatch");
-  return pl.fallbacks > 0 && (faultReasons.length > 0 || pl.reasons.length === 0);
-}
+/** Whether a reason speaks to the engine (`package-mismatch`, #1046, and `unverifiable`, #985, do not). */
+const engineReason = (r) => r !== "package-mismatch" && r !== "unverifiable";
+
+/** Whether the page life fell back for an engine fault: an engine reason, or
+ *  no reason at all with its rows lost. */
+export const isFault = (pl) => pl.fallbacks > 0 && (pl.reasons.some(engineReason) || pl.reasons.length === 0);
 
 /** Whether a page life got past its settle row: settled, or a row that only
  *  comes after it (an engaged row, a later fallback or a latch-off) proves it
@@ -118,15 +119,15 @@ export function isFault(pl) {
 const pastSettle = (pl) => pl.settled || pl.engaged || pl.fallbacks > pl.settleFallbacks || pl.writerLatched;
 
 /** Whether a page life ran the engine: one whose settle row already fell
- *  back on `package-mismatch` alone never did. */
-export const ranEngine = (pl) => pastSettle(pl) && !(pl.settleFallbacks > 0 && !isFault(pl) && pl.reasons.includes("package-mismatch"));
+ *  back on non-engine reasons alone never did. */
+export const ranEngine = (pl) => pastSettle(pl) && !(pl.settleFallbacks > 0 && !isFault(pl) && pl.reasons.some((r) => !engineReason(r)));
 
 const leftBeforeTower = (pl) => pl.attempted && !pastSettle(pl);
 
 /** Whether a page life reports an engine fault by its reasons or its count:
- *  any reason but `package-mismatch`, even with no fallback counted (a boot
- *  that detected a crash loop under an override may send one so). */
-const faultReason = (pl) => isFault(pl) || pl.reasons.some((r) => r !== "package-mismatch");
+ *  an engine reason, even with no fallback counted (a boot that detected a
+ *  crash loop under an override may send one so). */
+const faultReason = (pl) => isFault(pl) || pl.reasons.some(engineReason);
 
 /** Whether a safety suppression moved the page life to TypeScript: the flag,
  *  or the selection (A4 may fold one into the other). */
@@ -296,16 +297,15 @@ export function summarizeCohorts(allLives, opts = {}) {
 
   // A page life asked for the engine on a counted host unless a suppression
   // moved it to TypeScript, and ran it if it settled (a settle that fell back
-  // on `package-mismatch` alone never did; the overall rate counts those). A
-  // size-gated page life counts only once the engine faulted or engaged in it
-  // (a gated load, then a new game on the engine). An opt-out is a setting or
-  // URL choice of TypeScript in the `wasm` arm, and belongs to the production
-  // host; a choice of an uncounted WASM host is in no population here. A
-  // suppressed page life with an engine-fault reason (a detected crash loop)
-  // is an attempt with a fault on the host its row names (A4: the selection
-  // before safety), size gate or not, since large towers are the likeliest to
-  // take the engine down; one that names `ts` in the `wasm` arm belongs to
-  // the production host.
+  // on `package-mismatch` or `unverifiable` alone never did). A size-gated page
+  // life counts only once the engine faulted or engaged in it (a gated load,
+  // then a new game on the engine). An opt-out is a setting or URL choice of
+  // TypeScript in the `wasm` arm, and belongs to the production host; a choice
+  // of an uncounted WASM host is in no population here. A suppressed page life
+  // with an engine-fault reason (a detected crash loop) is an attempt with a
+  // fault on the host its row names (A4: the selection before safety), size
+  // gate or not, since large towers are the likeliest to take the engine down;
+  // one that names `ts` in the `wasm` arm belongs to the production host.
   const loopHost = (pl) => hosts.includes(pl.requested) || (pl.requested === "ts" && pl.assignedArm === "wasm" && hosts.includes(ELIGIBLE_HOST));
   const asked = (pl) =>
     (hosts.includes(pl.requested) && !isSuppressed(pl) && (pl.settled ? ranEngine(pl) : pl.attempted) && (!pl.sizeGated || engineFault(pl) || engagedOnEngine(pl))) || (suppressedFault(pl) && loopHost(pl));
@@ -352,7 +352,7 @@ export function summarizeCohorts(allLives, opts = {}) {
   // Repeats read every recognized page life (any host, size gate or arm), as
   // the latch-off signal does: a shared-core fault can show through any host.
   for (const pl of pageLives.filter(engineFault)) {
-    const reasons = pl.reasons.filter((x) => x !== "package-mismatch");
+    const reasons = pl.reasons.filter(engineReason);
     for (const r of reasons.length ? reasons : ["no reason sent"]) {
       const key = `${r} on ${buildKey(pl)}`;
       if (!repeats.has(key)) repeats.set(key, new Set());
