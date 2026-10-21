@@ -108,7 +108,11 @@ in that order; the recovery records the point it loaded on
 `status.restorePoint`, with how many newer points it skipped, says when
 it went further back, and clears the undo trail then, whose newest steps are
 later than the tower (#1126). A save asked of the frozen tower answers with the
-same point the recovery uses (`RestorePoints.newestSave`), and throws only
+same point the recovery uses (`RestorePoints.newestSave`, and the recovery
+goes back to the point a save already answered with); when that save is an
+undo's or a redo's own snapshot and the swap comes first, the recovery reads
+the point it answered with (`WasmHost.answered`) and clears the trail when
+it is older (the follow-up to #1230's review). The save throws only
 when no point loads, which cannot happen while a merge's save or the attach
 save is kept, since TypeScript loaded both.
 
@@ -234,6 +238,11 @@ edit made while paused. Both were dropped.
   gets a line. After an undo or a redo whose own snapshot trapped, that
   snapshot is the newest point, from before any edit no point covered, so
   the undo and redo steps that would now change nothing are dropped too.
+  When that snapshot went past the newest point, because the newest did not
+  load (#1126), the step it made holds an older tower: the whole trail is
+  cleared instead, and the line is "The WASM engine stopped, so the undo
+  history was cleared. The game runs on the TypeScript engine now." The
+  tower is the undo's or the redo's target, as the player asked.
   When an undo or a redo replaced the tower and a command was relayed since
   the newest point (`lostEdits`), or that tidy dropped a step, changes were
   lost and the line says so: "The WASM engine stopped, so some of your
