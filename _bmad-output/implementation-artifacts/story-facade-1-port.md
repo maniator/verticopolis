@@ -348,8 +348,9 @@ Claude Code (the facade lane's thread), 2026-10-20.
     fails a static edge into an engine module that loads `Simulation`
     lazily, keeps a dual-run file in the reach set only when it reaches
     `Simulation` through engine modules, and holds each file that loads the
-    engine package's glue by URL (`engineLoad.ts`, the dual-run worker) to
-    one unreadable import; any other unreadable import fails, the dual run's
+    engine package's glue by URL to one unreadable import (`engineLoad.ts`
+    and, since #1183 moved the workers onto the checked load,
+    `loadEngineModule.ts`); any other unreadable import fails, the dual run's
     included.
 - The reach set on `main` at this branch's base is `Simulation.ts`,
   `sim/loop.ts` and `sim/serialization.ts`, and the crossings are the 9
