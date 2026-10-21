@@ -10,7 +10,7 @@ import type { FacilityKind, Unit } from "../../engine/types";
  * that walk every unit, the per-move scans, the host sending every unit every
  * frame, the hourly merge and the restore point (save size), the structural
  * snapshot and the load peak. A tower with many units and few people would pass
- * a population gate onto the slowest path, so these two kinds of tower sit
+ * a rule that counts only people onto the slowest path, so these two kinds of tower sit
  * beside the three:
  *
  *  - two bracket towers between small and medium, so the size threshold can be
@@ -104,7 +104,7 @@ const BANDS: readonly (readonly [number, number])[] = [
  *  deepest basement to floor 100, sky-lobby rows every 15th story, offices and
  *  condos on every other story, the 24-shaft elevator pool and the 64-link
  *  stairs and escalator pool both full, and a population in the hundreds. It
- *  is the pathological case for a size gate that counts people: roughly the
+ *  is the pathological case for a size rule that counts people: roughly the
  *  large tower's unit count on a few hundred. */
 export function buildManyUnitTower(spec: ManyUnitSpec): Simulation {
   const sim = Simulation.newGame(spec.seed, "classic");
