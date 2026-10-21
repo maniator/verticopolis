@@ -158,8 +158,11 @@ state hash.
 
 `start` is one of:
 
-- `{ "newGame": { "seed": n, "mode": "classic" | "modern" } }`: a new game with
-  the default calendar and automatic bridging on (`newGame(seed, mode)`).
+- `{ "newGame": { "seed": n, "mode": "classic" | "modern", "star": 1 to 5 } }`: a
+  new game with the default calendar and automatic bridging on
+  (`newGame(seed, mode)`). The optional `star` sets the game's star before the
+  first command, so what unlocks above one star is in reach (the fuzzer uses
+  it); a game with no `star` opens at one.
 - `{ "fixture": "conformance/fixtures/file.vctower", "mode"?: "classic" | "modern" }`:
   a save file inside the suite (the name starts with `conformance/` and has no
   empty, `.` or `..` step), loaded the way an import loads

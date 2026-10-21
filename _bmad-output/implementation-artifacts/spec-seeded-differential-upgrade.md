@@ -75,10 +75,16 @@ it, and drops it otherwise. The tuning ops take no `reason` yet; #865 pins
 reasons on the build ops and the tuning ops can follow if a refusal reason
 turns out to matter there.
 
-Slice 2c: a path to higher stars, so escalators, service and express shafts
-(3, 2 and 3 stars) are accepted and the express stops and lobby skips run.
-A new game starts at one star and no scenario command raises it, so the
-nightly never builds them today.
+Slice 2c (done): a path to higher stars, so escalators, service and express
+shafts (3, 2 and 3 stars) are accepted and the express stops and lobby skips
+run. A new game starts at one star and the star is earned from population and
+facility gates, so the scenario start takes an optional `star` (1 to 5) that
+sets the game's star before the first command, in the TypeScript runner, the
+Rust runner and the WASM adapter (which edits the founded game's save, since
+the binding has no star setter). The fuzzer draws it per seed (one and three stars
+for two seeds in seven each, two, four and five for one in seven each), and the draw
+changes the scenario any given seed produces. The wedding hall's floor-100 rule
+still needs a 100-story tower, which the fuzzer's 40 stories do not reach.
 
 - Guard test: nightly scenarios start from a new game, never a fixture
   outside `conformance/fixtures/`.

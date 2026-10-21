@@ -157,7 +157,17 @@ export const startWasmEngine: EngineStart = (start) => {
     return wasmEngine(w);
   };
   if ("newGame" in start) {
-    return checked(Engine.newGame(u32(start.newGame.seed, "seed"), start.newGame.mode), start.newGame.mode, "new game founded");
+    const founded = Engine.newGame(u32(start.newGame.seed, "seed"), start.newGame.mode);
+    if (start.newGame.star === undefined) return checked(founded, start.newGame.mode, "new game founded");
+    // The binding has no star setter: edit the founded game's save and load it
+    // back, which is what the fixtures with a raised star are.
+    try {
+      const save = JSON.parse(founded.serialize()) as { star: number };
+      save.star = start.newGame.star;
+      return checked(Engine.fromSave(JSON.stringify(save)), start.newGame.mode, "new game founded");
+    } finally {
+      founded.free();
+    }
   }
   return checked(Engine.fromVctower(readFileSync(resolve(REPO_ROOT, start.fixture), "utf8"), start.mode ?? null), start.mode, `${start.fixture} loaded`);
 };

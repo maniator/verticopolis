@@ -33,6 +33,9 @@ pub enum Start {
 pub struct NewGame {
     pub seed: u32,
     pub mode: String,
+    /// The star the game opens at (1 to 5), so what unlocks above one star is
+    /// in reach from a new game.
+    pub star: Option<i64>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -233,14 +236,15 @@ impl Scenario {
 /// a facility kind that is not a transport, "shaft" a transport kind, "mode"
 /// classic or modern, "obj" a JSON object, "kind" any facility kind,
 /// "choice" fireRescue or bombThreat, "policy" a film policy, "target" a
-/// batch rent target (a finite number, default or noRate). A trailing "?"
-/// marks the field optional.
+/// batch rent target (a finite number, default or noRate), "star" a whole
+/// number from 1 to 5. A trailing "?" marks the field optional.
 fn field_fits(ty: &str, v: &Value) -> bool {
     let int = |v: &Value| v.as_i64().is_some();
     match ty {
         "int" => int(v),
         "u32" => v.as_i64().is_some_and(|n| (0..=0xffff_ffff).contains(&n)),
         "count" => v.as_i64().is_some_and(|n| n > 0),
+        "star" => v.as_i64().is_some_and(|n| (1..=5).contains(&n)),
         "dir" => matches!(v.as_i64(), Some(1) | Some(-1)),
         "num" => v.as_f64().is_some_and(f64::is_finite),
         "str" => v.as_str().is_some_and(|s| !s.is_empty()),
@@ -420,7 +424,7 @@ fn check_scenario(s: &Value) -> Result<(), String> {
         check_fields(
             "start.newGame",
             &start["newGame"],
-            &[("seed", "u32"), ("mode", "mode")],
+            &[("seed", "u32"), ("mode", "mode"), ("star", "star?")],
             &[],
         )?;
     } else {
@@ -499,7 +503,14 @@ fn start_sim(start: &Start, suite: &std::path::Path) -> Result<Simulation, RunEr
                 index: 0,
                 what: format!("mode {}", new_game.mode),
             })?;
-            Ok(Simulation::new_game(new_game.seed, mode))
+            let mut sim = Simulation::new_game(new_game.seed, mode);
+            if let Some(star) = new_game.star {
+                sim.star = star;
+                // What a load of this star would adopt, so a reload of the
+                // opened game (which re-derives milestones) matches the live one.
+                sim.adopt_milestones();
+            }
+            Ok(sim)
         }
         Start::Fixture { fixture, mode } => {
             let failed = |what: String| RunError::Failed { index: 0, what };
