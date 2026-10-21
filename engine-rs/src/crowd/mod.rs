@@ -10,6 +10,7 @@ pub mod motion;
 pub mod routines;
 pub mod routing;
 pub mod spawn;
+pub mod spawn_floors;
 pub mod visits;
 pub mod walk;
 
