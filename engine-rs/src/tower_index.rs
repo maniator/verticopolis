@@ -26,10 +26,10 @@
 //! `main`, though nothing needs that today and nothing here runs on another
 //! thread.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::facilities::Kind;
+use crate::facilities::{Kind, FACILITIES};
 use crate::tower::{Tower, Unit};
 
 /// What an index was built from: the tower revision and the unit count.
@@ -39,6 +39,14 @@ pub type IndexKey = (i64, usize);
 /// unit's tiles left to right: the list `pickX` builds. A floor with no
 /// tiles has no entry.
 pub type FloorTiles = HashMap<i64, Arc<[i64]>>;
+
+/// The room census: units of each kind, indexed by `Kind as usize`, and the
+/// floors that hold an office. Structural kinds count zero here; `count_kind`
+/// walks the tiles for them.
+pub struct Census {
+    pub kinds: Vec<i64>,
+    pub office_floors: HashSet<i64>,
+}
 
 impl Tower {
     fn index_key(&self) -> IndexKey {
@@ -72,23 +80,41 @@ impl Tower {
         rooms
     }
 
-    /// How many housekeeping units the tower has: the crews behind
-    /// `maxStaffFor`'s ceiling (`staffCeiling` in `crowd/spawn.ts`). Counted
-    /// over the room index, since a housekeeping unit is never a tile.
-    pub(crate) fn housekeeping_units(&self) -> i64 {
+    /// What the per-move build checks count over the rooms, built once per
+    /// revision (#1239): `count_kind` for the build caps and the pooled
+    /// caps, and the office floors behind the Classic escalator rule.
+    pub(crate) fn census(&self) -> Arc<Census> {
         let key = self.index_key();
-        let cached = self.memo.borrow().crews;
-        if let Some((built, crews)) = cached {
-            if built == key {
-                return crews;
+        if let Some((built, census)) = &self.memo.borrow().census {
+            if *built == key {
+                return census.clone();
             }
         }
-        let crews = self
-            .room_units()
-            .filter(|u| u.kind == Kind::Housekeeping)
-            .count() as i64;
-        self.memo.borrow_mut().crews = Some((key, crews));
-        crews
+        let mut census = Census {
+            kinds: vec![0; FACILITIES.len()],
+            office_floors: HashSet::new(),
+        };
+        for u in self.room_units() {
+            census.kinds[u.kind as usize] += 1;
+            if u.kind == Kind::Office {
+                census.office_floors.insert(u.floor);
+            }
+        }
+        let census = Arc::new(census);
+        self.memo.borrow_mut().census = Some((key, census.clone()));
+        census
+    }
+
+    /// How many housekeeping units the tower has: the crews behind
+    /// `maxStaffFor`'s ceiling (`staffCeiling` in `crowd/spawn.ts`). Read
+    /// from the census, since a housekeeping unit is never a tile.
+    pub(crate) fn housekeeping_units(&self) -> i64 {
+        self.census().kinds[Kind::Housekeeping as usize]
+    }
+
+    /// Whether `floor` has an office on it, in any state.
+    pub(crate) fn has_office_on(&self, floor: i64) -> bool {
+        self.census().office_floors.contains(&floor)
     }
 
     /// The structural tiles of `floor` in the order `pickX` lists them, or
