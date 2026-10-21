@@ -21,6 +21,7 @@ pub struct Memo {
         crate::tower_index::IndexKey,
         std::sync::Arc<crate::tower_index::Census>,
     )>,
+    pub floors: crate::tower_index::FloorsMemo,
 }
 
 // ---- unit state predicates (types.ts) --------------------------------------

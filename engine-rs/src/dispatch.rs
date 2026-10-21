@@ -1,7 +1,7 @@
 //! Port of `src/engine/ElevatorDispatch.ts`: the SCAN controller that moves
 //! each car against the statistical waiting estimate and the crowd's calls.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use indexmap::IndexMap;
 
@@ -13,15 +13,30 @@ use crate::tower::Tower;
 pub const CAR_FLOORS_PER_MINUTE: f64 = 0.8;
 const DWELL_MINUTES: f64 = 0.8;
 
+/// Stop flag: a live hall call (the crowd's, or the statistical estimate's
+/// on a passenger shaft).
+const CALL: u8 = 1;
+/// Stop flag: a car of this shaft is heading to the stop or dwelling at it.
+const CLAIMED: u8 = 2;
+
 #[derive(Default)]
 pub struct ElevatorDispatch {
     /// Transient per-car dwell timers.
     car_dwell: HashMap<i64, Vec<f64>>,
-    /// Waiting passengers per floor.
-    waiting: HashMap<i64, f64>,
+    /// Waiting passengers per floor, kept in floor order so each shaft
+    /// reads its span as one range instead of hashing every stop. The range
+    /// only sets one flag per stop, so the order it visits changes no
+    /// result; every other read and write is by floor.
+    waiting: BTreeMap<i64, f64>,
     /// The boarding tally since the last drain (#465): shaft id to origin
     /// floor to boarded count. Counting only, never read back into behavior.
     board_tally: HashMap<i64, IndexMap<i64, f64>>,
+    /// Scratch for the waiting pass, one slot per served floor: that
+    /// floor's running estimate this step, `None` until a room touches it.
+    acc: Vec<Option<f64>>,
+    /// Scratch for `move_cars`, one byte per stop of the shaft in hand:
+    /// `CALL` and `CLAIMED`, the TypeScript's `calls` and `claimed` sets.
+    flags: Vec<u8>,
 }
 
 impl ElevatorDispatch {
@@ -39,11 +54,9 @@ impl ElevatorDispatch {
     }
 
     fn prune_removed_shafts(&mut self, tower: &Tower) {
-        if self.car_dwell.is_empty() {
-            return;
-        }
-        let live: HashSet<i64> = tower.transports.iter().map(|t| t.id).collect();
-        self.car_dwell.retain(|id, _| live.contains(id));
+        // The shaft index answers "is this id live" without building a set.
+        self.car_dwell
+            .retain(|id, _| tower.transport_index(*id).is_some());
     }
 
     /// `accumulate(tower, dt, rush)`: once per outer step.
@@ -62,20 +75,37 @@ impl ElevatorDispatch {
                 true
             }
         });
-        let served = tower.served_floors();
+        let floors = tower.dispatch_floors();
+        let served = &floors.served;
+        self.acc.clear();
+        self.acc.resize(served.len(), None);
+        // `totalPopulation` rides along: the same rooms in the same order,
+        // so one pass over the rooms instead of two.
+        let mut pop = 0;
         for u in tower.room_units() {
-            if u.kind.attendance_cap().is_some() {
+            if u.is_present() {
+                pop += u.census_count();
+            }
+            if u.kind.attendance_cap().is_some() || u.occupants <= 0 {
                 continue;
             }
-            if u.occupants <= 0 || !served.contains(&u.floor) {
+            let Ok(slot) = served.binary_search(&u.floor) else {
                 continue;
-            }
-            let w = self.waiting.entry(u.floor).or_insert(0.0);
+            };
+            // Each floor folds its rooms in room order, starting from the
+            // value the map held, exactly as the per-room map updates did.
+            let w = self.acc[slot]
+                .get_or_insert_with(|| self.waiting.get(&u.floor).copied().unwrap_or(0.0));
             *w = (*w + u.occupants as f64 * rush * dt * 0.012).min(25.0);
         }
-        let pop = tower.total_population();
+        for (slot, w) in self.acc.iter().enumerate() {
+            if let Some(w) = *w {
+                self.waiting.insert(served[slot], w);
+            }
+        }
+        debug_assert_eq!(pop, tower.total_population());
         if pop > 0 {
-            for fl in tower.lobby_floors() {
+            for &fl in &floors.lobbies {
                 let w = self.waiting.entry(fl).or_insert(0.0);
                 *w = (*w + pop as f64 * rush * dt * 0.0015).min(25.0);
             }
@@ -91,7 +121,7 @@ impl ElevatorDispatch {
         hour: i64,
         is_weekend: bool,
     ) {
-        let lobby_set: HashSet<i64> = tower.lobby_floors().into_iter().collect();
+        let floors = tower.dispatch_floors();
         let n = tower.transports.len();
         for ti in 0..n {
             let (kind, id) = {
@@ -108,17 +138,18 @@ impl ElevatorDispatch {
             if stops.is_empty() {
                 continue;
             }
+            debug_assert!(stops.windows(2).all(|w| w[0] < w[1]));
             let idle_floor = stops
                 .iter()
                 .copied()
-                .find(|s| lobby_set.contains(s))
+                .find(|s| floors.lobbies.binary_search(s).is_ok())
                 .unwrap_or(stops[0]);
             let t = &mut tower.transports[ti];
-            let sched = t.schedule.clone();
-            let active_count =
-                Schedule::active_car_count(sched.as_ref(), is_weekend, hour, t.cars) as usize;
-            let shaft_dwell = Schedule::dwell_minutes_for(sched.as_ref(), DWELL_MINUTES);
-            let response = Schedule::waiting_response_for(sched.as_ref());
+            // Dispatch only reads the schedule, so it borrows it.
+            let sched = t.schedule.as_ref();
+            let active_count = Schedule::active_car_count(sched, is_weekend, hour, t.cars) as usize;
+            let shaft_dwell = Schedule::dwell_minutes_for(sched, DWELL_MINUTES);
+            let response = Schedule::waiting_response_for(sched);
             let span = (t.top - t.bottom) as f64;
             let cars = t.cars as usize;
             let dwell = self.car_dwell.entry(id).or_default();
@@ -132,18 +163,33 @@ impl ElevatorDispatch {
             let cap = kind.car_capacity();
 
             let hall_at = |fl: i64| hall.and_then(|h| h.get(&fl)).copied().unwrap_or(0.0);
-            let mut call_set: HashSet<i64> = HashSet::new();
-            for &fl in &stops {
-                if hall_at(fl) >= 1.0
-                    || (!staff_only && self.waiting.get(&fl).copied().unwrap_or(0.0) >= 1.0)
-                {
-                    call_set.insert(fl);
+            // `calls` and `claimed` as one flag byte per stop. `stops` is
+            // ascending, so a floor's stop is a binary search away, and a
+            // floor that is not a stop is never asked about.
+            let flags = &mut self.flags;
+            flags.clear();
+            flags.resize(stops.len(), 0);
+            if hall.is_some() {
+                for (k, &fl) in stops.iter().enumerate() {
+                    if hall_at(fl) >= 1.0 {
+                        flags[k] = CALL;
+                    }
                 }
             }
-            let mut claimed: HashSet<i64> = HashSet::new();
+            if !staff_only {
+                let span_floors = stops[0]..=stops[stops.len() - 1];
+                for (fl, &w) in self.waiting.range(span_floors) {
+                    if w >= 1.0 {
+                        if let Ok(k) = stops.binary_search(fl) {
+                            flags[k] |= CALL;
+                        }
+                    }
+                }
+            }
+            let flag_at = |floor: i64| stops.binary_search(&floor).ok();
             for i in 0..cars {
                 let car_home =
-                    Schedule::home_floor_for(sched.as_ref(), i, idle_floor).clamp(t.bottom, t.top);
+                    Schedule::home_floor_for(sched, i, idle_floor).clamp(t.bottom, t.top);
                 if i >= active_count {
                     car_load[i] = 0.0;
                     dwell[i] = 0.0;
@@ -171,7 +217,9 @@ impl ElevatorDispatch {
                     dwell[i] -= pause;
                     car_dt -= pause;
                     if car_dt <= 0.0 {
-                        claimed.insert(jsmath::round(t.car_positions[i]) as i64);
+                        if let Some(k) = flag_at(jsmath::round(t.car_positions[i]) as i64) {
+                            flags[k] |= CLAIMED;
+                        }
                         continue;
                     }
                 }
@@ -195,13 +243,13 @@ impl ElevatorDispatch {
                         other => other,
                     }
                 };
-                let mut target = held(next_demand_stop(&stops, pos, dir, &call_set, &claimed, cab));
+                let mut target = held(next_demand_stop(&stops, flags, pos, dir, cab));
                 if target.is_none() {
                     dir = -dir;
-                    target = held(next_demand_stop(&stops, pos, dir, &call_set, &claimed, cab));
+                    target = held(next_demand_stop(&stops, flags, pos, dir, cab));
                 }
-                if let Some(tg) = target {
-                    claimed.insert(tg);
+                if let Some(k) = target.and_then(flag_at) {
+                    flags[k] |= CLAIMED;
                 }
                 let target = match target {
                     Some(tg) => tg as f64,
@@ -232,7 +280,7 @@ impl ElevatorDispatch {
                             self.waiting.insert(tf, (w - board).max(0.0));
                         }
                         // Origin tally (#465), only at a stop with a live call.
-                        if call_set.contains(&tf) {
+                        if flag_at(tf).is_some_and(|k| flags[k] & CALL != 0) {
                             let n = self
                                 .board_tally
                                 .entry(id)
@@ -258,37 +306,52 @@ impl ElevatorDispatch {
     }
 }
 
+/// `nextDemandStop`: the nearest stop strictly ahead with a live call no
+/// other car has claimed, or one of this car's own cab stops (never blocked
+/// by a claim). `flags` runs parallel to `stops`.
+///
+/// `stops` ascends, so the distance never shrinks as the walk leaves the
+/// car, and the walk stops at the first stop that answers instead of
+/// testing every stop of the shaft. The TypeScript scans every stop and
+/// keeps the first strict minimum, which is the lowest floor among equal
+/// distances, so the downward walk runs on through any tie. Ties need a
+/// position far beyond any tower, where rounding merges distances.
 fn next_demand_stop(
     stops: &[i64],
+    flags: &[u8],
     pos: f64,
     dir: i64,
-    calls: &HashSet<i64>,
-    claimed: &HashSet<i64>,
     cab: Option<&HashSet<i64>>,
 ) -> Option<i64> {
-    let mut best: Option<i64> = None;
-    let mut best_dist = f64::INFINITY;
-    for &fl in stops {
-        let f = fl as f64;
-        if dir > 0 && f <= pos + 0.05 {
-            continue;
-        }
-        if dir < 0 && f >= pos - 0.05 {
-            continue;
-        }
-        if !cab.is_some_and(|c| c.contains(&fl)) {
-            if claimed.contains(&fl) {
-                continue;
+    debug_assert_ne!(dir, 0);
+    // The flags first, so the cab set is only hashed for a stop without a
+    // free call. The test is pure, so the order is free.
+    let wanted = |k: usize| {
+        (flags[k] & (CALL | CLAIMED)) == CALL || cab.is_some_and(|c| c.contains(&stops[k]))
+    };
+    let dist = |k: usize| (stops[k] as f64 - pos).abs();
+    let (k, d) = if dir > 0 {
+        let first = stops.partition_point(|&s| s as f64 <= pos + 0.05);
+        let k = (first..stops.len()).find(|&k| wanted(k))?;
+        (k, dist(k))
+    } else {
+        let end = stops.partition_point(|&s| (s as f64) < pos - 0.05);
+        let mut hit: Option<(usize, f64)> = None;
+        for k in (0..end).rev() {
+            let d = dist(k);
+            match hit {
+                Some((_, best)) if d > best => break,
+                _ if wanted(k) => hit = Some((k, d)),
+                _ => {}
             }
-            if !calls.contains(&fl) {
-                continue;
-            }
         }
-        let dist = (f - pos).abs();
-        if dist < best_dist {
-            best_dist = dist;
-            best = Some(fl);
-        }
-    }
-    best
+        hit?
+    };
+    // The scan's `dist < best_dist` from infinity: a position that is not
+    // finite finds no stop.
+    (d < f64::INFINITY).then_some(stops[k])
 }
+
+#[cfg(test)]
+#[path = "dispatch_tests.rs"]
+mod tests;
