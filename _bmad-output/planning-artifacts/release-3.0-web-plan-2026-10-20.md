@@ -391,14 +391,14 @@ in #1104.
 | #1090 governed definition | Projection | #1185 (merged) | #1090; PR #1232 | Conditional GO earlier; carry needed | Running | none | Oct 22 to 23 |
 | Shared `engaged` detector and `attempt` row, with the ts/wasm parity e2e | Projection with Cohort | packet; #1232 | #1090 | Not started | n/a | none | Oct 23 to 25 |
 | A4 fields PR (data map first, Help/Privacy copy, `COHORT_TELEMETRY` on, stage 0) | Cohort | packet; detector | #1197 | Not started | n/a | none | Oct 24 to 26, live Oct 26 to 28 |
-| Size gate with `size_gated` and `trigger: size-gate` | Cohort | gate rule (1.3.9, item 2) | #1197 | Not started | n/a | the bracket run | Code Oct 24 to 26; threshold Oct 26 to 27 |
+| Size gate with `size_gated` and `trigger: size-gate` | Cohort | gate rule (1.3.9, item 2) | #1197 | Not started | n/a | the bracket run | Code Oct 24 to 26; threshold (a cutoff per measure) Oct 26 to 27 |
 | Package integrity: slice 2a and the `unverifiable` line merged (#1183, #1185 at `22d1d1d`); slice 2b specs (tamper, install race, eviction, repair) | Offline | #1185 (merged) | #985; 2b not opened | Merged on GO | Green | none | 2b Oct 22 to 26 |
 | Recovery follow-up (items 1 to 5 of #1230's review) | Runtime | #1230 (merged) | #1126 | Confirming pass | n/a | none | Oct 21 to 22 |
 | #874 restore points on the PC | PC | #1101 (merged) | `release-3.0/pc-run-874-restore-points.md` | n/a | n/a | `perf:restore`, 10 reps, 1x and 4x | Running tonight; readout Oct 21 |
 | Saves audit on WASM; #858 and #856 | Evidence; Saves audit | none | #1236 (PR #1238 merged `b35127c`); #858, #856 | #1238 merged | Green | none | B6 Oct 23 to 27 |
 | Bracket and many-unit fixtures | Evidence (perf tooling) | none | #1270 | Not started | n/a | builds the fixtures | Must merge by Oct 24 |
 | Stage-1 cut and the GPU-verified bracket run | PC | the cut; fixtures | #1197 | n/a | n/a | 1.3.6 | Oct 25 (rerun Oct 26) |
-| Size threshold and its excluded share, from governed data | Cohort with Projection | the bracket run | #1197 | n/a | n/a | for population or floors, the share from `boot` for the tower each page life opens with (1.3.7); for units, a new `boot` field approved and live first, so the GO waits for it | Oct 26 to 27 (population or floors); after the field is live (units) |
+| Size threshold (a cutoff per measure) and its excluded share, from governed data | Cohort with Projection | the bracket run | #1197 | n/a | n/a | for population or floors, the share above each cutoff and above either, from `boot` for the tower each page life opens with (1.3.7); for units, a new `boot` field approved and live first, so the GO waits for it | Oct 26 to 27 (population or floors); after the field is live (units) |
 | Drop-back PR prepared (one constant); a named daily reader | Cohort; Coordinator | #1266 | #1197 | n/a | n/a | none | Oct 26 |
 | The 11-item GO packet, linked | Cohort with Coordinator | all of the above | #1197 | n/a | n/a | n/a | Oct 27 at the earliest; Oct 28 to 31 if the packet approval or the bracket run slips |
 
@@ -475,14 +475,15 @@ minutes for medium and large, both engines, 1x and 4x, 10 repetitions).
 | Oct 26 to 27, if the build moved after the cut | Activation recheck of the commit to be activated: medium and large, both engines, 1x and 4x (1.3.8, row 12) | about 1.5 h | 1 | A result outside the bracket's noise reruns the bracket and moves the GO |
 | Oct 26 (held) | Slice 9: facade, TypeScript and today's host, medium and large, the many-unit tower as a reported row, 1x and 4x, plus the save budget, #1237's overlays and a structural edit on the large and many-unit towers | about 6 to 8 h | 1 | A miss stops the facade after slice 8 and goes to the owner; a fix and rerun costs at least 1 to 3 days. If slice 8 is not ready, the slot goes to the calibration passes. On Oct 26 the bracket rerun goes first and the activation recheck second; slice 9 yields to both and moves to Oct 27 or later |
 | Oct 28 to Dec 26 (stages 1 and 2) | Batched rechecks for row 12 of 1.3.8: one medium-tower recheck of a combined commit per batch, at most one batch a day | about 45 min per batch; up to about 45 h over the roughly 60 days if a batch runs every day, about 15 to 25 h at one batch every two or three days | 2 (after a stage-1 or stage-2 rerun, before calibration) | A result outside the bracket's noise holds the batch and goes to the owner |
-| Nights from Oct 28 | δ and ε calibration passes (protocol 6.1; RUN-0b's A/A role) | about 1.5 h per pass per engine; 5.3 adds passes until a stable harness exceeds each tolerance less than 5% of the time, which protocol 6.1 puts at about 20 per engine, so about 60 h | 1 before RUN-1 | 1.3.9, item 3 |
+| Nights from Oct 28 | δ and ε calibration passes (protocol 6.1; RUN-0b's A/A role) | about 1.5 h per pass per engine; 5.3 adds passes until a stable harness exceeds each tolerance less than 5% of the time, which protocol 6.1 says takes at least 20 per engine, so at least 60 h | 1 before RUN-1 | 1.3.9, item 3 |
 | After slice 10 | RUN-1 on the deployed build | about 6 to 8 h | 1 | Stage 3 waits; one fix and rerun fits before Dec 26 if slice 10 deploys by about Dec 12 |
 
 Committed time from Oct 21 to Oct 27 is about 25 hours, inside the week. The
 calibration campaign does not fit in it, and RUN-1 needs it (protocol 6.1
 step 5), so it runs on November nights. From Oct 28 to Dec 26 the PC carries
-the batched rechecks (15 to 45 hours) and the calibration passes (about 60
-hours): about 75 to 105 hours over about 60 days before any slice 9 rerun
+the batched rechecks (15 to 45 hours) and the calibration passes (at least
+60 hours): about 75 to 105 hours over about 60 days, more if calibration
+needs more than 20 passes per engine, before any slice 9 rerun
 and RUN-1, under 2 hours a night, so the nights are booked but not full.
 
 #### 1.3.7 Fixtures beyond population
@@ -511,7 +512,8 @@ slowest path.
   Performance row's scenarios and is the owner's call (1.3.9, item 6).
 - **The gate rule:** `boot` reports `population` and `floors` and not units
   (`docs/analytics-data-map.md`). A gate on population **or** floors needs no
-  new field, and floors stand in for units on tall towers. Before stage 1,
+  new field, and floors stand in for units on tall towers. It takes two
+  cutoffs, one per measure, each set from the fixtures (1.3.9, item 2). Before stage 1,
   `boot` gives the excluded share for the tower each page life opens with;
   a tower loaded or imported later in the same page life is not in that
   estimate, which the GO packet states. Once the gate ships, the live share
@@ -532,7 +534,7 @@ slowest path.
 | 6 | #1104's eligible-session note quotes revision 1 (about 110 days); revision 3 with engaged sessions says about 141 days at today's traffic | Triage updates #1104 |
 | 7 | 4.2 ends the freeze on `main` when the replay and the tail end, but the flip rechecks the window's key, so in practice the engine stays frozen from the freeze to the review | 1.3.2, option F2 |
 | 8 | Engaged floors count only once the `attempt` and `engaged` rows are live; if they are not live on stage 1's first day, stage 1 runs longer | 1.3.5 stage-1 path; the packet approval by Oct 22 |
-| 9 | Slice 9's verdict and RUN-1 need δ and ε calibrated from A/A passes on the GPU-verified harness; none has run; 5.3 requires passes until a stable harness exceeds each tolerance less than 5% of the time (about 20 per engine), which is about 60 PC hours | 1.3.6; 1.3.9, item 3 |
+| 9 | Slice 9's verdict and RUN-1 need δ and ε calibrated from A/A passes on the GPU-verified harness; none has run; 5.3 requires passes until a stable harness exceeds each tolerance less than 5% of the time (at least 20 per engine), which is at least 60 PC hours | 1.3.6; 1.3.9, item 3 |
 | 10 | The bracket run needs towers between small and medium, and the many-unit tower, which do not exist | 1.3.7; #1270 |
 | 11 | 4.1 sets the size gate on units; the roundtable (4b) recommended population, which would let a many-unit, low-population tower onto today's host in stages 1 and 2; and `boot` reports no units, so a unit gate's excluded share cannot be read from governed data | 1.3.7; 1.3.9, item 2; 4.1's size-gate text points there |
 | 12 | The stage-1 run must be "the exact stage-1 build", but `main` keeps deploying, and slices 2, 4 and 5 touch the shared app path for every player | Rule (a plan choice): cut the stage-1 commit on Oct 24 or 25, and the bracket run measures its build. If anything that changes the shipped app bundle or the WASM package merges between the cut and stage 1's activation, the commit to be activated gets a medium and large recheck on the PC, both engines, 1x and 4x (about 1.5 h), and a result outside the bracket run's noise reruns the bracket before the GO. During stages 1 and 2, a merge that changes the WASM package (`engine-rs/`, the WASM build inputs, the lockfile) or the hosted frame path (`src/wasmhost`, `src/dualrun`, `src/simport`, `src/game/frameLoop.ts`, the renderer) gets a medium-tower recheck on the PC before it merges, or the owner's waiver. Such merges are batched: one recheck of a combined commit (main plus the waiting merges, at most once a day) covers the batch, which then merges together; 1.3.6 carries the load |
@@ -567,16 +569,26 @@ and R6.
    roundtable recommended (measurable today, but misses the many-unit,
    low-population tower); or population **or** floors (recommended: both
    already on `boot`, and floors catch tall many-unit towers). The choice
-   replaces 4.1's "unit threshold" wording. Threshold on Oct 26 or 27 from
-   the bracket run, with its excluded share. Choosing units adds a `boot`
-   field to the analytics packet, and the GO waits until it is live.
+   replaces 4.1's "unit threshold" wording. The composite needs two
+   cutoffs, since populations run in thousands and floor counts in tens: a
+   tower is gated when its population is above the population cutoff or
+   its floor count is above the floor cutoff. Each is set on Oct 26 or 27
+   from the bracket run, and neither sits above a fixture he accepts from
+   that run. The population cutoff is the population of the largest
+   population-sized fixture (small, the two brackets, medium) he accepts.
+   The floor cutoff is the floor count of the many-unit tower if he accepts
+   it, otherwise the floor count of the tallest fixture he accepts. The GO
+   packet gives the excluded share above each cutoff and above either.
+   Population alone or units alone takes one cutoff, set the same way on
+   its own axis. Choosing units adds a `boot` field to the analytics
+   packet, and the GO waits until it is live.
 3. **δ and ε for slice 9 and RUN-1.** Slice 9 (an open amendment to OD-4):
    pre-register the caps (δ 0.05; ε 50 ms of blocking, or 5% of TypeScript's
    cold start) as a provisional bar for the slice-10 decision only, marked as
    uncalibrated. RUN-1 and RUN-3 calibrate as 5.3 already says: at least
    five passes per engine, adding passes until a stable harness exceeds each
-   tolerance less than 5% of the time, which protocol 6.1 puts at about 20
-   per engine (about 60 PC hours on November nights, 1.3.6). Recommended:
+   tolerance less than 5% of the time, which protocol 6.1 says takes at least
+   20 per engine (at least 60 PC hours on November nights, 1.3.6). Recommended:
    keep that rule. Stopping at 10 passes (a 9% chance, about 30 hours) or 5
    (17%, 15 hours) would loosen 5.3's bar, which only the owner can do.
 4. **#945's text.** Approve the section 10 amendments (OD-7's final review)
@@ -970,7 +982,7 @@ remain.
   comes off at stage 3, and 3.0.0 ships without it, so the release evidence
   includes large towers: no session on a build with the gate is eligible.
   Which measure the threshold uses (units as written here, population, or
-  population or floors) is open in 1.3.9, item 2; the owner's choice
+  population or floors with a cutoff for each) is open in 1.3.9, item 2; the owner's choice
   replaces "a unit threshold" in this bullet.
 - Every stage is a default-engine change for real players, so each ships only
   on the owner's approval.
@@ -1963,11 +1975,12 @@ approves this revision:
   and 50 engaged eligible sessions), freeze option F2, the post timing the
   projections assume (stage-3 day 3 and a week later, each post on its own
   approval), the stage-1 cut rule with its activation recheck (1.3.8, row
-  12), the size gate on population or floors in place of 4.1's units, slice
+  12), the size gate on population or floors (a cutoff for each) in place
+  of 4.1's units, slice
   9's provisional bar (the caps, marked
   uncalibrated, for the slice-10 decision only), the 50 ms long-task bar on a
   structural edit at 1x on the large and many-unit towers as part of slice
-  9's check (from the spike 0 readout) (1.3.9).
+  9's check (from the spike 0 readout; 1.3.9).
 
 **Still the owner's:**
 
