@@ -405,9 +405,17 @@ impl Engine {
         self.sim.tick(dt_minutes);
     }
 
-    /// `build(kind, floor, x)`: JSON `{ ok, reason? }`.
-    pub fn build(&mut self, kind: &str, floor: i32, x: i32) -> Result<String, JsError> {
-        let kind = parse_kind(kind).map_err(err)?;
+    /// `build(kind, floor, x)`: JSON `{ ok, reason? }`. An unknown kind is
+    /// refused with "Unknown facility.", as TypeScript's `build` does.
+    pub fn build(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] kind: JsValue,
+        floor: i32,
+        x: i32,
+    ) -> Result<String, JsError> {
+        let Ok(kind) = parse_kind(&kind.as_string().unwrap_or_default()) else {
+            return Ok(facade_commands::unknown_facility());
+        };
         Ok(build_result(self.sim.build(kind, floor.into(), x.into())))
     }
 
@@ -420,24 +428,32 @@ impl Engine {
     /// base price. An unknown kind answers the way TypeScript does, with
     /// "Unknown facility." and a cost of 0.
     #[wasm_bindgen(js_name = canBuild)]
-    pub fn can_build(&self, kind: &str, floor: i32, x: i32) -> String {
-        let Ok(kind) = parse_kind(kind) else {
-            return can_build_json(false, Some("Unknown facility."), 0.0);
+    pub fn can_build(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] kind: JsValue,
+        floor: i32,
+        x: i32,
+    ) -> String {
+        let Ok(kind) = parse_kind(&kind.as_string().unwrap_or_default()) else {
+            return can_build_json(false, Some(facade_commands::UNKNOWN_FACILITY), 0.0);
         };
         let c = self.sim.can_build(kind, floor.into(), x.into());
         can_build_json(c.ok, c.reason.as_deref(), c.cost)
     }
 
-    /// `buildTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`.
+    /// `buildTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`. An
+    /// unknown kind is refused with "Unknown facility.".
     #[wasm_bindgen(js_name = buildTransport)]
     pub fn build_transport(
         &mut self,
-        kind: &str,
+        #[wasm_bindgen(unchecked_param_type = "string")] kind: JsValue,
         x: i32,
         bottom: i32,
         top: i32,
     ) -> Result<String, JsError> {
-        let kind = parse_kind(kind).map_err(err)?;
+        let Ok(kind) = parse_kind(&kind.as_string().unwrap_or_default()) else {
+            return Ok(facade_commands::unknown_facility());
+        };
         Ok(build_result(self.sim.build_transport(
             kind,
             x.into(),
@@ -561,20 +577,18 @@ impl Engine {
 
     /// `applyRentBatch(kind, target, onlyDefaultPriced)` with the target as
     /// JSON text (a number, `"default"` or `"noRate"`): the result counters
-    /// as JSON, or null when the batch does not apply.
+    /// as JSON, or null when the batch does not apply: an unknown or unpriced
+    /// kind, a No Rate target off the ladder, or a target that is not
+    /// `"default"`, `"noRate"` or a finite number, as in TypeScript.
     #[wasm_bindgen(js_name = applyRentBatch)]
     pub fn apply_rent_batch(
         &mut self,
-        kind: &str,
+        #[wasm_bindgen(unchecked_param_type = "string")] kind: JsValue,
         target: &str,
-        only_default_priced: bool,
+        #[wasm_bindgen(unchecked_param_type = "boolean")] only_default_priced: JsValue,
     ) -> Result<Option<String>, JsError> {
-        let kind = parse_kind(kind).map_err(err)?;
-        let target = parse_batch_target(target).map_err(err)?;
-        Ok(self
-            .sim
-            .apply_rent_batch(kind, target, only_default_priced)
-            .map(|r| batch_result_json(&r)))
+        let kind = kind.as_string().unwrap_or_default();
+        Ok(self.apply_rent_batch_named(&kind, target, only_default_priced.is_truthy()))
     }
 
     /// `resizeTransport(id, bottom, top)`, the simulation-layer edit that
@@ -701,9 +715,16 @@ impl Engine {
         self.set_stop_checked(id.as_f64(), floor.as_f64(), stop.as_bool())
     }
 
+    /// `setExpressStops(id)`: whether the id names a shaft, as TypeScript's
+    /// answers; a shaft's stops are rebuilt, an unknown id changes nothing.
     #[wasm_bindgen(js_name = setExpressStops)]
-    pub fn set_express_stops(&mut self, id: i32) {
-        self.sim.tower.set_express_stops(id.into());
+    pub fn set_express_stops(&mut self, id: i32) -> bool {
+        let id = i64::from(id);
+        let known = self.sim.tower.get_transport(id).is_some();
+        if known {
+            self.sim.tower.set_express_stops(id);
+        }
+        known
     }
 
     #[wasm_bindgen(js_name = clearStops)]
@@ -780,13 +801,12 @@ impl Engine {
         self.sim.evaluate_star();
     }
 
-    /// `callExterminator()`: JSON `{ ok, reason? }`.
+    /// `callExterminator()`: JSON `{ ok, reason?, cost?, rooms? }`, the
+    /// TypeScript `ExterminatorResult`: `cost` and `rooms` ride on a booking
+    /// and on the "funds" refusal, the other refusals carry the reason alone.
     #[wasm_bindgen(js_name = callExterminator)]
     pub fn call_exterminator(&mut self) -> String {
-        match self.sim.call_exterminator() {
-            Ok(_) => outcome(true, None),
-            Err(r) => outcome(false, Some(r.reason())),
-        }
+        facade_commands::exterminator_json(&self.sim.call_exterminator())
     }
 
     /// The pending player choice as JSON `{ kind, cost, message }`, or null.
@@ -989,6 +1009,60 @@ pub fn encode_vctower(
     crate::load::stamp_save(&mut save, app_version, saved_at_ms).map_err(err)?;
     // The container is ASCII by construction (magic, base64, newlines).
     String::from_utf8(crate::load::encode_vctower(&save).map_err(err)?).map_err(err)
+}
+
+#[path = "wasm_facade_commands.rs"]
+mod facade_commands;
+
+/// The command answers the Rust-backed facade reads (slice 6d, #1216); the
+/// logic is in `wasm_facade_commands.rs`.
+#[wasm_bindgen]
+impl Engine {
+    /// `previewRentBatch(kind, target, onlyDefaultPriced)` with the target as
+    /// JSON text, as for `applyRentBatch`: the counters that call would
+    /// report, as JSON, with nothing written; null where it would not apply.
+    /// A kind that is not a string is an unknown kind, and the flag is read
+    /// by JavaScript truthiness, as TypeScript's `opts.onlyDefaultPriced` is.
+    #[wasm_bindgen(js_name = previewRentBatch)]
+    pub fn preview_rent_batch(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] kind: JsValue,
+        target: &str,
+        #[wasm_bindgen(unchecked_param_type = "boolean")] only_default_priced: JsValue,
+    ) -> Option<String> {
+        let kind = kind.as_string().unwrap_or_default();
+        self.preview_rent_batch_named(&kind, target, only_default_priced.is_truthy())
+    }
+
+    /// `tower.validateTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`,
+    /// nothing written. An unknown kind is refused with "Unknown facility."; a
+    /// coordinate that is not a whole JS number within `Number.isSafeInteger`
+    /// is refused with `INVALID_REQUEST`, never coerced (#923).
+    #[wasm_bindgen(js_name = validateTransport)]
+    pub fn validate_transport(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] kind: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] x: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bottom: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] top: JsValue,
+    ) -> String {
+        let kind = kind.as_string().unwrap_or_default();
+        self.validate_transport_json(&kind, x.as_f64(), bottom.as_f64(), top.as_f64())
+    }
+
+    /// `tower.placeTransportDryRun(kind, x, bottom, top)`: whether
+    /// `validateTransport` accepts the shaft, read the same way.
+    #[wasm_bindgen(js_name = placeTransportDryRun)]
+    pub fn place_transport_dry_run(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] kind: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] x: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bottom: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] top: JsValue,
+    ) -> bool {
+        let kind = kind.as_string().unwrap_or_default();
+        self.place_transport_dry_run_checked(&kind, x.as_f64(), bottom.as_f64(), top.as_f64())
+    }
 }
 
 #[cfg(test)]
