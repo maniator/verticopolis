@@ -11,9 +11,9 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // fallback (package fails to load, the game boots on the TypeScript engine)
 // can be asserted without a package.
 const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm" | "wasm-worker", loadError: null as Error | null, module: null as unknown, workerError: null as Error | null, binary: null as { state: "ok"; sourceHash: string } | null }));
-vi.mock("./wasmhost/engineChoice", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./wasmhost/engineChoice")>();
-  return { ...real, engineRequested: () => wasmStub.requested };
+vi.mock("./engineCohort/boot", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./engineCohort/boot")>();
+  return { ...real, selectBootEngine: () => wasmStub.requested, noteRustFailed: vi.fn() };
 });
 vi.mock("./wasmhost/startWasmHost", async (importOriginal) => {
   const real = await importOriginal<typeof import("./wasmhost/startWasmHost")>();
