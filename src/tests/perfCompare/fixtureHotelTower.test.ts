@@ -37,6 +37,14 @@ describe("the hotel-heavy tower", () => {
     expect(Simulation.deserialize(sim.serialize()).spawnStaffTrip(crew.floor, main.floor, main.x + main.width / 2, main.id, 8, crew.x + crew.width / 2)).toBe("sent");
   });
 
+  it("keeps the wing's guests, so its rooms stay dirty and the no-route path runs on later days", () => {
+    const day = Simulation.deserialize(sim.serialize());
+    for (let i = 0; i < 720 * 2; i++) day.tick(2);
+    const wing = day.tower.units.filter((u) => isHotelKind(u.kind) && u.x >= 270);
+    expect(wing.length).toBeGreaterThan(100);
+    expect(wing.filter((u) => u.state === "dirty").length).toBeGreaterThan(wing.length / 2);
+  });
+
   it("makes hundreds of rooms dirty at the morning checkout and leaves the unreachable ones dirty", () => {
     const day = Simulation.deserialize(sim.serialize());
     let peak = 0;

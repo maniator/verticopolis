@@ -334,7 +334,7 @@ to the unit state, and the tests bound the people and units) and handed unchange
 | `medium` | 3,240 | 12,062 | 15 | 644,803 | default |
 | `large` | 17,322 | 43,358 | 5 | 2,157,159 | default |
 | `many-unit` | 504 | 41,880 | 88 | 1,977,903 | unit-scaled costs with a small crowd |
-| `hotel-heavy` | 1,704 | 10,446 | 9 | 537,018 | housekeeping dispatch (#1279) |
+| `hotel-heavy` | 1,704 | 10,490 | 10 | 539,181 | housekeeping dispatch (#1279) |
 
 Every tower records its people, units and save bytes, so a size rule can be
 read off any of them (which one the gate uses is not decided here). The
@@ -352,8 +352,10 @@ ride standard elevators that serve every floor, but the staff network is split
 into three service-elevator zones and only the first two have crews, so 276 of
 the rooms (32%) are out of every crew's reach: `staffConnected` fails for them
 on every dispatch. A low wing beside the tower, joined to it only along the lobby row, has 120 more rooms on crewed stories
-with no staff transport of its own: `staffConnected` says yes, but every
-dispatch to the wing ends in `no-route` (about 27,000 in a day). The save starts at 07:00 and the 08:00 checkout makes
+with no staff transport of its own (one standard elevator lets its guests reach
+the lobby and stay): `staffConnected` says yes, but every dispatch to the wing
+ends in `no-route`, about 62,000 times on the first day and about 140,000 on
+each day after. The save starts at 07:00 and the 08:00 checkout makes
 nearly 700 rooms dirty at once; the 276 unreachable ones stay dirty through the
 shift. The large tower has no housekeeping units, so nothing else exercises
 that dispatch. Run them with

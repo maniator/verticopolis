@@ -19,8 +19,9 @@ import { must } from "./fixtureTowers";
  *  - a low wing beside the tower, joined to it only along the lobby row and
  *    cut from the tower's floors by a gap. Its stories are in a crewed zone, so
  *    `staffConnected` (which is per story) says yes, but the staff route is per
- *    floor segment and the wing has no staff transport, so every dispatch to its
- *    rooms ends in `no-route`.
+ *    floor segment and the wing has no staff transport (its one elevator is a
+ *    standard one, which guests ride and staff do not), so every dispatch to its
+ *    rooms ends in `no-route`, on every day.
  *
  * Guests ride the standard elevators, which serve every floor; only the staff
  * network is split. Built through the engine's own commands and asserted, like
@@ -46,6 +47,10 @@ const RUNS_PER_FLOOR = 4;
  *  `WING_TOP`, which all lie in the first service zone. */
 const WING_FROM = RIGHT + 10;
 const WING_TO = WING_FROM + RUNS_PER_FLOOR * 20;
+/** A standard elevator on the wing's far edge, so its guests can reach the
+ *  lobby and stay. Standard elevators are not part of the staff network, so
+ *  the crews still have no route there. */
+const WING_END = WING_TO + FACILITIES.elevatorStandard.width;
 const WING_TOP = 11;
 
 /** The three staff zones: a service shaft each, a story apart so they never link. */
@@ -73,8 +78,9 @@ export function buildHotelTower(spec: HotelSpec): Simulation {
   }
   const zones = zonesOf(spec.floors);
   // The lobby row runs on under the wing, which is all that joins the two.
-  for (let x = RIGHT; x < WING_TO; x++) must(`hotel: lobby at ${x}`, t.place("lobby", 1, x));
-  for (let f = 2; f <= WING_TOP; f++) for (let x = WING_FROM; x < WING_TO; x++) must(`hotel: wing floor ${f} at ${x}`, t.place("floor", f, x));
+  for (let x = RIGHT; x < WING_END; x++) must(`hotel: lobby at ${x}`, t.place("lobby", 1, x));
+  for (let f = 2; f <= WING_TOP; f++) for (let x = WING_FROM; x < WING_END; x++) must(`hotel: wing floor ${f} at ${x}`, t.place("floor", f, x));
+  must(`hotel: wing elevator at ${WING_TO}`, t.placeTransport("elevatorStandard", WING_TO, 1, WING_TOP));
   for (const [bottom, top] of zones) must(`hotel: service ${bottom}-${top}`, t.placeTransport("elevatorService", LEFT + 16, bottom, top));
 
   // Crews sit on the first two zones' stories, spread evenly; the last zone has none.
