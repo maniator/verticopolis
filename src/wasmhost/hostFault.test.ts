@@ -194,7 +194,7 @@ describe("a teardown's steps (#1113)", () => {
     expect(isEngineTrap(thrown)).toBe(true);
   });
 
-  it("names a wrapped trap's wrapper, and still finds the trap however deep it sat", () => {
+  it("names a wrapped trap's wrapper, and still finds the trap three wrappers deep", () => {
     const trap = new WebAssembly.RuntimeError("unreachable");
     const wrapped = [1, 2, 3].reduce<unknown>((cause, n) => Object.assign(new Error(`wrapper ${n}`), { cause }), trap);
     const thrown = thrownBy(throwing(new Error("the events do not go back")), throwing(wrapped));
