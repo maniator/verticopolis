@@ -5,9 +5,9 @@
 //! `tower_stats` is one pass over the rooms (the tower's room index, so the
 //! floor and lobby tiles are not walked). Unit states, customers and money
 //! move between revisions and between hours, so no revision or hour key could
-//! stand in for the pass without showing stale numbers. `highest_floor`,
-//! `lowest_floor` and `population` are the engine's own reads and still walk
-//! the units; the story's AC6 figures and the backlog row cover them.
+//! stand in for the pass without showing stale numbers. `highest_floor` and
+//! `lowest_floor` read the tower's floor bounds, kept per revision, and
+//! `population` is one more pass over the rooms (#1237).
 
 use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
