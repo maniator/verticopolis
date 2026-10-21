@@ -123,7 +123,7 @@ describe.runIf(run)("saves audit: the Rust engine loads what the web loads, byte
   /** The save with each transport's own keys sorted: the one place the two writers' key order is known to differ. */
   const transportKeysSorted = (save: Record<string, unknown>): Record<string, unknown> => ({
     ...save,
-    transports: (save.transports as Array<Record<string, unknown>>).map((t) => Object.fromEntries(Object.entries(t).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)))),
+    transports: (save.transports as Array<Record<string, unknown>>).map((t) => Object.fromEntries(Object.entries(t).sort(([x], [y]) => x.localeCompare(y, "en")))),
   });
 
   it.each(fixtures)("%s: the written file is the TypeScript writer's text up to a transport's key order, and the binding text only adds .0", async (name) => {
