@@ -17,6 +17,9 @@ export class FakeEngine {
   hourRuns = 0;
   logSeq = 0;
   freed = false;
+  /** Let go without a call into the module (#1113). */
+  abandoned = false;
+  frameViews = 0;
   owed: unknown[] = [];
   dropped = 0;
   pending: string | undefined = undefined;
@@ -29,6 +32,7 @@ export class FakeEngine {
     this.star = data.star ?? 1;
   }
   frameView(): Float64Array {
+    this.frameViews++;
     const v = new Float64Array(FRAME_HEADER);
     v[0] = this.minutes;
     v[1] = this.revision;
@@ -58,6 +62,11 @@ export class FakeEngine {
     this.logSeq++;
   }
   free(): void { this.freed = true; }
+  /** wasm-bindgen's JavaScript-only half of `free`. */
+  __destroy_into_raw(): number {
+    this.abandoned = true;
+    return 1;
+  }
   pendingChoice(): string | undefined { return this.pending; }
   logSince(seq: number): string {
     return JSON.stringify(Array.from({ length: this.logSeq - seq }, (_, i) => ({ seq: seq + i + 1, minute: this.minutes, text: `line ${seq + i + 1}`, kind: "info" })));

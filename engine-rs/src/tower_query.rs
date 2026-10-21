@@ -16,6 +16,7 @@ pub struct Memo {
     pub cols: Option<(i64, HashMap<i64, Vec<(i64, i64)>>)>,
     pub tiles: Option<(crate::tower_index::IndexKey, crate::tower_index::FloorTiles)>,
     pub rooms: Option<(crate::tower_index::IndexKey, std::sync::Arc<[usize]>)>,
+    pub crews: Option<(crate::tower_index::IndexKey, i64)>,
 }
 
 // ---- unit state predicates (types.ts) --------------------------------------

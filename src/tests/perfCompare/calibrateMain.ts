@@ -13,7 +13,9 @@ import type { CompareResults } from "./types";
  * M3 and M5; a `perf:worker` folder feeds M4's long-task ε, and one command
  * takes both kinds. Writes calibration.json and calibration.md into the new
  * `--out` folder (never an existing one) and exits 0 only when every check
- * passes for every kind of folder given. `--min-passes` is the passes
+ * passes for every kind of folder given (a run with one kind only is judged
+ * on that kind and says so on its last line and in `missingFamilies`).
+ * `--min-passes` is the passes
  * required of each engine (default 5, as the protocol says today) and
  * `--exceedance-limit` the coverage limit the stated guarantee must be under
  * (default 0.05); the report states the guarantee for the count used. The
@@ -92,6 +94,6 @@ export function main(argv: string[], repo: string, now: () => string = () => new
   writeFileSync(join(out, "calibration.json"), JSON.stringify({ generatedAt, ...(compare ?? {}), m4, missingFamilies, problems, adoptable }, null, 1) + "\n");
   const mixed = m4 ? { m4Window: m4.window, m4Commits: [...new Set(m4.passes.map((p) => p.commit.slice(0, 7)))], adoptable, problems: [...m4Problems, ...across] } : null;
   writeFileSync(join(out, "calibration.md"), [compare ? calibrationMarkdown(compare, generatedAt, mixed) : null, m4 ? m4Markdown(m4, generatedAt, compare !== null) : null].filter((x) => x !== null).join("\n"));
-  process.stdout.write(`perf:calibrate: wrote ${out} (${adoptable ? "adoptable" : `not adoptable: ${problems.length} problem(s)`})\n`);
+  process.stdout.write(`perf:calibrate: wrote ${out} (${adoptable ? "adoptable" : `not adoptable: ${problems.length} problem(s)`}${missingFamilies.length ? `; partial, no folders for ${missingFamilies.join(", ")}` : ""})\n`);
   return adoptable ? 0 : 1;
 }
