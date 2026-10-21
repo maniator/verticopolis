@@ -80,8 +80,9 @@ so build-preview cost is unchanged (slice 4 owns it).
    `setFilmPolicy`, `rerollSubtype`, `callExterminator`, `resolveChoice`,
    `toggleAutoBridge`, `setTowerName` and `emit` go through
    `port.command()`, and the caller reads only the result. A source guard
-   (`src/simport/commandSites.guard.test.ts`) fails if a command method is
-   called on a `Simulation` or `Tower` in those files again.
+   (`src/tests/commandSites.guard.test.ts`) fails if a frontend file calls a
+   command method on a simulation or tower, or writes a setting a command
+   owns, again; slice 5's lifecycle writes are pinned there and only shrink.
 3. **The paint brush is one command.** `{ op: "paintBrush"; kind; floor;
    tiles }` answers `{ ok, reason?, delta, placed }`: `placed` tiles laid,
    `ok` when at least one was, `reason` the last refusal the engine gave, and
@@ -108,11 +109,14 @@ so build-preview cost is unchanged (slice 4 owns it).
    `describePortContract`'s `restarts` option. Per command: the accepted path
    (result shape, `delta` equals the balance's change, the effect on `view`);
    each refusal path (no state change, `delta` 0, the engine's `reason`, no
-   gameplay event and no log line); malformed input (a non-integer, NaN or
-   unknown id, a bad direction, end, method, policy or flag, a schedule that
-   is not one) refused without a throw; issue order across back-to-back
-   commands; the brush atomic against steps and equal to the same builds
-   issued one by one. `src/simport/tsSimCommands.test.ts` runs it over `TsSim`;
+   gameplay event and no log line); malformed input (a non-integer or NaN
+   number, an unknown op or kind, a bad direction, end, method, policy or
+   flag, a non-string label, name or bulletin) refused without a throw,
+   with the engine's own "That request is not valid.", by the port's shape
+   check (`src/simport/request.ts`) before the engine sees it; a schedule
+   stays the engine's to harden, whatever it is; issue order across
+   back-to-back commands; the brush atomic against steps and equal to the
+   same builds issued one by one. `src/simport/tsSimCommands.test.ts` runs it over `TsSim`;
    `npm run test:wasm:parity` runs it on the WASM mirror host, where a
    divergence between the two engines fails the case. Slice 7 runs it over
    `RustSim`.
@@ -143,7 +147,7 @@ so build-preview cost is unchanged (slice 4 owns it).
   - [ ] `uiCallbacks.ts`, `UI.ts`, `uiSettings.ts` auto-bridge
   - [ ] `frameLoop.ts` emergency answer and meal rush
   - [ ] `main.ts` `renameTower`
-- [ ] Guard (AC 2): `commandSites.guard.test.ts`
+- [ ] Guard (AC 2): `src/tests/commandSites.guard.test.ts`
 - [ ] Command contract (AC 7) and its `TsSim` test
 - [ ] Existing tests await the controllers
 - [ ] Gates, parity, file sizes (AC 8)
