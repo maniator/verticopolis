@@ -585,17 +585,22 @@ and R6.
    many-unit tower will be about as tall as the large tower, so a floor
    cutoff at its floor count would admit, for example, a tower of that
    height with medium's population, which no fixture measures. Three ways
-   to close that corner: (a) a corner fixture (the many-unit tower's height
+   to handle that corner: (a) a corner fixture (the many-unit tower's height
    with the population cutoff's population) in the bracket run, so the
    floor cutoff can sit at the many-unit tower's floor count with the
    corner measured; it adds a tower to #1270 by Oct 24 and about an hour to
    the Oct 25 run, so it needs his choice by Oct 23; (b) the floor cutoff
-   is the floor count of the fixture that sets the population cutoff, so every admitted tower is
+   is the floor count of the fixture that sets the population cutoff, with
+   the many-unit tower kept as a reported row, so every admitted tower is
    no taller and no more populous than a measured one, at the cost of a
-   larger gated share, which lengthens stages 1 and 2 (1.3.1); or (c) the
-   floor cutoff is the many-unit tower's floor count if he accepts it, and
-   the GO packet states the unmeasured corner as a risk he accepts.
-   Recommended: (b), since it needs no new fixture and no PC time; (a) can
+   larger gated share, which lengthens stages 1 and 2 (1.3.1); this narrows
+   the corner without closing it, since a full-width tower of that height
+   can carry more units than the fixture and `boot` has no units; or (c)
+   the floor cutoff is the many-unit tower's floor count if he accepts it,
+   and the GO packet states the unmeasured corner as a risk he accepts.
+   Only (a) makes the cutoffs evidence for every tower they admit.
+   Recommended: (b) for the Oct 27 GO, since it needs no new fixture and no
+   PC time, with the GO packet stating the remaining unit gap; (a) can
    replace it later on his approval. The GO packet gives the excluded share
    above each cutoff and above either.
    Population alone or units alone takes one cutoff, set the same way on
