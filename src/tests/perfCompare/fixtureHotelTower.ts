@@ -15,7 +15,12 @@ import { must } from "./fixtureTowers";
  *  - 24 housekeeping units, in two of three service-elevator zones;
  *  - the third zone, and the stories between zones, have no crew and no staff
  *    link, so `staffConnected` fails for a third of the dirty rooms on every
- *    dispatch and those rooms stay dirty through the shift.
+ *    dispatch and those rooms stay dirty through the shift;
+ *  - a low wing beside the tower, joined to it only along the lobby row and
+ *    cut from the tower's floors by a gap. Its stories are in a crewed zone, so
+ *    `staffConnected` (which is per story) says yes, but the staff route is per
+ *    floor segment and the wing has no staff transport, so every dispatch to its
+ *    rooms ends in `no-route`.
  *
  * Guests ride the standard elevators, which serve every floor; only the staff
  * network is split. Built through the engine's own commands and asserted, like
@@ -37,6 +42,11 @@ const ROOMS_FROM = LEFT + 32;
 /** The run of rooms on a story, then the slot a housekeeping unit takes. */
 const RUN: readonly FacilityKind[] = ["hotelSingle", "hotelDouble", "hotelSuite"];
 const RUNS_PER_FLOOR = 4;
+/** The wing stands past a gap at the tower's right edge, on stories 2 to
+ *  `WING_TOP`, which all lie in the first service zone. */
+const WING_FROM = RIGHT + 10;
+const WING_TO = WING_FROM + RUNS_PER_FLOOR * 20;
+const WING_TOP = 11;
 
 /** The three staff zones: a service shaft each, a story apart so they never link. */
 function zonesOf(floors: number): [number, number][] {
@@ -62,6 +72,9 @@ export function buildHotelTower(spec: HotelSpec): Simulation {
     for (const x of [LEFT + band * w, RIGHT - w - band * w]) must(`hotel: elevator ${bottom}-${top} at ${x}`, t.placeTransport("elevatorStandard", x, bottom, top));
   }
   const zones = zonesOf(spec.floors);
+  // The lobby row runs on under the wing, which is all that joins the two.
+  for (let x = RIGHT; x < WING_TO; x++) must(`hotel: lobby at ${x}`, t.place("lobby", 1, x));
+  for (let f = 2; f <= WING_TOP; f++) for (let x = WING_FROM; x < WING_TO; x++) must(`hotel: wing floor ${f} at ${x}`, t.place("floor", f, x));
   for (const [bottom, top] of zones) must(`hotel: service ${bottom}-${top}`, t.placeTransport("elevatorService", LEFT + 16, bottom, top));
 
   // Crews sit on the first two zones' stories, spread evenly; the last zone has none.
@@ -71,15 +84,21 @@ export function buildHotelTower(spec: HotelSpec): Simulation {
     const n = perZone[z];
     for (let i = 0; i < n; i++) crewFloors.add(bottom + Math.floor(((top - bottom) * (i + 0.5)) / n));
   });
-  let placed = 0;
-  for (let f = 2; f <= spec.floors; f++) {
-    let cx = ROOMS_FROM;
+  /** A story's run of rooms from `from`; returns the x just past it. */
+  const placeRun = (f: number, from: number): number => {
+    let cx = from;
     for (let r = 0; r < RUNS_PER_FLOOR; r++) {
       for (const kind of RUN) {
         must(`hotel: ${kind} at ${f}, ${cx}`, t.place(kind, f, cx));
         cx += FACILITIES[kind].width;
       }
     }
+    return cx;
+  };
+  let placed = 0;
+  for (let f = 2; f <= spec.floors; f++) {
+    const cx = placeRun(f, ROOMS_FROM);
+    if (f <= WING_TOP) placeRun(f, WING_FROM);
     if (crewFloors.has(f)) {
       must(`hotel: housekeeping at ${f}, ${cx}`, t.place("housekeeping", f, cx));
       placed++;

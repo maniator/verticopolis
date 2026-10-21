@@ -334,7 +334,7 @@ to the unit state, and the tests bound the people and units) and handed unchange
 | `medium` | 3,240 | 12,062 | 15 | 644,803 | default |
 | `large` | 17,322 | 43,358 | 5 | 2,157,159 | default |
 | `many-unit` | 504 | 41,880 | 88 | 1,977,903 | unit-scaled costs with a small crowd |
-| `hotel-heavy` | 1,464 | 9,436 | 9 | 482,887 | housekeeping dispatch (#1279) |
+| `hotel-heavy` | 1,704 | 10,446 | 9 | 537,018 | housekeeping dispatch (#1279) |
 
 Every tower records its people, units and save bytes, so a size rule can be
 read off any of them (which one the gate uses is not decided here). The
@@ -347,11 +347,14 @@ bands and 14 express) and all 64 stairs and escalator links, and most of its
 rooms are vacant. A rule that counts only people would let it onto the slowest path.
 Its rows are reported rows at the stage-1 bracket run, slice 9 and RUN-1;
 whether they bind at RUN-3 is the owner's decision. The `hotel-heavy` tower is a Modern tower
-of 732 booked hotel rooms on 61 stories with 24 housekeeping units. Guests
+of 852 booked hotel rooms on 61 stories with 24 housekeeping units. Guests
 ride standard elevators that serve every floor, but the staff network is split
-into three service-elevator zones and only the first two have crews, so about a
-third of the rooms are out of every crew's reach. It starts at 07:00 and the 08:00 checkout makes
-about 500 rooms dirty at once; the unreachable ones stay dirty through the
+into three service-elevator zones and only the first two have crews, so 276 of
+the rooms (32%) are out of every crew's reach: `staffConnected` fails for them
+on every dispatch. A low wing beside the tower, joined to it only along the lobby row, has 120 more rooms on crewed stories
+with no staff transport of its own: `staffConnected` says yes, but every
+dispatch to the wing ends in `no-route` (about 27,000 in a day). The save starts at 07:00 and the 08:00 checkout makes
+nearly 700 rooms dirty at once; the 276 unreachable ones stay dirty through the
 shift. The large tower has no housekeeping units, so nothing else exercises
 that dispatch. Run them with
 `--scenarios bracket-a,bracket-b,many-unit,hotel-heavy` (quote the list in PowerShell).
