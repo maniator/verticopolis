@@ -18,6 +18,10 @@ import type { FacilityKind, LogEntry, SerializedView } from "../engine/types";
  */
 export type Command =
   | { op: "build"; kind: FacilityKind; floor: number; x: number }
+  /** The floor and lobby brush: `build` over `tiles` on one floor, as
+   *  `runBrush` (`brush.ts`) defines it. One command, so no step falls
+   *  between its tiles on any host. */
+  | { op: "paintBrush"; kind: FacilityKind; floor: number; tiles: ReadonlyArray<number> }
   | { op: "buildTransport"; kind: FacilityKind; x: number; bottom: number; top: number }
   | { op: "removeFacility"; id: number; method: "sell" | "bulldoze" }
   | { op: "beginExtend"; id: number }
@@ -64,6 +68,9 @@ export interface BaseResult {
 /** Each command's answer: the base fields plus what its callers read today. */
 export interface CommandResults {
   build: BaseResult;
+  /** How many tiles the brush laid; `ok` when it laid any, with the last
+   *  refusal the engine gave as `reason`, and `delta` over the whole brush. */
+  paintBrush: BaseResult & { readonly placed: number };
   buildTransport: BaseResult;
   removeFacility: BaseResult;
   beginExtend: BaseResult;
