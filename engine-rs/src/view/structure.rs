@@ -1,0 +1,245 @@
+//! The structural snapshot: what a view rebuilds when `tower.revision`
+//! moves. Rooms go one record each, in the order of the rooms index
+//! (`Tower::room_index`), which is the slot order of the dynamic frame's
+//! room records. Floor and lobby tiles,
+//! most of a large tower's units, go as runs per floor, so the snapshot
+//! grows with the rooms and the floors rather than with every tile.
+use super::layout::{ROOM_RECORD, RUN_RECORD, SHAFT_FIXED, STRUCTURE_HEADER};
+use crate::clock::{CalendarKind, GameMode};
+use crate::facilities::{MAX_FLOOR, MIN_FLOOR};
+use crate::frame::unit_fields;
+use crate::sim::Simulation;
+use crate::tower::{Tower, Unit};
+
+/// A run of floor or lobby tiles being collected.
+struct Run {
+    kind: usize,
+    floor: i64,
+    x: i64,
+    width: i64,
+    count: i64,
+    fields: [f64; 5],
+}
+
+impl Run {
+    fn start(u: &Unit) -> Run {
+        Run {
+            kind: u.kind as usize,
+            floor: u.floor,
+            x: u.x,
+            width: u.width,
+            count: 1,
+            fields: unit_fields(u),
+        }
+    }
+
+    /// Whether `u` has this run's kind, floor, width and frame fields.
+    fn matches(&self, u: &Unit) -> bool {
+        u.kind as usize == self.kind
+            && u.floor == self.floor
+            && u.width == self.width
+            && unit_fields(u) == self.fields
+    }
+
+    /// Add `u` to this run when it sits right after its last tile or right
+    /// before its first one, with the same kind, floor, width and fields.
+    /// Whether it did.
+    fn take(&mut self, u: &Unit) -> bool {
+        if !self.matches(u) {
+            return false;
+        }
+        if u.x == self.x + self.count * self.width {
+            self.count += 1;
+        } else if u.x + self.width == self.x {
+            self.x = u.x;
+            self.count += 1;
+        } else {
+            return false;
+        }
+        true
+    }
+
+    /// Whether `next` starts where this run ends, with the same kind, floor,
+    /// width and frame fields.
+    fn continues_with(&self, next: &Run) -> bool {
+        next.kind == self.kind
+            && next.floor == self.floor
+            && next.width == self.width
+            && next.x == self.x + self.count * self.width
+            && next.fields == self.fields
+    }
+
+    fn push(&self, v: &mut Vec<f64>) {
+        v.extend_from_slice(&[
+            self.kind as f64,
+            self.floor as f64,
+            self.x as f64,
+            self.width as f64,
+            self.count as f64,
+        ]);
+        v.extend_from_slice(&self.fields);
+    }
+}
+
+/// Floors a tower can have, `MIN_FLOOR` to `MAX_FLOOR`.
+const FLOORS: usize = (MAX_FLOOR - MIN_FLOOR + 1) as usize;
+
+/// The runs of the floor and lobby tiles, by floor and then x, from one walk
+/// in unit-list order. Each floor keeps the run its
+/// last tile went into, and a tile joins that run when it sits right after
+/// or right before it, so a floor built in one drag in either direction is
+/// one run however the list interleaves floors. A floor built in separate
+/// drags gives one run per drag, so the runs are then sorted by where they
+/// start and the ones that continue each other joined: the sort is over
+/// those runs, about one per drag, never over the tiles.
+fn tile_runs(tower: &Tower) -> Vec<Run> {
+    let mut runs: Vec<Run> = Vec::new();
+    let mut open: [Option<usize>; FLOORS] = [None; FLOORS];
+    for u in &tower.units {
+        if !u.kind.is_structural() {
+            continue;
+        }
+        // A floor outside the grid, which no save the loader accepts holds,
+        // still gets its runs, without the per-floor memory.
+        let slot = usize::try_from(u.floor - MIN_FLOOR)
+            .ok()
+            .filter(|&f| f < FLOORS);
+        let open_run = slot.and_then(|f| open[f]);
+        if let Some(r) = open_run {
+            if runs[r].take(u) {
+                continue;
+            }
+        }
+        if let Some(f) = slot {
+            open[f] = Some(runs.len());
+        }
+        runs.push(Run::start(u));
+    }
+    let ordered = runs
+        .windows(2)
+        .all(|w| (w[0].floor, w[0].x) < (w[1].floor, w[1].x));
+    if ordered {
+        return runs;
+    }
+    // A stable sort, so two runs that start on the same tile (a save that
+    // stacks two tiles) keep their list order.
+    runs.sort_by_key(|r| (r.floor, r.x));
+    // `dedup_by` hands the later run first: fold it into the earlier one
+    // when it continues it.
+    runs.dedup_by(|next, last| {
+        let joins = last.continues_with(next);
+        if joins {
+            last.count += next.count;
+        }
+        joins
+    });
+    runs
+}
+
+/// The structural snapshot as one flat number array.
+///
+/// Header (`STRUCTURE_HEADER` slots): the tower revision, the room count, the
+/// run count, the shaft count, the highest and the lowest floor any unit
+/// stands on with floor 1 always counted (so 1 on an empty tower), read from
+/// the tower's cached floor bounds (`Tower::floor_bounds`, which
+/// `highest_floor` and `lowest_floor` answer from), then the game mode and
+/// the Modern calendar as codes
+/// (`layout::MODES`, `layout::CALENDARS`), fixed when the tower was founded
+/// and carried here so a host reads them with the structure it reads at
+/// load. Then the rooms (`ROOM_RECORD` each: id,
+/// kind code, floor, x, width), in the order of the rooms index: the room in
+/// slot k is the one a dynamic frame's record with slot k describes. Then the
+/// floor and lobby tiles as runs (`RUN_RECORD` each: kind code, floor, x,
+/// width, count, then the five frame fields every tile of the run holds),
+/// ordered by floor and then x, so every tile is in exactly one run, and
+/// maximal: no run continues the one before it. A run carries no ids: a host that needs a tile's id asks for the unit at its
+/// floor and x. Then every transport (`SHAFT_FIXED` plus its skipped floors:
+/// id, kind code, x, width, bottom, top, cars, the skip count, then the
+/// skipped floors as the save carries them).
+///
+/// A field belongs here only if every write to it moves the revision. The
+/// tiles' frame fields are here on the strength of the view freshness test
+/// (`oracle_tests.rs`), which fails if one changes with the revision still.
+///
+/// A host reads it when it starts on an engine (a load or an attach builds a
+/// new tower, whose revision starts over) and whenever the frame header's
+/// tower revision moves. The unit count, which the dynamic frame's reader
+/// also keys on, moves only with the revision.
+///
+/// One pass over the units (the runs) and one over the rooms index, plus a
+/// sort of the runs when a floor was built in several drags; the floor
+/// bounds and the rooms index are the tower's per-revision caches, shared
+/// with every other reader. The output is allocated once, after the walk, at
+/// its size. A read for each revision, never for each frame.
+pub fn structure_view(sim: &Simulation) -> Vec<f64> {
+    let tower = &sim.tower;
+    let rooms = tower.room_index();
+    let skips: usize = tower
+        .transports
+        .iter()
+        .map(|t| t.skip_floors.as_ref().map_or(0, Vec::len))
+        .sum();
+    let runs = tile_runs(tower);
+    let (low, high) = tower.floor_bounds();
+    let mut v = Vec::with_capacity(
+        STRUCTURE_HEADER
+            + rooms.len() * ROOM_RECORD
+            + runs.len() * RUN_RECORD
+            + tower.transports.len() * SHAFT_FIXED
+            + skips,
+    );
+    v.extend_from_slice(&[
+        tower.revision as f64,
+        rooms.len() as f64,
+        runs.len() as f64,
+        tower.transports.len() as f64,
+        high as f64,
+        low as f64,
+        mode_code(sim.mode),
+        calendar_code(sim.modern_calendar),
+    ]);
+    for &i in rooms.iter() {
+        let u = &tower.units[i];
+        v.extend_from_slice(&[
+            u.id as f64,
+            u.kind as usize as f64,
+            u.floor as f64,
+            u.x as f64,
+            u.width as f64,
+        ]);
+    }
+    for run in &runs {
+        run.push(&mut v);
+    }
+    for t in &tower.transports {
+        let skip = t.skip_floors.as_deref().unwrap_or(&[]);
+        v.extend_from_slice(&[
+            t.id as f64,
+            t.kind as usize as f64,
+            t.x as f64,
+            t.width as f64,
+            t.bottom as f64,
+            t.top as f64,
+            t.cars as f64,
+            skip.len() as f64,
+        ]);
+        v.extend_from_slice(skip);
+    }
+    v
+}
+
+/// A game mode's code: its index in `layout::MODES`.
+pub(crate) fn mode_code(mode: GameMode) -> f64 {
+    match mode {
+        GameMode::Classic => 0.0,
+        GameMode::Modern => 1.0,
+    }
+}
+
+/// A Modern calendar's code: its index in `layout::CALENDARS`.
+pub(crate) fn calendar_code(calendar: CalendarKind) -> f64 {
+    match calendar {
+        CalendarKind::Canon => 0.0,
+        CalendarKind::RealWorld => 1.0,
+    }
+}
