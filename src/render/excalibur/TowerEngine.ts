@@ -1,6 +1,7 @@
 import * as ex from "excalibur";
 import type { Simulation, HeatmapMode, HeatCell } from "../../engine/Simulation";
-import type { FacilityKind, SerializedView, Transport, Unit } from "../../engine/types";
+import type { FacilityKind, SerializedView } from "../../engine/types";
+import type { UnitView, TransportView } from "../../simport/view";
 import { PinchTracker } from "../pinchTracker";
 import type { DrawCtx } from "../sprites";
 
@@ -152,7 +153,7 @@ export class TowerEngine {
   // Engine-animated actors, regenerated when the layout changes.
   carActors: {
     actor: ex.Actor;
-    t: Transport;
+    t: TransportView;
     i: number;
     seed: number;
     w: number;
@@ -162,10 +163,10 @@ export class TowerEngine {
     gfx: Map<string, ex.Canvas>;
     shown: string;
   }[] = [];
-  trainActors: { actor: ex.Actor; u: Unit; w: number }[] = [];
+  trainActors: { actor: ex.Actor; u: UnitView; w: number }[] = [];
   /** The pre-dawn garbage truck: one per recycling center, visible only during
    *  the collection hour (drives in, loads, drives off, like the metro train). */
-  truckActors: { actor: ex.Actor; u: Unit; w: number }[] = [];
+  truckActors: { actor: ex.Actor; u: UnitView; w: number }[] = [];
   /** Commute cars cruising the garage decks at rush hours: one per basement
    *  parking floor, ping-ponging along that floor's parking run. */
   garageCars: { actor: ex.Actor; floor: number; x0w: number; x1w: number; seed: number }[] = [];

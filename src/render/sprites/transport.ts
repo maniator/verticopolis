@@ -1,16 +1,17 @@
 import { isElevatorKind } from "../../engine/facilities";
 import { facilityColor } from "../../presentation/facilityPresentation";
-import type { FacilityKind, Transport } from "../../engine/types";
+import type { FacilityKind } from "../../engine/types";
+import type { TransportView } from "../../simport/view";
 import { personRider } from "../pixelSprites/common";
 import { layerBreak, layerEnd } from "../pixelSprites/layers";
 import type { CarArrow } from "../carIndicator";
 import { shade, shadeAlpha } from "./common";
 
-// ---- Transport ----------------------------------------------------------
+// ---- TransportView ----------------------------------------------------------
 
 export function drawTransport(
   ctx: CanvasRenderingContext2D,
-  t: Transport,
+  t: TransportView,
   sx: number,
   topY: number,
   w: number,

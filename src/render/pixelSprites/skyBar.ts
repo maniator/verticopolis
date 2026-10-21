@@ -1,4 +1,4 @@
-import type { Unit } from "../../engine/types";
+import type { UnitView } from "../../simport/view";
 import { busyStations, hash, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, authoredWidth } from "./artScale";
 import { layerBreak } from "./layers";
@@ -31,11 +31,11 @@ const BAR_INSET = 3;
 
 /** A stable per-room seed from GEOGRAPHY (floor, x), so the crowd, bottles, and
  *  skyline survive a save/export/import (which renumbers `u.id`). */
-function figureSeed(u: Pick<Unit, "floor" | "x">): number {
+function figureSeed(u: Pick<UnitView, "floor" | "x">): number {
   return (u.floor * 167 + u.x * 29) | 0;
 }
 
-export function skyBar(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+export function skyBar(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const { ctx } = d;
   const floorY = shell(ctx, x, y, w, h, WALL, WALL);
   const seed = figureSeed(u);
