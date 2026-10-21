@@ -158,9 +158,10 @@ export const startWasmEngine: EngineStart = (start) => {
   };
   if ("newGame" in start) {
     const founded = Engine.newGame(u32(start.newGame.seed, "seed"), start.newGame.mode);
-    if (start.newGame.star === undefined) return checked(founded, start.newGame.mode, "new game founded");
-    // The binding has no star setter: edit the founded game's save and load it
-    // back, which is what the fixtures with a raised star are.
+    // One star is the founded game itself (the other two runners do the same).
+    if (start.newGame.star === undefined || start.newGame.star === 1) return checked(founded, start.newGame.mode, "new game founded");
+    // The binding has no star setter: save the founded game, raise the star and
+    // load it back, the route the other two runners take.
     try {
       const save = JSON.parse(founded.serialize()) as { star: number };
       save.star = start.newGame.star;

@@ -64,3 +64,38 @@ fn a_reload_at_four_and_five_stars_matches_the_live_game() {
         );
     }
 }
+
+/// A refused build at the opened star, now and after one hour of play, so a
+/// star that is capped at three or reset by a step shows.
+fn refused(star: u8, kind: &str, floor: i64, x: i64, reason: &str) -> Option<RunError> {
+    let build = format!(
+        r#"{{"op":"build","kind":"{kind}","floor":{floor},"x":{x},"expectFail":true,"reason":"{reason}"}}"#
+    );
+    let s = Scenario::parse(&format!(
+        r#"{{"id":"t","description":"t","start":{{"newGame":{{"seed":1,"mode":"classic","star":{star}}}}},"commands":[
+        {{"op":"setMoney","amount":500000000}},
+        {{"op":"buildRow","kind":"lobby","floor":1,"from":167,"to":206}},
+        {{"op":"buildRow","kind":"floor","floor":2,"from":168,"to":205}},
+        {build},{{"op":"tick","dt":60}},{build}]}}"#
+    ))
+    .unwrap();
+    run_scenario(&s, Path::new(".")).error
+}
+
+#[test]
+fn four_and_five_stars_open_at_four_and_five_now_and_after_a_step() {
+    let unlock5 = "Wedding Hall unlocks at 5★.";
+    let crown = "The wedding hall can only crown floor 100.";
+    assert!(refused(4, "weddingHall", 2, 170, unlock5).is_none());
+    assert!(refused(5, "weddingHall", 2, 170, crown).is_none());
+    assert!(refused(5, "weddingHall", 2, 170, unlock5).is_some());
+    assert!(refused(3, "metro", -8, 0, "Metro Station unlocks at 4★.").is_none());
+    assert!(refused(
+        4,
+        "metro",
+        -8,
+        0,
+        "Build next to the tower. You can't build in midair."
+    )
+    .is_none());
+}

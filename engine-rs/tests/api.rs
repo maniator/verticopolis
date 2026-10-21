@@ -28,6 +28,8 @@ fn the_host_api_is_in_place() {
     let _ = Simulation::new_game;
     let _ = Simulation::new_game_with;
     let _ = Simulation::tick;
+    let _ = verticopolis_engine::fixed_step::FrameStepper::advance::<Simulation>;
+    let _ = verticopolis_engine::fixed_step::quantum_for;
     let _ = Simulation::can_build;
     let _ = Simulation::can_build_transport;
     let _ = Simulation::build;

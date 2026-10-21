@@ -163,7 +163,7 @@ describe("worker controller (fake engine)", () => {
 
   it("keeps a refused package's kind and ids when the worker's byte check refuses it (#985)", async () => {
     const package_ = { kind: "mismatch" as const, file: "wasm" as const, expected: "aaaaaaaaaaaa", found: "bbbbbbbbbbbb", expectedPackage: "111111111111", servedPackage: "222222222222", controlled: true };
-    const refusing = (kind: "mismatch" | "load-failed"): EngineWorkerLike => {
+    const refusing = (kind: "mismatch" | "load-failed" | "unverifiable"): EngineWorkerLike => {
       const w = fakeWorker();
       w.postMessage = () => {
         setTimeout(() => w.onmessage?.({ data: { type: "error", fatal: true, message: "could not load the WASM engine: refused", package: { ...package_, kind } } }), 0);
@@ -175,6 +175,9 @@ describe("worker controller (fake engine)", () => {
     expect(mismatch).toMatchObject({ reason: "package-mismatch", package: { kind: "mismatch", servedPackage: "222222222222" } });
     const missing = await spawnEngineWorker(() => refusing("load-failed"), "x").catch((e: unknown) => e);
     expect(missing).toMatchObject({ reason: "boot-error", package: { kind: "load-failed" } });
+    // The browser could not hash the files: its own code, sent by the worker or derived from the kind.
+    const unverifiable = await spawnEngineWorker(() => refusing("unverifiable"), "x").catch((e: unknown) => e);
+    expect(unverifiable).toMatchObject({ reason: "unverifiable", package: { kind: "unverifiable" } });
   });
 
   it("keeps the code a worker gave a failed load, a binding the shell cannot use included (#1086)", async () => {

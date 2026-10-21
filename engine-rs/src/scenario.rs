@@ -503,14 +503,22 @@ fn start_sim(start: &Start, suite: &std::path::Path) -> Result<Simulation, RunEr
                 index: 0,
                 what: format!("mode {}", new_game.mode),
             })?;
-            let mut sim = Simulation::new_game(new_game.seed, mode);
-            if let Some(star) = new_game.star {
-                sim.star = star;
-                // What a load of this star would adopt, so a reload of the
-                // opened game (which re-derives milestones) matches the live one.
-                sim.adopt_milestones();
+            let sim = Simulation::new_game(new_game.seed, mode);
+            // A start state, not a command. The founded game is saved, raised
+            // to the star and loaded back, the route all three runners take,
+            // so a load's milestones and boundary markers are the same
+            // everywhere. One star is the founded game itself.
+            match new_game.star.filter(|&star| star > 1) {
+                None => Ok(sim),
+                Some(star) => {
+                    let mut raw = sim.serialize();
+                    raw["star"] = star.into();
+                    crate::load::deserialize(&raw).map_err(|e| RunError::Failed {
+                        index: 0,
+                        what: format!("star {star}: {e}"),
+                    })
+                }
             }
-            Ok(sim)
         }
         Start::Fixture { fixture, mode } => {
             let failed = |what: String| RunError::Failed { index: 0, what };

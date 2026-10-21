@@ -4,13 +4,14 @@
 //! thousand rooms. `roomUnits` walks past every tile to reach the rooms, and
 //! `pickX` and `pickXInSegment` walk every unit to list one floor's tiles,
 //! once or twice for each person spawned. `maxStaffFor` counted every unit
-//! for each staff spawn attempt (#1143). These indexes answer from one walk
-//! per tower revision.
+//! for each staff spawn attempt (#1143), and the floor bounds behind
+//! `highest_floor` and `lowest_floor` folded every unit per read (#1237).
+//! These indexes answer from one walk per tower revision.
 //!
 //! They are keyed on `revision` and the unit count. Every placement and
 //! removal bumps the revision, a load ends in `reindex`, which resets the
-//! memo and bumps it too, and no other path adds, removes, moves or resizes
-//! a unit. The count guards one case only: a list cut behind the revision
+//! memo and bumps it too, and no other path adds, removes, moves, resizes or
+//! retypes a unit (the census reads each unit's kind and floor). The count guards one case only: a list cut behind the revision
 //! rebuilds instead of indexing past its end. A change that keeps the count
 //! and skips the bump would be served stale; no production path makes one.
 //! (`roomUnits` in `tower/rooms.ts` also keys on the array's identity. Here
@@ -26,10 +27,10 @@
 //! `main`, though nothing needs that today and nothing here runs on another
 //! thread.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::facilities::Kind;
+use crate::facilities::{Kind, FACILITIES};
 use crate::tower::{Tower, Unit};
 
 /// What an index was built from: the tower revision and the unit count.
@@ -39,6 +40,14 @@ pub type IndexKey = (i64, usize);
 /// unit's tiles left to right: the list `pickX` builds. A floor with no
 /// tiles has no entry.
 pub type FloorTiles = HashMap<i64, Arc<[i64]>>;
+
+/// The room census: units of each kind, indexed by `Kind as usize`, and the
+/// floors that hold an office. Structural kinds count zero here; `count_kind`
+/// walks the tiles for them.
+pub struct Census {
+    pub kinds: Vec<i64>,
+    pub office_floors: HashSet<i64>,
+}
 
 impl Tower {
     fn index_key(&self) -> IndexKey {
@@ -72,23 +81,55 @@ impl Tower {
         rooms
     }
 
-    /// How many housekeeping units the tower has: the crews behind
-    /// `maxStaffFor`'s ceiling (`staffCeiling` in `crowd/spawn.ts`). Counted
-    /// over the room index, since a housekeeping unit is never a tile.
-    pub(crate) fn housekeeping_units(&self) -> i64 {
+    /// The units of one kind, in list order. A room kind is read from the
+    /// room index, past the tiles that make up most of a large tower; only
+    /// a tile kind walks every unit (#1237). No allocation: the room index
+    /// is a shared slice, rebuilt only when the tower's revision moves.
+    pub(crate) fn units_of_kind(&self, kind: Kind) -> impl Iterator<Item = &Unit> + '_ {
+        let structural = kind.is_structural();
+        let tiles: &[Unit] = if structural { &self.units } else { &[] };
+        let rooms = (!structural).then(|| self.room_units());
+        tiles
+            .iter()
+            .chain(rooms.into_iter().flatten())
+            .filter(move |u| u.kind == kind)
+    }
+
+    /// What the per-move build checks count over the rooms, built once per
+    /// revision (#1239): `count_kind` for the build caps and the pooled
+    /// caps, and the office floors behind the Classic escalator rule.
+    pub(crate) fn census(&self) -> Arc<Census> {
         let key = self.index_key();
-        let cached = self.memo.borrow().crews;
-        if let Some((built, crews)) = cached {
-            if built == key {
-                return crews;
+        if let Some((built, census)) = &self.memo.borrow().census {
+            if *built == key {
+                return census.clone();
             }
         }
-        let crews = self
-            .room_units()
-            .filter(|u| u.kind == Kind::Housekeeping)
-            .count() as i64;
-        self.memo.borrow_mut().crews = Some((key, crews));
-        crews
+        let mut census = Census {
+            kinds: vec![0; FACILITIES.len()],
+            office_floors: HashSet::new(),
+        };
+        for u in self.room_units() {
+            census.kinds[u.kind as usize] += 1;
+            if u.kind == Kind::Office {
+                census.office_floors.insert(u.floor);
+            }
+        }
+        let census = Arc::new(census);
+        self.memo.borrow_mut().census = Some((key, census.clone()));
+        census
+    }
+
+    /// How many housekeeping units the tower has: the crews behind
+    /// `maxStaffFor`'s ceiling (`staffCeiling` in `crowd/spawn.ts`). Read
+    /// from the census, since a housekeeping unit is never a tile.
+    pub(crate) fn housekeeping_units(&self) -> i64 {
+        self.census().kinds[Kind::Housekeeping as usize]
+    }
+
+    /// Whether `floor` has an office on it, in any state.
+    pub(crate) fn has_office_on(&self, floor: i64) -> bool {
+        self.census().office_floors.contains(&floor)
     }
 
     /// The structural tiles of `floor` in the order `pickX` lists them, or
@@ -112,8 +153,40 @@ impl Tower {
         self.memo.borrow_mut().tiles = Some((key, tiles));
         hit
     }
+
+    /// `floorBounds` in `Tower.ts`: the lowest and highest floor any unit
+    /// sits on, tiles included, both folded from the ground floor, so an
+    /// empty tower reads `(1, 1)`. Behind `highest_floor` and `lowest_floor`,
+    /// which the panel getters read on every refresh (#1237, A11 in #1158).
+    pub(crate) fn floor_bounds(&self) -> (i64, i64) {
+        let key = self.index_key();
+        let cached = self.memo.borrow().bounds;
+        if let Some((built, bounds)) = cached {
+            if built == key {
+                return bounds;
+            }
+        }
+        let bounds = self
+            .units
+            .iter()
+            .fold((1, 1), |(lo, hi), u| (lo.min(u.floor), hi.max(u.floor)));
+        self.memo.borrow_mut().bounds = Some((key, bounds));
+        bounds
+    }
 }
 
 #[cfg(test)]
 #[path = "tower_index_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tower_census_tests.rs"]
+mod census_tests;
+
+#[cfg(test)]
+#[path = "tower_reads_tests.rs"]
+mod reads_tests;
+
+#[cfg(test)]
+#[path = "tower_scans_tests.rs"]
+mod scans_tests;
