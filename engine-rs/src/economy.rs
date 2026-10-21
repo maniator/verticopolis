@@ -148,19 +148,18 @@ fn is_overhead_kind(kind: Kind) -> bool {
 
 impl Simulation {
     pub fn has_operational(&self, kind: Kind) -> bool {
-        self.count_operational(kind) > 0
+        self.tower.units_of_kind(kind).any(|u| u.is_operational())
     }
 
     pub fn count_operational(&self, kind: Kind) -> i64 {
         self.tower
-            .units
-            .iter()
-            .filter(|u| u.kind == kind && u.is_operational())
+            .units_of_kind(kind)
+            .filter(|u| u.is_operational())
             .count() as i64
     }
 
     pub fn has_any(&self, kind: Kind) -> bool {
-        self.tower.units.iter().any(|u| u.kind == kind)
+        self.tower.units_of_kind(kind).next().is_some()
     }
 
     /// `collectRent`: quarterly lease income.
