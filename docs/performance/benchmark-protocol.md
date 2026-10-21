@@ -334,14 +334,15 @@ holds, and each placement is asserted) and handed unchanged to both engines
 | `large` | 17,322 | 43,358 | 5 | 2,157,159 | default |
 | `many-unit` | 504 | 41,880 | 88 | 1,977,903 | unit-scaled costs with a small crowd |
 
-The size gate is on population, with units recorded as a cross-check. The
+Every tower records its people, units and save bytes, so a size rule can be
+read off any of them (which one the gate uses is not decided here). The
 many-unit tower exists because several costs scale with units, not people: the
 engine reads that walk every unit, the per-move scans, the host sending every
 unit each frame, the hourly merge and the restore point (save size), the
 structural snapshot and the load peak. It is a five-star, 100-story tower with
 full-width floors, lobbies, all 24 elevator shafts (5 standard bands, 5 service
 bands and 14 express) and all 64 stairs and escalator links, and most of its
-rooms are vacant. A population gate alone would let it onto the slowest path.
+rooms are vacant. A rule that counts only people would let it onto the slowest path.
 Its rows are reported rows at the stage-1 bracket run, slice 9 and RUN-1;
 whether they bind at RUN-3 is the owner's decision. Run them with
 `--scenarios bracket-a,bracket-b,many-unit` (quote the list in PowerShell).
