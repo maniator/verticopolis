@@ -50,9 +50,10 @@ zero-second page load can never become a clean success:
    in any of the session's eligible page lives counts, before engagement too.
    The cohort's rate and bound are conditional on engagement; which bound the
    gate reads is pending the owner. A session with an override page life (a
-   setting or the URL chose the engine, in any page life) is in no eligible
-   population: overridden sessions never qualify. Its faults stay in all
-   attempts, and the report counts the sessions left out.
+   setting or the URL chose either engine, an opt-out included, in any page
+   life) is in no eligible population: overridden sessions never qualify. Its
+   faults stay in all attempts, and the report counts the sessions left out
+   and how many of them carried a fault the row would hold.
 3. **Candidate tail.** The eligible attempts and the engaged cohort
    restricted to page lives on the commits the candidate review names
    (`--tail-shas`), so a failure before engagement on the candidate shows.

@@ -230,13 +230,14 @@ describe("the all-attempts safety denominator", () => {
   it("keeps a session that faulted and then opted out in the rate, and still shows its opt-out", () => {
     const optOut = (session: string, over: Partial<PageLife> = {}) => life({ session, requested: "ts", selectedBy: "setting", engaged: false, ...over });
     const c = run([life({ session: "a", engaged: false, ...fault, firstSeen: "2026-12-01 11:00:00" }), optOut("a")]);
-    expect(c.attempts).toMatchObject({ sessions: 1, faults: 1, movedOff: 1, movedOffNeverRan: 0, overrides: 1 });
+    // An opt-out counts once, among the opt-outs, never also as an override.
+    expect(c.attempts).toMatchObject({ sessions: 1, faults: 1, movedOff: 1, movedOffNeverRan: 0, overrides: 0 });
     // Only a session that never ran the engine joins N in #1197's reading.
     expect(c.attemptsWithMovedOff.n).toBe(1);
     // An engaged cohort page life, then an opt-out: the opt-out shows in the
     // WASM arm, and the overridden session leaves the cohort.
     const engaged = run([life({ session: "b", firstSeen: "2026-12-01 11:00:00" }), optOut("b")]);
-    expect(engaged.attempts.byArm).toEqual([expect.objectContaining({ arm: "wasm", sessions: 1, overrides: 1, movedOff: 1, movedOffNeverRan: 0 })]);
+    expect(engaged.attempts.byArm).toEqual([expect.objectContaining({ arm: "wasm", sessions: 1, overrides: 0, movedOff: 1, movedOffNeverRan: 0 })]);
     expect(engaged.eligible).toMatchObject({ n: 0, overridden: 1 });
     // The opt-out must be in the `wasm` arm, and so must the session.
     expect(run([life({ session: "c", firstSeen: "2026-12-01 11:00:00" }), optOut("c", { assignedArm: "ts" })]).attempts.movedOff).toBe(0);
@@ -363,6 +364,16 @@ describe("overridden sessions", () => {
 
   it("count apart from sessions that were never eligible", () => {
     expect(run([life({ selectedBy: "url" })]).eligible).toMatchObject({ n: 0, overridden: 0 });
+  });
+
+  it("say how many left-out sessions carried a fault the row would hold", () => {
+    const later = life({ session: "a", selectedBy: "setting", engaged: false, firstSeen: "2026-12-01 13:00:00" });
+    const before = run([life({ session: "a", engaged: false, ...fault }), later]);
+    expect(before.attempts).toMatchObject({ sessions: 1, faults: 1, overrides: 1 });
+    expect(before.eligibleAttempts).toMatchObject({ n: 0, overridden: 1, overriddenFaults: 1 });
+    const after = run([life({ session: "a", ...fault }), later]);
+    expect(after.eligible).toMatchObject({ n: 0, overridden: 1, overriddenFaults: 1 });
+    expect(run([life({ session: "a" }), later]).eligible).toMatchObject({ overridden: 1, overriddenFaults: 0 });
   });
 });
 

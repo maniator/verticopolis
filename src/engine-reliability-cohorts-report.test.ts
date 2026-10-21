@@ -135,7 +135,8 @@ describe("the report", () => {
     expect(md).toContain("| Candidate tail attempts (no commits named; engaged or not) | 0 |");
     expect(md).toContain("| Candidate tail, engaged (no commits named; rate and bounds conditional on engagement; which bound the gate reads is pending the owner) | 0 |");
     expect(md).toContain("95% upper bound, early exits as faults");
-    expect(md).toContain("Sessions left out of the eligible rows for an override page life: 0 of the eligible attempts");
+    expect(md).toContain("Sessions left out of the eligible rows for an override page life (with a fault the row would hold): 0 (0) of the eligible attempts");
+    expect(md).toContain("| Overrides other than opt-outs |");
     expect(md).toContain("| `2.50.0 (abc1234, switchable)` | 1 | 0 |");
     expect(md).toContain("| Eligible attempts (engaged or not) | 1 |");
     expect(md).toContain("### Candidate tail attempts by build");

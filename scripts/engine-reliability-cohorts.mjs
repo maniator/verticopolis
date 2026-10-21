@@ -31,10 +31,10 @@
  *   row left before its first tower, which may be a crash while the package
  *   loaded: it is reported beside the faults, and a second, pessimistic bound
  *   counts it as one.
- * - No session with an override page life (a setting or the URL chose the
- *   engine, in any page life) is in the eligible populations below, since
+ * - No session with an override page life (a setting or the URL chose either
+ *   engine, an opt-out included) is in the eligible populations below, since
  *   overridden sessions never qualify. Its faults stay in all attempts, and
- *   the report counts the sessions left out.
+ *   the report counts the sessions left out and how many of them faulted.
  * - ELIGIBLE ATTEMPTS: the `wasm`-arm sessions with an eligible page life
  *   (below) that settled or made an attempt, engaged or not: the cohort's
  *   denominator before the engagement condition, so a fault that stopped the
@@ -84,7 +84,7 @@
 import { recognized, shaMatches, upperBound } from "./engine-reliability.mjs";
 
 /** The `selected_by` values that make a page life an override: the player
- *  chose the engine (Settings) or the URL did. */
+ *  chose either engine (Settings) or the URL did; an opt-out is one too. */
 export const OVERRIDE_SELECTIONS = ["setting", "url"];
 
 /** The only stage whose page lives can be eligible, as `stage` reads. */
@@ -192,9 +192,10 @@ const buildKey = (pl) => `${pl.version} (${pl.sha}, ${pl.build})`;
  *  `pickLoading` finds the ones that left before a tower, and `pickLoop` the
  *  crash loops a suppressed boot of the same session detected (a same-tab
  *  reload keeps the session), which are charged to it as faults. A session
- *  with an override page life never qualifies; `overridden` counts those. */
+ *  with an override page life never qualifies; `overridden` counts those,
+ *  and `overriddenFaults` the ones a fault the cohort would hold. */
 function cohort(sessions, pick, pickLoading, pickLoop, engagedOnly = true) {
-  const out = { n: 0, faults: 0, faultsOrLeft: 0, latched: 0, leftBeforeTower: 0, overridden: 0, byEngagement: { command: 0, play: 0, unknown: 0, none: 0 } };
+  const out = { n: 0, faults: 0, faultsOrLeft: 0, latched: 0, leftBeforeTower: 0, overridden: 0, overriddenFaults: 0, byEngagement: { command: 0, play: 0, unknown: 0, none: 0 } };
   const byBuild = new Map();
   for (const s of sessions) {
     if (s.arm !== "wasm") continue;
@@ -203,6 +204,7 @@ function cohort(sessions, pick, pickLoading, pickLoop, engagedOnly = true) {
     if (engagedOnly ? !engaged.length : !lives.length) continue;
     if (s.lives.some(isOverride)) {
       out.overridden++;
+      if (lives.some(engineFault) || s.lives.some(pickLoop)) out.overriddenFaults++;
       continue;
     }
     out.n++;
@@ -342,7 +344,7 @@ export function summarizeCohorts(allLives, opts = {}) {
       if (engaged) t.engaged++;
       if (fault && !engaged) t.faultNotEngaged++;
       if (left) t.leftBeforeTower++;
-      if (s.lives.some(isOverride)) t.overrides++;
+      if (s.lives.some((pl) => isOverride(pl) && !movedOff(pl))) t.overrides++;
       if (wasMovedOff) t.movedOff++;
       if (lives.some((pl) => pl.writerLatched)) t.latched++;
     }
@@ -456,7 +458,7 @@ export function renderCohortsMarkdown(c, meta) {
     "",
     "## Release evidence and safety",
     "",
-    "> The all-attempts denominator is the safety count: every engine fault in a page life that asked for a counted host is in it, before engagement too, and so is a crash loop a suppressed boot detected. `wasm`-arm sessions that never ran the engine (opted out to TypeScript or suppressed) are outside its N; the next row puts them in N as #1197 words it. The first reading departs from #1197's wording; which one the gate uses is pending the owner. A page life that left before a tower sits in N without a fault (some may be crashes during the load); the last column shows how many, and the pessimistic bound counts each as a fault, so the two bounds bracket the engine. A session with an override page life (a setting or the URL chose the engine) is in no eligible row, since overridden sessions never qualify; its faults stay in all attempts. The engaged rows hold only sessions that engaged, so a fault that stopped a player engaging is outside them and inside the attempts rows: read the rows together. \`--shas\`, \`--versions\`, \`--builds\` and \`--arms\` apply only to the overall rate above; \`--hosts\` applies to both. Each session's arm is that of its first page life in the window that carries one. A page life still loading when this ran counts as having left before a tower, and one that left may have crashed while the engine loaded. Sessions are not independent, so each bound is optimistic.",
+    "> The all-attempts denominator is the safety count: every engine fault in a page life that asked for a counted host is in it, before engagement too, and so is a crash loop a suppressed boot detected. `wasm`-arm sessions that never ran the engine (opted out to TypeScript or suppressed) are outside its N; the next row puts them in N as #1197 words it. The first reading departs from #1197's wording; which one the gate uses is pending the owner. A page life that left before a tower sits in N without a fault (some may be crashes during the load); the last column shows how many, and the pessimistic bound counts each as a fault, so the two bounds bracket the engine. A session with an override page life (a setting or the URL chose either engine, an opt-out included) is in no eligible row, since overridden sessions never qualify; its faults stay in all attempts. The engaged rows hold only sessions that engaged, so a fault that stopped a player engaging is outside them and inside the attempts rows: read the rows together. \`--shas\`, \`--versions\`, \`--builds\` and \`--arms\` apply only to the overall rate above; \`--hosts\` applies to both. Each session's arm is that of its first page life in the window that carries one. A page life still loading when this ran counts as having left before a tower, and one that left may have crashed while the engine loaded. Sessions are not independent, so each bound is optimistic.",
     "",
     "| Population | Sessions | Faults | Fault rate | 95% upper bound | 95% upper bound, early exits as faults | Latch-offs | Left before a tower |",
     "| --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -467,7 +469,7 @@ export function renderCohortsMarkdown(c, meta) {
     pop(`Candidate tail attempts (${tailLabel}; engaged or not)`, c.tailAttempts),
     pop(`Candidate tail, engaged (${tailLabel}; ${conditional})`, c.tail),
     "",
-    `Engaged by: command ${c.eligible.byEngagement.command}, 30 s of play ${c.eligible.byEngagement.play}, no route ${c.eligible.byEngagement.unknown}. Sessions with a page life carrying a value the game never sends (that page life is in no count; the session's others still count): ${c.unrecognizedSessions}. \`$exception\` sessions in the window: ${c.crashSessions}. Sessions with a page life on an uncounted WASM host and none counted here (widen \`--hosts\` to count them): ${c.uncountedHostSessions}, ${c.uncountedHostFaults} of them with an engine fault. Eligible attempts that did not engage: ${share(c.eligibleAttempts.byEngagement.none, c.eligibleAttempts.n)}. Sessions left out of the eligible rows for an override page life: ${c.eligibleAttempts.overridden} of the eligible attempts, ${c.eligible.overridden} of the engaged cohort, ${c.tailAttempts.overridden} of the tail attempts.`,
+    `Engaged by: command ${c.eligible.byEngagement.command}, 30 s of play ${c.eligible.byEngagement.play}, no route ${c.eligible.byEngagement.unknown}. Sessions with a page life carrying a value the game never sends (that page life is in no count; the session's others still count): ${c.unrecognizedSessions}. \`$exception\` sessions in the window: ${c.crashSessions}. Sessions with a page life on an uncounted WASM host and none counted here (widen \`--hosts\` to count them): ${c.uncountedHostSessions}, ${c.uncountedHostFaults} of them with an engine fault. Eligible attempts that did not engage: ${share(c.eligibleAttempts.byEngagement.none, c.eligibleAttempts.n)}. Sessions left out of the eligible rows for an override page life (with a fault the row would hold): ${c.eligibleAttempts.overridden} (${c.eligibleAttempts.overriddenFaults}) of the eligible attempts, ${c.eligible.overridden} (${c.eligible.overriddenFaults}) of the engaged cohort, ${c.tailAttempts.overridden} (${c.tailAttempts.overriddenFaults}) of the tail attempts.`,
     "",
     "Blind spots: a trap the host catches reports through `engine_status`, not `$exception`, so the crash comparison understates engine failures (the engine-fault column holds them); `$exception` is not split into engine and host code; a crash loop detected after a same-tab reload is charged to its session's cohorts when one of the session's page lives that crashed is in the window, but one detected in a new tab is a new session, so it cannot be charged to the session that crashed, and the cohort never sees it; a tab the browser kills after its first rows (out of memory, a hang) sends nothing more and reads clean unless a crash loop is detected; the comparison reads settled page lives only, so early exits are outside it in both arms, and since the load before a tower is mostly WASM-arm time, the WASM crash rate there reads low and the crash-difference signal fires late.",
     ...byBuildTable("Engaged eligible cohort by build", c.eligible.byBuild),
@@ -476,7 +478,7 @@ export function renderCohortsMarkdown(c, meta) {
     "",
     "### All attempts by assigned arm",
     "",
-    "| Arm | Sessions | Engaged on the engine | Did not engage | Faults | Faulted, never engaged | Left before a tower | Overrides | Opted out or suppressed (any page life) | Of those, never ran the engine (outside the rate) |",
+    "| Arm | Sessions | Engaged on the engine | Did not engage | Faults | Faulted, never engaged | Left before a tower | Overrides other than opt-outs | Opted out or suppressed (any page life) | Of those, never ran the engine (outside the rate) |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ...c.attempts.byArm.map((r) => `| ${code(r.arm)} | ${r.sessions} | ${share(r.engaged, r.sessions)} | ${share(r.sessions - r.engaged, r.sessions)} | ${r.faults} | ${r.faultNotEngaged} | ${share(r.leftBeforeTower, r.sessions)} | ${r.overrides} | ${r.movedOff} | ${r.movedOffNeverRan} |`),
     "",

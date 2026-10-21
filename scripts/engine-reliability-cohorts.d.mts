@@ -16,6 +16,7 @@ export interface CohortCount {
   latched: number;
   leftBeforeTower: number;
   overridden: number;
+  overriddenFaults: number;
   byEngagement: { command: number; play: number; unknown: number; none: number };
   rate: number | null;
   upper95: number | null;

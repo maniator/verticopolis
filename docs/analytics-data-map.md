@@ -171,8 +171,9 @@ the cohort, at stage 3, not safety-suppressed and not size-gated, on commits
 the gate review names, that engaged on the engine; a fault in any of their
 eligible page lives counts, one before the engagement too. Its rate and bound
 are conditional on engagement, and which bound the gate reads is pending the
-owner. A session with an override page life (a setting or the URL chose the
-engine) never qualifies; the report counts the sessions it left out. Beside
+owner. A session with an override page life (a setting or the URL chose
+either engine, an opt-out to TypeScript included) never qualifies; the report
+counts the sessions it left out and how many of them faulted. Beside
 the cohort, the eligible attempts row holds the same sessions engaged or not,
 so a fault that stopped a player engaging still shows, and the all-attempts
 safety denominator holds every session that asked for the engine, overrides
