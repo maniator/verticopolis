@@ -14,3 +14,8 @@ export const INVALID_REQUEST = "That request is not valid.";
 /** A whole number a command may take: a safe integer, so both engines read
  *  the same value. */
 export const whole = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v);
+
+/** The refusal for a facility kind the catalog does not hold. `canBuild`,
+ *  `build`, `buildTransport` and `validateTransport` answer it in both
+ *  engines instead of throwing (#1216). */
+export const UNKNOWN_FACILITY = "Unknown facility.";

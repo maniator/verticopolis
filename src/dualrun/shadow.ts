@@ -1,6 +1,16 @@
 import type { Divergence, ShadowCommand } from "./commands";
 import type { WasmEngine, WasmModule } from "./binding";
 
+/** A batch target as JSON text. One JSON cannot write (undefined, a BigInt, a
+ *  symbol) is `null`, which the engine reads as "does not apply", as TypeScript does. */
+function batchTarget(target: unknown): string {
+  try {
+    return JSON.stringify(target) ?? "null";
+  } catch {
+    return "null";
+  }
+}
+
 /**
  * The second engine behind the shadow commands: one WASM `Engine` instance
  * that receives what the live simulation received, and answers a checkpoint
@@ -68,7 +78,7 @@ export class ShadowEngine {
       case "adjustRent": this.live().adjustRent(cmd.id, cmd.dir); return null;
       case "setNoRate": this.live().setNoRate(cmd.id); return null;
       case "priceUnit": this.live().priceUnit(cmd.id, cmd.target); return null;
-      case "applyRentBatch": this.live().applyRentBatch(cmd.kind, JSON.stringify(cmd.target), cmd.onlyDefaultPriced); return null;
+      case "applyRentBatch": this.live().applyRentBatch(cmd.kind, batchTarget(cmd.target), cmd.onlyDefaultPriced); return null;
       case "setFilmPolicy": this.live().setFilmPolicy(cmd.id, cmd.policy); return null;
       case "rerollSubtype": this.live().rerollSubtype(cmd.id); return null;
       case "toggleAutoBridge": this.live().toggleAutoBridge(); return null;
@@ -101,8 +111,20 @@ export class ShadowEngine {
   }
 
   free(): void {
-    this.engine?.free();
+    const engine = this.engine;
     this.engine = null;
+    engine?.free();
+  }
+
+  /** Let the engine go without a call into the module, for a module that
+   *  trapped (#1113): wasm-bindgen's JavaScript-only half of `free` zeroes
+   *  the handle and takes it off the finalizer, so the garbage collector
+   *  never frees it into the module either. Its memory stays with the
+   *  module, which is not used again. */
+  abandon(): void {
+    const engine = this.engine as { __destroy_into_raw?: () => number } | null;
+    this.engine = null;
+    engine?.__destroy_into_raw?.();
   }
 }
 

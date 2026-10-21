@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
-import { FaultLatch, RestorePoints, carryLiveState, hostFault, isHostFault, type FaultContext } from "./hostFault";
+import { EngineBootError } from "./engineBoot";
+import { FaultLatch, RestorePoints, carryLiveState, hostFault, isEngineTrap, isHostFault, type FaultContext } from "./hostFault";
 
 /** A save told apart by its clock. */
 const save = (minutes: number) => {
@@ -41,6 +42,19 @@ describe("restore points (#874)", () => {
     expect((points.newestSave() as { minutes: number }).minutes).toBe(minutesOf(6));
   });
 
+  it("counts the newer points that did not load before the one that did (#1126)", () => {
+    const points = new RestorePoints(save(1));
+    expect(points.restore()).toMatchObject({ point: "attach", skipped: 0 });
+    points.note("null");
+    expect(points.restore()).toMatchObject({ point: "attach", skipped: 1 });
+    points.noteMerge(save(2));
+    expect(points.restore()).toMatchObject({ point: "merge", skipped: 0 });
+    points.note("{not a save");
+    expect(points.restore()).toMatchObject({ point: "merge", skipped: 1 });
+    points.note(save(3));
+    expect(points.restore()).toMatchObject({ point: "latest", skipped: 0 });
+  });
+
   it("drops the attach save once a merge's loads in its place", () => {
     const points = new RestorePoints(save(1));
     points.noteMerge("{merged but broken");
@@ -53,6 +67,33 @@ describe("restore points (#874)", () => {
     const points = new RestorePoints("{");
     expect(() => points.restore()).toThrow(SyntaxError);
     expect(() => points.newestSave()).toThrow(SyntaxError);
+  });
+});
+
+describe("an engine trap (#1113)", () => {
+  const named = (name: string, message: string) => Object.assign(new Error(message), { name });
+
+  it("is a RuntimeError, from this realm or another, the borrow error after one, or a stack overflow", () => {
+    expect(isEngineTrap(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
+    expect(isEngineTrap(named("RuntimeError", "unreachable executed"))).toBe(true);
+    expect(isEngineTrap(new Error("recursive use of an object detected which would lead to unsafe aliasing in rust"))).toBe(true);
+    expect(isEngineTrap(new RangeError("Maximum call stack size exceeded"))).toBe(true);
+    expect(isEngineTrap(named("InternalError", "too much recursion"))).toBe(true);
+    // Another realm's error is no `Error` here, and a wrapper keeps the trap
+    // as its cause (the catalog read).
+    expect(isEngineTrap({ name: "RuntimeError", message: "unreachable" })).toBe(true);
+    expect(isEngineTrap(Object.assign(new Error("the engine returned no classic catalog: unreachable"), { cause: new WebAssembly.RuntimeError("unreachable") }))).toBe(true);
+  });
+
+  it("is not the engine's clean refusal, the host's own check, or a value that is no error", () => {
+    expect(isEngineTrap(new Error("unknown mode: tower"))).toBe(false); // a JsError
+    expect(isEngineTrap(new Error("the tower already has a crowd"))).toBe(false);
+    expect(isEngineTrap(new RangeError("Invalid array length"))).toBe(false);
+    expect(isEngineTrap(new TypeError("cannot read properties of undefined"))).toBe(false);
+    expect(isEngineTrap(new EngineBootError("package-mismatch", "no catalog"))).toBe(false);
+    expect(isEngineTrap("unreachable")).toBe(false);
+    expect(isEngineTrap(null)).toBe(false);
+    expect(isEngineTrap(Object.assign(new Error("the engine returned no classic catalog: mode must be"), { cause: new Error("mode must be") }))).toBe(false);
   });
 });
 

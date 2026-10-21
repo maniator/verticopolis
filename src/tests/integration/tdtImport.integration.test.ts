@@ -1130,7 +1130,12 @@ describe("transport decode: the save's own shafts and flights", () => {
       // A confident answer has to be the RIGHT one.
       expect(walked.parkingConnected, `truncated to ${len}`).toBe(7);
     }
-  });
+    // The sweep is 6,455 parses of a file of about 53 KB. It takes about 2.5 s
+    // on its own and about 13 s under v8 coverage on a 4-core machine. CI's
+    // coverage run, with the other test files beside it on a slow runner, took
+    // it past the suite's 30 s default and failed an unrelated PR (#1185).
+    // Every length still runs.
+  }, 120_000);
 
   it("a STAIRLESS legacy tower keeps its parking count too", () => {
     // Both stairs signals go quiet when the tower has no stairways: the exact

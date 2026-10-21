@@ -104,7 +104,10 @@ save as a problem.
 
 Validation happens at recovery: `Simulation.deserialize(JSON.parse(text))`.
 When the newest point fails, the merge's and then the attach save are tried
-in that order (a recovery from an older point does not say so yet, #1126). A save asked of the frozen tower answers with the
+in that order; the recovery records the point it loaded on
+`status.restorePoint`, with how many newer points it skipped, says when
+it went further back, and clears the undo trail then, whose newest steps are
+later than the tower (#1126). A save asked of the frozen tower answers with the
 same point the recovery uses (`RestorePoints.newestSave`), and throws only
 when no point loads, which cannot happen while a merge's save or the attach
 save is kept, since TypeScript loaded both.
@@ -138,7 +141,8 @@ leaves the host only once a point covers it:
 
 Each event is delivered once when the recovery loads the newest point. When
 it falls back to an older point, the TypeScript engine can emit events the
-game already has (#1126).
+game already has; the status and the player's line name that recovery
+(#1126), and an analytics field for it is an owner decision.
 
 **Cost.** #874 adds no engine save per command or per tick. The undo
 capture's save is main's: on main the hosted tower's `serialize` reads
@@ -175,8 +179,14 @@ loses everything since the newest merge or hosted save:
   save is what traps;
 - any action taken since that point without an undo capture (an emergency
   answer, an exterminator call, a rename);
-- the game time since that point, up to an in-game hour while the clock
-  runs, since the hour pass merges.
+- the play since that point: the 30-second autosave reads a point, so about
+  30 seconds of play while its timer fires on time, and at most an in-game
+  hour, since the hour pass merges.
+
+The owner's bound (R6, 2026-10-20 22:07 UTC) is up to 30 seconds of play.
+This host does not measure or enforce it; the facade's restore points prove
+it (its slice 8). A recovery that has to go back to an older point loses
+more, and says so (#1126).
 
 The speed and the bridging toggle are not tower state and are kept.
 
@@ -261,10 +271,15 @@ edit made while paused. Both were dropped.
   step (and no redo trail is cleared); a drag that goes on over the
   restored tower leaves one step, which undoes what it did there. A capture
   that read the tower itself keeps its fingerprint.
-- **No point loads, or the adopt throws:** the error is recorded, the frozen
-  tower stays (its tick does nothing, its save is the newest point), and the
-  player reads "The WASM engine stopped, and the tower could not go back to a
-  good state. Load a save or start a new tower to keep playing."
+- **No point loads, or the adopt throws:** the error is recorded and the
+  frozen tower stays (its tick does nothing, its save is the newest point,
+  and its event buffer takes nothing after the release handed the held
+  events back, #1149). When no point loads, the player reads "The WASM
+  engine stopped, and the tower could not go back to a good state. Load a
+  save or start a new tower to keep playing." When the point loaded and the
+  adopt threw, the player reads "The WASM engine stopped, and the tower could
+  not switch to the TypeScript engine, so it is frozen and changes to it are
+  not saved. Load a save or start a new tower to keep playing." (#1149).
 - **Live state no save carries** goes from the frozen read model to the
   fresh tower (`carryLiveState`, each part on its own, best effort): the
   elevator telemetry for the fresh tower's shafts, yesterday's housekeeping
@@ -272,7 +287,14 @@ edit made while paused. Both were dropped.
 - **No tower is hosted again in this page life.** A trapped module may be
   corrupt, so a later load or new game stays on TypeScript, and `hosted`
   stays false. The boot turns the engine save writer off too, since it runs
-  in the same module, and records the fault in the boot state.
+  in the same module, and records the fault in the boot state. A trap while
+  a tower attaches latches the same way (`status.latched`, still coded
+  `attach-refused`; #1113, `spec-1113-1126-1149-recovery-correctness.md`).
+  The faulted tower's engine is let go without a call into the module
+  (taken off wasm-bindgen's finalizer, #1113). The latch covers the page
+  life only: a reload starts on the build's engine again, and staying on
+  TypeScript across reloads after a real failure is A4's sticky safety
+  suppression (#1197); this fallback does not do it.
 - **Strict (wasm-only) builds:** `onFatal(message, reason)` once, no
   recovery; the boot's existing stop shows the failure and sets the speed to
   0. The frozen instance answers a save with the newest point.

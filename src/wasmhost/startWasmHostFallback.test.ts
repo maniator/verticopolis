@@ -66,7 +66,7 @@ describe("startWasmHost fallback codes", () => {
     const onFallback = vi.fn();
     const handle = startWasmHost(app(crowded()), fakeModule(), quiet(), { onFallback });
     expect(handle.status).toMatchObject({ hosted: false, fallbacks: 1, lastFallback: { reason: "attach-refused", stage: "start" } });
-    expect(onFallback).toHaveBeenCalledWith({ reason: "attach-refused", stage: "start" });
+    expect(onFallback).toHaveBeenCalledWith({ reason: "attach-refused", stage: "start" }, false);
   });
 
   it("keeps the adopt going when the report throws, and logs it", () => {
@@ -104,7 +104,7 @@ describe("startWasmHost fallback codes", () => {
     const onFatal = vi.fn();
     const handle = startWasmHost(app(), mod, quiet(), { strict: true, onFallback, onFatal });
     expect(handle.status).toMatchObject({ hosted: false, fallbacks: 1, lastFallback: { reason: "package-mismatch", stage: "start" } });
-    expect(onFallback).toHaveBeenCalledWith({ reason: "package-mismatch", stage: "start" });
+    expect(onFallback).toHaveBeenCalledWith({ reason: "package-mismatch", stage: "start" }, false);
     expect(onFatal).toHaveBeenCalledWith(expect.stringContaining("skyBridge"), "package-mismatch");
   });
 
@@ -135,13 +135,230 @@ describe("startWasmHost fallback codes", () => {
   });
 });
 
+/** A fake module that records every call into it, whose next engine load
+ *  throws `failNext`'s error, and whose catalog call number `trapCatalogAt`
+ *  traps. */
+function counted() {
+  const mod = fakeModule();
+  const calls: string[] = [];
+  let next: unknown = null;
+  let catalogTrap = 0;
+  const fromSave = mod.Engine.fromSave.bind(mod.Engine);
+  const catalog = mod.catalog!.bind(mod);
+  mod.catalog = (mode: string) => {
+    calls.push("catalog");
+    if (calls.filter((c) => c === "catalog").length === catalogTrap) throw new WebAssembly.RuntimeError("unreachable");
+    return catalog(mode);
+  };
+  mod.Engine = {
+    fromSave(save: string, markers?: string) {
+      calls.push("fromSave");
+      if (next !== null) {
+        const error = next;
+        next = null;
+        throw error;
+      }
+      return fromSave(save, markers);
+    },
+  } as unknown as typeof mod.Engine;
+  return Object.assign(mod, { calls, failNext: (error: unknown) => void (next = error), trapCatalogAt: (n: number) => void (catalogTrap = n) });
+}
+
+describe("a trap while a tower attaches (#1113)", () => {
+  afterEach(() => {
+    const g = globalThis as { __vcEngine?: { stop(): void } };
+    g.__vcEngine?.stop();
+  });
+
+  it("latches hosting off when a later tower's engine load traps, and calls the module no more", () => {
+    const mod = counted();
+    const a = app();
+    const seen: unknown[] = [];
+    const handle = startWasmHost(a, mod, quiet(), { onFallback: (f, latched) => seen.push({ ...f, latched }) });
+    expect(handle.status).toMatchObject({ hosted: true, latched: false });
+    mod.failNext(new WebAssembly.RuntimeError("unreachable"));
+    a.adoptSim(Simulation.newGame(4, "classic"));
+    const trapped = mod.calls.length;
+    expect(mod.calls[trapped - 1]).toBe("fromSave");
+    expect(handle.status).toMatchObject({ hosted: false, latched: true, starts: 1, fallbacks: 1, lastFallback: { reason: "attach-refused", stage: "adopt" } });
+    expect(handle.status.lastError).toBe("not hosting this tower or any later one, since the WASM engine trapped: unreachable");
+    expect(seen).toEqual([{ reason: "attach-refused", stage: "adopt", latched: true }]);
+    expect(mod.engines[0].freed).toBe(true); // the first tower's, let go before
+    // A load, an undo and a stop: none asks the module again.
+    a.adoptSim(Simulation.newGame(5, "classic"));
+    a.adoptSim(Simulation.newGame(6, "classic"), true);
+    expect(handle.status).toMatchObject({ hosted: false, starts: 1, fallbacks: 1 });
+    expect(handle.current()).toBeNull();
+    handle.stop();
+    expect(mod.calls).toHaveLength(trapped);
+  });
+
+  it("latches at the start on a first tower's trap, without the catalog check behind a refusal", () => {
+    const mod = counted();
+    mod.failNext(new WebAssembly.RuntimeError("unreachable"));
+    const a = app();
+    const handle = startWasmHost(a, mod, quiet());
+    expect(mod.calls).toEqual(["catalog", "catalog", "fromSave"]);
+    expect(handle.status).toMatchObject({ hosted: false, latched: true, starts: 0, lastFallback: { reason: "attach-refused", stage: "start" } });
+    a.adoptSim(Simulation.newGame(4, "classic"));
+    expect(mod.calls).toHaveLength(3);
+  });
+
+  it.each([
+    ["the borrow error a trap leaves", new Error("recursive use of an object detected which would lead to unsafe aliasing in rust")],
+    ["a stack overflow", new RangeError("Maximum call stack size exceeded")],
+    ["another realm's RuntimeError", Object.assign(new Error("unreachable executed"), { name: "RuntimeError" })],
+  ])("latches on %s", (_name, error) => {
+    const mod = counted();
+    mod.failNext(error);
+    const handle = startWasmHost(app(), mod, quiet());
+    expect(handle.status).toMatchObject({ hosted: false, latched: true });
+  });
+
+  it("keeps the engine's clean refusal a refusal, so the next tower is hosted", () => {
+    const mod = counted();
+    mod.failNext(new Error("unknown mode: tower")); // the engine's Result::Err
+    const onFallback = vi.fn();
+    const a = app();
+    const handle = startWasmHost(a, mod, quiet(), { onFallback });
+    expect(handle.status).toMatchObject({ hosted: false, latched: false, lastFallback: { reason: "attach-refused", stage: "start" } });
+    expect(onFallback).toHaveBeenCalledWith({ reason: "attach-refused", stage: "start" }, false);
+    // A refusal asks the catalogs again, to tell a foreign package apart.
+    expect(mod.calls).toEqual(["catalog", "catalog", "fromSave", "catalog", "catalog"]);
+    a.adoptSim(Simulation.newGame(4, "classic"));
+    expect(handle.status).toMatchObject({ hosted: true, starts: 1 });
+  });
+
+  it("frees the engine a refusal built, and leaves one that trapped alone", () => {
+    const mod = fakeModule();
+    const fromSave = mod.Engine.fromSave.bind(mod.Engine);
+    let error: unknown = new Error("a frame the host cannot read");
+    mod.Engine = {
+      fromSave(save: string, markers?: string) {
+        const engine = fromSave(save, markers);
+        mod.engines[mod.engines.length - 1].frameView = () => {
+          throw error;
+        };
+        return engine;
+      },
+    } as unknown as typeof mod.Engine;
+    const a = app();
+    const handle = startWasmHost(a, mod, quiet());
+    expect(handle.status).toMatchObject({ hosted: false, latched: false });
+    expect(mod.engines[0].freed).toBe(true);
+    error = new WebAssembly.RuntimeError("unreachable");
+    a.adoptSim(Simulation.newGame(4, "classic"));
+    expect(handle.status).toMatchObject({ hosted: false, latched: true });
+    // A free would call into the module; the engine is taken off the
+    // finalizer instead.
+    expect(mod.engines[1]).toMatchObject({ freed: false, abandoned: true });
+  });
+
+  it("latches on a trap in the attach's catalog read, and calls nothing after it", () => {
+    const mod = counted();
+    mod.trapCatalogAt(1);
+    const a = app();
+    const handle = startWasmHost(a, mod, quiet());
+    expect(mod.calls).toEqual(["catalog"]);
+    expect(handle.status).toMatchObject({ hosted: false, latched: true, lastFallback: { reason: "attach-refused", stage: "start" } });
+    a.adoptSim(Simulation.newGame(4, "classic"));
+    expect(mod.calls).toEqual(["catalog"]);
+  });
+
+  it("latches when the catalog check behind a clean refusal traps, and keeps the refusal's message", () => {
+    const mod = counted();
+    mod.failNext(new Error("unknown mode: tower"));
+    mod.trapCatalogAt(3);
+    const a = app();
+    const handle = startWasmHost(a, mod, quiet());
+    expect(mod.calls).toEqual(["catalog", "catalog", "fromSave", "catalog"]);
+    expect(handle.status).toMatchObject({ hosted: false, latched: true, fallbacks: 1, lastFallback: { reason: "attach-refused", stage: "start" } });
+    expect(handle.status.errors).toEqual(["not hosting this tower: unknown mode: tower", "not hosting this tower or any later one, since the WASM engine trapped: unreachable"]);
+    a.adoptSim(Simulation.newGame(4, "classic"));
+    expect(mod.calls).toHaveLength(4);
+  });
+
+  /** A module whose first engine refuses its frame, then throws `freeError`
+   *  from the free behind that refusal. */
+  const refusingFree = (freeError: Error) => {
+    const mod = fakeModule();
+    const fromSave = mod.Engine.fromSave.bind(mod.Engine);
+    mod.Engine = {
+      fromSave(save: string, markers?: string) {
+        const engine = fromSave(save, markers);
+        const fake = mod.engines[mod.engines.length - 1];
+        if (mod.engines.length > 1) return engine;
+        fake.frameView = () => {
+          throw new Error("a frame the host cannot read");
+        };
+        fake.free = () => {
+          throw freeError;
+        };
+        return engine;
+      },
+    } as unknown as typeof mod.Engine;
+    return mod;
+  };
+
+  it("latches when the free behind a refusal traps, and keeps the refusal's message", () => {
+    const handle = startWasmHost(app(), refusingFree(new WebAssembly.RuntimeError("unreachable")), quiet());
+    expect(handle.status).toMatchObject({ hosted: false, latched: true });
+    expect(handle.status.errors).toEqual(["not hosting this tower or any later one, since the WASM engine trapped: unreachable, while freeing the engine after a refusal: a frame the host cannot read"]);
+  });
+
+  it("answers the refusal when the free behind it throws a clean error, and hosts the next tower", () => {
+    const a = app();
+    const handle = startWasmHost(a, refusingFree(new Error("null pointer passed to rust")), quiet());
+    expect(handle.status).toMatchObject({ hosted: false, latched: false, lastError: "not hosting this tower: a frame the host cannot read" });
+    a.adoptSim(Simulation.newGame(4, "classic"));
+    expect(handle.status).toMatchObject({ hosted: true, latched: false, starts: 1 });
+  });
+
+  it("latches the next tower off when a healthy tower's free traps as it is let go, and ends the redo hold", () => {
+    const mod = fakeModule();
+    const holds: boolean[] = [];
+    const a = Object.assign(app(), { holdClearedRedo: (on: boolean) => void holds.push(on) });
+    const onFallback = vi.fn();
+    const handle = startWasmHost(a, mod, quiet(), { onFallback });
+    mod.engines[0].free = () => {
+      throw new WebAssembly.RuntimeError("unreachable");
+    };
+    a.adoptSim(Simulation.newGame(4, "classic"));
+    expect(mod.engines).toHaveLength(1);
+    expect(handle.status).toMatchObject({ hosted: false, latched: true, starts: 1, lastFallback: { reason: "attach-refused", stage: "adopt" } });
+    expect(onFallback).toHaveBeenCalledWith({ reason: "attach-refused", stage: "adopt" }, true);
+    expect(handle.status.errors[0]).toBe("letting go of the last tower: unreachable");
+    expect(holds).toEqual([true, false]);
+  });
+
+  it("hosts the next tower when a healthy tower's free throws a clean error as it is let go", () => {
+    const mod = fakeModule();
+    const a = app();
+    const handle = startWasmHost(a, mod, quiet());
+    mod.engines[0].free = () => {
+      throw new Error("null pointer passed to rust");
+    };
+    a.adoptSim(Simulation.newGame(4, "classic"));
+    expect(handle.status).toMatchObject({ hosted: true, latched: false, starts: 2, errors: ["letting go of the last tower: null pointer passed to rust"] });
+  });
+
+  it("stops a wasm-only build on an attach trap, with hosting off", () => {
+    const mod = counted();
+    mod.failNext(new WebAssembly.RuntimeError("unreachable"));
+    const onFatal = vi.fn();
+    const handle = startWasmHost(app(), mod, quiet(), { strict: true, onFatal });
+    expect(onFatal).toHaveBeenCalledWith(expect.stringContaining("trapped: unreachable"), "attach-refused");
+    expect(handle.status.latched).toBe(true);
+  });
+});
+
 describe("loadWasmEngine", () => {
   it("codes a package that lacks what this shell calls as a package mismatch", async () => {
     // A data URL module that loads and initializes but exports no Engine.
     const url = `data:text/javascript,${encodeURIComponent("export default async function init() {}")}`;
     // The bytes path: this file runs in a DOM environment whose Response is not the engine's own.
     vi.stubGlobal("fetch", wasmFetch(EMPTY_WASM, { type: "application/octet-stream" }));
-    const err = await loadWasmEngine(url, { wasmUrl: "http://x/e.wasm" }).catch((e: unknown) => e);
+    const err = await loadWasmEngine(url, undefined, { wasmUrl: "http://x/e.wasm" }).catch((e: unknown) => e);
     vi.unstubAllGlobals();
     expect(err).toBeInstanceOf(EngineBootError);
     expect(err).toMatchObject({ reason: "package-mismatch", message: expect.stringContaining("no Engine class") });

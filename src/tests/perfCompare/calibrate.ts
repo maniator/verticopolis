@@ -1,5 +1,5 @@
 import { duplicateCheck, lossRecordProblem, poolIdentity, poolProblems, rendererProblem, stable, treeProblem, type PoolIdentity, type PoolPass } from "./calibratePool";
-import { pairedDifferences, summarize } from "./stats";
+import { MIN_REPS, pairedDifference, summarize } from "./stats";
 import type { CompareResults, EngineName } from "./types";
 
 export { stable, treeProblem };
@@ -46,8 +46,7 @@ export const EPSILON_STEP_MS = 5;
 /** The long-task ε cap: 50 ms of blocking, one 100 ms task (protocol 6.1 step 4). */
 export const LONG_TASK_CAP_MS = 50;
 export const DEFAULT_MIN_PASSES_PER_ENGINE = 5;
-/** The repetitions every pass must have: the verdict runs use 10, and a pass with another count does not pool with them. */
-export const MIN_REPS = 10;
+export { MIN_REPS };
 export const SCENARIOS = ["medium", "large"];
 export const THROTTLES = ["1", "4"];
 
@@ -125,9 +124,8 @@ export function coldStartDifference(p: Pick<Pass, "metrics">, throttle: string):
   const a = row("wasm");
   const b = row("ts");
   if (!a || !b) return null;
-  const diffs = pairedDifferences(a, b);
-  if (diffs.length < MIN_REPS) return null;
-  return summarize(diffs).medianCiHigh;
+  const d = pairedDifference(a, b);
+  return d && d.n >= MIN_REPS ? d.ciHigh : null;
 }
 
 export function family(id: Family["id"], kind: Family["kind"], unit: Family["unit"], values: (number | null)[], cap: number | null, step: number, limit: number): Family {

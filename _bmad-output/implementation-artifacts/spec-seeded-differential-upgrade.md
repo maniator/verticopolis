@@ -64,11 +64,16 @@ random draws change the scenario any given seed produces, so a seed from
 before this slice does not replay. The engine has no bankruptcy rule, so
 "cash that runs out" is the whole money goal.
 
-Slice 2b: the six dropped commands (`sell`, `adjustRent`, `setCars`,
-`setNoRate`, `setSchedule`, `startFire`) get an `expectFail` form, so a
-command one engine refuses and the other accepts is a divergence. Reason
-compares wait for #865 (B4). Needs schema work in both runners and a split of
-`scenario.ts`, which sits at the 500-line ceiling.
+Slice 2b (done): the six dropped commands (`sell`, `adjustRent`, `setCars`,
+`setNoRate`, `setSchedule`, `startFire`) have an `expectFail` form in both
+runners, so a command one engine refuses and the other accepts is a
+divergence. The ops moved to `tuneOps.ts` to keep `scenario.ts` under the
+500-line ceiling. A bad address (nothing at the tile) stays an error, since
+`expectFail` covers the engine's refusal, not a bad scenario. The fuzzer keeps
+a refused tuning command with `expectFail` when the scenario replays clean with
+it, and drops it otherwise. The tuning ops take no `reason` yet; #865 pins
+reasons on the build ops and the tuning ops can follow if a refusal reason
+turns out to matter there.
 
 Slice 2c: a path to higher stars, so escalators, service and express shafts
 (3, 2 and 3 stars) are accepted and the express stops and lobby skips run.

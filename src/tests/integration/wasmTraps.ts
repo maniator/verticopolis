@@ -14,13 +14,14 @@ export const POISONED = "recursive use of an object detected which would lead to
  *  {@link freePoisoned} (the injected trap never reached the module). */
 const poisoned: WasmEngine[] = [];
 
-/** For `afterEach`: free every engine a test poisoned. */
+/** For `afterEach`: free every engine a test poisoned. One the host let go
+ *  without a call into the module (#1113) has no handle left to free. */
 export function freePoisoned(): void {
   for (const engine of poisoned.splice(0)) {
     for (const name of Object.getOwnPropertyNames(engine)) {
       if (typeof (engine as unknown as Record<string, unknown>)[name] === "function") delete (engine as unknown as Record<string, unknown>)[name];
     }
-    engine.free();
+    if ((engine as unknown as { __wbg_ptr: number }).__wbg_ptr !== 0) engine.free();
   }
 }
 
@@ -31,7 +32,8 @@ export function trapAfter(engine: WasmEngine, method: keyof WasmEngine & string,
   poisoned.push(engine);
   const poison = () => {
     for (const name of Object.getOwnPropertyNames(proto)) {
-      if (name === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, name)?.value !== "function") continue;
+      // wasm-bindgen's `__destroy_into_raw` is JavaScript only and never traps.
+      if (name === "constructor" || name === "__destroy_into_raw" || typeof Object.getOwnPropertyDescriptor(proto, name)?.value !== "function") continue;
       Object.defineProperty(engine, name, {
         value: () => {
           throw new Error(POISONED);
