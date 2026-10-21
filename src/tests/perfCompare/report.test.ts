@@ -29,6 +29,9 @@ describe("fmt", () => {
     expect(fmt(1234.5, "ms")).toBe("1235 ms");
     expect(fmt(12.345, "ms")).toBe("12.35 ms");
     expect(fmt(0.1234, "ms")).toBe("0.123 ms");
+    expect(fmt(-12.345, "ms")).toBe("-12.35 ms");
+    expect(fmt(-1234.5, "ms")).toBe("-1235 ms");
+    expect(fmt(-0.1234, "ms")).toBe("-0.123 ms");
     expect(fmt(59.5, "fps")).toBe("59.50 fps");
     expect(fmt(null, "ms")).toBe("n/a");
     expect(fmt(NaN, "ms")).toBe("n/a");
@@ -101,6 +104,18 @@ describe("markdownReport", () => {
     expect(md).toContain("- one machine");
     expect(markdownReport(results(true))).toContain("**Validation: passed.**");
     expect(md).not.toContain("A/A pass");
+  });
+
+  it("prints M5's paired difference under the Startup table", () => {
+    const r = results(false);
+    const base = r.metrics[0];
+    const cold = (engine: "ts" | "wasm", values: number[]) => ({ ...base, group: "startup" as const, scenario: "-", throttle: "1", metric: "cold game ready", unit: "ms", engine, values, reps: values.map((_, i) => i), summary: null });
+    const md = markdownReport({ ...r, metrics: [...r.metrics.filter((m) => m.metric !== "cold game ready"), cold("ts", Array(10).fill(1000)), cold("wasm", Array.from({ length: 10 }, (_, i) => 1000 + i))] });
+    expect(md).toContain("Cold start to ready, paired difference (WASM minus TypeScript; above zero is worse):");
+    expect(md).toContain("| 1x | 4.50 ms | 1.00 ms to 8.00 ms | 10 |");
+    expect(md.indexOf("Cold start to ready, paired difference")).toBeGreaterThan(md.indexOf("## Startup"));
+    expect(md.indexOf("Cold start to ready, paired difference")).toBeLessThan(md.indexOf("## Simulation only, engine as the app hosts it"));
+    expect(markdownReport({ ...r, metrics: r.metrics.filter((m) => m.metric !== "cold game ready") })).not.toContain("Cold start to ready, paired difference");
   });
 
   it("names what made the tree dirty", () => {

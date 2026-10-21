@@ -1,3 +1,4 @@
+import { MIN_REPS, pairedDifference } from "../perfCompare/stats";
 import { treeSummary } from "../perfCompare/treeRecord";
 import { browserName, rendererBanners, rendererSummary } from "../perfCompare/renderer";
 import type { Metric, Ratio } from "./analysis";
@@ -25,8 +26,24 @@ const cell = (m: Metric | undefined): string => {
   return `${fmt(s.median, m!.unit)}${ci}${m!.unthrottled ? " †" : ""}`;
 };
 
-/** Metrics the gate judges by an additive paired difference (protocol section 5, M4: a zero TypeScript reference has no ratio). Their gate cell says so; the harness does not report that difference yet (#1111). */
+/** Metrics the gate judges by an additive paired difference (protocol section 5, M4: a zero TypeScript reference has no ratio). Their gate cell prints that difference instead of a ratio. */
 const DIFFERENCE_GATED = /^main-thread blocking/;
+
+/**
+ * The gate cell of a metric judged by a paired difference (M4): the median of
+ * wasm minus ts per repetition, with the 95% interval of the median, in the
+ * metric's unit. The upper end of the interval is the statistic ε is read
+ * against (protocol 6.1), the same one `perf:calibrate` computes for a pass.
+ * Above zero is worse. Pairs are by repetition number.
+ */
+export function differenceCell(wasm: Metric | undefined, ts: Metric | undefined, aa = false): string {
+  if (!wasm || !ts) return "n/a";
+  const d = pairedDifference(wasm, ts);
+  if (!d) return "n/a";
+  const ci = d.ciLow !== null && d.ciHigh !== null ? ` [${fmt(d.ciLow, wasm.unit)}, ${fmt(d.ciHigh, wasm.unit)}]` : " (no interval)";
+  const thin = d.n < MIN_REPS ? `, below the gate's minimum of ${MIN_REPS} pairs` : "";
+  return `${fmt(d.median, wasm.unit)}${ci}, ${d.n} pairs (${aa ? "slot wasm minus slot ts" : "wasm minus ts"})${thin}`;
+}
 
 /** `verdict` false for an A/A folder, which has no verdict words: the interval is the data. */
 const ratioCell = (r: Ratio | undefined, verdict = true): string => {
@@ -112,7 +129,7 @@ export function markdown(res: WorkerResults): string {
       const of = (mode: ModeName) => rows.find((m) => m.scenario === scenario && m.throttle === throttle && m.metric === metric && m.mode === mode);
       const ratio = (mode: ModeName, against: ModeName) => res.ratios.find((r) => r.scenario === scenario && r.throttle === throttle && r.metric === metric && r.mode === mode && r.against === against);
       const higher = (of("wasm") ?? rows.find((m) => m.scenario === scenario && m.throttle === throttle && m.metric === metric))?.better === "higher";
-      lines.push(row([scenario, `${throttle}x`, `${metric} (${unit})`, ...(gate ? [DIFFERENCE_GATED.test(metric) ? "no ratio: gated by a paired difference (#1111)" : ratioCell(higher ? ratio("ts", "wasm") : ratio("wasm", "ts"), !aa)] : []), ...present.map((m) => cell(of(m))), ...cols.map(([a, b]) => ratioCell(ratio(a, b), !aa))]));
+      lines.push(row([scenario, `${throttle}x`, `${metric} (${unit})`, ...(gate ? [DIFFERENCE_GATED.test(metric) ? differenceCell(of("wasm"), of("ts"), !!aa) : ratioCell(higher ? ratio("ts", "wasm") : ratio("wasm", "ts"), !aa)] : []), ...present.map((m) => cell(of(m))), ...cols.map(([a, b]) => ratioCell(ratio(a, b), !aa))]));
     }
     lines.push("");
   }

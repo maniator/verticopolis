@@ -31,4 +31,18 @@ describe("catalogVerdict", () => {
     expect(catalogVerdict((mode) => (mode === "classic" ? own(mode) : "{}"))).toBe("foreign");
     expect(catalogVerdict((mode) => (mode === "classic" ? own(mode) : "not json"))).toBe("failing");
   });
+
+  it("throws a trap in a catalog call, for the host's latch, and not a verdict", () => {
+    const trap = new WebAssembly.RuntimeError("unreachable");
+    expect(() =>
+      catalogVerdict(() => {
+        throw trap;
+      }),
+    ).toThrow(trap);
+    expect(() => catalogVerdict((mode) => (mode === "classic" ? own(mode) : throwTrap()))).toThrow(WebAssembly.RuntimeError);
+  });
 });
+
+function throwTrap(): never {
+  throw new WebAssembly.RuntimeError("unreachable");
+}
