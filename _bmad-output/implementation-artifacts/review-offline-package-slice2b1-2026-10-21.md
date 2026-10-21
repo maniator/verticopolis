@@ -40,3 +40,7 @@ design 5.4). Reviewed head ec9046ad, fixed in the next commit.
 - Timeout copy blames the connection: the sentence is the design's wording;
   a compile that overruns the deadline is the rarer case.
 - Mismatch gives no cause and only Reload: Repair is slice 2b-2.
+
+## Independent review round (reviewer 2, 315a78a0)
+
+- C1 (patch, fixed): nothing tested the `isSecureContext` wiring in `showEngineFailure`. `src/bootstrapEngineSecure.test.ts` shows an `unverifiable` failure with the context stubbed insecure (the HTTPS sentence) and secure (the reload or another browser sentence), so a constant-true or constant-false mutant fails.
