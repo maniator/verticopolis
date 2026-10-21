@@ -5,9 +5,9 @@ import type { At, Outcome, ScenarioEngine, Spec } from "./scenario";
  * The scenario ops that tune or provoke something the engine may refuse:
  * `sell`, `adjustRent`, `setNoRate`, `setCars`, `setSchedule` and `startFire`.
  * Each carries an optional `expectFail`, so a command one engine refuses and
- * the other accepts is a divergence, not a silent gap. A tile with nothing on
- * it is a scenario error either way: `expectFail` covers the engine's refusal,
- * not a bad address.
+ * the other accepts is a divergence and not a silent gap. A tile with nothing
+ * on it is a scenario error either way: `expectFail` covers the engine's
+ * refusal only.
  */
 
 export type TuneCommand =
@@ -63,6 +63,9 @@ export function applyTune(e: ScenarioEngine, c: TuneCommand): void {
         const here = e.unitAt(c.floor, c.x)?.kind ?? e.transportAt(c.floor, c.x)?.kind;
         if (here !== c.kind) throw new Error(`sell @ ${c.floor},${c.x}: expected ${c.kind}, found ${here ?? "nothing"}`);
       }
+      // A refusal needs something on the tile to refuse: a sell at a bare tile
+      // is a bad address, as it is for the ops that look up a unit first.
+      if (c.expectFail && !e.unitAt(c.floor, c.x) && !e.transportAt(c.floor, c.x)) throw new Error(`no unit or transport at floor ${c.floor}, x ${c.x}`);
       expectOk(e.sellAt(c.floor, c.x), c.expectFail, `sell @ ${c.floor},${c.x}`);
       return;
     }

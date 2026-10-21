@@ -843,6 +843,17 @@ fn run_scenario_inner(
                             )));
                         }
                     }
+                    // A refusal needs something on the tile to refuse: a sell at
+                    // a bare tile is a bad address, as for the ops that look up
+                    // a unit first.
+                    if expect_fail.unwrap_or(false)
+                        && sim.tower.unit_at(*floor, *x).is_none()
+                        && sim.tower.transport_at(*floor, *x).is_none()
+                    {
+                        return Err(failed(format!(
+                            "no unit or transport at floor {floor}, x {x}"
+                        )));
+                    }
                     expect_ok(
                         sim.sell_at(*floor, *x),
                         expect_fail.unwrap_or(false),
