@@ -167,9 +167,10 @@ in while they do.
   - [x] the synthetic-graph self-test
 - [x] Gates and records (AC 8 to 10)
   - [x] the four gates, coverage, `test:wasm:parity`
-  - [ ] the HP record in the PR body
+  - [x] the HP record on the PR (a section 6 comment) and the complexity
+        note in the PR body
   - [x] `/bmad-code-review` (all four layers), fixes, backlog rows for defers
-  - [ ] a confirming review pass on the fixed diff
+  - [x] a confirming review pass on the fixed diff (round 3)
 
 ## Dev Notes
 
@@ -347,8 +348,9 @@ Claude Code (the facade lane's thread), 2026-10-20.
     fails a static edge into an engine module that loads `Simulation`
     lazily, keeps a dual-run file in the reach set only when it reaches
     `Simulation` through engine modules, and holds each file that loads the
-    engine package's glue by URL (`engineLoad.ts`, the dual-run worker) to
-    one unreadable import; any other unreadable import fails, the dual run's
+    engine package's glue by URL to one unreadable import (`engineLoad.ts`
+    and, since #1183 moved the workers onto the checked load,
+    `loadEngineModule.ts`); any other unreadable import fails, the dual run's
     included.
 - The reach set on `main` at this branch's base is `Simulation.ts`,
   `sim/loop.ts` and `sim/serialization.ts`, and the crossings are the 9
@@ -356,8 +358,10 @@ Claude Code (the facade lane's thread), 2026-10-20.
   the slice that removes it.
 - `Simulation.population` is a scan over the rooms
   (`routing.totalPopulation`). The header reads it only when its
-  `population` is read, once per header object; slice 3 reads `view.header`
-  once per frame and keeps it, and the PR's hot-path record says so.
+  `population` is read, once per header object. Slice 3 reads `population`
+  at most once per step or per HUD tick, or has the adapter memoize it per
+  step, and never per frame (the independent review's C2); `view.ts` says so
+  on the field.
 
 ### File List
 

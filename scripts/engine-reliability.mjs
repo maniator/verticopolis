@@ -38,18 +38,21 @@
  *   with valid codes cannot be told apart.)
  * - A counted page life FELL BACK when its highest `fallbacks` is above 0.
  *   Its fallback is an ENGINE FAULT when it sent any reason but
- *   `package-mismatch` (or, with its rows lost, no reason at all).
- *   `package-mismatch` comes from the deploy race (#1046) and says nothing
- *   about the engine. Every other code counts, `attach-refused` included, as
+ *   `package-mismatch` or `unverifiable` (or, with its rows lost, no reason at
+ *   all). `package-mismatch` comes from the deploy race (#1046) and says
+ *   nothing about the engine. `unverifiable` is a browser that cannot hash the
+ *   engine files (an insecure context, a disabled `crypto.subtle`, #985): the
+ *   files may be fine, so it says nothing about the engine either, and has a
+ *   line of its own. Every other code counts, `attach-refused` included, as
  *   plan 4.1 rules, and so does `other`: the worker host sends it for a boot
  *   step outside the engine (so it overstates that host), and the
  *   main-thread host for a save that failed on a running engine or for the
  *   engine reads that fail while a tower is let go (#874).
- * - A page life whose settle row already fell back on `package-mismatch`, and
- *   that sent no other reason, never ran the engine: it is neither a pass nor
- *   a fault. One whose first tower ran on the engine and that met the mismatch
- *   later ran the engine without a fault. Both are counted on the mismatch
- *   line, and a writer latch-off in either still counts on the latch line.
+ * - A page life whose settle row already fell back on `package-mismatch` or
+ *   `unverifiable`, and that sent no other reason, never ran the engine: it is
+ *   neither a pass nor a fault. One whose first tower ran on the engine and
+ *   that met the mismatch later ran the engine without a fault. Both are
+ *   counted on the line of their reason, and a writer latch-off in either still counts on the latch line.
  * - N counts sessions with at least one counted page life that ran the engine.
  *   A session counts as a fault when any of those page lives had an engine
  *   fault; it counts once however many did, and stays a fault if a later page
@@ -107,7 +110,7 @@ export const DEFAULT_HOSTS = ["wasm"];
 export const REQUESTS = ["ts", "wasm", "wasm-frame", "wasm-worker"];
 export const HOSTS = ["wasm", "wasm-frame", "wasm-worker"];
 export const BUILDS = ["switchable", "wasm-only"];
-export const REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"];
+export const REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"];
 
 /** A build's commit (`git rev-parse --short`, or `unknown` outside a checkout)
  *  and version, as the game sends them. */
@@ -269,7 +272,7 @@ export function summarizeReliability(pageLives, opts = {}) {
   const byBuild = new Map();
   const byArm = new Map();
   const reasons = new Map();
-  const totals = { pageLives: 0, faultPageLives: 0, mismatchPageLives: 0, mismatchNeverRan: 0, latchedPageLives: 0, sizeGatedPageLives: 0, unrecognizedPageLives: 0, totalFallbacks: 0, maxFallbacks: 0 };
+  const totals = { pageLives: 0, faultPageLives: 0, mismatchPageLives: 0, mismatchNeverRan: 0, unverifiablePageLives: 0, unverifiableNeverRan: 0, latchedPageLives: 0, sizeGatedPageLives: 0, unrecognizedPageLives: 0, totalFallbacks: 0, maxFallbacks: 0 };
   const bucket = (map, key) => {
     if (!map.has(key)) map.set(key, { sessions: new Set(), faults: new Set(), pageLives: 0, faultPageLives: 0 });
     return map.get(key);
@@ -286,21 +289,27 @@ export function summarizeReliability(pageLives, opts = {}) {
       continue;
     }
     const fellBack = pl.fallbacks > 0;
-    const faultReasons = pl.reasons.filter((r) => r !== "package-mismatch");
+    const faultReasons = pl.reasons.filter((r) => r !== "package-mismatch" && r !== "unverifiable");
     const mismatch = pl.reasons.includes("package-mismatch");
+    const unverifiable = pl.reasons.includes("unverifiable");
     const fault = fellBack && (faultReasons.length > 0 || pl.reasons.length === 0);
-    const s = sessions.get(pl.session) ?? { ran: false, fault: false, mismatch: false, latched: false };
+    const s = sessions.get(pl.session) ?? { ran: false, fault: false, mismatch: false, unverifiable: false, latched: false };
     sessions.set(pl.session, s);
     if (mismatch) {
       s.mismatch = true;
       totals.mismatchPageLives++;
     }
+    if (unverifiable) {
+      s.unverifiable = true;
+      totals.unverifiablePageLives++;
+    }
     if (pl.writerLatched) {
       s.latched = true;
       totals.latchedPageLives++;
     }
-    if (mismatch && !fault && pl.settleFallbacks > 0) {
-      totals.mismatchNeverRan++;
+    if ((mismatch || unverifiable) && !fault && pl.settleFallbacks > 0) {
+      if (mismatch) totals.mismatchNeverRan++;
+      if (unverifiable) totals.unverifiableNeverRan++;
       continue;
     }
     s.ran = true;
@@ -336,6 +345,7 @@ export function summarizeReliability(pageLives, opts = {}) {
     rate: n ? faults / n : null,
     upper95: upperBound(faults, n),
     mismatchSessions: all.filter((s) => s.mismatch).length,
+    unverifiableSessions: all.filter((s) => s.unverifiable).length,
     latchedSessions: all.filter((s) => s.latched).length,
     ...totals,
     byBuild: rows(byBuild, "build"),
@@ -387,6 +397,7 @@ export function renderReliabilityMarkdown(summary, meta) {
     `| Counted page lives that ran the engine | ${summary.pageLives} (${summary.faultPageLives} with a fault) |`,
     `| Fallbacks the counted page lives sent | ${summary.totalFallbacks} in all, at most ${summary.maxFallbacks} in one page life |`,
     `| Package mismatch (outside the rate) | ${summary.mismatchSessions} sessions, ${summary.mismatchPageLives} page lives, ${summary.mismatchNeverRan} of them never ran the engine |`,
+    `| Cannot verify the engine files (outside the rate) | ${summary.unverifiableSessions} sessions, ${summary.unverifiablePageLives} page lives, ${summary.unverifiableNeverRan} of them never ran the engine |`,
     `| Engine writer latch-offs | ${summary.latchedSessions} sessions, ${summary.latchedPageLives} page lives |`,
     `| Size-gated page lives (outside the rate) | ${summary.sizeGatedPageLives} |`,
     `| Unrecognized page lives (values the game never sends; left out) | ${summary.unrecognizedPageLives} |`,

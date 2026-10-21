@@ -56,10 +56,11 @@ const EXEMPT: ReadonlySet<string> = new Set(DUAL_RUN);
 
 /** Files whose `import()` loads the engine package's glue by URL, a file
  *  outside `src/` that no TypeScript source reaches through, with how many
- *  such imports each holds (the dual-run worker loads the shadow's). */
+ *  such imports each holds: the checked load the boot and both workers use
+ *  (`loadEngineModule.ts`, #985) and the development serve's (`engineLoad.ts`). */
 const PACKAGE_LOADERS: ReadonlyMap<string, number> = new Map([
   ["src/wasmhost/engineLoad.ts", 1],
-  ["src/dualrun/worker.ts", 1],
+  ["src/wasmhost/loadEngineModule.ts", 1],
 ]);
 
 interface Edge {
@@ -411,7 +412,7 @@ describe("the reach guard on a synthetic tree", () => {
     const { graph } = tree({
       "src/ui/computed.ts": "const n = 'x';\nimport(n);\nnew URL(n, import.meta.url);\nimport.meta.glob(n);",
       "src/wasmhost/engineLoad.ts": "const g = 'x';\nimport(g);\nimport(g);",
-      "src/dualrun/worker.ts": "const g = 'x';\nimport(g);",
+      "src/wasmhost/loadEngineModule.ts": "const g = 'x';\nimport(g);",
       "src/dualrun/dualRun.ts": "const g = 'x';\nimport(g);",
     });
     expect(unreadableImports(graph)).toEqual([

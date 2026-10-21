@@ -1,22 +1,29 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { shellProblems } from "../src/build/enginePackageBuild";
 import { engineBuildRecord } from "../src/wasmhost/enginePackageRecord";
 import { ENGINE_GLUE, ENGINE_WASM } from "../src/wasmhost/enginePackageNames";
 
 /**
  * Two deployments of the game behind one origin (#985). The first is the
  * production build in `dist/` (the one `npm run e2e` serves). The second is a
- * copy of it with a different engine glue file and binary and every identity the service
- * worker and the page read kept consistent: the glue's precache revision and
- * integrity, `engine/BUILD.json` and its precache entry, and `version.json`.
+ * real second `vite build` of the same source over a public folder whose
+ * engine glue and binary differ (a trailing comment, and a valid WebAssembly
+ * custom section) and whose `BUILD.json` describes them. Its shell therefore
+ * carries the second package's id (`__ENGINE_PACKAGE__`), and its `sw.js`,
+ * precache revisions and integrity all come from the build, not from edits
+ * here; only `version.json` is rewritten, so the update prompt names a build.
  * The server answers from whichever one `serve()` last picked, so a test can
  * install the first, "deploy" the second, and watch the update flow move
- * between them.
+ * between them. A rewrite of the first build's files could not stand in: the
+ * shell chunk keeps its hashed name and is served immutable, so the second
+ * install would keep the first's cached copy and its id (design section 6.2).
  *
  * Playwright's `page.route` does not see a service worker's own requests, so
  * the switch lives in a real HTTP server the browser and the worker both reach.
@@ -24,14 +31,6 @@ import { ENGINE_GLUE, ENGINE_WASM } from "../src/wasmhost/enginePackageNames";
  * is revalidated, `version.json` is never stored, hashed assets are immutable.
  * It is a static server only: no ETag or 304, no Range, and none of
  * vercel.json's rewrites (`/help`, `/gallery`), none of which the flow needs.
- *
- * The second deployment's page bundle is the first's, so the package id
- * compiled into the shell (`__ENGINE_PACKAGE__`) is still the first's. Nothing
- * reads it at run time yet. When the loader checks the engine against it
- * (#985 slice 2), rewriting that value in the copied chunk will not do: the
- * chunk keeps its hashed name, is served immutable, and so the second install
- * would keep the first's cached copy. That slice needs a real second
- * `vite build` with a different engine package (design section 6.2).
  */
 
 export type Deployment = "A" | "B";
@@ -73,16 +72,7 @@ const TYPES: Record<string, string> = {
   ".txt": "text/plain; charset=utf-8",
 };
 
-const md5 = (data: Uint8Array | string): string => createHash("md5").update(data).digest("hex");
 const sha256Hex = (data: Uint8Array | string): string => createHash("sha256").update(data).digest("hex");
-const sha256Integrity = (data: Uint8Array | string): string => `sha256-${createHash("sha256").update(data).digest("base64")}`;
-
-/** Point the precache entry for `url` at new bytes: its revision and integrity. */
-function repointEntry(sw: string, url: string, bytes: Uint8Array | string): string {
-  const entry = new RegExp(`(\\{url:"${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}",revision:")[a-f0-9]+(",integrity:)"[^"]+"`);
-  if (!entry.test(sw)) throw new Error(`sw.js has no precache entry with an integrity for ${url}; did the manifest shape change?`);
-  return sw.replace(entry, `$1${md5(bytes)}$2"${sha256Integrity(bytes)}"`);
-}
 
 /** A WebAssembly custom section named "B" with a one-byte payload: the binary
  *  stays valid and loads, and its bytes (and so its hash) differ. */
@@ -101,32 +91,60 @@ function manifestOf(sw: string): { revisionOf(url: string): string; entries: num
   };
 }
 
-/** Build the second deployment from the first, in a new folder under `into`. */
+const REPO = fileURLToPath(new URL("..", import.meta.url));
+
+/** `VC_ENGINE` for a build that has the first build's engine mode. Spelled out
+ *  both ways, so a changed default cannot give the second deployment another
+ *  shell; a `version.json` that names neither is an error. */
+function engineModeOf(engineBuild: string | undefined): "wasm" | "switchable" {
+  if (engineBuild === "wasm-only") return "wasm";
+  if (engineBuild === "switchable") return "switchable";
+  throw new Error(`version.json names no engine build (found ${JSON.stringify(engineBuild)}), so the second deployment cannot match the first`);
+}
+
+/** Build the second deployment in a new folder under `into`: a copy of the
+ *  public folder with the first build's engine package salted and recorded,
+ *  built into `B/` by the same `vite build` as the first, in the same modes. */
 function makeSecond(dist: string, into: string): { dir: string; packageId: string } {
-  const dir = join(into, "B");
-  cpSync(dist, dir, { recursive: true });
-  const glue = join(dir, "engine", ENGINE_GLUE);
-  const wasmPath = join(dir, "engine", ENGINE_WASM);
+  const publicDir = join(into, "public-B");
+  cpSync(join(REPO, "src", "public"), publicDir, { recursive: true });
+  cpSync(join(dist, "engine"), join(publicDir, "engine"), { recursive: true });
+  const glue = join(publicDir, "engine", ENGINE_GLUE);
+  const wasmPath = join(publicDir, "engine", ENGINE_WASM);
   const wasm = Buffer.concat([readFileSync(wasmPath), SALT_SECTION]);
   writeFileSync(wasmPath, wasm);
   const changed = Buffer.concat([readFileSync(glue), Buffer.from("\n// deployment B\n")]);
   writeFileSync(glue, changed);
-
   const first = JSON.parse(readFileSync(join(dist, "engine", "BUILD.json"), "utf8")) as { sources: string };
   const record = engineBuildRecord(changed, wasm, first.sources, sha256Hex);
-  const recordText = `${JSON.stringify(record, null, 2)}\n`;
-  writeFileSync(join(dir, "engine", "BUILD.json"), recordText);
+  writeFileSync(join(publicDir, "engine", "BUILD.json"), `${JSON.stringify(record, null, 2)}\n`);
 
-  const swPath = join(dir, "sw.js");
-  const swFirst = readFileSync(swPath, "utf8");
-  let sw = swFirst;
-  sw = repointEntry(sw, `engine/${ENGINE_GLUE}`, changed);
-  sw = repointEntry(sw, `engine/${ENGINE_WASM}`, wasm);
-  sw = repointEntry(sw, "engine/BUILD.json", recordText);
+  const firstVersion = JSON.parse(readFileSync(join(dist, "version.json"), "utf8")) as { engineBuild?: string };
+  const dir = join(into, "B");
+  const built = spawnSync(process.execPath, [join(REPO, "node_modules", "vite", "bin", "vite.js"), "build", "--outDir", dir, "--emptyOutDir"], {
+    cwd: REPO,
+    encoding: "utf8",
+    timeout: 200_000,
+    env: {
+      ...process.env,
+      // The e2e builds A with the tooling handle too (specs drive `window.game`).
+      VC_TOOLING: "1",
+      VC_PUBLIC_DIR: publicDir,
+      // The same engine mode as the first build, or the wrong shell is served.
+      VC_ENGINE: engineModeOf(firstVersion.engineBuild),
+    },
+  });
+  if (built.error) throw built.error;
+  if (built.status !== 0) throw new Error(`the second deployment's vite build failed (${built.status ?? built.signal}):\n${(built.stderr || built.stdout || "").split("\n").slice(-30).join("\n")}`);
+  // The second shell must check the second package, or the update would
+  // prove nothing about the loader.
+  const unsound = shellProblems(dir, true);
+  if (unsound.length > 0) throw new Error(`the second deployment's shell does not match its engine package: ${unsound.join("; ")}`);
   // The browser updates only when sw.js differs byte for byte; fail here, with
   // the reason, rather than at a test timeout.
-  if (sw === swFirst) throw new Error("the second deployment's sw.js is identical to the first's, so no update would be found");
-  writeFileSync(swPath, sw);
+  if (readFileSync(join(dist, "sw.js"), "utf8") === readFileSync(join(dir, "sw.js"), "utf8")) {
+    throw new Error("the second deployment's sw.js is identical to the first's, so no update would be found");
+  }
 
   const versionPath = join(dir, "version.json");
   const version = JSON.parse(readFileSync(versionPath, "utf8")) as Record<string, unknown>;

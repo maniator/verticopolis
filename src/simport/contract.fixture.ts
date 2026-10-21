@@ -88,6 +88,44 @@ export function describePortContract(name: string, makePort: () => SimPort, opts
       port.tick(1);
     });
 
+    it("carries each command's arguments to the engine, as its save and events show", async () => {
+      const port = start(makePort);
+      const mid = lobbyCenter(port);
+      const send = sender(port);
+      for (const floor of [2, 3]) {
+        for (let x = mid + 5; x < mid + 16; x++) expect(await send({ op: "build", kind: "floor", floor, x }), `floor ${floor} at ${x}`).toMatchObject({ ok: true });
+      }
+      expect(await send({ op: "buildTransport", kind: "elevatorStandard", x: mid + 8, bottom: 1, top: 3 })).toMatchObject({ ok: true });
+      const shaft = mustFind(port.view.tower.transports, (t) => t.kind === "elevatorStandard").id;
+      const saved = async () => JSON.parse(await port.save()) as SavedTower;
+      const savedShaft = async () => mustFind((await saved()).transports, (t) => t.id === shaft);
+
+      expect(await send({ op: "setStop", id: shaft, floor: 2, stop: false })).toMatchObject({ ok: true });
+      expect((await savedShaft()).skipFloors).toEqual([2]);
+      expect(await send({ op: "setStop", id: shaft, floor: 2, stop: true })).toMatchObject({ ok: true });
+      expect((await savedShaft()).skipFloors ?? []).toEqual([]);
+
+      expect(await send({ op: "setSchedule", id: shaft, schedule: { waitingCarResponse: 7 } })).toMatchObject({ ok: true });
+      expect((await savedShaft()).schedule).toMatchObject({ waitingCarResponse: 7 });
+
+      expect(await send({ op: "emit", text: "Contract notice", kind: "good" })).toMatchObject({ ok: true });
+      expect((await saved()).log?.find((e) => e.text === "Contract notice")?.kind).toBe("good");
+
+      // Sell and the bulldozer refund the same; the method shows in the event.
+      expect(await send({ op: "build", kind: "office", floor: 2, x: mid - 4 })).toMatchObject({ ok: true });
+      expect(await send({ op: "build", kind: "office", floor: 3, x: mid - 4 })).toMatchObject({ ok: true });
+      const offices = port.view.tower.units.filter((u) => u.kind === "office");
+      port.drainEvents({ release: true });
+      expect(await send({ op: "removeFacility", id: offices[0].id, method: "bulldoze" })).toMatchObject({ ok: true });
+      expect(await send({ op: "removeFacility", id: offices[1].id, method: "sell" })).toMatchObject({ ok: true });
+      port.tick(1);
+      const removed = port.drainEvents({ release: true }).filter((e) => e.name === "facility_removed");
+      expect(removed.map((e) => e.payload)).toEqual([
+        { kind: "office", method: "bulldoze" },
+        { kind: "office", method: "sell" },
+      ]);
+    });
+
     it("refuses a command it cannot run with ok false, and moves no money", async () => {
       const port = start(makePort);
       const money = port.view.header.money;
@@ -194,15 +232,27 @@ function sender(port: SimPort): <C extends Command>(c: C) => Promise<CommandResu
 }
 
 /** The middle of the ground-floor lobby the founded tower stands on, checked
- *  to span the cells the session builds over (`mid - 4` to `mid + 15`). */
+ *  to span the cells the session builds over (`mid - 4` to `mid + 15`). Read
+ *  through `structureKindAt`, so the contract does not depend on `units`
+ *  listing structure tiles. */
 function lobbyCenter(port: SimPort): number {
-  const lobby = port.view.tower.units.filter((u) => u.kind === "lobby" && u.floor === 1);
+  const lobby: number[] = [];
+  for (let x = 0; x < LOT_WIDTH; x++) if (port.view.tower.structureKindAt(1, x) === "lobby") lobby.push(x);
   expect(lobby.length, "the founded tower's starter lobby").toBeGreaterThan(0);
-  const left = Math.min(...lobby.map((u) => u.x));
-  const right = Math.max(...lobby.map((u) => u.x + u.width));
+  const left = lobby[0];
+  const right = lobby[lobby.length - 1] + 1;
   const mid = Math.floor((left + right) / 2);
-  expect([left <= mid - 4, right >= mid + 16], `the starter lobby spans ${left} to ${right}`).toEqual([true, true]);
+  expect([left <= mid - 4, right >= mid + 16, right - left === lobby.length], `the starter lobby spans ${left} to ${right} in one run`).toEqual([true, true, true]);
   return mid;
+}
+
+/** The lot's width in tiles (`GRID.width`, the 1994 map's 375 segments). */
+const LOT_WIDTH = 375;
+
+/** The parts of a save the contract reads back. */
+interface SavedTower {
+  transports: { id: number; skipFloors?: number[]; schedule?: Record<string, unknown> }[];
+  log?: { text: string; kind: string }[];
 }
 
 function mustFind<T>(items: ReadonlyArray<T>, match: (item: T) => boolean): T {

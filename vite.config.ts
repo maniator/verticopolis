@@ -43,6 +43,17 @@ function toolingBuild(): boolean {
   return on;
 }
 
+/** The folder Vite copies into dist/ and the engine package is read from:
+ *  `src/public`, unless the offline e2e sets `VC_PUBLIC_DIR` to build a second
+ *  deployment with a different engine package (e2e/deployments.ts, #985). A
+ *  Vercel build refuses it, so no deploy can ship a package from elsewhere. */
+function publicDir(): string {
+  const raw = process.env.VC_PUBLIC_DIR;
+  if (raw === undefined || raw === "") return resolve(__dirname, "src/public");
+  if (process.env.VERCEL) throw new Error("VC_PUBLIC_DIR is set in a Vercel build. Deploys build from src/public; remove VC_PUBLIC_DIR from the Vercel environment.");
+  return resolve(raw);
+}
+
 /** The engine build mode (`VC_ENGINE`; see src/build/engineBundle.ts). A
  *  wasm-only build ships the Rust/WASM engine as the only engine: no runtime
  *  switch, no TypeScript step loop, no fallback. The value is validated, and
@@ -232,6 +243,7 @@ function wasmParityProjects() {
     "**/conformanceWasmTdt.integration.test.ts",
     "**/conformanceWasmCanBuild.integration.test.ts",
     "**/conformanceWasmVctower.integration.test.ts",
+    "**/conformanceWasmSaves.integration.test.ts",
     "**/dualRunDay.integration.test.ts",
     "**/dualRunEdits.integration.test.ts",
     "**/loaderCases.integration.test.ts",
@@ -246,6 +258,7 @@ function wasmParityProjects() {
     "**/wasmHostTelemetry.integration.test.ts",
     // These start their own host (in process, or the worker's).
     "**/wasmHostAnalyticsBridge.integration.test.ts",
+    "**/wasmHostAttachTrap.integration.test.ts",
     "**/wasmHostExtermination.integration.test.ts",
     "**/wasmHostFallback.integration.test.ts",
     "**/wasmHostRollback*.integration.test.ts",
@@ -287,6 +300,7 @@ function wasmParityProjects() {
 
 export default defineConfig(({ command }) => ({
   root: "src",
+  publicDir: publicDir(),
   resolve: { alias: engineAliases(command) },
   base: "./",
   // Compile-time app version, shown on the splash. (package.json isn't importable
@@ -318,7 +332,7 @@ export default defineConfig(({ command }) => ({
     // skip the check) and for a production build with no package folder at
     // all (VC_ALLOW_NO_ENGINE=1); a production build with a broken record
     // stops here.
-    __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(resolve(__dirname, "src/public"), command === "build" ? "build" : "other")),
+    __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(publicDir(), command === "build" ? "build" : "other")),
   },
   plugins: [
     captureOutDir((dir) => {

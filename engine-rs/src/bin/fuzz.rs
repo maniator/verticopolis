@@ -1,5 +1,5 @@
 //! Differential fuzzer: grow a random scenario from a seed, one command at a
-//! time, keeping only commands the Rust engine accepts (a refused build keeps
+//! time, keeping only commands the Rust engine accepts (a refusal keeps
 //! its `expectFail`), then write the scenario and the Rust checkpoints so
 //! `scripts/fuzz-compare.ts` can replay it on the TypeScript engine and name
 //! the first divergence. Usage: fuzz <seed> <out-dir> [commands]
@@ -217,11 +217,23 @@ fn main() {
                         cmd["expectFail"] = json!(true);
                         kept_one(&mut commands, cmd);
                     }
-                    // A refusal with no expectFail form: dropped, the prefix stays
-                    // valid. The drop is logged so an accept-versus-refuse
-                    // divergence on these commands can still be chased by hand.
+                    // The tuning ops take `expectFail` too, but they also fail on a
+                    // bad address (nothing at that tile). Only an engine refusal is
+                    // kept: the same command replayed with `expectFail` runs clean
+                    // when the engine said no, and errors when the address was bad,
+                    // which is dropped with the prefix still valid.
                     "sell" | "adjustRent" | "setCars" | "setNoRate" | "setSchedule"
-                    | "startFire" => eprintln!("seed {seed}: dropped {op} ({what}): {cmd}"),
+                    | "startFire" => {
+                        let mut refused = cmd.clone();
+                        refused["expectFail"] = json!(true);
+                        trial.pop();
+                        trial.push(refused.clone());
+                        if run(&trial).error.is_none() {
+                            kept_one(&mut commands, refused);
+                        } else {
+                            eprintln!("seed {seed}: dropped {op} ({what}): {cmd}");
+                        }
+                    }
                     // tick, reload, bombThreat, evaluateStar cannot legitimately refuse:
                     // a failure here is the engine's own. The failing scenario is
                     // written before the panic so the artifact carries it.

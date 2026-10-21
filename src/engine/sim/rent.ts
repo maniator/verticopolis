@@ -1,6 +1,7 @@
 import type { Simulation } from "../Simulation";
 
 import { rentOf, rentConfig } from "../econConfig";
+import { isFacilityKind } from "../facilitiesData";
 import { ladderRungFor, priceNeutral, snapToLadder } from "../gameRules";
 import { whole } from "../request";
 
@@ -117,8 +118,9 @@ export function computeBatch(sim: Simulation,
   opts: BatchRentOptions,
   mutate: boolean,
 ): BatchRentResult | null {
-  const cfg = rentConfig(kind);
-  const shape = sim.rules.priceOptions(kind);
+  // A name that is not in the catalog ("constructor") is not a priced kind (#1216).
+  const cfg = isFacilityKind(kind) ? rentConfig(kind) : null;
+  const shape = cfg && sim.rules.priceOptions(kind);
   if (!cfg || !shape) return null; // not a priced kind
   const ladder = shape.shape === "ladder" ? shape : null;
   // "noRate" is a ladder-only target (seam law: Modern never holds the state);
