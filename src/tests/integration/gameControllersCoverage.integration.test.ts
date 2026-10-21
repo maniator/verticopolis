@@ -1489,19 +1489,39 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     expect(undoLog.slice(-2)).toEqual(["capture:Bulldoze", "commit"]);
   });
 
-  it("a keyboard bulldoze refused for fire announces failure, not success", () => {
-    office.state = "fire";
+  it("announces refused, successful, then refused keyboard bulldozes as a facility changes state", () => {
     tool = { type: "bulldoze" };
-    keyboard.moveCursor(-10, 1); // (mid - 10, 2): the burning office
+    keyboard.moveCursor(-10, 1); // (mid - 10, 2): the office
+    const pick = { type: "unit" as const, kind: "office" as const, id: office.id };
+    office.state = "fire";
     keyboard.commitCursor();
-    expect(sim.tower.getUnit(office.id)).toBeTruthy();
+    expect(sim.tower.getUnit(pick.id)).toBeTruthy();
+    expect(last(announced)).toBe(`Could not bulldoze ${FACILITIES.office.name}`);
     expect(last(f.toasts)).toEqual({
       text: "You can't bulldoze a burning unit. Call fire rescue or let it burn out.",
       kind: "bad",
     });
     expect(last(f.sfx)).toBe("error");
+
+    office.state = "vacant"; // the fire clears, and the same cursor can remove it
+    keyboard.commitCursor();
+    expect(sim.tower.getUnit(pick.id)).toBeUndefined();
+    expect(last(announced)).toBe(`Bulldozed ${FACILITIES.office.name}`);
+    expect(last(f.sfx)).toBe("sell");
+
+    const replaced = sim.tower.place("office", 2, mid - 10);
+    expect(replaced.ok).toBe(true);
+    const next = sim.tower.getUnit(replaced.unitId!)!;
+    next.state = "fire"; // a new fire at the same location must refuse again
+    keyboard.commitCursor();
+    expect(sim.tower.getUnit(next.id)).toBeTruthy();
     expect(last(announced)).toBe(`Could not bulldoze ${FACILITIES.office.name}`);
-    expect(undoLog.slice(-2)).toEqual(["capture:Bulldoze", "commit"]);
+    expect(last(f.sfx)).toBe("error");
+    expect(undoLog.slice(-6)).toEqual([
+      "capture:Bulldoze", "commit",
+      "capture:Bulldoze", "commit",
+      "capture:Bulldoze", "commit",
+    ]);
   });
 
   it("bulldozeCursor and refreshCursorPreview are no-ops before the cursor is revealed", () => {
