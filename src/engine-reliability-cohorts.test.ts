@@ -405,6 +405,10 @@ describe("the tail", () => {
     const other = run([life({ session: "a", sha: "def5678", engaged: false, ...fault, firstSeen: "2026-12-01 11:00:00" }), life({ session: "a" })], { eligibleShas: [SHA, "def5678"], tailShas: ["def5678"] });
     expect(other.tail.n).toBe(0);
     expect(other.tailAttempts).toMatchObject({ n: 1, faults: 1 });
+    // An attempts table gives a build every session that attempted on it, as its N does.
+    const quiet = run([life({ session: "q", engaged: false })], { tailShas: [SHA] });
+    expect(quiet.tailAttempts.byBuild).toEqual([{ build: "2.50.0 (abc1234, switchable)", sessions: 1, faults: 0, upper95: upperBound(0, 1) }]);
+    expect(quiet.tail.byBuild).toEqual([]);
     expect(other.eligible).toMatchObject({ n: 1, faults: 1 });
   });
 

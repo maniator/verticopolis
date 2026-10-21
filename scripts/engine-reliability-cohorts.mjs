@@ -219,8 +219,8 @@ function cohort(sessions, pick, pickLoading, pickLoop, engagedOnly = true) {
     // `none` never engaged; an engaged row with no route is `unknown`.
     const by = engaged[0]?.engagedBy;
     out.byEngagement[!engaged.length ? "none" : by === "command" || by === "play" ? by : "unknown"]++;
-    // A build holds the session only where it engaged or faulted, so a page
-    // load that never played a build is never its clean session.
+    // An engaged table gives a build the session only where it engaged or
+    // faulted; an attempts table, wherever it attempted, as its N does.
     for (const pl of [...(engagedOnly ? lives.filter((x) => engagedOnEngine(x) || engineFault(x)) : lives), ...loops]) {
       const b = byBuild.get(buildKey(pl)) ?? { build: buildKey(pl), sessions: new Set(), faults: new Set() };
       byBuild.set(b.build, b);

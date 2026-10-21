@@ -71,8 +71,10 @@ and assigned arm, sessions with a settled page life (until both arms send the
 rows carry no page life); stop signals (a repeated engine-fault reason on one
 build in two sessions and a latch-off, both read from every recognized page
 life, and a crash-rate difference whose interval lies above zero at a
-stage). A build in the by-build tables holds a session only where it engaged
-or faulted there.
+stage). A build in an engaged by-build table holds a session only where it
+engaged or faulted there; in an attempts by-build table it holds every session
+that attempted on it, engaged or not, as the attempts row's N does, so a
+clean attempt that never engaged is a clean attempt there.
 New A4 values are validated against the spec's lists; a page life carrying
 another value is counted on its own line, in no population.
 
