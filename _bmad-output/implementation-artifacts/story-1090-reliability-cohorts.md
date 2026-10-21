@@ -38,8 +38,9 @@ zero-second page load can never become a clean success:
    **Eligible attempts** is the cohort below without the engagement
    condition, so a fault that stopped the player engaging, which the cohort
    cannot hold, still shows beside it.
-2. **Engaged eligible cohort (proposed release count; #945's unit is the
-   owner's decision).** A session with at least one
+2. **Engaged eligible cohort (the 1,000-session gate's unit, and the stage 1
+   and 2 floors' unit: the owner's direction of 2026-10-21).** A session with
+   at least one
    eligible page life that engaged on the engine. Eligible page life: the
    production host (`wasm`), a commit the gate review names as eligible
    (`--eligible-shas`: S4, S9 and the slice-10 facade in the build, and no
@@ -48,8 +49,9 @@ zero-second page load can never become a clean success:
    choice), not safety-suppressed, not size-gated, settled with the engine
    running. Engaged: an `engaged` row whose `engine` is a WASM engine. A fault
    in any of the session's eligible page lives counts, before engagement too.
-   The cohort's rate and bound are conditional on engagement; which bound the
-   gate reads is pending the owner. A session with an override page life (a
+   The cohort's rate and bound are conditional on engagement, so it is read
+   beside the attempts rows, which keep every failure before engagement. A
+   session with an override page life (a
    setting or the URL chose either engine, an opt-out included, in any page
    life) is in no eligible population: overridden sessions never qualify. Its
    faults stay in all attempts, and the report counts the sessions left out
@@ -132,8 +134,9 @@ game unpaused and the game clock advancing in each counted second
 - Classifying `$exception` as engine or host code, and a repeated-`$exception`
   stop signal: production stacks are minified and rows carry no build commit.
   Stays open on #1090.
-- Any change to #945's numeric gate: the owner decides whether "1,000 engine
-  sessions" becomes 1,000 engaged eligible sessions.
+- Editing #945's text: the owner's direction of 2026-10-21 makes its "1,000
+  engine sessions" 1,000 engaged eligible sessions, and the plan thread
+  reconciles #945 with #1104. The 1,000 and its bound are unchanged.
 
 ## Acceptance
 

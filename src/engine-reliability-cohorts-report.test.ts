@@ -131,9 +131,9 @@ describe("the report", () => {
     const md = renderReliabilityMarkdown(summarizeReliability([life()]), { ...meta, cohorts: c, eligibleShas: [SHA], tailShas: [] });
     for (const lead of caveats) expect(md).not.toContain(lead);
     expect(md).toContain("| All attempts (safety denominator) | 1 |");
-    expect(md).toContain("| Engaged eligible cohort (proposed release count; rate and bounds conditional on engagement; which bound the gate reads is pending the owner) | 1 |");
+    expect(md).toContain("| Engaged eligible cohort (the 1,000-session gate's unit; rate and bounds conditional on engagement) | 1 |");
     expect(md).toContain("| Candidate tail attempts (no commits named; engaged or not) | 0 |");
-    expect(md).toContain("| Candidate tail, engaged (no commits named; rate and bounds conditional on engagement; which bound the gate reads is pending the owner) | 0 |");
+    expect(md).toContain("| Candidate tail, engaged (no commits named; rate and bounds conditional on engagement) | 0 |");
     expect(md).toContain("95% upper bound, early exits as faults");
     expect(md).toContain("Sessions left out of the eligible rows for an override page life (with a fault the row would hold): 0 (0) of the eligible attempts");
     expect(md).toContain("| Overrides other than opt-outs |");

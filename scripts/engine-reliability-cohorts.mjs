@@ -39,18 +39,18 @@
  *   (below) that settled or made an attempt, engaged or not: the cohort's
  *   denominator before the engagement condition, so a fault that stopped the
  *   player engaging shows here.
- * - The ENGAGED ELIGIBLE COHORT, the proposed release count: a `wasm`-arm
- *   session with an eligible page life that engaged on the engine. A page
- *   life is eligible on the production host (`wasm`), on a commit the gate
- *   review names (one with S4, S9 and the slice-10 facade, where the old
- *   mirror host cannot run under `wasm`), at stage 3, chosen by the cohort
- *   (a setting, a URL or the safety latch never qualifies), not suppressed,
- *   not size-gated, settled, and having run the engine (a settle that already
- *   fell back on `package-mismatch` alone did not). It engaged when its
- *   `engaged` row says a WASM engine was running. A fault in any eligible
- *   page life of the session counts, one before the engagement included.
- *   Its rate and bounds are conditional on engagement; which bound the gate
- *   reads is pending the owner.
+ * - The ENGAGED ELIGIBLE COHORT, the 1,000-session gate's unit (the owner,
+ *   2026-10-21): a `wasm`-arm session with an eligible page life that engaged
+ *   on the engine. A page life is eligible on the production host (`wasm`), on
+ *   a commit the gate review names (one with S4, S9 and the slice-10 facade,
+ *   where the old mirror host cannot run under `wasm`), at stage 3, chosen by
+ *   the cohort (a setting, a URL or the safety latch never qualifies), not
+ *   suppressed, not size-gated, settled, and having run the engine (a settle
+ *   that already fell back on `package-mismatch` alone did not). It engaged
+ *   when its `engaged` row says a WASM engine was running. A fault in any
+ *   eligible page life of the session counts, one before the engagement
+ *   included. Its rate and bounds are conditional on engagement, so it is read
+ *   beside the attempts rows, which keep every failure before engagement.
  * - The TAIL: the eligible attempts and the engaged cohort on the commits the
  *   candidate review names.
  *
@@ -453,7 +453,7 @@ const byBuildTable = (title, rows) => [
 export function renderCohortsMarkdown(c, meta) {
   const tailLabel = meta.tailShas.length ? meta.tailShas.map(code).join(", ") : "no commits named";
   const pop = (label, r) => `| ${label} | ${r.n ?? r.sessions} | ${r.faults} | ${pct(r.rate)} | ${pct(r.upper95)} | ${pct(r.upper95Pessimistic)} | ${r.latched} | ${share(r.leftBeforeTower, r.n ?? r.sessions)} |`;
-  const conditional = "rate and bounds conditional on engagement; which bound the gate reads is pending the owner";
+  const conditional = "rate and bounds conditional on engagement";
   return [
     "",
     "## Release evidence and safety",
@@ -465,7 +465,7 @@ export function renderCohortsMarkdown(c, meta) {
     pop("All attempts (safety denominator)", c.attempts),
     pop("All attempts, moved-off `wasm`-arm sessions that never ran the engine in N (#1197's wording)", c.attemptsWithMovedOff),
     pop("Eligible attempts (engaged or not)", c.eligibleAttempts),
-    pop(`Engaged eligible cohort (proposed release count; ${conditional})`, c.eligible),
+    pop(`Engaged eligible cohort (the 1,000-session gate's unit; ${conditional})`, c.eligible),
     pop(`Candidate tail attempts (${tailLabel}; engaged or not)`, c.tailAttempts),
     pop(`Candidate tail, engaged (${tailLabel}; ${conditional})`, c.tail),
     "",

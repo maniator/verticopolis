@@ -164,14 +164,14 @@ is a fault when any of those page lives fell back for a reason other than
 lives (which run TypeScript) are always left out and counted on their own
 line; the bound is the exact
 one-sided 95% Clopper-Pearson bound, by build and by arm as well. That rate is
-early telemetry. The proposed release count (#1090; whether it replaces
-#945's "1,000 engine sessions" is the owner's decision) is the engaged
+early telemetry. The 1,000-session gate counts (#1090; the owner's direction
+of 2026-10-21, which also counts the stage 1 and 2 floors this way) the engaged
 eligible cohort: sessions in the `wasm` arm, on the production host, chosen by
 the cohort, at stage 3, not safety-suppressed and not size-gated, on commits
 the gate review names, that engaged on the engine; a fault in any of their
 eligible page lives counts, one before the engagement too. Its rate and bound
-are conditional on engagement, and which bound the gate reads is pending the
-owner. A session with an override page life (a setting or the URL chose
+are conditional on engagement, so it is read beside the attempts rows, which
+keep every failure before engagement. A session with an override page life (a setting or the URL chose
 either engine, an opt-out to TypeScript included) never qualifies; the report
 counts the sessions it left out and how many of them faulted. Beside
 the cohort, the eligible attempts row holds the same sessions engaged or not,

@@ -374,6 +374,9 @@ describe("overridden sessions", () => {
     const after = run([life({ session: "a", ...fault }), later]);
     expect(after.eligible).toMatchObject({ n: 0, overridden: 1, overriddenFaults: 1 });
     expect(run([life({ session: "a" }), later]).eligible).toMatchObject({ overridden: 1, overriddenFaults: 0 });
+    // A crash loop a suppressed boot detected is such a fault too.
+    const loop = life({ session: "b", selectedBy: "safety", safetySuppressed: true, engaged: false, reasons: ["boot-error"], firstSeen: "2026-12-01 12:30:00" });
+    expect(run([life({ session: "b" }), loop, { ...later, session: "b" }]).eligible).toMatchObject({ overridden: 1, overriddenFaults: 1 });
   });
 });
 
