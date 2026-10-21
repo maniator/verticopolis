@@ -265,7 +265,8 @@ Between those PRs the table belongs to the repository owner (maniator), the
 | rooms without floor and lobby tiles | `roomUnits`, `src/engine/tower/rooms.ts` | unit array, length, revision | ported (`room_index`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1139) |
 | floor and lobby tiles per floor, for `pickX` | none (`pickX` walks every unit, #539) | revision and unit count | `structural_tiles`, `engine-rs/src/tower_index.rs` (#1139) |
 | each floor's segment runs | `src/engine/tower/segments.ts` | revision | ported (cloned on read, #859) |
-| housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision | ported (`housekeeping_units`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1143) |
+| housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision | ported (`housekeeping_units`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1143; now reads the census below) |
+| per-kind unit counts for the build caps, floors that hold an office | none (`countKind` and the Classic escalator office check walk every unit, A24 in #1158 and #1239) | revision and unit count | `census`, `engine-rs/src/tower_index.rs` (#1264) |
 | nearest crew and crew order per floor in one dispatch | `distByFloor`, `crewOrderByFloor`, `src/engine/economy/housekeeping.ts` | one pass | `dist_by_floor` ported; crew order missing, so the crews are cloned and sorted per room (A12 in #1158) |
 | live staff count | `crowd.staffCount`, `src/engine/Crowd.ts` | counter | ported |
 | riders per car | `crowd.carRiders`, `src/engine/Crowd.ts` | counter | ported (`car_riders`) |
