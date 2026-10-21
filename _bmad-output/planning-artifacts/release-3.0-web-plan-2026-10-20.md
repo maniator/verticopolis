@@ -410,7 +410,7 @@ realistically Oct 29 to Nov 4)**
 
 | Item | Lane | Depends on | Issue / PR | Review | CI | Measurement | Realistic |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Spike 0 | PC; Facade | none | #1196 (never merges) | n/a | n/a | T1 to T4 at 1x | Passed 03:10 UTC: frame p99 0.99x and 1.01x of TypeScript on medium and large at 1x, no long tasks; slice 3 unblocked. Spike evidence only, with no speed claim. It never timed a structural edit, which slice 9 now adds |
+| Spike 0 | PC; Facade | none | #1196 (never merges) | n/a | n/a | T1 to T4 at 1x | Passed 03:10 UTC (`release-3.0/rust-facade/spike0-readout-2026-10-21.md`): frame p99 point estimates 0.99x and 1.01x of TypeScript on medium and large at 1x (large interval [0.62, 1.58]), no long tasks past 50 ms; slice 3 unblocked. Spike evidence only: it decides no release gate, is not acceptance evidence for M1 to M6, and supports no speed claim. It never timed a structural edit, which slice 9 now adds |
 | Slice 1, the port | Facade | #1184 | #1208; PR #1245 | GO at `c88d27b`; carry after a merge of `main` | Green at `c88d27b` | none | Oct 21 |
 | 6a, the engine view | Facade engine view | slice 1 for the RustSim reader | #1213 | Not opened | n/a | conformance, compat guard | Oct 22 to 24 |
 | 6b wrappers (Rust half merged in #1228) | Facade panel getters | 6a's `wasm.rs` block | #1214; patches held | n/a | n/a | differential test | Oct 23 to 25 |
@@ -425,7 +425,7 @@ realistically Oct 29 to Nov 4)**
 | M5 W1 harness (must be in slice 9's commit) | Rust engine cold start | none | #1254 | PR not opened | n/a | P1 on the PC, about 90 min | Oct 22 to 23 |
 | Slice 7, RustSim behind its flag; cue-timing test | Facade | 2 to 6, 6a to 6d, #1237, #1239 | #1217 | n/a | n/a | none | Oct 26 to 30 |
 | Slice 8, fallback from the Rust recovery point | Runtime with Facade | slice 7; R6a | #1218 | n/a | n/a | the 50 ms save budget on the PC | Oct 27 to Nov 1 |
-| Slice 9, the PC protocol run | PC | 8, 13, W1; the tolerance rule (1.3.9, item 3) | #1220 | n/a | n/a | 1.3.6, plus a structural edit timed on the large tower | Best Oct 26 (reserved); realistic Oct 29 to Nov 4 |
+| Slice 9, the PC protocol run | PC | 8, 13, W1; the tolerance rule (1.3.9, item 3) | #1220 | n/a | n/a | 1.3.6, plus a structural edit (a revision change) timed on the large and many-unit towers against the 50 ms long-task bar at 1x | Best Oct 26 (reserved); realistic Oct 29 to Nov 4 |
 | Slice 10, the facade becomes the WASM host | Facade | slice 9 passing; owner approval | #1222 | n/a | n/a | RUN-1 after it | Target before about Nov 22 |
 
 **Concurrent work that lands before stage 3 or the freeze**
@@ -469,7 +469,7 @@ minutes for medium and large, both engines, 1x and 4x, 10 repetitions).
 | Oct 21 to 22 | M5 P1 after W1 merges | about 90 min | 2 | Next free slot |
 | Oct 23 | #1143 and A8 before and after (bare step, load peak; the hotspot lane's #1143 run file) | about 2 to 3 h | 3 | Moves a day; optimization evidence only |
 | Oct 25 | Stage-1 bracket: small, two bracket towers, medium, the many-unit tower; both engines; 1x and 4x; 10 repetitions; frames, 1% lows, long tasks, command-to-frame, cold start, memory, units beside population | about 5 to 6 h | 1 | Rerun Oct 26, which pushes slice 9 to Oct 27 or later |
-| Oct 26 (held) | Slice 9: facade, TypeScript and today's host, medium and large, the many-unit tower as a reported row, 1x and 4x, plus the save budget, #1237's overlays and a structural edit on the large tower | about 6 to 8 h | 1 | A miss stops the facade after slice 8 and goes to the owner; a fix and rerun costs at least 1 to 3 days. If slice 8 is not ready, the slot goes to the calibration passes |
+| Oct 26 (held) | Slice 9: facade, TypeScript and today's host, medium and large, the many-unit tower as a reported row, 1x and 4x, plus the save budget, #1237's overlays and a structural edit on the large and many-unit towers | about 6 to 8 h | 1 | A miss stops the facade after slice 8 and goes to the owner; a fix and rerun costs at least 1 to 3 days. If slice 8 is not ready, the slot goes to the calibration passes |
 | Nights from Oct 28 | δ and ε calibration passes (protocol 6.1; RUN-0b's A/A role) | about 1.5 h per pass per engine: 15 h for 5 per engine, 30 h for 10, 60 h for 20 | 1 before RUN-1 | 1.3.9, item 3 |
 | After slice 10 | RUN-1 on the deployed build | about 6 to 8 h | 1 | Stage 3 waits; one fix and rerun fits before Dec 26 if slice 10 deploys by about Dec 12 |
 
@@ -1929,8 +1929,10 @@ approves this revision:
   projections assume (stage-3 day 3 and a week later, each post on its own
   approval), the stage-1 cut rule (1.3.8, row 12), the size gate on
   population or floors, slice 9's provisional bar (the caps, marked
-  uncalibrated, for the slice-10 decision only) and 10 A/A passes per engine
-  for RUN-1 and RUN-3 (1.3.9).
+  uncalibrated, for the slice-10 decision only), the 50 ms long-task bar on a
+  structural edit at 1x on the large and many-unit towers as part of slice
+  9's check (from the spike 0 readout), and 10 A/A passes per engine for
+  RUN-1 and RUN-3 (1.3.9).
 
 **Still the owner's:**
 
