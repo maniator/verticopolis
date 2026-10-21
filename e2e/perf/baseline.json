@@ -15,5 +15,22 @@
       "windowMs": 4000,
       "windows": 5
     }
+  },
+  "wasm": {
+    "engine": "wasm",
+    "uiUpdate": {
+      "n": 4000,
+      "batch": 40,
+      "medianMs": 1.45,
+      "p95Ms": 1.825,
+      "meanMs": 1.5332250000000065
+    },
+    "simSpeed": {
+      "simMinutesPerRealSecond": 0.48325520707485214,
+      "cpuThrottle": 4,
+      "speed": 120,
+      "windowMs": 4000,
+      "windows": 5
+    }
   }
 }
