@@ -9,7 +9,6 @@ import type { SerializedGame } from "../../engine/serializedGame";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
 import { rentOf } from "../../engine/econConfig";
-import { MILESTONES } from "../../engine/milestones";
 import { serializeUnit } from "../../engine/sim/coerce";
 import { digest } from "./canonical";
 import { check, own, type Spec } from "./scenarioSchema";
@@ -248,12 +247,15 @@ export const startTsEngine: EngineStart = (start) => {
     const sim = Simulation.newGame(start.newGame.seed, start.newGame.mode);
     if (sim.mode !== start.newGame.mode) throw new Error(`new game founded as ${sim.mode}, not ${start.newGame.mode}`);
     // A start state, not a command: the star the game opens at, so the kinds
-    // and shafts that unlock above one star are in reach from a new game.
-    if (start.newGame.star !== undefined) {
-      sim.star = start.newGame.star;
-      // A load adopts every milestone the star satisfies; do the same so a
-      // reload of the opened game matches the live one.
-      for (const m of MILESTONES) if (!sim.achievedMilestones.has(m.id) && m.test(sim)) sim.achievedMilestones.add(m.id);
+    // and shafts that unlock above one star are in reach from a new game. The
+    // founded game is saved, raised to the star and loaded back, the route all
+    // three runners take, so a load's milestones and boundary markers are the
+    // same everywhere. One star is the founded game itself.
+    const star = start.newGame.star;
+    if (star !== undefined && star > 1) {
+      const save = JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame;
+      save.star = star;
+      return tsEngine(Simulation.deserialize(save));
     }
     return tsEngine(sim);
   }
