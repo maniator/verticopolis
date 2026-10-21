@@ -570,8 +570,9 @@ and R6.
    (recommended, since stages 1 and 2 are early telemetry).
 
 Still open on their own cards and not repeated here: R6a, A7's real-save
-list, #1114's field (item 1 folds it in), the #1068 recommendation when it
-arrives, #873's exception when it is proposed, and EX-1 at the sign-off.
+list, the #1068 recommendation when it arrives, #873's exception when it is
+proposed, and EX-1 at the sign-off. #1114's `fault_source` has no card of its
+own: the Runtime lane withdrew it, and item 1 carries the field.
 
 ## 2. Where things stand (from the takeover inventory)
 
