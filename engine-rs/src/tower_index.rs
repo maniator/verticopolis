@@ -4,8 +4,9 @@
 //! thousand rooms. `roomUnits` walks past every tile to reach the rooms, and
 //! `pickX` and `pickXInSegment` walk every unit to list one floor's tiles,
 //! once or twice for each person spawned. `maxStaffFor` counted every unit
-//! for each staff spawn attempt (#1143). These indexes answer from one walk
-//! per tower revision.
+//! for each staff spawn attempt (#1143), and the floor bounds behind
+//! `highest_floor` and `lowest_floor` folded every unit per read (#1237).
+//! These indexes answer from one walk per tower revision.
 //!
 //! They are keyed on `revision` and the unit count. Every placement and
 //! removal bumps the revision, a load ends in `reindex`, which resets the
@@ -80,6 +81,20 @@ impl Tower {
         rooms
     }
 
+    /// The units of one kind, in list order. A room kind is read from the
+    /// room index, past the tiles that make up most of a large tower; only
+    /// a tile kind walks every unit (#1237). No allocation: the room index
+    /// is a shared slice, rebuilt only when the tower's revision moves.
+    pub(crate) fn units_of_kind(&self, kind: Kind) -> impl Iterator<Item = &Unit> + '_ {
+        let structural = kind.is_structural();
+        let tiles: &[Unit] = if structural { &self.units } else { &[] };
+        let rooms = (!structural).then(|| self.room_units());
+        tiles
+            .iter()
+            .chain(rooms.into_iter().flatten())
+            .filter(move |u| u.kind == kind)
+    }
+
     /// What the per-move build checks count over the rooms, built once per
     /// revision (#1239): `count_kind` for the build caps and the pooled
     /// caps, and the office floors behind the Classic escalator rule.
@@ -138,6 +153,26 @@ impl Tower {
         self.memo.borrow_mut().tiles = Some((key, tiles));
         hit
     }
+
+    /// `floorBounds` in `Tower.ts`: the lowest and highest floor any unit
+    /// sits on, tiles included, both folded from the ground floor, so an
+    /// empty tower reads `(1, 1)`. Behind `highest_floor` and `lowest_floor`,
+    /// which the panel getters read on every refresh (#1237, A11 in #1158).
+    pub(crate) fn floor_bounds(&self) -> (i64, i64) {
+        let key = self.index_key();
+        let cached = self.memo.borrow().bounds;
+        if let Some((built, bounds)) = cached {
+            if built == key {
+                return bounds;
+            }
+        }
+        let bounds = self
+            .units
+            .iter()
+            .fold((1, 1), |(lo, hi), u| (lo.min(u.floor), hi.max(u.floor)));
+        self.memo.borrow_mut().bounds = Some((key, bounds));
+        bounds
+    }
 }
 
 #[cfg(test)]
@@ -147,3 +182,11 @@ mod tests;
 #[cfg(test)]
 #[path = "tower_census_tests.rs"]
 mod census_tests;
+
+#[cfg(test)]
+#[path = "tower_reads_tests.rs"]
+mod reads_tests;
+
+#[cfg(test)]
+#[path = "tower_scans_tests.rs"]
+mod scans_tests;
