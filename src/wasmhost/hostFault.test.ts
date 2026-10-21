@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { EngineBootError } from "./engineBoot";
-import { FaultLatch, RestorePoints, carryLiveState, hostFault, isEngineTrap, isHostFault, type FaultContext } from "./hostFault";
+import { FaultLatch, RestorePoints, carryLiveState, hostFault, isEngineTrap, isHostFault, runEach, type FaultContext } from "./hostFault";
 
 /** A save told apart by its clock. */
 const save = (minutes: number) => {
@@ -55,6 +55,74 @@ describe("restore points (#874)", () => {
     expect(points.restore()).toMatchObject({ point: "latest", skipped: 0 });
   });
 
+  it("names the point a save or the recovery chose, until a newer point (#1126)", () => {
+    const points = new RestorePoints(save(1));
+    points.noteMerge(save(2));
+    points.note("{not a save");
+    expect(points.answered).toBeNull();
+    points.newestSave();
+    expect(points.answered).toEqual({ point: "merge", skipped: 1 });
+    points.note(save(3));
+    expect(points.answered).toBeNull();
+    points.restore();
+    expect(points.answered).toEqual({ point: "latest", skipped: 0 });
+    points.noteMerge(save(4));
+    expect(points.answered).toBeNull();
+  });
+
+  it("goes back to the point a save already answered with, even when a newer one would load now (#1126)", () => {
+    const points = new RestorePoints(save(1));
+    points.noteMerge(save(2));
+    points.note(save(3));
+    const load = vi.spyOn(Simulation, "deserialize").mockImplementationOnce(() => {
+      throw new Error("out of memory");
+    });
+    try {
+      expect((points.newestSave() as { minutes: number }).minutes).toBe(minutesOf(2));
+      const restored = points.restore();
+      expect(restored).toMatchObject({ point: "merge", skipped: 1 });
+      expect(restored.sim.clock.minutes).toBe(minutesOf(2));
+    } finally {
+      load.mockRestore();
+    }
+  });
+
+  it("walks on from the point a save answered with, never back to a newer one (#1126)", () => {
+    const points = new RestorePoints(save(1));
+    points.note(save(3));
+    const load = vi.spyOn(Simulation, "deserialize").mockImplementationOnce(() => {
+      throw new Error("the latest point does not load");
+    });
+    try {
+      expect((points.newestSave() as { minutes: number }).minutes).toBe(minutesOf(1)); // the attach save
+      load.mockImplementationOnce(() => {
+        throw new Error("the attach save does not load this time");
+      });
+      expect(() => points.restore()).toThrow("the attach save does not load this time");
+      expect(load).toHaveBeenCalledTimes(3); // the latest point is not tried again
+    } finally {
+      load.mockRestore();
+    }
+  });
+
+  it("walks on to an older point when the one a save answered with does not load again (#1126)", () => {
+    const points = new RestorePoints(save(1));
+    points.note(save(3));
+    const load = vi.spyOn(Simulation, "deserialize");
+    try {
+      expect((points.newestSave() as { minutes: number }).minutes).toBe(minutesOf(3)); // the latest point
+      load.mockImplementationOnce(() => {
+        throw new Error("out of memory");
+      });
+      const restored = points.restore();
+      expect(restored).toMatchObject({ point: "attach", skipped: 1 });
+      expect(restored.sim.clock.minutes).toBe(minutesOf(1));
+      expect(points.answered).toEqual({ point: "attach", skipped: 1 });
+    } finally {
+      load.mockRestore();
+    }
+  });
+
   it("drops the attach save once a merge's loads in its place", () => {
     const points = new RestorePoints(save(1));
     points.noteMerge("{merged but broken");
@@ -94,6 +162,44 @@ describe("an engine trap (#1113)", () => {
     expect(isEngineTrap("unreachable")).toBe(false);
     expect(isEngineTrap(null)).toBe(false);
     expect(isEngineTrap(Object.assign(new Error("the engine returned no classic catalog: mode must be"), { cause: new Error("mode must be") }))).toBe(false);
+  });
+});
+
+describe("a teardown's steps (#1113)", () => {
+  const throwing = (e: unknown) => () => {
+    throw e;
+  };
+
+  const thrownBy = (...steps: (() => void)[]): unknown => {
+    try {
+      runEach(...steps);
+    } catch (e) {
+      return e;
+    }
+    return null;
+  };
+
+  it("runs every step and throws a lone error as it is", () => {
+    const ran: number[] = [];
+    const clean = new Error("the events do not go back");
+    expect(thrownBy(() => void ran.push(1), throwing(clean), () => void ran.push(3))).toBe(clean);
+    expect(ran).toEqual([1, 3]);
+    expect(thrownBy(() => {})).toBeNull();
+  });
+
+  it("throws the first trap, naming the other errors, with the trap as its cause", () => {
+    const trap = new WebAssembly.RuntimeError("unreachable");
+    const thrown = thrownBy(throwing(new Error("the events do not go back")), throwing(trap), throwing(new WebAssembly.RuntimeError("a second trap")));
+    expect(thrown).toMatchObject({ message: "unreachable, and the events do not go back, and a second trap", cause: trap });
+    expect(isEngineTrap(thrown)).toBe(true);
+  });
+
+  it("names a wrapped trap's wrapper, and still finds the trap however deep it sat", () => {
+    const trap = new WebAssembly.RuntimeError("unreachable");
+    const wrapped = [1, 2, 3].reduce<unknown>((cause, n) => Object.assign(new Error(`wrapper ${n}`), { cause }), trap);
+    const thrown = thrownBy(throwing(new Error("the events do not go back")), throwing(wrapped));
+    expect(thrown).toMatchObject({ message: "wrapper 3, and the events do not go back", cause: trap });
+    expect(isEngineTrap(thrown)).toBe(true);
   });
 });
 

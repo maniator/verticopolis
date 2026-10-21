@@ -2,7 +2,7 @@
 title: WASM host recovery correctness before the flip (attach traps, older points, a failed swap)
 type: bugfix
 created: 2026-10-20
-status: in-progress
+status: done
 baseline_commit: f1777e1e
 issues: [1113, 1126, 1149]
 context:
@@ -65,18 +65,28 @@ runs no engine send real gameplay events.
 | A non-trap throw after the engine was built (a frame the host cannot decode) | the built engine leaks | the engine is freed, then the refusal as today; a trap in that free latches |
 | The catalog check behind a clean refusal traps | `attach-refused`; the trap is swallowed | latched as an attach trap, with the refusal's message kept in `errors` |
 | The free of a healthy tower let go before an attach traps | logged; the next tower is hosted on the module | logged; the next tower latches as an attach trap |
+| That free traps after a clean throw from an earlier step of the let-go | the clean throw answers, so the next tower is hosted on the module | the trap answers, its message naming the clean throw too (follow-up), and the next tower latches |
+| A relay already on the tower (the dual run's mirror) refuses the attach, and the free behind it traps | the trap is swallowed; the next tower is hosted | latched as an attach trap, with the refusal's message kept (follow-up); the tower keeps its own events either way |
 | A faulted tower is let go | its engine freed, a throw ignored | its engine taken off the finalizer without a call into the module |
 | A strict (wasm-only) build's attach trap | `onFatal` | unchanged, and the writer is off |
 | The newest point loads | `RESTORED` or `UNDONE` | unchanged, and `status.restorePoint` names it with `skipped: 0` |
 | The newest point fails, an older one loads | the newest point's line | `status.restorePoint` names the older point with `skipped` > 0, the player reads `OLDER`, and the undo trail is cleared |
+| An undo's or a redo's own snapshot faults the host and answers with an older point, and the swap comes before the recovery | `LOST` or `REPLACED`; the trail is tidied, and the step the snapshot made holds the older tower | `status.restorePoint` names the point, the trail is cleared, and the player reads `CLEARED`, since the tower is the undo's or the redo's target (follow-up) |
+| A save of the faulted host answered with a point, and the recovery restores | the recovery walks the points again, and can load a newer one than the save holds | the recovery goes back to the point the save answered with (follow-up) |
 | The adopt throws after the release, the app still on the faulted tower | `STUCK` ("could not go back to a good state"); the stuck tower's edits send events | `SWAP_FAILED`; events the frozen tower emits after it is let go are dropped, and the events the host handed back still reach the game; `status.restorePoint` still names the point that loaded |
 | No point loads | `STUCK` | unchanged |
 
 The lines (temporary, with the re-adoption on TypeScript):
 
 - `OLDER`: "The WASM engine stopped, so the tower went back to an earlier
-  good state. Your changes since then were undone and the undo history was
-  cleared. The tower runs on the TypeScript engine now."
+  good state and anything since then was undone. The undo history was
+  cleared, and the tower runs on the TypeScript engine now." It says
+  "anything", since the play since an older point is undone even when the
+  player made no change in it (the follow-up's rewording).
+- `CLEARED` (follow-up): "The WASM engine stopped, so the undo history was
+  cleared. The game runs on the TypeScript engine now." For an undo or a
+  redo whose own snapshot went past the newest point: the tower is the one
+  the player asked for, and only the trail is lost.
 - `SWAP_FAILED`: "The WASM engine stopped, and the tower could not switch to
   the TypeScript engine, so it is frozen and changes to it are not saved.
   Load a save or start a new tower to keep playing." (The frozen tower's
@@ -127,9 +137,10 @@ of the tower `release` let go before it (a trap there is kept for the next
 
 `attachWasmHost` reads the attach's two header fields from one frame view,
 checked whole as the decoder checks it (`decodeHeader` and `checkRecords`).
-When a step after the engine was built throws, `letEngineGo` frees the
-engine on a clean refusal and answers the refusal, or a trap in that free,
-which the caller latches on; that trap's message keeps the refusal's. After
+When a step after the engine was built throws, a relay's refusal included,
+`letEngineGo` frees the engine on a clean refusal and answers the refusal,
+or a trap in that free, which the caller latches on; that trap's message
+keeps the refusal's. After
 a trap it lets the engine go with `ShadowEngine.abandon()`: wasm-bindgen's
 JavaScript-only half of `free` (`__destroy_into_raw`) zeroes the handle and
 takes it off the `FinalizationRegistry`, so the garbage collector never
@@ -143,6 +154,13 @@ latch as it does for a fault, and does not install the writer after start
 when the first tower's attach latched. A first tower's latch is recorded on
 the boot state once `startWasmHost` returns, with its message, as a refused
 first tower is today.
+
+A healthy detach runs every step even when one throws (`runEach`, now in
+`hostFault.ts`). A lone error is thrown as it is. Several are thrown as one
+new error whose message names them all, the first trap's first (or else the
+first error's), with the trap itself as its cause, so `isEngineTrap` finds
+it however deep it sat. So `release` latches on a trap in the free behind a
+clean throw, and the log keeps both (follow-up).
 
 The worker host needs none of this: a failure terminates its worker, and the
 next tower starts a fresh one with its own instance (`workerController.ts`).
@@ -159,6 +177,35 @@ After an older point it clears the undo trail (`app.clearUndo`, the
 history's `clear`) instead of tidying it: the newest steps were taken after
 the point it went back to, so an undo would move the tower forward again,
 and one of them may be the save that did not load.
+
+A save asked of the faulted host answers with the same point
+(`RestorePoints.newestSave`), and an undo's or a redo's own snapshot is such
+a save. When the undo or the redo then swaps the tower before the recovery
+runs, the recovery has nothing to restore, so it reads the point that save
+answered with (`WasmHost.answered`). When the swap kept the history, it
+records the point on `status.restorePoint`, and when the snapshot went past
+the newest point it clears the trail and says `CLEARED`: the redo or undo
+step the snapshot made holds the older tower, while the tower in play is the
+target the player asked for (follow-up to the independent review of #1230,
+its item 1). The whole trail goes, as after an older-point recovery, rather
+than the one step: the app's history has no call to drop one step, and the
+steps around the gap would be labeled for states the trail no longer
+reaches. It takes two failures at once. A load or a new game clears the
+trail itself (the app's adopt), so the tidy after it finds nothing in the
+game; it keeps its line and records no point, since no point became the
+tower or a step.
+
+`RestorePoints.restore` starts its walk at the point a save already answered
+with, when there is one, so the recovery and every save of the faulted host
+agree even when a newer point's load would succeed the second time (out of
+memory the first). If that point fails to load the second time, the walk
+goes on to older points only, never back to a newer one, and records the
+point it loads with its place in the list, so the trail is cleared and the
+player reads `OLDER`. When none of those loads, the recovery is `STUCK`, as
+when no point loads, even if a newer point would load by then. That takes a
+point that loaded once failing to load again, which only a page short of
+memory does, and a newer point would put the tower ahead of a save the
+player already holds.
 
 The events stay as they are: the events up to the newest point left the
 host once, so an edit the recovery took away still has its event in the
@@ -191,8 +238,8 @@ recovery's release, a load or a new game, and `stop`.
 
 | Part | Class |
 | --- | --- |
-| `isEngineTrap`, `letEngineGo`, `ShadowEngine.abandon`, the latch in `follow` (attach, catalog check, release), `status.latched`, `onFallback`'s `latched`, the boot's writer off on `latched`, the engine freed on a non-trap attach failure, the faulted detach's let-go, the catalog error's `cause`, the attach's single frame read | Permanent host infrastructure |
-| `RestorePoints.restore`'s `skipped`, `status.restorePoint`, `OLDER`, `SWAP_FAILED`, the frozen tower's closed event buffer, `clearUndo` | Temporary fallback code, removed with the TypeScript simulation (listed in `story-engine-retire-typescript.md`) |
+| `isEngineTrap`, `letEngineGo`, `runEach` (its trap first), `ShadowEngine.abandon`, the latch in `follow` (attach, catalog check, release), `status.latched`, `onFallback`'s `latched`, the boot's writer off on `latched`, the engine freed on a non-trap attach failure, the faulted detach's let-go, the catalog error's `cause`, the attach's single frame read | Permanent host infrastructure |
+| `RestorePoints.restore`'s `skipped`, `RestorePoints.answered` and `WasmHost.answered`, `status.restorePoint`, `OLDER`, `CLEARED`, `SWAP_FAILED`, the frozen tower's closed event buffer, `clearUndo` | Temporary fallback code, removed with the TypeScript simulation (listed in `story-engine-retire-typescript.md`) |
 
 # Owner asks (not in this PR)
 
@@ -230,16 +277,20 @@ for this PR:
 
 # Code map
 
-- `src/wasmhost/hostFault.ts`: `isEngineTrap`, `letEngineGo`;
-  `RestorePoints.restore` with `skipped`; the `RestoredPoint` type.
+- `src/wasmhost/hostFault.ts`: `isEngineTrap`, `letEngineGo`, `runEach`
+  (moved from `wasmHost.ts` in the follow-up); `RestorePoints.restore` with
+  `skipped` and its reuse of the chosen point, `RestorePoints.answered`; the
+  `RestoredPoint` type.
 - `src/dualrun/shadow.ts`: `abandon()`; `free()` clears its field first.
 - `src/dualrun/catalog.ts`: the catalog error keeps its `cause`.
-- `src/wasmhost/wasmHost.ts`: `restore()`'s new shape; the attach's single
-  frame read and `letEngineGo`; the frozen instance's event buffer closed and
+- `src/wasmhost/wasmHost.ts`: `restore()`'s new shape, `answered`; the
+  attach's single frame read and `letEngineGo`, behind a relay's refusal
+  too; the frozen instance's event buffer closed and
   its engine let go at a faulted detach.
 - `src/wasmhost/startWasmHost.ts`: `status.latched`, `status.restorePoint`;
   the latch (attach, catalog check, release); `onFallback`'s `latched`;
-  `OLDER` with the trail cleared, `SWAP_FAILED`; `WasmHostApp.clearUndo`.
+  `OLDER` with the trail cleared, `SWAP_FAILED`; `WasmHostApp.clearUndo`;
+  `recover`'s replaced branch reading `answered`, with `CLEARED`.
 - `src/main.ts`: `clearUndo`.
 - `src/bootstrap.ts`: the writer and the boot state on `latched`.
 - `src/wasmhost/merge.ts`: the copied list.
@@ -249,7 +300,8 @@ for this PR:
   `bootstrapEngine.test.ts`, the fake engine fixture; on the real engine a new
   `src/tests/integration/wasmHostAttachTrap.integration.test.ts` (#1113,
   permanent), `wasmHostFallback.integration.test.ts` (#1126, #1149),
-  `wasmHost.integration.test.ts`, `wasmTraps.ts`,
+  `wasmHostRollbackHistory.integration.test.ts` and `wasmRollback.ts`
+  (#1126), `wasmHost.integration.test.ts`, `wasmTraps.ts`,
   `engine-rs/src/extermination_tests.rs`,
   `loaderCases.integration.test.ts`.
 - Docs: this spec, `spec-874-runtime-fallback.md` (the three "not yet"
@@ -286,6 +338,28 @@ for this PR:
   point, is counted; with the game's real undo history, undo then has
   nothing to undo. A newest point that loads records `skipped: 0` and keeps
   its line.
+- **Follow-up (the independent review of #1230).** An undo's own snapshot
+  that went past the newest point clears the trail and says `CLEARED`, with
+  the point on `status.restorePoint`, on the fake engine and with the real
+  undo history (redo then has nothing to redo), and a redo's does the same
+  (undo then has nothing to undo); a load after such a save keeps
+  `REPLACED` and records no point, and a snapshot of the newest point
+  records `skipped: 0` and tidies. The recovery goes back to the point an
+  undo capture's save answered with, on the real engine, though the newest
+  would load the second time, and `RestorePoints.restore` never walks back
+  to a newer point, and walks on to an older one, recording it, when the
+  point a save answered with does not load again. A trap in the free behind a relay's refusal latches and
+  keeps the refusal's message. A trap in a healthy tower's free behind a
+  clean throw from an earlier step latches the next tower, and the log names
+  both; with several errors, the trap is the cause even when it sat three
+  wrappers deep. Each of these fails without its fix. Regression guards,
+  which pin what the base already did and fail when the line they pin is
+  removed: a
+  clean throw in the free behind a relay's refusal does not latch and the
+  next tower is hosted; the tower keeps its own events; `runEach` throws a
+  lone error as it is; an attach whose frame overruns its record count is
+  refused and its engine freed; a healthy detach leaves the event buffer
+  open.
 - **#1149.** An adopt that throws after its release shows `SWAP_FAILED`; an
   edit on the stuck tower sends no event, while the events the host handed
   back still reach the game; a later load inherits none of the stuck tower's
@@ -321,12 +395,18 @@ not measure or enforce that bound, which the facade's restore points prove
 # Versioning
 
 The two lines are player-visible on the opt-in WASM engine, so the app takes
-a minor bump (the next free one at merge time; 2.44.0 after #1177's 2.42.0
-and #1183's 2.43.0). The engine crate does not move: no save, frame, catalog,
+a minor bump: 2.44.0. The engine crate does not move: no save, frame, catalog,
 identity or interface change, and the Rust change is a test.
+
+The follow-up adds a line a player can see (`CLEARED`) and changes when the
+history is cleared, a visible fix, so it takes the next free minor too:
+2.46.0, after #1183's 2.45.0. Whichever of it and another bump merges second
+takes the next free minor.
 
 # Review
 
 `/gds-code-review` (the host's recovery is gameplay-parity work, as #874's
 was), then the independent review thread's GO before merge. No auto-merge
-before that review completes.
+before that review completes. The follow-up PR (items 1 to 5 of that
+review; item 6 was information) runs the same review and goes back to the
+same reviewer, and closes #1126.
