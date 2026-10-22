@@ -3,7 +3,7 @@ import { Z } from "../depthPlanes";
 import { GROUND, groundBelowFloors } from "../sceneryLayout";
 import type { Simulation } from "../../engine/Simulation";
 import { bindViewWorld, viewWorld } from "../../presentation/viewWorld";
-import type { Unit } from "../../engine/types";
+import type { UnitView } from "../../simport/view";
 import {
   AWNING_W,
   drawAwning,
@@ -148,7 +148,7 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
   // Structural tiles bake from a FIXED DrawCtx (not the live this.d): these
   // canvases cache on first render, so baking from live state would freeze
   // whatever lighting happened to be on screen at that moment into the tile.
-  const bake = (u: Unit, lit: boolean) =>
+  const bake = (u: UnitView, lit: boolean) =>
     new ex.Canvas({
       width: TILE,
       height: FLOOR,
@@ -247,7 +247,7 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
   engine.personGfxRed = bakePerson("#C24A3A");
 }
 
-export function fakeStruct(kind: "floor" | "lobby", floor = 1, x = 0): Unit {
+export function fakeStruct(kind: "floor" | "lobby", floor = 1, x = 0): UnitView {
   return {
     id: -1,
     kind,
@@ -255,10 +255,7 @@ export function fakeStruct(kind: "floor" | "lobby", floor = 1, x = 0): Unit {
     x,
     width: 1,
     state: "occupied",
-    satisfaction: 1,
     occupants: 0,
-    everOccupied: false,
-    pendingIncome: 0,
     label: "",
   };
 }

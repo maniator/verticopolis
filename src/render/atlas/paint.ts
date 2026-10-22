@@ -1,4 +1,5 @@
-import type { FacilityKind, Transport, Unit, UnitState } from "../../engine/types";
+import type { FacilityKind, UnitState } from "../../engine/types";
+import type { UnitView, TransportView } from "../../simport/view";
 import type { PersonBuild } from "../pixelSprites/common";
 import { personFigure } from "../pixelSprites/common";
 import type { CarArrow } from "../carIndicator";
@@ -58,8 +59,8 @@ export interface UnitPaint {
   dead?: boolean;
 }
 
-/** Build the engine-shaped unit a {@link UnitPaint} describes. */
-export function unitOf(s: UnitPaint): Unit {
+/** Build the unit view a {@link UnitPaint} describes. */
+export function unitOf(s: UnitPaint): UnitView {
   return {
     id: s.id,
     kind: s.kind,
@@ -67,18 +68,15 @@ export function unitOf(s: UnitPaint): Unit {
     x: s.x,
     width: s.width,
     state: s.state,
-    satisfaction: 1,
     occupants: s.occupants,
     outForMeal: s.outForMeal,
     subtype: s.subtype,
-    everOccupied: true,
-    pendingIncome: 0,
     label: "",
   };
 }
 
 /** A structural tile as the web bakes it (`towerScene.fakeStruct`). */
-function structUnit(kind: "floor" | "lobby", floor: number, x: number): Unit {
+function structUnit(kind: "floor" | "lobby", floor: number, x: number): UnitView {
   return {
     id: -1,
     kind,
@@ -86,10 +84,7 @@ function structUnit(kind: "floor" | "lobby", floor: number, x: number): Unit {
     x,
     width: 1,
     state: "occupied",
-    satisfaction: 1,
     occupants: 0,
-    everOccupied: false,
-    pendingIncome: 0,
     label: "",
   };
 }
@@ -188,7 +183,7 @@ function structCtx(ctx: CanvasRenderingContext2D, lit: boolean): DrawCtx {
 
 /** A shaft `floors` tall for one band bake, as the web's `transportGraphic`
  *  draws it. */
-function shaftOf(kind: FacilityKind, floors: number, skip: number[], w: number): Transport {
+function shaftOf(kind: FacilityKind, floors: number, skip: number[], w: number): TransportView {
   return {
     id: 1,
     kind,
@@ -199,7 +194,6 @@ function shaftOf(kind: FacilityKind, floors: number, skip: number[], w: number):
     cars: 1,
     carPositions: [1],
     carDir: [0],
-    load: 0,
     skipFloors: skip,
   };
 }

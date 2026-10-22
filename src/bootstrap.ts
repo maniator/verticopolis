@@ -149,7 +149,7 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
   // An open modal dialog sits in the top layer above any z-index and makes
   // the rest of the page inert, the Reload button included, so close it.
   for (const dialog of Array.from(document.querySelectorAll("dialog[open]"))) (dialog as HTMLDialogElement).close();
-  const copy = engineFailureCopy(state.failure, online);
+  const copy = engineFailureCopy(state.failure, online, typeof window === "undefined" || window.isSecureContext !== false);
   showBootMessage(
     html`<div id=${ENGINE_FAILURE_ID} data-stage=${state.failure.stage} role="alert" aria-live="assertive">
       <p><b>${copy.headline}</b></p>
