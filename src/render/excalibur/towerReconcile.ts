@@ -3,7 +3,8 @@ import { Z } from "../depthPlanes";
 import { catalogFacility } from "../../engine/catalogTypes";
 import { towerCatalog } from "../../engine/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
-import { isPresent, type Transport, type Unit } from "../../engine/types";
+import { isPresent } from "../../engine/types";
+import type { TransportView, UnitView } from "../../simport/view";
 import {
   CRANE_H,
   CRANE_W,
@@ -299,7 +300,7 @@ function addBoxActor(engine: TowerEngine, pos: ex.Vector, w: number, h: number, 
   return a;
 }
 
-function addStruct(engine: TowerEngine, u: Unit): void {
+function addStruct(engine: TowerEngine, u: UnitView): void {
   // Floor/lobby units are one tile wide in the sim (and the old per-unit
   // actor drew exactly one tile regardless), so a unit maps to one cell.
   const cell = engine.structTileMap.getTile(u.x, viewWorld().maxFloor - u.floor);
@@ -314,7 +315,7 @@ function addStruct(engine: TowerEngine, u: Unit): void {
  *  For floor-1 lobby tiles the frontage-edge predicate can override the
  *  variant to a wide-storefront grand slice, a compact grand fallback, or
  *  a service entrance; see {@link floor1EntranceKind}. */
-function lobbyTileGfx(engine: TowerEngine, u: Unit): ex.Canvas {
+function lobbyTileGfx(engine: TowerEngine, u: UnitView): ex.Canvas {
   const lit = engine.litState ? 1 : 0;
   if (u.floor === 1) {
     const kind = floor1EntranceKind(engine, u.x);
@@ -406,7 +407,7 @@ function refreshFloor1EntranceMap(engine: TowerEngine): void {
  *  region canvas (z 0) and under every crowd sprite: walkers sit at 0.4 or
  *  lower, garage commute cars at exactly 0.5, so 0.45 avoids the insertion-
  *  order tie a 0.5 room would have with the cars driving past the flames. */
-function addRoom(engine: TowerEngine, u: Unit): void {
+function addRoom(engine: TowerEngine, u: UnitView): void {
   const hgt = catalogFacility(towerCatalog(engine.sim), u.kind).floors;
   const w = u.width * TILE;
   const h = hgt * FLOOR;
@@ -423,7 +424,7 @@ function addRoom(engine: TowerEngine, u: Unit): void {
   engine.animatedRooms.set(u.id, a);
 }
 
-function addTransport(engine: TowerEngine, t: Transport): void {
+function addTransport(engine: TowerEngine, t: TransportView): void {
   const w = t.width * TILE;
   const totalFloors = t.top - t.bottom + 1;
   const h = totalFloors * FLOOR;
@@ -439,7 +440,7 @@ function addTransport(engine: TowerEngine, t: Transport): void {
  * each its own small cached Canvas, composed onto one GraphicsGroup, a single
  * actor, so the rest of the engine (sync, removal, collider) is unchanged.
  */
-function transportGraphic(engine: TowerEngine, t: Transport, w: number, totalFloors: number): ex.Graphic {
+function transportGraphic(engine: TowerEngine, t: TransportView, w: number, totalFloors: number): ex.Graphic {
   const band = (fromTop: number, floors: number): ex.Canvas =>
     new ex.Canvas({
       width: w,
