@@ -55,7 +55,7 @@ describe("bootGame, the engine loading line (#1132)", () => {
       expect(await run).toBeInstanceOf(Error);
       expect(document.querySelector(".boot-loading")).toBeNull();
       expect(document.getElementById("boot-cover")).toBeNull();
-      expect(document.getElementById("engine-failure")?.textContent).toContain("the engine package did not load within 90 seconds");
+      expect(document.getElementById("engine-failure")?.textContent).toContain("The engine took too long to load");
       expect(document.getElementById("a11y-live")?.textContent).toBe("");
     } finally {
       vi.useRealTimers();

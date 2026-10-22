@@ -334,7 +334,9 @@ describe("the recovery after a fault (#874)", () => {
     }
   });
 
-  const OLDER = "The Rust engine stopped, so the tower went back to an earlier good state. Your changes since then were undone and the undo history was cleared. The tower runs on the TypeScript engine now.";
+  const REPLACED = "The Rust engine stopped, so the game runs on the TypeScript engine now.";
+  const CLEARED = "The Rust engine stopped, so the undo history was cleared. The game runs on the TypeScript engine now.";
+  const OLDER = "The Rust engine stopped, so the tower went back to an earlier good state and anything since then was undone. The undo history was cleared, and the tower runs on the TypeScript engine now.";
   const SWAP_FAILED = "The Rust engine stopped, and the tower could not switch to the TypeScript engine, so it is frozen and changes to it are not saved. Load a save or start a new tower to keep playing.";
 
   it("says the tower went back further, names the point and clears the undo trail, when the newest point does not load (#1126)", async () => {
@@ -361,6 +363,44 @@ describe("the recovery after a fault (#874)", () => {
       // over instead of being tidied.
       expect(a.cleared).toBe(1);
       expect(a.dropped).toBe(0);
+    } finally {
+      load.mockRestore();
+      handle.stop();
+    }
+  });
+
+  // An undo's or a redo's own snapshot of the faulted tower is a save of it,
+  // which answers with a restore point: past the newest when that one does
+  // not load. The swap comes before the recovery then (#1126). The tower is
+  // the one the player asked for; the step the snapshot made is not.
+  it.each([
+    ["an undo whose snapshot went past the newest point: names it and clears the trail", true, true, { point: "merge", skipped: 1 }, CLEARED, 1],
+    ["a load after a save that went past the newest point: names none and keeps its line", false, true, null, REPLACED, 0],
+    ["an undo whose snapshot is the newest point: names it and tidies as before", true, false, { point: "latest", skipped: 0 }, REPLACED, 0],
+  ])("records which point a save of the faulted tower answered with, if any, after %s", async (_, keepHistory, skips, point, line, cleared) => {
+    const a = app();
+    const { handle, engine } = start(a);
+    const load = vi.spyOn(Simulation, "deserialize");
+    try {
+      const sim = a.sim;
+      sim.tick(60); // the hour pass merges: an older point
+      sim.money += 12_345;
+      sim.serialize(); // a hosted save: the newest point
+      engine().serialize = () => {
+        throw new Error("serialize failed");
+      };
+      if (skips) {
+        load.mockImplementationOnce(() => {
+          throw new Error("the newest point does not load");
+        });
+      }
+      sim.serialize(); // the snapshot faults the host and answers with a point
+      a.adoptSim(Simulation.newGame(3, "classic"), keepHistory);
+      await settle();
+      expect(handle.status.restorePoint).toEqual(point);
+      expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: line, kind: "bad" }));
+      expect(a.cleared).toBe(cleared);
+      expect(a.dropped).toBe(1 - cleared);
     } finally {
       load.mockRestore();
       handle.stop();

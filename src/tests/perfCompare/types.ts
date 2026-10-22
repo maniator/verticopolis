@@ -95,8 +95,32 @@ export interface StartupSample {
    *  (first instantiateStreaming or instantiate call), WASM only. */
   wasmInstantiateMs: number | null;
   wasmInstantiateVia: "instantiateStreaming" | "instantiate" | null;
+  /** When boot first published its engine state (`window.__vcEngineBoot`),
+   *  which both engines do just before the app is created: on WASM it ends
+   *  the package load (#1254). Null when the page never published it;
+   *  absent in results written before the mark existed. */
+  engineLoadedMs?: number | null;
   servedBeforeReady: ServedRequest[];
   servedAfterReady: ServedRequest[];
+}
+
+/** One cold start with a scenario's save in the autosave slot (#1254), in a
+ *  fresh context of the repetition's browser process. `sample` is set only
+ *  when every check passed (the requested engine ran, the boot loaded the
+ *  seeded tower with its population, the renderer did not change, no context
+ *  was lost and no engine or frame error was logged); otherwise `error` says
+ *  why and the row has no sample from this repetition. */
+export interface SavedStart {
+  sample: StartupSample | null;
+  error: string | null;
+  /** sha256 of the autosave value the context was seeded with. */
+  seedSha256: string;
+  /** The WebGL renderer read after the start. */
+  renderer: string | null;
+  /** Page and console errors and lost WebGL contexts during this start,
+   *  kept off the repetition's own lists. */
+  pageErrors: string[];
+  contextLost: string[];
 }
 
 export interface ScenarioRun {
@@ -140,6 +164,11 @@ export interface ProcessRun {
    *  default), in a second fresh context of the same browser process
    *  (fresh HTTP cache, not a fresh process). */
   cold4x: StartupSample | null;
+  /** A cold start at 1x with each scenario's save in the autosave slot,
+   *  keyed by scenario (#1254). Auxiliary like the first visit: it runs after
+   *  every other measurement of a good repetition and cannot fail it.
+   *  Absent in results written before it and in failed repetitions. */
+  coldSaved?: Record<string, SavedStart>;
   /** A fixed CPU loop: unthrottled, under the cold start's throttle, and
    *  under each throttle of every scenario's timed passes and of each frame
    *  block (keyed "<scenario or frames-on/off>:<rate>"). */

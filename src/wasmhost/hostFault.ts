@@ -64,15 +64,20 @@ const POISONED = "recursive use of an object detected";
  * one the test misses is only left a refusal, as before.
  */
 export function isEngineTrap(error: unknown): boolean {
+  return trapIn(error) !== null;
+}
+
+/** The trap itself, `error` or one of its causes, or null for none. */
+function trapIn(error: unknown): unknown {
   for (let e = error, depth = 0; typeof e === "object" && e !== null && depth < 4; e = (e as { cause?: unknown }).cause, depth++) {
-    if (typeof WebAssembly !== "undefined" && e instanceof WebAssembly.RuntimeError) return true;
+    if (typeof WebAssembly !== "undefined" && e instanceof WebAssembly.RuntimeError) return e;
     const { name, message } = e as { name?: unknown; message?: unknown };
-    if (name === "RuntimeError") return true;
+    if (name === "RuntimeError") return e;
     if (typeof message !== "string") continue;
-    if (message.includes(POISONED)) return true;
-    if ((name === "RangeError" && /maximum call stack size exceeded/i.test(message)) || (name === "InternalError" && /too much recursion/i.test(message))) return true;
+    if (message.includes(POISONED)) return e;
+    if ((name === "RangeError" && /maximum call stack size exceeded/i.test(message)) || (name === "InternalError" && /too much recursion/i.test(message))) return e;
   }
-  return false;
+  return null;
 }
 
 /** Let the engine a refused attach built go, and answer what to throw: the
@@ -92,6 +97,27 @@ export function letEngineGo(shadow: { free(): void; abandon(): void }, refusal: 
     if (isEngineTrap(e)) return Object.assign(new Error(`${text(e)}, while freeing the engine after a refusal: ${text(refusal)}`), { cause: e });
   }
   return refusal;
+}
+
+/** Run every step, even after one throws, then throw: a teardown that must
+ *  let the instance go and free the engine whatever an earlier step did.
+ *  A lone error is thrown as it is. Several are thrown as one new error that
+ *  names them all, the first trap's first (or else the first error's), with
+ *  the trap itself as its cause, so the caller latches on it (#1113). */
+export function runEach(...steps: (() => void)[]): void {
+  const errors: unknown[] = [];
+  for (const step of steps) {
+    try {
+      step();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length === 0) return;
+  if (errors.length === 1) throw errors[0];
+  const first = errors.find((e) => trapIn(e) !== null) ?? errors[0];
+  const text = (x: unknown) => (x instanceof Error ? x.message : String(x));
+  throw Object.assign(new Error([first, ...errors.filter((e) => e !== first)].map(text).join(", and ")), { cause: trapIn(first) ?? first });
 }
 
 /** Freezes a host on the first throw from its engine and reports it. */
@@ -179,7 +205,7 @@ export class RestorePoints {
   private attach: string | null;
   /** The point `restore` last chose, so a save of a faulted host answers
    *  with the same one. Cleared by a newer point. */
-  private chosen: string | null = null;
+  private chosen: { text: string; point: RestoredPoint } | null = null;
 
   constructor(attach: string) {
     this.attach = attach;
@@ -210,15 +236,18 @@ export class RestorePoints {
   }
 
   /** A fresh TypeScript tower from the newest point that loads, with the
-   *  number of newer points that did not. Throws the first point's error
-   *  when none does. */
+   *  number of newer points that did not. After a save answered with a point
+   *  the walk starts there and goes on to older points only, so the tower is
+   *  never newer than a save already holds: the points newer than it failed
+   *  already, and only a fault reads them, so `skipped` is its place in the
+   *  list. Throws the walk's first error when none from there on loads. */
   restore(): RestoredPoint & { sim: Simulation } {
     let first: unknown = null;
-    let skipped = 0;
-    for (const [point, text] of this.candidates()) {
+    let skipped = this.chosen?.point.skipped ?? 0;
+    for (const [point, text] of this.candidates().slice(skipped)) {
       try {
         const sim = Simulation.deserialize(JSON.parse(text));
-        this.chosen = text;
+        this.chosen = { text, point: { point, skipped } };
         return { sim, point, skipped };
       } catch (e) {
         first ??= e;
@@ -229,13 +258,21 @@ export class RestorePoints {
   }
 
   /** The save of the point `restore` goes back to: what a save asked of a
-   *  faulted host answers with, so a save never holds a state the recovery
-   *  would skip. Checked once; throws when no point loads, which cannot
-   *  happen while a merge's save or the attach save is kept (TypeScript
-   *  loaded the one and wrote the other), and one always is. */
+   *  faulted host answers with, and where the recovery's walk starts.
+   *  Checked once; throws when no point loads, which cannot happen while a
+   *  merge's save or the attach save is kept (TypeScript loaded the one and
+   *  wrote the other), and one always is. */
   newestSave(): unknown {
     if (this.chosen === null) this.restore();
-    return JSON.parse(this.chosen as string);
+    return JSON.parse((this.chosen as { text: string }).text);
+  }
+
+  /** The point the faulted host's saves answer with, once a save or the
+   *  recovery chose one; null until then. An undo's or a redo's own
+   *  snapshot can be that save, so the recovery after it learns how far
+   *  back the snapshot went. */
+  get answered(): RestoredPoint | null {
+    return this.chosen?.point ?? null;
   }
 }
 
