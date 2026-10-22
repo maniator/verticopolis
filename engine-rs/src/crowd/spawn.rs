@@ -1,15 +1,12 @@
 //! Port of `crowd/spawn.ts`, `crowd/trips.ts` and `crowd/venueTrips.ts`.
 
-use std::collections::HashMap;
-
-use indexmap::IndexSet;
-
 use crate::housekeeping::HK_MAIDS_PER_UNIT;
 
 use super::meals::{
     matches_meal_origin_kind, meal_window_for, outbound_weight, staff_on_shift, MealOrigin,
 };
 use super::routines::push_routine_options;
+pub use super::spawn_floors::{spawn_floors, SpawnFloors};
 use super::visits::{push_venue_visit_options, spawn_venue_visit, VisitOrigin};
 use super::{
     Crowd, PState, Person, Route, CROWD_SECONDS_PER_MINUTE, MAX_PEOPLE, METRO_DWELL_MAX,
@@ -193,111 +190,6 @@ fn metro_departure(crowd: &mut Crowd, tower: &Tower, station: &Unit, from: i64) 
 
 // ---- spawn.ts --------------------------------------------------------------
 
-pub struct SpawnFloors {
-    pub leased_offices: Vec<i64>,
-    pub staffed_offices: Vec<i64>,
-    pub homes: Vec<i64>,
-    pub open_venues: Vec<i64>,
-    pub condo_floors: Vec<i64>,
-    pub household_floors: Vec<i64>,
-    pub hotel_floors: Vec<i64>,
-    pub staff_floors: Vec<(Kind, i64)>,
-    pub venues_by_kind: HashMap<Kind, Vec<i64>>,
-    /// Room unit ids per floor, in unit order.
-    pub units_by_floor: HashMap<i64, Vec<i64>>,
-    /// Operational metro station ids.
-    pub metro_stations: Vec<i64>,
-}
-
-impl SpawnFloors {
-    pub fn units_on(&self, floor: i64) -> &[i64] {
-        self.units_by_floor
-            .get(&floor)
-            .map(|v| v.as_slice())
-            .unwrap_or(&[])
-    }
-}
-
-pub fn spawn_floors(tower: &Tower, clock: &Clock) -> SpawnFloors {
-    let hour = clock.hour();
-    let weekend = clock.is_weekend();
-    let mut leased: IndexSet<i64> = IndexSet::new();
-    let mut staffed: IndexSet<i64> = IndexSet::new();
-    let mut homes: IndexSet<i64> = IndexSet::new();
-    let mut venues: IndexSet<i64> = IndexSet::new();
-    let mut metro_stations: Vec<i64> = Vec::new();
-    let mut condo_floors: IndexSet<i64> = IndexSet::new();
-    let mut household_floors: IndexSet<i64> = IndexSet::new();
-    let mut hotel_floors: IndexSet<i64> = IndexSet::new();
-    let mut staff_floors: Vec<(Kind, i64)> = Vec::new();
-    let mut venues_by_kind: HashMap<Kind, IndexSet<i64>> = HashMap::new();
-    let mut units_by_floor: HashMap<i64, Vec<i64>> = HashMap::new();
-    for u in tower.room_units() {
-        units_by_floor.entry(u.floor).or_default().push(u.id);
-        if u.kind.is_staff_kind() {
-            if u.is_operational() && !staff_floors.contains(&(u.kind, u.floor)) {
-                staff_floors.push((u.kind, u.floor));
-            }
-            continue;
-        }
-        if u.kind == Kind::WeddingHall {
-            if u.is_operational() {
-                venues_by_kind.entry(u.kind).or_default().insert(u.floor);
-            }
-            continue;
-        }
-        if u.kind == Kind::Metro {
-            if u.is_operational() {
-                metro_stations.push(u.id);
-            }
-            continue;
-        }
-        if !(u.is_tenanted() || u.state == crate::tower::UnitState::Asleep) {
-            continue;
-        }
-        if u.kind == Kind::Office {
-            if !weekend {
-                leased.insert(u.floor);
-            }
-            if u.occupants > 0 {
-                staffed.insert(u.floor);
-            }
-        } else if u.kind == Kind::Condo || u.kind.is_rental() {
-            homes.insert(u.floor);
-            if u.kind != Kind::RentalStudio || u.visible_occupants() > 0 {
-                condo_floors.insert(u.floor);
-            }
-            if u.kind.has_household() {
-                household_floors.insert(u.floor);
-            }
-        } else if u.kind.is_hotel() {
-            homes.insert(u.floor);
-            hotel_floors.insert(u.floor);
-        } else if u.kind.is_ambient_venue() && u.kind.is_open_at(hour) {
-            venues.insert(u.floor);
-            venues_by_kind.entry(u.kind).or_default().insert(u.floor);
-        } else if u.kind.attendance_cap().is_some() && u.kind.is_open_at(hour) {
-            venues_by_kind.entry(u.kind).or_default().insert(u.floor);
-        }
-    }
-    SpawnFloors {
-        leased_offices: leased.into_iter().collect(),
-        staffed_offices: staffed.into_iter().collect(),
-        homes: homes.into_iter().collect(),
-        open_venues: venues.into_iter().collect(),
-        condo_floors: condo_floors.into_iter().collect(),
-        household_floors: household_floors.into_iter().collect(),
-        hotel_floors: hotel_floors.into_iter().collect(),
-        staff_floors,
-        venues_by_kind: venues_by_kind
-            .into_iter()
-            .map(|(k, s)| (k, s.into_iter().collect()))
-            .collect(),
-        units_by_floor,
-        metro_stations,
-    }
-}
-
 #[derive(Clone, Copy)]
 enum List {
     LeasedOffices,
@@ -363,8 +255,14 @@ fn list_of(floors: &SpawnFloors, l: List) -> &[i64] {
     }
 }
 
+/// A full crowd spawns no one: `spawn_trips` returns on it before any draw,
+/// and `spawn_step` skips the floor lists on it (#1143 item 4).
+fn crowd_is_full(crowd: &Crowd) -> bool {
+    crowd.people.len() >= MAX_PEOPLE
+}
+
 pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: &SpawnFloors) {
-    if crowd.people.len() >= MAX_PEOPLE {
+    if crowd_is_full(crowd) {
         return;
     }
     let morning = clock.is_morning();
@@ -688,12 +586,17 @@ pub fn spawn_step(
     if crowd.spawn_acc < 1.0 {
         return;
     }
-    let floors = spawn_floors(tower, clock);
+    // `spawn_trips` only adds people and returns on `crowd_is_full` before
+    // any draw, so a crowd full here skips the lists and drains the
+    // accumulator the same (#1143 item 4).
+    let floors = (!crowd_is_full(crowd)).then(|| spawn_floors(tower, clock));
     let mut guard = 0;
     while crowd.spawn_acc >= 1.0 && guard < 8 {
         guard += 1;
         crowd.spawn_acc -= 1.0;
-        spawn_trips(crowd, tower, clock, &floors);
+        if let Some(floors) = &floors {
+            spawn_trips(crowd, tower, clock, floors);
+        }
     }
 }
 

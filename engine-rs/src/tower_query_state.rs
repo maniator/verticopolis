@@ -16,6 +16,10 @@ pub struct Memo {
         crate::tower_index::IndexKey,
         std::sync::Arc<crate::tower_index::Census>,
     )>,
+    pub floor_rooms: Option<(
+        crate::tower_index::IndexKey,
+        std::sync::Arc<crate::tower_index::FloorRooms>,
+    )>,
     pub floors: crate::tower_index::FloorsMemo,
 }
 

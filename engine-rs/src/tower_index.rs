@@ -9,6 +9,7 @@
 //! Elevator dispatch hashed every room's floor against a copy of the served
 //! set and sorted the lobby floors on every step (A20 in #1158). These
 //! indexes answer from one walk per tower revision.
+//! The spawn step's rooms per floor joined them with #1143 item 4.
 //!
 //! They are keyed on `revision` and the unit count. Every placement and
 //! removal bumps the revision, a load ends in `reindex`, which resets the
@@ -32,7 +33,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::facilities::{Kind, FACILITIES};
+use crate::facilities::{Kind, FACILITIES, MAX_FLOOR, MIN_FLOOR};
 use crate::tower::{Tower, Unit};
 
 /// What an index was built from: the tower revision and the unit count.
@@ -62,6 +63,74 @@ pub struct DispatchFloors {
 
 /// The memo slot for [`DispatchFloors`].
 pub type FloorsMemo = Option<(IndexKey, Arc<DispatchFloors>)>;
+
+/// The floors from `MIN_FLOOR` up that get a slot, and a bit in a 128-bit
+/// floor set. Every floor a tower can build fits; a floor past them takes a
+/// slower path.
+pub(crate) const FLOOR_SLOTS: usize = 128;
+
+// One bit per slot in 128 bits, and a slot for every buildable floor.
+const _: () = assert!(FLOOR_SLOTS <= 128 && MAX_FLOOR - MIN_FLOOR < FLOOR_SLOTS as i64);
+
+/// `floor`'s slot, or `None` for a floor past the slots.
+#[inline]
+pub(crate) fn floor_slot(floor: i64) -> Option<usize> {
+    let i = floor.checked_sub(MIN_FLOOR)?;
+    (0..FLOOR_SLOTS as i64).contains(&i).then_some(i as usize)
+}
+
+/// Room unit ids per floor, in unit order: `unitsByFloor` in `spawnFloors`
+/// (`crowd/spawn.ts`), which the TypeScript rebuilds on every spawn step.
+pub struct FloorRooms {
+    /// The rooms on floor `MIN_FLOOR + i` are `ids[start[i]..start[i + 1]]`.
+    start: Vec<usize>,
+    ids: Vec<i64>,
+    /// Rooms on a floor past the slots, which placement and load never make.
+    other: Vec<(i64, Vec<i64>)>,
+}
+
+impl FloorRooms {
+    /// From `(floor, id)` pairs in unit order: a count per floor, then each
+    /// id into its floor's next place.
+    fn new(rooms: &[(i64, i64)]) -> FloorRooms {
+        let mut start = vec![0usize; FLOOR_SLOTS + 1];
+        let mut other: Vec<(i64, Vec<i64>)> = Vec::new();
+        for &(floor, id) in rooms {
+            match floor_slot(floor) {
+                Some(i) => start[i + 1] += 1,
+                None => match other.iter_mut().find(|(f, _)| *f == floor) {
+                    Some((_, ids)) => ids.push(id),
+                    None => other.push((floor, vec![id])),
+                },
+            }
+        }
+        for i in 0..FLOOR_SLOTS {
+            start[i + 1] += start[i];
+        }
+        let mut next = [0usize; FLOOR_SLOTS];
+        next.copy_from_slice(&start[..FLOOR_SLOTS]);
+        let mut ids = vec![0; start[FLOOR_SLOTS]];
+        for &(floor, id) in rooms {
+            if let Some(i) = floor_slot(floor) {
+                ids[next[i]] = id;
+                next[i] += 1;
+            }
+        }
+        FloorRooms { start, ids, other }
+    }
+
+    /// The room unit ids on `floor`, in unit order.
+    pub fn on(&self, floor: i64) -> &[i64] {
+        match floor_slot(floor) {
+            Some(i) => &self.ids[self.start[i]..self.start[i + 1]],
+            None => self
+                .other
+                .iter()
+                .find(|(f, _)| *f == floor)
+                .map_or(&[], |(_, ids)| ids.as_slice()),
+        }
+    }
+}
 
 impl Tower {
     fn index_key(&self) -> IndexKey {
@@ -144,6 +213,21 @@ impl Tower {
     /// Whether `floor` has an office on it, in any state.
     pub(crate) fn has_office_on(&self, floor: i64) -> bool {
         self.census().office_floors.contains(&floor)
+    }
+
+    /// The room unit ids of every floor, which each spawn step that has
+    /// room to spawn reads to pick a room on a floor (#1143 item 4).
+    pub(crate) fn floor_rooms(&self) -> Arc<FloorRooms> {
+        let key = self.index_key();
+        if let Some((built, rooms)) = &self.memo.borrow().floor_rooms {
+            if *built == key {
+                return rooms.clone();
+            }
+        }
+        let pairs: Vec<(i64, i64)> = self.room_units().map(|u| (u.floor, u.id)).collect();
+        let rooms = Arc::new(FloorRooms::new(&pairs));
+        self.memo.borrow_mut().floor_rooms = Some((key, rooms.clone()));
+        rooms
     }
 
     /// The structural tiles of `floor` in the order `pickX` lists them, or

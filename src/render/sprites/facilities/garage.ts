@@ -1,4 +1,4 @@
-import type { Unit } from "../../../engine/types";
+import type { UnitView } from "../../../simport/view";
 import { layerBreak, layerEnd } from "../../pixelSprites/layers";
 import { ACCENTS, rand, shade, type DrawCtx } from "../common";
 import { FLOOR, TILE } from "../../scale";
@@ -23,7 +23,7 @@ import { box, floorb, refMap } from "./serviceKit";
 
 // ---- Parking spaces ---------------------------------------------------------
 
-export function drawParking(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+export function drawParking(d: DrawCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
   const RW = 4 * TILE;
   const RH = FLOOR;
@@ -90,7 +90,7 @@ export function drawDeadParkingX(ctx: CanvasRenderingContext2D, x: number, y: nu
 
 // ---- Parking ramp -----------------------------------------------------------
 
-export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: Unit, x: number, y: number, w: number, h: number): void {
+export function drawParkingRamp(ctx: CanvasRenderingContext2D, u: UnitView, x: number, y: number, w: number, h: number): void {
   const RW = 16 * TILE;
   const RH = FLOOR;
   const { F } = refMap(ctx, x, y, w, h, RW, RH);

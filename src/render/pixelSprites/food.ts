@@ -1,5 +1,5 @@
 import { visibleOccupants } from "../../engine/Crowd";
-import type { Unit } from "../../engine/types";
+import type { UnitView } from "../../simport/view";
 import { geoVariant, type RoomCtx } from "./common";
 import { drawCinema, drawFastFood, drawRestaurant } from "./food.interiors";
 import { FASTFOOD_DEFAULT, FASTFOOD_LOOKS, FOODHALL_DEFAULT, FOODHALL_LOOKS, RESTAURANT_DEFAULT, RESTAURANT_LOOKS } from "./food.looks";
@@ -29,16 +29,16 @@ export type { FastFoodLook, RestaurantLook } from "./food.looks";
 /** A stable per-room shirt seed from GEOGRAPHY (floor, x), so the crowd's colors
  *  survive a save, export, and TDT import (which renumbers `u.id`). Each seat
  *  index adds to it, giving per-occupant variety within the room. */
-function figureSeed(u: Pick<Unit, "floor" | "x">): number {
+function figureSeed(u: Pick<UnitView, "floor" | "x">): number {
   return (u.floor * 131 + u.x * 17) | 0;
 }
 
-export function fastFood(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+export function fastFood(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const look = (u.subtype !== undefined && FASTFOOD_LOOKS[u.subtype]) || FASTFOOD_DEFAULT;
   drawFastFood(d.ctx, x, y, w, h, look, visibleOccupants(u), figureSeed(u));
 }
 
-export function restaurant(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+export function restaurant(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const look = (u.subtype !== undefined && RESTAURANT_LOOKS[u.subtype]) || RESTAURANT_DEFAULT;
   drawRestaurant(d.ctx, x, y, w, h, look, d.lit, visibleOccupants(u), figureSeed(u));
 }
@@ -46,12 +46,12 @@ export function restaurant(d: RoomCtx, u: Unit, x: number, y: number, w: number,
 /** The Modern Food Hall: rendered with the restaurant dining-room drawer, but
  *  each stall subtype (Ramen Bar, Taco Stand, ...) supplies its own look so the
  *  stalls read as visibly different counters instead of identical restaurants. */
-export function foodHall(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+export function foodHall(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const look = (u.subtype !== undefined && FOODHALL_LOOKS[u.subtype]) || FOODHALL_DEFAULT;
   drawRestaurant(d.ctx, x, y, w, h, look, d.lit, visibleOccupants(u), figureSeed(u));
 }
 
-export function cinema(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+export function cinema(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   // Two cinemas on different footprints must not screen the identical crowd or
   // marquee color: axis 4 varies the audience, axis 5 seeds the marquee phase
   // (art bible geoVariant axis map; no axis is reused within the cinema kind).
