@@ -61,6 +61,33 @@ export function pgMaskVersion(): void {
   });
 }
 
+/** Assert Settings modal content visibility for screenshot captures.
+ *  - `require-all`: every tracked Settings section must be fully visible.
+ *  - `visible-only`: tracked sections that are visible must not be clipped.
+ *  Runs in the browser via page.evaluate. */
+export function pgAssertSettingsContentVisible(mode: "require-all" | "visible-only" = "require-all"): void {
+  const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
+  if (!box) throw new Error("the Settings dialog did not mount");
+  const boxRect = box.getBoundingClientRect();
+  const selectors = [".set-engine", ".set-engine-status", ".modal-actions", ".set-version"];
+  for (const selector of selectors) {
+    const el = box.querySelector(selector) as HTMLElement | null;
+    if (!el) throw new Error(`Settings is missing required content: ${selector}`);
+    const rect = el.getBoundingClientRect();
+    const visible = rect.bottom > boxRect.top + 1 && rect.top < boxRect.bottom - 1;
+    if (mode === "require-all" && !visible) {
+      throw new Error(
+        `Settings content is outside the captured modal viewport: ${selector} (top=${rect.top.toFixed(1)}, bottom=${rect.bottom.toFixed(1)}, box=${boxRect.top.toFixed(1)}..${boxRect.bottom.toFixed(1)})`,
+      );
+    }
+    if (visible && (rect.top < boxRect.top - 1 || rect.bottom > boxRect.bottom + 1)) {
+      throw new Error(
+        `Settings content clipped by the modal scrollport: ${selector} (top=${rect.top.toFixed(1)}, bottom=${rect.bottom.toFixed(1)}, box=${boxRect.top.toFixed(1)}..${boxRect.bottom.toFixed(1)})`,
+      );
+    }
+  }
+}
+
 // ---- In-page helpers (serialized into the browser by page.evaluate) ---------
 // These run in the browser off window.game; they cannot reference Node scope.
 

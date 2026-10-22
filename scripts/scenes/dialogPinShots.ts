@@ -22,35 +22,7 @@
  * nothing.
  */
 import { type Shot } from "../screenshot-env.ts";
-
-/** Assert the currently open Settings modal is fully visible inside its scroll
- *  box, so the Game engine section, status, Close action and the version line
- *  cannot silently clip out of the committed screenshot. The shot is rendering
- *  the actual modal box, not a larger page capture, so the test is purposely
- *  strict: every clinically relevant element must stay within the scrollport.
- */
-export function assertSettingsContentVisible(): void {
-  const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
-  if (!box) throw new Error("the Settings dialog did not mount");
-  const boxRect = box.getBoundingClientRect();
-  const visible = [...document.querySelectorAll<HTMLElement>(
-    "#modal .modal-box h3, #modal .modal-box .set-engine, #modal .modal-box .set-engine-status, #modal .modal-box .modal-actions, #modal .modal-box .set-version",
-  )].filter((el) => {
-    const rect = el.getBoundingClientRect();
-    return rect.bottom > boxRect.top + 1 && rect.top < boxRect.bottom - 1;
-  });
-  const clipped = visible.filter((el) => {
-    const rect = el.getBoundingClientRect();
-    return rect.top < boxRect.top - 1 || rect.bottom > boxRect.bottom + 1;
-  });
-  if (clipped.length > 0) {
-    const first = clipped[0];
-    const rect = first.getBoundingClientRect();
-    throw new Error(
-      `Settings content clipped by the modal scrollport: ${first.tagName}.${first.className || ""} (top=${rect.top.toFixed(1)}, bottom=${rect.bottom.toFixed(1)}, box=${boxRect.top.toFixed(1)}..${boxRect.bottom.toFixed(1)})`,
-    );
-  }
-}
+import { pgAssertSettingsContentVisible } from "../screenshot-builders.ts";
 
 /**
  * Short enough that both dialogs overflow their 82vh cap with room to spare.
@@ -97,7 +69,6 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
     setup: async (page) => {
       await page.evaluate(() => document.getElementById("btn-settings")?.click());
       await page.waitForSelector("#modal #vol-music", { timeout: 4000 });
-      await page.evaluate(assertSettingsContentVisible);
       await page.evaluate(() => {
         const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
         const strip = document.querySelector("#modal .modal-box > .modal-actions") as HTMLElement | null;
@@ -105,11 +76,14 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
         // The premise of the selector's second arm: something really does
         // follow the action row here.
         if (strip.nextElementSibling === null) throw new Error("Settings no longer renders anything after its action row; the shot has lost its subject");
-        box.scrollTop = Math.floor((box.scrollHeight - box.clientHeight) / 2);
+        // Keep the Settings Game engine row intact in the capture while still
+        // leaving enough content below the fold to prove the sticky footer rule.
+        box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight - strip.offsetHeight * 3);
         const left = box.scrollHeight - box.clientHeight - box.scrollTop;
         if (left <= strip.offsetHeight) throw new Error("Settings did not overflow enough for the pin to be doing anything");
         if (strip.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1) throw new Error("the Settings footer is not pinned; this shot would prove nothing");
       });
+      await page.evaluate(pgAssertSettingsContentVisible, "visible-only");
     },
     wait: 300,
   },
