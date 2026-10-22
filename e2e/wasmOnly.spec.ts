@@ -175,7 +175,6 @@ test.describe("never falls back to the TypeScript engine", () => {
     );
     await page.goto("/");
     const text = await expectStopped(page, "load");
-<<<<<<< HEAD
     expect(text).toContain("The engine files do not match this version of the game. The engine was not started.");
     expect(await bootState(page)).toMatchObject({ failure: { reason: "package-mismatch", package: { kind: "mismatch", file: "glue" } } });
   });

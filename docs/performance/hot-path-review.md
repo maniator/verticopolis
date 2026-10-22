@@ -271,11 +271,8 @@ Between those PRs the table belongs to the repository owner (maniator), the
 | each floor's segment runs | `src/engine/tower/segments.ts` | revision | ported (cloned on read, #859) |
 | housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision | ported (`housekeeping_units`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1143; now reads the census below) |
 | per-kind unit counts for the build caps, floors that hold an office | none (`countKind` and the Classic escalator office check walk every unit, A24 in #1158 and #1239) | revision and unit count | `census`, `engine-rs/src/tower_index.rs` (#1264) |
-<<<<<<< HEAD
-=======
 | room units per floor, for the spawn step's picks | `unitsByFloor` in `spawnFloors`, `src/engine/crowd/spawn.ts` | one call (rebuilt every spawn step) | `floor_rooms`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count, so the step reads it instead of rebuilding it; the floor lists around it are still built on each spawn step that has room to spawn, where the TypeScript builds them on every spawn step (T2 in #1170; #1143 item 4, #1281) |
 | staff and venue floors deduped in one spawn step | `seenStaff`, `venuesByKindSet`, `src/engine/crowd/spawn.ts` | one call | ported as a bit per floor (`engine-rs/src/crowd/spawn_floors.rs`; #1143 item 4, #1281); before it the Rust searched the staff list for each staff room |
->>>>>>> origin/main
 | nearest crew and crew order per floor in one dispatch | `distByFloor`, `crewOrderByFloor`, `src/engine/economy/housekeeping.ts` | one pass | `dist_by_floor` ported; crew order missing, so the crews are cloned and sorted per room (A12 in #1158) |
 | live staff count | `crowd.staffCount`, `src/engine/Crowd.ts` | counter | ported |
 | riders per car | `crowd.carRiders`, `src/engine/Crowd.ts` | counter | ported (`car_riders`) |

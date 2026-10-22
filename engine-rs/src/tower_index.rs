@@ -31,11 +31,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-<<<<<<< HEAD
-use crate::facilities::{Kind, FACILITIES};
-=======
 use crate::facilities::{Kind, FACILITIES, MAX_FLOOR, MIN_FLOOR};
->>>>>>> origin/main
 use crate::tower::{Tower, Unit};
 
 /// What an index was built from: the tower revision and the unit count.
@@ -54,8 +50,6 @@ pub struct Census {
     pub office_floors: HashSet<i64>,
 }
 
-<<<<<<< HEAD
-=======
 /// The floors from `MIN_FLOOR` up that get a slot, and a bit in a 128-bit
 /// floor set. Every floor a tower can build fits; a floor past them takes a
 /// slower path.
@@ -124,7 +118,6 @@ impl FloorRooms {
     }
 }
 
->>>>>>> origin/main
 impl Tower {
     fn index_key(&self) -> IndexKey {
         (self.revision, self.units.len())
@@ -206,8 +199,6 @@ impl Tower {
     /// Whether `floor` has an office on it, in any state.
     pub(crate) fn has_office_on(&self, floor: i64) -> bool {
         self.census().office_floors.contains(&floor)
-<<<<<<< HEAD
-=======
     }
 
     /// The room unit ids of every floor, which each spawn step that has
@@ -223,7 +214,6 @@ impl Tower {
         let rooms = Arc::new(FloorRooms::new(&pairs));
         self.memo.borrow_mut().floor_rooms = Some((key, rooms.clone()));
         rooms
->>>>>>> origin/main
     }
 
     /// The structural tiles of `floor` in the order `pickX` lists them, or
