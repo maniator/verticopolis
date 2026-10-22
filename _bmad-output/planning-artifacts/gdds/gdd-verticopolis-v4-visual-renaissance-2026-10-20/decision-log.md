@@ -1,6 +1,6 @@
 # Decision log: Verticopolis 4.0 Visual Renaissance
 
-**GitHub tracking:** [v4.0 umbrella #1189](https://github.com/maniator/verticopolis/issues/1189), [draft planning PR #1188](https://github.com/maniator/verticopolis/pull/1188). Stage issues: [4A #1190](https://github.com/maniator/verticopolis/issues/1190), [4B #1191](https://github.com/maniator/verticopolis/issues/1191), [4C #1192](https://github.com/maniator/verticopolis/issues/1192), [4D #1193](https://github.com/maniator/verticopolis/issues/1193), [4E #1194](https://github.com/maniator/verticopolis/issues/1194), [4F #1195](https://github.com/maniator/verticopolis/issues/1195).
+**GitHub tracking:** [v4.0 umbrella #1189](https://github.com/maniator/verticopolis/issues/1189), [planning PR #1188](https://github.com/maniator/verticopolis/pull/1188). Stage issues: [4A #1190](https://github.com/maniator/verticopolis/issues/1190), [4B #1191](https://github.com/maniator/verticopolis/issues/1191), [4C #1192](https://github.com/maniator/verticopolis/issues/1192), [4D #1193](https://github.com/maniator/verticopolis/issues/1193), [4E #1194](https://github.com/maniator/verticopolis/issues/1194), [4F #1195](https://github.com/maniator/verticopolis/issues/1195).
 
 **Created:** 2026-10-20
 **Status:** initial owner direction recorded; implementation and renderer decisions pending
@@ -24,7 +24,7 @@
 - `docs/atlas.md` already specifies reproducible versioned atlases, 1x/2x/4x output, layers, animations, normals and cross-frontend distribution.
 - `src/render/excalibur/towerRegions.ts` already caches region canvases with dirty-budget updates. No blanket assertion that procedural drawing currently dominates FPS is supported.
 - `docs/design-system.md` defines existing Windows-style UI identity; refinements must be deliberate and tested.
-- `verticopolis-native` uses Godot with the Rust crate; reusable *assets and state*, rather than one renderer everywhere, is the provisional integration direction.
+- The native Godot client uses the Rust crate; reusable *assets and state*, rather than one renderer everywhere, is the provisional integration direction.
 
 ## Proposed decisions requiring evidence and owner approval
 
