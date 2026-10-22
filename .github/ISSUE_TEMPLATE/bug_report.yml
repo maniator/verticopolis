@@ -20,7 +20,7 @@ body:
     id: engine
     attributes:
       label: Engine
-      description: Which simulation engine was running? Rust/WASM is the Rust engine, which the game calls the "Rust engine" on the version line on the splash screen, in Settings and in Help (versions before 2.46.0 called it the "WASM engine"). Choose Fallback if the game said the Rust engine stopped and it runs on the TypeScript engine now.
+      description: Which simulation engine was running? Rust/WASM is the Rust engine, which the game calls the "Rust engine" on the version line on the splash screen, in Settings and in Help (versions before 2.47.0 called it the "WASM engine"). Choose Fallback if the game said the Rust engine stopped and it runs on the TypeScript engine now.
       options:
         - Not sure
         - Rust/WASM
