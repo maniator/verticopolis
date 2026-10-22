@@ -149,7 +149,7 @@ function testWasmArgs(script: string): {
   projects: string[];
 } {
   const args = script
-    .replace(/^VC_REQUIRE_WASM=1 vitest run\s+/, "")
+    .replace(/^(?:cross-env\s+)?VC_REQUIRE_WASM=1 vitest run\s+/, "")
     .split(/\s+/);
   const filters: string[] = [];
   const projects: string[] = [];
@@ -186,7 +186,7 @@ describe("the host suites run in test:wasm", () => {
   });
 
   it("requires the package and runs the plain integration project, where the handed-over suites live", () => {
-    expect(script).toMatch(/^VC_REQUIRE_WASM=1 vitest run /);
+    expect(script).toMatch(/^(?:cross-env\s+)?VC_REQUIRE_WASM=1 vitest run /);
     expect(projects).toEqual(["integration"]);
   });
 
