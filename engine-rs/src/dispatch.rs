@@ -23,10 +23,11 @@ const CLAIMED: u8 = 2;
 pub struct ElevatorDispatch {
     /// Transient per-car dwell timers.
     car_dwell: HashMap<i64, Vec<f64>>,
-    /// Waiting passengers per floor, kept in floor order so each shaft
-    /// reads its span as one range instead of hashing every stop. The range
-    /// only sets one flag per stop, so the order it visits changes no
-    /// result; every other read and write is by floor.
+    /// Waiting passengers per floor, kept in ascending floor order so the
+    /// shaft's floor lookups stay by key instead of hashing every stop. The
+    /// per-stop flag pass still walks the shaft's sorted stop list, but every
+    /// read and write remains a floor lookup (`get`/`entry`/`insert`), with
+    /// the ordering used only to keep floor-wise state consistent.
     waiting: BTreeMap<i64, f64>,
     /// The boarding tally since the last drain (#465): shaft id to origin
     /// floor to boarded count. Counting only, never read back into behavior.
