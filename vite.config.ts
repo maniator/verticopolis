@@ -60,6 +60,14 @@ function engineBuild(): EngineBuild {
 const ENGINE_BUILD = engineBuild();
 const TOOLING_BUILD = toolingBuild();
 
+/** The public assets folder for this build. The deployment harness swaps in a
+ *  salted copy under a temp directory; the same override must also drive the
+ *  shell's expected engine package so the second build checks the correct
+ *  package instead of the default `src/public` folder. */
+function publicDir(): string {
+  return process.env.VC_PUBLIC_DIR ? resolve(process.env.VC_PUBLIC_DIR) : resolve(__dirname, "src/public");
+}
+
 /**
  * Module swaps that keep engine-specific code out of a bundle that cannot use
  * it. Plain `resolve.alias` entries match an import specifier's text from any
@@ -321,7 +329,7 @@ export default defineConfig(({ command }) => ({
     // skip the check) and for a production build with no package folder at
     // all (VC_ALLOW_NO_ENGINE=1); a production build with a broken record
     // stops here.
-    __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(resolve(__dirname, "src/public"), command === "build" ? "build" : "other")),
+    __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(publicDir(), command === "build" ? "build" : "other")),
   },
   plugins: [
     captureOutDir((dir) => {
