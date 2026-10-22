@@ -55,10 +55,10 @@
 - Owner explicitly approves the example room designs **before full catalog reauthoring**.
 - Full provenance manifest for imported art, including author, license, source URL and transformed source file; if no third-party art is used, record that.
 - Rebuilds reproduce known atlas manifests and exports in the pinned build environment.
-- Art assets render correctly in the browser and the native Godot proof host. No dependency on paid art.
+- Art assets render correctly in the browser and the native Godot proof host when available, without blocking the web path. No dependency on paid art.
 - Maintain a clear boundary between asset version, save version and simulation game mode.
 
-**Dependencies:** stage 4A technical constraints and owner prototype approval. Do not replace `docs/atlas.md` without preserving existing consumers.
+**Dependencies:** stage 4A technical constraints. Owner prototype approval is a 4B completion gate and a prerequisite for 4D batch authoring, not a start gate for 4B. Do not replace `docs/atlas.md` without preserving existing consumers.
 
 ## 4C. Renderer and presentation contract rollout
 **Purpose:** implement the chosen backend while preserving interactions and performance.
@@ -90,7 +90,7 @@
 - D5. Keep visual checks across night/lit, different view positions and large-tower patterns to avoid identical rooms or geometry-seed seams.
 
 **Acceptance**
-- Every catalogued facility/state combination has a reviewed result or a documented fallback.
+- Every cataloged facility/state combination has a reviewed result or a documented fallback.
 - Rendered occupant counts match authoritative projection. No fake crowds or extra riders.
 - All new artwork is license-verified and within the $0 art budget.
 - Owner signs off major art batches; preserve visible before/after documentation.

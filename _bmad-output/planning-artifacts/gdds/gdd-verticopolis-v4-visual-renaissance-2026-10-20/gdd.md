@@ -102,7 +102,7 @@ Detailed gates and acceptance criteria: `epics.md`.
 
 ## Definition of success
 - Art prototypes judged better than current rooms by the owner at actual play zoom, and distinct from copied SimTower assets.
-- All catalogued facility/state combinations covered, including night, vacancy, construction, disasters and service cues.
+- All cataloged facility/state combinations covered, including night, vacancy, construction, disasters and service cues.
 - No divergence in gameplay conformance, save round trips or host command behavior.
 - No material regression to baseline median/low-tail frame pacing or memory on the tested hardware. Exact statistically credible pass bands agreed in 4A, before the comparison is interpreted.
 - Browser and Godot load the same versioned art vocabulary; any platform-specific divergence is explicitly documented.
