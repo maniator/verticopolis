@@ -1235,7 +1235,10 @@ mod tests {
         assert!(sim.build_transport(Kind::ElevatorStandard, 10, 1, 2).ok);
         let lift = sim.tower.transport_at(1, 10).unwrap().id;
         sim.money = 1_000_000.0;
-        let mut e = Engine { sim };
+        let mut e = Engine {
+            sim,
+            mirror: SaveMirror::default(),
+        };
         let before = e.serialize();
         e.sim.gameplay.drain();
         let refused = |text: String| -> Value {
