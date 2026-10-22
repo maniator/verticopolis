@@ -13,7 +13,7 @@ import type { WorkerHostStats } from "./workerStats";
  * write and applies it with the rest of a fresh reply.
  */
 
-const now = (): number => (globalThis.performance ? performance.now() : Date.now());
+const now = (): number => performance.now();
 
 export type SaveSync =
   | { kind: "merge"; parsed: ParsedMerge; sync: number; parseMs: number }

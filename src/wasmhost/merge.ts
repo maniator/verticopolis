@@ -116,7 +116,7 @@ function adoptSimulationFields(target: Simulation, fresh: Simulation, keepUnitSe
   target.clock.minutes = fresh.clock.minutes;
   // Set the billed rooms outright as well, so a fresh instance without the
   // key still clears a list whose treatment the engine landed.
-  target.exterminationRoomIds = fresh.exterminationRoomIds;
+  target.exterminationRoomIds = fresh.exterminationRoomIds && [...fresh.exterminationRoomIds];
   target.events.loadState(fresh.events.saveState());
   target.economy.restoreBlockbusters(fresh.economy.blockbusterIds);
 }

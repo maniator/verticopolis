@@ -298,6 +298,7 @@ function wasmParityProjects() {
 
 export default defineConfig(({ command }) => ({
   root: "src",
+  publicDir: publicDir(),
   resolve: { alias: engineAliases(command) },
   base: "./",
   // Compile-time app version, shown on the splash. (package.json isn't importable
