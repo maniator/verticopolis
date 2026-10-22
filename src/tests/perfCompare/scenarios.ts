@@ -6,12 +6,14 @@ import { FACILITIES } from "../../engine/facilities";
 import type { SerializedGame } from "../../engine/serializedGame";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { buildWinningTower } from "../fixtures/winningTower";
+import { buildHotelTower } from "./fixtureHotelTower";
 import { buildBracketTower, buildManyUnitTower } from "./fixtureTowers";
 
-/** Every tower the harnesses can run, in order of size. A run with no
+/** Every tower the harnesses can run, small to large by people with the
+ *  special-purpose towers after them. A run with no
  *  `--scenarios` takes the first three kinds only (`DEFAULT_SCENARIOS`); the
- *  bracket towers and the many-unit tower (issue #1270) are named on purpose. */
-export const SCENARIO_NAMES = ["small", "bracket-a", "bracket-b", "medium", "large", "many-unit"] as const;
+ *  bracket towers, the many-unit tower (issue #1270) and the hotel-heavy tower (#1279) are named on purpose. */
+export const SCENARIO_NAMES = ["small", "bracket-a", "bracket-b", "medium", "large", "many-unit", "hotel-heavy"] as const;
 export type ScenarioName = (typeof SCENARIO_NAMES)[number];
 export const DEFAULT_SCENARIOS: readonly ScenarioName[] = ["small", "medium", "large"];
 
@@ -115,6 +117,7 @@ const BUILDERS: Record<ScenarioName, () => Scenario> = {
   medium: () => describeSave("medium", "player fixture conformance/fixtures/sixseven_2.vctower", loadFixtureSave("conformance/fixtures/sixseven_2.vctower")),
   large: () => describeSave("large", "Tier-1 win tower (src/tests/fixtures/winningTower.ts)", buildLargeTower().serialize()),
   "many-unit": () => describeSave("many-unit", "many units, few people: the large tower's shell with about 500 people (fixtureTowers: buildManyUnitTower)", buildManyUnitTower({ seed: 13, population: 500 }).serialize()),
+  "hotel-heavy": () => describeSave("hotel-heavy", "Modern hotel tower: 852 rooms, 24 housekeeping units, a split staff network and a wing no crew can route to (fixtureHotelTower: buildHotelTower)", buildHotelTower({ seed: 21, floors: 62, crews: 24 }).serialize()),
 };
 
 /** The names that are not a tower the harnesses can run. */

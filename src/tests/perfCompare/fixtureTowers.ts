@@ -25,7 +25,7 @@ import type { FacilityKind, Unit } from "../../engine/types";
  * the tests bound the resulting people and units.
  */
 
-const must = (label: string, r: { ok: boolean; reason?: string }): void => {
+export const must = (label: string, r: { ok: boolean; reason?: string }): void => {
   if (!r.ok) throw new Error(`${label} refused: ${r.reason}`);
 };
 
