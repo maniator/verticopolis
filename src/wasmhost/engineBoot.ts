@@ -57,12 +57,9 @@ export interface EngineBootFailure {
   message: string;
   /** Set when the byte check refused the package. */
   package?: PackageFailure;
-<<<<<<< HEAD
-=======
   /** Set for a cause with no code of its own in the closed list, so the
    *  screen can word it without reading `message`. */
   cause?: "no-save-writer";
->>>>>>> origin/main
 }
 
 /** A boot failure that already knows its code: the load's time limit, a
