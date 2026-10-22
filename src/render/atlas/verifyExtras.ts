@@ -1,5 +1,6 @@
 import { FACILITIES } from "../../engine/facilities";
-import type { FacilityKind, Transport, Unit } from "../../engine/types";
+import type { FacilityKind } from "../../engine/types";
+import type { UnitView, TransportView } from "../../simport/view";
 import { SHIRTS, personFigure } from "../pixelSprites/common";
 import { FLOOR, TILE } from "../scale";
 import { drawCar, drawEscapeStairs, drawLobbyEntrance, drawTransport, drawUnit } from "../sprites";
@@ -36,8 +37,8 @@ function read(ctx: CanvasRenderingContext2D, w: number, h: number): Image {
 }
 
 /** A structural tile as the game bakes it (`towerScene.fakeStruct`). */
-function struct(kind: "floor" | "lobby", floor: number, x: number): Unit {
-  return { id: -1, kind, floor, x, width: 1, state: "occupied", satisfaction: 1, occupants: 0, everOccupied: false, pendingIncome: 0, label: "" };
+function struct(kind: "floor" | "lobby", floor: number, x: number): UnitView {
+  return { id: -1, kind, floor, x, width: 1, state: "occupied", occupants: 0, label: "" };
 }
 
 interface Case {
@@ -68,7 +69,7 @@ function shaftCase(kind: FacilityKind, skip: number[], pieces: string[], tiles =
     },
     game: (doc) => {
       const ctx = canvas(doc, w, floors * FLOOR);
-      const t: Transport = { id: 1, kind, x: 0, width: w / TILE, bottom: 1, top: floors, cars: 1, carPositions: [1], carDir: [0], load: 0, skipFloors: skip };
+      const t: TransportView = { id: 1, kind, x: 0, width: w / TILE, bottom: 1, top: floors, cars: 1, carPositions: [1], carDir: [0], skipFloors: skip };
       drawTransport(ctx, t, 0, 0, w, FLOOR);
       return read(ctx, w, floors * FLOOR);
     },
@@ -112,7 +113,7 @@ export function extraCases(): Case[] {
       game: (doc) => {
         const w = 4 * TILE;
         const ctx = canvas(doc, w, 2 * FLOOR);
-        const t: Transport = { id: 1, kind, x: 0, width: 4, bottom: 1, top: 2, cars: 0, carPositions: [], carDir: [], load: 0, skipFloors: [] };
+        const t: TransportView = { id: 1, kind, x: 0, width: 4, bottom: 1, top: 2, cars: 0, carPositions: [], carDir: [], skipFloors: [] };
         drawTransport(ctx, t, 0, 0, w, FLOOR);
         return read(ctx, w, 2 * FLOOR);
       },
