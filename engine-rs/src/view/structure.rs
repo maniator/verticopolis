@@ -115,9 +115,9 @@ fn tile_runs(tower: &Tower) -> Vec<Run> {
         }
         runs.push(Run::start(u));
     }
-    let ordered = runs
-        .windows(2)
-        .all(|w| (w[0].floor, w[0].x) < (w[1].floor, w[1].x));
+    let ordered = runs.windows(2).all(|w| {
+        (w[0].floor, w[0].x) < (w[1].floor, w[1].x) && !w[0].continues_with(&w[1])
+    });
     if ordered {
         return runs;
     }
