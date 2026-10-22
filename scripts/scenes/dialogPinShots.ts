@@ -97,6 +97,7 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
     setup: async (page) => {
       await page.evaluate(() => document.getElementById("btn-settings")?.click());
       await page.waitForSelector("#modal #vol-music", { timeout: 4000 });
+      await page.evaluate(assertSettingsContentVisible);
       await page.evaluate(() => {
         const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
         const strip = document.querySelector("#modal .modal-box > .modal-actions") as HTMLElement | null;
@@ -108,23 +109,6 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
         const left = box.scrollHeight - box.clientHeight - box.scrollTop;
         if (left <= strip.offsetHeight) throw new Error("Settings did not overflow enough for the pin to be doing anything");
         if (strip.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1) throw new Error("the Settings footer is not pinned; this shot would prove nothing");
-        const visible = [...document.querySelectorAll<HTMLElement>(
-          "#modal .modal-box h3, #modal .modal-box .set-engine, #modal .modal-box .set-engine-status, #modal .modal-box .modal-actions, #modal .modal-box .set-version",
-        )].filter((el) => {
-          const rect = el.getBoundingClientRect();
-          return rect.bottom > box.getBoundingClientRect().top + 1 && rect.top < box.getBoundingClientRect().bottom - 1;
-        });
-        const r = box.getBoundingClientRect();
-        const clipped = visible.find((el) => {
-          const rect = el.getBoundingClientRect();
-          return rect.top < r.top - 1 || rect.bottom > r.bottom + 1;
-        });
-        if (clipped) {
-          const rect = clipped.getBoundingClientRect();
-          throw new Error(
-            `Settings content clipped by the modal scrollport: ${clipped.tagName}.${clipped.className || ""} (top=${rect.top.toFixed(1)}, bottom=${rect.bottom.toFixed(1)}, box=${r.top.toFixed(1)}..${r.bottom.toFixed(1)})`,
-          );
-        }
       });
     },
     wait: 300,
