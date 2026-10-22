@@ -370,7 +370,7 @@ describe("bootGame engine_status", () => {
     await boot();
     expect(await SaveGame.export(new Simulation(1))).toBe("VCTOWER1\nZW5naW5l\n");
     // A load traps as it attaches; the host sets its status, then reports.
-    Object.assign(status, { hosted: false, latched: true, lastError: `not hosting this tower or any later one, since the Rust engine trapped: ${secret}` });
+    Object.assign(status, { hosted: false, latched: true, lastError: `not hosting this tower or any later one, since the WASM engine trapped: ${secret}` });
     opts?.onFallback?.({ reason: "attach-refused", stage: "adopt" }, true);
     expect(bootState()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "host", reason: "attach-refused", message: status.lastError } });
     expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
@@ -381,7 +381,7 @@ describe("bootGame engine_status", () => {
 
   it("never installs the engine writer when the first tower's attach trapped (#1113)", async () => {
     const encodeVctower = requestWasm();
-    const lastError = `not hosting this tower or any later one, since the Rust engine trapped: ${secret}`;
+    const lastError = `not hosting this tower or any later one, since the WASM engine trapped: ${secret}`;
     vi.mocked(startWasmHost).mockImplementationOnce((_app, _mod, _log, o) => {
       o?.onFallback?.({ reason: "attach-refused", stage: "start" }, true);
       return { status: { engine: "wasm", starts: 0, hosted: false, fallbacks: 1, lastFallback: { reason: "attach-refused", stage: "start" }, latched: true, restorePoint: null, errors: [lastError], lastError, droppedErrors: 0 }, current: () => null, stop: () => {} };

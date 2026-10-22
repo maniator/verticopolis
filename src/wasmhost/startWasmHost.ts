@@ -374,7 +374,7 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
   // code stays `attach-refused`: a new one needs the owner's production OK.
   const latch = (trap: unknown, stage: FallbackStage) => {
     faulted = true;
-    fallBack(`not hosting this tower or any later one, since the Rust engine trapped: ${trap instanceof Error ? trap.message : String(trap)}`, "attach-refused", stage, true);
+    fallBack(`not hosting this tower or any later one, since the WASM engine trapped: ${trap instanceof Error ? trap.message : String(trap)}`, "attach-refused", stage, true);
   };
   const follow = (sim: Simulation, stage: FallbackStage) => {
     release();
