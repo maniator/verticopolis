@@ -50,7 +50,7 @@ approves an exception.
   - **Number form (the binding's `serialize()` text only).** It prints an
     integer-valued double with a trailing `.0` (`"money":13551601.0` where
     TypeScript writes `13551601`): 634 to 1,474 numbers per fixture, text
-    0.2% to 0.4% longer. The `.vctower` writer re-prints numbers the
+    0.3% to 1% longer (0.27% to 0.95% measured). The `.vctower` writer re-prints numbers the
     JavaScript way (`js_json`), so a written file has the same numbers and
     the same length as the TypeScript writer's.
   - **Key order inside a transport (files and text).** TypeScript writes a

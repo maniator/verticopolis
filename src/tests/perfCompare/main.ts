@@ -12,7 +12,8 @@ import { measureChurn } from "./churn";
 import { checkScenario, loadWebPackage } from "./nodeCheck";
 import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
 import { engineOrder, runProcess } from "./runner";
-import { buildScenarios } from "./scenarios";
+import { autosaveSeed, checkAutosaveSeeds } from "./savedStart";
+import { SCENARIO_NAMES, buildScenarios, unknownScenarios } from "./scenarios";
 import { startServer } from "./server";
 import type { CompareConfig, CompareResults, EngineName, ProcessRun } from "./types";
 import type { Environment as Env } from "./env";
@@ -140,9 +141,9 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   }
   for (const d of [dist, distPerf]) if (!existsSync(join(d, "index.html"))) throw new Error(`no build at ${d}; run without --skip-build`);
 
-  const all = buildScenarios();
-  const scenarios = args.scenarios ? all.filter((s) => args.scenarios!.includes(s.name)) : all;
-  if (args.scenarios && scenarios.length !== args.scenarios.length) throw new Error(`unknown scenario in ${args.scenarios.join(",")}; expected ${all.map((s) => s.name).join(",")}`);
+  const unknown = unknownScenarios(args.scenarios ?? []);
+  if (unknown.length) throw new Error(`unknown scenario ${unknown.join(",")}; expected ${SCENARIO_NAMES.join(",")}`);
+  const scenarios = buildScenarios(args.scenarios);
   const config = makeConfig(args, scenarios.map((s) => s.name));
   const sourceHash = existsSync(join(repo, "engine-rs/src")) ? engineSourceHash(join(repo, "engine-rs")) : null;
   const environment = collectEnvironment(repo, distPerf, sourceHash);
@@ -199,6 +200,9 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   // of TypeScript has nothing to add and an A/A pass of WASM repeats it.
   const churn = scenarios.map((sc) => measureChurn(mod, sc, Math.max(1, Math.floor((config.steps * config.dt) / 60)), config.dt, config.warmSteps));
   for (const c of churn) log(`  ${c.scenario}: hourly save churn median ${(c.medianShare * 100).toFixed(1)}%, p95 ${(c.p95Share * 100).toFixed(1)}% of ${c.saveChars} characters`);
+  // The saved-tower starts' seeds, packed and read back before any browser runs (#1254).
+  checkAutosaveSeeds(scenarios);
+  log(`perf:compare: each scenario's autosave seed loads back as its tower (${scenarios.map((s) => `${s.name} ${autosaveSeed(s).sha256.slice(0, 12)}`).join(", ")})`);
 
   const server = await startServer(distPerf);
   let browserVersion: string | null = runs.find((r) => r.browserVersion)?.browserVersion ?? null;

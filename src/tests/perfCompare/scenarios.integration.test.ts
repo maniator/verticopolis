@@ -39,4 +39,16 @@ describe("the comparison's scenarios", () => {
       expect(c.match, `${sc.name} engines agree`).toBe(true);
     }
   }, 120_000);
+
+  // The #1270 towers start from the same bytes on both engines and stay
+  // together: the bracket towers, and the many-unit tower whose cost is units.
+  it.skipIf(!hasPkg && !wasmRequired())("run identically on both engines for the bracket, many-unit and hotel-heavy towers", async () => {
+    const mod = await loadWebPackage(PKG);
+    for (const sc of buildScenarios(["bracket-a", "bracket-b", "many-unit", "hotel-heavy"])) {
+      const c = checkScenario(mod, sc, 60, 2, 5);
+      expect(c.start.tsState).toBe(c.start.wasmState);
+      expect(c.end.tsCrowd).toBe(c.end.wasmCrowd);
+      expect(c.match, `${sc.name} engines agree`).toBe(true);
+    }
+  }, 240_000);
 });

@@ -272,9 +272,13 @@ Between those PRs the table belongs to the repository owner (maniator), the
 | live staff count | `crowd.staffCount`, `src/engine/Crowd.ts` | counter | ported |
 | riders per car | `crowd.carRiders`, `src/engine/Crowd.ts` | counter | ported (`car_riders`) |
 | noise verdicts | `noiseMemo`, `src/engine/sim/satisfaction.ts` | revision | ported (`noise_memo`, `engine-rs/src/noise.rs`; #1139) |
-| served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported (cloned on read, #859) |
+| served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported; `is_floor_served` reads the served set in place (#1237), `served_floors` and the staff components are still cloned on read (#859) |
 | stops, transport columns | `stopsCache` on `Tower`, `src/engine/tower/transport.ts` | revision | ported (cloned on read, #859) |
+<<<<<<< HEAD
 | built floor bounds | `floorBounds`, `src/engine/Tower.ts` | revision | missing in the tower (A11 in #1158); the inspector's top-floor read has its own memo (`diag_memo`, `engine-rs/src/diagnostics/memo.rs`, keyed on revision and unit count; #1255) |
+=======
+| built floor bounds | `floorBounds`, `src/engine/Tower.ts` | revision | ported (`floor_bounds`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1237) |
+>>>>>>> origin/main
 | passenger and staff routing graphs | `adjacency`, `staffAdjacency`, `src/engine/crowd/routing.ts` | revision | ported |
 | shaft banks | `src/engine/crowd/shaftBanks.ts` | revision | ported |
 | segments served | `segServed`, `src/engine/crowd/segmentGraph.ts` | revision | ported (`connected_set`) |

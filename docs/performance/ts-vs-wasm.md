@@ -317,6 +317,17 @@ Two startup rows in `report.md` need care:
 
 The load-step probe is tracked as `perf-compare-startup-rows` (#1005).
 
+Later runs of the harness also split each start where boot first publishes its
+engine state, which both engines do just before the app is created. `engine
+loaded` is that moment (on WASM, the end of the package load) and `loaded to
+ready` the rest: the app's creation, plus the host attach on WASM. They also
+time a cold start at 1x with each scenario's save in the autosave slot, so the
+boot loads that tower behind the title screen. Those starts run last in each
+process, in a browser that everything before them has warmed, so compare them
+across engines and never against the cold start. The report prints all of
+these and the warm start with M5's paired difference under "Reported, not
+gates". They belong to the cold-start work in #1254.
+
 ### Memory and save load
 
 At 1x, after loading the save and two in-game hours, then a forced GC:

@@ -1,15 +1,16 @@
 import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
 import { processTreePss } from "./env";
-import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, wasmColdLoad, wasmMemoryBytes, watchContextLoss, webglRenderer, type PageInfo } from "./page";
+import { adoptScenario, cpuProbe, digestStashed, installEngineBootProbe, installProbes, pageInfo, prepareLiveApp, stashSave, wasmColdLoad, wasmMemoryBytes, watchContextLoss, webglRenderer, type PageInfo } from "./page";
 import { trackContextLoss } from "./contextLoss";
 import { audioStatus, measureFrames, startAudio, type FrameRun } from "./pageFrames";
 import { simRun, type SimRun } from "./pageSim";
 import type { PerfServer, ServedRequest } from "./server";
 import { launchOptions, type BrowserLaunch } from "./renderer";
+import { autosaveSeed, autosaveState, bootedTower } from "./savedStart";
 import { eachScenarioFresh } from "./scenarioPages";
 import type { Scenario } from "./scenarios";
 import { frameStats, quantile } from "./stats";
-import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun, StartupSample, StepSummary } from "./types";
+import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun, SavedStart, StartupSample, StepSummary } from "./types";
 
 /**
  * One repetition of one engine in a fresh browser process (issue #972):
@@ -26,7 +27,9 @@ import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun
  * 6. a cold start under the heaviest throttle in a second fresh context,
  *    with a CPU probe showing the throttle held;
  * 7. a first visit with the service worker allowed, then an offline reload
- *    (a side measurement that cannot fail the repetition).
+ *    (a side measurement that cannot fail the repetition);
+ * 8. per scenario, a cold start at 1x with its save in the autosave slot,
+ *    each in a fresh context (auxiliary like 7, #1254).
  * The requested engine is re-checked after every sample.
  */
 
@@ -74,6 +77,7 @@ export function startupSample(info: PageInfo, servedBeforeReady: ServedRequest[]
     glueFetchMs: resourceMs(info, "/engine/verticopolis_engine.js"),
     wasmInstantiateMs: instantiated ? m.wasmInstantiateEnd - m.wasmInstantiateStart : null,
     wasmInstantiateVia: via[m.wasmInstantiateVia as 1 | 2] ?? null,
+    engineLoadedMs: m.engineLoaded ?? null,
     servedBeforeReady,
     servedAfterReady,
   };
@@ -141,14 +145,15 @@ async function throttle(cdp: CDPSession, rate: number): Promise<void> {
   await cdp.send("Emulation.setCPUThrottlingRate", { rate });
 }
 
-async function newContext(browser: Browser, config: CompareConfig, serviceWorkers: "allow" | "block", onLoss: (line: string) => void): Promise<BrowserContext> {
-  const ctx = await browser.newContext({ viewport: config.viewport, deviceScaleFactor: 1, serviceWorkers });
+async function newContext(browser: Browser, config: CompareConfig, serviceWorkers: "allow" | "block", onLoss: (line: string) => void, storageState?: ReturnType<typeof autosaveState>): Promise<BrowserContext> {
+  const ctx = await browser.newContext({ viewport: config.viewport, deviceScaleFactor: 1, serviceWorkers, ...(storageState ? { storageState } : {}) });
   // tsx compiles this harness with esbuild's keepNames, which wraps inner
   // functions in a `__name(fn, "name")` helper. The functions Playwright
   // serializes into the page carry those calls but not the helper, so the
   // page gets an identity stand-in before anything else runs.
   await ctx.addInitScript({ content: "globalThis.__name = (fn) => fn;" });
   await ctx.addInitScript(installProbes);
+  await ctx.addInitScript(installEngineBootProbe);
   await ctx.addInitScript(watchContextLoss);
   await trackContextLoss(ctx, onLoss);
   return ctx;
@@ -375,8 +380,8 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     log(`  rep ${rep} ${slot}: FAILED: ${run.error}`);
   }
   // Auxiliary, after the measurements are final: a first visit with the
-  // service worker allowed, then an offline reload. Nothing in it can mark
-  // the repetition failed.
+  // service worker allowed, then an offline reload, then the saved-tower
+  // starts. Nothing in them can mark the repetition failed.
   if (run.ok && browser) {
     run.firstVisitWithServiceWorker = await firstVisit(browser, config, server, url, listen, sink).catch((e: unknown) => ({
       served: [],
@@ -388,9 +393,53 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
       error: e instanceof Error ? e.message : String(e),
     }));
     sink.side = null;
+    run.coldSaved = await savedStarts(browser, opts, url, engine, run.page?.webgl?.renderer ?? null, listen, sink);
+    for (const [name, r] of Object.entries(run.coldSaved)) log(`  rep ${rep} ${slot} ${name} saved tower: ${r.sample ? `cold ready ${r.sample.gameReadyMs?.toFixed(0)} ms` : `no sample (${r.error})`}`);
   }
   await browser?.close().catch(() => {});
   return run;
+}
+
+/** The cold starts with a saved tower (#1254), auxiliary like the first
+ *  visit and run after it, so nothing measured before them changes: per
+ *  scenario, a fresh context (fresh HTTP cache, this process) at 1x whose
+ *  autosave slot holds the scenario's save. A failed check leaves that
+ *  scenario's row without a sample from this repetition and fails nothing. */
+async function savedStarts(browser: Browser, opts: RunnerOptions, url: string, engine: EngineName, startRenderer: string | null, listen: (p: Page) => void, sink: { side: string[] | null }): Promise<Record<string, SavedStart>> {
+  const out: Record<string, SavedStart> = {};
+  for (const sc of opts.scenarios) {
+    const row: SavedStart = { sample: null, error: null, seedSha256: "", renderer: null, pageErrors: [], contextLost: [] };
+    let ctx: BrowserContext | null = null;
+    let sample: StartupSample | null = null;
+    sink.side = row.pageErrors;
+    try {
+      const seed = autosaveSeed(sc);
+      row.seedSha256 = seed.sha256;
+      ctx = await newContext(browser, opts.config, "block", (line) => row.contextLost.push(line), autosaveState(opts.server.url, seed));
+      const page = await ctx.newPage();
+      listen(page);
+      const s = await within("saved-tower start", startup(page, opts.server, () => page.goto(url, { waitUntil: "commit" })), 5 * 60_000);
+      if (s.sample.engineActive !== engine) throw new Error(`requested the ${engine} engine but ${s.sample.engineActive} is active`);
+      if (engine === "wasm" && !(s.sample.engineHostedMs !== null && s.sample.gameReadyMs !== null && s.sample.engineHostedMs <= s.sample.gameReadyMs)) throw new Error(`the engine was not hosted by the time the game was ready (hosted ${s.sample.engineHostedMs ?? "never"}, ready ${s.sample.gameReadyMs ?? "never"})`);
+      // The boot must have loaded the seeded tower, or the row times an empty one.
+      const tower = await within("saved tower", page.evaluate(bootedTower), 60_000);
+      if (!tower.loaded || tower.corrupt || tower.population !== sc.population) throw new Error(`the boot did not load the seeded tower (readable save ${tower.loaded}, corrupt ${tower.corrupt}, population ${tower.population}, the save's ${sc.population})`);
+      row.renderer = (await within("renderer after the saved start", page.evaluate(webglRenderer), 60_000))?.renderer ?? null;
+      if (row.renderer !== startRenderer) throw new Error(`the WebGL renderer changed from ${startRenderer ?? "none"} to ${row.renderer ?? "none"}`);
+      sample = s.sample;
+    } catch (e) {
+      row.error = e instanceof Error ? e.message : String(e);
+    } finally {
+      await ctx?.close().catch(() => {});
+      sink.side = null;
+    }
+    const fatal = row.pageErrors.find((e) => /\[wasm\]|\[tick\]/.test(e));
+    if (!row.error && row.contextLost.length) row.error = `a WebGL context was lost: ${row.contextLost[0]}`;
+    if (!row.error && fatal) row.error = `engine or frame errors in the page: ${fatal}`;
+    if (!row.error) row.sample = sample;
+    out[sc.name] = row;
+  }
+  return out;
 }
 
 async function firstVisit(browser: Browser, config: CompareConfig, server: PerfServer, url: string, listen: (p: Page) => void, sink: { side: string[] | null }): Promise<NonNullable<ProcessRun["firstVisitWithServiceWorker"]>> {
