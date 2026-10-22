@@ -32,16 +32,13 @@ import { type Shot } from "../screenshot-env.ts";
 export function assertSettingsContentVisible(): void {
   const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
   if (!box) throw new Error("the Settings dialog did not mount");
-  const headings = [...document.querySelectorAll<HTMLElement>("#modal .modal-box h3")].filter(
-    (heading) => heading.nextElementSibling?.classList.contains("set-engine"),
-  );
-  const visible = [
-    ...headings,
-    ...document.querySelectorAll<HTMLElement>(
-      "#modal .modal-box .set-engine, #modal .modal-box .set-engine-status, #modal .modal-box .modal-actions, #modal .modal-box .set-version",
-    ),
-  ];
   const boxRect = box.getBoundingClientRect();
+  const visible = [...document.querySelectorAll<HTMLElement>(
+    "#modal .modal-box h3, #modal .modal-box .set-engine, #modal .modal-box .set-engine-status, #modal .modal-box .modal-actions, #modal .modal-box .set-version",
+  )].filter((el) => {
+    const rect = el.getBoundingClientRect();
+    return rect.bottom > boxRect.top + 1 && rect.top < boxRect.bottom - 1;
+  });
   const clipped = visible.filter((el) => {
     const rect = el.getBoundingClientRect();
     return rect.top < boxRect.top - 1 || rect.bottom > boxRect.bottom + 1;
@@ -112,8 +109,11 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
         if (left <= strip.offsetHeight) throw new Error("Settings did not overflow enough for the pin to be doing anything");
         if (strip.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1) throw new Error("the Settings footer is not pinned; this shot would prove nothing");
         const visible = [...document.querySelectorAll<HTMLElement>(
-          "#modal .modal-box h2, #modal .modal-box h3, #modal .modal-box .set-row, #modal .modal-box .set-engine, #modal .modal-box .set-engine-status, #modal .modal-box .modal-actions, #modal .modal-box .set-version",
-        )];
+          "#modal .modal-box h3, #modal .modal-box .set-engine, #modal .modal-box .set-engine-status, #modal .modal-box .modal-actions, #modal .modal-box .set-version",
+        )].filter((el) => {
+          const rect = el.getBoundingClientRect();
+          return rect.bottom > box.getBoundingClientRect().top + 1 && rect.top < box.getBoundingClientRect().bottom - 1;
+        });
         const r = box.getBoundingClientRect();
         const clipped = visible.find((el) => {
           const rect = el.getBoundingClientRect();

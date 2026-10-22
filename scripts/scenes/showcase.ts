@@ -90,10 +90,13 @@ export const SHOWCASE_SCENES: Scene[] = [
           await page.evaluate(() => {
             const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
             if (!box) throw new Error("the Settings dialog did not mount");
-            const visible = [...document.querySelectorAll<HTMLElement>(
-              "#modal .modal-box h2, #modal .modal-box h3, #modal .modal-box .set-row, #modal .modal-box .set-engine, #modal .modal-box .set-engine-status, #modal .modal-box .modal-actions, #modal .modal-box .set-version",
-            )];
             const rect = box.getBoundingClientRect();
+            const visible = [...document.querySelectorAll<HTMLElement>(
+              "#modal .modal-box h3, #modal .modal-box .set-engine, #modal .modal-box .set-engine-status, #modal .modal-box .modal-actions, #modal .modal-box .set-version",
+            )].filter((el) => {
+              const e = el.getBoundingClientRect();
+              return e.bottom > rect.top + 1 && e.top < rect.bottom - 1;
+            });
             const clipped = visible.find((el) => {
               const e = el.getBoundingClientRect();
               return e.top < rect.top - 1 || e.bottom > rect.bottom + 1;
