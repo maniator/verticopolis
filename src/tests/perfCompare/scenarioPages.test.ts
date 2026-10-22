@@ -28,17 +28,26 @@ describe("eachScenarioFresh", () => {
 });
 
 describe("the perf:compare runner", () => {
-  const source = readFileSync(join(__dirname, "runner.ts"), "utf8");
+  const source = readFileSync(join(__dirname, "runner.ts"), "utf8").replace(/\r\n/g, "\n");
 
   it("measures each scenario through eachScenarioFresh, in the timed passes and in each frames block", () => {
     expect(source.match(/await eachScenarioFresh\(/g)).toHaveLength(2);
-    // The timed and frames loops are the helper's, so no bare loop over the scenarios is left (the memory pass loops over opts.scenarios, each in its own fresh page).
+    // The timed and frames loops are the helper's, so no bare loop over the scenarios is left (the memory pass and the saved-tower starts loop over opts.scenarios, each in its own fresh page or context).
     expect(source).not.toMatch(/for \(const sc of scenarios\)/);
     // Each use opens a fresh page for the scenario.
     expect(source).toMatch(/eachScenarioFresh\(scenarios, \(sc\) => freshPage\(page, engine, `\$\{sc\.name\} timed passes boot`\)/);
     expect(source).toMatch(/eachScenarioFresh\(scenarios, \(sc\) => freshPage\(page, engine, `\$\{sc\.name\} frames \(audio \$\{block\}\) boot`\)/);
     // One page boot for all scenarios is the pattern that biased the second tower.
     expect(source).not.toMatch(/"timed passes boot"/);
+  });
+
+  it("gives each saved-tower start a fresh context, seeded at creation and closed whatever happens (#1254)", () => {
+    const body = source.slice(source.indexOf("async function savedStarts("), source.indexOf("async function firstVisit("));
+    expect(body).toMatch(/for \(const sc of opts\.scenarios\) \{[\s\S]*ctx = await newContext\(browser, opts\.config, "block", \(line\) => row\.contextLost\.push\(line\), autosaveState\(opts\.server\.url, seed\)\);/);
+    expect(body).toMatch(/\} finally \{\n\s*await ctx\?\.close\(\)/);
+    // It runs after the first visit, outside the repetition's try, so it cannot fail the repetition.
+    expect(source.indexOf("run.coldSaved = await savedStarts(")).toBeGreaterThan(source.indexOf("run.firstVisitWithServiceWorker = await firstVisit("));
+    expect(source.indexOf("run.coldSaved = await savedStarts(")).toBeGreaterThan(source.indexOf("    run.ok = true;\n  } catch (e) {"));
   });
 
   it("stashes the cold load's scenario in the page it runs in, which is the last scenario's fresh page", () => {

@@ -68,11 +68,11 @@ export interface WasmHostStatus extends HostErrors {
    *  engine faulted (#874), or the engine trapped while a tower attached
    *  (#1113), so the module may be corrupt and no later tower is hosted. */
   latched: boolean;
-  /** The restore point the latest recovery loaded, and how many newer
-   *  points failed to load before it (#1126); null until one loads. Set
-   *  once the point loads, so a swap to it that then fails still shows it
-   *  (the failure is in `lastError`). Temporary, with the re-adoption on
-   *  TypeScript. */
+  /** The restore point the latest recovery loaded, or an undo's or a redo's
+   *  own snapshot of the faulted tower held, with how many newer points
+   *  failed to load first (#1126); null until then. Set as the point loads,
+   *  so a failed swap to it still shows it (the failure is in `lastError`).
+   *  Temporary, with the re-adoption on TypeScript. */
   restorePoint: RestoredPoint | null;
 }
 
@@ -102,9 +102,9 @@ export interface WasmHostApp {
    *  that edit away, so the tidy can put them back. Temporary, with the
    *  re-adoption on TypeScript. */
   holdClearedRedo?(on: boolean): void;
-  /** Drop the whole undo trail: after a recovery from an older point its
-   *  newest steps are later than the tower, and may not load (#1126).
-   *  Temporary, with the re-adoption on TypeScript. */
+  /** Drop the whole undo trail: after a recovery from an older point, or an
+   *  undo's or a redo's snapshot of one, it holds steps the tower does not
+   *  match (#1126). Temporary, with the re-adoption on TypeScript. */
   clearUndo?(): void;
 }
 
@@ -251,7 +251,8 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
   const LOST = "The WASM engine stopped, so some of your recent changes were lost. The game runs on the TypeScript engine now.";
   const STUCK = "The WASM engine stopped, and the tower could not go back to a good state. Load a save or start a new tower to keep playing.";
   const SWAP_FAILED = "The WASM engine stopped, and the tower could not switch to the TypeScript engine, so it is frozen and changes to it are not saved. Load a save or start a new tower to keep playing.";
-  const OLDER = "The WASM engine stopped, so the tower went back to an earlier good state. Your changes since then were undone and the undo history was cleared. The tower runs on the TypeScript engine now.";
+  const CLEARED = "The WASM engine stopped, so the undo history was cleared. The game runs on the TypeScript engine now.";
+  const OLDER = "The WASM engine stopped, so the tower went back to an earlier good state and anything since then was undone. The undo history was cleared, and the tower runs on the TypeScript engine now.";
   const RESTORED = "The WASM engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.";
   const UNDONE = "The WASM engine stopped, so the tower went back to its last good state and your recent changes were undone. It runs on the TypeScript engine now.";
   const say = (sim: Simulation, line: string) => {
@@ -296,9 +297,18 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     // so there is nothing to restore; the player still hears why. After an
     // undo or a redo, the line also says changes were lost when commands ran
     // after the newest point or the trail lost steps (an undo's own snapshot
-    // read that point). A load or a new game let the old tower's changes go
-    // itself, so the line does not blame the engine for them.
+    // read that point), and the trail is cleared when that snapshot went past
+    // it (#1126): the step it made holds an older tower. A load or a new game
+    // let the old tower's changes go itself, so the line does not blame the
+    // engine for them.
     if (app.sim !== sim) {
+      const answered = keptHistory ? h.answered : null;
+      if (answered) status.restorePoint = { ...answered };
+      if (answered && answered.skipped > 0) {
+        clearHistory();
+        say(app.sim, CLEARED);
+        return;
+      }
       const dropped = tidyHistory();
       say(app.sim, keptHistory && (h.lostEdits > 0 || dropped > 0) ? LOST : REPLACED);
       return;

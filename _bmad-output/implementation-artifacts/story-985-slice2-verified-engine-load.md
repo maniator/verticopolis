@@ -107,7 +107,36 @@ retirement story.
 
 ## Out of scope for 2a
 
-Failure copy, Copy Diagnostics, Repair, cache-key rotation, the
-the respawn latch, eviction, install-race and first-install specs, the load
+Failure copy (slice 2b-1), Repair, cache-key rotation, the
+respawn latch, eviction, install-race and first-install specs, the load
 measurement, Safari and Firefox passes (a merge condition for the wasm-only
 flip, design section 11).
+
+## Slice 2b plan (2026-10-21)
+
+Slice 2b is split into four small PRs so each gets its own review:
+
+1. **2b-1, failure screens.** `engineFailureCopy` gives each load cause its own
+   sentence (design 5.4): `mismatch` with the package ids it knows (an
+   "unavailable" label for the rest, and the file that differs when both sides
+   name the same package), `load-failed` (with a corrected-deployment sentence
+   when the build carries no package, and no "connect to the internet" for an
+   online player), `timeout`, `unverifiable` (HTTPS on an insecure connection,
+   a plain retry on a secure one) and the missing save writer, which carries a
+   `cause` of its own. The sentence comes from the code, the cause and the
+   package detail. Every failure at the load stage has one; a start or host
+   failure keeps its message. Copy Diagnostics already renders on every stop
+   screen. No player sees these screens until the wasm-only build ships, so
+   there is no version bump.
+2. **2b-2, Repair.** The **Repair engine files** action, offered when a worker
+   controls the page and the reason is `mismatch` or `load-failed` (design 5.4,
+   "Corrupted-entry recovery"): replace the running build's three engine keys in
+   place after the digests match, one registration update, never delete first.
+3. **2b-3, cache-key rotation.** Design section 8: change the engine cache keys
+   with the first schema 2 worker, or purge the three engine keys at its first
+   activation, so a mixed set stored by a pre-integrity worker does not survive
+   the update.
+4. **2b-4, remaining e2e.** Install race, eviction, repair, first install, plus
+   the respawn refusal latch and the deferred notes on the #985 row. The
+   load-cost measurement on the owner's PC runs alongside and is not a merge
+   condition.

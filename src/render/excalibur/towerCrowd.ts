@@ -10,7 +10,7 @@ import { METRO_TRAIN_H, GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
 import { buildWalkers } from "./towerWalkerBuild";
 import { carIndicator, type CarIndicator } from "../carIndicator";
 import { stepCarPursuit, type CarDrawState } from "../carMotion";
-import type { Person } from "../../engine/Crowd";
+import type { PersonView } from "../../simport/view";
 import { FLOOR, TILE } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
 import { applyCrowdCull, reassertCrowdCull } from "./crowdCull";
@@ -106,7 +106,7 @@ export function reconcileCrowd(engine: TowerEngine): void {
   reap(engine.crowdActors, seen, (rec) => rec.actor.kill());
 }
 
-function positionPerson(engine: TowerEngine, p: Person, rec: { actor: ex.Actor; gfx: ex.Canvas; red: boolean }): void {
+function positionPerson(engine: TowerEngine, p: PersonView, rec: { actor: ex.Actor; gfx: ex.Canvas; red: boolean }): void {
   // While riding, a tenant is inside a car, the cab's own rider count shows
   // them, so we hide the standalone figure to avoid drawing them twice.
   // Staff stay visible while riding: a lone housekeeper in a 16-person
