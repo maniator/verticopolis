@@ -38,6 +38,11 @@ No claimed speedups until comparable runs exist.
 7. Verify web test parity and accessible input/gesture behavior. Test failed WebGL/WebGPU support and deliberate GPU context loss.
 8. Record migration size estimate including changes to `towerScene`, `towerRegions`, hit-testing, UI overlays, screenshot pipeline, asset loader, PWA and Godot asset parity.
 
+### Measurable gate requirements
+- Declare pass thresholds before comparison runs for at least: median/p95/p99 frame time, 1% low FPS, memory high-water mark, cold-start time and bundle/download deltas.
+- Publish a per-fixture pass/fail table for each candidate, plus one overall recommendation that cites the threshold table.
+- Include the raw runs and environment metadata with each result set so a reviewer can reproduce the same decision.
+
 ## Outputs
 - `baseline-inventory.md`: source and profiler map with current bottlenecks and known limitations.
 - `benchmark-protocol.md`: reproducible commands, fixtures, devices, workload, pass thresholds and raw artifacts.

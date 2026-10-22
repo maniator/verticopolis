@@ -16,7 +16,7 @@
 ### Cross-cutting definition of done
 1. Rust authoritative simulation unchanged, conformance and save/replay checks green; no gameplay logic in presentation.
 2. Versioned portable asset inputs, checksum/provenance, validated license metadata and deterministic renderer outputs.
-3. The four standard web checks (`typecheck`, `lint`, `test`, `build`), relevant Rust/Godot checks, E2E and visual baselines run.
+3. The four standard web checks (`typecheck`, `lint`, `test`, `build`), relevant Rust/Godot checks, E2E and visual baselines run, and configured coverage floors hold.
 4. Normal and reduced-motion behavior, day/night, keyboard, pointer and touch, mobile layout, and WebGL loss/recovery covered.
 5. Visual changes use owner-approved references and pinned Playwright baselines; intentional pixel differences documented with before/after comparisons.
 6. No new paid tools, commissions, licenses or subscriptions, and no outside art with unclear permission.
@@ -35,6 +35,7 @@
 **Acceptance**
 - Benchmarks use paired runs and the same authoritative input/data, not different simulations or different art.
 - No unsupported FPS win claims. A renderer migration only proceeds if measured benefits on important fixtures outweigh migration, compatibility and maintenance costs.
+- The 4A decision record includes predeclared thresholds (median/p95/p99 frame time, 1% low, memory high-water and cold-start deltas), raw run artifacts and an explicit pass/fail call per threshold.
 - Explicit **keep Excalibur** pathway if PixiJS does not win.
 - Explicit review of Phaser/Godot-web only on evidence of a use case current finalists cannot meet.
 - Owner approves an Architecture Decision Record before 4C. The existing `docs/performance/benchmark-protocol.md` remains the starting point; no quiet relaxation of 3.0 gates.
@@ -54,6 +55,7 @@
 **Acceptance**
 - Owner explicitly approves the example room designs **before full catalog reauthoring**.
 - Full provenance manifest for imported art, including author, license, source URL and transformed source file; if no third-party art is used, record that.
+- Any imported third-party art uses a redistribution-safe license recorded in the manifest, with required attribution bundled for release outputs.
 - Rebuilds reproduce known atlas manifests and exports in the pinned build environment.
 - Art assets render correctly in the browser and the native Godot proof host when available, without blocking the web path. No dependency on paid art.
 - Maintain a clear boundary between asset version, save version and simulation game mode.
@@ -72,6 +74,7 @@
 
 **Acceptance**
 - Existing save imports, commands and telemetry meanings unchanged.
+- On healthy 3.0 hosts, gameplay authority remains Rust-only, with no duplicate TypeScript simulation authority introduced for rendering.
 - Browser screenshots and accessibility/regression suite green after expected baseline updates.
 - No broad API change to the Rust crate solely for visual effects; read-only fields, if needed, reviewed as versioned contracts.
 - The migration can be disabled or rolled back without converting player saves.
