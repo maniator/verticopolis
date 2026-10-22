@@ -259,4 +259,51 @@ describe("the host suites run in test:wasm", () => {
       expect(step[1]).not.toMatch(/\bif:|continue-on-error/);
     });
   });
+
+  describe("cross-env wiring for shell portability", () => {
+    const pkg = JSON.parse(read("package.json")) as {
+      scripts: Record<string, string>;
+      engines: { node: string };
+      devDependencies: Record<string, string>;
+    };
+    const lock = JSON.parse(read("package-lock.json")) as {
+      packages?: Record<
+        string,
+        { version?: string; engines?: { node?: string }; devDependencies?: Record<string, string> }
+      >;
+    };
+    const scripts = pkg.scripts;
+
+    const scriptNames = [
+      "test:wasm",
+      "test:wasm:parity",
+      "perf:capture",
+      "screenshots",
+    ] as const;
+
+    const minMajor = (range: string): number => {
+      const major = /(\d+)/.exec(range)?.[1];
+      if (!major) throw new Error(`cannot read a major from ${range}`);
+      return Number(major);
+    };
+
+    it("keeps cross-env in scripts that set inline environment variables", () => {
+      for (const name of scriptNames)
+        expect(scripts[name], `${name} stays shell-agnostic`).toMatch(/^cross-env\s+/);
+    });
+
+    it("keeps cross-env as a dev dependency and pinned in the lockfile", () => {
+      expect(pkg.devDependencies["cross-env"]).toBeTruthy();
+      expect(lock.packages?.[""]?.devDependencies?.["cross-env"]).toBeTruthy();
+      expect(lock.packages?.["node_modules/cross-env"]?.version).toBeTruthy();
+    });
+
+    it("keeps the repo's Node engine compatible with cross-env", () => {
+      const repoNode = pkg.engines.node;
+      const crossEnvNode = lock.packages?.["node_modules/cross-env"]?.engines?.node;
+      if (!crossEnvNode)
+        throw new Error("package-lock.json: node_modules/cross-env engines.node is missing");
+      expect(minMajor(repoNode)).toBeGreaterThanOrEqual(minMajor(crossEnvNode));
+    });
+  });
 });
