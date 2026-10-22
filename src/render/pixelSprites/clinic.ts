@@ -1,5 +1,5 @@
 import { visibleOccupants } from "../../engine/Crowd";
-import type { Unit } from "../../engine/types";
+import type { UnitView } from "../../simport/view";
 import { castShadow, hash, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
 import { layerBreak } from "./layers";
 
@@ -39,7 +39,7 @@ export const CLINIC_LOOKS: Record<string, ClinicLook> = {
 
 /** A stable per-room seed from GEOGRAPHY (floor, x), so the figures survive a
  *  save/export/import (which renumbers `u.id`). */
-function figureSeed(u: Pick<Unit, "floor" | "x">): number {
+function figureSeed(u: Pick<UnitView, "floor" | "x">): number {
   return (u.floor * 131 + u.x * 17) | 0;
 }
 
@@ -183,7 +183,7 @@ function drawPhysio(ctx: CanvasRenderingContext2D, x: number, floorY: number, w:
 
 /** The Modern Clinic. Reused for every practice subtype; the look's `practice`
  *  discriminant picks the interior so each renders as its own room. */
-export function clinic(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+export function clinic(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const { ctx } = d;
   const look = (u.subtype !== undefined && CLINIC_LOOKS[u.subtype]) || CLINIC_DEFAULT;
   const floorY = shell(ctx, x, y, w, h, look.wall, look.floor);

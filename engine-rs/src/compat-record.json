@@ -1,5 +1,9 @@
 {
+<<<<<<< HEAD
   "crateVersion": "0.7.0",
+=======
+  "crateVersion": "0.5.0",
+>>>>>>> origin/main
   "lockDigest": "7d59bce70a9465f7",
   "saveVersion": 7,
   "oldestSaveVersion": 1,

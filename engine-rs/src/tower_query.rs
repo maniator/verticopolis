@@ -21,6 +21,13 @@ pub struct Memo {
         crate::tower_index::IndexKey,
         std::sync::Arc<crate::tower_index::Census>,
     )>,
+<<<<<<< HEAD
+=======
+    pub floor_rooms: Option<(
+        crate::tower_index::IndexKey,
+        std::sync::Arc<crate::tower_index::FloorRooms>,
+    )>,
+>>>>>>> origin/main
 }
 
 // ---- unit state predicates (types.ts) --------------------------------------

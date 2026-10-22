@@ -57,6 +57,12 @@ export interface EngineBootFailure {
   message: string;
   /** Set when the byte check refused the package. */
   package?: PackageFailure;
+<<<<<<< HEAD
+=======
+  /** Set for a cause with no code of its own in the closed list, so the
+   *  screen can word it without reading `message`. */
+  cause?: "no-save-writer";
+>>>>>>> origin/main
 }
 
 /** A boot failure that already knows its code: the load's time limit, a
@@ -72,6 +78,11 @@ export class EngineBootError extends Error {
     if (pkg) this.package = pkg;
   }
 }
+
+/** The message a wasm-only build logs and records when the package has no
+ *  save writer. It reads as a developer note, so the screen words the cause
+ *  from the failure's `cause` instead. */
+const NO_SAVE_WRITER_MESSAGE = "the engine package has no save writer (encodeVctower); rebuild it";
 
 /** The codes a failed load can carry: the rest of the closed list is for a
  *  fault in a running engine or for no fault at all. */
@@ -240,9 +251,9 @@ export async function loadBootEngine(opts: EngineBootOptions): Promise<EngineBoo
   // Saves go through the engine's own writer (#935). A switchable build keeps
   // the TypeScript writer for a package without one; a wasm-only build needs it.
   if (opts.wasmOnly && !mod.encodeVctower) {
-    const message = "the engine package has no save writer (encodeVctower); rebuild it";
+    const message = NO_SAVE_WRITER_MESSAGE;
     log.error(`[wasm] ${message}`);
-    return { module: null, state: { build, engine: "none", failure: { stage: "load", reason: "package-mismatch", message }, ...binaryField() } };
+    return { module: null, state: { build, engine: "none", failure: { stage: "load", reason: "package-mismatch", message, cause: "no-save-writer" }, ...binaryField() } };
   }
   const identity = readEngineIdentity(mod);
   return { module: mod, state: { build, engine: "wasm", failure: null, ...(identity === undefined ? {} : { identity }), ...binaryField() } };
@@ -267,17 +278,48 @@ export interface EngineFailureCopy {
   steps: string[];
 }
 
-export function engineFailureCopy(failure: EngineBootFailure, online: boolean): EngineFailureCopy {
+const FILE_LABEL: Record<string, string> = { glue: "the engine glue file", wasm: "the engine binary", "build-record": "the build record" };
+
+/** The sentence the player reads for a refused or failed engine load (#985),
+ *  one per cause, from the failure's code, cause and package detail. Every
+ *  failure at the load stage has one; a start or host failure has none and
+ *  its message stands. */
+function loadFailureSentence(failure: EngineBootFailure, online: boolean, secure: boolean): string | null {
+  if (failure.stage !== "load") return null;
+  const pkg = failure.package;
+  if (failure.cause === "no-save-writer") return "The engine cannot save towers. Reload after the game is updated.";
+  if (failure.reason === "boot-timeout") return "The engine took too long to load. Try Reload when your connection is ready.";
+  if (failure.reason === "unverifiable" || pkg?.kind === "unverifiable") {
+    return secure ? "This browser could not check the engine files. Try Reload, or try another browser." : "This browser connection cannot verify the engine files. Open the game using HTTPS.";
+  }
+  if (failure.reason === "package-mismatch" && pkg?.kind !== "load-failed") {
+    const id = (v: string | null | undefined) => v ?? "unavailable";
+    // The same package id on both sides means one file differs from the record.
+    const detail =
+      pkg?.expectedPackage && pkg.expectedPackage === pkg.servedPackage
+        ? `${FILE_LABEL[pkg.file ?? ""] ?? "an engine file"} differs from the record`
+        : `expected ${id(pkg?.expectedPackage)}, found ${id(pkg?.servedPackage)}`;
+    return `The engine files do not match this version of the game. The engine was not started. (${detail})`;
+  }
+  if (pkg?.kind === "load-failed" && pkg.expectedPackage === null) {
+    return "The engine files could not be loaded. This version of the game was published without them, so a corrected deployment is needed.";
+  }
+  return online ? "The engine files could not be loaded. Try Reload." : "The engine files could not be loaded. Connect to the internet and try Reload.";
+}
+
+export function engineFailureCopy(failure: EngineBootFailure, online: boolean, secure = true): EngineFailureCopy {
   const host = failure.stage === "host";
   const headline = host ? "The game engine stopped running this tower, so the game has stopped." : "The game engine could not start, so the game cannot run.";
-  const steps = [
-    host
-      ? "Reload the page to continue from your last save. Changes since that save may be lost."
-      : "Reload the page to try again. Your saved towers stay in this browser.",
-  ];
-  if (!online) {
+  const sentence = loadFailureSentence(failure, online, secure);
+  // Over an insecure connection a reload cannot help; the first step is HTTPS.
+  const insecure = failure.stage === "load" && !secure && (failure.reason === "unverifiable" || failure.package?.kind === "unverifiable");
+  let first = "Reload the page to try again. Your saved towers stay in this browser.";
+  if (host) first = "Reload the page to continue from your last save. Changes since that save may be lost.";
+  else if (insecure) first = "Open the game using HTTPS, then reload. Your saved towers stay in this browser.";
+  const steps = [first];
+  if (!online && !insecure) {
     steps.push("You appear to be offline. If the game was updated since this device last opened it, connect to the internet and reload once so the new engine can download.");
   }
   steps.push("If it keeps happening, update your browser or try another one.");
-  return { headline, reason: failure.message, steps };
+  return { headline, reason: sentence ?? failure.message, steps };
 }

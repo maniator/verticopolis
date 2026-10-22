@@ -1,6 +1,10 @@
 [package]
 name = "verticopolis-engine"
+<<<<<<< HEAD
 version = "0.7.0"
+=======
+version = "0.5.0"
+>>>>>>> origin/main
 edition = "2021"
 rust-version = "1.97"
 license = "MIT"

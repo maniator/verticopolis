@@ -1,4 +1,4 @@
-import type { Unit } from "../../engine/types";
+import type { UnitView } from "../../simport/view";
 import { busyStations, hash, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { layerBreak } from "./layers";
 
@@ -23,11 +23,11 @@ const PLANT = "#4f9a5c"; // greenery
 
 /** A stable per-room seed from GEOGRAPHY (floor, x), so the guests and steam
  *  survive a save/export/import (which renumbers `u.id`). */
-function figureSeed(u: Pick<Unit, "floor" | "x">): number {
+function figureSeed(u: Pick<UnitView, "floor" | "x">): number {
   return (u.floor * 149 + u.x * 23) | 0;
 }
 
-export function spa(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+export function spa(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const { ctx } = d;
   const floorY = shell(ctx, x, y, w, h, WALL, FLOOR);
   const seed = figureSeed(u);
