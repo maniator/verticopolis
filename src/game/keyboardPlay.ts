@@ -183,9 +183,9 @@ export class KeyboardPlay {
     }
     const name = catalogFacility(towerCatalog(this.deps.getSim()), p.kind).name;
     this.deps.captureUndo("Bulldoze");
-    await this.deps.build.bulldozePicked(p);
+    const removed = await this.deps.build.bulldozePicked(p);
     this.deps.commitUndo();
-    this.deps.announce(`Bulldozed ${name}`);
+    this.deps.announce(removed ? `Bulldozed ${name}` : `Could not bulldoze ${name}`);
     this.refreshCursorPreview();
   }
 }

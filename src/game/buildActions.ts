@@ -228,20 +228,22 @@ export class BuildActions {
 
   /** Bulldoze whatever Excalibur reported under the pointer, with a refund.
    *  `quiet` suppresses blocked-removal feedback on the drag path, so sweeping
-   *  across load-bearing floors doesn't machine-gun toasts and error sfx. */
-  async bulldozePicked(p: Picked | null, quiet = false): Promise<void> {
-    if (!p) return;
-    const tower = this.deps.getSim().tower;
+   *  across load-bearing floors doesn't machine-gun toasts and error sfx.
+   *  Returns true only when the engine removed the picked facility. */
+  async bulldozePicked(p: Picked | null, quiet = false): Promise<boolean> {
+    if (!p) return false;
+    const sim = this.deps.getSim();
     if (p.type === "unit") {
-      const u = tower.getUnit(p.id);
-      if (!u) return;
-      if (!(await this.tryRemoveUnit(u, "bulldoze", quiet))) return;
+      const u = sim.tower.getUnit(p.id);
+      if (!u) return false;
+      if (!(await this.tryRemoveUnit(u, "bulldoze", quiet))) return false;
     } else {
-      const t = tower.getTransport(p.id);
-      if (!t) return;
-      if (!(await this.removeTransportWithRefund(t, "bulldoze"))) return;
+      const t = sim.tower.getTransport(p.id);
+      if (!t) return false;
+      if (!(await this.removeTransportWithRefund(t, "bulldoze"))) return false;
     }
     this.deps.audio.sfx("sell");
     if (this.deps.selectedId() === p.id) this.deps.clearSelection();
+    return true;
   }
 }

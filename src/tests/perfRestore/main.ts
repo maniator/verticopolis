@@ -5,7 +5,7 @@ import { engineSourceHash } from "../../wasmhost/packageHash";
 import { buildTree, collectEnvironment, packageState, type PackageState } from "../perfCompare/env";
 import { outputDir, packageErrors, stampErrors } from "../perfCompare/main";
 import { adoptScenario, prepareLiveApp, stashSave } from "../perfCompare/page";
-import { buildScenarios } from "../perfCompare/scenarios";
+import { SCENARIO_NAMES, buildScenarios, unknownScenarios } from "../perfCompare/scenarios";
 import { startServer } from "../perfCompare/server";
 import { buildTooling } from "../perfWorker/build";
 import { restoreRun, type Workload } from "./page";
@@ -114,9 +114,9 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const args = parseArgs(argv);
   const log = (line: string) => process.stderr.write(`${line}\n`);
   // Everything that can refuse the run does so before the build.
-  const all = buildScenarios();
-  const scenarios = args.scenarios ? all.filter((s) => args.scenarios!.includes(s.name)) : all;
-  if (args.scenarios && scenarios.length !== args.scenarios.length) throw new Error(`unknown scenario in ${args.scenarios.join(",")}; expected ${all.map((s) => s.name).join(",")}`);
+  const unknown = unknownScenarios(args.scenarios ?? []);
+  if (unknown.length) throw new Error(`unknown scenario ${unknown.join(",")}; expected ${SCENARIO_NAMES.join(",")}`);
+  const scenarios = buildScenarios(args.scenarios);
   const distPerf = join(repo, "dist-perf");
   const stamp = join(distPerf, ".perf-build.json");
   const tree = buildTree(repo);

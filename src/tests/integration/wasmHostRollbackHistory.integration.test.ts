@@ -3,7 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import { hasWasmPackage, wasmRequired } from "../conformance/wasmEngine";
 import { FrameDriver } from "../dualrun/dualRunHarness";
 import { freePoisoned, trapAfter } from "./wasmTraps";
-import { LOST, OLDER, REPLACED, SET_UP, UNDONE, expectRolledBack, lastGood, offices, settle, setUp, tally } from "./wasmRollback";
+import { CLEARED, LOST, OLDER, REPLACED, SET_UP, UNDONE, expectRolledBack, lastGood, offices, settle, setUp, tally } from "./wasmRollback";
 
 /**
  * Undo, redo and the undo capture when the engine traps inside them, on the
@@ -312,6 +312,97 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       // The trail is gone, the step older than the tower with it.
       a.undo();
       expect(a.toasts).toEqual(["Nothing to undo."]);
+      expect(offices(a)).toEqual([170, 190]);
+    } finally {
+      load.mockRestore();
+      h.stop();
+    }
+  });
+
+  it("clears the undo trail when an undo's own snapshot goes back past the newest point (#1126)", async () => {
+    const { a, h, engine } = setUp(77);
+    const load = vi.spyOn(Simulation, "deserialize");
+    try {
+      const sim = a.sim;
+      a.captureUndo("Build office");
+      expect(sim.build("office", 2, 190).ok).toBe(true);
+      a.commitUndo();
+      h.current()!.syncStructure(); // a merge covers the office: the older point
+      sim.tower.towerName = "Sky Plaza";
+      sim.serialize(); // a hosted save covers the rename: the newest point
+      trapAfter(engine(), "serialize", false);
+      load.mockImplementationOnce(() => {
+        throw new Error("the newest point does not load");
+      });
+      a.undo(); // the snapshot for its redo step goes back to the merge
+      await settle();
+      expect(h.status.restorePoint).toEqual({ point: "merge", skipped: 1 });
+      // The tower is the undo's target, as the player asked; only the trail goes.
+      expect(a.sim.log[a.sim.log.length - 1].text).toBe(CLEARED);
+      expect(offices(a)).toEqual([170]);
+      // Kept, that redo step would bring back the merge's tower, without the rename.
+      a.redo();
+      expect(a.toasts).toEqual(["Undid: Build office", "Nothing to redo."]);
+      expect(offices(a)).toEqual([170]);
+    } finally {
+      load.mockRestore();
+      h.stop();
+    }
+  });
+
+  it("goes back to the point an undo capture's save answered with, though the newest would load now (#1126)", async () => {
+    const { a, h, engine } = setUp(79);
+    const load = vi.spyOn(Simulation, "deserialize");
+    try {
+      const sim = a.sim;
+      h.current()!.syncStructure(); // a merge: the older point
+      sim.tower.towerName = "Sky Plaza";
+      sim.serialize(); // a hosted save covers the rename: the newest point
+      trapAfter(engine(), "serialize", false);
+      load.mockImplementationOnce(() => {
+        throw new Error("the newest point does not load");
+      });
+      a.captureUndo("Build office"); // its save traps and answers with the merge
+      expect(sim.build("office", 2, 190).ok).toBe(true);
+      a.commitUndo();
+      await settle();
+      // The recovery lands where the capture's step does, without the rename.
+      expect(h.status.restorePoint).toEqual({ point: "merge", skipped: 1 });
+      expect(a.sim.log[a.sim.log.length - 1].text).toBe(OLDER);
+      expect(a.sim.tower.towerName).toBe("Tower One");
+      expect(offices(a)).toEqual([170]);
+      a.undo();
+      expect(a.toasts).toEqual(["Nothing to undo."]);
+    } finally {
+      load.mockRestore();
+      h.stop();
+    }
+  });
+
+  it("clears the undo trail when a redo's own snapshot goes back past the newest point (#1126)", async () => {
+    const { a, h, engine } = setUp(78);
+    const load = vi.spyOn(Simulation, "deserialize");
+    try {
+      a.captureUndo("Build office");
+      expect(a.sim.build("office", 2, 190).ok).toBe(true);
+      a.commitUndo();
+      a.undo(); // healthy: a redo trail, on a new engine
+      const sim = a.sim;
+      h.current()!.syncStructure(); // a merge: the older point
+      sim.tower.towerName = "Sky Plaza";
+      sim.serialize(); // a hosted save covers the rename: the newest point
+      trapAfter(engine(), "serialize", false);
+      load.mockImplementationOnce(() => {
+        throw new Error("the newest point does not load");
+      });
+      a.redo(); // the snapshot for its undo step goes back to the merge
+      await settle();
+      expect(h.status.restorePoint).toEqual({ point: "merge", skipped: 1 });
+      expect(a.sim.log[a.sim.log.length - 1].text).toBe(CLEARED);
+      expect(offices(a)).toEqual([170, 190]);
+      // Kept, that undo step would bring back the merge's tower, without the rename.
+      a.undo();
+      expect(a.toasts).toEqual(["Undid: Build office", "Redid: Build office", "Nothing to undo."]);
       expect(offices(a)).toEqual([170, 190]);
     } finally {
       load.mockRestore();

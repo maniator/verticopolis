@@ -255,9 +255,9 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
 
   it("bulldozePicked: null and stale picks are no-ops (no sfx, no refund)", async () => {
     const before = sim.money;
-    await build.bulldozePicked(null);
-    await build.bulldozePicked({ type: "unit", id: 99_999, kind: "office" });
-    await build.bulldozePicked({ type: "transport", id: 99_999, kind: "elevatorStandard" });
+    await expect(build.bulldozePicked(null)).resolves.toBe(false);
+    await expect(build.bulldozePicked({ type: "unit", id: 99_999, kind: "office" })).resolves.toBe(false);
+    await expect(build.bulldozePicked({ type: "transport", id: 99_999, kind: "elevatorStandard" })).resolves.toBe(false);
     expect(sim.money).toBe(before);
     expect(f.sfx).toEqual([]);
   });
@@ -265,7 +265,7 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
   it("bulldozePicked on a transport refunds the shaft resale and clears a matching selection", async () => {
     sel = lift.id;
     const before = sim.money;
-    await build.bulldozePicked({ type: "transport", id: lift.id, kind: lift.kind });
+    await expect(build.bulldozePicked({ type: "transport", id: lift.id, kind: lift.kind })).resolves.toBe(true);
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
     expect(sim.tower.transports.some((t) => t.id === lift.id)).toBe(false);
     expect(f.sfx).toEqual(["sell"]);
@@ -274,10 +274,10 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
 
   it("bulldozePicked on a burning unit refuses: loud toasts, the quiet drag path doesn't", async () => {
     office.state = "fire";
-    await build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }, true); // drag step
+    await expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }, true)).resolves.toBe(false); // drag step
     expect(f.toasts).toEqual([]);
     expect(f.sfx).toEqual([]);
-    await build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }); // deliberate click
+    await expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" })).resolves.toBe(false); // deliberate click
     expect(f.sfx).toEqual(["error"]);
     expect(f.toasts).toEqual([
       { text: "You can't bulldoze a burning unit. Call fire rescue or let it burn out.", kind: "bad" },
@@ -1504,6 +1504,41 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
     expect(last(announced)).toBe(`Bulldozed ${FACILITIES.elevatorStandard.name}`);
     expect(undoLog.slice(-2)).toEqual(["capture:Bulldoze", "commit"]);
+  });
+
+  it("announces refused, successful, then refused keyboard bulldozes as a facility changes state", async () => {
+    tool = { type: "bulldoze" };
+    keyboard.moveCursor(-10, 1); // (mid - 10, 2): the office
+    const pick = { type: "unit" as const, kind: "office" as const, id: office.id };
+    office.state = "fire";
+    await keyboard.commitCursor();
+    expect(sim.tower.getUnit(pick.id)).toBeTruthy();
+    expect(last(announced)).toBe(`Could not bulldoze ${FACILITIES.office.name}`);
+    expect(last(f.toasts)).toEqual({
+      text: "You can't bulldoze a burning unit. Call fire rescue or let it burn out.",
+      kind: "bad",
+    });
+    expect(last(f.sfx)).toBe("error");
+
+    office.state = "empty"; // the fire clears, and the same cursor can remove it
+    await keyboard.commitCursor();
+    expect(sim.tower.getUnit(pick.id)).toBeUndefined();
+    expect(last(announced)).toBe(`Bulldozed ${FACILITIES.office.name}`);
+    expect(last(f.sfx)).toBe("sell");
+
+    const replaced = sim.tower.place("office", 2, mid - 10);
+    expect(replaced.ok).toBe(true);
+    const next = sim.tower.getUnit(replaced.unitId!)!;
+    next.state = "fire"; // a new fire at the same location must refuse again
+    await keyboard.commitCursor();
+    expect(sim.tower.getUnit(next.id)).toBeTruthy();
+    expect(last(announced)).toBe(`Could not bulldoze ${FACILITIES.office.name}`);
+    expect(last(f.sfx)).toBe("error");
+    expect(undoLog.slice(-6)).toEqual([
+      "capture:Bulldoze", "commit",
+      "capture:Bulldoze", "commit",
+      "capture:Bulldoze", "commit",
+    ]);
   });
 
   it("bulldozeCursor and refreshCursorPreview are no-ops before the cursor is revealed", async () => {
