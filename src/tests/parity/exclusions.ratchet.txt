@@ -25,3 +25,4 @@ src/tests/integration/phase2.integration.test.ts itTypeScriptOnly=2 atEngineFram
 src/tests/integration/segmentRoutingReachable.integration.test.ts itTypeScriptOnly=3 atEngineFrameCadence=0 onWasmParityProject=0
 src/tests/integration/simulation.integration.test.ts itTypeScriptOnly=1 atEngineFrameCadence=0 onWasmParityProject=0
 src/tests/integration/storage.integration.test.ts itTypeScriptOnly=5 atEngineFrameCadence=0 onWasmParityProject=0
+src/tests/perfCompare/fixtureHotelTower.test.ts itTypeScriptOnly=0 atEngineFrameCadence=2 onWasmParityProject=0
