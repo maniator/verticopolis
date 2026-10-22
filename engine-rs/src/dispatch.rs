@@ -177,12 +177,9 @@ impl ElevatorDispatch {
                 }
             }
             if !staff_only {
-                let span_floors = stops[0]..=stops[stops.len() - 1];
-                for (fl, &w) in self.waiting.range(span_floors) {
-                    if w >= 1.0 {
-                        if let Ok(k) = stops.binary_search(fl) {
-                            flags[k] |= CALL;
-                        }
+                for (k, &fl) in stops.iter().enumerate() {
+                    if self.waiting.get(&fl).copied().unwrap_or(0.0) >= 1.0 {
+                        flags[k] |= CALL;
                     }
                 }
             }
@@ -332,20 +329,33 @@ fn next_demand_stop(
     let dist = |k: usize| (stops[k] as f64 - pos).abs();
     let (k, d) = if dir > 0 {
         let first = stops.partition_point(|&s| s as f64 <= pos + 0.05);
-        let k = (first..stops.len()).find(|&k| wanted(k))?;
-        (k, dist(k))
-    } else {
-        let end = stops.partition_point(|&s| (s as f64) < pos - 0.05);
-        let mut hit: Option<(usize, f64)> = None;
-        for k in (0..end).rev() {
+        let mut best: Option<(usize, f64)> = None;
+        for k in first..stops.len() {
+            if !wanted(k) {
+                continue;
+            }
             let d = dist(k);
-            match hit {
-                Some((_, best)) if d > best => break,
-                _ if wanted(k) => hit = Some((k, d)),
-                _ => {}
+            match best {
+                Some((_, best_d)) if d > best_d => break,
+                Some((_, best_d)) if d == best_d => continue,
+                _ => best = Some((k, d)),
             }
         }
-        hit?
+        best?
+    } else {
+        let end = stops.partition_point(|&s| (s as f64) < pos - 0.05);
+        let mut best: Option<(usize, f64)> = None;
+        for k in (0..end).rev() {
+            if !wanted(k) {
+                continue;
+            }
+            let d = dist(k);
+            match best {
+                Some((_, best_d)) if d > best_d => break,
+                _ => best = Some((k, d)),
+            }
+        }
+        best?
     };
     // The scan's `dist < best_dist` from infinity: a position that is not
     // finite finds no stop.
