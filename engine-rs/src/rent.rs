@@ -103,7 +103,11 @@ impl Simulation {
         }
         let neutral = price_neutral(self.mode, kind)?;
         let mut r = BatchRentResult::default();
-        for u in self.tower.units.iter_mut() {
+        // A priced kind is never structural, so the room list holds every
+        // unit of it, in list order: R units visited, not all of them.
+        let rooms = self.tower.room_index();
+        for &i in rooms.iter() {
+            let u = &mut self.tower.units[i];
             if u.kind != kind {
                 continue;
             }

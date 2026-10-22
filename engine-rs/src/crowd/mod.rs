@@ -2,6 +2,7 @@
 //! which saves never carry. The conformance suite hashes them separately.
 
 pub mod banks;
+pub(crate) mod fasthash;
 pub mod graph;
 pub mod landing;
 pub mod meals;
@@ -204,6 +205,10 @@ pub struct Crowd {
     pub staff_adj: Option<(i64, AdjGraph)>,
     pub shaft_banks: Option<(i64, HashMap<(Kind, Vec<i64>, Vec<i64>), Vec<i64>>)>,
     pub seg_served: Option<(i64, HashSet<i64>)>,
+    /// The segments the Classic walk-budget search reaches from a lobby
+    /// segment (see `graph.rs`). Built from `adj`, so keyed like it on the
+    /// tower revision; a load builds a fresh `Crowd`.
+    pub lobby_reach: Option<(i64, HashSet<i64>)>,
     pub blockbusters: HashSet<i64>,
     pub staff_done: Vec<StaffResult>,
     pub staff_count: i64,
@@ -225,6 +230,7 @@ impl Crowd {
             staff_adj: None,
             shaft_banks: None,
             seg_served: None,
+            lobby_reach: None,
             blockbusters: HashSet::new(),
             staff_done: Vec::new(),
             staff_count: 0,

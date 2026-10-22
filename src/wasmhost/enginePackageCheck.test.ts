@@ -320,6 +320,10 @@ describe("files from another build", () => {
     expect(e.kind).toBe("mismatch");
     expect(e.detail.file).toBe("wasm");
     expect(e.message).toContain("larger than");
+    // The digest the shell expects rides on the refusal, though the record was not read.
+    expect(e.detail.expected).toBe(record.files[ENGINE_WASM].sha256.slice(0, 12));
+    // The record arrived whole before the stream was cut, so its id is named.
+    expect(e.detail.servedPackage).toBe(record.package.slice(0, 12));
     expect(seen.find((s) => s.url === URLS.wasm)?.cancelled).toBe(true);
   });
 

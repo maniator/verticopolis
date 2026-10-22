@@ -1,4 +1,5 @@
 import type { WasmModule } from "../dualrun/binding";
+import { EnginePackageError, type PackageFailureDetail, type PackageFailureKind } from "./enginePackageCheck";
 import { readEngineIdentity } from "./engineIdentity";
 import type { BuildMetadataResult } from "./buildSection";
 
@@ -25,14 +26,14 @@ export type BootStage = "load" | "start" | "host";
  * on the console and the boot state and is never put in that event, since an
  * engine message can quote a tower name or a path.
  *
- * Boot sends the first five, plus `other` for a boot step outside the engine
+ * Boot sends the first six, plus `other` for a boot step outside the engine
  * that failed after the worker host started (the host is let go). The
  * runtime fallback (#874) sends the trap codes for a running engine's fault
  * in a command (the undo capture's save just before an edit included), a
  * tick, a frame sync or the event drain, or an undo or redo, and `other` for
  * a save or the reads when a tower is let go.
  */
-export const FALLBACK_REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"] as const;
+export const FALLBACK_REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"] as const;
 export type FallbackReason = (typeof FALLBACK_REASONS)[number];
 
 /** Where a fallback happened: loading the package, starting the host on the
@@ -43,11 +44,22 @@ export type FallbackReason = (typeof FALLBACK_REASONS)[number];
 export const FALLBACK_STAGES = ["none", "load", "start", "adopt", "undo"] as const;
 export type FallbackStage = (typeof FALLBACK_STAGES)[number];
 
+/** Why the byte check refused the engine package, as plain data (so a worker
+ *  can send it): the kind, the file, both package ids and whether a service
+ *  worker controlled the page (#985). Hex ids and codes only; the boot state
+ *  carries it for tooling and support, and analytics never does. */
+export type PackageFailure = PackageFailureDetail & { kind: PackageFailureKind };
+
 export interface EngineBootFailure {
   stage: BootStage;
   /** The code analytics reports; never derived from `message`. */
   reason: FallbackReason;
   message: string;
+  /** Set when the byte check refused the package. */
+  package?: PackageFailure;
+  /** Set for a cause with no code of its own in the closed list, so the
+   *  screen can word it without reading `message`. */
+  cause?: "no-save-writer";
 }
 
 /** A boot failure that already knows its code: the load's time limit, a
@@ -55,11 +67,67 @@ export interface EngineBootFailure {
  *  running engine is `boot-error` (see {@link bootFailureReason}). */
 export class EngineBootError extends Error {
   readonly reason: FallbackReason;
-  constructor(reason: FallbackReason, message: string) {
+  readonly package?: PackageFailure;
+  constructor(reason: FallbackReason, message: string, pkg?: PackageFailure) {
     super(message);
     this.name = "EngineBootError";
     this.reason = reason;
+    if (pkg) this.package = pkg;
   }
+}
+
+/** The message a wasm-only build logs and records when the package has no
+ *  save writer. It reads as a developer note, so the screen words the cause
+ *  from the failure's `cause` instead. */
+const NO_SAVE_WRITER_MESSAGE = "the engine package has no save writer (encodeVctower); rebuild it";
+
+/** The codes a failed load can carry: the rest of the closed list is for a
+ *  fault in a running engine or for no fault at all. */
+export const LOAD_FAILURE_REASONS: readonly FallbackReason[] = ["boot-error", "package-mismatch", "unverifiable", "boot-timeout"];
+
+const PACKAGE_KINDS: readonly string[] = ["mismatch", "load-failed", "unverifiable"];
+const PACKAGE_FILES: readonly string[] = ["glue", "wasm", "build-record"];
+const hexId = (v: unknown): string | null => (typeof v === "string" && /^[0-9a-f]{12}$/.test(v) ? v : null);
+
+/** A package detail that came across a worker message, rebuilt from known
+ *  values only: the kind and file from their lists, the ids as 12 hex digits.
+ *  Anything else is dropped, so the boot state never carries free text from a
+ *  message. Undefined when there is no usable kind. */
+export function cleanPackageFailure(raw: unknown): PackageFailure | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const p = raw as Record<string, unknown>;
+  if (typeof p.kind !== "string" || !PACKAGE_KINDS.includes(p.kind)) return undefined;
+  return {
+    kind: p.kind as PackageFailureKind,
+    file: typeof p.file === "string" && PACKAGE_FILES.includes(p.file) ? (p.file as PackageFailure["file"]) : null,
+    expected: hexId(p.expected),
+    found: hexId(p.found),
+    expectedPackage: hexId(p.expectedPackage),
+    servedPackage: hexId(p.servedPackage),
+    controlled: p.controlled === true,
+  };
+}
+
+/** A worker's account of the binary's build section, rebuilt from known
+ *  values (a state from the list, a 64-digit hash, a short reason), so the
+ *  boot state never carries free text from a message. Undefined for anything
+ *  else. */
+export function cleanBuildMetadata(raw: unknown): BuildMetadataResult | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const b = raw as Record<string, unknown>;
+  if (b.state === "missing") return { state: "missing" };
+  if (b.state === "ok") return typeof b.sourceHash === "string" && /^[0-9a-f]{64}$/.test(b.sourceHash) ? { state: "ok", sourceHash: b.sourceHash } : undefined;
+  if (b.state === "malformed") return { state: "malformed", why: typeof b.why === "string" ? b.why.slice(0, 120) : "" };
+  return undefined;
+}
+
+/** The code for a refused package. A set that disagrees with the shell is a
+ *  mismatch, a browser that cannot hash the files is `unverifiable` (the files
+ *  may be fine; neither sits in the fault rate), and files that did not arrive
+ *  are a `boot-error`. */
+export function packageFailureReason(kind: PackageFailureKind): FallbackReason {
+  if (kind === "mismatch") return "package-mismatch";
+  return kind === "unverifiable" ? "unverifiable" : "boot-error";
 }
 
 /** The code for a failure on the way to a running engine. A glue and binary
@@ -67,8 +135,24 @@ export class EngineBootError extends Error {
  *  engine itself may be sound. Every other untyped failure is `boot-error`. */
 export function bootFailureReason(e: unknown): FallbackReason {
   if (e instanceof EngineBootError) return e.reason;
+  if (e instanceof EnginePackageError) return packageFailureReason(e.kind);
   if (typeof WebAssembly !== "undefined" && e instanceof WebAssembly.LinkError) return "package-mismatch";
   return "boot-error";
+}
+
+/** The package detail of a failure, when the byte check refused the package. */
+export function packageFailureOf(e: unknown): PackageFailure | undefined {
+  if (e instanceof EnginePackageError) return { kind: e.kind, ...e.detail };
+  if (e instanceof EngineBootError) return e.package;
+  return undefined;
+}
+
+const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** A boot failure built from what was thrown. */
+export function bootFailure(stage: BootStage, e: unknown): EngineBootFailure {
+  const pkg = packageFailureOf(e);
+  return { stage, reason: bootFailureReason(e), message: messageOf(e), ...(pkg ? { package: pkg } : {}) };
 }
 
 export interface EngineBootState {
@@ -93,9 +177,11 @@ export interface EngineBootState {
 
 export interface EngineBootOptions {
   wasmOnly: boolean;
-  /** Loads the package; calls `onBuild` with the binary's build metadata as
-   *  soon as it is read, so a failure later in the load still reports it. */
-  load: (onBuild: (build: BuildMetadataResult) => void) => Promise<WasmModule>;
+  /** Loads the engine. The signal fires at the time limit; the loader checks
+   *  it after each step and drops a result that arrives later. `onBuild` gets
+   *  the binary's build metadata as soon as it is read, so a failure later in
+   *  the load still reports it. */
+  load: (signal: AbortSignal, onBuild: (build: BuildMetadataResult) => void) => Promise<WasmModule>;
   log?: Pick<Console, "error">;
   /** How long the load may take before boot gives up on it (ms). */
   timeoutMs?: number;
@@ -107,10 +193,14 @@ export interface EngineBootOptions {
  *  leave a wasm-only boot on a blank page with no message. */
 export const ENGINE_LOAD_TIMEOUT_MS = 90_000;
 
-function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+function withTimeout<T>(work: Promise<T>, ms: number, expire: () => void): Promise<T> {
   return new Promise<T>((done, fail) => {
     const seconds = Math.round(ms / 1000);
-    const timer = setTimeout(() => fail(new EngineBootError("boot-timeout", `the engine package did not load within ${seconds} ${seconds === 1 ? "second" : "seconds"}`)), ms);
+    const timer = setTimeout(() => {
+      // The attempt is terminal before the timeout is published.
+      expire();
+      fail(new EngineBootError("boot-timeout", `the engine package did not load within ${seconds} ${seconds === 1 ? "second" : "seconds"}`));
+    }, ms);
     work.then(
       (v) => {
         clearTimeout(timer);
@@ -129,8 +219,6 @@ export interface EngineBootResult {
   state: EngineBootState;
 }
 
-const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
-
 /** A switchable build's boot when the WASM engine was not asked for. Boot
  *  takes it without awaiting, so a TypeScript boot stays synchronous. */
 export function typescriptBoot(): EngineBootResult {
@@ -146,22 +234,23 @@ export async function loadBootEngine(opts: EngineBootOptions): Promise<EngineBoo
   let binary: BuildMetadataResult | undefined;
   const binaryField = () => (binary === undefined ? {} : { binary });
   try {
-    mod = await withTimeout(opts.load((b) => (binary = b)), opts.timeoutMs ?? ENGINE_LOAD_TIMEOUT_MS);
+    const attempt = new AbortController();
+    mod = await withTimeout(opts.load(attempt.signal, (b) => (binary = b)), opts.timeoutMs ?? ENGINE_LOAD_TIMEOUT_MS, () => attempt.abort());
   } catch (e) {
     if (!opts.wasmOnly) {
       // The fallback is recorded with its reason (#874) as well as logged.
       log.error("[wasm] the engine package did not load; running on the TypeScript engine:", e);
-      return { module: null, state: { build, engine: "ts", failure: { stage: "load", reason: bootFailureReason(e), message: messageOf(e) }, ...binaryField() } };
+      return { module: null, state: { build, engine: "ts", failure: bootFailure("load", e), ...binaryField() } };
     }
     log.error("[wasm] the engine package did not load, and this build has no other engine:", e);
-    return { module: null, state: { build, engine: "none", failure: { stage: "load", reason: bootFailureReason(e), message: messageOf(e) }, ...binaryField() } };
+    return { module: null, state: { build, engine: "none", failure: bootFailure("load", e), ...binaryField() } };
   }
   // Saves go through the engine's own writer (#935). A switchable build keeps
   // the TypeScript writer for a package without one; a wasm-only build needs it.
   if (opts.wasmOnly && !mod.encodeVctower) {
-    const message = "the engine package has no save writer (encodeVctower); rebuild it";
+    const message = NO_SAVE_WRITER_MESSAGE;
     log.error(`[wasm] ${message}`);
-    return { module: null, state: { build, engine: "none", failure: { stage: "load", reason: "package-mismatch", message }, ...binaryField() } };
+    return { module: null, state: { build, engine: "none", failure: { stage: "load", reason: "package-mismatch", message, cause: "no-save-writer" }, ...binaryField() } };
   }
   const identity = readEngineIdentity(mod);
   return { module: mod, state: { build, engine: "wasm", failure: null, ...(identity === undefined ? {} : { identity }), ...binaryField() } };
@@ -186,17 +275,48 @@ export interface EngineFailureCopy {
   steps: string[];
 }
 
-export function engineFailureCopy(failure: EngineBootFailure, online: boolean): EngineFailureCopy {
+const FILE_LABEL: Record<string, string> = { glue: "the engine glue file", wasm: "the engine binary", "build-record": "the build record" };
+
+/** The sentence the player reads for a refused or failed engine load (#985),
+ *  one per cause, from the failure's code, cause and package detail. Every
+ *  failure at the load stage has one; a start or host failure has none and
+ *  its message stands. */
+function loadFailureSentence(failure: EngineBootFailure, online: boolean, secure: boolean): string | null {
+  if (failure.stage !== "load") return null;
+  const pkg = failure.package;
+  if (failure.cause === "no-save-writer") return "The engine cannot save towers. Reload after the game is updated.";
+  if (failure.reason === "boot-timeout") return "The engine took too long to load. Try Reload when your connection is ready.";
+  if (failure.reason === "unverifiable" || pkg?.kind === "unverifiable") {
+    return secure ? "This browser could not check the engine files. Try Reload, or try another browser." : "This browser connection cannot verify the engine files. Open the game using HTTPS.";
+  }
+  if (failure.reason === "package-mismatch" && pkg?.kind !== "load-failed") {
+    const id = (v: string | null | undefined) => v ?? "unavailable";
+    // The same package id on both sides means one file differs from the record.
+    const detail =
+      pkg?.expectedPackage && pkg.expectedPackage === pkg.servedPackage
+        ? `${FILE_LABEL[pkg.file ?? ""] ?? "an engine file"} differs from the record`
+        : `expected ${id(pkg?.expectedPackage)}, found ${id(pkg?.servedPackage)}`;
+    return `The engine files do not match this version of the game. The engine was not started. (${detail})`;
+  }
+  if (pkg?.kind === "load-failed" && pkg.expectedPackage === null) {
+    return "The engine files could not be loaded. This version of the game was published without them, so a corrected deployment is needed.";
+  }
+  return online ? "The engine files could not be loaded. Try Reload." : "The engine files could not be loaded. Connect to the internet and try Reload.";
+}
+
+export function engineFailureCopy(failure: EngineBootFailure, online: boolean, secure = true): EngineFailureCopy {
   const host = failure.stage === "host";
   const headline = host ? "The game engine stopped running this tower, so the game has stopped." : "The game engine could not start, so the game cannot run.";
-  const steps = [
-    host
-      ? "Reload the page to continue from your last save. Changes since that save may be lost."
-      : "Reload the page to try again. Your saved towers stay in this browser.",
-  ];
-  if (!online) {
+  const sentence = loadFailureSentence(failure, online, secure);
+  // Over an insecure connection a reload cannot help; the first step is HTTPS.
+  const insecure = failure.stage === "load" && !secure && (failure.reason === "unverifiable" || failure.package?.kind === "unverifiable");
+  let first = "Reload the page to try again. Your saved towers stay in this browser.";
+  if (host) first = "Reload the page to continue from your last save. Changes since that save may be lost.";
+  else if (insecure) first = "Open the game using HTTPS, then reload. Your saved towers stay in this browser.";
+  const steps = [first];
+  if (!online && !insecure) {
     steps.push("You appear to be offline. If the game was updated since this device last opened it, connect to the internet and reload once so the new engine can download.");
   }
   steps.push("If it keeps happening, update your browser or try another one.");
-  return { headline, reason: failure.message, steps };
+  return { headline, reason: sentence ?? failure.message, steps };
 }

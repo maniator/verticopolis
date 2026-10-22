@@ -13,13 +13,31 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.46.1
+
+- Keyboard bulldozing now tells screen readers when a facility could not be removed, instead of announcing a successful removal.
+
+## 2.46.0
+
+- On the opt-in WASM engine (`?engine=wasm`), an undo or a redo that meets an engine failure, when the last good state also fails to load, now clears the undo history and says so.
+- When that engine stops and the tower goes back to an earlier good state, the notice no longer says you made changes since then.
+
+## 2.45.0
+
+- On the opt-in WASM engine (`?engine=wasm`), the start screen now says the engine is loading when the download is slow, instead of showing an empty sky.
+- That engine now checks its own files before it runs them. If the files do not belong together, the game stays on the standard engine instead of running them.
+
+## 2.44.0
+
+- On the opt-in WASM engine (`?engine=wasm`), an engine failure that has to go back past the last good state now says so and clears the undo history, and a failed switch to TypeScript says so too.
+
 ## 2.42.0
 
 - Help's About now shows which game engine runs and which build it is, with a Copy diagnostics button to send us if something looks wrong. It works even when the engine cannot start.
 
 ## 2.41.0
 
-- A save made while an exterminator is booked now remembers which rooms were booked, so after a reload the treatment covers the same rooms as if you had kept playing.
+- Saving, or undoing an edit, while an exterminator is booked now keeps the booked rooms, so the treatment covers only the rooms you paid for.
 
 ## 2.40.0
 

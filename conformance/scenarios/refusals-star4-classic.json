@@ -1,0 +1,118 @@
+{
+  "id": "refusals-star4-classic",
+  "description": "The four-star tower-one save refuses placements a one-star tower cannot reach, each named by the reason the engine gives: parking and a ramp above the basement, a two-story cinema with no floors above it, an office on a sky-lobby concourse tile, a floor on a sky lobby story, and, on a new sky story at floor 60, a sky lobby over a room and then a room on a claimed sky lobby story. Two settled hours follow. The wedding hall's floor-100 rule stays unreachable below five stars, where the star lock fires first.",
+  "start": {
+    "fixture": "conformance/fixtures/towerone-star4.vctower"
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 2,
+      "x": 100,
+      "expectFail": true,
+      "reason": "Parking Space can only be built in the basement."
+    },
+    {
+      "op": "build",
+      "kind": "parkingRamp",
+      "floor": 2,
+      "x": 100,
+      "expectFail": true,
+      "reason": "Parking Ramp can only be built in the basement."
+    },
+    {
+      "op": "build",
+      "kind": "cinema",
+      "floor": 100,
+      "x": 100,
+      "expectFail": true,
+      "reason": "Not enough floors above for this facility."
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 15,
+      "x": 120,
+      "expectFail": true,
+      "reason": "Lobbies are transit-only. Build rooms on a standard floor."
+    },
+    {
+      "op": "build",
+      "kind": "floor",
+      "floor": 15,
+      "x": 296,
+      "expectFail": true,
+      "reason": "Sky lobbies are concourses. Only lobby tiles go here."
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 58,
+      "from": 104,
+      "to": 283
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 59,
+      "from": 104,
+      "to": 283
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 60,
+      "from": 104,
+      "to": 283
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 60,
+      "x": 240
+    },
+    {
+      "op": "build",
+      "kind": "lobby",
+      "floor": 60,
+      "x": 120,
+      "expectFail": true,
+      "reason": "Clear the rooms here first, then place your sky lobby."
+    },
+    {
+      "op": "sell",
+      "floor": 60,
+      "x": 240,
+      "kind": "office"
+    },
+    {
+      "op": "build",
+      "kind": "lobby",
+      "floor": 60,
+      "x": 120
+    },
+    {
+      "op": "build",
+      "kind": "office",
+      "floor": 60,
+      "x": 200,
+      "expectFail": true,
+      "reason": "This room would sit on a sky lobby. Move it up or down a story."
+    },
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 120,
+      "checkpointEvery": 60
+    },
+    {
+      "op": "checkpoint",
+      "label": "settled"
+    }
+  ]
+}

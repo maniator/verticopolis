@@ -89,7 +89,7 @@ function forbiddenEverywhere(s: string): string | null {
 /** Sources a player build (no `VC_TOOLING`) may not carry: the dual run is a
  *  developer switch on the tooling-only path, and its worker is emitted (and
  *  was precached) even though the code that starts it is compiled away. */
-const DUAL_RUN = ["src/dualrun/dualRun.ts", "src/dualrun/worker.ts"];
+export const DUAL_RUN: readonly string[] = ["src/dualrun/dualRun.ts", "src/dualrun/worker.ts"];
 
 /** Sources a wasm-only build may not carry: the TypeScript step loop, the
  *  runtime engine switch, and the dual run, which shadows a TypeScript live

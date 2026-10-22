@@ -29,6 +29,9 @@ describe("fmt", () => {
     expect(fmt(1234.5, "ms")).toBe("1235 ms");
     expect(fmt(12.345, "ms")).toBe("12.35 ms");
     expect(fmt(0.1234, "ms")).toBe("0.123 ms");
+    expect(fmt(-12.345, "ms")).toBe("-12.35 ms");
+    expect(fmt(-1234.5, "ms")).toBe("-1235 ms");
+    expect(fmt(-0.1234, "ms")).toBe("-0.123 ms");
     expect(fmt(59.5, "fps")).toBe("59.50 fps");
     expect(fmt(null, "ms")).toBe("n/a");
     expect(fmt(NaN, "ms")).toBe("n/a");
@@ -97,10 +100,25 @@ describe("markdownReport", () => {
     expect(md).toContain("## Simulation only, engine as the app hosts it");
     expect(md).toMatch(/\| small \| 1x \| total for fixed duration \| 100 ms \| 200 ms \| 2\.00x \(2\.00 to 2\.00\) \| wasm slower \| 6\/6\/6 \|/);
     expect(md).toContain("ts: ts; wasm: ts");
-    expect(md).toMatch(/No engine comparison for cold DOMContentLoaded, cold load event, warm DOMContentLoaded, warm load event: boot order differs between engines/);
+    expect(md).toMatch(/No engine comparison for cold DOMContentLoaded, cold load event, cold engine loaded, warm DOMContentLoaded, warm load event, warm engine loaded: boot order differs between engines/);
+    expect(md).toMatch(/No engine comparison for cold loaded to ready, warm loaded to ready, cold loaded to ready \(saved tower\): the span covers different work on each engine/);
+    expect(md).toContain("Reported, not gates (#1254)");
+    expect(md).toContain("| cold game ready (saved tower) | small | 1x |");
     expect(md).toContain("- one machine");
     expect(markdownReport(results(true))).toContain("**Validation: passed.**");
     expect(md).not.toContain("A/A pass");
+  });
+
+  it("prints M5's paired difference under the Startup table", () => {
+    const r = results(false);
+    const base = r.metrics[0];
+    const cold = (engine: "ts" | "wasm", values: number[]) => ({ ...base, group: "startup" as const, scenario: "-", throttle: "1", metric: "cold game ready", unit: "ms", engine, values, reps: values.map((_, i) => i), summary: null });
+    const md = markdownReport({ ...r, metrics: [...r.metrics.filter((m) => m.metric !== "cold game ready"), cold("ts", Array(10).fill(1000)), cold("wasm", Array.from({ length: 10 }, (_, i) => 1000 + i))] });
+    expect(md).toContain("Cold start to ready, paired difference (WASM minus TypeScript; above zero is worse):");
+    expect(md).toContain("| 1x | 4.50 ms | 1.00 ms to 8.00 ms | 10 |");
+    expect(md.indexOf("Cold start to ready, paired difference")).toBeGreaterThan(md.indexOf("## Startup"));
+    expect(md.indexOf("Cold start to ready, paired difference")).toBeLessThan(md.indexOf("## Simulation only, engine as the app hosts it"));
+    expect(markdownReport({ ...r, metrics: r.metrics.filter((m) => m.metric !== "cold game ready") })).not.toContain("Cold start to ready, paired difference");
   });
 
   it("names what made the tree dirty", () => {

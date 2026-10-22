@@ -24,6 +24,7 @@ pub mod economy;
 pub mod events;
 pub mod facilities;
 pub mod fflate;
+pub mod fixed_step;
 pub mod frame;
 pub mod gameplay;
 pub mod housekeeping;
@@ -32,6 +33,7 @@ pub mod jsmath;
 pub mod ledger;
 pub mod load;
 mod noise;
+pub mod panels;
 pub mod presence;
 pub mod rent;
 pub mod rng;
@@ -45,6 +47,10 @@ pub mod save_delta;
 pub mod scenario;
 #[cfg(any(test, feature = "conformance"))]
 pub mod scenario_detail;
+#[cfg(test)]
+mod scenario_reason_tests;
+#[cfg(test)]
+mod scenario_tune_tests;
 pub mod schedule;
 pub mod services;
 pub mod sim;

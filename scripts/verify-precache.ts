@@ -16,7 +16,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets.ts";
-import { engineDistProblems } from "../src/build/enginePackageBuild.ts";
+import { engineDistProblems, shellProblems } from "../src/build/enginePackageBuild.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
 import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, ENGINE_WASM, glueLoads } from "../src/wasmhost/engineAssets.ts";
 
@@ -145,6 +145,10 @@ if (builtEngine) {
   const unsound = engineDistProblems(DIST, manifest);
   if (unsound.length > 0) fail(`the engine package in dist/ is not one consistent set: ${unsound.join("; ")}`);
 }
+// The page checks the engine against the id compiled into its chunks, and a
+// production bundle must not carry the development serve's skip (#985).
+const shell = shellProblems(DIST, builtEngine);
+if (shell.length > 0) fail(`the shell in dist/ and its engine check are not sound: ${shell.join("; ")}`);
 
 // Today's sounds must play offline too (#985): the lazy chunk that carries
 // Tone.js and every synthesized sound, and each recorded file the audio layer

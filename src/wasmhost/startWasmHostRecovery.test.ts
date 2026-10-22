@@ -8,7 +8,7 @@ import { startWasmHost, type WasmHostApp, type WasmHostOptions } from "./startWa
  * told on every path, and what the app is asked to do.
  */
 
-function app(): WasmHostApp & { adopted: Simulation[]; dropped: number; steps: number; holds: boolean[] } {
+function app(): WasmHostApp & { adopted: Simulation[]; dropped: number; steps: number; holds: boolean[]; cleared: number } {
   const a = {
     sim: Simulation.newGame(3, "classic"),
     adopted: [] as Simulation[],
@@ -28,6 +28,11 @@ function app(): WasmHostApp & { adopted: Simulation[]; dropped: number; steps: n
     },
     holdClearedRedo(on: boolean) {
       a.holds.push(on);
+    },
+    /** Whole trails cleared. */
+    cleared: 0,
+    clearUndo() {
+      a.cleared++;
     },
   };
   return a;
@@ -54,6 +59,26 @@ describe("the recovery after a fault (#874)", () => {
       expect(a.adopted).toHaveLength(1);
       expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: "The WASM engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.", kind: "bad" }));
       expect(a.dropped).toBe(1);
+      expect(handle.status.restorePoint).toEqual({ point: "attach", skipped: 0 });
+      expect(a.cleared).toBe(0);
+    } finally {
+      handle.stop();
+    }
+  });
+
+  // The boot turns the engine save writer off on `latched` (#1113).
+  it("latches hosting off on a fault and tells the owner so", async () => {
+    const a = app();
+    const onFallback = vi.fn();
+    const { handle, engine } = start(a, { onFallback });
+    try {
+      engine().failOn = "tick";
+      a.sim.tick(1);
+      expect(onFallback).toHaveBeenCalledWith({ reason: "trap-tick", stage: "start" }, true);
+      expect(handle.status).toMatchObject({ hosted: false, latched: true });
+      await settle();
+      a.adoptSim(Simulation.newGame(4, "classic"));
+      expect(handle.status).toMatchObject({ hosted: false, starts: 1 });
     } finally {
       handle.stop();
     }
@@ -309,6 +334,112 @@ describe("the recovery after a fault (#874)", () => {
     }
   });
 
+  const REPLACED = "The WASM engine stopped, so the game runs on the TypeScript engine now.";
+  const CLEARED = "The WASM engine stopped, so the undo history was cleared. The game runs on the TypeScript engine now.";
+  const OLDER = "The WASM engine stopped, so the tower went back to an earlier good state and anything since then was undone. The undo history was cleared, and the tower runs on the TypeScript engine now.";
+  const SWAP_FAILED = "The WASM engine stopped, and the tower could not switch to the TypeScript engine, so it is frozen and changes to it are not saved. Load a save or start a new tower to keep playing.";
+
+  it("says the tower went back further, names the point and clears the undo trail, when the newest point does not load (#1126)", async () => {
+    const a = app();
+    const { handle, engine } = start(a);
+    const load = vi.spyOn(Simulation, "deserialize");
+    try {
+      const sim = a.sim;
+      sim.tick(60); // the hour pass merges: an older point
+      const atMerge = sim.money;
+      sim.money = atMerge + 12_345; // an edit after it
+      sim.serialize(); // a hosted save: the newest point
+      engine().failOn = "tick";
+      sim.tick(1);
+      load.mockImplementationOnce(() => {
+        throw new Error("the newest point does not load");
+      });
+      await settle();
+      expect(a.sim).not.toBe(sim);
+      expect(handle.status.restorePoint).toEqual({ point: "merge", skipped: 1 });
+      expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: OLDER, kind: "bad" }));
+      expect(a.sim.money).toBe(atMerge); // the edit after the merge is gone
+      // The newest undo steps are later than the tower now: the trail starts
+      // over instead of being tidied.
+      expect(a.cleared).toBe(1);
+      expect(a.dropped).toBe(0);
+    } finally {
+      load.mockRestore();
+      handle.stop();
+    }
+  });
+
+  // An undo's or a redo's own snapshot of the faulted tower is a save of it,
+  // which answers with a restore point: past the newest when that one does
+  // not load. The swap comes before the recovery then (#1126). The tower is
+  // the one the player asked for; the step the snapshot made is not.
+  it.each([
+    ["an undo whose snapshot went past the newest point: names it and clears the trail", true, true, { point: "merge", skipped: 1 }, CLEARED, 1],
+    ["a load after a save that went past the newest point: names none and keeps its line", false, true, null, REPLACED, 0],
+    ["an undo whose snapshot is the newest point: names it and tidies as before", true, false, { point: "latest", skipped: 0 }, REPLACED, 0],
+  ])("records which point a save of the faulted tower answered with, if any, after %s", async (_, keepHistory, skips, point, line, cleared) => {
+    const a = app();
+    const { handle, engine } = start(a);
+    const load = vi.spyOn(Simulation, "deserialize");
+    try {
+      const sim = a.sim;
+      sim.tick(60); // the hour pass merges: an older point
+      sim.money += 12_345;
+      sim.serialize(); // a hosted save: the newest point
+      engine().serialize = () => {
+        throw new Error("serialize failed");
+      };
+      if (skips) {
+        load.mockImplementationOnce(() => {
+          throw new Error("the newest point does not load");
+        });
+      }
+      sim.serialize(); // the snapshot faults the host and answers with a point
+      a.adoptSim(Simulation.newGame(3, "classic"), keepHistory);
+      await settle();
+      expect(handle.status.restorePoint).toEqual(point);
+      expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: line, kind: "bad" }));
+      expect(a.cleared).toBe(cleared);
+      expect(a.dropped).toBe(1 - cleared);
+    } finally {
+      load.mockRestore();
+      handle.stop();
+    }
+  });
+
+  it("says the swap failed, and keeps the stuck tower's own events out of the game (#1149)", async () => {
+    const a = app();
+    const adopt = a.adoptSim.bind(a);
+    a.adoptSim = (next: Simulation, keep?: boolean) => {
+      if (keep) throw new Error("the app broke");
+      adopt(next, keep);
+    };
+    const { handle, engine } = start(a);
+    try {
+      const sim = a.sim;
+      sim.drainGameplayEvents(); // the founding
+      engine().owed.push({ name: "star_reached", payload: { star: 2 } });
+      sim.serialize(); // a point covers the engine's event, which waits in the host
+      engine().failOn = "tick";
+      sim.tick(1);
+      await settle();
+      expect(a.sim).toBe(sim);
+      expect(handle.status.restorePoint).toMatchObject({ skipped: 0 });
+      expect(lastLine(sim)).toEqual(expect.objectContaining({ text: SWAP_FAILED, kind: "bad" }));
+      // An edit on the stuck tower: no engine runs it, so its event is not
+      // real. The event the point covered still reaches the game.
+      sim.money = 1e9;
+      expect(sim.build("lobby", 1, 180).ok).toBe(true);
+      expect(sim.drainGameplayEvents().map((e) => e.name)).toEqual(["star_reached"]);
+      // A load that replaces it inherits none of its edits' events either.
+      expect(sim.build("lobby", 1, 181).ok).toBe(true);
+      a.adoptSim(Simulation.newGame(4, "classic"));
+      expect(a.sim.drainGameplayEvents().map((e) => e.name)).toEqual(["tower_founded"]);
+    } finally {
+      handle.stop();
+    }
+  });
+
   it("reports an adopt that throws instead of letting it escape the recovery", async () => {
     const a = app();
     const adopt = a.adoptSim.bind(a);
@@ -326,7 +457,7 @@ describe("the recovery after a fault (#874)", () => {
       expect(handle.status.errors).toContain("adopting the restored tower: the app broke");
       expect(a.sim).toBe(sim);
       expect(a.dropped).toBe(0);
-      expect(lastLine(sim)).toEqual(expect.objectContaining({ text: expect.stringMatching(/could not go back to a good state/), kind: "bad" }));
+      expect(lastLine(sim)).toEqual(expect.objectContaining({ text: SWAP_FAILED, kind: "bad" }));
     } finally {
       handle.stop();
     }

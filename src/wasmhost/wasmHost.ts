@@ -16,7 +16,7 @@ import { useTowerCatalogSource } from "../engine/towerCatalog";
 import { syncCars, syncPeople, syncUnits } from "./frameSync";
 import { refuseForeignCatalog } from "./catalogCheck";
 export { refuseForeignCatalog } from "./catalogCheck";
-import { FaultLatch, RestorePoints, carryLiveState, type FaultContext, type HostFault } from "./hostFault";
+import { FaultLatch, RestorePoints, carryLiveState, letEngineGo, runEach, type FaultContext, type HostFault, type RestoredPoint } from "./hostFault";
 import { HostEvents, type EventRead } from "./hostEvents";
 
 /**
@@ -71,10 +71,14 @@ export interface WasmHost {
    *  command and any after the fault included (#874). Temporary, with the
    *  restore points. */
   readonly lostEdits: number;
-  /** A fresh TypeScript tower from the newest restore point that loads,
-   *  carrying the read model's live state no save holds (#874). Throws when
-   *  no point loads. Temporary, with the restore points. */
-  restore(): Simulation;
+  /** A fresh TypeScript tower from the newest restore point that loads, or
+   *  that a save of the faulted host answered with, carrying the read model's
+   *  live state no save holds (#874), with the point it came from and how
+   *  many newer points did not load (#1126). Throws when none from there on
+   *  loads. Temporary, with the restore points. */
+  restore(): RestoredPoint & { sim: Simulation };
+  /** The point the faulted host's saves answer with, once chosen (#1126). */
+  readonly answered: RestoredPoint | null;
 }
 
 /** Attach a host to `sim`. Throws, leaving the instance untouched, when the
@@ -133,12 +137,23 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   // its own line, and the engine logs the same line for the same command
   // (the conformance suite pins the log), so those entries are skipped
   // rather than appended twice.
-  let engineLogSeq = engine.frameView()[3];
+  let engineLogSeq: number;
   // The engine's meal overlay counter at the last sync. The instance keeps
   // its own counter and bumps it once in every sync where the engine's moved,
   // so a bump the instance made itself (a relayed command) and an engine bump
   // never land on the same number and the counter never steps back.
-  let engineMealRev = decodeFrame(engine.frameView()).header.mealOverlayRevision;
+  let engineMealRev: number;
+  try {
+    // One read, checked whole as the decoder checks it (#1158 A25).
+    const view = engine.frameView();
+    const header = decodeHeader(view);
+    checkRecords(view, header);
+    engineLogSeq = header.logSeq;
+    engineMealRev = header.mealOverlayRevision;
+  } catch (e) {
+    // A refusal frees the engine it built; a trap lets it go untouched (#1113).
+    throw letEngineGo(shadow, e);
+  }
   let simLogSeqAtSync = sim.logSeq;
   let commuteRevision = Number.NaN;
   let detached = false;
@@ -221,9 +236,12 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
       if (coalesce && stale && !detached) guard("trap-tick", () => syncFrame(), undefined);
     },
     restore() {
-      const fresh = points.restore().sim;
-      carryLiveState(sim, fresh);
-      return fresh;
+      const restored = points.restore();
+      carryLiveState(sim, restored.sim);
+      return restored;
+    },
+    get answered() {
+      return points.answered;
     },
     detach() {
       if (detached) return;
@@ -259,14 +277,13 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
         () => restoreOwn(sim, "drainGameplayEvents", ownDrain),
         () => restoreOwn(sim, "gameplayEventsDropped", ownDropped),
         () => sim.gameplayEvents.restore(handOff.events, handOff.dropped),
-        () => {
-          try {
-            shadow.free();
-          } catch (e) {
-            // A trapped engine cannot be freed; its module is not used again.
-            if (!faulted) throw e;
-          }
-        },
+        // A faulted tower runs no engine, so what its edits would emit is
+        // not real (#1149): its buffer keeps the events handed back, for the
+        // tower that replaces it or its own drain, and takes no more.
+        // Temporary, with the frozen tower's own tick.
+        faulted ? () => Object.defineProperty(sim.gameplayEvents, "pushEvent", { value: () => {}, configurable: true, writable: true }) : () => {},
+        // After a fault the module is not called again, its free included (#1113).
+        () => (faulted ? shadow.abandon() : shadow.free()),
       );
     },
   };
@@ -410,17 +427,14 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     });
   } catch (e) {
     // A relay already on the instance (the dual run's mirror, a second
-    // host): the engine built for it must not leak, and the instance keeps
-    // its own events.
+    // host): the instance keeps its own events, and the engine built for it
+    // must not leak. A trap in its free is the answer then (#1113).
     try {
-      runEach(
-        () => shadow.free(),
-        () => sim.gameplayEvents.restore(events.take(), sim.gameplayEvents.dropped),
-      );
+      sim.gameplayEvents.restore(events.take(), sim.gameplayEvents.dropped);
     } catch {
-      // The refusal is the caller's answer; a failure to free behind it is not.
+      // The refusal is the caller's answer; a failure to put events back is not.
     }
-    throw e;
+    throw letEngineGo(shadow, e);
   }
   const ownSerialize = Object.getOwnPropertyDescriptor(sim, "serialize");
   const ownDrain = Object.getOwnPropertyDescriptor(sim, "drainGameplayEvents");
@@ -462,21 +476,6 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     });
   }
   return host;
-}
-
-/** Run every step, even after one throws, then throw the first error: a
- *  teardown that must let the instance go and free the engine whatever an
- *  earlier step did. */
-function runEach(...steps: (() => void)[]): void {
-  let failure: { error: unknown } | null = null;
-  for (const step of steps) {
-    try {
-      step();
-    } catch (error) {
-      failure ??= { error };
-    }
-  }
-  if (failure) throw failure.error;
 }
 
 /** Put back an own property the host replaced: the one that was there, or

@@ -1,5 +1,6 @@
 import type { ShadowCommand } from "../dualrun/commands";
 import type { BuildMetadataResult } from "./buildSection";
+import type { FallbackReason, PackageFailure } from "./engineBoot";
 import type { DeltaText } from "./saveSyncRules";
 
 /**
@@ -87,10 +88,8 @@ export interface LoadedReply {
   view: Float64Array;
 }
 
-/** The full-save half of a frame, sent when the tower's revision moved
- *  since the last one sent, when asked for, or on an hour pass a delta
- *  cannot carry (the engine cannot describe it, or a command ran since the
- *  last sync). */
+/** The full-save half of a frame, sent when the tower's revision or the
+ *  engine's hour pass moved since the last one sent, or when asked for. */
 export interface MergePayload {
   save: string;
   telemetry: string;
@@ -150,6 +149,11 @@ export interface ErrorReply {
   seq?: number;
   fatal: boolean;
   message: string;
+  /** The code of a failed load (`package-mismatch` for a binding the shell
+   *  cannot use, #1086) and, when the byte check refused the package, its
+   *  detail (#985). Absent on every other error. */
+  reason?: FallbackReason;
+  package?: PackageFailure;
   /** On a failed package load: what the binary's build section said, when it
    *  had been read (#963). */
   build?: BuildMetadataResult;

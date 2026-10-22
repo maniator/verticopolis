@@ -102,7 +102,7 @@ for (const f of [`${target.lib}.js`, `${target.lib}_bg.wasm`]) {
 if (which === "engine") stamp(resolve(crate, "pkg", `${target.lib}_bg.wasm`));
 if (which === "engine") {
   // The browser build, served beside the app from src/public/engine/ (the WASM
-  // host and the dual run's worker load it by URL). It is build output, not
+  // host and the dual run's worker load it through the verified loader). It is build output, not
   // checked in; Vercel and CI build it (scripts/build-engine-wasm.sh). Its
   // BUILD.json records a hash of the Rust sources it was built from: CI keys
   // its cache on that hash, and src/wasmhost/packageHash.test.ts fails when

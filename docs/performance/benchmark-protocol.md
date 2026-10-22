@@ -318,6 +318,50 @@ goes first). A failed repetition is re-run and the report says how many were.
 Every desktop metric runs at **1x and 4x** CPU throttle, on the small, medium
 and large scenarios with their pinned scenario hashes.
 
+**Bracket and many-unit towers (#1270).** The three default towers are sized by
+people. Three more are named on purpose with `--scenarios` and never run by
+default, so an existing run keeps its meaning. Each is a save built in Node
+through the engine's own commands (every cap in `src/engine/facilities.ts`
+holds, and the floors, shafts and walkways are asserted; occupancy is written
+to the unit state, and the tests bound the people and units) and handed unchanged to both engines
+(`src/tests/perfCompare/fixtureTowers.ts`):
+
+| Name | People | Units | Transports | Save bytes | What it is for |
+| --- | --- | --- | --- | --- | --- |
+| `small` | 729 | 2,240 | 2 | 108,517 | default |
+| `bracket-a` | 1,155 | 3,904 | 2 | 189,483 | size threshold: between small and medium |
+| `bracket-b` | 1,803 | 7,222 | 4 | 349,763 | size threshold: between small and medium |
+| `medium` | 3,240 | 12,062 | 15 | 644,803 | default |
+| `large` | 17,322 | 43,358 | 5 | 2,157,159 | default |
+| `many-unit` | 504 | 41,880 | 88 | 1,977,903 | unit-scaled costs with a small crowd |
+| `hotel-heavy` | 1,704 | 10,490 | 10 | 539,181 | housekeeping dispatch (#1279) |
+
+Every tower records its people, units and save bytes, so a size rule can be
+read off any of them (which one the gate uses is not decided here). The
+many-unit tower exists because several costs scale with units, not people: the
+engine reads that walk every unit, the per-move scans, the host sending every
+unit each frame, the hourly merge and the restore point (save size), the
+structural snapshot and the load peak. It is a five-star, 100-story tower with
+full-width floors, lobbies, all 24 elevator shafts (5 standard bands, 5 service
+bands and 14 express) and all 64 stairs and escalator links, and most of its
+rooms are vacant. A rule that counts only people would let it onto the slowest path.
+Its rows are reported rows at the stage-1 bracket run, slice 9 and RUN-1;
+whether they bind at RUN-3 is the owner's decision. The `hotel-heavy` tower is a Modern tower
+of 852 booked hotel rooms total (732 in the main 61-story tower and 120 in its low wing),
+with 24 housekeeping units. Guests
+ride standard elevators that serve every floor, but the staff network is split
+into three service-elevator zones and only the first two have crews, so 276 of
+the rooms (32%) are out of every crew's reach: `staffConnected` fails for them
+on every dispatch. The 120-room wing beside the tower, joined to it only along the lobby row, has rooms on crewed stories
+with no staff transport of its own (one standard elevator lets its guests reach
+the lobby and stay): `staffConnected` says yes, but every dispatch to the wing
+ends in `no-route`, about 62,000 times on the first day and about 140,000 on
+each day after. The save starts at 07:00 and the 08:00 checkout makes
+nearly 700 rooms dirty at once; the 276 unreachable ones stay dirty through the
+shift. The large tower has no housekeeping units, so nothing else exercises
+that dispatch. Run them with
+`--scenarios bracket-a,bracket-b,many-unit,hotel-heavy` (quote the list in PowerShell).
+
 `perf:compare` opens a fresh page for every scenario and engine in the timed
 simulation passes and in each gameplay-frames block (#1162). Before that change
 it ran every scenario after the first in a page an earlier scenario had used,
@@ -438,8 +482,10 @@ noise the tolerance has to cover.
    the median paired difference (WASM slot minus TypeScript slot, one-sided).
    `perf:worker`'s report prints M4's difference (median and 95% interval of
    the median, WASM minus TypeScript, in ms); the upper end is the statistic
-   `perf:calibrate` computes for a pass. Not yet: the `perf:compare` report has
-   to print that same statistic before M5 can be judged against ε.
+   `perf:calibrate` computes for a pass. The `perf:compare` report prints M5's statistic
+   the same way, under the Startup table (one row per CPU throttle, with the
+   pair count); a row under 10 pairs is marked as below the gate's minimum, in
+   both reports.
 3. **Coverage.** For passes that are exchangeable, on average over
    the draw of the passes, a fresh pass lands above the largest of n passes
    with probability 1/(n + 1) (before rounding).

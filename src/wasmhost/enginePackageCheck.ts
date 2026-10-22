@@ -221,7 +221,10 @@ export async function verifyEnginePackage(opts: VerifyOptions): Promise<Verified
       if (origin !== opts.origin) throw refuse("was redirected to another origin");
     }
     if (/^text\/html/i.test(res.headers.get("content-type") ?? "")) throw refuse("came back as a web page");
-    return readBounded(file, res, cap, ctl, (kind, why) => fail(kind, why, { file }));
+    // The digest the shell expects for this file rides on any refusal, the
+    // oversize one included (the record may not have been read yet).
+    const entry = file === "build-record" ? null : expected.files[file === "glue" ? ENGINE_GLUE : ENGINE_WASM];
+    return readBounded(file, res, cap, ctl, (kind, why) => fail(kind, why, { file, expected: entry ? shortId(entry.sha256) : null }));
   };
   const order: [PackageFile, string, number][] = [
     ["build-record", opts.urls.record, RECORD_CAP_BYTES],
@@ -244,7 +247,17 @@ export async function verifyEnginePackage(opts: VerifyOptions): Promise<Verified
     // The first failure in a fixed order that is not a sibling's stop, so the
     // reason does not depend on which fetch lost the race.
     for (const s of settled) {
-      if (s.status === "rejected" && !(s.reason instanceof SiblingStopped)) throw s.reason;
+      if (s.status === "rejected" && !(s.reason instanceof SiblingStopped)) {
+        // An oversize file is refused as it streams, possibly before the
+        // record was read; when the record did arrive whole, the refusal
+        // still names the package it served.
+        const early = settled[0];
+        if (s.reason instanceof EnginePackageError && s.reason.detail.servedPackage === null && early.status === "fulfilled") {
+          const served = parseEngineRecord(new TextDecoder().decode(early.value));
+          if (served.ok) s.reason.detail.servedPackage = shortId(served.record.package);
+        }
+        throw s.reason;
+      }
     }
     if (settled.some((s) => s.status === "rejected")) throw new EnginePackageAborted();
     bodies = settled.map((s) => (s as PromiseFulfilledResult<Uint8Array>).value);

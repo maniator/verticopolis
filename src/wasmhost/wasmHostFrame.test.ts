@@ -6,6 +6,45 @@ import { fakeModule } from "./fakeEngine.fixture";
 import { advanceOwedMinutes } from "../game/frameLoop";
 import { engineSuffix } from "./engineLabel";
 
+describe("the attach", () => {
+  // Two header fields, one read of the frame view, checked whole as the
+  // decoder checks it (#1158 A25).
+  it("reads the engine's frame view once", () => {
+    const mod = fakeModule();
+    const host = attachWasmHost(Simulation.newGame(9, "classic"), mod);
+    expect(mod.engines[0].frameViews).toBe(1);
+    host.detach();
+  });
+  // A frame whose records run past its end is a clean refusal at the
+  // attach, where the first sync would fault on it and latch hosting off.
+  it("refuses a frame that overruns its record count, and frees the engine", () => {
+    const mod = fakeModule();
+    const fromSave = mod.Engine.fromSave.bind(mod.Engine);
+    mod.Engine = {
+      fromSave(save: string, markers?: string) {
+        const engine = fromSave(save, markers);
+        const fake = mod.engines[mod.engines.length - 1];
+        const view = fake.frameView.bind(fake);
+        // The header's unit count (slot 24) says three, and no records follow.
+        fake.frameView = () => Object.assign(view(), { 24: 3 });
+        return engine;
+      },
+    } as unknown as typeof mod.Engine;
+    const sim = Simulation.newGame(9, "classic");
+    expect(() => attachWasmHost(sim, mod)).toThrow(/record at \d+ needs 6/);
+    expect(mod.engines[0]).toMatchObject({ freed: true, abandoned: false });
+    expect(Object.getOwnPropertyDescriptor(sim, "serialize")).toBeUndefined();
+  });
+  // Only a faulted tower's buffer is closed (#1149).
+  it("leaves the instance's event buffer open after a healthy detach", () => {
+    const sim = Simulation.newGame(9, "classic");
+    attachWasmHost(sim, fakeModule()).detach();
+    sim.drainGameplayEvents();
+    expect(sim.build("lobby", 1, 170).ok).toBe(true);
+    expect(sim.drainGameplayEvents().filter((e) => e.name === "facility_placed")).toHaveLength(1);
+  });
+});
+
 describe("the coalesced main-thread host (sync: frame)", () => {
   it.each(["frame", "step"] as const)("hands current commute rows back before an hourly merge (%s)", (sync) => {
     const sim = Simulation.newGame(9, "classic");
@@ -31,7 +70,7 @@ describe("the coalesced main-thread host (sync: frame)", () => {
     expect(sim.drainGameplayEvents().filter((e) => e.name === "star_reached")).toHaveLength(1);
     expect(sim.drainGameplayEvents()).toEqual([]);
   });
-  it("faults, frees the engine and freezes the tower when the commute rows at detach are malformed (#874)", () => {
+  it("faults, lets the engine go and freezes the tower when the commute rows at detach are malformed (#874)", () => {
     const sim = Simulation.newGame(9, "classic");
     const mod = fakeModule();
     const host = attachWasmHost(sim, mod, { sync: "frame" });
@@ -42,7 +81,8 @@ describe("the coalesced main-thread host (sync: frame)", () => {
     sim.tick(1);
     expect(() => host.detach()).not.toThrow();
     expect(host.fault).toMatchObject({ reason: "other", message: expect.stringMatching(/while letting a tower go: .*commute stress/) });
-    expect(engine.freed).toBe(true);
+    // After a fault the module is not called again, its free included (#1113).
+    expect(engine).toMatchObject({ freed: false, abandoned: true });
     expect([...sim.crowd.commuteStressByFloor]).toEqual([[2, 10]]);
     // A faulted tower never runs on TypeScript, and its save is the newest
     // restore point (here the attach save).

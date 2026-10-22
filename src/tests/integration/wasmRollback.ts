@@ -19,6 +19,9 @@ export const UNDONE = "The WASM engine stopped, so the tower went back to its la
 export const RESTORED = "The WASM engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.";
 export const REPLACED = "The WASM engine stopped, so the game runs on the TypeScript engine now.";
 export const LOST = "The WASM engine stopped, so some of your recent changes were lost. The game runs on the TypeScript engine now.";
+export const OLDER = "The WASM engine stopped, so the tower went back to an earlier good state and anything since then was undone. The undo history was cleared, and the tower runs on the TypeScript engine now.";
+export const CLEARED = "The WASM engine stopped, so the undo history was cleared. The game runs on the TypeScript engine now.";
+export const SWAP_FAILED = "The WASM engine stopped, and the tower could not switch to the TypeScript engine, so it is frozen and changes to it are not saved. Load a save or start a new tower to keep playing.";
 
 /** GameApp as far as the host and the undo trail see it: its adopt, its
  *  history (the real one, through the app's own ports) and its toasts. */
@@ -40,6 +43,7 @@ export function gameApp(sim: Simulation) {
     redo: () => a.history.redo(),
     dropEmptyUndo: () => a.history.dropUnchanged(),
     holdClearedRedo: (on: boolean) => void (a.history.holdClearedRedo = on),
+    clearUndo: () => a.history.clear(),
   };
   a.history = createAppHistory(a);
   return a;

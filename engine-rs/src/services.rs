@@ -217,7 +217,7 @@ impl Simulation {
     }
 
     pub fn nudge_metro_platform(&mut self) {
-        let orphaned = self.tower.units.iter().any(|u| {
+        let orphaned = self.tower.room_units().any(|u| {
             u.kind == Kind::Metro && u.is_operational() && !self.tower.is_metro_platform_served(u)
         });
         if orphaned && !self.metro_platform_nudged {
@@ -226,7 +226,7 @@ impl Simulation {
         self.metro_platform_nudged = orphaned;
     }
 
-    fn is_stranded_candidate(u: &Unit, rentable: bool) -> bool {
+    pub(crate) fn is_stranded_candidate(u: &Unit, rentable: bool) -> bool {
         if is_tenant_floor_unit(u) {
             return true;
         }
@@ -241,7 +241,9 @@ impl Simulation {
     /// `strandedFloors(scope)`: sorted ascending.
     pub fn stranded_floors(&mut self, rentable: bool) -> Vec<i64> {
         let mut candidates: indexmap::IndexSet<i64> = indexmap::IndexSet::new();
-        for u in &self.tower.units {
+        // A tile is never a candidate (no population, not a hotel), so the
+        // room index lists them all in list order (#1237).
+        for u in self.tower.room_units() {
             if !Self::is_stranded_candidate(u, rentable) {
                 continue;
             }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { WasmModule } from "../dualrun/binding";
-import { EngineBootError, FALLBACK_REASONS, FALLBACK_STAGES, bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState } from "./engineBoot";
+import { EngineBootError, FALLBACK_REASONS, FALLBACK_STAGES, bootFailure, bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, packageFailureOf, publishBootState, typescriptBoot, type EngineBootState } from "./engineBoot";
+import { EnginePackageError, type PackageFailureKind } from "./enginePackageCheck";
 
 const mod = (withWriter = true) => ({ Engine: class {}, ...(withWriter ? { encodeVctower: () => new Uint8Array() } : {}) }) as unknown as WasmModule;
 const quiet = () => ({ error: vi.fn() });
@@ -68,7 +69,7 @@ describe("loadBootEngine, wasm-only build", () => {
 
 describe("fallback reason codes", () => {
   it("keeps the lists closed, with none first and the runtime codes reserved", () => {
-    expect(FALLBACK_REASONS).toEqual(["none", "boot-timeout", "boot-error", "package-mismatch", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"]);
+    expect(FALLBACK_REASONS).toEqual(["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"]);
     expect(FALLBACK_STAGES).toEqual(["none", "load", "start", "adopt", "undo"]);
   });
 
@@ -84,6 +85,82 @@ describe("fallback reason codes", () => {
   it("reports a glue and binary that do not link as a package mismatch", async () => {
     const r = await loadBootEngine({ wasmOnly: false, load: async () => Promise.reject(new WebAssembly.LinkError("bad import")), log: quiet() });
     expect(r.state.failure).toMatchObject({ stage: "load", reason: "package-mismatch" });
+  });
+});
+
+const refusal = (kind: PackageFailureKind) =>
+  new EnginePackageError(kind, `the ${kind} message`, { controlled: true, file: "wasm", expected: "aaaaaaaaaaaa", found: "bbbbbbbbbbbb", expectedPackage: "111111111111", servedPackage: "222222222222" });
+
+describe("a refused engine package (#985)", () => {
+  it("is a package mismatch only when the bytes disagree with the shell", () => {
+    expect(bootFailureReason(refusal("mismatch"))).toBe("package-mismatch");
+    expect(bootFailureReason(refusal("load-failed"))).toBe("boot-error");
+    expect(bootFailureReason(refusal("unverifiable"))).toBe("unverifiable");
+  });
+
+  it("keeps the kind, the file and both ids on the failure, beside the closed code", () => {
+    expect(bootFailure("load", refusal("mismatch"))).toEqual({
+      stage: "load",
+      reason: "package-mismatch",
+      message: "the mismatch message",
+      package: { kind: "mismatch", file: "wasm", expected: "aaaaaaaaaaaa", found: "bbbbbbbbbbbb", expectedPackage: "111111111111", servedPackage: "222222222222", controlled: true },
+    });
+    // The detail is plain data, so a worker can post it.
+    expect(structuredClone(bootFailure("load", refusal("load-failed")))).toMatchObject({ reason: "boot-error", package: { kind: "load-failed" } });
+    expect(bootFailure("load", new Error("404"))).toEqual({ stage: "load", reason: "boot-error", message: "404" });
+  });
+
+  it("carries the detail through a boot error that a worker's reply became", () => {
+    const pkg = packageFailureOf(refusal("mismatch"));
+    expect(pkg?.kind).toBe("mismatch");
+    const e = new EngineBootError("package-mismatch", "from the worker", pkg);
+    expect(packageFailureOf(e)).toBe(pkg);
+    expect(bootFailure("load", e).package).toBe(pkg);
+    expect(packageFailureOf(new EngineBootError("boot-timeout", "slow"))).toBeUndefined();
+  });
+
+  it("falls back to the TypeScript engine on a switchable build and records the detail", async () => {
+    const log = quiet();
+    const r = await loadBootEngine({ wasmOnly: false, load: async () => Promise.reject(refusal("mismatch")), log });
+    expect(r.module).toBeNull();
+    expect(r.state).toMatchObject({ build: "switchable", engine: "ts", failure: { stage: "load", reason: "package-mismatch", package: { kind: "mismatch", expectedPackage: "111111111111" } } });
+    expect(log.error).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops a wasm-only build with the same detail", async () => {
+    const r = await loadBootEngine({ wasmOnly: true, load: async () => Promise.reject(refusal("unverifiable")), log: quiet() });
+    expect(r.state).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "load", reason: "unverifiable", package: { kind: "unverifiable" } } });
+  });
+});
+
+describe("the load deadline", () => {
+  it("aborts the signal the loader holds when it expires, before the timeout is published", async () => {
+    vi.useFakeTimers();
+    try {
+      let seen: AbortSignal | undefined;
+      const pending = loadBootEngine({
+        wasmOnly: false,
+        load: (signal) => {
+          seen = signal;
+          return new Promise<WasmModule>((_, fail) => signal.addEventListener("abort", () => fail(new Error("late"))));
+        },
+        log: quiet(),
+        timeoutMs: 2000,
+      });
+      expect(seen?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(seen?.aborted).toBe(true);
+      // The timeout wins over the load's own late rejection.
+      expect((await pending).state.failure).toMatchObject({ reason: "boot-timeout", message: "the engine package did not load within 2 seconds" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("leaves the signal alone when the load finishes in time", async () => {
+    let seen: AbortSignal | undefined;
+    await loadBootEngine({ wasmOnly: false, load: async (signal) => ((seen = signal), mod()), log: quiet() });
+    expect(seen?.aborted).toBe(false);
   });
 });
 
@@ -103,13 +180,74 @@ describe("failBoot and publishBootState", () => {
 
 describe("engineFailureCopy", () => {
   it("says what happened, why, and what to try, with the offline step only offline", () => {
-    const online = engineFailureCopy({ stage: "load", reason: "boot-error", message: "404" }, true);
+    const online = engineFailureCopy({ stage: "start", reason: "attach-refused", message: "404" }, true);
     expect(online.headline).toMatch(/could not start/);
     expect(online.reason).toBe("404");
     expect(online.steps[0]).toMatch(/^Reload the page/);
     expect(online.steps.some((s) => /offline/.test(s))).toBe(false);
-    const offline = engineFailureCopy({ stage: "load", reason: "boot-error", message: "404" }, false);
+    const offline = engineFailureCopy({ stage: "start", reason: "attach-refused", message: "404" }, false);
     expect(offline.steps.some((s) => /You appear to be offline/.test(s))).toBe(true);
+  });
+
+  it("gives each load cause its own sentence, from the code, the cause and the package detail (#985)", () => {
+    const detail = { file: "wasm" as const, expected: null, found: null, expectedPackage: "111111111111", servedPackage: "222222222222", controlled: true };
+    const load = (reason: Parameters<typeof engineFailureCopy>[0]["reason"], extra: Partial<Parameters<typeof engineFailureCopy>[0]> = {}, online = true, secure = true) =>
+      engineFailureCopy({ stage: "load", reason, message: "SECRET internal detail", ...extra }, online, secure);
+    const mismatch = "The engine files do not match this version of the game. The engine was not started.";
+    expect(load("package-mismatch", { package: { ...detail, kind: "mismatch" } }).reason).toBe(`${mismatch} (expected 111111111111, found 222222222222)`);
+    // Ids that are not known read as unavailable, and a mismatch with no detail at all (a link error, a dropped worker detail) still gets the sentence.
+    expect(load("package-mismatch", { package: { ...detail, kind: "mismatch", expectedPackage: null, servedPackage: null } }).reason).toBe(`${mismatch} (expected unavailable, found unavailable)`);
+    expect(load("package-mismatch").reason).toBe(`${mismatch} (expected unavailable, found unavailable)`);
+    // The same package id on both sides means one file differs, so the ids would only repeat.
+    expect(load("package-mismatch", { package: { ...detail, kind: "mismatch", servedPackage: "111111111111" } }).reason).toBe(`${mismatch} (the engine binary differs from the record)`);
+    // A load-failed detail wins over the code that carries it.
+    expect(load("package-mismatch", { package: { ...detail, kind: "load-failed" } }).reason).toBe("The engine files could not be loaded. Try Reload.");
+    // Any other load failure, with no detail at all included, reads as the files not loading.
+    expect(load("boot-error", { package: { ...detail, kind: "load-failed" } }).reason).toBe("The engine files could not be loaded. Try Reload.");
+    expect(load("boot-error").reason).toBe("The engine files could not be loaded. Try Reload.");
+    expect(load("boot-error", {}, false).reason).toBe("The engine files could not be loaded. Connect to the internet and try Reload.");
+    expect(load("boot-error", { package: { ...detail, kind: "load-failed", expectedPackage: null } }).reason).toMatch(/published without them, so a corrected deployment is needed\.$/);
+    expect(load("boot-timeout").reason).toBe("The engine took too long to load. Try Reload when your connection is ready.");
+    expect(load("boot-timeout", { package: { ...detail, kind: "mismatch" } }).reason).toMatch(/took too long/);
+  });
+
+  it("tells an insecure connection to use HTTPS, and a hashing failure on a secure one to try again (#985)", () => {
+    const failure = (extra: object) => ({ stage: "load" as const, reason: "unverifiable" as const, message: "SECRET", ...extra });
+    const insecure = engineFailureCopy(failure({}), false, false);
+    expect(insecure.reason).toBe("This browser connection cannot verify the engine files. Open the game using HTTPS.");
+    expect(insecure.steps[0]).toMatch(/^Open the game using HTTPS/);
+    expect(insecure.steps.some((s) => /offline/.test(s)), "an offline hint does not fit here").toBe(false);
+    const pkg = { kind: "unverifiable" as const, file: "wasm" as const, expected: null, found: null, expectedPackage: null, servedPackage: null, controlled: false };
+    expect(engineFailureCopy({ stage: "load", reason: "boot-error", message: "x", package: pkg }, true, false).reason).toMatch(/Open the game using HTTPS\.$/);
+    const secure = engineFailureCopy(failure({}), true, true);
+    expect(secure.reason).toBe("This browser could not check the engine files. Try Reload, or try another browser.");
+    expect(secure.steps[0]).toMatch(/^Reload the page/);
+    // Only the load stage has these sentences; a later stage keeps its message and its own first step.
+    const start = engineFailureCopy({ stage: "start", reason: "unverifiable", message: "kept" }, true, false);
+    expect(start.reason).toBe("kept");
+    expect(start.steps[0]).toMatch(/^Reload the page/);
+  });
+
+  it("words the missing save writer from its cause, and a boot that refuses for it sets that cause", async () => {
+    expect(engineFailureCopy({ stage: "load", reason: "package-mismatch", message: "any wording", cause: "no-save-writer" }, true).reason).toBe("The engine cannot save towers. Reload after the game is updated.");
+    const r = await loadBootEngine({ wasmOnly: true, log: quiet(), load: async () => mod(false) });
+    expect(r.state.failure).toMatchObject({ stage: "load", reason: "package-mismatch", cause: "no-save-writer" });
+    const copy = engineFailureCopy(r.state.failure!, true);
+    expect(copy.reason).toBe("The engine cannot save towers. Reload after the game is updated.");
+    expect(JSON.stringify(copy)).not.toMatch(/rebuild it|encodeVctower/);
+  });
+
+  it("keeps the failure message on the screen only for a stage that has no sentence of its own", () => {
+    expect(engineFailureCopy({ stage: "host", reason: "attach-refused", message: "kept message" }, true).reason).toBe("kept message");
+    expect(engineFailureCopy({ stage: "start", reason: "attach-refused", message: "kept message" }, true).reason).toBe("kept message");
+    const sentences = [
+      engineFailureCopy({ stage: "load", reason: "boot-error", message: "SECRET" }, true),
+      engineFailureCopy({ stage: "load", reason: "boot-timeout", message: "SECRET" }, true),
+      engineFailureCopy({ stage: "load", reason: "package-mismatch", message: "SECRET" }, true),
+      engineFailureCopy({ stage: "load", reason: "unverifiable", message: "SECRET" }, true, false),
+      engineFailureCopy({ stage: "load", reason: "package-mismatch", message: "SECRET", cause: "no-save-writer" }, true),
+    ];
+    for (const c of sentences) expect(JSON.stringify(c)).not.toContain("SECRET");
   });
 
   it("tells a mid-game stop apart from a failed start", () => {
@@ -157,7 +295,7 @@ describe("loadBootEngine, the engine binary's build metadata (#963)", () => {
     for (const wasmOnly of [false, true]) {
       const r = await loadBootEngine({
         wasmOnly,
-        load: async (onBuild) => {
+        load: async (_signal, onBuild) => {
           onBuild(ok);
           return mod();
         },
@@ -170,7 +308,7 @@ describe("loadBootEngine, the engine binary's build metadata (#963)", () => {
     for (const binary of [{ state: "missing" }, { state: "malformed", why: "not JSON" }] as const) {
       const r = await loadBootEngine({
         wasmOnly: false,
-        load: async (onBuild) => {
+        load: async (_signal, onBuild) => {
           onBuild(binary);
           return mod();
         },
@@ -189,7 +327,7 @@ describe("loadBootEngine, the engine binary's build metadata (#963)", () => {
       const r = await loadBootEngine({
         wasmOnly,
         log: quiet(),
-        load: async (onBuild) => {
+        load: async (_signal, onBuild) => {
           onBuild(ok);
           throw new WebAssembly.LinkError("import mismatch");
         },
@@ -204,7 +342,7 @@ describe("loadBootEngine, the engine binary's build metadata (#963)", () => {
     const r = await loadBootEngine({
       wasmOnly: true,
       log: quiet(),
-      load: async (onBuild) => {
+      load: async (_signal, onBuild) => {
         onBuild(ok);
         return mod(false);
       },
@@ -216,7 +354,7 @@ describe("loadBootEngine, the engine binary's build metadata (#963)", () => {
   it("keeps it when a later failure puts the game back on TypeScript", async () => {
     const r = await loadBootEngine({
       wasmOnly: false,
-      load: async (onBuild) => {
+      load: async (_signal, onBuild) => {
         onBuild(ok);
         return mod();
       },
@@ -232,7 +370,7 @@ describe("loadBootEngine, the engine binary's build metadata (#963)", () => {
         wasmOnly: false,
         timeoutMs: 1000,
         log: quiet(),
-        load: (onBuild) => {
+        load: (_signal, onBuild) => {
           late = onBuild;
           return new Promise<WasmModule>(() => {});
         },

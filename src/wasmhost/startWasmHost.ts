@@ -1,12 +1,12 @@
 import type { Simulation } from "../engine/Simulation";
 import { checkBinding, type WasmModule } from "../dualrun/binding";
-import { readCatalog } from "../dualrun/catalog";
-import { attachWasmHost, refuseForeignCatalog, type WasmHost } from "./wasmHost";
+import { attachWasmHost, type WasmHost } from "./wasmHost";
+import { catalogVerdict } from "./foreignCatalog";
 import { ENGINE_DIR, ENGINE_GLUE } from "./enginePackageNames";
 import { EngineBootError, type FallbackReason, type FallbackStage } from "./engineBoot";
-import { initEngineGlue, type EngineLoadOptions } from "./engineLoad";
+import { loadEngineModule, type LoadEngineOptions } from "./loadEngineModule";
 import { recordHostError, type HostErrors } from "./hostErrors";
-import type { FaultContext, HostFault } from "./hostFault";
+import { isEngineTrap, type FaultContext, type HostFault, type RestoredPoint } from "./hostFault";
 import { towerStateSig } from "../engine/UndoHistory";
 
 /** What a player can change and see: the undo signature (rooms, transports,
@@ -30,10 +30,12 @@ function playerState(sim: Simulation): string {
  * The same holds while a tower runs (#874): when a call into the engine
  * throws, the host freezes, the fault is reported like a refusal, and once
  * the call that faulted has returned the app adopts a fresh TypeScript tower
- * from the host's newest restore point, with a log line saying so (and that
- * the player's recent changes were undone, when commands since the point
- * changed what the player sees). No tower is hosted again in this page life,
- * since a trapped module may be corrupt. A wasm-only build stops through
+ * from the host's newest restore point that loads, with a log line saying so
+ * (and that the player's recent changes were undone, when commands since the
+ * point changed what the player sees, or that it went back further, when the
+ * newest point did not load). No tower is hosted again in this page life,
+ * since a trapped module may be corrupt, and the same holds when the engine
+ * traps while a tower attaches (#1113). A wasm-only build stops through
  * `onFatal` instead.
  *
  * A command that traps has already answered its caller with the TypeScript
@@ -62,6 +64,16 @@ export interface WasmHostStatus extends HostErrors {
   /** The code and stage of the latest fallback, as analytics reports it
    *  (`engine_status`); null while there has been none. */
   lastFallback: HostFallback | null;
+  /** Whether hosting is off for the rest of the page life: a hosted tower's
+   *  engine faulted (#874), or the engine trapped while a tower attached
+   *  (#1113), so the module may be corrupt and no later tower is hosted. */
+  latched: boolean;
+  /** The restore point the latest recovery loaded, or an undo's or a redo's
+   *  own snapshot of the faulted tower held, with how many newer points
+   *  failed to load first (#1126); null until then. Set as the point loads,
+   *  so a failed swap to it still shows it (the failure is in `lastError`).
+   *  Temporary, with the re-adoption on TypeScript. */
+  restorePoint: RestoredPoint | null;
 }
 
 /** A fallback as codes only: its message is `lastError` until a later
@@ -90,6 +102,10 @@ export interface WasmHostApp {
    *  that edit away, so the tidy can put them back. Temporary, with the
    *  re-adoption on TypeScript. */
   holdClearedRedo?(on: boolean): void;
+  /** Drop the whole undo trail: after a recovery from an older point, or an
+   *  undo's or a redo's snapshot of one, it holds steps the tower does not
+   *  match (#1126). Temporary, with the re-adoption on TypeScript. */
+  clearUndo?(): void;
 }
 
 export interface WasmHostHandle {
@@ -109,11 +125,12 @@ export function enginePackageUrl(base = import.meta.env.BASE_URL, href = globalT
   return new URL(`${base}${ENGINE_DIR}${ENGINE_GLUE}`, href).href;
 }
 
-/** Load and initialize the browser package. A package that loads but lacks
- *  what this shell calls is a mismatched package (a shell and an engine from
- *  different builds), coded so analytics tells it from a broken engine. */
-export async function loadWasmEngine(url = enginePackageUrl(), opts: EngineLoadOptions = {}): Promise<WasmModule> {
-  const { mod } = await initEngineGlue(url, opts);
+/** Load and initialize the browser package through the byte check
+ *  (loadEngineModule). A package that passes it but lacks what this shell
+ *  calls is a mismatched package too (a shell and an engine from different
+ *  builds), coded so analytics tells it from a broken engine. */
+export async function loadWasmEngine(url = enginePackageUrl(), signal?: AbortSignal, opts: Omit<LoadEngineOptions, "signal"> = {}): Promise<WasmModule> {
+  const { mod } = await loadEngineModule(url, { ...opts, signal });
   try {
     return checkBinding(mod);
   } catch (e) {
@@ -134,16 +151,19 @@ export interface WasmHostOptions {
    *  "step" (the default) or the experimental "frame" (`?engine=wasm-frame`). */
   sync?: "step" | "frame";
   /** Called with the codes of every tower the host would not take, the first
-   *  one included, and of every fault, after the status records it. A throw
-   *  from it is logged, and the adopt or the faulted call goes on. */
-  onFallback?: (fallback: HostFallback) => void;
+   *  one included, and of every fault, after the status records it, and
+   *  whether that fallback latched hosting off (a fault, or a trap while a
+   *  tower attached: the module may be corrupt). A throw from it is logged,
+   *  and the adopt or the faulted call goes on. */
+  onFallback?: (fallback: HostFallback, latched: boolean) => void;
 }
 
 export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Console, "info" | "error"> = console, opts: WasmHostOptions = {}): WasmHostHandle {
-  const status: WasmHostStatus = { engine: "wasm", starts: 0, hosted: false, fallbacks: 0, lastFallback: null, errors: [], lastError: null, droppedErrors: 0 };
+  const status: WasmHostStatus = { engine: "wasm", starts: 0, hosted: false, fallbacks: 0, lastFallback: null, latched: false, restorePoint: null, errors: [], lastError: null, droppedErrors: 0 };
   let host: WasmHost | null = null;
   let fatal = false;
-  // A fault latches hosting off for the page life (#874).
+  // A fault, or a trap while a tower attaches, latches hosting off for the
+  // page life (#874, #1113).
   let faulted = false;
   // Whether the latest swap kept the undo trail (an undo or a redo), where
   // a load or a new game drops it. Temporary, with the re-adoption.
@@ -154,6 +174,9 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     recordHostError(status, message);
     log.error(`[wasm] ${message}`);
   };
+  // A trap the host saw outside a call it guards (the engine's free while a
+  // tower is let go), for the next tower to latch on (#1113).
+  let trapped: unknown = null;
   // Let go of the current tower. The host is still current while it lets
   // go, so a trap there is a fault (it latches hosting off). Any other throw
   // goes to the status and the log, so a load or a new game stays the way
@@ -164,46 +187,33 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
       h?.detach();
     } catch (e) {
       noteError(`letting go of the last tower: ${e instanceof Error ? e.message : String(e)}`);
+      if (isEngineTrap(e)) trapped ??= e;
     } finally {
       host = null;
       status.hosted = false;
     }
   };
-  // Whether the package's catalogs are foreign to this build: the attach
-  // reads both and refuses every tower then, and the cause is a shell and an
-  // engine from different deploys (#1046), so the code is `package-mismatch`.
-  // Only a catalog the engine handed over and this build rejects (its version,
-  // its shape, another world) counts. A catalog call that throws or returns no
-  // JSON is the engine failing, which stays `attach-refused` and is asked
-  // again at the next refusal. A verdict is kept: the package cannot change
-  // under the page.
+  // Whether the package's catalogs are foreign to this build (see
+  // catalogVerdict). A verdict is kept: the package cannot change under the
+  // page. An engine that will not hand its catalogs over has none, and is
+  // asked again at the next refusal; a trap there is thrown, for the latch.
   let foreign: boolean | undefined;
   const foreignPackage = (): boolean => {
     if (foreign !== undefined) return foreign;
-    if (typeof mod.catalog !== "function") return (foreign = true);
-    for (const mode of ["classic", "modern"] as const) {
-      let text: string;
-      try {
-        text = mod.catalog(mode);
-        JSON.parse(text);
-      } catch {
-        return false;
-      }
-      try {
-        refuseForeignCatalog(readCatalog({ catalog: () => text }, mode));
-      } catch {
-        return (foreign = true);
-      }
-    }
-    return (foreign = false);
+    // Called as a method, so the binding keeps its `this`.
+    const verdict = catalogVerdict(typeof mod.catalog === "function" ? (mode) => mod.catalog?.(mode) ?? "" : undefined);
+    if (verdict === "failing") return false;
+    return (foreign = verdict === "foreign");
   };
   // Record a fallback: a tower the host would not take, or a fault.
-  const fallBack = (message: string, reason: FallbackReason, stage: FallbackStage) => {
+  // `latched` says it turned hosting off for the page life.
+  const fallBack = (message: string, reason: FallbackReason, stage: FallbackStage, latched = false) => {
     noteError(message);
     status.fallbacks++;
     status.lastFallback = { reason, stage };
+    if (latched) status.latched = true;
     try {
-      opts.onFallback?.(status.lastFallback);
+      opts.onFallback?.(status.lastFallback, latched);
     } catch (err) {
       log.error(`[wasm] reporting the fallback failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -226,7 +236,7 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     if (host !== h) return; // a tower already let go
     faulted = true;
     status.hosted = false;
-    fallBack(fault.message, fault.reason, stage);
+    fallBack(fault.message, fault.reason, stage, true);
     if (opts.strict) return;
     queueMicrotask(() => {
       try {
@@ -240,6 +250,9 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
   const REPLACED = "The WASM engine stopped, so the game runs on the TypeScript engine now.";
   const LOST = "The WASM engine stopped, so some of your recent changes were lost. The game runs on the TypeScript engine now.";
   const STUCK = "The WASM engine stopped, and the tower could not go back to a good state. Load a save or start a new tower to keep playing.";
+  const SWAP_FAILED = "The WASM engine stopped, and the tower could not switch to the TypeScript engine, so it is frozen and changes to it are not saved. Load a save or start a new tower to keep playing.";
+  const CLEARED = "The WASM engine stopped, so the undo history was cleared. The game runs on the TypeScript engine now.";
+  const OLDER = "The WASM engine stopped, so the tower went back to an earlier good state and anything since then was undone. The undo history was cleared, and the tower runs on the TypeScript engine now.";
   const RESTORED = "The WASM engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.";
   const UNDONE = "The WASM engine stopped, so the tower went back to its last good state and your recent changes were undone. It runs on the TypeScript engine now.";
   const say = (sim: Simulation, line: string) => {
@@ -260,6 +273,13 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
       return 0;
     }
   };
+  const clearHistory = () => {
+    try {
+      app.clearUndo?.();
+    } catch (e) {
+      noteError(`clearing the undo trail: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
   // While a fault can still take an edit away (a hosted tower, in a build
   // that falls back), the history keeps the redo steps the edit cleared, for
   // the tidy to put back.
@@ -277,16 +297,29 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     // so there is nothing to restore; the player still hears why. After an
     // undo or a redo, the line also says changes were lost when commands ran
     // after the newest point or the trail lost steps (an undo's own snapshot
-    // read that point). A load or a new game let the old tower's changes go
-    // itself, so the line does not blame the engine for them.
+    // read that point), and the trail is cleared when that snapshot went past
+    // it (#1126): the step it made holds an older tower. A load or a new game
+    // let the old tower's changes go itself, so the line does not blame the
+    // engine for them.
     if (app.sim !== sim) {
+      const answered = keptHistory ? h.answered : null;
+      if (answered) status.restorePoint = { ...answered };
+      if (answered && answered.skipped > 0) {
+        clearHistory();
+        say(app.sim, CLEARED);
+        return;
+      }
       const dropped = tidyHistory();
       say(app.sim, keptHistory && (h.lostEdits > 0 || dropped > 0) ? LOST : REPLACED);
       return;
     }
     let fresh: Simulation;
+    let skipped: number;
     try {
-      fresh = h.restore();
+      const restored = h.restore();
+      fresh = restored.sim;
+      skipped = restored.skipped;
+      status.restorePoint = { point: restored.point, skipped };
     } catch (e) {
       noteError(`no restore point loads, so the tower stays stopped: ${e instanceof Error ? e.message : String(e)}`);
       say(sim, STUCK);
@@ -311,8 +344,20 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
       noteError(`adopting the restored tower: ${e instanceof Error ? e.message : String(e)}`);
     }
     if (app.sim !== fresh) {
-      // The adopt failed: the player still hears why the tower stopped.
-      say(app.sim, app.sim === sim ? STUCK : REPLACED);
+      // The adopt failed: the player still hears why the tower stopped. The
+      // point loaded, so a tower still on the faulted one failed its swap
+      // (#1149): it stays frozen, its saves answer with the newest point, and
+      // the release closed its events.
+      say(app.sim, app.sim === sim ? SWAP_FAILED : REPLACED);
+      return;
+    }
+    // An older point than the newest loses more than the latest changes:
+    // everything the newer points held (#1126). The newest undo steps were
+    // taken after that point, and may be the save that did not load, so the
+    // trail starts over.
+    if (skipped > 0) {
+      clearHistory();
+      say(fresh, OLDER);
       return;
     }
     tidyHistory();
@@ -324,8 +369,20 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     if (undoDepth > 0) return "undo";
     return captureDepth > 0 ? "capture" : null;
   };
+  // A trap leaves the module unsafe (#1113): hosting latches off as at a
+  // fault, and nothing calls into it again, the catalog check included. The
+  // code stays `attach-refused`: a new one needs the owner's production OK.
+  const latch = (trap: unknown, stage: FallbackStage) => {
+    faulted = true;
+    fallBack(`not hosting this tower or any later one, since the WASM engine trapped: ${trap instanceof Error ? trap.message : String(trap)}`, "attach-refused", stage, true);
+  };
   const follow = (sim: Simulation, stage: FallbackStage) => {
     release();
+    if (trapped !== null && !faulted) {
+      // No recovery is pending to tidy a held redo trail.
+      latch(trapped, stage);
+      holdRedo(false);
+    }
     if (faulted) return;
     try {
       let attached: WasmHost | null = null;
@@ -341,7 +398,18 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
       status.hosted = true;
       log.info(`[wasm] tower ${status.starts} runs on the WASM engine`);
     } catch (e) {
-      fallBack(`not hosting this tower: ${e instanceof Error ? e.message : String(e)}`, foreignPackage() ? "package-mismatch" : "attach-refused", stage);
+      const message = e instanceof Error ? e.message : String(e);
+      let trap = isEngineTrap(e) ? e : null;
+      let reason: FallbackReason = "attach-refused";
+      try {
+        if (trap === null && foreignPackage()) reason = "package-mismatch";
+      } catch (f) {
+        // The catalog check trapped behind a clean refusal.
+        noteError(`not hosting this tower: ${message}`);
+        trap = f;
+      }
+      if (trap !== null) latch(trap, stage);
+      else fallBack(`not hosting this tower: ${message}`, reason, stage);
     }
     // A wasm-only build stops instead of falling back, and a tower left on
     // the TypeScript engine has nothing to fall back from.
