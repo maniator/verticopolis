@@ -32,9 +32,15 @@ import { type Shot } from "../screenshot-env.ts";
 export function assertSettingsContentVisible(): void {
   const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
   if (!box) throw new Error("the Settings dialog did not mount");
-  const visible = [...document.querySelectorAll<HTMLElement>(
-    "#modal .modal-box h2, #modal .modal-box h3, #modal .modal-box .set-row, #modal .modal-box .set-engine, #modal .modal-box .set-engine-status, #modal .modal-box .modal-actions, #modal .modal-box .set-version",
-  )];
+  const headings = [...document.querySelectorAll<HTMLElement>("#modal .modal-box h3")].filter(
+    (heading) => heading.nextElementSibling?.classList.contains("set-engine"),
+  );
+  const visible = [
+    ...headings,
+    ...document.querySelectorAll<HTMLElement>(
+      "#modal .modal-box .set-engine, #modal .modal-box .set-engine-status, #modal .modal-box .modal-actions, #modal .modal-box .set-version",
+    ),
+  ];
   const boxRect = box.getBoundingClientRect();
   const clipped = visible.filter((el) => {
     const rect = el.getBoundingClientRect();
