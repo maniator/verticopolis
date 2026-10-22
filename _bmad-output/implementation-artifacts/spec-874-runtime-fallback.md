@@ -2,7 +2,7 @@
 title: 'Fall back to TypeScript when the hosted WASM engine throws or traps'
 type: bugfix
 created: '2026-10-20'
-status: in-review
+status: done
 baseline_commit: c12bc1be (main, after #1137, #1140, #1144, #1125 and #1142 merged)
 context:
   - CONTRIBUTING.md
@@ -108,7 +108,11 @@ in that order; the recovery records the point it loaded on
 `status.restorePoint`, with how many newer points it skipped, says when
 it went further back, and clears the undo trail then, whose newest steps are
 later than the tower (#1126). A save asked of the frozen tower answers with the
-same point the recovery uses (`RestorePoints.newestSave`), and throws only
+same point the recovery uses (`RestorePoints.newestSave`, and the recovery
+goes back to the point a save already answered with); when that save is an
+undo's or a redo's own snapshot and the swap comes first, the recovery reads
+the point it answered with (`WasmHost.answered`) and clears the trail when
+it is older (the follow-up to #1230's review). The save throws only
 when no point loads, which cannot happen while a merge's save or the attach
 save is kept, since TypeScript loaded both.
 
@@ -234,6 +238,11 @@ edit made while paused. Both were dropped.
   gets a line. After an undo or a redo whose own snapshot trapped, that
   snapshot is the newest point, from before any edit no point covered, so
   the undo and redo steps that would now change nothing are dropped too.
+  When that snapshot went past the newest point, because the newest did not
+  load (#1126), the step it made holds an older tower: the whole trail is
+  cleared instead, and the line is "The WASM engine stopped, so the undo
+  history was cleared. The game runs on the TypeScript engine now." The
+  tower is the undo's or the redo's target, as the player asked.
   When an undo or a redo replaced the tower and a command was relayed since
   the newest point (`lostEdits`), or that tidy dropped a step, changes were
   lost and the line says so: "The WASM engine stopped, so some of your
@@ -343,8 +352,8 @@ retirement):
 - **An exterminator booking pending at the trap** keeps its billed rooms
   after the fallback: #1092 merges this in and pins it in
   `wasmHostExtermination.integration.test.ts` (a trap in a tick and in a
-  command); #874 stays open until it lands and the owner's PC
-  restore-point run on `4fa8072` is done.
+  command); #874 stayed open until it landed and the owner's PC
+  restore-point run on `4fa8072` was done (both are, as of 2026-10-21).
 - **A rollout, the default flip, a gate exception:** owner decisions (#945).
 
 ## Code map
@@ -560,11 +569,39 @@ Container numbers are indicative only; the owner's PC run under
 `docs/performance/benchmark-protocol.md` is the evidence. The `edits`
 workload is the owner's rapid-edit check.
 
+### The owner's PC run
+
+> **Snapshot of one run on 2026-10-21 (03:17 to 03:59 UTC), commit
+> `4fa8072`, not refreshing.** The run's own files are in
+> `docs/performance/results/2026-10-21-4fa8072-restore-points/`
+> (`report.md`, `results.json`, `NOTES.md`). To refresh, run
+> `npm run perf:restore` (`scripts/perf-restore-points.ts`);
+> `src/tests/perfRestore/report.test.ts` pins how the figures are computed.
+
+The rapid-edit check passes. On the owner's desktop (Ryzen 5 5600X, RTX
+3060, Windows 11, Chromium 149.0.7827.55, 10 repetitions), every `edits` row
+on the small, medium and large towers at 1x and 4x shows 400 commands, 400
+merges, 400 hosted saves (one per command, the undo capture's own save) and
+0 extra saves, and extra saves are 0 on all 24 rows. The run exited 0 with
+no problems listed. The idle CPU before it was noisy (8% to 45%), which does
+not touch a count; the timings below are context.
+
+On the large tower at 1x, one restore point costs about 31 ms (a 2.27
+million character save) and a fallback's restore 59 ms, paid once at the
+fault; at 4x, 213 ms and 393 ms. Every engine save per rapid edit, the
+merge's and the capture's together (2 per command), costs 63 ms at 1x and
+413 ms at 4x on the large tower, 18 ms at 1x on medium. Those saves were on
+main before the restore points: what a burst of edits pays is the existing
+merge per structural command, which the facade removes (#1207), and the
+existing undo capture.
+
 ## Merge
 
 #1059 (PR #1100) merged first; this branch merges main. #1092 merges this
 after it lands and adds the trap mid-booking test. #874 closes once #1092
-has merged and the owner's PC restore-point run on `4fa8072` is done.
+has merged and the owner's PC restore-point run on `4fa8072` is done. Both
+are: #1092 merged at `f1777e1`, and the PC run passed on 2026-10-21 (see
+"The owner's PC run").
 
 ## Review record
 

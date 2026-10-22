@@ -10,7 +10,7 @@ import { gateBrowser, probeBrowser } from "../perfCompare/browserProbe";
 import { rendererLimitation } from "../perfCompare/limitations";
 import { checkExceptionFolder, exceptionMarker, resolveLaunch } from "../perfCompare/exceptionRegister";
 import { browserName, recordedGpuVerified } from "../perfCompare/renderer";
-import { buildScenarios } from "../perfCompare/scenarios";
+import { SCENARIO_NAMES, buildScenarios, unknownScenarios } from "../perfCompare/scenarios";
 import { startServer } from "../perfCompare/server";
 import { aggregate, ratios, validate, type Metric, type Ratio } from "./analysis";
 import type { ModeName } from "./pageWorker";
@@ -244,9 +244,9 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     const errs = stampErrors(stampPaths, tree);
     if (errs.length) throw new Error(errs.join("; "));
   }
-  const all = buildScenarios();
-  const scenarios = args.scenarios ? all.filter((s) => args.scenarios!.includes(s.name)) : all;
-  if (args.scenarios && scenarios.length !== args.scenarios.length) throw new Error(`unknown scenario in ${args.scenarios.join(",")}`);
+  const unknown = unknownScenarios(args.scenarios ?? []);
+  if (unknown.length) throw new Error(`unknown scenario ${unknown.join(",")}; expected ${SCENARIO_NAMES.join(",")}`);
+  const scenarios = buildScenarios(args.scenarios);
   const config = makeConfig(args, scenarios.map((s) => s.name));
   const sourceHash = existsSync(join(repo, "engine-rs/src")) ? engineSourceHash(join(repo, "engine-rs")) : null;
   const environment = collectEnvironment(repo, distPerf, sourceHash);
@@ -396,9 +396,9 @@ export interface ReadModelResults {
 async function readModelMain(args: Args, repo: string): Promise<number> {
   const log = (line: string) => process.stderr.write(`${line}\n`);
   const tree = buildTree(repo);
-  const all = buildScenarios();
-  const scenarios = args.scenarios ? all.filter((s) => args.scenarios!.includes(s.name)) : all;
-  if (args.scenarios && scenarios.length !== args.scenarios.length) throw new Error(`unknown scenario in ${args.scenarios.join(",")}`);
+  const unknown = unknownScenarios(args.scenarios ?? []);
+  if (unknown.length) throw new Error(`unknown scenario ${unknown.join(",")}; expected ${SCENARIO_NAMES.join(",")}`);
+  const scenarios = buildScenarios(args.scenarios);
   const config = makeConfig(args, scenarios.map((s) => s.name));
   const generatedAt = new Date().toISOString();
   const out = args.out ? resolve(repo, args.out) : resolve(repo, "docs/performance/results", `${generatedAt.slice(0, 10)}-${tree.commit.slice(0, 7)}-read-model${args.quick ? "-quick" : ""}${tree.dirty ? "-dirty" : ""}`);

@@ -13,9 +13,18 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.46.0
+## 2.47.0
 
 - Exporting to SimTower (1994) now works for a tower loaded from a save that has no tower name. The file is named TOWER1.TDT.
+
+## 2.46.1
+
+- Keyboard bulldozing now tells screen readers when a facility could not be removed, instead of announcing a successful removal.
+
+## 2.46.0
+
+- On the opt-in WASM engine (`?engine=wasm`), an undo or a redo that meets an engine failure, when the last good state also fails to load, now clears the undo history and says so.
+- When that engine stops and the tower goes back to an earlier good state, the notice no longer says you made changes since then.
 
 ## 2.45.0
 
