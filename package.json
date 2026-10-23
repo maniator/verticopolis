@@ -22,7 +22,7 @@
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test --grep-invert @perf",
     "perf": "playwright test --grep @perf",
-    "perf:capture": "PERF_CAPTURE=1 playwright test --grep @perf",
+    "perf:capture": "cross-env PERF_CAPTURE=1 playwright test --grep @perf",
     "perf:compare": "tsx scripts/perf-compare.ts",
     "perf:worker": "tsx scripts/perf-worker.ts",
     "perf:restore": "tsx scripts/perf-restore-points.ts",
@@ -30,7 +30,7 @@
     "perf:before-after": "tsx scripts/perf-before-after.ts",
     "lint": "eslint src api --ext .ts,.tsx",
     "lint:fix": "eslint src api --ext .ts,.tsx --fix",
-    "screenshots": "VC_TOOLING=1 vite build && RUN_SERVER=1 node scripts/screenshots.ts",
+    "screenshots": "cross-env VC_TOOLING=1 vite build && cross-env RUN_SERVER=1 node scripts/screenshots.ts",
     "icons": "node scripts/gen-pwa-icons.mjs",
     "og-image": "node scripts/gen-og-image.mjs",
     "verify:dist": "node scripts/gen-third-party-notices.ts && node scripts/verify-public-files.ts && node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts && node scripts/verify-engine-bundle.ts && node scripts/verify-assetlinks.ts",
@@ -39,8 +39,8 @@
     "gen:events": "node scripts/gen-gameplay-events.ts",
     "wasm:build": "node scripts/wasm-build.ts",
     "engine:compat": "node scripts/engine-compat.ts",
-    "test:wasm": "VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost wasmWorker chargeBindingRaw engineView perfCompare/scenarios.integration",
-    "test:wasm:parity": "VC_REQUIRE_WASM=1 vitest run --project integrationWasm --project unitWasm"
+    "test:wasm": "cross-env VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost wasmWorker chargeBindingRaw engineView perfCompare/scenarios.integration",
+    "test:wasm:parity": "cross-env VC_REQUIRE_WASM=1 vitest run --project integrationWasm --project unitWasm"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
@@ -49,6 +49,7 @@
     "@typescript-eslint/parser": "^8.54.0",
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
+    "cross-env": "^10.1.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
