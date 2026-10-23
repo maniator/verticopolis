@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { isHotelKind } from "../../engine/facilities";
+import { atEngineFrameCadence } from "../parity/typescriptOnly";
 import { buildHotelTower } from "./fixtureHotelTower";
 
 const spec = { seed: 21, floors: 62, crews: 24 };
@@ -38,6 +39,7 @@ describe("the hotel-heavy tower", () => {
   });
 
   it("keeps the wing's guests, so its rooms stay dirty and the no-route path runs on later days", { timeout: 240_000 }, () => {
+    atEngineFrameCadence("ticks two full days and asserts only frame-carried unit states");
     const day = Simulation.deserialize(sim.serialize());
     for (let i = 0; i < 720 * 2; i++) day.tick(2);
     const wing = day.tower.units.filter((u) => isHotelKind(u.kind) && u.x >= 270);
@@ -46,6 +48,7 @@ describe("the hotel-heavy tower", () => {
   });
 
   it("makes hundreds of rooms dirty at the morning checkout and leaves the unreachable ones dirty", () => {
+    atEngineFrameCadence("ticks one day and asserts only frame-carried dirty-state counts");
     const day = Simulation.deserialize(sim.serialize());
     let peak = 0;
     for (let i = 0; i < 720; i++) {

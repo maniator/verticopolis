@@ -168,7 +168,7 @@ export class BuildActions {
    * structure; midair cells simply fail to place, exactly as you'd expect.
    * Settles once the engine has answered every step; the anchor moves at once.
    */
-  paintFloorRun(kind: FacilityKind, tile: number, floor: number): Promise<void> {
+  async paintFloorRun(kind: FacilityKind, tile: number, floor: number): Promise<void> {
     if (!this.paint || this.paint.floor !== floor) {
       // snapX (not clampTile) so a wide unit's FOOTPRINT stays on-lot: a tap at
       // the right edge left-shifts to fit instead of silently failing off-lot.
@@ -180,20 +180,29 @@ export class BuildActions {
       this.paint = { tile: seedX, floor };
       return seeded.then(() => undefined);
     }
-    // Quiet drag steps: issued in order before any answer, so the port runs
-    // them back to back and the anchor below moves at once.
-    const steps: Promise<boolean>[] = [];
-    for (const x of dragRunTiles(this.paint.tile, tile)) {
-      // snapX each column so a WIDE unit near the right edge still lands on-lot
-      // (its footprint would otherwise run off; width-1 floor/lobby is unchanged).
-      steps.push(this.tryBuild(kind, floor, snapX(towerCatalog(this.deps.getSim()), kind, x), true));
+    const dragTiles = dragRunTiles(this.paint.tile, tile);
+    // Floor and lobby drag now batch into bounded brush commands (max 32 tiles
+    // per command, matching request validation), preserving the same outward tile
+    // order while avoiding one promise object per tile in long drags.
+    if (kind === "floor" || kind === "lobby") {
+      const snappedTiles = dragTiles.map((x) => snapX(towerCatalog(this.deps.getSim()), kind, x));
+      for (let i = 0; i < snappedTiles.length; i += 32) {
+        const tiles = snappedTiles.slice(i, i + 32);
+        await this.deps.port.command({ op: "paintBrush", kind, floor, tiles });
+      }
+    } else {
+      // Quiet drag steps: issued in order and awaited in sequence.
+      for (const x of dragTiles) {
+        // snapX each column so a WIDE unit near the right edge still lands on-lot
+        // (its footprint would otherwise run off; width-1 floor/lobby is unchanged).
+        await this.tryBuild(kind, floor, snapX(towerCatalog(this.deps.getSim()), kind, x), true);
+      }
     }
     // Record the SNAPPED anchor (what actually landed), not the raw pointer tile:
     // for a wide kind near the right edge snapX left-shifts the placement, so a
     // raw anchor would make the next drag step recompute from an off-lot column
     // and misfire. Identical to `tile` for width-1 floor/lobby.
     this.paint = { tile: snapX(towerCatalog(this.deps.getSim()), kind, tile), floor };
-    return Promise.all(steps).then(() => undefined);
   }
 
   /**
