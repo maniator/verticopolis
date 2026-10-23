@@ -156,12 +156,29 @@ function firstDiff(a: unknown, b: unknown, path = "$"): string | null {
   return null;
 }
 
+/** Safe dump formatter for divergence reports: very deep forged saves are
+ * logged as a shallow marker, not a stack overflow. */
+function safeJsonStringify(value: unknown): string {
+ try {
+   return JSON.stringify(value);
+ } catch (e) {
+   if (e instanceof RangeError) return JSON.stringify({ $tooDeep: true }, null, 1);
+   throw e;
+ }
+}
+
 /** `JSON.stringify` with NaN, Infinity and -Infinity kept as
  *  `{"$nonFinite": "NaN"}` (and so on), so a dump of the in-memory object the
  *  TypeScript exporter took still holds them. `Number(v.$nonFinite)` turns a
  *  tag back into the number; see {@link reviveNonFinite}. */
-export const stringifyNonFinite = (v: unknown): string =>
-  JSON.stringify(v, (_k, x: unknown) => (typeof x === "number" && !Number.isFinite(x) ? { $nonFinite: String(x) } : x), 1);
+export const stringifyNonFinite = (v: unknown): string => {
+ try {
+   return JSON.stringify(v, (_k, x: unknown) => (typeof x === "number" && !Number.isFinite(x) ? { $nonFinite: String(x) } : x), 1);
+ } catch (e) {
+   if (e instanceof RangeError) return safeJsonStringify({ $tooDeep: true, preview: typeof v === "string" ? v.slice(0, 200) : undefined });
+   throw e;
+ }
+};
 
 /** The reviver that undoes {@link stringifyNonFinite}. */
 export const reviveNonFinite = (_k: string, x: unknown): unknown =>
