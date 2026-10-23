@@ -18,7 +18,7 @@ async function boot(page: Page): Promise<void> {
     const w = window as any;
     return w.__vcEngine?.status?.placement === "worker" && w.__vcEngine.current()?.loaded() && !!w.game;
   }, undefined, { timeout: 30_000 });
-  await expect(page.locator(".splash-version")).toContainText("WASM engine (worker)");
+  await expect(page.locator(".splash-version")).toContainText("Rust engine (worker)");
   await page.evaluate(() => document.getElementById("splash")?.remove());
 }
 

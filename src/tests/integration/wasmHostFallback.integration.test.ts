@@ -97,7 +97,7 @@ describe.skipIf(!hasWasmPackage())("WASM host runtime fallback (#874)", () => {
       expect(before.minutes - fresh.clock.minutes).toBeLessThanOrEqual(60);
       expect(fresh.tower.units).toHaveLength(before.units);
       expect(fresh.log[fresh.log.length - 1]).toMatchObject({
-        text: "The WASM engine stopped, so the tower went back to its last good state and your recent changes were undone. It runs on the TypeScript engine now.",
+        text: "The Rust engine stopped, so the tower went back to its last good state and your recent changes were undone. It runs on the TypeScript engine now.",
         kind: "bad",
       });
       // The TypeScript engine runs it now.

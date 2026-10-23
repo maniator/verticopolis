@@ -60,7 +60,7 @@ describe.skipIf(!hasWasmPackage())("worker host lifecycle", () => {
     expect((globalThis as { __vcEngine?: unknown }).__vcEngine).toBe(handle);
     expect(handle.status).toMatchObject({ engine: "wasm", placement: "worker", hosted: true, starts: 1 });
     expect(activeEngine()).toBe("wasm");
-    expect(engineSuffix()).toBe(" · WASM engine (worker)");
+    expect(engineSuffix()).toBe(" · Rust engine (worker)");
     await until(() => handle.current()!.loaded(), "load");
     handle.stop();
     expect((globalThis as { __vcEngine?: unknown }).__vcEngine).toBeUndefined();

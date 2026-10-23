@@ -2,6 +2,7 @@ import type { UI } from "./UI";
 import { settingsTemplate } from "./templates/settings";
 import { trackAppAction } from "../analytics";
 import { engineSuffix } from "../wasmhost/engineLabel";
+import { liveEngineSettings, wireEngineSection } from "../engineCohort/settingsLive";
 
 /**
  * The Settings dialog controller, split out of `uiDialogs.ts` at the
@@ -18,7 +19,10 @@ export function showSettings(ui: UI): void {
   // The Building section (the bridging toggle) is Modern-only; Classic never
   // renders it (bridging is forced on and can't be toggled there).
   const modern = ui.cb.getMode() === "modern";
-  const box = ui.openModalTemplate(settingsTemplate(version, modern, engineSuffix()), { displaceable: true });
+  // The Game engine section (#1197) exists only where the build has a choice:
+  // a wasm-only build has no TypeScript engine to pick.
+  const engineView = __WASM_ONLY__ ? null : liveEngineSettings();
+  const box = ui.openModalTemplate(settingsTemplate(version, modern, engineSuffix(), engineView), { displaceable: true });
   // Volume sliders: initialize from the live levels, apply on every input tick
   // (persistence is debounced by the onSetVolume handler in main.ts), and keep
   // the percent readout in step. Mute is independent; sliders never touch it.
@@ -64,5 +68,6 @@ export function showSettings(ui: UI): void {
   // The controller wires every stateful control above; the plain Close action is
   // the one [data-act] button, so wireActions binds it (its loud lookup throws at
   // open if the button is ever dropped).
+  if (engineView) wireEngineSection(box);
   ui.wireActions(box);
 }

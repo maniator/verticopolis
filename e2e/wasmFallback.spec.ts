@@ -95,13 +95,13 @@ test("a tick that traps mid-game falls back to TypeScript and the game keeps run
   expect(after.lastError).toMatch(/failed during a tick: unreachable/);
   // No command ran after the newest point, so the line says only that the
   // tower went back, and the UI shows it as an alert toast.
-  const RESTORED = "The WASM engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.";
+  const RESTORED = "The Rust engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.";
   expect(after.recentLog.split("\n")).toContain(RESTORED);
   await expect(page.locator("#toast-wrap .toast.bad[role=alert]", { hasText: RESTORED })).toBeVisible({ timeout: 10_000 });
   // The TypeScript engine runs the tower now, and the fault was the only error.
   await page.waitForFunction((b) => (window as any).game.sim.clock.minutes > b + 5, after.minutes, { timeout: 30_000 });
   expect((await state(page)).fallbacks).toBe(1);
-  expect(errors.filter((e) => !/the WASM engine failed during a tick/.test(e))).toEqual([]);
+  expect(errors.filter((e) => !/the Rust engine failed during a tick/.test(e))).toEqual([]);
 });
 
 test("a command that traps falls back without throwing to the caller, and the edit is undone", async ({ page }) => {
@@ -118,7 +118,7 @@ test("a command that traps falls back without throwing to the caller, and the ed
   expect(after.lobbies).toBe(30);
   expect(after.recentLog).toMatch(/your recent changes were undone/);
   await expect(page.locator("#toast-wrap .toast.bad[role=alert]", { hasText: "your recent changes were undone" })).toBeVisible({ timeout: 10_000 });
-  expect(errors.filter((e) => !/the WASM engine failed during a command/.test(e))).toEqual([]);
+  expect(errors.filter((e) => !/the Rust engine failed during a command/.test(e))).toEqual([]);
   // A later tower stays on TypeScript for the rest of the page life.
   await page.evaluate(() => {
     const g = (window as any).game;

@@ -11,7 +11,7 @@ import type { Simulation } from "../engine/Simulation";
  */
 export class StepLoopAbsentError extends Error {
   constructor(what: string) {
-    super(`${what}: the TypeScript step loop is not part of this wasm-only build, so only the WASM engine can advance a tower`);
+    super(`${what}: the TypeScript step loop is not part of this wasm-only build, so only the Rust engine can advance a tower`);
     this.name = "StepLoopAbsentError";
   }
 }

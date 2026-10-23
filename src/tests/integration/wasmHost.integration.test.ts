@@ -209,7 +209,7 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     // A trapped engine throws from every call.
     (host.engine as { drainGameplayEvents: () => string }).drainGameplayEvents = () => { throw new Error("unreachable executed"); };
     expect(() => host.detach()).not.toThrow();
-    expect(host.fault).toMatchObject({ reason: "other", message: "the WASM engine failed while letting a tower go: unreachable executed" });
+    expect(host.fault).toMatchObject({ reason: "other", message: "the Rust engine failed while letting a tower go: unreachable executed" });
     expect(Object.getOwnPropertyDescriptor(sim, "drainGameplayEvents")).toBeUndefined();
     expect(Object.getOwnPropertyDescriptor(sim, "gameplayEventsDropped")).toBeUndefined();
     expect(Object.getOwnPropertyDescriptor(sim, "serialize")).toBeDefined(); // the restore point's
