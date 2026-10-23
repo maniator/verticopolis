@@ -384,7 +384,7 @@ describe("a trap while a tower attaches (#1113)", () => {
     detachMirror();
     expect(handle.status).toMatchObject({ hosted: false, latched });
     const refusal = "mirror: a mirror is already attached to this simulation";
-    const lastError = latched ? `not hosting this tower or any later one, since the WASM engine trapped: unreachable, while freeing the engine after a refusal: ${refusal}` : `not hosting this tower: ${refusal}`;
+    const lastError = latched ? `not hosting this tower or any later one, since the Rust engine trapped: unreachable, while freeing the engine after a refusal: ${refusal}` : `not hosting this tower: ${refusal}`;
     expect(handle.status.lastError).toBe(lastError);
     expect(a.sim.drainGameplayEvents()).toEqual([{ name: "tower_founded", payload: { mode: "classic" } }]);
     a.adoptSim(Simulation.newGame(4, "classic"));
