@@ -346,7 +346,7 @@ describe("third-party notices (#951)", () => {
       { name: "base64", version: "0.22.1", license: "MIT", licenseText: "b" },
     ]);
     expect(out).toContain("Packages: 2");
-    expect(out).toContain("base64@0.22.1 (Rust, in the WASM engine)");
+    expect(out).toContain("base64@0.22.1 (Rust engine crate)");
     expect(out).toMatch(/^base64@0\.22\.1$/m);
     // unicode-ident's license, compiled into the engine.
     expect(isAllowedLicense("(MIT OR Apache-2.0) AND Unicode-3.0")).toBe(true);

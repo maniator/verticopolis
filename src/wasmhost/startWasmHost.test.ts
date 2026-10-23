@@ -213,7 +213,7 @@ describe("startWasmHost", () => {
     a.adoptSim(next);
     expect(a.sim).toBe(next);
     expect(handle.status).toMatchObject({ starts: 1, hosted: false, fallbacks: 1, lastFallback: { reason: "other", stage: "start" } });
-    expect(handle.status.errors).toEqual(["the WASM engine failed while letting a tower go: unreachable executed"]);
+    expect(handle.status.errors).toEqual(["the Rust engine failed while letting a tower go: unreachable executed"]);
     // After a fault the module is not called again, its free included (#1113).
     expect(trapped).toMatchObject({ freed: false, abandoned: true });
     expect(mod.engines).toHaveLength(1); // the loaded tower stays on TypeScript
@@ -221,7 +221,7 @@ describe("startWasmHost", () => {
     expect(next.gameplayEventsDropped).toBe(0);
     await new Promise((r) => setTimeout(r, 0));
     // Nothing to restore (the player chose the new tower), and the log says why.
-    expect(next.log[next.log.length - 1]).toMatchObject({ text: "The WASM engine stopped, so the game runs on the TypeScript engine now.", kind: "bad" });
+    expect(next.log[next.log.length - 1]).toMatchObject({ text: "The Rust engine stopped, so the game runs on the TypeScript engine now.", kind: "bad" });
     handle.stop();
   });
 
@@ -233,7 +233,7 @@ describe("startWasmHost", () => {
     const sim = a.sim;
     const logged = sim.log.length;
     handle.stop();
-    expect(handle.status.errors).toEqual(["the WASM engine failed while letting a tower go: unreachable executed"]);
+    expect(handle.status.errors).toEqual(["the Rust engine failed while letting a tower go: unreachable executed"]);
     expect(mod.engines[0]).toMatchObject({ freed: false, abandoned: true });
     expect(handle.status.hosted).toBe(false);
     // The stopped tower is frozen, and its save is the newest restore point.
