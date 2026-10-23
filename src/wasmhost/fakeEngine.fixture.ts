@@ -73,6 +73,12 @@ export class FakeEngine {
     this.check("setMoney");
     this.money = amount;
   }
+  setView(_view: string | null): void {
+    this.check("setView");
+  }
+  setTowerName(_name: string): void {
+    this.check("setTowerName");
+  }
   emit(text: string): void {
     this.check("emit");
     this.calls.push(`emit ${text}`);
