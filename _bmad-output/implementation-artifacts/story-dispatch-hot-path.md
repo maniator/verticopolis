@@ -157,9 +157,12 @@ ratios: `split-tower-4` 0.872 (medians 417.5 and 361.2 ms), `sixseven_2`
 little from the ratio of the two medians. Single pairs range from 0.67 to
 1.32 on this machine, so the instruction counts are the figure to quote.
 
-The desktop figure comes from the Oct 25 size run on `main` (medium and
-large, bare rows), which #1143's plan uses in place of a separate PC slot;
-this change is in it if it merges first.
+The October 22 owner desktop benchmark on the combined measurement branch
+included this dispatch change alongside the DO-NOT-MERGE #1196 facade spike,
+so it cannot isolate the dispatch speedup. The instruction-count and paired
+wall-clock results above are cloud estimates. A standalone desktop
+before/after for this PR has not yet been completed; do not claim the Oct 25
+mainline measurement happened before its scheduled date.
 
 ## Review
 
