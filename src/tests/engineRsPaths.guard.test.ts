@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { minVersion } from "semver";
 
 /**
  * Engine path list guard for `.github/workflows/engine-rs.yml` (#1044).
@@ -281,15 +282,16 @@ describe("the host suites run in test:wasm", () => {
       "screenshots",
     ] as const;
 
-    const minMajor = (range: string): number => {
-      const major = /(\d+)/.exec(range)?.[1];
-      if (!major) throw new Error(`cannot read a major from ${range}`);
-      return Number(major);
-    };
-
     it("keeps cross-env in scripts that set inline environment variables", () => {
-      for (const name of scriptNames)
-        expect(scripts[name], `${name} stays shell-agnostic`).toMatch(/^cross-env\s+/);
+      for (const name of scriptNames) {
+        const script = scripts[name];
+        expect(script, `${name} is defined`).toBeDefined();
+        expect(script, `${name} starts with cross-env`).toMatch(/^cross-env\s+/);
+        expect(
+          script,
+          `${name} keeps an inline environment assignment after cross-env`,
+        ).toMatch(/^cross-env\s+[^ ]+=/);
+      }
     });
 
     it("keeps cross-env as a dev dependency and pinned in the lockfile", () => {
@@ -299,11 +301,20 @@ describe("the host suites run in test:wasm", () => {
     });
 
     it("keeps the repo's Node engine compatible with cross-env", () => {
-      const repoNode = pkg.engines.node;
+      const repoNode = pkg.engines?.node;
       const crossEnvNode = lock.packages?.["node_modules/cross-env"]?.engines?.node;
+      if (!repoNode) throw new Error("package.json: engines.node is missing");
       if (!crossEnvNode)
         throw new Error("package-lock.json: node_modules/cross-env engines.node is missing");
-      expect(minMajor(repoNode)).toBeGreaterThanOrEqual(minMajor(crossEnvNode));
+      expect(repoNode).toMatch(/^>=\d/);
+      expect(crossEnvNode).toMatch(/^>=\d/);
+      const repoMin = minVersion(repoNode);
+      const crossEnvMin = minVersion(crossEnvNode);
+      if (!repoMin || !crossEnvMin)
+        throw new Error(
+          `cannot compare Node engines: repo=${JSON.stringify(repoNode)} cross-env=${JSON.stringify(crossEnvNode)}`,
+        );
+      expect(repoMin.compare(crossEnvMin)).toBeGreaterThanOrEqual(0);
     });
   });
 });
