@@ -29,8 +29,9 @@ export function showStats(app: GameApp): void {
 
 /** Confirm and pay for a tower-wide exterminator dispatch (Modern), then reopen
  *  the stats modal so the player sees the "en route" state. The engine charges
- *  and logs the booking; here we only confirm the spend and surface a refusal
- *  the gate above should already have prevented. */
+ *  and logs the booking through the port; here we only confirm the spend and
+ *  surface a refusal the gate above should already have prevented. The stats
+ *  modal reopens once the engine has answered, so it shows the answer. */
 function confirmExterminate(app: GameApp): void {
   const cov = app.sim.housekeepingCoverage();
   const recovery = towerCatalog(app.sim).economy.exterminator;
@@ -39,16 +40,16 @@ function confirmExterminate(app: GameApp): void {
     // button (a fire or bulldoze clears the last infested room, or the mode
     // rule-set no longer offers an exterminator), so say why nothing happens
     // instead of a silent no-op.
-    app.sim.emit(recovery ? "No infested rooms left to treat." : "The exterminator is unavailable.", "bad");
-    showStats(app);
+    const why = recovery ? "No infested rooms left to treat." : "The exterminator is unavailable.";
+    void app.port.command({ op: "emit", text: why, kind: "bad" }).then(() => showStats(app));
     return;
   }
   const cost = recovery.calloutFee + recovery.perRoomFee * cov.infested;
   app.ui.confirmModal(
     "Call the exterminator?",
     `Clear ${cov.infested} infested room(s) for $${cost.toLocaleString()}? The crew arrives tomorrow.`,
-    () => {
-      const res = app.sim.callExterminator();
+    async () => {
+      const res = await app.port.command({ op: "callExterminator" });
       // Surface every refusal, not just funds: the tower can change between
       // rendering the stats modal and confirming (rooms cleared, or another
       // dispatch already booked), so a silent no-op would leave the player
@@ -68,7 +69,7 @@ function confirmExterminate(app: GameApp): void {
           default:
             why = "The exterminator is unavailable.";
         }
-        app.sim.emit(why, "bad");
+        await app.port.command({ op: "emit", text: why, kind: "bad" });
       }
       showStats(app);
     },

@@ -26,11 +26,12 @@ import { presetSchedule, autoTuneSchedule, scheduleAdvice, stagingSummary, recom
 export interface ScheduleStopsPort {
   /** The live span rows, DESCENDING (top first). Re-read after every toggle. */
   read(): FloorRow[];
-  /** Toggle one floor's stop (its own undo step). No-op refusals are silent. */
-  setServe(floor: number, serve: boolean): void;
+  /** Toggle one floor's stop (its own undo step). No-op refusals are silent.
+   *  Settles once the engine has answered; the dialog re-reads after that. */
+  setServe(floor: number, serve: boolean): Promise<void>;
   /** The bulk actions folded in from the editor card (standard/service only). */
-  expressStops(): void;
-  allStops(): void;
+  expressStops(): Promise<void>;
+  allStops(): Promise<void>;
 }
 
 export interface ScheduleDialogCtx {
@@ -73,7 +74,7 @@ const PRESET_LABEL: Record<SchedulePreset, string> = {
 export function showElevatorScheduleDialog(
   ui: UI,
   ctx: ScheduleDialogCtx,
-  cb: { apply: (schedule: ElevatorSchedule) => void },
+  cb: { apply: (schedule: ElevatorSchedule) => Promise<void> },
 ): void {
   // Each day's measured curve arms the assists only once genuinely warmed (#466);
   // a cold curve is withheld from the authoring model entirely, so advice and
@@ -186,10 +187,9 @@ export function showElevatorScheduleDialog(
   // presets keep their hands off hand-set homes, and Auto-tune seeds staging only
   // while this is false (spec §5.2/§14.3).
   let homesDirty = !!ctx.current?.homeFloors && ctx.current.homeFloors.length > 0;
-  // Whether ANY schedule edit has landed since open: arms the Cancel discard guard.
-  // Stop edits (Serve toggles) do NOT arm it: they applied live and Cancel cannot
-  // take them back (each has its own undo step instead).
-
+  // `state.dirty` (any schedule edit since open) arms the Cancel discard guard; stop
+  // edits do not, since they applied live and each has its own undo step.
+  let applying = false; // one OK per open, held while the engine answers
   // The template's `hourly`/`hasMeasured` are DAY-SCOPED (#466): the ghost and
   // the "line up" fallback follow the day tab, so an unmeasured weekend shows no
   // ghost even while the weekday curve is warm. `recompute` keeps them current.
@@ -365,8 +365,10 @@ export function showElevatorScheduleDialog(
       announce(`Standard Floor Departure: ${sfd} seconds.`);
       after();
     },
-    onServe: (floor, serve) => {
-      ctx.stops.setServe(floor, serve);
+    // A stop edit settles after the engine answers; a closed dialog skips the repaint.
+    onServe: async (floor, serve) => {
+      await ctx.stops.setServe(floor, serve);
+      if (!box.isConnected) return;
       afterStops();
       // Announce what actually happened: the engine can refuse (endpoints,
       // the express lobby lock), and the re-read rows are the truth.
@@ -375,13 +377,15 @@ export function showElevatorScheduleDialog(
       if (now === serve) announce(serve ? `Floor ${fl} served.` : `Floor ${fl} skipped.`);
       else announce(`Floor ${fl} must stay a stop.`);
     },
-    onExpressStops: () => {
-      ctx.stops.expressStops();
+    onExpressStops: async () => {
+      await ctx.stops.expressStops();
+      if (!box.isConnected) return;
       announce("Stops set to lobbies only.");
       afterStops();
     },
-    onAllStops: () => {
-      ctx.stops.allStops();
+    onAllStops: async () => {
+      await ctx.stops.allStops();
+      if (!box.isConnected) return;
       announce("Stopping at every floor.");
       afterStops();
     },
@@ -450,7 +454,9 @@ export function showElevatorScheduleDialog(
       rerender();
     },
     onOk: () => {
-      cb.apply({
+      if (applying) return;
+      applying = true;
+      void cb.apply({
         activeCars: {
           weekday: [...state.schedule.activeCars.weekday!],
           weekend: [...state.schedule.activeCars.weekend!],
@@ -458,8 +464,7 @@ export function showElevatorScheduleDialog(
         waitingCarResponse: state.schedule.waitingCarResponse,
         standardFloorDeparture: state.schedule.standardFloorDeparture,
         homeFloors: [...state.schedule.homeFloors],
-      });
-      ui.closeModal();
+      }).finally(() => box.isConnected && ui.closeModal());
     },
     onCancel: () => {
       // A dirty working copy takes two presses: the first arms "Discard changes?",

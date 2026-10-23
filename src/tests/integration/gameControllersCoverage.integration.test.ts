@@ -21,6 +21,7 @@ import { EditorActions } from "../../game/editorActions";
 import { SaveLoad } from "../../game/saveLoad";
 import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
+import { createTsSim } from "../../simport/tsSim";
 
 /** Coverage companion to gameControllers.integration.test.ts: the same harness idioms
  *  (recording fakes, fixture placements asserted with .ok, real Simulation)
@@ -111,6 +112,7 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     cleared = 0;
     build = new BuildActions({
       getSim: () => sim,
+      port: createTsSim(() => sim),
       ui: f.ui,
       audio: f.audio,
       selectedId: () => sel,
@@ -118,18 +120,18 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     });
   });
 
-  it("paintFloorRun drags one continuous run on a floor, resets across floors, and clearPaint drops the anchor", () => {
+  it("paintFloorRun drags one continuous run on a floor, resets across floors, and clearPaint drops the anchor", async () => {
     // Fresh anchor: a single tile, not a brush strip.
-    build.paintFloorRun("floor", 12, 3);
+    await build.paintFloorRun("floor", 12, 3);
     expect(sim.tower.structureKindAt(3, 12)).toBe("floor");
     expect(sim.tower.structureKindAt(3, 13)).toBeUndefined();
     // Same-floor drag: every cell between the anchor and the pointer fills in.
-    build.paintFloorRun("floor", 18, 3);
+    await build.paintFloorRun("floor", 18, 3);
     for (let x = 13; x <= 18; x++) expect(sim.tower.structureKindAt(3, x)).toBe("floor");
     // Cross-floor move resets the anchor: floor 4 is empty, so the new cursor
     // lays ONE tile (no run dragged over from the floor-3 anchor at column 18,
     // and no bridge, since floor 4 has no other floor to reach yet).
-    build.paintFloorRun("floor", 12, 4);
+    await build.paintFloorRun("floor", 12, 4);
     expect(sim.tower.structureKindAt(4, 12)).toBe("floor");
     for (let x = 13; x <= 17; x++) expect(sim.tower.structureKindAt(4, x)).toBeUndefined();
     // clearPaint (pointer released): the next paint anchors fresh, so it does
@@ -138,21 +140,21 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     // engine auto-floors between the seed and the floor-4 neighbor at 12), which
     // is a separate mechanism from the drag run.
     build.clearPaint();
-    build.paintFloorRun("floor", 15, 4);
+    await build.paintFloorRun("floor", 15, 4);
     expect(sim.tower.structureKindAt(4, 15)).toBe("floor");
     for (let x = 13; x <= 14; x++) expect(sim.tower.structureKindAt(4, x)).toBe("floor");
   });
 
-  it("seedPaint stamps the full brush strip for floor/lobby, so a touch tap matches a desktop click", () => {
+  it("seedPaint stamps the full brush strip for floor/lobby, so a touch tap matches a desktop click", async () => {
     // A touch tap used to seed a single 1-wide tile here while a desktop click
     // laid the whole brush strip, so phones built one brick at a time.
-    build.seedPaint("floor", 20, 3);
+    await build.seedPaint("floor", 20, 3);
     for (const x of brushTiles(20)) expect(sim.tower.structureKindAt(3, x)).toBe("floor");
     const strip = brushTiles(20);
     expect(sim.tower.structureKindAt(3, strip[0] - 1)).toBeUndefined();
     expect(sim.tower.structureKindAt(3, last(strip) + 1)).toBeUndefined();
     // The stamp anchors the run: a drag extends from the strip with no gap.
-    build.paintFloorRun("floor", last(strip) + 3, 3);
+    await build.paintFloorRun("floor", last(strip) + 3, 3);
     for (let x = last(strip) + 1; x <= last(strip) + 3; x++) {
       expect(sim.tower.structureKindAt(3, x)).toBe("floor");
     }
@@ -161,21 +163,21 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     // fixture's pre-built ground lobby, so only the right edge is assertable.
     build.clearPaint();
     const lobbyStrip = brushTiles(32);
-    build.seedPaint("lobby", 32, 1);
+    await build.seedPaint("lobby", 32, 1);
     for (const x of lobbyStrip) expect(sim.tower.structureKindAt(1, x)).toBe("lobby");
     expect(sim.tower.structureKindAt(1, last(lobbyStrip) + 1)).toBeUndefined();
   });
 
-  it("seedPaint keeps parking's single-module seed and anchors the chain for the drag", () => {
+  it("seedPaint keeps parking's single-module seed and anchors the chain for the drag", async () => {
     sim.star = 3; // parking unlocks at 3★
     sim.money = 1e9;
     for (let x = 0; x < 40; x++) sim.tower.place("floor", 0, x); // a basement floor (B1) to build on
-    build.seedPaint("parking", 6, 0);
+    await build.seedPaint("parking", 6, 0);
     const seeded = sim.tower.units.filter((u) => u.kind === "parking");
     expect(seeded).toHaveLength(1);
     expect(seeded[0].x).toBe(6); // the seed lands where the tap pointed
     // The seed recorded the run anchor: the drag chains flush from it.
-    build.paintFloorRun("parking", 34, 0);
+    await build.paintFloorRun("parking", 34, 0);
     const w = FACILITIES.parking.width;
     const xs = sim.tower.units
       .filter((u) => u.kind === "parking")
@@ -185,13 +187,13 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBe(w);
   });
 
-  it("paintFloorRun chains parking into contiguous spaces (canon drag-to-lay a chain)", () => {
+  it("paintFloorRun chains parking into contiguous spaces (canon drag-to-lay a chain)", async () => {
     sim.star = 3; // parking unlocks at 3★
     sim.money = 1e9;
     for (let x = 0; x < 40; x++) sim.tower.place("floor", 0, x); // a basement floor (B1) to build on
     // Drag the parking tool across the floor from x=6.
-    build.paintFloorRun("parking", 6, 0);
-    build.paintFloorRun("parking", 34, 0);
+    await build.paintFloorRun("parking", 6, 0);
+    await build.paintFloorRun("parking", 34, 0);
     const spaces = sim.tower.units.filter((u) => u.kind === "parking");
     expect(spaces.length).toBeGreaterThan(1); // a CHAIN, not one module
     const w = FACILITIES.parking.width;
@@ -201,7 +203,7 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBe(w);
   });
 
-  it("a paint tap at the right edge left-shifts to fit (snapX seed), never no-ops off-lot", () => {
+  it("a paint tap at the right edge left-shifts to fit (snapX seed), never no-ops off-lot", async () => {
     sim.star = 3;
     sim.money = 1e9;
     const W = GRID.width;
@@ -211,71 +213,71 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     // A tap at the very last column: a width-4 parking footprint would run off
     // the lot with a raw clamp and silently fail; snapX left-shifts it to fit.
     // Taps commit through seedPaint (the gesture-opening placement).
-    build.seedPaint("parking", W - 1, 0);
+    await build.seedPaint("parking", W - 1, 0);
     const p = sim.tower.units.find((u) => u.kind === "parking");
     expect(p).toBeDefined();
     expect(p!.x + p!.width).toBeLessThanOrEqual(W); // the whole footprint is on-lot
   });
 
-  it("tryBuild toasts the refusal only when loud; quiet drags stay silent", () => {
+  it("tryBuild toasts the refusal only when loud; quiet drags stay silent", async () => {
     sim.money = 0;
-    build.tryBuild("floor", 3, 20); // loud (default): error sfx + toast
+    await build.tryBuild("floor", 3, 20); // loud (default): error sfx + toast
     expect(f.sfx).toEqual(["error"]);
     expect(f.toasts).toEqual([{ text: "Not enough money.", kind: "bad" }]);
-    build.tryBuild("floor", 3, 20, true); // quiet: no extra feedback
+    await build.tryBuild("floor", 3, 20, true); // quiet: no extra feedback
     expect(f.sfx).toEqual(["error"]);
     expect(f.toasts).toHaveLength(1);
     sim.money = ECON.startingMoney;
-    build.tryBuild("floor", 3, 20); // loud success plays the build sfx
+    await build.tryBuild("floor", 3, 20); // loud success plays the build sfx
     expect(last(f.sfx)).toBe("build");
     expect(f.toasts).toHaveLength(1);
   });
 
-  it("tryBuildTransport surfaces the build's own failure reason as a toast", () => {
+  it("tryBuildTransport surfaces the build's own failure reason as a toast", async () => {
     sim.money = 0;
-    const r = build.tryBuildTransport("elevatorStandard", 20, 1, 2);
+    const r = await build.tryBuildTransport("elevatorStandard", 20, 1, 2);
     expect(r).toEqual({ ok: false, reason: "Not enough money." });
     expect(f.sfx).toEqual(["error"]);
     expect(f.toasts).toEqual([{ text: "Not enough money.", kind: "bad" }]);
   });
 
-  it("transportReason: locked kinds name their star gate; a valid span falls back to the generic line", () => {
+  it("transportReason: locked kinds name their star gate; a valid span falls back to the generic line", async () => {
     // A 1★ tower asking about the 3★ express gets the unlock line.
-    expect(build.transportReason("elevatorExpress", 20, 1, 2)).toBe(
+    expect(await build.transportReason("elevatorExpress", 20, 1, 2)).toBe(
       `${FACILITIES.elevatorExpress.name} unlocks at ${FACILITIES.elevatorExpress.minStar}★.`,
     );
     // validateTransport passes here (clear column, built floors), so the build
     // failed for a reason placement can't diagnose — the generic fallback.
-    expect(build.transportReason("elevatorStandard", 20, 1, 2)).toBe(
+    expect(await build.transportReason("elevatorStandard", 20, 1, 2)).toBe(
       "A shaft can't go here. Leave a clear column through built floors.",
     );
   });
 
-  it("bulldozePicked: null and stale picks are no-ops (no sfx, no refund)", () => {
+  it("bulldozePicked: null and stale picks are no-ops (no sfx, no refund)", async () => {
     const before = sim.money;
-    expect(build.bulldozePicked(null)).toBe(false);
-    expect(build.bulldozePicked({ type: "unit", id: 99_999, kind: "office" })).toBe(false);
-    expect(build.bulldozePicked({ type: "transport", id: 99_999, kind: "elevatorStandard" })).toBe(false);
+    await expect(build.bulldozePicked(null)).resolves.toBe(false);
+    await expect(build.bulldozePicked({ type: "unit", id: 99_999, kind: "office" })).resolves.toBe(false);
+    await expect(build.bulldozePicked({ type: "transport", id: 99_999, kind: "elevatorStandard" })).resolves.toBe(false);
     expect(sim.money).toBe(before);
     expect(f.sfx).toEqual([]);
   });
 
-  it("bulldozePicked on a transport refunds the shaft resale and clears a matching selection", () => {
+  it("bulldozePicked on a transport refunds the shaft resale and clears a matching selection", async () => {
     sel = lift.id;
     const before = sim.money;
-    expect(build.bulldozePicked({ type: "transport", id: lift.id, kind: lift.kind })).toBe(true);
+    await expect(build.bulldozePicked({ type: "transport", id: lift.id, kind: lift.kind })).resolves.toBe(true);
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
     expect(sim.tower.transports.some((t) => t.id === lift.id)).toBe(false);
     expect(f.sfx).toEqual(["sell"]);
     expect(cleared).toBe(1);
   });
 
-  it("bulldozePicked on a burning unit refuses — loud toasts, the quiet drag path doesn't", () => {
+  it("bulldozePicked on a burning unit refuses: loud toasts, the quiet drag path doesn't", async () => {
     office.state = "fire";
-    expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }, true)).toBe(false); // drag step
+    await expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }, true)).resolves.toBe(false); // drag step
     expect(f.toasts).toEqual([]);
     expect(f.sfx).toEqual([]);
-    expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" })).toBe(false); // deliberate click
+    await expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" })).resolves.toBe(false); // deliberate click
     expect(f.sfx).toEqual(["error"]);
     expect(f.toasts).toEqual([
       { text: "You can't bulldoze a burning unit. Call fire rescue or let it burn out.", kind: "bad" },
@@ -283,10 +285,10 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     expect(sim.tower.units.some((u) => u.id === office.id)).toBe(true);
   });
 
-  it("a gutted shell removes but refunds nothing (no salvage value)", () => {
+  it("a gutted shell removes but refunds nothing (no salvage value)", async () => {
     office.state = "gutted";
     const before = sim.money;
-    expect(build.tryRemoveUnit(office, "bulldoze")).toBe(true);
+    expect(await build.tryRemoveUnit(office, "bulldoze")).toBe(true);
     expect(sim.money).toBe(before);
     expect(sim.tower.units.some((u) => u.id === office.id)).toBe(false);
   });
@@ -310,13 +312,13 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     ctx: { kind: string; kindLabel: string; options: PriceOptions };
     cb: {
       preview: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
-      apply: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
+      apply: (target: BatchTarget, opts: BatchRentOptions) => Promise<BatchRentResult | null>;
       onApplied: (summary: string) => void;
     };
   } | null;
   let scheduleDlg: {
     ctx: ScheduleDialogCtx;
-    cb: { apply: (schedule: ElevatorSchedule) => void };
+    cb: { apply: (schedule: ElevatorSchedule) => Promise<void> };
   } | null;
 
   /** A richer strip than fixture(): three room floors so the cinema (2 floors,
@@ -353,6 +355,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     root = document.createElement("div");
     const build = new BuildActions({
       getSim: () => sim,
+      port: createTsSim(() => sim),
       ui: f.ui,
       audio: f.audio,
       selectedId: () => sel?.id ?? null,
@@ -360,6 +363,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     });
     editor = new EditorActions({
       getSim: () => sim,
+      port: createTsSim(() => sim),
       ui: {
         toast: f.ui.toast,
         showBatchPricingDialog: (ctx, cb) => (batchDlg = { ctx, cb }),
@@ -379,74 +383,74 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     });
   });
 
-  it("handleEditAction without a selection is a no-op (no undo capture)", () => {
-    editor.handleEditAction("sell", root);
+  it("handleEditAction without a selection is a no-op (no undo capture)", async () => {
+    await editor.handleEditAction("sell", root);
     expect(undo.captures).toEqual([]);
     expect(undo.commits).toBe(0);
   });
 
-  it("a stale selection (entity already removed) clears itself", () => {
+  it("a stale selection (entity already removed) clears itself", async () => {
     sel = { type: "unit", id: 99_999 };
-    editor.handleEditAction("rename", root);
+    await editor.handleEditAction("rename", root);
     expect(sel).toBeNull();
     sel = { type: "transport", id: 99_999 };
-    editor.handleEditAction("addcar", root);
+    await editor.handleEditAction("addcar", root);
     expect(sel).toBeNull();
   });
 
-  it("sell on a burning unit refuses: the unit survives and the undo step never commits", () => {
+  it("sell on a burning unit refuses: the unit survives and the undo step never commits", async () => {
     office.state = "fire";
     sel = { type: "unit", id: office.id };
     render(unitEditorTemplate(sim, office), root);
-    editor.handleEditAction("sell", root);
+    await editor.handleEditAction("sell", root);
     expect(sim.tower.units.some((u) => u.id === office.id)).toBe(true);
     expect(undo.captures).toEqual(["Sell"]);
     expect(undo.commits).toBe(0);
     expect(f.toasts[0].text).toContain("burning");
   });
 
-  it("rename takes #ed-name's trimmed value and falls back to the facility name when blank", () => {
+  it("rename takes #ed-name's trimmed value and falls back to the facility name when blank", async () => {
     sel = { type: "unit", id: office.id };
     render(unitEditorTemplate(sim, office), root);
     const input = root.querySelector<HTMLInputElement>("#ed-name")!;
     input.value = "  Corner Office  ";
-    editor.handleEditAction("rename", root);
+    await editor.handleEditAction("rename", root);
     expect(office.label).toBe("Corner Office");
     input.value = "   ";
-    editor.handleEditAction("rename", root);
+    await editor.handleEditAction("rename", root);
     expect(office.label).toBe(FACILITIES.office.name);
     expect(f.sfx).toContain("click");
   });
 
-  it("a sold condo can't be repriced: rent nudges are silent no-ops", () => {
+  it("a sold condo can't be repriced: rent nudges are silent no-ops", async () => {
     condo.everOccupied = true; // sold — the engine's priceUnit returns null
     sel = { type: "unit", id: condo.id };
     render(unitEditorTemplate(sim, condo), root);
     const before = rentOf(condo);
-    editor.handleEditAction("rentDown", root);
+    await editor.handleEditAction("rentDown", root);
     expect(rentOf(condo)).toBe(before);
     expect(f.sfx).not.toContain("click"); // no feedback for a refused nudge
   });
 
-  it("filmPolicy cycles auto → feature → blockbuster → auto on a cinema", () => {
+  it("filmPolicy cycles auto → feature → blockbuster → auto on a cinema", async () => {
     sel = { type: "unit", id: cinema.id };
     render(unitEditorTemplate(sim, cinema), root);
-    editor.handleEditAction("filmPolicy", root);
+    await editor.handleEditAction("filmPolicy", root);
     expect(cinema.filmPolicy).toBe("feature");
-    editor.handleEditAction("filmPolicy", root);
+    await editor.handleEditAction("filmPolicy", root);
     expect(cinema.filmPolicy).toBe("blockbuster");
-    editor.handleEditAction("filmPolicy", root);
+    await editor.handleEditAction("filmPolicy", root);
     expect(cinema.filmPolicy).toBe("auto");
     expect(f.sfx).toEqual(["click", "click", "click"]);
   });
 
-  it("the rung action applies the picked rung through the choke point and announces the pinned string", () => {
+  it("the rung action applies the picked rung through the choke point and announces the pinned string", async () => {
     sel = { type: "unit", id: office.id };
     render(unitEditorTemplate(sim, office), root);
     const select = root.querySelector<HTMLSelectElement>("#ed-rung")!;
     expect(select).not.toBeNull();
     select.value = "1"; // Low
-    editor.handleEditAction("rung", root);
+    await editor.handleEditAction("rung", root);
     expect(rentOf(office)).toBe(5_000);
     expect(last(announced)).toBe("Rent set to Low ($5,000).");
     expect(last(f.sfx)).toBe("click");
@@ -454,12 +458,12 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(refreshed).toBeGreaterThan(0);
   });
 
-  it("the rung action's No Rate entry takes the unit off the market and announces the off-market string", () => {
+  it("the rung action's No Rate entry takes the unit off the market and announces the off-market string", async () => {
     sel = { type: "unit", id: office.id };
     render(unitEditorTemplate(sim, office), root);
     const select = root.querySelector<HTMLSelectElement>("#ed-rung")!;
     select.value = "noRate";
-    editor.handleEditAction("rung", root);
+    await editor.handleEditAction("rung", root);
     expect(office.noRate).toBe(true);
     expect(office.state).toBe("occupied"); // never evicts
     expect(rentOf(office)).toBe(0);
@@ -467,25 +471,25 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     // Picking a rung afterwards returns it to the market.
     render(unitEditorTemplate(sim, office), root);
     root.querySelector<HTMLSelectElement>("#ed-rung")!.value = "3";
-    editor.handleEditAction("rung", root);
+    await editor.handleEditAction("rung", root);
     expect(office.noRate).toBeUndefined();
     expect(rentOf(office)).toBe(15_000);
     expect(last(announced)).toBe("Rent set to High ($15,000).");
   });
 
-  it("the rung action announces condo and hotel phrasing per the copy inventory", () => {
+  it("the rung action announces condo and hotel phrasing per the copy inventory", async () => {
     sel = { type: "unit", id: condo.id };
     render(unitEditorTemplate(sim, condo), root);
     root.querySelector<HTMLSelectElement>("#ed-rung")!.value = "0";
-    editor.handleEditAction("rung", root);
+    await editor.handleEditAction("rung", root);
     expect(rentOf(condo)).toBe(50_000); // the canon firesale floor, below build cost
     expect(last(announced)).toBe("Sale price set to Very Low ($50,000).");
   });
 
-  it("batchKind opens the batch-pricing dialog wired to the engine's preview/apply, with undo around apply", () => {
+  it("batchKind opens the batch-pricing dialog wired to the engine's preview/apply, with undo around apply", async () => {
     sel = { type: "unit", id: office.id };
     render(unitEditorTemplate(sim, office), root);
-    editor.handleEditAction("batchKind", root);
+    await editor.handleEditAction("batchKind", root);
     expect(batchDlg).not.toBeNull();
     // A default Simulation is Classic, so the dialog is handed the ladder shape.
     const options = sim.rules.priceOptions("office")!;
@@ -499,8 +503,8 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(rentOf(office)).toBe(before);
     // Apply commits exactly what preview showed, inside its own undo step.
     undo = { captures: [], commits: 0 };
-    const a = batchDlg!.cb.apply(high, {});
-    expect(a.changed).toBe(1);
+    const a = await batchDlg!.cb.apply(high, {});
+    expect(a?.changed).toBe(1);
     expect(rentOf(office)).toBe(high);
     expect(undo.captures).toEqual(["Set prices"]);
     expect(undo.commits).toBe(1);
@@ -510,20 +514,24 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(last(f.toasts)).toEqual({ text: "1 office repriced", kind: "good" });
     expect(last(announced)).toBe("1 office repriced");
     expect(refreshed).toBeGreaterThan(0);
+    // A refused apply says why and hands the dialog nothing to summarize.
+    expect(await batchDlg!.cb.apply(Number.NaN, {})).toBeNull();
+    expect(last(f.toasts)).toEqual({ text: "That request is not valid.", kind: "bad" });
+    expect(rentOf(office)).toBe(high);
   });
 
-  it("batchKind on a kind without a rent band does nothing", () => {
+  it("batchKind on a kind without a rent band does nothing", async () => {
     sel = { type: "unit", id: cinema.id };
     render(unitEditorTemplate(sim, cinema), root);
-    editor.handleEditAction("batchKind", root);
+    await editor.handleEditAction("batchKind", root);
     expect(batchDlg).toBeNull();
   });
 
-  it("schedule opens the elevator-schedule dialog wired to setSchedule, with undo around apply", () => {
+  it("schedule opens the elevator-schedule dialog wired to setSchedule, with undo around apply", async () => {
     lift.cars = 4;
     sel = { type: "transport", id: lift.id };
     render(transportEditorTemplate(sim, lift), root);
-    editor.handleEditAction("schedule", root);
+    await editor.handleEditAction("schedule", root);
     expect(scheduleDlg).not.toBeNull();
     // The dialog is handed the shaft's live geometry and the mode UX flags.
     expect(scheduleDlg!.ctx.cars).toBe(4);
@@ -532,7 +540,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(lift.schedule).toBeUndefined();
     // Apply writes the authored schedule through one undoable setSchedule.
     undo = { captures: [], commits: 0 };
-    scheduleDlg!.cb.apply({
+    await scheduleDlg!.cb.apply({
       activeCars: { weekday: Array(24).fill(2), weekend: Array(24).fill(1) },
       waitingCarResponse: 6,
       standardFloorDeparture: 40,
@@ -546,40 +554,47 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(last(f.sfx)).toBe("build");
     expect(last(announced)).toBe("Elevator schedule saved.");
     expect(refreshed).toBeGreaterThan(0);
+    // A refused write says so instead of "saved".
+    vi.spyOn(sim.tower, "setSchedule").mockReturnValueOnce(false);
+    const spoken = announced.length;
+    await scheduleDlg!.cb.apply({ activeCars: { weekday: [], weekend: [] }, waitingCarResponse: 0, standardFloorDeparture: 0, homeFloors: [] });
+    expect(last(f.sfx)).toBe("error");
+    expect(last(f.toasts)).toEqual({ text: "That schedule could not be saved.", kind: "bad" });
+    expect(announced.length).toBe(spoken);
   });
 
-  it("schedule on a non-elevator transport (stairs) does nothing", () => {
+  it("schedule on a non-elevator transport (stairs) does nothing", async () => {
     sel = { type: "transport", id: stairs.id };
     render(transportEditorTemplate(sim, stairs), root);
-    editor.handleEditAction("schedule", root);
+    await editor.handleEditAction("schedule", root);
     expect(scheduleDlg).toBeNull();
   });
 
-  it("addcar refuses at the car cap (before any money talk) and when broke", () => {
+  it("addcar refuses at the car cap (before any money talk) and when broke", async () => {
     sel = { type: "transport", id: lift.id };
     render(transportEditorTemplate(sim, lift), root);
     lift.cars = maxCarsFor(lift.kind);
     const before = sim.money;
-    editor.handleEditAction("addcar", root);
+    await editor.handleEditAction("addcar", root);
     expect(lift.cars).toBe(maxCarsFor(lift.kind));
     expect(sim.money).toBe(before);
     expect(f.toasts).toEqual([]); // cap refusal is silent — the button is disabled anyway
     lift.cars = 1;
     sim.money = 0;
-    editor.handleEditAction("addcar", root);
+    await editor.handleEditAction("addcar", root);
     expect(lift.cars).toBe(1);
     expect(f.toasts).toEqual([{ text: "Not enough money.", kind: "bad" }]);
   });
 
-  it("the folded-in bulk stop actions: express skips non-lobby middles, allstops restores them (#464)", () => {
+  it("the folded-in bulk stop actions: express skips non-lobby middles, allstops restores them (#464)", async () => {
     expect(sim.tower.resizeTransport(lift.id, 1, 4).ok).toBe(true);
     sel = { type: "transport", id: lift.id };
     editor.openSchedule();
     const stops = scheduleDlg!.ctx.stops;
-    stops.expressStops();
+    await stops.expressStops();
     expect(lift.skipFloors).toEqual([2, 3]); // endpoints always stop; 2–3 aren't lobbies
     expect(sim.tower.stopsAt(lift, 2)).toBe(false);
-    stops.allStops();
+    await stops.allStops();
     expect(lift.skipFloors).toEqual([]);
     expect(sim.tower.stopsAt(lift, 2)).toBe(true);
     expect(undo.commits).toBe(2);
@@ -659,7 +674,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(renderedCard(transportEditorTemplate(s, ex)).textContent).toContain("lobbies and sky lobbies (1 skipped)");
   });
 
-  it("the schedule dialog's stops port lists floors top-down and each toggle is its own undo-bracketed setStop (#464)", () => {
+  it("the schedule dialog's stops port lists floors top-down and each toggle is its own undo-bracketed setStop (#464)", async () => {
     expect(sim.tower.resizeTransport(lift.id, 1, 4).ok).toBe(true);
     sel = { type: "transport", id: lift.id };
     editor.openSchedule();
@@ -667,115 +682,115 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(stops.read().map((fl) => fl.floor)).toEqual([4, 3, 2, 1]);
     expect(stops.read().every((fl) => fl.served)).toBe(true);
     expect(stops.read().find((fl) => fl.floor === 1)!.lobby).toBe(true);
-    stops.setServe(3, false);
+    await stops.setServe(3, false);
     expect(sim.tower.stopsAt(lift, 3)).toBe(false);
     expect(stops.read().find((fl) => fl.floor === 3)!.served).toBe(false);
     expect(undo.captures).toEqual(["Elevator stops"]);
     expect(undo.commits).toBe(1);
     expect(refreshed).toBeGreaterThan(0);
-    stops.setServe(3, true);
+    await stops.setServe(3, true);
     expect(sim.tower.stopsAt(lift, 3)).toBe(true);
     // The folded-in bulk actions ride the same undo bracket.
-    stops.expressStops();
+    await stops.expressStops();
     expect(sim.tower.stopsAt(lift, 3)).toBe(false); // 3 is no lobby
-    stops.allStops();
+    await stops.allStops();
     expect(sim.tower.stopsAt(lift, 3)).toBe(true);
     expect(undo.captures.every((c) => c === "Elevator stops")).toBe(true);
   });
 
-  it("the stops port goes inert when the shaft vanishes mid-dialog (undo past its construction)", () => {
+  it("the stops port goes inert when the shaft vanishes mid-dialog (undo past its construction)", async () => {
     sel = { type: "transport", id: lift.id };
     editor.openSchedule();
     const stops = scheduleDlg!.ctx.stops;
     sim.tower.removeTransport(lift.id);
     expect(stops.read()).toEqual([]);
     const before = undo.captures.length;
-    stops.setServe(1, false); // silent no-op: no undo step, no crash
-    stops.expressStops();
-    stops.allStops();
+    await stops.setServe(1, false); // silent no-op: no undo step, no crash
+    await stops.expressStops();
+    await stops.allStops();
     expect(undo.captures.length).toBe(before);
   });
 
-  it("extendUp bills a floor when it fits and auto-lays the floor behind it in open sky", () => {
+  it("extendUp bills a floor when it fits and auto-lays the floor behind it in open sky", async () => {
     sel = { type: "transport", id: lift.id };
     render(transportEditorTemplate(sim, lift), root);
     const before = sim.money;
-    editor.handleEditAction("extendUp", root); // floor 3 is built → grows
+    await editor.handleEditAction("extendUp", root); // floor 3 is built → grows
     expect(lift.top).toBe(3);
     expect(before - sim.money).toBe(ECON.transportFloorCost);
     expect(last(f.sfx)).toBe("build");
-    editor.handleEditAction("extendUp", root); // floor 4 built too
+    await editor.handleEditAction("extendUp", root); // floor 4 built too
     expect(lift.top).toBe(4);
     // Floor 5 is open sky: the extend now brings the floor with it (it rests on
     // floor 4), still billing the single extend cost, and lays plain floor
     // across the shaft's 4-tile footprint at 58..61.
     const mid = sim.money;
-    editor.handleEditAction("extendUp", root);
+    await editor.handleEditAction("extendUp", root);
     expect(lift.top).toBe(5);
     expect(mid - sim.money).toBe(ECON.transportFloorCost);
     expect(last(f.sfx)).toBe("build");
     for (let i = 0; i < 4; i++) expect(sim.tower.structureKindAt(5, 58 + i)).toBe("floor");
   });
 
-  it("extendUp toasts the engine's reason when another shaft blocks the column", () => {
+  it("extendUp toasts the engine's reason when another shaft blocks the column", async () => {
     // A second short shaft stacked in the lift's column at floors 3..4 blocks
     // the extend: the editor surfaces the engine's refusal as an error toast.
     expect(sim.buildTransport("elevatorStandard", 58, 3, 4).ok).toBe(true);
     sel = { type: "transport", id: lift.id };
     render(transportEditorTemplate(sim, lift), root);
-    editor.handleEditAction("extendUp", root); // floor 3 is occupied by the other shaft
+    await editor.handleEditAction("extendUp", root); // floor 3 is occupied by the other shaft
     expect(lift.top).toBe(2); // unchanged
     expect(last(f.sfx)).toBe("error");
     expect(last(f.toasts)).toEqual({ text: "Transport shafts cannot overlap.", kind: "bad" });
   });
 
-  it("extendSelectedTo bills only floors past the drag's engine-held mark; wiggles re-bill nothing", () => {
+  it("extendSelectedTo bills only floors past the drag's engine-held mark; wiggles re-bill nothing", async () => {
     sel = { type: "transport", id: lift.id };
     const before = sim.money;
-    editor.extendSelectedTo("up", 4); // 1..2 → 1..4: two new floors billed
+    await editor.extendSelectedTo("up", 4); // 1..2 → 1..4: two new floors billed
     expect(lift.top).toBe(4);
     expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
     expect(last(f.sfx)).toBe("build");
-    editor.extendSelectedTo("up", 3); // shrink back is free…
+    await editor.extendSelectedTo("up", 3); // shrink back is free…
     expect(lift.top).toBe(3);
     expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
     expect(last(f.sfx)).toBe("click");
-    editor.extendSelectedTo("up", 4); // …and regrowing within the mark re-bills nothing
+    await editor.extendSelectedTo("up", 4); // …and regrowing within the mark re-bills nothing
     expect(lift.top).toBe(4);
     expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
-    editor.extendSelectedTo("up", 4); // no change at all: silent early return
+    await editor.extendSelectedTo("up", 4); // no change at all: silent early return
     const sfxCount = f.sfx.length;
     expect(f.sfx.length).toBe(sfxCount);
     expect(undo.captures).toEqual(["Extend"]); // ONE capture for the whole drag
     // endExtend closes the gesture: the next drag re-captures. Floor 5 is open
     // sky, but the extend now auto-lays the floor behind it (rests on floor 4),
     // so the shaft grows to 5 and bills the one new floor past the fresh mark.
-    editor.endExtend();
-    editor.extendSelectedTo("up", 5);
+    await editor.endExtend();
+    await editor.extendSelectedTo("up", 5);
     expect(lift.top).toBe(5);
     expect(before - sim.money).toBe(3 * ECON.transportFloorCost);
     expect(undo.captures).toEqual(["Extend", "Extend"]);
     for (let i = 0; i < 4; i++) expect(sim.tower.structureKindAt(5, 58 + i)).toBe("floor");
     // The engine holds the mark (#990): the drag opened a gesture on the sim,
     // and endExtend closed it, so a shrink and regrow after it bills again.
-    editor.extendSelectedTo("up", 4);
-    editor.endExtend();
+    await editor.extendSelectedTo("up", 4);
+    await editor.endExtend();
     sim.extendTransport(lift.id, "up", 5);
     expect(before - sim.money).toBe(4 * ECON.transportFloorCost);
     // A one-floor press while a drag's gesture is still open (its pointer-up
     // lost, #1014) is a step of that gesture: a floor the drag already paid
     // for is not billed twice.
-    editor.extendSelectedTo("up", 6); // paid floor 6
-    editor.extendSelectedTo("up", 5); // shrank back, the gesture still open
+    await editor.extendSelectedTo("up", 6); // paid floor 6
+    await editor.extendSelectedTo("up", 5); // shrank back, the gesture still open
     render(transportEditorTemplate(sim, lift), root);
-    editor.handleEditAction("extendUp", root);
+    await editor.handleEditAction("extendUp", root);
     expect(lift.top).toBe(6);
     expect(before - sim.money).toBe(5 * ECON.transportFloorCost);
   });
 
-  it("a tower swapped in mid-drag starts a fresh high-water mark, so nothing grows unbilled", () => {
+  it("a tower swapped in mid-drag starts a fresh high-water mark, so nothing grows unbilled", async () => {
     sel = { type: "transport", id: lift.id };
-    editor.extendSelectedTo("up", 4); // the old tower's drag reaches floor 4
+    await editor.extendSelectedTo("up", 4); // the old tower's drag reaches floor 4
     expect(lift.top).toBe(4);
     // A load or an undo adopts a copy of the tower from before the drag; the
     // shaft keeps its id but stands at 1..2 again.
@@ -783,17 +798,17 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(snapshot.tower.resizeTransport(lift.id, 1, 2).ok).toBe(true);
     sim = snapshot;
     const before = sim.money;
-    editor.extendSelectedTo("up", 4); // the stale mark (top 4) must not make this free
+    await editor.extendSelectedTo("up", 4); // the stale mark (top 4) must not make this free
     expect(sim.tower.transportById(lift.id)!.top).toBe(4);
     expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
   });
 
-  it("extendSelectedTo guards: no selection, a unit, and a stairway (no extend handles) all bail", () => {
-    editor.extendSelectedTo("up", 4);
+  it("extendSelectedTo guards: no selection, a unit, and a stairway (no extend handles) all bail", async () => {
+    await editor.extendSelectedTo("up", 4);
     sel = { type: "unit", id: office.id };
-    editor.extendSelectedTo("up", 4);
+    await editor.extendSelectedTo("up", 4);
     sel = { type: "transport", id: stairs.id };
-    editor.extendSelectedTo("up", 4);
+    await editor.extendSelectedTo("up", 4);
     expect(stairs.top).toBe(2);
     expect(undo.captures).toEqual([]); // no gesture ever started
   });
@@ -1344,6 +1359,7 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     engine = { ensureVisible: () => {}, preview: null, transportPreview: null };
     const build = new BuildActions({
       getSim: () => sim,
+      port: createTsSim(() => sim),
       ui: f.ui,
       audio: f.audio,
       selectedId: () => null,
@@ -1361,6 +1377,7 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     };
     keyboard = new KeyboardPlay({
       getSim: () => sim,
+      port: createTsSim(() => sim),
       engine: () => engine,
       audio: f.audio,
       ui: f.ui,
@@ -1394,29 +1411,29 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     expect(last(announced)).toBe(`Cursor: floor ${GRID.maxFloor}, column ${GRID.width - 1}. Empty.`);
   });
 
-  it("the first Enter with no cursor just reveals it (no select, no build)", () => {
-    keyboard.commitCursor();
+  it("the first Enter with no cursor just reveals it (no select, no build)", async () => {
+    await keyboard.commitCursor();
     expect(keyboard.cursor()).toEqual({ tile: mid, floor: 1 });
     expect(selections).toEqual([]);
     expect(last(announced)).toMatch(/^Cursor: floor 1/);
   });
 
-  it("inspect commit announces the selection — or the honest nothing", () => {
+  it("inspect commit announces the selection, or the honest nothing", async () => {
     keyboard.moveCursor(0, 0); // (mid, 1)
     keyboard.moveCursor(-5, 1); // (mid-5, 2) — inside the office (mid-10 .. mid-2)
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(last(announced)).toBe(`Selected ${FACILITIES.office.name}`);
     expect(last(selections)).toEqual({ type: "unit", id: office.id, kind: "office" });
     keyboard.moveCursor(10, 0); // (mid+5, 2) — bare floor strip
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(last(announced)).toBe("Nothing to inspect here");
     expect(last(selections)).toBeNull();
   });
 
-  it("elevator two-press flow: first Enter anchors and announces, second builds the span", () => {
+  it("elevator two-press flow: first Enter anchors and announces, second builds the span", async () => {
     tool = { type: "build", kind: "elevatorStandard" };
     keyboard.moveCursor(0, 0); // (mid, 1)
-    keyboard.commitCursor(); // anchor
+    await keyboard.commitCursor(); // anchor
     expect(last(announced)).toBe(
       `${FACILITIES.elevatorStandard.name} anchored at floor 1. Move to the other end and press Enter.`,
     );
@@ -1432,7 +1449,7 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
       valid: true,
     });
     expect(engine.preview).toBeNull();
-    keyboard.commitCursor(); // build floors 1..2
+    await keyboard.commitCursor(); // build floors 1..2
     expect(sim.tower.transports).toHaveLength(1);
     expect(last(f.sfx)).toBe("build");
     expect(last(announced)).toBe(`${FACILITIES.elevatorStandard.name} built, floors 1 to 2`);
@@ -1449,27 +1466,27 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     ]);
   });
 
-  it("resetAnchor drops a pending anchor: the next Enter re-anchors instead of building", () => {
+  it("resetAnchor drops a pending anchor: the next Enter re-anchors instead of building", async () => {
     tool = { type: "build", kind: "elevatorStandard" };
     keyboard.moveCursor(0, 0);
-    keyboard.commitCursor(); // anchor at floor 1
+    await keyboard.commitCursor(); // anchor at floor 1
     keyboard.resetAnchor(); // Escape / tool switch
     keyboard.moveCursor(0, 1);
     // No anchor → the move delegates to the shared build preview (clearing the
     // stale shaft ghost is that callback's job in GameApp).
     expect(last(previewCalls)).toEqual({ tile: mid, floor: 2 });
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(sim.tower.transports).toHaveLength(0); // re-anchored, didn't build
     expect(last(announced)).toContain("anchored at floor 2");
   });
 
-  it("a failed transport build plays the error sfx, toasts, and announces the reason", () => {
+  it("a failed transport build plays the error sfx, toasts, and announces the reason", async () => {
     tool = { type: "build", kind: "elevatorStandard" };
     keyboard.moveCursor(0, 0);
-    keyboard.commitCursor(); // anchor
+    await keyboard.commitCursor(); // anchor
     sim.money = 0; // broke before the second press
     keyboard.moveCursor(0, 1);
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(sim.tower.transports).toHaveLength(0);
     expect(last(f.sfx)).toBe("error");
     expect(last(f.toasts)).toEqual({ text: "Not enough money.", kind: "bad" });
@@ -1477,24 +1494,24 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     expect(engine.transportPreview).toBeNull(); // the anchor is spent either way
   });
 
-  it("bulldozing the cursor over a transport removes it with a refund and announces it", () => {
+  it("bulldozing the cursor over a transport removes it with a refund and announces it", async () => {
     expect(sim.buildTransport("elevatorStandard", mid, 1, 2).ok).toBe(true);
     tool = { type: "bulldoze" };
     const before = sim.money;
     keyboard.moveCursor(0, 0); // (mid, 1) — inside the shaft
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(sim.tower.transports).toHaveLength(0);
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
     expect(last(announced)).toBe(`Bulldozed ${FACILITIES.elevatorStandard.name}`);
     expect(undoLog.slice(-2)).toEqual(["capture:Bulldoze", "commit"]);
   });
 
-  it("announces refused, successful, then refused keyboard bulldozes as a facility changes state", () => {
+  it("announces refused, successful, then refused keyboard bulldozes as a facility changes state", async () => {
     tool = { type: "bulldoze" };
     keyboard.moveCursor(-10, 1); // (mid - 10, 2): the office
     const pick = { type: "unit" as const, kind: "office" as const, id: office.id };
     office.state = "fire";
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(sim.tower.getUnit(pick.id)).toBeTruthy();
     expect(last(announced)).toBe(`Could not bulldoze ${FACILITIES.office.name}`);
     expect(last(f.toasts)).toEqual({
@@ -1504,7 +1521,7 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     expect(last(f.sfx)).toBe("error");
 
     office.state = "empty"; // the fire clears, and the same cursor can remove it
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(sim.tower.getUnit(pick.id)).toBeUndefined();
     expect(last(announced)).toBe(`Bulldozed ${FACILITIES.office.name}`);
     expect(last(f.sfx)).toBe("sell");
@@ -1513,7 +1530,7 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     expect(replaced.ok).toBe(true);
     const next = sim.tower.getUnit(replaced.unitId!)!;
     next.state = "fire"; // a new fire at the same location must refuse again
-    keyboard.commitCursor();
+    await keyboard.commitCursor();
     expect(sim.tower.getUnit(next.id)).toBeTruthy();
     expect(last(announced)).toBe(`Could not bulldoze ${FACILITIES.office.name}`);
     expect(last(f.sfx)).toBe("error");
@@ -1524,8 +1541,8 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     ]);
   });
 
-  it("bulldozeCursor and refreshCursorPreview are no-ops before the cursor is revealed", () => {
-    keyboard.bulldozeCursor();
+  it("bulldozeCursor and refreshCursorPreview are no-ops before the cursor is revealed", async () => {
+    await keyboard.bulldozeCursor();
     expect(announced).toEqual([]);
     keyboard.refreshCursorPreview();
     expect(previewCalls).toEqual([]);

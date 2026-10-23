@@ -33,6 +33,8 @@ import { updateTraffic } from "./game/trafficHud";
 import { onUpdateAvailable } from "./game/updateFlow";
 import { bootGame } from "./bootstrap";
 import { gameplaySession } from "./analytics";
+import { createTsSim } from "./simport/tsSim";
+import type { SimPort } from "./simport/port";
 
 /**
  * The game controller. Excalibur (via {@link TowerEngine}) owns the render
@@ -58,6 +60,8 @@ import { gameplaySession } from "./analytics";
  */
 class GameApp implements GameAppPorts {
   sim: Simulation;
+  /** The simulation as the game drives it (AD-9); follows every adoptSim swap. */
+  readonly port: SimPort = createTsSim(() => this.sim);
   engine: TowerEngine;
   audio = new AudioEngine();
   ui: UI;
@@ -313,9 +317,7 @@ class GameApp implements GameAppPorts {
   }
 
   renameTower(name: string): void {
-    // The original callback was an assignment expression `(name) => (… = name)`;
-    // as a void method the returned string is dropped, which no caller used.
-    this.sim.tower.towerName = name;
+    void this.port.command({ op: "setTowerName", name });
   }
 
   // Stats + save-slot modal commands, bodies in game/appModals.ts.
@@ -358,7 +360,7 @@ class GameApp implements GameAppPorts {
   // Kept as methods because KeyboardPlay's deps call them on the app, and the
   // gameControllers.integration.test.ts mirror re-implements the same bodies.
 
-  /** @internal */ placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null { return placeSimpleBuild(this, kind, tile, floor); }
+  /** @internal */ placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): Promise<PlaceOutcome> | null { return placeSimpleBuild(this, kind, tile, floor); }
   /** @internal */ isTransportTool(): boolean { return isTransportTool(this); }
   /** @internal */ updateBuildPreview(tile: number, floor: number): void { updateBuildPreview(this, tile, floor); }
   /** @internal */ pickedAt(floor: number, tile: number): Picked | null { return pickedAt(this, floor, tile); }

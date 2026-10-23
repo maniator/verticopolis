@@ -403,6 +403,22 @@ export function isSupported(tower: Tower, floor: number, x: number, width: numbe
   return false;
 }
 
+function removeUnitsByIdDescending(tower: Tower, ids: readonly number[]): void {
+  if (ids.length === 0) return;
+  const indexById = new Map<number, number>();
+  for (let i = 0; i < tower.units.length; i++) {
+    indexById.set(tower.units[i].id, i);
+  }
+  const indexes = [...new Set(ids.map((id) => indexById.get(id)).filter((idx): idx is number => idx !== undefined))]
+    .sort((a, b) => b - a);
+  for (const idx of indexes) {
+    const [u] = tower.units.splice(idx, 1);
+    if (!u) continue;
+    tower.unregister(u);
+    tower.revision++;
+  }
+}
+
 export function place(tower: Tower, kind: FacilityKind, floor: number, x: number): PlaceResult {
   const check = tower.canPlace(kind, floor, x);
   if (!check.ok) return check;
@@ -411,9 +427,17 @@ export function place(tower: Tower, kind: FacilityKind, floor: number, x: number
   // before registering the lobby, so the structure index never goes stale.
   // (canPlace guaranteed any structure in the span is plain floor.)
   if (kind === "lobby") {
+    const ids = new Set<number>();
     for (let i = 0; i < f.width; i++) {
       const sid = tower.structure.get(tower.key(floor, x + i));
-      if (sid !== undefined) tower.removeUnit(sid);
+      if (sid !== undefined) ids.add(sid);
+    }
+    const removeIds = [...ids];
+    const allFloor = removeIds.every((id) => tower.byId.get(id)?.kind === "floor");
+    if (allFloor) {
+      removeUnitsByIdDescending(tower, removeIds);
+    } else {
+      for (const id of removeIds) tower.removeUnit(id);
     }
   }
   const unit: Unit = {
@@ -437,6 +461,7 @@ export function place(tower: Tower, kind: FacilityKind, floor: number, x: number
   if (kind === "lobby" && tower.lobbyTiles.get(floor) === unit.width) {
     tower.syncExpressStopsForFloor(floor);
   }
+
   tower.revision++;
   return { ok: true, unitId: unit.id };
 }

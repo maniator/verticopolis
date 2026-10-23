@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { towerCatalog } from "../engine/towerCatalog";
 import { createUICallbacks, type GameAppPorts } from "./uiCallbacks";
 import type { Simulation } from "../engine/Simulation";
+import type { SimPort } from "../simport/port";
 
 /**
  * The UI command boundary is pure wiring: every UICallbacks member delegates to
@@ -18,6 +19,7 @@ function makePorts() {
   const sim = { mode: "classic", tower: {}, autoBridge: true } as unknown as Simulation;
   const ports: GameAppPorts = {
     getSim: vi.fn(() => sim),
+    port: { command: vi.fn(async () => ({ ok: true, delta: 0, value: false })) } as unknown as SimPort,
     audio: { muted: true, musicVolume: 0.4, ambienceVolume: 0.7, sfxVolume: 0.6 },
     saveLoad: {
       save: vi.fn(),
@@ -152,6 +154,16 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(cb.onToggleReducedMotion()).toBe(true);
     expect(cb.onToggleSteadyClock()).toBe(true);
     expect(cb.isSteadyClock()).toBe(true);
+  });
+
+  it("the bridging switch is a port command that resolves to the engine's answer", async () => {
+    const { ports } = makePorts();
+    const cb = createUICallbacks(ports);
+    // The fake engine answers false while the live sim still reads true: the
+    // switch takes the answer.
+    expect(await cb.onToggleAutoBridge()).toBe(false);
+    expect(ports.port.command).toHaveBeenCalledExactlyOnceWith({ op: "toggleAutoBridge" });
+    expect(cb.isAutoBridge()).toBe(true);
   });
 
   it("onboarding, rename, stats, inspector close", () => {

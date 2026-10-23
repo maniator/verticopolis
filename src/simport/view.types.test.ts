@@ -29,6 +29,10 @@ type NotPlayerCommand =
   | "bombThreat"
   | "evaluateStar";
 
+/** Port commands the relay carries as other ops: a port-level composite of
+ *  `build` (the paint brush, one `build` per tile in `runBrush`'s order). */
+type PortComposite = "paintBrush";
+
 describe("the port's types", () => {
   it("the live TypeScript objects are views, so the adapter copies nothing", () => {
     expectTypeOf<Tower>().toExtend<TowerView>();
@@ -47,7 +51,9 @@ describe("the port's types", () => {
   });
 
   it("every player op the relay carries has a command, and no command lacks one", () => {
-    expectTypeOf<Command["op"]>().toEqualTypeOf<Exclude<ShadowCommand["op"], NotPlayerCommand>>();
+    expectTypeOf<Exclude<Command["op"], PortComposite>>().toEqualTypeOf<Exclude<ShadowCommand["op"], NotPlayerCommand>>();
+    // A composite is a port command the relay does not carry under its name.
+    expectTypeOf<PortComposite>().toExtend<Command["op"]>();
     // A renamed or removed relay op leaves no stale name in the list above.
     expectTypeOf<NotPlayerCommand>().toExtend<ShadowCommand["op"]>();
   });

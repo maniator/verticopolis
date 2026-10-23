@@ -39,10 +39,13 @@ export interface BatchPricingDialogCtx {
   options: PriceOptions;
 }
 
-/** The engine operations the dialog drives. */
+/** The engine operations the dialog drives. `apply` is a command, so it
+ *  resolves once the engine has answered; the summary waits for it. It
+ *  resolves to null when the engine refused (the caller has said why), and
+ *  the dialog then closes without a summary. */
 export interface BatchPricingDialogCb {
   preview: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
-  apply: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
+  apply: (target: BatchTarget, opts: BatchRentOptions) => Promise<BatchRentResult | null>;
   onApplied: (summary: string) => void;
 }
 
@@ -72,6 +75,7 @@ export function showBatchPricingDialog(ui: UI, ctx: BatchPricingDialogCtx, cb: B
     previewMsg: "",
     applyDisabled: false,
   };
+  let applying = false;
   const targetOf = (): BatchTarget => (state.mode === "default" ? "default" : snap(Number(state.priceRaw) || 0));
   const optsOf = (): BatchRentOptions => ({ onlyDefaultPriced: state.only });
   // Recompute the honest preview sentence and the Apply-disabled flag from state
@@ -127,9 +131,14 @@ export function showBatchPricingDialog(ui: UI, ctx: BatchPricingDialogCtx, cb: B
         rerender();
         return;
       }
-      const r = cb.apply(targetOf(), optsOf());
-      cb.onApplied(`Set ${r.changed} ${noun} to ${batchPriceText(tctx, targetOf())}.`);
-      ui.closeModal();
+      // One apply at a time: a second click while the engine answers is dropped.
+      if (applying) return;
+      applying = true;
+      const target = targetOf();
+      return cb.apply(target, optsOf()).then((r) => {
+        if (r) cb.onApplied(`Set ${r.changed} ${noun} to ${batchPriceText(tctx, target)}.`);
+        ui.closeModal();
+      });
     },
     onCancel: () => ui.closeModal(),
   };
@@ -146,11 +155,7 @@ function showBatchRungDialog(
   noun: string,
   single: string,
   rungs: readonly PriceRung[],
-  cb: {
-    preview: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
-    apply: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
-    onApplied: (summary: string) => void;
-  },
+  cb: BatchPricingDialogCb,
 ): void {
   const tctx: BatchRungCtx = { noun, single, rungs };
   // Opens on Average, the default rung (AR6), so Apply-with-no-thought is the
@@ -162,6 +167,7 @@ function showBatchRungDialog(
     previewMsg: "",
     applyDisabled: false,
   };
+  let applying = false;
   const targetOf = (): BatchTarget => (state.choice === "noRate" ? "noRate" : rungs[state.choice].value);
   const optsOf = (): BatchRentOptions => ({ onlyDefaultPriced: state.only });
   const recompute = () => {
@@ -212,13 +218,18 @@ function showBatchRungDialog(
         rerender();
         return;
       }
-      const r = cb.apply(targetOf(), optsOf());
-      const summary =
-        state.choice === "noRate"
-          ? `Took ${r.changed} ${noun} off the market (No Rate).`
-          : `Set ${r.changed} ${noun} to ${rungs[state.choice].label} ($${rungs[state.choice].value.toLocaleString()}).`;
-      cb.onApplied(summary);
-      ui.closeModal();
+      if (applying) return;
+      applying = true;
+      const choice = state.choice;
+      return cb.apply(targetOf(), optsOf()).then((r) => {
+        if (!r) return ui.closeModal();
+        const summary =
+          choice === "noRate"
+            ? `Took ${r.changed} ${noun} off the market (No Rate).`
+            : `Set ${r.changed} ${noun} to ${rungs[choice].label} ($${rungs[choice].value.toLocaleString()}).`;
+        cb.onApplied(summary);
+        ui.closeModal();
+      });
     },
     onCancel: () => ui.closeModal(),
   };
