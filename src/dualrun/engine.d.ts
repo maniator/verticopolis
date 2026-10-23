@@ -355,6 +355,14 @@ export class Engine {
      */
     towerSetCars(id: number, cars: number): boolean;
     /**
+     * The tower signature (`Simulation::tower_signature`) as a `bigint`: two
+     * reads are equal when the tower half of `towerStateSig` is, and differ
+     * when it differs (but for a 64-bit collision). Undo reads it, beside
+     * money, at a gesture's capture and commit; it walks every unit, so it
+     * is never a per-frame read.
+     */
+    towerSignature(): bigint;
+    /**
      * The shaft covering a tile, serialized as the save would, or null.
      */
     transportAt(floor: number, x: number): string | undefined;
@@ -363,12 +371,36 @@ export class Engine {
      */
     unitAt(floor: number, x: number): string | undefined;
     /**
+     * The labels and subtypes changed after the meta revision `since`, as
+     * JSON `{ revision, full, units: [[id, label, subtype], ...] }`
+     * (`view::meta_since`). Read raw: no argument, 0, and anything but a
+     * whole JS number from the log's reach up to the current revision get
+     * a full listing.
+     */
+    unitMetaSince(since: number): string;
+    /**
      * `tower.validateTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`,
      * nothing written. An unknown kind is refused with "Unknown facility."; a
      * coordinate that is not a whole JS number within `Number.isSafeInteger`
      * is refused with `INVALID_REQUEST`, never coerced (#923).
      */
     validateTransport(kind: string, x: number, bottom: number, top: number): string;
+    /**
+     * The dynamic frame (`view::ViewReader::frame`): the header, the
+     * people, the rooms whose fields changed since the last call (every room
+     * when `full` is `true`, on the first call, or after a structural
+     * change, with the header's full flag set) and the cars. One reader per
+     * engine, so one caller: the header's frame number tells it when it
+     * missed a frame. Read raw: only a JS `true` asks for a full frame.
+     */
+    viewFrame(full: boolean): Float64Array;
+    /**
+     * The structural snapshot (`view::structure_view`): the floor bounds,
+     * the mode and calendar, rooms by slot, floor and lobby tiles as runs,
+     * transports with their skipped floors. Read again when the frame
+     * header's tower revision moves.
+     */
+    viewStructure(): Float64Array;
 }
 
 /**
@@ -417,3 +449,12 @@ export function exportTdt(save_json: string): Uint8Array;
  * the player-readable message.
  */
 export function importTdt(bytes: Uint8Array, filename: string): string;
+
+/**
+ * The view's layout (facade slice 6a, #1213) as JSON: the version, every
+ * slot and width of the dynamic frame and the structural snapshot by name,
+ * and the kind, state, weather, mode and calendar codes
+ * (`view::layout_json`). A host checks it on load and refuses a version or
+ * width it does not know.
+ */
+export function viewLayout(): string;

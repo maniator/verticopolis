@@ -283,6 +283,92 @@ pub fn frame_view(sim: &Simulation) -> Vec<f64> {
     v
 }
 
+// The encoders below write what `frame_view` writes, for the engine view
+// (`view/`), which shares the codes and the transport records. `frame_view`
+// keeps its own copies; `view/frame_tests.rs` and `view/layout_tests.rs`
+// check that the two agree.
+
+/// The `PersonState` index a frame carries for a person's state.
+pub(crate) fn person_state_code(state: crate::crowd::PState) -> f64 {
+    use crate::crowd::PState;
+    match state {
+        PState::ToShaft => 0.0,
+        PState::Waiting => 1.0,
+        PState::Riding => 2.0,
+        PState::Climbing => 3.0,
+        PState::ToDest => 4.0,
+        PState::Dwelling => 5.0,
+        PState::Done => 6.0,
+    }
+}
+
+/// The `UnitState` index a frame carries for a unit's state.
+pub(crate) fn unit_state_code(state: crate::tower::UnitState) -> f64 {
+    use crate::tower::UnitState;
+    match state {
+        UnitState::Construction => 0.0,
+        UnitState::Empty => 1.0,
+        UnitState::Occupied => 2.0,
+        UnitState::MovingIn => 3.0,
+        UnitState::Vacating => 4.0,
+        UnitState::Asleep => 5.0,
+        UnitState::Dirty => 6.0,
+        UnitState::Infested => 7.0,
+        UnitState::Fire => 8.0,
+        UnitState::Gutted => 9.0,
+    }
+}
+
+/// The weather code a frame carries: 0 clear, 1 cloudy, 2 rain.
+pub(crate) fn weather_code(weather: crate::sim_loop::Weather) -> f64 {
+    use crate::sim_loop::Weather;
+    match weather {
+        Weather::Clear => 0.0,
+        Weather::Cloudy => 1.0,
+        Weather::Rain => 2.0,
+    }
+}
+
+/// A unit's frame fields after its id: state, occupants, customersIn,
+/// hotelCustomersIn, outForMeal (an absent counter is -1).
+pub(crate) fn unit_fields(u: &crate::tower::Unit) -> [f64; 5] {
+    let counter = |c: Option<i64>| c.map_or(-1.0, |n| n as f64);
+    [
+        unit_state_code(u.state),
+        u.occupants as f64,
+        counter(u.customers_in),
+        counter(u.hotel_customers_in),
+        counter(u.out_for_meal),
+    ]
+}
+
+/// The slots `push_transports` writes for these transports.
+pub(crate) fn transports_len(transports: &[crate::tower::Transport]) -> usize {
+    transports
+        .iter()
+        .map(|t| TRANSPORT_FIXED + CAR_RECORD * t.cars as usize)
+        .sum()
+}
+
+/// Every transport's record: id, cars, then per car position, load (-1 when
+/// the shaft keeps none) and direction.
+pub(crate) fn push_transports(v: &mut Vec<f64>, transports: &[crate::tower::Transport]) {
+    for t in transports {
+        v.push(t.id as f64);
+        v.push(t.cars as f64);
+        for i in 0..t.cars as usize {
+            v.push(t.car_positions.get(i).copied().unwrap_or(0.0));
+            v.push(
+                t.car_load
+                    .as_ref()
+                    .and_then(|l| l.get(i).copied())
+                    .unwrap_or(-1.0),
+            );
+            v.push(t.car_dir.get(i).copied().unwrap_or(0) as f64);
+        }
+    }
+}
+
 /// The log entries numbered after `seq`, oldest first. The ring's entries
 /// are numbered from `log_seq` backwards, so the last entry is `log_seq`.
 pub fn log_since(sim: &Simulation, seq: i64) -> Value {

@@ -154,7 +154,7 @@ impl Simulation {
             }
         };
         let next = list[idx];
-        self.tower.get_unit_mut(id)?.subtype = Some(next);
+        self.tower.set_unit_subtype(id, Some(next));
         self.tower.bump_meal_overlay_revision();
         Some(next)
     }
@@ -208,9 +208,10 @@ impl Simulation {
                 });
             }
         }
-        u.label = kind.facility().name.to_string();
         u.vacate_reason = None;
         u.vacate_at = None;
+        self.tower
+            .set_unit_label_at(i, kind.facility().name.to_string());
         let name = kind.facility().name;
         // The trailing note asks the move-in gate directly, on the emptied
         // unit: a No Rate unit stays off the market, a unit the gate still
@@ -408,23 +409,20 @@ impl Simulation {
         match kind {
             Kind::Office => {
                 let name = self.company_name();
-                let u = &mut self.tower.units[i];
-                u.ever_occupied = true;
-                u.label = name;
+                self.tower.units[i].ever_occupied = true;
+                self.tower.set_unit_label_at(i, name);
                 self.move_ins_today.offices += 1;
             }
             Kind::FitnessClub => {
                 let name = self.gym_name();
-                let u = &mut self.tower.units[i];
-                u.ever_occupied = true;
-                u.label = name;
+                self.tower.units[i].ever_occupied = true;
+                self.tower.set_unit_label_at(i, name);
                 self.move_ins_today.fitness += 1;
             }
             Kind::Clinic => {
                 let name = self.clinic_name();
-                let u = &mut self.tower.units[i];
-                u.ever_occupied = true;
-                u.label = name;
+                self.tower.units[i].ever_occupied = true;
+                self.tower.set_unit_label_at(i, name);
                 self.move_ins_today.clinic += 1;
             }
             Kind::RentalStudio | Kind::RentalApartment => {

@@ -197,7 +197,8 @@ impl Simulation {
         u.profit_today = None;
         u.profit_yest = None;
         u.dirty_days = None;
-        u.label = u.kind.facility().name.to_string();
+        let name = u.kind.facility().name;
+        self.tower.set_unit_label_at(i, name.to_string());
     }
 
     fn extinguish_all(&mut self) {

@@ -1064,6 +1064,68 @@ impl Engine {
     }
 }
 
+/// The view's layout (facade slice 6a, #1213) as JSON: the version, every
+/// slot and width of the dynamic frame and the structural snapshot by name,
+/// and the kind, state, weather, mode and calendar codes
+/// (`view::layout_json`). A host checks it on load and refuses a version or
+/// width it does not know.
+#[wasm_bindgen(js_name = viewLayout)]
+pub fn view_layout() -> String {
+    crate::view::layout_json().to_string()
+}
+
+/// The renderer-facing view (facade slice 6a, #1213): one-line wrappers over
+/// `crate::view`, which documents each layout.
+#[wasm_bindgen]
+impl Engine {
+    /// The structural snapshot (`view::structure_view`): the floor bounds,
+    /// the mode and calendar, rooms by slot, floor and lobby tiles as runs,
+    /// transports with their skipped floors. Read again when the frame
+    /// header's tower revision moves.
+    #[wasm_bindgen(js_name = viewStructure)]
+    pub fn view_structure(&self) -> Vec<f64> {
+        crate::view::structure_view(&self.sim)
+    }
+
+    /// The dynamic frame (`view::ViewReader::frame`): the header, the
+    /// people, the rooms whose fields changed since the last call (every room
+    /// when `full` is `true`, on the first call, or after a structural
+    /// change, with the header's full flag set) and the cars. One reader per
+    /// engine, so one caller: the header's frame number tells it when it
+    /// missed a frame. Read raw: only a JS `true` asks for a full frame.
+    #[wasm_bindgen(js_name = viewFrame)]
+    pub fn view_frame(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "boolean")] full: JsValue,
+    ) -> Vec<f64> {
+        crate::view::view_frame(&self.sim, full.as_bool() == Some(true))
+    }
+
+    /// The labels and subtypes changed after the meta revision `since`, as
+    /// JSON `{ revision, full, units: [[id, label, subtype], ...] }`
+    /// (`view::meta_since`). Read raw: no argument, 0, and anything but a
+    /// whole JS number from the log's reach up to the current revision get
+    /// a full listing.
+    #[wasm_bindgen(js_name = unitMetaSince)]
+    pub fn unit_meta_since(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] since: JsValue,
+    ) -> String {
+        let since = crate::view::whole_revision(since.as_f64());
+        crate::view::meta_since(&self.sim.tower, since).to_string()
+    }
+
+    /// The tower signature (`Simulation::tower_signature`) as a `bigint`: two
+    /// reads are equal when the tower half of `towerStateSig` is, and differ
+    /// when it differs (but for a 64-bit collision). Undo reads it, beside
+    /// money, at a gesture's capture and commit; it walks every unit, so it
+    /// is never a per-frame read.
+    #[wasm_bindgen(js_name = towerSignature)]
+    pub fn tower_signature(&self) -> u64 {
+        self.sim.tower_signature()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

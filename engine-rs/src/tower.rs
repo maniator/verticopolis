@@ -287,6 +287,12 @@ pub struct Tower {
     pub(crate) memo: RefCell<crate::tower_query::Memo>,
     /// `mealOverlayRevision`: bumped on every customersIn/outForMeal change.
     pub meal_overlay_revision: i64,
+    /// The unit metadata revision: starts at 1 and is bumped by the label
+    /// and subtype setters (`view/meta.rs`) when a value changes. Never saved
+    /// or hashed.
+    pub meta_revision: i64,
+    /// What the renderer-facing view keeps between reads (`view/mod.rs`).
+    pub(crate) view: crate::view::ViewState,
 }
 
 impl Tower {
@@ -309,6 +315,8 @@ impl Tower {
             room_tiles: HashMap::new(),
             memo: RefCell::new(Default::default()),
             meal_overlay_revision: 0,
+            meta_revision: crate::view::FIRST_META_REVISION,
+            view: Default::default(),
         }
     }
 
@@ -1291,21 +1299,6 @@ impl Tower {
         }
         self.transports[i].skip_floors = Some(Vec::new());
         self.revision += 1;
-        true
-    }
-
-    /// `u.label = label`, the editor's rename: trimmed as JavaScript trims,
-    /// an empty name falling back to the catalog name. False for an unknown id.
-    pub fn set_label(&mut self, id: i64, label: &str) -> bool {
-        let Some(u) = self.get_unit_mut(id) else {
-            return false;
-        };
-        let trimmed = crate::load::js_trim(label);
-        u.label = if trimmed.is_empty() {
-            u.kind.facility().name.to_string()
-        } else {
-            trimmed.to_string()
-        };
         true
     }
 

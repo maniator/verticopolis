@@ -24,6 +24,7 @@ on:
       - "src/tests/integration/dualRunDay.integration.test.ts"
       - "src/tests/integration/dualRunEdits.integration.test.ts"
       - "src/tests/integration/chargeBindingRaw.integration.test.ts"
+      - "src/tests/integration/engineView.integration.test.ts"
       - "src/tests/dualrun/**"
       - "src/dualrun/**"
       - "src/wasmhost/**"
@@ -117,6 +118,7 @@ jobs:
             case "$f" in src/tests/integration/dualRunDay.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/dualRunEdits.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/chargeBindingRaw.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/engineView.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/dualrun/*) engine=true ;; esac
             case "$f" in src/dualrun/*) engine=true ;; esac
             case "$f" in src/wasmhost/*) engine=true ;; esac
