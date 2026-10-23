@@ -1,5 +1,5 @@
 import { catalogFacility, type Catalog } from "../engine/catalogTypes";
-import type { Unit } from "../engine/types";
+import type { UnitView } from "../simport/view";
 
 /** Left/right built extent of one above-ground floor row, in tile columns
  *  (`min` = leftmost tile, `max` = exclusive right edge). */
@@ -34,7 +34,7 @@ export interface FacadeGeometry {
  * top occupied floor (passed in so the caller's canonical value drives which
  * row the crane reads, rather than re-deriving it here).
  */
-export function facadeGeometry(units: readonly Unit[], highestFloor: number, catalog: Catalog): FacadeGeometry {
+export function facadeGeometry(units: readonly UnitView[], highestFloor: number, catalog: Catalog): FacadeGeometry {
   const edges = new Map<number, FloorEdge>();
   const topTiles = new Set<number>();
   for (const u of units) {

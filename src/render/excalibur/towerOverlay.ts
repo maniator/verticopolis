@@ -4,7 +4,7 @@ import { isElevatorKind } from "../../engine/facilities";
 import { catalogFacility } from "../../engine/catalogTypes";
 import { towerCatalog } from "../../engine/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
-import type { Transport } from "../../engine/types";
+import type { TransportView } from "../../simport/view";
 import { drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
 import { FLOOR, TILE } from "../scale";
 import type { ScreenRect } from "./towerInputCamera";
@@ -396,7 +396,7 @@ function drawSelection(engine: TowerEngine, ctx: CanvasRenderingContext2D): void
 
 /** Outline the selected shaft and, for elevators, draw clickable extend
  *  arrows above the top and below the bottom (as in the original). */
-function drawTransportSelection(engine: TowerEngine, ctx: CanvasRenderingContext2D, t: Transport): void {
+function drawTransportSelection(engine: TowerEngine, ctx: CanvasRenderingContext2D, t: TransportView): void {
   const z = engine.cam.zoom;
   const sx = engine.worldToScreenX(t.x);
   const sw = t.width * TILE * z;

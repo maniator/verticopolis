@@ -1,4 +1,4 @@
-import type { Unit } from "../../../engine/types";
+import type { UnitView } from "../../../simport/view";
 import { visibleOccupants } from "../../../engine/Crowd";
 import { shade, type DrawCtx } from "../common";
 import { personFigure, personSeated, personStanding } from "../../pixelSprites/common";
@@ -21,7 +21,7 @@ import { layerBreak, layerEnd } from "../../pixelSprites/layers";
  * ghost crowd this replaced is gone for good. Static fills only, no `d.anim` read; the
  * seed is geography so a TDT id renumber does not reshuffle the guests.
  */
-export function drawPartyHall(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number) {
+export function drawPartyHall(d: DrawCtx, u: UnitView, x: number, y: number, w: number, h: number) {
   const ctx = d.ctx;
   const f = (bx: number, by: number, bw: number, bh: number, c: string, o = 1) => {
     ctx.fillStyle = c;
@@ -109,7 +109,7 @@ export function drawPartyHall(d: DrawCtx, u: Unit, x: number, y: number, w: numb
  * so an empty pool draws none and a busy one fills. Static fills only, no `d.anim`
  * read; the seed is geography so a TDT id renumber does not reshuffle the crowd.
  */
-export function drawAquaticCenter(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number) {
+export function drawAquaticCenter(d: DrawCtx, u: UnitView, x: number, y: number, w: number, h: number) {
   const ctx = d.ctx;
   const f = (bx: number, by: number, bw: number, bh: number, c: string, o = 1) => {
     ctx.fillStyle = c;
@@ -193,7 +193,7 @@ function bloom(ctx: CanvasRenderingContext2D, x: number, y: number, c: string): 
  * lone guest in an empty hall. The room's live attendance arrives through the
  * `customersIn` -> `occupants` mirror, which is already a bake-signature input.
  */
-export function drawWeddingHall(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number) {
+export function drawWeddingHall(d: DrawCtx, u: UnitView, x: number, y: number, w: number, h: number) {
   const ctx = d.ctx;
   const n = visibleOccupants(u);
   let filled = 0;

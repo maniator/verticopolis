@@ -1,4 +1,4 @@
-import type { Unit } from "../../engine/types";
+import type { UnitView } from "../../simport/view";
 import { busyStations, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { artRow, authoredWidth } from "./artScale";
 import { layerBreak } from "./layers";
@@ -23,7 +23,7 @@ const SHELF = "#B07A46";
 
 /** A stable per-room seed from GEOGRAPHY (floor, x), so the children and toys
  *  survive a save/export/import (which renumbers `u.id`). */
-function figureSeed(u: Pick<Unit, "floor" | "x">): number {
+function figureSeed(u: Pick<UnitView, "floor" | "x">): number {
   return (u.floor * 137 + u.x * 19) | 0;
 }
 
@@ -40,7 +40,7 @@ function child(ctx: CanvasRenderingContext2D, px: number, footY: number, seed: n
   ctx.fillRect(px, footY - 5, 3, 2); // head
 }
 
-export function daycare(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+export function daycare(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const { ctx } = d;
   const floorY = shell(ctx, x, y, w, h, WALL, FLOOR);
   const seed = figureSeed(u);
