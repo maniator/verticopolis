@@ -46,6 +46,9 @@ function withoutToString(_key: string, value: unknown): unknown {
 /** The engine's JSON reader refuses this many nested arrays and objects,
  *  counting the root (serde_json's recursion limit). */
 const MAX_DEPTH = 128;
+/** `JSON.stringify` can throw before `depthRefusal` runs on very deep values. */
+const STRINGIFY_PRECHECK_DEPTH = 2_048;
+const RECURSION_REFUSAL = "save: recursion limit exceeded at line 1 column";
 
 /** The engine's refusal for JSON text nested deeper than its reader allows,
  *  or `null` (#887). serde_json names the line and the 1-based UTF-8 byte
@@ -64,12 +67,38 @@ function depthRefusal(text: string): string | null {
         else if (d === 0x22) break;
       }
     } else if (c === 0x5b || c === 0x7b) {
-      if (++depth === MAX_DEPTH) return `save: recursion limit exceeded at line 1 column ${utf8Length(text, i) + 1}`;
+      if (++depth === MAX_DEPTH) return `${RECURSION_REFUSAL} ${utf8Length(text, i) + 1}`;
     } else if (c === 0x5d || c === 0x7d) {
       depth--;
     }
+
   }
   return null;
+}
+
+/** A stack-safe depth preflight over JSON-shaped values, used only to keep
+ *  very deep forged input from crashing `JSON.stringify` before we can refuse
+ *  it as the engine reader would. */
+function exceedsDepth(value: unknown, limit: number): boolean {
+  if (value === null || typeof value !== "object") return false;
+  const seen = new WeakSet<object>();
+  const stack: { value: object; depth: number }[] = [{ value, depth: 1 }];
+  while (stack.length > 0) {
+    const top = stack.pop()!;
+    if (top.depth >= limit) return true;
+    if (seen.has(top.value)) continue;
+    seen.add(top.value);
+    if (Array.isArray(top.value)) {
+      for (const v of top.value) {
+        if (v !== null && typeof v === "object") stack.push({ value: v as object, depth: top.depth + 1 });
+      }
+      continue;
+    }
+    for (const v of Object.values(top.value as Record<string, unknown>)) {
+      if (v !== null && typeof v === "object") stack.push({ value: v as object, depth: top.depth + 1 });
+    }
+  }
+  return false;
 }
 
 /** The UTF-8 length of `text`'s first `end` code units. A lone surrogate,
@@ -97,12 +126,14 @@ function utf8Length(text: string, end: number): number {
  * or `transports` that is not an array, a unit kind outside the catalog), with
  * that codec's message, and for JSON nested 128 arrays and objects deep (the
  * root included), which the engine's reader refuses; every other JSON value
- * writes bytes. A value JSON cannot carry (a BigInt, a cycle, nesting too deep
- * for `JSON.stringify`, about 4,000 levels) throws `JSON.stringify`'s own
- * error: the live save never holds one, and the engine's exporter could not
- * be handed it.
+ * writes bytes. A value JSON cannot carry (a BigInt or a cycle) throws
+ * `JSON.stringify`'s own error: the live save never holds one, and the
+ * engine's exporter could not be handed it.
  */
 export function buildTDT(save: SerializedGame): BuiltLegacyTower {
+  if (exceedsDepth(save, STRINGIFY_PRECHECK_DEPTH)) {
+    throw new LegacyExportError(`${RECURSION_REFUSAL} 1`);
+  }
   // Read the tower as JSON carries it, the input the engine's exporter gets
   // across the binding (#887): NaN and Infinity become null, -0 becomes 0,
   // undefined fields drop and undefined array slots read null. One copy per

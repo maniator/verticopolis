@@ -224,8 +224,9 @@ describe("buildTDT on forged input: bytes or LegacyExportError, nothing else (#8
     const base = input("census");
     expect(outcome({ ...base, minutes: nested(3500), extra: NO_STRING })).toMatch(/^refused: save: recursion limit exceeded at line 1 column \d+$/);
     expect(outcome(withValue(base, ["units", 0, "x"], nested(3500)))).toMatch(/^refused: save: recursion limit exceeded/);
-    // Past what `JSON.stringify` can write, its own error, as the binding's.
-    expect(() => buildTDT({ ...base, extra: nested(100_000) } as SerializedGame)).toThrow(RangeError);
+    // Past what `JSON.stringify` can write, still a codec refusal, never a
+    // bare RangeError.
+    expect(outcome({ ...base, extra: nested(100_000) })).toMatch(/^refused: save: recursion limit exceeded at line 1 column \d+$/);
   });
 
   it("names the download TOWER1.TDT when the save has no string tower name", () => {
