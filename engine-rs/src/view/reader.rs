@@ -16,6 +16,12 @@ use crate::sim::Simulation;
 /// rooms. A reader belongs to one simulation: a host that loads another
 /// starts a new reader (the binding's lives on the tower, which every load
 /// builds afresh).
+///
+/// This keeps the hot path simple and predictable: it compares the room slots
+/// the host has already indexed, and it only emits the ones whose frame fields
+/// changed. That is the measured tradeoff in this branch. The alternative is a
+/// wider write-site dirty-mark rollout, which would need explicit owner
+/// approval because it spreads a room-dirty signal through many game systems.
 #[derive(Default)]
 pub struct ViewReader {
     sent: Option<(i64, usize)>,
