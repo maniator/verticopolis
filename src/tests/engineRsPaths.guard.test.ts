@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { minVersion } from "semver";
 
 /**
  * Engine path list guard for `.github/workflows/engine-rs.yml` (#1044).
@@ -169,6 +168,24 @@ function testWasmArgs(script: string): {
 const matches = (file: string, filters: string[]): boolean =>
   filters.some((x) => file.toLowerCase().includes(x.toLowerCase()));
 
+/** Minimum semver tuple in an npm engine range like ">=22.18.0". */
+function minTuple(range: string): [number, number, number] | null {
+  const m = /(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(range);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2] ?? 0), Number(m[3] ?? 0)];
+}
+
+function compareTuple(
+  a: [number, number, number],
+  b: [number, number, number],
+): number {
+  for (let i = 0; i < 3; i++) {
+    if (a[i] > b[i]) return 1;
+    if (a[i] < b[i]) return -1;
+  }
+  return 0;
+}
+
 /** Suites handed to the TypeScript side that no `test:wasm` filter reaches and that need the package. */
 function unrun(files: string[], filters: string[]): string[] {
   return files.filter((f) => !(f in NO_ENGINE_PACKAGE) && !matches(f, filters));
@@ -306,13 +323,13 @@ describe("the host suites run in test:wasm", () => {
       if (!repoNode) throw new Error("package.json: engines.node is missing");
       if (!crossEnvNode)
         throw new Error("package-lock.json: node_modules/cross-env engines.node is missing");
-      const repoMin = minVersion(repoNode);
-      const crossEnvMin = minVersion(crossEnvNode);
+      const repoMin = minTuple(repoNode);
+      const crossEnvMin = minTuple(crossEnvNode);
       if (!repoMin || !crossEnvMin)
         throw new Error(
           `cannot compare Node engines: repo=${JSON.stringify(repoNode)} cross-env=${JSON.stringify(crossEnvNode)}`,
         );
-      expect(repoMin.compare(crossEnvMin)).not.toBe(-1);
+      expect(compareTuple(repoMin, crossEnvMin)).not.toBe(-1);
     });
   });
 });
