@@ -33,41 +33,41 @@ if (problem) {
 }
 
 const original = JSON.parse(readFileSync(file, "utf8")) as { id: string; description: string; start: unknown; commands: unknown[] };
-const work = mkdtempSync(join(tmpdir(), "vc-shrink-"));
-let runs = 0;
+const out = resolve(corpusDir(), `${name}.json`);
+if (existsSync(out)) {
+  console.error(`${out} already exists; pick another name`);
+  process.exitCode = 2;
+} else {
+  const work = mkdtempSync(join(tmpdir(), "vc-shrink-"));
 
-/** What the candidate shows: a signature when Rust ran it clean and TypeScript
- *  diverged, otherwise null (it converged, or it is not a valid scenario). */
-function show(commands: readonly unknown[], id = "candidate"): string | null {
-  runs++;
-  const path = join(work, `${id}.json`);
-  writeFileSync(path, JSON.stringify({ ...original, id, commands }));
-  if (rustReplay(path, work).code !== 0) return null;
-  const r = replayCompare(path, work);
-  return r.status === "diverged" ? r.signature : null;
-}
+  /** What the candidate shows: a signature when Rust ran it clean and TypeScript
+   *  diverged, otherwise null (it converged, or it is not a valid scenario). */
+  function show(commands: readonly unknown[], id = "candidate"): string | null {
+    const path = join(work, `${id}.json`);
+    writeFileSync(path, JSON.stringify({ ...original, id, commands }));
+    if (rustReplay(path, work).code !== 0) return null;
+    const r = replayCompare(path, work);
+    return r.status === "diverged" ? r.signature : null;
+  }
 
-try {
-  const target = show(original.commands, "original");
-  if (target === null) {
-    console.log(`${file}: does not diverge with the fuzzer's current build, nothing to shrink`);
-    process.exit(1);
+  try {
+    const target = show(original.commands, "original");
+    if (target === null) {
+      console.log(`${file}: does not diverge with the fuzzer's current build, nothing to shrink`);
+      process.exitCode = 1;
+      return;
+    }
+    const r = ddmin(original.commands, (c) => show(c) === target, maxTests);
+    const shrunk = {
+      id: name,
+      description: `Shrunk from ${original.id} (${original.commands.length} to ${r.kept.length} commands), which diverged as ${target}. ${original.description}`,
+      start: original.start,
+      commands: r.kept,
+    };
+    mkdirSync(corpusDir(), { recursive: true });
+    writeFileSync(out, `${JSON.stringify(shrunk, null, 2)}\n`);
+    console.log(`${original.commands.length} commands to ${r.kept.length} in ${r.tests} tests${r.exhausted ? " (stopped at the test limit, may not be minimal)" : ""}; signature ${target}; wrote ${out}`);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
   }
-  const r = ddmin(original.commands, (c) => show(c) === target, maxTests);
-  const shrunk = {
-    id: name,
-    description: `Shrunk from ${original.id} (${original.commands.length} to ${r.kept.length} commands), which diverged as ${target}. ${original.description}`,
-    start: original.start,
-    commands: r.kept,
-  };
-  const out = resolve(corpusDir(), `${name}.json`);
-  if (existsSync(out)) {
-    console.error(`${out} already exists; pick another name`);
-    process.exit(2);
-  }
-  mkdirSync(corpusDir(), { recursive: true });
-  writeFileSync(out, `${JSON.stringify(shrunk, null, 2)}\n`);
-  console.log(`${original.commands.length} commands to ${r.kept.length} in ${r.tests} tests${r.exhausted ? " (stopped at the test limit, may not be minimal)" : ""}; signature ${target}; wrote ${out}`);
-} finally {
-  rmSync(work, { recursive: true, force: true });
 }
