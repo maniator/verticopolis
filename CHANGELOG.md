@@ -13,6 +13,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.47.0
+
+- Settings has a new Game engine choice, Automatic, the Rust engine (experimental), or the TypeScript engine (stable). A change takes effect the next time the game starts.
+- The experimental engine is now called the Rust engine everywhere in the game.
+- If the Rust engine runs into a problem on your device, the game stays on the TypeScript engine until you choose to try it again in Settings.
+
 ## 2.46.1
 
 - Keyboard bulldozing now tells screen readers when a facility could not be removed, instead of announcing a successful removal.

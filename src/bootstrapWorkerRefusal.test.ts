@@ -7,7 +7,8 @@ vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
-vi.mock("./wasmhost/engineChoice", async (importOriginal) => ({ ...(await importOriginal<typeof import("./wasmhost/engineChoice")>()), engineRequested: () => "wasm-worker" }));
+// The cohort's selection picks the boot engine (#1197); this page life asks for the worker host.
+vi.mock("./engineCohort/boot", async (importOriginal) => ({ ...(await importOriginal<typeof import("./engineCohort/boot")>()), selectBootEngine: () => "wasm-worker", noteRustFailed: vi.fn() }));
 // The worker the page spawns refuses the package, as the engine worker's byte check does.
 // With `catalogs` set the worker starts, answering ready with those catalogs, and the host refuses the first tower.
 const refusal = vi.hoisted(() => ({ error: null as unknown, catalogs: null as { classic: string; modern: string } | null }));

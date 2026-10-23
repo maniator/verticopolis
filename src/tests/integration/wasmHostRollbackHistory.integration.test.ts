@@ -152,7 +152,7 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       // The load dropped the old tower's changes itself, so the line does not
       // say the engine lost them.
       expect(a.sim.log[a.sim.log.length - 1]).toEqual(expect.objectContaining({ text: REPLACED, kind: "bad" }));
-      expect(a.sim.log.filter((e) => e.text.startsWith("The WASM engine stopped"))).toHaveLength(1);
+      expect(a.sim.log.filter((e) => e.text.startsWith("The Rust engine stopped"))).toHaveLength(1);
       a.undo();
       expect(a.toasts).toEqual(["Nothing to undo."]);
     } finally {
