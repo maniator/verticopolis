@@ -232,7 +232,7 @@ export function tsEngine(sim: Simulation): ScenarioEngine {
     pendingChoice: () => sim.pendingChoice,
     resolveChoice: (accept) => sim.resolveChoice(accept ? "accept" : "decline"),
     tick: (dt) => sim.tick(dt),
-    reload: () => tsEngine(Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame)),
+    reload: () => tsEngine(reloadTsSim(sim)),
     stateDigest: () => digest(stateView(sim)),
     crowdDigest: () => digest(crowdView(sim)),
     drainEvents: () => sim.drainGameplayEvents(),
@@ -241,12 +241,16 @@ export function tsEngine(sim: Simulation): ScenarioEngine {
   };
 }
 
-/** Start the TypeScript engine from a scenario's `start`. */
-export const startTsEngine: EngineStart = (start) => {
+/** The `reload` command's save round trip on the TypeScript engine. */
+export const reloadTsSim = (sim: Simulation): Simulation =>
+  Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame);
+
+/** The TypeScript simulation a scenario's `start` founds or loads. */
+export function startTsSim(start: Start): Simulation {
   if ("newGame" in start) {
     const sim = Simulation.newGame(start.newGame.seed, start.newGame.mode);
     if (sim.mode !== start.newGame.mode) throw new Error(`new game founded as ${sim.mode}, not ${start.newGame.mode}`);
-    return tsEngine(sim);
+    return sim;
   }
   const raw = decodeVctower(readFileSync(resolve(REPO_ROOT, start.fixture), "utf8"), start.fixture) as SerializedGame;
   if (start.mode) raw.mode = start.mode;
@@ -254,8 +258,11 @@ export const startTsEngine: EngineStart = (start) => {
   const sim = Simulation.deserialize(raw);
   markFounderFromLoadedFile(sim, raw);
   if (start.mode && sim.mode !== start.mode) throw new Error(`${start.fixture} loaded as ${sim.mode}, not ${start.mode}`);
-  return tsEngine(sim);
-};
+  return sim;
+}
+
+/** Start the TypeScript engine from a scenario's `start`. */
+export const startTsEngine: EngineStart = (start) => tsEngine(startTsSim(start));
 
 export { crowdView, stateView };
 

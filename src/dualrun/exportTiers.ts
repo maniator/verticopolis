@@ -115,6 +115,7 @@ export const BINDING_EXPORT_TIERS = {
   elevatorTelemetry: T2,
   housekeepingReport: T2,
   loopMemos: T2,
+  diagnosticFacts: T2,
   // Tier 2, the host loop and the engine's lifetime.
   tick: LOOP,
   frameView: LOOP,

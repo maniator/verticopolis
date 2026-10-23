@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { rentOf } from "../../engine/econConfig";
-import { REPO_ROOT, type EngineStart, type Outcome, type ScenarioEngine } from "./scenario";
+import { REPO_ROOT, type EngineStart, type Outcome, type ScenarioEngine, type Start } from "./scenario";
 import type { ChargeOutcome } from "./chargeOps";
 import { checkBinding, type WasmEngine, type WasmModule } from "../../dualrun/binding";
 
@@ -145,19 +145,22 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
 /** Start the Rust engine from a scenario's `start`, the way `startTsEngine`
  *  starts the TypeScript one: a new game by seed and mode, or a `.vctower`
  *  fixture through the import path with the mode overridden when given. */
-export const startWasmEngine: EngineStart = (start) => {
+export const startWasmEngine: EngineStart = (start) => wasmEngine(startWasmHandle(start));
+
+/** The binding instance a scenario's `start` founds or loads. */
+export function startWasmHandle(start: Start): WasmEngine {
   const { Engine } = wasm();
   // A start whose mode check fails frees the instance it refuses.
-  const checked = (w: WasmEngine, mode: string | undefined, what: string): ScenarioEngine => {
+  const checked = (w: WasmEngine, mode: string | undefined, what: string): WasmEngine => {
     if (mode && w.mode() !== mode) {
       const found = w.mode();
       w.free();
       throw new Error(`${what} as ${found}, not ${mode}`);
     }
-    return wasmEngine(w);
+    return w;
   };
   if ("newGame" in start) {
     return checked(Engine.newGame(u32(start.newGame.seed, "seed"), start.newGame.mode), start.newGame.mode, "new game founded");
   }
   return checked(Engine.fromVctower(readFileSync(resolve(REPO_ROOT, start.fixture), "utf8"), start.mode ?? null), start.mode, `${start.fixture} loaded`);
-};
+}
