@@ -119,6 +119,14 @@ export function budgetChecks(run: PerfMeasurement, baseline: PerfMeasurement, to
   ];
 }
 
+/** The gate's blocking checks for a measured engine. The WASM sim-speed probe is
+ *  still reported, but it is intentionally not a gate until the cloud probe is
+ *  calibrated away from the 0 / ~0.48 bimodal outcome. */
+export function gateChecks(run: PerfMeasurement, baseline: PerfMeasurement, engine: PerfEngine, tol = PERF_TOLERANCES): BudgetCheck[] {
+  const checks = budgetChecks(run, baseline, tol);
+  return engine === "wasm" ? checks.filter((check) => check.label !== "sim speed") : checks;
+}
+
 /** M7's reading of a WASM run against the TypeScript engine's baseline (the
  *  Performance row: a 5,000+ population tower within the TypeScript engine's
  *  own `npm run perf` baseline). It is printed on every CI run and read on the

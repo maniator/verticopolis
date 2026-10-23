@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { budgetChecks, crossEngineLines, entryFromPasses, formatBaselineFile, harnessOf, mintProblem, parseBaselineFile, passSpread, PERF_TOLERANCES, spreadLines, withBaseline, type EngineBaseline, type PerfMeasurement } from "./perfBaseline";
+import { budgetChecks, crossEngineLines, entryFromPasses, formatBaselineFile, gateChecks, harnessOf, mintProblem, parseBaselineFile, passSpread, PERF_TOLERANCES, spreadLines, withBaseline, type EngineBaseline, type PerfMeasurement } from "./perfBaseline";
 
 const measurement = (over: { medianMs?: number; p95Ms?: number; speed?: number; windows?: number } = {}): PerfMeasurement => ({
   uiUpdate: { n: 4000, batch: 40, medianMs: over.medianMs ?? 0.65, p95Ms: over.p95Ms ?? 1, meanMs: 0.68 },
@@ -75,6 +75,15 @@ describe("budgetChecks", () => {
     expect(median.message).toBe("ui.update median 0.7000ms vs baseline 0.6500ms (x1.05)");
     expect(p95.message).toBe("ui.update p95 1.0000ms vs baseline 1.0000ms (x1.1)");
     expect(speed.message).toBe("sim-min/s 0.30 vs baseline 0.30 (x0.9)");
+  });
+
+  it("keeps the WASM sim-speed budget report-only", () => {
+    const base = measurement({ medianMs: 1, p95Ms: 2, speed: 10 });
+    expect(gateChecks(measurement({ medianMs: 1.06, p95Ms: 2.21, speed: 8.9 }), base, "wasm").map((c) => c.label)).toEqual(["ui.update median", "ui.update p95"]);
+    expect(gateChecks(measurement({ medianMs: 1.06, p95Ms: 2.21, speed: 8.9 }), base, "wasm").map((c) => c.ok)).toEqual([false, false]);
+    expect(gateChecks(measurement({ medianMs: 1, p95Ms: 2, speed: 8.9 }), base, "wasm").map((c) => c.ok)).toEqual([true, true]);
+    expect(gateChecks(measurement({ medianMs: 1, p95Ms: 2, speed: 0 }), base, "wasm").map((c) => c.ok)).toEqual([true, true]);
+    expect(gateChecks(measurement({ medianMs: 1, p95Ms: 2, speed: 8.9 }), base, "ts").map((c) => c.label)).toEqual(["ui.update median", "ui.update p95", "sim speed"]);
   });
 });
 
