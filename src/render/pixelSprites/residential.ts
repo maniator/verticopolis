@@ -1,4 +1,4 @@
-import type { Unit } from "../../engine/types";
+import type { UnitView } from "../../simport/view";
 import { visibleOccupants } from "../../engine/Crowd";
 import { isLateHour } from "../lateNight";
 import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, roomOccupants, shade, vacancy, windowView, type RoomCtx } from "./common";
@@ -54,7 +54,7 @@ function cube(ctx: CanvasRenderingContext2D, dx: number, floorY: number, staffed
   fill(ctx, dx + 15, floorY - 8, 2, 2, "#C87A5A"); // desk cup
 }
 
-export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+export function office(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const { ctx } = d;
   if (u.state === "empty") return vacancy(ctx, x, y, w, h, "LEASE");
   // Geo-seeded variety, geometry first (party law): three true layouts (the
@@ -203,7 +203,7 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
 const WIDE_LAYOUT_MIN_W = 84;
 
 // prettier-ignore
-export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number, walls: string[] = CONDO_WALLS, pics: string[] = CONDO_PICTURES, vacancyLabel = "SALE"): void {
+export function condo(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number, walls: string[] = CONDO_WALLS, pics: string[] = CONDO_PICTURES, vacancyLabel = "SALE"): void {
   const { ctx } = d;
   if (u.state === "empty") return vacancy(ctx, x, y, w, h, vacancyLabel);
   // Residents are "up" only when home and not asleep in the small hours.
@@ -329,7 +329,7 @@ export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
 
 // ---- Hotel --------------------------------------------------------------
 
-export function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number, grade: number): void {
+export function hotel(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number, grade: number): void {
   const { ctx } = d;
   const asleep = u.state === "asleep";
   const dirty = u.state === "dirty";

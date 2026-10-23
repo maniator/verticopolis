@@ -1,4 +1,4 @@
-import type { Unit } from "../../../engine/types";
+import type { UnitView } from "../../../simport/view";
 import { ceilingFixture, geoVariant, personSeated, personStanding, roomGlow, SKIN } from "../../pixelSprites/common";
 import { layerBreak, layerEnd } from "../../pixelSprites/layers";
 import type { DrawCtx } from "../common";
@@ -34,13 +34,13 @@ import { box, floorb, glow, refMap, wallp, whiteCoat, type Fill } from "./servic
 /** Staff appearance depends on room geography alone. `geoVariant` reads the
  *  world's lowest floor and lot width, so the shirts follow those too; both
  *  are constant for the shipped catalog. */
-function staffSeed(u: Pick<Unit, "kind" | "floor" | "x">): number {
+function staffSeed(u: Pick<UnitView, "kind" | "floor" | "x">): number {
   return geoVariant(u, 6, 997);
 }
 
 // ---- Security ---------------------------------------------------------------
 
-export function drawSecurity(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x">, x: number, y: number, w: number, h: number): void {
+export function drawSecurity(d: DrawCtx, u: Pick<UnitView, "kind" | "floor" | "x">, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
   const RW = 8 * TILE;
   const RH = FLOOR;
@@ -90,7 +90,7 @@ export function drawSecurity(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x">, 
 
 // ---- Medical ----------------------------------------------------------------
 
-export function drawMedical(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x">, x: number, y: number, w: number, h: number): void {
+export function drawMedical(d: DrawCtx, u: Pick<UnitView, "kind" | "floor" | "x">, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
   const RW = 16 * TILE;
   const RH = FLOOR;
@@ -163,7 +163,7 @@ export function drawMedical(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x">, x
 
 // ---- Housekeeping -----------------------------------------------------------
 
-export function drawHousekeeping(d: DrawCtx, u: Pick<Unit, "kind" | "floor" | "x">, x: number, y: number, w: number, h: number): void {
+export function drawHousekeeping(d: DrawCtx, u: Pick<UnitView, "kind" | "floor" | "x">, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
   const RW = 8 * TILE;
   const RH = FLOOR;
