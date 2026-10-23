@@ -286,6 +286,7 @@ run records below.
 | `src/engine/aquaticCenter.test.ts` (unit) | 0/6 | fixed | reads `mealVenueId`, which the frame carries now |
 | `src/engine/rentalCrowd.test.ts` (unit) | 0/5 | cost, fixed | three tests at the host's own cadence (`atEngineFrameCadence`, slice 3): minute-tick runs of one to three days that read the crowd, which the frame carries |
 | `src/engine/tower/rooms.test.ts` (unit) | 0/8 | cost, fixed | one test at the host's own cadence (`atEngineFrameCadence`, slice 3), which calls `refreshFromEngine` before each assertion: 360 ticks on a 12,000-unit fixture, with a merge before each census check |
+| `src/tests/perfCompare/fixtureHotelTower.test.ts` (unit) | 0/6 | cost, fixed | two tests at the host's own cadence (`atEngineFrameCadence`, slice 3): one and two-day minute-tick runs on a large hotel fixture that assert frame-carried dirty-room state counts |
 | `conformance.integration.test.ts` (left out) | 24 | c | the TypeScript side of the referee and the scenario lock writer; its engine twin is `conformanceWasm` |
 | `loaderCases.integration.test.ts` (left out) | 1 | c | the loader-case lock writer; the Rust test replays the lock |
 | `dualRunDay`, `dualRunEdits`, `wasmHost` (left out) | 53 | c | attach a mirror or a host themselves |
