@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { buildProduction, buildTooling, npmEntry, runNodeCli } from "./build";
 
 const roots: string[] = [];
@@ -65,6 +66,18 @@ describe("shell-free worker comparison builds", () => {
     writeFileSync(join(root, "record.cjs"), 'require("node:fs").writeFileSync("tooling.txt", String(process.env.VC_TOOLING));');
     buildProduction(root, { ...process.env, VC_TOOLING: "1" });
     expect(readFileSync(join(root, "tooling.txt"), "utf8")).toBe("undefined");
+  });
+
+  it("rejects VC_PUBLIC_DIR on a Vercel build", () => {
+    const root = resolve(__dirname, "../../..");
+    const vite = join(root, "node_modules", "vite", "bin", "vite.js");
+    expect(() => {
+      execFileSync(process.execPath, [vite, "build", "--emptyOutDir"], {
+        cwd: root,
+        env: { ...process.env, VERCEL: "1", VC_PUBLIC_DIR: "src/public" },
+        stdio: "pipe",
+      });
+    }).toThrow(/VC_PUBLIC_DIR is not allowed in a Vercel build/);
   });
 
   it("names npm ci when vite is missing", () => {

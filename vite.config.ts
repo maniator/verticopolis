@@ -65,7 +65,16 @@ const TOOLING_BUILD = toolingBuild();
  *  shell's expected engine package so the second build checks the correct
  *  package instead of the default `src/public` folder. */
 function publicDir(): string {
-  return process.env.VC_PUBLIC_DIR ? resolve(process.env.VC_PUBLIC_DIR) : resolve(__dirname, "src/public");
+  const raw = process.env.VC_PUBLIC_DIR;
+  if (raw) {
+    if (process.env.VERCEL) {
+      throw new Error(
+        "VC_PUBLIC_DIR is not allowed in a Vercel build. Deploys must ship the checked-in engine package from src/public; remove VC_PUBLIC_DIR from the Vercel environment.",
+      );
+    }
+    return resolve(raw);
+  }
+  return resolve(__dirname, "src/public");
 }
 
 /**
