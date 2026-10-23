@@ -1,7 +1,26 @@
+import type { CalendarKind } from "../engine/calendar";
 import type { GameplayEvent } from "../engine/gameplayEventBuffer";
+import type { GameMode, SerializedView } from "../engine/types";
 import type { Command, CommandResult } from "./commands";
 import type { Query, QueryResult } from "./queries";
 import type { SimView } from "./view";
+
+export type SaveOptions = {
+  /** Stamp the live view onto the sim before a save or export. */
+  view?: () => SerializedView | null;
+};
+
+export type TowerSource =
+  | { from: "history"; text: string }
+  | { from: "stored"; saves: string[] }
+  | { from: "legacy"; save: string }
+  | {
+      from: "found";
+      seed: number;
+      mode: GameMode;
+      calendar?: CalendarKind;
+      unbridged?: boolean;
+    };
 
 /**
  * The one interface the game drives the simulation through (spine AD-9; the
@@ -22,13 +41,16 @@ import type { SimView } from "./view";
  * - A caller that reads `view` right after issuing a command awaits the
  *   command first. The TypeScript adapter applies a command at once, so code
  *   that skips the await works there and breaks on a worker.
- *
- * Not on the port yet: `load` (slice 5, the lifecycle) and the change
- * counter, which arrives with slice 5 as undo's signature, backed by slice
- * 6a's engine counter. Their first callers come with that slice, and the
- * TypeScript adapter could not give them today's behavior exactly.
+ * - The lifecycle members below are for main-thread adapters only. They are
+ *   sharp in the TypeScript host because the live tower is already in memory,
+ *   but a worker host cannot answer them synchronously without a queued
+ *   checkpoint or a stale restore point.
  */
 export interface SimPort {
+  /** The tower's current generation, so a load or replacement can be tracked. */
+  readonly generation: number;
+  /** Replace the live tower from a saved or newly founded source. */
+  load(source: TowerSource): Promise<void>;
   /** The current state, read-only. Valid until the next tick or command. */
   readonly view: SimView;
   /** Advance the game clock by `dtMinutes`, the frame loop's step. */
@@ -43,8 +65,12 @@ export interface SimPort {
    *  Answers about a replaced tower are dropped, and the adapter may drop
    *  the least recently used placement answers. */
   cached<Q extends Query>(q: Q): QueryResult<Q> | undefined;
+  /** Write the tower's save as JSON right now, without waiting for a step gate. */
+  saveNow(opts?: SaveOptions): string;
   /** The tower's save, as the engine-format JSON the game stores. */
-  save(): Promise<string>;
+  save(opts?: SaveOptions): Promise<string>;
+  /** The fingerprint of the current player-mutable state. */
+  undoSignature(): string;
   /** Every gameplay event since the last drain, oldest first. On the WASM
    *  host a command's events wait for the next restore point; `release`
    *  hands them over now, for the flush when the page closes. */
