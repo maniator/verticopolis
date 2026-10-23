@@ -60,10 +60,12 @@ integer floor keys:
 
 ## Design
 
-- `waiting` becomes a `BTreeMap<i64, f64>`. A shaft reads its span with one
-  `range` instead of a lookup per stop; the range only sets one flag per
-  stop, `retain` decays each entry on its own, and every other read and write
-  is by floor, so the map's order changes no result.
+- `waiting` becomes a `BTreeMap<i64, f64>`. The map stays in ascending floor
+  order so each lookup remains a small integer key comparison instead of a
+  SipHash on a floor id, and the shaft's sorted stop list still carries the
+  per-stop flag scan. The actual hot path reads and writes by floor via
+  `get`/`entry`/`insert`, and the `retain` pass decays each entry in place,
+  so the map's ordering does not change the result.
 - Per shaft, a reused `Vec<u8>` parallel to `stops` carries `CALL` and
   `CLAIMED`. `stops` is ascending (`stops_of` filters `bottom..=top`), so a
   floor's stop is a binary search away; a claimed floor that is not a stop
