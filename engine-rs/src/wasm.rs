@@ -290,6 +290,7 @@ pub fn engine_identity() -> String {
 #[wasm_bindgen]
 pub struct Engine {
     sim: Simulation,
+    proto_last_units: Vec<(i64, [f64; 6])>,
 }
 
 #[wasm_bindgen]
@@ -314,6 +315,7 @@ impl Engine {
             })?,
         };
         Ok(Engine {
+            proto_last_units: Vec::new(),
             sim: Simulation::new_game_with(seed, mode, calendar, start_unbridged.unwrap_or(false)),
         })
     }
@@ -336,7 +338,10 @@ impl Engine {
         if let Some(m) = markers {
             apply_markers(&mut sim, &m).map_err(err)?;
         }
-        Ok(Engine { sim })
+        Ok(Engine {
+            sim,
+            proto_last_units: Vec::new(),
+        })
     }
 
     /// The import path for a `.vctower` file: decode, migrate and load, then
@@ -350,7 +355,10 @@ impl Engine {
         }
         let mut sim = crate::load::deserialize(&raw).map_err(err)?;
         crate::load::mark_founder_from_loaded_file(&mut sim, &raw);
-        Ok(Engine { sim })
+        Ok(Engine {
+            sim,
+            proto_last_units: Vec::new(),
+        })
     }
 
     /// `serialize()` as JSON text.
@@ -936,6 +944,59 @@ impl Engine {
         frame_view(&self.sim)
     }
 
+    /// FACADE SPIKE 0, MEASUREMENT ONLY (never merged): the frame view with only
+    /// the unit records that changed since the last call (all on the first
+    /// call or when the unit id sequence moved). `mode` 0: changed units,
+    /// 1: no units at all (people and cars only).
+    #[wasm_bindgen(js_name = frameDynamicProto)]
+    pub fn frame_dynamic_proto(&mut self, mode: u32) -> Vec<f64> {
+        let full = frame_view(&self.sim);
+        let people_end = {
+            // header + people records
+            let mut i = crate::frame::FRAME_HEADER;
+            let n = full[crate::frame::header::PEOPLE] as usize;
+            for _ in 0..n {
+                let fc = full[i + 16] as usize;
+                let sc = full[i + 17] as usize;
+                i += crate::frame::PERSON_FIXED + fc + sc;
+            }
+            i
+        };
+        let nunits = full[crate::frame::header::UNITS] as usize;
+        let units_end = people_end + nunits * 6;
+        let mut out = Vec::with_capacity(full.len());
+        out.extend_from_slice(&full[..people_end]);
+        let mut changed = 0usize;
+        if mode == 0 {
+            let same_seq = self.proto_last_units.len() == nunits
+                && (0..nunits)
+                    .all(|k| self.proto_last_units[k].0 as f64 == full[people_end + k * 6]);
+            if !same_seq {
+                self.proto_last_units.clear();
+                for k in 0..nunits {
+                    let r = &full[people_end + k * 6..people_end + k * 6 + 6];
+                    self.proto_last_units
+                        .push((r[0] as i64, [r[0], r[1], r[2], r[3], r[4], r[5]]));
+                    out.extend_from_slice(r);
+                }
+                changed = nunits;
+            } else {
+                for k in 0..nunits {
+                    let r = &full[people_end + k * 6..people_end + k * 6 + 6];
+                    let last = &mut self.proto_last_units[k].1;
+                    if last[..] != r[..] {
+                        last.copy_from_slice(r);
+                        out.extend_from_slice(r);
+                        changed += 1;
+                    }
+                }
+            }
+        }
+        out.extend_from_slice(&full[units_end..]);
+        out[crate::frame::header::UNITS] = changed as f64;
+        out
+    }
+
     /// The log entries emitted after `seq` (the `logSeq` the host last saw),
     /// oldest first, as JSON `[{ seq, minute, text, kind }]`. The engine keeps
     /// a ring of the last entries, so a host that falls further behind than
@@ -1212,7 +1273,10 @@ mod tests {
         assert!(sim.build_transport(Kind::ElevatorStandard, 10, 1, 2).ok);
         let lift = sim.tower.transport_at(1, 10).unwrap().id;
         sim.money = 1_000_000.0;
-        let mut e = Engine { sim };
+        let mut e = Engine {
+            sim,
+            proto_last_units: Vec::new(),
+        };
         let before = e.serialize();
         e.sim.gameplay.drain();
         let refused = |text: String| -> Value {
