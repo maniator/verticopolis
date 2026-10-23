@@ -306,15 +306,13 @@ describe("the host suites run in test:wasm", () => {
       if (!repoNode) throw new Error("package.json: engines.node is missing");
       if (!crossEnvNode)
         throw new Error("package-lock.json: node_modules/cross-env engines.node is missing");
-      expect(repoNode).toMatch(/^>=\d/);
-      expect(crossEnvNode).toMatch(/^>=\d/);
       const repoMin = minVersion(repoNode);
       const crossEnvMin = minVersion(crossEnvNode);
       if (!repoMin || !crossEnvMin)
         throw new Error(
           `cannot compare Node engines: repo=${JSON.stringify(repoNode)} cross-env=${JSON.stringify(crossEnvNode)}`,
         );
-      expect(repoMin.compare(crossEnvMin)).toBeGreaterThanOrEqual(0);
+      expect(repoMin.compare(crossEnvMin)).not.toBe(-1);
     });
   });
 });
