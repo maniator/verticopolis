@@ -66,6 +66,15 @@ describe("engine-rs.yml engine path lists", () => {
     );
     expect(casePaths(dropped)).not.toEqual(pushPaths(dropped));
   });
+
+  it("requires the aggregate gate to include fuzz-corpus in its dependencies", () => {
+    expect(yaml).toContain("needs: [changes, consumer, rust, wasm-binding, fuzz-corpus]");
+  });
+
+  it("allows skipping required engine jobs only when all four are skipped on purpose", () => {
+    expect(yaml).toContain('&& [ "$CONSUMER" = skipped ] && [ "$RUST" = skipped ] && [ "$BINDING" = skipped ] && [ "$CORPUS" = skipped ]');
+    expect(yaml).toContain('test "$CONSUMER" = success && test "$RUST" = success && test "$BINDING" = success && test "$CORPUS" = success');
+  });
 });
 
 /**
