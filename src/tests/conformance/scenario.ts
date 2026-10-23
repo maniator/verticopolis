@@ -27,7 +27,7 @@ export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..
 export const CONFORMANCE_DIR = resolve(REPO_ROOT, "conformance");
 
 export type Start =
-  | { newGame: { seed: number; mode: GameMode } }
+  | { newGame: { seed: number; mode: GameMode; star?: number } }
   | { fixture: string; mode?: GameMode };
 
 /** A unit or shaft is named by a tile it covers, never by id. */
@@ -105,7 +105,7 @@ export function loadScenario(file: string): Scenario {
   const start = s.start as unknown as Record<string, unknown>;
   if (start && typeof start === "object" && "newGame" in start) {
     check(`${file} start`, start, {}, ["newGame"]);
-    check(`${file} start.newGame`, start.newGame, { seed: "u32", mode: "mode" });
+    check(`${file} start.newGame`, start.newGame, { seed: "u32", mode: "mode", star: "star?" });
   } else {
     check(`${file} start`, start, { fixture: "str", mode: "mode?" });
   }
@@ -246,6 +246,17 @@ export const startTsEngine: EngineStart = (start) => {
   if ("newGame" in start) {
     const sim = Simulation.newGame(start.newGame.seed, start.newGame.mode);
     if (sim.mode !== start.newGame.mode) throw new Error(`new game founded as ${sim.mode}, not ${start.newGame.mode}`);
+    // A start state, not a command: the star the game opens at, so the kinds
+    // and shafts that unlock above one star are in reach from a new game. The
+    // founded game is saved, raised to the star and loaded back, the route all
+    // three runners take, so a load's milestones and boundary markers are the
+    // same everywhere. One star is the founded game itself.
+    const star = start.newGame.star;
+    if (star !== undefined && star > 1) {
+      const save = JSON.parse(JSON.stringify(sim.serialize())) as SerializedGame;
+      save.star = star;
+      return tsEngine(Simulation.deserialize(save));
+    }
     return tsEngine(sim);
   }
   const raw = decodeVctower(readFileSync(resolve(REPO_ROOT, start.fixture), "utf8"), start.fixture) as SerializedGame;
