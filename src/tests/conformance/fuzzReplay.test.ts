@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { replayCompare } from "./fuzzReplay";
@@ -19,9 +19,17 @@ const commands = (extra: unknown[] = []) => [
 /** Write a scenario and, beside it, the records a Rust run would leave: the
  *  TypeScript run's own, edited by `tweak`, so the compare has agreement to
  *  start from. */
-function setup(name: string, cmds: unknown[], tweak?: (c: Checkpoint[], d: CheckpointDetail[]) => void): string {
+function setup(
+  name: string,
+  cmds: unknown[],
+  tweak?: (c: Checkpoint[], d: CheckpointDetail[]) => void,
+  seed = 1,
+  mode: "classic" | "modern" = "classic",
+  star?: 1 | 2 | 3 | 4 | 5,
+): string {
   const file = join(dir, `${name}.json`);
-  writeFileSync(file, JSON.stringify({ id: name, description: "d", start: { newGame: { seed: 1, mode: "classic" } }, commands: cmds }));
+  const newGame = star ? { seed, mode, star } : { seed, mode };
+  writeFileSync(file, JSON.stringify({ id: name, description: "d", start: { newGame }, commands: cmds }));
   if (tweak) {
     const details: CheckpointDetail[] = [];
     const checkpoints = runScenario(loadScenario(file), undefined, details);
@@ -99,5 +107,31 @@ describe("replayCompare", () => {
     writeFileSync(join(dir, "bad.rs.json"), "[]");
     writeFileSync(join(dir, "bad.rs.detail.json"), "[]");
     expect(replayCompare(file)).toMatchObject({ status: "harness" });
+  });
+
+  it("replays a minimized known failing seed deterministically", () => {
+    const file = setup(
+      "seed-9315-min",
+      [
+        { op: "buildRow", kind: "lobby", floor: 1, from: 160, to: 220 },
+        { op: "buildRow", kind: "floor", floor: 2, from: 161, to: 219 },
+        { op: "build", kind: "clinic", floor: 2, x: 170 },
+      ],
+      (_c, d) => {
+        expect(d.length).toBeGreaterThan(0);
+        d[d.length - 1].money += 1;
+      },
+      9315,
+      "modern",
+      5,
+    );
+    const a = replayCompare(file);
+    const checkpointsAfterFirst = readFileSync(join(dir, "seed-9315-min.rs.json"), "utf8");
+    const detailsAfterFirst = readFileSync(join(dir, "seed-9315-min.rs.detail.json"), "utf8");
+    const b = replayCompare(file);
+    expect(readFileSync(join(dir, "seed-9315-min.rs.json"), "utf8")).toBe(checkpointsAfterFirst);
+    expect(readFileSync(join(dir, "seed-9315-min.rs.detail.json"), "utf8")).toBe(detailsAfterFirst);
+    expect(a).toMatchObject({ status: "diverged", signature: "money" });
+    expect(b).toEqual(a);
   });
 });
