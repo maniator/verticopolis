@@ -3,10 +3,11 @@ import { rentConfig } from "../engine/econConfig";
 import { FACILITIES, GRID, facilityFloors, isCommercialKind, isHotelKind, residentCount } from "../engine/facilities";
 import type { SerializedGame, SerializedUnit } from "../engine/types";
 import { isPresent } from "../engine/types";
+import { wellFormed } from "../engine/wellFormed";
 import { TDT_FLOOR_OFFSET } from "./tdtConstants";
 import { HOTEL_ASLEEP_FLAG, HOTEL_DIRTY_FLAG, HOTEL_OCCUPANT_MASK, isLobbyFloor } from "./tdtTables";
 import { rentFromClass } from "./tdtTables";
-import { KIND_TENANT, PART_STACKS, classFromRent, type OutTenant } from "./tdtExportTables";
+import { KIND_TENANT, LegacyExportError, PART_STACKS, classFromRent, listOf, type OutTenant } from "./tdtExportTables";
 
 /**
  * The gather pass of the `.TDT` export: walk the serialized tower into
@@ -16,8 +17,16 @@ import { KIND_TENANT, PART_STACKS, classFromRent, type OutTenant } from "./tdtEx
  */
 
 /** Serialized units may omit width/state/label (older saves): normalize once,
- *  the same defaults deserialize applies. */
-function norm(u: SerializedUnit) {
+ *  the same defaults deserialize applies. An entry that is not an object, or
+ *  whose kind is missing, not a string or not in the catalog, is refused with
+ *  the Rust codec's message (#887). The kind is quoted as JSON quotes it, with
+ *  lone surrogates read as U+FFFD the way the engine reads them. */
+function norm(raw: unknown) {
+  const kind = typeof raw === "object" && raw !== null && typeof (raw as { kind?: unknown }).kind === "string" ? (raw as { kind: string }).kind : "";
+  if (!Object.prototype.hasOwnProperty.call(FACILITIES, kind)) {
+    throw new LegacyExportError(`unit kind ${JSON.stringify(wellFormed(kind))} is not in the catalog`);
+  }
+  const u = raw as SerializedUnit;
   return {
     ...u,
     width: u.width ?? FACILITIES[u.kind].width,
@@ -156,7 +165,7 @@ export function gatherTower(save: SerializedGame): GatheredTower {
   };
 
   const rooms: GatheredRoom[] = [];
-  for (const raw of save.units) {
+  for (const raw of listOf(save, "units")) {
     const u = norm(raw);
     if (u.kind === "floor" || u.kind === "lobby") {
       // Ground lobby (our floor 1 = TDT ground row 10) drives lobbyHeight; we
@@ -221,9 +230,11 @@ export function gatherTower(save: SerializedGame): GatheredTower {
       right = clamp(u.x + u.width);
     }
     if (!room.emitted && right <= left) continue; // wholly off-lot or unusable: claim nothing
-    for (let fl = u.floor; fl < u.floor + facilityFloors(u.kind); fl++) {
-      widen(fl, left, right);
-    }
+    // At most one pass per story (#887): near 2^53 `fl++` stops moving, and a
+    // string floor makes the bound text ("1e5" + 1 is "1e51"), so the bound
+    // alone can run forever. How a string floor reads is #884's question.
+    const stories = facilityFloors(u.kind);
+    for (let fl = u.floor, i = 0; i < stories && fl < u.floor + stories; fl++, i++) widen(fl, left, right);
   }
 
   for (const u of rooms) {

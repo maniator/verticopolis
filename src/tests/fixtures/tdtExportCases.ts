@@ -256,5 +256,92 @@ export function exportInputs(): [string, ExportInput][] {
     unit({ id: 2, kind: "office", floor: 2, x: forged(null), width: 9, state: "gutted" }),
     unit({ id: 3, kind: "office", floor: 3, x: forged(null), width: 9 }),
   ]));
+  // Forged shapes the TypeScript exporter used to throw a TypeError on, or loop
+  // forever on, where the Rust codec refuses, drops or stops (#887). The
+  // agreed answer is the Rust one.
+  const reshaped = (patch: Record<string, unknown>, drop: string[] = []): SerializedGame => {
+    const save: Record<string, unknown> = { ...tower(lobbyOnly), ...patch };
+    for (const key of drop) delete save[key];
+    return forged(save);
+  };
+  add("forged-units-missing", reshaped({}, ["units"]));
+  add("forged-units-null", reshaped({ units: null }));
+  add("forged-units-empty-string", reshaped({ units: "" }));
+  add("forged-units-string", reshaped({ units: "lobby" }));
+  add("forged-units-object", reshaped({ units: { 0: lobbyOnly[0] } }));
+  add("forged-transports-missing", reshaped({}, ["transports"]));
+  add("forged-transports-null", reshaped({ transports: null }));
+  add("forged-transports-string", reshaped({ transports: "shaft" }));
+  add("forged-transport-entries", tower(lobbyOnly, forged([null, 7, "shaft", [1, 2], {}, true, shaft({ id: 11 })])));
+  add("forged-unit-entry-null", tower(forged([...lobbyOnly, null])));
+  add("forged-unit-entry-number", tower(forged([...lobbyOnly, 7])));
+  add("forged-unit-entry-string", tower(forged([...lobbyOnly, "office"])));
+  add("forged-unit-entry-array", tower(forged([...lobbyOnly, ["office", 2]])));
+  const room = { id: 2, floor: 2, x: 0, width: 9 };
+  add("forged-unit-kind-missing", tower(forged([...lobbyOnly, room])));
+  add("forged-unit-kind-null", tower(forged([...lobbyOnly, { ...room, kind: null }])));
+  add("forged-unit-kind-number", tower(forged([...lobbyOnly, { ...room, kind: 5 }])));
+  add("forged-unit-kind-unknown", tower(forged([...lobbyOnly, { ...room, kind: "arcade" }])));
+  add("forged-unit-kind-prototype", tower(forged([...lobbyOnly, { ...room, kind: "constructor" }])));
+  // The refusal quotes the kind; JSON's quoting is what both sides write.
+  add("forged-unit-kind-quoting", tower(forged([...lobbyOnly, { ...room, kind: 'say "hi" \\ \n\t\u0001\u007f\u2028 é 塔 🏢' }])));
+  for (const [id, skipFloors] of [["true", true], ["number", 4], ["object", { 0: 4 }], ["string", "45"]] as const) {
+    add(`forged-skip-floors-${id}`, tower(lobbyOnly, [shaft({ bottom: 1, top: 9, skipFloors: forged(skipFloors) })]));
+  }
+  for (const [id, carPositions] of [["true", true], ["object", { 0: 5, 1: 7 }], ["string", "57"], ["number", 5], ["null", null]] as const) {
+    add(`forged-car-positions-${id}`, tower(lobbyOnly, [shaft({ bottom: 1, top: 9, cars: 2, carPositions: forged(carPositions) })]));
+  }
+  // A two-story room past 2^53: `floor + 1` is `floor`, and the story walk
+  // still ends.
+  for (const floor of [2 ** 53, 2 ** 60, Number.MAX_VALUE]) {
+    add(`forged-two-story-floor-${floor}`, tower([...lobbyOnly, unit({ id: 2, kind: "cinema", floor, x: 0, width: 31 })]));
+  }
+  add("forged-name-missing", reshaped({}, ["towerName"]));
+  add("forged-name-number", reshaped({ towerName: 5 }));
+  // The null JSON writes for a NaN or an Infinity at the fields the TypeScript
+  // exporter once read differently from null: the clock, an asleep hotel
+  // room's occupants, an office's rent.
+  const asleep = (over: Record<string, unknown>) =>
+    tower(forged([...lobbyOnly, { ...unit({ id: 2, kind: "hotelSingle", floor: 2, x: 0, width: 4, state: "asleep", occupants: 1 }), ...over }]));
+  const rented = (over: Record<string, unknown>) =>
+    tower(forged([...lobbyOnly, { ...unit({ id: 2, kind: "office", floor: 2, x: 0, width: 9, state: "occupied" }), ...over }]));
+  add("forged-minutes-null", reshaped({ minutes: null }));
+  add("forged-occupants-null", asleep({ occupants: null }));
+  add("forged-rent-null", rented({ rent: null }));
+  // An object with its own `toString` key: JavaScript cannot convert it, and
+  // both sides read it as NaN where a number belongs and as no kind.
+  const noString = { toString: 0 };
+  add("forged-to-string-minutes", reshaped({ minutes: noString }));
+  add("forged-to-string-occupants", asleep({ occupants: noString }));
+  add("forged-to-string-rent", rented({ rent: [noString] }));
+  add("forged-to-string-transport-kind", tower(lobbyOnly, [shaft({ kind: forged(noString) })]));
+  add("forged-to-string-unit-kind", tower(forged([...lobbyOnly, { ...room, kind: noString }])));
+  // Transport kinds no table holds: a prototype key, and a kind in a list.
+  add("forged-transport-kind-prototype", tower(lobbyOnly, [shaft({ kind: forged("constructor") })]));
+  add("forged-transport-kind-list", tower(lobbyOnly, [shaft({ kind: forged(["elevatorStandard"]) })]));
+  // A stall with no x reads NaN; both sides sort it after every number. The
+  // first list is one the old Rust sort ordered differently, the second one
+  // both old sorts did.
+  add("forged-parking-x-missing", tower([
+    unit({ id: 1, kind: "parking", floor: -1, x: 5, width: 4 }),
+    unit({ id: 2, kind: "parking", floor: -1, x: 3, width: 4 }),
+    forged({ id: 3, kind: "parking", floor: -1, width: 4 }),
+    unit({ id: 4, kind: "parkingRamp", floor: -1, x: 1, width: 2 }),
+  ]));
+  add("forged-parking-x-missing-twice", tower([
+    forged({ id: 1, kind: "parkingRamp", floor: -1, width: 2 }),
+    unit({ id: 2, kind: "parkingRamp", floor: -1, x: 1, width: 4 }),
+    unit({ id: 3, kind: "parking", floor: -1, x: 9, width: 2 }),
+    forged({ id: 4, kind: "parking", floor: -1, width: 4 }),
+    unit({ id: 5, kind: "parking", floor: -1, x: 4, width: 2 }),
+    forged({ id: 6, kind: "parking", floor: -1, width: 2 }),
+    unit({ id: 7, kind: "parkingRamp", floor: -1, x: 4, width: 2 }),
+  ]));
+  // A catalog kind of the wrong family, and two forgeries at once: the unit
+  // kind is refused before the transport list is read, and Modern rules
+  // before the unit list.
+  add("forged-unit-kind-transport", tower(forged([...lobbyOnly, { ...room, kind: "elevatorExpress" }])));
+  add("forged-refusal-order", reshaped({ units: [...lobbyOnly, { ...room, kind: "arcade" }], transports: "shaft" }));
+  add("forged-refusal-order-modern", reshaped({ mode: "modern", units: null }));
   return out;
 }
