@@ -64,5 +64,6 @@ pub mod telemetry;
 pub mod tower;
 mod tower_index;
 pub mod tower_query;
+pub mod tower_query_state;
 #[cfg(feature = "wasm")]
 pub mod wasm;

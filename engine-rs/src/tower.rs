@@ -284,7 +284,7 @@ pub struct Tower {
     pub(crate) room_tiles: HashMap<i64, i64>,
     /// Revision-keyed memos (`servedSet`, `stopsCache`, segment runs, staff
     /// components), see `tower_query.rs`.
-    pub(crate) memo: RefCell<crate::tower_query::Memo>,
+    pub(crate) memo: RefCell<crate::tower_query_state::Memo>,
     /// `mealOverlayRevision`: bumped on every customersIn/outForMeal change.
     pub meal_overlay_revision: i64,
 }
