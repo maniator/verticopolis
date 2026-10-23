@@ -6,8 +6,10 @@
 //! once or twice for each person spawned. `maxStaffFor` counted every unit
 //! for each staff spawn attempt (#1143), and the floor bounds behind
 //! `highest_floor` and `lowest_floor` folded every unit per read (#1237).
-//! These indexes answer from one walk per tower revision. The spawn step's
-//! rooms per floor joined them with #1143 item 4.
+//! Elevator dispatch hashed every room's floor against a copy of the served
+//! set and sorted the lobby floors on every step (A20 in #1158). These
+//! indexes answer from one walk per tower revision.
+//! The spawn step's rooms per floor joined them with #1143 item 4.
 //!
 //! They are keyed on `revision` and the unit count. Every placement and
 //! removal bumps the revision, a load ends in `reindex`, which resets the
@@ -49,6 +51,18 @@ pub struct Census {
     pub kinds: Vec<i64>,
     pub office_floors: HashSet<i64>,
 }
+
+/// The floor lists elevator dispatch reads on every step and every motion
+/// chunk (A20 in #1158), both ascending.
+pub struct DispatchFloors {
+    /// `servedFloors`.
+    pub served: Vec<i64>,
+    /// `lobbyFloors`.
+    pub lobbies: Vec<i64>,
+}
+
+/// The memo slot for [`DispatchFloors`].
+pub type FloorsMemo = Option<(IndexKey, Arc<DispatchFloors>)>;
 
 /// The floors from `MIN_FLOOR` up that get a slot, and a bit in a 128-bit
 /// floor set. Every floor a tower can build fits; a floor past them takes a
@@ -256,6 +270,33 @@ impl Tower {
             .fold((1, 1), |(lo, hi), u| (lo.min(u.floor), hi.max(u.floor)));
         self.memo.borrow_mut().bounds = Some((key, bounds));
         bounds
+    }
+
+    /// The served and lobby floors in ascending order, so dispatch can
+    /// binary search them instead of hashing every room's floor each step
+    /// and sorting the lobby floors on every call. Built once per revision.
+    /// The served list asks the served-floor memo about each floor from the
+    /// lowest to the highest a passenger shaft spans, so no set is iterated
+    /// and nothing is sorted: the memo's closure starts at floor 1 and adds
+    /// only passenger shafts' stops, so no served floor lies outside them.
+    pub(crate) fn dispatch_floors(&self) -> Arc<DispatchFloors> {
+        let key = self.index_key();
+        if let Some((built, floors)) = &self.memo.borrow().floors {
+            if *built == key {
+                return floors.clone();
+            }
+        }
+        let (lo, hi) = self
+            .transports
+            .iter()
+            .filter(|t| !t.kind.is_staff_only_transport())
+            .fold((1, 1), |(lo, hi), t| (lo.min(t.bottom), hi.max(t.top)));
+        let served = (lo..=hi).filter(|&f| self.is_floor_served(f)).collect();
+        let lobbies = self.lobby_floors();
+        debug_assert!(lobbies.windows(2).all(|w| w[0] < w[1]));
+        let floors = Arc::new(DispatchFloors { served, lobbies });
+        self.memo.borrow_mut().floors = Some((key, floors.clone()));
+        floors
     }
 }
 
