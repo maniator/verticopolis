@@ -6,12 +6,8 @@
 //! once or twice for each person spawned. `maxStaffFor` counted every unit
 //! for each staff spawn attempt (#1143), and the floor bounds behind
 //! `highest_floor` and `lowest_floor` folded every unit per read (#1237).
-<<<<<<< HEAD
-//! These indexes answer from one walk per tower revision.
-=======
 //! These indexes answer from one walk per tower revision. The spawn step's
 //! rooms per floor joined them with #1143 item 4.
->>>>>>> origin/main
 //!
 //! They are keyed on `revision` and the unit count. Every placement and
 //! removal bumps the revision, a load ends in `reindex`, which resets the
