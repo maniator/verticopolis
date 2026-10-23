@@ -15,7 +15,7 @@ Measurements and the recommendation are in
 | `wasm-worker` | Experimental. The Rust engine in a dedicated module worker; the read model syncs from its replies. |
 
 `?engine=` wins over the stored value, as before (`src/wasmhost/engineChoice.ts`).
-The title screen reads "WASM engine (worker)" on the worker host.
+The title screen reads "Rust engine (worker)" on the worker host.
 
 ## How the main-thread host works today (the baseline)
 
