@@ -13,7 +13,6 @@ import { setStepGate } from "./stepGate";
 import { mergeSimulation } from "./merge";
 import { adoptTelemetry, parseCommuteStress, type TelemetryDocument } from "./telemetry";
 import { useTowerCatalogSource } from "../engine/towerCatalog";
-import { syncCars, syncPeople, syncUnits } from "./frameSync";
 import { refuseForeignCatalog } from "./catalogCheck";
 export { refuseForeignCatalog } from "./catalogCheck";
 import { FaultLatch, RestorePoints, carryLiveState, letEngineGo, runEach, type FaultContext, type HostFault, type RestoredPoint } from "./hostFault";
@@ -130,7 +129,6 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   // everything below that reads or notes a point.
   const points = new RestorePoints(load.save);
   let lastRevision = sim.tower.revision;
-  let lastHourRuns = -1;
   // The engine's own log cursor, kept apart from the instance's `logSeq`
   // (which only ever grows here, as the UI's log view expects), and the
   // instance's cursor at the last sync: a command the instance ran logged
@@ -200,7 +198,9 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
       events.count(batch);
       return;
     }
-    points.note(engine.serialize());
+    // FACADE SPIKE 0 (measurement only, never merged): no save per event
+    // batch. Under the facade, restore points ride the saves the host already
+    // takes, so the spike takes none here.
     events.cover(batch);
   };
   const drainHosted = (): GameplayEvent[] => {
@@ -323,20 +323,20 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
    *  first when the engine's hour pass ran or its tower moved (or when
    *  `force` asks for one). */
   const syncFrame = (force = false) => {
-    const view = engine.frameView();
-    let frame: FrameView | null = null;
-    let h: FrameHeader;
-    if (coalesce) {
-      h = decodeHeader(view);
-      checkRecords(view, h);
-    } else {
-      frame = decodeFrame(view);
-      h = frame.header;
-    }
+    // FACADE SPIKE 0 (measurement only, never merged): the facade's data
+    // flow on today's renderer. The frame carries only the unit records that
+    // changed since the last read (the prototype export), it is applied from
+    // the raw numbers with no object decode, and the instance gets a full
+    // merge only when the tower's revision moves (a structural edit), never
+    // on the hour pass. Panels that read hourly state go stale, which the
+    // spike allows. It applies every step, not once per rendered frame as
+    // the facade will, so its cost is an upper bound on the facade's.
+    const view = engine.frameDynamicProto(0);
+    const h: FrameHeader = decodeHeader(view);
+    checkRecords(view, h);
     relay.suppress(() => {
-      if (force || h.onHourRuns !== lastHourRuns || h.revision !== lastRevision) {
+      if (force || h.revision !== lastRevision) {
         merge({ header: h });
-        lastHourRuns = h.onHourRuns;
       }
       const revision = engine.commuteStressRevision();
       if (revision !== commuteRevision) {
@@ -379,13 +379,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
         engineLogSeq = h.logSeq;
       }
       simLogSeqAtSync = sim.logSeq;
-      if (frame) {
-        syncPeople(sim, frame);
-        syncUnits(sim, frame);
-        syncCars(sim, frame);
-      } else {
-        applyRecords(sim, view, h);
-      }
+      applyRecords(sim, view, h);
     });
     stale = false;
     host.frames++;
