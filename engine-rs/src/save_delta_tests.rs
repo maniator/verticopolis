@@ -140,6 +140,23 @@ fn units_in_a_new_order_ask_for_a_full_save() {
 }
 
 #[test]
+fn a_late_reorder_clears_even_a_partially_updated_mirror() {
+    let mut sim = busy();
+    let mut m = SaveMirror::default();
+    m.full(&sim);
+    let n = sim.tower.units.len();
+    assert!(n > 3);
+    // A mismatch near the end must still force a full save even if earlier
+    // records have already been compared and provisionally copied.
+    sim.tick(60.0);
+    sim.tower.units.swap(n - 2, n - 1);
+    assert!(m.delta(&mut sim).is_none());
+    assert!(m.delta(&mut sim).is_none(), "mirror must stay unprimed");
+    m.full(&sim);
+    assert!(m.delta(&mut sim).is_some(), "full save re-primes the mirror");
+}
+
+#[test]
 fn clear_forgets_the_mirror() {
     let mut sim = busy();
     let mut m = SaveMirror::default();
