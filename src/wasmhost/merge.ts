@@ -1,6 +1,7 @@
 import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
 import type { Transport, Unit } from "../engine/types";
+import { roomUnits } from "../engine/tower/rooms";
 
 /**
  * Bring a live read model up to a fresh deserialization of the engine's
@@ -94,7 +95,9 @@ export function mergeSimulationDelta(target: Simulation, d: DeltaRecords, marks:
 export function rebuildUnitSets(target: Simulation): void {
   const fires: number[] = [];
   target.constructing.clear();
-  for (const u of target.tower.units) {
+  // Structural floor/lobby tiles cannot be under construction or on fire.
+  // The revision-keyed room index preserves the unit ordering and live states.
+  for (const u of roomUnits(target.tower)) {
     if (u.state === "construction") target.constructing.add(u.id);
     else if (u.state === "fire") fires.push(u.id);
   }
