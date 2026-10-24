@@ -58,18 +58,20 @@ impl SaveMirror {
     /// mirror) when no delta can describe the change.
     pub fn delta(&mut self, sim: &mut Simulation) -> Option<String> {
         let units = &sim.tower.units;
-        if !self.primed
-            || units.len() != self.units.len()
-            || units
-                .iter()
-                .zip(&self.units)
-                .any(|(u, (m, _))| u.id != m.id)
-        {
+        if !self.primed || units.len() != self.units.len() {
             self.clear();
             return None;
         }
         let mut changed = Vec::new();
+        let mut order_changed = false;
+        // Check ids while comparing records, rather than walking all units
+        // twice per hour. A late mismatch discards any provisional mirror
+        // updates and requests a full save, just like an early mismatch.
         for (unit, (copy, sent)) in units.iter().zip(self.units.iter_mut()) {
+            if unit.id != copy.id {
+                order_changed = true;
+                break;
+            }
             if unit == copy {
                 continue;
             }
@@ -80,6 +82,10 @@ impl SaveMirror {
                 *sent = text;
                 changed.push(saved);
             }
+        }
+        if order_changed {
+            self.clear();
+            return None;
         }
         // The rest of the save, written with the units lent out of the tower
         // so they are not serialized a second time, and put straight back.
