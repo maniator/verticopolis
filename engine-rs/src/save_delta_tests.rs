@@ -153,7 +153,10 @@ fn a_late_reorder_clears_even_a_partially_updated_mirror() {
     assert!(m.delta(&mut sim).is_none());
     assert!(m.delta(&mut sim).is_none(), "mirror must stay unprimed");
     m.full(&sim);
-    assert!(m.delta(&mut sim).is_some(), "full save re-primes the mirror");
+    assert!(
+        m.delta(&mut sim).is_some(),
+        "full save re-primes the mirror"
+    );
 }
 
 #[test]
