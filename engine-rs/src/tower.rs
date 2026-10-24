@@ -41,7 +41,7 @@ impl UnitState {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Unit {
     pub id: i64,
     pub kind: Kind,
@@ -362,12 +362,12 @@ impl Tower {
     }
 
     pub fn count_kind(&self, kind: Kind) -> i64 {
-        let placed = if kind.is_structural() {
+        let unit_count = if kind.is_structural() {
             self.units.iter().filter(|u| u.kind == kind).count() as i64
         } else {
             self.census().kinds[kind as usize]
         };
-        placed + self.transports.iter().filter(|t| t.kind == kind).count() as i64
+        unit_count + self.transports.iter().filter(|t| t.kind == kind).count() as i64
     }
 
     fn span_every(

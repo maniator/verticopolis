@@ -83,8 +83,10 @@ design below cuts the sync work first, then moves the engine.
    lines since the last sync with the engine's, in the engine's order
    (`appendEngineLog`).
 
-The full-save merge is unchanged. It still runs on the main thread, hourly
-and on every edit, in all three WASM modes (backlog #868 owns shrinking it).
+The full-save merge is unchanged on the step and coalesced hosts. It still
+runs on the main thread, hourly and on every edit (backlog #868 owns shrinking
+it). The worker host sends an hourly delta instead when only the hour pass
+moved (see below), and the full save on edits and loads.
 
 ## The worker host
 
@@ -93,8 +95,8 @@ main thread                                  engine worker
 -----------                                  -------------
 frame loop: steps (clock += dt) ──ops──────▶ apply ops in seq order
             flush: one request ─────────────▶ frameView, events, log, pending
-commands: run on instance, ──ops──────────▶   (+ full save when it moved)
-          relayed in seq order
+commands: run on instance, ──ops──────────▶   (+ full save when the layout moved,
+          relayed in seq order                  or a delta on an hour pass)
 apply reply ◀──── frame (buffer transferred) ─┘
 ```
 
@@ -128,14 +130,35 @@ apply reply ◀──── frame (buffer transferred) ─┘
 - `ready {catalogs}`: the catalogs' text, so the main thread never loads a
   second copy of the engine.
 - `loaded {gen, view}`
-- `frame {gen, req, seq, view, events, dropped, log, pending, merge?, workMs, memoryBytes}`
+- `frame {gen, req, seq, view, events, dropped, log, pending, merge?, delta?, workMs, memoryBytes}`
   - `seq` is the last op the reply includes.
   - `view`'s buffer is transferred, not copied.
   - `events` is the one drain of the engine's gameplay events since the
     last reply.
   - `log` holds the entries after the request's cursor.
-  - `merge` is the full save. It is sent only when the revision or the hour
-    pass moved since the last one sent, or when the request asks for it.
+  - `merge` is the full save. It is sent when the revision moved since the
+    last one sent, when the request asks for it, or on an hour pass the
+    delta below cannot carry (the cases are listed with it).
+  - `delta` replaces it when only the hour pass moved (#1045): the engine's
+    `saveDelta()` text, holding the unit records whose save form changed
+    since the last save or delta sent and every other top-level key of the
+    save (the transports among them). The engine keeps a mirror of the units
+    as last sent, and a unit equal to its copy is never serialized again.
+    Every full save and delta takes the next number in the tower's sync
+    sequence (`sync`), and a delta names the one it was taken against
+    (`base`). The main thread patches the changed records onto the objects it
+    holds (`mergeSimulationDelta`) only when `base` is the last one it
+    applied; otherwise, or when the delta names a unit it does not hold, it
+    asks for a full save. The load primes the mirror, so the first hour pass
+    is a delta too; when the engine read the save into something other than
+    what the main thread sent, the first reply carries a full save instead.
+    An hour pass after a command (a camera stamp, a log line such as the
+    frame loop's meal-rush bulletins, or a tower rename aside; the exempt
+    list is `saveSyncRules.ts`) also sends the full save: the
+    read model ran the command on its own, and a command the engine answered
+    differently in its result alone leaves a unit the engine never changes,
+    which no delta would correct. Units moved in place (a changed
+    floor, x or width) count as a layout change and ask for a full save too.
 - `error {gen?, seq?, fatal, message}`: `fatal` for a refused load, a gap in
   the sequence, a step the engine failed on or a reply that could not be
   built (the worker frees the engine and the main thread lets the tower go);
@@ -208,7 +231,8 @@ fan-out, and an event is never handed out twice.
 - Otherwise it answers with the read model's own save: the state of the
   last fresh reply plus the player's commands since, with the internals the
   frame does not carry (the RNG, `satisfaction`, the dispatch memos) as of
-  the last merge, which every hour pass carries. The steps still in flight
+  the last merge or delta applied (an hour pass brings one, or asks for a
+  full save the next reply brings). The steps still in flight
   are not in it, so it carries that reply's minute instead of the frame
   loop's clock, and a tower loaded from it runs those steps again, an hour
   or day pass among them (#1018).
@@ -278,7 +302,7 @@ fan-out, and an event is never handed out twice.
 
 - **#868 (read model).** The worker host keeps the read model's gaps
   exactly as the main-thread host does: placeholders for the fields a frame
-  does not carry, and a full merge for the rest. It adds no new gap.
+  does not carry, and a full merge (or the hourly delta) for the rest. The delta adds one gap: its reply carries no exact save text, so a synchronous save right after an hour pass is approximate while steps are in flight (backlog row `wasm-worker-delta-review-deferrals`).
 - **#954 (engine-first answers).** Commands still answer from the
   instance, as on the main-thread host. On the coalesced and worker hosts the
   instance is up to a frame (worker: a round trip) behind the engine, so an

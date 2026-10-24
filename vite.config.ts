@@ -43,17 +43,6 @@ function toolingBuild(): boolean {
   return on;
 }
 
-/** The folder Vite copies into dist/ and the engine package is read from:
- *  `src/public`, unless the offline e2e sets `VC_PUBLIC_DIR` to build a second
- *  deployment with a different engine package (e2e/deployments.ts, #985). A
- *  Vercel build refuses it, so no deploy can ship a package from elsewhere. */
-function publicDir(): string {
-  const raw = process.env.VC_PUBLIC_DIR;
-  if (raw === undefined || raw === "") return resolve(__dirname, "src/public");
-  if (process.env.VERCEL) throw new Error("VC_PUBLIC_DIR is set in a Vercel build. Deploys build from src/public; remove VC_PUBLIC_DIR from the Vercel environment.");
-  return resolve(raw);
-}
-
 /** The engine build mode (`VC_ENGINE`; see src/build/engineBundle.ts). A
  *  wasm-only build ships the Rust/WASM engine as the only engine: no runtime
  *  switch, no TypeScript step loop, no fallback. The value is validated, and
@@ -70,6 +59,23 @@ function engineBuild(): EngineBuild {
 
 const ENGINE_BUILD = engineBuild();
 const TOOLING_BUILD = toolingBuild();
+
+/** The public assets folder for this build. The deployment harness swaps in a
+ *  salted copy under a temp directory; the same override must also drive the
+ *  shell's expected engine package so the second build checks the correct
+ *  package instead of the default `src/public` folder. */
+function publicDir(): string {
+  const raw = process.env.VC_PUBLIC_DIR;
+  if (raw) {
+    if (process.env.VERCEL) {
+      throw new Error(
+        "VC_PUBLIC_DIR is not allowed in a Vercel build. Deploys must ship the checked-in engine package from src/public; remove VC_PUBLIC_DIR from the Vercel environment.",
+      );
+    }
+    return resolve(raw);
+  }
+  return resolve(__dirname, "src/public");
+}
 
 /**
  * Module swaps that keep engine-specific code out of a bundle that cannot use
@@ -243,7 +249,6 @@ function wasmParityProjects() {
     "**/conformanceWasmTdt.integration.test.ts",
     "**/conformanceWasmCanBuild.integration.test.ts",
     "**/conformanceWasmVctower.integration.test.ts",
-    "**/conformanceWasmSaves.integration.test.ts",
     "**/dualRunDay.integration.test.ts",
     "**/dualRunEdits.integration.test.ts",
     "**/loaderCases.integration.test.ts",
@@ -257,8 +262,10 @@ function wasmParityProjects() {
     "**/wasmHostLogText.integration.test.ts",
     "**/wasmHostTelemetry.integration.test.ts",
     // These start their own host (in process, or the worker's).
+    "**/conformanceWasmSaves.integration.test.ts",
     "**/wasmHostAnalyticsBridge.integration.test.ts",
     "**/wasmHostAttachTrap.integration.test.ts",
+    "**/wasmWorkerDelta.integration.test.ts",
     "**/wasmHostExtermination.integration.test.ts",
     "**/wasmHostFallback.integration.test.ts",
     "**/wasmHostRollback*.integration.test.ts",

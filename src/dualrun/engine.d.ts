@@ -253,6 +253,13 @@ export class Engine {
      */
     resolveChoice(accept: boolean): void;
     /**
+     * What moved in the save since the last sync: `{ units, rest }` as JSON
+     * text (the changed unit records, and every other top-level key).
+     * `undefined` when units were added, removed or reordered, or no full
+     * save was taken yet: the host then takes a full one.
+     */
+    saveDelta(): string | undefined;
+    /**
      * Replace the elevator telemetry with an `elevatorTelemetry` document.
      * Tooling only (the gallery's engine leg); no game command reaches it.
      */
@@ -270,6 +277,11 @@ export class Engine {
      * is refused with `false`, never coerced.
      */
     sellAt(floor: number, x: number): boolean;
+    /**
+     * `serialize()`, byte for byte, which also becomes the base the next
+     * `saveDelta` is taken against (#1045, `crate::save_delta`).
+     */
+    serializeForSync(): string;
     /**
      * `serialize()` as JSON text.
      */

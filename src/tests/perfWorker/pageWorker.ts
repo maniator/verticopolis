@@ -37,7 +37,7 @@ export interface HostedRun {
   batchMainMs: number[];
   /** Worker host only: its counters over the timed steps (the settle that
    *  fetches the exact end save comes after and is not counted). */
-  worker: { replies: number; staleReplies: number; merges: number; messagesSent: number; messagesReceived: number; bytesReceived: number; frameBytes: number; mergeBytes: number; applyMs: number; mergeMs: number; workerOpsMs: number; workerReplyMs: number } | null;
+  worker: { replies: number; staleReplies: number; merges: number; messagesSent: number; messagesReceived: number; bytesReceived: number; frameBytes: number; mergeBytes: number; applyMs: number; mergeMs: number; workerOpsMs: number; workerReplyMs: number; deltas?: number; deltaBytes?: number; deltaMs?: number; workerSaveMs?: number; deltasRefused?: number; approximateSaves?: number } | null;
   startKey: string;
   endKey: string;
   hostErrorsAdded: string[];
@@ -145,7 +145,7 @@ export async function hostedRun(arg: { name: string; steps: number; warmSteps: n
       wallMs,
       mainMs,
       batchMainMs,
-      worker: isWorker() && before ? { replies: d("replies"), staleReplies: d("staleReplies"), merges: d("merges"), messagesSent: d("messagesSent"), messagesReceived: d("messagesReceived"), bytesReceived: d("bytesReceived"), frameBytes: d("frameBytes"), mergeBytes: d("mergeBytes"), applyMs: d("applyMs"), mergeMs: d("mergeMs"), workerOpsMs: d("workerOpsMs"), workerReplyMs: d("workerReplyMs") } : null,
+      worker: isWorker() && before ? { replies: d("replies"), staleReplies: d("staleReplies"), merges: d("merges"), messagesSent: d("messagesSent"), messagesReceived: d("messagesReceived"), bytesReceived: d("bytesReceived"), frameBytes: d("frameBytes"), mergeBytes: d("mergeBytes"), applyMs: d("applyMs"), mergeMs: d("mergeMs"), workerOpsMs: d("workerOpsMs"), workerReplyMs: d("workerReplyMs"), deltas: d("deltas"), deltaBytes: d("deltaBytes"), deltaMs: d("deltaMs"), workerSaveMs: d("workerSaveMs"), deltasRefused: d("deltasRefused"), approximateSaves: d("approximateSaves") } : null,
       startKey: `${tag}:start`,
       endKey: `${tag}:end`,
       hostErrorsAdded: errorsNow().slice(errorsAtStart),
@@ -171,7 +171,7 @@ export interface FramesRun {
   commandToFrameMs: number[];
   commandsUnanswered: number;
   /** Worker host: the counters over the window. */
-  worker: { replies: number; staleReplies: number; merges: number; messagesSent: number; messagesReceived: number; bytesReceived: number; applyMs: number; commandAckMs: number[] } | null;
+  worker: { replies: number; staleReplies: number; merges: number; messagesSent: number; messagesReceived: number; bytesReceived: number; applyMs: number; commandAckMs: number[]; deltas?: number; deltasRefused?: number; approximateSaves?: number } | null;
   hostErrorsAdded: string[];
 }
 
@@ -237,7 +237,7 @@ export function framesRun(arg: { windowMs: number; warmMs: number; speed: number
         blockingMs: longTasks ? inWindow.reduce((s, x) => s + Math.max(0, x.duration - 50), 0) : null,
         commandToFrameMs,
         commandsUnanswered: pending ? 1 : 0,
-        worker: worker && before ? { replies: d("replies"), staleReplies: d("staleReplies"), merges: d("merges"), messagesSent: d("messagesSent"), messagesReceived: d("messagesReceived"), bytesReceived: d("bytesReceived"), applyMs: d("applyMs"), commandAckMs: lastSamples(after.commandAckMs as number[], after.commandsAcked - before.commandsAcked) } : null,
+        worker: worker && before ? { replies: d("replies"), staleReplies: d("staleReplies"), merges: d("merges"), messagesSent: d("messagesSent"), messagesReceived: d("messagesReceived"), bytesReceived: d("bytesReceived"), applyMs: d("applyMs"), deltas: d("deltas"), deltasRefused: d("deltasRefused"), approximateSaves: d("approximateSaves"), commandAckMs: lastSamples(after.commandAckMs as number[], after.commandsAcked - before.commandsAcked) } : null,
         hostErrorsAdded: ((host?.status?.errors ?? []) as string[]).slice(errorsAtStart),
       });
     };
@@ -277,17 +277,19 @@ export function framesRun(arg: { windowMs: number; warmMs: number; speed: number
 }
 
 /** Memory of the hosted tower: the main thread's WASM linear memory
- *  (main-thread hosts, read from the instance the probe kept) or the worker's
+ *  (main-thread hosts, read through the app's own module) or the worker's
  *  (the worker host's last reply). The JS heaps and the process PSS come
  *  from the runner (which drops the harness's stashed saves before it reads the heap). It also drops them here, so
  *  they are not counted as the game's. */
-export function engineMemory(): { mainWasmBytes: number | null; workerWasmBytes: number | null } {
+export async function engineMemory(arg: { engineUrl: string }): Promise<{ mainWasmBytes: number | null; workerWasmBytes: number | null }> {
   const w = window as any;
   w.__perfStash = {};
   const h = w.__vcEngine;
   if (!h?.status?.hosted) return { mainWasmBytes: null, workerWasmBytes: null };
   if (h.status.placement === "worker") return { mainWasmBytes: null, workerWasmBytes: h.current().stats.workerMemoryBytes ?? null };
-  const memory = w.__perfWasmMemory as WebAssembly.Memory | undefined;
-  if (!memory) throw new Error("the WASM memory read found no instance the app booted");
-  return { mainWasmBytes: memory.buffer.byteLength, workerWasmBytes: null };
+  const before = w.__perfMarks?.wasmInstantiateCalls ?? 0;
+  const mod = await import(/* @vite-ignore */ arg.engineUrl);
+  const exports = await mod.default();
+  if ((w.__perfMarks?.wasmInstantiateCalls ?? 0) !== before || before === 0) throw new Error("the WASM memory read did not reach the instance the app booted");
+  return { mainWasmBytes: (exports.memory as WebAssembly.Memory).buffer.byteLength, workerWasmBytes: null };
 }
