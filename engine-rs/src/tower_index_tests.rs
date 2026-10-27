@@ -19,6 +19,16 @@ fn walked_tiles(tower: &Tower, floor: i64) -> Vec<i64> {
     tiles
 }
 
+/// The room ids on `floor` as the walk over every unit lists them.
+fn walked_floor_rooms(tower: &Tower, floor: i64) -> Vec<i64> {
+    tower
+        .units
+        .iter()
+        .filter(|u| !u.kind.is_structural() && u.floor == floor)
+        .map(|u| u.id)
+        .collect()
+}
+
 fn walked_rooms(tower: &Tower) -> Vec<usize> {
     (0..tower.units.len())
         .filter(|&i| !tower.units[i].kind.is_structural())
@@ -69,7 +79,13 @@ fn assert_matches_walks(tower: &Tower) {
         .map(|&i| tower.units[i].id)
         .collect();
     assert_eq!(rooms, walked);
+    let floor_rooms = tower.floor_rooms();
     for floor in -2..=7 {
+        assert_eq!(
+            floor_rooms.on(floor),
+            walked_floor_rooms(tower, floor),
+            "floor {floor}"
+        );
         let tiles = tower
             .structural_tiles(floor)
             .map_or_else(Vec::new, |t| t.to_vec());
@@ -196,6 +212,32 @@ fn a_list_changed_behind_the_revision_rebuilds_rather_than_overruns() {
     tower.units.truncate(tower.units.len() - 1);
     assert_eq!(tower.revision, revision);
     assert_matches_walks(&tower);
+}
+
+#[test]
+fn rooms_on_a_floor_past_the_slots_keep_their_order() {
+    use crate::facilities::{MAX_FLOOR, MIN_FLOOR};
+    // Floors 200 and -50 have no slot, so they take the list fallback.
+    assert_eq!(super::floor_slot(200), None);
+    assert_eq!(super::floor_slot(-50), None);
+    let rooms = super::FloorRooms::new(&[
+        (3, 1),
+        (200, 2),
+        (3, 3),
+        (-50, 4),
+        (200, 5),
+        (MIN_FLOOR, 6),
+        (MAX_FLOOR, 7),
+    ]);
+    assert_eq!(rooms.on(3), [1, 3]);
+    assert_eq!(rooms.on(200), [2, 5]);
+    assert_eq!(rooms.on(-50), [4]);
+    assert_eq!(rooms.on(MIN_FLOOR), [6]);
+    assert_eq!(rooms.on(MAX_FLOOR), [7]);
+    for floor in [4, MAX_FLOOR + 1, 201, i64::MIN, i64::MAX] {
+        assert!(rooms.on(floor).is_empty(), "{floor}");
+    }
+    assert!(super::FloorRooms::new(&[]).on(1).is_empty());
 }
 
 /// `maxStaffFor` as the walk over every unit counted it.

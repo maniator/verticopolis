@@ -15,10 +15,15 @@ pub struct Memo {
     pub staff: Option<(i64, HashMap<i64, i64>)>,
     pub cols: Option<(i64, HashMap<i64, Vec<(i64, i64)>>)>,
     pub tiles: Option<(crate::tower_index::IndexKey, crate::tower_index::FloorTiles)>,
+    pub bounds: Option<(crate::tower_index::IndexKey, (i64, i64))>,
     pub rooms: Option<(crate::tower_index::IndexKey, std::sync::Arc<[usize]>)>,
     pub census: Option<(
         crate::tower_index::IndexKey,
         std::sync::Arc<crate::tower_index::Census>,
+    )>,
+    pub floor_rooms: Option<(
+        crate::tower_index::IndexKey,
+        std::sync::Arc<crate::tower_index::FloorRooms>,
     )>,
 }
 
@@ -143,41 +148,55 @@ impl Tower {
     /// `servedFloors`: the fixpoint of floors a passenger transport chain
     /// connects to the ground lobby.
     pub fn served_floors(&self) -> HashSet<i64> {
-        {
-            let memo = self.memo.borrow();
-            if let Some((rev, s)) = &memo.served {
-                if *rev == self.revision {
-                    return s.clone();
-                }
-            }
+        self.fill_served();
+        let memo = self.memo.borrow();
+        let (_, served) = memo.served.as_ref().expect("fill_served built it");
+        served.clone()
+    }
+
+    /// Builds the served-floor memo when this revision has none, so a reader
+    /// can answer from it in place. Each transport's stops are listed once,
+    /// and a transport that has joined adds nothing on later sweeps, so a
+    /// rebuild costs the stops once plus one membership test per stop of the
+    /// transports still unjoined on each sweep (#1237). The closure is the
+    /// one the TypeScript fixpoint reaches, and the set is only queried.
+    fn fill_served(&self) {
+        if matches!(&self.memo.borrow().served, Some((rev, _)) if *rev == self.revision) {
+            return;
         }
+        let mut pending: Vec<Vec<i64>> = self
+            .transports
+            .iter()
+            .filter(|t| !t.kind.is_staff_only_transport())
+            .map(|t| (t.bottom..=t.top).filter(|&fl| t.stops_at(fl)).collect())
+            .collect();
         let mut reachable: HashSet<i64> = HashSet::new();
         reachable.insert(1);
         let mut changed = true;
         while changed {
             changed = false;
-            for t in &self.transports {
-                if t.kind.is_staff_only_transport() {
-                    continue;
+            pending.retain(|stops| {
+                if !stops.iter().any(|fl| reachable.contains(fl)) {
+                    return true;
                 }
-                let connects =
-                    (t.bottom..=t.top).any(|fl| t.stops_at(fl) && reachable.contains(&fl));
-                if connects {
-                    for fl in t.bottom..=t.top {
-                        if t.stops_at(fl) && !reachable.contains(&fl) {
-                            reachable.insert(fl);
-                            changed = true;
-                        }
-                    }
-                }
-            }
+                reachable.extend(stops.iter().copied());
+                changed = true;
+                false
+            });
         }
-        self.memo.borrow_mut().served = Some((self.revision, reachable.clone()));
-        reachable
+        self.memo.borrow_mut().served = Some((self.revision, reachable));
     }
 
+    /// `isFloorServed`, read from the memo without copying the set (#859,
+    /// #1237): the stranded-floor scans ask once per room.
     pub fn is_floor_served(&self, floor: i64) -> bool {
-        floor == 1 || self.served_floors().contains(&floor)
+        if floor == 1 {
+            return true;
+        }
+        self.fill_served();
+        let memo = self.memo.borrow();
+        let (_, served) = memo.served.as_ref().expect("fill_served built it");
+        served.contains(&floor)
     }
 
     pub fn is_metro_platform_served(&self, station: &Unit) -> bool {
@@ -250,7 +269,9 @@ impl Tower {
             })
         };
         let mut stack: Vec<(i64, i64)> = Vec::new();
-        for u in &self.units {
+        // A ramp is a room, never a tile, so the room index lists every seed
+        // in the order the full unit walk did (#1237).
+        for u in self.room_units() {
             if u.kind == Kind::ParkingRamp && u.is_operational() {
                 for i in 0..u.width {
                     stack.push((u.floor, u.x + i));

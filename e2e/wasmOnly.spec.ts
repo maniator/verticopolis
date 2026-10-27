@@ -46,7 +46,7 @@ test.describe("starts on the WASM engine", () => {
     await page.goto("/?engine=ts");
     await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, { timeout: 30_000 });
     expect(await bootState(page)).toMatchObject({ build: "wasm-only", engine: "wasm", failure: null });
-    await expect(page.locator(".splash-version")).toContainText("WASM engine");
+    await expect(page.locator(".splash-version")).toContainText("Rust engine");
     await page.evaluate(() => document.getElementById("splash")?.remove());
     await page.evaluate(() => (window as any).game.setSpeed(1));
     const before = await page.evaluate(() => (window as any).game.sim.clock.minutes as number);
@@ -289,7 +289,7 @@ test.describe("never falls back to the TypeScript engine", () => {
     expect(await page.evaluate(() => (window as any).game.sim.clock.minutes)).toBe(after.minutes);
     // The fault is the only error the page reports: a failed fallback report
     // or a failed stop would show here.
-    expect(errors.filter((e) => !/the WASM engine failed during a tick: unreachable/.test(e))).toEqual([]);
+    expect(errors.filter((e) => !/the Rust engine failed during a tick: unreachable/.test(e))).toEqual([]);
   });
 
   /** Install the worker and reload under it, so the engine package is in
