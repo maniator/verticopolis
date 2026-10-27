@@ -210,7 +210,7 @@ production.
 | G1 | Every read decodes, migrates and checks on TypeScript; no binding decodes a stored value or a `.vctower` file without an `Engine`, and `decode_vctower` differs from `SaveGame.import` (a `VCTOWER1` prefix only, lenient base64, other error text) | C, D1 |
 | G2 | The slot list and the boot read build a TypeScript `Simulation` to check a save, which slice 10's runtime guard forbids on the healthy path | C (`inspectSave`), D1, used by slice 10 |
 | G3 | The founder rule runs only on TypeScript, and in Rust only inside `fromVctower` (#1066, first half) | C (the setter), facade 7 (its first caller) |
-| G4 | `.TDT` import and export never reach `importTdt`/`exportTdt`, which throw their refusals and return no report facts. The import is #1066's second half; the export is #1301's own (requirement 2), under the same A7 prerequisites | D2, after A7 (OD-8); on today's host TypeScript still loads the import's result before the attach, so #1066 finishes with facade 7 |
+| G4 | `.TDT` import and export never reach `importTdt`/`exportTdt`, which throw their refusals and return no report facts. The import is #1066's second half; the export is #1301's own (requirement 2), under the same A7 prerequisites | D2, after A7 (OD-8); on today's host TypeScript still loads the import's result before the attach, so #1066 closes once facade 7 and D2 have both landed, or with facade 7 if OD-8 moves its `.TDT` half to the exception register |
 | G5 | A new tower is founded on TypeScript | facade 5c and 7 (#1212, #1217) |
 | G6 | The worker host never gets the engine writer | facade 12; the worker is a measurement-only override, held (#1068) and outside 3.0's scope |
 | G7 | The asynchronous autosave deflates on `CompressionStream` | kept by design (decision O1) |
@@ -411,7 +411,9 @@ Rules:
   Before the call, TypeScript checks the input's size, as the writer does
   today (`vctowerWriter.ts:44`): a stored value or `.vctower` text longer
   than an 8 MiB save can occupy (about 11 MiB of base64), `.TDT` bytes past
-  the importer's 4 MiB limit (`TDT_MAX_FILE_BYTES`, `tdt/format.rs`), and
+  the importer's 4 MiB limit (`TDT_MAX_FILE_BYTES`, `tdt/format.rs`; the
+  TypeScript importer refuses past the same limit with the same message,
+  `tdtFormat.ts:51`, so nothing runs on TypeScript past it), and
   save JSON past 8 MiB for `exportTdt` or decoded text past 8 MiB for
   `inspectSave` are never sent to Rust. Inside the
   call, the decode inflates at most 8 MiB, the writer's existing bound.
@@ -580,7 +582,10 @@ recorded case its no-`Simulation` guard allows; the slot list's check
 wired to `inspect`; C9's oversized `inspect` (decoded text past 8 MiB),
 which runs the TypeScript check at boot and in the slot list, as a second
 recorded case the guard allows; the TypeScript redo and checks after a
-codec latch while the host stays healthy (C4), a third; and, since slice 10 moves the `Simulation` module into
+codec latch while the host stays healthy (C4), a third; and `.TDT` import
+and export on TypeScript with the host healthy (before D2, on OD-8's
+exception-register route, or under #932's module split), a fourth, unless
+the facade's `.TDT` path builds no `Simulation`; and, since slice 10 moves the `Simulation` module into
 a lazy chunk, that the TypeScript redo of C4 and C5 can reach it: preloaded
 before any synchronous caller can need it (the boot read inside
 `create()`, `listSlots`, `loadSlot`), or with those paths made
@@ -589,8 +594,9 @@ asynchronous by slice 10, and precached for offline play.
 **Carried to slice 7 (#1217)**, in a comment there: RustSim's stored and
 `.vctower` loads apply the founder rule through C's setter, before the
 first restore point and any save, and never for the attach, undo, restore
-points, a new tower or a `.TDT` import (which boots from D2's output with
-no founder mark). So slice 7's stored and `.vctower` loads depend on C
+points, a new tower or a `.TDT` import (which boots from the boundary's
+`importLegacy` output, TypeScript's `parseTDT` until D2 lands, with no
+founder mark; slice 7 does not wait for D2). So slice 7's stored and `.vctower` loads depend on C
 (`decodeSave` and the setter): `Engine.fromVctower` is no substitute,
 since a legacy raw-JSON value has no container to re-header and its
 decoder is not C's. If the rest of slice 7 is ready first, those loads
@@ -610,8 +616,10 @@ fidelity checks (A7), and the rollback rehearsal itself (X2).
 
 ## Owner decisions
 
-O1 and O2 keep today's behavior, so the slices go ahead on them until the
-owner says otherwise. O3 changes what production does and reports, so D1
+O1 and O2 keep every save that loads today loading, so the slices go ahead
+on them until the owner says otherwise; the one change they bring, D1
+loading a `.vctower` file only Rust decodes (C5), is a gain that strands
+nothing, and D1 does not wait on O2 for it. O3 changes what production does and reports, so D1
 can be written and reviewed before it, but merges only after the owner
 answers.
 
@@ -760,3 +768,11 @@ answers.
   with a spy; the TypeScript redo after a codec latch as a third case
   slice 10's guard allows; every C9 bound in policy item 4; the cap and
   lone-surrogate cases cited to their test.
+- Round 7 (the same layers on `04a8fa0e`; the Edge Case Hunter and
+  Acceptance Auditor found nothing to patch). The Blind Hunter found three
+  narrow `patch` items and one dismiss-candidate, all fixed: the facade's
+  `.TDT` paths on TypeScript as a fourth case slice 10's guard allows;
+  slice 7 does not wait for D2, and #1066 closes once facade 7 and D2 have
+  both landed (or with facade 7 on OD-8's exception route); C9 says the
+  TypeScript importer refuses past the same 4 MiB `.TDT` limit; the owner
+  decisions name D1's one gain under O2.
