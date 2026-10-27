@@ -108,6 +108,17 @@ impl<K: Hash + Eq, V> FastMap<K, V> {
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         self.0.insert(key, value)
     }
+
+    #[inline]
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.0.get(key)
+    }
+
+    /// The value at `key`, made by `make` the first time.
+    #[inline]
+    pub fn get_or_insert_with(&mut self, key: K, make: impl FnOnce() -> V) -> &mut V {
+        self.0.entry(key).or_insert_with(make)
+    }
 }
 
 impl<K: Hash + Eq, V> Index<&K> for FastMap<K, V> {
@@ -201,6 +212,10 @@ mod tests {
         }
         for (k, v) in &std_map {
             assert_eq!(fast[k], *v);
+            assert_eq!(fast.get(k), Some(v));
         }
+        assert_eq!(fast.get(&4001), None);
+        assert_eq!(*fast.get_or_insert_with(4001, || 9), 9);
+        assert_eq!(*fast.get_or_insert_with(4001, || 10), 9, "made once");
     }
 }
