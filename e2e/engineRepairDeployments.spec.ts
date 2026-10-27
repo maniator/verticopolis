@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { startDeployments, type Deployments } from "./deployments";
-import { engineEntries, engineEntriesOf, expectEngineIs, newContext } from "./engineDeployHelpers";
+import { engineEntries, expectEngineIs, newContext } from "./engineDeployHelpers";
 import { tamperCache } from "./engineCacheHelpers";
 import { WASM_ONLY_PROJECT } from "./helpers";
 import { expectControlledWithEngine, hostedGame, installWorker, lobbyAt } from "./offlineHelpers";
@@ -10,7 +10,7 @@ import { expectControlledWithEngine, hostedGame, installWorker, lobbyAt } from "
  * Repair engine files next to a save, a lost connection and a second tab (#985,
  * design 6.2 spec 8). Repair writes only the running build's three engine keys
  * and never touches anything else, so a save stays, and another tab keeps
- * running the engine it loaded. A stop screen with a build waiting does not
+ * keeps its own engine until it reloads. A stop screen with a build waiting does not
  * wait for Repair: it takes the build at once. It runs on the two-deployment
  * server (deployments.ts), on the wasm-only build, where the stop screen with
  * the Repair action exists.
@@ -37,6 +37,7 @@ test.afterEach(() => {
 const repairButton = (page: Page) => page.locator('#engine-failure [data-act="repair-engine"]');
 const status = (page: Page) => page.locator("#engine-failure .engine-failure-repair-status");
 const refused = (page: Page) => page.waitForFunction(() => (window as any).__vcEngineBoot?.failure?.reason === "package-mismatch", undefined, { timeout: 60_000 });
+const slotStored = (page: Page) => page.evaluate(() => localStorage.getItem("simtower-clone-slot-1") !== null);
 const bootFailure = (page: Page) => page.evaluate(() => (window as any).__vcEngineBoot?.failure ?? null);
 
 /** The first build installed and controlling this page, on the engine. */
@@ -65,6 +66,7 @@ test("a repair leaves a save that was made online, and the repaired engine loads
       return ok;
     });
     expect(built, "the lobby was built before the save").toBe(true);
+    expect(await slotStored(page), "slot 1 holds the save before the damage").toBe(true);
 
     await tamperCache(page, "wasm", "salt");
     await page.reload();
@@ -74,6 +76,10 @@ test("a repair leaves a save that was made online, and the repaired engine loads
     await page.reload();
     await hostedGame(page);
     await expectEngineIs(deployments, page, "A");
+    // The save sits in its slot, not in the page: a new game has no lobby yet,
+    // so an autosave of the old tower cannot stand in for the slot.
+    expect(await slotStored(page), "slot 1 still holds the save after the repair").toBe(true);
+    expect(await lobbyAt(page, 160), "the booted game does not already hold the lobby").toBe(false);
 
     const loaded = await page.evaluate(() => {
       (window as any).game.loadFromSlot(1);
@@ -86,7 +92,7 @@ test("a repair leaves a save that was made online, and the repaired engine loads
   }
 });
 
-test("with the engine network cut at the worker, a repair changes nothing and the next repair works", async ({ browser }) => {
+test("with the engine network cut at the server, a repair changes nothing and the next repair works", async ({ browser }) => {
   const context = await newContext(browser, deployments);
   try {
     const page = await context.newPage();
@@ -95,10 +101,16 @@ test("with the engine network cut at the worker, a repair changes nothing and th
     const damaged = await engineEntries(page);
     await page.reload();
     await refused(page);
+    const before = deployments.requests.length;
     deployments.failNetwork("engine");
     await repairButton(page).click();
     await expect(status(page)).toContainText(/Could not download the engine files\. Nothing was changed/);
     expect(await engineEntries(page), "nothing was written").toEqual(damaged);
+    const asked = deployments.requests.slice(before).filter((r) => r.path.startsWith("/engine/"));
+    expect(
+      asked.some((r) => r.path.endsWith(".wasm") || r.path.endsWith("BUILD.json")),
+      "Repair stopped at the first failed file",
+    ).toBe(false);
     await expect(repairButton(page)).toBeEnabled();
 
     deployments.failNetwork(null);
@@ -141,9 +153,11 @@ test("a stop screen takes a waiting build at once, and the damaged entry leaves 
       await expectEngineIs(deployments, page, "B");
     });
 
-    await test.step("the other tab kept the engine it loaded before the damage", async () => {
+    await test.step("the other tab, reloaded after the switch, lands on the second build's consistent set", async () => {
+      await other.reload();
+      await hostedGame(other);
       expect(await bootFailure(other)).toBeNull();
-      expect(await other.evaluate(() => !!(window as any).__vcEngine?.status.hosted)).toBe(true);
+      await expectEngineIs(deployments, other, "B");
     });
 
     await test.step("a cold start with no network runs the second build's engine", async () => {
@@ -153,6 +167,7 @@ test("a stop screen takes a waiting build at once, and the damaged entry leaves 
       expect(await bootFailure(page), "no fallback on the offline start").toBeNull();
       const record = await page.evaluate(async () => (await (await fetch("/engine/BUILD.json", { cache: "no-store" })).json()).package as string);
       expect(record).toBe(deployments.packageId.B);
+      await expectEngineIs(deployments, page, "B");
     });
   } finally {
     await context.close();
