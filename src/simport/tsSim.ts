@@ -3,6 +3,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { FacilityKind } from "../engine/types";
 import { findCatalogFacility } from "../engine/catalogTypes";
 import { towerCatalog } from "../engine/towerCatalog";
+import { roomUnits, structureRuns } from "../engine/tower/rooms";
 import { wellFormed as wellFormedText } from "../engine/wellFormed";
 import { settleEngine, stepGate } from "../wasmhost/stepGate";
 import { runBrush } from "./brush";
@@ -32,7 +33,11 @@ import type { HeaderView, SimView } from "./view";
  * per tower, so a new tower starts with none. The view hands out the live
  * tower and crowd, so a read copies nothing; the header is one small object
  * per read whose `population`, the one field that walks the rooms, is
- * computed only when read.
+ * computed only when read. `rooms` and `structure` are the engine's own
+ * lists, memoized per revision (`roomUnits` and `structureRuns`). On the
+ * TypeScript host the engine's per-step scans keep `roomUnits` warm; on the
+ * WASM hosts the instance does not step, so the first read of either after
+ * a revision move walks every unit once.
  *
  * Every command goes through a method or a field of the instance itself, the
  * ones the mirror host's relay (`relayCommands` in `src/dualrun/mirror.ts`)
@@ -48,10 +53,11 @@ import type { HeaderView, SimView } from "./view";
  * Engine types come in through `import type` only. The runtime edges into
  * `src/engine/` are the catalog handle (#921), which names the tower's
  * facility kinds and which the retirement inventory moves out of the engine,
- * and the text repair `wellFormed`, which retires with this adapter. The
- * panel answers (`tsPanels.ts`) call the engine's own functions, so that
- * module carries their runtime edge, with its reason in the frontend import
- * ratchet.
+ * and three that carry their reasons in the frontend import ratchet: the
+ * text repair `wellFormed`, the room list and structure runs above (from the
+ * engine's own memos), and the panel answers (`tsPanels.ts`, which call the
+ * engine's own functions). Those three retire with the adapter and the
+ * TypeScript engine, so they cost the retirement nothing.
  */
 export function createTsSim(getSim: () => Simulation): SimPort {
   /** Whether a value names a facility in the live tower's catalog. */
@@ -70,6 +76,12 @@ export function createTsSim(getSim: () => Simulation): SimPort {
     },
     get tower() {
       return getSim().tower;
+    },
+    get rooms() {
+      return roomUnits(getSim().tower);
+    },
+    get structure() {
+      return structureRuns(getSim().tower);
     },
     get crowd() {
       return getSim().crowd;
@@ -165,8 +177,18 @@ function readHeader(sim: Simulation): HeaderView {
     minuteOfDay: sim.clock.minuteOfDay,
     mode: sim.mode,
     modernCalendar: sim.modernCalendar,
+    sceneSeed: sim.rng.initialSeed,
     revision: sim.tower.revision,
     mealOverlayRevision: sim.tower.mealOverlayRevision,
+    // Copied, so a header kept across a step still shows one moment's counters.
+    fx: {
+      santaSeq: sim.santaFxSeq,
+      vipSeq: sim.vipFxSeq,
+      explosion: { ...sim.explosionFx },
+      thief: { ...sim.thiefFx },
+      treasure: { ...sim.treasureFx },
+    },
+    camera: sim.view,
   };
 }
 

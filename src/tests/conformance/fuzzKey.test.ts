@@ -27,6 +27,8 @@ function tree(): string {
   put("src/engine/a.test.ts", "export const t = 1;\n");
   put("scripts/fuzz-compare.ts", 'import { helper } from "../src/tests/helper";\nexport const c = helper;\n');
   put("scripts/fuzz-key.ts", "export {};\n");
+  put("scripts/fuzz-shrink.ts", "export {};\n");
+  put("scripts/fuzz-corpus.ts", "export {};\n");
   put("src/tests/helper.ts", "export const helper = 1;\n");
   put("scripts/wasm-build.ts", "export {};\n");
   put("scripts/build-engine-wasm.sh", "#!/bin/sh\n");

@@ -1,0 +1,674 @@
+{
+  "id": "smoke-modern-five-star",
+  "description": "A smoke entry, not a past divergence: fuzz seed 9315 (a Modern tower of 7 stories opened at 5 stars, 132 commands, with a clinic and other rooms the one-star start could never build) as the generator wrote it when the corpus began. It keeps the corpus job replaying a real fuzzer scenario on both engines.",
+  "start": {
+    "newGame": {
+      "seed": 9315,
+      "mode": "modern",
+      "star": 5
+    }
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 150,
+      "to": 230
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row2"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 3,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row3"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 4,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row4"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 5,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row5"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 6,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row6"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 7,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row7"
+    },
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 75,
+      "checkpointEvery": 18
+    },
+    {
+      "op": "checkpoint",
+      "label": "k1"
+    },
+    {
+      "op": "build",
+      "kind": "daycare",
+      "floor": 4,
+      "x": 178
+    },
+    {
+      "op": "checkpoint",
+      "label": "k2"
+    },
+    {
+      "op": "build",
+      "kind": "clinic",
+      "floor": 2,
+      "x": 194
+    },
+    {
+      "op": "checkpoint",
+      "label": "k3"
+    },
+    {
+      "op": "build",
+      "kind": "foodHall",
+      "floor": 2,
+      "x": 227,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k4"
+    },
+    {
+      "op": "evaluateStar"
+    },
+    {
+      "op": "checkpoint",
+      "label": "k5"
+    },
+    {
+      "op": "build",
+      "kind": "weddingHall",
+      "floor": 2,
+      "x": 195,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k6"
+    },
+    {
+      "op": "tick",
+      "dt": 20,
+      "times": 13,
+      "checkpointEvery": 3
+    },
+    {
+      "op": "checkpoint",
+      "label": "k7"
+    },
+    {
+      "op": "build",
+      "kind": "nightclub",
+      "floor": 1,
+      "x": 204,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k8"
+    },
+    {
+      "op": "adjustRent",
+      "floor": 2,
+      "x": 193,
+      "dir": 1,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k9"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 155,
+      "bottom": 4,
+      "top": 5
+    },
+    {
+      "op": "checkpoint",
+      "label": "k10"
+    },
+    {
+      "op": "adjustRent",
+      "floor": 7,
+      "x": 191,
+      "dir": -1,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k11"
+    },
+    {
+      "op": "build",
+      "kind": "partyHall",
+      "floor": 2,
+      "x": 192,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k12"
+    },
+    {
+      "op": "tick",
+      "dt": 3,
+      "times": 55,
+      "checkpointEvery": 13
+    },
+    {
+      "op": "checkpoint",
+      "label": "k13"
+    },
+    {
+      "op": "reload"
+    },
+    {
+      "op": "reload"
+    },
+    {
+      "op": "reload"
+    },
+    {
+      "op": "build",
+      "kind": "nightclub",
+      "floor": 7,
+      "x": 212,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k17"
+    },
+    {
+      "op": "adjustRent",
+      "floor": 7,
+      "x": 192,
+      "dir": 1,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k18"
+    },
+    {
+      "op": "sell",
+      "floor": 3,
+      "x": 160,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k19"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 221,
+      "bottom": 1,
+      "top": 5
+    },
+    {
+      "op": "checkpoint",
+      "label": "k20"
+    },
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 235,
+      "checkpointEvery": 58
+    },
+    {
+      "op": "checkpoint",
+      "label": "k21"
+    },
+    {
+      "op": "sell",
+      "floor": 5,
+      "x": 199,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k22"
+    },
+    {
+      "op": "evaluateStar"
+    },
+    {
+      "op": "checkpoint",
+      "label": "k23"
+    },
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 210,
+      "checkpointEvery": 52
+    },
+    {
+      "op": "checkpoint",
+      "label": "k24"
+    },
+    {
+      "op": "tick",
+      "dt": 20,
+      "times": 137,
+      "checkpointEvery": 3
+    },
+    {
+      "op": "checkpoint",
+      "label": "k25"
+    },
+    {
+      "op": "build",
+      "kind": "rentalStudio",
+      "floor": 5,
+      "x": 185
+    },
+    {
+      "op": "checkpoint",
+      "label": "k26"
+    },
+    {
+      "op": "adjustRent",
+      "floor": 6,
+      "x": 221,
+      "dir": -1,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k27"
+    },
+    {
+      "op": "setMoney",
+      "amount": -50000
+    },
+    {
+      "op": "checkpoint",
+      "label": "k28"
+    },
+    {
+      "op": "sell",
+      "floor": 1,
+      "x": 227,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k29"
+    },
+    {
+      "op": "build",
+      "kind": "fitnessClub",
+      "floor": 1,
+      "x": 154,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k30"
+    },
+    {
+      "op": "build",
+      "kind": "restaurant",
+      "floor": 2,
+      "x": 209,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k31"
+    },
+    {
+      "op": "build",
+      "kind": "cinema",
+      "floor": 6,
+      "x": 190,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k32"
+    },
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 114,
+      "checkpointEvery": 28
+    },
+    {
+      "op": "checkpoint",
+      "label": "k33"
+    },
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 89,
+      "checkpointEvery": 22
+    },
+    {
+      "op": "checkpoint",
+      "label": "k34"
+    },
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 191,
+      "checkpointEvery": 47
+    },
+    {
+      "op": "checkpoint",
+      "label": "k35"
+    },
+    {
+      "op": "build",
+      "kind": "housekeeping",
+      "floor": 2,
+      "x": 200,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k36"
+    },
+    {
+      "op": "reload"
+    },
+    {
+      "op": "build",
+      "kind": "hotelSingle",
+      "floor": 1,
+      "x": 167,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k38"
+    },
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 133,
+      "checkpointEvery": 33
+    },
+    {
+      "op": "checkpoint",
+      "label": "k39"
+    },
+    {
+      "op": "adjustRent",
+      "floor": 6,
+      "x": 189,
+      "dir": 1,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k40"
+    },
+    {
+      "op": "tick",
+      "dt": 3,
+      "times": 239,
+      "checkpointEvery": 20
+    },
+    {
+      "op": "checkpoint",
+      "label": "k41"
+    },
+    {
+      "op": "sell",
+      "floor": 7,
+      "x": 212
+    },
+    {
+      "op": "checkpoint",
+      "label": "k42"
+    },
+    {
+      "op": "tick",
+      "dt": 20,
+      "times": 22,
+      "checkpointEvery": 3
+    },
+    {
+      "op": "checkpoint",
+      "label": "k43"
+    },
+    {
+      "op": "bombThreat"
+    },
+    {
+      "op": "checkpoint",
+      "label": "k44"
+    },
+    {
+      "op": "build",
+      "kind": "hotelDouble",
+      "floor": 3,
+      "x": 224,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k45"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 220,
+      "bottom": 2,
+      "top": 6,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k46"
+    },
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 123,
+      "checkpointEvery": 30
+    },
+    {
+      "op": "checkpoint",
+      "label": "k47"
+    },
+    {
+      "op": "build",
+      "kind": "hotelDouble",
+      "floor": 5,
+      "x": 224,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k48"
+    },
+    {
+      "op": "tick",
+      "dt": 10,
+      "times": 178,
+      "checkpointEvery": 6
+    },
+    {
+      "op": "checkpoint",
+      "label": "k49"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 190,
+      "bottom": 1,
+      "top": 4,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k50"
+    },
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 58,
+      "checkpointEvery": 14
+    },
+    {
+      "op": "checkpoint",
+      "label": "k51"
+    },
+    {
+      "op": "sell",
+      "floor": 4,
+      "x": 215,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k52"
+    },
+    {
+      "op": "startFire"
+    },
+    {
+      "op": "checkpoint",
+      "label": "k53"
+    },
+    {
+      "op": "setMoney",
+      "amount": 3000000
+    },
+    {
+      "op": "checkpoint",
+      "label": "k54"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 221,
+      "bottom": 6,
+      "top": 7
+    },
+    {
+      "op": "checkpoint",
+      "label": "k55"
+    },
+    {
+      "op": "startFire",
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k56"
+    },
+    {
+      "op": "build",
+      "kind": "rentalStudio",
+      "floor": 5,
+      "x": 170
+    },
+    {
+      "op": "checkpoint",
+      "label": "k57"
+    },
+    {
+      "op": "build",
+      "kind": "amusements",
+      "floor": 2,
+      "x": 195,
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k58"
+    },
+    {
+      "op": "startFire",
+      "expectFail": true
+    },
+    {
+      "op": "checkpoint",
+      "label": "k59"
+    },
+    {
+      "op": "tick",
+      "dt": 1,
+      "times": 210,
+      "checkpointEvery": 52
+    },
+    {
+      "op": "checkpoint",
+      "label": "k60"
+    },
+    {
+      "op": "checkpoint",
+      "label": "end"
+    }
+  ]
+}

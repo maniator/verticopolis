@@ -30,9 +30,9 @@ import type { CrowdView, TowerView } from "../simport/view";
 export interface RenderSim {
   /** The tower's mode, which picks its catalog (`towerCatalog`). */
   readonly mode: GameMode;
-  /** The founding seed the scenery derives from; fixed for a tower's life. */
+  /** View: `header.sceneSeed`. The founding seed the scenery derives from; fixed for a tower's life. */
   readonly rng: { readonly initialSeed: number };
-  /** The saved camera. Read on construction and on `setSim` to restore it (`adoptCamera`); null means no saved view. */
+  /** View: `header.camera`. The saved camera. Read on construction and on `setSim` to restore it (`adoptCamera`); null means no saved view. */
   readonly view: SerializedView | null;
 
   /** View: `header.weather`. */
@@ -49,7 +49,7 @@ export interface RenderSim {
     queueView(tower: RenderTower): ElevatorQueueView;
   };
 
-  /** Effect counters: a change fires one visual. View proposal: `fx`. */
+  /** Effect counters: a change fires one visual. View: `header.fx`. */
   readonly santaFxSeq: number;
   readonly vipFxSeq: number;
   readonly explosionFx: { readonly floor: number; readonly x: number; readonly seq: number };
