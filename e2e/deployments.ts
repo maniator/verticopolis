@@ -48,8 +48,8 @@ export interface Deployments {
   failVersionJson(failing: boolean): void;
   /** Every path requested so far, in order, with the deployment that answered. */
   readonly requests: { path: string; from: Deployment }[];
-  /** The SHA-256 (hex) of each deployment's engine glue and binary as served. */
-  readonly digests: Record<Deployment, { glue: string; wasm: string }>;
+  /** The SHA-256 (hex) of each deployment's engine glue, binary and record as served. */
+  readonly digests: Record<Deployment, { glue: string; wasm: string; record: string }>;
   /** The engine package id each deployment's `BUILD.json` records. */
   readonly packageId: Record<Deployment, string>;
   /** The precache revision each deployment's `sw.js` records for each engine entry. */
@@ -158,8 +158,9 @@ function makeSecond(dist: string, into: string): { dir: string; packageId: strin
   return { dir, packageId: record.package };
 }
 
-function digestsOf(root: string): { glue: string; wasm: string } {
-  return { glue: sha256Hex(readFileSync(join(root, "engine", ENGINE_GLUE))), wasm: sha256Hex(readFileSync(join(root, "engine", ENGINE_WASM))) };
+function digestsOf(root: string): { glue: string; wasm: string; record: string } {
+  const read = (name: string) => sha256Hex(readFileSync(join(root, "engine", name)));
+  return { glue: read(ENGINE_GLUE), wasm: read(ENGINE_WASM), record: read("BUILD.json") };
 }
 
 function cacheControl(path: string): string {

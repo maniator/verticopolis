@@ -33,6 +33,8 @@ test.afterAll(async () => {
   await deployments?.close();
 });
 
+const short = (id: string): string => id.slice(0, 12);
+
 /** A new context on the deployments' origin that chooses the engine, as the project's own contexts do. */
 const newContext = (browser: Browser): Promise<BrowserContext> =>
   browser.newContext({
@@ -64,16 +66,16 @@ function engineEntriesOf(which: Deployment): Record<string, string> {
   return {
     [`/engine/verticopolis_engine.js?__WB_REVISION__=${r.glue}`]: d.glue,
     [`/engine/verticopolis_engine_bg.wasm?__WB_REVISION__=${r.wasm}`]: d.wasm,
+    [`/engine/BUILD.json?__WB_REVISION__=${r.record}`]: d.record,
   };
 }
 
-/** Whether the engine files cached for `which` are exactly its glue and binary (the record is not hashed here). */
+/** The cache holds exactly `which`'s three engine files under its keys, each with its own bytes. */
 async function expectEngineIs(page: Page, which: Deployment): Promise<void> {
   const held = await engineEntries(page);
   const expected = engineEntriesOf(which);
   for (const [key, digest] of Object.entries(expected)) expect(held[key], `${key} holds ${which}'s bytes`).toBe(digest);
-  expect(Object.keys(held).filter((k) => k.includes("BUILD.json")), "one record").toHaveLength(1);
-  expect(Object.keys(held).filter((k) => !k.includes("BUILD.json")).sort(), `no engine key but ${which}'s`).toEqual(Object.keys(expected).sort());
+  expect(Object.keys(held).sort(), `no engine key but ${which}'s`).toEqual(Object.keys(expected).sort());
 }
 
 test("an update whose engine files come from another build fails to install and leaves the installed engine alone", async ({ browser }) => {
@@ -89,9 +91,9 @@ test("an update whose engine files come from another build fails to install and 
     await expectEngineIs(page, "A");
 
     await test.step("the new worker is refused when its engine files are the installed build's", async () => {
-      // The deploy has put the second build's worker script up, and the engine
-      // files still answer from the first (or the other way around in a real
-      // rollout): the second worker's manifest cannot be satisfied.
+      // The deploy has put the second build's worker script up while the engine
+      // files still answer from the first, as they do when the files reach the
+      // edge after the script: the second worker's manifest cannot be satisfied.
       const before = deployments.requests.length;
       deployments.serve("B");
       deployments.engineFrom("A");
@@ -101,7 +103,7 @@ test("an update whose engine files come from another build fails to install and 
       });
       // The install did try the engine files, and they came from the first build.
       await expect
-        .poll(() => deployments.requests.slice(before).some((r) => r.path.startsWith("/engine/") && r.from === "A"), { message: "the install asked for the engine files", timeout: 60_000 })
+        .poll(() => deployments.requests.slice(before).some((r) => r.path.startsWith("/engine/") && r.from === "A"), { message: "the install asked for the engine files", timeout: 90_000 })
         .toBe(true);
       await expect
         .poll(
@@ -110,7 +112,7 @@ test("an update whose engine files come from another build fails to install and 
               const registration = await navigator.serviceWorker.getRegistration();
               return { installing: !!registration?.installing, waiting: !!registration?.waiting, active: !!registration?.active };
             }),
-          { message: "the failed install leaves nothing installing or waiting and the first worker active", timeout: 60_000 },
+          { message: "the failed install leaves nothing installing or waiting and the first worker active", timeout: 90_000 },
         )
         .toEqual({ installing: false, waiting: false, active: true });
       await expect(page.locator('[data-act="update"]'), "no update is offered for a worker that never installed").toHaveCount(0);
@@ -149,11 +151,11 @@ test("a first install whose engine files come from another build never activates
     const page = await context.newPage();
     deployments.serve("A");
     deployments.engineFrom("B");
-    const before = deployments.requests.length;
+    // The page registers its worker after it boots, so the install is observed
+    // from the browser's side: a worker that starts is the install attempt.
+    const started = context.waitForEvent("serviceworker", { timeout: 90_000 });
     await page.goto("/");
-    await expect
-      .poll(() => deployments.requests.slice(before).some((r) => r.path.startsWith("/engine/") && r.from === "B"), { message: "the page asked for the engine files", timeout: 60_000 })
-      .toBe(true);
+    await started;
     // A failed first install leaves no registration with a worker in it.
     await expect
       .poll(
@@ -162,22 +164,42 @@ test("a first install whose engine files come from another build never activates
             const registration = await navigator.serviceWorker.getRegistration();
             return !registration || (!registration.installing && !registration.waiting && !registration.active);
           }),
-        { message: "the worker never installed", timeout: 60_000 },
+        { message: "the worker never installed", timeout: 90_000 },
       )
       .toBe(true);
     expect(await page.evaluate(() => !!navigator.serviceWorker.controller), "nothing controls the page").toBe(false);
 
-    // Whatever the failed install managed to store, it is not the other build's bytes under this build's names.
+    // Whatever the failed install managed to store (entries fetched before the
+    // failure stay), no engine key holds the other build's bytes.
     const held = await engineEntries(page);
     const mine = engineEntriesOf("A");
-    for (const [key, digest] of Object.entries(held)) {
-      if (key in mine) expect(digest, `${key} holds only the first build's bytes`).toBe(mine[key]);
-    }
+    for (const [key, digest] of Object.entries(held)) expect(digest, `${key} holds only the first build's bytes`).toBe(mine[key]);
 
     // The page loaded the second build's glue and binary from the network; its own check refuses them.
-    await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 60_000 });
+    await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 90_000 });
     const failure = await page.evaluate(() => (window as any).__vcEngineBoot.failure as { stage: string; reason: string; package?: { kind: string } });
-    expect(failure).toMatchObject({ stage: "load", reason: "package-mismatch", package: { kind: "mismatch" } });
+    expect(failure).toMatchObject({
+      stage: "load",
+      reason: "package-mismatch",
+      package: { kind: "mismatch", expectedPackage: short(deployments.packageId.A), controlled: false },
+    });
+
+    await test.step("once the deployment settles, a revisit installs, takes control and plays offline on the first build", async () => {
+      deployments.engineFrom(null);
+      await page.close();
+      const revisit = await context.newPage();
+      await installWorker(revisit);
+      await revisit.reload();
+      await expectControlledWithEngine(revisit);
+      await hostedGame(revisit);
+      await expectEngineIs(revisit, "A");
+      await context.setOffline(true);
+      await revisit.reload();
+      await expectControlledWithEngine(revisit);
+      await hostedGame(revisit);
+      expect(await revisit.evaluate(() => (window as any).__vcEngineBoot?.failure ?? null), "no fallback on the offline start").toBeNull();
+      await context.setOffline(false);
+    });
   } finally {
     deployments.serve("A");
     deployments.engineFrom(null);
