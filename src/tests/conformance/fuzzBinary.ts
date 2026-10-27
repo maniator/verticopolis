@@ -20,7 +20,8 @@ export function binaryProblem(): string | null {
   return existsSync(FUZZ_BIN) ? null : `no fuzzer at ${FUZZ_BIN} (cargo build --release --features conformance --bin fuzz, in engine-rs/)`;
 }
 
-export function rustReplay(scenarioFile: string, outDir: string): RustReplay {
-  const r = spawnSync(FUZZ_BIN, ["--replay", scenarioFile, outDir], { encoding: "utf8", timeout: 120_000 });
+/** `timeoutMs` caps the run (default 120 s); a run that hits it reports code 3. */
+export function rustReplay(scenarioFile: string, outDir: string, timeoutMs: number = 120_000): RustReplay {
+  const r = spawnSync(FUZZ_BIN, ["--replay", scenarioFile, outDir], { encoding: "utf8", timeout: Math.max(1, Math.ceil(timeoutMs)) });
   return { code: r.status ?? 3, stderr: r.stderr ?? "" };
 }

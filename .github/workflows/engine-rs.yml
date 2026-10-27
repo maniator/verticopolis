@@ -49,6 +49,12 @@ on:
       - "package-lock.json"
       - ".nvmrc"
       - "vite.config.ts"
+      - "scripts/fuzz-compare.ts"
+      - "scripts/fuzz-corpus.ts"
+      - "scripts/fuzz-key.ts"
+      - "scripts/fuzz-shrink.ts"
+      - "tsconfig.json"
+      - ".github/workflows/engine-fuzz.yml"
       - ".github/workflows/engine-rs.yml"
   # Every PR runs this workflow, because engine-rs is a required check: a
   # path filter here would leave a PR that touches none of these files
@@ -142,6 +148,12 @@ jobs:
             case "$f" in package-lock.json) engine=true ;; esac
             case "$f" in .nvmrc) engine=true ;; esac
             case "$f" in vite.config.ts) engine=true ;; esac
+            case "$f" in scripts/fuzz-compare.ts) engine=true ;; esac
+            case "$f" in scripts/fuzz-corpus.ts) engine=true ;; esac
+            case "$f" in scripts/fuzz-key.ts) engine=true ;; esac
+            case "$f" in scripts/fuzz-shrink.ts) engine=true ;; esac
+            case "$f" in tsconfig.json) engine=true ;; esac
+            case "$f" in .github/workflows/engine-fuzz.yml) engine=true ;; esac
             case "$f" in .github/workflows/engine-rs.yml) engine=true ;; esac
           done < "$list"
           echo "engine=$engine" >> "$GITHUB_OUTPUT"

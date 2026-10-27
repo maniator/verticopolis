@@ -5,7 +5,8 @@
  *   (cd engine-rs && cargo build --release --features conformance --bin fuzz)
  *   npx tsx scripts/fuzz-corpus.ts [--budget <seconds>]
  * Exit 0 all entries agree, 1 a divergence, an engine refusal or the budget
- * ran out (default 480 s, under the job's ten-minute limit), 3 the harness
+ * ran out (default 480 s, under the job's ten-minute limit; an entry still
+ * running at the deadline is cut off, and a run that finishes late fails), 3 the harness
  * failed (no fuzzer, an unreadable entry, an empty corpus).
  */
 import { mkdtempSync, rmSync } from "node:fs";
@@ -44,7 +45,13 @@ try {
       failed.push(`${name} (over budget)`);
       continue;
     }
-    const rust = rustReplay(file, work);
+    const remainingMs = budget * 1000 - (Date.now() - started);
+    const rust = rustReplay(file, work, Math.min(120_000, remainingMs));
+    if (rust.code === 3 && Date.now() - started >= budget * 1000) {
+      console.log(`${name}: the Rust replay was cut off by the ${budget} s budget`);
+      failed.push(`${name} (over budget)`);
+      continue;
+    }
     if (rust.code !== 0) {
       console.log(`${name}: the Rust engine ${rust.code === 1 ? "stopped" : rust.code === 101 ? "panicked" : `failed (${rust.code})`}: ${rust.stderr.trim().split("\n").pop()}`);
       if (rust.code === 1 || rust.code === 101) failed.push(name);
@@ -62,6 +69,8 @@ try {
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
-const seconds = ((Date.now() - started) / 1000).toFixed(1);
+const elapsed = (Date.now() - started) / 1000;
+if (elapsed > budget && !failed.some((f) => f.endsWith("(over budget)"))) failed.push("(the last entry ran past the budget)");
+const seconds = elapsed.toFixed(1);
 console.log(`${files.length} corpus entries in ${seconds} s${failed.length ? `; failed: ${failed.join(", ")}` : ""}`);
 process.exit(failed.length ? 1 : harness ? 3 : 0);

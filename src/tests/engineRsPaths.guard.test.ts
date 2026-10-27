@@ -67,6 +67,14 @@ describe("engine-rs.yml engine path lists", () => {
     expect(casePaths(dropped)).not.toEqual(pushPaths(dropped));
   });
 
+  it("covers every input of the differential's window key, so the corpus job runs when one changes", async () => {
+    const { FUZZ_ENTRIES } = await import("./conformance/fuzzKey");
+    const inputs = [...FUZZ_ENTRIES, "tsconfig.json", ".github/workflows/engine-fuzz.yml", ".nvmrc", "package-lock.json"];
+    const matches = (file: string) =>
+      casePaths(yaml).some((p) => (p.endsWith("/*") ? file.startsWith(p.slice(0, -1)) : p === file));
+    for (const file of inputs) expect(matches(file), `${file} is not in the engine path lists`).toBe(true);
+  });
+
   it("requires the aggregate gate to include fuzz-corpus in its dependencies", () => {
     expect(yaml).toContain("needs: [changes, consumer, rust, wasm-binding, fuzz-corpus]");
   });
