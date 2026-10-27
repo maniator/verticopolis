@@ -3,6 +3,9 @@ import { Simulation } from "../engine/Simulation";
 import { markRoom, roomCounts, roomUnits, structureRuns } from "../engine/tower/rooms";
 import { mergeSimulation, mergeSimulationDelta } from "./merge";
 import { walkedStats } from "../tests/fixtures/walkedStats";
+import { rampUnits, roomUnits, structureRuns } from "../engine/tower/rooms";
+import { MID, lay, mustBuild, placeUnit } from "../tests/fixtures/towerFixtures";
+import { mergeSimulation } from "./merge";
 
 /** A tower with a lobby row, two offices and a shaft, ticked a little. */
 function tower(seed: number, mode: "classic" | "modern" = "classic"): Simulation {
@@ -262,5 +265,70 @@ describe("mergeSimulation", () => {
     mergeSimulationDelta(target, { rest: next, units: [office], transports: next.tower.transports }, { revision: target.tower.revision, mealOverlayRevision: 0 });
     expect(roomUnits(target.tower)).not.toBe(rooms);
     expect(target.stats()).toMatchObject({ ...walkedStats(target), offices: before.offices - 1, condos: before.condos + 1 });
+  it("keeps the ramp index and the stop lists the congestion map reads in step with the engine", () => {
+    // The render reads both every frame from the instance the host merges into.
+    const target = parkingTower();
+    const fresh = parkingTower();
+    const shaft = target.tower.transports[0];
+    const [oldRamp] = rampUnits(target.tower);
+    expect(target.tower.stopsOf(shaft)).toEqual([0, 1, 2, 3, 4]);
+    expect(target.tower.functionalParkingSet().size).toBe(1);
+    // The engine rebuilds the ramp in place (a new id, the same unit count),
+    // adds a second one, and drops a stop.
+    fresh.tower.removeUnit(oldRamp.id);
+    const rebuilt = placeUnit(fresh, "parkingRamp", 0, MID);
+    const added = placeUnit(fresh, "parkingRamp", 0, MID - 40);
+    expect(fresh.tower.setStop(shaft.id, 3, false)).toBe(true);
+    const marks = { revision: fresh.tower.revision, mealOverlayRevision: fresh.tower.mealOverlayRevision };
+    mergeSimulation(target, Simulation.deserialize(fresh.serialize()), marks);
+    expect(rampUnits(target.tower).map((u) => u.id)).toEqual([rebuilt.id, added.id]);
+    expect([...target.tower.functionalParkingSet()]).toEqual([...fresh.tower.functionalParkingSet()]);
+    expect(target.tower.stopsOf(target.tower.transports[0])).toEqual([0, 1, 2, 4]);
+
+    // And a bulldoze: the next merge drops the second ramp and restores the stop.
+    const next = Simulation.deserialize(fresh.serialize());
+    next.tower.removeUnit(added.id);
+    expect(next.tower.setStop(shaft.id, 3, true)).toBe(true);
+    mergeSimulation(target, Simulation.deserialize(next.serialize()), {
+      revision: next.tower.revision,
+      mealOverlayRevision: next.tower.mealOverlayRevision,
+    });
+    expect(rampUnits(target.tower).map((u) => u.id)).toEqual([rebuilt.id]);
+    expect(target.tower.stopsOf(target.tower.transports[0])).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it("rebuilds the ramp index with the rooms list when the engine's revision repeats a kept one", () => {
+    // The engine counts its revision from its own load, so it can hand back
+    // one the lists were kept at while its units changed (#1253).
+    const target = parkingTower();
+    const fresh = parkingTower();
+    const held = target.tower.revision;
+    const [oldRamp] = rampUnits(target.tower);
+    const rooms = roomUnits(target.tower);
+    fresh.tower.removeUnit(oldRamp.id);
+    const rebuilt = placeUnit(fresh, "parkingRamp", 0, MID);
+    expect(fresh.tower.units.length).toBe(target.tower.units.length);
+    mergeSimulation(target, Simulation.deserialize(fresh.serialize()), {
+      revision: held,
+      mealOverlayRevision: fresh.tower.mealOverlayRevision,
+    });
+    expect(target.tower.revision).toBe(held);
+    expect(roomUnits(target.tower)).not.toBe(rooms);
+    expect(rampUnits(target.tower).map((u) => u.id)).toEqual([rebuilt.id]);
+    expect([...target.tower.functionalParkingSet()]).toEqual([...fresh.tower.functionalParkingSet()]);
   });
 });
+
+/** A tower with a parking ramp and a space beside it in the basement, and a
+ *  shaft from the basement to floor 4. */
+function parkingTower(): Simulation {
+  const sim = Simulation.newGame(13);
+  sim.money = 1e12;
+  sim.star = 3; // parking unlocks at 3 stars
+  lay(sim, "lobby", 1);
+  for (const f of [0, 2, 3, 4]) lay(sim, "floor", f);
+  placeUnit(sim, "parkingRamp", 0, MID);
+  placeUnit(sim, "parking", 0, MID + 16);
+  mustBuild(sim, "elevatorStandard", MID + 60, 0, 4);
+  return sim;
+}

@@ -29,7 +29,7 @@ import { SPEEDS, applySpeed } from "./game/frameLoop";
 import { placeSimpleBuild, updateBuildPreview, isTransportTool, pickedAt, clearBuildRefusal } from "./game/buildPreview";
 import { toggleMute, setVolume, toggleReducedMotion, toggleSteadyClock, isSteadyClock, applyReducedMotion } from "./game/audioPrefs";
 import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot } from "./game/appModals";
-import { updateTraffic } from "./game/trafficHud";
+import { refreshTraffic } from "./game/trafficHud";
 import { onUpdateAvailable } from "./game/updateFlow";
 import { bootGame } from "./bootstrap";
 import { gameplaySession } from "./analytics";
@@ -55,7 +55,7 @@ import type { SimPort } from "./simport/port";
  * and VC_TOOLING=1 builds only (bootstrap.ts gates the publish; production
  * bundles carry none): the public fields (sim, engine, speed, grid) plus, via
  * any-cast, `selectPicked`, `selected`, `refreshEditor`, `onUpdateAvailable`,
- * `setSpeed`, `onboarding.dismissSplash` and `updateTraffic` (the last pins the
+ * `setSpeed`, `onboarding.dismissSplash` and `refreshTraffic` (the last pins the
  * traffic chip); renaming any needs every consumer updated (TypeScript won't catch it).
  */
 class GameApp implements GameAppPorts {
@@ -81,11 +81,8 @@ class GameApp implements GameAppPorts {
     dinner: -1,
   };
   /** @internal */ lastUiUpdate = 0;
-  /** Throttle for the per-frame error log, so a repeating throw can't spam.
-   *  @internal */
-  lastTickErrorLog = 0;
-  /** The last few tick-guard failures, kept for the crash report (the guard
-   *  swallows them to keep the game alive, which otherwise erases the trail).
+  /** The last few failures the frame guard and the traffic chip swallowed to
+   *  keep the game alive, kept for the crash report (game/frameErrors.ts).
    *  @internal */
   frameErrors: FrameErrorEntry[] = [];
   /** @internal */ shownWin = false;
@@ -360,11 +357,12 @@ class GameApp implements GameAppPorts {
   /** @internal */ isTransportTool(): boolean { return isTransportTool(this); }
   /** @internal */ updateBuildPreview(tile: number, floor: number): void { updateBuildPreview(this, tile, floor); }
   /** @internal */ pickedAt(floor: number, tile: number): Picked | null { return pickedAt(this, floor, tile); }
-  /** Refresh the traffic HUD chip. Body in game/trafficHud.ts; kept a method on
-   *  the instance because the screenshot tooling (scripts/scenes/features.ts and
-   *  screenshot-page-ops.ts) calls `window.game.updateTraffic()` to pin the chip
-   *  into its jammed state before capturing. @internal */
-  updateTraffic(): void { updateTraffic(this); }
+  /** Refresh the traffic HUD chip. Settles once the answer is drawn or dropped
+   *  (overtaken, or about a replaced tower), and rejects if a failure was not
+   *  dropped. Body in game/trafficHud.ts; a method on the instance because the
+   *  screenshot tooling (scripts/scenes/features.ts, screenshot-page-ops.ts)
+   *  awaits `window.game.refreshTraffic()` to pin the chip. @internal */
+  refreshTraffic(): Promise<void> { return refreshTraffic(this); }
 
   // ---- PWA update ---------------------------------------------------------
 
@@ -470,6 +468,7 @@ class GameApp implements GameAppPorts {
       // undo trail; otherwise Undo could resurrect an unrelated old tower and a
       // later autosave persist it. Undo/redo restores pass preserveHistory.
       this.history.clear();
+      this.lastTrafficTier = 0; // the chip's hysteresis starts over on another tower
     }
   }
 
