@@ -1,0 +1,34 @@
+{
+  "id": "sell-ground-lobby",
+  "description": "Selling the permanent ground lobby is refused by both engines, and the refused sell leaves the tower untouched. The fuzzer's tuning ops first reported a refusal as an error here; the runner now takes expectFail on sell. Found by the seeded differential in #1229.",
+  "start": {
+    "newGame": {
+      "seed": 9103,
+      "mode": "classic"
+    }
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 160,
+      "to": 220
+    },
+    {
+      "op": "sell",
+      "floor": 1,
+      "x": 170,
+      "expectFail": true
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 2
+    }
+  ]
+}

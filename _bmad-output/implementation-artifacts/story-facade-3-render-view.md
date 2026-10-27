@@ -1,6 +1,6 @@
 # Story facade.3: The renderer and HUD read the view (3a types, 3b frame data)
 
-Status: in progress (3a-1 is PR #1291; 3a-2 next; 3b waits for gates)
+Status: in progress (3a-1 merged as #1291; 3a-2a is the RenderSim PR; clockView, view.fx and view.camera next; 3b waits for gates)
 
 Slice 3 of the Rust-backed facade
 (`_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/slice-plan.md`),
@@ -201,3 +201,47 @@ Slice 3 adds the `view.ts` lines, the `TsSim` fills and assertions in its own fi
   missed file (`towerReconcile.ts`), a mangled section banner in
   `sprites/transport.ts`, a stale doc comment and the mapping-table gaps
   above. All are fixed in this PR.
+
+## 3a-2a notes (RenderSim)
+
+- `src/render/renderSim.ts` lists every read the renderer makes of the
+  simulation, grouped by call frequency. `TowerEngine.sim`, `setSim`,
+  `bindSceneWorld` and the scenery record are typed by it; the live
+  `Simulation` satisfies it (`renderSim.types.test.ts`), so `main.ts` is
+  unchanged. `renderSim.guard.test.ts` keeps `Simulation` out of every
+  production source under `src/render`.
+- Typing the sim as `RenderSim` made the compiler report one read the views
+  lacked: `towerInputCamera` filters people by their discrete `floor`.
+  `PersonView` gains `floor` (the live `Person` already has it). The Rust
+  frame must carry the discrete floor beside `fy`; this goes to the facade
+  lane for the 6a frame.
+- `TowerEngine.ts` was at the 500-line ceiling, so the frame prelude
+  (decorative clock, event visuals, lighting, sky) moved to `towerFrame.ts`
+  with the same step order.
+- The `RenderSim` members for effects, usage, reachability and the frame
+  slices are the live engine's own today. Each moves behind a view member as
+  the facade lane adds it.
+- `RenderSim` does not extend `SimView`: it keeps the live engine's flat
+  member names (`weather`, `population`, `clock`) so `main.ts` is unchanged,
+  and its comments name the `SimView` member each one stands for. The
+  stand-ins are `mode` (with the catalog handle, per the lane decision that
+  there is no `view.catalog`), `rng.initialSeed` (until `HeaderView.sceneSeed`
+  exists), `view` (the saved `SerializedView` until `view.camera` exists) and
+  the effect counters (until `view.fx` exists). Each is replaced by its view
+  member when the facade lane adds it.
+- The type test assigns the live `Simulation`. A test over `TsSim` comes with
+  the first step that reads through the view instead of the instance.
+
+## 3a-2b notes (clock helper)
+
+- `src/simport/clockView.ts` adds `ClockReads`, the renderer's clock reads
+  (`hour`, `minute`, `minuteOfDay`, `isMorning`, `isEvening`, `isNight`)
+  derived from `header.minutes`. `clockView.test.ts` pins every minute from
+  two days before the start to four days after against `Clock`, so the windows
+  cannot drift, and checks the class is a `RenderClock`.
+- It is a reusable object (`set(header)`, then read) so a frame reads the clock
+  with no allocation. `headerClock.ts` (slice 4) builds a full `Clock` for the
+  panels, which suits a once-per-tick read; the renderer reads per frame, so it
+  gets the cheaper form.
+- Nothing reads it yet. The loop binding swaps `RenderSim.clock` for it when
+  `main.ts` hands the renderer a view.

@@ -3,13 +3,15 @@
 //! its `expectFail`), then write the scenario and the Rust checkpoints so
 //! `scripts/fuzz-compare.ts` can replay it on the TypeScript engine and name
 //! the first divergence. Usage: fuzz <seed> <out-dir> [commands]
+//! The shrinker and the corpus replay use the other form: fuzz --replay
+//! <scenario.json> <out-dir> runs a given scenario and writes the same records.
 
 use std::path::PathBuf;
 
 use serde_json::{json, Value};
 use verticopolis_engine::facilities::{is_lobby_floor, Kind, FACILITIES};
 use verticopolis_engine::rng::Rng;
-use verticopolis_engine::scenario::{run_scenario, run_scenario_detailed, RunError, Scenario};
+use verticopolis_engine::scenario::{run_scenario, run_scenario_detailed, Run, RunError, Scenario};
 
 const LEFT: i64 = 150;
 const RIGHT: i64 = 230;
@@ -24,8 +26,78 @@ fn write_failed(out: &std::path::Path, id: &str, scenario: &Value) {
     );
 }
 
+/// Write a run's checkpoints and details beside each other, named for the
+/// scenario id, in the form `scripts/fuzz-compare.ts` reads.
+fn write_records(out: &std::path::Path, id: &str, run: &Run, details: &impl serde::Serialize) {
+    if let Err(e) = try_write_records(out, id, run, details) {
+        // A failed write is bad input or a full disk, not an engine panic.
+        eprintln!("{}: cannot write the records: {e}", out.display());
+        std::process::exit(2);
+    }
+}
+
+fn try_write_records(
+    out: &std::path::Path,
+    id: &str,
+    run: &Run,
+    details: &impl serde::Serialize,
+) -> Result<(), Box<dyn std::error::Error>> {
+    std::fs::create_dir_all(out)?;
+    let checkpoints: Vec<Value> = run
+        .checkpoints
+        .iter()
+        .map(|c| json!({"label": c.label, "state": c.state, "crowd": c.crowd, "events": c.events}))
+        .collect();
+    std::fs::write(
+        out.join(format!("{id}.rs.json")),
+        serde_json::to_string_pretty(&checkpoints)?,
+    )?;
+    std::fs::write(
+        out.join(format!("{id}.rs.detail.json")),
+        serde_json::to_string(details)?,
+    )?;
+    Ok(())
+}
+
+/// `fuzz --replay <scenario.json> <out-dir>`: run a scenario that was not just
+/// grown (a shrinker's candidate, a corpus entry) and write its records as
+/// `<scenario id>.rs.json` and `.rs.detail.json`. Exit 1 when the Rust engine
+/// refuses it, so the caller can tell an invalid candidate from a divergence.
+fn replay(args: &[String]) {
+    let [file, out] = args else {
+        eprintln!("usage: fuzz --replay <scenario.json> <out-dir>");
+        std::process::exit(2);
+    };
+    let text = std::fs::read_to_string(file).unwrap_or_else(|e| {
+        eprintln!("{file}: {e}");
+        std::process::exit(2);
+    });
+    let scenario = Scenario::parse(&text).unwrap_or_else(|e| {
+        eprintln!("{file}: {e}");
+        std::process::exit(2);
+    });
+    let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("conformance");
+    let (run, details) = run_scenario_detailed(&scenario, &suite);
+    if let Some(e) = run.error {
+        eprintln!("{file}: the Rust engine stopped: {e:?}");
+        std::process::exit(1);
+    }
+    let stem = std::path::Path::new(file)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("replay");
+    write_records(std::path::Path::new(out), stem, &run, &details);
+    println!("{file}: {} checkpoints", run.checkpoints.len());
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("--replay") {
+        replay(&args[1..]);
+        return;
+    }
     if args.len() < 2 {
         eprintln!("usage: fuzz <seed> <out-dir> [commands]");
         std::process::exit(2);
@@ -272,25 +344,11 @@ fn main() {
         serde_json::to_string_pretty(&scenario_value(&commands)).unwrap(),
     )
     .unwrap();
-    let checkpoints: Vec<Value> = final_run
-        .checkpoints
-        .iter()
-        .map(|c| json!({"label": c.label, "state": c.state, "crowd": c.crowd, "events": c.events}))
-        .collect();
-    std::fs::write(
-        out.join(format!("{id}.rs.json")),
-        serde_json::to_string_pretty(&checkpoints).unwrap(),
-    )
-    .unwrap();
-    std::fs::write(
-        out.join(format!("{id}.rs.detail.json")),
-        serde_json::to_string(&details).unwrap(),
-    )
-    .unwrap();
+    write_records(&out, &id, &final_run, &details);
     println!(
         "{id}: {} commands, {} checkpoints, written to {}",
         commands.len(),
-        checkpoints.len(),
+        final_run.checkpoints.len(),
         scenario_path.display()
     );
 }

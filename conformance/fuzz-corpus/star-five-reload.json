@@ -1,0 +1,44 @@
+{
+  "id": "star-five-reload",
+  "description": "A new game forced to five stars, then reloaded. The two engines once differed in the milestones a reload grants (the start did not adopt the ones a load of that star would), which the seeded differential found on 12 of its first 40 star-drawing seeds. Found by the seeded differential and fixed in #1256.",
+  "start": {
+    "newGame": {
+      "seed": 9102,
+      "mode": "classic",
+      "star": 5
+    }
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 160,
+      "to": 220
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 161,
+      "to": 219
+    },
+    {
+      "op": "checkpoint",
+      "label": "built"
+    },
+    {
+      "op": "reload"
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 4,
+      "checkpointEvery": 2
+    }
+  ]
+}

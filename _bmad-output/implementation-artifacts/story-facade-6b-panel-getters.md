@@ -48,8 +48,8 @@ the star-gate sentences), exactly as the plan says for the diagnostics family.
    labels and descriptions.
 3. **AC3 Differential against TypeScript.** For every conformance scenario,
    at every checkpoint, each getter's JSON equals the TypeScript reference
-   (`src/tests/conformance/panelReference.ts`, built only from the functions in
-   the table above) after the same normalization on both sides. The test runs
+   (`src/simport/tsPanels.ts`, slice 4a's one TypeScript definition of each
+   panel answer, built only from the functions in the table above) after the same normalization on both sides. The test runs
    the scenario on each engine independently (the lock already proves the two
    agree at every checkpoint) so transient state such as elevator telemetry and
    the housekeeping report is the engine's own. It reports, per getter, how
@@ -177,13 +177,14 @@ Sonnet 5.5 (high)
   speed, so `statsReport` and the three overlays go on the slice 9 PC list
   (#1220) at top speed; a frame-time or long-task impact makes the fix required
   before 50/50.
-- **Gate on per-tick callers (independent review, 2026-10-21).** `tower_stats`
-  and `peak_congestion_hotspot` run per UI tick once the HUD reads them, and
-  they still pay `highest_floor` / `lowest_floor` (two walks over all units,
-  no `floorBounds` cache, A11) and `functional_parking_set` (a walk over all
-  units to seed the flood). No PR may give either a per-tick caller (slice 4
-  #1211, slice 7 #1217) until those two #1237 items are on `main`, or Naftali
-  accepts the deferral on that PR.
+- **Gate on per-tick callers (independent review, 2026-10-21): lifted by #1237's
+  change on `main` (a403beac).** `tower_stats` and `peak_congestion_hotspot` were
+  not to get a per-tick caller (slice 4 #1211, slice 7 #1217) until
+  `highest_floor` / `lowest_floor` read a revision-keyed floor-bounds memo (A11)
+  and the parking flood seeded from the room index. Both are on `main` now. The
+  wrapper commit's medians below are the first reading with them; the PC list
+  (#1220) still decides whether `stats_report` and the overlays hold at top
+  speed on the large tower.
 - **For the binding and slice 4.** The wrappers bind eight methods; the five
   small getters (`next_star_requirements`, `milestone_progress`,
   `next_star_threshold`, `income_breakdown`, `elevator_stats`) are reached
@@ -212,6 +213,23 @@ Sonnet 5.5 (high)
 ### File List
 
 - `engine-rs/src/panels/` (new): the getters and their native tests
-- `src/tests/conformance/panelReference.ts`, `panelProbe.ts`: the TypeScript reference and the probe
+- `src/tests/conformance/panelProbe.ts`: the probe; the TypeScript side is slice 4a's `src/simport/tsPanels.ts`
 - `src/tests/integration/panelGettersWasm.integration.test.ts`, `panelGettersCost.integration.test.ts`
-- Wrappers, `engine.d.ts`, binding tiers and the crate bump: after slice 6a
+- `engine-rs/src/wasm.rs` (eight wrappers before the test module), `src/dualrun/engine.d.ts`, `binding.ts`, `exportTiers.ts`, the `test:wasm` and `engine-rs.yml` path lists, and the crate bump to 0.8.0 with `engine:compat`
+
+### Wrapper commit (2026-10-27)
+
+Bound on top of main (6d's block is there; 6a's is not, and the block sits
+before `wasm.rs`'s test module so the two keep both). The differential now
+reads its TypeScript side from `src/simport/tsPanels.ts` and the gate ids from
+`StarRequirement.id`, both from slice 4a (#1313).
+
+- Differential, all conformance scenarios, one probe per checkpoint:
+  611 checkpoints, 10,507 unit cards, 4,738 shaft cards, 508,408 heat cells,
+  739 stranded-floor readings, 23 checkpoints with an infested room, 489 with a
+  shaft of 2+ cars. All equal (1e-12 on `severity` only).
+- Cost, WASM under Node on a cloud sandbox (indicative; the PC decides gates),
+  large tower, ms: `towerStats` 0.03, `statsReport` 0.46 (2.0 before #1237),
+  `peakCongestionHotspot` 0.24, congestion overlay 1.02, occupancy 0.83,
+  satisfaction 1.05, cleanliness 0.02, `unitDetail` 0.01.
+- Crate 0.7.0 to 0.8.0; `npm run engine:compat` rerun.
