@@ -1,8 +1,9 @@
-//! `ElevatorDispatch` as it was before the flags and the floor lists (#1143
-//! item 5, A20 in #1158), kept so `dispatch_tests.rs` can pin byte identity
-//! step for step. Test-only: `dispatch_tests.rs` mounts it.
+//! `ElevatorDispatch` as it was before #1143 item 5 (A20 in #1158): hashed
+//! `calls` and `claimed` sets, a full scan per car and per-call rebuilds of
+//! the floor lists. Kept so `dispatch_tests.rs` can pin byte identity step
+//! for step. Test-only: `dispatch_tests.rs` mounts it.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use indexmap::IndexMap;
 
@@ -10,7 +11,7 @@ use super::super::*;
 use crate::schedule::Schedule;
 use crate::tower::Tower;
 
-/// `ElevatorDispatch` as it was before the flags, kept to pin byte identity.
+/// `ElevatorDispatch` as it was before #1143 item 5, kept to pin byte identity.
 #[derive(Default)]
 pub(super) struct Reference {
     pub(super) car_dwell: HashMap<i64, Vec<f64>>,
@@ -222,7 +223,7 @@ fn ref_next(
     dir: i64,
     calls: &HashSet<i64>,
     claimed: &HashSet<i64>,
-    cab: Option<&HashSet<i64>>,
+    cab: Option<&BTreeSet<i64>>,
 ) -> Option<i64> {
     let (mut best, mut best_dist) = (None, f64::INFINITY);
     for &fl in stops {

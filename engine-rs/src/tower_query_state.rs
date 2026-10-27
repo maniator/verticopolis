@@ -1,3 +1,9 @@
+//! The tower's memo slots and the unit state predicates (`types.ts`), moved
+//! out of `tower_query.rs` to bring that file under the 500-line ceiling. The
+//! queries that fill the slots live in `tower_query.rs` and `tower_index.rs`;
+//! each slot is keyed on the revision (or the `IndexKey`) it was built at,
+//! and `Tower::reindex` resets them all.
+
 use std::collections::{HashMap, HashSet};
 
 use crate::tower::{Unit, UnitState};
@@ -22,6 +28,8 @@ pub struct Memo {
     )>,
     pub floors: crate::tower_index::FloorsMemo,
 }
+
+// ---- unit state predicates (types.ts) --------------------------------------
 
 impl Unit {
     pub fn is_operational(&self) -> bool {

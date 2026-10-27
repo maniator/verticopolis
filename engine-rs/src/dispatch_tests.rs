@@ -1,8 +1,8 @@
-//! Tests for `dispatch.rs`: the flagged stops, the ordered waiting map and
+//! Tests for `dispatch.rs`: the stop bit sets, the ordered waiting map and
 //! the per-revision floor lists answer exactly as the hashed sets and the
 //! per-call rebuilds did (#1143 item 5, A20 and A10 in #1158).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use indexmap::IndexMap;
 
@@ -17,6 +17,10 @@ use crate::tower::{PlaceResult, Tower, UnitState};
 #[path = "dispatch_reference_tests.rs"]
 mod reference;
 use reference::Reference;
+
+#[cfg(test)]
+#[path = "dispatch_search_tests.rs"]
+mod search;
 
 /// A small deterministic generator for the scenario's inputs.
 struct Lcg(u64);
@@ -40,6 +44,28 @@ fn must(placed: PlaceResult) -> i64 {
 /// other floor (floor 22's sit above every passenger stop, so they are
 /// unserved), a cinema, and four shafts: a standard to floor 15, an express,
 /// a service car and a scheduled standard from the sky lobby up.
+/// Where `tall_scenario` puts its tall express shaft.
+const TALL_X: i64 = 172;
+
+/// `scenario` with an express shaft from floor 1 to floor 80 beside the
+/// others, so its stops run past one 64-bit word.
+fn tall_scenario() -> Tower {
+    let mut tower = scenario();
+    for floor in 23..=80 {
+        for x in 168..184 {
+            must(tower.place(Kind::Floor, floor, x));
+        }
+    }
+    let tall = must(tower.place_transport(Kind::ElevatorExpress, TALL_X, 1, 80));
+    let t = tower.transports.iter_mut().find(|t| t.id == tall).unwrap();
+    t.cars = 8;
+    // Spread up the shaft: a car finds its nearest call, so cars that all
+    // start at the bottom would never reach the second word.
+    t.car_positions = (0..8).map(|i| 1.0 + 11.0 * i as f64).collect();
+    t.car_dir = vec![0; 8];
+    tower
+}
+
 fn scenario() -> Tower {
     let mut tower = Tower::new();
     let lobby = Kind::Lobby.facility().width as usize;
@@ -147,7 +173,7 @@ fn assert_same(tower: &Tower, d: &ElevatorDispatch, rt: &Tower, r: &Reference, a
 }
 
 /// Cars about to sit out a whole chunk dwelling on a floor their shaft no
-/// longer stops at: the claim the reference keeps there and the flags drop.
+/// longer stops at: the claim the reference keeps there and the bit sets drop.
 fn dwelling_off_a_stop(tower: &Tower, d: &ElevatorDispatch, chunk: f64) -> usize {
     let mut n = 0;
     for t in tower.transports.iter().filter(|t| t.kind.is_elevator()) {
@@ -189,11 +215,12 @@ fn drop_a_stop(towers: [&mut Tower; 2], d: &ElevatorDispatch, rng: &mut Lcg) -> 
 
 #[test]
 fn dispatch_matches_the_hashed_reference_step_for_step() {
-    let (mut tower, mut rt) = (scenario(), scenario());
+    let (mut tower, mut rt) = (tall_scenario(), tall_scenario());
     let (mut d, mut r) = (ElevatorDispatch::new(), Reference::default());
     let mut rng = Lcg(0x1143_0005);
     let mut dropped: Vec<(i64, i64)> = Vec::new();
     let (mut off_stop, mut empty_steps, mut tallies, mut calls_up) = (0, 0, 0, 0);
+    let mut second_word = 0;
     for step in 0..3000 {
         let mut stir_rng = Lcg(rng.0);
         stir(&mut tower, &mut stir_rng);
@@ -228,9 +255,10 @@ fn dispatch_matches_the_hashed_reference_step_for_step() {
             }
         }
         if step == 1500 || step == 2100 {
-            // The express first, then the shaft added at step 900.
+            // The short express first, then the shaft added at step 900.
             for tw in [&mut tower, &mut rt] {
-                let id = tw.transports[if step == 1500 { 1 } else { 3 }].id;
+                let x = if step == 1500 { 188 } else { 212 };
+                let id = tw.transports.iter().find(|t| t.x == x).unwrap().id;
                 assert!(tw.remove_transport(id).is_some());
             }
         }
@@ -249,6 +277,9 @@ fn dispatch_matches_the_hashed_reference_step_for_step() {
             left -= chunk;
         }
         assert_same(&tower, &d, &rt, &r, step);
+        // A tall-shaft car past its 64th stop works in the second word.
+        let tall = tower.transports.iter().find(|t| t.x == TALL_X).unwrap();
+        second_word += usize::from(tall.car_positions.iter().any(|p| *p >= 65.0));
         calls_up += usize::from(d.waiting.values().any(|w| *w >= 1.0));
         if step % 30 == 29 {
             let ours: Vec<_> = sorted_tally(d.drain_boardings());
@@ -260,10 +291,14 @@ fn dispatch_matches_the_hashed_reference_step_for_step() {
             tallies += usize::from(!ours.is_empty());
         }
     }
-    // The scenario reaches the paths the flags replaced.
+    // The scenario reaches the paths the bit sets replaced.
     assert!(calls_up > 0, "the estimate never raised a call");
     assert!(off_stop > 0, "no car dwelt on a dropped stop");
     assert!(empty_steps > 0 && tallies > 0);
+    assert!(
+        second_word > 0,
+        "no car reached the tall shaft's second word"
+    );
 }
 
 type Tally = Vec<(i64, Vec<(i64, u64)>)>;
@@ -367,73 +402,4 @@ fn a_removed_shaft_loses_its_dwell_timers() {
             .filter(|t| t.kind.is_elevator())
             .count()
     );
-}
-
-/// The scan `next_demand_stop` replaced: every stop, first strict minimum.
-fn scan_every_stop(
-    stops: &[i64],
-    flags: &[u8],
-    pos: f64,
-    dir: i64,
-    cab: Option<&HashSet<i64>>,
-) -> Option<i64> {
-    let mut best: Option<i64> = None;
-    let mut best_dist = f64::INFINITY;
-    for (k, &fl) in stops.iter().enumerate() {
-        let f = fl as f64;
-        if (dir > 0 && f <= pos + 0.05) || (dir < 0 && f >= pos - 0.05) {
-            continue;
-        }
-        if flags[k] & (CALL | CLAIMED) != CALL && !cab.is_some_and(|c| c.contains(&fl)) {
-            continue;
-        }
-        let dist = (f - pos).abs();
-        if dist < best_dist {
-            best_dist = dist;
-            best = Some(fl);
-        }
-    }
-    best
-}
-
-#[test]
-fn the_stop_walk_finds_what_the_full_scan_found() {
-    let mut rng = Lcg(0x1143_5005);
-    // Far positions round distances together; the scan kept the lowest floor.
-    let odd = [f64::NAN, f64::INFINITY, -f64::INFINITY, 1e300, -1e300, 1e17];
-    let mut found = 0;
-    for case in 0..20_000 {
-        let (bottom, len) = (rng.next(12) as i64 - 10, rng.next(40) as usize + 1);
-        let mut stops: Vec<i64> = (bottom..bottom + 2 * len as i64)
-            .filter(|_| rng.next(3) > 0)
-            .collect();
-        if stops.is_empty() {
-            stops.push(bottom);
-        }
-        let flags: Vec<u8> = stops.iter().map(|_| rng.next(4) as u8).collect();
-        let cab: HashSet<i64> = stops.iter().copied().filter(|_| rng.next(6) == 0).collect();
-        let cab = (rng.next(2) == 0).then_some(&cab);
-        let pos = if case % 50 == 0 {
-            odd[rng.next(odd.len() as u64) as usize]
-        } else {
-            // On a stop, a hair either side of one, or anywhere in the span.
-            let fl = stops[rng.next(stops.len() as u64) as usize] as f64;
-            match rng.next(4) {
-                0 => fl,
-                1 => fl + 0.05,
-                2 => fl - 0.05 + rng.next(3) as f64 * 0.025,
-                _ => bottom as f64 - 2.0 + rng.next(1000) as f64 * 0.1,
-            }
-        };
-        for dir in [1, -1, 2] {
-            let walked = next_demand_stop(&stops, &flags, pos, dir, cab);
-            assert_eq!(
-                walked,
-                scan_every_stop(&stops, &flags, pos, dir, cab),
-                "case {case}, pos {pos}, dir {dir}"
-            );
-            found += usize::from(walked.is_some());
-        }
-    }
-    assert!(found > 10_000);
 }

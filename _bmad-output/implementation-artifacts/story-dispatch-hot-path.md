@@ -45,7 +45,8 @@ integer floor keys:
    changes and no new random draws.
 2. **AC2 No per-stop hashing in the scan.** `calls` and `claimed` become one
    flag byte per stop; the cab set is consulted only for a stop without a free
-   call.
+   call. (Review round 2 replaced the flag bytes with bit sets over the stops
+   and reads the cab set once per car; see Design.)
 3. **AC3 No per-room hashing in the waiting pass.** Each room's floor is
    found by binary search in the served floors, kept ascending per tower
    revision; the waiting map is read and written once per touched floor, not
@@ -66,19 +67,27 @@ integer floor keys:
   per-stop flag scan. The actual hot path reads and writes by floor via
   `get`/`entry`/`insert`, and the `retain` pass decays each entry in place,
   so the map's ordering does not change the result.
-- Per shaft, a reused `Vec<u8>` parallel to `stops` carries `CALL` and
-  `CLAIMED`. `stops` is ascending (`stops_of` filters `bottom..=top`), so a
-  floor's stop is a binary search away; a claimed floor that is not a stop
-  (a dwelling car between stops) can never be asked about, so it is dropped.
-- `next_demand_stop` checks the flags before the cab set. Its accept test,
-  "a cab stop, or a call nobody has claimed", is pure, so evaluating it in
-  another order gives the same answer.
-- `next_demand_stop` walks out from the car and stops at the first stop that
-  answers (added in review, H5). `stops` ascends, so the distance never
-  shrinks along the walk and the first answer is the scan's nearest. The
-  TypeScript keeps the first strict minimum, the lowest floor among equal
-  distances, so the downward walk runs on through ties; a position that is
-  not finite still finds nothing.
+- Per shaft, reused bit sets over the stops (64 stops a word) carry the
+  TypeScript's `calls` and `claimed` sets: stop `k` is bit `k`. `stops` is
+  ascending (`stops_of` filters `bottom..=top`), so a floor's stop is a
+  binary search away; a claimed floor that is not a stop (a dwelling car
+  between stops) can never be asked about, so it is dropped. The flag pass
+  reads the hall calls and the waiting map once per stop.
+- Each active car reads its cab set once into a third bit set over the
+  stops, one binary search per cab floor; a cab floor that is not a stop is
+  left out, as the scan never reached it. The set is read in its own order,
+  which no result depends on, since each floor only sets its own bit.
+- `Demand::next_stop` (the TypeScript's `nextDemandStop`) answers from the
+  words: a stop answers when it has a call nobody has claimed or is one of
+  the car's cab stops. `stops` ascends, so going up the scan's nearest is the
+  lowest answering stop ahead (a trailing-zero count) and going down it is
+  the highest one below (a leading-zero count). The TypeScript keeps the
+  first strict minimum, the lowest floor among equal distances, so going down
+  the search steps on to any lower answering stop at the same distance, which
+  only a position far beyond any tower can produce; a position that is not
+  finite still finds nothing. Round 1 walked out from the car instead (H5);
+  round 2 replaced the walk because a car with nothing to serve still tested
+  every stop of its shaft (R2-1).
 - The served list is built once per revision by asking the served-floor memo
   about each floor from the lowest to the highest a passenger shaft spans,
   so no set is iterated and nothing is sorted (review, H2).
@@ -96,9 +105,10 @@ integer floor keys:
 - `stops_of` still returns a clone per shaft per chunk (#859, A8). Changing
   what it returns reaches its callers in `tower.rs`, a facade file this lane
   does not edit, and in the crowd's routing and banks.
-- The hall and cab calls come from `crowd/routing.rs` as `HashMap` /
-  `HashSet`, so the scan still hashes them per stop: #1293 (backlog row
-  `rust-dispatch-call-map-hashing`).
+- The hall calls come from `crowd/routing.rs` as a `HashMap`, so the flag
+  pass still hashes them once per stop: #1293 (backlog row
+  `rust-dispatch-call-map-hashing`). The cab sets are no longer hashed per
+  stop (round 2).
 - `total_population` is still walked by the spawn step (A10 in #1158).
   `accumulate` now computes the same sum one call earlier, so `spawn_step`
   could take it; `crowd/spawn.rs` belongs to the other hotspot lane.
@@ -106,12 +116,16 @@ integer floor keys:
 ## Result
 
 All figures are cloud estimates (native release build, this sandbox); the PC
-is the source for any gate figure. The base is `main` efb4bdf, which includes
-#1237's change (PR #1276).
+is the source for any gate figure. Round 1 measured against `main` efb4bdf
+(with #1237's change, PR #1276). Round 2 measured the head with the bit sets
+against `main` d8e5a847, whose engine matches the PR's merge base 245f548
+(it includes #1143 item 4, #1281).
 
 **Same results.** The state and crowd digests every 30 steps and the final
 save digest over 720 steps of 2 game minutes match the base on all 8
-conformance fixtures. The Rust referee (`cargo run --release --features
+conformance fixtures, in both rounds; round 2 also ran the `large`,
+`many-unit` and `hotel-heavy` perf towers the same way, with the same
+result. The Rust referee (`cargo run --release --features
 conformance --bin conformance`) passes every scenario and catalog, and the
 conformance lock is untouched. `npm run test:wasm` on the built engine
 (the WASM conformance and parity suites, the seeded dual-run differential and
@@ -130,39 +144,49 @@ The dispatch tests run this dispatcher beside the hashed one it replaced
   every step, and the boarding tally every 30 steps, and asserts the run
   reached a car dwelling on a dropped stop, an empty tower, a raised call and
   a non-empty tally.
-- `the_stop_walk_finds_what_the_full_scan_found` compares the walk with the
-  full scan over 20,000 random stop lists, both directions, positions on,
-  beside and between stops, and positions that are not finite or far beyond
-  any tower.
+- `the_stop_search_finds_what_the_full_scan_found` compares the search with
+  the full scan over 20,000 random stop lists of up to 200 floors (one to
+  four words; more than 5,000 lists span two or more), both directions, cab
+  floors on and off the stops, positions on, beside and between stops, and
+  positions that are not finite or far beyond any tower.
 - The floor lists follow a shaft placed and removed, a new lobby floor and a
   stop toggle at the same unit count; `reindex_resets_the_floor_lists` pins
   the memo reset with a stop list changed behind the revision; a reload
   rebuilds them; a removed shaft loses its dwell timers.
 - Seeded mutations: the dwelling claim dropped, `CLAIMED` ignored, every
   boarding tallied (Acceptance Auditor), the walk's tie rule, its
-  non-finite rule and its tolerance (this round): each fails a test.
+  non-finite rule and its tolerance (round 1): each fails a test. Round 2,
+  on the bit sets: the upward search ignoring its start inside a word, the
+  downward search keeping bits at or above its end, claims ignored, cab
+  stops ignored, no tie step, an off-stop cab floor taking its neighbor's
+  bit, the tie step on infinite distances and the dwelling claim dropped:
+  MUTATIONS_R2.
 
 **The bare step** (callgrind, 720 steps, instructions inside
-`Simulation::tick`; `next_demand_stop` is inlined into `move_cars` after the
-change):
+`Simulation::tick`), round 2 against `main` d8e5a847:
 
 | Fixture | Step | `accumulate` | `move_cars` |
 | --- | --- | --- | --- |
-| `split-tower-4` | 2,946.1M to 2,479.6M (-15.8%) | 284.3M to 117.8M | 401.8M to 90.3M |
-| `sixseven_2` | 1,664.0M to 1,402.0M (-15.7%) | 138.9M to 66.4M | 266.9M to 70.4M |
+| `split-tower-4` | 2,196.3M to 1,747.1M (-20.5%) | 287.6M to 118.2M | 383.0M to 100.0M |
+| `sixseven_2` | 1,207.5M to 968.6M (-19.8%) | 140.5M to 66.7M | 241.5M to 73.5M |
+
+Round 1's walk measured `move_cars` at 90.3M and 70.4M (against efb4bdf,
+where dispatch costs the same). The bit sets cost a little more on these
+saves, mostly the cab fill per car, in exchange for a search whose cost no
+longer grows with the shaft's stops. Round 1's step figures against efb4bdf
+were -15.8% and -15.7%.
 
 **Wall clock**, 20 interleaved pairs of 720 steps, median of the per-pair
-ratios: `split-tower-4` 0.872 (medians 417.5 and 361.2 ms), `sixseven_2`
-0.895 (225.3 and 199.7 ms). The ratio is a median of pairs, so it differs a
-little from the ratio of the two medians. Single pairs range from 0.67 to
-1.32 on this machine, so the instruction counts are the figure to quote.
+ratios, round 2: `split-tower-4` 0.902 (medians 257.0 and 230.2 ms),
+`sixseven_2` 0.816 (126.3 and 105.5 ms). The ratio is a median of pairs, so
+it differs a little from the ratio of the two medians. Single pairs range
+from 0.61 to 1.24 on this machine, so the instruction counts are the figure
+to quote.
 
-The October 22 owner desktop benchmark on the combined measurement branch
-included this dispatch change alongside the DO-NOT-MERGE #1196 facade spike,
-so it cannot isolate the dispatch speedup. The instruction-count and paired
-wall-clock results above are cloud estimates. A standalone desktop
-before/after for this PR has not yet been completed; do not claim the Oct 25
-mainline measurement happened before its scheduled date.
+No desktop figure isolates this change yet. The October 22 owner desktop
+run on the combined measurement branch included it beside the
+DO-NOT-MERGE #1196 facade spike, so it cannot attribute the gain, and the
+size runs on `main` do not contain it until it merges.
 
 ## Review
 

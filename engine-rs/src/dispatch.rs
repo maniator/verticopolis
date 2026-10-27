@@ -1,7 +1,7 @@
 //! Port of `src/engine/ElevatorDispatch.ts`: the SCAN controller that moves
 //! each car against the statistical waiting estimate and the crowd's calls.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use indexmap::IndexMap;
 
@@ -13,21 +13,18 @@ use crate::tower::Tower;
 pub const CAR_FLOORS_PER_MINUTE: f64 = 0.8;
 const DWELL_MINUTES: f64 = 0.8;
 
-/// Stop flag: a live hall call (the crowd's, or the statistical estimate's
-/// on a passenger shaft).
-const CALL: u8 = 1;
-/// Stop flag: a car of this shaft is heading to the stop or dwelling at it.
-const CLAIMED: u8 = 2;
+/// Stops per word of a stop bit set: stop `k` of the shaft in hand is bit
+/// `k % 64` of word `k / 64`.
+const WORD: usize = 64;
 
 #[derive(Default)]
 pub struct ElevatorDispatch {
     /// Transient per-car dwell timers.
     car_dwell: HashMap<i64, Vec<f64>>,
-    /// Waiting passengers per floor, kept in ascending floor order so the
-    /// shaft's floor lookups stay by key instead of hashing every stop. The
-    /// per-stop flag pass still walks the shaft's sorted stop list, but every
-    /// read and write remains a floor lookup (`get`/`entry`/`insert`), with
-    /// the ordering used only to keep floor-wise state consistent.
+    /// Waiting passengers per floor. An ordered map, so a floor lookup
+    /// compares small integer keys where a hash map ran SipHash on each.
+    /// Every read and write is by floor, and `retain` decays each entry on
+    /// its own, so no result depends on the order.
     waiting: BTreeMap<i64, f64>,
     /// The boarding tally since the last drain (#465): shaft id to origin
     /// floor to boarded count. Counting only, never read back into behavior.
@@ -35,9 +32,13 @@ pub struct ElevatorDispatch {
     /// Scratch for the waiting pass, one slot per served floor: that
     /// floor's running estimate this step, `None` until a room touches it.
     acc: Vec<Option<f64>>,
-    /// Scratch for `move_cars`, one byte per stop of the shaft in hand:
-    /// `CALL` and `CLAIMED`, the TypeScript's `calls` and `claimed` sets.
-    flags: Vec<u8>,
+    /// Scratch for `move_cars`, bit sets over the stops of the shaft in
+    /// hand: the TypeScript's `calls` (a live hall call, the crowd's or the
+    /// statistical estimate's) and `claimed` (a car is heading to the stop or
+    /// dwelling at it), and the current car's cab stops.
+    calls: Vec<u64>,
+    claimed: Vec<u64>,
+    cab_stops: Vec<u64>,
 }
 
 impl ElevatorDispatch {
@@ -164,27 +165,25 @@ impl ElevatorDispatch {
             let cap = kind.car_capacity();
 
             let hall_at = |fl: i64| hall.and_then(|h| h.get(&fl)).copied().unwrap_or(0.0);
-            // `calls` and `claimed` as one flag byte per stop. `stops` is
+            // `calls` and `claimed` as bit sets over the stops. `stops` is
             // ascending, so a floor's stop is a binary search away, and a
             // floor that is not a stop is never asked about.
-            let flags = &mut self.flags;
-            flags.clear();
-            flags.resize(stops.len(), 0);
-            if hall.is_some() {
-                for (k, &fl) in stops.iter().enumerate() {
-                    if hall_at(fl) >= 1.0 {
-                        flags[k] = CALL;
-                    }
+            let words = stops.len().div_ceil(WORD);
+            let (calls, claimed) = (&mut self.calls, &mut self.claimed);
+            calls.clear();
+            calls.resize(words, 0);
+            claimed.clear();
+            claimed.resize(words, 0);
+            for (k, &fl) in stops.iter().enumerate() {
+                // A crowd call already raises the stop, so the estimate is
+                // only looked up when it would decide.
+                if hall_at(fl) >= 1.0
+                    || (!staff_only && self.waiting.get(&fl).copied().unwrap_or(0.0) >= 1.0)
+                {
+                    set_bit(calls, k);
                 }
             }
-            if !staff_only {
-                for (k, &fl) in stops.iter().enumerate() {
-                    if self.waiting.get(&fl).copied().unwrap_or(0.0) >= 1.0 {
-                        flags[k] |= CALL;
-                    }
-                }
-            }
-            let flag_at = |floor: i64| stops.binary_search(&floor).ok();
+            let stop_index = |floor: i64| stops.binary_search(&floor).ok();
             for i in 0..cars {
                 let car_home =
                     Schedule::home_floor_for(sched, i, idle_floor).clamp(t.bottom, t.top);
@@ -215,8 +214,8 @@ impl ElevatorDispatch {
                     dwell[i] -= pause;
                     car_dt -= pause;
                     if car_dt <= 0.0 {
-                        if let Some(k) = flag_at(jsmath::round(t.car_positions[i]) as i64) {
-                            flags[k] |= CLAIMED;
+                        if let Some(k) = stop_index(jsmath::round(t.car_positions[i]) as i64) {
+                            set_bit(claimed, k);
                         }
                         continue;
                     }
@@ -225,32 +224,37 @@ impl ElevatorDispatch {
                 let mut pos = t.car_positions[i];
                 let was_parked = t.car_dir[i] == 0;
                 let mut dir = if t.car_dir[i] == 0 { 1 } else { t.car_dir[i] };
-                let cab = cabs.and_then(|c| c.get(&(i as i64)));
+                let cab_stops = cabs
+                    .and_then(|c| c.get(&(i as i64)))
+                    .filter(|c| !c.is_empty())
+                    .map(|c| fill_cab_stops(&stops, c, &mut self.cab_stops));
                 let reach = match response {
                     Some(r) if was_parked => (span - r).max(0.0),
                     _ => f64::INFINITY,
                 };
-                let held = |tg: Option<i64>| -> Option<i64> {
-                    match tg {
-                        Some(f)
-                            if !cab.is_some_and(|c| c.contains(&f))
-                                && (f as f64 - pos).abs() > reach =>
-                        {
-                            None
-                        }
-                        other => other,
-                    }
+                let demand = Demand {
+                    stops: &stops,
+                    calls: &calls[..],
+                    claimed: &claimed[..],
+                    cab: cab_stops,
                 };
-                let mut target = held(next_demand_stop(&stops, flags, pos, dir, cab));
+                // A parked car leaves a stop beyond its reach alone unless the
+                // stop is in its own cab. The search only returns a stop at a
+                // finite distance and `reach` is never NaN, so `<=` is the
+                // TypeScript's `!(dist > reach)`.
+                let held = |k: Option<usize>| {
+                    k.filter(|&k| demand.is_cab(k) || (stops[k] as f64 - pos).abs() <= reach)
+                };
+                let mut target = held(demand.next_stop(pos, dir));
                 if target.is_none() {
                     dir = -dir;
-                    target = held(next_demand_stop(&stops, flags, pos, dir, cab));
+                    target = held(demand.next_stop(pos, dir));
                 }
-                if let Some(k) = target.and_then(flag_at) {
-                    flags[k] |= CLAIMED;
+                if let Some(k) = target {
+                    set_bit(claimed, k);
                 }
                 let target = match target {
-                    Some(tg) => tg as f64,
+                    Some(k) => stops[k] as f64,
                     None => {
                         let tg = car_home as f64;
                         if (pos - tg).abs() < 0.05 {
@@ -278,7 +282,7 @@ impl ElevatorDispatch {
                             self.waiting.insert(tf, (w - board).max(0.0));
                         }
                         // Origin tally (#465), only at a stop with a live call.
-                        if flag_at(tf).is_some_and(|k| flags[k] & CALL != 0) {
+                        if stop_index(tf).is_some_and(|k| has_bit(calls, k)) {
                             let n = self
                                 .board_tally
                                 .entry(id)
@@ -304,63 +308,111 @@ impl ElevatorDispatch {
     }
 }
 
-/// `nextDemandStop`: the nearest stop strictly ahead with a live call no
-/// other car has claimed, or one of this car's own cab stops (never blocked
-/// by a claim). `flags` runs parallel to `stops`.
-///
-/// `stops` ascends, so the distance never shrinks as the walk leaves the
-/// car, and the walk stops at the first stop that answers instead of
-/// testing every stop of the shaft. The TypeScript scans every stop and
-/// keeps the first strict minimum, which is the lowest floor among equal
-/// distances, so the downward walk runs on through any tie. Ties need a
-/// position far beyond any tower, where rounding merges distances.
-fn next_demand_stop(
-    stops: &[i64],
-    flags: &[u8],
-    pos: f64,
-    dir: i64,
-    cab: Option<&HashSet<i64>>,
-) -> Option<i64> {
-    debug_assert_ne!(dir, 0);
-    // The flags first, so the cab set is only hashed for a stop without a
-    // free call. The test is pure, so the order is free.
-    let wanted = |k: usize| {
-        (flags[k] & (CALL | CLAIMED)) == CALL || cab.is_some_and(|c| c.contains(&stops[k]))
-    };
-    let dist = |k: usize| (stops[k] as f64 - pos).abs();
-    let (k, d) = if dir > 0 {
-        let first = stops.partition_point(|&s| s as f64 <= pos + 0.05);
-        let mut best: Option<(usize, f64)> = None;
-        for k in first..stops.len() {
-            if !wanted(k) {
-                continue;
+fn set_bit(bits: &mut [u64], k: usize) {
+    bits[k / WORD] |= 1u64 << (k % WORD);
+}
+
+fn has_bit(bits: &[u64], k: usize) -> bool {
+    bits[k / WORD] & (1u64 << (k % WORD)) != 0
+}
+
+/// The car's cab floors as a bit set over `stops`, in `bits`. A cab floor
+/// that is not a stop is left out, as the scan never reached it. The set is
+/// ordered, so the floors are read in floor order.
+fn fill_cab_stops<'a>(stops: &[i64], cab: &BTreeSet<i64>, bits: &'a mut Vec<u64>) -> &'a [u64] {
+    bits.clear();
+    bits.resize(stops.len().div_ceil(WORD), 0);
+    for fl in cab {
+        if let Ok(k) = stops.binary_search(fl) {
+            set_bit(bits, k);
+        }
+    }
+    bits
+}
+
+/// What one car asks of its shaft: the stops in ascending order, the
+/// `calls` and `claimed` bit sets over them, and the car's own cab stops.
+struct Demand<'a> {
+    stops: &'a [i64],
+    calls: &'a [u64],
+    claimed: &'a [u64],
+    cab: Option<&'a [u64]>,
+}
+
+impl Demand<'_> {
+    /// The stops that answer in word `w`: a live call no car has claimed,
+    /// or one of this car's cab stops (never blocked by a claim).
+    fn word(&self, w: usize) -> u64 {
+        (self.calls[w] & !self.claimed[w]) | self.cab.map_or(0, |c| c[w])
+    }
+
+    /// Whether stop `k` is one of this car's cab stops.
+    fn is_cab(&self, k: usize) -> bool {
+        self.cab.is_some_and(|c| has_bit(c, k))
+    }
+
+    /// The lowest answering stop at or above index `from`.
+    fn first_from(&self, from: usize) -> Option<usize> {
+        let mut w = from / WORD;
+        if w >= self.calls.len() {
+            return None;
+        }
+        let mut bits = self.word(w) & (u64::MAX << (from % WORD));
+        while bits == 0 {
+            w += 1;
+            if w >= self.calls.len() {
+                return None;
             }
-            let d = dist(k);
-            match best {
-                Some((_, best_d)) if d > best_d => break,
-                Some((_, best_d)) if d == best_d => continue,
-                _ => best = Some((k, d)),
+            bits = self.word(w);
+        }
+        Some(w * WORD + bits.trailing_zeros() as usize)
+    }
+
+    /// The highest answering stop below index `end`.
+    fn last_below(&self, end: usize) -> Option<usize> {
+        let last = end.checked_sub(1)?;
+        let mut w = last / WORD;
+        let mut bits = self.word(w) & (u64::MAX >> (WORD - 1 - last % WORD));
+        while bits == 0 {
+            w = w.checked_sub(1)?;
+            bits = self.word(w);
+        }
+        Some(w * WORD + (WORD - 1) - bits.leading_zeros() as usize)
+    }
+
+    /// `nextDemandStop`: the index of the nearest stop strictly ahead that
+    /// answers.
+    ///
+    /// The TypeScript scans every stop and keeps the first strict minimum,
+    /// which is the lowest floor among equal distances. `stops` ascends, so
+    /// going up the nearest is the lowest answering stop ahead, and going
+    /// down it is the highest one below, then any lower stop at the same
+    /// distance. Ties need a position far beyond any tower, where rounding
+    /// merges distances. The bit sets answer each search in a word or two
+    /// (a shaft has at most about 110 stops), so a car with nothing to serve
+    /// no longer tests its shaft's stops one by one.
+    fn next_stop(&self, pos: f64, dir: i64) -> Option<usize> {
+        debug_assert_ne!(dir, 0);
+        let stops = self.stops;
+        let dist = |k: usize| (stops[k] as f64 - pos).abs();
+        let k = if dir > 0 {
+            self.first_from(stops.partition_point(|&s| s as f64 <= pos + 0.05))?
+        } else {
+            self.last_below(stops.partition_point(|&s| (s as f64) < pos - 0.05))?
+        };
+        let d = dist(k);
+        // Going down, a lower stop at the same distance wins. Only a finite
+        // distance can tie usefully: the check below drops the rest.
+        let mut k = k;
+        if dir < 0 && d < f64::INFINITY {
+            while let Some(j) = self.last_below(k).filter(|&j| dist(j) == d) {
+                k = j;
             }
         }
-        best?
-    } else {
-        let end = stops.partition_point(|&s| (s as f64) < pos - 0.05);
-        let mut best: Option<(usize, f64)> = None;
-        for k in (0..end).rev() {
-            if !wanted(k) {
-                continue;
-            }
-            let d = dist(k);
-            match best {
-                Some((_, best_d)) if d > best_d => break,
-                _ => best = Some((k, d)),
-            }
-        }
-        best?
-    };
-    // The scan's `dist < best_dist` from infinity: a position that is not
-    // finite finds no stop.
-    (d < f64::INFINITY).then_some(stops[k])
+        // The scan's `dist < best_dist` from infinity: a position that is not
+        // finite finds no stop.
+        (d < f64::INFINITY).then_some(k)
+    }
 }
 
 #[cfg(test)]
