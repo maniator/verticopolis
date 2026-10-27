@@ -42,10 +42,14 @@ export interface Deployments {
   serve(which: Deployment): void;
   /** Answer `sw.js` of the first deployment with one extra comment line, so the browser finds a new worker whose precache manifest is identical (the same engine bytes under the same keys). */
   reissueWorker(on: boolean): void;
+  /** Answer every `/engine/` request from `which` whatever `serve()` picked, as a deploy that lands between the worker script and the engine files does; `null` ends it. */
+  engineFrom(which: Deployment | null): void;
   /** Make `version.json` answer 404, as it does when the host or the network drops it. */
   failVersionJson(failing: boolean): void;
   /** Every path requested so far, in order, with the deployment that answered. */
   readonly requests: { path: string; from: Deployment }[];
+  /** The SHA-256 (hex) of each deployment's engine glue and binary as served. */
+  readonly digests: Record<Deployment, { glue: string; wasm: string }>;
   /** The engine package id each deployment's `BUILD.json` records. */
   readonly packageId: Record<Deployment, string>;
   /** The precache revision each deployment's `sw.js` records for each engine entry. */
@@ -154,6 +158,10 @@ function makeSecond(dist: string, into: string): { dir: string; packageId: strin
   return { dir, packageId: record.package };
 }
 
+function digestsOf(root: string): { glue: string; wasm: string } {
+  return { glue: sha256Hex(readFileSync(join(root, "engine", ENGINE_GLUE))), wasm: sha256Hex(readFileSync(join(root, "engine", ENGINE_WASM))) };
+}
+
 function cacheControl(path: string): string {
   if (path.startsWith("/assets/")) return "public, max-age=31536000, immutable";
   if (path === "/version.json") return "no-store";
@@ -188,16 +196,17 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
   let current: Deployment = "A";
   let versionJsonFails = false;
   let workerReissued = false;
+  let engineOverride: Deployment | null = null;
   const requests: Deployments["requests"] = [];
 
   const server: Server = createServer((req, res) => {
     // Each response keeps the root it started with, so a switch mid-stream
     // cannot change what a response already begun carries.
-    const root = roots[current];
-    const from = current;
     const target = req.url ?? "/";
     // Origin-form only, one leading slash, nothing that names a drive or stream.
     const path = /^\/(?!\/)/.test(target) ? new URL(target, "http://localhost").pathname : "/\0";
+    const from = engineOverride && path.startsWith("/engine/") ? engineOverride : current;
+    const root = roots[from];
     requests.push({ path, from });
     if (versionJsonFails && path === "/version.json") {
       res.writeHead(404, { "content-type": "text/plain" }).end("not found");
@@ -238,10 +247,14 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
     reissueWorker: (on) => {
       workerReissued = on;
     },
+    engineFrom: (which) => {
+      engineOverride = which;
+    },
     failVersionJson: (failing) => {
       versionJsonFails = failing;
     },
     requests,
+    digests: { A: digestsOf(roots.A), B: digestsOf(roots.B) },
     packageId: { A: firstRecord.package, B: second.packageId },
     revisions: { A: revisionsOf(manifests.A), B: revisionsOf(manifests.B) },
     manifestEntries: { A: manifests.A.entries, B: manifests.B.entries },
