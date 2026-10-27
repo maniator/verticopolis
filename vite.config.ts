@@ -250,6 +250,7 @@ function wasmParityProjects() {
     // They run each engine themselves, like the conformance suites above.
     "**/panelGettersWasm.integration.test.ts",
     "**/panelGettersCost.integration.test.ts",
+    "**/engineView.integration.test.ts",
     // The engine comparison's own checks run each engine themselves (#972).
     "**/perfCompare/*.integration.test.ts",
     // Pure render: it paints in a software raster and never touches the engine,
