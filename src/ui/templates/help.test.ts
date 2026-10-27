@@ -205,7 +205,7 @@ describe("helpTemplate escapes the interpolated version as text", () => {
 describe("helpTemplate engine diagnostics (#963)", () => {
   const report = {
     state: "ok" as const,
-    summary: "The WASM engine is running and matches this build.",
+    summary: "The Rust engine is running and matches this build.",
     rows: [{ label: "Engine crate", value: "example-engine 9.8.7" }],
     text: "Verticopolis diagnostics",
   };

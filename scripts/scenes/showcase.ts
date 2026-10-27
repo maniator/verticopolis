@@ -6,6 +6,7 @@
  */
 import { type Scene, PHONE } from "../screenshot-env.ts";
 import {
+  pgAssertSettingsContentVisible,
   buildCanonTower,
   buildCrowdTower,
   buildEngineTower,
@@ -87,6 +88,7 @@ export const SHOWCASE_SCENES: Scene[] = [
           // Guard on a Settings-only element: a bare #modal wait would be
           // satisfied by the Help dialog the previous shot leaves open.
           await page.waitForSelector("#modal #vol-music", { timeout: 4000 });
+          await page.evaluate(pgAssertSettingsContentVisible, "require-all");
         },
         wait: 300,
       },
@@ -124,12 +126,14 @@ export const SHOWCASE_SCENES: Scene[] = [
       {
         name: "02b-settings-modern",
         keepDialogs: true,
+        viewport: { width: 1280, height: 820 },
         frame: { floor: 3, zoom: 1.2 },
         setup: async (page) => {
           await page.evaluate(() => document.getElementById("btn-settings")?.click());
           // Wait on the Modern-only Building toggle, not a bare #modal: it
           // proves the Modern Settings variant (with its extra section) mounted.
           await page.waitForSelector("#modal #set-auto-bridge", { timeout: 4000 });
+          await page.evaluate(pgAssertSettingsContentVisible, "require-all");
         },
         wait: 300,
       },

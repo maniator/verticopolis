@@ -93,7 +93,7 @@ test("the worker host reports the same stamped hash", async ({ page }) => {
   await openHelp(page);
   expect(await state(page)).toBe("ok");
   expect((await page.evaluate(() => (window as any).__vcEngineBoot)).binary).toEqual({ state: "ok", sourceHash: record.sources });
-  expect(await copyDiagnostics(page)).toContain("WASM engine (worker)");
+  expect(await copyDiagnostics(page)).toContain("Rust engine (worker)");
 });
 
 // A binary that is not the one this shell was built for never runs (the byte

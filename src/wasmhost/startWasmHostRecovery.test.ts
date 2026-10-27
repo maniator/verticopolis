@@ -57,7 +57,7 @@ describe("the recovery after a fault (#874)", () => {
       a.sim.tick(1);
       await settle();
       expect(a.adopted).toHaveLength(1);
-      expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: "The WASM engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.", kind: "bad" }));
+      expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: "The Rust engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.", kind: "bad" }));
       expect(a.dropped).toBe(1);
       expect(handle.status.restorePoint).toEqual({ point: "attach", skipped: 0 });
       expect(a.cleared).toBe(0);
@@ -84,8 +84,8 @@ describe("the recovery after a fault (#874)", () => {
     }
   });
 
-  const UNDONE = "The WASM engine stopped, so the tower went back to its last good state and your recent changes were undone. It runs on the TypeScript engine now.";
-  const RESTORED = "The WASM engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.";
+  const UNDONE = "The Rust engine stopped, so the tower went back to its last good state and your recent changes were undone. It runs on the TypeScript engine now.";
+  const RESTORED = "The Rust engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.";
 
   it("says the player's recent changes were undone when the point is from before an edit", async () => {
     const a = app();
@@ -164,13 +164,13 @@ describe("the recovery after a fault (#874)", () => {
       a.adoptSim(Simulation.newGame(3, "classic"), true);
       await settle();
       expect(a.dropped).toBe(1);
-      expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: "The WASM engine stopped, so the game runs on the TypeScript engine now.", kind: "bad" }));
+      expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: "The Rust engine stopped, so the game runs on the TypeScript engine now.", kind: "bad" }));
     } finally {
       handle.stop();
     }
   });
 
-  const LOST = "The WASM engine stopped, so some of your recent changes were lost. The game runs on the TypeScript engine now.";
+  const LOST = "The Rust engine stopped, so some of your recent changes were lost. The game runs on the TypeScript engine now.";
 
   it("says changes were lost when an undo replaced the faulted tower after a command no point covers", async () => {
     const a = app();
@@ -212,7 +212,7 @@ describe("the recovery after a fault (#874)", () => {
       a.sim.tick(1);
       a.adoptSim(Simulation.newGame(3, "classic")); // a load drops the old tower's changes itself
       await settle();
-      expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: "The WASM engine stopped, so the game runs on the TypeScript engine now.", kind: "bad" }));
+      expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: "The Rust engine stopped, so the game runs on the TypeScript engine now.", kind: "bad" }));
     } finally {
       handle.stop();
     }
@@ -325,7 +325,7 @@ describe("the recovery after a fault (#874)", () => {
       await settle();
       expect(a.adopted).toHaveLength(0);
       expect(handle.status.lastError).toBe("no restore point loads, so the tower stays stopped: no point loads");
-      expect(lastLine(sim)).toEqual(expect.objectContaining({ text: "The WASM engine stopped, and the tower could not go back to a good state. Load a save or start a new tower to keep playing.", kind: "bad" }));
+      expect(lastLine(sim)).toEqual(expect.objectContaining({ text: "The Rust engine stopped, and the tower could not go back to a good state. Load a save or start a new tower to keep playing.", kind: "bad" }));
       const minutes = sim.clock.minutes;
       sim.tick(30);
       expect(sim.clock.minutes).toBe(minutes);
@@ -334,10 +334,10 @@ describe("the recovery after a fault (#874)", () => {
     }
   });
 
-  const REPLACED = "The WASM engine stopped, so the game runs on the TypeScript engine now.";
-  const CLEARED = "The WASM engine stopped, so the undo history was cleared. The game runs on the TypeScript engine now.";
-  const OLDER = "The WASM engine stopped, so the tower went back to an earlier good state and anything since then was undone. The undo history was cleared, and the tower runs on the TypeScript engine now.";
-  const SWAP_FAILED = "The WASM engine stopped, and the tower could not switch to the TypeScript engine, so it is frozen and changes to it are not saved. Load a save or start a new tower to keep playing.";
+  const REPLACED = "The Rust engine stopped, so the game runs on the TypeScript engine now.";
+  const CLEARED = "The Rust engine stopped, so the undo history was cleared. The game runs on the TypeScript engine now.";
+  const OLDER = "The Rust engine stopped, so the tower went back to an earlier good state and anything since then was undone. The undo history was cleared, and the tower runs on the TypeScript engine now.";
+  const SWAP_FAILED = "The Rust engine stopped, and the tower could not switch to the TypeScript engine, so it is frozen and changes to it are not saved. Load a save or start a new tower to keep playing.";
 
   it("says the tower went back further, names the point and clears the undo trail, when the newest point does not load (#1126)", async () => {
     const a = app();

@@ -141,8 +141,8 @@ function engineName(input: DiagnosticsInput): string {
   if (input.boot?.engine === "none") return "none";
   if (wasmRunning(input))
     return input.host?.placement === "worker"
-      ? "WASM engine (worker)"
-      : "WASM engine";
+      ? "Rust engine (worker)"
+      : "Rust engine";
   return "TypeScript engine";
 }
 
@@ -152,10 +152,10 @@ function failureSummary(
   stage: string,
 ): string {
   const WHAT: Record<string, string> = {
-    host: "The WASM engine stopped after a fault",
-    start: "The WASM engine did not take the first tower",
+    host: "The Rust engine stopped after a fault",
+    start: "The Rust engine did not take the first tower",
   };
-  const what = WHAT[stage] ?? "The WASM engine did not load";
+  const what = WHAT[stage] ?? "The Rust engine did not load";
   return boot.engine === "none"
     ? `${what}, and this build has no other engine.`
     : `${what}, so the game is running on the TypeScript engine.`;
@@ -189,21 +189,21 @@ export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
       : "The game is running on the TypeScript engine.";
   } else if (mismatches.length > 0) {
     state = "mismatch";
-    summary = "The WASM engine does not match the build this page expected.";
+    summary = "The Rust engine does not match the build this page expected.";
   } else if (!identity) {
     state = "unavailable";
     summary =
-      "The WASM engine is running, but this package does not report its identity.";
+      "The Rust engine is running, but this package does not report its identity.";
   } else if (noBuild) {
     state = "unavailable";
-    summary = `The WASM engine is running, but ${noBuild}, so its source hash is unavailable.`;
+    summary = `The Rust engine is running, but ${noBuild}, so its source hash is unavailable.`;
   } else if (compared) {
     state = "ok";
-    summary = "The WASM engine is running and matches this build.";
+    summary = "The Rust engine is running and matches this build.";
   } else {
     state = "ok";
     summary =
-      "The WASM engine is running. This page has no build record to compare it with.";
+      "The Rust engine is running. This page has no build record to compare it with.";
   }
 
   const rows: DiagnosticsRow[] = [
