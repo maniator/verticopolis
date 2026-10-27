@@ -61,6 +61,11 @@ fn main() {
         2 => rng.int(5, 50) * 1_000_000,
         _ => rng.int(2, 40) * 100_000,
     };
+    // The star the game opens at. A new game starts at one star, which keeps
+    // escalators, service and express shafts (two and three stars) and the
+    // later rooms locked; raising it puts them in reach, and the refusals
+    // below each star stay in the mix.
+    let star = [1, 1, 2, 3, 3, 4, 5][rng.int(0, 6) as usize];
     let id = format!("fuzz-{seed}");
     let mut commands: Vec<Value> = vec![
         json!({"op": "setMoney", "amount": 500000000}),
@@ -87,10 +92,14 @@ fn main() {
         .map(|f| f.kind)
         .collect();
     let scenario_value = |commands: &[Value]| {
+        let mut new_game = json!({"seed": seed, "mode": if modern { "modern" } else { "classic" }});
+        if star > 1 {
+            new_game["star"] = json!(star);
+        }
         json!({
             "id": id,
-            "description": format!("Fuzz seed {seed}: a random {} tower of {height} stories.", if modern { "Modern" } else { "Classic" }),
-            "start": {"newGame": {"seed": seed, "mode": if modern { "modern" } else { "classic" }}},
+            "description": format!("Fuzz seed {seed}: a random {} tower of {height} stories at {star} star{}.", if modern { "Modern" } else { "Classic" }, if star == 1 { "" } else { "s" }),
+            "start": {"newGame": new_game},
             "commands": commands,
         })
     };
@@ -102,8 +111,9 @@ fn main() {
     // A tall tower starts with a burst of shafts and stairs that overruns the
     // 24-shaft and 64-link pools, so both engines also agree on the refusal at
     // each cap. The burst runs before the random commands and is not part of
-    // the command budget. Escalators, service and express shafts unlock at
-    // higher stars than a new game has, so they stay out of reach here.
+    // the command budget. Its standard shafts and stairs need no star; the
+    // escalators, service and express shafts that unlock higher come from the
+    // random commands, at the stars the seed opens with.
     let mut pressure: Vec<Value> = Vec::new();
     if tall {
         // Standard shafts: 27 slots (nine columns, three floor bands) against

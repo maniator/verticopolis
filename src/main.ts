@@ -34,6 +34,7 @@ import { onUpdateAvailable } from "./game/updateFlow";
 import { bootGame } from "./bootstrap";
 import { gameplaySession } from "./analytics";
 import { createTsSim } from "./simport/tsSim";
+import type { SimPort } from "./simport/port";
 
 /**
  * The game controller. Excalibur (via {@link TowerEngine}) owns the render
@@ -60,7 +61,7 @@ import { createTsSim } from "./simport/tsSim";
 class GameApp implements GameAppPorts {
   sim: Simulation;
   /** The simulation as the game drives it (AD-9); follows every adoptSim swap. */
-  readonly port = createTsSim(() => this.sim, { adopt: (sim, keep) => this.adoptSim(sim, keep) });
+  readonly port: SimPort = createTsSim(() => this.sim, { adopt: (sim, keep) => this.adoptSim(sim, keep) });
   engine: TowerEngine;
   audio = new AudioEngine();
   ui: UI;
@@ -321,7 +322,7 @@ class GameApp implements GameAppPorts {
   }
 
   // Stats + save-slot modal commands, bodies in game/appModals.ts.
-  showStats(): void { showStats(this); }
+  showStats(): void { void showStats(this); }
   showSaves(): void { showSaves(this); }
   saveToSlot(slot: number): void { saveToSlot(this, slot); }
   loadFromSlot(slot: number | "auto"): void { loadFromSlot(this, slot); }

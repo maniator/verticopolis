@@ -76,10 +76,13 @@ export interface SimPort {
   command<C extends Command>(c: C): Promise<CommandResult<C>>;
   /** Ask the engine a question it decides. */
   query<Q extends Query>(q: Q): Promise<QueryResult<Q>>;
-  /** The last answer to an equal query, for a reader that cannot wait;
-   *  `undefined` when there is none. It may be out of date, so ask again.
-   *  Answers about a replaced tower are dropped, and the adapter may drop
-   *  the least recently used placement answers. */
+  /** The last answer to an equal query about this tower, for a reader that
+   *  cannot wait; `undefined` when there is none. It may be out of date, and
+   *  the caller decides when to ask again. Answers about a replaced tower are
+   *  dropped. Each question keeps a bounded number of answers and drops the
+   *  least recently used; the adapter sets the bounds (on `TsSim` today, 256
+   *  placements and 16 unit and 16 shaft cards, the card bounds owned by the
+   *  panel queries). */
   cached<Q extends Query>(q: Q): QueryResult<Q> | undefined;
   /** Replace the tower (see {@link TowerSource}). A load that fails rejects
    *  and leaves the tower as it was. */
