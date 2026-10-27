@@ -130,7 +130,10 @@ describe("mergeSimulation", () => {
   it("gives the HUD the merged rooms at the same unit count and the revision the rooms list was read at", () => {
     const target = tower(11);
     const fresh = tower(11);
-    expect(target.stats().offices).toBe(2); // the rooms list is now memoized
+    expect(target.stats().offices).toBe(2);
+    const rooms = roomUnits(target.tower);
+    expect(roomUnits(target.tower)).toBe(rooms); // memoized, so only a drop refreshes it
+    const [revision, count] = [target.tower.revision, target.tower.units.length];
     // An office becomes a hotel room, so the unit count holds, and the merge
     // brings back the revision the list was read at: neither key moves.
     const office = fresh.tower.units.find((u) => u.kind === "office")!;
@@ -142,10 +145,12 @@ describe("mergeSimulation", () => {
       if (u.kind === "hotelDouble") u.state = "asleep";
     }
     const save = fresh.serialize();
-    mergeSimulation(target, Simulation.deserialize(save), { revision: target.tower.revision, mealOverlayRevision: 0 });
+    mergeSimulation(target, Simulation.deserialize(save), { revision, mealOverlayRevision: 0 });
+    expect([target.tower.revision, target.tower.units.length]).toEqual([revision, count]);
     const hud = target.stats();
     expect(hud).toEqual(Simulation.deserialize(save).stats());
     expect(hud).toMatchObject({ offices: 1, occupiedOffices: 1, hotelRooms: 1, occupiedHotel: 1 });
     expect(hud.population).toBeGreaterThan(0);
+    expect(hud.population).toBe(target.population);
   });
 });

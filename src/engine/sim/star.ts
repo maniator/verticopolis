@@ -108,7 +108,8 @@ export function population(sim: Simulation): number {
   // baseline occupancy and, while eating, again at the venue (customersIn),
   // so the HUD number deliberately swells during meal windows and settles
   // between them. Delegate to Tower.totalPopulation() so this metric has a
-  // single source of truth.
+  // single source of truth. The HUD's `stats()` sums the same rule in its own
+  // pass over the rooms, and its test pins the two equal.
   return sim.tower.totalPopulation();
 }
 

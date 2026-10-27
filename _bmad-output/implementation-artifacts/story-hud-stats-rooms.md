@@ -23,17 +23,22 @@ row and issue carry it), and its part 4e moves the HUD strip onto the
 whole-unit walk per UI tick, which the hot-path checklist always patches. The
 Rust bare-step lane took the change to `stats.ts` under #1051 (agreed with
 slice 4 on 2026-10-21); 4e builds on this PR and leaves the function alone.
+This change still leaves one pass over the rooms per refresh, where the
+checklist's HP-12 asks for a flat HUD tier; whether that pass may stay for
+now, in this change and in 4e, is the owner's call (F2 in Review, pending).
 
 ## Acceptance criteria
 
 1. **AC1 Same numbers.** `stats()` returns the same object as before for any
    tower: every count, the population, money, star, the floor and transport
    figures and the fire count. The HUD shows the same population.
-2. **AC2 One pass over the rooms per HUD refresh.** The counts walk
+2. **AC2 One pass over the rooms for the HUD's stats.** The counts walk
    `roomUnits` (the tower's units minus floor and lobby tiles, in the same
    order), and the population comes from the same pass. The HUD refresh
    (`uiStatus.update`) reads `stats()` once for the population label and the
-   stats grid, where it read `sim.population` as well.
+   stats grid, where it read `sim.population` as well. The same refresh's
+   traffic readout makes its own pass (#338), and a flat HUD tier is F2,
+   pending the owner (Review).
 3. **AC3 No revision cache of the result.** `stats()` reads tenancy, condo
    sales, hotel states, `noRate`, residents and customers, which change
    without a revision bump, so the result is computed on every call. Only the
@@ -83,22 +88,29 @@ slice 4 on 2026-10-21); 4e builds on this PR and leaves the function alone.
   measured about twice as slow as one built in place) stays open there: this
   change shortens both, and the gate in #905 compares them.
 - Moving the HUD strip onto `towerStats` is facade slice 4e. The Rust
-  `tower_stats` (`engine-rs/src/panels/stats.rs`) makes the same two passes
-  this change folds into one (counts, then `population()`); it is not
-  exported today, and 4e carries the fold over when it routes the HUD there.
-- The crowd renderer reads `sim.population` every frame (#1234), and the
-  host's hourly merge reads the whole save (#868).
+  `tower_stats` (`engine-rs/src/panels/stats.rs`, bound as `towerStats` but
+  called by no production code yet) makes the same two passes this change
+  folds into one (counts, then `population()`); 4e carries the fold over
+  when it routes the HUD there.
+- Other per-frame and per-refresh reads of the rooms on the same path, all
+  older than this change: the crowd renderer reads `sim.population` every
+  frame, and so does the meal-rush bulletin check (`emitMealRushes`) before
+  it knows a meal starts (both #1234); the HUD's traffic readout and the
+  renderer rebuild the congestion map (#338); the host's hourly merge reads
+  the whole save (#868).
 - Making the HUD refresh flat as the tower grows (counters kept on every
   state write, across the engine, the host's frame apply and the merge) is
-  pending the owner (see Review).
+  F2 in Review: always patched under the checklist's section 7 unless the
+  owner accepts a deferral, and pending his answer.
 
 ## Result
 
-Cloud estimates (Node 22, this sandbox, 2026-10-27), not gate figures: the
-harness is a pair of scripts outside the repository that load each perf
-tower from `src/tests/perfCompare/scenarios.ts`, check that `main`'s
-`stats()` (d09aa64) and this one return the same object, warm up, and take
-the median of batches of 100 calls.
+These are cloud estimates from this sandbox (Node 22, 2026-10-27); gate
+figures come only from the owner's PC. The harness is a pair of scripts kept
+outside the repository: they load each perf tower from
+`src/tests/perfCompare/scenarios.ts`, check that `main`'s `stats()` (d09aa64,
+unchanged on `main` through 035231a) and this one return the same object,
+warm up, and take the median of batches of 100 calls.
 
 `stats()` alone, milliseconds per call, 20 batches:
 
@@ -132,11 +144,16 @@ Tests:
 - `merge.test.ts` (beside #1325's merge tests) memoizes the host mirror's
   rooms list through `stats()`, merges a tower in which an office became a
   hotel room at the same unit count, with the revision the list was memoized
-  at, and checks the HUD equals a fresh load's `stats()`.
+  at (the test checks the list was memoized and that the revision and unit
+  count held), and checks the HUD equals a fresh load's `stats()` and its
+  population equals the mirror's `population`.
+- `uiStatus.test.ts` runs one HUD refresh and checks it calls `stats()` once,
+  never reads `sim.population`, and labels the population from `stats()`.
 - Seeded mutations, each failing a test: the population counted for absent
   rooms, the population off by one, half the offices skipped, the rooms
-  list memoized without the revision, and the merge without
-  `forgetUnitLists` (the HUD test fails, with #1325's two drop tests).
+  list memoized without the revision, the merge without `forgetUnitLists`
+  (the HUD test fails, with #1325's two drop tests), the label read from
+  `sim.population`, and the grid drawn from a second `stats()` read.
 
 ## Review
 
@@ -145,14 +162,37 @@ rebuilt on `main` 035231a after #1325 merged; see the first item): Blind Hunter,
 Edge Case Hunter, Acceptance Auditor and Hot-Path Auditor. No layer found a
 wrong count on a path the tests reached. The Edge Case Hunter found the merge
 path that could serve the HUD a stale rooms list, and the Hot-Path Auditor
-found a second rooms pass at the HUD's entry point.
+found a second rooms pass at the HUD's entry point (F1) and that the one
+pass left still grows with the rooms (F2).
 
 - [x] [Review][Patch] The host's merge keeps the unit array and sets the engine's revision, which can equal the one the rooms list was memoized at (at attach the read model and the engine count their bumps separately), so a merged tower could serve the HUD a stale list; an id that named another kind on the engine side would change a held unit's kind in place (Edge Case Hunter E3; Blind Hunter M3) [merge.ts, rooms.ts]: round 1 added a `forgetRooms` drop to the merge. #1325 (issue #1253) then landed `forgetUnitLists` on `main`, which drops the list whenever the revision or a unit's id, kind, floor, x or width moved, so the rebuilt branch carries no merge code and keeps the HUD-level merge test, which fails without that drop. Design said the change opened no new staleness path, which held for the population only; it now says so.
 - [x] [Review][Patch] The HUD refresh read `sim.population` and then `stats()`, two rooms passes for one population, so AC2's one pass did not hold at the entry point (Hot-Path Auditor F1) [uiStatus.ts, story]: the refresh reads `stats()` once and takes the population from it.
 - [x] [Review][Patch] Both tests changed the unit count at every step, and the merge test added units and passed a revision of its own, so neither showed the revision key or the merge's drop doing anything (Blind Hunter M1, M2; Edge Case Hunter E1, E2) [stats.test.ts, merge.test.ts]: each test swaps an office for a hotel room at the same unit count with no read in between, and the merge test passes the held revision.
 - [x] [Review][Patch] The counted kinds were a hand list whose presence the test checked with its own filter (Blind Hunter L6) [stats.test.ts]: the test checks that every kind `stats()` counts is in the list, and counts four of each through `roomUnits`.
 - [x] [Review][Patch] The fixture's comment said three basements where it builds four levels, and its wrap jumped from floor 11 to a basement (Blind Hunter L7) [stats.test.ts]: the comment is corrected, the fixture asserts it stays on the upper floors, and a kind they refuse goes below on its own cursor.
-- [x] [Review][Patch] AC5 named no date, commit or script, and the mutation list had no memo that ignores the revision (Blind Hunter L9, L10; Acceptance Auditor) [story]: Result names them, and the two new mutations each fail a test.
-- DECISION_F2
+- [x] [Review][Patch] AC5 named no date, commit or method, and the mutation list had no memo that ignores the revision (Blind Hunter L9, L10; Acceptance Auditor) [story]: Result names the date, the commits and the method, and the two new mutations each fail a test.
+- [ ] [Review][Patch, pending the owner] `stats()` still makes one pass over the rooms per HUD refresh, about 2,900 visits on the large tower and 17,400 a second at 6 Hz, where HP-12 asks for a flat HUD tier (Hot-Path Auditor F2) [stats.ts]: always patched under section 7 unless the owner accepts a deferral in his own words. The fix is counters kept at every write (the step, the hosts' frame apply, the merge) or a census snapshot from a rooms pass the step already makes, carried in the frame header; the cost estimate is in round 2's F2. Asked on 2026-10-27, with the recommendation to accept for now and track a flat HUD as a P3 row; no GO before he answers.
 - [x] [Review][Defer] The other caches keyed on an object the merge keeps and on the tower's revision (`segmentsOf` and the staff ceiling on the tower, the reach verdicts on the simulation) read a merged tower the same way, and the merge can hand back a revision they were memoized at (Edge Case Hunter E3, beyond this change) [merge.ts]: deferred to #1331 (row `wasm-merge-revision-caches`), with its remedy: the merge's drop on a moved revision or moved units (#1325) takes those caches too, with the transports in the check for the reach verdicts.
 - Dismissed (3): the inlined population duplicates `totalPopulation`'s sum (Blind Hunter M4), but the first test asserts `stats().population` equals `sim.population` in every round; the swap and merge tests match a subset of the fields (L5), but the fields they leave out are read straight from the simulation, untouched by this change; and the issue numbers (L11) follow the PR's Refs, with #905 left open for its loaded-tower gate.
+
+### Round 2
+
+`/gds-code-review` round 2 (a confirming pass) on 86ccc02 against `main`
+035231a: Blind Hunter, Edge Case Hunter, Acceptance Auditor and Hot-Path
+Auditor. The Edge Case Hunter found no unhandled path: it traced every writer
+of the unit array and of a unit's kind, the merge at a repeated or earlier
+revision, and the frame apply, and a probe compared `stats()` with the walk
+over every unit and with `sim.population` through each. The Acceptance
+Auditor found every AC met as worded, with the claims below to correct. The
+Hot-Path Auditor confirmed F1's fix, restated F2 with its numbers, and found
+two older room walks on the same frame path. The record is on the PR.
+
+- [x] [Review][Patch] The merge test did not show the rooms list was memoized before the merge, that the revision and unit count held through it, or that the HUD's population matched the mirror's (Blind Hunter B1, B4) [merge.test.ts]: it checks all three.
+- [x] [Review][Patch] No test pinned the HUD's single `stats()` read or its population label, so a return to `sim.population` would have passed (Acceptance Auditor A7; Blind Hunter B9) [uiStatus.test.ts]: a HUD refresh test counts the reads and checks the label; both mutations fail it.
+- [x] [Review][Patch] The story said the Rust `tower_stats` is not exported (it is bound as `towerStats`, with no production caller), scoped F2 out while it is pending, gave AC2 a whole-refresh claim the traffic readout breaks, said Result named a script, left F2 out of round 1's summary, and used one "X, not Y" phrase (Acceptance Auditor A1 to A5, A9, A11) [story, PR body]: each is corrected.
+- [x] [Review][Patch] The comment on `population` in `star.ts` called it the single source of truth for the displayed number, which the HUD now sums in `stats()` (Acceptance Auditor A10) [star.ts]: it names the HUD's sum and the test that pins the two equal.
+- [x] [Review][Patch] The #905 row called the walk part done without F2 (Acceptance Auditor A8) [backlog.md]: it says the flat HUD is pending the owner.
+- [x] [Review][Defer] `emitMealRushes` reads `totalPopulation()` on every frame, paused included, before it knows a meal starts: about 0.2 ms a frame on the large tower, older than this change (Hot-Path Auditor F3) [frameLoop.ts]: deferred onto #1234 (its row and issue), with the remedy of reading the population only on a frame that crosses a meal start.
+- [x] [Review][Defer] The HUD's traffic chip rebuilds the congestion map on every refresh, about 0.6 ms on the large tower and 0.9 ms on the owner's save, now the larger HUD cost (Hot-Path Auditor F4; Acceptance Auditor A2) [trafficHud.ts]: deferred onto #338, whose row now names this reader beside the render frame.
+- F2 stays pending the owner (round 1's item above).
+- Dismissed (10): the population rule copied from `totalPopulation` (Blind Hunter B2, B5 to B7), since `censusCount` holds the rule, floor and lobby tiles have catalog population 0, and the first test pins `stats().population` to `sim.population` every round; units replaced in place without a revision bump (B3), since the Edge Case Hunter found no writer that does so; the subset match (B8), since the fields left out are read straight from the simulation; the read moved to the top of `update` (B10), since nothing before the grid writes unit state; the comment on the old second pass (B11), since `sim.population` was an uncached room walk; the fixture's numbers and basement branch (B12 to B14), which the assertions bound; the serialize path on both sides of the merge test (B15), which the host's own merge also takes; lint (B16), which passes; the version (B17), since the label shows the same number; and the hand list of counted kinds (Acceptance Auditor A6), since a kind `stats()` began to count would need a new field, which the reference would have to name as well.
