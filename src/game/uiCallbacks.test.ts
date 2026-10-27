@@ -30,7 +30,7 @@ function makePorts() {
       exportLegacy: vi.fn(),
       newGame: vi.fn(),
     },
-    editor: { handleEditAction: vi.fn() },
+    editor: { handleEditAction: vi.fn(), renameTower: vi.fn(async () => {}) },
     inspector: { dismiss: vi.fn() },
     handleSelectTool: vi.fn(),
     setSpeed: vi.fn(),
@@ -44,7 +44,6 @@ function makePorts() {
     toggleSteadyClock: vi.fn(() => true),
     isSteadyClock: vi.fn(() => true),
     replayOnboarding: vi.fn(),
-    renameTower: vi.fn(),
     clearBuildRefusal: vi.fn(),
     showStats: vi.fn(),
     showSaves: vi.fn(),
@@ -156,13 +155,23 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(cb.isSteadyClock()).toBe(true);
   });
 
+  it("the bridging switch is a port command that resolves to the engine's answer", async () => {
+    const { ports } = makePorts();
+    const cb = createUICallbacks(ports);
+    // The fake engine answers false while the live sim still reads true: the
+    // switch takes the answer.
+    expect(await cb.onToggleAutoBridge()).toBe(false);
+    expect(ports.port.command).toHaveBeenCalledExactlyOnceWith({ op: "toggleAutoBridge" });
+    expect(cb.isAutoBridge()).toBe(true);
+  });
+
   it("onboarding, rename, stats, inspector close", () => {
     const { ports } = makePorts();
     const cb = createUICallbacks(ports);
     cb.onReplayOnboarding();
     expect(ports.replayOnboarding).toHaveBeenCalledTimes(1);
     cb.onRenameTower("Skyline");
-    expect(ports.renameTower).toHaveBeenCalledWith("Skyline");
+    expect(ports.editor.renameTower).toHaveBeenCalledWith("Skyline");
     cb.onShowStats();
     expect(ports.showStats).toHaveBeenCalledTimes(1);
     cb.onInspectorClose();
