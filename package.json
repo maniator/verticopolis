@@ -28,6 +28,7 @@
     "perf:restore": "tsx scripts/perf-restore-points.ts",
     "perf:calibrate": "tsx scripts/perf-calibrate.ts",
     "perf:before-after": "tsx scripts/perf-before-after.ts",
+    "perf:load-memory": "tsx scripts/perf-load-memory.ts",
     "lint": "eslint src api --ext .ts,.tsx",
     "lint:fix": "eslint src api --ext .ts,.tsx --fix",
     "screenshots": "cross-env VC_TOOLING=1 vite build && cross-env RUN_SERVER=1 node scripts/screenshots.ts",
