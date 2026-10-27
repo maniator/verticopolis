@@ -40,15 +40,14 @@ fn must(placed: PlaceResult) -> i64 {
     placed.unit_id.unwrap_or(-1)
 }
 
-/// Lobbies on floors 1 and 15, floor tiles up to floor 22, offices on every
-/// other floor (floor 22's sit above every passenger stop, so they are
-/// unserved), a cinema, and four shafts: a standard to floor 15, an express,
-/// a service car and a scheduled standard from the sky lobby up.
 /// Where `tall_scenario` puts its tall express shaft.
 const TALL_X: i64 = 172;
 
 /// `scenario` with an express shaft from floor 1 to floor 80 beside the
-/// others, so its stops run past one 64-bit word.
+/// others. Placing an express skips every floor without a lobby, so the
+/// shaft's skip list is cleared, as a loaded save can have it, and the
+/// tower reindexed: the shaft then stops at all 80 floors, past one 64-bit
+/// word.
 fn tall_scenario() -> Tower {
     let mut tower = scenario();
     for floor in 23..=80 {
@@ -59,13 +58,19 @@ fn tall_scenario() -> Tower {
     let tall = must(tower.place_transport(Kind::ElevatorExpress, TALL_X, 1, 80));
     let t = tower.transports.iter_mut().find(|t| t.id == tall).unwrap();
     t.cars = 8;
+    t.skip_floors = None;
     // Spread up the shaft: a car finds its nearest call, so cars that all
-    // start at the bottom would never reach the second word.
+    // start at the bottom would seldom reach the second word.
     t.car_positions = (0..8).map(|i| 1.0 + 11.0 * i as f64).collect();
     t.car_dir = vec![0; 8];
+    tower.reindex();
     tower
 }
 
+/// Lobbies on floors 1 and 15, floor tiles up to floor 22, two offices on
+/// every floor but the lobbies (floor 22's sit above every passenger stop, so
+/// they are unserved), a cinema, and four shafts: a standard to floor 15, an express,
+/// a service car and a scheduled standard from the sky lobby up.
 fn scenario() -> Tower {
     let mut tower = Tower::new();
     let lobby = Kind::Lobby.facility().width as usize;
@@ -164,12 +169,41 @@ fn assert_same(tower: &Tower, d: &ElevatorDispatch, rt: &Tower, r: &Reference, a
     waiting.sort();
     let ours: Vec<(i64, u64)> = d.waiting.iter().map(|(f, w)| (*f, w.to_bits())).collect();
     assert_eq!(ours, waiting, "step {at}");
-    let dwell = |m: &HashMap<i64, Vec<f64>>| {
-        let mut v: Vec<(i64, Vec<u64>)> = m.iter().map(|(id, d)| (*id, bits(d))).collect();
-        v.sort();
-        v
-    };
-    assert_eq!(dwell(&d.car_dwell), dwell(&r.car_dwell), "step {at}");
+    assert_eq!(
+        dwell_bits(&d.car_dwell),
+        dwell_bits(&r.car_dwell),
+        "step {at}"
+    );
+}
+
+/// Dwell timers by shaft id, in id order and bit for bit.
+fn dwell_bits<'a>(m: impl IntoIterator<Item = (&'a i64, &'a Vec<f64>)>) -> Vec<(i64, Vec<u64>)> {
+    let mut v: Vec<(i64, Vec<u64>)> = m.into_iter().map(|(id, d)| (*id, bits(d))).collect();
+    v.sort();
+    v
+}
+
+/// Passenger stops where the waiting estimate raises the call and the
+/// crowd's hall call does not: the flag pass's second test decides them.
+fn raised_by_the_estimate_alone(
+    tower: &Tower,
+    d: &ElevatorDispatch,
+    calls: &ElevatorCalls,
+) -> usize {
+    let mut n = 0;
+    for t in tower.transports.iter().filter(|t| t.kind.is_elevator()) {
+        if t.kind.is_staff_only_transport() {
+            continue;
+        }
+        let hall = calls.hall.get(&t.id);
+        for fl in tower.stops_of(t) {
+            let hall_at = hall.and_then(|h| h.get(&fl)).copied().unwrap_or(0.0);
+            if hall_at < 1.0 && d.waiting_at(fl) >= 1.0 {
+                n += 1;
+            }
+        }
+    }
+    n
 }
 
 /// Cars about to sit out a whole chunk dwelling on a floor their shaft no
@@ -195,7 +229,10 @@ fn dwelling_off_a_stop(tower: &Tower, d: &ElevatorDispatch, chunk: f64) -> usize
 /// random shaft, on both towers; returns what to put back later.
 fn drop_a_stop(towers: [&mut Tower; 2], d: &ElevatorDispatch, rng: &mut Lcg) -> Option<(i64, i64)> {
     let tower = &*towers[0];
-    let dwelling = tower.transports.iter().find_map(|t| {
+    // The tall express takes no drops: an express gets back only a lobby
+    // floor, so its stops would wear down below the second word.
+    let droppable = |t: &&crate::tower::Transport| t.x != TALL_X;
+    let dwelling = tower.transports.iter().filter(droppable).find_map(|t| {
         let dwell = d.car_dwell.get(&t.id)?;
         (0..dwell.len()).find_map(|i| {
             let fl = crate::jsmath::round(t.car_positions[i]) as i64;
@@ -205,7 +242,7 @@ fn drop_a_stop(towers: [&mut Tower; 2], d: &ElevatorDispatch, rng: &mut Lcg) -> 
     let (id, fl) = dwelling.or_else(|| {
         let t = &tower.transports[rng.next(tower.transports.len() as u64) as usize];
         let fl = t.bottom + 1 + rng.next((t.top - t.bottom).max(1) as u64) as i64;
-        (fl < t.top && t.stops_at(fl)).then_some((t.id, fl))
+        (fl < t.top && t.stops_at(fl) && droppable(&t)).then_some((t.id, fl))
     })?;
     for tw in towers {
         assert!(tw.set_stop(id, fl, false));
@@ -216,10 +253,12 @@ fn drop_a_stop(towers: [&mut Tower; 2], d: &ElevatorDispatch, rng: &mut Lcg) -> 
 #[test]
 fn dispatch_matches_the_hashed_reference_step_for_step() {
     let (mut tower, mut rt) = (tall_scenario(), tall_scenario());
+    let tall_id = tower.transports.iter().find(|t| t.x == TALL_X).unwrap().id;
+    assert_eq!(tower.stops_of(tall_shaft(&tower)).len(), 80);
     let (mut d, mut r) = (ElevatorDispatch::new(), Reference::default());
     let mut rng = Lcg(0x1143_0005);
     let mut dropped: Vec<(i64, i64)> = Vec::new();
-    let (mut off_stop, mut empty_steps, mut tallies, mut calls_up) = (0, 0, 0, 0);
+    let (mut off_stop, mut empty_steps, mut tallies, mut estimate_only) = (0, 0, 0, 0);
     let mut second_word = 0;
     for step in 0..3000 {
         let mut stir_rng = Lcg(rng.0);
@@ -269,18 +308,33 @@ fn dispatch_matches_the_hashed_reference_step_for_step() {
         let mut left = dt.min(12.5);
         while left > 0.0 {
             let chunk = left.min(2.5);
-            let calls = random_calls(&tower, &mut rng);
+            let mut calls = random_calls(&tower, &mut rng);
+            // Calls high in the tall shaft, half the time, keep its cars
+            // working past its 64th stop.
+            if step % 40 < 20 {
+                let hall = calls.hall.entry(tall_id).or_default();
+                for floor in (66..=80).step_by(7) {
+                    hall.insert(floor, 2.0);
+                }
+            }
             let (hour, weekend) = (rng.next(24) as i64, rng.next(5) == 0);
             off_stop += dwelling_off_a_stop(&tower, &d, chunk);
+            estimate_only += raised_by_the_estimate_alone(&tower, &d, &calls);
+            let upper = upper_floor(&tower);
+            let before = tall_shaft(&tower).car_positions.clone();
             d.move_cars(&mut tower, chunk, &calls, hour, weekend);
             r.move_cars(&mut rt, chunk, &calls, hour, weekend);
+            if let Some(upper) = upper {
+                let after = &tall_shaft(&tower).car_positions;
+                second_word += before
+                    .iter()
+                    .zip(after)
+                    .filter(|(b, a)| **b > upper && a.to_bits() != b.to_bits())
+                    .count();
+            }
             left -= chunk;
         }
         assert_same(&tower, &d, &rt, &r, step);
-        // A tall-shaft car past its 64th stop works in the second word.
-        let tall = tower.transports.iter().find(|t| t.x == TALL_X).unwrap();
-        second_word += usize::from(tall.car_positions.iter().any(|p| *p >= 65.0));
-        calls_up += usize::from(d.waiting.values().any(|w| *w >= 1.0));
         if step % 30 == 29 {
             let ours: Vec<_> = sorted_tally(d.drain_boardings());
             assert_eq!(
@@ -292,13 +346,33 @@ fn dispatch_matches_the_hashed_reference_step_for_step() {
         }
     }
     // The scenario reaches the paths the bit sets replaced.
-    assert!(calls_up > 0, "the estimate never raised a call");
+    assert!(
+        estimate_only > 0,
+        "the estimate never raised a stop the hall left alone"
+    );
+    assert!(tower.stops_of(tall_shaft(&tower)).len() > WORD);
     assert!(off_stop > 0, "no car dwelt on a dropped stop");
     assert!(empty_steps > 0 && tallies > 0);
     assert!(
-        second_word > 0,
-        "no car reached the tall shaft's second word"
+        second_word >= SECOND_WORD_MOVES,
+        "tall-shaft cars moved from past the 64th stop only {second_word} times"
     );
+}
+
+/// How many times the step-for-step test needs a tall-shaft car to move
+/// from past the shaft's 64th stop.
+const SECOND_WORD_MOVES: usize = 500;
+
+fn tall_shaft(tower: &Tower) -> &crate::tower::Transport {
+    tower.transports.iter().find(|t| t.x == TALL_X).unwrap()
+}
+
+/// A floor just past the tall shaft's 65th stop, the first stop in the
+/// second word. A car above it that moves has searched the second word,
+/// whichever way it looked: up from there, or down through it.
+fn upper_floor(tower: &Tower) -> Option<f64> {
+    let stops = tower.stops_of(tall_shaft(tower));
+    stops.get(WORD).map(|&s| s as f64 + 0.05)
 }
 
 type Tally = Vec<(i64, Vec<(i64, u64)>)>;
@@ -353,6 +427,25 @@ fn the_floor_lists_follow_every_layout_edit() {
     assert!(tower.set_stop(standard, 7, true));
     assert_floor_lists(&tower);
     assert!(tower.dispatch_floors().served.contains(&7));
+}
+
+#[test]
+fn the_served_list_follows_stairs_past_the_elevators_and_skips_service_cars() {
+    let mut tower = scenario();
+    for floor in 23..=26 {
+        for x in 100..220 {
+            must(tower.place(Kind::Floor, floor, x));
+        }
+    }
+    // Two flights of stairs carry passengers above every elevator; a
+    // service car reaches higher still, and only staff ride it.
+    must(tower.place_transport(Kind::Stairs, 140, 21, 22));
+    must(tower.place_transport(Kind::Stairs, 152, 22, 23));
+    must(tower.place_transport(Kind::ElevatorService, 164, 15, 26));
+    assert_floor_lists(&tower);
+    let served = &tower.dispatch_floors().served;
+    assert!(served.contains(&23));
+    assert!(!served.contains(&24) && !served.contains(&26));
 }
 
 #[test]
