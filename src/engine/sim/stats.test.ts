@@ -79,11 +79,15 @@ describe("stats() reads the rooms list", () => {
     const sim = tower();
     for (const kind of KINDS) expect(roomUnits(sim.tower).filter((u) => u.kind === kind).length, kind).toBe(4);
     const rooms = sim.tower.units.filter((u: Unit) => u.kind !== "floor" && u.kind !== "lobby");
-    for (let round = 0; round < STATES.length; round++) {
+    // Four laps of the states, each lap with its own pair of flags, so every
+    // room meets every state with every noRate and everOccupied pairing (a
+    // sold condo standing empty, an unrated office that is let).
+    for (let round = 0; round < STATES.length * 4; round++) {
+      const lap = Math.floor(round / STATES.length);
       rooms.forEach((u, i) => {
         u.state = STATES[(i + round) % STATES.length];
-        u.noRate = (i + round) % 3 === 0;
-        u.everOccupied = (i + round) % 4 === 0;
+        u.noRate = (i + lap) % 2 === 0;
+        u.everOccupied = (i + (lap >> 1)) % 2 === 0;
         u.residents = (i * 7 + round) % 9;
         u.customersIn = (i + 2 * round) % 5;
       });

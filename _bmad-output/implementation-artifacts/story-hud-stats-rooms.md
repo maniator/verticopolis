@@ -135,7 +135,9 @@ Tests:
 
 - `stats.test.ts` compares `stats()` with the walk over every unit (the
   population summed over every unit too, so no memoized list stands behind
-  the reference) across ten rounds of states, on a tower holding four of
+  the reference) across four laps of the ten states, each lap with its own
+  pair of `noRate` and `everOccupied` flags so every state meets every
+  pairing (a sold condo standing empty among them), on a tower holding four of
   every counted kind (the test checks the list covers every kind `stats()`
   counts) and some uncounted ones. It follows a room removed and placed
   again, and a room swapped for another kind at the same unit count with no
@@ -153,7 +155,8 @@ Tests:
   rooms, the population off by one, half the offices skipped, the rooms
   list memoized without the revision, the merge without `forgetUnitLists`
   (the HUD test fails, with #1325's two drop tests), the label read from
-  `sim.population`, and the grid drawn from a second `stats()` read.
+  `sim.population`, the grid drawn from a second `stats()` read, and a sold
+  condo counted only while tenanted or not empty.
 
 ## Review
 
@@ -195,4 +198,5 @@ two older room walks on the same frame path. The record is on the PR.
 - [x] [Review][Defer] `emitMealRushes` reads `totalPopulation()` on every frame, paused included, before it knows a meal starts: about 0.2 ms a frame on the large tower, older than this change (Hot-Path Auditor F3) [frameLoop.ts]: deferred onto #1234 (its row and issue), with the remedy of reading the population only on a frame that crosses a meal start.
 - [x] [Review][Defer] The HUD's traffic chip rebuilds the congestion map on every refresh, about 0.6 ms on the large tower and 0.9 ms on the owner's save, now the larger HUD cost (Hot-Path Auditor F4; Acceptance Auditor A2) [trafficHud.ts]: deferred onto #338, whose row now names this reader beside the render frame.
 - F2 stays pending the owner (round 1's item above).
+- [x] [Review][Patch] The independent review (R3, CONDITIONAL GO on 4973e51, review 5666150813) found that every flag in the first test moved with the state, so a sold condo never stood empty and a `soldCondos` mutant survived (nit N1) [stats.test.ts]: the test runs four laps of the states, each with its own flag pair, and the mutants that count a sold condo only while tenanted or not empty now fail it.
 - Dismissed (10): the population rule copied from `totalPopulation` (Blind Hunter B2, B5 to B7), since `censusCount` holds the rule, floor and lobby tiles have catalog population 0, and the first test pins `stats().population` to `sim.population` every round; units replaced in place without a revision bump (B3), since the Edge Case Hunter found no writer that does so; the subset match (B8), since the fields left out are read straight from the simulation; the read moved to the top of `update` (B10), since nothing before the grid writes unit state; the comment on the old second pass (B11), since `sim.population` was an uncached room walk; the fixture's numbers and basement branch (B12 to B14), which the assertions bound; the serialize path on both sides of the merge test (B15), which the host's own merge also takes; lint (B16), which passes; the version (B17), since the label shows the same number; and the hand list of counted kinds (Acceptance Auditor A6), since a kind `stats()` began to count would need a new field, which the reference would have to name as well.
