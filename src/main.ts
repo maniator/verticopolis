@@ -316,10 +316,6 @@ class GameApp implements GameAppPorts {
     }
   }
 
-  renameTower(name: string): void {
-    void this.port.command({ op: "setTowerName", name });
-  }
-
   // Stats + save-slot modal commands, bodies in game/appModals.ts.
   showStats(): void { void showStats(this); }
   showSaves(): void { showSaves(this); }

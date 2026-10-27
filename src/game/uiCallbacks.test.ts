@@ -30,7 +30,7 @@ function makePorts() {
       exportLegacy: vi.fn(),
       newGame: vi.fn(),
     },
-    editor: { handleEditAction: vi.fn() },
+    editor: { handleEditAction: vi.fn(), renameTower: vi.fn(async () => {}) },
     inspector: { dismiss: vi.fn() },
     handleSelectTool: vi.fn(),
     setSpeed: vi.fn(),
@@ -44,7 +44,6 @@ function makePorts() {
     toggleSteadyClock: vi.fn(() => true),
     isSteadyClock: vi.fn(() => true),
     replayOnboarding: vi.fn(),
-    renameTower: vi.fn(),
     clearBuildRefusal: vi.fn(),
     showStats: vi.fn(),
     showSaves: vi.fn(),
@@ -172,7 +171,7 @@ describe("createUICallbacks delegates every callback to its port", () => {
     cb.onReplayOnboarding();
     expect(ports.replayOnboarding).toHaveBeenCalledTimes(1);
     cb.onRenameTower("Skyline");
-    expect(ports.renameTower).toHaveBeenCalledWith("Skyline");
+    expect(ports.editor.renameTower).toHaveBeenCalledWith("Skyline");
     cb.onShowStats();
     expect(ports.showStats).toHaveBeenCalledTimes(1);
     cb.onInspectorClose();

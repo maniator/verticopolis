@@ -362,6 +362,13 @@ export class EditorActions {
     this.deps.commitUndo();
   }
 
+  /** Rename the tower from the top bar. A refused name (longer than the
+   *  engine takes) says why, as a refused unit name does. */
+  async renameTower(name: string): Promise<void> {
+    const res = await this.deps.port.command({ op: "setTowerName", name });
+    if (!res.ok) this.refuse(res.reason ?? "That name could not be saved.");
+  }
+
   /** An engine refusal on an editor action: error sfx plus the engine's
    *  reason as a toast. Nothing moved, so no undo step is committed. */
   private refuse(reason: string): void {

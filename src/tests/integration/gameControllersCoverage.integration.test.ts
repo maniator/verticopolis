@@ -485,6 +485,18 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(undo.commits).toBe(0);
   });
 
+  it("a refused tower name keeps the old one and says why; an accepted one is quiet", async () => {
+    const before = sim.tower.towerName;
+    await editor.renameTower("x".repeat(MAX_TEXT + 1));
+    expect(sim.tower.towerName).toBe(before);
+    expect(f.sfx).toEqual(["error"]);
+    expect(f.toasts).toEqual([{ text: INVALID_COMMAND, kind: "bad" }]);
+    await editor.renameTower("Skyspire");
+    expect(sim.tower.towerName).toBe("Skyspire");
+    expect(f.sfx).toEqual(["error"]);
+    expect(f.toasts).toHaveLength(1);
+  });
+
   it("a sold condo can't be repriced: rent nudges are silent no-ops", async () => {
     condo.everOccupied = true; // sold — the engine's priceUnit returns null
     sel = { type: "unit", id: condo.id };

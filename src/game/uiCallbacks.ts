@@ -37,7 +37,7 @@ export interface GameAppPorts {
     SaveLoad,
     "save" | "load" | "exportGame" | "importGame" | "importLegacy" | "exportLegacy" | "newGame"
   >;
-  readonly editor: Pick<EditorActions, "handleEditAction">;
+  readonly editor: Pick<EditorActions, "handleEditAction" | "renameTower">;
   readonly inspector: Pick<InspectorController, "dismiss">;
 
   handleSelectTool(tool: Tool): void;
@@ -53,7 +53,6 @@ export interface GameAppPorts {
   toggleSteadyClock(): boolean;
   isSteadyClock(): boolean;
   replayOnboarding(): void;
-  renameTower(name: string): void;
   /** Drop the Modern build-refusal card and its ownership latch (no-op when
    *  the build path doesn't own the card). The inspector ✕ routes through
    *  this before the dismissal latch: the refusal card shares the inspector
@@ -127,7 +126,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
       trackAppAction("replay_onboarding");
       app.replayOnboarding();
     },
-    onRenameTower: (name) => app.renameTower(wellFormed(name)),
+    onRenameTower: (name) => void app.editor.renameTower(wellFormed(name)),
     onShowStats: () => {
       trackAppAction("stats_open"); // the user open; the exterminator refresh reopens showStats directly
       app.showStats();
