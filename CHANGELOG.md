@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.47.1
+
+- If the browser clears the game's stored files, one visit online now puts them back, so the game starts offline again.
+
 ## 2.47.0
 
 - Settings has a new Game engine choice, Automatic, the Rust engine (experimental), or the TypeScript engine (stable). A change takes effect the next time the game starts.

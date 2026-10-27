@@ -5,7 +5,7 @@
  * precache entries carry. Node only; never imported by the app.
  */
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames.ts";
 import { canonicalFilesJson, expectedOf, parseEngineRecord, type ExpectedEnginePackage } from "../wasmhost/enginePackageRecord.ts";
@@ -89,6 +89,11 @@ export function integrityOf(bytes: Uint8Array): string {
 /** The engine files whose precache entries carry `integrity`, as manifest URLs. */
 export const INTEGRITY_FILES: readonly string[] = [ENGINE_GLUE, ENGINE_WASM, ENGINE_BUILD_RECORD].map((f) => ENGINE_DIR + f);
 
+/** Precache entries whose file does not exist yet when the manifest transforms
+ *  run (the PWA plugin writes the web app manifest afterwards), so they carry no
+ *  integrity. The offline cold start does not read it. */
+export const NO_INTEGRITY_FILES: readonly string[] = ["manifest.webmanifest"];
+
 interface ManifestEntry {
   url: string;
   revision: string | null;
@@ -97,27 +102,36 @@ interface ManifestEntry {
 }
 
 /**
- * A Workbox `manifestTransform`: adds `integrity` to the three engine entries,
- * computed from the files in the build output, and gives them the revision of
+ * A Workbox `manifestTransform`: adds `integrity` to every entry whose file is
+ * in the build output, and gives the three engine entries the revision of
  * {@link engineRevision}. The browser then rejects a
  * body that differs from the build's own bytes, during install and on a
- * precache-miss fetch, so a mixed set cannot enter the precache. Every other
- * entry is unchanged. An engine entry whose file is not under `distDir` stops
- * the build rather than ship without a check.
+ * precache-miss fetch, so a mixed set cannot enter the precache. An entry
+ * whose file is not under `distDir` is left as it is, except an engine entry,
+ * which stops the build rather than ship without a check.
  */
 export function engineIntegrityTransform(distDir: string | (() => string)) {
-  return (entries: ManifestEntry[]): { manifest: ManifestEntry[]; warnings: string[] } => ({
-    manifest: entries.map((e) => {
-      const url = e.url.split(/[?#]/)[0].replace(/^\.?\//, "");
-      if (!INTEGRITY_FILES.includes(url)) return e;
-      const dir = typeof distDir === "function" ? distDir() : distDir;
-      const file = resolve(dir, url);
-      if (!existsSync(file)) throw new Error(`precache entry ${url} has no file under ${dir}, so it cannot carry integrity`);
-      const bytes = readFileSync(file);
-      return { ...e, revision: engineRevision(bytes), integrity: integrityOf(bytes) };
-    }),
-    warnings: [],
-  });
+  return (entries: ManifestEntry[]): { manifest: ManifestEntry[]; warnings: string[] } => {
+    const dir = typeof distDir === "function" ? distDir() : distDir;
+    return {
+      manifest: entries.map((e) => {
+        const url = e.url.split(/[?#]/)[0].replace(/^\.?\//, "");
+        const file = resolve(dir, url);
+        if (!INTEGRITY_FILES.includes(url)) {
+          // Any other entry keeps its revision and gains the integrity of its file,
+          // so a precache miss on a controlled page stores the file (Workbox caches
+          // a missed entry only when the manifest carries integrity) and the shell
+          // comes back after the cache is lost.
+          if (!existsSync(file) || !statSync(file).isFile()) return e;
+          return { ...e, integrity: integrityOf(readFileSync(file)) };
+        }
+        if (!existsSync(file)) throw new Error(`precache entry ${url} has no file under ${dir}, so it cannot carry integrity`);
+        const bytes = readFileSync(file);
+        return { ...e, revision: engineRevision(bytes), integrity: integrityOf(bytes) };
+      }),
+      warnings: [],
+    };
+  };
 }
 
 /** `key: "value"` in a flat object literal, quoted or bare key, either quote,
@@ -174,6 +188,15 @@ export function engineDistProblems(distDir: string, manifest: string): string[] 
     const have = integrity.get(url);
     if (!have) problems.push(`precache entry ${url} carries no integrity, so a body from another build could enter the precache`);
     else if (existsSync(file) && have !== integrityOf(readFileSync(file))) problems.push(`precache entry ${url} carries an integrity that is not the digest of the file in dist/`);
+  }
+  // Every other entry whose file is in dist/ carries its integrity too, so a
+  // precache miss on a controlled page stores it and the shell self-heals.
+  for (const [url, have] of integrity) {
+    if (INTEGRITY_FILES.includes(url) || NO_INTEGRITY_FILES.includes(url)) continue;
+    const file = resolve(distDir, url);
+    if (!existsSync(file) || !statSync(file).isFile()) continue;
+    if (!have) problems.push(`precache entry ${url} carries no integrity, so the shell would not come back after the cache is lost`);
+    else if (have !== integrityOf(readFileSync(file))) problems.push(`precache entry ${url} carries an integrity that is not the digest of the file in dist/`);
   }
   // Repair names the running build's cache keys by revision, so each engine
   // entry's revision must be the one of the file the shell was built with.

@@ -78,7 +78,17 @@ describe("engineIntegrityTransform", () => {
     { url: "index.html", revision: "r4", size: 10 },
   ];
 
-  it("adds the integrity of each of the three engine files and leaves the rest alone", () => {
+  it("gives a shell entry whose file is in the build its integrity and keeps its revision", () => {
+    const d = pkg();
+    const html = new TextEncoder().encode("<html></html>");
+    writeFileSync(join(d, "index.html"), html);
+    const { manifest } = engineIntegrityTransform(d)(entries());
+    expect(manifest[3]).toEqual({ url: "index.html", revision: "r4", size: 10, integrity: integrityOf(html) });
+    const asset = engineIntegrityTransform(d)([{ url: "assets/missing-abc.js", revision: null, size: 1 }]);
+    expect(asset.manifest[0], "an entry with no file under the folder is left as it is").toEqual({ url: "assets/missing-abc.js", revision: null, size: 1 });
+  });
+
+  it("adds the integrity of each of the three engine files and leaves a shell entry with no file alone", () => {
     const d = pkg();
     const { manifest, warnings } = engineIntegrityTransform(d)(entries());
     expect(warnings).toEqual([]);
@@ -111,7 +121,7 @@ describe("engineIntegrityTransform", () => {
     const d = pkg();
     let asked = 0;
     const { manifest } = engineIntegrityTransform(() => (asked++, d))(entries());
-    expect(asked).toBe(3);
+    expect(asked).toBe(1);
     expect(manifest[0].integrity).toBe(integrityOf(glue));
   });
 
@@ -158,6 +168,19 @@ describe("engineDistProblems", () => {
   it("finds nothing wrong with a consistent package", () => {
     const d = pkg();
     expect(engineDistProblems(d, manifestFor(d))).toEqual([]);
+  });
+
+  it("reports a shell entry with its file in dist/ and no integrity, or the wrong one", () => {
+    const d = pkg();
+    const html = new TextEncoder().encode("<html></html>");
+    writeFileSync(join(d, "index.html"), html);
+    const base = manifestFor(d).slice(0, -1);
+    expect(engineDistProblems(d, `${base},{url:"index.html",revision:"r4",integrity:"${integrityOf(html)}"}]`)).toEqual([]);
+    expect(engineDistProblems(d, `${base},{url:"index.html",revision:"r4"}]`).join("\n")).toContain("precache entry index.html carries no integrity");
+    expect(engineDistProblems(d, `${base},{url:"index.html",revision:"r4",integrity:"sha256-AAAA"}]`).join("\n")).toContain("precache entry index.html carries an integrity that is not the digest");
+    expect(engineDistProblems(d, `${base},{url:"assets/gone-abc.js",revision:null}]`), "an entry with no file in dist/ is not this check's").toEqual([]);
+    writeFileSync(join(d, "manifest.webmanifest"), "{}");
+    expect(engineDistProblems(d, `${base},{url:"manifest.webmanifest",revision:"r5"}]`), "the web app manifest is written after the transforms run").toEqual([]);
   });
 
   it("reports a binary that is not the one BUILD.json describes", () => {

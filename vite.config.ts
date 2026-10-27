@@ -430,7 +430,12 @@ export default defineConfig(({ command }) => ({
         // entries therefore carry a revision no earlier worker used (the
         // MD5 plus ENGINE_REVISION_SUFFIX, enginePackageBuild.ts), so a set
         // stored before this change is never found under their keys and the
-        // update fetches all three files with integrity. The page's own byte
+        // update fetches all three files with integrity. Every other entry
+        // whose file is in the build carries its integrity as well (the web
+        // app manifest, written afterwards, is the one exception), because
+        // Workbox stores a precache miss only when the entry has one: with
+        // it, an online visit after the cache is lost puts the shell back and
+        // the next cold start works offline (#1345). The page's own byte
         // check (#985 slice 2) covers the window before the update lands.
         // scripts/verify-precache.ts fails the build when a run-time engine
         // or audio file is missing from the manifest, when a build-only

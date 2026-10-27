@@ -147,7 +147,7 @@ test("an evicted binary is never refilled with another build's bytes while the f
   }
 });
 
-test("with the whole precache gone and no network the page does not load, and an online visit recovers", async ({ browser }) => {
+test("with the whole precache gone and no network the page does not load, and an online visit recovers, offline start included", async ({ browser }) => {
   const context = await newContext(browser, deployments);
   try {
     const page = await context.newPage();
@@ -168,6 +168,13 @@ test("with the whole precache gone and no network the page does not load, and an
     await revisit.goto("/");
     await hostedGame(revisit);
     expect(await bootFailure(revisit)).toBeNull();
+    await expectEngineIs(deployments, revisit, "A");
+
+    // The online visit stored the shell again, so the next start needs no network.
+    deployments.failNetwork("all");
+    await revisit.reload({ timeout: 30_000 });
+    await hostedGame(revisit);
+    expect(await bootFailure(revisit), "no fallback on the offline start after the recovery").toBeNull();
     await expectEngineIs(deployments, revisit, "A");
   } finally {
     await context.close();
