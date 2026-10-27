@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 2.47.1
 
-- If the browser clears the game's stored files, one visit online now puts them back, so the game starts offline again.
+- If the browser clears the game's stored files, one visit online now puts back the ones the game needs to start offline.
 
 ## 2.47.0
 

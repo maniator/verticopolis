@@ -89,9 +89,10 @@ export function integrityOf(bytes: Uint8Array): string {
 /** The engine files whose precache entries carry `integrity`, as manifest URLs. */
 export const INTEGRITY_FILES: readonly string[] = [ENGINE_GLUE, ENGINE_WASM, ENGINE_BUILD_RECORD].map((f) => ENGINE_DIR + f);
 
-/** Precache entries whose file does not exist yet when the manifest transforms
- *  run (the PWA plugin writes the web app manifest afterwards), so they carry no
- *  integrity. The offline cold start does not read it. */
+/** Precache entries the manifest transforms never see: vite-plugin-pwa adds the
+ *  web app manifest through `additionalManifestEntries`, which workbox-build
+ *  applies after the transforms, so it carries no integrity. The offline cold
+ *  start does not read it. */
 export const NO_INTEGRITY_FILES: readonly string[] = ["manifest.webmanifest"];
 
 interface ManifestEntry {
@@ -110,7 +111,7 @@ interface ManifestEntry {
  * whose file is not under `distDir` is left as it is, except an engine entry,
  * which stops the build rather than ship without a check.
  */
-export function engineIntegrityTransform(distDir: string | (() => string)) {
+export function engineIntegrityTransform(distDir: string | (() => string), options: { shell?: boolean } = {}) {
   return (entries: ManifestEntry[]): { manifest: ManifestEntry[]; warnings: string[] } => {
     const dir = typeof distDir === "function" ? distDir() : distDir;
     return {
@@ -118,6 +119,7 @@ export function engineIntegrityTransform(distDir: string | (() => string)) {
         const url = e.url.split(/[?#]/)[0].replace(/^\.?\//, "");
         const file = resolve(dir, url);
         if (!INTEGRITY_FILES.includes(url)) {
+          if (options.shell === false) return e;
           // Any other entry keeps its revision and gains the integrity of its file,
           // so a precache miss on a controlled page stores the file (Workbox caches
           // a missed entry only when the manifest carries integrity) and the shell

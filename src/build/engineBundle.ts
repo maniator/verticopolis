@@ -177,21 +177,35 @@ export function repoRelativeSource(path: string, root: string): string {
   return plain.startsWith(`${root}/`) ? plain.slice(root.length + 1) : plain.replace(/^\//, "");
 }
 
-/** The precache URLs in a Workbox `sw.js`: the entries of the array passed to
- *  `precacheAndRoute`, and nothing else in the worker. Null when the call or
- *  its array cannot be found. */
-export function precacheManifest(sw: string): string[] | null {
-  // The call with an array literal argument, so an inlined Workbox runtime's
-  // own `function precacheAndRoute(e,t){` is never read as the manifest.
+/** Where the precache manifest array opens in a Workbox `sw.js`, or null. The
+ *  worker is built from src/sw.ts and minified, so the call's name is not
+ *  stable, and the entry keys come out quoted and sorted
+ *  (`{"integrity":...,"revision":...,"url":...}`): the array is found by its
+ *  first entry, a flat object with a `url` key. A call spelled `precacheAndRoute([` (an unminified worker) is read
+ *  first, so an inlined runtime's own `function precacheAndRoute(e,t){` is
+ *  never taken for the manifest. */
+export function precacheManifestOpen(sw: string): number | null {
   const call = /precacheAndRoute\(\s*\[/.exec(sw);
-  if (!call) return null;
-  const open = call.index + call[0].length - 1;
+  if (call) return call.index + call[0].length - 1;
+  const entry = /\[\s*\{[^{}\]]*?["']?\burl["']?\s*:\s*["']/.exec(sw);
+  return entry ? entry.index : null;
+}
+
+/** The precache manifest array of a worker as text, brackets included; null when it cannot be found or matched. */
+export function precacheManifestText(sw: string): string | null {
+  const open = precacheManifestOpen(sw);
+  if (open === null) return null;
   let depth = 0;
   for (let i = open; i < sw.length; i++) {
     if (sw[i] === "[") depth++;
-    else if (sw[i] === "]" && --depth === 0) {
-      return [...sw.slice(open, i + 1).matchAll(/["']?url["']?\s*:\s*(["'])(.*?)\1/g)].map((m) => m[2].replace(/^\.?\//, ""));
-    }
+    else if (sw[i] === "]" && --depth === 0) return sw.slice(open, i + 1);
   }
   return null;
+}
+
+/** The precache URLs in a Workbox `sw.js`: the entries of the manifest array,
+ *  and nothing else in the worker. Null when the array cannot be found. */
+export function precacheManifest(sw: string): string[] | null {
+  const text = precacheManifestText(sw);
+  return text === null ? null : [...text.matchAll(/["']?url["']?\s*:\s*(["'])(.*?)\1/g)].map((m) => m[2].replace(/^\.?\//, ""));
 }

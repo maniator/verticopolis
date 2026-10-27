@@ -16,6 +16,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets.ts";
+import { precacheManifestText } from "../src/build/engineBundle.ts";
 import { engineDistProblems, shellProblems, shellRevisionProblems } from "../src/build/enginePackageBuild.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
 import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, ENGINE_WASM, glueLoads } from "../src/wasmhost/engineAssets.ts";
@@ -48,26 +49,11 @@ try {
 } catch (e) {
   fail(`could not read ${SW} (run the build first): ${e instanceof Error ? e.message : String(e)}`);
 }
-const start = sw.indexOf("precacheAndRoute(");
-if (start === -1) fail("no precacheAndRoute call found in dist/sw.js; did the workbox output format change?");
-
 // Bracket-match the manifest array so URLs elsewhere in the worker (routing
 // regexes, cache names) can never leak into the count.
-const open = sw.indexOf("[", start);
-if (open === -1) fail("no manifest array follows the precacheAndRoute call in dist/sw.js");
-let depth = 0;
-let end = -1;
-for (let i = open; i < sw.length; i++) {
-  if (sw[i] === "[") depth++;
-  else if (sw[i] === "]" && --depth === 0) {
-    end = i;
-    break;
-  }
-}
-if (end === -1) fail("could not bracket-match the precache manifest array in dist/sw.js");
-const manifest = sw.slice(open, end + 1);
+const manifest = precacheManifestText(sw) ?? fail("no precache manifest array found in dist/sw.js; did the worker output format change?");
 
-// generateSW emits entries as {url:"...",revision:"..."} (unquoted keys,
+// The manifest entries are emitted as {url:"...",revision:"..."} (unquoted keys,
 // double-quoted values in the minified output); tolerate quoted keys and
 // single-quoted values too, and normalize a leading "./" or "/", so a purely
 // cosmetic emitter change cannot false-fail the build. A real format change
@@ -140,8 +126,9 @@ if (builtEngine) {
   const wasted = ENGINE_BUILD_ONLY_FILES.filter((f) => seen.has(f));
   if (wasted.length > 0) fail(`engine files the game never fetches are in the precache manifest (src/wasmhost/engineAssets.ts marks them build-only): ${wasted.join(", ")}`);
   // The package check (#985 criterion 5): BUILD.json describes the files
-  // beside it, and the three engine entries carry the integrity that keeps a
-  // body from another build out of the precache.
+  // beside it, and every entry whose file is in dist/ carries the integrity
+  // that keeps a body from another build out of the precache and lets a
+  // missed entry be stored again (#1345).
   const unsound = engineDistProblems(DIST, manifest);
   if (unsound.length > 0) fail(`the engine package in dist/ is not one consistent set: ${unsound.join("; ")}`);
 }

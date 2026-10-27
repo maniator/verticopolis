@@ -69,6 +69,15 @@ function engineBuild(): EngineBuild {
 }
 
 const ENGINE_BUILD = engineBuild();
+/**
+ * Whether the shell's precache entries (everything but the engine files) carry
+ * integrity (#1345). Vercel's toolbar rewrites `index.html` on preview
+ * deployments, so a worker whose install fetched it with the build's digest
+ * would never install there: previews keep the engine-only integrity of
+ * #985, and production and local builds get the full set. `VERCEL_ENV` is
+ * set by Vercel's build and by nothing else in this repository.
+ */
+const SHELL_INTEGRITY = process.env.VERCEL_ENV !== "preview";
 const TOOLING_BUILD = toolingBuild();
 
 /**
@@ -386,7 +395,10 @@ export default defineConfig(({ command }) => ({
           },
         ],
       },
-      workbox: {
+      strategies: "injectManifest",
+      srcDir: ".",
+      filename: "sw.ts",
+      injectManifest: {
         // Precache the game shell only. The dev/tooling entry points and their
         // chunks are excluded so an install ships just the game.
         //
@@ -432,7 +444,8 @@ export default defineConfig(({ command }) => ({
         // stored before this change is never found under their keys and the
         // update fetches all three files with integrity. Every other entry
         // whose file is in the build carries its integrity as well (the web
-        // app manifest, written afterwards, is the one exception), because
+        // app manifest, which the plugin adds after the transforms, is the
+        // one exception; none on preview deployments), because
         // Workbox stores a precache miss only when the entry has one: with
         // it, an online visit after the cache is lost puts the shell back and
         // the next cold start works offline (#1345). The page's own byte
@@ -458,62 +471,10 @@ export default defineConfig(({ command }) => ({
         // of every web player's offline precache (a review catch on the PR
         // that added it).
         globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png"],
-        navigateFallback: "index.html",
-        // Keep the non-game pages and the real static files out of the app-shell
-        // fallback, letting them fall through to the network rather than the game
-        // shell: the `/gallery` and `/help` public pages, `version.json` (the
-        // update-check payload), the crawler control files `robots.txt` /
-        // `sitemap.xml`, and the `og-image.png` share card (a direct navigation to
-        // it, e.g. opening the card in a new tab while the service worker controls
-        // the origin, must return the PNG, not the shell), none of which are app
-        // routes. Without the `/help` entry the fallback would answer a `/help`
-        // navigation with the precached game shell.
-        //
-        // `help.html` is kept OUT of precache (the `globIgnores` entries above),
-        // exactly like `gallery.html`, so the CLEAN `/help` always resolves over
-        // the network via the Vercel rewrite and is never stale. This matters
-        // because Workbox precaching defaults `cleanURLs` to true: a navigation to
-        // `/help` generates a `/help.html` variation, so a precached `/help.html`
-        // would answer the clean `/help` FROM THE CACHE, pinning it to whatever was
-        // cached when the service worker installed and serving an outdated page
-        // across deploys until the worker updates (and the `/help` page does not
-        // register the worker, so a `/help`-only visitor never triggers that
-        // update). The `navigateFallbackDenylist` alone does not prevent this: it
-        // governs only the app-shell NavigationRoute, not the precache route. Not
-        // precaching the page is the fix; the trade-off is that `/help` is
-        // online-only (no offline copy), the same call already made for `/gallery`.
-        // A precache alias for the clean URL is separately rejected: with
-        // generateSW it would make Workbox fetch `/help` at install, which 404s
-        // anywhere the Vercel rewrite is absent (`vite preview`, the e2e harness),
-        // failing the whole precache and taking the game's offline down with it.
-        // `.well-known/` joins the machine-readable files for the same reason
-        // robots.txt and sitemap.xml are here: they are documents ABOUT the
-        // site rather than pages of it, and answering one with the game shell
-        // makes a person checking it think it is missing. Android's Digital
-        // Asset Links verifier fetches server-side and never meets a service
-        // worker, so this changes nothing for verification itself; it is what
-        // makes checking the file by hand tell the truth.
-        // `third-party-notices.txt` (#951, written after each build) is the
-        // same kind of document, so a navigation to it, query string or not,
-        // reaches the file itself.
-        navigateFallbackDenylist: [
-          /gallery/,
-          /help/,
-          /preview/,
-          /version\.json$/,
-          // The engine package's own files (its BUILD.json above all) are
-          // documents; a navigation to one must reach the file itself.
-          /\/engine\//,
-          /robots\.txt$/,
-          /sitemap\.xml$/,
-          /third-party-notices\.txt(\?.*)?$/,
-          /og-image\.png$/,
-          // No trailing slash: a bare `/.well-known` navigation should reach the
-          // host's own 404 rather than the game shell, same as the file below it.
-          /\.well-known/,
-        ],
-        manifestTransforms: [engineIntegrityTransform(() => builtDistDir)],
-        cleanupOutdatedCaches: true,
+        // The app-shell navigation route, its denylist and the cleanup of
+        // outdated caches are in src/sw.ts, which this plugin builds into the
+        // worker (strategies: "injectManifest").
+        manifestTransforms: [engineIntegrityTransform(() => builtDistDir, { shell: SHELL_INTEGRITY })],
         // Excalibur's bundle is comfortably large; lift the precache ceiling.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
       },

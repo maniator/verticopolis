@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { checkEngineBundle, DEFAULT_ENGINE_BUILD, ENGINE_PACKAGE_FILES, parseAllowList, parseEngineBuild, precacheManifest, repoRelativeSource, TS_STEP_LOOP, type EngineBundleInput } from "./engineBundle";
+import { checkEngineBundle, DEFAULT_ENGINE_BUILD, ENGINE_PACKAGE_FILES, parseAllowList, parseEngineBuild, precacheManifest, precacheManifestText, repoRelativeSource, TS_STEP_LOOP, type EngineBundleInput } from "./engineBundle";
 
 const ROOT = resolve(__dirname, "..", "..");
 
@@ -138,5 +138,19 @@ describe("precacheManifest", () => {
     expect(precacheManifest("precacheAndRoute(")).toBeNull();
     // An inlined runtime's definition comes first and is skipped.
     expect(precacheManifest('function precacheAndRoute(e,t){x([e])}precacheAndRoute([{url:"a.js",revision:"1"}])')).toEqual(["a.js"]);
+  });
+
+  it("finds the array of a worker built from src/sw.ts, where the call's name is minified", () => {
+    const sw = 'function Ne(e){return[e]}Ne([{url:"index.html",revision:"1",integrity:"sha256-x"},{url:"assets/a.js",revision:null}]);Ie(new Ce(Re("index.html"),{denylist:[/\\/engine\\//]}))';
+    expect(precacheManifest(sw)).toEqual(["index.html", "assets/a.js"]);
+    // The built worker quotes the keys and sorts them, so the url comes last.
+    expect(precacheManifest('ce([{"integrity":"sha256-x","revision":"1","url":"index.html"},{"revision":null,"url":"assets/a.js"}]);')).toEqual(["index.html", "assets/a.js"]);
+    expect(precacheManifestText(sw)).toBe('[{url:"index.html",revision:"1",integrity:"sha256-x"},{url:"assets/a.js",revision:null}]');
+  });
+
+  it("is null for an array that never closes, or one whose entries have no url", () => {
+    expect(precacheManifestText('x([{url:"a.js",revision:"1"}')).toBeNull();
+    expect(precacheManifestText('x([{revision:"1",path:"a.js"}])')).toBeNull();
+    expect(precacheManifestText('x([1,2],{url:"a.js"})')).toBeNull();
   });
 });

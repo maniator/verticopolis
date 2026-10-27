@@ -60,6 +60,14 @@ async function installedFirst(page: Page): Promise<void> {
   await expectEngineIs(deployments, page, "A");
 }
 
+/** The path of every entry in every cache of the origin. */
+const precacheKeys = (page: Page): Promise<string[]> =>
+  page.evaluate(async () => {
+    const out: string[] = [];
+    for (const name of await caches.keys()) for (const request of await (await caches.open(name)).keys()) out.push(new URL(request.url).pathname);
+    return out;
+  });
+
 const bootFailure = (page: Page) =>
   page.evaluate(() => (window as any).__vcEngineBoot?.failure as { stage: string; reason: string; package?: { kind: string; controlled: boolean } } | null | undefined);
 
@@ -170,12 +178,52 @@ test("with the whole precache gone and no network the page does not load, and an
     expect(await bootFailure(revisit)).toBeNull();
     await expectEngineIs(deployments, revisit, "A");
 
-    // The online visit stored the shell again, so the next start needs no network.
+    // The online visit stored the shell again: the page, its entry chunks and
+    // the engine are in the precache under their own keys.
+    const stored = await precacheKeys(revisit);
+    for (const want of [/^\/index\.html$/, /^\/assets\/main-[\w-]+\.js$/, /^\/assets\/vendor-excalibur-[\w-]+\.js$/, /^\/engine\/verticopolis_engine_bg\.wasm$/]) {
+      expect(stored.some((p) => want.test(p)), `${want} is in the precache after the recovery`).toBe(true);
+    }
+
+    // A cold start with no network and an empty HTTP cache (a new page, not a reload).
+    const cdp = await context.newCDPSession(revisit);
+    await cdp.send("Network.clearBrowserCache");
     deployments.failNetwork("all");
-    await revisit.reload({ timeout: 30_000 });
-    await hostedGame(revisit);
-    expect(await bootFailure(revisit), "no fallback on the offline start after the recovery").toBeNull();
-    await expectEngineIs(deployments, revisit, "A");
+    await revisit.close();
+    const cold = await context.newPage();
+    await cold.goto("/", { timeout: 30_000 });
+    await hostedGame(cold);
+    expect(await bootFailure(cold), "no fallback on the offline start after the recovery").toBeNull();
+    await expectEngineIs(deployments, cold, "A");
+  } finally {
+    await context.close();
+  }
+});
+
+test("with the precache gone and a newer deploy live, an online visit loads the newer build and its worker installs", async ({ browser }) => {
+  // The old worker's index.html entry carries the first build's digest, and the
+  // server now answers with the second build's page. That page must still load
+  // (the worker's catch handler falls back to the network for a navigation),
+  // and the newer worker must then install and take over.
+  const context = await newContext(browser, deployments);
+  try {
+    const page = await context.newPage();
+    await installedFirst(page);
+    await page.evaluate(async () => {
+      for (const name of await caches.keys()) await caches.delete(name);
+    });
+    await page.close();
+    deployments.serve("B");
+    const revisit = await context.newPage();
+    const response = await revisit.goto("/", { timeout: 30_000 });
+    expect(response?.status(), "the page loads while online").toBe(200);
+    // The page is the second build's, but the first worker still enforces its own
+    // engine digests on the cache misses, so the engine is refused (a stop screen
+    // on this build). The second worker installs and the stop screen takes it at
+    // once, which lands the page on the second build.
+    await revisit.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted, undefined, { timeout: 90_000 });
+    expect(await bootFailure(revisit)).toBeNull();
+    await expectEngineIs(deployments, revisit, "B");
   } finally {
     await context.close();
   }

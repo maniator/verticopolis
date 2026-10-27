@@ -264,8 +264,8 @@ diagnostics.
    `runtime: true` in the same change. `THIRD-PARTY.json` stays out.
 3. **Integrity on the three engine entries.** A `manifestTransforms` entry
    in the workbox options reads each engine file from the build output and
-   adds `integrity: "sha256-<base64>"`. The other entries are unchanged (see
-   open question 3 for widening it).
+   adds `integrity: "sha256-<base64>"`. The other entries were unchanged
+   here; open question 3 widened it on 2026-10-27 (section 10).
 4. **`scripts/verify-precache.ts` gains these failures:**
    - an engine run-time entry (now three) without `integrity`, or whose
      `integrity` differs from the file in `dist/`;
@@ -689,7 +689,7 @@ the room's positions on all six open questions.
 | --- | --- | --- |
 | 1 | `BUILD.json` at run time | Required. |
 | 2 | Content-hashed names (option A) | Only if the S16 fallback-use signal shows mismatches in the field. |
-| 3 | Integrity beyond the engine set | Engine set only for now. The shell is tracked as #1046 (a `design-decision` backlog row restored by the Phase 2 plan PR #1080, which records the preview-deploy problem). |
+| 3 | Integrity beyond the engine set | Engine set only for now. The shell is tracked as #1046 (a `design-decision` backlog row restored by the Phase 2 plan PR #1080, which records the preview-deploy problem). | **Reversed 2026-10-27 (Naftali, option A for #1345):** every precache entry whose file is in the build carries its integrity in production and local builds (not on Vercel preview deployments, where the toolbar rewrites `index.html`), because Workbox stores a precache miss only for an entry that has integrity, and without it an installed game cannot cold-start offline after its caches are cleared. The worker is built from `src/sw.ts` (`injectManifest`) so it can carry a catch handler that sends a navigation to the network when the integrity fetch fails, which keeps the lost-precache plus newer-deploy case loadable online (`e2e/engineEviction.spec.ts`). Row #1046 is closed by it.
 | 4 | No `crypto.subtle` | Refuse with `unverifiable`. No JavaScript SHA-256. |
 | 5 | Kill switch | None. A redeploy or a Vercel rollback is the fix; each build checks only against itself. |
 | 6 | The id #963 shows | Both: `package` and `sources`. |

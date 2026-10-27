@@ -6,6 +6,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { precacheManifestText } from "../src/build/engineBundle";
 import { shellProblems } from "../src/build/enginePackageBuild";
 import { engineBuildRecord } from "../src/wasmhost/enginePackageRecord";
 import { ENGINE_GLUE, ENGINE_WASM } from "../src/wasmhost/enginePackageNames";
@@ -88,13 +89,16 @@ const SALT_SECTION = Buffer.from([0x00, 0x03, 0x01, 0x42, 0x00]);
 
 /** The revision `sw.js` records for a precached `url`, and how many entries it lists. */
 function manifestOf(sw: string): { revisionOf(url: string): string; entries: number } {
-  const entries = sw.match(/\{url:"/g)?.length ?? 0;
+  const text = precacheManifestText(sw);
+  if (text === null) throw new Error("sw.js has no precache manifest");
+  // The built worker writes the manifest with quoted keys, so it is JSON.
+  const list = JSON.parse(text) as { url: string; revision: string | null }[];
   return {
-    entries,
+    entries: list.length,
     revisionOf: (url) => {
-      const found = new RegExp(`\\{url:"${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}",revision:"([a-f0-9]{32}(?:-i\\d+)?)"`).exec(sw);
-      if (!found) throw new Error(`sw.js has no revisioned precache entry for ${url}`);
-      return found[1];
+      const found = list.find((e) => e.url === url)?.revision;
+      if (!found || !/^[a-f0-9]{32}(?:-i\d+)?$/.test(found)) throw new Error(`sw.js has no revisioned precache entry for ${url}`);
+      return found;
     },
   };
 }
