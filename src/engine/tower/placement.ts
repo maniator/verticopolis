@@ -2,6 +2,7 @@ import type { Tower } from "../Tower";
 import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isFixedSpanTransport, maxSpanFor } from "../facilities";
 import type { FacilityKind, PlaceResult, Unit } from "../types";
 import { isStructural, isLobbyFloor, isSkyLobbyFloor, coversGroundFloor, NO_BASEMENT_KINDS } from "./towerTopology";
+import { addUnit, removeUnits, takeFloorSlot } from "./removal";
 
 /** Placement + support/bridging validation for the Tower, as friend functions
  * taking the {@link Tower} instance. Extracted from `Tower.ts`; the class keeps
@@ -264,7 +265,7 @@ export function ensureFloorUnder(tower: Tower, floor: number, x: number, width: 
   if (tiles.length === 0) return { ok: true, count: 0 };
   const { placed, stuck } = tower.placeStructureRun(tiles, "floor");
   if (stuck.length > 0) {
-    for (const id of placed) tower.removeUnit(id);
+    removeUnits(tower, placed);
     return { ok: false, reason: "Build next to the tower. You can't build in midair.", count: 0 };
   }
   return { ok: true, count: placed.length };
@@ -407,15 +408,6 @@ export function place(tower: Tower, kind: FacilityKind, floor: number, x: number
   const check = tower.canPlace(kind, floor, x);
   if (!check.ok) return check;
   const f = FACILITIES[kind];
-  // In-place floor→lobby upgrade: clear the plain floor tiles being replaced
-  // before registering the lobby, so the structure index never goes stale.
-  // (canPlace guaranteed any structure in the span is plain floor.)
-  if (kind === "lobby") {
-    for (let i = 0; i < f.width; i++) {
-      const sid = tower.structure.get(tower.key(floor, x + i));
-      if (sid !== undefined) tower.removeUnit(sid);
-    }
-  }
   const unit: Unit = {
     id: tower.nextId++,
     kind,
@@ -429,7 +421,23 @@ export function place(tower: Tower, kind: FacilityKind, floor: number, x: number
     pendingIncome: 0,
     label: f.name,
   };
-  tower.units.push(unit);
+  // In-place floor→lobby upgrade: clear the plain floor tiles being replaced
+  // before registering the lobby, so the structure index never goes stale.
+  // (canPlace guaranteed any structure in the span is plain floor.) Inside
+  // the lobby brush a lobby over one tile takes that tile's place in the
+  // unit list, and the brush moves what it placed to the end once
+  // (tower/removal.ts).
+  let slot: number | undefined;
+  if (kind === "lobby") {
+    const under: number[] = [];
+    for (let i = 0; i < f.width; i++) {
+      const sid = tower.structure.get(tower.key(floor, x + i));
+      if (sid !== undefined) under.push(sid);
+    }
+    if (under.length === 1) slot = takeFloorSlot(tower, under[0]);
+    if (slot === undefined) removeUnits(tower, under);
+  }
+  addUnit(tower, unit, slot);
   tower.register(unit);
   if (kind === "weddingHall") tower.builtWeddingHall = true;
   // First lobby tile on this floor → it just became a (sky) lobby, so bring any

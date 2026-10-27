@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { cumulativeStarGates, nextStarRequirements } from "../../engine/sim/star";
+import { markRoom } from "../../engine/tower/rooms";
 import { nothing } from "lit-html";
 import { incomeSection, milestonesSection, nextStarSection, statsModalTemplate, canCallExterminator, STAR_GATE_LABELS } from "./stats";
 import { statsBodyOf, statsScreenOf } from "./stats.fixture";
@@ -287,7 +288,9 @@ describe("Tenancy vacancies split off-market (No Rate) counts out", () => {
       return (key?.nextElementSibling as HTMLElement).textContent;
     };
     expect(await vacantRow()).toBe("2"); // two vacant, none off-market: unchanged
-    sim.tower.units.find((u) => u.id === c.unitId)!.noRate = true;
+    const office = sim.tower.units.find((u) => u.id === c.unitId)!;
+    office.noRate = true;
+    markRoom(sim.tower, office); // as the engine's rate commands do
     expect(await vacantRow()).toBe("2 (1 off-market)"); // the honest split
   });
 });

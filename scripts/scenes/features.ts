@@ -210,6 +210,10 @@ export const FEATURE_SCENES: Scene[] = [
               u.occupants = 0;
               if (i < 2) u.noRate = true;
             }
+            // The writes above mark no room, so a new revision makes the HUD
+            // and the report count the rooms again (as e2e/regions.spec.ts
+            // does after its staged fire).
+            g.sim.tower.revision++;
           });
           await page.evaluate(() => document.getElementById("btn-stats")?.click());
           await page.waitForSelector("#modal .stats-grid", { timeout: 4000 });
@@ -300,9 +304,10 @@ export const FEATURE_SCENES: Scene[] = [
           for (let i = 0; i < 40; i++) {
             const stepped = await page.evaluate(pgStep, 10);
             if (!stepped) throw new Error("traffic chip needs the stepped clock");
-            const label = await page.evaluate(() => {
+            const label = await page.evaluate(async () => {
               const g = (window as any).game;
-              g?.updateTraffic?.();
+              // The chip draws once the port answers.
+              await g?.refreshTraffic();
               return document.getElementById("traffic-label")?.textContent ?? "";
             });
             if (label && label !== "Smooth") break;

@@ -422,6 +422,20 @@ impl Engine {
         Ok(build_result(self.sim.build(kind, floor.into(), x.into())))
     }
 
+    /// `paintBrush(kind, floor, tiles)` with the tiles as JSON text: JSON
+    /// `{ placed, reason? }`, the floor and lobby brush (`brush.rs`) in one
+    /// call. Every argument is read raw, so a malformed brush is refused
+    /// with "That request is not valid." as TypeScript refuses it.
+    #[wasm_bindgen(js_name = paintBrush)]
+    pub fn paint_brush(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] kind: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] floor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tiles: JsValue,
+    ) -> String {
+        self.paint_brush_checked(kind.as_string(), floor.as_f64(), tiles.as_string())
+    }
+
     /// `canBuild(kind, floor, x)`: JSON `{ ok, reason?, cost }`, the dry run
     /// `build` makes first. When the placement fits, `cost` is its full
     /// price: the facility, the floor tiles laid under a room, and the tiles
@@ -1068,6 +1082,71 @@ impl Engine {
     }
 }
 
+// The view's layout (facade slice 6a, #1213) as JSON: the version, every
+// slot and width of the dynamic frame and the structural snapshot by name,
+// and the kind, state, weather, mode and calendar codes
+// (`view::layout_json`). A host checks it on load and refuses a version or
+// width it does not know.
+#[wasm_bindgen(js_name = viewLayout)]
+pub fn view_layout() -> String {
+    crate::view::layout_json().to_string()
+}
+
+/// The renderer-facing view (facade slice 6a, #1213): one-line wrappers over
+/// `crate::view`, which documents each layout. Their notes, and
+/// `view_layout`'s above, are plain comments: wasm-bindgen copies doc
+/// comments into the generated `src/dualrun/engine.d.ts`, which the 500-line
+/// ceiling holds.
+#[wasm_bindgen]
+impl Engine {
+    // The structural snapshot (`view::structure_view`): the floor bounds,
+    // the mode and calendar, rooms by slot, floor and lobby tiles as runs,
+    // transports with their skipped floors. Read again when the frame
+    // header's tower revision moves.
+    #[wasm_bindgen(js_name = viewStructure)]
+    pub fn view_structure(&self) -> Vec<f64> {
+        crate::view::structure_view(&self.sim)
+    }
+
+    // The dynamic frame (`view::ViewReader::frame`): the header, the
+    // people, the rooms whose fields changed since the last call (every room
+    // when `full` is `true`, on the first call, or after a structural
+    // change, with the header's full flag set) and the cars. One reader per
+    // engine, so one caller: the header's frame number tells it when it
+    // missed a frame. Read raw: only a JS `true` asks for a full frame.
+    #[wasm_bindgen(js_name = viewFrame)]
+    pub fn view_frame(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "boolean")] full: JsValue,
+    ) -> Vec<f64> {
+        crate::view::view_frame(&self.sim, full.as_bool() == Some(true))
+    }
+
+    // The labels and subtypes changed after the meta revision `since`, as
+    // JSON `{ revision, full, units: [[id, label, subtype], ...] }`
+    // (`view::meta_since`). Read raw: a `since` of 0, or of anything but a
+    // whole JS number from the log's reach up to the current revision
+    // (`undefined` from untyped JavaScript among them), gets a full listing.
+    #[wasm_bindgen(js_name = unitMetaSince)]
+    pub fn unit_meta_since(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] since: JsValue,
+    ) -> String {
+        let since = crate::view::whole_revision(since.as_f64());
+        crate::view::meta_since(&self.sim.tower, since).to_string()
+    }
+
+    // The tower signature (`Simulation::tower_signature`) as a `bigint`: two
+    // reads are equal when the fields the tower half of `towerStateSig`
+    // reads are equal, and differ when they differ (but for a 64-bit
+    // collision). Undo reads it, beside money, at a gesture's capture and
+    // commit; it walks every unit, so it is too slow to read each frame.
+    #[wasm_bindgen(js_name = towerSignature)]
+    pub fn tower_signature(&self) -> u64 {
+        self.sim.tower_signature()
+    }
+}
+
 // ---- panel getters (facade slice 6b, #1214) ----------------------------
 //
 // One-line wrappers over `crate::panels`: each answers JSON text keyed with
@@ -1145,6 +1224,25 @@ impl Engine {
     #[wasm_bindgen(js_name = onboardingFacts)]
     pub fn onboarding_facts(&self) -> String {
         self.sim.onboarding_facts().to_string()
+    }
+}
+
+/// Facade slice 6c (#1215): the inspector's diagnostics facts.
+#[wasm_bindgen]
+impl Engine {
+    /// The facts behind the inspector's diagnostics for one unit, as JSON
+    /// text (`diagnostics::DiagnosticFacts`); TypeScript keeps the wording.
+    /// Undefined for an id that names no unit (a transport's, zero or a
+    /// negative one) and for a malformed one (fractional, not finite, past
+    /// the safe integers), read raw so it cannot wrap onto a real unit.
+    /// The read may fill the engine's caches, which sit outside the save; it
+    /// changes nothing in the game.
+    #[wasm_bindgen(js_name = diagnosticFacts)]
+    pub fn diagnostic_facts(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+    ) -> Option<String> {
+        crate::diagnostics::facts_json(&mut self.sim, id.as_f64())
     }
 }
 

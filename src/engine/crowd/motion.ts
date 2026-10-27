@@ -15,6 +15,7 @@ import { pickX, pickXInSegment, insideX, metroStationForPlatform } from "./trips
 import { walkTo } from "./walk";
 import { landingSlots } from "./landing";
 import { alightX } from "../tower/segments";
+import { markRoom } from "../tower/rooms";
 import { beginDwell } from "./visits";
 
 /**
@@ -389,6 +390,7 @@ export function finish(crowd: Crowd, p: Person, tower: Tower): void {
     const venue = tower.getUnit(p.venueUnitId);
     if (venue && (venue.customersIn ?? 0) > 0) {
       venue.customersIn = (venue.customersIn ?? 0) - 1;
+      markRoom(tower, venue);
       // Attendance venues keep their occupants mirror in step with the tally
       // (a no-op for every other kind).
       syncAttendanceOccupants(venue);

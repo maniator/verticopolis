@@ -20,6 +20,10 @@ use verticopolis_engine::load::{
 };
 use verticopolis_engine::sim::Simulation;
 use verticopolis_engine::snapshot::state_view;
+use verticopolis_engine::view::{
+    layout, layout_json, meta_since, structure_view, view_frame, whole_revision, ViewReader,
+    VIEW_LAYOUT_VERSION,
+};
 use verticopolis_engine::{export_tdt, import_tdt};
 
 #[test]
@@ -33,6 +37,7 @@ fn the_host_api_is_in_place() {
     let _ = Simulation::can_build;
     let _ = Simulation::can_build_transport;
     let _ = Simulation::build;
+    let _ = Simulation::paint_brush;
     let _ = Simulation::build_transport;
     let _ = Simulation::sell_at;
     let _ = Simulation::toggle_auto_bridge;
@@ -66,6 +71,26 @@ fn the_host_api_is_in_place() {
     );
     let _ = (UNKNOWN_ROUTINE, header::MONEY, person::ROUTINE);
     let _ = (unit::STATE, transport::CARS, car::DIRECTION);
+    // The renderer-facing view: structure, frame, metadata, the tower
+    // signature, and the layout by name.
+    let _ = structure_view;
+    let _ = ViewReader::new;
+    let _ = ViewReader::frame;
+    let _ = view_frame;
+    let _ = (meta_since, whole_revision);
+    let _ = Simulation::tower_signature;
+    let _ = layout_json;
+    let _ = (VIEW_LAYOUT_VERSION, layout::HEADER, layout::UNIT_RECORD);
+    let _ = (
+        layout::STRUCTURE_HEADER,
+        layout::ROOM_RECORD,
+        layout::RUN_RECORD,
+    );
+    let _ = (
+        layout::SHAFT_FIXED,
+        layout::header::POPULATION,
+        layout::run::COUNT,
+    );
     // Saves, old and new.
     let _ = decode_vctower;
     let _ = deserialize;
