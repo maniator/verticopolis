@@ -16,10 +16,14 @@ impl Simulation {
     /// The tower signature (see the module docs): read it at a gesture's
     /// capture and at its commit, beside money, and the step changed the
     /// tower if and only if the two differ. Equal fields always give equal
-    /// signatures; a change to one field always gives a different one (each
-    /// step of the hash is a bijection), and any other change does but for a
-    /// 64-bit collision. One pass over units and transports per read, so it
-    /// is a per-command read, never a per-frame one.
+    /// signatures, and different fields give different ones but for a
+    /// 64-bit collision. It keeps apart a few states the `towerStateSig`
+    /// string runs together (a label holding the string's `:` or `;`
+    /// separators, an empty film policy or subtype beside a missing one), so
+    /// there it can see a change the string would not; where the string
+    /// sees one, so does the signature. One pass over units and transports
+    /// per read: a read for each command (undo's capture and commit), too
+    /// slow for each frame.
     pub fn tower_signature(&self) -> u64 {
         fingerprint(&self.tower)
     }

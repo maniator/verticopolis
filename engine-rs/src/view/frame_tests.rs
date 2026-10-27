@@ -145,24 +145,31 @@ fn the_unlocked_mask_follows_the_star() {
     );
 }
 
-/// The people, the rooms and the transports are `frameView`'s: each person
-/// record is the first `PERSON_RECORD` slots of `frameView`'s, each room's
-/// fields are its unit record's, and the transports close both frames slot
-/// for slot. `frameView` keeps its own encoders, so this holds the view's
-/// copies to them.
-#[test]
-fn people_and_transports_are_the_frames() {
-    let sim = busy();
-    let v = ViewReader::new().frame(&sim, true);
-    let f = frame_view(&sim);
+/// A full frame's people, rooms and transports are `frameView`'s: each
+/// person record is the first `PERSON_RECORD` slots of `frameView`'s, each
+/// room's fields are its unit record's, and the transports close both
+/// frames slot for slot. `frameView` keeps its own encoders, so this holds
+/// the view's copies to them; the oracle runs it after every session step,
+/// and `every_state_is_encoded_as_the_frame_encodes_it` on every unit and
+/// person state.
+pub(super) fn agrees_with_frame_view(sim: &Simulation, what: &str) {
+    let v = ViewReader::new().frame(sim, true);
+    let f = frame_view(sim);
+    assert_eq!(
+        v[header::WEATHER],
+        f[frame::header::WEATHER],
+        "{what}: weather"
+    );
     let people = sim.crowd.people.len();
-    assert!(people > 0);
     let mut at = frame::FRAME_HEADER;
     for k in 0..people {
         let mine = &v[HEADER + k * PERSON_RECORD..HEADER + (k + 1) * PERSON_RECORD];
         let theirs = &f[at..at + PERSON_RECORD];
-        assert_eq!(mine[person::ID], theirs[frame::person::ID]);
-        assert!(super::oracle_tests::same(mine, theirs), "person {k}");
+        assert_eq!(mine[person::ID], theirs[frame::person::ID], "{what}");
+        assert!(
+            super::oracle_tests::same(mine, theirs),
+            "{what}: person {k}"
+        );
         let route = f[at + frame::person::FLOOR_COUNT] + f[at + frame::person::SHAFT_COUNT];
         at += frame::PERSON_FIXED + route as usize;
     }
@@ -174,19 +181,70 @@ fn people_and_transports_are_the_frames() {
     for (slot, &i) in rooms.iter().enumerate() {
         let mine = &v[room_at + slot * UNIT_RECORD..room_at + (slot + 1) * UNIT_RECORD];
         let theirs = &f[units_at + i * frame::UNIT_RECORD..units_at + (i + 1) * frame::UNIT_RECORD];
-        assert_eq!(theirs[frame::unit::ID], sim.tower.units[i].id as f64);
-        assert_eq!(mine[unit::SLOT], slot as f64);
+        assert_eq!(
+            theirs[frame::unit::ID],
+            sim.tower.units[i].id as f64,
+            "{what}"
+        );
+        assert_eq!(mine[unit::SLOT], slot as f64, "{what}");
         assert!(
             super::oracle_tests::same(&mine[1..], &theirs[1..]),
-            "room {slot}"
+            "{what}: room {slot}"
         );
     }
     let tail = transports_len(&sim.tower.transports);
-    assert!(tail > 0);
-    assert!(super::oracle_tests::same(
-        &v[v.len() - tail..],
-        &f[f.len() - tail..]
-    ));
+    assert!(
+        super::oracle_tests::same(&v[v.len() - tail..], &f[f.len() - tail..]),
+        "{what}: transports"
+    );
+}
+
+#[test]
+fn people_and_transports_are_the_frames() {
+    let sim = busy();
+    assert!(!sim.crowd.people.is_empty());
+    assert!(!sim.tower.transports.is_empty());
+    agrees_with_frame_view(&sim, "busy");
+}
+
+/// The view writes every unit state, person state and weather with the code
+/// `frameView` writes, whether or not a session reaches it.
+#[test]
+fn every_state_is_encoded_as_the_frame_encodes_it() {
+    use crate::crowd::PState;
+    let mut sim = busy();
+    let room = sim.tower.room_index()[0];
+    for state in [
+        UnitState::Construction,
+        UnitState::Empty,
+        UnitState::Occupied,
+        UnitState::MovingIn,
+        UnitState::Vacating,
+        UnitState::Asleep,
+        UnitState::Dirty,
+        UnitState::Infested,
+        UnitState::Fire,
+        UnitState::Gutted,
+    ] {
+        sim.tower.units[room].state = state;
+        agrees_with_frame_view(&sim, state.as_str());
+    }
+    for state in [
+        PState::ToShaft,
+        PState::Waiting,
+        PState::Riding,
+        PState::Climbing,
+        PState::ToDest,
+        PState::Dwelling,
+        PState::Done,
+    ] {
+        sim.crowd.people[0].state = state;
+        agrees_with_frame_view(&sim, state.as_str());
+    }
+    for weather in [Weather::Clear, Weather::Cloudy, Weather::Rain] {
+        sim.weather = weather;
+        agrees_with_frame_view(&sim, "a weather");
+    }
 }
 
 /// A reader's first frame is full; then a frame sends only the rooms that

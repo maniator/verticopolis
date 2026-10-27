@@ -133,9 +133,10 @@ consumer and is out of scope here.
 ## Tasks
 
 - [x] Story file (this file) before the first commit.
-- [x] `frame.rs`: lift the state, weather and transport encoders into
-      `pub(crate)` helpers that `frame_view` and the view share; no `pub const`
-      added (the frame layout table stays as it is).
+- [x] `frame.rs`: the state, weather and transport encoders as
+      `pub(crate)` helpers after `frame_view`, for the view; `frame_view`
+      keeps its own body (round 1 put it back to its base text) and no
+      `pub const` is added (the frame layout table stays as it is).
 - [x] `engine-rs/src/view/`: `mod.rs` (state hung on `Tower`), `layout.rs`,
       `structure.rs`, `reader.rs`, `meta.rs` (setters, log, listing),
       `signature.rs`, and `*_tests.rs` beside them (the seeded sessions in
@@ -184,16 +185,18 @@ lane's), the load path (slice 13's), `src/simport/` (the facade thread's),
 `events.rs` and `build.rs` are the only edits outside 6a's files; 6d's command
 modules may touch the same files, and a conflict there is one line.
 
-6b (panel getters) keys its caches on `tower.revision`,
-`tower.meal_overlay_revision`, `tower.meta_revision` and the clock hour, and
-appends its own `wasm.rs` block after this one.
+6b (panel getters, #1228) merged first, with its `wasm.rs` wrappers held
+for this block; they append their own block after it. Its getters read
+labels and subtypes live, so they need no key on `tower.meta_revision`.
 
 ### Current state of what changes
 
 - `frame_view` (`frame.rs`) writes the header, every person with its route,
-  every unit's six slots and every transport's cars. The view reuses its
-  encoders; its own output does not change (`frame_tests.rs` and the frame
-  layout pin hold it).
+  every unit's six slots and every transport's cars. The view writes the
+  same codes with its own copies of those encoders, which
+  `view/frame_tests.rs` holds to `frame_view`'s on every unit state, person
+  state and weather and after every oracle step; `frame_view`'s body and
+  output do not change (`frame_tests.rs` and the frame layout pin hold it).
 - `Tower::set_label` (the editor's rename) returns `false` only for an unknown
   id, and `true` even when the name is unchanged. It keeps that contract.
 - Label writes today: `tower.rs` `set_label`, `churn.rs` (vacate and the
@@ -234,25 +237,28 @@ still exists, with its current values.
   compares each, summing the population as it goes; people and cars as
   `frameView` sends them; one allocation at the exact size. No walk over
   floor and lobby tiles.
-- `viewStructure`: per revision change, never per frame. One pass over units
-  for the runs (with an open run per floor, so a tile extends its floor's
-  run whatever was built between) and one over rooms; when the runs come out
-  of order, a stable sort and a join of the runs, which are a few hundred,
-  never of the tiles. The floor bounds come from the tower's per-revision
+- `viewStructure`: per revision change, and on a new engine. One pass over
+  units for the runs (with an open run per floor, so a tile extends its
+  floor's run whatever was built between) and one over rooms; a stable sort
+  of the runs when they come out of order, and always a join of the runs
+  that continue each other. Both are over the runs, about one per drag, and
+  leave the tiles alone. The floor bounds come from the tower's per-revision
   cache (`Tower::floor_bounds`, #1237), which the panel getters share. One
   allocation at the exact size.
 - `unitMetaSince`: per frame only when the meta revision moved; answers from
   the log by binary search. A full listing is one pass over units (load, or a
   reader that fell behind the log's cap).
 - `towerSignature`: per command (undo's capture and commit), one pass over
-  units and transports with a word-at-a-time hash. Never per frame.
+  units and transports with a word-at-a-time hash, too slow to read each
+  frame.
 - Setters: O(1) plus the log push; the log is capped and trimmed by halves.
 
 ### Out of scope
 
 The TypeScript view, `RustSim`, the port's undo wiring (slices 1, 5 and 7),
 panel getters (6b), diagnostics facts (6c), command gaps (6d), write-site dirty
-marks (only if the PC asks), the worker adapter (12).
+marks (#1285 item 1, which waits on the owner's decision and the PC), the
+worker adapter (12).
 
 ### Project context rules
 
@@ -282,19 +288,25 @@ Opus 5.5, extra high effort.
   any seeded session, so the structure carries the tiles' fields and the
   frame never walks them. The loader normalizes floor and lobby tiles (state
   empty, no occupants, no counters), which is why.
-- AC 6: one oracle test (`oracle_tests.rs`) runs six starts (a fixture, a
-  split tower, two Modern fixtures with a pending VIP and a 4-star tower, and
-  the events scenario at its fire) through seeded sessions of 24 kinds of
-  step (`session_tests.rs`), checking after every step. The last run, on 826
-  steps, saw the revision move on 62, the signature on 96 and the meta
-  revision on 36, with 113 incremental frames that sent rooms; the test
+- AC 6: one oracle test (`oracle_tests.rs`) runs seven starts (a new Modern
+  game the session grows by its own commands, the medium fixture, the
+  owner's split tower, two Modern fixtures with a hotel and a pending VIP, a
+  four-star fixture, and the events scenario at its fire) through seeded
+  sessions of 24 kinds of step (`session_tests.rs`), checking after every
+  step. Floor and lobby drags go rightward and leftward. The last run, on
+  1,110 checks, saw the revision move on 76, the signature on 121 and the
+  meta revision on 50, with 175 incremental frames that sent rooms; the test
   asserts floors on those counts so a session that stops exercising a path
-  fails. It also checks that every structure's runs are maximal, and a
-  separate test reverses the unit list and orders it by column, and gets the
-  same runs.
+  fails. It also checks that every structure's runs are maximal and that a
+  full frame's people, rooms and transports are `frameView`'s, and a
+  separate test reverses the unit list, orders it by column, and lays one
+  floor as two drags that meet, and gets the same runs.
 - AC 8: the signature is checked against `ts_sig`, a Rust port of
   `towerStateSig`'s tower half (`signature_tests.rs`), on every oracle step:
   equal strings give equal signatures and a new string a new signature. The
+  corpus's labels hold none of the string's `:` or `;` separators; with
+  them the string can run two states together that the signature keeps
+  apart, so there the signature can see a change the string would not. The
   integration test checks it against the real `towerStateSig` over renames,
   a name put back, rent, No Rate, cars, play and a sale.
 - The facade lane asked (2026-10-21) for the mode and calendar in the view,
@@ -322,8 +334,10 @@ Acceptance Auditor and the Hot-Path Auditor. Its patch findings, all fixed in
 this PR:
 
 - The runs depended on the unit list's order: a floor built in pieces gave a
-  run per piece. The walk now keeps an open run per floor, then sorts and
-  joins the runs only when they come out of order.
+  run per piece. The walk now keeps an open run per floor, then sorts the
+  runs when they come out of order and joins the ones that continue each
+  other (round 2 found the join skipped when the runs came out in order; it
+  now always runs).
 - The frame was built in two allocations with a copy between; it is now one
   allocation at its exact size, with the population summed in the room pass.
 - `frameView`'s body had been rewritten to call the shared encoders; it is
@@ -382,7 +396,7 @@ New:
 
 Changed:
 
-- `engine-rs/src/frame.rs` (shared encoders), `tower.rs` (view state, meta
+- `engine-rs/src/frame.rs` (the view's copies of the frame's encoders), `tower.rs` (view state, meta
   revision), `build.rs`, `churn.rs`, `events.rs` (setter calls), `lib.rs`
   (the module), `wasm.rs` (the binding block), `identity_tests.rs`,
   `compat-record.json`

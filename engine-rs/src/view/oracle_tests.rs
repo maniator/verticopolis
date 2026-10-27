@@ -10,13 +10,15 @@
 //! without a revision fails it.
 use std::collections::HashMap;
 
+use super::frame_tests::agrees_with_frame_view;
 use super::layout::{
-    header, room, run, shaft, structure, unit, HEADER, PERSON_RECORD, ROOM_RECORD, RUN_RECORD,
-    SHAFT_FIXED, STRUCTURE_HEADER, UNIT_RECORD,
+    header, room, run, shaft, structure, unit, CALENDARS, HEADER, MODES, PERSON_RECORD,
+    ROOM_RECORD, RUN_RECORD, SHAFT_FIXED, STRUCTURE_HEADER, UNIT_RECORD,
 };
 use super::session_tests::{run as run_session, starts};
 use super::signature_tests::ts_sig;
 use super::*;
+use crate::clock::{CalendarKind, GameMode};
 use crate::frame::{transports_len, unit_fields};
 use crate::tower::Tower;
 use sha2::{Digest, Sha256};
@@ -182,6 +184,20 @@ fn decode_structure(sim: &Simulation, v: &[f64], what: &str) {
         sim.lowest_floor() as f64,
         "{what}"
     );
+    let mode = match sim.mode {
+        GameMode::Classic => "classic",
+        GameMode::Modern => "modern",
+    };
+    let calendar = match sim.modern_calendar {
+        CalendarKind::Canon => "canon",
+        CalendarKind::RealWorld => "realWorld",
+    };
+    assert_eq!(MODES[v[structure::MODE] as usize], mode, "{what}");
+    assert_eq!(
+        CALENDARS[v[structure::CALENDAR] as usize],
+        calendar,
+        "{what}"
+    );
     let mut at = STRUCTURE_HEADER;
     for &i in rooms.iter() {
         let u = &tower.units[i];
@@ -197,7 +213,7 @@ fn decode_structure(sim: &Simulation, v: &[f64], what: &str) {
         let r = &v[at..at + RUN_RECORD];
         if let Some(l) = last {
             assert!(
-                (l[run::FLOOR], l[run::X]) <= (r[run::FLOOR], r[run::X]),
+                (l[run::FLOOR], l[run::X]) < (r[run::FLOOR], r[run::X]),
                 "{what}: runs by floor, then x"
             );
             let continues = l[run::FLOOR] == r[run::FLOOR]
@@ -283,9 +299,11 @@ fn tiles(tower: &Tower) -> Vec<[u64; 5]> {
         .collect()
 }
 
-/// The seeded sessions, each checked at every step for three claims:
+/// The seeded sessions, each checked at every step for four claims:
 ///
 /// - the freshness test: the kept view equals a fresh read;
+/// - a full frame's people, rooms and transports are `frameView`'s
+///   (`frame_tests::agrees_with_frame_view`);
 /// - the tiles' fields stand still between revisions: read straight off
 ///   the tower, they change only in a step that moved the revision (the
 ///   structure comparison implies it; this states it on its own);
@@ -301,6 +319,7 @@ fn a_kept_view_matches_a_fresh_read_after_every_step() {
     for (n, (name, mut sim, steps)) in starts().into_iter().enumerate() {
         let mut kept = Kept::new(&sim);
         kept.check(&sim, &format!("{name} at the start"));
+        agrees_with_frame_view(&sim, name);
         let mut tiles_then = (sim.tower.revision, tiles(&sim.tower));
         let mut sig_then = (sim.tower_signature(), sig_key(&sim.tower));
         let mut by_key = HashMap::from([(sig_then.1, sig_then.0)]);
@@ -310,6 +329,7 @@ fn a_kept_view_matches_a_fresh_read_after_every_step() {
             let what = format!("{name} {what}");
             kept.read(sim);
             kept.check(sim, &what);
+            agrees_with_frame_view(sim, &what);
             let tiles_now = (sim.tower.revision, tiles(&sim.tower));
             if tiles_now.0 == tiles_then.0 {
                 assert!(
@@ -354,8 +374,10 @@ fn a_kept_view_matches_a_fresh_read_after_every_step() {
 }
 
 /// The runs do not depend on the order the unit list gives the tiles in: a
-/// list reversed, or ordered by column so it interleaves the floors, gives
-/// the same runs as the tower's own order.
+/// list reversed, ordered by column so it interleaves the floors, with one
+/// floor's tiles laid as two drags that meet (0 to 4 and then 9 down to 5,
+/// or 0 to 4, then 6, then 5), or shuffled (read both by the walk and off
+/// the grid) gives the same runs as the tower's own order.
 #[test]
 fn the_runs_do_not_depend_on_the_unit_order() {
     let mut sim = super::session_tests::at("events-classic", "built");
@@ -372,10 +394,58 @@ fn the_runs_do_not_depend_on_the_unit_order() {
     sim.tower.units.sort_by_key(|u| (u.x, u.floor));
     sim.tower.reindex();
     assert!(same(&runs(&sim), &want), "a list by column");
+    // The first ten tiles of the longest run, laid in the list's own slots
+    // for them as two drags, the second growing left up to the first.
+    let mut sim = super::session_tests::at("events-classic", "built");
+    let first = (0..want.len() / RUN_RECORD)
+        .map(|k| &want[k * RUN_RECORD..(k + 1) * RUN_RECORD])
+        .max_by_key(|r| r[run::COUNT] as i64)
+        .unwrap();
+    assert!(first[run::COUNT] >= 10.0);
+    let (floor, x0, width) = (first[run::FLOOR] as i64, first[run::X], first[run::WIDTH]);
+    for order in [
+        [0, 1, 2, 3, 4, 9, 8, 7, 6, 5],
+        [0, 1, 2, 3, 4, 6, 5, 7, 8, 9],
+    ] {
+        let tile_at: Vec<usize> = (0..10)
+            .map(|k| {
+                let x = (x0 + k as f64 * width) as i64;
+                let units = &sim.tower.units;
+                units
+                    .iter()
+                    .position(|u| u.kind.is_structural() && u.floor == floor && u.x == x)
+                    .unwrap()
+            })
+            .collect();
+        let mut slots = tile_at.clone();
+        slots.sort_unstable();
+        let tiles: Vec<_> = order
+            .iter()
+            .map(|&k| sim.tower.units[tile_at[k]].clone())
+            .collect();
+        for (slot, u) in slots.into_iter().zip(tiles) {
+            sim.tower.units[slot] = u;
+        }
+        sim.tower.reindex();
+        assert!(same(&runs(&sim), &want), "two drags that meet: {order:?}");
+    }
+    // A list in no order at all: the walk's runs sorted and the runs read
+    // off the grid are the tower's.
+    let n = sim.tower.units.len();
+    let mut p = super::session_tests::Picker::new(3);
+    for i in (1..n).rev() {
+        sim.tower.units.swap(i, p.below(i + 1));
+    }
+    sim.tower.reindex();
+    assert!(same(&runs(&sim), &want), "a shuffled list");
+    let walked = super::structure::run_records(&sim.tower, usize::MAX);
+    assert!(same(&walked, &want), "a shuffled list, sorted");
+    let grid = super::structure::run_records(&sim.tower, 0);
+    assert!(same(&grid, &want), "a shuffled list, off the grid");
 }
 
 #[test]
-fn adjacent_runs_are_coalesced_before_the_order_fast_path_returns() {
+fn tiles_laid_out_of_order_join_one_run() {
     let mut sim = Simulation::new_game(1, crate::clock::GameMode::Classic);
     for x in 0..=2 {
         assert!(sim.tower.place(crate::facilities::Kind::Lobby, 1, x).ok);

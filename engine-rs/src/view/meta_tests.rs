@@ -263,7 +263,15 @@ fn only_the_setters_write_labels_and_subtypes() {
         ("*label = x;", true),
         ("std::mem::replace(&mut u.label, x)", true),
         ("std::mem::take(&mut self.units[i].subtype)", true),
+        ("u.label += \"x\";", true),
+        ("u.label.extend(chars)", true),
+        ("u.label.pop()", true),
+        ("u.subtype.as_mut()", true),
+        ("let n = &mut u.label;", true),
+        ("write!(&mut u.label, \"x\")", true),
+        ("f(&mut self.units[i].subtype, x)", true),
         ("let n = u.label.len();", false),
+        ("f(&mut u.label.len())", false),
     ] {
         assert_eq!(writes_metadata(line), writes, "{line}");
     }
@@ -274,8 +282,12 @@ fn only_the_setters_write_labels_and_subtypes() {
 }
 
 /// Whether a line of code writes a label or a subtype in place: an
-/// assignment (spaces or none), a mutating method on the field, a write
-/// through a destructured binding, or a `mem` swap of the field.
+/// assignment (spaces or none, compound included), a mutating method on the
+/// field, a write through a destructured binding, or a `&mut` borrow of the
+/// field (a `mem` swap, a `write!`, an alias). A new unit gets its metadata
+/// in a struct literal (the loader and `Tower::place`), which a line check
+/// cannot tell from a rebuild elsewhere; the session oracle's metadata
+/// comparison covers that case.
 fn writes_metadata(code: &str) -> bool {
     let squeezed: String = code.chars().filter(|c| !c.is_whitespace()).collect();
     let assigns = |field: &str| {
@@ -283,8 +295,19 @@ fn writes_metadata(code: &str) -> bool {
             .match_indices(field)
             .any(|(at, m)| !squeezed[at + m.len()..].starts_with('='))
     };
+    let borrowed = squeezed.match_indices("&mut").any(|(at, m)| {
+        let rest = &squeezed[at + m.len()..];
+        let place = rest.split([')', ',', ';']).next().unwrap();
+        place.ends_with(".label") || place.ends_with(".subtype")
+    });
     let methods = [
+        ".label+=",
         ".label.push",
+        ".label.extend(",
+        ".label.pop(",
+        ".label.remove(",
+        ".label.drain(",
+        ".label.as_mut",
         ".label.clear(",
         ".label.insert",
         ".label.truncate(",
@@ -295,15 +318,12 @@ fn writes_metadata(code: &str) -> bool {
         ".subtype.replace(",
         ".subtype.insert(",
         ".subtype.get_or_insert",
+        ".subtype.as_mut(",
         "*label=",
         "*subtype=",
     ];
-    let swapped = ["mem::replace(&mut", "mem::take(&mut", "mem::swap(&mut"]
-        .iter()
-        .any(|m| squeezed.contains(m))
-        && (squeezed.contains(".label") || squeezed.contains(".subtype"));
     assigns(".label=")
         || assigns(".subtype=")
         || methods.iter().any(|m| squeezed.contains(m))
-        || swapped
+        || borrowed
 }

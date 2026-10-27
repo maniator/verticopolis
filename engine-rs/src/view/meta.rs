@@ -150,8 +150,11 @@ pub fn whole_revision(raw: Option<f64>) -> Option<i64> {
 /// every unit whose label differs from its catalog name or that has a
 /// subtype, in unit-list order: a unit it leaves out has its catalog name and
 /// no subtype. `revision` is `meta_revision`, the `since` of the next read.
-/// A removed unit is never listed; a host drops what it holds for ids the
-/// structure no longer has.
+/// A removed unit is never listed, and an id is never given to another unit
+/// (`Tower::next_id` only grows), so what a host still holds for a removed
+/// id goes unused. A `since` belongs to one engine: a load or an attach
+/// builds a tower that starts again at revision 1, so a host on a new
+/// engine asks with nothing or 0, as it reads a fresh structure.
 pub fn meta_since(tower: &Tower, since: Option<i64>) -> Value {
     let reachable = since.filter(|&s| s <= tower.meta_revision);
     let changed = reachable.and_then(|s| tower.view.meta_log.since(s));

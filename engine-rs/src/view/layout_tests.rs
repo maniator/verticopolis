@@ -125,7 +125,8 @@ fn the_tables_hold_every_constant() {
 /// frame's: a person record is the first `PERSON_RECORD` slots of the
 /// frame's, a room record is the frame's unit record with the room's slot
 /// where the frame puts the unit id, and the transports and cars are
-/// written by the frame's own writer.
+/// written as the frame writes them (`frame::push_transports`, which
+/// `frame_tests::agrees_with_frame_view` holds to `frameView`'s own copy).
 #[test]
 fn records_are_laid_out_as_in_the_frame() {
     use crate::frame;

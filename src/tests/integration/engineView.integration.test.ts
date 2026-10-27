@@ -142,6 +142,46 @@ function transports(sim: Simulation) {
   }));
 }
 
+/** The structure decodes, by the layout's names alone, to the tower the
+ *  TypeScript instance holds: the header, every room in slot order, every
+ *  floor and lobby tile in exactly one run, every shaft. */
+function expectStructure(sim: Simulation, engine: Engine): Float64Array {
+  const l = layout();
+  const v = engine.viewStructure();
+  const h = (name: string) => v[l.structure[name]];
+  expect(h("revision")).toBe(sim.tower.revision);
+  expect([h("highestFloor"), h("lowestFloor")]).toEqual([sim.tower.highestFloor, sim.tower.lowestFloor]);
+  expect([l.modes[h("mode")], l.calendars[h("calendar")]]).toEqual([sim.mode, sim.modernCalendar]);
+  const rooms = roomsOf(sim);
+  expect(h("rooms")).toBe(rooms.length);
+  let at = l.structureWidth;
+  for (const u of rooms) {
+    const r = (name: string) => v[at + l.room[name]];
+    expect([r("id"), l.kinds[r("kind")], r("floor"), r("x"), r("width")]).toEqual([u.id, u.kind, u.floor, u.x, u.width]);
+    at += l.roomWidth;
+  }
+  const tiles: string[] = [];
+  for (let k = 0; k < h("runs"); k++) {
+    const r = (name: string) => v[at + l.run[name]];
+    for (let i = 0; i < r("count"); i++) {
+      tiles.push(`${l.kinds[r("kind")]}@${r("floor")},${r("x") + i * r("width")}x${r("width")}:${FIELD_NAMES.map(r).join(",")}`);
+    }
+    at += l.runWidth;
+  }
+  const want = sim.tower.units
+    .filter((u) => isStructural(u.kind))
+    .map((u) => `${u.kind}@${u.floor},${u.x}x${u.width}:${fields(u, l).join(",")}`);
+  expect(tiles.sort()).toEqual(want.sort());
+  expect(h("shafts")).toBe(sim.tower.transports.length);
+  for (const t of sim.tower.transports) {
+    const s = (name: string) => v[at + l.shaft[name]];
+    expect([s("id"), l.kinds[s("kind")], s("x"), s("width"), s("bottom"), s("top"), s("cars")]).toEqual([t.id, t.kind, t.x, t.width, t.bottom, t.top, t.cars]);
+    at += l.shaftFixed + s("skips");
+  }
+  expect(at).toBe(v.length);
+  return v;
+}
+
 describe.skipIf(!hasWasmPackage())("the engine view through the binding (#1213)", () => {
   it("hands over its layout by name, every slot named once", () => {
     const l = layout();
@@ -162,41 +202,9 @@ describe.skipIf(!hasWasmPackage())("the engine view through the binding (#1213)"
 
   it("decodes the structure to the tower the TypeScript engine holds", () => {
     const { sim, engine } = tower();
-    const l = layout();
-    const v = engine.viewStructure();
-    const h = (name: string) => v[l.structure[name]];
-    expect(h("revision")).toBe(sim.tower.revision);
-    expect([h("highestFloor"), h("lowestFloor")]).toEqual([sim.tower.highestFloor, sim.tower.lowestFloor]);
-    expect([l.modes[h("mode")], l.calendars[h("calendar")]]).toEqual([sim.mode, sim.modernCalendar]);
-    const rooms = roomsOf(sim);
-    expect(h("rooms")).toBe(rooms.length);
-    let at = l.structureWidth;
-    for (const u of rooms) {
-      const r = (name: string) => v[at + l.room[name]];
-      expect([r("id"), l.kinds[r("kind")], r("floor"), r("x"), r("width")]).toEqual([u.id, u.kind, u.floor, u.x, u.width]);
-      at += l.roomWidth;
-    }
-    const tiles: string[] = [];
-    for (let k = 0; k < h("runs"); k++) {
-      const r = (name: string) => v[at + l.run[name]];
-      for (let i = 0; i < r("count"); i++) {
-        tiles.push(`${l.kinds[r("kind")]}@${r("floor")},${r("x") + i * r("width")}x${r("width")}:${FIELD_NAMES.map(r).join(",")}`);
-      }
-      at += l.runWidth;
-    }
-    const want = sim.tower.units
-      .filter((u) => isStructural(u.kind))
-      .map((u) => `${u.kind}@${u.floor},${u.x}x${u.width}:${fields(u, l).join(",")}`);
-    expect(tiles.sort()).toEqual(want.sort());
+    const v = expectStructure(sim, engine);
     // Three floors of one kind each, every tile alike: one run per floor.
-    expect(h("runs")).toBe(3);
-    expect(h("shafts")).toBe(sim.tower.transports.length);
-    for (const t of sim.tower.transports) {
-      const s = (name: string) => v[at + l.shaft[name]];
-      expect([s("id"), l.kinds[s("kind")], s("x"), s("width"), s("bottom"), s("top"), s("cars")]).toEqual([t.id, t.kind, t.x, t.width, t.bottom, t.top, t.cars]);
-      at += l.shaftFixed + s("skips");
-    }
-    expect(at).toBe(v.length);
+    expect(v[layout().structure.runs]).toBe(3);
   });
 
   it("reads a tower in play: the header, the people, the rooms that changed and the cars", () => {
@@ -265,6 +273,7 @@ describe.skipIf(!hasWasmPackage())("the engine view through the binding (#1213)"
     // The play moved some room and some tenant's metadata, so both paths ran.
     expect(changedFrames).toBeGreaterThan(0);
     expect(metaRevision).toBeGreaterThan(1);
+    expectStructure(sim, engine);
     // Only a JS `true` asks for a full frame.
     for (const raw of [false, undefined, null, 1, "true", {}]) {
       const f = decode(engine.viewFrame(raw), l);
@@ -337,6 +346,8 @@ describe.skipIf(!hasWasmPackage())("the engine view through the binding (#1213)"
       step();
       check(what);
     }
+    // After the cars, the play and the sale, the structure is the tower's.
+    expectStructure(sim, engine);
     // At least the loaded tower, the rename, the rent, no rate, two cars and
     // the sale read as strings of their own; the money step and the label
     // put back read as the loaded one.

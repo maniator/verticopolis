@@ -53,13 +53,19 @@ pub(super) fn fixture(name: &str, mode: Option<&str>) -> Simulation {
     crate::load::deserialize(&raw).unwrap()
 }
 
-/// The towers the sessions start from, each with its step count: the
-/// medium fixture, the owner's Modern save (its unit list gives floors in
-/// pieces), a hotel tower, a tower with a VIP visit pending, a four-star
-/// tower with cinemas, shops and an express shaft, and a small Classic
-/// tower on fire, which is cheap to play and so gets the longest session.
+/// The towers the sessions start from, each with its step count: a new
+/// Modern game the session grows by its own commands, the medium fixture,
+/// the owner's Modern save (its unit list gives floors in pieces), a hotel
+/// tower, a tower with a VIP visit pending, a four-star tower with cinemas,
+/// shops and an express shaft, and a small Classic tower on fire, which is
+/// cheap to play and so gets the longest session.
 pub(super) fn starts() -> Vec<(&'static str, Simulation, usize)> {
     vec![
+        (
+            "new game",
+            Simulation::new_game(11, crate::clock::GameMode::Modern),
+            120,
+        ),
         ("sixseven", fixture("sixseven_2", None), 30),
         ("split-tower-4", fixture("split-tower-4", None), 16),
         ("hotel", fixture("towerone_6", Some("modern")), 30),
@@ -203,13 +209,17 @@ fn step(
             format!("build {kind:?} at {floor},{x}: {:?}", r.reason)
         }
         10 => {
+            // A drag of floor or lobby tiles, rightward when it is odd in
+            // length and leftward when even, so the unit list gets runs
+            // built both ways.
             let kind = p.pick(&[Kind::Floor, Kind::Lobby]);
             let (floor, x) = open_spot(sim, p, kind);
             let n = 1 + p.below(12);
+            let dir = if n % 2 == 1 { 1 } else { -1 };
             let ok = (0..n)
-                .filter(|&k| sim.build(kind, floor, x + k as i64).ok)
+                .filter(|&k| sim.build(kind, floor, x + dir * k as i64).ok)
                 .count();
-            format!("build {n} {kind:?} from {floor},{x}: {ok} placed")
+            format!("build {n} {kind:?} from {floor},{x} by {dir}: {ok} placed")
         }
         11 => {
             let kind = p.pick(&[Kind::Stairs, Kind::ElevatorStandard, Kind::Escalator]);
