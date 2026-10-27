@@ -72,5 +72,6 @@ pub mod tower;
 mod tower_index;
 pub mod tower_query;
 mod tower_query_state;
+pub mod view;
 #[cfg(feature = "wasm")]
 pub mod wasm;

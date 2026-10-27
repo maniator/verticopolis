@@ -26,6 +26,7 @@ on:
       - "src/tests/integration/chargeBindingRaw.integration.test.ts"
       - "src/tests/integration/panelGettersWasm.integration.test.ts"
       - "src/tests/integration/panelGettersCost.integration.test.ts"
+      - "src/tests/integration/engineView.integration.test.ts"
       - "src/tests/dualrun/**"
       - "src/dualrun/**"
       - "src/wasmhost/**"
@@ -128,6 +129,7 @@ jobs:
             case "$f" in src/tests/integration/chargeBindingRaw.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/panelGettersWasm.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/panelGettersCost.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/engineView.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/dualrun/*) engine=true ;; esac
             case "$f" in src/dualrun/*) engine=true ;; esac
             case "$f" in src/wasmhost/*) engine=true ;; esac

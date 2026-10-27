@@ -387,6 +387,7 @@ export class Engine {
      * (#996), as `setCars`.
      */
     towerSetCars(id: number, cars: number): boolean;
+    towerSignature(): bigint;
     /**
      * `stats()`: the HUD strip's counters, as JSON.
      */
@@ -407,6 +408,7 @@ export class Engine {
      * The unit inspector and editor card for unit `id`, as JSON, or null.
      */
     unitDetail(id: number): string | undefined;
+    unitMetaSince(since: number): string;
     /**
      * `tower.validateTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`,
      * nothing written. An unknown kind is refused with "Unknown facility."; a
@@ -414,6 +416,8 @@ export class Engine {
      * is refused with `INVALID_REQUEST`, never coerced (#923).
      */
     validateTransport(kind: string, x: number, bottom: number, top: number): string;
+    viewFrame(full: boolean): Float64Array;
+    viewStructure(): Float64Array;
 }
 
 /**
@@ -462,3 +466,5 @@ export function exportTdt(save_json: string): Uint8Array;
  * the player-readable message.
  */
 export function importTdt(bytes: Uint8Array, filename: string): string;
+
+export function viewLayout(): string;

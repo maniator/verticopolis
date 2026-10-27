@@ -476,16 +476,17 @@ and About will show it (#963 slice 3). The app version stays what players see.
   `expected.json`, `loader-cases.json` or `tdt-cases.json` under `conformance/`
   (a new fixture or scenario lands through `expected.json`, so it counts);
 - `SAVE_VERSION`, or the oldest save version the engine loads;
-- `FRAME_LAYOUT_VERSION`, `CATALOG_VERSION` or `IDENTITY_SCHEMA` (the frame
-  layout and the identity record's shape each have a pin table in
-  `engine-rs/src/identity_tests.rs` that grows with the version; the catalog
-  version has none yet, see #1154);
+- `FRAME_LAYOUT_VERSION`, `VIEW_LAYOUT_VERSION`, `CATALOG_VERSION` or
+  `IDENTITY_SCHEMA` (the frame layout and the identity record's shape each
+  have a pin table in `engine-rs/src/identity_tests.rs` that grows with the
+  version, and the view layout has one in `engine-rs/src/view/layout_tests.rs`;
+  the catalog version has none yet, see #1154);
 - the binding's declaration, `src/dualrun/engine.d.ts`, outside comments.
 
 An internal change that keeps all of these, such as a performance
 optimization, needs no bump. The build hash (`sources` in the package's
 `BUILD.json`) tells such builds apart. While the crate is 0.x, take a minor
-bump for a save, frame layout, catalog, identity schema or interface change,
+bump for a save, frame or view layout, catalog, identity schema or interface change,
 and a patch bump for a lock change on its own. Publishing and 1.0.0 are #893.
 
 **How:** raise `version` in `engine-rs/Cargo.toml`, then in `engine-rs/Cargo.lock`

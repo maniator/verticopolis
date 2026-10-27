@@ -114,6 +114,7 @@ fn the_compat_record_agrees_with_the_crate() {
     assert_eq!(rec["saveVersion"], SAVE_VERSION);
     assert_eq!(rec["oldestSaveVersion"], OLDEST_SAVE_VERSION);
     assert_eq!(rec["frameLayoutVersion"], FRAME_LAYOUT_VERSION);
+    assert_eq!(rec["viewLayoutVersion"], crate::view::VIEW_LAYOUT_VERSION);
     assert_eq!(rec["catalogVersion"], CATALOG_VERSION);
     assert_eq!(rec["identitySchema"], IDENTITY_SCHEMA);
     assert_ne!(crate_version(), UNREADABLE);
