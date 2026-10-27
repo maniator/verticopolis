@@ -191,8 +191,8 @@ describe("engineFailureCopy", () => {
 
   it("gives each load cause its own sentence, from the code, the cause and the package detail (#985)", () => {
     const detail = { file: "wasm" as const, expected: null, found: null, expectedPackage: "111111111111", servedPackage: "222222222222", controlled: true };
-    const load = (reason: Parameters<typeof engineFailureCopy>[0]["reason"], extra: Partial<Parameters<typeof engineFailureCopy>[0]> = {}, online = true, secure = true) =>
-      engineFailureCopy({ stage: "load", reason, message: "SECRET internal detail", ...extra }, online, secure);
+    const load = (reason: Parameters<typeof engineFailureCopy>[0]["reason"], extra: Partial<Parameters<typeof engineFailureCopy>[0]> = {}, online = true) =>
+      engineFailureCopy({ stage: "load", reason, message: "SECRET internal detail", ...extra }, online);
     const mismatch = "The engine files do not match this version of the game. The engine was not started.";
     expect(load("package-mismatch", { package: { ...detail, kind: "mismatch" } }).reason).toBe(`${mismatch} (expected 111111111111, found 222222222222)`);
     // Ids that are not known read as unavailable, and a mismatch with no detail at all (a link error, a dropped worker detail) still gets the sentence.
@@ -213,17 +213,17 @@ describe("engineFailureCopy", () => {
 
   it("tells an insecure connection to use HTTPS, and a hashing failure on a secure one to try again (#985)", () => {
     const failure = (extra: object) => ({ stage: "load" as const, reason: "unverifiable" as const, message: "SECRET", ...extra });
-    const insecure = engineFailureCopy(failure({}), false, false);
+    const insecure = engineFailureCopy(failure({}), false, { secure: false });
     expect(insecure.reason).toBe("This browser connection cannot verify the engine files. Open the game using HTTPS.");
     expect(insecure.steps[0]).toMatch(/^Open the game using HTTPS/);
     expect(insecure.steps.some((s) => /offline/.test(s)), "an offline hint does not fit here").toBe(false);
     const pkg = { kind: "unverifiable" as const, file: "wasm" as const, expected: null, found: null, expectedPackage: null, servedPackage: null, controlled: false };
-    expect(engineFailureCopy({ stage: "load", reason: "boot-error", message: "x", package: pkg }, true, false).reason).toMatch(/Open the game using HTTPS\.$/);
-    const secure = engineFailureCopy(failure({}), true, true);
+    expect(engineFailureCopy({ stage: "load", reason: "boot-error", message: "x", package: pkg }, true, { secure: false }).reason).toMatch(/Open the game using HTTPS\.$/);
+    const secure = engineFailureCopy(failure({}), true, { secure: true });
     expect(secure.reason).toBe("This browser could not check the engine files. Try Reload, or try another browser.");
     expect(secure.steps[0]).toMatch(/^Reload the page/);
     // Only the load stage has these sentences; a later stage keeps its message and its own first step.
-    const start = engineFailureCopy({ stage: "start", reason: "unverifiable", message: "kept" }, true, false);
+    const start = engineFailureCopy({ stage: "start", reason: "unverifiable", message: "kept" }, true, { secure: false });
     expect(start.reason).toBe("kept");
     expect(start.steps[0]).toMatch(/^Reload the page/);
   });
@@ -244,7 +244,7 @@ describe("engineFailureCopy", () => {
       engineFailureCopy({ stage: "load", reason: "boot-error", message: "SECRET" }, true),
       engineFailureCopy({ stage: "load", reason: "boot-timeout", message: "SECRET" }, true),
       engineFailureCopy({ stage: "load", reason: "package-mismatch", message: "SECRET" }, true),
-      engineFailureCopy({ stage: "load", reason: "unverifiable", message: "SECRET" }, true, false),
+      engineFailureCopy({ stage: "load", reason: "unverifiable", message: "SECRET" }, true, { secure: false }),
       engineFailureCopy({ stage: "load", reason: "package-mismatch", message: "SECRET", cause: "no-save-writer" }, true),
     ];
     for (const c of sentences) expect(JSON.stringify(c)).not.toContain("SECRET");
