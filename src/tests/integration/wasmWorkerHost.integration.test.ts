@@ -70,6 +70,9 @@ async function run(kind: HostKind, save: string, steps: number, at = edits): Pro
     if (h.worker) {
       expect(h.worker.fatal, "worker failures").toEqual([]);
       expect(h.worker.errors, "worker op errors").toEqual([]);
+      // An hour pass went out as a full save or a delta, so the comparison
+      // covers the save half, not only the frames.
+      expect(h.worker.host.stats.deltas + h.worker.host.stats.merges, "an hour pass was synced").toBeGreaterThan(0);
     }
     return out;
   } finally {

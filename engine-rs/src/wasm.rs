@@ -9,6 +9,7 @@ use crate::canonical::{canonical_json, digest};
 use crate::facilities::Kind;
 pub use crate::frame::{frame_view, log_since, FRAME_HEADER, PERSON_FIXED, UNKNOWN_ROUTINE};
 use crate::load_stream::parse_mode;
+use crate::save_delta::SaveMirror;
 use crate::sim::Simulation;
 use crate::snapshot::state_view;
 
@@ -56,6 +57,8 @@ fn resize_json(r: crate::tower::ResizeResult) -> String {
 
 #[path = "wasm_relay.rs"]
 mod relay;
+#[path = "wasm_sync.rs"]
+mod sync;
 
 /// `canBuild`'s answer as the TypeScript spells it: `{ ok, reason?, cost }`.
 fn can_build_json(ok: bool, reason: Option<&str>, cost: f64) -> String {
@@ -274,10 +277,27 @@ pub fn engine_identity() -> String {
 #[wasm_bindgen]
 pub struct Engine {
     sim: Simulation,
+    mirror: SaveMirror,
 }
 
 #[wasm_bindgen]
 impl Engine {
+    /// `serialize()`, byte for byte, which also becomes the base the next
+    /// `saveDelta` is taken against (#1045, `crate::save_delta`).
+    #[wasm_bindgen(js_name = serializeForSync)]
+    pub fn serialize_for_sync(&mut self) -> String {
+        self.mirror.full(&self.sim)
+    }
+
+    /// What moved in the save since the last sync: `{ units, rest }` as JSON
+    /// text (the changed unit records, and every other top-level key).
+    /// `undefined` when units were added, removed or reordered, or no full
+    /// save was taken yet: the host then takes a full one.
+    #[wasm_bindgen(js_name = saveDelta)]
+    pub fn save_delta(&mut self) -> Option<String> {
+        self.mirror.delta(&mut self.sim)
+    }
+
     /// `Simulation.newGame(seed, mode, modernCalendar, startUnbridged)`; the
     /// calendar defaults to the real-world one and the tower starts bridged,
     /// as the TypeScript defaults do.
@@ -297,9 +317,12 @@ impl Engine {
                 ))
             })?,
         };
-        Ok(Engine {
-            sim: Simulation::new_game_with(seed, mode, calendar, start_unbridged.unwrap_or(false)),
-        })
+        Ok(Engine::of(Simulation::new_game_with(
+            seed,
+            mode,
+            calendar,
+            start_unbridged.unwrap_or(false),
+        )))
     }
 
     /// `Simulation.deserialize(JSON.parse(text))`: a serialized game, migrated
@@ -321,7 +344,7 @@ impl Engine {
         if let Some(m) = markers {
             apply_markers(&mut sim, &m).map_err(err)?;
         }
-        Ok(Engine { sim })
+        Ok(Engine::of(sim))
     }
 
     /// The import path for a `.vctower` file: decode, migrate and load, then
@@ -331,7 +354,7 @@ impl Engine {
     pub fn from_vctower(text: &str, mode: Option<String>) -> Result<Engine, JsError> {
         // Decoded, then read as `fromSave` reads a save, with the mode set.
         let sim = crate::load_stream::load_vctower_text(text, mode.as_deref()).map_err(err)?;
-        Ok(Engine { sim })
+        Ok(Engine::of(sim))
     }
 
     /// `serialize()` as JSON text.
@@ -1275,7 +1298,10 @@ mod tests {
         assert!(sim.build_transport(Kind::ElevatorStandard, 10, 1, 2).ok);
         let lift = sim.tower.transport_at(1, 10).unwrap().id;
         sim.money = 1_000_000.0;
-        let mut e = Engine { sim };
+        let mut e = Engine {
+            sim,
+            mirror: SaveMirror::default(),
+        };
         let before = e.serialize();
         e.sim.gameplay.drain();
         let refused = |text: String| -> Value {
