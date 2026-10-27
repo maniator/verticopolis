@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { towerCatalog } from "../engine/towerCatalog";
 import { createUICallbacks, type GameAppPorts } from "./uiCallbacks";
 import type { Simulation } from "../engine/Simulation";
+import type { SimPort } from "../simport/port";
 
 /**
  * The UI command boundary is pure wiring: every UICallbacks member delegates to
@@ -18,6 +19,7 @@ function makePorts() {
   const sim = { mode: "classic", tower: {}, autoBridge: true } as unknown as Simulation;
   const ports: GameAppPorts = {
     getSim: vi.fn(() => sim),
+    port: { command: vi.fn(async () => ({ ok: true, delta: 0, value: false })) } as unknown as SimPort,
     audio: { muted: true, musicVolume: 0.4, ambienceVolume: 0.7, sfxVolume: 0.6 },
     saveLoad: {
       save: vi.fn(),
