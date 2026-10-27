@@ -134,6 +134,8 @@ export const BINDING_EXPORT_TIERS = {
   viewStructure: T2,
   unitMetaSince: T2,
   towerSignature: T2,
+  // Tier 2, the inspector's diagnostics facts (facade slice 6c).
+  diagnosticFacts: T2,
   // Tier 2, the host loop and the engine's lifetime.
   tick: LOOP,
   frameView: LOOP,
