@@ -21,20 +21,36 @@ function sources(dir: string): string[] {
   });
 }
 
-/** `file:line` of each import in `text` that names `Simulation` or loads the module that defines it. */
+const SIM_MODULE = /(^|\/)engine\/Simulation(\.[jt]s)?$/;
+
+/** `file:line` of each place in `text` that names `Simulation` through a module
+ *  specifier or an import or export name: static and dynamic imports, type
+ *  imports (`import("...")`), `import x = require(...)` and re-exports. */
 function simulationImports(file: string, text: string): string[] {
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const hits: string[] = [];
-  const at = (n: ts.Node): string => `${relative(ROOT, file)}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1}`;
-  for (const st of sf.statements) {
-    if (!ts.isImportDeclaration(st) && !ts.isExportDeclaration(st)) continue;
-    const spec = st.moduleSpecifier;
-    if (!spec || !ts.isStringLiteral(spec)) continue;
-    if (/(^|\/)engine\/Simulation$/.test(spec.text)) hits.push(at(st));
-    else if (ts.isImportDeclaration(st) && st.importClause?.namedBindings && ts.isNamedImports(st.importClause.namedBindings)) {
-      if (st.importClause.namedBindings.elements.some((el) => (el.propertyName ?? el.name).text === "Simulation")) hits.push(at(st));
+  const hit = (n: ts.Node): void => {
+    hits.push(`${relative(ROOT, file)}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1}`);
+  };
+  const visit = (n: ts.Node): void => {
+    if ((ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) {
+      const named = ts.isImportDeclaration(n) ? n.importClause?.namedBindings : n.exportClause;
+      const namesClass =
+        !!named && (ts.isNamedImports(named) || ts.isNamedExports(named)) && named.elements.some((el) => (el.propertyName ?? el.name).text === "Simulation");
+      if (SIM_MODULE.test(n.moduleSpecifier.text) || namesClass) hit(n);
+    } else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference)) {
+      const e = n.moduleReference.expression;
+      if (ts.isStringLiteral(e) && SIM_MODULE.test(e.text)) hit(n);
+    } else if (ts.isImportTypeNode(n)) {
+      const lit = ts.isLiteralTypeNode(n.argument) ? n.argument.literal : null;
+      if (lit && ts.isStringLiteral(lit) && SIM_MODULE.test(lit.text)) hit(n);
+    } else if (ts.isCallExpression(n) && n.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const a = n.arguments[0];
+      if (a && ts.isStringLiteralLike(a) && SIM_MODULE.test(a.text)) hit(n);
     }
-  }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
   return hits;
 }
 
@@ -44,10 +60,18 @@ describe("the renderer does not name the Simulation", () => {
     expect(hits).toEqual([]);
   });
 
-  it("the scan finds an import of the module and of the class", () => {
-    expect(simulationImports(join(ROOT, "x.ts"), 'import type { Simulation } from "../engine/Simulation";')).toHaveLength(1);
-    expect(simulationImports(join(ROOT, "x.ts"), 'import type { HeatmapMode } from "../../engine/Simulation";')).toHaveLength(1);
-    expect(simulationImports(join(ROOT, "x.ts"), 'import type { Simulation as S } from "../engine/sim/types";')).toHaveLength(1);
-    expect(simulationImports(join(ROOT, "x.ts"), 'import type { HeatmapMode } from "../engine/sim/constants";')).toEqual([]);
+  it("the scan finds every import form that names the module or the class", () => {
+    const f = join(ROOT, "x.ts");
+    const found = (text: string): number => simulationImports(f, text).length;
+    expect(found('import type { Simulation } from "../engine/Simulation";')).toBe(1);
+    expect(found('import type { HeatmapMode } from "../../engine/Simulation";')).toBe(1);
+    expect(found('import type { Simulation as S } from "../engine/sim/types";')).toBe(1);
+    expect(found('export type { Simulation } from "../engine/sim/types";')).toBe(1);
+    expect(found('export * from "../engine/Simulation";')).toBe(1);
+    expect(found('import { Simulation } from "../engine/Simulation.ts";')).toBe(1);
+    expect(found('type S = import("../engine/Simulation").Simulation;')).toBe(1);
+    expect(found('const m = await import("../engine/Simulation");')).toBe(1);
+    expect(found('import S = require("../engine/Simulation");')).toBe(1);
+    expect(found('import type { HeatmapMode } from "../engine/sim/constants";')).toBe(0);
   });
 });

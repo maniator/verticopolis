@@ -221,3 +221,13 @@ Slice 3 adds the `view.ts` lines, the `TsSim` fills and assertions in its own fi
 - The `RenderSim` members for effects, usage, reachability and the frame
   slices are the live engine's own today. Each moves behind a view member as
   the facade lane adds it.
+- `RenderSim` does not extend `SimView`: it keeps the live engine's flat
+  member names (`weather`, `population`, `clock`) so `main.ts` is unchanged,
+  and its comments name the `SimView` member each one stands for. The
+  stand-ins are `mode` (with the catalog handle, per the lane decision that
+  there is no `view.catalog`), `rng.initialSeed` (until `HeaderView.sceneSeed`
+  exists), `view` (the saved `SerializedView` until `view.camera` exists) and
+  the effect counters (until `view.fx` exists). Each is replaced by its view
+  member when the facade lane adds it.
+- The type test assigns the live `Simulation`. A test over `TsSim` comes with
+  the first step that reads through the view instead of the instance.

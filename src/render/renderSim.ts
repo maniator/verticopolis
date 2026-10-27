@@ -17,21 +17,22 @@ import type { CrowdView, TowerView } from "../simport/view";
  *
  * - Per frame, cheap: `clock`, `tower.revision`, the effect counters, `weather`.
  * - Per frame, memoized by the engine: `congestion`, `crowd.queueView`.
- * - Per step or per HUD tick: `population` (it walks every room, so a reader
- *   takes it at most once per step and never per frame).
+ * - Per step or per HUD tick: `population` (it walks every room, so the target
+ *   is one read per step and never per frame; `towerCrowd.ts` still reads it
+ *   every frame today, which is #1234 and a later step of slice 3).
  * - Per scene sync or hourly: `floorHeatmap`, `peakCongestion`, `parkingUsage`,
  *   `recyclingFill`, `positionReachable` (memoized per revision by its caller).
  * - Once per tower: `mode`, `rng.initialSeed`, `view`.
  *
- * The members marked "frame slice" below move behind view slices in slice 3b;
- * the members marked "view" are on `SimView` today.
+ * Members whose comment starts "View:" are on `SimView` today; those under
+ * "Frame slices (3b)" move behind view slices in slice 3b.
  */
 export interface RenderSim {
   /** The tower's mode, which picks its catalog (`towerCatalog`). */
   readonly mode: GameMode;
   /** The founding seed the scenery derives from; fixed for a tower's life. */
   readonly rng: { readonly initialSeed: number };
-  /** The saved camera, restored after a load. Inert cargo the engine never reads. */
+  /** The saved camera. Read on construction and on `setSim` to restore it (`adoptCamera`); null means no saved view. */
   readonly view: SerializedView | null;
 
   /** View: `header.weather`. */
