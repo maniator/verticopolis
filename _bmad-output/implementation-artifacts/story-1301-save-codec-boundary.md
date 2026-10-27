@@ -68,8 +68,8 @@ the open points are under "Owner decisions" below.
    and coverage floors run and reported on each PR. Not an instruction to
    merge PRs, change cohorts, turn on telemetry, change timing or change
    release policy. Branch overlap is coordinated with #1292 (the TypeScript
-   `.TDT` exporter), #1298 (Rust step work; a crate version only) and #1327
-   (B6, `load.rs`); #1266 merged on 2026-10-23.
+   `.TDT` exporter) and #1327 (B6, `load.rs`); #1266 merged on 2026-10-23
+   and #1298 (Rust step work) on 2026-10-27.
 
 Two changes to the six-slice outline the owner endorsed, both explained
 below: `.TDT` import moves from C to D2, because OD-8 makes A7 its
