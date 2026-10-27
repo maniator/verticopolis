@@ -83,6 +83,27 @@ export function forgetUnitLists(tower: Tower): void {
 
 const cache = new WeakMap<Tower, { units: Unit[]; length: number; revision: number; rooms: readonly Unit[] }>();
 const runsCache = new WeakMap<Tower, { units: Unit[]; length: number; revision: number; runs: readonly StructureRun[] }>();
+const ramps = new WeakMap<Tower, { rooms: readonly Unit[]; ramps: readonly Unit[] }>();
+
+/**
+ * The tower's parking ramps, in the same order as `tower.units`. The parking
+ * flood fill seeds from them on every congestion build, which the render reads
+ * once per frame, so a tower with a few ramps among thousands of rooms pays
+ * for the ramps only. Kept per {@link roomUnits} list (a new list means the
+ * tower changed), so it shares that cache's key and rebuilds with it: a loaded
+ * tower is a new `Tower` and starts empty, and when the WASM hosts' merge
+ * drops the rooms list (`forgetUnitLists`) this list follows. Whether a ramp
+ * works is live state (construction, fire), so callers check `isOperational`
+ * as they read; the list holds every ramp. Frozen and shared.
+ */
+export function rampUnits(tower: Tower): readonly Unit[] {
+  const rooms = roomUnits(tower);
+  const hit = ramps.get(tower);
+  if (hit && hit.rooms === rooms) return hit.ramps;
+  const list: readonly Unit[] = Object.freeze(rooms.filter((u) => u.kind === "parkingRamp"));
+  ramps.set(tower, { rooms, ramps: list });
+  return list;
+}
 
 function buildRuns(units: readonly Unit[]): readonly StructureRun[] {
   const byFloor = new Map<number, Unit[]>();
