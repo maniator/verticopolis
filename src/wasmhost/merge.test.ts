@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { markRoom, roomCounts, roomUnits, structureRuns } from "../engine/tower/rooms";
 import { mergeSimulation, mergeSimulationDelta } from "./merge";
+import { walkedStats } from "../tests/fixtures/walkedStats";
 
 /** A tower with a lobby row, two offices and a shaft, ticked a little. */
 function tower(seed: number, mode: "classic" | "modern" = "classic"): Simulation {
@@ -247,5 +248,19 @@ describe("mergeSimulation", () => {
     const hud = target.stats();
     expect(hud).toEqual(Simulation.deserialize(save).stats());
     expect(hud).toMatchObject({ occupiedOffices: before.occupiedOffices + 1, vacant: before.vacant - 1, vacantNoRate: before.vacantNoRate + 1 });
+  });
+
+  it("drops the room list when an hourly delta's record changes a unit's kind", () => {
+    const target = tower(6);
+    const rooms = roomUnits(target.tower);
+    const before = { ...target.stats() };
+    const next = Simulation.deserialize(target.serialize());
+    // No engine sends this (a delta goes out only when the revision held),
+    // but a record whose kind moved must not leave the room counted as it was.
+    const office = next.tower.units.find((u) => u.kind === "office")!;
+    office.kind = "condo";
+    mergeSimulationDelta(target, { rest: next, units: [office], transports: next.tower.transports }, { revision: target.tower.revision, mealOverlayRevision: 0 });
+    expect(roomUnits(target.tower)).not.toBe(rooms);
+    expect(target.stats()).toMatchObject({ ...walkedStats(target), offices: before.offices - 1, condos: before.condos + 1 });
   });
 });

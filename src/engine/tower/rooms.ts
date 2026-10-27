@@ -106,23 +106,29 @@ export interface RoomCounts {
   parkingSpaces: number;
 }
 
+/** The unit fields {@link roomCounts} reads besides `kind`: every write of
+ *  one marks its room. `roomCounts.test.ts` holds the counts to reading only
+ *  these, and the writers guard (`src/tests/roomCountsWriters.guard.test.ts`)
+ *  scans for writes of these. */
+export const COUNTED_FIELDS = ["state", "noRate", "everOccupied", "residents", "customersIn"] as const;
+
 /**
  * The tower's {@link RoomCounts}, kept as the rooms change so that a HUD
  * refresh does not pass over the rooms (HP-12 in
  * `docs/performance/hot-path-review.md`, #905).
  *
  * The counts are built in one pass over `roomUnits` whenever that list is
- * rebuilt (a placement, a removal, a load, a merge that moved the units) or
- * dropped by {@link forgetRoomCounts}. Between rebuilds, each write of a field
- * the counts read (`state`, `noRate`, `everOccupied`, `residents`,
- * `customersIn`) marks its room through {@link setRoomState} or
+ * rebuilt (a placement, a removal, a load, a merge that moved the units).
+ * Between rebuilds, each write of a field the counts read
+ * ({@link COUNTED_FIELDS}) marks its room through {@link setRoomState} or
  * {@link markRoom}, and a read recounts only the marked rooms: it takes each
  * one's last share out and puts its share as the fields stand now back in.
  * A room's kind never changes in place (`roomUnits` relies on the same; the
- * hosts' merge, the one writer that could, drops the rooms list when a kind
- * moves), so the kind counts move only with the list. The returned object is the
- * ledger's own: the next read after a write updates it in place, and a
- * rebuild replaces it, so a caller that keeps the counts copies them.
+ * hosts' full merge and hourly delta, the writers that could, drop the rooms
+ * list when a kind moves), so the kind counts move only with the list. The
+ * returned object is the ledger's own: the next read after a write updates it
+ * in place, and a rebuild replaces it, so a caller that keeps the counts
+ * copies them.
  */
 export function roomCounts(tower: Tower): Readonly<RoomCounts> {
   const rooms = roomUnits(tower);
@@ -130,7 +136,9 @@ export function roomCounts(tower: Tower): Readonly<RoomCounts> {
   if (!ledger || ledger.rooms !== rooms) return countRooms(tower, rooms);
   for (const u of ledger.changed) {
     const share = ledger.shares.get(u);
-    if (!share) continue; // a structure tile: it counts toward nothing
+    // A structure tile, the one marked unit with no share: the list holds
+    // every room, and no writer swaps a room's object while the list stands.
+    if (!share) continue;
     tally(ledger.counts, share, -1);
     share.flags = flagsOf(u);
     share.population = populationOf(u);
@@ -152,14 +160,6 @@ export function setRoomState(tower: Tower, u: Unit, state: UnitState): void {
  *  that read). Nothing to do before the tower's first count. */
 export function markRoom(tower: Tower, u: Unit): void {
   ledgers.get(tower)?.changed.add(u);
-}
-
-/** Drop the tower's room counts, so the next read counts every room again:
- *  for a writer that rewrites rooms' fields wholesale without marking each,
- *  and for a reader that wants the counts from a fresh pass (the stats
- *  report). */
-export function forgetRoomCounts(tower: Tower): void {
-  ledgers.delete(tower);
 }
 
 const cache = new WeakMap<Tower, { units: Unit[]; length: number; revision: number; rooms: readonly Unit[] }>();

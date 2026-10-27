@@ -1,16 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../Simulation";
 import { Housekeeping, INFEST_DAYS } from "../economy/housekeeping";
-import { markRoom } from "./rooms";
+import { ALL_KINDS } from "../facilities";
+import { COUNTED_FIELDS, markRoom, roomCounts } from "./rooms";
 import type { FacilityKind, Unit, UnitState } from "../types";
 import { walkedStats } from "../../tests/fixtures/walkedStats";
 
 /**
- * The engine's rarer writes of a field the HUD's kept room counts read, each
- * driven once after the counts are kept and held to the walk over every unit.
- * The seeded run (`roomCounts.integration.test.ts`) reaches the common ones;
- * these are the paths 30 game hours on the fixtures do not reach, or reach
- * only where the write leaves every count where it was.
+ * Single writes of a field the HUD's kept room counts read, each driven once
+ * after the counts are kept and held to the walk over every unit. The first
+ * case issues the rent commands and a vacate one at a time, so a failure names
+ * the command; the seeded run (`roomCounts.integration.test.ts`) issues them
+ * too, mixed with the steps. The others are the paths 30 game hours on the
+ * fixtures do not reach, or reach only where the write leaves every count
+ * where it was. The last case holds the counts to reading a room's kind and
+ * `COUNTED_FIELDS` only.
  */
 
 /** A Classic tower: a lobby, two floors over it and stairs, with `rooms`. */
@@ -35,7 +39,7 @@ function set(sim: Simulation, u: Unit, fields: Partial<Unit> & { state?: UnitSta
   markRoom(sim.tower, u);
 }
 
-describe("the engine's rarer room writes reach the HUD's kept counts", () => {
+describe("single room writes reach the HUD's kept counts", () => {
   it("vacate, the No Rate toggle, a reprice, the No Rate batch and a batch reprice", () => {
     const { sim, placed } = tower([["office", 2, 160], ["office", 2, 170], ["office", 2, 180]]);
     for (const u of placed) set(sim, u, { state: "occupied" });
@@ -77,12 +81,42 @@ describe("the engine's rarer room writes reach the HUD's kept counts", () => {
     const [shop] = placed;
     set(sim, shop, { state: "occupied", customersIn: 2 });
     const start = sim.stats();
-    sim.vacate(shop, "access"); // the customers inside stay counted on the venue
+    sim.vacate(shop, "access"); // its tally stays on the room, but an empty room counts nobody
     expect(shop.customersIn).toBe(2);
     expect(sim.stats()).toMatchObject({ ...walkedStats(sim), population: start.population - 2 });
     sim.clock.minutes = 12 * 60; // midday: open
     sim.economy.collectTrafficIncome();
     expect(shop.state).toBe("occupied");
     expect(sim.stats()).toMatchObject({ ...walkedStats(sim), population: start.population });
+  });
+});
+
+describe("the HUD's kept counts read", () => {
+  it("a room's kind and the counted fields only, for every kind and state in both modes", () => {
+    const states: UnitState[] = ["construction", "empty", "occupied", "moving_in", "vacating", "asleep", "dirty", "infested", "fire", "gutted"];
+    const read = new Set<string>();
+    for (const mode of ["classic", "modern"] as const) {
+      const sim = Simulation.newGame(3, mode);
+      let id = 1;
+      const units = ALL_KINDS.flatMap((kind) =>
+        states.flatMap((state) =>
+          [false, true].map((flag) => {
+            const fields = { id: id++, kind, floor: 2, x: 0, width: 1, state, noRate: flag, everOccupied: flag, residents: flag ? 3 : undefined, customersIn: flag ? 2 : undefined, occupants: 1 };
+            return new Proxy(fields as unknown as Unit, {
+              get: (target, key, receiver) => {
+                read.add(String(key));
+                return Reflect.get(target, key, receiver);
+              },
+            });
+          }),
+        ),
+      );
+      sim.tower.units.splice(0, sim.tower.units.length, ...units);
+      roomCounts(sim.tower); // the pass over every room
+      for (const u of units) markRoom(sim.tower, u);
+      roomCounts(sim.tower); // the recount of every marked room
+    }
+    const counted: readonly string[] = COUNTED_FIELDS;
+    expect([...read].filter((key) => key !== "kind" && !counted.includes(key)), "a field the counts read must be in COUNTED_FIELDS, and every write of it marks").toEqual([]);
   });
 });

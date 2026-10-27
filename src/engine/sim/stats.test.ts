@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../Simulation";
 import { GRID } from "../facilitiesData";
 import { FACILITIES, isHotelKind } from "../facilities";
-import { forgetRoomCounts, markRoom, roomUnits } from "../tower/rooms";
+import { markRoom, roomUnits } from "../tower/rooms";
 import type { FacilityKind, Unit, UnitState } from "../types";
 import { walkedStats } from "../../tests/fixtures/walkedStats";
 import { stats } from "./stats";
@@ -69,7 +69,7 @@ describe("stats() reads the kept room counts", () => {
     expect(walkedStats(sim).population).toBeGreaterThan(0);
   });
 
-  it("recounts only the rooms it is told about until the counts are dropped", () => {
+  it("recounts only the rooms it is told about until the rooms list is rebuilt", () => {
     const sim = tower();
     const before = stats(sim);
     const office = sim.tower.units.find((u) => u.kind === "office")!;
@@ -80,7 +80,7 @@ describe("stats() reads the kept room counts", () => {
     expect(stats(sim)).toEqual(before);
     markRoom(sim.tower, office);
     expect(stats(sim)).toMatchObject({ occupiedOffices: before.occupiedOffices + 1, vacant: before.vacant - 1, soldCondos: before.soldCondos });
-    forgetRoomCounts(sim.tower);
+    sim.tower.revision++; // as a placement does, and as tooling does after a staged write
     expect(stats(sim)).toMatchObject({ ...walkedStats(sim), soldCondos: before.soldCondos + 1 });
   });
 

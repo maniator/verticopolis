@@ -39,14 +39,15 @@ function pick(sim: Simulation, n: number, keep: (u: Unit) => boolean): Unit | un
  * marked writes moved them. The rarer writes have their own cases in
  * `src/engine/tower/roomCounts.test.ts`.
  */
-function run(save: string): Record<keyof Counts, number> {
+function run(name: string, save: string): { moved: Record<keyof Counts, number>; rebuilds: number } {
   const sim = Simulation.deserialize(decodeVctower(save));
   sim.money = 1e12;
   const moved = Object.fromEntries(FIELDS.map((f) => [f, 0])) as Record<keyof Counts, number>;
+  let rebuilds = 0;
   let last = sim.stats();
   const check = (label: string, rebuilt = false) => {
     const now = sim.stats();
-    expect(now, label).toMatchObject(walkedStats(sim));
+    expect(now, `${name}, ${label}`).toMatchObject(walkedStats(sim));
     if (!rebuilt) for (const f of FIELDS) if (now[f] !== last[f]) moved[f]++;
     last = now;
   };
@@ -77,27 +78,30 @@ function run(save: string): Record<keyof Counts, number> {
       const room = pick(sim, step, (u) => u.kind === "office" || u.kind === "condo" || u.kind === "shop");
       if (room) {
         const { kind, floor, x } = room;
-        sim.sellAt(floor, x);
+        const sold = sim.sellAt(floor, x);
         check(`sale at ${step}`, true);
-        sim.build(kind, floor, x);
+        if (sold && sim.build(kind, floor, x).ok) rebuilds++;
         check(`build at ${step}`, true);
       }
     }
   }
-  return moved;
+  return { moved, rebuilds };
 }
 
 describe("the HUD's kept room counts follow a running simulation", () => {
   itTypeScriptOnly("vacates offices through sim.vacate mid-run, which no command relays; the hosts' merge and frame apply have their own cases (merge.test.ts, frameApply.test.ts)")("match the walk over every unit after every step and command", () => {
     const totals = Object.fromEntries(FIELDS.map((f) => [f, 0])) as Record<keyof Counts, number>;
-    for (const save of [medium, ownersSave, starFour]) {
-      const moved = run(save);
-      for (const f of FIELDS) totals[f] += moved[f];
+    let rebuilds = 0;
+    for (const [name, save] of [["sixseven_2", medium], ["split-tower-4", ownersSave], ["towerone-star4", starFour]] as const) {
+      const result = run(name, save);
+      for (const f of FIELDS) totals[f] += result.moved[f];
+      rebuilds += result.rebuilds;
     }
     // What the runs reached: every condition count and the population moved
-    // under marked writes.
+    // under marked writes, and a sale and a build went through.
     for (const f of ["population", "occupiedOffices", "vacant", "vacantNoRate", "soldCondos", "occupiedHotel", "dirty"] as const) {
       expect(totals[f], f).toBeGreaterThan(0);
     }
+    expect(rebuilds, "sales and builds that went through").toBeGreaterThan(0);
   }, 120_000);
 });

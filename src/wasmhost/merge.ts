@@ -70,7 +70,9 @@ export interface DeltaRecords {
  * unit's state. The tower's caches stay:
  * the revision did not move (a delta is only sent when it did not), and
  * every revision-keyed cache reads layout, never unit state; the HUD's room
- * counts, which read unit state, follow the marks.
+ * counts, which read unit state, follow the marks. A record whose kind or
+ * place differs from the held unit's still drops the room lists, as the full
+ * merge does, so the counts never hold a room under a kind it left.
  */
 export function mergeSimulationDelta(target: Simulation, d: DeltaRecords, marks: MergeMarks): void {
   const tower = target.tower;
@@ -84,10 +86,14 @@ export function mergeSimulationDelta(target: Simulation, d: DeltaRecords, marks:
   adoptSimulationFields(target, d.rest, true);
   // Each rewritten unit is marked for the HUD's room counts: the delta holds
   // only the units whose save form moved, so this is per changed unit.
+  let moved = false;
   d.units.forEach((record, i) => {
-    assignRecord(held[i], record);
-    markRoom(tower, held[i]);
+    const u = held[i];
+    if (u.kind !== record.kind || u.floor !== record.floor || u.x !== record.x || u.width !== record.width) moved = true;
+    assignRecord(u, record);
+    markRoom(tower, u);
   });
+  if (moved) forgetUnitLists(tower);
   mergeById(tower.transports, d.transports, tower.transportsById);
   tower.setNextId(d.rest.tower.getNextId());
   tower.towerName = d.rest.tower.towerName;

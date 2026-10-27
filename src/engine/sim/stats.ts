@@ -16,7 +16,7 @@ export function stats(sim: Simulation) {
   // The room counts are kept as the rooms change (`roomCounts`), so this HUD
   // refresh, about 6 a second, reads them without a pass over the rooms: a
   // read recounts only the rooms written since the last one, and counts them
-  // all once after a build command, a load or a merge.
+  // all once after a build command, a load, or a merge that moved the units.
   const {
     population,
     parkingSpaces,

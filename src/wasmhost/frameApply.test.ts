@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { roomUnits } from "../engine/tower/rooms";
 import { walkedStats } from "../tests/fixtures/walkedStats";
-import { FRAME_HEADER, PERSON_FIXED, decodeFrame, decodeHeader } from "./frameView";
+import { FRAME_HEADER, PERSON_FIXED, UNIT_STATES, decodeFrame, decodeHeader } from "./frameView";
 import { appendEngineLog, applyRecords } from "./frameApply";
 import { syncCars, syncPeople, syncUnits } from "./frameSync";
 
@@ -178,5 +178,21 @@ describe("the HUD's room counts over frames", () => {
       }
     }
     for (const [k, n] of Object.entries(moved)) expect(n, k).toBeGreaterThan(0);
+  });
+
+  it("read a NaN customer count as none, so the next frame's count lands", () => {
+    const a = rooms();
+    const b = rooms();
+    const venue = a.tower.units.find((u) => u.kind === "fastFood")!;
+    a.stats();
+    b.stats();
+    for (const customers of [Number.NaN, 4]) {
+      const v = Float64Array.from(randomFrame(rng(1), a, [], [venue.id]));
+      v.set([venue.id, UNIT_STATES.indexOf("occupied"), 0, customers], FRAME_HEADER);
+      syncUnits(a, decodeFrame(v));
+      applyRecords(b, v, decodeHeader(v));
+      for (const sim of [a, b]) expect(sim.stats(), `customers ${customers}`).toMatchObject(walkedStats(sim));
+    }
+    expect(a.stats().population).toBe(4);
   });
 });

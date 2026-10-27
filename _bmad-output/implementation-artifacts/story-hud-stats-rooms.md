@@ -39,22 +39,27 @@ quoted in Review). So the HUD now reads counts kept as the rooms change.
    (`roomCounts` in `src/engine/tower/rooms.ts`). A read recounts only the
    rooms written since the last read, and counts every room once after the
    rooms list is rebuilt (a build command, a load, a host merge that moved
-   the units) or the counts are dropped (the stats report, on open). The HUD refresh
-   (`uiStatus.update`) reads `stats()` once for the population label and the
-   stats grid, where it read `sim.population` as well. The same refresh's
-   traffic readout makes its own pass (#338).
+   the units). The HUD refresh (`uiStatus.update`) reads `stats()` once for
+   the population label and the stats grid, where it read `sim.population`
+   as well, and the stats report reads the same kept counts. The same
+   refresh's traffic readout makes its own pass (#338).
 3. **AC3 Every write marks its room.** Each write of a field the counts read
-   (`state`, `noRate`, `everOccupied`, `residents`, `customersIn`), in the
-   engine and in the hosts' frame apply and merge, marks the room. A guard
-   pins the raw writes of those fields per file and field, in every
-   assignment form, so a new one fails until its author updates the table
-   (the guard cannot see whether the mark is there; the tests check that).
+   (`COUNTED_FIELDS`: `state`, `noRate`, `everOccupied`, `residents`,
+   `customersIn`), in the engine and in the hosts' frame apply and merges,
+   marks the room, and a test holds the counts to reading only those fields
+   and the kind. A guard pins the raw writes of those fields per file and
+   field, in every assignment form, and per file the writes its field
+   patterns cannot see (wholesale writes, and computed-key writes in the host
+   code), so a new one fails until its author updates the table. The guard
+   cannot see whether the mark is there (the tests check that), nor a
+   destructuring assignment or a computed-key write in the engine.
 4. **AC4 Hosted.** On the WASM host, the HUD follows the rooms each frame
    rewrites, on the decode path and the direct apply, and a merge of the
    engine's tower gives the HUD the merged rooms: at the same unit count and
    the revision the rooms list was memoized at, and over an hourly merge that
    kept the list, where the merge marks the rooms it changed and keeps the
-   counts.
+   counts. The worker's hourly delta marks the rooms it rewrites, and drops
+   the list if a record moved a unit's kind or place.
 5. **AC5 Measured.** The HUD read and the rebuild on the perf towers, before
    and after, labeled cloud estimates.
 
@@ -65,8 +70,8 @@ quoted in Review). So the HUD now reads counts kept as the rooms change.
   set of rooms marked since the last read. A read whose `roomUnits` list is
   the one the ledger was built from takes each marked room's old share out,
   puts its share as its fields stand now back in, and clears the marks. A
-  read over a new list, or after `forgetRoomCounts`, counts every room in
-  one pass and starts a new ledger. The kind counts move only with the list:
+  read over a new list counts every room in one pass and starts a new
+  ledger. The kind counts move only with the list:
   a room's kind never changes in place, which `roomUnits` relies on as well.
 - **The rules are the old ones.** A room's flags are the tests `stats()`
   always made (an office tenanted, empty, empty and off the market; a condo
@@ -92,7 +97,11 @@ quoted in Review). So the HUD now reads counts kept as the rooms change.
   ledger. The same check now also compares the five counted fields and,
   when the list stays, marks the rooms whose fields the merge rewrites. The
   worker host's hourly delta (`mergeSimulationDelta`, #1045) rewrites only
-  the units whose save form moved, and marks each of them.
+  the units whose save form moved, and marks each of them; a record whose
+  kind or place differs from the held unit's drops the rooms list, as the
+  full merge does (no engine sends one, since a delta goes out only when the
+  revision held). A frame's NaN count reads as none, so no kept count takes
+  one in.
 - **Costs.** A HUD read with nothing marked is a list identity check and the
   rest of `stats()`'s fields; with marks, constant work per marked room. A
   rebuild is one pass over the rooms, at the command, load or unit-moving
@@ -101,14 +110,16 @@ quoted in Review). So the HUD now reads counts kept as the rooms change.
 - **What keeps it right.** A missed mark would leave a count behind
   silently. Three nets: a seeded run over three conformance fixtures holds
   `stats()` to the walk over every unit after every step and command; cases
-  for the rarer engine paths and for the hosts do the same; and a guard
+  for the single engine paths and for the hosts do the same, and one holds
+  the counts to reading only a room's kind and `COUNTED_FIELDS`; and a guard
   (`src/tests/roomCountsWriters.guard.test.ts`) pins every raw write of a
   counted field outside the tests, per file and field and in every
-  assignment form, to a table naming where it is marked, and every file that
-  rewrites objects wholesale to a table naming how it keeps the counts. The
+  assignment form, to a table naming where it is marked, and per file the
+  writes its field patterns cannot see, with the merge's marks counted. The
   guard catches a new raw write; the tests catch a missing mark. The stats
-  report drops the counts before it reads, so the dialog always shows a
-  fresh pass (one per open).
+  report reads the kept counts like the HUD, so a missed mark shows in both
+  and nothing heals it on the side. Tooling that stages a counted field
+  after the HUD has read bumps the revision, which rebuilds the list.
 - The HUD refresh read `sim.population` for its label and then `stats()`.
   It now reads `stats()` once and takes the population from it;
   `stats().population` equals `sim.population` (a test pins it).
@@ -131,8 +142,9 @@ quoted in Review). So the HUD now reads counts kept as the rooms change.
   which reads the population every frame before it knows a meal starts
   (#1334); the HUD's traffic readout and the renderer rebuild the congestion
   map (#338); the host's hourly merge reads the whole save (#868), which the
-  worker host's delta (#1045) now avoids on an unchanged layout. The engine's own population reads keep their walk:
-  the kept counts serve the HUD only.
+  worker host's delta (#1045) now avoids on an unchanged layout. The
+  engine's own population reads keep their walk: the kept counts serve the
+  HUD and the stats report only.
 
 ## Result
 
@@ -160,8 +172,8 @@ over the rooms; the head is the kept counts with nothing marked:
 
 What the head pays after the rooms change, milliseconds: a read after one
 engine step's marks (the median of 120 steps, one timed call each), a full
-recount (the read after the counts are dropped, as the stats report does on
-open), and a rooms list rebuild with its recount (the read after a build
+recount (the pass over the rooms alone, timed with the counts dropped in the
+harness), and a rooms list rebuild with its recount (the read after a build
 command or a load):
 
 | Tower | Read after a step | Full recount | Rebuild after a command |
@@ -179,13 +191,18 @@ once (single timed reads). With every room marked a read costs about
 since each marked room costs a map lookup and two tallies. The marks dedupe
 per room, so a read never does more than that.
 
+The population the renderer and the meal-rush check still walk for (#1335,
+#1334): `sim.population` costs 0.128 ms per read on the large tower and 0.102
+ms on the owner's save, against 0.00007 ms for `roomCounts(tower).population`
+(round 3's Hot-Path Auditor).
+
 The host merge, on the WASM host, lands on every engine hour pass and every
 command: at speed 3 a game hour passes every 0.15 s at night and every 0.5 s
 on average, against a HUD read every 160 ms or more. The merge marks the
 rooms whose counted fields it rewrites, so the read after it costs what the
 read after that hour's pass would. Merging an hour's states in and out of
 each tower at the held revision (28 merges, the median after 4), with the
-counts read alone:
+counts read alone, against `main` c0787c1 (whose `merge.ts` matches 035231a):
 
 | Tower | Rooms changed per merge | Merge, head / main | Read after the merge | Full recount |
 | --- | --- | --- | --- | --- |
@@ -196,11 +213,17 @@ counts read alone:
 
 The merge's TypeScript side (`mergeSimulation` alone, 15 to 95 ms here) is
 within noise of `main`'s, so the five field compares it adds per unit do
-not show next to the copy of every field it already makes.
+not show next to the copy of every field it already makes. Round 4's
+Hot-Path Auditor measured again against `main` 9ebf538, which brought the
+worker's hourly delta: deserialize, merge and a HUD read at 1.11 (`large`),
+1.00 (`medium`) and 0.96 (`split-tower-4`) of `main`, noise. The delta's
+marks were not timed on their own: one per rewritten unit, at a mark's
+measured 26 to 53 ns.
 
 The frame apply's change check, with each record's unit taken by position,
-against `main`'s apply of the same unchanged frame (the Hot-Path Auditor's
-harness, 40 rounds; the owner's save is `split-tower-4`):
+against `main` c0787c1's apply of the same unchanged frame (the Hot-Path
+Auditor's harness, 40 rounds; the owner's save is `split-tower-4`; the frame
+apply is the same on 9ebf538):
 
 | Tower | Direct apply, head / main | Decode path, head / main |
 | --- | --- | --- |
@@ -208,11 +231,19 @@ harness, 40 rounds; the owner's save is `split-tower-4`):
 | `large` | 0.58 | 0.44 |
 | `split-tower-4` | 0.89 | 0.69 |
 
-The engine step with the marks, against `main`'s step: three copies of each
-save stepped in turn for 24 rounds of 40 steps (`main`, the head with the
-counts read after every step, the head with them dropped so every mark
-misses), and the median of each round's ratio to `main`. Marks per step come
-from an instrumented copy:
+Round 4's Hot-Path Auditor measured the unit loop alone against 9ebf538: in
+order, 0.53, 0.81 and 0.86 of `main` on the direct apply (`large`, `medium`,
+`split-tower-4`) and 0.52, 0.60 and 0.66 for `syncUnits`. With every record
+out of place (one extra record in front) the head pays the position check
+and the id lookup both: 1.17, 1.23 and 1.51 on the direct apply, 1.25, 1.04
+and 1.52 for `syncUnits`. The mirror's order differs from the engine's only
+between a command and the merge that follows it, a frame or two.
+
+The engine step with the marks, against `main` 035231a's step: three copies
+of each save stepped in turn for 24 rounds of 40 steps (`main`, the head with
+the counts read after every step, the head with them dropped so every mark
+misses, through a helper round 4 removed), and the median of each round's
+ratio to `main`. Marks per step come from an instrumented copy:
 
 | Tower | Marks per step, mean (max) | Head kept / main | Head dropped / main |
 | --- | --- | --- | --- |
@@ -240,8 +271,9 @@ Tests:
   room removed and placed again, and a room swapped for another kind at the
   same unit count with no read in between, where only the revision tells the
   memoized list it is out of date. Two cases pin the ledger itself: an
-  unmarked write stays out of the counts until they are dropped, and a mark
-  on a structure tile, or before the first count, changes nothing.
+  unmarked write stays out of the counts until the rooms list is rebuilt,
+  and a mark on a structure tile, or before the first count, changes
+  nothing.
 - `roomCounts.integration.test.ts` runs three conformance towers
   (`sixseven_2`, `split-tower-4`, `towerone-star4`) for 900 steps of one
   `tick(2)` each (two game minutes, so 30 game hours: one evening, a morning
@@ -251,13 +283,18 @@ Tests:
   to the offices or the condos, which alternates No Rate and the default
   rate for each kind. Every 113th sells a room and builds it again. It
   checks that the population and every condition count moved between reads,
-  leaving out the reads after a sale or a build, which rebuild the list. It
-  is TypeScript-only on the parity projects, since no command relays
-  `sim.vacate`.
-- `roomCounts.test.ts` drives the rarer writes once each and holds `stats()`
-  to the walk: a vacate, the No Rate toggle, a reprice, the No Rate batch and
-  a batch reprice; the morning infestation and the cockroaches' spread; and a
-  venue left empty with customers inside opening again for the hour.
+  leaving out the reads after a sale or a build, which rebuild the list, and
+  that a sale and a build went through. Each failure names its save. It
+  takes about 22 s here against its 120 s timeout, and it is TypeScript-only
+  on the parity projects, since no command relays `sim.vacate`.
+- `roomCounts.test.ts` drives single writes and holds `stats()` to the
+  walk: a vacate, the No Rate toggle, a reprice, the No Rate batch and a
+  batch reprice one at a time (the seeded run issues these too, mixed with
+  the steps); the morning infestation and the cockroaches' spread; and a
+  venue left empty with customers inside opening again for the hour. A last
+  case builds a unit of every kind in every state with both flag settings,
+  in both modes, reads the counts through a proxy that records each field
+  read, and fails on any field besides the kind and `COUNTED_FIELDS`.
 - `merge.test.ts` (beside #1325's merge tests) memoizes the host mirror's
   rooms list through `stats()`, merges a tower in which an office became a
   hotel room at the same unit count, with the revision the list was memoized
@@ -269,24 +306,34 @@ Tests:
   customers taken away by a save that does not carry them), and checks the
   ledger is the same object afterwards, the HUD equals a fresh load's, and a
   later mark still lands. A fourth applies the worker host's hourly delta
-  with two changed offices and checks the same.
+  with two changed offices and checks the same, and a fifth sends a delta
+  record whose kind changed and checks the rooms list is dropped and the
+  counts follow.
 - `frameApply.test.ts` applies 30 random frames, for each of twelve seeds, to
   a tower standing in for the host's mirror (a plain `Simulation`, no host
   attached), on the decode path and the direct apply. The unit records come
   out of the mirror's order, in it, or in it but for one swapped pair of
   rooms; the test checks each record lands on its own unit and holds
-  `stats()` to the walk after every frame.
+  `stats()` to the walk after every frame. A second case sends a NaN
+  customer count and then a real one, on both paths.
 - `uiStatus.test.ts` runs one HUD refresh and checks it calls `stats()` once,
   never reads `sim.population` or the tower's census, and labels the
   population from `stats()`.
 - `roomCountsWriters.guard.test.ts` pins every raw write of a counted field
   outside the tests, per file and field, in every assignment form, prefix
   and postfix step, `delete` and quoted key, to a table naming where each is
-  marked. Writes through a person's or a class's own name (`p`, `person`,
-  `this`) are pinned in a table of their own. Every file with a wholesale
-  write (`Object.assign`, `Reflect.set`, a `delete` through a cast or a
-  computed key) is listed, and the unit writer among them, the merge, must
-  call `markRoom`. It tests its own patterns on each form and on reads.
+  marked, with comment lines left out. Writes through a person's or a
+  class's own name (`p`, `person`, `this`) are pinned in a table of their
+  own. A third table pins per file the writes the field patterns cannot see:
+  anywhere in `src/`, `Object.assign`, `Object.defineProperty` and
+  `defineProperties`, `Reflect.set` and `deleteProperty`, a `delete` through
+  a cast or a computed key, and an assignment through a cast and a computed
+  key; in the host code (`src/wasmhost/`, `src/dualrun/`, `src/simport/`),
+  any assignment through a computed key. It also pins how many `markRoom`
+  calls each such unit writer makes (the merge's two). It does not see a
+  destructuring assignment into a counted field or the engine's plain
+  computed-key writes. It tests its own patterns on each form, on a long
+  name after a step or a `delete`, on reads and on comments.
 - Seeded mutations, run against the behavioral tests above (the guard left
   out) on the final code: 40 at the write sites, the hosts and the ledger.
   - 18 `setRoomState` calls swapped back for a raw `state` write: 13 fail a
@@ -308,8 +355,9 @@ Tests:
     a drop of the counts, each of the five counted fields left out of its
     compare, and the hourly delta's marks removed. All fail a test (the No
     Rate one only once the merge test changed each field on its own; it
-    survived the first run, when the test moved the state with it). The guard catches neither mark removed alone, since the file keeps
-    a `markRoom` call either way.
+    survived the first run, when the test moved the state with it). Since
+    round 4 the guard pins the merge's two `markRoom` calls, so it fails
+    either mark removed as well.
   - 2 in the ledger (a room's old share kept, the marked rooms skipped):
     both fail.
   - The first version's 8 mutations, run again on the final code (the
@@ -317,6 +365,9 @@ Tests:
     skipped, the list memoized without the revision, the merge's
     `forgetUnitLists` made a no-op, the label read from `sim.population`, a
     sold condo counted only while tenanted or not empty), each fail a test.
+  - 3 on round 4's additions (the hourly delta's drop of the rooms list
+    made a no-op, the frame counter that lets a NaN through, and a
+    population that also reads `occupants`): each fails a test.
 
 ## Review
 
@@ -355,7 +406,7 @@ two older room walks on the same frame path. The record is on the PR.
 - [x] [Review][Patch] The story said the Rust `tower_stats` is not exported (it is bound as `towerStats`, with no production caller), scoped F2 out while it is pending, gave AC2 a whole-refresh claim the traffic readout breaks, said Result named a script, left F2 out of round 1's summary, and used one "X, not Y" phrase (Acceptance Auditor A1 to A5, A9, A11) [story, PR body]: each is corrected.
 - [x] [Review][Patch] The comment on `population` in `star.ts` called it the single source of truth for the displayed number, which the HUD now sums in `stats()` (Acceptance Auditor A10) [star.ts]: it names the HUD's sum and the test that pins the two equal.
 - [x] [Review][Patch] The #905 row called the walk part done without F2 (Acceptance Auditor A8) [backlog.md]: it says the flat HUD is pending the owner.
-- [x] [Review][Defer] `emitMealRushes` reads `totalPopulation()` on every frame, paused included, before it knows a meal starts: about 0.2 ms a frame on the large tower, older than this change (Hot-Path Auditor F3) [frameLoop.ts]: deferred onto #1234 (its row and issue), with the remedy of reading the population only on a frame that crosses a meal start.
+- [x] [Review][Defer] `emitMealRushes` reads `totalPopulation()` on every frame, paused included, before it knows a meal starts: about 0.2 ms a frame on the large tower, older than this change (Hot-Path Auditor F3) [frameLoop.ts]: deferred onto #1234 (its row and issue), with the remedy of reading the population only on a frame that crosses a meal start. (Moved to #1334 when `main` split #1234; see round 3.)
 - [x] [Review][Defer] The HUD's traffic chip rebuilds the congestion map on every refresh, about 0.6 ms on the large tower and 0.9 ms on the owner's save, now the larger HUD cost (Hot-Path Auditor F4; Acceptance Auditor A2) [trafficHud.ts]: deferred onto #338, whose row now names this reader beside the render frame.
 - F2: fixed after the owner's answer (round 1's item above).
 - [x] [Review][Patch] The independent review (R3, CONDITIONAL GO on 4973e51, review 5666150813) found that every flag in the first test moved with the state, so a sold condo never stood empty and a `soldCondos` mutant survived (nit N1) [stats.test.ts]: the test runs four laps of the states, each with its own flag pair, and the mutants that count a sold condo only while tenanted or not empty now fail it.
@@ -389,5 +440,35 @@ on the hosts. Its record is on the PR.
 - [x] [Review][Patch] #1331 repeated the open #1296 (Acceptance Auditor A1) [backlog.md]: the row is dropped, its extra detail is on #1296's row and issue, #1331 is closed as a duplicate, and round 1's defer item points at #1296.
 - [x] [Review][Patch] Inexact test descriptions, stale review and backlog text, no pointer to a live number, and no row cited for the Rust `tower_stats` pass (Acceptance Auditor A8 to A11) [story, backlog.md]: each is corrected.
 - [x] [Review][Defer] The crowd renderer and the meal-rush check walk the rooms every frame for the population the ledger now holds (Hot-Path Auditor F4) [towerCrowd.ts, frameLoop.ts]: deferred by reference, with the ledger named in each remedy. Main has since split #1234: facade slice 3's cadence fix resolved its row (the renderer reads the population about twice a second, the rest tracked as #1335), and the meal-rush check is #1334. The note sits on the #1334 and #1335 rows and issues.
-- [x] [Review][Defer] Engine functions this diff touched walk every unit where the rooms list answers: the 08:00 checkout hour's up to five passes, the late checkout, condo relocations, the rent batch and three fire walks (Hot-Path Auditor F5) [EconomySystem.ts, housekeeping.ts, churn.ts, rent.ts, EventSystem.ts]: deferred onto #1170 (row note and issue comment); the housekeeping walks were already its T5, now widened to the hour, and the extermination walk is #1173 F1.
+- [x] [Review][Defer] Engine functions this diff touched walk every unit where the rooms list answers: the 08:00 checkout hour's up to five passes, the late checkout, condo relocations, the rent batch and three fire walks (Hot-Path Auditor F5) [EconomySystem.ts, housekeeping.ts, churn.ts, rent.ts, EventSystem.ts]: deferred onto #1170 (row note and issue comment); the housekeeping walks were already its T5, now widened to the hour, and the extermination walk is #1173 F1. Why not here: this diff swaps one raw `state` write for `setRoomState` inside each loop and leaves every walk as `main` has it, so section 7 reads these as inherited walks, deferred with an issue (the PR adds, ports and rewrites none of them); each pass is one walk of the units (43,358 visits on the large tower), under the hourly tier's 50,000. Folding the checkout hour into one pass over the hotel rooms changes five systems' order of work and needs its own parity check. Two open questions on the page could reclassify it: whether an in-place edit makes a function a rewrite (#1203 item 5), and whether the hourly budget counts per pass or per hour (#1203 item 1; the 08:00 hour's five passes make 216,790 visits). If the owner settles either one the other way, these become `patch` here.
 - Dismissed (7): a periodic full recount as a safety net (Blind Hunter B1), since the guard, the tests, the mutation pass and the stress run are the nets and a recount would hide drift from them; a mark consumed by a listener between a `setRoomState` and a later counted write in the same function (B4), since the Edge Case Hunter found `emit` synchronous with no listener that reads the counts; inputs beyond the five fields (B5), since `censusCount`, `isPresent` and `isTenanted` read none of the others and the mutant that marks only on a state change fails the frame test; the smoke check and the reference predicate (B13), which the walk over every unit backs; the mark set's references to removed units (B17), since the Hot-Path Auditor found no leak (a removal rebuilds the list and replaces the ledger at the next read); the palette key the HUD test copies (B12's second half), a test-only coupling whose assertions hold either way; and the guard's blindness to generic copiers (Hot-Path Auditor's HP-10 note), now covered by the bulk-writer table.
+
+### Round 4
+
+`/gds-code-review` round 4 (a confirming pass) on cb0eb9f (round 3's fixes,
+merged with `main` 9ebf538, which brought the worker's hourly delta) against
+`main` 9ebf538: Blind Hunter, Edge Case Hunter, Acceptance Auditor and
+Hot-Path Auditor. The outside reviewers were still down. No layer found a
+wrong count on a path the code takes: the Hot-Path Auditor's stress probe
+(2,160 two-minute steps on four towers, with fires, a bomb, rescues, vacates
+and rate commands) held `stats()` to the walk over every unit at every read.
+Two layers found the same two faults in the guard's own patterns, and the
+Hot-Path Auditor found one cache bypass, which section 7 always patches.
+
+- [x] [Review][Patch] The stats report dropped the counts on every open, a recount where the ledger answers, which also healed a missed mark silently, against round 3's reason for dismissing a periodic recount (Hot-Path Auditor F1; Blind Hunter B7; Acceptance Auditor A4) [tsPanels.ts, rooms.ts, features.ts, stats.test.ts]: the report reads the kept counts like the HUD, `forgetRoomCounts` is gone, and the screenshot scene that stages vacancies bumps the revision after its raw writes, as `e2e/regions.spec.ts` does after its fire.
+- [x] [Review][Patch] The guard's prefix pattern pointed its quote backreference at the field group, so `++u["customersIn"]` and the like matched nothing (Blind Hunter B1; Edge Case Hunter 2) [guard]: the pattern keeps group 3, and the self-test has a prefix step and a `delete` on a quoted key.
+- [x] [Review][Patch] The prefix pattern's nested quantifier backtracked exponentially on a long name after `++`, `--` or `delete`, about 7 s at 30 characters (Blind Hunter B2; Edge Case Hunter 4) [guard]: the chain is one character class, and the self-test runs a 60-character name.
+- [x] [Review][Patch] Writes through a computed key, `Object.defineProperty` and `Reflect.deleteProperty` passed the guard unseen, while AC3, Design and round 3's last dismissal said every form was covered (Blind Hunter B3; Acceptance Auditor A1; Edge Case Hunter 3) [guard, story]: the guard pins them per file (an assignment through a cast and a computed key anywhere in `src/`, any computed-key assignment in the host code), names the engine's plain computed-key writes and destructuring as the forms it does not see, and AC3, Design and Tests say so.
+- [x] [Review][Patch] The bulk-writer table checked file names only, and the merge had to call `markRoom` once for its two unit writers (Blind Hunter B4; Acceptance Auditor A2) [guard]: each file's wholesale and computed-key writes are counted, the merge's two `markRoom` calls are pinned, and its note names both writers.
+- [x] [Review][Patch] Nothing tied the five counted fields to what the counts' predicates read; round 3 dismissed this on a reading (Blind Hunter B5) [rooms.ts, roomCounts.test.ts, guard]: `COUNTED_FIELDS` is exported, the guard builds its pattern from it, and a test reads the counts through a proxy for every kind and state in both modes and fails on any other field; a mutant that reads `occupants` fails it.
+- [x] [Review][Patch] The hourly delta could change a unit's kind in place under a kept rooms list, which the `roomCounts` comment said only the full merge could do (Blind Hunter B6) [merge.ts, rooms.ts, merge.test.ts]: the delta compares each record's kind and place with the held unit's and drops the room lists when one moved; a test sends a record whose kind changed, and fails without the drop.
+- [x] [Review][Patch] Tooling that stages a counted field after the HUD has read leaves the HUD behind (Blind Hunter B8) [guard, features.ts]: the one scene that does so bumps the revision, and the guard's comment gives the rule for tooling; the screenshot drift check runs on this head.
+- [x] [Review][Patch] A NaN customer count in a frame record would stay in the kept population for good (Edge Case Hunter 1) [frameApply.ts, frameView.ts, frameApply.test.ts]: both counters read a NaN as no count, which no engine sends (its counts are 64-bit integers); a test fails on the old counter.
+- [x] [Review][Patch] The seeded run's labels did not name the save, and a refused sale or build went unnoticed (Blind Hunter B10; Acceptance Auditor A7) [roomCounts.integration.test.ts]: each label names its fixture, and the run requires a sale and a build to go through; it takes about 22 s of its 120 s timeout here.
+- [x] [Review][Patch] The guard counted matches in comments (Blind Hunter B14) [guard]: comment lines are left out of the scan, and the self-test shows a commented write is ignored.
+- [x] [Review][Patch] Inexact comments and text: `stats.ts`, `star.ts` and `roomCounts.test.ts`, the HP-8 row's merge wording and the row for the walkers' population, the `roomCounts.test.ts` header and Tests bullet, the guard's `coerce.ts` note, two restatement phrases, two unwrapped story lines, round 2's pointer to #1234, the F5 deferral's missing reason, backlog figures with no source, and Result's ratios with no `main` commit and no out-of-place frame cost (Blind Hunter B11, B15; Acceptance Auditor A3, A5 to A9; Hot-Path Auditor P1) [those files, backlog.md]: each is corrected; round 4's measurements against 9ebf538 are in Result.
+- [x] [Review][Defer] The daily fire pass walks every unit per active fire for station coverage, spread and satisfaction, about 211,000 visits for one fire on the large tower, older than this change (Hot-Path Auditor P4) [EventSystem.ts]: deferred onto #1170 (row note and issue comment), with the Rust `service_within` half on #1158.
+- [x] [Review][Defer] Three hourly costs inside functions this diff touched, whose Rust twins are tracked (Hot-Path Auditor P5) [churn.ts, gripe.ts]: the move-in probes, the nightclub walks in `vacateCause`, and the context rebuilds per buy-back in `vacate`, deferred onto #1170 beside A14, A13 and #1257 item 3.
+- [x] [Review][Defer] The rest of the stats report's walks (Hot-Path Auditor P7) [tsPanels.ts]: on #1262, whose row now notes the report's population reads can take the ledger's.
+- By reference, older than this change and tracked: the hosts' per-frame walk over every unit record (P1: #1158 A22, #1049), the full merge per hour pass and command (P2: A23, A34, #1045, #1050, #1342, #868), the engine passes that walk every unit where the rooms list answers (P3: #1170, #1173 F1, A35, A16), `removeUnit`'s scan under `build` (P6: #1170, A17), the meal-rush check's walk per frame (P8: #1334), the step's population walks (P9: #1170, A10; the parity-safe fold is #1298's, since the engine reading the ledger would make gameplay depend on every mark), and the traffic chip (P10: #338).
+- Dismissed (4): the rebuild's cost, about five times the first version's plain pass (Blind Hunter B9), since it is paid once per build command at the next HUD read (1.2 ms on the large tower), where `main` paid 1.9 ms at every read; the live ledger object (B12), since its type is read-only, its comment says a caller that keeps the counts copies them, `stats()` copies them, and the tests pin its identity on purpose; a marked room with no share (B13), which only a writer swapping a room's object under a standing list could cause, and none does (the merges keep each object), as its comment now says; and rewording #905's gate (Acceptance Auditor A6's last point), since the gate is the row's requirement, and the row's update already says where it is to be measured now.
