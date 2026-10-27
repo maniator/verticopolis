@@ -222,7 +222,7 @@ test("a worker with the same engine bytes does not trust entries stored under th
     const { page } = first;
     context = first.context;
     const rev = deployments.revisions.A;
-    const plain = (revision: string) => revision.slice(0, -ENGINE_REVISION_SUFFIX.length);
+    const plain = (revision: string) => revision.slice(0, revision.length - ENGINE_REVISION_SUFFIX.length);
     for (const revision of [rev.glue, rev.wasm, rev.record]) {
       expect(revision.endsWith(ENGINE_REVISION_SUFFIX), "the revision carries the rotation suffix").toBe(true);
     }
@@ -236,7 +236,7 @@ test("a worker with the same engine bytes does not trust entries stored under th
         const cache = await caches.open(names[0]);
         for (const [path, revision] of entries) {
           const current = new URL(`${path}?__WB_REVISION__=${revision}`, location.href).href;
-          const old = new URL(`${path}?__WB_REVISION__=${revision.slice(0, -suffixLength)}`, location.href).href;
+          const old = new URL(`${path}?__WB_REVISION__=${revision.slice(0, revision.length - suffixLength)}`, location.href).href;
           const response = (await cache.match(current))!;
           let bytes = new Uint8Array(await response.arrayBuffer());
           if (path.endsWith(".wasm")) bytes = new Uint8Array([...bytes, 0x00, 0x03, 0x01, 0x42, 0x00]);
