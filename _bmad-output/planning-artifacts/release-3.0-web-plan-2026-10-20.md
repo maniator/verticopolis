@@ -144,7 +144,8 @@ is the WASM host. A6's #1064, #1065 and #1066 stay D5 release blockers,
 and #1067 is fixed before the freeze or entered in the exception register;
 none of them is an eligibility input, as under OD-2. Slice 9 is the facade's own PC run before the switch; it
 is not RUN-1, which runs on the shipping host after slice 10. Slice 13 (the
-engine's load-time memory peak, A8) lands before slice 9's verdict. The
+engine's load-time memory peak, A8) and #1242 (its save-time twin, added
+2026-10-27) land before slice 9's verdict. The
 fallback's loss bound under the facade is up to 30 seconds of play, the
 owner's choice at 22:07 UTC (review R6): restore points ride the saves the
 host already takes, with no added cadence. What that requires (one record
@@ -428,7 +429,7 @@ realistically Oct 29 to Nov 4)**
 | M5 W1 harness (must be in slice 9's commit) | Rust engine cold start | none | #1254 | PR not opened | n/a | P1 on the PC, about 90 min | Oct 22 to 23 |
 | Slice 7, RustSim behind its flag; cue-timing test | Facade | 2 to 6, 6a to 6d, #1237, #1239 | #1217 | n/a | n/a | none | Oct 26 to 30 |
 | Slice 8, fallback from the Rust recovery point | Runtime with Facade | slice 7; R6a | #1218 | n/a | n/a | the 50 ms save budget on the PC | Oct 27 to Nov 1 |
-| Slice 9, the PC protocol run | PC | 8, 13, W1; the tolerance rule (1.3.9, item 3) | #1220 | n/a | n/a | 1.3.6, plus a structural edit (a revision change) timed on the large and many-unit towers against the 50 ms long-task bar at 1x | Best Oct 26 (reserved); realistic Oct 29 to Nov 4 |
+| Slice 9, the PC protocol run | PC | 8, 13, #1242, W1; the tolerance rule (1.3.9, item 3) | #1220 | n/a | n/a | 1.3.6, plus a structural edit (a revision change) timed on the large and many-unit towers against the 50 ms long-task bar at 1x | Best Oct 26 (reserved); realistic Oct 29 to Nov 4 |
 | Slice 10, the facade becomes the WASM host | Facade | slice 9 passing; owner approval | #1222 | n/a | n/a | RUN-1 after it | Target before about Nov 22 |
 
 **Concurrent work that lands before stage 3 or the freeze**
@@ -756,6 +757,7 @@ flowchart TD
   TEL --> STG3{{"Owner: cohort stage 3, 50% (OD-1)"}}
   P868["#868 S6: the Rust-backed facade, slices 1 to 8 and 10 (AD-9)"] --> P954["#954 S9: Rust-first commands (slices 2, 7, 10)"]
   A8M["A8 slice 13: engine load-time memory peak"] --> P868
+  A8S["#1242: engine save-time memory peak"] --> P868
   P868 --> S11C["Slice 11: mirror-code cleanup"]
   S11C -. "before the freeze where practical (1.2)" .-> FREEZE
   P868 -->|"RUN-1 or RUN-2 passes M2 to M6"| STG3
@@ -1699,7 +1701,7 @@ plumbing and for every recovered patch.
 | A4 | The staged cohort (OD-1, 4.1): the bucket draw with its read-back check, the config module that holds the share constant and the size gate's threshold, the `arm` and `stage` fields, the size gate, the stop signals in A1's report, and the help-text sentence | none | Its fields need the owner's production OK, as A1's do. Each stage and each drop-back ships only on the owner's approval; stage 1 waits for stage 0, A3's forced-trap spec and A2; stage 3 waits for A5 and a protocol run passing M2 to M6 at 1x and 4x, and takes the size gate off |
 | A5 | S6 #868 under AD-9 (1.2): the Rust-backed facade, slices 1 to 8 and 10 of `architecture/architecture-rust-facade-2026-10-20/slice-plan.md`; audio cue-timing test, and #965 if that test fails; then slice 11, the mirror-code cleanup, before the freeze where practical | none (the facade replaces the sync design; #1068's Rust `SaveMirror` only if restore-point cost needs it) | Each slice has a story and its own PR with a hot-path record. Slice 9 is the facade's PC run before slice 10 and is not RUN-1. Slice 10 needs the owner's approval and the automated proof of 1.2's condition 1. RUN-1 measures the shipping host after slice 10 |
 | A6 | S9 #954 with #1064, #1065, #1066 and #1067; under AD-9, Rust-first commands through the port (slices 2, 7 and 10); audio cue-timing test; #965 if this test is the first to fail | none (re-implementation) | The engine answers; AD-8 on every load path. #1064 and #1065 run where two engines answer the same command (the mirror host while it exists, the dual run, the parity harness); after slice 11 their evidence comes only from CI. #954 first, then #1064, #1065 and #1066 each in a focused PR with parity tests (the owner's 2026-10-16 order). Only #1066's `.TDT` half waits for A7 (OD-8); the rest of S9 does not |
-| A8 | The engine's load-time memory peak (slice 13): load a save without building a `serde_json::Value` tree for it, measured against M6 | none | Before the facade's PC run (slice 9). Engine work, crate minor, `/gds-code-review` with a hot-path record |
+| A8 | The engine's load-time memory peak (slice 13): load a save without building a `serde_json::Value` tree for it, measured against M6 | none | Before the facade's PC run (slice 9), followed there by #1242, the save without a whole-save tree (added 2026-10-27). Engine work with no interface change, so no crate bump (corrected 2026-10-27); `/gds-code-review` with a hot-path record |
 | A7 | Under OD-8 (a), #1066's `.TDT` prerequisites: #886 (test parity table), #887 (forged-input handling), #885 (TDT differential fuzzer), #920 (1994-fidelity checks) | none | First, in Phase A beside A1, the list of real-save inputs (below), which the coordinator puts to the owner. The rest is worked between A3 and A6, ordered in A7's spec; `/gds-code-review` (CLAUDE.md's TDT rule) |
 
 **A7's real-save inputs (OD-8).** #885's local check compares both codecs on
