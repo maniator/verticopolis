@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
-import { markRoom, roomCounts, roomUnits, structureRuns } from "../engine/tower/rooms";
+import { markRoom, rampUnits, roomCounts, roomUnits, structureRuns } from "../engine/tower/rooms";
 import { mergeSimulation, mergeSimulationDelta } from "./merge";
 import { walkedStats } from "../tests/fixtures/walkedStats";
-import { rampUnits, roomUnits, structureRuns } from "../engine/tower/rooms";
 import { MID, lay, mustBuild, placeUnit } from "../tests/fixtures/towerFixtures";
-import { mergeSimulation } from "./merge";
 
 /** A tower with a lobby row, two offices and a shaft, ticked a little. */
 function tower(seed: number, mode: "classic" | "modern" = "classic"): Simulation {

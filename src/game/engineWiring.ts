@@ -17,9 +17,6 @@ import { noteFrameError } from "./frameErrors";
  * an engine rebuild stay visible. Behavior unchanged from the former methods.
  */
 
-/** Ring-buffer depth for tick-guard failures included in a crash report. */
-const MAX_FRAME_ERRORS = 5;
-
 /** Close the gesture's undo step once the commands it issued have been
  *  answered, or at once when it issued none, so the step holds their effect
  *  on any port. A rejected command skips the commit, as a throw did before
