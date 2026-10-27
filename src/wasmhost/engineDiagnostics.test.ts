@@ -56,7 +56,7 @@ describe("buildDiagnostics", () => {
       expected: expected(),
     });
     expect(r.state).toBe("ok");
-    expect(row(r, "Engine in use")).toEqual(["WASM engine"]);
+    expect(row(r, "Engine in use")).toEqual(["Rust engine"]);
     expect(row(r, "Engine crate")).toEqual(["example-engine 9.8.7"]);
     expect(row(r, "Save version")).toEqual(["7 (loads back to 1)"]);
     expect(row(r, "Frame layout")).toEqual(["2"]);
@@ -74,7 +74,7 @@ describe("buildDiagnostics", () => {
       boot: wasmBoot(),
       host: { hosted: true, placement: "worker" },
     });
-    expect(row(r, "Engine in use")).toEqual(["WASM engine (worker)"]);
+    expect(row(r, "Engine in use")).toEqual(["Rust engine (worker)"]);
   });
 
   it("says the identity is unavailable for a package without the call", () => {
@@ -348,7 +348,7 @@ describe("which engine is running, by the host's status", () => {
       expected: expected(),
     });
     expect(r.state).toBe("ok");
-    expect(row(r, "Engine in use")).toEqual(["WASM engine"]);
+    expect(row(r, "Engine in use")).toEqual(["Rust engine"]);
     expect(row(r, "Failed at")).toEqual(["start"]);
   });
 
@@ -367,7 +367,7 @@ describe("which engine is running, by the host's status", () => {
   it("says a wasm-only build has no other engine after a fault", () => {
     const boot: EngineBootState = { build: "wasm-only", engine: "none", failure: { stage: "host", reason: "trap-tick", message: "trap" } };
     const r = buildDiagnostics({ ...base, boot, host: { hosted: false } });
-    expect(r.summary).toBe("The WASM engine stopped after a fault, and this build has no other engine.");
+    expect(r.summary).toBe("The Rust engine stopped after a fault, and this build has no other engine.");
   });
 
   it("reports a source hash mismatch for a package that reports no identity", () => {

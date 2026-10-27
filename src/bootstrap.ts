@@ -5,7 +5,7 @@ import { startGameplaySession, trackAppActionOnce } from "./analytics";
 import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
-import { engineRequested } from "./wasmhost/engineChoice";
+import { noteRustFailed, selectBootEngine, stageNotice } from "./engineCohort/boot";
 import { enginePackageUrl, loadWasmEngine, startWasmHost, type WasmHostApp, type WasmHostHandle } from "./wasmhost/startWasmHost";
 import { makeBrowserWorker, spawnEngineWorker, startWorkerHost, type SpawnedWorker, type WorkerHostHandle } from "./wasmhost/workerController";
 import { setEngineWriter } from "./storage/vctowerWriter";
@@ -17,8 +17,9 @@ import { showEngineLoading } from "./engineLoading";
 import { catalogVerdict } from "./wasmhost/foreignCatalog";
 import { bootFailure, bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState, type FallbackReason } from "./wasmhost/engineBoot";
 import type { BuildMetadataResult } from "./wasmhost/buildSection";
-import { liveDiagnostics } from "./wasmhost/engineDiagnosticsLive";
-import { copyText } from "./ui/copyText";
+import { copyEngineDiagnostics } from "./engineDiagnosticsCopy";
+import { pageControlled, repairOffered } from "./wasmhost/engineRepair";
+import { runEngineRepair } from "./engineRepairControl";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -33,6 +34,7 @@ import { copyText } from "./ui/copyText";
  *  the PWA update prompt. Structural, so `bootstrap.ts` need not import `GameApp`. */
 interface BootApp {
   onUpdateAvailable(activate: () => Promise<void>, info?: UpdateInfo): void;
+  ui?: { toast?(text: string): void };
 }
 
 /** The renderer needs WebGL; some in-app file viewers don't provide it. */
@@ -114,33 +116,6 @@ export function showBootMessage(content: TemplateResult | string, withReload = f
 
 let inertWatch: MutationObserver | null = null;
 
-/** Copy the engine diagnostics from the stop screen, where Help cannot be
- *  opened (#963). The report is built from the page's own state, so it works
- *  when the engine never loaded. */
-function copyEngineDiagnostics(e: Event): void {
-  const status = (e.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(".engine-failure-copy-status");
-  const host = document.getElementById("boot-fallback-host") ?? document.body;
-  const { text } = liveDiagnostics();
-  void copyText(text, navigator, document, host).then((ok) => {
-    if (status) status.textContent = ok ? "Copied." : "Could not copy. Select the text below and copy it by hand.";
-    if (ok) return;
-    // Nothing reached the clipboard, so show the report where it can be selected.
-    let area = host.querySelector<HTMLTextAreaElement>(".engine-failure-copy-text");
-    if (!area) {
-      area = document.createElement("textarea");
-      area.className = "engine-failure-copy-text";
-      area.readOnly = true;
-      area.rows = 12;
-      area.setAttribute("aria-label", "Engine diagnostics");
-      area.style.cssText = "width:min(48em,100%);box-sizing:border-box;font:12px/1.4 ui-monospace,monospace;text-align:left";
-      status?.closest("p")?.insertAdjacentElement("afterend", area);
-    }
-    area.value = text;
-    area.focus();
-    area.select();
-  });
-}
-
 /** Stop the game with the wasm-only build's engine failure: what happened,
  *  why, and what to try. Covers the title screen and any running tower, like
  *  every other boot-fallback message. */
@@ -149,7 +124,8 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
   // An open modal dialog sits in the top layer above any z-index and makes
   // the rest of the page inert, the Reload button included, so close it.
   for (const dialog of Array.from(document.querySelectorAll("dialog[open]"))) (dialog as HTMLDialogElement).close();
-  const copy = engineFailureCopy(state.failure, online, typeof window === "undefined" || window.isSecureContext !== false);
+  const offerRepair = repairOffered(state.failure, pageControlled());
+  const copy = engineFailureCopy(state.failure, online, { secure: typeof window === "undefined" || window.isSecureContext !== false, repair: offerRepair });
   showBootMessage(
     html`<div id=${ENGINE_FAILURE_ID} data-stage=${state.failure.stage} role="alert" aria-live="assertive">
       <p><b>${copy.headline}</b></p>
@@ -158,6 +134,10 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
         ${copy.steps.map((step) => html`<li>${step}</li>`)}
       </ul>
       <p>
+        ${offerRepair
+          ? html`<button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="repair-engine" @click=${runEngineRepair}>Repair engine files</button>
+              <span class="engine-failure-repair-status" role="status" aria-live="polite" style="margin:0 .5em;opacity:.8"></span>`
+          : nothing}
         <button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="copy-diagnostics" @click=${copyEngineDiagnostics}>Copy diagnostics</button>
         <span class="engine-failure-copy-status" role="status" aria-live="polite" style="margin-left:.5em;opacity:.8"></span>
       </p>
@@ -253,8 +233,10 @@ export function bootGame(create: () => BootApp): Promise<void> {
     // app exists, for the same reason; one that fails to start leaves the
     // game on the TypeScript engine.
     // A wasm-only build has no switch: `__WASM_ONLY__` folds the choice and
-    // drops the experimental hosts from its bundle.
-    const choice = __WASM_ONLY__ ? "wasm" : engineRequested();
+    // drops the experimental hosts from its bundle. A switchable build asks
+    // the staged cohort's policy (#1197): the URL, a safety suppression, the
+    // Settings choice, then the cohort arm.
+    const choice = __WASM_ONLY__ ? "wasm" : selectBootEngine();
     const mainThreadWasm = choice === "wasm" || choice === "wasm-frame";
     // The cover says so after a short wait, when the package takes a while (#1132).
     const stopLoadingLine = mainThreadWasm || choice === "wasm-worker" ? showEngineLoading() : () => {};
@@ -275,6 +257,11 @@ export function bootGame(create: () => BootApp): Promise<void> {
       }
     }
     stopLoadingLine();
+    // Rust failed on this device: later boots stay on TypeScript (#1197), for
+    // this build after a load failure, else until a retry. Never throws.
+    const rustFailed = (stage: Parameters<typeof noteRustFailed>[0], reason: string) =>
+      __WASM_ONLY__ || noteRustFailed(stage, reason, bootState.binary?.state === "ok" ? bootState.binary.sourceHash : undefined);
+    if (bootState.failure) rustFailed(bootState.failure.stage, bootState.failure.reason);
     publishBootState(bootState);
     // Start the gameplay session clock (foreground time + funnel state) only once
     // the game can run: a no-WebGL visitor bails above, and a wasm-only build
@@ -300,7 +287,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
       // refused package is named by its code and kind, never by its file or
       // digests (those stay on the console and in `__vcEngineBoot`).
       const f = bootState.failure;
-      throw new Error(`the WASM engine did not start (${f.stage}): ${f.package ? `${f.reason}, ${f.package.kind}` : f.message}`);
+      throw new Error(`the Rust engine did not start (${f.stage}): ${f.package ? `${f.reason}, ${f.package.kind}` : f.message}`);
     }
     // Whether the game exists: a boot that throws before it does sends no
     // row, even when its engine had already failed to load (the error itself
@@ -337,6 +324,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
           engineWorker?.worker.terminate();
           engineWorker = null;
           bootState = failBoot(bootState, "start", bootFailureReason(e), e instanceof Error ? e.message : String(e));
+          rustFailed("start", bootFailureReason(e));
           publishBootState(bootState);
           console.error("[wasm-worker] did not start; running on the TypeScript engine:", e);
         }
@@ -371,6 +359,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
             onFallback: (fallback, latched) => {
               if (latched || isHostFault(fallback.reason)) {
                 setEngineWriter(null);
+                rustFailed(fallback.stage, fallback.reason);
                 // The boot state tooling and support read says so too (a
                 // wasm-only build records it through onFatal, and a first
                 // tower's is recorded below, with its message).
@@ -390,6 +379,7 @@ export function bootGame(create: () => BootApp): Promise<void> {
           hosted = !(__WASM_ONLY__ && bootState.failure) && !handle.status.latched;
         } catch (e) {
           stopForEngine("start", bootFailureReason(e), e instanceof Error ? e.message : String(e));
+          rustFailed("start", bootFailureReason(e));
           console.error(__WASM_ONLY__ ? "[wasm] did not start, and this build has no other engine:" : "[wasm] did not start; running on the TypeScript engine:", e);
         }
         starting = false;
@@ -408,6 +398,13 @@ export function bootGame(create: () => BootApp): Promise<void> {
       // The engine is settled. Sent before the tooling and service-worker
       // steps below, so a throw in one of them cannot lose the row.
       settle();
+      // A stage change that moved this browser's engine says so once (#1197).
+      try {
+        const notice = stageNotice();
+        if (notice) app.ui?.toast?.(notice);
+      } catch (e) {
+        console.error("[engine] could not show the engine test notice:", e);
+      }
       // Publish the tooling handle only where tooling runs: dev serves and
       // VC_TOOLING=1 builds (the e2e, screenshot, and perf pipelines; see
       // vite.config.ts `define`). A production build compiles this branch

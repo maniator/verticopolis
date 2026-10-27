@@ -22,6 +22,7 @@
  * nothing.
  */
 import { type Shot } from "../screenshot-env.ts";
+import { pgAssertSettingsContentVisible } from "../screenshot-builders.ts";
 
 /**
  * Short enough that both dialogs overflow their 82vh cap with room to spare.
@@ -75,11 +76,14 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
         // The premise of the selector's second arm: something really does
         // follow the action row here.
         if (strip.nextElementSibling === null) throw new Error("Settings no longer renders anything after its action row; the shot has lost its subject");
-        box.scrollTop = Math.floor((box.scrollHeight - box.clientHeight) / 2);
+        // Keep the Settings Game engine row intact in the capture while still
+        // leaving enough content below the fold to prove the sticky footer rule.
+        box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight - strip.offsetHeight * 3);
         const left = box.scrollHeight - box.clientHeight - box.scrollTop;
         if (left <= strip.offsetHeight) throw new Error("Settings did not overflow enough for the pin to be doing anything");
         if (strip.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1) throw new Error("the Settings footer is not pinned; this shot would prove nothing");
       });
+      await page.evaluate(pgAssertSettingsContentVisible, "visible-only");
     },
     wait: 300,
   },

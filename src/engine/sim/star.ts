@@ -117,8 +117,15 @@ export function nextStarThreshold(sim: Simulation): number | null {
   return STAR_THRESHOLDS[sim.star + 1];
 }
 
-/** One requirement toward the next star: a human label and whether it is met. */
+/** A star gate's stable id: what a panel keys its copy on, and what the Rust
+ *  engine's stats report answers (facade slice 6b), so the two engines name
+ *  each gate the same way whatever the label says. */
+export type StarGateId = "security" | "medical" | "recycling" | "suites" | "vip" | "metro" | "weddingHall";
+
+/** One requirement toward the next star: its id, a human label and whether it
+ *  is met. */
 export interface StarRequirement {
+  id: StarGateId;
   label: string;
   met: boolean;
 }
@@ -159,16 +166,16 @@ export interface NextStarProgress {
 export function cumulativeStarGates(sim: Simulation, rung: number): StarRequirement[] {
   const gates: StarRequirement[] = [];
   if (rung >= 3) {
-    gates.push({ label: "Security office", met: sim.hasOperational("security") });
+    gates.push({ id: "security", label: "Security office", met: sim.hasOperational("security") });
   }
   if (rung >= 4) {
-    gates.push({ label: "Medical center", met: sim.hasOperational("medical") });
-    gates.push({ label: "Recycling meets demand", met: sim.recyclingDemandMet() });
-    gates.push({ label: "2+ hotel suites", met: sim.countOperational("hotelSuite") >= 2 });
-    gates.push({ label: "Favorable VIP review", met: sim.vipFavorable });
+    gates.push({ id: "medical", label: "Medical center", met: sim.hasOperational("medical") });
+    gates.push({ id: "recycling", label: "Recycling meets demand", met: sim.recyclingDemandMet() });
+    gates.push({ id: "suites", label: "2+ hotel suites", met: sim.countOperational("hotelSuite") >= 2 });
+    gates.push({ id: "vip", label: "Favorable VIP review", met: sim.vipFavorable });
   }
   if (rung >= 5) {
-    gates.push({ label: "Metro station", met: sim.hasOperational("metro") });
+    gates.push({ id: "metro", label: "Metro station", met: sim.hasOperational("metro") });
   }
   return gates;
 }
@@ -188,8 +195,8 @@ export function nextStarRequirements(sim: Simulation): NextStarProgress | null {
   // so the label's floor is always accurate), the metro, and the population bar.
   const gates: StarRequirement[] = isTower
     ? [
-        { label: "Wedding Hall (floor 100)", met: sim.hasOperational("weddingHall") },
-        { label: "Metro station", met: sim.hasOperational("metro") },
+        { id: "weddingHall", label: "Wedding Hall (floor 100)", met: sim.hasOperational("weddingHall") },
+        { id: "metro", label: "Metro station", met: sim.hasOperational("metro") },
       ]
     : cumulativeStarGates(sim, star);
   const allMet = popMet && gates.every((g) => g.met);
