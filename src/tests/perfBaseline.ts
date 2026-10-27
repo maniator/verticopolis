@@ -35,6 +35,12 @@ export interface PerfHarness {
   windows: number;
 }
 
+export interface PerfTolerances {
+  uiMedian: number;
+  uiP95: number;
+  simSpeedFloor: number;
+}
+
 /**
  * Tolerances. (A) median may rise at most 5% and p95 at most 10% (the plan's
  * numbers). (B) may fall at most 10% below baseline: it is the noisiest signal
@@ -42,15 +48,69 @@ export interface PerfHarness {
  * wider than (A)'s, while a genuine catch-up-spiral regression tanks B far more
  * than 10% and is still caught. Locally (a noisier shared sandbox than CI) the
  * three metrics held to ~1% / ~5% / ~4% run-to-run, comfortably inside these.
- * They were set on the TypeScript engine; the WASM engine's entry uses the
- * same values until an A/A calibration of M7 replaces them (#900).
+ * They were set on the TypeScript engine, and they are the approved gate for
+ * it. The WASM engine's run is read against them and gates nothing until an
+ * A/A calibration of M7 under the δ cap sets the values it is held to (#900).
  */
-export const PERF_TOLERANCES = { uiMedian: 1.05, uiP95: 1.1, simSpeedFloor: 0.9 } as const;
+export const PERF_TOLERANCES: Readonly<PerfTolerances> = { uiMedian: 1.05, uiP95: 1.1, simSpeedFloor: 0.9 };
+
+export type BudgetLabel = "ui.update median" | "ui.update p95" | "sim speed";
+export const BUDGET_LABELS: readonly BudgetLabel[] = ["ui.update median", "ui.update p95", "sim speed"];
+
+/**
+ * The budgets that block each engine's run against its own entry; the rest
+ * are printed and gate nothing. The TypeScript engine's three are the approved
+ * E5-S0 gate. On the WASM engine the speed budget prints only (Copilot's
+ * 6f8a492); whether any WASM budget blocks before M7's calibration is the
+ * owner's call, pending (#900), and this is the one place it is set. CI's
+ * first within-run reading of five WASM passes (the mint at eb44215) put a
+ * ui.update pass at x1.209 of the median against today's x1.05, and the speed
+ * passes at x0.963 or better against x0.9.
+ */
+export const BLOCKING: Readonly<Record<PerfEngine, readonly BudgetLabel[]>> = {
+  ts: BUDGET_LABELS,
+  wasm: ["ui.update median", "ui.update p95"],
+};
+
+/** A mint takes at least this many passes, so one slow or fast pass cannot
+ *  set the baseline (W8, the plan's "at least five A/A passes"). */
+export const MIN_MINT_PASSES = 5;
+
+const UI_FIELDS = ["n", "batch", "medianMs", "p95Ms", "meanMs"] as const;
+const SPEED_FIELDS = ["simMinutesPerRealSecond", "cpuThrottle", "speed", "windowMs", "windows"] as const;
+
+/** The values a run reads, as against the harness parameters it records. */
+const READINGS: ReadonlySet<string> = new Set(["medianMs", "p95Ms", "meanMs", "simMinutesPerRealSecond"]);
+
+/** What is wrong with one recorded measurement, or null: both parts must be
+ *  there and every value a finite number above zero. A zero would make its
+ *  budget pass any run, so it cannot stand as a baseline. One pass of a mint
+ *  may read zero (the speed probe can), so `pass` lets the readings be zero
+ *  and still requires the harness parameters above zero. */
+export function measurementProblem(value: unknown, o: { pass?: boolean } = {}): string | null {
+  const m = value as Partial<Record<"uiUpdate" | "simSpeed", Record<string, unknown>>> | null;
+  if (m === null || typeof m !== "object") return "it is not an object";
+  const parts = [
+    ["uiUpdate", UI_FIELDS],
+    ["simSpeed", SPEED_FIELDS],
+  ] as const;
+  for (const [part, fields] of parts) {
+    const p = m[part];
+    if (p === null || typeof p !== "object") return `it has no ${part}`;
+    for (const f of fields) {
+      const v = p[f];
+      const floorOk = typeof v === "number" && (v > 0 || (o.pass === true && READINGS.has(f) && v === 0));
+      if (!floorOk || !Number.isFinite(v)) return `its ${part}.${f} is ${JSON.stringify(v ?? null)}, and ${o.pass ? "a pass's readings must be numbers of zero or more and its harness parameters above zero" : "every value must be a number above zero"}`;
+    }
+  }
+  return null;
+}
 
 /** Read the committed file. It refuses the shape from before #900 (one
- *  baseline, no engine), a key that names no engine, and an entry whose
- *  recorded engine is not its key, so a file edited by hand cannot hold one
- *  engine to another's numbers. */
+ *  baseline, no engine), a key that names no engine, an entry whose recorded
+ *  engine is not its key, and an entry with a missing, zero or non-numeric
+ *  value, so a file edited by hand cannot hold one engine to another's
+ *  numbers or to a floor that passes anything. */
 export function parseBaselineFile(text: string): BaselineFile {
   const raw = JSON.parse(text) as Record<string, unknown> | null;
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) throw new Error("the perf baseline must be an object keyed by engine");
@@ -59,7 +119,10 @@ export function parseBaselineFile(text: string): BaselineFile {
   for (const [key, entry] of Object.entries(raw)) {
     if (!(PERF_ENGINES as readonly string[]).includes(key)) throw new Error(`the perf baseline has an entry for "${key}", which is not an engine (${PERF_ENGINES.join(", ")})`);
     const recorded = (entry as { engine?: unknown } | null)?.engine;
+    if (recorded === undefined) throw new Error(`the perf baseline's "${key}" entry records no engine; re-mint it with [update-perf-baseline:${key}]`);
     if (recorded !== key) throw new Error(`the perf baseline's "${key}" entry records the engine ${JSON.stringify(recorded)}; re-mint it with [update-perf-baseline:${key}]`);
+    const problem = measurementProblem(entry);
+    if (problem) throw new Error(`the perf baseline's "${key}" entry cannot gate: ${problem}; remove it and re-mint it with [update-perf-baseline:${key}]`);
     file[key as PerfEngine] = entry as EngineBaseline;
   }
   return file;
@@ -86,7 +149,7 @@ export function harnessOf(m: PerfMeasurement): PerfHarness {
 }
 
 export interface BudgetCheck {
-  label: string;
+  label: BudgetLabel;
   ok: boolean;
   message: string;
 }
@@ -97,7 +160,7 @@ export interface BudgetCheck {
  *  against `baseline * tol` once failed a docs-only diff by 4e-13 ms of
  *  float-representation noise at the exact boundary (AUD-009). The effective
  *  tolerances stay 5%/10%. */
-export function budgetChecks(run: PerfMeasurement, baseline: PerfMeasurement, tol = PERF_TOLERANCES): BudgetCheck[] {
+export function budgetChecks(run: PerfMeasurement, baseline: PerfMeasurement, tol: PerfTolerances = PERF_TOLERANCES): BudgetCheck[] {
   const { uiUpdate: u, simSpeed: s } = run;
   const { uiUpdate: bu, simSpeed: bs } = baseline;
   return [
@@ -119,26 +182,59 @@ export function budgetChecks(run: PerfMeasurement, baseline: PerfMeasurement, to
   ];
 }
 
-/** The gate's blocking checks for a measured engine. The WASM sim-speed probe is
- *  still reported, but it is intentionally not a gate until the cloud probe is
- *  calibrated away from the 0 / ~0.48 bimodal outcome. */
-export function gateChecks(run: PerfMeasurement, baseline: PerfMeasurement, engine: PerfEngine, tol = PERF_TOLERANCES): BudgetCheck[] {
-  const checks = budgetChecks(run, baseline, tol);
-  return engine === "wasm" ? checks.filter((check) => check.label !== "sim speed") : checks;
+/** The budgets that fail an engine's run against its own entry (BLOCKING). */
+export function gateChecks(run: PerfMeasurement, baseline: PerfMeasurement, engine: PerfEngine, tol: PerfTolerances = PERF_TOLERANCES): BudgetCheck[] {
+  return budgetChecks(run, baseline, tol).filter((c) => BLOCKING[engine].includes(c.label));
+}
+
+/** Whether some budget of an engine prints without blocking. */
+export function hasReportedBudgets(engine: PerfEngine): boolean {
+  return BUDGET_LABELS.some((l) => !BLOCKING[engine].includes(l));
+}
+
+/** An engine's run against its own entry as printed lines, each budget marked
+ *  blocking or reported. A reported budget's line is its whole reading. */
+export function ownEntryLines(engine: PerfEngine, run: PerfMeasurement, baseline: PerfMeasurement): string[] {
+  return [
+    `perf ${engine} against its own entry (a reported budget gates nothing until M7's calibration):`,
+    ...budgetChecks(run, baseline).map((c) => `  ${c.ok ? "within" : "outside"} (${BLOCKING[engine].includes(c.label) ? "blocking" : "reported"}): ${c.message}`),
+  ];
 }
 
 /** M7's reading of a WASM run against the TypeScript engine's baseline (the
  *  Performance row: a 5,000+ population tower within the TypeScript engine's
  *  own `npm run perf` baseline). It is printed on every CI run and read on the
- *  release candidate's run; it fails nothing. */
+ *  release candidate's run; it fails nothing. It is provisional on two
+ *  counts, which the printed note names: the tolerances are the TypeScript
+ *  gate's and are not yet calibrated under the δ cap, and the two entries measure
+ *  towers set up differently (`buildToStar` builds the TypeScript tower in
+ *  place and the WASM one through a loaded save, which #905 measures at about
+ *  twice the `stats()` cost, and their clocks sit at different times). */
 export function crossEngineLines(run: PerfMeasurement, file: BaselineFile): string[] {
   const ts = file.ts;
-  const head = "M7, the WASM run against the TypeScript baseline (reported, gates nothing):";
+  const head = "M7, the WASM run against the TypeScript baseline (provisional, reported, gates nothing):";
   if (!ts) return [`${head} no TypeScript entry to read against`];
   const a = harnessOf(run);
   const b = harnessOf(ts);
   if (JSON.stringify(a) !== JSON.stringify(b)) return [`${head} not comparable, the TypeScript entry was minted with ${JSON.stringify(b)} and this run used ${JSON.stringify(a)}`];
-  return [head, ...budgetChecks(run, ts).map((c) => `  ${c.ok ? "within" : "outside"}: ${c.message}`)];
+  return [
+    head,
+    "  note: tolerances not yet calibrated under the δ cap; the TypeScript tower is built in place and the WASM tower through a loaded save (#905), at a different clock time",
+    ...budgetChecks(run, ts).map((c) => `  ${c.ok ? "within" : "outside"}: ${c.message}`),
+  ];
+}
+
+/** What a run of the spec does with its measurement against the committed
+ *  file (a pass of a mint records itself before this, for the mint script).
+ *  A local capture writes the engine's entry; on CI a missing entry fails, so
+ *  deleting an entry cannot silently switch the gate off; off CI nothing is
+ *  compared or written, since local hardware is never the arbiter. */
+export type RunAction = "capture" | "fail-missing" | "report-missing" | "report" | "gate";
+
+export function runAction(o: { capture: boolean; enforce: boolean; hasEntry: boolean }): RunAction {
+  if (o.capture) return "capture";
+  if (!o.hasEntry) return o.enforce ? "fail-missing" : "report-missing";
+  return o.enforce ? "gate" : "report";
 }
 
 /** After a mint of `engine` (update-perf-baseline.yml): what is wrong with
@@ -158,13 +254,18 @@ const median = (xs: readonly number[]): number => {
 
 /** A mint's entry from its passes (update-perf-baseline.yml runs the spec
  *  several times): each measured value is the median across the passes, so
- *  one slow or fast pass does not set the baseline. The passes must all be
- *  the minted engine's and share the harness parameters, and a sim speed of
- *  zero is refused, since a floor of zero would pass any run. */
+ *  one slow or fast pass does not set the baseline, and the result does not
+ *  depend on the order the passes are read in. Every pass must be a complete
+ *  measurement of the minted engine with the same harness parameters, and a
+ *  median of zero is refused, since a floor of zero would pass any run. */
 export function entryFromPasses(engine: PerfEngine, passes: readonly EngineBaseline[]): EngineBaseline {
   if (passes.length === 0) throw new Error(`no ${engine} passes to mint from`);
   const other = passes.find((p) => p.engine !== engine);
   if (other) throw new Error(`a ${engine} mint got a pass that recorded the engine ${JSON.stringify(other.engine)}`);
+  for (const [i, p] of passes.entries()) {
+    const problem = measurementProblem(p, { pass: true });
+    if (problem) throw new Error(`${engine} pass ${i + 1} is not a complete measurement: ${problem}`);
+  }
   const harness = JSON.stringify(harnessOf(passes[0]));
   const odd = passes.find((p) => JSON.stringify(harnessOf(p)) !== harness);
   if (odd) throw new Error(`the ${engine} passes used different harness parameters (${harness} and ${JSON.stringify(harnessOf(odd))})`);
@@ -175,13 +276,13 @@ export function entryFromPasses(engine: PerfEngine, passes: readonly EngineBasel
     uiUpdate: { ...first.uiUpdate, medianMs: med((p) => p.uiUpdate.medianMs), p95Ms: med((p) => p.uiUpdate.p95Ms), meanMs: med((p) => p.uiUpdate.meanMs) },
     simSpeed: { ...first.simSpeed, simMinutesPerRealSecond: med((p) => p.simSpeed.simMinutesPerRealSecond) },
   };
-  const values = [entry.uiUpdate.medianMs, entry.uiUpdate.p95Ms, entry.uiUpdate.meanMs, entry.simSpeed.simMinutesPerRealSecond];
-  if (!values.every((v) => Number.isFinite(v) && v > 0)) throw new Error(`the ${engine} passes give a median that is zero or not a number (${values.join(", ")}); a baseline of zero cannot gate`);
+  const problem = measurementProblem(entry);
+  if (problem) throw new Error(`the ${engine} passes give a median entry that cannot gate: ${problem}`);
   return entry;
 }
 
-/** One budget's A/A reading: the passes of a mint held to the entry made
- *  from them, as the gate holds a run to its baseline. */
+/** One budget's within-run reading: the passes of a mint held to the entry
+ *  made from them, as the gate holds a run to its baseline. */
 export interface PassSpread {
   label: string;
   tolerance: number;
@@ -192,13 +293,17 @@ export interface PassSpread {
   passes: number;
 }
 
-/** How a mint's passes spread around their entry: the A/A reading M7's
- *  calibration needs (#900, the plan's section 5.3), from one CI run. */
-export function passSpread(passes: readonly PerfMeasurement[], entry: PerfMeasurement, tol = PERF_TOLERANCES): PassSpread[] {
+/** How a mint's passes spread around their entry. The passes share one job,
+ *  one runner and one browser, and each is held to a median it is part of,
+ *  so this is a within-run spread: it leaves out the runner-to-runner
+ *  variance a later PR's run meets. M7's calibration (#900, the plan's
+ *  section 5.3) also reads the `perf <engine>:` lines every CI run prints, or
+ *  several mints. */
+export function passSpread(passes: readonly PerfMeasurement[], entry: PerfMeasurement, tol: PerfTolerances = PERF_TOLERANCES): PassSpread[] {
   const ratios = (p: PerfMeasurement): number[] => [p.uiUpdate.medianMs / entry.uiUpdate.medianMs, p.uiUpdate.p95Ms / entry.uiUpdate.p95Ms, p.simSpeed.simMinutesPerRealSecond / entry.simSpeed.simMinutesPerRealSecond];
   const tolerances = [tol.uiMedian, tol.uiP95, tol.simSpeedFloor];
   const checks = passes.map((p) => budgetChecks(p, entry, tol));
-  return budgetChecks(entry, entry, tol).map((c, i) => {
+  return budgetChecks(entry, entry, tol).map((c, i): PassSpread => {
     const rs = passes.map((p) => ratios(p)[i]);
     return {
       label: c.label,
@@ -211,13 +316,29 @@ export function passSpread(passes: readonly PerfMeasurement[], entry: PerfMeasur
   });
 }
 
-/** The spread as a Markdown table, for the mint run's summary. */
+/** The spread as a Markdown table, for the mint run's summary and commit. */
 export function spreadLines(engine: PerfEngine, spread: readonly PassSpread[]): string[] {
   return [
-    `A/A reading of the ${engine} mint (each pass against the median of all ${spread[0]?.passes ?? 0}):`,
+    `Within-run spread of the ${engine} mint (each pass against the median of all ${spread[0]?.passes ?? 0}, one runner):`,
     "",
     "| Budget | Tolerance | Worst pass | Passes outside |",
     "| --- | --- | --- | --- |",
     ...spread.map((s) => `| ${s.label} | x${s.tolerance} | x${s.worst.toFixed(3)} | ${s.outside} of ${s.passes} |`),
+  ];
+}
+
+/** The passes themselves as a Markdown table, printed before anything can
+ *  refuse them so a refused mint still shows what it measured. */
+export function passLines(engine: PerfEngine, passes: readonly unknown[]): string[] {
+  const cell = (v: unknown): string => (typeof v === "number" ? String(v) : JSON.stringify(v ?? null));
+  return [
+    `The ${engine} passes:`,
+    "",
+    "| Pass | ui.update median ms | ui.update p95 ms | sim-min/s |",
+    "| --- | --- | --- | --- |",
+    ...passes.map((raw, i) => {
+      const p = raw as Partial<PerfMeasurement> | null;
+      return `| ${i + 1} | ${cell(p?.uiUpdate?.medianMs)} | ${cell(p?.uiUpdate?.p95Ms)} | ${cell(p?.simSpeed?.simMinutesPerRealSecond)} |`;
+    }),
   ];
 }

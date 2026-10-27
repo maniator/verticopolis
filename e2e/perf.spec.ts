@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildToStar, expectEngineHosted, onWasm } from "./helpers";
 import { benchmarkUiUpdate, measureSimSpeed, checkNodeIdentity } from "./perf-harness";
-import { budgetChecks, crossEngineLines, formatBaselineFile, gateChecks, harnessOf, parseBaselineFile, withBaseline, type BaselineFile, type PerfEngine, type PerfMeasurement } from "../src/tests/perfBaseline";
+import { crossEngineLines, formatBaselineFile, gateChecks, harnessOf, hasReportedBudgets, measurementProblem, ownEntryLines, parseBaselineFile, runAction, withBaseline, type BaselineFile, type PerfEngine, type PerfMeasurement } from "../src/tests/perfBaseline";
 
 /**
  * The E5-S0 perf gate (BLOCKING, ahead of any live-view migration). It holds a
@@ -14,19 +14,21 @@ import { budgetChecks, crossEngineLines, formatBaselineFile, gateChecks, harness
  *
  * Baselines are captured on the reference build and committed as JSON, exactly
  * like the visual-snapshot baselines: a local sandbox with variable CPU is never
- * the arbiter. Set `PERF_CAPTURE=1` to (re)write the baseline instead of asserting
- * against it; CI mints the authoritative numbers via update-perf-baseline.yml.
- * When no baseline file exists yet, a normal run captures one and skips the
- * assertions (first-run bootstrap) so the harness is never gated on a file it just
- * created; E5-S1 additionally asserts the file exists so the gate can never stay
- * silently inert (see the backlog note).
+ * the arbiter. CI mints the authoritative numbers via update-perf-baseline.yml.
+ * Set `PERF_CAPTURE=1` to write this engine's entry from a local run instead of
+ * asserting against it (a preview, never one to commit); a plain local run
+ * writes nothing, so an engine with no entry yet cannot gain a local one by
+ * accident. On CI a missing entry fails, so the gate can never stay silently
+ * inert (see the backlog note).
  *
  * The spec runs on both engines (#900): `chromium` on the TypeScript engine and
  * `chromium-wasm` on the WASM engine. The file holds one entry per engine
  * (src/tests/perfBaseline.ts), each run is held to its own engine's entry, and
- * a capture writes only the engine it ran. On the WASM engine the run is also
- * read against the TypeScript entry and printed (M7's reading), which fails
- * nothing.
+ * a capture writes only the engine it ran. The TypeScript engine's three
+ * budgets block; on the WASM engine the speed budget prints and gates nothing
+ * until M7's calibration (BLOCKING in src/tests/perfBaseline.ts, which says
+ * why). On the WASM engine the run is also read against the TypeScript entry
+ * and printed (M7's reading), which fails nothing.
  */
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
@@ -92,8 +94,10 @@ test.describe("E5-S0 perf gate @perf", () => {
       return Boolean(g?.sim && g.ui);
     });
     // Build the deterministic large tower (TOWER-rank: ~100 floors, thousands of
-    // occupants), the committed "large-tower fixture" for the benchmark.
-    await page.evaluate(buildToStar, 6);
+    // occupants), the committed "large-tower fixture" for the benchmark. TOWER
+    // needs 15,000 people (TOWER_POPULATION in src/engine/census.ts), so the
+    // rank also holds M7's 5,000+ population precondition.
+    expect(await page.evaluate(buildToStar, 6), "the fixture must reach TOWER").toBe(6);
     await expectEngine(page, engine);
 
     // (A) isolated render cost (batched, change-path).
@@ -168,51 +172,65 @@ test.describe("E5-S0 perf gate @perf", () => {
     expect(nodeIdentity.towerStatsChildStable, "the tower-stats grid children keep their identity across pumps").toBe(true);
 
     if (CAPTURE && PASSES_DIR) {
+      // One pass of a mint: scripts/perf-baseline-mint.ts reads them all, and
+      // checks them, and the committed file is left alone.
       fs.mkdirSync(PASSES_DIR, { recursive: true });
       fs.writeFileSync(path.join(PASSES_DIR, `${engine}-${test.info().repeatEachIndex}.json`), JSON.stringify({ engine, ...current }) + "\n");
       return;
     }
     const file: BaselineFile = fs.existsSync(BASELINE_PATH) ? parseBaselineFile(fs.readFileSync(BASELINE_PATH, "utf8")) : {};
     const baseline = file[engine];
-    if (CAPTURE || !baseline) {
-      // In enforce mode a missing baseline is a hard failure, not a bootstrap:
-      // otherwise deleting baseline.json, or an engine's entry, would silently
-      // disable the gate in CI. The bootstrap capture-and-skip remains for
-      // local runs and for the capture workflow itself (PERF_CAPTURE=1), which
-      // writes this engine's entry and keeps the others.
-      expect(
-        CAPTURE || !ENFORCE,
-        `no committed ${engine} baseline in ${BASELINE_PATH}; mint one with [update-perf-baseline:${engine}]`,
-      ).toBe(true);
-      fs.mkdirSync(path.dirname(BASELINE_PATH), { recursive: true });
-      fs.writeFileSync(BASELINE_PATH, formatBaselineFile(withBaseline(file, { engine, ...current })));
-      test.info().annotations.push({
-        type: "perf-baseline",
-        description: `captured ${engine} baseline (not asserted): ${JSON.stringify(current)}`,
-      });
-      return;
+    const action = runAction({ capture: CAPTURE, enforce: ENFORCE, hasEntry: Boolean(baseline) });
+
+    // Every CI run prints what it measured, so CI's runs give the
+    // runner-to-runner spread M7's calibration needs, and M7's reading and
+    // the engine's own reading print before anything below can fail.
+    if (ENFORCE) {
+      const lines = [`perf ${engine}: ${JSON.stringify(current)}`];
+      if (engine === "wasm") lines.push(...crossEngineLines(current, file));
+      if (baseline && hasReportedBudgets(engine)) lines.push(...ownEntryLines(engine, current, baseline));
+      for (const line of lines) console.log(line);
+      if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, ["```", ...lines, "```", ""].join("\n"));
     }
 
-    if (!ENFORCE) {
-      // Local hardware differs from the CI runner that minted the baseline, so
-      // the comparison would be meaningless here; report the measurements and
-      // stop (see the ENFORCE note at the top).
-      test.info().annotations.push({
-        type: "perf-measured",
-        description: `measured ${engine} (comparison skipped outside CI; PERF_ENFORCE=1 to compare): ${JSON.stringify(current)}`,
-      });
-      return;
+    switch (action) {
+      case "capture": {
+        // A local preview of this engine's entry; the others stay as they are.
+        const problem = measurementProblem(current);
+        expect(problem, `this ${engine} run cannot be a baseline: ${problem}`).toBeNull();
+        fs.mkdirSync(path.dirname(BASELINE_PATH), { recursive: true });
+        fs.writeFileSync(BASELINE_PATH, formatBaselineFile(withBaseline(file, { engine, ...current })));
+        test.info().annotations.push({ type: "perf-baseline", description: `captured ${engine} baseline locally (a preview, not asserted): ${JSON.stringify(current)}` });
+        return;
+      }
+      case "fail-missing":
+        // Deleting baseline.json, or an engine's entry, must not silently
+        // disable the gate on CI.
+        expect(baseline, `no committed ${engine} baseline in ${BASELINE_PATH}; mint one with [update-perf-baseline:${engine}]`).toBeDefined();
+        return;
+      case "report-missing":
+        test.info().annotations.push({
+          type: "perf-measured",
+          description: `measured ${engine}; there is no committed ${engine} entry, and only CI mints one ([update-perf-baseline:${engine}]): ${JSON.stringify(current)}`,
+        });
+        return;
+      case "report":
+        // Local hardware differs from the CI runner that minted the baseline, so
+        // the comparison would be meaningless here; report the measurements and
+        // stop (see the ENFORCE note at the top).
+        test.info().annotations.push({
+          type: "perf-measured",
+          description: `measured ${engine} (comparison skipped outside CI; PERF_ENFORCE=1 to compare): ${JSON.stringify(current)}`,
+        });
+        return;
+      case "gate":
+        break;
     }
 
-    // Every CI run prints what it measured, so the runs of one commit give an
-    // A/A spread, and M7's reading comes before this engine's own budgets so a
-    // failing budget still leaves both in the log.
-    console.log(`perf ${engine}: ${JSON.stringify(current)}`);
-    if (engine === "wasm") for (const line of crossEngineLines(current, file)) console.log(line);
     // The baseline is only comparable if it was minted with the SAME harness
     // parameters; a constant change (or a stale file) must demand a re-mint via
-    // [update-perf-baseline:<engine>], never a silent apples-to-oranges comparison.
-    expect(harnessOf(baseline), `the ${engine} baseline's metadata must match the harness parameters; re-mint with [update-perf-baseline:${engine}]`).toEqual({
+    // [update-perf-baseline:<engine>] instead of comparing unlike runs.
+    expect(harnessOf(baseline!), `the ${engine} baseline's metadata must match the harness parameters; re-mint with [update-perf-baseline:${engine}]`).toEqual({
       n: N_PUMPS,
       batch: A_BATCH,
       cpuThrottle: CPU_THROTTLE,
@@ -220,12 +238,12 @@ test.describe("E5-S0 perf gate @perf", () => {
       windowMs: SPEED_WINDOW_MS,
       windows: SPEED_WINDOWS,
     });
-    // (A) median must not rise more than 5%; p95 not more than 10%. The WASM
-    // end-to-end speed probe remains report-only while the cloud host is still
-    // bimodal (~0 or ~0.48 sim-min/s), so the gate checks only the UI budgets
-    // for that engine. budgetChecks (src/tests/perfBaseline.ts) carries the
-    // float-safe comparisons and the tolerances, and gateChecks narrows which
-    // ones block the project.
-    for (const check of gateChecks(current, baseline, engine)) expect(check.ok, check.message).toBe(true);
+    // (A) median must not rise more than 5%; p95 not more than 10%. (B)
+    // end-to-end speed must be at least the baseline, within its 10% floor.
+    // gateChecks keeps the budgets that block this engine (BLOCKING in
+    // src/tests/perfBaseline.ts; the rest printed above), and
+    // src/tests/perfBaseline.ts also carries the float-safe comparisons and
+    // the tolerances.
+    for (const check of gateChecks(current, baseline!, engine)) expect(check.ok, check.message).toBe(true);
   });
 });

@@ -103,8 +103,9 @@ export function syncEngine(): void {
  * driven directly (no crowd tick), exactly like the headless fixture.
  *
  * On the TypeScript engine the instance is the engine, so the tower is scripted
- * on it in place (the perf gate's committed baseline measures exactly that
- * tower). On the WASM engine the structure and the occupancy are scripted on a
+ * on it in place (the perf gate's TypeScript entry measures exactly that
+ * tower; its WASM entry measures the loaded copy below, which #905 measures at
+ * about twice the `stats()` cost, so M7's cross-engine reading names that). On the WASM engine the structure and the occupancy are scripted on a
  * scratch copy of the live tower, loaded from the engine's own save, and the
  * app then adopts that copy, which is the load a player's save takes: the host
  * follows `adoptSim` and starts the engine from it. Every later step there is a
