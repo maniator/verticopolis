@@ -62,10 +62,8 @@ export const BUDGET_LABELS: readonly BudgetLabel[] = ["ui.update median", "ui.up
  * are printed and gate nothing. The TypeScript engine's three are the approved
  * E5-S0 gate. On the WASM engine the speed budget prints only (Copilot's
  * 6f8a492); whether any WASM budget blocks before M7's calibration is the
- * owner's call, pending (#900), and this is the one place it is set. CI's
- * first within-run reading of five WASM passes (the mint at eb44215) put a
- * ui.update pass at x1.209 of the median against today's x1.05, and the speed
- * passes at x0.963 or better against x0.9.
+ * owner's call, pending (#900), and this is the one place it is set. The
+ * calibration readings it rests on are in the #900 backlog row.
  */
 export const BLOCKING: Readonly<Record<PerfEngine, readonly BudgetLabel[]>> = {
   ts: BUDGET_LABELS,
