@@ -1,8 +1,9 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
+import { linkFolder } from "./fixtures/links";
 import { PUBLIC_FILES, isExcludedPublicPath, publicFileProblems, type PublicFile } from "../build/publicFiles";
 
 // The list of files Vite copies from src/public into dist (#974): the pure
@@ -86,7 +87,7 @@ describe("public files are listed with their source and license (#974)", () => {
   it("walks two links to one folder", () => {
     const src = tree(listed);
     mkdirSync(join(src, "shared"));
-    symlinkSync(join(src, "shared"), join(src, "again"));
+    linkFolder(join(src, "shared"), join(src, "again"));
     const r = run(src, tree(listed));
     expect(r.stderr).toBe("");
     expect(r.status).toBe(0);
@@ -94,8 +95,8 @@ describe("public files are listed with their source and license (#974)", () => {
 
   it("fails with one line on a broken link, a link back to a folder above it, or an operating system's file", () => {
     for (const [name, link, message] of [
-      ["a broken link", (src: string) => symlinkSync(join(src, "missing"), join(src, "gone.png")), /gone\.png is a broken link/],
-      ["a link loop", (src: string) => symlinkSync(src, join(src, "loop")), /links back to a folder above it/],
+      ["a broken link", (src: string) => linkFolder(join(src, "missing"), join(src, "gone.png")), /gone\.png is a broken link/],
+      ["a link loop", (src: string) => linkFolder(src, join(src, "loop")), /links back to a folder above it/],
       ["an operating system's file", (src: string) => writeFileSync(join(src, ".DS_Store"), ""), /\.DS_Store is a file the operating system wrote/],
     ] as const) {
       const src = tree(listed);

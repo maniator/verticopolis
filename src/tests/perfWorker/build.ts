@@ -32,6 +32,11 @@ export function buildProduction(repo: string, env: NodeJS.ProcessEnv = process.e
   // A VC_TOOLING left in the shell would turn this into a tooling build.
   const clean = { ...env };
   delete clean.VC_TOOLING;
+  // This is a new npm run, not a step of the one that started the harness. Left
+  // in, the parent's lifecycle identity ("npx" under `npx vitest`, "perf:worker"
+  // under npm run) can reach the prebuild, build and postbuild hooks on Windows.
+  delete clean.npm_lifecycle_event;
+  delete clean.npm_lifecycle_script;
   runNodeCli(npmEntry(env), ["run", "build"], repo, clean);
 }
 
