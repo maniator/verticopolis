@@ -1,4 +1,5 @@
 import type { Simulation } from "../engine/Simulation";
+import { markRoom } from "../engine/tower/rooms";
 import type { Person } from "../engine/crowd/person";
 import type { FrameView } from "./frameView";
 import { PERSON_OPTIONALS, clearOptional } from "./personFields";
@@ -56,6 +57,8 @@ export function syncUnits(sim: Simulation, frame: FrameView): void {
   for (const r of frame.units) {
     const u = sim.tower.byId.get(r.id);
     if (!u) continue;
+    // The HUD's room counts recount a room only when a field they read moved.
+    if (u.state !== r.state || u.customersIn !== r.customersIn) markRoom(sim.tower, u);
     u.state = r.state;
     u.occupants = r.occupants;
     u.customersIn = r.customersIn;

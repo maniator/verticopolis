@@ -1,5 +1,8 @@
 import type { Tower } from "../Tower";
-import type { Unit } from "../types";
+import { censusCount } from "../census";
+import { isHotelKind } from "../facilityPredicates";
+import type { Unit, UnitState } from "../types";
+import { isPresent, isTenanted } from "../types";
 import { isStructural } from "./towerTopology";
 
 /**
@@ -81,6 +84,81 @@ export function forgetUnitLists(tower: Tower): void {
   runsCache.delete(tower);
 }
 
+/**
+ * The counts the HUD strip shows from the rooms (`stats()`): each counted kind,
+ * the offices, condos and hotel rooms in each counted condition, and the
+ * population (`censusCount` over the present rooms, as `totalPopulation` sums
+ * it).
+ */
+export interface RoomCounts {
+  population: number;
+  offices: number;
+  occupiedOffices: number;
+  vacant: number;
+  vacantNoRate: number;
+  condos: number;
+  soldCondos: number;
+  hotelRooms: number;
+  occupiedHotel: number;
+  dirty: number;
+  shops: number;
+  restaurants: number;
+  parkingSpaces: number;
+}
+
+/**
+ * The tower's {@link RoomCounts}, kept as the rooms change so that a HUD
+ * refresh does not pass over the rooms (HP-12 in
+ * `docs/performance/hot-path-review.md`, #905).
+ *
+ * The counts are built in one pass over `roomUnits` whenever that list is
+ * rebuilt (a placement, a removal, a load, a merge that moved the units) or
+ * dropped by {@link forgetRoomCounts}. Between rebuilds, each write of a field
+ * the counts read (`state`, `noRate`, `everOccupied`, `residents`,
+ * `customersIn`) marks its room through {@link setRoomState} or
+ * {@link markRoom}, and a read recounts only the marked rooms: it takes each
+ * one's last share out and puts its share as the fields stand now back in.
+ * A room's kind never changes in place (`roomUnits` relies on the same), so
+ * the kind counts move only with the list. The returned object is the
+ * ledger's own and changes with later reads.
+ */
+export function roomCounts(tower: Tower): Readonly<RoomCounts> {
+  const rooms = roomUnits(tower);
+  const ledger = ledgers.get(tower);
+  if (!ledger || ledger.rooms !== rooms) return countRooms(tower, rooms);
+  for (const u of ledger.changed) {
+    const share = ledger.shares.get(u);
+    if (!share) continue; // a structure tile: it counts toward nothing
+    tally(ledger.counts, share, -1);
+    share.flags = flagsOf(u);
+    share.population = isPresent(u) ? censusCount(u) : 0;
+    tally(ledger.counts, share, 1);
+  }
+  ledger.changed.clear();
+  return ledger.counts;
+}
+
+/** Set `u.state` and mark the room for {@link roomCounts}. */
+export function setRoomState(tower: Tower, u: Unit, state: UnitState): void {
+  u.state = state;
+  markRoom(tower, u);
+}
+
+/** Mark `u` as changed since the counts were last read, after a write to one
+ *  of the fields {@link roomCounts} reads (or before it: the next read takes
+ *  the fields as they stand then, so one mark covers every write made before
+ *  that read). Nothing to do before the tower's first count. */
+export function markRoom(tower: Tower, u: Unit): void {
+  ledgers.get(tower)?.changed.add(u);
+}
+
+/** Drop the tower's room counts, so the next read counts every room again.
+ *  For a writer that rewrites rooms' fields wholesale without marking each,
+ *  as the WASM hosts' merge does. */
+export function forgetRoomCounts(tower: Tower): void {
+  ledgers.delete(tower);
+}
+
 const cache = new WeakMap<Tower, { units: Unit[]; length: number; revision: number; rooms: readonly Unit[] }>();
 const runsCache = new WeakMap<Tower, { units: Unit[]; length: number; revision: number; runs: readonly StructureRun[] }>();
 
@@ -115,4 +193,73 @@ function buildRuns(units: readonly Unit[]): readonly StructureRun[] {
 function inOrder(tiles: readonly Unit[]): boolean {
   for (let i = 1; i < tiles.length; i++) if (tiles[i].x < tiles[i - 1].x) return false;
   return true;
+}
+
+/** A room's part in the condition counts and the population. */
+interface Share {
+  flags: number;
+  population: number;
+}
+
+interface RoomLedger {
+  rooms: readonly Unit[];
+  counts: RoomCounts;
+  shares: Map<Unit, Share>;
+  changed: Set<Unit>;
+}
+
+const ledgers = new WeakMap<Tower, RoomLedger>();
+
+const OCCUPIED_OFFICE = 1;
+const VACANT = 2;
+const VACANT_NO_RATE = 4;
+const SOLD_CONDO = 8;
+const OCCUPIED_HOTEL = 16;
+const DIRTY = 32;
+
+/** Which condition counts `u` is in, by the tests `stats()` has always used. */
+function flagsOf(u: Unit): number {
+  if (u.kind === "office") {
+    let flags = isTenanted(u) ? OCCUPIED_OFFICE : 0; // a lame-duck on notice still holds the space
+    // Off-market (No Rate) vacancies are split out so the headline count
+    // stays honest: these will never fill at the current setting.
+    if (u.state === "empty") flags |= u.noRate ? VACANT | VACANT_NO_RATE : VACANT;
+    return flags;
+  }
+  if (u.kind === "condo") return u.everOccupied ? SOLD_CONDO : 0;
+  if (isHotelKind(u.kind)) return (u.state === "asleep" ? OCCUPIED_HOTEL : 0) | (u.state === "dirty" ? DIRTY : 0);
+  return 0;
+}
+
+function tally(c: RoomCounts, share: Share, sign: 1 | -1): void {
+  c.population += sign * share.population;
+  if (share.flags === 0) return;
+  if (share.flags & OCCUPIED_OFFICE) c.occupiedOffices += sign;
+  if (share.flags & VACANT) c.vacant += sign;
+  if (share.flags & VACANT_NO_RATE) c.vacantNoRate += sign;
+  if (share.flags & SOLD_CONDO) c.soldCondos += sign;
+  if (share.flags & OCCUPIED_HOTEL) c.occupiedHotel += sign;
+  if (share.flags & DIRTY) c.dirty += sign;
+}
+
+/** One pass over the rooms: the kind counts, and each room's share. */
+function countRooms(tower: Tower, rooms: readonly Unit[]): RoomCounts {
+  const counts: RoomCounts = {
+    population: 0, offices: 0, occupiedOffices: 0, vacant: 0, vacantNoRate: 0, condos: 0, soldCondos: 0,
+    hotelRooms: 0, occupiedHotel: 0, dirty: 0, shops: 0, restaurants: 0, parkingSpaces: 0,
+  };
+  const shares = new Map<Unit, Share>();
+  for (const u of rooms) {
+    if (u.kind === "office") counts.offices++;
+    else if (u.kind === "condo") counts.condos++;
+    else if (isHotelKind(u.kind)) counts.hotelRooms++;
+    else if (u.kind === "shop") counts.shops++;
+    else if (u.kind === "restaurant" || u.kind === "fastFood") counts.restaurants++;
+    else if (u.kind === "parking") counts.parkingSpaces++;
+    const share = { flags: flagsOf(u), population: isPresent(u) ? censusCount(u) : 0 };
+    tally(counts, share, 1);
+    shares.set(u, share);
+  }
+  ledgers.set(tower, { rooms, counts, shares, changed: new Set() });
+  return counts;
 }

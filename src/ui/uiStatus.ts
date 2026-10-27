@@ -43,7 +43,8 @@ const toastTimers = new WeakMap<Element, number>();
 
 /** Refresh status bar, palette locks, tower stats and the bulletin log. */
 export function update(ui: UI, sim: Simulation): void {
-  // One pass over the rooms gives the population label and the stats grid.
+  // One read of the kept room counts gives the population label and the
+  // stats grid.
   const stats = sim.stats();
   ui.el.money.textContent = `$${Math.round(sim.money).toLocaleString()}`;
   ui.el.money.style.color = sim.money < 0 ? "var(--bad)" : "var(--money)";

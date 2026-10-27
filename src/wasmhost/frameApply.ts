@@ -1,5 +1,6 @@
 import { LOG_RING_CAP } from "../engine/sim/constants";
 import type { Simulation } from "../engine/Simulation";
+import { markRoom } from "../engine/tower/rooms";
 import type { LogEntry } from "../engine/types";
 import type { Person } from "../engine/crowd/person";
 import { FRAME_HEADER, PERSON_FIXED, PERSON_STATES, ROUTINES, UNIT_STATES, enumAt, type FrameHeader } from "./frameView";
@@ -150,9 +151,13 @@ function applyUnits(sim: Simulation, v: ArrayLike<number>, count: number, start:
   for (let k = 0; k < count; k++, i += 6) {
     const u = byId.get(v[i]);
     if (!u) continue;
-    u.state = UNIT_STATES[v[i + 1]];
+    const state = UNIT_STATES[v[i + 1]];
+    const customersIn = counter(v[i + 3]);
+    // The HUD's room counts recount a room only when a field they read moved.
+    if (u.state !== state || u.customersIn !== customersIn) markRoom(sim.tower, u);
+    u.state = state;
     u.occupants = v[i + 2];
-    u.customersIn = counter(v[i + 3]);
+    u.customersIn = customersIn;
     u.hotelCustomersIn = counter(v[i + 4]);
     u.outForMeal = counter(v[i + 5]);
   }

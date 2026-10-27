@@ -153,4 +153,19 @@ describe("mergeSimulation", () => {
     expect(hud.population).toBeGreaterThan(0);
     expect(hud.population).toBe(target.population);
   });
+
+  it("gives the HUD the rooms' merged states over a merge that kept the room list", () => {
+    const target = tower(5);
+    const fresh = tower(5);
+    const before = target.stats(); // the HUD's counts are kept from this read on
+    for (const u of fresh.tower.units) if (u.kind === "office") u.state = "occupied";
+    const rooms = roomUnits(target.tower);
+    // An hourly merge that moved neither the revision nor the units: the room
+    // list stays, and only the rooms' fields change, none of them marked.
+    mergeSimulation(target, Simulation.deserialize(fresh.serialize()), { revision: target.tower.revision, mealOverlayRevision: 0 });
+    expect(roomUnits(target.tower)).toBe(rooms);
+    const hud = target.stats();
+    expect(hud).toEqual(Simulation.deserialize(fresh.serialize()).stats());
+    expect(hud.occupiedOffices).toBe(before.occupiedOffices + 2);
+  });
 });

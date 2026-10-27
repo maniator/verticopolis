@@ -1,6 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
-import { forgetUnitLists } from "../engine/tower/rooms";
+import { forgetRoomCounts, forgetUnitLists } from "../engine/tower/rooms";
 import type { Transport, Unit } from "../engine/types";
 
 /**
@@ -79,6 +79,9 @@ function mergeTower(target: Tower, fresh: Tower, marks: MergeMarks): void {
   mergeById(target.transports, fresh.transports, target.transportsById);
   target.revision = marks.revision;
   if (moved) forgetUnitLists(target);
+  // Every unit's fields were rewritten in place, unmarked: count the rooms
+  // again at the next read (once per merge, an engine hour or a command).
+  forgetRoomCounts(target);
   target.mealOverlayRevision = marks.mealOverlayRevision;
 }
 

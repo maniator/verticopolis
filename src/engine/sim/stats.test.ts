@@ -1,40 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { censusCount } from "../census";
 import { Simulation } from "../Simulation";
 import { GRID } from "../facilitiesData";
 import { FACILITIES, isHotelKind } from "../facilities";
-import { roomUnits } from "../tower/rooms";
+import { forgetRoomCounts, markRoom, roomUnits } from "../tower/rooms";
 import type { FacilityKind, Unit, UnitState } from "../types";
-import { isPresent, isTenanted } from "../types";
+import { walkedStats } from "../../tests/fixtures/walkedStats";
 import { stats } from "./stats";
-
-/** `stats()` as it was before it read the rooms list, walking every unit,
- *  with the population summed over every unit as well, so no memoized list
- *  stands behind either side. */
-function walkedStats(sim: Simulation) {
-  const c = { offices: 0, occupiedOffices: 0, condos: 0, soldCondos: 0, hotelRooms: 0, occupiedHotel: 0, dirty: 0, shops: 0, restaurants: 0, vacant: 0, vacantNoRate: 0, parkingSpaces: 0, population: 0 };
-  for (const u of sim.tower.units) {
-    if (isPresent(u)) c.population += censusCount(u);
-    if (u.kind === "office") {
-      c.offices++;
-      if (isTenanted(u)) c.occupiedOffices++;
-      if (u.state === "empty") {
-        c.vacant++;
-        if (u.noRate) c.vacantNoRate++;
-      }
-    } else if (u.kind === "condo") {
-      c.condos++;
-      if (u.everOccupied) c.soldCondos++;
-    } else if (isHotelKind(u.kind)) {
-      c.hotelRooms++;
-      if (u.state === "asleep") c.occupiedHotel++;
-      if (u.state === "dirty") c.dirty++;
-    } else if (u.kind === "shop") c.shops++;
-    else if (u.kind === "restaurant" || u.kind === "fastFood") c.restaurants++;
-    else if (u.kind === "parking") c.parkingSpaces++;
-  }
-  return c;
-}
 
 const STATES: UnitState[] = ["construction", "empty", "occupied", "moving_in", "vacating", "asleep", "dirty", "infested", "fire", "gutted"];
 const KINDS: FacilityKind[] = ["office", "condo", "hotelSingle", "hotelDouble", "hotelSuite", "shop", "restaurant", "fastFood", "cinema", "parking", "security", "medical"];
@@ -73,8 +44,8 @@ function tower(): Simulation {
   return sim;
 }
 
-describe("stats() reads the rooms list", () => {
-  it("counts what the walk over every unit counted, in every state", () => {
+describe("stats() reads the kept room counts", () => {
+  it("counts what the walk over every unit counted, in every state, recounting the marked rooms", () => {
     for (const kind of Object.keys(FACILITIES) as FacilityKind[]) if (counted(kind)) expect(KINDS, kind).toContain(kind);
     const sim = tower();
     for (const kind of KINDS) expect(roomUnits(sim.tower).filter((u) => u.kind === kind).length, kind).toBe(4);
@@ -90,11 +61,38 @@ describe("stats() reads the rooms list", () => {
         u.everOccupied = (i + (lap >> 1)) % 2 === 0;
         u.residents = (i * 7 + round) % 9;
         u.customersIn = (i + 2 * round) % 5;
+        markRoom(sim.tower, u);
       });
       expect(stats(sim)).toMatchObject(walkedStats(sim));
       expect(stats(sim).population).toBe(sim.population);
     }
     expect(walkedStats(sim).population).toBeGreaterThan(0);
+  });
+
+  it("recounts only the rooms it is told about until the counts are dropped", () => {
+    const sim = tower();
+    const before = stats(sim);
+    const office = sim.tower.units.find((u) => u.kind === "office")!;
+    const condo = sim.tower.units.find((u) => u.kind === "condo")!;
+    office.state = "occupied";
+    condo.everOccupied = true;
+    // A read passes over no room, so a write nobody marked is not seen.
+    expect(stats(sim)).toEqual(before);
+    markRoom(sim.tower, office);
+    expect(stats(sim)).toMatchObject({ occupiedOffices: before.occupiedOffices + 1, vacant: before.vacant - 1, soldCondos: before.soldCondos });
+    forgetRoomCounts(sim.tower);
+    expect(stats(sim)).toMatchObject({ ...walkedStats(sim), soldCondos: before.soldCondos + 1 });
+  });
+
+  it("ignores a mark on a structure tile and a mark before the first count", () => {
+    const sim = tower();
+    const office = sim.tower.units.find((u) => u.kind === "office")!;
+    office.state = "occupied";
+    markRoom(sim.tower, office); // nothing is kept yet: the first read counts every room
+    expect(stats(sim)).toMatchObject(walkedStats(sim));
+    const tile = sim.tower.units.find((u) => u.kind === "floor")!;
+    markRoom(sim.tower, tile);
+    expect(stats(sim)).toMatchObject(walkedStats(sim));
   });
 
   it("follows a room removed and placed again, at each changed unit count", () => {
