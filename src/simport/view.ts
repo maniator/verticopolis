@@ -49,6 +49,32 @@ export interface HeaderView {
    *  stores it (a Classic tower always runs the canon calendar whatever this
    *  says); with `mode` it gives the clock's day names (`headerClock.ts`). */
   readonly modernCalendar: CalendarKind;
+  /** The visual-effect counters: a change in a `seq` (or a `*Seq` counter)
+   *  fires one visual. A reader keeps the last value it saw, so this is
+   *  cheap to take every frame. */
+  readonly fx: FxView;
+  /** The saved camera, or null when the tower has none. Read on construction
+   *  and on a tower swap to restore it, not per frame; the live camera is the
+   *  renderer's, and `setView` is the command that stores it. */
+  readonly camera: CameraView | null;
+}
+
+/** Where the camera was when the tower was saved. */
+export interface CameraView {
+  /** The tile the view is centered on. */
+  readonly tile: number;
+  readonly floor: number;
+  /** Absent in saves from before zoom was stored. */
+  readonly zoom?: number;
+}
+
+/** The effect counters the renderer turns into visuals. */
+export interface FxView {
+  readonly santaSeq: number;
+  readonly vipSeq: number;
+  readonly explosion: { readonly floor: number; readonly x: number; readonly seq: number };
+  readonly thief: { readonly caught: boolean; readonly floor: number; readonly seq: number };
+  readonly treasure: { readonly floor: number; readonly x: number; readonly seq: number };
 }
 
 /** An emergency waiting on the player's answer. */

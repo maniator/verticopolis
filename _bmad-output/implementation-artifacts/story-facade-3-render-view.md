@@ -245,3 +245,23 @@ Slice 3 adds the `view.ts` lines, the `TsSim` fills and assertions in its own fi
   gets the cheaper form.
 - Nothing reads it yet. The loop binding swaps `RenderSim.clock` for it when
   `main.ts` hands the renderer a view.
+
+## 3a-2b notes (fx and camera)
+
+- `HeaderView` gains `fx` (`FxView`: `santaSeq`, `vipSeq`, `explosion`, `thief`,
+  `treasure`) and `camera` (`CameraView | null`: `tile`, `floor`, optional
+  `zoom`, the shape of the save's `SerializedView`). `CameraView` is the saved
+  camera read on construction and on a tower swap; `setView` stays the command
+  that stores it, and the live camera belongs to the renderer.
+- `TsSim` fills `fx` with copies taken when the header is read, so a header
+  kept across a step shows one moment's counters. That costs four small
+  objects per header read; the renderer's per-frame read is the seq numbers,
+  and the loop binding decides whether it takes the header each frame or only
+  on a step. The Rust header supplies the same counters from the frame (6a's
+  dynamic frame, per the facade lane's decision).
+- `view.types.test.ts` keeps the live `Simulation` fields assignable to the
+  view types; `tsSim.test.ts` pins the copy and the null camera.
+- `RenderSim` keeps its flat stand-ins (`santaFxSeq` and the other counters,
+  `view`) until the loop binding swaps them for these members.
+- The clock pin gained fractional minutes (`m + 0.5`, `m + 59.999 / 60`),
+  the independent reviewer's note on 3a-2b.
