@@ -97,6 +97,23 @@ still needs a 100-story tower, which the fuzzer's 40 stories do not reach.
   still diverges and keeps it under `conformance/fuzz-corpus/`.
 - A PR job replays the corpus on every PR that touches either engine, inside a
   ten-minute budget. The nightly keeps growing new seeds.
+- Built (done): `fuzz --replay <scenario> <out-dir>` in the Rust fuzzer runs a
+  given scenario and writes the records the compare reads;
+  `src/tests/conformance/fuzzReplay.ts` is the one compare the nightly, the
+  shrinker and the corpus job share (`replayCompare` returns ok, diverged with
+  a signature such as `state:units` or `threw`, or a harness failure);
+  `scripts/fuzz-shrink.ts` runs delta debugging (`fuzzShrink.ts`, `ddmin`) over
+  the command list and accepts a candidate only when Rust runs it cleanly and
+  the TypeScript replay shows the same signature as the original, so a smaller
+  scenario that breaks a different way is not taken; `scripts/fuzz-corpus.ts`
+  replays the corpus (exit 1 on a divergence, an engine refusal or the 240 s
+  budget, exit 3 on a harness failure or an empty corpus); the `fuzz-corpus`
+  job joins the required `engine-rs` check. The shrinker and the corpus script
+  join `FUZZ_ENTRIES`, so they move the window key. The corpus starts with two
+  past findings (a reload at five stars, a refused sell of the ground lobby)
+  and two generator scenarios as smoke entries. Checked by mutation: with the
+  clinic's price changed in the TypeScript engine, a 132-command scenario
+  shrank to a two-command one in 87 tests (4 s), and the corpus job failed on it.
 
 ### Slice 4: the shipped artifact, and the key
 

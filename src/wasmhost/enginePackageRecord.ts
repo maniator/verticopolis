@@ -49,7 +49,7 @@ export interface ExpectedEnginePackage {
   files: EngineFiles;
   /** The crate this shell was built to run, a label for About and diagnostics (#963); the check never reads it. */
   crate?: EngineCrateRecord;
-  /** The Workbox precache revision (the MD5 of the file) of each of the three
+  /** The Workbox precache revision (the file's MD5 plus the rotation suffix) of each of the three
    *  engine files this build ships, by file name, so Repair can name the cache
    *  keys of the running build and no other (#985, design 5.4). Optional: a
    *  label for Repair; the package check never reads it. */
