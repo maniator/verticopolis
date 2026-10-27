@@ -126,4 +126,26 @@ describe("mergeSimulation", () => {
     expect(structureRuns(target.tower)).not.toBe(runs);
     expect(roomUnits(target.tower)).toEqual(rooms);
   });
+
+  it("gives the HUD the merged rooms at the same unit count and the revision the rooms list was read at", () => {
+    const target = tower(11);
+    const fresh = tower(11);
+    expect(target.stats().offices).toBe(2); // the rooms list is now memoized
+    // An office becomes a hotel room, so the unit count holds, and the merge
+    // brings back the revision the list was read at: neither key moves.
+    const office = fresh.tower.units.find((u) => u.kind === "office")!;
+    expect(fresh.tower.removeUnit(office.id)).toBeDefined();
+    expect(fresh.tower.place("hotelDouble", office.floor, office.x).ok).toBe(true);
+    expect(fresh.tower.units.length).toBe(target.tower.units.length);
+    for (const u of fresh.tower.units) {
+      if (u.kind === "office") u.state = "occupied";
+      if (u.kind === "hotelDouble") u.state = "asleep";
+    }
+    const save = fresh.serialize();
+    mergeSimulation(target, Simulation.deserialize(save), { revision: target.tower.revision, mealOverlayRevision: 0 });
+    const hud = target.stats();
+    expect(hud).toEqual(Simulation.deserialize(save).stats());
+    expect(hud).toMatchObject({ offices: 1, occupiedOffices: 1, hotelRooms: 1, occupiedHotel: 1 });
+    expect(hud.population).toBeGreaterThan(0);
+  });
 });

@@ -2,10 +2,12 @@ import type { Simulation } from "../Simulation";
 
 import { ledgerCatFor, type LedgerCat } from "../Ledger";
 
+import { censusCount } from "../census";
 import { isElevatorKind, isHotelKind } from "../facilities";
+import { roomUnits } from "../tower/rooms";
 import type { FacilityKind } from "../types";
 import type { LogEntry } from "../types";
-import { isTenanted } from "../types";
+import { isPresent, isTenanted } from "../types";
 
 import { LOG_RING_CAP } from "./constants";
 
@@ -24,8 +26,16 @@ export function stats(sim: Simulation) {
     restaurants = 0,
     vacant = 0,
     vacantNoRate = 0,
-    parkingSpaces = 0;
-  for (const u of sim.tower.units) {
+    parkingSpaces = 0,
+    population = 0;
+  // Every kind counted here is a room kind, so the rooms list gives the same
+  // counts without stepping over the floor and lobby tiles, which are most of
+  // a large tower's units. The population rides along: `totalPopulation`
+  // sums `censusCount` over the same rooms' present units, so this HUD
+  // refresh makes one pass over the rooms instead of a walk over every unit
+  // and a second pass for the population.
+  for (const u of roomUnits(sim.tower)) {
+    if (isPresent(u)) population += censusCount(u);
     if (u.kind === "office") {
       offices++;
       if (isTenanted(u)) occupiedOffices++; // a lame-duck on notice still holds the space
@@ -47,7 +57,7 @@ export function stats(sim: Simulation) {
     else if (u.kind === "parking") parkingSpaces++;
   }
   return {
-    population: sim.population,
+    population,
     // Cheap loop-counter field only. The modal-only diagnostics that need a
     // full scan or flood fill (ratingPopulation, the functional parking count)
     // are computed for the stats report when the modal opens
