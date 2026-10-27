@@ -220,14 +220,16 @@ earlier statement in this plan, the earlier text now points here.
 > sessions on the facade host with zero failures as the field standard before
 > the default flip, and the 1,000 became the gate for removing TypeScript. He
 > then accepted the planning party's recommendations for the slow-player
-> switch, what waits for 3.x and the removal ladder. Where this plan gives the
+> switch, what waits for 3.x and the removal ladder, and he answered the
+> decisions still open on cards (1.3.10.1). Where this plan gives the
 > 1,000 as the flip gate, offers the F1 and F2 freeze options (1.3.2), counts
 > only stage-3 sessions, puts slice 11 before the freeze, or keeps the .TDT
-> half of #1066 in 3.0.0, 1.3.10 governs; the .TDT move is the party's
-> direction and waits for the owner's confirmation. Those statements, and the
+> half of #1066 in 3.0.0, 1.3.10 governs; he confirmed the .TDT move on a
+> card, and 1.3.10.1 records its conditions. Those statements, and the
 > stage and freeze dates built on them, still stand in section 1 (items 1 and
 > 5), 1.1, 1.2, 1.3.1 to 1.3.6, 1.3.8, 1.3.9, section 3, 4.1, 7.2, 7.4,
-> section 8 (the #885, #886, #887 and #920 rows), 9.1, section 11 (R4, R13,
+> section 8 (the #885, #886, #887 and #920 rows), 9.1, section 10 (the
+> Authority and Saves rows), section 11 (R4, R13,
 > R14, R19) and section 12, and in the slice plan, `release-3.0-matrix.md`,
 > the #1090 story,
 > `_bmad-output/implementation-artifacts/spec-wasm-staged-cohort.md`,
@@ -666,7 +668,8 @@ own: the Runtime lane withdrew it, and item 1 carries the field.
 
 #### 1.3.10 The Rust-default release (owner decision on the field standard, 2026-10-27)
 
-> **Snapshot, 2026-10-27 at about 15:40 UTC, against `main` at `bb65bbb`
+> **Snapshot, 2026-10-27 at about 15:40 UTC, with the owner's 19:19 UTC card
+> answers added (1.3.10.1), against `main` at `bb65bbb`
 > (app 2.47.0, engine crate 0.8.0). It does not refresh.** Live state is
 > #1104. Every date, and every session count that rests on traffic, is a
 > projection from this plan's durations and a traffic figure of about 14.2
@@ -677,11 +680,13 @@ own: the Runtime lane withdrew it, and item 1 carries the field.
 > on the Verticopolis: Gameplay Analytics dashboard. The bounds are exact
 > computations from `upperBound` in `scripts/engine-reliability.mjs`, pinned
 > by `src/engine-reliability.test.ts`; the 300-session rows, the 473 and 628
-> crossings and the 9.5% figure are not pinned there yet, and the tooling
-> work in #1350 adds those pins before any of them is published as a result.
-> The planning party's transcript is
+> crossings, the 9.5% figure and the 1,000-session row with 4 failures are
+> not pinned there yet, and the tooling work in #1350 adds those pins before
+> any of them is published as a result. The planning party's transcript is
 > `_bmad-output/party-mode/rust-default-replan-party-2026-10-27.md` in this
-> repository, and the decision packet is "Rust-default 3.0 replan: decision
+> repository, the second sitting's is
+> `_bmad-output/party-mode/rust-default-open-decisions-party-2026-10-27.md`,
+> and the decision packet is "Rust-default 3.0 replan: decision
 > packet" (https://claude.ai/artifact/VccZTZe6p2iBBaqBcSwwhn, a private page
 > whose content this section carries). This section carries what the owner
 > decided and accepted, and what follows from it.
@@ -692,8 +697,10 @@ That matches OD-5 and 7.3: 3.0.0 is the switchable build, with Rust/WASM as
 the default, TypeScript selectable and the automatic fallback kept. A
 planning party (twelve voices, three rounds) tested the idea and raised four
 decisions. The owner decided the first on a card and accepted the party's
-recommendations on the other three. This section authorizes no stage, no
-flip, no deploy, no new analytics field and no post.
+recommendations on the other three. A second sitting (twelve voices, two
+rounds) took the decisions that were still open, and 1.3.10.1 records his
+answers. This section authorizes no stage, no flip, no deploy, no new
+analytics field and no post.
 
 **Decided (owner, 12:16 UTC, on the card "Choose the field standard before
 the Rust-default flip").** The field standard before the flip is 300 engaged
@@ -708,18 +715,17 @@ pick among the options on the cards for decisions 2 to 4. He delegated them
 to the party's recommendations, which 1.3.10.1 records. He can still change
 any of them. The limits in 1.3 stay his: stages, drop-backs, the flip, the
 deploy, 3.0.0, new production analytics fields, gate exceptions and posts.
-The packet marks one recommendation, the .TDT half of #1066, as his to
-confirm because it reverses OD-8 and D5. This plan treats the 15:04 message
-as accepting the direction, and every gate text that rests on OD-8 and D5
-stays as written until he confirms the reversal in his own words or records
-it in the exception register.
+The packet marked one recommendation, the .TDT half of #1066, as his to
+confirm because it reverses OD-8 and D5. He confirmed it on a card at 19:19
+UTC (1.3.10.1). The gate texts that rest on OD-8 and D5 are amended in the
+docs sweep of #1350 and stay as written until then.
 
 | Topic | Before (1.3.1 to 1.3.9) | Now |
 | --- | --- | --- |
 | Count before the flip | 1,000 engaged eligible sessions, which bounds the rate under 0.30% at zero failures | 300 on the facade host with zero failures, which bounds the rate under 1.0% at 95%. Choosing 300 accepts the looser bound. The section 10 Reliability row follows |
-| The 1,000 | The flip gate | The gate for removing TypeScript, with the bound reported (0.30% at zero failures). The removal steps follow the ladder in 1.3.10.1 |
+| The 1,000 | The flip gate | The gate for removing TypeScript: one read at exactly 1,000 sessions, passed with 4 or fewer failures (0.91%; 1.3.10.1). The removal steps follow the ladder in 1.3.10.1 |
 | Where sessions count | Stage 3 only, on the facade | Stages 2 and 3 on the facade host, counted from the freeze commit. The size gate applies to the mirror host in stage 1 and ends when slice 10 deploys. Sessions before the freeze, stage 1's included, count to nothing here, and stage 2 opens on the freeze date on the owner's approval |
-| Freeze | F1 or F2 (1.3.2), after the soak and slice 11 | One freeze, the later of Dec 1 and slice 10's deploy, with every key-moving item merged. Those items include the TypeScript switch, its notice and the tap event with the owner's analytics approval (1.3.10.1). The 14-night replay and the observation tail run side by side from it. A change to the candidate during them restarts the 14 nights and the tail (1.3.2) |
+| Freeze | F1 or F2 (1.3.2), after the soak and slice 11 | One freeze, the later of Dec 1 and slice 10's deploy, with every key-moving item merged. Those items include the TypeScript switch, its notice, the tap event and the browser-family field, each with the owner's analytics approval (1.3.10.1). The 14-night replay and the observation tail run side by side from it. A change to the candidate during them restarts the 14 nights and the tail (1.3.2) |
 | Observation tail | 14 nights and 100 engaged eligible sessions on the candidate | Stage 2's 100 engaged eligible sessions on the frozen candidate, side by side with the 14 nights |
 | Soak and slice 11 | Soak, then slice 11, then the freeze, then 14 nights | The soak stays: the first 7 nights of the 50% step, with 50 engaged eligible sessions and no stop signal (both required, as 1.3.2 proposes), and its sessions count toward the 300. 100% is the flip. One freeze around Dec 1 cannot hold the old chain, because the soak and slice 11 would have to come before it, so slice 11 leaves the pre-flip path and lands in 3.x (1.3.10.1) |
 
@@ -740,7 +746,8 @@ Unchanged: conformance, dual run, the 14-night seeded replay, saves in both
 directions, M1 to M8 on the owner's PC with calibrated δ and ε, RUN-1 on the
 deployed slice 10 build (1.3.6), the offline cold start of #985, the
 forced-trap fallback spec, the rollback rehearsal, analytics (apart from the
-tap event of 1.3.10.1), no flip on the mirror host, and facade slices 7 to 10 with the slice 9 PC run. If RUN-1 or
+tap event of 1.3.10.1 and the browser-family field of the coverage bullet below),
+no flip on the mirror host, and facade slices 7 to 10 with the slice 9 PC run. If RUN-1 or
 RUN-3 misses and the fix changes the engine or the host, that is a change to
 the candidate: it restarts the 14 nights and the tail, and the dates carry no
 float for it. Every stage, every drop-back and the flip stay on the owner's
@@ -753,7 +760,8 @@ determinism hashes in Firefox and WebKit, one CPU-throttled Chromium pass, a
 Firefox pass on the PC, and smoke runs on Safari, Firefox and a throttled
 phone that prove boot only. Thresholds are written before the runs. These
 checks are due before the flip, and they are the only browser evidence the
-sign-off has, because the data map carries no browser field. A failure that
+sign-off has until the browser-family field of the coverage bullet below
+ships, because the data map carries no browser field today. A failure that
 changes the engine or the host restarts the 14 nights and the tail.
 
 **The failure rule,** written before anyone reads a number and fixed before
@@ -767,8 +775,9 @@ the freeze:
   whatever the session's later page lives report. Today the cohort script
   keeps a latch-off in its own `latched` column, leaves the session clean in
   `faults`, and treats a Settings choice of TypeScript as an opt-out outside
-  the rate, so it changes to count the latch-off and the tap, each with a
-  test, before the first read.
+  the rate, so it changes to count the latch-off and the tap (and, by the room's default
+  in 1.3.10.1, a move to TypeScript through Settings inside a Rust session),
+  each with a test, before the first read.
 - The denominator is engaged eligible sessions on the facade host (the #1090
   rule). The 300 and its bound come only from the cohort script
   (`scripts/engine-reliability-cohorts.mjs`) or another governed definition.
@@ -812,14 +821,20 @@ the freeze:
   runs, and it gets one read of its own, never read early. Flipping over a
   failure departs from the amended section 10 Reliability row, so the
   sign-off records it in the exception register as his decision.
-- Coverage uses the dimensions the data map carries: platform, distribution
-  channel and display. It has no browser or device-class field, and this
-  section adds none (a new field waits for the owner), so the packet's
-  browser-by-device-class cells cannot be measured today. Each cell prints its
-  own one-sided bound, a cell under 30 sessions (a proposed minimum; 9.5% at
-  zero failures) is named unbounded, and whether an unbounded cell blocks the
-  flip is the owner's call. The claim covers the traffic mix observed, with
-  browser unmeasured.
+- Coverage uses the dimensions the data map carries: platform (only `web` or
+  `twa`), distribution channel and display. It has no browser or device-class
+  field today. The owner chose on a card to add one closed field, browser
+  family (chromium, gecko, webkit or other, with no user-agent string and no
+  version), sent on the engine status event only, with its data map row and
+  Help copy in the same change and live before the 300 window opens. It goes
+  into the analytics packet he has not yet approved, so until that approval
+  and the field ship, the packet's browser-by-device-class cells cannot be
+  measured. Each cell prints its own one-sided bound, a cell under 30 sessions
+  (a proposed minimum; 9.5% at zero failures) is named unbounded, and whether
+  an unbounded cell blocks the flip is the owner's call. A thin cell helps
+  diagnose a failure and cannot back a per-browser claim (50 sessions print
+  5.82% at zero failures). The claim covers the traffic mix observed, with
+  browser unmeasured until the field ships.
 - The stop signals of 4.1 (a writer latch-off, a repeated engine-fault
   fallback, a repeated crash, a crash-rate difference) and the rest of the
   OD-2 rule (every failure triaged, the bound reported as achieved) are
@@ -836,6 +851,7 @@ the freeze:
 | 300 | 1 | 1.57% |
 | 300 | 2 | 2.08% |
 | 1,000 | 0 | 0.30% |
+| 1,000 | 4 (the cap for removing TypeScript, 1.3.10.1) | 0.91% |
 
 The bounds are exact (Clopper-Pearson), computed the way 1.3.4 states them.
 They assume independent sessions. Repeat sessions from one player make the
@@ -858,10 +874,10 @@ The dates assume the analytics packet is approved, the PC session stays
 available, slices 7 and 8 merge and slice 9 passes, stage 1 has moved on by
 the freeze (14 days and 30 sessions in 4.1; 1.3.1 projects 26 days, so a
 Dec 1 freeze needs stage 1 started by about Nov 5 and a Dec 12 freeze by
-about Nov 16), the switch, its notice, the tap event and the script changes
-are merged and the thresholds written by the freeze, the .TDT half is out of
-3.0.0 as the party recommends (if the owner declines, it returns as a
-pre-flip item and the dates move), no engine change follows the freeze, and
+about Nov 16), the switch, its notice, the tap event, the browser-family field
+and the script changes are merged and the thresholds written by the freeze, the .TDT half is out of
+3.0.0, as the owner confirmed (1.3.10.1), no engine change follows the
+freeze, and
 every session runs the candidate from day one. They are best-case dates:
 they carry no float for a RUN-1, RUN-3 or added-check miss, and no allowance
 for the holidays, the owner's approval of each stage, or installed apps that
@@ -885,11 +901,13 @@ installed shell, hold a fault suppression or a stored TypeScript choice, or
 block storage do not count. The plan's earlier gate review projection was
 Jan 17 at twice July's traffic and May 16 at today's.
 
-##### 1.3.10.1 Accepted direction on decisions 2 to 4
+##### 1.3.10.1 Accepted direction on decisions 2 to 4, and the answers to the open ones
 
-These are the planning party's recommendations, accepted by the owner's
-15:04 UTC message above. Each is planning direction only. Nothing here
-ships, activates or approves an item that needs its own approval.
+The first part of this subsection (decisions 2 to 4) is the planning party's
+recommendations, accepted by the owner's 15:04 UTC message above. The part
+after the ladder records the second sitting and his 19:19 UTC card answers.
+Each is planning direction only. Nothing here ships, activates or approves an
+item that needs its own approval.
 
 **The slow or stranded player (decision 2).**
 
@@ -928,10 +946,11 @@ ships, activates or approves an item that needs its own approval.
   3.0.0.
 - The .TDT half of #1066 and A7 (9.1) leaves 3.0.0. A pinned test that .TDT
   import and export route through the TypeScript codec ships with 3.0.0
-  (#1350 carries it). This reverses OD-8 and D5 for that half only. OD-8, D5, 7.2,
-  R14 and the section 10 Authority and Saves rows keep their text until the
-  owner confirms the reversal. Saves in both directions stay a lab gate, and
-  .TDT stays on the TypeScript codec until the crate carries it.
+  (#1350 carries it). This reverses OD-8 and D5 for that half only, and the
+  owner confirmed it on a card (below). OD-8, D5, 7.2, R14 and the section 10
+  Authority and Saves rows keep their text until the docs sweep of #1350
+  amends them. Saves in both directions stay a lab gate, and .TDT stays on the
+  TypeScript codec until the crate carries it.
 - #1239 is a slice 7 prerequisite and stays.
 
 **The removal ladder (decision 4).** Each step is a minor release, 3.0.0 is
@@ -943,7 +962,7 @@ story's own PR. Removal keeps its own owner approval under OD-5.
 | 3.0.0, the flip | Rust default. "TypeScript engine (stable)" stays in Settings. Fallback, mirror host and `src/engine` intact | Decisions 1 to 3 and every lab gate |
 | Slice 11 | The mirror host and `?engine=wasm-mirror` leave the production path; the mirror stays as the test and tooling harness | The stage-3 soak, plus a release at the default |
 | Step one, label | The choice reads "TypeScript engine (legacy)" for one release | At least two releases on the Rust default with the fallback unused (retirement story gate 1), and no replay or dual-run divergence over that window |
-| Step one, choice gone | The Settings choice is removed; the fallback and `src/engine` stay, so an undo is a deploy | The 1,000 count closed with the bound printed |
+| Step one, choice gone | The Settings choice is removed; the fallback and `src/engine` stay, so an undo is a deploy | The 1,000 count read once at exactly 1,000 sessions with 4 or fewer failures (below) |
 | Step two, delete | The fallback, the mirror host, `src/engine`, the importing frontend files and tests, the recovery code, the perf tooling's TypeScript slot and the `!wasmOnly` branches | The choice-gone release shipped; all 360 TypeScript engine tests mapped or dropped (a CI test enforces it); TDT import and export in the crate; the copy catalog complete; Rust coverage floors at or above TypeScript's (94, 94, 86 in `vite.config.ts`); one release after the choice-gone release |
 
 Two hazards the retirement story must close, added by this review and not
@@ -952,32 +971,83 @@ choice or a fault suppression (`policy.ts` keeps both across builds, and the
 retry control sits with the Settings engine choice) must not be left on an
 engine it cannot leave, and the readers of both must ignore a stored `ts`
 and any suppression before step two deletes the engine, pinned by a test.
-7.4 promises that `?engine=ts` stays; when the parameter leaves is open.
+7.4 promises that `?engine=ts` stays; the recommended default for when it
+leaves is below. At the choice-gone step a stored `vc.engine=ts` would
+otherwise read as Automatic and move the player without a word, so it
+migrates with a one-time notice, pinned by a test.
 
-Still open (owner decisions unless noted): whether the 300 count toward the
-1,000 (the party recommends they do, since they are the same definition on
-the same host; the dates show both); the pass rule for the 1,000 (a maximum
-failure count or bound, and whether tap rate, early-exit rate and the share
-held on TypeScript are conditions), since "closed with the bound printed"
-passes at any failure count; how the 1,000 count and the early-exit
-comparison work once the TypeScript arm ends at 100%, which needs either a
-count filter that admits default selections on named commits (pinned by a
-test) and a stage-3 baseline, or a fixed TypeScript holdback until the 1,000
-closes; whether a move to TypeScript through Settings counts as a failure
-like a tap on the switch (the packet counts only the switch, and whether
-opted-out sessions belong in the count is already waiting on the owner);
-whether to add a browser or device-class field, which needs his approval, or
-to accept the substitute cells; a distinct-player or device floor for the
-300, which needs a governed definition; when `?engine=ts` leaves; the
-definitions of "fallback unused" and of a release for the ladder; and the
-date of slice 11 inside 3.x. #1350 carries the code, the new checks and the
-docs sweep, including the packet's remaining items (the flip PR's CLAUDE.md
-amendment and #1112, the rule that Rust is fixed first and TypeScript is
-patched for parity, the condition on the switch, the other Settings labels
-and the support and changelog lines, the EX-2 and EX-3 conditions, and the
-Firefox pass in the PC schedule). The follow-up docs PRs wait for the PC run
-to finish. The #945 body and the #1104 matrix text need the owner's approval
-before they change.
+**Answered by the owner on cards (2026-10-27, 19:19 UTC),** after a second
+planning party took the decisions that were still open (twelve voices, two
+rounds; notes in
+`_bmad-output/party-mode/rust-default-open-decisions-party-2026-10-27.md`).
+
+- **The .TDT reversal is confirmed,** on the room's conditions. An
+  exception-register entry for the sign-off names #885, #886, #887, #920 and
+  A7, and says in one sentence that TypeScript still authors the engine's
+  starting state on the .TDT load path after the flip. The pinned routing test
+  must fail if the Rust call is swapped in: web import and export reach the
+  TypeScript parse and build, the Rust import and export have no web caller,
+  and every fixture goes load, save, load with an empty diff. The trigger is
+  TDT in the crate, which is already a step-two gate and gets its own backlog
+  row and issue. His real saves, which #885 needs, are a precondition for step
+  two and not for 3.0.0. The room would refuse the reversal if the routing
+  test cannot be pinned.
+- **The 1,000's pass rule.** One read at exactly 1,000 engaged eligible
+  sessions, counted from the first of the 300, passes with 4 or fewer
+  failures (0.91%, inside the under-1.0% claim). Failures in the 300 count
+  against the 4. Each failure is root-caused, a writer latch-off holds the
+  gate at any count, and the tap rate, the early-exit rate and the stranded
+  share print beside the bound. The rule is written before the freeze. A miss
+  means a fresh 1,000 (about 70 days) or an extension whose bound carries no
+  95% guarantee, and he chooses at the time.
+- **A closed browser-family field** joins the analytics packet (the coverage
+  bullet in 1.3.10 has the terms). The packet's approval is still his.
+
+**Recommended defaults from the same sitting,** which he can veto. They stand
+as planning direction until he changes them, and they authorize nothing.
+
+- The 300 count toward the 1,000, failures included, printed as two segments,
+  and a failure does not restart the count.
+- A move to TypeScript through Settings inside a Rust session is a failure,
+  like a tap on the switch. A session that starts on a saved TypeScript
+  choice, and any opted-out session, stays out of the denominator and prints
+  on its own line.
+- After the flip the early-exit comparison uses the stage-3 baseline, with a
+  written floor of 150 TypeScript-arm sessions and default selections
+  admitted on named commits (a test pins the filter). If the pre-flip arm
+  lands under the floor, the plan switches to a fixed TypeScript holdback.
+  The floor, the commit range and release calendar, the engaged definition,
+  the single read and the stop gap are written before the first read. The
+  room's detectable-gap figures are Tess's arithmetic and not a governed
+  figure: at a 20% early-exit rate and 80% power, about 10 points for 150
+  sessions against 1,000, 7 points for 300 against 1,000, and 16 points for a
+  50-session holdback.
+- No distinct-player floor, because the data map has no identifier that
+  outlives a tab. The sign-off prints "player count unknown" beside the bound,
+  says the bound assumes independent sessions, and splits failures by the
+  returning flag and tenure bucket.
+- `?engine=ts` leaves with the deletion at step two, announced one release
+  ahead.
+- "A release" is a minor version deployed to production and live at least 14
+  days, with its own changelog entry. Patches do not count.
+- "Fallback unused" is the failure rule at zero across the window, with
+  recovered faults, new suppressions and taps included, at least 300 engaged
+  eligible sessions in it, and the stranded share printed beside it. It
+  counts by session, because there is no install identifier.
+- Slice 11 is 3.1.0, alone in its deploy, 14 days after the flip or after the
+  last 3.0.x that touched the engine, whichever is later. One voice wanted 30
+  days. Its commit goes on the eligible list, and the claim that it restarts
+  nothing is checked when its PR is written.
+
+#1350 carries the code, the new checks and the docs sweep, including the
+browser-family field, the exception-register entry, the cap and the baseline
+filter as pinned tests, the stored-choice migration, and the packet's
+remaining items (the flip PR's CLAUDE.md amendment and #1112, the rule that
+Rust is fixed first and TypeScript is patched for parity, the condition on
+the switch, the other Settings labels and the support and changelog lines,
+the EX-2 and EX-3 conditions, and the Firefox pass in the PC schedule). The
+follow-up docs PRs wait for the PC run to finish. The #945 body and the #1104
+matrix text need the owner's approval before they change.
 
 ## 2. Where things stand (from the takeover inventory)
 
