@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect } from "vitest";
 import { inflateSync } from "fflate";
 
 import medium from "../../../conformance/fixtures/sixseven_2.vctower?raw";
@@ -8,6 +8,7 @@ import { Simulation } from "../../engine/Simulation";
 import { roomUnits } from "../../engine/tower/rooms";
 import type { SerializedGame, Unit } from "../../engine/types";
 import { walkedStats } from "../fixtures/walkedStats";
+import { itTypeScriptOnly } from "../parity/typescriptOnly";
 
 /** Decode a `.vctower` container (magic line + base64 deflate-raw JSON). */
 function decodeVctower(text: string): SerializedGame {
@@ -16,7 +17,7 @@ function decodeVctower(text: string): SerializedGame {
   return JSON.parse(new TextDecoder().decode(inflateSync(bytes))) as SerializedGame;
 }
 
-const STEPS = 900; // 30 game hours of 2-minute steps: two evenings, a morning checkout, the hourly passes
+const STEPS = 900; // 30 game hours, one tick(2) (two game minutes) a step: an evening, a morning checkout, the hourly passes
 
 type Counts = ReturnType<typeof walkedStats>;
 const FIELDS = Object.keys(walkedStats(new Simulation(1))) as (keyof Counts)[];
@@ -32,19 +33,21 @@ function pick(sim: Simulation, n: number, keep: (u: Unit) => boolean): Unit | un
  * command, and hold each read to the walk over every unit. A write to a
  * counted field that does not mark its room leaves the kept counts behind the
  * walk, so this catches any write site the run reaches. Fires, departures,
- * rate changes, reprices, sales and builds are issued along the way; the
- * counts each field moved by show what the run reached. The rarer writes have
- * their own cases in `src/engine/tower/roomCounts.test.ts`.
+ * rate changes, reprices, sales and builds are issued along the way. How
+ * often each count moved between reads, leaving out the reads after a sale
+ * or a build (which rebuild the rooms list and count every room), shows that
+ * marked writes moved them. The rarer writes have their own cases in
+ * `src/engine/tower/roomCounts.test.ts`.
  */
 function run(save: string): Record<keyof Counts, number> {
   const sim = Simulation.deserialize(decodeVctower(save));
   sim.money = 1e12;
   const moved = Object.fromEntries(FIELDS.map((f) => [f, 0])) as Record<keyof Counts, number>;
   let last = sim.stats();
-  const check = (label: string) => {
+  const check = (label: string, rebuilt = false) => {
     const now = sim.stats();
     expect(now, label).toMatchObject(walkedStats(sim));
-    for (const f of FIELDS) if (now[f] !== last[f]) moved[f]++;
+    if (!rebuilt) for (const f of FIELDS) if (now[f] !== last[f]) moved[f]++;
     last = now;
   };
   for (let step = 1; step <= STEPS; step++) {
@@ -64,7 +67,10 @@ function run(save: string): Record<keyof Counts, number> {
         else sim.setNoRate(office.id);
         check(`rate at ${step}`);
       }
-      sim.applyRentBatch(step % 2 === 0 ? "office" : "condo", "noRate");
+      // The batch takes a kind off the market and, the next time round for
+      // that kind, back on at the default rate.
+      const k = step / 61;
+      sim.applyRentBatch(k % 2 === 0 ? "office" : "condo", (k >> 1) % 2 === 0 ? "noRate" : "default");
       check(`batch at ${step}`);
     }
     if (step % 113 === 0) {
@@ -72,9 +78,9 @@ function run(save: string): Record<keyof Counts, number> {
       if (room) {
         const { kind, floor, x } = room;
         sim.sellAt(floor, x);
-        check(`sale at ${step}`);
+        check(`sale at ${step}`, true);
         sim.build(kind, floor, x);
-        check(`build at ${step}`);
+        check(`build at ${step}`, true);
       }
     }
   }
@@ -82,14 +88,15 @@ function run(save: string): Record<keyof Counts, number> {
 }
 
 describe("the HUD's kept room counts follow a running simulation", () => {
-  it("match the walk over every unit after every step and command", () => {
+  itTypeScriptOnly("vacates offices through sim.vacate mid-run, which no command relays; the hosts' merge and frame apply have their own cases (merge.test.ts, frameApply.test.ts)")("match the walk over every unit after every step and command", () => {
     const totals = Object.fromEntries(FIELDS.map((f) => [f, 0])) as Record<keyof Counts, number>;
     for (const save of [medium, ownersSave, starFour]) {
       const moved = run(save);
       for (const f of FIELDS) totals[f] += moved[f];
     }
-    // What the runs reached: every condition count and the population moved.
-    for (const f of ["population", "occupiedOffices", "vacant", "vacantNoRate", "soldCondos", "occupiedHotel", "dirty", "offices"] as const) {
+    // What the runs reached: every condition count and the population moved
+    // under marked writes.
+    for (const f of ["population", "occupiedOffices", "vacant", "vacantNoRate", "soldCondos", "occupiedHotel", "dirty"] as const) {
       expect(totals[f], f).toBeGreaterThan(0);
     }
   }, 120_000);

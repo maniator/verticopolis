@@ -1,6 +1,7 @@
 import type { Simulation } from "../engine/Simulation";
 import { markRoom } from "../engine/tower/rooms";
 import type { Person } from "../engine/crowd/person";
+import type { Unit } from "../engine/types";
 import type { FrameView } from "./frameView";
 import { PERSON_OPTIONALS, clearOptional } from "./personFields";
 
@@ -54,8 +55,13 @@ export function syncPeople(sim: Simulation, frame: FrameView): void {
 }
 
 export function syncUnits(sim: Simulation, frame: FrameView): void {
-  for (const r of frame.units) {
-    const u = sim.tower.byId.get(r.id);
+  const { units, byId } = sim.tower;
+  for (let k = 0; k < frame.units.length; k++) {
+    const r = frame.units[k];
+    // The unit at the record's position, as the frame carries the units in
+    // the mirror's order between merges; the id index otherwise.
+    let u: Unit | undefined = units[k];
+    if (u?.id !== r.id) u = byId.get(r.id);
     if (!u) continue;
     // The HUD's room counts recount a room only when a field they read moved.
     if (u.state !== r.state || u.customersIn !== r.customersIn) markRoom(sim.tower, u);

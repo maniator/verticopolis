@@ -149,17 +149,27 @@ describe("the HUD's room counts over frames", () => {
 
   it("follow the rooms each frame rewrites, on the decode path and the direct apply", () => {
     const moved = { population: 0, occupiedOffices: 0, occupiedHotel: 0, dirty: 0 };
-    for (let seed = 1; seed <= 10; seed++) {
+    for (let seed = 1; seed <= 12; seed++) {
       const r = rng(seed);
       const a = rooms();
       const b = rooms();
-      const ids = [...roomUnits(a.tower).map((u) => u.id), a.tower.units[0].id];
+      // Records out of the mirror's order (the rooms, then a tile), in it
+      // (every unit, as the engine sends them), and in it but for one pair.
+      const inOrder = a.tower.units.map((u) => u.id);
+      const swapped = [...inOrder];
+      const [i, j] = roomUnits(a.tower).slice(0, 2).map((u) => a.tower.units.indexOf(u));
+      [swapped[i], swapped[j]] = [swapped[j], swapped[i]];
+      const ids = [[...roomUnits(a.tower).map((u) => u.id), a.tower.units[0].id], inOrder, swapped][seed % 3];
       let last = a.stats(); // the counts are kept from this read on
       b.stats();
       for (let f = 0; f < 30; f++) {
         const v = Float64Array.from(randomFrame(r, a, [], ids));
-        syncUnits(a, decodeFrame(v));
+        const frame = decodeFrame(v);
+        syncUnits(a, frame);
         applyRecords(b, v, decodeHeader(v));
+        for (const sim of [a, b]) {
+          for (const rec of frame.units) expect(sim.tower.getUnit(rec.id)?.state ?? rec.state, `seed ${seed} frame ${f} unit ${rec.id}`).toBe(rec.state);
+        }
         const hud = a.stats();
         expect(hud, `seed ${seed} frame ${f}`).toMatchObject(walkedStats(a));
         expect(b.stats(), `seed ${seed} frame ${f}`).toEqual(hud);

@@ -2,7 +2,7 @@ import type { HeatmapMode } from "../engine/sim/constants";
 import type { Simulation } from "../engine/Simulation";
 import { isElevatorKind, residentCount } from "../engine/facilities";
 import { MILESTONES } from "../engine/milestones";
-import { roomUnits } from "../engine/tower/rooms";
+import { forgetRoomCounts, roomUnits } from "../engine/tower/rooms";
 import { towerCatalog } from "../engine/towerCatalog";
 import { isPresent } from "../engine/types";
 import { unitPrice } from "../ui/catalogPricing";
@@ -42,6 +42,11 @@ export function tsStatsReport(sim: Simulation): StatsReport {
   const { averages, hasData } = sim.incomeBreakdown();
   const milestones = sim.achievedMilestones;
   const list = MILESTONES.map((m) => ({ id: m.id, done: milestones.has(m.id) }));
+  // The report opens on a click, so its counts come from a fresh pass over
+  // the rooms (one pass per open) rather than the HUD's kept counts: a field
+  // written without a mark (a test or tooling scene staging a tower) shows
+  // here as written.
+  forgetRoomCounts(sim.tower);
   return {
     stats: sim.stats(),
     ratingPopulation: sim.ratingPopulation(),

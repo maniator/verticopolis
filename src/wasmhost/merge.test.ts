@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
-import { roomUnits, structureRuns } from "../engine/tower/rooms";
+import { markRoom, roomCounts, roomUnits, structureRuns } from "../engine/tower/rooms";
 import { mergeSimulation } from "./merge";
 
 /** A tower with a lobby row, two offices and a shaft, ticked a little. */
-function tower(seed: number): Simulation {
-  const sim = Simulation.newGame(seed, "classic");
+function tower(seed: number, mode: "classic" | "modern" = "classic"): Simulation {
+  const sim = Simulation.newGame(seed, mode);
   sim.money = 1e9;
   for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
   expect(sim.build("office", 2, 175).ok).toBe(true);
@@ -167,5 +167,65 @@ describe("mergeSimulation", () => {
     const hud = target.stats();
     expect(hud).toEqual(Simulation.deserialize(fresh.serialize()).stats());
     expect(hud.occupiedOffices).toBe(before.occupiedOffices + 2);
+  });
+
+  it("marks the rooms whose counted fields a merge rewrites, one field at a time, and keeps the HUD's counts when the room list stays", () => {
+    // A save carries No Rate in Classic only, and a household only for a
+    // sold condo in Modern, so each mode changes the fields it keeps.
+    for (const mode of ["classic", "modern"] as const) {
+      const target = tower(5, mode);
+      expect(target.build("condo", 3, 175).ok).toBe(true);
+      expect(target.build("fastFood", 4, 175).ok).toBe(true);
+      const units = target.tower.units;
+      const [office, other] = units.filter((u) => u.kind === "office");
+      const condo = units.find((u) => u.kind === "condo")!;
+      const venue = units.find((u) => u.kind === "fastFood")!;
+      office.state = "empty";
+      other.state = "empty";
+      condo.state = "occupied";
+      if (mode === "modern") {
+        condo.everOccupied = true;
+        condo.residents = 2;
+      }
+      venue.state = "occupied";
+      venue.customersIn = 4;
+      const counts = roomCounts(target.tower); // the HUD's counts are kept from this read on
+      const rooms = roomUnits(target.tower);
+      const unit = (sim: Simulation, id: number) => sim.tower.getUnit(id)!;
+      // Each merge changes one counted field of one room. The first changes
+      // nothing on purpose: the save does not carry a venue's customers, so
+      // the merge takes them away.
+      type Change = [string, (sim: Simulation) => void];
+      const byMode: Change[] =
+        mode === "classic"
+          ? [
+              ["noRate", (sim) => { unit(sim, other.id).noRate = true; }],
+              ["everOccupied", (sim) => { unit(sim, condo.id).everOccupied = true; }],
+            ]
+          : [["residents", (sim) => { unit(sim, condo.id).residents = 3; }]];
+      const changes: Change[] = [
+        ["customersIn", () => {}],
+        ["state", (sim) => { unit(sim, office.id).state = "occupied"; }],
+        ...byMode,
+      ];
+      for (const [field, change] of changes) {
+        const label = `${mode} ${field}`;
+        const before = { ...target.stats() };
+        const fresh = Simulation.deserialize(target.serialize());
+        change(fresh);
+        const save = fresh.serialize();
+        mergeSimulation(target, Simulation.deserialize(save), { revision: target.tower.revision, mealOverlayRevision: 0 });
+        expect(roomUnits(target.tower), label).toBe(rooms);
+        expect(roomCounts(target.tower), `${label}: the same ledger, marked and not dropped`).toBe(counts);
+        const hud = target.stats();
+        expect(hud, label).toEqual(Simulation.deserialize(save).stats());
+        expect(hud.population, label).toBe(target.population);
+        expect(hud, `${label} moved a count`).not.toEqual(before);
+      }
+      // A later mark still lands in the kept ledger.
+      venue.customersIn = 2;
+      markRoom(target.tower, venue);
+      expect(target.stats().population).toBe(target.population);
+    }
   });
 });

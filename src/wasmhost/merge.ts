@@ -1,6 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
-import { forgetRoomCounts, forgetUnitLists } from "../engine/tower/rooms";
+import { forgetUnitLists, markRoom } from "../engine/tower/rooms";
 import type { Transport, Unit } from "../engine/types";
 
 /**
@@ -74,26 +74,33 @@ function mergeTower(target: Tower, fresh: Tower, marks: MergeMarks): void {
   // which counts from its own load, so a revision can come back with other
   // units behind it. The per-revision lists go when the revision moves or the
   // units do, and stay over an hourly merge that changed neither (#1253).
-  const moved = target.revision !== marks.revision || unitsMoved(target.units, fresh.units);
+  // Lists that go take the HUD's room counts with them (a new rooms list is
+  // counted afresh); lists that stay keep them, so the rooms whose counted
+  // fields this merge rewrites are marked instead.
+  const changed: Unit[] = [];
+  const moved = target.revision !== marks.revision || unitsMoved(target.units, fresh.units, changed);
   mergeById(target.units, fresh.units, target.byId);
   mergeById(target.transports, fresh.transports, target.transportsById);
   target.revision = marks.revision;
   if (moved) forgetUnitLists(target);
-  // Every unit's fields were rewritten in place, unmarked: count the rooms
-  // again at the next read (once per merge, an engine hour or a command).
-  forgetRoomCounts(target);
+  else for (const u of changed) markRoom(target, u);
   target.mealOverlayRevision = marks.mealOverlayRevision;
 }
 
 /** Whether `fresh` lists other units than `live`, or the same ones in
  *  another order, of another kind or in another place: what the
- *  per-revision room list and structure runs are built from. */
-function unitsMoved(live: readonly Unit[], fresh: readonly Unit[]): boolean {
+ *  per-revision room list and structure runs are built from. While they
+ *  match, also collect into `changed` the live units whose fields the room
+ *  counts read (`roomCounts`) differ from the fresh record's. */
+function unitsMoved(live: readonly Unit[], fresh: readonly Unit[], changed: Unit[]): boolean {
   if (live.length !== fresh.length) return true;
   for (let i = 0; i < live.length; i++) {
     const a = live[i];
     const b = fresh[i];
     if (a.id !== b.id || a.kind !== b.kind || a.floor !== b.floor || a.x !== b.x || a.width !== b.width) return true;
+    if (a.state !== b.state || a.noRate !== b.noRate || a.everOccupied !== b.everOccupied || a.residents !== b.residents || a.customersIn !== b.customersIn) {
+      changed.push(a);
+    }
   }
   return false;
 }

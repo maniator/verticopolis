@@ -1,7 +1,7 @@
 import { LOG_RING_CAP } from "../engine/sim/constants";
 import type { Simulation } from "../engine/Simulation";
 import { markRoom } from "../engine/tower/rooms";
-import type { LogEntry } from "../engine/types";
+import type { LogEntry, Unit } from "../engine/types";
 import type { Person } from "../engine/crowd/person";
 import { FRAME_HEADER, PERSON_FIXED, PERSON_STATES, ROUTINES, UNIT_STATES, enumAt, type FrameHeader } from "./frameView";
 import { PERSON_OPTIONALS, clearOptional } from "./personFields";
@@ -147,9 +147,14 @@ function applyPeople(sim: Simulation, v: ArrayLike<number>, count: number, start
 
 function applyUnits(sim: Simulation, v: ArrayLike<number>, count: number, start: number): number {
   let i = start;
-  const byId = sim.tower.byId;
+  const { units, byId } = sim.tower;
   for (let k = 0; k < count; k++, i += 6) {
-    const u = byId.get(v[i]);
+    // Between merges the mirror holds the units in the engine's order, the
+    // frame's order, so a record's unit is the one at its position; the id
+    // index is the fallback for a record out of place.
+    const id = v[i];
+    let u: Unit | undefined = units[k];
+    if (u?.id !== id) u = byId.get(id);
     if (!u) continue;
     const state = UNIT_STATES[v[i + 1]];
     const customersIn = counter(v[i + 3]);

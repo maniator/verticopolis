@@ -118,9 +118,11 @@ export interface RoomCounts {
  * `customersIn`) marks its room through {@link setRoomState} or
  * {@link markRoom}, and a read recounts only the marked rooms: it takes each
  * one's last share out and puts its share as the fields stand now back in.
- * A room's kind never changes in place (`roomUnits` relies on the same), so
- * the kind counts move only with the list. The returned object is the
- * ledger's own and changes with later reads.
+ * A room's kind never changes in place (`roomUnits` relies on the same; the
+ * hosts' merge, the one writer that could, drops the rooms list when a kind
+ * moves), so the kind counts move only with the list. The returned object is the
+ * ledger's own: the next read after a write updates it in place, and a
+ * rebuild replaces it, so a caller that keeps the counts copies them.
  */
 export function roomCounts(tower: Tower): Readonly<RoomCounts> {
   const rooms = roomUnits(tower);
@@ -131,7 +133,7 @@ export function roomCounts(tower: Tower): Readonly<RoomCounts> {
     if (!share) continue; // a structure tile: it counts toward nothing
     tally(ledger.counts, share, -1);
     share.flags = flagsOf(u);
-    share.population = isPresent(u) ? censusCount(u) : 0;
+    share.population = populationOf(u);
     tally(ledger.counts, share, 1);
   }
   ledger.changed.clear();
@@ -152,9 +154,10 @@ export function markRoom(tower: Tower, u: Unit): void {
   ledgers.get(tower)?.changed.add(u);
 }
 
-/** Drop the tower's room counts, so the next read counts every room again.
- *  For a writer that rewrites rooms' fields wholesale without marking each,
- *  as the WASM hosts' merge does. */
+/** Drop the tower's room counts, so the next read counts every room again:
+ *  for a writer that rewrites rooms' fields wholesale without marking each,
+ *  and for a reader that wants the counts from a fresh pass (the stats
+ *  report). */
 export function forgetRoomCounts(tower: Tower): void {
   ledgers.delete(tower);
 }
@@ -231,6 +234,11 @@ function flagsOf(u: Unit): number {
   return 0;
 }
 
+/** A room's part in the population: its census count while anyone is in. */
+function populationOf(u: Unit): number {
+  return isPresent(u) ? censusCount(u) : 0;
+}
+
 function tally(c: RoomCounts, share: Share, sign: 1 | -1): void {
   c.population += sign * share.population;
   if (share.flags === 0) return;
@@ -256,7 +264,7 @@ function countRooms(tower: Tower, rooms: readonly Unit[]): RoomCounts {
     else if (u.kind === "shop") counts.shops++;
     else if (u.kind === "restaurant" || u.kind === "fastFood") counts.restaurants++;
     else if (u.kind === "parking") counts.parkingSpaces++;
-    const share = { flags: flagsOf(u), population: isPresent(u) ? censusCount(u) : 0 };
+    const share = { flags: flagsOf(u), population: populationOf(u) };
     tally(counts, share, 1);
     shares.set(u, share);
   }

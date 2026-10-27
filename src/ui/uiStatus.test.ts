@@ -126,9 +126,11 @@ describe("update", () => {
     const ui = { el, paletteCatalog: catalog, paletteScanKey: scanKey, lastLogSeq: sim.logSeq, tool: { type: "inspect" }, setTowerName: () => {} } as unknown as UI;
     const reads = vi.spyOn(sim, "stats");
     const population = vi.spyOn(sim, "population", "get");
+    const census = vi.spyOn(sim.tower, "totalPopulation");
     update(ui, sim);
     expect(reads).toHaveBeenCalledTimes(1);
     expect(population).not.toHaveBeenCalled();
+    expect(census).not.toHaveBeenCalled();
     expect(el.pop.textContent).toBe(want.toLocaleString());
   });
 });
