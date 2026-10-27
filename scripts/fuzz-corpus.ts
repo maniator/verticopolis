@@ -5,19 +5,21 @@
  *   (cd engine-rs && cargo build --release --features conformance --bin fuzz)
  *   npx tsx scripts/fuzz-corpus.ts [--budget <seconds>]
  * Exit 0 all entries agree, 1 a divergence, an engine refusal or the budget
- * ran out (default 480 s, under the job's ten-minute limit; an entry still
- * running at the deadline is cut off, and a run that finishes late fails), 3 the harness
- * failed (no fuzzer, an unreadable entry, an empty corpus).
+ * ran out (default 240 s, well under the job's ten-minute limit; a Rust replay
+ * still running at the deadline is cut off, the TypeScript half has no timer
+ * of its own so a hang there waits for the job's limit, and a run that
+ * finishes late fails), 2 bad arguments, 3 the harness failed (no fuzzer, an
+ * unreadable entry or folder, an empty corpus).
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { binaryProblem, rustReplay } from "../src/tests/conformance/fuzzBinary";
-import { corpusFiles } from "../src/tests/conformance/fuzzCorpus";
+import { binaryProblem, rustMessage, rustReplay } from "../src/tests/conformance/fuzzBinary";
+import { corpusExit, corpusFiles, lateFailure, rustVerdict } from "../src/tests/conformance/fuzzCorpus";
 import { replayCompare } from "../src/tests/conformance/fuzzReplay";
 
 const flag = process.argv.indexOf("--budget");
-const budget = flag >= 0 ? Number(process.argv[flag + 1]) : 480;
+const budget = flag >= 0 ? Number(process.argv[flag + 1]) : 240;
 if (!Number.isFinite(budget) || budget <= 0) {
   console.error("usage: fuzz-corpus [--budget <seconds>]");
   process.exit(2);
@@ -27,7 +29,13 @@ if (problem) {
   console.error(`HARNESS: ${problem}`);
   process.exit(3);
 }
-const files = corpusFiles();
+let files: string[] = [];
+try {
+  files = corpusFiles();
+} catch (e) {
+  console.error(`HARNESS: cannot read conformance/fuzz-corpus/: ${(e as Error).message}`);
+  process.exit(3);
+}
 if (files.length === 0) {
   console.error("HARNESS: conformance/fuzz-corpus/ holds no entries, so the job would prove nothing");
   process.exit(3);
@@ -52,9 +60,10 @@ try {
       failed.push(`${name} (over budget)`);
       continue;
     }
-    if (rust.code !== 0) {
-      console.log(`${name}: the Rust engine ${rust.code === 1 ? "stopped" : rust.code === 101 ? "panicked" : `failed (${rust.code})`}: ${rust.stderr.trim().split("\n").pop()}`);
-      if (rust.code === 1 || rust.code === 101) failed.push(name);
+    const verdict = rustVerdict(rust.code);
+    if (verdict !== "ok") {
+      console.log(`${name}: the Rust engine ${rust.code === 1 ? "stopped" : rust.code === 101 ? "panicked" : `failed (${rust.code})`}: ${rustMessage(rust.stderr)}`);
+      if (verdict === "failed") failed.push(name);
       else harness = true;
       continue;
     }
@@ -70,7 +79,7 @@ try {
   rmSync(work, { recursive: true, force: true });
 }
 const elapsed = (Date.now() - started) / 1000;
-if (elapsed > budget && !failed.some((f) => f.endsWith("(over budget)"))) failed.push("(the last entry ran past the budget)");
+failed.push(...lateFailure(elapsed, budget, failed));
 const seconds = elapsed.toFixed(1);
 console.log(`${files.length} corpus entries in ${seconds} s${failed.length ? `; failed: ${failed.join(", ")}` : ""}`);
-process.exit(failed.length ? 1 : harness ? 3 : 0);
+process.exit(corpusExit(failed, harness));

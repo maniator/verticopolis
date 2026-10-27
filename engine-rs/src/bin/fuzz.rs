@@ -29,7 +29,20 @@ fn write_failed(out: &std::path::Path, id: &str, scenario: &Value) {
 /// Write a run's checkpoints and details beside each other, named for the
 /// scenario id, in the form `scripts/fuzz-compare.ts` reads.
 fn write_records(out: &std::path::Path, id: &str, run: &Run, details: &impl serde::Serialize) {
-    std::fs::create_dir_all(out).expect("out dir");
+    if let Err(e) = try_write_records(out, id, run, details) {
+        // A failed write is bad input or a full disk, not an engine panic.
+        eprintln!("{}: cannot write the records: {e}", out.display());
+        std::process::exit(2);
+    }
+}
+
+fn try_write_records(
+    out: &std::path::Path,
+    id: &str,
+    run: &Run,
+    details: &impl serde::Serialize,
+) -> Result<(), Box<dyn std::error::Error>> {
+    std::fs::create_dir_all(out)?;
     let checkpoints: Vec<Value> = run
         .checkpoints
         .iter()
@@ -37,14 +50,13 @@ fn write_records(out: &std::path::Path, id: &str, run: &Run, details: &impl serd
         .collect();
     std::fs::write(
         out.join(format!("{id}.rs.json")),
-        serde_json::to_string_pretty(&checkpoints).unwrap(),
-    )
-    .unwrap();
+        serde_json::to_string_pretty(&checkpoints)?,
+    )?;
     std::fs::write(
         out.join(format!("{id}.rs.detail.json")),
-        serde_json::to_string(details).unwrap(),
-    )
-    .unwrap();
+        serde_json::to_string(details)?,
+    )?;
+    Ok(())
 }
 
 /// `fuzz --replay <scenario.json> <out-dir>`: run a scenario that was not just

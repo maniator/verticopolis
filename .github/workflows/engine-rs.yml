@@ -45,6 +45,7 @@ on:
       - "scripts/license-files.ts"
       - "src/build/thirdPartyNotices.ts"
       - "src/build/rustNotices.ts"
+      - "src/build/engineCompat.ts"
       - "package.json"
       - "package-lock.json"
       - ".nvmrc"
@@ -144,6 +145,7 @@ jobs:
             case "$f" in scripts/license-files.ts) engine=true ;; esac
             case "$f" in src/build/thirdPartyNotices.ts) engine=true ;; esac
             case "$f" in src/build/rustNotices.ts) engine=true ;; esac
+            case "$f" in src/build/engineCompat.ts) engine=true ;; esac
             case "$f" in package.json) engine=true ;; esac
             case "$f" in package-lock.json) engine=true ;; esac
             case "$f" in .nvmrc) engine=true ;; esac

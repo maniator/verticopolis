@@ -276,15 +276,20 @@ When a night diverges, shrink its scenario and add the result in the fix pull
 request:
 
 ```sh
-npx tsx scripts/fuzz-shrink.ts fuzz-out/fuzz-<seed>.json <entry-name>
+npx tsx scripts/fuzz-shrink.ts fuzz-out/fuzz-<seed>.json <entry-name> [--max-tests 4000]
 ```
 
 The shrinker drops commands until none can go, keeping a candidate only when
 the Rust engine runs it cleanly and the TypeScript replay shows the same kind
 of divergence, then writes `fuzz-corpus/<entry-name>.json`. Before the fix the
 entry fails the corpus job; after it, the entry passes and stays as a
-regression. `fuzz --replay <scenario.json> <out-dir>` is the Rust half: it
-runs any scenario and writes the records `scripts/fuzz-compare.ts` reads.
+regression. A tall night needs about 1300 tests, so the default limit is 4000;
+a run that reaches `--max-tests` says so, and its list may not be minimal.
+`fuzz --replay <scenario.json> <out-dir>` is the Rust half: it runs any
+scenario and writes the records `scripts/fuzz-compare.ts` reads
+(`<id>.rs.json` and `<id>.rs.detail.json`). Write them somewhere other than
+`fuzz-corpus/`; git ignores them there and the corpus job does not read them as
+entries, but a stray copy is still clutter.
 
 ## Checkpoints
 

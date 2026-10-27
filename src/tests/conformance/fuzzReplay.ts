@@ -21,6 +21,16 @@ export type ReplayResult =
    *  scenario. Never an engine divergence. */
   | { status: "harness"; message: string };
 
+/** What a TypeScript refusal names, so a shrink cannot settle on a different
+ *  refusal: the runner's messages start with the command (`build fitnessClub @
+ *  4,196 failed: ...`, `buildTransport elevatorExpress @ x212 failed: ...`,
+ *  `resolveChoice: cannot pay`), so the words before ` @`, ` failed` or `:`
+ *  become part of the signature. A message of another shape is plain `threw`. */
+export function throwSignature(message: string): string {
+  const head = /^([A-Za-z][\w-]*(?: [A-Za-z][\w-]*)?)(?: @| failed|:)/.exec(message);
+  return head ? `threw:${head[1].replace(/ /g, ":")}` : "threw";
+}
+
 const harness = (message: string): ReplayResult => ({ status: "harness", message: `HARNESS: ${message}` });
 
 function readRecord<T>(path: string, what: string): T[] | string {
@@ -58,7 +68,7 @@ export function replayCompare(file: string, rustDir: string = dirname(file)): Re
     if (e instanceof DetailError) return harness(e.message);
     // The TypeScript engine refused a command the Rust engine accepted (or an
     // expectFail it did not meet): the divergence the fuzzer exists to find.
-    return { status: "diverged", signature: "threw", message: `DIVERGED before any hash compare, TypeScript runner threw: ${(e as Error).message}` };
+    return { status: "diverged", signature: throwSignature((e as Error).message), message: `DIVERGED before any hash compare, TypeScript runner threw: ${(e as Error).message}` };
   }
   try {
     const d = compareRuns({ checkpoints: tsCheckpoints, details: tsDetails }, { checkpoints: rustCheckpoints, details: rustDetails });

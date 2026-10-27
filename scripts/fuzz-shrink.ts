@@ -4,7 +4,7 @@
  * the corpus. Delta debugging does not promise the globally shortest list, and
  * a run cut off by `--max-tests` may not be 1-minimal; the entry's description
  * says so. Usage:
- *   npx tsx scripts/fuzz-shrink.ts <fuzz-out>/fuzz-<seed>.json <name> [--max-tests 400]
+ *   npx tsx scripts/fuzz-shrink.ts <fuzz-out>/fuzz-<seed>.json <name> [--max-tests 4000]
  * The fuzzer (`cargo build --release --features conformance --bin fuzz`, in
  * engine-rs/) must be built. A candidate counts as still failing only when the
  * Rust engine runs it cleanly and the TypeScript replay shows the same kind of
@@ -12,13 +12,14 @@
  * scenario that merely breaks differently is not accepted. The result goes to
  * conformance/fuzz-corpus/<name>.json; commit it with the fix, where the corpus
  * job then holds it to agreement. Exit 0 written, 1 the original does not
- * diverge (or the Rust engine refuses it), 2 bad arguments or a taken name, 3
- * the harness failed (no fuzzer, a timeout, a malformed record).
+ * diverge (or the Rust engine refuses it), 2 bad arguments, an unreadable input
+ * or a taken name, 3 the harness failed (no fuzzer, a timeout, a malformed
+ * record). The default limit is 4000 tests: a tall night needs about 1300.
  */
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { binaryProblem, rustReplay } from "../src/tests/conformance/fuzzBinary";
+import { binaryProblem, rustMessage, rustReplay } from "../src/tests/conformance/fuzzBinary";
 import { replayCompare } from "../src/tests/conformance/fuzzReplay";
 import { ddmin } from "../src/tests/conformance/fuzzShrink";
 import { CORPUS_NAME, corpusDir } from "../src/tests/conformance/fuzzCorpus";
@@ -34,7 +35,7 @@ type Shown =
 function main(): number {
   const [file, name, ...rest] = process.argv.slice(2);
   const flag = rest.indexOf("--max-tests");
-  const maxTests = flag >= 0 ? Number(rest[flag + 1]) : 400;
+  const maxTests = flag >= 0 ? Number(rest[flag + 1]) : 4000;
   if (!file || !name || !CORPUS_NAME.test(name) || !Number.isInteger(maxTests) || maxTests < 1) {
     console.error("usage: fuzz-shrink <scenario.json> <name: lowercase words and digits joined by dashes> [--max-tests <n>]");
     return 2;
@@ -52,7 +53,14 @@ function main(): number {
     return 2;
   }
 
-  const original = JSON.parse(readFileSync(file, "utf8")) as { id: string; description: string; start: unknown; commands: unknown[] };
+  let original: { id: string; description: string; start: unknown; commands: unknown[] };
+  try {
+    original = JSON.parse(readFileSync(file, "utf8"));
+    if (!original || typeof original.id !== "string" || typeof original.description !== "string" || !Array.isArray(original.commands)) throw new Error("not a scenario (needs id, description and commands)");
+  } catch (e) {
+    console.error(`${file}: cannot read the scenario: ${(e as Error).message}`);
+    return 2;
+  }
   const work = mkdtempSync(join(tmpdir(), "vc-shrink-"));
   try {
     /** Run a candidate: the Rust engine must run it cleanly (a scenario it
@@ -61,8 +69,8 @@ function main(): number {
       const path = join(work, `${id}.json`);
       writeFileSync(path, JSON.stringify({ ...original, id, commands }));
       const rust = rustReplay(path, work);
-      if (rust.code === 1) return { kind: "refused", message: `the Rust engine refuses it: ${rust.stderr.trim().split("\n").pop()}` };
-      if (rust.code !== 0) return { kind: "harness", message: `the Rust replay failed (${rust.code}): ${rust.stderr.trim().split("\n").pop()}` };
+      if (rust.code === 1) return { kind: "refused", message: `the Rust engine refuses it: ${rustMessage(rust.stderr)}` };
+      if (rust.code !== 0) return { kind: "harness", message: `the Rust replay failed (${rust.code}): ${rustMessage(rust.stderr)}` };
       const r = replayCompare(path, work);
       if (r.status === "harness") return { kind: "harness", message: r.message };
       return r.status === "diverged" ? { kind: "diverged", signature: r.signature } : { kind: "converged" };

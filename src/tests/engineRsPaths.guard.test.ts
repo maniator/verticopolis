@@ -68,8 +68,11 @@ describe("engine-rs.yml engine path lists", () => {
   });
 
   it("covers every input of the differential's window key, so the corpus job runs when one changes", async () => {
-    const { FUZZ_ENTRIES } = await import("./conformance/fuzzKey");
-    const inputs = [...FUZZ_ENTRIES, "tsconfig.json", ".github/workflows/engine-fuzz.yml", ".nvmrc", "package-lock.json"];
+    const { fuzzKeyFiles } = await import("./conformance/fuzzKey");
+    // The key's own file lists, not a copy: an import added to a script the
+    // key hashes lands in `scripts` and must land in the path lists too.
+    const files = fuzzKeyFiles(resolve(here, "..", ".."));
+    const inputs = [...files.scripts, ...files.wasmBuild, ".github/workflows/engine-fuzz.yml", ".nvmrc", "package-lock.json"];
     const matches = (file: string) =>
       casePaths(yaml).some((p) => (p.endsWith("/*") ? file.startsWith(p.slice(0, -1)) : p === file));
     for (const file of inputs) expect(matches(file), `${file} is not in the engine path lists`).toBe(true);

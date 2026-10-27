@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { replayCompare } from "./fuzzReplay";
+import { replayCompare, throwSignature } from "./fuzzReplay";
 import { loadScenario, runScenario, type Checkpoint } from "./scenario";
 import type { CheckpointDetail } from "./checkpointDetail";
 
@@ -84,7 +84,16 @@ describe("replayCompare", () => {
     writeFileSync(join(dir, "threw.rs.json"), JSON.stringify(checkpoints));
     writeFileSync(join(dir, "threw.rs.detail.json"), JSON.stringify(details));
     const r = replayCompare(file);
-    expect(r).toMatchObject({ status: "diverged", signature: "threw" });
+    expect(r).toMatchObject({ status: "diverged", signature: "threw:build:floor" });
+  });
+
+  it("keeps a refusal of one command apart from a refusal of another", () => {
+    expect(throwSignature("build floor @ 2,170 succeeded but was expected to fail")).toBe("threw:build:floor");
+    expect(throwSignature("build fitnessClub @ 4,196 failed: no money")).toBe("threw:build:fitnessClub");
+    expect(throwSignature("buildTransport elevatorExpress @ x212 failed: cap")).toBe("threw:buildTransport:elevatorExpress");
+    expect(throwSignature("resolveChoice: cannot pay 500")).toBe("threw:resolveChoice");
+    expect(throwSignature("reload changed the saved state")).toBe("threw");
+    expect(throwSignature("build fitnessClub @ 4,196 failed: x")).not.toBe(throwSignature("build floor @ 4,196 failed: x"));
   });
 
   it("reads missing, malformed and mismatched records as harness failures", () => {
