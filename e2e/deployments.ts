@@ -84,7 +84,7 @@ function manifestOf(sw: string): { revisionOf(url: string): string; entries: num
   return {
     entries,
     revisionOf: (url) => {
-      const found = new RegExp(`\\{url:"${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}",revision:"([a-f0-9]+)"`).exec(sw);
+      const found = new RegExp(`\\{url:"${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}",revision:"([^"]+)"`).exec(sw);
       if (!found) throw new Error(`sw.js has no revisioned precache entry for ${url}`);
       return found[1];
     },

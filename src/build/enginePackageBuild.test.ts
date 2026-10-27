@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames";
 import { engineBuildRecord } from "../wasmhost/enginePackageRecord";
-import { INTEGRITY_FILES, engineDistProblems, engineIntegrityTransform, integrityOf, manifestIntegrity, manifestRevisions, readExpectedPackage, revisionsOf, shellProblems, shellRevisionProblems } from "./enginePackageBuild";
+import { ENGINE_REVISION_SUFFIX, INTEGRITY_FILES, engineDistProblems, engineRevision, engineIntegrityTransform, integrityOf, manifestIntegrity, manifestRevisions, readExpectedPackage, revisionsOf, shellProblems, shellRevisionProblems } from "./enginePackageBuild";
 
 const sha = (d: Uint8Array | string) => createHash("sha256").update(d).digest("hex");
 const md5 = (d: Uint8Array | string) => createHash("md5").update(d).digest("hex");
@@ -88,6 +88,18 @@ describe("engineIntegrityTransform", () => {
     expect(manifest[3]).toEqual({ url: "index.html", revision: "r4", size: 10 });
   });
 
+  it("gives each engine entry a revision no worker before the integrity attribute used, and leaves the rest alone", () => {
+    const d = pkg();
+    const { manifest } = engineIntegrityTransform(d)(entries());
+    expect(manifest.slice(0, 2).map((e) => e.revision)).toEqual([engineRevision(glue), engineRevision(wasm)]);
+    for (const e of manifest.slice(0, 3)) {
+      expect(e.revision, "not the plain MD5 an earlier worker keyed the file by").toMatch(new RegExp(`^[0-9a-f]{32}${ENGINE_REVISION_SUFFIX}$`));
+      expect(e.revision).not.toMatch(/^[0-9a-f]{32}$/);
+    }
+    expect(engineRevision(glue)).toBe(`${md5(glue)}${ENGINE_REVISION_SUFFIX}`);
+    expect(manifest[3].revision).toBe("r4");
+  });
+
   it("matches an entry whatever its prefix or query string", () => {
     const d = pkg();
     const { manifest } = engineIntegrityTransform(d)([{ url: `./${ENGINE_DIR}${ENGINE_GLUE}?v=1`, revision: null, size: 1 }]);
@@ -136,7 +148,7 @@ describe("engineDistProblems", () => {
     const entry = (name: string, bytes: Uint8Array) => {
       const url = ENGINE_DIR + name;
       const integrity = url in over ? over[url] : integrityOf(bytes);
-      const revision = url in revisionOver ? revisionOver[url] : md5(bytes);
+      const revision = url in revisionOver ? revisionOver[url] : engineRevision(bytes);
       return `{url:"${url}",revision:"${revision}"${integrity === null ? "" : `,integrity:"${integrity}"`}}`;
     };
     return `[${entry(ENGINE_GLUE, glue)},${entry(ENGINE_WASM, wasm)},${entry(ENGINE_BUILD_RECORD, new TextEncoder().encode(JSON.stringify(record)))}]`;
@@ -178,11 +190,11 @@ describe("engineDistProblems", () => {
     expect(engineDistProblems(d, "[]")).toHaveLength(3);
   });
 
-  it("reports an engine entry whose revision is not the MD5 of its file, which would send Repair to another cache key", () => {
+  it("reports an engine entry whose revision is not the one of its file, which would send Repair to another cache key", () => {
     const d = pkg();
     const bad = manifestFor(d, {}, { [`${ENGINE_DIR}${ENGINE_WASM}`]: "0".repeat(32) });
-    expect(engineDistProblems(d, bad).join("\n")).toContain(`precache entry ${ENGINE_DIR}${ENGINE_WASM} has revision ${"0".repeat(32)}, not the MD5`);
-    expect(manifestRevisions(manifestFor(d)).get(`${ENGINE_DIR}${ENGINE_GLUE}`)).toBe(md5(glue));
+    expect(engineDistProblems(d, bad).join("\n")).toContain(`precache entry ${ENGINE_DIR}${ENGINE_WASM} has revision ${"0".repeat(32)}; the file in dist/ has ${engineRevision(wasm)}`);
+    expect(manifestRevisions(manifestFor(d)).get(`${ENGINE_DIR}${ENGINE_GLUE}`)).toBe(engineRevision(glue));
   });
 
   it("reports a binary that is missing from dist", () => {
@@ -294,7 +306,7 @@ describe("shellRevisionProblems", () => {
     const all = JSON.stringify(revisionsOf(join(d, ENGINE_DIR)));
     writeFileSync(join(d, "assets/index-1.js"), `x={revisions:${all}}`);
     expect(shellRevisionProblems(d)).toEqual([]);
-    writeFileSync(join(d, "assets/index-1.js"), `x={revisions:${all.replace(md5(wasm), "0".repeat(32))}}`);
+    writeFileSync(join(d, "assets/index-1.js"), `x={revisions:${all.replace(engineRevision(wasm), "0".repeat(32))}}`);
     expect(shellRevisionProblems(d).join("\n")).toContain(`precache revision of ${ENGINE_DIR}${ENGINE_WASM}`);
   });
 
