@@ -38,8 +38,12 @@ export interface MergeMarks {
 
 export function mergeSimulation(target: Simulation, fresh: Simulation, marks: MergeMarks): void {
   adoptSimulationFields(target, fresh);
-  target.events.restore(fresh.tower.units.filter((u) => u.state === "fire").map((u) => u.id));
   mergeTower(target.tower, fresh.tower, marks);
+  // The fires, read from the merged rooms (a floor or lobby tile cannot
+  // burn) through the revision-keyed room list: after a merge that kept the
+  // revision it is warm, and after one that moved it the build is the one
+  // pass the read model's own queries would make next.
+  target.events.restore(roomUnits(target.tower).filter((u) => u.state === "fire").map((u) => u.id));
 }
 
 /** What an hourly delta carries (#1045), read and coerced: `rest` is a

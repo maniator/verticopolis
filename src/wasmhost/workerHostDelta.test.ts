@@ -323,6 +323,25 @@ describe("a full merge that brings in a unit object", () => {
   });
 });
 
+describe("mergeSimulation", () => {
+  it("re-arms the fires the engine's save carries, from the merged rooms", () => {
+    const sim = Simulation.newGame(7, "classic");
+    sim.money = 1e9;
+    for (let x = 100; x < 130; x++) {
+      expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+      expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    }
+    expect(sim.tower.place("office", 2, 102).ok).toBe(true);
+    const save = JSON.parse(JSON.stringify(sim.serialize())) as { units: { kind: string; state: string }[] };
+    save.units.find((u) => u.kind === "office")!.state = "fire";
+    const fresh = Simulation.deserialize(save as unknown as Parameters<typeof Simulation.deserialize>[0]);
+    expect(fresh.events.count).toBe(1);
+    expect(sim.events.count).toBe(0);
+    mergeSimulation(sim, fresh, { revision: sim.tower.revision, mealOverlayRevision: 0 });
+    expect(sim.events.count).toBe(1);
+  });
+});
+
 describe("sameJson", () => {
   it("ignores key order and compares nested lists and objects", () => {
     expect(sameJson({ a: 1, b: { c: [1, { d: 2 }] } }, { b: { c: [1, { d: 2 }] }, a: 1 })).toBe(true);
