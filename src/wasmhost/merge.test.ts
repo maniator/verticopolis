@@ -91,6 +91,25 @@ describe("mergeSimulation", () => {
     expect(structureRuns(target.tower)).not.toEqual(runs);
   });
 
+  it("drops the room list when only a room's id changed under a repeated revision", () => {
+    const target = tower(5);
+    const fresh = tower(5);
+    // The office at 186 is the last unit, so a new one built where it stood
+    // takes its place in the array: same kind, floor, x and width, new id.
+    const old = fresh.tower.units[fresh.tower.units.length - 1];
+    expect([old.kind, old.floor, old.x]).toEqual(["office", 2, 186]);
+    fresh.tower.removeUnit(old.id);
+    expect(fresh.build("office", 2, 186).ok).toBe(true);
+    const replaced = fresh.tower.units[fresh.tower.units.length - 1];
+    expect(fresh.tower.units.length).toBe(target.tower.units.length);
+    expect([replaced.kind, replaced.floor, replaced.x, replaced.width]).toEqual([old.kind, old.floor, old.x, old.width]);
+    expect(replaced.id).not.toBe(old.id);
+    const rooms = roomUnits(target.tower);
+    mergeSimulation(target, Simulation.deserialize(fresh.serialize()), { revision: target.tower.revision, mealOverlayRevision: 0 });
+    expect(roomUnits(target.tower)).not.toBe(rooms);
+    expect(roomUnits(target.tower).map((u) => u.id)).toEqual(roomUnits(fresh.tower).map((u) => u.id));
+  });
+
   it("keeps the room list and structure runs over a merge that moved neither the revision nor the units", () => {
     const target = tower(5);
     const fresh = tower(5);

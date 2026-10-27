@@ -119,6 +119,20 @@ describe("structureRuns", () => {
     expect(structureRuns(sim.tower)).toEqual(first);
   });
 
+  it("rebuilds when a bulldoze and a build between two reads keep the unit count", () => {
+    const sim = Simulation.newGame(7, "classic");
+    sim.money = 1e9;
+    ensureStarterLobby(sim);
+    layTile(sim, "floor", 2, MID);
+    const [first, count] = [structureRuns(sim.tower), sim.tower.units.length];
+    sim.tower.removeUnit(sim.tower.unitAt(2, MID)?.id as number);
+    layTile(sim, "floor", 2, MID + 3);
+    expect(sim.tower.units.length, "only the revision tells the two towers apart").toBe(count);
+    const after = structureRuns(sim.tower);
+    expect(after).not.toBe(first);
+    expect(after.filter((r) => r.floor === 2)).toEqual([{ floor: 2, kind: "floor", x: MID + 3, width: 1, count: 1 }]);
+  });
+
   it("rebuilds when the same tower's unit array is replaced", () => {
     const sim = Simulation.newGame(7, "classic");
     ensureStarterLobby(sim);

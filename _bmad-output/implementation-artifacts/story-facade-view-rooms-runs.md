@@ -178,6 +178,11 @@ drops both.
     and `roomUnits` is warm only on the TypeScript host.
   - A test pins `isStructural` to exactly the floor and lobby kinds, and the
     fixture-dependent expectations now come from the fixture.
+- Independent review (CONDITIONAL GO on 8f37630e): a merge of `main` for a
+  conflict in `view.types.test.ts`, and two tests that pin key clauses a
+  mutant could drop: a bulldoze and a build between two reads that keep the
+  unit count (the runs' revision clause), and a merge where only a room's id
+  changes under a repeated revision (`unitsMoved`'s id compare).
 
 ### File List
 
