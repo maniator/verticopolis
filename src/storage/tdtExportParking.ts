@@ -8,6 +8,14 @@ import type { GatheredRoom } from "./tdtExportGather";
  * ramp on its own floor, so a lot full of orphan stalls exports 0, exactly what
  * the 1994 game could produce itself.
  */
+/** A stall's `x` as the sort reads it, NaN after every number. A forged `x`
+ *  can be any JSON value (a missing one is `undefined`), so it is converted
+ *  first: `undefined - 1` is NaN too. */
+const sortX = (x: unknown): number => {
+  const n = Number(x);
+  return Number.isNaN(n) ? Infinity : n;
+};
+
 export function connectedStallCount(rooms: readonly GatheredRoom[]): number {
   const byFloor = new Map<number, { x: number; w: number; ramp: boolean }[]>();
   for (const u of rooms) {
@@ -22,7 +30,10 @@ export function connectedStallCount(rooms: readonly GatheredRoom[]): number {
   }
   let connected = 0;
   for (const arr of byFloor.values()) {
-    arr.sort((a, b) => a.x - b.x);
+    // NaN sorts last, as in Rust (#887): a comparator that leaves NaN
+    // unordered is inconsistent, and the two sorts then order one list
+    // differently. `|| 0` settles Infinity against Infinity.
+    arr.sort((a, b) => sortX(a.x) - sortX(b.x) || 0);
     const linked = arr.map((it) => it.ramp);
     // Chains are one-dimensional: two sweeps settle flush adjacency.
     for (let i = 1; i < arr.length; i++) {
