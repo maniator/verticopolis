@@ -9,7 +9,7 @@ import { ShadowEngine } from "../dualrun/shadow";
 import { drainEngineBatch } from "./engineEvents";
 import { decodeFrame, decodeHeader, type FrameHeader, type FrameView } from "./frameView";
 import { appendEngineLog, applyRecords, checkRecords } from "./frameApply";
-import { setStepGate } from "./stepGate";
+import { setSaveText, setStepGate } from "./stepGate";
 import { mergeSimulation } from "./merge";
 import { adoptTelemetry, parseCommuteStress, type TelemetryDocument } from "./telemetry";
 import { useTowerCatalogSource } from "../engine/towerCatalog";
@@ -274,6 +274,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
         // A faulted tower never runs on TypeScript: its tick does nothing and
         // its save stays the newest restore point (temporary, with them).
         faulted ? () => Object.defineProperty(sim, "tick", { value: () => {}, configurable: true, writable: true }) : () => restoreOwn(sim, "serialize", ownSerialize),
+        faulted ? () => {} : () => setSaveText(sim, null),
         () => restoreOwn(sim, "drainGameplayEvents", ownDrain),
         () => restoreOwn(sim, "gameplayEventsDropped", ownDropped),
         () => sim.gameplayEvents.restore(handOff.events, handOff.dropped),
@@ -441,12 +442,10 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   const ownDropped = Object.getOwnPropertyDescriptor(sim, "gameplayEventsDropped");
   // Every save the game reads (an undo capture, an autosave, an export) is
   // a restore point at no extra cost, and one asked of a faulted host is the
-  // point the fallback goes back to.
-  const serializeHosted = () => {
-    const text = guard("other", readPoint, null);
-    return text === null ? points.newestSave() : JSON.parse(text);
-  };
-  Object.defineProperty(sim, "serialize", { value: serializeHosted, configurable: true, writable: true });
+  // point the fallback goes back to. An undo step takes the text itself.
+  const hostedText = (): string => guard("other", readPoint, null) ?? points.newestText();
+  Object.defineProperty(sim, "serialize", { value: () => JSON.parse(hostedText()), configurable: true, writable: true });
+  setSaveText(sim, hostedText);
   // A reference to the override kept past detach drains the instance, which
   // is the authority again, and never reaches the freed engine. The
   // analytics session's own flush releases the held events (`release`),

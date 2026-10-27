@@ -270,6 +270,20 @@ describe("startWasmHost", () => {
     handle.stop();
   });
 
+  it("passes on the promise an undo or a redo returns, and the capture's answer (slice 5)", () => {
+    const mod = fakeModule();
+    const restored = Promise.resolve();
+    const a = Object.assign(app(), { undo: () => restored, redo: () => restored, captureUndo: (label: string) => void label });
+    const handle = startWasmHost(a, mod, quiet());
+    try {
+      expect(a.undo()).toBe(restored);
+      expect(a.redo()).toBe(restored);
+      expect(a.captureUndo("Build")).toBeUndefined();
+    } finally {
+      handle.stop();
+    }
+  });
+
   it("stays stopped when the adopt stops the host", () => {
     const mod = fakeModule();
     const a = app();

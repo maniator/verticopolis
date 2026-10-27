@@ -26,7 +26,7 @@
 # src/audio/ import the engine for types only; the scan keeps them that way.
 src/analyticsEngineBridge.ts gameplayCatalog gameplayEventRules
 src/gallery.ts catalog facilities retailSubtypes
-src/game/appHistory.ts Simulation UndoHistory # moved from src/main.ts with the app's undo history (#874): no new engine import
+src/game/appHistory.ts UndoHistory # moved from src/main.ts with the app's undo history (#874): no new engine import
 src/game/editorActions.ts facilities sim/charges
 src/game/facilityDiagnostics.ts EconomySystem Simulation facilities residentialRentals sim/constants sim/gripe types
 src/game/frameLoop.ts sim/fixedStep timePacing
@@ -57,6 +57,7 @@ src/render/pixelSprites/food.ts Crowd
 src/render/pixelSprites/residential.ts Crowd
 src/render/sprites/facilities/venue.ts Crowd
 src/render/sprites/transport.ts facilities
+src/simport/tsLifecycle.ts Simulation UndoHistory sim/founderStatus # the TypeScript adapter's loads, saves and undo signature, its one runtime edge into the engine (facade slice 5, #1212); slice 10 loads it lazily, and it goes when the engine retires
 src/ui/templates/editor.ts facilities gameRules residentialRentals types
 src/ui/templates/inspector.ts facilities types
 src/ui/templates/stats.ts Ledger facilities types

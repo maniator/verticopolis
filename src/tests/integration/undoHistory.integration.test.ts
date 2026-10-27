@@ -3,6 +3,8 @@ import { newSeededGame } from "../fixtures/towerFixtures";
 import { UndoHistory, towerStateSig } from "../../engine/UndoHistory";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
+import { createAppHistory } from "../../game/appHistory";
+import { createTsSim } from "../../simport/tsSim";
 
 // A tiny in-memory "world" so the stack logic can be exercised with no
 // simulation at all — the snapshot is just the JSON of a single number.
@@ -13,6 +15,7 @@ function fakeHistory() {
     snapshot: () => JSON.stringify(world),
     restore: (s) => {
       world = JSON.parse(s) as { v: number };
+      return Promise.resolve();
     },
     signature: () => String(world.v),
     notify: (m) => notes.push(m),
@@ -20,22 +23,25 @@ function fakeHistory() {
   return { hist, notes, set: (v: number) => (world.v = v), get: () => world.v };
 }
 
+// The fake world fingerprints a snapshot as its number.
+const sigOf = (s: string) => String((JSON.parse(s) as { v: number }).v);
+
 describe("UndoHistory — stack semantics", () => {
-  it("commits a step only when the signature actually changed", () => {
+  it("commits a step only when the signature actually changed", async () => {
     const { hist, notes, set } = fakeHistory();
     hist.capture("noop");
     hist.commit(); // nothing changed → no step recorded
-    hist.undo();
+    await hist.undo();
     expect(notes[notes.length - 1]).toBe("Nothing to undo.");
 
     hist.capture("change");
     set(1);
     hist.commit(); // changed → one step
-    hist.undo();
+    await hist.undo();
     expect(notes[notes.length - 1]).toBe("Undid: change");
   });
 
-  it("undoes then redoes in order, restoring each snapshot", () => {
+  it("undoes then redoes in order, restoring each snapshot", async () => {
     const { hist, set, get } = fakeHistory();
     hist.capture("a");
     set(5);
@@ -44,34 +50,34 @@ describe("UndoHistory — stack semantics", () => {
     set(9);
     hist.commit();
     expect(get()).toBe(9);
-    hist.undo();
+    await hist.undo();
     expect(get()).toBe(5);
-    hist.undo();
+    await hist.undo();
     expect(get()).toBe(0);
-    hist.undo(); // nothing left — value stays put
+    await hist.undo(); // nothing left: the value stays put
     expect(get()).toBe(0);
-    hist.redo();
+    await hist.redo();
     expect(get()).toBe(5);
-    hist.redo();
+    await hist.redo();
     expect(get()).toBe(9);
   });
 
-  it("a fresh action invalidates the redo trail", () => {
+  it("a fresh action invalidates the redo trail", async () => {
     const { hist, notes, set, get } = fakeHistory();
     hist.capture("a");
     set(1);
     hist.commit();
-    hist.undo(); // back to 0, redo now available
+    await hist.undo(); // back to 0, redo now available
     expect(get()).toBe(0);
     hist.capture("b");
     set(2);
     hist.commit(); // fresh action clears redo
-    hist.redo();
+    await hist.redo();
     expect(notes[notes.length - 1]).toBe("Nothing to redo.");
     expect(get()).toBe(2);
   });
 
-  it("caps the trail at 40 steps", () => {
+  it("caps the trail at 40 steps", async () => {
     const { hist, set, get } = fakeHistory();
     for (let i = 1; i <= 45; i++) {
       hist.capture(`s${i}`);
@@ -83,7 +89,7 @@ describe("UndoHistory — stack semantics", () => {
     let undos = 0;
     let prev = get();
     for (;;) {
-      hist.undo();
+      await hist.undo();
       if (get() === prev) break;
       prev = get();
       undos++;
@@ -91,20 +97,50 @@ describe("UndoHistory — stack semantics", () => {
     expect(undos).toBe(40);
   });
 
-  it("clear() drops the whole trail (a different tower must not be undoable)", () => {
+  it("clear() drops the whole trail (a different tower must not be undoable)", async () => {
     const { hist, notes, set, get } = fakeHistory();
     hist.capture("a");
     set(7);
     hist.commit();
     hist.clear();
-    hist.undo();
+    await hist.undo();
     expect(notes[notes.length - 1]).toBe("Nothing to undo.");
     expect(get()).toBe(7); // no restore happened
+  });
+  it("starts each restore inside its call, says the notice once it settles, and none when it fails (slice 5)", async () => {
+    let world = { v: 0 };
+    const notes: string[] = [];
+    let fail = false;
+    const hist = new UndoHistory({
+      snapshot: () => JSON.stringify(world),
+      restore: (s) => {
+        if (fail) return Promise.reject(new Error("no load"));
+        world = JSON.parse(s) as { v: number };
+        return Promise.resolve();
+      },
+      signature: () => String(world.v),
+      notify: (m) => notes.push(m),
+    });
+    hist.capture("a");
+    world.v = 1;
+    hist.commit();
+    hist.capture("b");
+    world.v = 2;
+    hist.commit();
+    // Two undos in one task pop two steps, in order, before either settles.
+    const first = hist.undo();
+    const second = hist.undo();
+    expect(world.v).toBe(0);
+    expect(notes).toEqual([]);
+    await Promise.all([first, second]);
+    expect(notes).toEqual(["Undid: b", "Undid: a"]);
+    fail = true;
+    await expect(hist.redo()).rejects.toThrow("no load");
+    expect(notes).toEqual(["Undid: b", "Undid: a"]);
   });
 });
 
 describe("UndoHistory.dropUnchanged (#874)", () => {
-  // The fake world fingerprints a snapshot as its number.
   function withSigOf() {
     let world = { v: 0 };
     const notes: string[] = [];
@@ -112,9 +148,9 @@ describe("UndoHistory.dropUnchanged (#874)", () => {
       snapshot: () => JSON.stringify(world),
       restore: (s) => {
         world = JSON.parse(s) as { v: number };
+        return Promise.resolve();
       },
       signature: () => String(world.v),
-      signatureOf: (s) => String((JSON.parse(s) as { v: number }).v),
       notify: (m) => notes.push(m),
     });
     return { hist, notes, set: (v: number) => (world.v = v) };
@@ -126,7 +162,7 @@ describe("UndoHistory.dropUnchanged (#874)", () => {
     return [...stacks.undoStack, ...stacks.redoStack].filter((e) => e.cleared).length;
   }
 
-  it("drops the newest steps that would change nothing now, and keeps the rest", () => {
+  it("drops the newest steps that would change nothing now, and keeps the rest", async () => {
     const { hist, notes, set } = withSigOf();
     hist.capture("a");
     set(1);
@@ -136,14 +172,14 @@ describe("UndoHistory.dropUnchanged (#874)", () => {
     hist.commit();
     // A fallback put the world back to the state "b" captured, before "b".
     set(1);
-    hist.dropUnchanged();
-    hist.undo();
+    hist.dropUnchanged(sigOf);
+    await hist.undo();
     expect(notes).toEqual(["Undid: a"]);
-    hist.undo();
+    await hist.undo();
     expect(notes[notes.length - 1]).toBe("Nothing to undo.");
   });
 
-  it("drops a redo step that would redo nothing, and keeps one that would not", () => {
+  it("drops a redo step that would redo nothing, and keeps one that would not", async () => {
     let world = { v: 0 };
     // A frozen host's snapshot answers with its newest restore point.
     let point: string | null = null;
@@ -152,9 +188,9 @@ describe("UndoHistory.dropUnchanged (#874)", () => {
       snapshot: () => point ?? JSON.stringify(world),
       restore: (s) => {
         world = JSON.parse(s) as { v: number };
+        return Promise.resolve();
       },
       signature: () => String(world.v),
-      signatureOf: (s) => String((JSON.parse(s) as { v: number }).v),
       notify: (m) => notes.push(m),
     });
     hist.capture("a");
@@ -163,9 +199,9 @@ describe("UndoHistory.dropUnchanged (#874)", () => {
     // The undo's own snapshot traps: its redo step is the point, the state
     // before "a", which is where the undo goes.
     point = JSON.stringify({ v: 0 });
-    hist.undo();
-    hist.dropUnchanged();
-    hist.redo();
+    await hist.undo();
+    hist.dropUnchanged(sigOf);
+    await hist.redo();
     expect(notes).toEqual(["Undid: a", "Nothing to redo."]);
     // A point from after "a" redoes it.
     point = null;
@@ -173,14 +209,14 @@ describe("UndoHistory.dropUnchanged (#874)", () => {
     world.v = 2;
     hist.commit();
     point = JSON.stringify({ v: 2 });
-    hist.undo();
-    hist.dropUnchanged();
-    hist.redo();
+    await hist.undo();
+    hist.dropUnchanged(sigOf);
+    await hist.redo();
     expect(notes.slice(2)).toEqual(["Undid: b", "Redid: b"]);
     expect(world.v).toBe(2);
   });
 
-  it("fingerprints a gesture's capture again from its own snapshot, so a release after the fallback leaves no empty step", () => {
+  it("fingerprints a gesture's capture again from its own snapshot, so a release after the fallback leaves no empty step", async () => {
     let world = { v: 0 };
     // A frozen host's snapshot answers with its newest restore point.
     let point: string | null = null;
@@ -189,9 +225,9 @@ describe("UndoHistory.dropUnchanged (#874)", () => {
       snapshot: () => point ?? JSON.stringify(world),
       restore: (s) => {
         world = JSON.parse(s) as { v: number };
+        return Promise.resolve();
       },
       signature: () => String(world.v),
-      signatureOf: (s) => String((JSON.parse(s) as { v: number }).v),
       notify: (m) => notes.push(m),
     });
     hist.capture("a");
@@ -203,45 +239,45 @@ describe("UndoHistory.dropUnchanged (#874)", () => {
     hist.capture("b");
     point = null;
     world.v = 0; // the fallback goes back to that point
-    expect(hist.dropUnchanged()).toBe(1);
+    expect(hist.dropUnchanged(sigOf)).toBe(1);
     hist.commit(); // the release, with nothing done since
-    hist.undo();
+    await hist.undo();
     expect(notes).toEqual(["Nothing to undo."]);
     // A capture that read the tower itself keeps its fingerprint, so what
     // the gesture does after the tidy is one step.
     hist.capture("c");
     world.v = 2;
-    expect(hist.dropUnchanged()).toBe(0);
+    expect(hist.dropUnchanged(sigOf)).toBe(0);
     hist.commit();
-    hist.undo();
+    await hist.undo();
     expect(notes.slice(1)).toEqual(["Undid: c"]);
     expect(world.v).toBe(0);
   });
 
-  it("puts back the redo steps a dropped step's commit cleared, while the hold is on", () => {
+  it("puts back the redo steps a dropped step's commit cleared, while the hold is on", async () => {
     const { hist, notes, set } = withSigOf();
     hist.holdClearedRedo = true;
     hist.capture("a");
     set(1);
     hist.commit();
-    hist.undo(); // a redo trail: "a"
+    await hist.undo(); // a redo trail: "a"
     hist.capture("b");
     set(2);
     hist.commit(); // clears it, and holds it with "b"
     set(0); // a fallback put the world back to the state "b" captured
-    expect(hist.dropUnchanged()).toBe(1);
-    hist.redo();
+    expect(hist.dropUnchanged(sigOf)).toBe(1);
+    await hist.redo();
     expect(notes).toEqual(["Undid: a", "Redid: a"]);
     expect(notes).toHaveLength(2);
   });
 
-  it("puts back the cleared redo steps under two dropped steps", () => {
+  it("puts back the cleared redo steps under two dropped steps", async () => {
     const { hist, notes, set } = withSigOf();
     hist.holdClearedRedo = true;
     hist.capture("a");
     set(1);
     hist.commit();
-    hist.undo();
+    await hist.undo();
     hist.capture("b");
     set(2);
     hist.commit(); // holds the "a" redo step
@@ -251,65 +287,65 @@ describe("UndoHistory.dropUnchanged (#874)", () => {
     set(3);
     hist.commit();
     set(0); // the fallback goes back to that point
-    expect(hist.dropUnchanged()).toBe(2);
-    hist.redo();
+    expect(hist.dropUnchanged(sigOf)).toBe(2);
+    await hist.redo();
     expect(notes).toEqual(["Undid: a", "Redid: a"]);
   });
 
-  it("forgets the held redo steps when the player undoes the step that holds them", () => {
+  it("forgets the held redo steps when the player undoes the step that holds them", async () => {
     const { hist, notes, set } = withSigOf();
     hist.holdClearedRedo = true;
     hist.capture("a");
     set(1);
     hist.commit();
-    hist.undo();
+    await hist.undo();
     hist.capture("b");
     set(2);
     hist.commit();
     expect(heldTrails(hist)).toBe(1);
-    hist.undo();
+    await hist.undo();
     expect(heldTrails(hist)).toBe(0); // the undone step's trail goes with it
-    expect(hist.dropUnchanged()).toBe(0);
-    hist.redo();
-    hist.redo();
+    expect(hist.dropUnchanged(sigOf)).toBe(0);
+    await hist.redo();
+    await hist.redo();
     expect(notes).toEqual(["Undid: a", "Undid: b", "Redid: b", "Nothing to redo."]);
   });
 
-  it("holds one cleared trail at a time: a later commit that clears a trail lets the older one go", () => {
+  it("holds one cleared trail at a time: a later commit that clears a trail lets the older one go", async () => {
     const { hist, notes, set } = withSigOf();
     hist.holdClearedRedo = true;
     hist.capture("a");
     set(1);
     hist.commit();
-    hist.undo(); // a redo trail: "a"
+    await hist.undo(); // a redo trail: "a"
     hist.capture("b");
     set(2);
     hist.commit(); // holds the "a" redo step
     hist.capture("c");
     set(3);
     hist.commit();
-    hist.undo(); // a redo trail: "c"
+    await hist.undo(); // a redo trail: "c"
     hist.capture("d");
     set(4);
     hist.commit(); // holds the "c" redo step, and lets "a" go
     expect(heldTrails(hist)).toBe(1);
-    hist.undo();
+    await hist.undo();
     // Put the world back to before "b" by hand: no fallback reaches that far
     // back, since the undo of "c" read a point after "b".
     set(0);
-    expect(hist.dropUnchanged()).toBe(1);
-    hist.redo();
-    hist.redo();
+    expect(hist.dropUnchanged(sigOf)).toBe(1);
+    await hist.redo();
+    await hist.redo();
     expect(notes).toEqual(["Undid: a", "Undid: c", "Undid: d", "Redid: d", "Nothing to redo."]);
   });
 
-  it("lets the held trail go when the hold turns off", () => {
+  it("lets the held trail go when the hold turns off", async () => {
     const { hist, notes, set } = withSigOf();
     hist.holdClearedRedo = true;
     hist.capture("a");
     set(1);
     hist.commit();
-    hist.undo();
+    await hist.undo();
     hist.capture("b");
     set(2);
     hist.commit(); // holds the "a" redo step
@@ -317,45 +353,34 @@ describe("UndoHistory.dropUnchanged (#874)", () => {
     expect(hist.holdClearedRedo).toBe(false);
     expect(heldTrails(hist)).toBe(0);
     set(0);
-    expect(hist.dropUnchanged()).toBe(1);
-    hist.redo();
+    expect(hist.dropUnchanged(sigOf)).toBe(1);
+    await hist.redo();
     expect(notes).toEqual(["Undid: a", "Nothing to redo."]);
   });
 
-  it("clears the redo trail for good while the hold is off, as main does", () => {
+  it("clears the redo trail for good while the hold is off, as main does", async () => {
     const { hist, notes, set } = withSigOf();
     hist.capture("a");
     set(1);
     hist.commit();
-    hist.undo();
+    await hist.undo();
     hist.capture("b");
     set(2);
     hist.commit();
     set(0);
-    expect(hist.dropUnchanged()).toBe(1);
-    hist.redo();
+    expect(hist.dropUnchanged(sigOf)).toBe(1);
+    await hist.redo();
     expect(notes).toEqual(["Undid: a", "Nothing to redo."]);
   });
 
-  it("keeps every step when the world differs from the newest one", () => {
+  it("keeps every step when the world differs from the newest one", async () => {
     const { hist, notes, set } = withSigOf();
     hist.capture("a");
     set(1);
     hist.commit();
     set(5);
-    hist.dropUnchanged();
-    hist.undo();
-    expect(notes).toEqual(["Undid: a"]);
-  });
-
-  it("does nothing without a way to fingerprint a snapshot", () => {
-    const { hist, notes, set } = fakeHistory();
-    hist.capture("a");
-    set(1);
-    hist.commit();
-    set(0);
-    hist.dropUnchanged();
-    hist.undo();
+    hist.dropUnchanged(sigOf);
+    await hist.undo();
     expect(notes).toEqual(["Undid: a"]);
   });
 });
@@ -442,13 +467,14 @@ describe("towerStateSig", () => {
 });
 
 describe("UndoHistory + Simulation — round-trip", () => {
-  it("restores the exact serialized sim on undo", () => {
+  it("restores the exact serialized sim on undo", async () => {
     let sim = newSeededGame(7);
     const notes: string[] = [];
     const hist = new UndoHistory({
       snapshot: () => JSON.stringify(sim.serialize()),
       restore: (s) => {
         sim = Simulation.deserialize(JSON.parse(s));
+        return Promise.resolve();
       },
       signature: () => towerStateSig(sim.tower, sim.money),
       notify: (m) => notes.push(m),
@@ -461,32 +487,25 @@ describe("UndoHistory + Simulation — round-trip", () => {
     hist.commit();
     expect(sim.serialize()).not.toEqual(before); // mutated
 
-    hist.undo();
+    await hist.undo();
     expect(sim.serialize()).toEqual(before); // restored exactly
     expect(notes[notes.length - 1]).toBe("Undid: Build");
   });
 
-  it("undo of a build preserves a bridging toggle changed afterward (a setting, not a build step)", () => {
-    // Mirrors GameApp.adoptSim's preserveHistory path: the restore carries the
-    // live autoBridge across, so undoing a BUILD never silently flips a Settings
+  it("undo of a build preserves a bridging toggle changed afterward (a setting, not a build step)", async () => {
+    // The app's history through the port: a `history` load carries the live
+    // autoBridge across, so undoing a BUILD never silently flips a Settings
     // toggle the player changed after that build (Codex P2).
     let sim = Simulation.newGame(3, "modern", "realWorld");
-    const hist = new UndoHistory({
-      snapshot: () => JSON.stringify(sim.serialize()),
-      restore: (s) => {
-        const autoBridge = sim.autoBridge;
-        sim = Simulation.deserialize(JSON.parse(s));
-        sim.autoBridge = autoBridge;
-      },
-      signature: () => towerStateSig(sim.tower, sim.money),
-      notify: () => {},
-    });
+    const port = createTsSim(() => sim, { adopt: (next) => void (sim = next) });
+    const hist = createAppHistory({ port, ui: { toast: () => {} } });
     const cx = Math.floor(GRID.width / 2);
     hist.capture("Build"); // snapshot taken while bridging is on
     expect(sim.tower.place("lobby", 1, cx).ok).toBe(true); // ground lobby: the first valid placement
     hist.commit();
     sim.autoBridge = false; // player turns bridging off AFTER the build
-    hist.undo();
+    await hist.undo();
+    expect(sim.tower.unitAt(1, cx)).toBeUndefined(); // the build is undone
     expect(sim.autoBridge).toBe(false); // preserved, not reverted to the snapshot's on
   });
 });

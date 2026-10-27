@@ -31,9 +31,11 @@ function app(sim: Simulation): WasmHostApp & { adopted: Simulation[]; undoSnapsh
     },
     undo() {
       a.undoSnapshots.push(a.sim.serialize());
+      return Promise.resolve();
     },
     redo() {
       a.undoSnapshots.push(a.sim.serialize());
+      return Promise.resolve();
     },
   };
   return a;

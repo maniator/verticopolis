@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { fakeModule } from "./fakeEngine.fixture";
+import { signatureOfSave } from "./hostFault";
 import { startWasmHost, type WasmHostApp, type WasmHostOptions } from "./startWasmHost";
 
 /**
@@ -8,7 +9,7 @@ import { startWasmHost, type WasmHostApp, type WasmHostOptions } from "./startWa
  * told on every path, and what the app is asked to do.
  */
 
-function app(): WasmHostApp & { adopted: Simulation[]; dropped: number; steps: number; holds: boolean[]; cleared: number } {
+function app(): WasmHostApp & { adopted: Simulation[]; dropped: number; steps: number; holds: boolean[]; cleared: number; sigOf: unknown } {
   const a = {
     sim: Simulation.newGame(3, "classic"),
     adopted: [] as Simulation[],
@@ -22,8 +23,11 @@ function app(): WasmHostApp & { adopted: Simulation[]; dropped: number; steps: n
       a.sim = next;
       a.adopted.push(next);
     },
-    dropEmptyUndo() {
+    /** The fingerprint the last tidy was handed. */
+    sigOf: null as unknown,
+    dropEmptyUndo(sigOf: (snap: string) => string) {
       a.dropped++;
+      a.sigOf = sigOf;
       return a.steps;
     },
     holdClearedRedo(on: boolean) {
@@ -59,6 +63,7 @@ describe("the recovery after a fault (#874)", () => {
       expect(a.adopted).toHaveLength(1);
       expect(lastLine(a.sim)).toEqual(expect.objectContaining({ text: "The Rust engine stopped, so the tower went back to its last good state and runs on the TypeScript engine.", kind: "bad" }));
       expect(a.dropped).toBe(1);
+      expect(a.sigOf, "the tidy fingerprints a step's save as the port reads a tower").toBe(signatureOfSave);
       expect(handle.status.restorePoint).toEqual({ point: "attach", skipped: 0 });
       expect(a.cleared).toBe(0);
     } finally {

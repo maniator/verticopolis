@@ -6,7 +6,7 @@ import { ENGINE_DIR, ENGINE_GLUE } from "./enginePackageNames";
 import { EngineBootError, type FallbackReason, type FallbackStage } from "./engineBoot";
 import { loadEngineModule, type LoadEngineOptions } from "./loadEngineModule";
 import { recordHostError, type HostErrors } from "./hostErrors";
-import { isEngineTrap, type FaultContext, type HostFault, type RestoredPoint } from "./hostFault";
+import { isEngineTrap, signatureOfSave, type FaultContext, type HostFault, type RestoredPoint } from "./hostFault";
 import { towerStateSig } from "../engine/UndoHistory";
 
 /** What a player can change and see: the undo signature (rooms, transports,
@@ -87,17 +87,18 @@ export interface WasmHostApp {
   sim: Simulation;
   adoptSim(sim: Simulation, preserveHistory?: boolean): void;
   /** The app's undo and redo, when it has them: wrapped so that a fault
-   *  inside one is coded `trap-undo`. */
-  undo?(): void;
-  redo?(): void;
+   *  inside one is coded `trap-undo`. The restore starts inside the call,
+   *  and the wrapper passes on the promise it returns. */
+  undo?(): Promise<void>;
+  redo?(): Promise<void>;
   /** The undo capture before an edit gesture: wrapped so that a fault in
    *  its save is coded `trap-command`. */
   captureUndo?(label: string): void;
   /** Drop the undo and redo steps that would change nothing on the tower
    *  the recovery adopted (the lost change's), when the app keeps a
-   *  history, and answer how many went. Temporary, with the re-adoption on
-   *  TypeScript. */
-  dropEmptyUndo?(): number;
+   *  history, and answer how many went. `sigOf` fingerprints a step's
+   *  snapshot. Temporary, with the re-adoption on TypeScript. */
+  dropEmptyUndo?(sigOf: (snap: string) => string): number;
   /** Keep the redo steps an edit clears while a fallback can still take
    *  that edit away, so the tidy can put them back. Temporary, with the
    *  re-adoption on TypeScript. */
@@ -267,7 +268,7 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
   // answers how many went.
   const tidyHistory = (): number => {
     try {
-      return app.dropEmptyUndo?.() ?? 0;
+      return app.dropEmptyUndo?.(signatureOfSave) ?? 0;
     } catch (e) {
       noteError(`tidying the undo trail: ${e instanceof Error ? e.message : String(e)}`);
       return 0;
@@ -425,14 +426,14 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
   // above 0, so a fault in its save is coded `trap-command`.
   const ownHistory = (["undo", "redo", "captureUndo"] as const).map((name) => {
     const own = Object.getOwnPropertyDescriptor(app, name);
-    const run = app[name] as ((this: WasmHostApp, ...args: unknown[]) => void) | undefined;
+    const run = app[name] as ((this: WasmHostApp, ...args: unknown[]) => unknown) | undefined;
     if (typeof run === "function") {
       const capture = name === "captureUndo";
-      const wrapped = function (this: WasmHostApp, ...args: unknown[]): void {
+      const wrapped = function (this: WasmHostApp, ...args: unknown[]): unknown {
         if (capture) captureDepth++;
         else undoDepth++;
         try {
-          run.apply(this, args);
+          return run.apply(this, args);
         } finally {
           if (capture) captureDepth--;
           else undoDepth--;

@@ -1,9 +1,9 @@
 import type { GameplayEvent } from "../engine/gameplayEventBuffer";
 import type { Simulation } from "../engine/Simulation";
-import { settleEngine, stepGate } from "../wasmhost/stepGate";
 import type { Command, CommandOp, CommandResult, CommandResults } from "./commands";
 import type { SimPort } from "./port";
 import { queryKey, type Query, type QueryOp, type QueryResult, type QueryResults } from "./queries";
+import { createTsLifecycle, type TsSimOptions } from "./tsLifecycle";
 import type { HeaderView, SimView } from "./view";
 
 /**
@@ -26,10 +26,11 @@ import type { HeaderView, SimView } from "./view";
  * issue order is execution order. A throw from the instance rejects the
  * promise with that error.
  *
- * Engine types come in through `import type` only, so this module adds no
- * runtime edge into `src/engine/`.
+ * Loads, saves and the undo signature live in `tsLifecycle.ts`, the
+ * adapter's one runtime edge into `src/engine/`; this module takes engine
+ * types through `import type` only.
  */
-export function createTsSim(getSim: () => Simulation): SimPort {
+export function createTsSim(getSim: () => Simulation, opts: TsSimOptions = {}): SimPort {
   // Kept per tower, so a swap starts with none and a replaced tower is not
   // held alive by its answers.
   const answers = new WeakMap<Simulation, Answers>();
@@ -49,8 +50,16 @@ export function createTsSim(getSim: () => Simulation): SimPort {
       return getSim().crowd;
     },
   };
+  const life = createTsLifecycle(getSim, opts);
   return {
     view,
+    get generation() {
+      return life.generation;
+    },
+    load: life.load,
+    save: life.save,
+    saveNow: life.saveNow,
+    undoSignature: life.undoSignature,
     tick(dtMinutes) {
       getSim().tick(dtMinutes);
     },
@@ -81,18 +90,6 @@ export function createTsSim(getSim: () => Simulation): SimPort {
     cached<Q extends Query>(q: Q): QueryResult<Q> | undefined {
       return answersFor(getSim()).get(q);
     },
-    save() {
-      try {
-        const sim = getSim();
-        // A host that steps in the background (the experimental worker and
-        // coalesced hosts) registers a step gate; without one the save is
-        // taken now, so it holds exactly what was issued before it.
-        if (!stepGate(sim)) return Promise.resolve(JSON.stringify(sim.serialize()));
-        return settledSave(getSim);
-      } catch (e) {
-        return Promise.reject(e);
-      }
-    },
     drainEvents(opts?: { release?: boolean }): GameplayEvent[] {
       // The WASM host's drain takes `release`; the instance's own ignores it.
       const source: EventSource = getSim();
@@ -106,17 +103,6 @@ export function createTsSim(getSim: () => Simulation): SimPort {
  *  `release`. */
 interface EventSource {
   drainGameplayEvents(opts?: { release?: boolean }): GameplayEvent[];
-}
-
-/** The save of a host that steps in the background, once it has caught up
- *  (as `saveLoad.ts`'s autosave waits). A tower adopted during the wait is
- *  not the one asked for, so the wait starts again on the tower held now. */
-async function settledSave(getSim: () => Simulation): Promise<string> {
-  for (;;) {
-    const sim = getSim();
-    await settleEngine(sim);
-    if (getSim() === sim) return JSON.stringify(sim.serialize());
-  }
 }
 
 /** The header as one object: the scalars copied, `population` computed on

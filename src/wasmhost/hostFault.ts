@@ -1,4 +1,5 @@
 import { Simulation } from "../engine/Simulation";
+import { towerStateSig } from "../engine/UndoHistory";
 
 /**
  * The runtime fallback's state (#874; spec-874-runtime-fallback.md): what a
@@ -9,7 +10,7 @@ import { Simulation } from "../engine/Simulation";
  * host infrastructure that stays once the TypeScript simulation retires: a
  * Rust-only build still has to freeze the engine and stop cleanly (the
  * strict path), and a frozen tower's save still answers with the newest
- * engine-written save (`RestorePoints.newestSave`, without its TypeScript
+ * engine-written save (`RestorePoints.newestText`, without its TypeScript
  * load check). The rest of the restore points and `carryLiveState` exist
  * only to re-adopt a tower on the TypeScript engine, which is temporary
  * compatibility code: the TypeScript-engine retirement removes them.
@@ -194,7 +195,7 @@ export interface RestoredPoint {
  * events between the two again; the recovery records the point it loaded
  * and says so (#1126).
  *
- * Temporary compatibility code, but for `newestSave`: the points exist to
+ * Temporary compatibility code, but for `newestText`: the points exist to
  * re-adopt a tower on the TypeScript engine, and go when the TypeScript
  * simulation retires. The strict path keeps the newest save a frozen tower
  * answers with (see the module note).
@@ -262,9 +263,14 @@ export class RestorePoints {
    *  Checked once; throws when no point loads, which cannot happen while a
    *  merge's save or the attach save is kept (TypeScript loaded the one and
    *  wrote the other), and one always is. */
-  newestSave(): unknown {
+  newestText(): string {
     if (this.chosen === null) this.restore();
-    return JSON.parse((this.chosen as { text: string }).text);
+    return (this.chosen as { text: string }).text;
+  }
+
+  /** {@link newestText}, parsed. */
+  newestSave(): unknown {
+    return JSON.parse(this.newestText());
   }
 
   /** The point the faulted host's saves answer with, once a save or the
@@ -279,10 +285,12 @@ export class RestorePoints {
 /** Live state no save carries, from the read model the fault froze to the
  *  fresh tower: the elevator telemetry and yesterday's housekeeping result
  *  (both last merged at the hour pass), the commute-stress averages (last
- *  synced at the faulted frame), and the title screen backdrop's mark, so
- *  its events are still left behind when the player's tower takes over.
- *  Telemetry for a car the fresh tower does not have is left behind. Each
- *  part is best effort: a fresh tower without one beats no fallback. */
+ *  synced at the faulted frame), the title screen backdrop's mark, so its
+ *  events are still left behind when the player's tower takes over, and the
+ *  bridging setting, which a restore point may hold from before the player
+ *  last switched it (an undo keeps the live one the same way). Telemetry for
+ *  a car the fresh tower does not have is left behind. Each part is best
+ *  effort: a fresh tower without one beats no fallback. */
 export function carryLiveState(from: Simulation, to: Simulation): void {
   const shafts = to.tower.transportsById;
   const parts = [
@@ -296,6 +304,9 @@ export function carryLiveState(from: Simulation, to: Simulation): void {
     () => {
       to.gameplayEvents.discardOnHandOff = from.gameplayEvents.discardOnHandOff;
     },
+    () => {
+      to.autoBridge = from.autoBridge;
+    },
   ];
   for (const part of parts) {
     try {
@@ -304,4 +315,13 @@ export function carryLiveState(from: Simulation, to: Simulation): void {
       // The fresh tower keeps its own.
     }
   }
+}
+
+/** The undo signature of a save's tower, the way the port's
+ *  `undoSignature` reads a live TypeScript tower, for the recovery's tidy of
+ *  the undo trail (`UndoHistory.dropUnchanged`). Temporary, with the
+ *  fallback. */
+export function signatureOfSave(text: string): string {
+  const sim = Simulation.deserialize(JSON.parse(text));
+  return towerStateSig(sim.tower, sim.money);
 }
