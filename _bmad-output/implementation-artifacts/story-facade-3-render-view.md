@@ -297,5 +297,18 @@ Slice 3 adds the `view.ts` lines, the `TsSim` fills and assertions in its own fi
 - `towerPopulation.test.ts` pins the read count: one read for 120 frames in a
   step, one more per step, one more after a paused edit, one more for a
   replaced tower.
-- The loop binding later takes `population` from the once-per-frame header
-  instead; the memo then goes away with the engine handle.
+- Deviation from criterion 3 as first written ("from the step's header or a
+  value the adapter memoizes per step"): the memo lives on the render side over
+  the live instance, because `main.ts` still passes the `Simulation`. It goes
+  away when the loop binding hands the renderer a header that is built once per
+  step (not per frame: `readHeader` walks the rooms once per header object, so
+  a header built every frame would bring #1234 back).
+- Bounded lag, documented beside the cache: the key is the clock minute and
+  the revision, so the count can trail unit-state changes that move neither (the
+  worker host's minute runs ahead of the step's reply; a declined bomb threat
+  guts rooms with no step). The next step corrects it; the gate it feeds is
+  cosmetic and saturates at 350.
+- Deferred with rows: at top speed a step runs every frame so the memo misses
+  every frame (`population-memo-top-speed`, #1335), and `emitMealRushes` in
+  `frameLoop.ts` walks the rooms every frame (`meal-rush-population-per-frame`,
+  #1334).
