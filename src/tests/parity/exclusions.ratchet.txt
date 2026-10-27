@@ -22,6 +22,7 @@ src/tests/integration/modernEconomy.integration.test.ts itTypeScriptOnly=2 atEng
 src/tests/integration/parity.integration.test.ts itTypeScriptOnly=1 atEngineFrameCadence=0 onWasmParityProject=0
 src/tests/integration/personRoundTrip.integration.test.ts itTypeScriptOnly=2 atEngineFrameCadence=0 onWasmParityProject=0
 src/tests/integration/phase2.integration.test.ts itTypeScriptOnly=2 atEngineFrameCadence=0 onWasmParityProject=0
+src/tests/integration/roomCounts.integration.test.ts itTypeScriptOnly=1 atEngineFrameCadence=0 onWasmParityProject=0
 src/tests/integration/segmentRoutingReachable.integration.test.ts itTypeScriptOnly=3 atEngineFrameCadence=0 onWasmParityProject=0
 src/tests/integration/simulation.integration.test.ts itTypeScriptOnly=1 atEngineFrameCadence=0 onWasmParityProject=0
 src/tests/integration/storage.integration.test.ts itTypeScriptOnly=5 atEngineFrameCadence=0 onWasmParityProject=0
