@@ -25,7 +25,6 @@ const COMPUTED_IMPORT_ALLOWED = new Set([
   "src/tests/perfCompare/page.ts",
   "src/tests/perfCompare/pageSim.ts",
   "src/tests/perfCompare/nodeCheck.ts",
-  "src/tests/perfWorker/pageWorker.ts",
 ]);
 
 /** The unchecked loaders in engineLoad.ts (each fetches or imports the package on its own), and who may name them. */

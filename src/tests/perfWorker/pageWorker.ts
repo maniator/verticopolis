@@ -277,19 +277,17 @@ export function framesRun(arg: { windowMs: number; warmMs: number; speed: number
 }
 
 /** Memory of the hosted tower: the main thread's WASM linear memory
- *  (main-thread hosts, read through the app's own module) or the worker's
+ *  (main-thread hosts, read from the instance the probe kept) or the worker's
  *  (the worker host's last reply). The JS heaps and the process PSS come
  *  from the runner (which drops the harness's stashed saves before it reads the heap). It also drops them here, so
  *  they are not counted as the game's. */
-export async function engineMemory(arg: { engineUrl: string }): Promise<{ mainWasmBytes: number | null; workerWasmBytes: number | null }> {
+export function engineMemory(): { mainWasmBytes: number | null; workerWasmBytes: number | null } {
   const w = window as any;
   w.__perfStash = {};
   const h = w.__vcEngine;
   if (!h?.status?.hosted) return { mainWasmBytes: null, workerWasmBytes: null };
   if (h.status.placement === "worker") return { mainWasmBytes: null, workerWasmBytes: h.current().stats.workerMemoryBytes ?? null };
-  const before = w.__perfMarks?.wasmInstantiateCalls ?? 0;
-  const mod = await import(/* @vite-ignore */ arg.engineUrl);
-  const exports = await mod.default();
-  if ((w.__perfMarks?.wasmInstantiateCalls ?? 0) !== before || before === 0) throw new Error("the WASM memory read did not reach the instance the app booted");
-  return { mainWasmBytes: (exports.memory as WebAssembly.Memory).buffer.byteLength, workerWasmBytes: null };
+  const memory = w.__perfWasmMemory as WebAssembly.Memory | undefined;
+  if (!memory) throw new Error("the WASM memory read found no instance the app booted");
+  return { mainWasmBytes: memory.buffer.byteLength, workerWasmBytes: null };
 }

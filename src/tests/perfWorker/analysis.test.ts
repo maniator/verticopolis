@@ -175,7 +175,7 @@ describe("perf:worker analysis", () => {
     // M4 is gated by a paired difference, so its gate cell carries no ratio or verdict.
     const blocking = (mode: "ts" | "wasm") => metrics.find((m) => m.scenario === "small" && m.throttle === "1" && m.metric.startsWith("main-thread blocking") && m.mode === mode)!;
     expect(cells("main-thread blocking")[4]).toBe(differenceCell(blocking("wasm"), blocking("ts")));
-    expect(cells("main-thread blocking")[4]).toMatch(/pairs \(wasm minus ts\)(, .+)?$/);
+    expect(cells("main-thread blocking")[4]).toMatch(/6 pairs \(wasm minus ts\), below the gate.s minimum of 10 pairs$/);
     // Every table row has as many cells as its header and delimiter row, with or without the extra ratio columns.
     const countCells = (l: string) => l.replace(/\\\|/g, "").split("|").length;
     const rectangular = (text: string) => {
