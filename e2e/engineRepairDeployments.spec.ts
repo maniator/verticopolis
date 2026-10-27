@@ -9,11 +9,11 @@ import { expectControlledWithEngine, hostedGame, installWorker, lobbyAt } from "
 /**
  * Repair engine files next to a save, a lost connection and a second tab (#985,
  * design 6.2 spec 8). Repair writes only the running build's three engine keys
- * and never touches anything else, so a save stays, and another tab keeps
- * keeps its own engine until it reloads. A stop screen with a build waiting does not
- * wait for Repair: it takes the build at once. It runs on the two-deployment
- * server (deployments.ts), on the wasm-only build, where the stop screen with
- * the Repair action exists.
+ * and never touches anything else, so a save stays, and another tab keeps its
+ * own engine until it reloads. A stop screen with a build waiting does not wait
+ * for Repair: it takes the build at once. It runs on the two-deployment server
+ * (deployments.ts), on the wasm-only build, where the stop screen with the
+ * Repair action exists.
  */
 test.beforeEach(({}, info) => test.skip(info.project.name !== WASM_ONLY_PROJECT, "the stop screen exists on the wasm-only build"));
 test.setTimeout(240_000);
