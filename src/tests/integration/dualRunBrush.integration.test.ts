@@ -40,10 +40,11 @@ describe.skipIf(!hasWasmPackage())("dual run: the brush", () => {
       brush("floor", floor, span(202, 206));
     }
     brush("floor", 15, span(170, 200));
-    // Upgrades of plain floor, a bare tile on supported ground with a bridge
-    // to it, a repeated column and a tile with nothing under it.
+    // Upgrades of plain floor (199, 198, 175, 180), a bare tile on supported
+    // ground (203, whose bridge lays 200 to 202, so 200 is then skipped), a
+    // repeated column and a tile with nothing under it (210).
     const r = brush("lobby", 15, [199, 203, 198, 175, 200, 198, 210, 180]);
-    expect(r.placed).toBeGreaterThanOrEqual(5);
+    expect(r.placed).toBe(5);
     expect(r.reason).toBeDefined();
     expect(sim.tower.structureKindAt(15, 201)).toBe("lobby");
 
@@ -71,6 +72,7 @@ describe.skipIf(!hasWasmPackage())("dual run: the brush", () => {
     const built = Simulation.newGame(5, "classic");
     built.money = 1e9;
     for (let x = 150; x < 160; x++) expect(built.build("lobby", 1, x).ok).toBe(true);
+    for (let floor = 2; floor <= 15; floor++) for (let x = 150; x < 154; x++) expect(built.build("floor", floor, x).ok).toBe(true);
     const save = JSON.stringify(built.serialize());
     const sim = Simulation.deserialize(JSON.parse(save) as SerializedGame);
     type Raw = (...args: unknown[]) => string;
@@ -103,6 +105,14 @@ describe.skipIf(!hasWasmPackage())("dual run: the brush", () => {
       expect(raw("floor", 0, "[150]")).toEqual({ placed: 1 });
       expect(paint("floor", 0, [150])).toEqual({ placed: 1 });
       expect(engine.stateDigest()).toBe(digest(stateView(sim)));
+      // A lobby over plain floor and a tile with nothing under it: the same
+      // answer, reason included, and the same state, unit order included.
+      const upgrade = paint("lobby", 15, [151, 150, 170]);
+      expect(upgrade.placed).toBe(2);
+      expect(upgrade.reason).toBeDefined();
+      expect(raw("lobby", 15, "[151,150,170]")).toEqual(upgrade);
+      expect(engine.stateDigest()).toBe(digest(stateView(sim)));
+      expect(JSON.parse(engine.drainGameplayEvents())).toEqual(JSON.parse(JSON.stringify(sim.drainGameplayEvents())));
     } finally {
       engine.free();
     }

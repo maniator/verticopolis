@@ -213,7 +213,7 @@ a per-candidate loop, or an ordered set rebuilt every step.
 **HP-5 Check containers and hashing.** Rust's default `HashMap` / `HashSet`
 hasher (SipHash) is slow for small integer keys, and a search that builds
 `prev` and `seen` maps on every call pays it on every insert. For a map that
-is only inserted into and looked up, never iterated, prefer a dense `Vec`
+is never iterated (only inserted into, looked up, removed from or cleared), prefer a dense `Vec`
 indexed by unit, floor or segment, a reused scratch buffer, or a fast
 deterministic hasher: `FastMap` / `FastSet` in
 `engine-rs/src/crowd/fasthash.rs`, which offer no iteration at all. A map
@@ -263,7 +263,8 @@ Between those PRs the table belongs to the repository owner (maniator), the
 
 | What it keeps | TypeScript | Keyed on | Rust (at 9cd44d1 unless noted) |
 | --- | --- | --- | --- |
-| units and transports by id | `byId`, `transportsById`, `src/engine/Tower.ts` | kept on every edit | `by_id`, `transport_by_id`; `remove_unit` still finds the unit by a scan and rebuilds the whole index per removal (A17 in #1158) |
+| units and transports by id | `byId`, `transportsById`, `src/engine/Tower.ts`; a removal looks its unit up in `byId` and finds its place at the end of the list or with one `indexOf`, and a removal of several searches from the end (#1290) | kept on every edit | `by_id` (a `FastMap` since #1290), `transport_by_id`; `remove_unit` reads the unit's index from `by_id` and rewrites only the entries after it, and `remove_units` takes a command's removals in one pass (#1290; a single removal is still O(U) in both engines, A17 in #1158) |
+| positions of plain floor tiles on the brush's floor | `LobbyUpgrades.at`, `src/engine/tower/removal.ts` (#1290), with `first`, the lowest place a unit placed can stand, kept on add and remove | one brush command; dropped on any removal inside it, read again for another floor | not needed: `take_floor_slot` reads the index from `by_id` |
 | tiles and rooms by position | `structure`, `structKind`, `rooms`, `src/engine/Tower.ts` | kept on every edit | ported (`structure`, `struct_kind`, `rooms`) |
 | lobby and room tiles per floor | `lobbyTiles`, `roomTiles`, `src/engine/Tower.ts` | counter | ported (`lobby_tiles`, `room_tiles`) |
 | rooms without floor and lobby tiles | `roomUnits`, `src/engine/tower/rooms.ts` | unit array, length, revision; the hosts' merge drops it when the revision or the units moved (#1253) | ported (`room_index`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1139) |

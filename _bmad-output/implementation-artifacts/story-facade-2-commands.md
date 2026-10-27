@@ -69,13 +69,15 @@ check (constant work: one check per tile for a brush of at most 32, and at
 most 256 values for a schedule or camera), one result object and one
 promise; the kind check is one closure per port over the per-catalog index.
 The brush is one command per stamp instead of one build call per tile at the
-call site (same engine work). The one query this slice touches is
+call site, and its lobby upgrades share one pass over the unit list (F2). The one query this slice touches is
 `transportReason`'s `isUnlocked`, which slice 1 had put on `port.query` and
 which now runs only for a refused transport; build-preview cost is unchanged
 (slice 4 owns it). The review's Hot-Path
 Auditor patched two inherited costs on the touched paths: the meal-rush
 census now runs only on a frame where a rush is due, and a placed transport
-is no longer diagnosed. The rest are deferred with issues (Completion Notes).
+is no longer diagnosed. The owner chose to fix the `removeUnit` scan here
+(F2), and its remainder, one list shift per single removal, waits on his
+answer; the rest are deferred with issues (Completion Notes).
 
 ## Acceptance Criteria
 
@@ -339,27 +341,65 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
     plain floor tile takes that tile's place in the list, and at the end
     what the brush placed moves to the end in one pass, so the list ends as
     laying the tiles one by one would leave it, and the revision goes up
-    once more. A lobby brush press is one pass instead of one per tile.
-  - What stays: the id scan is gone, several removals in one command take
-    one pass, and a lobby brush's upgrades share one pass. A single removal
-    (bulldoze drag step, Sell, keyboard bulldoze, one lobby of a drag run)
-    is still one pass over the list per command: TypeScript's `indexOf` and
-    `splice`, Rust's shift and the rewrite of the `by_id` entries after it
-    (up to about 43k on the large tower). HP-6 and the per-command tier
-    allow that; a drag run's per-tile commands as one is #1273 item 8.
-    Crate 0.10.0 for the binding (main took 0.9.0 first).
+    once more. A lobby brush press costs, in TypeScript, one pass that keeps
+    the positions of the plain floor tiles on its floor and one from the
+    first unit placed to the end, and in Rust one move from the first unit
+    placed, instead of one pass per tile.
+  - What stays: TypeScript finds the unit by id and its place with one
+    `indexOf`, Rust reads the place from `by_id`; several removals in one
+    command take one pass, and a lobby brush's upgrades share them. A
+    single removal (bulldoze drag step, Sell, keyboard bulldoze, one lobby
+    of a drag run) still shifts the rest of the list once, since list order
+    reaches saves: TypeScript's `indexOf` and `splice`, Rust's shift of the
+    400-byte units after it and the rewrite of their `by_id` entries (up to
+    about 43k on the large tower). Cloud estimates on the large tower:
+    TypeScript 0.01 to 0.1 ms per removal (main 0.02 to 0.3), Rust about
+    1.4 ms near the start of the list (main about 1.9) and almost nothing
+    near the end; a 367-tile lobby drag in one move, TypeScript 29 ms and
+    Rust 146 ms. Making a drag move's per-tile commands one command, which
+    would let a lobby drag share one pass as the brush does, is #1273 item
+    8. The F2 card listed these paths, so the remainder went back to Naftali
+    (decision card, 2026-10-27, round 2); his answer goes here. Crate
+    0.10.0 for the binding (main took 0.9.0 first).
   - Review round 1 on the fix (2026-10-27, Blind Hunter, Edge Case Hunter,
     Acceptance Auditor): a stale position or index never takes another unit
     (TypeScript checks the slot, Rust checks the id at the index); the unit
     is made before its slot is taken, so nothing runs between the two; Rust
-    scopes the batch with `Simulation::with_lobby_upgrades`, as TypeScript
-    does; the binding reads the tiles raw, so a non-string is refused
+    scopes the batch with a closure, `Simulation::with_lobby_upgrades`, like
+    TypeScript's `withLobbyUpgrades`; the binding reads the tiles raw, so a non-string is refused
     instead of throwing in the glue; the mirror hands the engine the copy it
     relays; tests add a wedding hall and two sky lobbies removed
     interleaved, exact counts, a nested brush, raw binding refusals against
     TypeScript, and a sky-lobby upgrade in the command contract. Deferred:
     a `paintBrush` op in the conformance suite, which has none, so its run
     only shows the lock unchanged (#1351).
+  - Review round 2 (2026-10-27, all four layers): the Rust batch ends even
+    when its closure panics, as TypeScript's `finally` ends it; the mirror
+    hands the engine the list it relays, also when that list is malformed;
+    a batched removal answers only the units that stood in the list; the
+    test comments and counts are exact, and a raw lobby upgrade is compared
+    with TypeScript on the real WASM engine. From the Hot-Path Auditor: the
+    TypeScript brush kept every unit's position, which made a press slower
+    than the per-tile builds it replaced (6.3 ms on the large tower), so it
+    now keeps only its floor's plain tiles and moves from the first unit
+    placed (0.7 ms); Rust's `by_id` moved to `FastMap`, which a removal
+    rewrites (an early removal took 2.3 ms at f6bf84a7 and takes 1.4 ms
+    now, against about 1.9 on `main`; also #1158 A36); TypeScript
+    rollbacks look for their units from the end of the list (0.5 to 0.02
+    ms); the HP-8 rows name both. The Edge Case Hunter's fuzz (about 480
+    random brush towers against one-by-one builds and the WASM engine, 400
+    removal batches, extreme floors and tiles) found nothing.
+  - Review round 3 (2026-10-27, confirming): the brush's move checks that it
+    found every unit placed that still stands, and reads the rest of the
+    list if not, so a list edit the batch did not see cannot change the
+    order; a removal of the last unit (a one-tile rollback) takes no pass
+    in TypeScript; if ending the Rust batch panics after its closure did,
+    the first panic is the one raised; tests add a brush that goes back to
+    a floor, a Rust panic inside the batch, and the mirror's answers to a
+    malformed brush. Dismissed: hash flooding of `by_id` through crafted
+    save ids (no easier than with std's fixed keys on the shipped wasm32
+    build), and a fractional raw `tower.removeUnit` id that the binding
+    truncates (no host calls it raw; already #1021).
   - The wasm-only build ships the two new modules (`sim/brush.ts`,
     `tower/removal.ts`): code moved out of `src/simport/brush.ts` and
     `Tower.ts`, listed in `scripts/engine-bundle.allow.txt` with the reason.
@@ -455,10 +495,13 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
   selected. A refused rename shows only for a label over 4,096 characters,
   which only a paste of that length reaches; on `main` it was stored, and now
   it is refused with "That request is not valid." and the error sound, the
-  name box keeping the text. The tower name took the same path late: Copilot
+  name box keeping the text. The tower name took the same path late (the
+  top bar's name box holds 28 characters, so only a caller outside the UI
+  reaches that refusal): Copilot
   found `renameTower` dropped the port's answer, so a refused name showed
-  nothing; it now lives on `EditorActions` and toasts like a refused label. A player notices only by pasting a name that
-  long, so no version bump is due; the change is recorded here.
+  nothing; it now lives on `EditorActions` and toasts like a refused label.
+  No player reaches that refusal through the name box, so no version bump
+  is due; the change is recorded here.
 
 ### File List
 
@@ -468,10 +511,16 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
   `Tower.ts`, `tower/placement.ts`, `tower/transport.ts`, `sim/build.ts`;
   `engine-rs/src/tower_removal.rs` (new, with `tower_removal_tests.rs`),
   `brush.rs` (new), `tower.rs`, `build.rs`, `lib.rs`, `wasm.rs`,
-  `wasm_facade_commands.rs`, crate 0.10.0 and its pins; the relay
-  (`src/dualrun/commands.ts`, `mirror.ts`, `shadow.ts`, `binding.ts`,
-  `exportTiers.ts`, `engine.d.ts`); `dualRunBrush.integration.test.ts`
-  (new); `scripts/engine-bundle.allow.txt`
+  `wasm_facade_commands.rs`, crate 0.10.0 and its pins (`Cargo.toml`, both
+  lockfiles, `compat-record.json`, `API.md`, `tests/api.rs`,
+  `consumer/src/lib.rs`); the relay (`src/dualrun/commands.ts`, `mirror.ts`
+  with `mirror.test.ts`, `shadow.ts`, `binding.ts`, `exportTiers.ts`,
+  `engine.d.ts`); `dualRunBrush.integration.test.ts` (new);
+  `scripts/engine-bundle.allow.txt`; `docs/performance/hot-path-review.md`
+  (HP-5's wording, the HP-8 row for `by_id` and a row for the brush's
+  positions); `engine-rs/src/crowd/fasthash.rs` (`FastMap` gains `get`,
+  `remove` and `clear` for `by_id`). `src/simport/brush.ts` is deleted: its
+  loop is the engine's `paintBrush` now.
 - `src/simport/commandContract.fixture.ts` (new), `tsSimCommands.test.ts`
   (new), `contract.fixture.ts`, `view.types.test.ts`
 - `src/tests/commandSites.guard.test.ts` (new),
@@ -491,6 +540,7 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
   integration tests
 - e2e: `auto-floor.spec.ts`, `offlineHelpers.ts`, `wasmEngine.spec.ts`
 - `_bmad-output/implementation-artifacts/backlog.md` (rows
-  `facade-async-command-hazards`, `keyboard-bulldoze-refusal-announce`; notes
+  `facade-async-command-hazards`, `keyboard-bulldoze-refusal-announce`,
+  `brush-conformance-op`; notes
   on `auto-floor-bridge-distance`, `ts-render-ui-hotpath-sweep` and
   `engine-rs-hotpath-audit`)

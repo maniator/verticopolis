@@ -184,9 +184,10 @@ fn removes_one_by_id_and_nothing_for_an_id_it_does_not_hold() {
 
 #[test]
 fn a_lobby_brush_ends_as_laying_its_tiles_one_by_one() {
-    // Upgrades of plain floor (198, 199, 165), lobbies on bare supported
-    // tiles (200, 205: the bridge lays 201 to 204 as lobby), a repeated
-    // column, and a tile with nothing under it (212), refused every pass.
+    // Upgrades of plain floor (198, 199, 165, 170), a lobby on a bare tile
+    // (205, whose bridge from 199 lays 200 to 204, so 200 is then skipped), a
+    // repeated column, and a tile with nothing under it (212), refused every
+    // pass.
     let tiles = [198, 205, 199, 165, 200, 199, 212, 170];
     let (mut brush, mut single) = (tower(), tower());
     let rev = brush.tower.revision;
@@ -275,22 +276,73 @@ fn a_malformed_brush_lays_nothing() {
 fn a_brush_inside_a_brush_joins_the_outer_batch() {
     let (mut brush, mut single) = (tower(), tower());
     let rev = brush.tower.revision;
-    let (a, b) = brush.with_lobby_upgrades(|sim| {
+    // Floor 15, then 30, then 15 again.
+    let (a, b, c) = brush.with_lobby_upgrades(|sim| {
         let a = sim.paint_brush(Kind::Lobby, 15, &[198, 199]);
         assert!(sim.tower.lobby_upgrades.is_some(), "the inner brush joined");
-        (a, sim.paint_brush(Kind::Lobby, 30, &[170]))
+        let b = sim.paint_brush(Kind::Lobby, 30, &[170]);
+        (a, b, sim.paint_brush(Kind::Lobby, 15, &[165]))
     });
     assert_eq!(a, one_by_one(&mut single, Kind::Lobby, 15, &[198, 199]));
     assert_eq!(b, one_by_one(&mut single, Kind::Lobby, 30, &[170]));
-    assert_eq!(a.placed + b.placed, 3);
+    assert_eq!(c, one_by_one(&mut single, Kind::Lobby, 15, &[165]));
+    assert_eq!(a.placed + b.placed + c.placed, 4);
     assert_eq!(brush.serialize(), single.serialize());
     assert_eq!(
         brush.tower.revision,
         single.tower.revision + 1,
-        "one move for both brushes"
+        "one move for every brush"
     );
-    assert_eq!(brush.tower.revision, rev + 3 * 2 + 1);
+    assert_eq!(brush.tower.revision, rev + 4 * 2 + 1);
     assert!(brush.tower.lobby_upgrades.is_none(), "the batch ended");
     assert_indexed(&brush.tower);
     assert_eq!(events(&mut brush), events(&mut single));
+}
+
+#[test]
+fn a_removal_inside_a_brush_still_moves_every_unit_placed() {
+    // Removing two tiles near the start of the list shifts the lobby already
+    // laid on 198 two places nearer the start, before the slot 199 takes; the
+    // move still finds both.
+    let (mut brush, mut single) = (tower(), tower());
+    let early = [id_at(&brush.tower, 2, 150), id_at(&brush.tower, 2, 151)];
+    assert_eq!(
+        early,
+        [id_at(&single.tower, 2, 150), id_at(&single.tower, 2, 151)]
+    );
+    brush.with_lobby_upgrades(|sim| {
+        assert_eq!(sim.paint_brush(Kind::Lobby, 15, &[198]).placed, 1);
+        let gone: Vec<i64> = sim
+            .tower
+            .remove_units(&early)
+            .iter()
+            .map(|u| u.id)
+            .collect();
+        assert_eq!(gone, early);
+        assert_eq!(sim.paint_brush(Kind::Lobby, 15, &[199]).placed, 1);
+    });
+    one_by_one(&mut single, Kind::Lobby, 15, &[198]);
+    for id in early {
+        assert_eq!(single.tower.remove_unit(id).map(|u| u.id), Some(id));
+    }
+    one_by_one(&mut single, Kind::Lobby, 15, &[199]);
+    assert_eq!(brush.serialize(), single.serialize());
+    assert_eq!(brush.tower.revision, single.tower.revision + 1);
+    assert_indexed(&brush.tower);
+}
+
+#[test]
+fn a_panic_inside_the_brush_still_ends_the_batch() {
+    let mut sim = tower();
+    let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        sim.with_lobby_upgrades(|sim| {
+            assert_eq!(sim.paint_brush(Kind::Lobby, 15, &[198]).placed, 1);
+            panic!("a host that catches this keeps the tower");
+        })
+    }));
+    assert!(caught.is_err());
+    assert!(sim.tower.lobby_upgrades.is_none(), "the batch ended");
+    assert_indexed(&sim.tower);
+    let lobby = id_at(&sim.tower, 15, 198);
+    assert_eq!(sim.tower.units.last().map(|u| u.id), Some(lobby));
 }

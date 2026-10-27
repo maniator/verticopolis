@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../engine/Simulation";
+import { INVALID_REQUEST } from "../engine/request";
 import { attachMirror, loadCommand } from "./mirror";
 import type { ShadowCommand } from "./commands";
 
@@ -29,10 +30,12 @@ describe("attachMirror", () => {
     const { cmds } = record(sim);
     expect(sim.paintBrush("floor", 1, [170, 171, 172]).placed).toBe(3);
     const loose = (v: unknown) => v as never;
+    // A malformed brush is relayed as the engine reads it, and refused.
+    const refused = { placed: 0, reason: INVALID_REQUEST };
     // eslint-disable-next-line no-sparse-arrays
-    sim.paintBrush(loose(7), loose("2"), loose([173, "174", , 175.5]));
-    sim.paintBrush("floor", 2, loose({ length: 1, 0: 170 }));
-    sim.paintBrush("floor", 2, Array.from({ length: 33 }, (_, i) => 150 + i));
+    expect(sim.paintBrush(loose(7), loose("2"), loose([173, "174", , 175.5]))).toEqual(refused);
+    expect(sim.paintBrush("floor", 2, loose({ length: 1, 0: 170 }))).toEqual(refused);
+    expect(sim.paintBrush("floor", 2, Array.from({ length: 33 }, (_, i) => 150 + i))).toEqual(refused);
     // A tile that reads 169 once and 300 after: the engine lays the copy it
     // relays, so both engines see 169.
     let reads = 0;

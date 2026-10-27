@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use serde_json::{json, Map, Value};
 
 use crate::clock::GameMode;
+use crate::crowd::fasthash::FastMap;
 use crate::facilities::*;
 use crate::schedule::Schedule;
 
@@ -277,7 +278,8 @@ pub struct Tower {
     pub(crate) structure: HashMap<(i64, i64), i64>,
     pub(crate) struct_kind: HashMap<(i64, i64), Kind>,
     pub(crate) rooms: HashMap<(i64, i64), i64>,
-    pub(crate) by_id: HashMap<i64, usize>,
+    /// Unit id to its index in `units` (`FastMap`: never iterated).
+    pub(crate) by_id: FastMap<i64, usize>,
     /// `transportsById`: shaft id to its index in `transports`.
     pub(crate) transport_by_id: HashMap<i64, usize>,
     pub(crate) lobby_tiles: HashMap<i64, i64>,
@@ -306,7 +308,7 @@ impl Tower {
             structure: HashMap::new(),
             struct_kind: HashMap::new(),
             rooms: HashMap::new(),
-            by_id: HashMap::new(),
+            by_id: FastMap::default(),
             transport_by_id: HashMap::new(),
             lobby_tiles: HashMap::new(),
             room_tiles: HashMap::new(),

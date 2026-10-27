@@ -183,7 +183,7 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
     let tiles: number[] | null = null;
     wrap(sim, "paintBrush", ([kind, floor]) => ({ op: "paintBrush", kind: str(kind), floor: num(floor), tiles }), ([kind, floor, raw]) => {
       tiles = brushTiles(raw);
-      return paint.call(sim, kind as BrushKind, floor as number, (tiles ?? raw) as number[]);
+      return paint.call(sim, kind as BrushKind, floor as number, tiles as number[]);
     });
     wrap(sim, "buildTransport", ([kind, x, bottom, top]) => ({ op: "buildTransport", kind, x: n(x), bottom: n(bottom), top: n(top) }) as ShadowCommand);
     wrap(sim, "sellAt", ([floor, x]) => ({ op: "sellAt", floor: num(floor), x: num(x) }));

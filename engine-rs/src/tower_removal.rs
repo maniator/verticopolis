@@ -85,7 +85,8 @@ impl Tower {
     }
 
     /// The list index `by_id` holds for `id`, when the unit there has that
-    /// id. A stale entry answers `None`, so a removal never takes another
+    /// id. A stale entry is a broken invariant: a debug build stops on it,
+    /// and a release build answers `None`, so a removal never takes another
     /// unit.
     fn index_of(&self, id: i64) -> Option<usize> {
         let idx = *self.by_id.get(&id)?;
@@ -209,9 +210,18 @@ impl Simulation {
             return run(self);
         }
         self.tower.lobby_upgrades = Some(LobbyUpgrades::default());
-        let out = run(self);
-        self.tower.end_lobby_upgrades();
-        out
+        // The batch ends even when `run` panics, as TypeScript's `finally`
+        // ends it, so a native host that catches the panic keeps a tower
+        // with no batch left open. Should ending it panic too (a removal cut
+        // short leaves `by_id` behind the list), the first panic is the one
+        // raised.
+        use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
+        let out = catch_unwind(AssertUnwindSafe(|| run(self)));
+        let end = catch_unwind(AssertUnwindSafe(|| self.tower.end_lobby_upgrades()));
+        match (out, end) {
+            (Err(panic), _) | (Ok(_), Err(panic)) => resume_unwind(panic),
+            (Ok(out), Ok(())) => out,
+        }
     }
 }
 

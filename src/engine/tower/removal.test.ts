@@ -147,9 +147,10 @@ describe("removing units together", () => {
 
 describe("the engine's brush", () => {
   it("ends a lobby brush as laying its tiles one by one", () => {
-    // Upgrades of plain floor (198, 199, 165), lobbies on bare supported
-    // tiles (200, 205), a repeated column, and a tile with nothing under it
-    // (212), refused every pass.
+    // Upgrades of plain floor (198, 199, 165, 170), a lobby on a bare tile
+    // (205, whose bridge from 199 lays 200 to 204, so 200 is then skipped), a
+    // repeated column, and a tile with nothing under it (212), refused every
+    // pass.
     const tiles = [198, 205, 199, 165, 200, 199, 212, 170];
     const brush = tower();
     const single = tower();
@@ -214,18 +215,60 @@ describe("the engine's brush", () => {
     const brush = tower();
     const single = tower();
     const rev = brush.tower.revision;
-    const [a, b] = withLobbyUpgrades(brush.tower, () => [
+    // Floor 15, then 30, then 15 again: each change of floor reads that
+    // floor's positions afresh.
+    const [a, b, c] = withLobbyUpgrades(brush.tower, () => [
       brush.paintBrush("lobby", 15, [198, 199]),
       brush.paintBrush("lobby", 30, [170]),
+      brush.paintBrush("lobby", 15, [165]),
     ]);
     expect(a).toEqual(oneByOne(single, "lobby", 15, [198, 199]));
     expect(b).toEqual(oneByOne(single, "lobby", 30, [170]));
-    expect(a.placed + b.placed).toBe(3);
+    expect(c).toEqual(oneByOne(single, "lobby", 15, [165]));
+    expect(a.placed + b.placed + c.placed).toBe(4);
     expect(save(brush)).toBe(save(single));
-    expect(brush.tower.revision, "one move for both brushes").toBe(single.tower.revision + 1);
-    expect(brush.tower.revision).toBe(rev + 3 * 2 + 1);
+    expect(brush.tower.revision, "one move for every brush").toBe(single.tower.revision + 1);
+    expect(brush.tower.revision).toBe(rev + 4 * 2 + 1);
     expectIndexed(brush.tower);
     expect(events(brush)).toEqual(events(single));
+  });
+
+  it("still moves every unit placed when a removal runs inside it", () => {
+    // Removing two tiles near the start of the list shifts the lobby already
+    // laid on 198 two places nearer the start, before the slot 199 takes; the
+    // next upgrade reads the positions again and the list ends as one by one.
+    const brush = tower();
+    const single = tower();
+    const early = [idAt(brush.tower, 2, 150), idAt(brush.tower, 2, 151)];
+    expect(early).toEqual([idAt(single.tower, 2, 150), idAt(single.tower, 2, 151)]);
+    withLobbyUpgrades(brush.tower, () => {
+      expect(brush.paintBrush("lobby", 15, [198]).placed).toBe(1);
+      expect(removeUnits(brush.tower, early).map((u) => u.id)).toEqual(early);
+      expect(brush.paintBrush("lobby", 15, [199]).placed).toBe(1);
+    });
+    oneByOne(single, "lobby", 15, [198]);
+    for (const id of early) expect(single.tower.removeUnit(id)?.id).toBe(id);
+    oneByOne(single, "lobby", 15, [199]);
+    expect(save(brush)).toBe(save(single));
+    expect(brush.tower.revision).toBe(single.tower.revision + 1);
+    expectIndexed(brush.tower);
+  });
+
+  it("still moves a unit placed that stands before where it looks", () => {
+    // A list edit the batch does not see (none happens in the engine) moves
+    // the lobby one place nearer the start than the batch knows; the move
+    // reads the rest of the list and still puts it last.
+    const sim = tower();
+    const units = sim.tower.units;
+    const n = units.length;
+    withLobbyUpgrades(sim.tower, () => {
+      expect(sim.paintBrush("lobby", 15, [198]).placed).toBe(1);
+      units.push(units.shift()!);
+    });
+    expect(units.length).toBe(n);
+    expect(units[units.length - 1].id).toBe(sim.tower.structure.get(sim.tower.key(15, 198)));
+    expect(new Set(units).size).toBe(n);
+    expectIndexed(sim.tower);
   });
 
   it("carries as many tiles as the port lets through", () => {
