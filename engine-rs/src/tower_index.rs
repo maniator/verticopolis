@@ -14,8 +14,12 @@
 //! They are keyed on `revision` and the unit count. Every placement and
 //! removal bumps the revision, a load ends in `reindex`, which resets the
 //! memo and bumps it too, and no other path adds, removes, moves, resizes or
-//! retypes a unit (the census reads each unit's kind and floor). The count guards one case only: a list cut behind the revision
-//! rebuilds instead of indexing past its end. A change that keeps the count
+//! retypes a unit (the census reads each unit's kind and floor). The
+//! dispatch floor lists also read the transports' spans and stops and the
+//! lobby tiles: placing, removing or resizing a transport, a stop toggle, a
+//! stop clear and the express-stop rule bump the revision as well. The
+//! count guards one case only: a list cut behind the revision rebuilds
+//! instead of indexing past its end. A change that keeps the count
 //! and skips the bump would be served stale; no production path makes one.
 //! (`roomUnits` in `tower/rooms.ts` also keys on the array's identity. Here
 //! only a load replaces the list, and it reindexes.)

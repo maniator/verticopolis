@@ -19,8 +19,9 @@ const WORD: usize = 64;
 
 #[derive(Default)]
 pub struct ElevatorDispatch {
-    /// Transient per-car dwell timers.
-    car_dwell: HashMap<i64, Vec<f64>>,
+    /// Transient per-car dwell timers, by shaft id. An ordered map, so the
+    /// prune's `retain` iterates no hashed collection.
+    car_dwell: BTreeMap<i64, Vec<f64>>,
     /// Waiting passengers per floor. An ordered map, so a floor lookup
     /// compares small integer keys where a hash map ran SipHash on each.
     /// Every read and write is by floor, and `retain` decays each entry on
@@ -36,7 +37,7 @@ pub struct ElevatorDispatch {
     /// hand: the TypeScript's `calls` (a live hall call, the crowd's or the
     /// statistical estimate's) and `claimed` (a car is heading to the stop or
     /// dwelling at it), and the current car's cab stops.
-    calls: Vec<u64>,
+    call_bits: Vec<u64>,
     claimed: Vec<u64>,
     cab_stops: Vec<u64>,
 }
@@ -169,9 +170,9 @@ impl ElevatorDispatch {
             // ascending, so a floor's stop is a binary search away, and a
             // floor that is not a stop is never asked about.
             let words = stops.len().div_ceil(WORD);
-            let (calls, claimed) = (&mut self.calls, &mut self.claimed);
-            calls.clear();
-            calls.resize(words, 0);
+            let (call_bits, claimed) = (&mut self.call_bits, &mut self.claimed);
+            call_bits.clear();
+            call_bits.resize(words, 0);
             claimed.clear();
             claimed.resize(words, 0);
             for (k, &fl) in stops.iter().enumerate() {
@@ -180,7 +181,7 @@ impl ElevatorDispatch {
                 if hall_at(fl) >= 1.0
                     || (!staff_only && self.waiting.get(&fl).copied().unwrap_or(0.0) >= 1.0)
                 {
-                    set_bit(calls, k);
+                    set_bit(call_bits, k);
                 }
             }
             let stop_index = |floor: i64| stops.binary_search(&floor).ok();
@@ -234,7 +235,7 @@ impl ElevatorDispatch {
                 };
                 let demand = Demand {
                     stops: &stops,
-                    calls: &calls[..],
+                    calls: &call_bits[..],
                     claimed: &claimed[..],
                     cab: cab_stops,
                 };
@@ -282,7 +283,7 @@ impl ElevatorDispatch {
                             self.waiting.insert(tf, (w - board).max(0.0));
                         }
                         // Origin tally (#465), only at a stop with a live call.
-                        if stop_index(tf).is_some_and(|k| has_bit(calls, k)) {
+                        if stop_index(tf).is_some_and(|k| has_bit(call_bits, k)) {
                             let n = self
                                 .board_tally
                                 .entry(id)
@@ -388,9 +389,11 @@ impl Demand<'_> {
     /// going up the nearest is the lowest answering stop ahead, and going
     /// down it is the highest one below, then any lower stop at the same
     /// distance. Ties need a position far beyond any tower, where rounding
-    /// merges distances. The bit sets answer each search in a word or two
-    /// (a shaft has at most about 110 stops), so a car with nothing to serve
-    /// no longer tests its shaft's stops one by one.
+    /// merges distances. Each search reads a word or two (a shaft built in
+    /// play has at most 31 stops, and a floor range of about 110 caps any
+    /// shaft at two words); going down, the tie check makes one more search.
+    /// So a car with nothing to serve no longer tests its shaft's stops one
+    /// by one.
     fn next_stop(&self, pos: f64, dir: i64) -> Option<usize> {
         debug_assert_ne!(dir, 0);
         let stops = self.stops;
