@@ -406,6 +406,9 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
   subclass (the brush reads only its own indices and never copies it);
   `view()` reads `tile` and `floor` by property access (no production
   caller, both engines agree, and load drops a bad camera).
+- The independent re-review of 8129b82 gave a CONDITIONAL GO with one
+  test-only condition: a contract case that nests a schedule past the depth
+  cap, since no case failed when the cap was removed. Added.
 - The editor's fallback refusal lines ("Those prices could not be set.",
   "That schedule could not be saved.", "That name could not be saved.") show
   only for a refusal today's editor cannot cause on `TsSim`: it opens the

@@ -303,6 +303,8 @@ export function describeCommandContract(name: string, makePort: () => SimPort, o
         { op: "setSchedule", id: t.shaft, schedule: { homeFloors: Rows.from([1, 2]) } },
         { op: "setSchedule", id: t.shaft, schedule: { homeFloors: Object.assign([1, 2], { toJSON: () => [3] }) } },
         { op: "setSchedule", id: t.shaft, schedule: Object.defineProperty({}, "toJSON", { value: () => BigInt(10) }) },
+        // Nested past the depth cap: the schedule, then four arrays.
+        { op: "setSchedule", id: t.shaft, schedule: { homeFloors: [[[[1]]]] } },
         { op: "setLabel", id: t.office, label: 5 },
         { op: "setLabel", id: t.office, label: tooLong },
         { op: "adjustRent", id: t.office, dir: 2 },
