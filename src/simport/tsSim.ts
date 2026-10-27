@@ -1,5 +1,6 @@
 import type { GameplayEvent } from "../engine/gameplayEventBuffer";
 import type { Simulation } from "../engine/Simulation";
+import { roomUnits, structureRuns } from "../engine/tower/rooms";
 import type { Command, CommandOp, CommandResult, CommandResults } from "./commands";
 import type { SimPort } from "./port";
 import { queryKey, type Query, type QueryOp, type QueryResult, type QueryResults } from "./queries";
@@ -26,7 +27,11 @@ import type { HeaderView, SimView } from "./view";
  * per tower, so a new tower starts with none. The view hands out the live
  * tower and crowd, so a read copies nothing; the header is one small object
  * per read whose `population`, the one field that walks the rooms, is
- * computed only when read.
+ * computed only when read. `rooms` and `structure` are the engine's own
+ * lists, memoized per revision (`roomUnits` and `structureRuns`). On the
+ * TypeScript host the engine's per-step scans keep `roomUnits` warm; on the
+ * WASM hosts the instance does not step, so the first read of either after
+ * a revision move walks every unit once.
  *
  * Every command goes through a method or a field of the instance itself, the
  * ones the mirror host's relay (`relayCommands` in `src/dualrun/mirror.ts`)
@@ -36,11 +41,13 @@ import type { HeaderView, SimView } from "./view";
  * issue order is execution order. A throw from the instance rejects the
  * promise with that error.
  *
- * Engine types come in through `import type` only. The panel answers
- * (`tsPanels.ts`) and the loads, saves and undo signature (`tsLifecycle.ts`)
- * call the engine's own functions, so those two modules carry the adapter's
- * runtime edges into `src/engine/`, each with its reason in the frontend
- * import ratchet.
+ * Engine types come in through `import type` only, with three exceptions
+ * that carry their reasons in the frontend import ratchet: the room list
+ * and the structure runs above come from the engine's own memos, the panel
+ * answers (`tsPanels.ts`) call the engine's own functions, and so do the
+ * loads, saves and undo signature (`tsLifecycle.ts`). The adapter retires
+ * with the TypeScript engine, so none of these edges costs the retirement
+ * anything.
  */
 export function createTsSim(getSim: () => Simulation, opts: TsSimOptions = {}): SimPort {
   // Kept per tower, so a swap starts with none and a replaced tower is not
@@ -57,6 +64,12 @@ export function createTsSim(getSim: () => Simulation, opts: TsSimOptions = {}): 
     },
     get tower() {
       return getSim().tower;
+    },
+    get rooms() {
+      return roomUnits(getSim().tower);
+    },
+    get structure() {
+      return structureRuns(getSim().tower);
     },
     get crowd() {
       return getSim().crowd;
@@ -134,8 +147,18 @@ function readHeader(sim: Simulation): HeaderView {
     minuteOfDay: sim.clock.minuteOfDay,
     mode: sim.mode,
     modernCalendar: sim.modernCalendar,
+    sceneSeed: sim.rng.initialSeed,
     revision: sim.tower.revision,
     mealOverlayRevision: sim.tower.mealOverlayRevision,
+    // Copied, so a header kept across a step still shows one moment's counters.
+    fx: {
+      santaSeq: sim.santaFxSeq,
+      vipSeq: sim.vipFxSeq,
+      explosion: { ...sim.explosionFx },
+      thief: { ...sim.thiefFx },
+      treasure: { ...sim.treasureFx },
+    },
+    camera: sim.view,
   };
 }
 

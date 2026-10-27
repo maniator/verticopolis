@@ -1,8 +1,9 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { installedLinkProblems } from "../build/installedLinks";
+import { linkFolder } from "./fixtures/links";
 
 // The installed tree's view of the linked-package road (#974).
 const dirs: string[] = [];
@@ -21,18 +22,18 @@ function tree(packages: string[]): string {
 describe("installedLinkProblems", () => {
   it("passes a tree of real folders, at any depth, and skips dot entries", () => {
     const nm = tree(["a", "@s/b", "a/node_modules/c", "a/node_modules/@t/d", ".bin"]);
-    symlinkSync(join(nm, "a"), join(nm, ".bin", "a"));
+    linkFolder(join(nm, "a"), join(nm, ".bin", "a"));
     expect(installedLinkProblems(nm)).toEqual([]);
   });
 
   it("names a linked package, a linked scope folder, and a link nested below a package", () => {
     const nm = tree(["a/node_modules", "@s/b", "b", "elsewhere/x", "elsewhere/y", "elsewhere/z", "elsewhere/nm"]);
     const out = join(nm, "elsewhere");
-    symlinkSync(join(out, "x"), join(nm, "linked"));
-    symlinkSync(join(out, "y"), join(nm, "@scope"));
-    symlinkSync(join(out, "z"), join(nm, "@s", "c"));
-    symlinkSync(join(out, "z"), join(nm, "a", "node_modules", "d"));
-    symlinkSync(join(out, "nm"), join(nm, "b", "node_modules"));
+    linkFolder(join(out, "x"), join(nm, "linked"));
+    linkFolder(join(out, "y"), join(nm, "@scope"));
+    linkFolder(join(out, "z"), join(nm, "@s", "c"));
+    linkFolder(join(out, "z"), join(nm, "a", "node_modules", "d"));
+    linkFolder(join(out, "nm"), join(nm, "b", "node_modules"));
     expect(installedLinkProblems(nm).sort()).toEqual(
       [
         "node_modules/@s/c is a link",
@@ -47,10 +48,10 @@ describe("installedLinkProblems", () => {
   it("refuses a tree that is itself a link", () => {
     const nm = tree(["a"]);
     const link = join(nm, "..", "linked_modules");
-    symlinkSync(nm, link);
+    linkFolder(nm, link);
     expect(installedLinkProblems(link)).toEqual(["node_modules is a link"]);
     // A dangling link is still a link.
-    symlinkSync(join(nm, "..", "gone"), join(nm, "..", "dangling"));
+    linkFolder(join(nm, "..", "gone"), join(nm, "..", "dangling"));
     expect(installedLinkProblems(join(nm, "..", "dangling"))).toEqual(["node_modules is a link"]);
   });
 

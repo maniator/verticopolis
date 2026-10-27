@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Command, CommandResult } from "./commands";
 import type { SimPort } from "./port";
+import type { SimView } from "./view";
 
 /**
  * The port's contract, run over any adapter: `TsSim` now, `RustSim` from
@@ -126,6 +127,56 @@ export function describePortContract(name: string, makePort: () => SimPort, opts
       ]);
     });
 
+    it("lists the rooms, and the structure as runs, each kept until the revision moves", async () => {
+      const port = start(makePort);
+      const { view } = port;
+      const mid = lobbyCenter(port);
+      const send = sender(port);
+      // Bridging off (the founded tower is Modern, where it is the player's
+      // choice), so the gap at `mid + 10` stays open until the case builds it.
+      expect(await send({ op: "setAutoBridge", value: false })).toMatchObject({ ok: true, value: false });
+      for (let x = mid + 5; x < mid + 16; x++) {
+        if (x !== mid + 10) expect(await send({ op: "build", kind: "floor", floor: 2, x }), `floor at ${x}`).toMatchObject({ ok: true });
+      }
+      expect(runsOn(view, 2)).toEqual([
+        ["floor", mid + 5, 1, 5],
+        ["floor", mid + 11, 1, 5],
+      ]);
+      // The office lays floor under its own nine cells, `mid - 4` to `mid + 4`.
+      expect(await send({ op: "build", kind: "office", floor: 2, x: mid - 4 })).toMatchObject({ ok: true });
+      expectRoomsAndStructure(view);
+      const office = mustFind(view.rooms, (u) => u.kind === "office").id;
+      expect(runsOn(view, 2)).toEqual([
+        ["floor", mid - 4, 1, 14],
+        ["floor", mid + 11, 1, 5],
+      ]);
+
+      const [rooms, structure, revision] = [view.rooms, view.structure, view.header.revision];
+      port.tick(1);
+      expect(await send({ op: "setLabel", id: office, label: "Kept" })).toMatchObject({ ok: true });
+      expect(view.header.revision, "a tick and a label move no revision").toBe(revision);
+      expect(view.rooms === rooms && view.structure === structure, "the same arrays while the revision holds").toBe(true);
+      expect(mustFind(view.rooms, (u) => u.id === office).label, "a kept entry reads current").toBe("Kept");
+      expect(view.tower.getUnit(office)?.label).toBe("Kept");
+
+      await expectRevision(port, () => send({ op: "build", kind: "floor", floor: 2, x: mid + 10 }));
+      expect(runsOn(view, 2)).toEqual([["floor", mid - 4, 1, 20]]);
+      // A tile that joins the run on its right as well as the one on its left.
+      for (const x of [mid + 5, mid + 7]) expect(await send({ op: "build", kind: "floor", floor: 3, x }), `floor 3 at ${x}`).toMatchObject({ ok: true });
+      expect(runsOn(view, 3)).toEqual([
+        ["floor", mid + 5, 1, 1],
+        ["floor", mid + 7, 1, 1],
+      ]);
+      expect(await send({ op: "build", kind: "floor", floor: 3, x: mid + 6 })).toMatchObject({ ok: true });
+      expect(runsOn(view, 3)).toEqual([["floor", mid + 5, 1, 3]]);
+      expectRoomsAndStructure(view);
+
+      await expectRevision(port, () => send({ op: "removeFacility", id: office, method: "sell" }));
+      expect(view.rooms.some((u) => u.id === office)).toBe(false);
+      expectRoomsAndStructure(view);
+      port.tick(1);
+    });
+
     it("refuses a command it cannot run with ok false, and moves no money", async () => {
       const port = start(makePort);
       const money = port.view.header.money;
@@ -244,6 +295,49 @@ export function lobbyCenter(port: SimPort): number {
   const mid = Math.floor((left + right) / 2);
   expect([left <= mid - 4, right >= mid + 16, right - left === lobby.length], `the starter lobby spans ${left} to ${right} in one run`).toEqual([true, true, true]);
   return mid;
+}
+
+/** Floor `floor`'s runs as `[kind, x, width, count]`. */
+function runsOn(view: SimView, floor: number): [string, number, number, number][] {
+  return view.structure.filter((r) => r.floor === floor).map((r) => [r.kind, r.x, r.width, r.count]);
+}
+
+/** Check `rooms` against the tower's units and `structure` against
+ *  `structureKindAt` over every cell of every floor, so neither depends on
+ *  `units` listing the structure tiles: `rooms` is every unit but the tiles,
+ *  in `units` order; the runs cover each structure cell once, in order of
+ *  floor and then x, and no two could join. */
+function expectRoomsAndStructure(view: SimView): void {
+  const { tower } = view;
+  const isRoom = (kind: string) => kind !== "floor" && kind !== "lobby";
+  expect(view.rooms.map((u) => u.id)).toEqual(tower.units.filter((u) => isRoom(u.kind)).map((u) => u.id));
+
+  const covered = new Map<string, string>();
+  const twice: string[] = [];
+  for (const r of view.structure) {
+    for (let cell = r.x; cell < r.x + r.count * r.width; cell++) {
+      const key = `${r.floor}:${cell}`;
+      if (covered.has(key)) twice.push(key);
+      covered.set(key, r.kind);
+    }
+  }
+  expect(twice, "cells in two runs").toEqual([]);
+  const scanned = new Map<string, string>();
+  for (let floor = tower.lowestFloor; floor <= tower.highestFloor; floor++) {
+    for (let x = 0; x < LOT_WIDTH; x++) {
+      const kind = tower.structureKindAt(floor, x);
+      if (kind) scanned.set(`${floor}:${x}`, kind);
+    }
+  }
+  expect(covered).toEqual(scanned);
+
+  const runs = view.structure;
+  for (let i = 1; i < runs.length; i++) {
+    const [a, b] = [runs[i - 1], runs[i]];
+    const end = a.x + a.count * a.width;
+    expect(a.floor < b.floor || (a.floor === b.floor && end <= b.x), `runs ${i - 1} and ${i} in order`).toBe(true);
+    expect(a.floor === b.floor && a.kind === b.kind && a.width === b.width && end === b.x, `runs ${i - 1} and ${i} would join`).toBe(false);
+  }
 }
 
 /** The lot's width in tiles (`GRID.width`, the 1994 map's 375 segments). */

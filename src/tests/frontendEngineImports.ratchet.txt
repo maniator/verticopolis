@@ -58,8 +58,9 @@ src/render/pixelSprites/residential.ts Crowd
 src/render/sprites/facilities/venue.ts Crowd
 src/render/sprites/transport.ts facilities
 src/simport/headerClock.ts Clock calendar gameRules # what panels derive from the view's header instead of sim.clock and sim.rules (facade slice 4, #1211): date arithmetic, the calendar's day names and the static rule set
-src/simport/tsLifecycle.ts Simulation UndoHistory sim/founderStatus # the TypeScript adapter's loads, saves and undo signature, its second runtime edge into the engine beside tsPanels.ts (facade slice 5, #1212); slice 10 loads it lazily, and it goes when the engine retires
+src/simport/tsLifecycle.ts Simulation UndoHistory sim/founderStatus # the TypeScript adapter's loads, saves and undo signature, a runtime edge into the engine beside tsPanels.ts and tsSim.ts (facade slice 5, #1212); slice 10 loads it lazily, and it goes when the engine retires
 src/simport/tsPanels.ts facilities milestones tower/rooms types # the TypeScript adapter's panel answers (facade slice 4, #1211), built from the TypeScript engine's own functions; they leave with it
+src/simport/tsSim.ts tower/rooms # the TypeScript engine's SimPort adapter: the room list and structure runs it serves (#1253); it retires with the engine, so this costs the retirement nothing
 src/ui/templates/editor.ts facilities gameRules residentialRentals types
 src/ui/templates/inspector.ts facilities types
 src/ui/templates/stats.ts Ledger milestones # milestone copy keyed by the id the stats report answers (facade slice 4, #1211); a static table, like the ledger labels

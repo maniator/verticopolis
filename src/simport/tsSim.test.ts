@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
+import { roomUnits, structureRuns } from "../engine/tower/rooms";
 import { MID, newSeededGame } from "../tests/fixtures/towerFixtures";
 import { parityRestarts } from "../tests/parity/typescriptOnly";
 import { setStepGate } from "../wasmhost/stepGate";
@@ -40,7 +41,45 @@ describe("TsSim over the live instance", () => {
       mealOverlayRevision: sim.tower.mealOverlayRevision,
       mode: sim.mode,
       modernCalendar: sim.modernCalendar,
+      sceneSeed: sim.rng.initialSeed,
+      fx: {
+        santaSeq: sim.santaFxSeq,
+        vipSeq: sim.vipFxSeq,
+        explosion: sim.explosionFx,
+        thief: sim.thiefFx,
+        treasure: sim.treasureFx,
+      },
+      camera: sim.view,
     });
+  });
+
+  it("shows the effect counters and the saved camera, as one moment's copy", () => {
+    const sim = newSeededGame(7, "modern");
+    sim.view = { tile: 12, floor: 4, zoom: 2 };
+    sim.santaFxSeq = 3;
+    sim.explosionFx = { floor: 5, x: 40, seq: 2 };
+    const port = createTsSim(() => sim);
+    const header = port.view.header;
+    expect(header.camera).toEqual({ tile: 12, floor: 4, zoom: 2 });
+    expect(header.fx.santaSeq).toBe(3);
+    expect(header.fx.explosion).toEqual({ floor: 5, x: 40, seq: 2 });
+    sim.santaFxSeq = 4;
+    sim.explosionFx.seq = 3;
+    expect(header.fx.santaSeq).toBe(3);
+    expect(header.fx.explosion.seq).toBe(2);
+    expect(port.view.header.fx.santaSeq).toBe(4);
+    sim.view = null;
+    expect(port.view.header.camera).toBeNull();
+  });
+
+  it("shows the founding seed, which differs per tower and follows a swap", () => {
+    let sim = newSeededGame(7, "modern");
+    const port = createTsSim(() => sim);
+    expect(port.view.header.sceneSeed).toBe(sim.rng.initialSeed);
+    const first = port.view.header.sceneSeed;
+    sim = Simulation.newGame(9, "classic");
+    expect(port.view.header.sceneSeed).toBe(sim.rng.initialSeed);
+    expect(port.view.header.sceneSeed).not.toBe(first);
   });
 
   it("walks the rooms for population only when it is read, once per header", () => {
@@ -65,6 +104,20 @@ describe("TsSim over the live instance", () => {
     expect(port.view.tower).toBe(sim.tower);
     expect(port.view.tower).not.toBe(first);
     expect(port.cached(office)).toBeUndefined();
+  });
+
+  it("hands out the engine's own room list and structure runs, frozen, for whichever tower is live", () => {
+    let sim = newSeededGame(7, "modern");
+    const port = createTsSim(() => sim);
+    const [rooms, structure] = [port.view.rooms, port.view.structure];
+    expect(rooms).toBe(roomUnits(sim.tower));
+    expect(structure).toBe(structureRuns(sim.tower));
+    expect(structure.length).toBeGreaterThan(0);
+    expect([Object.isFrozen(rooms), Object.isFrozen(structure), structure.every((r) => Object.isFrozen(r))]).toEqual([true, true, true]);
+    sim = Simulation.newGame(9, "classic");
+    expect(port.view.rooms).toBe(roomUnits(sim.tower));
+    expect(port.view.structure).toBe(structureRuns(sim.tower));
+    expect([port.view.rooms === rooms, port.view.structure === structure]).toEqual([false, false]);
   });
 
   it("runs each command through the instance's own method, so the relay sees it", async () => {
