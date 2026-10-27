@@ -218,10 +218,14 @@ impl ViewReader {
 /// Whether a frame that read `marks` marks (repeats counted, before the
 /// sort) compares every room instead of finding each marked one. From
 /// about half the rooms the sort and a binary search per mark cost more
-/// than one compare over the rooms: the review measured a frame after an
-/// hour on the large tower (2,886 marks, 2,900 rooms) at 875K instructions
-/// on the marks and 489K with this threshold, the compare's cost. Both
-/// branches send the same rooms, since every write of a frame field marks.
+/// than one compare over the rooms. The review measured two frames after an
+/// hour on the large tower (2,900 rooms): 2,886 marks cost 875K
+/// instructions on the marks and 489K with this threshold, the compare's
+/// cost; 1,377 marks cost 406.6K on the marks against 339.4K for a compare.
+/// The compare's cost moves with the rooms that changed, so no one share of
+/// the rooms breaks even on every frame, and just below half the marks cost
+/// up to 1.2 times a compare on the frames measured. Both branches send the
+/// same rooms, since every write of a frame field marks.
 pub(super) fn compare_all(marks: usize, rooms: usize) -> bool {
     marks * 2 >= rooms
 }

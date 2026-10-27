@@ -14,7 +14,9 @@ use sha2::{Digest, Sha256};
 /// of version `n`'s layout (`layout_json` without the catalog names, which
 /// the catalog version covers). A layout change appends an entry and raises
 /// the version together; a diff that changes an old pin is a reviewer's
-/// refusal, as for the frame's pins.
+/// refusal, as for the frame's pins. Version 1 was pinned again before its
+/// first merge (#1284 added the scene seed slot), which CONTRIBUTING allows
+/// for a version that has not merged.
 const VIEW_LAYOUT_PINS: &[&str] = &["147e0ae8ebe711f1"];
 
 fn pinned_text() -> String {

@@ -100,12 +100,11 @@ impl FrameMarks {
     /// when the log has dropped some of them or `from` is past its end (a
     /// position this log never gave).
     pub(super) fn read_since(&self, from: u64, out: &mut Vec<usize>) -> bool {
-        let log = self.log.borrow();
-        let end = log.base + log.entries.len() as u64;
-        if from < log.base || from > end {
+        let Some(n) = self.unread(from) else {
             return false;
-        }
-        let start = (from - log.base) as usize;
+        };
+        let log = self.log.borrow();
+        let start = log.entries.len() - n;
         out.extend(log.entries.range(start..).map(|&i| i as usize));
         true
     }

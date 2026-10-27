@@ -73,6 +73,9 @@ mod frame_tests;
 #[path = "layout_tests.rs"]
 mod layout_tests;
 #[cfg(test)]
+#[path = "lexer_tests.rs"]
+mod lexer_tests;
+#[cfg(test)]
 #[path = "marks_guard_tests.rs"]
 mod marks_guard_tests;
 #[cfg(test)]
@@ -99,3 +102,6 @@ mod structure_tests;
 #[cfg(test)]
 #[path = "unit_scan_tests.rs"]
 mod unit_scan_tests;
+#[cfg(test)]
+#[path = "write_cases_tests.rs"]
+mod write_cases_tests;

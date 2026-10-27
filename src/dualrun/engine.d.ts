@@ -406,9 +406,9 @@ export class Engine {
     /**
      * The labels and subtypes changed after the meta revision `since`, as
      * JSON `{ revision, full, units: [[id, label, subtype], ...] }`
-     * (`view::meta_since`). Read raw: 0, and anything but a whole JS
-     * number from the log's reach up to the current revision (`undefined`
-     * from untyped JavaScript among them), get a full listing.
+     * (`view::meta_since`). Read raw: a `since` of 0, or of anything but a
+     * whole JS number from the log's reach up to the current revision
+     * (`undefined` from untyped JavaScript among them), gets a full listing.
      */
     unitMetaSince(since: number): string;
     /**

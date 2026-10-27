@@ -11,7 +11,7 @@ depends_on: facade sign-off (F1 to F9, 2026-10-20 21:40 UTC)
 
 Status: review (written before the first commit, 2026-10-20; brought up to date
 with the implementation and review rounds 1 and 2, 2026-10-21, and with the
-write-site frame marks of round 3, 2026-10-27).
+write-site frame marks of round 3 and review rounds 3 to 5, 2026-10-27).
 
 ## Story
 
@@ -43,9 +43,10 @@ consumer and is out of scope here.
    revision, the record counts, the highest and lowest floor any unit stands
    on, the game mode and Modern calendar (fixed at founding, read once at
    load or adopt) and the scene seed (`rng.initial_seed`, which slice 3's
-   `HeaderView.sceneSeed` reads; fixed for a tower's life). Then every room (non-floor, non-lobby unit) as a fixed
-   record (id, kind code, floor, x, width) in rooms-index order, which is the
-   slot order the dynamic frame uses; then floor and lobby tiles as runs (one
+   `HeaderView.sceneSeed` reads; fixed for a tower's life). Then every room
+   (non-floor, non-lobby unit) as a fixed record (id, kind code, floor, x,
+   width) in rooms-index order, which is the slot order the dynamic frame
+   uses; then floor and lobby tiles as runs (one
    record per run of same-kind, same-width tiles side by side on one floor
    with identical frame fields, ordered by floor and then x and maximal
    whatever order the tiles were built in, with no ids: a host that needs a
@@ -76,9 +77,9 @@ consumer and is out of scope here.
 4. **Unit metadata under its own revision.** Labels and subtypes are written
    through one setter each (`Tower::set_unit_label_at`,
    `Tower::set_unit_subtype`), which bump `tower.meta_revision` and log the
-   unit's id only when the value changes. Every engine write site (the editor's rename, a move-in's company,
-   gym and clinic names, a vacate, a fire, a build's subtype, a churn re-theme)
-   goes through them. `view::meta_since(tower, since)` (binding
+   unit's id only when the value changes. Every engine write site (the
+   editor's rename, a move-in's company, gym and clinic names, a vacate, a
+   fire, a build's subtype, a churn re-theme) goes through them. `view::meta_since(tower, since)` (binding
    `unitMetaSince(since)`) answers the units changed after `since`, or a full
    listing (every unit whose label differs from its catalog name or that has a
    subtype) when `since` is not a whole number in `1..=meta_revision` or the
@@ -90,10 +91,11 @@ consumer and is out of scope here.
 5. **Header additions.** The frame header carries the meta revision, the meal
    overlay revision, the unlocked kinds as a bitmask by kind code
    (`Simulation::is_unlocked`), the population (`Simulation::population`,
-   kept as a running total that each visited room corrects, by the rule
-   `Tower::total_population` sums, `Unit::census_share`, so a host reads it
-   at HUD cadence with no walk of its own), the room count the slots index, the `FULL` flag and the
-   frame number, beside today's clock, money, star, weather, effects, event
+   kept as a running total that each visited room corrects by
+   `Unit::census_share`, the rule `Tower::total_population` sums, which a
+   test ties to it, so a host reads it at HUD cadence with no walk of its
+   own), the room count the slots index, the `FULL` flag and the frame
+   number, beside today's clock, money, star, weather, effects, event
    counts, pending choice and hour runs.
 6. **View freshness oracle.** Seeded sessions on several towers (a fixture, a
    new game grown by commands, scenario states with fires, guests and
@@ -149,9 +151,10 @@ consumer and is out of scope here.
     Each tower's log has its own id, which the reader keys on, so a reader
     handed another tower sends a full frame. The fields stay `pub`, so a
     source scan (`only_the_setters_write_the_frame_fields`, on the code with
-    comments and whitespace removed, so a split statement reads as one)
-    keeps the engine's writes inside the setters, a new unit's struct
-    literal aside; the oracle (AC 6) checks the kept rooms and the kept
+    comments removed and whitespace cut to one space between two words, so
+    a split statement reads as one) keeps the engine's writes inside the
+    setters, a new unit's struct literal and `load.rs`'s fill of a new
+    tower's list aside; the oracle (AC 6) checks the kept rooms and the kept
     population after every step; and tests show that a field written past
     the setters is not sent until a full frame or a frame that compares
     every room, which proves a frame below half the rooms reads only the
@@ -173,10 +176,11 @@ consumer and is out of scope here.
       moves into `view/meta.rs` beside the setter it now calls.
 - [x] Route the label and subtype writes in `churn.rs`, `events.rs` and
       `build.rs` through the setters (one line each).
-- [x] One `#[wasm_bindgen]` block in `wasm.rs` at the end of the bindings
-      (the facade lane asked for it there), now just before 6b's block,
-      which 6b appended after it before the test module: `viewLayout`,
-      `viewStructure`, `viewFrame`, `unitMetaSince`, `towerSignature`.
+- [x] One `#[wasm_bindgen]` block in `wasm.rs` after the other bindings
+      (the facade lane asked for it there) and just before 6b's block
+      (#1321, merged first, with its place left after this one):
+      `viewLayout`, `viewStructure`, `viewFrame`, `unitMetaSince`,
+      `towerSignature`.
 - [x] `src/dualrun/engine.d.ts` (regenerated: lines added only, at the
       places wasm-bindgen sorts them), `binding.ts`, `exportTiers.ts`.
 - [x] Compat record: `viewLayoutVersion` in `src/build/engineCompat.ts` and the
@@ -200,17 +204,21 @@ consumer and is out of scope here.
       covered chunk C; the round 3 record carries chunks A and B's items
       (A2-1, A2-2, B6).
 - [x] Write-site frame marks (AC 11): `view/marks.rs` (the setters and the
-      log), the reader on the log, 51 setter calls at the write sites in 14
-      files (`sync_attendance_occupants` among them), the source check and tests (`view/marks_tests.rs`,
-      `view/marks_guard_tests.rs`), and the
-      oracle's kept population.
+      log), the reader on the log, the setter calls at the write sites (51
+      in 14 files at round 4, `sync_attendance_occupants` among them), the
+      source check and tests (`view/marks_tests.rs`,
+      `view/marks_guard_tests.rs`), and the oracle's kept population.
 - [x] Round 3 review on the marks; its patch findings fixed and its
       defers filed (see the round 3 review section below).
 - [x] Round 4, the confirming pass; its patch findings fixed and its
       defers filed (see the round 4 review section below).
-- [ ] The round 3 and 4 HP-1 to HP-12 records on the PR; a confirming pass
-      on round 4's fixes; the independent review; the owner's human review
-      (no automatic merge).
+- [x] Round 5 on round 4's fixes; its patch findings fixed and its defers
+      filed (see the round 5 review section below); main merged again
+      (#1298, #1325).
+- [ ] The round 3 to 5 HP-1 to HP-12 records on the PR; a confirming pass
+      on round 5's fixes and the merge; the independent review; the owner's
+      human review and his call on the deferrals of B6 and H5-2 (no
+      automatic merge).
 
 ## Dev notes
 
@@ -222,19 +230,20 @@ end of the bindings in `wasm.rs` (6b's block follows it) and does not
 change the `Engine` struct or its constructors
 (slice 13 edits `from_save` and `from_vctower`). That is why the reader's
 state hangs on `Tower` (initialized in `Tower::new`, which every load goes
-through) instead of on `Engine`. Not touched: `tower_index.rs`, `sim.rs` reachability, the load path (slice 13's),
-`src/simport/` (the facade thread's), `src/wasmhost/` (Runtime's). Round 1
-added one-line setter calls in `churn.rs`, `events.rs` and `build.rs`; round 3's
+through) instead of on `Engine`. Not touched: `tower_index.rs`, `sim.rs`
+reachability, the load path (slice 13's), `src/simport/` (the facade
+thread's), `src/wasmhost/` (Runtime's). Round 1 added one-line setter calls in `churn.rs`, `events.rs` and `build.rs`; round 3's
 frame marks route the frame field writes through setters in `build.rs`,
 `churn.rs`, `economy.rs`, `events.rs`, `housekeeping.rs`, `presence.rs`,
 `satisfaction.rs`, `services.rs`, `sim_loop.rs` and `crowd/` (`motion.rs`,
-`routines.rs`, `spawn.rs`, `visits.rs`), and `syncAttendanceOccupants`
-moves from `tower_query.rs` to `view/marks.rs` beside its setter (round 4),
-one or two lines a site, several of them in the step-hotspot lanes' files, so a conflict
-there is a line or two.
+`routines.rs`, `spawn.rs`, `visits.rs`), one or two lines a site, several
+of them in the step-hotspot lanes' files, so a conflict there is a line or
+two. `syncAttendanceOccupants` moves to `view/marks.rs` beside its setter
+(round 4); #1298 had moved main's unmarked copy from `tower_query.rs` to
+`tower_query_state.rs`, and the merge of main in round 5 drops that copy.
 
-6b (panel getters, #1228) merged first, with its `wasm.rs` wrappers held
-for this block; they append their own block after it. Its getters read
+6b's getters (#1228) merged first, and its `wasm.rs` wrappers (#1321) after
+them, in their own block after this one's place. Its getters read
 labels and subtypes live, so they need no key on `tower.meta_revision`.
 
 ### Current state of what changes
@@ -261,13 +270,14 @@ Dynamic frame: a 32-slot header, one name per slot (minutes, tower revision,
 meta revision, meal overlay revision, log sequence, money, star, unlocked
 mask, population, weather, the Santa, explosion, thief, treasure and VIP
 effects slot by slot, event counts, pending choice, hour runs, room count,
-full flag, frame number, then the people, unit and transport counts), then `people` records of 8, then `units` records of 6
-(slot, state, occupants, customersIn, hotelCustomersIn, outForMeal; -1 for an
-absent counter), then `transports` records of `2 + 3 * cars` as in
-`frameView`. Codes are `frameView`'s.
+full flag, frame number, then the people, unit and transport counts), then
+`people` records of 8, then `units` records of 6 (slot, state, occupants,
+customersIn, hotelCustomersIn, outForMeal; -1 for an absent counter), then
+`transports` records of `2 + 3 * cars` as in `frameView`. Codes are
+`frameView`'s.
 
-Structure: an 8-slot header (revision, rooms, runs, shafts, highest floor,
-lowest floor, mode, calendar), rooms of 5 (id, kind, floor, x, width), runs
+Structure: a 9-slot header (revision, rooms, runs, shafts, highest floor,
+lowest floor, mode, calendar, scene seed), rooms of 5 (id, kind, floor, x, width), runs
 of 10 (kind, floor, x, width, count, then the five frame fields every tile in
 the run shares; no ids), shafts of `8 + skips` (id, kind, x, width, bottom,
 top, cars, skip count, then the skipped floors). Runs are ordered by floor and
@@ -275,9 +285,10 @@ then x and are maximal: two runs that touch with the same kind, width and
 fields are one. A host that needs a tile's id asks `unitAt(floor, x)`.
 
 Metadata: JSON `{ "revision", "full", "units": [[id, label, subtype or
-null], ...] }`, the record's fields named by `metaRecord`. A unit absent from a full listing has its catalog name and no
-subtype; an incremental answer lists every unit changed since `since` that
-still exists, with its current values.
+null], ...] }`, the record's fields named by `metaRecord`. A unit absent
+from a full listing has its catalog name and no subtype; an incremental
+answer lists every unit changed since `since` that still exists, with its
+current values.
 
 ### Hot paths (HP record goes on the PR)
 
@@ -288,8 +299,9 @@ still exists, with its current values.
   exact size. No walk over floor and lobby tiles. When the marks reach half
   the rooms (an hour can mark nearly every room), or the log dropped marks
   the reader had not read, the frame compares every room once instead
-  (O(R), which from about half the rooms costs less than the marks). A full frame (a revision move, a unit-count change,
-  another tower's reader, `full = true`) is one pass over rooms
+  (O(R), which from about half the rooms costs less than the marks). A full
+  frame (a revision move, a unit-count change, another tower's reader,
+  `full = true`) is one pass over rooms
   (R = 2,900 on large), at most one per frame. That pass is a
   revision-keyed cache rebuild, the per-command tier of section 2: the
   rooms index and the structure each rebuild in O(U) on the same frame, and
@@ -299,12 +311,12 @@ still exists, with its current values.
   floor's run whatever was built between) and one over rooms; a stable sort
   of the runs when they come out of order, and always a join of the runs
   that continue each other. Both are over the runs, about one per drag, and
-  leave the tiles alone. A unit list scattered into more raw runs than half
-  its units (4,096 at the least) is read off a floor-by-x grid instead, in
-  one more pass over the units, so the sort stays bounded; no reference save
-  comes near it (1,132 raw runs at most). The floor bounds come from the tower's per-revision
-  cache (`Tower::floor_bounds`, #1237), which the panel getters share. One
-  allocation at the exact size.
+  leave the tiles alone. A unit list scattered into more raw runs than two
+  fifths of its units (4,096 at the least) is read off a floor-by-x grid
+  instead, in one more pass over the units, so the sort stays bounded; no
+  reference save comes near it (1,132 raw runs at most). The floor bounds
+  come from the tower's per-revision cache (`Tower::floor_bounds`, #1237),
+  which the panel getters share. One allocation at the exact size.
 - `unitMetaSince`: per frame only when the meta revision moved; answers from
   the log by binary search. A full listing is one pass over units (load, or a
   reader that fell behind the log's cap).
@@ -376,7 +388,8 @@ Opus 5.5, extra high effort.
 - The facade lane asked (2026-10-21) for the mode and calendar in the view,
   for rooms and runs to stay separately addressable (#1253), for the floor
   bounds to come from the structure, and for the population to need no walk
-  of its own. All four are in the structure header or the frame header.
+  of its own. All four are in the structure header or the frame header, and
+  slice 3's scene seed (round 4) is in the structure header too.
 - Debug-build cost: `fromSave` of a 13k-unit fixture is about 3 s in a debug
   test, so the unit tests use the small scenario tower and the oracle loads
   fixtures once per start.
@@ -544,7 +557,8 @@ patch findings, all fixed in this PR:
   `Unit` field, so a new field fails to compile until it is sorted into
   what the frame and the census read or not.
 - The census rule was copied from `total_population`; both now call
-  `Unit::census_share`, and the attendance rule is
+  `Unit::census_share` (round 4 gave `total_population` back its body on
+  main, and round 5 ties the two with a test), and the attendance rule is
   `Unit::attendance_occupants`. Write sites paired a mark with a unit by
   hand; `Tower::marked` and `Tower::marked_units` hand them out together.
 - A frame after an hour that marks nearly every room cost more on the marks
@@ -594,11 +608,14 @@ between the round 2 and round 3 readers at `c383cf30` on medium, large and
 the owner's save at 2-minute, 6-minute and 4 x 20-minute steps, with money
 and population identical after 780 steps; the large game day hashed the
 same again after the fixes, and round 4 found all three saves
-byte-identical again at `3ec56f8b`.
+byte-identical again at `3ec56f8b`; round 5 found the frames
+byte-identical again at `2ea5c05d` (round 4's fixes) and the structure
+identical apart from the new seed slot, on all three saves.
 
 Coordination: slice 3 (#1210, PR #1317) reads the person's discrete floor,
 which the frame's person record already carries (`person::FLOOR`, slot 4),
-so the layout did not change for it. Spike #1196 was not cherry-picked: the
+so the layout did not change for that; its `HeaderView.sceneSeed` added the
+structure header's seed slot in round 4. Spike #1196 was not cherry-picked: the
 view is written from AD-9 in this PR, and the spike stays measurement-only.
 
 ### Review round 4 (2026-10-27)
@@ -621,7 +638,6 @@ findings, fixed in this PR:
   `if` whose every branch is one). The metadata guard counts whole-unit
   writes too. Its one new exemption is the loader's assignment of a new
   tower's list (`load.rs` fills a tower it has just made, with its own log).
-  Each new table case fails on the change it guards.
 - The read test of the frame fields named every field but did not make a new
   one sorted: each unmarked field is now bound by name and changed through
   its binding (an unused binding fails clippy), and the test checks that the
@@ -668,9 +684,90 @@ binding from another value (the Edge Case Hunter's finding 3) is #1285
 item 6, which would make the frame fields private to their setters; H4-3
 (the walk before the grid's pass) is #1285 item 4 with round 4's figures;
 H4-2 (`total_population` twice per step, 7.26% of the large bare step) is
-#1158 A10 with its measurement, and #1298 holds its dispatch half. This PR
+#1158 A10 with its measurement, and #1298 merged its dispatch half. This PR
 leaves that function and its per-step callers unchanged. H4-4's inherited
 costs are by reference as in round 3. B6 stays for the owner's review.
+
+### Review round 5 (2026-10-27)
+
+The pass ran `/gds-code-review` on `2ea5c05d` (round 4's fixes) with the same
+four layers. `main` then moved to `035231a6` (#1298), whose new
+`tower_query_state.rs` carries `sync_attendance_occupants`; this PR keeps that
+method in `view/marks.rs` behind a mark, so the merge drops the copy in
+`tower_query_state.rs`. Its patch findings, fixed in this PR:
+
+- The source scan still missed spellings of the writes it guards, each layer
+  with its own list. The rules changed shape instead of growing a case at a
+  time:
+  - The lexer keeps one space between two identifier characters, so
+    keywords stay words (`let Unit {`, `ref mut n`, `&raw mut x`), reads C
+    raw strings, and joins the code around a removed inline test module
+    without gluing two words together. It moved to `lexer_tests.rs`, with a
+    test of each.
+  - A method call on a guarded field is a write unless the method is on a
+    read list (`READS` for the frame fields, `META_READS` for the label and
+    subtype), so a `&mut self` method nobody listed fails the test instead
+    of passing it. The kind is written by `clone_from` and the `*_assign`
+    operators only, and a test checks that `impl Kind` has no `&mut self`
+    method.
+  - A borrow is `&mut`, `&raw mut` or `addr_of_mut!` of a place that may
+    hold parentheses, indexing or `?`; `write!` and `writeln!` write their
+    first argument; an index after a field (`u.label[..1]`) is read past;
+    array and struct destructuring assignments count as tuple ones did.
+  - The whole-unit half: a struct pattern whose fields end in `..` is a
+    pattern wherever it stands (nested, after a match guard, in a
+    parameter); `Self` counts inside `impl Unit`; a new unit assigned
+    through any dereferenced place
+    (`*self.units.get_mut(i).unwrap() = Unit::default()`) is caught, as are
+    a reorder of a slice of the list, a mutable borrow of the list or a range
+    of it, and a `swap`, `replace` or `take` of a unit in it. A field pattern
+    binds when it is a bare name or holds a binding anywhere in it
+    (`state: s @ UnitState::Fire`).
+- The exemptions went by name. The loader's covers only
+  `sim.tower.units = units;` (`the_loader_fills_only_a_new_tower`),
+  satisfaction's needs the local copy it probes
+  (`let mut probe = ... .clone();`), and the crowd's person state takes a
+  `PState` value on any path, or an `if` (with a final `else`) or `match`
+  whose every branch is one. A case under a `crowd/` path pins that a room's
+  state written there still counts.
+- Table cases that could not fail on the branch they were added for now bind
+  renamed fields, and the tables moved to `write_cases_tests.rs`. Each new
+  rule was then removed or weakened in turn, 44 mutations in all, and each
+  fails a test. The first run left three alive: two rules gained cases (a
+  nested destructure, the loader's receiver), and the third, a skip of
+  `impl Unit {` in the pattern half, was dropped: the engine passes without
+  it, and a misread there could only fail the test, never pass a write.
+- The census test's check of its own source accepted `..` and `name: _x`. It
+  now takes a bare name or `name: _` only, checks that every named field is
+  written, and its probes derive from the old values.
+- `read_since` is built on `unread`, so the two cannot disagree on a dropped
+  log. The wrapped-log test records its start before it writes and asserts
+  the refusal one past the cap; the readers test bumps its marks through
+  setters.
+- New tests: the header's scene seed (`the_header_carries_the_scene_seed`),
+  the census share summing to the population
+  (`the_census_share_sums_to_the_population`), and the grid's in-order
+  check (`grid_reads`) in the stacked-tiles test.
+- Docs: `run_limit` states the crossovers it relies on, `compare_all` gives
+  both measured frames, the layout pin notes that version 1 was pinned again
+  before it merged, the `unitMetaSince` doc names the raw `since` values that
+  get a full listing, `structure_view` lists the scene seed, and the story's
+  status, layout, hot paths, census note, parity and file list are current.
+
+Dismissed: a read-only destructure (`let Unit { occupants, .. } = &u`)
+counts as a write, since the scan cannot see the scrutinee's type; the scan's
+doc says so and asks for the field by name. The two-fifths ratio has no test
+of its own: it is a tuning value, and its doc carries the measurements.
+
+Deferred: `*u = other` stays #1285 item 6, which now names a newtype or
+setters inside the tower module, kind included. H5-1 (`total_population`
+twice per step) is #1158 A10: #1298 merged the dispatch half, and the spawn
+step's pass remains. H5-3's inherited costs are by reference as before.
+H5-2 is code this PR rewrites: past `run_limit` a structure read walks up to
+U and then the grid, about 128,000 visits on large against the per-command
+allowance of 50,000, though the rewrite lowers the worst read on all three
+saves. With B6 (a revision move resends every room) it waits on the owner's
+acceptance of the deferral to #1285 items 4 and 2.
 
 ### Departures from the architecture
 
@@ -692,10 +789,11 @@ New:
 - `_bmad-output/implementation-artifacts/story-facade-6a-engine-view.md`
 - `engine-rs/src/view/mod.rs`, `layout.rs`, `structure.rs`, `reader.rs`,
   `meta.rs`, `marks.rs`, `signature.rs`
-- `engine-rs/src/view/layout_tests.rs`, `frame_tests.rs`, `marks_tests.rs`,
-  `marks_guard_tests.rs`, `meta_tests.rs`, `signature_tests.rs`,
-  `oracle_tests.rs`, `session_tests.rs`, `source_scan_tests.rs`,
-  `structure_tests.rs`, `unit_scan_tests.rs`
+- `engine-rs/src/view/layout_tests.rs`, `frame_tests.rs`,
+  `lexer_tests.rs`, `marks_tests.rs`, `marks_guard_tests.rs`,
+  `meta_tests.rs`, `signature_tests.rs`, `oracle_tests.rs`,
+  `session_tests.rs`, `source_scan_tests.rs`, `structure_tests.rs`,
+  `unit_scan_tests.rs`, `write_cases_tests.rs`
 - `src/tests/integration/engineView.integration.test.ts`
 
 Changed:
@@ -703,9 +801,10 @@ Changed:
 - `engine-rs/src/frame.rs` (the view's copies of the frame's encoders), `tower.rs` (view state, meta
   revision), `build.rs`, `churn.rs`, `events.rs` (setter calls), the frame
   field write sites in `economy.rs`, `housekeeping.rs`, `presence.rs`,
-  `satisfaction.rs`, `services.rs`, `sim_loop.rs`, `tower_query.rs` and
-  `crowd/` (`motion.rs`, `routines.rs`, `spawn.rs`, `visits.rs`), `lib.rs`
-  (the module), `wasm.rs` (the binding block), `identity_tests.rs`,
+  `satisfaction.rs`, `services.rs`, `sim_loop.rs` and `crowd/`
+  (`motion.rs`, `routines.rs`, `spawn.rs`, `visits.rs`),
+  `tower_query.rs` and `tower_query_state.rs` (the attendance rule moved to
+  `view/marks.rs`), `lib.rs` (the module), `wasm.rs` (the binding block), `identity_tests.rs`,
   `compat-record.json`
 - `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock`,
   `engine-rs/consumer/Cargo.lock` (0.9.0), `engine-rs/consumer/src/lib.rs`,

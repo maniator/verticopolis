@@ -96,11 +96,12 @@ const RUN_LIMIT: usize = 4096;
 
 /// The raw runs past which `tower`'s walk gives way to the grid: two
 /// fifths of its units, or `RUN_LIMIT` on a small tower. No share of the
-/// units meets both measured crossovers, so this one is a compromise: it
-/// gives 4,824 on medium, inside that crossover, and 17,343 on large, where
-/// a list with 17,000 to 29,000 raw runs takes the grid a little before it
-/// pays. No reference save comes near it (110 raw runs on large, 639 on
-/// medium, 1,132 on the owner's).
+/// units meets both measured crossovers (about 4,000 to 5,500 raw runs on
+/// medium, about 29,000 on large), so this one is a compromise: it gives
+/// 4,824 on medium, inside that crossover, and 17,343 on large, where a
+/// list with 17,343 to about 29,000 raw runs takes the grid before it pays.
+/// No reference save comes near it (110 raw runs on large, 639 on medium,
+/// 1,132 on the owner's).
 fn run_limit(tower: &Tower) -> usize {
     RUN_LIMIT.max(tower.units.len() * 2 / 5)
 }
@@ -209,6 +210,13 @@ fn grid_runs(tower: &Tower) -> Option<Vec<Run>> {
     Some(runs)
 }
 
+/// Whether the grid reads `tower`'s tiles, so a test can tell the grid
+/// gave way.
+#[cfg(test)]
+pub(super) fn grid_reads(tower: &Tower) -> bool {
+    grid_runs(tower).is_some()
+}
+
 /// The runs as `structure_view` writes them, from the walk with `limit` (so
 /// a test reads the walk's path with `usize::MAX` and the grid's with 0).
 #[cfg(test)]
@@ -227,16 +235,17 @@ pub(super) fn run_records(tower: &Tower, limit: usize) -> Vec<f64> {
 /// stands on with floor 1 always counted (so 1 on an empty tower), read from
 /// the tower's cached floor bounds (`Tower::floor_bounds`, which
 /// `highest_floor` and `lowest_floor` answer from), then the game mode and
-/// the Modern calendar as codes
-/// (`layout::MODES`, `layout::CALENDARS`), fixed when the tower was founded
-/// and carried here so a host reads them with the structure it reads at
-/// load. Then the rooms (`ROOM_RECORD` each: id,
-/// kind code, floor, x, width), in the order of the rooms index: the room in
-/// slot k is the one a dynamic frame's record with slot k describes. Then the
-/// floor and lobby tiles as runs (`RUN_RECORD` each: kind code, floor, x,
-/// width, count, then the five frame fields every tile of the run holds),
-/// ordered by floor and then x, so every tile is in exactly one run, and
-/// maximal: no run continues the one before it. A run carries no ids: a host that needs a tile's id asks for the unit at its
+/// the Modern calendar as codes (`layout::MODES`, `layout::CALENDARS`) and
+/// the seed the tower was founded with (`rng.initial_seed`, a `u32`, whole in
+/// an `f64`), all three fixed when the tower was founded and carried here so
+/// a host reads them with the structure it reads at load. Then the rooms
+/// (`ROOM_RECORD` each: id, kind code, floor, x, width), in the order of the
+/// rooms index: the room in slot k is the one a dynamic frame's record with
+/// slot k describes. Then the floor and lobby tiles as runs (`RUN_RECORD`
+/// each: kind code, floor, x, width, count, then the five frame fields every
+/// tile of the run holds), ordered by floor and then x, so every tile is in
+/// exactly one run, and maximal: no run continues the one before it. A run
+/// carries no ids: a host that needs a tile's id asks for the unit at its
 /// floor and x. Then every transport (`SHAFT_FIXED` plus its skipped floors:
 /// id, kind code, x, width, bottom, top, cars, the skip count, then the
 /// skipped floors as the save carries them).

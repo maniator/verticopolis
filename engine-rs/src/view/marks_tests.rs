@@ -270,9 +270,9 @@ fn a_reader_left_behind_compares_every_room_once() {
 }
 
 /// Two readers on one log each keep their own place: one that read nothing
-/// for a while still ends with every room as a fresh read has it. The
-/// early reader reads after each minute until the late one has marks to
-/// read, few enough that the late frame reads them from the log.
+/// while the other read two frames still ends with every room as a fresh
+/// read has it. The setters make two marks, few enough that the late frame
+/// reads them from the log.
 #[test]
 fn readers_keep_their_own_place_in_the_log() {
     let mut sim = served();
@@ -282,17 +282,16 @@ fn readers_keep_their_own_place_in_the_log() {
     let mut kept = rooms(&late.frame(&sim, false));
     let start = kept.clone();
     let place = sim.tower.view.marks.end();
-    for _ in 0..60 {
-        sim.tick(1.0);
+    let index = sim.tower.room_index();
+    for i in [index[0], index[1]] {
+        bump(&mut sim, i);
         let a = early.frame(&sim, false);
+        assert_eq!(slots(&a).len(), 1, "the early reader reads its one mark");
         assert_eq!(a[header::POPULATION], sim.population() as f64);
-        if sim.tower.view.marks.unread(place) != Some(0) {
-            break;
-        }
     }
-    let unread = sim.tower.view.marks.unread(place).unwrap();
+    let unread = sim.tower.view.marks.unread(place).expect("the late marks");
     assert!(
-        unread > 0 && !compare_all(unread, kept.len()),
+        unread == 2 && !compare_all(unread, kept.len()),
         "{unread} marks, {} rooms",
         kept.len()
     );
@@ -303,7 +302,7 @@ fn readers_keep_their_own_place_in_the_log() {
     }
     let fresh = rooms(&ViewReader::new().frame(&sim, true));
     assert_eq!(kept, fresh);
-    assert_ne!(kept, start, "the ticks changed some room");
+    assert_ne!(kept, start, "the setters changed two rooms");
     assert_eq!(b[header::POPULATION], sim.population() as f64);
 }
 
@@ -338,11 +337,12 @@ fn a_wrapped_log_still_answers_a_reader_in_step() {
     reader.frame(&sim, false);
     let index = sim.tower.room_index();
     let (a, b, c) = (index[0], index[1], index[2]);
+    let start = sim.tower.view.marks.end();
     for _ in 0..MARK_CAP + 1 {
         bump(&mut sim, a);
     }
     reader.frame(&sim, false);
-    assert_eq!(sim.tower.view.marks.unread(0), None, "the log wrapped");
+    assert_eq!(sim.tower.view.marks.unread(start), None, "the log wrapped");
     sim.tower.units[c].occupants += 5;
     bump(&mut sim, b);
     let frame = reader.frame(&sim, false);
@@ -357,6 +357,9 @@ fn a_wrapped_log_still_answers_a_reader_in_step() {
     assert_eq!(read, vec![a; MARK_CAP]);
     bump(&mut sim, a);
     assert_eq!(sim.tower.view.marks.unread(from), None, "one past the cap");
+    let mut none = Vec::new();
+    assert!(!sim.tower.view.marks.read_since(from, &mut none));
+    assert!(none.is_empty());
 }
 
 /// A position past the log's end is one this log never gave: the log
@@ -371,4 +374,28 @@ fn a_position_past_the_end_reads_nothing() {
     assert!(out.is_empty());
     assert_eq!(marks.unread(marks.end()), Some(0));
     assert!(marks.read_since(marks.end(), &mut out));
+    assert!(out.is_empty());
+}
+
+/// The frame's population rule, `Unit::census_share`, sums to the census's
+/// `Tower::total_population`, which spells the rule out again, on a tower
+/// with rooms present and rooms not.
+#[test]
+fn the_census_share_sums_to_the_population() {
+    let sim = served();
+    let rooms = sim.tower.room_index();
+    let units = || rooms.iter().map(|&i| &sim.tower.units[i]);
+    let present = units().filter(|u| u.is_present()).count();
+    assert!(
+        present > 0 && present < rooms.len(),
+        "{present} of {}",
+        rooms.len()
+    );
+    let away: i64 = units()
+        .filter(|u| !u.is_present())
+        .map(|u| u.census_count())
+        .sum();
+    assert!(away > 0, "a room not present still counts heads");
+    let sum: i64 = units().map(|u| u.census_share()).sum();
+    assert_eq!(sum, sim.tower.total_population());
 }

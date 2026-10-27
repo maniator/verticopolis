@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 
 use super::meta::{FIRST_META_REVISION, LOG_CAP};
 use super::session_tests::at;
-use super::source_scan_tests::{engine_sources, field_writes, squeeze};
+use super::source_scan_tests::{engine_sources, field_writes, squeeze, Calls};
 use super::unit_scan_tests::{new_list_aside, unit_writes};
 use super::*;
 use crate::facilities::Kind;
@@ -257,6 +257,19 @@ fn only_the_setters_write_labels_and_subtypes() {
         ("let Unit { label, .. } = u; label.push('x');", true),
         ("let Unit { label: l, .. } = u; l.clear();", true),
         ("u.label.get_mut(0..1)", true),
+        ("write!(u.label, \"x\")", true),
+        ("writeln!(self.units[i].label)", true),
+        ("u.label[..1].make_ascii_uppercase();", true),
+        ("u.label.split_at_mut(1).0.make_ascii_uppercase();", true),
+        ("u.label.deref_mut().make_ascii_uppercase()", true),
+        ("u.subtype.get_or_insert(\"x\");", true),
+        (
+            "if let Some(Unit { label, .. }) = self.units.get_mut(i) {}",
+            true,
+        ),
+        ("let first = &u.label[..1];", false),
+        ("let s = u.label.as_str();", false),
+        ("let t = u.subtype.unwrap_or(\"x\");", false),
         ("self.units.swap(a, b);", true),
         ("let n = u.label.len();", false),
         ("f(&mut u.label.len())", false),
@@ -272,45 +285,40 @@ fn only_the_setters_write_labels_and_subtypes() {
     assert_eq!(writers.len(), 2, "{writers:?}");
 }
 
-/// The mutating methods of a label (a `String`) and a subtype (an
-/// `Option`).
-const METADATA_METHODS: [&str; 24] = [
-    "push",
-    "extend(",
-    "pop(",
-    "remove(",
-    "drain(",
-    "as_mut",
-    "clear(",
-    "insert",
-    "truncate(",
-    "retain(",
-    "clone_from(",
-    "replace_range(",
-    "make_ascii_",
-    "split_off(",
-    "extend_from_within(",
-    "take(",
-    "replace(",
-    "get_or_insert",
-    "as_deref_mut(",
-    "iter_mut(",
-    "take_if(",
-    "write_str(",
-    "write_fmt(",
-    "get_mut(",
+/// The methods that only read a label (a `String`) or a subtype (an
+/// `Option<&str>`); a call of any other method on one counts as a write.
+const META_READS: [&str; 18] = [
+    "as_str",
+    "as_deref",
+    "as_ref",
+    "clone",
+    "len",
+    "is_empty",
+    "is_some",
+    "is_none",
+    "unwrap_or",
+    "chars",
+    "starts_with",
+    "ends_with",
+    "contains",
+    "trim",
+    "to_string",
+    "to_owned",
+    "eq",
+    "map",
 ];
 
 /// Where `rel`'s `code` writes a label or a subtype in place: the shared
-/// scan's field writes (assignments, mutating methods, `&mut` borrows,
-/// `ref mut` bindings, writes through a binding of that name) and its
-/// whole-unit writes. A new unit gets its metadata in a struct literal
+/// scan's field writes (assignments, calls of methods off `META_READS`,
+/// `&mut` borrows, `ref mut` bindings, writes through a binding of that
+/// name) and its whole-unit writes. A new unit gets its metadata in a struct literal
 /// (`Tower::place`, the loaders), which the scan does not count, and the
 /// loader fills a new tower's list (`load.rs`, a new log and revision); the
 /// session oracle's metadata comparison covers both.
 fn metadata_writes(rel: &str, code: &str) -> Vec<usize> {
-    let mut out = field_writes(code, "label", &METADATA_METHODS, &|_| false);
-    out.extend(field_writes(code, "subtype", &METADATA_METHODS, &|_| false));
+    let reads = Calls::Reading(&META_READS);
+    let mut out = field_writes(code, "label", &reads, &|_| false);
+    out.extend(field_writes(code, "subtype", &reads, &|_| false));
     out.extend(new_list_aside(
         rel,
         code,
