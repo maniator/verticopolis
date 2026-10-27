@@ -1751,6 +1751,7 @@ Review: `/gds-code-review` for engine and test-parity work,
 | B5 | S8 #867, the step driver | none | After #1062; `frameLoop.ts` after A5's cue-timing test; `src/engine/sim/fixedStep.ts` after A2 |
 | B6 | S12 (#858, #856) fixed, or entered in the exception register; the Saves-row audit (32 MiB, Unicode, every fixture byte for byte) | none | Before the freeze: S12 edits `engine-rs/src/load.rs`, which is in the key |
 | B7 | #1068 CI repair under the hold: tier entries for `saveDelta` and `serializeForSync`, merge `main` | `perf-worker-1068.patch` (tier half) | No gate row needs it; no merge (D2) |
+| B8 | The screenshot gallery, its drift gate and the visual baselines render on the Rust engine (owner, 2026-10-27; backlog row `screenshots-on-rust-engine`, #1353). In small PRs: the gallery capture, `drift-gate` and `commit-on-approval` first, then `e2e/visual.spec.ts` and `update-visual-baselines.yml`. The TypeScript engine stays as the report-only parity leg (a second render compared byte for byte, and the visual specs on the TypeScript engine against the same baselines) for as long as it is selectable. Images change only where the engine change explains them; both parity jobs were byte-identical on `main` at `9ebf538`, so none is expected | none | Required before 3.0. The CI half of AC3 in `story-engine-test-parity` (#878), which that story left for the flip. Tooling and CI only, so `/bmad-code-review`; avoids the files the open facade PRs own; no app version bump |
 
 ### 9.3 Later lanes, in thread order
 

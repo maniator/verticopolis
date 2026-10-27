@@ -42,7 +42,11 @@ reason. The owner set this order on 2026-10-09.
    (`pr-drift-check`, `update-visual-baselines.yml`) is the pixel parity
    check: a pixel difference between the engines is a parity finding. At
    the flip the committed gallery and the minted baselines come from the
-   WASM engine.
+   WASM engine. **Moved earlier by the owner (2026-10-27): the committed
+   gallery, the drift gate and the baselines come from the WASM engine
+   before 3.0, with the TypeScript engine as the report-only parity leg
+   while it stays selectable (#1353, backlog row
+   `screenshots-on-rust-engine`, release plan 9.2 step B8).**
 4. **AC4 The test-mapping table.** This file carries a table naming every
    test file that stays TypeScript-only, its bucket and its reason, and the
    count of tests that pass on the engine.
