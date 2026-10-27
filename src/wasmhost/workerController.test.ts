@@ -166,6 +166,21 @@ describe("worker controller (fake engine)", () => {
     }
   });
 
+  it("names no file in the refusal note when the package detail has none, and stays unhosted", async () => {
+    const a = app();
+    const detail = { kind: "mismatch", file: null, expected: null, found: null, expectedPackage: null, servedPackage: null, controlled: true } as const;
+    const h = startWorkerHost(a, await spawnEngineWorker(fakeWorker, "u"), () => Promise.reject(new EngineBootError("package-mismatch", "refused", detail)), quiet);
+    h.current()!.receive({ type: "error", fatal: true, message: "gone" });
+    a.adoptSim(Simulation.newGame(5, "classic"));
+    await tasks();
+    expect(last(h.status.errors)).toMatch(/\(package mismatch; not trying again\)/);
+    a.adoptSim(Simulation.newGame(6, "classic"));
+    await tasks();
+    expect(h.status).toMatchObject({ hosted: false, refusal: expect.objectContaining({ kind: "mismatch" }) });
+    expect(h.current()).toBeNull();
+    h.stop();
+  });
+
   it("reports a tower it cannot host and keeps it on TypeScript", async () => {
     const a = app();
     a.sim.crowd.people.push({ id: 1 } as never);
