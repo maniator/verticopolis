@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
+import { roomUnits, structureRuns } from "../engine/tower/rooms";
 import { MID, newSeededGame } from "../tests/fixtures/towerFixtures";
 import { parityRestarts } from "../tests/parity/typescriptOnly";
 import { setStepGate } from "../wasmhost/stepGate";
@@ -65,6 +66,20 @@ describe("TsSim over the live instance", () => {
     expect(port.view.tower).toBe(sim.tower);
     expect(port.view.tower).not.toBe(first);
     expect(port.cached(office)).toBeUndefined();
+  });
+
+  it("hands out the engine's own room list and structure runs, frozen, for whichever tower is live", () => {
+    let sim = newSeededGame(7, "modern");
+    const port = createTsSim(() => sim);
+    const [rooms, structure] = [port.view.rooms, port.view.structure];
+    expect(rooms).toBe(roomUnits(sim.tower));
+    expect(structure).toBe(structureRuns(sim.tower));
+    expect(structure.length).toBeGreaterThan(0);
+    expect([Object.isFrozen(rooms), Object.isFrozen(structure), structure.every((r) => Object.isFrozen(r))]).toEqual([true, true, true]);
+    sim = Simulation.newGame(9, "classic");
+    expect(port.view.rooms).toBe(roomUnits(sim.tower));
+    expect(port.view.structure).toBe(structureRuns(sim.tower));
+    expect([port.view.rooms === rooms, port.view.structure === structure]).toEqual([false, false]);
   });
 
   it("runs each command through the instance's own method, so the relay sees it", async () => {

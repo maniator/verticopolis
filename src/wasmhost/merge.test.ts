@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
+import { roomUnits, structureRuns } from "../engine/tower/rooms";
 import { mergeSimulation } from "./merge";
 
 /** A tower with a lobby row, two offices and a shaft, ticked a little. */
@@ -69,5 +70,41 @@ describe("mergeSimulation", () => {
     expect(target.tower.units.some((u) => u.id === gone.id)).toBe(false);
     expect(target.crowd.people.length).toBe(1);
     expect(withoutLog(target.serialize())).toEqual(withoutLog(fresh.serialize()));
+  });
+
+  it("drops the per-revision room list and structure runs, even when the revision repeats over other units", () => {
+    const target = tower(5);
+    const fresh = tower(5);
+    // Other units at the same count: a lobby tile moved, an office replaced.
+    fresh.tower.removeUnit(fresh.tower.unitAt(1, 170)!.id);
+    expect(fresh.build("lobby", 1, 200).ok).toBe(true);
+    const office = fresh.tower.units.find((u) => u.kind === "office" && u.x === 186)!;
+    fresh.tower.removeUnit(office.id);
+    expect(fresh.build("office", 2, 186).ok).toBe(true);
+    expect(fresh.tower.units.length).toBe(target.tower.units.length);
+    const [rooms, runs] = [roomUnits(target.tower), structureRuns(target.tower)];
+    // What the engine reports after a fresh load can repeat the held revision.
+    mergeSimulation(target, Simulation.deserialize(fresh.serialize()), { revision: target.tower.revision, mealOverlayRevision: 0 });
+    expect(roomUnits(target.tower).map((u) => u.id)).toEqual(roomUnits(fresh.tower).map((u) => u.id));
+    expect(roomUnits(target.tower).map((u) => u.id)).not.toEqual(rooms.map((u) => u.id));
+    expect(structureRuns(target.tower)).toEqual(structureRuns(fresh.tower));
+    expect(structureRuns(target.tower)).not.toEqual(runs);
+  });
+
+  it("keeps the room list and structure runs over a merge that moved neither the revision nor the units", () => {
+    const target = tower(5);
+    const fresh = tower(5);
+    fresh.tick(60);
+    expect(fresh.tower.units.map((u) => u.id)).toEqual(target.tower.units.map((u) => u.id));
+    const [rooms, runs] = [roomUnits(target.tower), structureRuns(target.tower)];
+    // An hourly merge: the engine's hour pass ran and nothing was built.
+    mergeSimulation(target, Simulation.deserialize(fresh.serialize()), { revision: target.tower.revision, mealOverlayRevision: 0 });
+    expect(roomUnits(target.tower)).toBe(rooms);
+    expect(structureRuns(target.tower)).toBe(runs);
+    // A moved revision drops both, even over the same units.
+    mergeSimulation(target, Simulation.deserialize(fresh.serialize()), { revision: target.tower.revision + 1, mealOverlayRevision: 0 });
+    expect(roomUnits(target.tower)).not.toBe(rooms);
+    expect(structureRuns(target.tower)).not.toBe(runs);
+    expect(roomUnits(target.tower)).toEqual(rooms);
   });
 });

@@ -3,11 +3,12 @@ import type { Crowd } from "../engine/Crowd";
 import type { Person } from "../engine/crowd/person";
 import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
+import type { roomUnits, StructureRun, structureRuns } from "../engine/tower/rooms";
 import type { Transport, Unit } from "../engine/types";
 import type { ShadowCommand } from "../dualrun/commands";
 import type { Command, CommandResults } from "./commands";
 import type { Query, QueryResults } from "./queries";
-import type { CrowdView, HeaderView, PersonView, TowerView, TransportView, UnitView } from "./view";
+import type { CrowdView, HeaderView, PersonView, SimView, StructureRunView, TowerView, TransportView, UnitView } from "./view";
 
 /** The relay's ops that are not player commands: the shadow's own plumbing,
  *  edits no production code makes, and test and tooling hooks. A new
@@ -37,11 +38,16 @@ describe("the port's types", () => {
     expectTypeOf<Crowd>().toExtend<CrowdView>();
     expectTypeOf<Person>().toExtend<PersonView>();
     expectTypeOf<Simulation["pendingChoice"]>().toExtend<HeaderView["pendingChoice"]>();
+    expectTypeOf<StructureRun>().toEqualTypeOf<StructureRunView>();
+    expectTypeOf<ReturnType<typeof roomUnits>>().toExtend<SimView["rooms"]>();
+    expectTypeOf<ReturnType<typeof structureRuns>>().toExtend<SimView["structure"]>();
   });
 
   it("the views are read-only", () => {
     expectTypeOf<TowerView["units"]>().toEqualTypeOf<ReadonlyArray<UnitView>>();
     expectTypeOf<TowerView["transports"]>().toEqualTypeOf<ReadonlyArray<TransportView>>();
+    expectTypeOf<SimView["rooms"]>().toEqualTypeOf<ReadonlyArray<UnitView>>();
+    expectTypeOf<SimView["structure"]>().toEqualTypeOf<ReadonlyArray<StructureRunView>>();
     expectTypeOf<CrowdView["people"]>().toEqualTypeOf<ReadonlyArray<PersonView>>();
     expectTypeOf<TransportView["carPositions"]>().toEqualTypeOf<ReadonlyArray<number>>();
   });
