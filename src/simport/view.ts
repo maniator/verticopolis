@@ -109,6 +109,8 @@ export interface PersonView {
   readonly seed: number;
   readonly state: PersonState;
   readonly x: number;
+  /** The discrete floor the person stands on or boards at. */
+  readonly floor: number;
   /** The fractional floor the renderer draws the person at. */
   readonly fy: number;
   readonly wait: number;
