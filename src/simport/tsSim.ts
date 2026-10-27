@@ -148,6 +148,7 @@ function readHeader(sim: Simulation): HeaderView {
     minuteOfDay: sim.clock.minuteOfDay,
     mode: sim.mode,
     modernCalendar: sim.modernCalendar,
+    sceneSeed: sim.rng.initialSeed,
     revision: sim.tower.revision,
     mealOverlayRevision: sim.tower.mealOverlayRevision,
     // Copied, so a header kept across a step still shows one moment's counters.

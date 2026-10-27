@@ -265,3 +265,20 @@ Slice 3 adds the `view.ts` lines, the `TsSim` fills and assertions in its own fi
   `view`) until the loop binding swaps them for these members.
 - The clock pin gained fractional minutes (`m + 0.5`, `m + 59.999 / 60`),
   the independent reviewer's note on 3a-2b.
+
+## 3a-2b notes (sceneSeed)
+
+- `HeaderView.sceneSeed` is the founding seed (`RNG.initialSeed`) the scenery
+  derives from, beside `mode` and `modernCalendar` as the facade lane decided.
+  It is fixed for a tower's life, so the scenery compares it to the seed it
+  built from to notice a tower swap (`towerScenery.ts` does this with
+  `rng.initialSeed` today). `TsSim` fills it from the instance; the Rust
+  header supplies the same constant from the loaded save.
+- Still open for the view: `usage` (garage and recycling fill, valid per sim
+  hour) and reachability (a per-revision list of unreachable room ids). Each
+  needs its Rust source from the facade lane before the member is added here.
+- From the independent reviews of 3a-2b: the loop binding takes the header
+  once per frame, because each read allocates; and slice 7 needs a source for
+  `camera` (the frame has none), from the loaded save or a small getter, on
+  construction and on a tower swap, so the null branch is not the default by
+  accident.
