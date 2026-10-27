@@ -7,6 +7,7 @@ import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, tou
 import { runFrame, SPEEDS } from "./frameLoop";
 import { applyReducedMotion } from "./audioPrefs";
 import { towerCatalog } from "../engine/towerCatalog";
+import { noteFrameError } from "./frameErrors";
 
 /**
  * Engine wiring and post-context-loss engine rebuild, split out of the `GameApp`
@@ -15,9 +16,6 @@ import { towerCatalog } from "../engine/towerCatalog";
  * They reach `app` live per callback (never captured), so an `adoptSim` swap and
  * an engine rebuild stay visible. Behavior unchanged from the former methods.
  */
-
-/** Ring-buffer depth for tick-guard failures included in a crash report. */
-const MAX_FRAME_ERRORS = 5;
 
 /** Close the gesture's undo step once the commands it issued have been
  *  answered, or at once when it issued none, so the step holds their effect
@@ -260,20 +258,10 @@ export function wireEngine(app: GameApp): void {
     try {
       runFrame(app, ms);
     } catch (err) {
-      // Throttle the log so a per-frame throw can't spam the console at
-      // frame-rate (which would itself tank performance).
-      const now = globalThis.performance ? performance.now() : 0;
-      if (now - app.lastTickErrorLog > 2000) {
-        app.lastTickErrorLog = now;
-        console.error("[tick] frame error, continuing:", err);
-        // Same throttle for the crash-report ring buffer: a repeating throw
-        // records one entry per window, not one per frame.
-        app.frameErrors.push({
-          at: new Date().toISOString(),
-          message: err instanceof Error ? `${err.message}\n${err.stack ?? ""}`.trim() : String(err),
-        });
-        if (app.frameErrors.length > MAX_FRAME_ERRORS) app.frameErrors.shift();
-      }
+      // Logged at most once per two seconds per source, to the console and
+      // the crash report's ring buffer, so a per-frame throw can't spam
+      // either (game/frameErrors.ts has the window's rules).
+      noteFrameError(app, err);
     }
   };
 

@@ -256,12 +256,13 @@ export function pgStepNoDraw(frames: number): boolean {
 /** Repaint the throttled DOM chrome (topbar, traffic chip, open editor) off the
  *  final sim state. The per-frame update() only refreshes that DOM every ~160ms
  *  of WALL time, so under stepped frames the last refresh lands on an arbitrary
- *  step; one explicit refresh right before capture pins it to the final state. */
-export function pgRefreshUi(): void {
+ *  step; one explicit refresh right before capture pins it to the final state.
+ *  The traffic chip draws once the port answers, so this waits for it. */
+export async function pgRefreshUi(): Promise<void> {
   const g = (window as unknown as { game?: any }).game;
   if (!g) return;
   g.ui?.update?.(g.sim);
-  g.updateTraffic?.();
+  await g.refreshTraffic();
   if (g.selected != null && g.ui?.isEditorOpen?.() && !g.ui?.isEditorBusy?.()) g.refreshEditor?.();
 }
 
