@@ -279,7 +279,7 @@ Between those PRs the table belongs to the repository owner (maniator), the
 | noise verdicts | `noiseMemo`, `src/engine/sim/satisfaction.ts` | revision | ported (`noise_memo`, `engine-rs/src/noise.rs`; #1139) |
 | served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported; `is_floor_served` reads the served set in place (#1237), `served_floors` and the staff components are still cloned on read (#859) |
 | stops, transport columns | `stopsCache` on `Tower`, `src/engine/tower/transport.ts` | revision | ported (cloned on read, #859) |
-| built floor bounds | `floorBounds`, `src/engine/Tower.ts` | revision | ported (`floor_bounds`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1237) |
+| built floor bounds | `floorBounds`, `src/engine/Tower.ts` | revision | ported (`floor_bounds`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1237); the inspector's top-floor read goes through it (#1255) |
 | passenger and staff routing graphs | `adjacency`, `staffAdjacency`, `src/engine/crowd/routing.ts` | revision | ported |
 | shaft banks | `src/engine/crowd/shaftBanks.ts` | revision | ported |
 | segments served | `segServed`, `src/engine/crowd/segmentGraph.ts` | revision | ported (`connected_set`) |
@@ -289,7 +289,7 @@ Between those PRs the table belongs to the repository owner (maniator), the
 | commute averages revision (the hosts key their copies on it) | none (the TypeScript reads `commuteWaitByFloor` in place) | counter | `commute_revision`, `engine-rs/src/crowd/mod.rs` |
 | meal overlay revision (the frame header carries it and the renderer keys its overlay on it every frame) | `mealOverlayRevision`, `src/engine/Tower.ts` | counter | `meal_overlay_revision`, `engine-rs/src/tower.rs` |
 | excavated basement tiles | `excavated` (a `Set`), `src/engine/Simulation.ts` | kept on every dig and load | a `Vec` searched linearly on each dig and load (`build.rs`, `load.rs`; #1173) |
-| demand map (inspector reads) | `demandMemo`, `src/engine/sim/demand.ts` | revision and game hour | none (no inspector in Rust) |
+| demand map (inspector reads) | `demandMemo`, `src/engine/sim/demand.ts` | revision and game hour | ported for the inspector (`diag_memo`, `engine-rs/src/diagnostics/memo.rs`, keyed on revision, unit count and game hour, on the `Simulation` a load builds fresh; #1255) |
 | reachability within one demand or income pass | `reachCache`, `src/engine/sim/demand.ts`, `src/engine/EconomySystem.ts` | one call | ported |
 | reachability during one move-in pass | `reachMemo`, `src/engine/sim/churn.ts` | one pass | ported |
 

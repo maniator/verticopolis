@@ -98,6 +98,16 @@ export class Engine {
      */
     crowdView(): string;
     /**
+     * The facts behind the inspector's diagnostics for one unit, as JSON
+     * text (`diagnostics::DiagnosticFacts`); TypeScript keeps the wording.
+     * Undefined for an id that names no unit (a transport's, zero or a
+     * negative one) and for a malformed one (fractional, not finite, past
+     * the safe integers), read raw so it cannot wrap onto a real unit.
+     * The read may fill the engine's caches, which sit outside the save; it
+     * changes nothing in the game.
+     */
+    diagnosticFacts(id: number): string | undefined;
+    /**
      * The gameplay events emitted since the last drain, oldest first, as
      * JSON `[{ name, payload }]` (`conformance/events/catalog.json`); the
      * buffer is empty afterwards.

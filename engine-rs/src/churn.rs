@@ -4,6 +4,7 @@ use crate::demand::fold_origin_demand;
 use crate::econ::{classic_ladder, rent_config, rent_of};
 use crate::facilities::Kind;
 use crate::jsmath;
+use crate::presence::CongestionAttribution;
 use crate::rent::snap_to_ladder;
 use crate::satisfaction::{vacate_reason_text, SatisfactionContext, VACATE_NOTICE_MINUTES};
 use crate::services::with_thousands;
@@ -80,7 +81,21 @@ impl Simulation {
     /// attribution entry, or with every class at 0, falls back to the
     /// serving-kinds classification.
     pub fn binding_transport_class_at(&self, floor: i64) -> CongestionBindingClass {
-        if let Some(att) = self.spatial_congestion_attribution_by_floor().get(&floor) {
+        self.binding_class_from(
+            self.spatial_congestion_attribution_by_floor().get(&floor),
+            floor,
+        )
+    }
+
+    /// `bindingTransportClassAt` on an attribution entry the caller already
+    /// built (`None` for a floor without one), so a reader holding the
+    /// congestion maps does not build them again.
+    pub(crate) fn binding_class_from(
+        &self,
+        att: Option<&CongestionAttribution>,
+        floor: i64,
+    ) -> CongestionBindingClass {
+        if let Some(att) = att {
             let walk_max = att.stairs.max(att.escalator);
             if walk_max > att.elevator + BINDING_TIE_EPS {
                 let stairs_bind = att.stairs > att.elevator + BINDING_TIE_EPS;

@@ -163,6 +163,9 @@ pub struct Simulation {
     pub reach_memo: (i64, HashMap<i64, bool>),
     /// `noiseMemo`: unit id to `noiseAfflicted`, keyed by tower revision.
     pub noise_memo: (i64, HashMap<i64, bool>),
+    /// The inspector's demand map memo (never saved; see
+    /// `diagnostics/memo.rs`).
+    pub diag_memo: crate::diagnostics::DiagMemo,
     /// The saved camera view (inert cargo the save carries).
     pub view: Option<Value>,
     /// The gameplay events since the host last drained (never saved or
@@ -242,6 +245,7 @@ impl Simulation {
             extermination_room_ids: None,
             reach_memo: (-1, HashMap::new()),
             noise_memo: (-1, HashMap::new()),
+            diag_memo: Default::default(),
             view: None,
             gameplay: GameplayEvents::default(),
             extend_gesture: None,
