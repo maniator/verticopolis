@@ -41,6 +41,7 @@ describe("the port's types", () => {
     expectTypeOf<Simulation["thiefFx"]>().toExtend<FxView["thief"]>();
     expectTypeOf<Simulation["treasureFx"]>().toExtend<FxView["treasure"]>();
     expectTypeOf<Simulation["view"]>().toExtend<HeaderView["camera"]>();
+    expectTypeOf<Simulation["rng"]["initialSeed"]>().toEqualTypeOf<HeaderView["sceneSeed"]>();
   });
 
   it("the views are read-only", () => {
