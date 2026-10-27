@@ -304,7 +304,15 @@ function loadFailureSentence(failure: EngineBootFailure, online: boolean, secure
   return online ? "The engine files could not be loaded. Try Reload." : "The engine files could not be loaded. Connect to the internet and try Reload.";
 }
 
-export function engineFailureCopy(failure: EngineBootFailure, online: boolean, secure = true): EngineFailureCopy {
+/** What the stop screen knows beyond the failure: whether the page is on a
+ *  secure connection, and whether it offers Repair engine files. */
+export interface EngineFailureContext {
+  secure?: boolean;
+  repair?: boolean;
+}
+
+export function engineFailureCopy(failure: EngineBootFailure, online: boolean, context: EngineFailureContext = {}): EngineFailureCopy {
+  const { secure = true, repair = false } = context;
   const host = failure.stage === "host";
   const headline = host ? "The game engine stopped running this tower, so the game has stopped." : "The game engine could not start, so the game cannot run.";
   const sentence = loadFailureSentence(failure, online, secure);
@@ -314,6 +322,13 @@ export function engineFailureCopy(failure: EngineBootFailure, online: boolean, s
   if (host) first = "Reload the page to continue from your last save. Changes since that save may be lost.";
   else if (insecure) first = "Open the game using HTTPS, then reload. Your saved towers stay in this browser.";
   const steps = [first];
+  if (repair) {
+    steps.push(
+      online
+        ? "If Reload does not help, press Repair engine files to download a fresh copy, then reload."
+        : "Connect to the internet before repairing engine files. Then press Repair engine files and reload.",
+    );
+  }
   if (!online && !insecure) {
     steps.push("You appear to be offline. If the game was updated since this device last opened it, connect to the internet and reload once so the new engine can download.");
   }

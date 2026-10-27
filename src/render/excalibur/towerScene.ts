@@ -1,7 +1,7 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
 import { GROUND, groundBelowFloors } from "../sceneryLayout";
-import type { Simulation } from "../../engine/Simulation";
+import type { RenderSim } from "../renderSim";
 import { bindViewWorld, viewWorld } from "../../presentation/viewWorld";
 import type { UnitView } from "../../simport/view";
 import {
@@ -41,7 +41,7 @@ import { towerCatalog } from "../../engine/towerCatalog";
  *  scenery and cursor clamps are all sized from it (#921). The engine binds it
  *  when it is built, before any input can read it; a swapped-in tower must
  *  state the same world. */
-export function bindSceneWorld(sim: Simulation): void {
+export function bindSceneWorld(sim: RenderSim): void {
   bindViewWorld(towerCatalog(sim).world);
 }
 
@@ -344,7 +344,7 @@ export function disposeScene(engine: TowerEngine): void {
   crowd.clearMotion(engine);
 }
 
-export function setSim(engine: TowerEngine, sim: Simulation, opts?: { keepCamera?: boolean }): void {
+export function setSim(engine: TowerEngine, sim: RenderSim, opts?: { keepCamera?: boolean }): void {
   // The scene keeps its size, so the swapped-in tower must state the same
   // world. Bind first: a refused world throws before anything is torn down.
   bindSceneWorld(sim);

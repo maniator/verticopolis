@@ -7,6 +7,7 @@ import { GRID } from "../../engine/facilities";
 import { TILE } from "../scale";
 import { STRIP_MAX_SEG, syncScenery } from "./towerScenery";
 import type { TowerEngine } from "./TowerEngine";
+import type { RenderSim } from "../renderSim";
 
 /**
  * Unit coverage for the scenery module against a stub engine: the world is
@@ -64,7 +65,7 @@ afterAll(() => {
 function fakeEngine(sim: Simulation): { eng: TowerEngine; added: ex.Actor[]; swap: (s: Simulation) => void } {
   const added: ex.Actor[] = [];
   const eng = { engine: { add: (a: ex.Actor) => void added.push(a) }, sim, d: { anim: 0 } } as unknown as TowerEngine;
-  return { eng, added, swap: (s) => ((eng as { sim: Simulation }).sim = s) };
+  return { eng, added, swap: (s) => ((eng as { sim: RenderSim }).sim = s) };
 }
 
 /** A recording 2D-context stand-in (same idiom as the pixelSprites tests). */
