@@ -506,6 +506,15 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
   nothing; it now lives on `EditorActions` and toasts like a refused label.
   No player reaches that refusal through the name box, so no version bump
   is due; the change is recorded here.
+- The stack (owner, 2026-10-27): the PR sits on #1255 at crate 0.12.0. Two
+  guards from the slots below met this slice's code there. Facade slice
+  6a's view guards (#1284) flagged the lobby brush's slot fill in
+  `tower_removal.rs` as a whole-unit write; it is a removal and a new unit
+  with the revision moved, so `new_list_aside` takes it as a third
+  exemption, pinned by `the_brush_fills_only_an_emptied_slot` and checked
+  by a kept view against a fresh read after a lobby brush. The HUD room
+  count guard listed the contract fixture's malformed inputs as opaque
+  writes; its table names them as test data.
 
 ### File List
 
@@ -515,7 +524,7 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
   `Tower.ts`, `tower/placement.ts`, `tower/transport.ts`, `sim/build.ts`;
   `engine-rs/src/tower_removal.rs` (new, with `tower_removal_tests.rs`),
   `brush.rs` (new), `tower.rs`, `build.rs`, `lib.rs`, `wasm.rs`,
-  `wasm_facade_commands.rs`, crate 0.10.0 and its pins (`Cargo.toml`, both
+  `wasm_facade_commands.rs`, crate 0.12.0 on the stack (0.10.0 before it) and its pins (`Cargo.toml`, both
   lockfiles, `compat-record.json`, `API.md`, `tests/api.rs`,
   `consumer/src/lib.rs`); the relay (`src/dualrun/commands.ts`, `mirror.ts`
   with `mirror.test.ts`, `shadow.ts`, `binding.ts`, `exportTiers.ts`,
@@ -527,6 +536,10 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
   loop is the engine's `paintBrush` now.
 - `src/simport/commandContract.fixture.ts` (new), `tsSimCommands.test.ts`
   (new), `contract.fixture.ts`, `view.types.test.ts`
+- On the stack: `engine-rs/src/view/unit_scan_tests.rs`,
+  `marks_guard_tests.rs`, `oracle_tests.rs` (the slot fill's exemption, its
+  pin and the kept-view check); `src/tests/roomCountsWriters.guard.test.ts`
+  (the fixture's row)
 - `src/tests/commandSites.guard.test.ts` (new),
   `regexLookbehind.guard.test.ts` (new),
   `frontendEngineImports.ratchet.txt` (one line: `tsSim.ts` imports
