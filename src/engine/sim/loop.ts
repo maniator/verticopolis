@@ -5,6 +5,7 @@ import { HK_CHECKOUT_HOUR, HK_LATE_CHECKOUT_HOUR, HK_LATE_CHECKOUT_END } from ".
 import { collectMonthlyRent } from "../economy/rentalIncome";
 
 import { FACILITIES } from "../facilities";
+import { setRoomState } from "../tower/rooms";
 
 import { CROWD_MAX_STEP } from "./constants";
 
@@ -196,7 +197,7 @@ export function finishConstruction(sim: Simulation): void {
       continue;
     }
     if (sim.clock.minutes >= (u.completeAt ?? 0)) {
-      u.state = "empty";
+      setRoomState(sim.tower, u, "empty");
       u.completeAt = undefined;
       sim.constructing.delete(id);
       sim.emit(`${FACILITIES[u.kind].name} on ${sim.floorLabel(u.floor)} is now open for business.`, "good");
