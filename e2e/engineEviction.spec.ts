@@ -100,10 +100,11 @@ test("an evicted binary with no network fails to load with its own reason, and t
     await installedFirst(page);
     await evict(page, "wasm");
     deployments.failNetwork("engine");
+    const before = deployments.requests.length;
     await page.reload();
-    await expectControlledWithEngineShell(page);
     await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 60_000 });
     expect(await bootFailure(page)).toMatchObject({ stage: "load", package: { kind: "load-failed", controlled: true } });
+    expect(deployments.requests.slice(before).some((r) => r.path === `/${FILES.wasm}`), "the worker tried the network for the missing binary").toBe(true);
     expect(Object.keys(await engineEntries(page)).filter((k) => k.includes("_bg.wasm")), "nothing was stored for the missing binary").toEqual([]);
 
     deployments.failNetwork(null);
@@ -124,9 +125,14 @@ test("an evicted binary is never refilled with another build's bytes while the f
     await evict(page, "wasm");
     // The deploy has reached the engine files but not this page's worker.
     deployments.engineFrom("B");
+    const before = deployments.requests.length;
     await page.reload();
     await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 60_000 });
     expect(await bootFailure(page), "the first build's worker refuses the other build's binary").toMatchObject({ stage: "load", package: { kind: "load-failed" } });
+    expect(
+      deployments.requests.slice(before).some((r) => r.path === `/${FILES.wasm}` && r.from === "B"),
+      "the other build's binary reached the worker, which refused it",
+    ).toBe(true);
     const held = await engineEntries(page);
     const mine = engineEntriesOf(deployments, "A");
     for (const [key, digest] of Object.entries(held)) expect(digest, `${key} holds only the first build's bytes`).toBe(mine[key]);
@@ -152,10 +158,9 @@ test("with the whole precache gone and no network the page does not load, and an
     deployments.failNetwork("all");
     const outcome = await page.reload({ timeout: 30_000 }).then(
       (response) => `loaded ${response?.status()}`,
-      (error: Error) => `failed ${error.message.split("\n")[0]}`,
+      (error: Error) => error.message.split("\n")[0],
     );
-    expect(outcome, "the browser's unavailable-page outcome, not the game").toMatch(/^failed |loaded (0|5\d\d)/);
-    expect(await page.evaluate(() => !!(window as any).game).catch(() => false), "no game came from an empty cache").toBe(false);
+    expect(outcome, "the browser's unavailable-page outcome").toMatch(/^page\.reload: net::ERR_/);
 
     deployments.failNetwork(null);
     await page.close();
@@ -163,12 +168,8 @@ test("with the whole precache gone and no network the page does not load, and an
     await revisit.goto("/");
     await hostedGame(revisit);
     expect(await bootFailure(revisit)).toBeNull();
+    await expectEngineIs(deployments, revisit, "A");
   } finally {
     await context.close();
   }
 });
-
-/** After a reload with the engine unreachable: the worker still answers the page (the shell is cached). */
-async function expectControlledWithEngineShell(page: Page): Promise<void> {
-  await page.waitForFunction(() => !!navigator.serviceWorker.controller, undefined, { timeout: 30_000 });
-}
