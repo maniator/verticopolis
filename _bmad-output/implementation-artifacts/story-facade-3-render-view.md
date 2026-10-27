@@ -288,27 +288,34 @@ Slice 3 adds the `view.ts` lines, the `TsSim` fills and assertions in its own fi
 - `towerCrowd.ts` read `sim.population` every frame for the walkers' busyness
   gate; on the TypeScript engine that walks every room (about 330 µs on the
   large tower, cloud estimate). `towerPopulation.ts` (`crowdPopulation`) keeps
-  the value per (sim, clock minute, `tower.revision`): a sim step always moves
-  the minute, a structural edit while paused moves the revision, and a tower
-  swap changes the sim object. So the frames between steps reuse one read.
+  the count and reads it again when `tower.revision` moves (an edit made while
+  paused shows at once), when the sim is a different object (a tower swap), or
+  when the sim has stepped (the clock minute moved) and at least
+  `POPULATION_REFRESH_FRAMES` (30) frames have passed since the last read.
+- The frame count is what bounds the top speeds. With the minute alone as the
+  key, a step in every frame (speed 3 at 60 Hz, the night sprint) would miss
+  every frame; with the window the walk runs about twice a second whatever the
+  speed (Codex review P1 on 2a39d0cd, #1335). The cost is a count that trails
+  the sim by up to about half a second, which the gate hides: it scales a
+  cosmetic crowd and saturates at 350.
 - `RenderClock` gains `minutes` (the live `Clock` and `ClockReads` both have
-  it) for that key. The count is unchanged within a step, so the walkers show
-  exactly what they showed.
-- `towerPopulation.test.ts` pins the read count: one read for 120 frames in a
-  step, one more per step, one more after a paused edit, one more for a
-  replaced tower.
+  it) for the key.
+- Tests: `towerPopulation.test.ts` pins one read for any number of frames in a
+  step, the 30-frame window after a step, the top-speed rate (a few reads in 120
+  frames of a step each), an immediate read after a paused edit or a host
+  merge's revision change, a real change followed within the window, the
+  documented non-key lag, and a replaced tower. `towerCrowdMotion.test.ts`
+  pins that `updateMotion` itself goes through the memo.
 - Deviation from criterion 3 as first written ("from the step's header or a
   value the adapter memoizes per step"): the memo lives on the render side over
   the live instance, because `main.ts` still passes the `Simulation`. It goes
   away when the loop binding hands the renderer a header that is built once per
   step (not per frame: `readHeader` walks the rooms once per header object, so
   a header built every frame would bring #1234 back).
-- Bounded lag, documented beside the cache: the key is the clock minute and
-  the revision, so the count can trail unit-state changes that move neither (the
-  worker host's minute runs ahead of the step's reply; a declined bomb threat
-  guts rooms with no step). The next step corrects it; the gate it feeds is
-  cosmetic and saturates at 350.
-- Deferred with rows: at top speed a step runs every frame so the memo misses
-  every frame (`population-memo-top-speed`, #1335), and `emitMealRushes` in
-  `frameLoop.ts` walks the rooms every frame (`meal-rush-population-per-frame`,
-  #1334).
+- Lag paths the key cannot see, bounded the same way: the worker host moves the
+  minute on the main thread before the step's reply lands, and a paused
+  emergency answer that guts rooms (a declined bomb threat) changes states with
+  no step.
+- Deferred with a row: `emitMealRushes` in `frameLoop.ts` walks the rooms every
+  frame (`meal-rush-population-per-frame`, #1334). The top-speed row (#1335) is
+  resolved by the refresh window.
