@@ -300,9 +300,10 @@ export const FEATURE_SCENES: Scene[] = [
           for (let i = 0; i < 40; i++) {
             const stepped = await page.evaluate(pgStep, 10);
             if (!stepped) throw new Error("traffic chip needs the stepped clock");
-            const label = await page.evaluate(() => {
+            const label = await page.evaluate(async () => {
               const g = (window as any).game;
-              g?.updateTraffic?.();
+              // The chip draws once the port answers.
+              await g?.refreshTraffic();
               return document.getElementById("traffic-label")?.textContent ?? "";
             });
             if (label && label !== "Smooth") break;

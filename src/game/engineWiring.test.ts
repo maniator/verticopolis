@@ -83,7 +83,6 @@ function makeApp(toolOver: Record<string, unknown> = {}) {
     paintAnchor: null as unknown,
     buildAnchor: null as unknown,
     transportStart: null as unknown,
-    lastTickErrorLog: -1e9,
     frameErrors: [] as Array<{ at: string; message: string }>,
   };
   return app as unknown as GameApp & typeof app & { engine: FakeEngine };
