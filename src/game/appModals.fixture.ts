@@ -1,5 +1,7 @@
 import { vi } from "vitest";
 import type { GameApp } from "../main";
+import type { Simulation } from "../engine/Simulation";
+import { createTsSim } from "../simport/tsSim";
 import { catalogFor } from "../engine/catalog";
 import { useTowerCatalogSource } from "../engine/towerCatalog";
 import type { CatalogEconomy } from "../engine/catalogTypes";
@@ -10,7 +12,8 @@ import type { CatalogEconomy } from "../engine/catalogTypes";
  * pieces a test dials, and a fake port that answers the stats screen's two
  * questions about the app's tower at the time of each ask (`app.sim`, so a
  * test that swaps it gets answers about the new one, as `TsSim` gives) and
- * refuses any other.
+ * refuses any other. Its commands go through the real adapter over the fake
+ * sim, so they land on its spies.
  */
 
 /** Let the port's answers and the renders queued behind them run. */
@@ -73,6 +76,7 @@ export function makeApp(sim: SimShape) {
       if (q.op === "housekeepingCoverage") return Promise.resolve(coverage());
       return Promise.reject(new Error(`the fake port answers no ${q.op}`));
     }),
+    command: createTsSim(() => app.sim as unknown as Simulation).command,
     view: { header: { minutes: 420, mode: "modern", modernCalendar: "realWorld" }, tower: { towerName: "Fake" } },
   };
   const app: { sim: SimShape; ui: typeof ui; engine: typeof engine; port: typeof port; adoptSim: ReturnType<typeof vi.fn> } = {

@@ -119,7 +119,9 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onToggleReducedMotion: () => app.toggleReducedMotion(),
     onToggleSteadyClock: () => app.toggleSteadyClock(),
     isSteadyClock: () => app.isSteadyClock(),
-    onToggleAutoBridge: () => app.getSim().toggleAutoBridge(),
+    // The preference the engine holds after the toggle (a Classic tower
+    // always bridges, so there it stays on).
+    onToggleAutoBridge: async () => (await app.port.command({ op: "toggleAutoBridge" })).value,
     isAutoBridge: () => app.getSim().autoBridge,
     onReplayOnboarding: () => {
       trackAppAction("replay_onboarding");
