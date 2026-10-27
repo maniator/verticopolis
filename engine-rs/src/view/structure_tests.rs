@@ -1,5 +1,5 @@
-//! The structure's tile runs on hand-built towers: tiles laid out of order
-//! and a tile off the grid. The seeded sessions' runs are checked in
+//! The structure's tile runs on hand-built towers: tiles laid out of order,
+//! a tile off the grid and two tiles on one cell. The seeded sessions' runs are checked in
 //! `oracle_tests.rs`.
 use super::layout::{run, structure, ROOM_RECORD, RUN_RECORD, STRUCTURE_HEADER};
 use super::oracle_tests::same;
@@ -50,4 +50,22 @@ fn a_tile_off_the_grid_falls_back_to_the_walk() {
         .collect();
     assert_eq!(floor2.len(), 1, "the floor-2 tiles are one run");
     assert_eq!((floor2[0][run::X], floor2[0][run::COUNT]), (-1.0, 3.0));
+}
+
+/// Two tiles on one cell (no save the loader accepts holds them) give the
+/// grid no single tile for the cell, so the read falls back to the walk.
+#[test]
+fn stacked_tiles_fall_back_to_the_walk() {
+    let mut sim = Simulation::new_game(1, GameMode::Classic);
+    for (kind, floor) in [(Kind::Lobby, 1), (Kind::Floor, 2)] {
+        for x in 0..=2 {
+            assert!(sim.tower.place(kind, floor, x).ok);
+        }
+    }
+    let at = |u: &crate::tower::Unit| u.floor == 2 && u.x == 2;
+    let i = sim.tower.units.iter().position(at).unwrap();
+    sim.tower.units[i].x = 1;
+    let walked = super::structure::run_records(&sim.tower, usize::MAX);
+    let grid = super::structure::run_records(&sim.tower, 0);
+    assert!(same(&grid, &walked), "a shared cell falls back to the walk");
 }

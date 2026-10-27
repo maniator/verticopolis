@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use super::meta::{FIRST_META_REVISION, LOG_CAP};
 use super::session_tests::at;
 use super::source_scan_tests::{engine_sources, field_writes, squeeze};
+use super::unit_scan_tests::{new_list_aside, unit_writes};
 use super::*;
 use crate::facilities::Kind;
 use crate::tower::Tower;
@@ -218,14 +219,14 @@ fn a_new_retail_room_moves_the_meta_revision() {
     assert!(ids(&doc).contains(&shop.id));
 }
 
-/// Outside the save loader and a new unit's construction, only the setters
-/// in `view/meta.rs` write a label or a subtype: a write anywhere else in
-/// the library would leave the meta revision behind it.
+/// Outside a new unit's struct literal, which the loaders build with too,
+/// only the setters in `view/meta.rs` write a label or a subtype: a write
+/// anywhere else in the library would leave the meta revision behind it.
 #[test]
 fn only_the_setters_write_labels_and_subtypes() {
     let mut writers = Vec::new();
     for source in engine_sources() {
-        for at in metadata_writes(&source.code) {
+        for at in metadata_writes(&source.rel, &source.code) {
             writers.push(format!("{}:{}", source.rel, source.line(at)));
         }
     }
@@ -251,12 +252,18 @@ fn only_the_setters_write_labels_and_subtypes() {
         ("if let Some(ref mut s) = u.subtype { *s = \"x\" }", true),
         ("write!(&mut u.label, \"x\")", true),
         ("f(&mut self.units[i].subtype, x)", true),
+        ("let Some(s) = &mut u.subtype else { return };", true),
+        ("let Some(ref mut s) = u.subtype else { return };", true),
+        ("let Unit { label, .. } = u; label.push('x');", true),
+        ("let Unit { label: l, .. } = u; l.clear();", true),
+        ("u.label.get_mut(0..1)", true),
+        ("self.units.swap(a, b);", true),
         ("let n = u.label.len();", false),
         ("f(&mut u.label.len())", false),
         ("let l = u.labels;", false),
     ] {
         let code = squeeze("x.rs".into(), line).code;
-        assert_eq!(!metadata_writes(&code).is_empty(), writes, "{line}");
+        assert_eq!(!metadata_writes("x.rs", &code).is_empty(), writes, "{line}");
     }
     assert!(
         writers.iter().all(|w| w.starts_with("view/meta.rs:")),
@@ -267,7 +274,7 @@ fn only_the_setters_write_labels_and_subtypes() {
 
 /// The mutating methods of a label (a `String`) and a subtype (an
 /// `Option`).
-const METADATA_METHODS: [&str; 23] = [
+const METADATA_METHODS: [&str; 24] = [
     "push",
     "extend(",
     "pop(",
@@ -291,15 +298,23 @@ const METADATA_METHODS: [&str; 23] = [
     "take_if(",
     "write_str(",
     "write_fmt(",
+    "get_mut(",
 ];
 
-/// Where `code` writes a label or a subtype in place (the shared scan's
-/// assignments, mutating methods, `&mut` borrows, `ref mut` bindings and
-/// writes through a binding of that name). A new unit gets its metadata in
-/// a struct literal (the loader and `Tower::place`), which the scan does not
-/// count; the session oracle's metadata comparison covers that case.
-fn metadata_writes(code: &str) -> Vec<usize> {
+/// Where `rel`'s `code` writes a label or a subtype in place: the shared
+/// scan's field writes (assignments, mutating methods, `&mut` borrows,
+/// `ref mut` bindings, writes through a binding of that name) and its
+/// whole-unit writes. A new unit gets its metadata in a struct literal
+/// (`Tower::place`, the loaders), which the scan does not count, and the
+/// loader fills a new tower's list (`load.rs`, a new log and revision); the
+/// session oracle's metadata comparison covers both.
+fn metadata_writes(rel: &str, code: &str) -> Vec<usize> {
     let mut out = field_writes(code, "label", &METADATA_METHODS, &|_| false);
     out.extend(field_writes(code, "subtype", &METADATA_METHODS, &|_| false));
+    out.extend(new_list_aside(
+        rel,
+        code,
+        unit_writes(code, &["label", "subtype"]),
+    ));
     out
 }

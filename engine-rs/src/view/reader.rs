@@ -107,8 +107,12 @@ impl ViewReader {
         } else {
             let mut marked = std::mem::take(&mut self.marked);
             marked.clear();
-            let read = marks.read_since(self.read, &mut marked);
-            if read && !compare_all(marked.len(), rooms.len()) {
+            // The count decides first, so a frame that compares every room
+            // copies no mark.
+            let few = marks
+                .unread(self.read)
+                .is_some_and(|n| !compare_all(n, rooms.len()));
+            if few && marks.read_since(self.read, &mut marked) {
                 // Unit-list order is the rooms index's order, so sorted
                 // indices give the slots in order.
                 marked.sort_unstable();
@@ -218,7 +222,7 @@ impl ViewReader {
 /// hour on the large tower (2,886 marks, 2,900 rooms) at 875K instructions
 /// on the marks and 489K with this threshold, the compare's cost. Both
 /// branches send the same rooms, since every write of a frame field marks.
-fn compare_all(marks: usize, rooms: usize) -> bool {
+pub(super) fn compare_all(marks: usize, rooms: usize) -> bool {
     marks * 2 >= rooms
 }
 

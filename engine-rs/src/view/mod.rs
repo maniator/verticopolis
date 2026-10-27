@@ -34,7 +34,6 @@ use std::cell::RefCell;
 
 pub use layout::{layout_json, VIEW_LAYOUT_VERSION};
 use marks::FrameMarks;
-pub(crate) use marks::Mark;
 pub(crate) use meta::FIRST_META_REVISION;
 pub use meta::{meta_since, whole_revision, MetaLog};
 pub use reader::ViewReader;
@@ -97,3 +96,6 @@ mod source_scan_tests;
 #[cfg(test)]
 #[path = "structure_tests.rs"]
 mod structure_tests;
+#[cfg(test)]
+#[path = "unit_scan_tests.rs"]
+mod unit_scan_tests;

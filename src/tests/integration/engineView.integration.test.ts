@@ -152,6 +152,7 @@ function expectStructure(sim: Simulation, engine: Engine): Float64Array {
   expect(h("revision")).toBe(sim.tower.revision);
   expect([h("highestFloor"), h("lowestFloor")]).toEqual([sim.tower.highestFloor, sim.tower.lowestFloor]);
   expect([l.modes[h("mode")], l.calendars[h("calendar")]]).toEqual([sim.mode, sim.modernCalendar]);
+  expect(h("sceneSeed")).toBe(sim.rng.initialSeed);
   const rooms = roomsOf(sim);
   expect(h("rooms")).toBe(rooms.length);
   let at = l.structureWidth;

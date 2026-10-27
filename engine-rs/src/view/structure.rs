@@ -94,11 +94,15 @@ const FLOORS: usize = (MAX_FLOOR - MIN_FLOOR + 1) as usize;
 /// pass over the units is the larger cost.
 const RUN_LIMIT: usize = 4096;
 
-/// The raw runs past which `tower`'s walk gives way to the grid: half its
-/// units, or `RUN_LIMIT` on a small tower. No reference save comes near it
-/// (110 raw runs on large, 639 on medium, 1,132 on the owner's).
+/// The raw runs past which `tower`'s walk gives way to the grid: two
+/// fifths of its units, or `RUN_LIMIT` on a small tower. No share of the
+/// units meets both measured crossovers, so this one is a compromise: it
+/// gives 4,824 on medium, inside that crossover, and 17,343 on large, where
+/// a list with 17,000 to 29,000 raw runs takes the grid a little before it
+/// pays. No reference save comes near it (110 raw runs on large, 639 on
+/// medium, 1,132 on the owner's).
 fn run_limit(tower: &Tower) -> usize {
-    RUN_LIMIT.max(tower.units.len() / 2)
+    RUN_LIMIT.max(tower.units.len() * 2 / 5)
 }
 
 /// The runs of the floor and lobby tiles, by floor and then x, and
@@ -279,6 +283,7 @@ pub fn structure_view(sim: &Simulation) -> Vec<f64> {
         low as f64,
         mode_code(sim.mode),
         calendar_code(sim.modern_calendar),
+        sim.rng.initial_seed as f64,
     ]);
     for &i in rooms.iter() {
         let u = &tower.units[i];

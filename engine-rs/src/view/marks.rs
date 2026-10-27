@@ -1,8 +1,9 @@
 //! Write-site marks for the dynamic frame. The engine's own writes of a
 //! room's frame fields (state, occupants, customersIn, hotelCustomersIn,
 //! outForMeal) and its residents, which the census counts, go through the
-//! setters below, the save loader and a new unit's construction aside; the
-//! fields stay `pub`, so `marks_tests.rs` scans the sources to keep it so.
+//! setters below; a new unit's struct literal sets them at construction,
+//! which is how the loaders build a tower too. The fields stay `pub`, so
+//! `marks_guard_tests.rs` scans the sources to keep it so.
 //! Each setter takes a [`Mark`], the tower's mark log and the unit's index,
 //! and logs the index when it changes a value. A frame reader reads the log
 //! from where its last frame stopped, so a frame visits the rooms that
@@ -85,6 +86,15 @@ impl FrameMarks {
         log.base + log.entries.len() as u64
     }
 
+    /// How many marks a reader at position `from` has not read, or `None`
+    /// when the log has dropped some of them or `from` is past its end (a
+    /// position this log never gave).
+    pub(super) fn unread(&self, from: u64) -> Option<usize> {
+        let log = self.log.borrow();
+        let start = usize::try_from(from.checked_sub(log.base)?).ok()?;
+        log.entries.len().checked_sub(start)
+    }
+
     /// Append the indices marked at position `from` and after to `out`,
     /// oldest first, and return true; or return false, appending nothing,
     /// when the log has dropped some of them or `from` is past its end (a
@@ -156,6 +166,40 @@ impl Unit {
         if self.residents != n {
             self.residents = n;
             at.marks.note(at.i);
+        }
+    }
+}
+
+/// The rules the setters and the frame share with the queries in
+/// `tower_query.rs`.
+impl Unit {
+    /// A room's share of the population: its census count while it is
+    /// present, else 0, the rule `Tower::total_population` sums. The frame
+    /// keeps its running population from it, and the freshness oracle checks
+    /// that total against `total_population` after every step.
+    pub fn census_share(&self) -> i64 {
+        if self.is_present() {
+            self.census_count()
+        } else {
+            0
+        }
+    }
+
+    /// The head count `syncAttendanceOccupants` sets on a room whose kind
+    /// has an attendance cap, or `None` for any other kind.
+    pub fn attendance_occupants(&self) -> Option<i64> {
+        self.kind.attendance_cap()?;
+        Some(if self.is_operational() {
+            self.customers_in.unwrap_or(0)
+        } else {
+            0
+        })
+    }
+
+    /// `syncAttendanceOccupants`, through the head count's setter.
+    pub(crate) fn sync_attendance_occupants(&mut self, at: Mark<'_>) {
+        if let Some(occupants) = self.attendance_occupants() {
+            self.set_occupants(at, occupants);
         }
     }
 }

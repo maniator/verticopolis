@@ -109,7 +109,8 @@ pub const CAR_RECORD: usize = car::DIRECTION + 1;
 /// `LOWEST_FLOOR` are the highest and lowest floor any unit stands on (1 on
 /// an empty tower), the bounds the camera reads; `MODE` and `CALENDAR` are
 /// the game mode and the Modern calendar, by the codes in `MODES` and
-/// `CALENDARS`.
+/// `CALENDARS`; `SCENE_SEED` is the founding seed the scenery derives from
+/// (`rng.initial_seed`, `HeaderView.sceneSeed`), fixed for a tower's life.
 pub mod structure {
     pub const REVISION: usize = 0;
     pub const ROOMS: usize = 1;
@@ -119,10 +120,11 @@ pub mod structure {
     pub const LOWEST_FLOOR: usize = 5;
     pub const MODE: usize = 6;
     pub const CALENDAR: usize = 7;
+    pub const SCENE_SEED: usize = 8;
 }
 
 /// Slots of the structural snapshot's header.
-pub const STRUCTURE_HEADER: usize = structure::CALENDAR + 1;
+pub const STRUCTURE_HEADER: usize = structure::SCENE_SEED + 1;
 
 /// The slots of a room in the structural snapshot.
 pub mod room {
@@ -276,6 +278,7 @@ pub(crate) const TABLES: &[Table] = &[
             ("lowestFloor", structure::LOWEST_FLOOR),
             ("mode", structure::MODE),
             ("calendar", structure::CALENDAR),
+            ("sceneSeed", structure::SCENE_SEED),
         ],
         width_name: "structureWidth",
         width: STRUCTURE_HEADER,

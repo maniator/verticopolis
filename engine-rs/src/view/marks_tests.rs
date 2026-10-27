@@ -3,6 +3,7 @@
 //! write inside the setters.
 use super::layout::{header, unit, HEADER, PERSON_RECORD, UNIT_RECORD};
 use super::marks::MARK_CAP;
+use super::reader::compare_all;
 use super::ViewReader;
 use crate::frame::unit_fields;
 use crate::sim::Simulation;
@@ -173,8 +174,8 @@ fn marks_from_half_the_rooms_compare_every_room() {
     let mut reader = ViewReader::new();
     reader.frame(&sim, false);
     let index = sim.tower.room_index();
+    assert!(index.len() >= 4, "{} rooms", index.len());
     let half = index.len().div_ceil(2);
-    assert!(half > 1, "{} rooms", index.len());
     for (marks, want) in [(half - 1, vec![3]), (half, vec![0, 3])] {
         sim.tower.units[index[0]].occupants += 5;
         for _ in 0..marks {
@@ -187,6 +188,31 @@ fn marks_from_half_the_rooms_compare_every_room() {
     let compared = reader.frame(&sim, false);
     assert_eq!(compared[header::UNITS], 0.0);
     assert_eq!(compared[header::POPULATION], sim.population() as f64);
+    // The threshold itself, on an even and an odd room count, so `>` in
+    // place of `>=` fails too.
+    assert!(!compare_all(1, 4) && compare_all(2, 4));
+    assert!(!compare_all(2, 5) && compare_all(3, 5));
+}
+
+/// Every frame moves the reader to the end of the log, the one that
+/// compares every room too: the next frame with nothing marked visits no
+/// room, so a room written past the setters after a frame stays unsent.
+#[test]
+fn a_frame_moves_the_reader_past_what_it_read() {
+    let mut sim = served();
+    let mut reader = ViewReader::new();
+    reader.frame(&sim, false);
+    let index = sim.tower.room_index();
+    assert!(index.len() >= 4, "{} rooms", index.len());
+    for marks in [1, index.len().div_ceil(2)] {
+        for _ in 0..marks {
+            bump(&mut sim, index[1]);
+        }
+        assert_eq!(slots(&reader.frame(&sim, false)), vec![1], "{marks} marks");
+        sim.tower.units[index[1]].occupants += 5;
+        let next = reader.frame(&sim, false);
+        assert_eq!(next[header::UNITS], 0.0, "the frame after {marks} marks");
+    }
 }
 
 /// A unit changed again after a reader read its first change is sent again:
@@ -225,10 +251,7 @@ fn a_reader_left_behind_compares_every_room_once() {
     }
     let (u, at) = sim.tower.marked(b);
     u.set_occupants(at, b0);
-    assert!(
-        !sim.tower.view.marks.read_since(first, &mut Vec::new()),
-        "c's mark is gone"
-    );
+    assert_eq!(sim.tower.view.marks.unread(first), None, "c's mark is gone");
     let frame = reader.frame(&sim, false);
     assert_eq!(
         frame[header::FULL],
@@ -247,7 +270,9 @@ fn a_reader_left_behind_compares_every_room_once() {
 }
 
 /// Two readers on one log each keep their own place: one that read nothing
-/// for a while still ends with every room as a fresh read has it.
+/// for a while still ends with every room as a fresh read has it. The
+/// early reader reads after each minute until the late one has marks to
+/// read, few enough that the late frame reads them from the log.
 #[test]
 fn readers_keep_their_own_place_in_the_log() {
     let mut sim = served();
@@ -256,11 +281,21 @@ fn readers_keep_their_own_place_in_the_log() {
     early.frame(&sim, false);
     let mut kept = rooms(&late.frame(&sim, false));
     let start = kept.clone();
-    for _ in 0..5 {
-        sim.tick(2.0);
+    let place = sim.tower.view.marks.end();
+    for _ in 0..60 {
+        sim.tick(1.0);
         let a = early.frame(&sim, false);
         assert_eq!(a[header::POPULATION], sim.population() as f64);
+        if sim.tower.view.marks.unread(place) != Some(0) {
+            break;
+        }
     }
+    let unread = sim.tower.view.marks.unread(place).unwrap();
+    assert!(
+        unread > 0 && !compare_all(unread, kept.len()),
+        "{unread} marks, {} rooms",
+        kept.len()
+    );
     let b = late.frame(&sim, false);
     assert_eq!(b[header::FULL], 0.0);
     for (slot, fields) in rooms(&b) {
@@ -274,19 +309,66 @@ fn readers_keep_their_own_place_in_the_log() {
 
 /// A reader handed another tower sends a full frame, even when the towers'
 /// revision and unit count agree, since each tower's log has its own id.
+/// The towers' logs part by a setter call, which moves neither.
 #[test]
 fn a_reader_on_another_tower_sends_a_full_frame() {
     let mut a = served();
     let b = served();
+    let mut reader = ViewReader::new();
+    reader.frame(&a, false);
+    let i = a.tower.room_index()[1];
+    bump(&mut a, i);
+    reader.frame(&a, false);
     assert_eq!(
         (a.tower.revision, a.tower.units.len()),
         (b.tower.revision, b.tower.units.len())
     );
-    let mut reader = ViewReader::new();
-    reader.frame(&a, false);
-    a.tick(60.0);
-    reader.frame(&a, false);
     let frame = reader.frame(&b, false);
     assert_eq!(frame[header::FULL], 1.0);
     assert_eq!(frame[header::POPULATION], b.population() as f64);
+}
+
+/// After the log has wrapped (it dropped its oldest marks), a reader that
+/// kept up still reads it, and the log answers a reader exactly
+/// `MARK_CAP` marks behind and no further.
+#[test]
+fn a_wrapped_log_still_answers_a_reader_in_step() {
+    let mut sim = served();
+    let mut reader = ViewReader::new();
+    reader.frame(&sim, false);
+    let index = sim.tower.room_index();
+    let (a, b, c) = (index[0], index[1], index[2]);
+    for _ in 0..MARK_CAP + 1 {
+        bump(&mut sim, a);
+    }
+    reader.frame(&sim, false);
+    assert_eq!(sim.tower.view.marks.unread(0), None, "the log wrapped");
+    sim.tower.units[c].occupants += 5;
+    bump(&mut sim, b);
+    let frame = reader.frame(&sim, false);
+    assert_eq!(slots(&frame), vec![1], "a wrapped log still names the room");
+    let from = sim.tower.view.marks.end();
+    for _ in 0..MARK_CAP {
+        bump(&mut sim, a);
+    }
+    assert_eq!(sim.tower.view.marks.unread(from), Some(MARK_CAP));
+    let mut read = Vec::new();
+    assert!(sim.tower.view.marks.read_since(from, &mut read));
+    assert_eq!(read, vec![a; MARK_CAP]);
+    bump(&mut sim, a);
+    assert_eq!(sim.tower.view.marks.unread(from), None, "one past the cap");
+}
+
+/// A position past the log's end is one this log never gave: the log
+/// answers nothing for it.
+#[test]
+fn a_position_past_the_end_reads_nothing() {
+    let sim = served();
+    let marks = &sim.tower.view.marks;
+    let mut out = Vec::new();
+    assert_eq!(marks.unread(marks.end() + 1), None);
+    assert!(!marks.read_since(marks.end() + 1, &mut out));
+    assert!(out.is_empty());
+    assert_eq!(marks.unread(marks.end()), Some(0));
+    assert!(marks.read_since(marks.end(), &mut out));
 }
