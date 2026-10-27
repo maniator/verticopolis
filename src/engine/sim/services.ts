@@ -10,7 +10,7 @@ import type { FacilityKind, Unit } from "../types";
 
 import { isOperational, isTenanted } from "../types";
 import { HK_MAIDS_PER_UNIT, HK_NOMINAL_ROOMS_PER_MAID } from "../economy/housekeeping";
-import { roomUnits } from "../tower/rooms";
+import { roomUnits, setRoomState } from "../tower/rooms";
 
 /** Recycling / parking / staff / stranded advisories for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -184,7 +184,7 @@ export function resolveExtermination(sim: Simulation): void {
   for (const u of sim.tower.units) {
     if (!isHotelKind(u.kind) || u.state !== "infested") continue;
     if (billedSet && !billedSet.has(u.id)) continue; // escalated after booking: not paid for
-    u.state = "empty";
+    setRoomState(sim.tower, u, "empty");
     u.satisfaction = 1;
     u.occupants = 0;
     u.dirtyDays = undefined;
