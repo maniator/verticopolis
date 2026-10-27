@@ -144,8 +144,9 @@ Slice 2b is split into four small PRs so each gets its own review:
    `ENGINE_REVISION_SUFFIX` (`-i2`), so a worker with the same bytes still
    fetches the files with integrity. The record is
    `review-offline-package-slice2b3-2026-10-27.md`.
-4. **2b-4, remaining e2e.** Install race, eviction, first install, Repair with a
-   waiting build or another tab and with an online save kept, plus
+4. **2b-4, remaining e2e.** Install race, eviction, first install, Repair with an
+   online save kept, with the network cut and beside a second tab (a stop screen
+   takes a waiting build at once, so Repair never meets one), plus
    the respawn refusal latch and the deferred notes on the #985 row. The
    load-cost measurement on the owner's PC runs alongside and is not a merge
    condition.

@@ -32,6 +32,10 @@ pub mod identity;
 pub mod jsmath;
 pub mod ledger;
 pub mod load;
+// The binding's save reader (#1225): `wasm.rs` loads through it, and the
+// crate's tests check it against `load::deserialize`.
+#[cfg(any(test, feature = "wasm"))]
+mod load_stream;
 mod noise;
 pub mod panels;
 pub mod presence;
@@ -67,5 +71,6 @@ pub mod telemetry;
 pub mod tower;
 mod tower_index;
 pub mod tower_query;
+mod tower_query_state;
 #[cfg(feature = "wasm")]
 pub mod wasm;

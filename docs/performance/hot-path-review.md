@@ -279,13 +279,15 @@ Between those PRs the table belongs to the repository owner (maniator), the
 | live staff count | `crowd.staffCount`, `src/engine/Crowd.ts` | counter | ported |
 | riders per car | `crowd.carRiders`, `src/engine/Crowd.ts` | counter | ported (`car_riders`) |
 | noise verdicts | `noiseMemo`, `src/engine/sim/satisfaction.ts` | revision | ported (`noise_memo`, `engine-rs/src/noise.rs`; #1139) |
-| served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported; `is_floor_served` reads the served set in place (#1237), `served_floors` and the staff components are still cloned on read (#859) |
+| served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported; `is_floor_served` reads the served set in place (#1237) and elevator dispatch reads `dispatch_floors` (below, #1143 item 5, #1298); `served_floors` and the staff components are still cloned on read (#859) |
 | stops, transport columns | `stopsCache` on `Tower`, `src/engine/tower/transport.ts` | revision | ported (cloned on read, #859) |
 | built floor bounds | `floorBounds`, `src/engine/Tower.ts` | revision | ported (`floor_bounds`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1237) |
+| served and lobby floors in ascending order, for elevator dispatch | none (`accumulateWaiting` reads `servedSet` in place and walks `lobbyFloors()`, which sorts the lobby tiles' floors, each step the population is above zero; `moveCars` builds a set from `lobbyFloors()` on every call) | revision and unit count | Rust-only: `dispatch_floors`, `engine-rs/src/tower_index.rs` (#1143 item 5, #1298) |
 | passenger and staff routing graphs | `adjacency`, `staffAdjacency`, `src/engine/crowd/routing.ts` | revision | ported |
 | shaft banks | `src/engine/crowd/shaftBanks.ts` | revision | ported |
 | segments served | `segServed`, `src/engine/crowd/segmentGraph.ts` | revision | ported (`connected_set`) |
 | queue view | `queueView`, `src/engine/Crowd.ts` | step and revision | no counterpart yet; check before porting one |
+| tower population for the walkers' busyness gate | none in the engine (`totalPopulation` walks `roomUnits` per read); `crowdPopulation`, `src/render/excalibur/towerPopulation.ts`, caches it in the renderer (the PR that fixes #1234) | revision, sim identity, and the clock minute plus a 30-frame window, per sim | none: render side only, goes with the engine handle |
 | floor reachable from the lobby (`floorReachable`) | `reachMemos`, `src/engine/sim/services.ts` | revision | ported (`reach_memo` in `sim.rs`) |
 | segments reachable from a lobby (`segReachable`, behind `floorReachable` and the per-room checks) | none: one route search per lobby segment for each check (#849) | n/a in TypeScript; revision in Rust | Rust-only: a set of every segment reachable from a lobby, which answers as those searches do: `connected_set` (Modern) and `lobby_reach` (Classic walk budget), `engine-rs/src/crowd/graph.rs` (#1143) |
 | commute averages revision (the hosts key their copies on it) | none (the TypeScript reads `commuteWaitByFloor` in place) | counter | `commute_revision`, `engine-rs/src/crowd/mod.rs` |

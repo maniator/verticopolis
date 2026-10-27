@@ -8,6 +8,7 @@ import { isOperational } from "../../engine/types";
 import { drawCar, drawGarbageTruck, drawMetroTrain, drawStreetCar } from "../sprites";
 import { METRO_TRAIN_H, GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
 import { buildWalkers } from "./towerWalkerBuild";
+import { crowdPopulation } from "./towerPopulation";
 import { carIndicator, type CarIndicator } from "../carIndicator";
 import { stepCarPursuit, type CarDrawState } from "../carMotion";
 import type { PersonView } from "../../simport/view";
@@ -439,7 +440,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   // How busy the building looks right now: scales with population so an empty
   // tower has an empty lobby, and thins out overnight.
   const night = engine.sim.clock.isNight();
-  const crowd = Math.min(1, engine.sim.population / 350) * (night ? 0.35 : 1);
+  const crowd = Math.min(1, crowdPopulation(engine) / 350) * (night ? 0.35 : 1);
   refreshFloorLiveliness(engine);
   for (const w of engine.walkers) {
     // Corridor loiterers gate on their own floor's live occupancy (so an empty
