@@ -49,6 +49,10 @@ export interface HeaderView {
    *  stores it (a Classic tower always runs the canon calendar whatever this
    *  says); with `mode` it gives the clock's day names (`headerClock.ts`). */
   readonly modernCalendar: CalendarKind;
+  /** The founding seed the scenery derives from (`RNG.initialSeed`). Fixed
+   *  for a tower's life, so a reader keeps it per tower and compares it to
+   *  notice a tower swap. */
+  readonly sceneSeed: number;
   /** The visual-effect counters: a change in a `seq` (or a `*Seq` counter)
    *  fires one visual. A reader keeps the last value it saw, so this is
    *  cheap to take every frame. */

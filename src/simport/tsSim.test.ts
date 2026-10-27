@@ -40,6 +40,7 @@ describe("TsSim over the live instance", () => {
       mealOverlayRevision: sim.tower.mealOverlayRevision,
       mode: sim.mode,
       modernCalendar: sim.modernCalendar,
+      sceneSeed: sim.rng.initialSeed,
       fx: {
         santaSeq: sim.santaFxSeq,
         vipSeq: sim.vipFxSeq,
@@ -68,6 +69,16 @@ describe("TsSim over the live instance", () => {
     expect(port.view.header.fx.santaSeq).toBe(4);
     sim.view = null;
     expect(port.view.header.camera).toBeNull();
+  });
+
+  it("shows the founding seed, which differs per tower and follows a swap", () => {
+    let sim = newSeededGame(7, "modern");
+    const port = createTsSim(() => sim);
+    expect(port.view.header.sceneSeed).toBe(sim.rng.initialSeed);
+    const first = port.view.header.sceneSeed;
+    sim = Simulation.newGame(9, "classic");
+    expect(port.view.header.sceneSeed).toBe(sim.rng.initialSeed);
+    expect(port.view.header.sceneSeed).not.toBe(first);
   });
 
   it("walks the rooms for population only when it is read, once per header", () => {

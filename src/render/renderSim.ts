@@ -30,7 +30,7 @@ import type { CrowdView, TowerView } from "../simport/view";
 export interface RenderSim {
   /** The tower's mode, which picks its catalog (`towerCatalog`). */
   readonly mode: GameMode;
-  /** The founding seed the scenery derives from; fixed for a tower's life. */
+  /** View: `header.sceneSeed`. The founding seed the scenery derives from; fixed for a tower's life. */
   readonly rng: { readonly initialSeed: number };
   /** View: `header.camera`. The saved camera. Read on construction and on `setSim` to restore it (`adoptCamera`); null means no saved view. */
   readonly view: SerializedView | null;
