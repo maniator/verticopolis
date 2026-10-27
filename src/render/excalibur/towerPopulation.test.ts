@@ -30,7 +30,9 @@ describe("crowdPopulation", () => {
 
   it("holds the count for the refresh window after a step, then reads again", () => {
     const { reads, sim, engine } = counted(newSeededGame(7, "modern"));
+    sim.tick(1); // the WASM binding restarts its revision on the first step (#1296)
     crowdPopulation(engine);
+    expect(reads.n).toBe(1);
     sim.tick(1);
     frames(engine, POPULATION_REFRESH_FRAMES - 1);
     expect(reads.n).toBe(1);

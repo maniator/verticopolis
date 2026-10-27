@@ -317,5 +317,6 @@ Slice 3 adds the `view.ts` lines, the `TsSim` fills and assertions in its own fi
   emergency answer that guts rooms (a declined bomb threat) changes states with
   no step.
 - Deferred with a row: `emitMealRushes` in `frameLoop.ts` walks the rooms every
-  frame (`meal-rush-population-per-frame`, #1334). The top-speed row (#1335) is
-  resolved by the refresh window.
+  frame (`meal-rush-population-per-frame`, #1334). The top-speed row (#1335) stays
+  open: the refresh window bounds the walk to about two a second, and an
+  engine census or the port header makes it O(1).
