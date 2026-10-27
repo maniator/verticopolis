@@ -17,9 +17,9 @@ import type { CrowdView, TowerView } from "../simport/view";
  *
  * - Per frame, cheap: `clock`, `tower.revision`, the effect counters, `weather`.
  * - Per frame, memoized by the engine: `congestion`, `crowd.queueView`.
- * - Per step or per HUD tick: `population` (it walks every room, so the target
- *   is one read per step and never per frame; `towerCrowd.ts` still reads it
- *   every frame today, which is #1234 and a later step of slice 3).
+ * - Per step or per HUD tick: `population` (it walks every room, so it is read
+ *   once per step and never per frame: `towerPopulation.ts` keeps it per step
+ *   and revision, which fixes #1234).
  * - Per scene sync or hourly: `floorHeatmap`, `peakCongestion`, `parkingUsage`,
  *   `recyclingFill`, `positionReachable` (memoized per revision by its caller).
  * - Once per tower: `mode`, `rng.initialSeed`, `view`.
@@ -69,6 +69,8 @@ export interface RenderSim {
 
 /** The clock reads the renderer makes. */
 export interface RenderClock {
+  /** The game clock in minutes since the start; it moves on every sim step. */
+  readonly minutes: number;
   readonly hour: number;
   readonly minute: number;
   readonly minuteOfDay: number;

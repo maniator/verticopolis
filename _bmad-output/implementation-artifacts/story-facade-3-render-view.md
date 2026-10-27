@@ -1,6 +1,6 @@
 # Story facade.3: The renderer and HUD read the view (3a types, 3b frame data)
 
-Status: in progress (3a-1 merged as #1291; 3a-2a is the RenderSim PR; clockView, view.fx and view.camera next; 3b waits for gates)
+Status: in progress (3a-1 #1291, 3a-2a #1317, clock helper #1322, fx and camera #1324 and sceneSeed #1328 merged; population cadence is the open PR; the loop binding waits for #1325; 3b waits for gates)
 
 Slice 3 of the Rust-backed facade
 (`_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/slice-plan.md`),
@@ -282,3 +282,20 @@ Slice 3 adds the `view.ts` lines, the `TsSim` fills and assertions in its own fi
   `camera` (the frame has none), from the loaded save or a small getter, on
   construction and on a tower swap, so the null branch is not the default by
   accident.
+
+## Header cadence notes (#1234)
+
+- `towerCrowd.ts` read `sim.population` every frame for the walkers' busyness
+  gate; on the TypeScript engine that walks every room (about 330 µs on the
+  large tower, cloud estimate). `towerPopulation.ts` (`crowdPopulation`) keeps
+  the value per (sim, clock minute, `tower.revision`): a sim step always moves
+  the minute, a structural edit while paused moves the revision, and a tower
+  swap changes the sim object. So the frames between steps reuse one read.
+- `RenderClock` gains `minutes` (the live `Clock` and `ClockReads` both have
+  it) for that key. The count is unchanged within a step, so the walkers show
+  exactly what they showed.
+- `towerPopulation.test.ts` pins the read count: one read for 120 frames in a
+  step, one more per step, one more after a paused edit, one more for a
+  replaced tower.
+- The loop binding later takes `population` from the once-per-frame header
+  instead; the memo then goes away with the engine handle.
