@@ -384,8 +384,9 @@ describe("engine crate version rule", () => {
   it("the five lock files are the whole conformance lock", () => {
     // A new file at the top of conformance/ or in events/ has to be placed:
     // add it to LOCK_FILES (and the Rust test's list) when it pins the engine,
-    // or to this list when it is an input the lock already covers.
-    const inputs = new Set(["README.md", "fixtures", "scenarios"]);
+    // or to this list when it is an input the lock already covers or has no
+    // pinned hashes (the fuzz corpus holds only the engines' agreement).
+    const inputs = new Set(["README.md", "fixtures", "fuzz-corpus", "scenarios"]);
     const locked = new Set(LOCK_FILES.map((f) => f.split("/")[0]));
     const visible = (dir: string) =>
       readdirSync(resolve(ROOT, dir)).filter((n) => !n.startsWith("."));

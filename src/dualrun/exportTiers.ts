@@ -115,6 +115,19 @@ export const BINDING_EXPORT_TIERS = {
   elevatorTelemetry: T2,
   housekeepingReport: T2,
   loopMemos: T2,
+  // Tier 2, the panel getters (facade slice 6b): read-only answers for the
+  // stats screen, HUD strip, inspector and editor cards, overlays and
+  // onboarding checklist.
+  towerStats: T2,
+  statsReport: T2,
+  housekeepingCoverage: T2,
+  unitDetail: T2,
+  transportDetail: T2,
+  floorHeatmap: T2,
+  peakCongestionHotspot: T2,
+  onboardingFacts: T2,
+  // Tier 2, the engine view (facade slice 6a): the layout, the structure
+  // per revision, the metadata per meta revision and undo's signature.
   viewLayout: T2,
   viewStructure: T2,
   unitMetaSince: T2,

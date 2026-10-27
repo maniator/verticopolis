@@ -66,6 +66,26 @@ describe("engine-rs.yml engine path lists", () => {
     );
     expect(casePaths(dropped)).not.toEqual(pushPaths(dropped));
   });
+
+  it("covers every input of the differential's window key, so the corpus job runs when one changes", async () => {
+    const { fuzzKeyFiles } = await import("./conformance/fuzzKey");
+    // The key's own file lists, not a copy: an import added to a script the
+    // key hashes lands in `scripts` and must land in the path lists too.
+    const files = fuzzKeyFiles(resolve(here, "..", ".."));
+    const inputs = [...files.scripts, ...files.wasmBuild, ".github/workflows/engine-fuzz.yml", ".nvmrc", "package-lock.json"];
+    const matches = (file: string) =>
+      casePaths(yaml).some((p) => (p.endsWith("/*") ? file.startsWith(p.slice(0, -1)) : p === file));
+    for (const file of inputs) expect(matches(file), `${file} is not in the engine path lists`).toBe(true);
+  });
+
+  it("requires the aggregate gate to include fuzz-corpus in its dependencies", () => {
+    expect(yaml).toContain("needs: [changes, consumer, rust, wasm-binding, fuzz-corpus]");
+  });
+
+  it("allows skipping required engine jobs only when all four are skipped on purpose", () => {
+    expect(yaml).toContain('&& [ "$CONSUMER" = skipped ] && [ "$RUST" = skipped ] && [ "$BINDING" = skipped ] && [ "$CORPUS" = skipped ]');
+    expect(yaml).toContain('test "$CONSUMER" = success && test "$RUST" = success && test "$BINDING" = success && test "$CORPUS" = success');
+  });
 });
 
 /**

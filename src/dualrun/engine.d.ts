@@ -132,6 +132,11 @@ export class Engine {
      */
     fires(): number;
     /**
+     * `floorHeatmap(mode)`'s cells as JSON; a mode that is not one of the
+     * four overlays is an error.
+     */
+    floorHeatmap(mode: string): string;
+    /**
      * The per-frame read model as one flat number array (see
      * `frame_view` for the layout): what the host reads every frame while
      * the engine runs the simulation.
@@ -169,6 +174,10 @@ export class Engine {
      */
     gameplayEventsPending(): number;
     /**
+     * `housekeepingCoverage()`, as JSON.
+     */
+    housekeepingCoverage(): string;
+    /**
      * `economy.housekeepingReport()`: yesterday's shift result as JSON
      * `{ cleaned, leftover }`, or nothing (`undefined`) before the first
      * morning checkout.
@@ -195,6 +204,14 @@ export class Engine {
      * as the TypeScript defaults do.
      */
     static newGame(seed: number, mode: string, modern_calendar?: string | null, start_unbridged?: boolean | null): Engine;
+    /**
+     * The five onboarding facts as JSON.
+     */
+    onboardingFacts(): string;
+    /**
+     * `peakCongestionHotspot()`: `{ ratio, floor }` as JSON.
+     */
+    peakCongestionHotspot(): string;
     /**
      * The pending player choice as JSON `{ kind, cost, message }`, or null.
      */
@@ -334,6 +351,10 @@ export class Engine {
      * The hashed state view: the saved game minus prose, as canonical JSON.
      */
     stateView(): string;
+    /**
+     * Everything the stats screen reads beyond `stats()`, as JSON.
+     */
+    statsReport(): string;
     tick(dt_minutes: number): void;
     /**
      * `toggleAutoBridge()`: the preference after the flip.
@@ -363,13 +384,25 @@ export class Engine {
      */
     towerSignature(): bigint;
     /**
+     * `stats()`: the HUD strip's counters, as JSON.
+     */
+    towerStats(): string;
+    /**
      * The shaft covering a tile, serialized as the save would, or null.
      */
     transportAt(floor: number, x: number): string | undefined;
     /**
+     * The transport inspector and editor card for shaft `id`, as JSON, or null.
+     */
+    transportDetail(id: number): string | undefined;
+    /**
      * The unit covering a tile, serialized as the save would, or null.
      */
     unitAt(floor: number, x: number): string | undefined;
+    /**
+     * The unit inspector and editor card for unit `id`, as JSON, or null.
+     */
+    unitDetail(id: number): string | undefined;
     /**
      * The labels and subtypes changed after the meta revision `since`, as
      * JSON `{ revision, full, units: [[id, label, subtype], ...] }`

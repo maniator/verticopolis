@@ -40,6 +40,8 @@ export interface Deployments {
   readonly origin: string;
   /** Pick the deployment later requests are answered from. */
   serve(which: Deployment): void;
+  /** Answer `sw.js` of the first deployment with one extra comment line, so the browser finds a new worker whose precache manifest is identical (the same engine bytes under the same keys). */
+  reissueWorker(on: boolean): void;
   /** Make `version.json` answer 404, as it does when the host or the network drops it. */
   failVersionJson(failing: boolean): void;
   /** Every path requested so far, in order, with the deployment that answered. */
@@ -84,7 +86,7 @@ function manifestOf(sw: string): { revisionOf(url: string): string; entries: num
   return {
     entries,
     revisionOf: (url) => {
-      const found = new RegExp(`\\{url:"${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}",revision:"([a-f0-9]+)"`).exec(sw);
+      const found = new RegExp(`\\{url:"${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}",revision:"([a-f0-9]{32}(?:-i\\d+)?)"`).exec(sw);
       if (!found) throw new Error(`sw.js has no revisioned precache entry for ${url}`);
       return found[1];
     },
@@ -185,6 +187,7 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
   });
   let current: Deployment = "A";
   let versionJsonFails = false;
+  let workerReissued = false;
   const requests: Deployments["requests"] = [];
 
   const server: Server = createServer((req, res) => {
@@ -212,7 +215,8 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
       return;
     }
     try {
-      const body = readFileSync(file);
+      let body = readFileSync(file);
+      if (workerReissued && from === "A" && path === "/sw.js") body = Buffer.concat([body, Buffer.from("\n// reissued\n")]);
       res.writeHead(200, {
         "content-type": TYPES[extname(file)] ?? "application/octet-stream",
         "content-length": body.length,
@@ -230,6 +234,9 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
     origin,
     serve: (which) => {
       current = which;
+    },
+    reissueWorker: (on) => {
+      workerReissued = on;
     },
     failVersionJson: (failing) => {
       versionJsonFails = failing;
