@@ -155,13 +155,24 @@ export function manifestIntegrity(manifest: string): Map<string, string | undefi
 }
 
 /**
+ * Whether the build puts `integrity` on every precache entry. Vercel preview
+ * deployments serve a Toolbar-rewritten index.html that would fail the
+ * check at install, so they keep engine-only integrity. Production and local
+ * builds get the full set. `VERCEL_ENV` is set by Vercel's build and by
+ * nothing else in this repository.
+ */
+export function shellIntegrityWanted(env: Record<string, string | undefined> = process.env): boolean {
+  return env.VERCEL_ENV !== "preview";
+}
+
+/**
  * What is wrong with the engine package in a built `dist/`, as sentences (an
  * empty list means it is sound): `dist/engine/BUILD.json` must be a schema 2
  * record whose entries match the glue and binary beside it, whose `package`
  * is the hash of its own files block, and each of the three engine precache
  * entries must carry the `integrity` of the file in `dist/`.
  */
-export function engineDistProblems(distDir: string, manifest: string): string[] {
+export function engineDistProblems(distDir: string, manifest: string, options: { shell?: boolean } = {}): string[] {
   const problems: string[] = [];
   const recordFile = resolve(distDir, ENGINE_DIR, ENGINE_BUILD_RECORD);
   if (!existsSync(recordFile)) return [`dist/${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing`];
@@ -194,6 +205,7 @@ export function engineDistProblems(distDir: string, manifest: string): string[] 
   // Every other entry whose file is in dist/ carries its integrity too, so a
   // precache miss on a controlled page stores it and the shell self-heals.
   for (const [url, have] of integrity) {
+    if (options.shell === false) break;
     if (INTEGRITY_FILES.includes(url) || NO_INTEGRITY_FILES.includes(url)) continue;
     const file = resolve(distDir, url);
     if (!existsSync(file) || !statSync(file).isFile()) continue;

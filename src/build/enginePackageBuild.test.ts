@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames";
 import { engineBuildRecord } from "../wasmhost/enginePackageRecord";
-import { ENGINE_REVISION_SUFFIX, INTEGRITY_FILES, engineDistProblems, engineRevision, engineIntegrityTransform, integrityOf, manifestIntegrity, manifestRevisions, readExpectedPackage, revisionsOf, shellProblems, shellRevisionProblems } from "./enginePackageBuild";
+import { ENGINE_REVISION_SUFFIX, INTEGRITY_FILES, engineDistProblems, engineRevision, engineIntegrityTransform, integrityOf, manifestIntegrity, manifestRevisions, readExpectedPackage, revisionsOf, shellIntegrityWanted, shellProblems, shellRevisionProblems } from "./enginePackageBuild";
 
 const sha = (d: Uint8Array | string) => createHash("sha256").update(d).digest("hex");
 const md5 = (d: Uint8Array | string) => createHash("md5").update(d).digest("hex");
@@ -181,6 +181,17 @@ describe("engineDistProblems", () => {
     expect(engineDistProblems(d, `${base},{url:"assets/gone-abc.js",revision:null}]`), "an entry with no file in dist/ is not this check's").toEqual([]);
     writeFileSync(join(d, "manifest.webmanifest"), "{}");
     expect(engineDistProblems(d, `${base},{url:"manifest.webmanifest",revision:"r5"}]`), "the web app manifest is written after the transforms run").toEqual([]);
+  });
+
+  it("does not ask a preview build for shell integrity, but still checks the engine files", () => {
+    const d = pkg();
+    writeFileSync(join(d, "index.html"), "<html></html>");
+    const base = manifestFor(d).slice(0, -1);
+    expect(engineDistProblems(d, `${base},{url:"index.html",revision:"r4"}]`, { shell: false })).toEqual([]);
+    expect(engineDistProblems(d, manifestFor(d, { [`${ENGINE_DIR}${ENGINE_WASM}`]: null }), { shell: false }).join("\n")).toContain("carries no integrity");
+    expect(shellIntegrityWanted({ VERCEL_ENV: "preview" })).toBe(false);
+    expect(shellIntegrityWanted({ VERCEL_ENV: "production" })).toBe(true);
+    expect(shellIntegrityWanted({})).toBe(true);
   });
 
   it("reports a binary that is not the one BUILD.json describes", () => {

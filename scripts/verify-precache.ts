@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets.ts";
 import { precacheManifestText } from "../src/build/engineBundle.ts";
-import { engineDistProblems, shellProblems, shellRevisionProblems } from "../src/build/enginePackageBuild.ts";
+import { engineDistProblems, shellIntegrityWanted, shellProblems, shellRevisionProblems } from "../src/build/enginePackageBuild.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
 import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, ENGINE_WASM, glueLoads } from "../src/wasmhost/engineAssets.ts";
 
@@ -129,7 +129,7 @@ if (builtEngine) {
   // beside it, and every entry whose file is in dist/ carries the integrity
   // that keeps a body from another build out of the precache and lets a
   // missed entry be stored again (#1345).
-  const unsound = engineDistProblems(DIST, manifest);
+  const unsound = engineDistProblems(DIST, manifest, { shell: shellIntegrityWanted() });
   if (unsound.length > 0) fail(`the engine package in dist/ is not one consistent set: ${unsound.join("; ")}`);
 }
 // The page checks the engine against the id compiled into its chunks, and a

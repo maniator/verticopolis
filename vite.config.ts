@@ -7,7 +7,7 @@ import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 import { parseEngineBuild, type EngineBuild } from "./src/build/engineBundle";
-import { engineIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
+import { engineIntegrityTransform, readExpectedPackage, shellIntegrityWanted } from "./src/build/enginePackageBuild";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
@@ -77,7 +77,7 @@ const ENGINE_BUILD = engineBuild();
  * #985, and production and local builds get the full set. `VERCEL_ENV` is
  * set by Vercel's build and by nothing else in this repository.
  */
-const SHELL_INTEGRITY = process.env.VERCEL_ENV !== "preview";
+const SHELL_INTEGRITY = shellIntegrityWanted();
 const TOOLING_BUILD = toolingBuild();
 
 /**
