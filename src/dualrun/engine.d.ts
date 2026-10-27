@@ -219,6 +219,13 @@ export class Engine {
      */
     onboardingFacts(): string;
     /**
+     * `paintBrush(kind, floor, tiles)` with the tiles as JSON text: JSON
+     * `{ placed, reason? }`, the floor and lobby brush (`brush.rs`) in one
+     * call. Every argument is read raw, so a malformed brush is refused
+     * with "That request is not valid." as TypeScript refuses it.
+     */
+    paintBrush(kind: string, floor: number, tiles: string): string;
+    /**
      * `peakCongestionHotspot()`: `{ ratio, floor }` as JSON.
      */
     peakCongestionHotspot(): string;

@@ -232,9 +232,12 @@ pub fn edit(sim: &mut Simulation) -> Result<(), String> {
     let r = sim.remove_car(elevator);
     check(!r.ok && r.delta == 0.0, "the last car stays")?;
 
-    for x in ELEVATOR_X..ELEVATOR_X + 6 {
-        check(sim.build(Kind::Floor, 4, x).ok, "floor tiles on floor 4")?;
-    }
+    let tiles: Vec<i64> = (ELEVATOR_X..ELEVATOR_X + 6).collect();
+    let r = sim.paint_brush(Kind::Floor, 4, &tiles);
+    check(
+        r.placed == 6 && r.reason.is_none(),
+        "the brush lays floor tiles on floor 4",
+    )?;
     let r = sim.extend_transport(elevator, ExtendEnd::Up, 4);
     check(
         r.charge.ok && r.top == 4 && r.added == 1,

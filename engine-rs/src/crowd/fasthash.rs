@@ -11,9 +11,15 @@
 //! uses), and `finish` scrambles the result with the `splitmix64`
 //! finalizer, a few instructions in all.
 //!
+//! The tower's `by_id` (unit id to list index) uses `FastMap` too: a removal
+//! rewrites the entries after the removed unit, up to the whole list on a
+//! large tower (#1290), and the step looks units up by id per person. Its
+//! ids come from the save, so a crafted save could pick colliding ids and
+//! slow its own load; std's fixed keys on the wasm32 build allowed as much.
+//!
 //! `FastMap` and `FastSet` offer no iteration: their order would follow the
-//! hash, so a result that read it could differ between builds. Insert and
-//! look up only.
+//! hash, so a result that read it could differ between builds. `FastMap`
+//! inserts, looks up, removes and clears; `FastSet` only adds.
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{BuildHasherDefault, Hash, Hasher};
@@ -118,6 +124,22 @@ impl<K: Hash + Eq, V> FastMap<K, V> {
     #[inline]
     pub fn get_or_insert_with(&mut self, key: K, make: impl FnOnce() -> V) -> &mut V {
         self.0.entry(key).or_insert_with(make)
+    }
+
+    #[inline]
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        self.0.remove(key)
+    }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        self.0.clear()
+    }
+
+    /// For tests that check an index against its list.
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.0.len()
     }
 }
 

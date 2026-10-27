@@ -265,7 +265,7 @@ export function describePortContract(name: string, makePort: () => SimPort, opts
 
 /** A port from `makePort`, ticked once so a parity host is attached before
  *  the case's first command. */
-function start(makePort: () => SimPort): SimPort {
+export function start(makePort: () => SimPort): SimPort {
   const port = makePort();
   port.tick(1);
   return port;
@@ -273,7 +273,7 @@ function start(makePort: () => SimPort): SimPort {
 
 /** `port.command`, checking that each result's `delta` is the balance's
  *  change (nothing else runs between the command and the check). */
-function sender(port: SimPort): <C extends Command>(c: C) => Promise<CommandResult<C>> {
+export function sender(port: SimPort): <C extends Command>(c: C) => Promise<CommandResult<C>> {
   return async (c) => {
     const before = port.view.header.money;
     const result = await port.command(c);
@@ -286,7 +286,7 @@ function sender(port: SimPort): <C extends Command>(c: C) => Promise<CommandResu
  *  to span the cells the session builds over (`mid - 4` to `mid + 15`). Read
  *  through `structureKindAt`, so the contract does not depend on `units`
  *  listing structure tiles. */
-function lobbyCenter(port: SimPort): number {
+export function lobbyCenter(port: SimPort): number {
   const lobby: number[] = [];
   for (let x = 0; x < LOT_WIDTH; x++) if (port.view.tower.structureKindAt(1, x) === "lobby") lobby.push(x);
   expect(lobby.length, "the founded tower's starter lobby").toBeGreaterThan(0);
@@ -349,7 +349,7 @@ interface SavedTower {
   log?: { text: string; kind: string }[];
 }
 
-function mustFind<T>(items: ReadonlyArray<T>, match: (item: T) => boolean): T {
+export function mustFind<T>(items: ReadonlyArray<T>, match: (item: T) => boolean): T {
   const found = items.find(match);
   if (found === undefined) throw new Error("contract: expected item not found");
   return found;
