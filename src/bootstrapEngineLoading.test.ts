@@ -12,7 +12,8 @@ vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 // A package load the test settles itself, to hold the boot while it looks at the cover.
 const held = vi.hoisted(() => ({ fail: (_e: Error) => {} }));
 const noop = held.fail;
-vi.mock("./wasmhost/engineChoice", async (importOriginal) => ({ ...(await importOriginal<typeof import("./wasmhost/engineChoice")>()), engineRequested: () => "wasm" }));
+// The cohort's selection picks the boot engine (#1197); this page life asks for Rust.
+vi.mock("./engineCohort/boot", async (importOriginal) => ({ ...(await importOriginal<typeof import("./engineCohort/boot")>()), selectBootEngine: () => "wasm", noteRustFailed: vi.fn() }));
 vi.mock("./wasmhost/startWasmHost", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./wasmhost/startWasmHost")>()),
   loadWasmEngine: vi.fn(() => new Promise((_, reject) => (held.fail = reject))),
@@ -54,7 +55,7 @@ describe("bootGame, the engine loading line (#1132)", () => {
       expect(await run).toBeInstanceOf(Error);
       expect(document.querySelector(".boot-loading")).toBeNull();
       expect(document.getElementById("boot-cover")).toBeNull();
-      expect(document.getElementById("engine-failure")?.textContent).toContain("the engine package did not load within 90 seconds");
+      expect(document.getElementById("engine-failure")?.textContent).toContain("The engine took too long to load");
       expect(document.getElementById("a11y-live")?.textContent).toBe("");
     } finally {
       vi.useRealTimers();

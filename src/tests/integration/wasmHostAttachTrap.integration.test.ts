@@ -114,7 +114,7 @@ describe.skipIf(!hasWasmPackage())("WASM host attach trap (#1113)", () => {
     try {
       expect(calls).toEqual(["catalog"]);
       expect(h.status).toMatchObject({ hosted: false, latched: true, starts: 0, lastFallback: { reason: "attach-refused", stage: "start" } });
-      expect(h.status.lastError).toMatch(/^not hosting this tower or any later one, since the WASM engine trapped: the engine returned no classic catalog: unreachable/);
+      expect(h.status.lastError).toMatch(/^not hosting this tower or any later one, since the Rust engine trapped: the engine returned no classic catalog: unreachable/);
       a.adoptSim(Simulation.newGame(67, "classic"));
       expect(calls).toEqual(["catalog"]);
     } finally {

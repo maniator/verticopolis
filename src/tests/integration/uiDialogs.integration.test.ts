@@ -1772,7 +1772,9 @@ describe("showSettings: the Settings dialog", () => {
     // The two boolean prefs render as switches (checkbox with switch
     // semantics), each with a visible explanatory note.
     expect(dialog().querySelectorAll('input[role="switch"]')).toHaveLength(2);
-    expect(dialog().querySelectorAll(".set-note")).toHaveLength(2);
+    expect(dialog().querySelectorAll('.set-note:not([id^="note-engine-"])')).toHaveLength(2);
+    // The Game engine choice (#1197) explains each of its three options.
+    expect(dialog().querySelectorAll('.set-note[id^="note-engine-"]')).toHaveLength(3);
     const acts = [...actions.querySelectorAll("[data-act]")].map((b) => b.getAttribute("data-act"));
     expect(acts).toEqual(["close"]);
   });

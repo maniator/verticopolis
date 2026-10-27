@@ -2,7 +2,7 @@
 title: 'Staged WASM cohort with sticky engine selection and a Settings engine choice'
 type: feature
 created: '2026-10-20'
-status: approved for implementation (activation not approved)
+status: in implementation (activation not approved)
 issue: '#1197'
 baseline_commit: c3aa94f (main, after #1177)
 context:
@@ -145,6 +145,12 @@ The size gate is not in this table: it acts at a tower load (below).
 
 ### 3. Sticky safety suppression
 
+- **When it runs.** The suppression and the crash marker switch on with
+  the cohort's fields (`COHORT_TELEMETRY`). Until then a stored Rust choice
+  boots Rust as it does on main, so no boot moves to TypeScript where the
+  reliability data could not say why (independent review of #1266, item 4;
+  route (a), pending the owner's answer). Tests turn it on through the
+  tooling seam.
 - **What latches.** A latched runtime fallback (`onFallback(_, true)`: a
   trap in a command, tick, frame sync, drain, undo, or while a tower
   attaches), any failure while the engine package loads, any failure while
@@ -155,23 +161,28 @@ The size gate is not in this table: it acts at a tower load (below).
 - **Two scopes, keyed on the stage where it failed** (`FALLBACK_STAGES` in
   `src/wasmhost/engineBoot.ts`), since one reason code can come from either
   kind of cause. `boot-error` from the load covers a package fetch that
-  failed (`load-failed`) or could not be checked (`unverifiable`), which is
-  a network or deploy problem; `boot-error` from the host's start is the
-  engine itself.
+  failed (`load-failed`), which is a network or deploy problem, and a
+  browser that cannot check the files reports `unverifiable` (#1185), also
+  from the load; `boot-error` from the host's start is the engine itself.
   - *Build* (stage `load`, whatever the reason: `boot-timeout`,
-    `package-mismatch`, `boot-error`): a slow network, an offline fetch or
-    the deploy race #1046, which say nothing about the engine. TypeScript
-    for the rest of this build (same `__APP_SHA__`); a new build tries Rust
-    once, and a build-scoped failure on that build latches again.
+    `package-mismatch`, `unverifiable`, `boot-error`): a slow network, an
+    offline fetch or the deploy race #1046, which say nothing about the
+    engine. TypeScript for the rest of this build (same `__APP_SHA__`); a new
+    build tries Rust once, and a build-scoped failure on that build latches
+    again. (A proposal for the owner: treat `package-mismatch` as build scope
+    at any stage, since it is the deploy race wherever the host notices it.
+    Until the owner decides, the scope follows the stage.)
   - *Fault* (stages `start`, `adopt`, `undo` and `host`: the trap codes,
     a `boot-error` or `other` from the host, and the crash loop's
     `unclean-exit`): TypeScript on every later boot, across deploys, until
     the player retries. No automatic re-enable in this story; any later
     automatic re-enable on a new validated engine is a separate spec and an
     owner decision, and must be visible and loop-proof.
-- **Not latched:** a clean attach refusal. Under the cohort the page life
-  still stays on TypeScript after it (rule 4 below), but the next page life
-  follows the policy.
+- **Not latched:** a clean attach refusal (`attach-refused` or
+  `package-mismatch`). Under the cohort the page life should still stay on
+  TypeScript after it (rule 4 below), and the next page life follows the
+  policy. The host does not hold the page life yet: deferred to #1258,
+  before any stage above 0.
 - **Within a page life:** after any fallback the page life stays on
   TypeScript; no later tower in it goes back to Rust.
 - **Crash-loop protection.** The marker (`vc.engineBoot`) is per page
@@ -179,7 +190,7 @@ The size gate is not in this table: it acts at a tower load (below).
   life that requests Rust adds its own entry (a random page-life key, the
   build's `__APP_SHA__`, and a heartbeat time) before it loads the engine.
   While the page is visible it refreshes its heartbeat every 10 seconds.
-  It removes its entry when the page is hidden (`visibilitychange` to
+  It removes its own entry when the page is hidden (`visibilitychange` to
   hidden, or `pagehide`), which is a clean exit as far as this check goes,
   and adds it back when the page becomes visible again. Removing it on hide
   keeps a phone that discards a backgrounded tab from counting as a crash.
@@ -190,9 +201,24 @@ The size gate is not in this table: it acts at a tower load (below).
   - Two or more stale entries for the same build latch a fault with the
     reason `unclean-exit`, and the boot runs TypeScript. One stale entry is
     kept and counted again next time.
-  - A page life that exits cleanly removes its own entry and the stale ones
-    for its build. Entries for another build are dropped at boot, since a
-    crash on an older build says nothing about this one.
+  - A hide removes only the page's own entry, since a page that hid and
+    then crashed has not shown that the build runs. Only a `pagehide` from a
+    page that ran visibly on Rust for at least 30 seconds also removes the
+    stale entries for its build. Entries for another build are dropped at
+    boot, since a crash on an older build says nothing about this one.
+  - One limit: a visible page whose main thread stalls for more than 30
+    seconds (a very large load, a paused debugger) cannot refresh its
+    heartbeat, so a window that boots meanwhile counts it as one stale entry.
+    The stalled page refreshes its entry when it resumes, so a false latch
+    needs two stale entries at once: two stalls on one build, or two windows
+    stalled together while a third one boots.
+  - A second limit: a browser or system shutdown with the game visible may
+    end the page without `pagehide`, which leaves a stale entry. Two such
+    shutdowns on one build latch `unclean-exit`, and the player can retry
+    from Settings.
+  - A third limit: a device that sleeps or a clock that jumps forward with
+    the game visible can make a live window's entry look stale until its
+    next heartbeat, so a window that boots in that gap counts it once.
 - **Retry.** Settings shows the suppression and a "Try the Rust engine
   again" button, which clears the safety record and the marker. It takes
   effect at the next start; the game never reloads itself.
@@ -402,7 +428,9 @@ using the opt-out count this story makes visible.
 5. Two stale crash-marker entries on one build latch `unclean-exit`; a
    second open window never counts as a crash.
 6. A page life never returns to Rust after a fallback or a size-gated
-   tower.
+   tower. (A clean attach refusal does not hold this yet: the host leaves
+   hosting on, so a later tower in that page life is offered to Rust again.
+   Deferred to #1258, before any stage above 0.)
 7. A tower above the threshold, at the first tower, a Load or an import,
    runs on TypeScript with the notice and `size_gated`; one that grew past
    it switches at its next Load or import; an undo restore is never gated.
@@ -446,3 +474,11 @@ using the opt-out count this story makes visible.
 - The size gate's unit and threshold.
 - Whether build-scoped suppression (any failure while the package loads)
   may retry once on a new build, as specified, or should latch like a fault.
+- Whether a `package-mismatch` seen after the load (at `start` or `adopt`)
+  is build scope like one seen while loading (recommended: yes, it is the
+  deploy race wherever it shows up).
+- Whether the safety path waits for the cohort's fields (route (a), in force
+  now, with `engine_requested` still reporting the request) or runs at
+  stage 0 for a stored Rust choice, with `engine_requested` then reporting
+  the engine after suppression (route (b)). Both are in the A4 + #1090
+  analytics packet.

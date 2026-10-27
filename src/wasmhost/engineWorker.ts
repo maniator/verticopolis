@@ -60,7 +60,7 @@ scope.onmessage = (e) => {
     load(msg.url).catch((err: unknown) => {
       queue = null;
       const refused = packageFailureOf(err);
-      post({ type: "error", fatal: true, message: `could not load the WASM engine: ${err instanceof Error ? err.message : String(err)}`, reason: bootFailureReason(err), ...(refused ? { package: refused } : {}), ...(build ? { build } : {}) });
+      post({ type: "error", fatal: true, message: `could not load the Rust engine: ${err instanceof Error ? err.message : String(err)}`, reason: bootFailureReason(err), ...(refused ? { package: refused } : {}), ...(build ? { build } : {}) });
     });
     return;
   }

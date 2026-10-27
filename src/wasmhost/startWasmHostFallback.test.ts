@@ -3,6 +3,7 @@ import { Simulation } from "../engine/Simulation";
 import { catalogFor } from "../engine/catalog";
 import { EngineBootError } from "./engineBoot";
 import { EMPTY_WASM, wasmFetch } from "./engineLoad.fixture";
+import { attachMirror } from "../dualrun/mirror";
 import { fakeModule } from "./fakeEngine.fixture";
 import { loadWasmEngine, startWasmHost, type HostFallback, type WasmHostApp } from "./startWasmHost";
 
@@ -181,7 +182,7 @@ describe("a trap while a tower attaches (#1113)", () => {
     const trapped = mod.calls.length;
     expect(mod.calls[trapped - 1]).toBe("fromSave");
     expect(handle.status).toMatchObject({ hosted: false, latched: true, starts: 1, fallbacks: 1, lastFallback: { reason: "attach-refused", stage: "adopt" } });
-    expect(handle.status.lastError).toBe("not hosting this tower or any later one, since the WASM engine trapped: unreachable");
+    expect(handle.status.lastError).toBe("not hosting this tower or any later one, since the Rust engine trapped: unreachable");
     expect(seen).toEqual([{ reason: "attach-refused", stage: "adopt", latched: true }]);
     expect(mod.engines[0].freed).toBe(true); // the first tower's, let go before
     // A load, an undo and a stop: none asks the module again.
@@ -273,7 +274,7 @@ describe("a trap while a tower attaches (#1113)", () => {
     const handle = startWasmHost(a, mod, quiet());
     expect(mod.calls).toEqual(["catalog", "catalog", "fromSave", "catalog"]);
     expect(handle.status).toMatchObject({ hosted: false, latched: true, fallbacks: 1, lastFallback: { reason: "attach-refused", stage: "start" } });
-    expect(handle.status.errors).toEqual(["not hosting this tower: unknown mode: tower", "not hosting this tower or any later one, since the WASM engine trapped: unreachable"]);
+    expect(handle.status.errors).toEqual(["not hosting this tower: unknown mode: tower", "not hosting this tower or any later one, since the Rust engine trapped: unreachable"]);
     a.adoptSim(Simulation.newGame(4, "classic"));
     expect(mod.calls).toHaveLength(4);
   });
@@ -303,7 +304,7 @@ describe("a trap while a tower attaches (#1113)", () => {
   it("latches when the free behind a refusal traps, and keeps the refusal's message", () => {
     const handle = startWasmHost(app(), refusingFree(new WebAssembly.RuntimeError("unreachable")), quiet());
     expect(handle.status).toMatchObject({ hosted: false, latched: true });
-    expect(handle.status.errors).toEqual(["not hosting this tower or any later one, since the WASM engine trapped: unreachable, while freeing the engine after a refusal: a frame the host cannot read"]);
+    expect(handle.status.errors).toEqual(["not hosting this tower or any later one, since the Rust engine trapped: unreachable, while freeing the engine after a refusal: a frame the host cannot read"]);
   });
 
   it("answers the refusal when the free behind it throws a clean error, and hosts the next tower", () => {
@@ -340,6 +341,55 @@ describe("a trap while a tower attaches (#1113)", () => {
     };
     a.adoptSim(Simulation.newGame(4, "classic"));
     expect(handle.status).toMatchObject({ hosted: true, latched: false, starts: 2, errors: ["letting go of the last tower: null pointer passed to rust"] });
+  });
+
+  // The let-go runs every step and throws one error: a trap in the free
+  // wins over a clean throw before it, so the next tower is not hosted.
+  it("latches the next tower off when a healthy tower's free traps behind a clean throw as it is let go", () => {
+    const mod = fakeModule();
+    const a = app();
+    const handle = startWasmHost(a, mod, quiet());
+    a.sim.gameplayEvents.restore = () => {
+      throw new Error("the events do not go back");
+    };
+    mod.engines[0].free = () => {
+      throw new WebAssembly.RuntimeError("unreachable");
+    };
+    a.adoptSim(Simulation.newGame(4, "classic"));
+    expect(mod.engines).toHaveLength(1);
+    expect(handle.status).toMatchObject({ hosted: false, latched: true });
+    expect(handle.status.errors[0]).toBe("letting go of the last tower: unreachable, and the events do not go back");
+  });
+
+  // A relay already on the tower (the dual run's mirror) refuses the attach,
+  // and the tower keeps its own events whatever the free behind it does.
+  it.each([
+    ["latches when the free traps", new WebAssembly.RuntimeError("unreachable"), true],
+    ["hosts the next tower when the free throws a clean error", new Error("null pointer passed to rust"), false],
+  ])("answers a relay's refusal, and %s", (_, freeError, latched) => {
+    const mod = fakeModule();
+    const fromSave = mod.Engine.fromSave.bind(mod.Engine);
+    mod.Engine = {
+      fromSave(save: string, markers?: string) {
+        const engine = fromSave(save, markers);
+        mod.engines[mod.engines.length - 1].free = () => {
+          throw freeError;
+        };
+        return engine;
+      },
+    } as unknown as typeof mod.Engine;
+    const a = app();
+    const detachMirror = attachMirror(a.sim, () => {});
+    const handle = startWasmHost(a, mod, quiet());
+    detachMirror();
+    expect(handle.status).toMatchObject({ hosted: false, latched });
+    const refusal = "mirror: a mirror is already attached to this simulation";
+    const lastError = latched ? `not hosting this tower or any later one, since the Rust engine trapped: unreachable, while freeing the engine after a refusal: ${refusal}` : `not hosting this tower: ${refusal}`;
+    expect(handle.status.lastError).toBe(lastError);
+    expect(a.sim.drainGameplayEvents()).toEqual([{ name: "tower_founded", payload: { mode: "classic" } }]);
+    a.adoptSim(Simulation.newGame(4, "classic"));
+    expect(handle.status.hosted).toBe(!latched);
+    handle.stop();
   });
 
   it("stops a wasm-only build on an attach trap, with hosting off", () => {

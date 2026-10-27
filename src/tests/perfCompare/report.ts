@@ -1,5 +1,6 @@
 import { treeSummary } from "./treeRecord";
 import { browserName, rendererBanners, rendererSummary } from "./renderer";
+import { REPORTED_DIFFERENCES } from "./metrics";
 import { MIN_REPS, pairedDifference } from "./stats";
 import type { CompareResults, Comparison, EngineName, MetricRow } from "./types";
 
@@ -99,6 +100,25 @@ export function coldStartDifferenceLines(metrics: readonly MetricRow[], aa: Engi
   return ["", `Cold start to ready, paired difference (${sign}; above zero is worse):`, "", table(["CPU", "Median", "95% CI of median", "Pairs"], lines)];
 }
 
+/** The startup rows printed with the same paired statistic as M5 but outside
+ *  any gate (#1254; the list is metrics.ts's `REPORTED_DIFFERENCES`). */
+export function reportedDifferenceLines(metrics: readonly MetricRow[], aa: EngineName | null): string[] {
+  const rows = metrics.filter((m) => m.group === "startup" && REPORTED_DIFFERENCES.includes(m.metric));
+  const keys = [...new Map(rows.map((m) => [`${m.metric}|${m.scenario}|${m.throttle}`, m])).values()];
+  const lines = keys.flatMap((k) => {
+    const pick = (engine: EngineName) => rows.find((m) => m.metric === k.metric && m.scenario === k.scenario && m.throttle === k.throttle && m.engine === engine);
+    const wasm = pick("wasm");
+    const ts = pick("ts");
+    const d = wasm && ts ? pairedDifference(wasm, ts) : null;
+    if (!d) return [];
+    const ci = d.ciLow !== null && d.ciHigh !== null ? `${fmt(d.ciLow, "ms")} to ${fmt(d.ciHigh, "ms")}` : "no interval";
+    return [[k.metric, k.scenario, `${k.throttle}x`, fmt(d.median, "ms"), ci, d.n < MIN_REPS ? `${d.n} (below the gate's minimum of ${MIN_REPS})` : String(d.n)]];
+  });
+  if (!lines.length) return [];
+  const sign = aa ? "slot wasm minus slot ts" : "WASM minus TypeScript";
+  return ["", `Reported, not gates (#1254): the same paired difference for the moment the engine loaded (on WASM, the end of the package load), the warm start, the span from the engine loaded to ready, and the cold start with each scenario's save in the autosave slot. Compare a saved-tower row only across engines: it runs after the repetition's other measurements, in a warmer browser process than M5's cold start (${sign}; above zero is worse):`, "", table(["Metric", "Scenario", "CPU", "Median", "95% CI of median", "Pairs"], lines)];
+}
+
 export function markdownReport(res: CompareResults): string {
   const e = res.environment;
   const aa = res.config.aa;
@@ -186,7 +206,7 @@ export function markdownReport(res: CompareResults): string {
       const head = aa ? ['slot "ts" median', 'slot "wasm" median', 'slot wasm / slot ts, paired (95% CI)'] : ["TypeScript median", "WASM median", "WASM / TS, paired (95% CI)"];
       out.push(table(["Scenario", "CPU", "Metric", ...head, ...(aa ? [] : ["Verdict"]), "n (ts/wasm/pairs)"], comps.map((x) => [x.scenario, `${x.throttle}x`, x.metric, fmt(x.tsMedian, x.unit), fmt(x.wasmMedian, x.unit), ratioText(x), ...(aa ? [] : [x.verdict]), `${x.n.ts}/${x.n.wasm}/${x.n.pairs}`])));
     }
-    if (g === "startup") out.push(...coldStartDifferenceLines(res.metrics, aa));
+    if (g === "startup") out.push(...coldStartDifferenceLines(res.metrics, aa), ...reportedDifferenceLines(res.metrics, aa));
     if (single.length) {
       out.push("");
       out.push(table(["Scenario", "CPU", "Metric", aa ? "Slot" : "Engine", "Median", "95% CI of median", "p95", "CV", "n"], single.map((m) => [m.scenario, `${m.throttle}x`, m.metric, m.engine, fmt(m.summary?.median, m.unit), m.summary?.medianCiLow != null ? `${fmt(m.summary.medianCiLow, m.unit)} to ${fmt(m.summary.medianCiHigh, m.unit)}` : "n/a", fmt(m.summary?.p95, m.unit), m.summary ? `${(m.summary.cv * 100).toFixed(1)}%` : "n/a", String(m.values.length)])));

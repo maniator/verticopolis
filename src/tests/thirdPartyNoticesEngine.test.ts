@@ -56,8 +56,8 @@ describe("the notices generator on a build that ships the WASM engine (#955)", (
     const r = run(build(engineFiles({ sources: "abc", crates: [crate, std] })));
     expect(r.stderr).not.toMatch(/gen-third-party-notices:/);
     expect(r.status).toBe(0);
-    expect(r.notices).toContain("serde@1.0.229 (Rust, in the WASM engine)");
-    expect(r.notices).toContain("Rust standard library@1.97.0 (Rust, in the WASM engine)");
+    expect(r.notices).toContain("serde@1.0.229 (Rust engine crate)");
+    expect(r.notices).toContain("Rust standard library@1.97.0 (Rust engine crate)");
   });
 
   it("fails closed on a missing, stale, malformed or incomplete record", () => {
@@ -103,7 +103,7 @@ describe("the notices generator on a build that ships the WASM engine (#955)", (
     expect(r.stderr).not.toMatch(/gen-third-party-notices:/);
     expect(r.status).toBe(0);
     expect(r.notices).toMatch(/^lit-html@\S+$/m);
-    expect(r.notices).not.toContain("(Rust, in the WASM engine)");
+    expect(r.notices).not.toContain("(Rust engine crate)");
   });
 });
 
