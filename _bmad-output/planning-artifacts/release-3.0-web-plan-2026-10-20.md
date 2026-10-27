@@ -724,7 +724,7 @@ docs sweep of #1350 and stay as written until then.
 | --- | --- | --- |
 | Count before the flip | 1,000 engaged eligible sessions, which bounds the rate under 0.30% at zero failures | 300 on the facade host with zero failures, which bounds the rate under 1.0% at 95%. Choosing 300 accepts the looser bound. The section 10 Reliability row follows |
 | The 1,000 | The flip gate | The gate for removing TypeScript: one read at exactly 1,000 sessions, passed with 4 or fewer failures (0.91%; 1.3.10.1). The removal steps follow the ladder in 1.3.10.1 |
-| Where sessions count | Stage 3 only, on the facade | Stages 2 and 3 on the facade host, counted from the freeze commit. The size gate applies to the mirror host in stage 1 and ends when slice 10 deploys. Sessions before the freeze, stage 1's included, count to nothing here, and stage 2 opens on the freeze date on the owner's approval |
+| Where sessions count | Stage 3 only, on the facade | Stages 2 and 3 on the facade host, counted from the freeze commit. The size gate and the entry to stage 3 stay as 4.1 and 1.3.1 have them: the gate stays on through stage 2 and ends when stage 3 opens, and stage 3 opens only with S6 complete, the audio cue-timing test green on the facade and a committed protocol run (RUN-1 on the deployed slice 10 build, or a run repeated after a fix) passing M2 to M6 at 1x and 4x on the medium and large towers. A stage-2 session behind the gate is outside the count, so the first 100 sessions come from towers under the gate. Sessions before the freeze, stage 1's included, count to nothing here, and stage 2 opens on the freeze date on the owner's approval |
 | Freeze | F1 or F2 (1.3.2), after the soak and slice 11 | One freeze, the later of Dec 1 and slice 10's deploy, with every key-moving item merged. Those items include the TypeScript switch, its notice, the tap event and the browser-family field, each with the owner's analytics approval (1.3.10.1). The 14-night replay and the observation tail run side by side from it. A change to the candidate during them restarts the 14 nights and the tail (1.3.2) |
 | Observation tail | 14 nights and 100 engaged eligible sessions on the candidate | Stage 2's 100 engaged eligible sessions on the frozen candidate, side by side with the 14 nights |
 | Soak and slice 11 | Soak, then slice 11, then the freeze, then 14 nights | The soak stays: the first 7 nights of the 50% step, with 50 engaged eligible sessions and no stop signal (both required, as 1.3.2 proposes), and its sessions count toward the 300. 100% is the flip. One freeze around Dec 1 cannot hold the old chain, because the soak and slice 11 would have to come before it, so slice 11 leaves the pre-flip path and lands in 3.x (1.3.10.1) |
@@ -736,15 +736,17 @@ candidate restarts the tail and not the 300, and the sign-off prints the 300
 split by build with the frozen candidate's own count beside the pooled
 bound.
 
-**Phases the dates assume,** at the plan's stage shares: stage 2 at 25% until
-100 engaged eligible sessions; then the 50% step, whose first 7 nights are
-the soak; the 50% step continues until the 300th session; the flip decision
-follows, and 100% is the flip. Stage 2 opens on the freeze date on the
+**Phases the dates assume,** at the plan's stage shares: stage 2 at 25%, behind
+the size gate, until 100 engaged eligible sessions; then stage 3's entry of
+4.1, which needs the protocol run above to have passed; then the 50% step
+without the gate, whose first 7 nights are the soak; the 50% step continues
+until the 300th session; the flip decision follows, and 100% is the flip. Stage 2 opens on the freeze date on the
 owner's approval, and stage 1 stays at 10% until then.
 
 Unchanged: conformance, dual run, the 14-night seeded replay, saves in both
 directions, M1 to M8 on the owner's PC with calibrated δ and ε, RUN-1 on the
-deployed slice 10 build (1.3.6), the offline cold start of #985, the
+deployed slice 10 build (1.3.6), the size gate through stage 2 and the entry
+to stage 3 with its protocol run (4.1, 1.3.1), the offline cold start of #985, the
 forced-trap fallback spec, the rollback rehearsal, analytics (apart from the
 tap event of 1.3.10.1 and the browser-family field of the coverage bullet below),
 no flip on the mirror host, and facade slices 7 to 10 with the slice 9 PC run. If RUN-1 or
@@ -860,18 +862,23 @@ from a governed definition if one exists, and is otherwise not published.
 
 **Projected dates** at today's traffic, which gives about 3.55 engaged
 sessions a day at 25% and 7.1 a day at 50%. From the freeze, stage 2's 100
-sessions take 28 days, the soak 7 days and the 150 sessions after it 21 days,
-so the 300th session comes about 56 days after the freeze. The freeze is the
+sessions take 34 days (1.3.1's figure behind the placeholder gate that holds
+back 16% of sessions; 28 days if the gate were off), the soak 7 days and the
+150 sessions after it 21 days, so the 300th session comes about 62 days
+after the freeze. The freeze is the
 later of Dec 1 and slice 10's deploy: slices 7 to 10 hold nine days of float
 between a Nov 22 deploy and Dec 1, and slip day for day after it.
 
 | Case | Freeze | Stage 2 | Soak | 300th session, flip decision |
 | --- | --- | --- | --- | --- |
-| Slice 10 deploys Nov 22 | Dec 1 | Dec 1 to Dec 29 | Dec 29 to Jan 5 | About Jan 26, 2027 |
-| Slice 10 deploys Dec 12 (the facade lane's current view, PR #1347) | Dec 12 | Dec 12 to Jan 9 | Jan 9 to Jan 16 | About Feb 6, 2027 |
+| Slice 10 deploys Nov 22 | Dec 1 | Dec 1 to Jan 4 | Jan 4 to Jan 11 | About Feb 1, 2027 |
+| Slice 10 deploys Dec 12 (the facade lane's current view, PR #1347) | Dec 12 | Dec 12 to Jan 15 | Jan 15 to Jan 22 | About Feb 12, 2027 |
 
 The dates assume the analytics packet is approved, the PC session stays
-available, slices 7 and 8 merge and slice 9 passes, stage 1 has moved on by
+available, slices 7 and 8 merge and slice 9 passes, a committed protocol run (RUN-1 on
+the deployed build) passes M2 to M6 at 1x and 4x before stage 3 opens (stage 3
+waits for it, so a miss moves the soak and everything after it day for day),
+stage 1 has moved on by
 the freeze (14 days and 30 sessions in 4.1; 1.3.1 projects 26 days, so a
 Dec 1 freeze needs stage 1 started by about Nov 5 and a Dec 12 freeze by
 about Nov 16), the switch, its notice, the tap event, the browser-family field
@@ -884,19 +891,20 @@ for the holidays, the owner's approval of each stage, or installed apps that
 have not yet updated (a drop-back reaches an installed app only at its next
 online launch, so this plan adds a rule to report the first week after each
 deploy apart). Traffic is the largest uncertainty. At 80% of the projected
-traffic each phase lasts 25% longer: stage 2 takes 35 days, the soak 8.8 and
-the last 150 sessions 26, and the 300th session comes about Feb 9 (Dec 1
-freeze) or Feb 20 (Dec 12). A stage that stays below its move-on floor for 30
-days goes to the owner (4.1), so at 80% stage 2 reaches the owner on day 30,
-and finishing within 30 days needs 3.33 sessions a day, 94% of the
-projection.
+traffic each phase lasts 25% longer: stage 2 takes 42.5 days, the soak 8.8 and
+the last 150 sessions 26, and the 300th session comes about Feb 17 (Dec 1
+freeze) or Feb 28 (Dec 12). A stage that stays below its move-on floor for 30
+days goes to the owner (4.1). Behind the gate, 100 sessions in 30 days need
+3.33 a day and the gated stage gives about 2.98 (3.55 less the placeholder
+16%), so stage 2 reaches the owner on day 30 in every case here, and the
+dates assume he keeps it running, as 1.3.1's 34 days do.
 
 Slice 7 is six PRs, and two of them wait on owner cards (6a's per-frame room
 compare and the facade decision F2 for slice 5a) while a third waits on 6c's
 remaining families, so Dec 12 is the likelier case. After the flip, the 1,000
 count at 100% of traffic (14.2 a day) closes about 49 days later if the 300
-count toward it (Mar 16 or Mar 27) and about 70 days later if they do not
-(Apr 6 or Apr 17). Those are the earliest dates: browsers that keep an old
+count toward it (Mar 22 or Apr 2) and about 70 days later if they do not
+(Apr 12 or Apr 23). Those are the earliest dates: browsers that keep an old
 installed shell, hold a fault suppression or a stored TypeScript choice, or
 block storage do not count. The plan's earlier gate review projection was
 Jan 17 at twice July's traffic and May 16 at today's.
@@ -993,8 +1001,8 @@ rounds; notes in
   two and not for 3.0.0. The room would refuse the reversal if the routing
   test cannot be pinned.
 - **The 1,000's pass rule.** One read at exactly 1,000 engaged eligible
-  sessions, counted from the first of the 300, passes with 4 or fewer
-  failures (0.91%, inside the under-1.0% claim). Failures in the 300 count
+  sessions, counted from the first of the 300 (so the 300 carry into the
+  1,000, failures included), passes with 4 or fewer failures (0.91%, inside the under-1.0% claim). Failures in the 300 count
   against the 4. Each failure is root-caused, a writer latch-off holds the
   gate at any count, and the tap rate, the early-exit rate and the stranded
   share print beside the bound. The rule is written before the freeze. A miss
@@ -1006,8 +1014,9 @@ rounds; notes in
 **Recommended defaults from the same sitting,** which he can veto. They stand
 as planning direction until he changes them, and they authorize nothing.
 
-- The 300 count toward the 1,000, failures included, printed as two segments,
-  and a failure does not restart the count.
+- The 300 and the rest of the 1,000 print as two segments so a drift shows,
+  and a failure does not restart the count (the card settled that the 300
+  count toward the 1,000).
 - A move to TypeScript through Settings inside a Rust session is a failure,
   like a tap on the switch. A session that starts on a saved TypeScript
   choice, and any opted-out session, stays out of the denominator and prints
