@@ -140,7 +140,10 @@ Slice 2b is split into four small PRs so each gets its own review:
 3. **2b-3, cache-key rotation.** Design section 8: change the engine cache keys
    with the first schema 2 worker, or purge the three engine keys at its first
    activation, so a mixed set stored by a pre-integrity worker does not survive
-   the update.
+   the update. Done by rotation: the engine entries' revision is the MD5 plus
+   `ENGINE_REVISION_SUFFIX` (`-i2`), so a worker with the same bytes still
+   fetches the files with integrity. The record is
+   `review-offline-package-slice2b3-2026-10-27.md`.
 4. **2b-4, remaining e2e.** Install race, eviction, first install, Repair with a
    waiting build or another tab and with an online save kept, plus
    the respawn refusal latch and the deferred notes on the #985 row. The

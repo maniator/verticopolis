@@ -40,10 +40,16 @@ export interface Deployments {
   readonly origin: string;
   /** Pick the deployment later requests are answered from. */
   serve(which: Deployment): void;
+  /** Answer `sw.js` of the first deployment with one extra comment line, so the browser finds a new worker whose precache manifest is identical (the same engine bytes under the same keys). */
+  reissueWorker(on: boolean): void;
+  /** Answer every `/engine/` request from `which` whatever `serve()` picked, as a deploy that lands between the worker script and the engine files does; `null` ends it. */
+  engineFrom(which: Deployment | null): void;
   /** Make `version.json` answer 404, as it does when the host or the network drops it. */
   failVersionJson(failing: boolean): void;
   /** Every path requested so far, in order, with the deployment that answered. */
   readonly requests: { path: string; from: Deployment }[];
+  /** The SHA-256 (hex) of each deployment's engine glue, binary and record as served. */
+  readonly digests: Record<Deployment, { glue: string; wasm: string; record: string }>;
   /** The engine package id each deployment's `BUILD.json` records. */
   readonly packageId: Record<Deployment, string>;
   /** The precache revision each deployment's `sw.js` records for each engine entry. */
@@ -84,7 +90,7 @@ function manifestOf(sw: string): { revisionOf(url: string): string; entries: num
   return {
     entries,
     revisionOf: (url) => {
-      const found = new RegExp(`\\{url:"${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}",revision:"([a-f0-9]+)"`).exec(sw);
+      const found = new RegExp(`\\{url:"${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}",revision:"([a-f0-9]{32}(?:-i\\d+)?)"`).exec(sw);
       if (!found) throw new Error(`sw.js has no revisioned precache entry for ${url}`);
       return found[1];
     },
@@ -152,6 +158,11 @@ function makeSecond(dist: string, into: string): { dir: string; packageId: strin
   return { dir, packageId: record.package };
 }
 
+function digestsOf(root: string): { glue: string; wasm: string; record: string } {
+  const read = (name: string) => sha256Hex(readFileSync(join(root, "engine", name)));
+  return { glue: read(ENGINE_GLUE), wasm: read(ENGINE_WASM), record: read("BUILD.json") };
+}
+
 function cacheControl(path: string): string {
   if (path.startsWith("/assets/")) return "public, max-age=31536000, immutable";
   if (path === "/version.json") return "no-store";
@@ -185,16 +196,18 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
   });
   let current: Deployment = "A";
   let versionJsonFails = false;
+  let workerReissued = false;
+  let engineOverride: Deployment | null = null;
   const requests: Deployments["requests"] = [];
 
   const server: Server = createServer((req, res) => {
     // Each response keeps the root it started with, so a switch mid-stream
     // cannot change what a response already begun carries.
-    const root = roots[current];
-    const from = current;
     const target = req.url ?? "/";
     // Origin-form only, one leading slash, nothing that names a drive or stream.
     const path = /^\/(?!\/)/.test(target) ? new URL(target, "http://localhost").pathname : "/\0";
+    const from = engineOverride && path.startsWith("/engine/") ? engineOverride : current;
+    const root = roots[from];
     requests.push({ path, from });
     if (versionJsonFails && path === "/version.json") {
       res.writeHead(404, { "content-type": "text/plain" }).end("not found");
@@ -212,7 +225,8 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
       return;
     }
     try {
-      const body = readFileSync(file);
+      let body = readFileSync(file);
+      if (workerReissued && from === "A" && path === "/sw.js") body = Buffer.concat([body, Buffer.from("\n// reissued\n")]);
       res.writeHead(200, {
         "content-type": TYPES[extname(file)] ?? "application/octet-stream",
         "content-length": body.length,
@@ -231,10 +245,17 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
     serve: (which) => {
       current = which;
     },
+    reissueWorker: (on) => {
+      workerReissued = on;
+    },
+    engineFrom: (which) => {
+      engineOverride = which;
+    },
     failVersionJson: (failing) => {
       versionJsonFails = failing;
     },
     requests,
+    digests: { A: digestsOf(roots.A), B: digestsOf(roots.B) },
     packageId: { A: firstRecord.package, B: second.packageId },
     revisions: { A: revisionsOf(manifests.A), B: revisionsOf(manifests.B) },
     manifestEntries: { A: manifests.A.entries, B: manifests.B.entries },
