@@ -218,8 +218,13 @@ describe("buildTDT on forged input: bytes or LegacyExportError wherever JSON.str
     // is 15 ASCII bytes and 2 + 3 + 4 for the three characters, 24 in all.
     expect(outcome({ ...small, extra: nested(127) })).toBe("refused: save: recursion limit exceeded at line 1 column 163");
     expect(outcome({ towerName: "é塔🏢", ...small, extra: nested(127) })).toBe("refused: save: recursion limit exceeded at line 1 column 187");
-    // Brackets inside a string do not nest.
+    // Brackets inside a string do not nest, an escaped quote included.
     expect(outcome({ towerName: "[".repeat(200), ...small, extra: nested(126) })).toBe("ok");
+    expect(outcome({ towerName: 'a"' + "[".repeat(200), ...small, extra: nested(126) })).toBe("ok");
+    // The engine's reader refuses the nesting before it reads the mode.
+    // `"mode":"modern",` adds 16 bytes.
+    expect(outcome({ ...small, mode: "modern", extra: nested(126) })).toBe("refused: This tower uses Modern rules. SimTower (1994) can only load Classic towers.");
+    expect(outcome({ ...small, mode: "modern", extra: nested(127) })).toBe("refused: save: recursion limit exceeded at line 1 column 179");
     // Past 2,048 levels and inside the stack, the column is still the
     // engine's (a walk before the stringify once answered column 1 here).
     expect(outcome({ ...small, extra: nested(2500) })).toBe("refused: save: recursion limit exceeded at line 1 column 163");

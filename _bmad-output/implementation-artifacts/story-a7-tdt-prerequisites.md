@@ -69,12 +69,15 @@ gate below holds.
      `transportsDropped`);
    - a `skipFloors` or `carPositions` that is not an array (`true`, a
      number, an object, a string): read as an empty list;
-   - a two-story unit at a floor past 2^53, or at a string floor: the story
-     walk ends after at most one pass per story (how a string floor reads is
-     #884's);
+   - a multi-story unit at a floor past 2^53, at a floor whose steps round
+     just under the bound (`3e-16`), or at a string floor: a number floor
+     walks as Rust's does, stopping where `fl + 1` is `fl` and otherwise
+     running to the bound, so both sides widen the same floors, and a string
+     floor stops after one pass per story (how it reads is #884's);
    - an object with its own `toString` key where a number or a kind belongs
-     (JavaScript cannot convert it): read as NaN, as the engine's
-     `js_number` reads any object;
+     (JavaScript cannot convert it): converted like any other object, to
+     NaN, as the engine's `js_number` reads any object (two objects compared
+     with each other still differ, as the parking bullet below says);
    - `units` or `transports` that is not an array, a string included
      (`save.units is not an array`, `save.transports is not an array`);
    - a unit entry that is not an object, or whose `kind` is missing, not a
@@ -98,7 +101,10 @@ gate below holds.
      that error's message (owner decision, 2026-10-27);
    - a parking stall or ramp whose `x` reads as NaN: its floor's chain sorts
      it after every finite number on both sides (the lock pins a missing
-     `x`; an object reads the same on both sides).
+     `x`). Two units with an object `x` still differ: TypeScript compares the
+     two as text (`"[object Object]4" >= "[object Object]"` is true) where
+     Rust reads each as NaN, in the parking chain and the wedding-hall probe,
+     so an object `x` joins #884's raw-site shapes.
 2. The JSON boundary: the TypeScript exporter reads its input as JSON would
    carry it, so a non-finite number at `minutes`, a hotel's `occupants`,
    `rent`, a unit's `x` or `width`, or anywhere else except a unit's
@@ -109,10 +115,10 @@ gate below holds.
    `buildTDT` entry, once per click and on no frame path, and are recorded
    in the hot-path record as such.
 3. Every shape above is an export case in `tdtExportCases.ts`, pinned in
-   `tdt-cases.json`, replayed by the Rust referee, except three (the
-   string floor, the lone surrogate and the deep nesting). The string
-   floor's bytes still differ (#884), and `tdtExportForged` checks that its
-   walk ends. The lone surrogate and the deep nesting cannot sit in the
+   `tdt-cases.json`, replayed by the Rust referee, except four (the
+   string floor, the object `x`, the lone surrogate and the deep nesting).
+   The string floor's and the object `x`'s bytes still differ (#884), and
+   `tdtExportForged` checks that the string floor's walk ends. The lone surrogate and the deep nesting cannot sit in the
    lock: the referee reads it with serde_json, which refuses a lone
    surrogate escape and the same nesting. The differential test's edge
    saves compare both with the engine live, and `tdtExportForged` pins the
@@ -357,6 +363,27 @@ a test for a RangeError from a `toJSON` method (it only covered the removed
 catch), commit ids a force-push leaves behind (each record says in words
 what it checked), and three more lines in `export_gather.rs`, a file on the
 size ratchet whose split is its own work.
+
+**AC1 (#887), independent review** (`/gds-code-review` at 45d97a3,
+2026-10-27, by the independent reviewer, CONDITIONAL GO). Game-written
+exports were byte-identical to main, and about 48,000 forged saves per
+layer gave no crash or hang. Two conditions, both fixed in the next commit.
+C1: the story walk's pass bound, added for the string floor, also bounded
+number floors, so a cinema at `3e-16` or `-3.17e-16` widened one floor
+fewer than Rust and main (96 of 6,000 fuzzed rooms); a number floor now
+walks as Rust's does, the bound applies only to a floor that is not a
+number, and three lock cases pin it (the old walk fails all three; 51
+new `forged-*` cases in all, the referee 279 of 279). C2:
+this AC said an object `x` reads the same on both sides, which is false
+when two meet in a comparison; under the owner's maintenance-only
+direction (#1301) the AC and the PR body now say so and #884 tracks it.
+Also fixed: tests for the depth scan's escape skip and for the depth
+refusal coming before the Modern one, and the round 5 record's HP-7 row
+(the inherited wedding-hall probe is a pre-existing finding, forged only,
+in #1260). Deferred: report counts that differ where the bytes match (a
+non-string `label`, a string `rent` equal to a rung), latent until the
+Rust side has a report, noted on #885; and a numeric `towerName`, which the
+`.vctower` export's filename cannot slug, noted on #1318.
 
 ## Test parity table
 

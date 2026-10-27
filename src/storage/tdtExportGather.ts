@@ -230,11 +230,18 @@ export function gatherTower(save: SerializedGame): GatheredTower {
       right = clamp(u.x + u.width);
     }
     if (!room.emitted && right <= left) continue; // wholly off-lot or unusable: claim nothing
-    // At most one pass per story (#887): near 2^53 `fl++` stops moving, and a
-    // string floor makes the bound text ("1e5" + 1 is "1e51"), so the bound
-    // alone can run forever. How a string floor reads is #884's question.
+    // Walk a number floor as the engine's exporter does (#887): stop where
+    // `fl++` no longer moves (past 2^53), and otherwise run to the bound, so a
+    // floor whose steps round just under it (3e-16) widens one more floor in
+    // both. A floor that is not a number stops after one pass per story, since
+    // a string makes the bound text ("1e5" + 1 is "1e51"); how such a floor
+    // reads is #884's question.
     const stories = facilityFloors(u.kind);
-    for (let fl = u.floor, i = 0; i < stories && fl < u.floor + stories; fl++, i++) widen(fl, left, right);
+    const numeric = typeof u.floor === "number";
+    for (let fl = u.floor, i = 1; fl < u.floor + stories; fl++, i++) {
+      widen(fl, left, right);
+      if (fl + 1 === fl || (!numeric && i >= stories)) break;
+    }
   }
 
   for (const u of rooms) {

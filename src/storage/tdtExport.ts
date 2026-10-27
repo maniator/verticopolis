@@ -34,8 +34,9 @@ export interface BuiltLegacyTower {
 
 /** `JSON.parse` reviver: an object's own `toString` key (never a function in
  *  JSON) makes every number or string conversion of that object throw a
- *  TypeError. Without it the object reads as NaN, as the engine's `js_number`
- *  reads any object. */
+ *  TypeError. Without it the object converts to NaN, as the engine's
+ *  `js_number` reads any object (two objects compared with each other still
+ *  compare as text, one of #884's raw-site shapes). */
 function withoutToString(_key: string, value: unknown): unknown {
   if (typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "toString")) {
     delete (value as { toString?: unknown }).toString;

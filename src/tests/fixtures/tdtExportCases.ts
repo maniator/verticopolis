@@ -296,6 +296,12 @@ export function exportInputs(): [string, ExportInput][] {
   for (const floor of [2 ** 53, 2 ** 60, Number.MAX_VALUE]) {
     add(`forged-two-story-floor-${floor}`, tower([...lobbyOnly, unit({ id: 2, kind: "cinema", floor, x: 0, width: 31 })]));
   }
+  // A floor whose steps round just under `floor + stories`: the walk widens
+  // one more floor on both sides.
+  for (const floor of [3e-16, -3.17e-16]) {
+    add(`forged-two-story-floor-${floor}`, tower([...lobbyOnly, unit({ id: 2, kind: "cinema", floor, x: 0, width: 31 })]));
+  }
+  add("forged-three-story-floor-2.28e-16", tower([...lobbyOnly, unit({ id: 2, kind: "metro", floor: 2.28e-16, x: 0, width: 375 })]));
   add("forged-name-missing", reshaped({}, ["towerName"]));
   add("forged-name-number", reshaped({ towerName: 5 }));
   // The null JSON writes for a NaN or an Infinity at the fields the TypeScript
