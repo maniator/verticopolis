@@ -1,0 +1,229 @@
+group,scenario,throttle,metric,unit,engine,n,median,median_ci_low,median_ci_high,p95,mean,sd,cv,min,max
+startup,-,1,cold game ready,ms,ts,10,405.843,391.495,437.530,444.672,411.603,19.7715,0.0480355,389.485,450.515
+startup,-,1,cold game ready,ms,wasm,10,470.370,439.660,493.575,503.747,470.385,26.6731,0.0567048,419.320,512.070
+startup,-,1,cold first frame after ready,ms,ts,10,484.793,470.500,530.980,533.021,492.860,23.0440,0.0467557,469.875,534.690
+startup,-,1,cold first frame after ready,ms,wasm,10,552.563,515.440,571.695,590.244,553.626,30.5988,0.0552698,495.515,605.420
+startup,-,1,cold DOMContentLoaded,ms,ts,10,468.900,453.780,511.770,515.125,476.110,22.4713,0.0471977,453.185,517.870
+startup,-,1,cold DOMContentLoaded,ms,wasm,10,236.097,128.190,252.220,252.657,216.932,48.2605,0.222469,125.650,253.015
+startup,-,1,cold load event,ms,ts,10,491.458,476.745,539.480,540.654,499.786,23.4627,0.0469456,476.255,541.615
+startup,-,1,cold load event,ms,wasm,10,264.600,155.980,279.400,280.976,245.000,47.8388,0.195260,155.665,282.265
+startup,-,1,cold engine hosted,ms,wasm,10,470.202,439.505,493.415,503.543,470.198,26.6629,0.0567057,419.125,511.830
+startup,-,1,cold wasm fetch (resource timing),ms,wasm,10,6.01250,5.76500,6.23000,6.98900,6.13900,0.548993,0.0894271,5.68500,7.61000
+startup,-,1,cold wasm compile and instantiate (boot path),ms,wasm,10,5.03750,4.61000,5.55500,5.72275,5.07950,0.424823,0.0836348,4.52000,5.86000
+transfer,-,1,cold bytes served before ready,bytes,ts,10,313130,313130,313130,314426,313366,745.349,0.00237853,313130,315487
+transfer,-,1,cold bytes served before ready,bytes,wasm,10,653170,653170,653170,653170,653170,0,0,653170,653170
+transfer,-,1,cold bytes served total,bytes,ts,10,315487,315487,315487,315487,315487,0,0,315487,315487
+transfer,-,1,cold bytes served total,bytes,wasm,10,653170,653170,653170,653170,653170,0,0,653170,653170
+transfer,-,1,cold before ready: html,bytes,ts,10,3475,3475,3475,3475,3475,0,0,3475,3475
+transfer,-,1,cold before ready: html,bytes,wasm,10,3475,3475,3475,3475,3475,0,0,3475,3475
+transfer,-,1,cold after ready: html,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: html,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: app-js,bytes,ts,10,297560,297560,297560,297560,297560,0,0,297560,297560
+transfer,-,1,cold before ready: app-js,bytes,wasm,10,297560,297560,297560,297560,297560,0,0,297560,297560
+transfer,-,1,cold after ready: app-js,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: app-js,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: css,bytes,ts,10,6591,6591,6591,6591,6591,0,0,6591,6591
+transfer,-,1,cold before ready: css,bytes,wasm,10,6591,6591,6591,6591,6591,0,0,6591,6591
+transfer,-,1,cold after ready: css,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: css,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: wasm-glue,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: wasm-glue,bytes,wasm,10,8243,8243,8243,8243,8243,0,0,8243,8243
+transfer,-,1,cold after ready: wasm-glue,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: wasm-glue,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: wasm-binary,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: wasm-binary,bytes,wasm,10,329440,329440,329440,329440,329440,0,0,329440,329440
+transfer,-,1,cold after ready: wasm-binary,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: wasm-binary,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: audio-js,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: audio-js,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: audio-js,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: audio-js,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: audio-assets,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: audio-assets,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: audio-assets,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: audio-assets,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: images,bytes,ts,10,0,0,0,1296.35,235.700,745.349,3.16228,0,2357
+transfer,-,1,cold before ready: images,bytes,wasm,10,2357,2357,2357,2357,2357,0,0,2357,2357
+transfer,-,1,cold after ready: images,bytes,ts,10,2357,2357,2357,2357,2121.30,745.349,0.351364,0,2357
+transfer,-,1,cold after ready: images,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: service-worker,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: service-worker,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: service-worker,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: service-worker,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: other,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold before ready: other,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: other,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,cold after ready: other,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+startup,-,1,warm game ready,ms,ts,10,65.9675,65.4950,69.5050,69.9862,66.7165,1.82467,0.0273496,64.7800,70.3800
+startup,-,1,warm game ready,ms,wasm,10,82.5250,81.4150,90.9650,92.7525,84.9365,4.72325,0.0556092,80.8800,94.2150
+startup,-,1,warm first frame after ready,ms,ts,10,124.893,123.420,129.220,131.277,126.184,3.11699,0.0247021,123.180,132.960
+startup,-,1,warm first frame after ready,ms,wasm,10,138.157,135.340,153.970,155.606,141.479,7.94975,0.0561901,135.155,156.945
+startup,-,1,warm DOMContentLoaded,ms,ts,10,117.908,116.745,122.405,124.382,119.129,3.04726,0.0255795,116.530,126
+startup,-,1,warm DOMContentLoaded,ms,wasm,10,22.9050,21.3900,25.0050,27.5102,23.5070,2.47842,0.105433,21.3600,29.5600
+startup,-,1,warm load event,ms,ts,10,129.978,128.280,134.455,136.614,131.278,3.32301,0.0253129,128.125,138.380
+startup,-,1,warm load event,ms,wasm,10,24.1600,23.1300,26.7250,29.2000,25.0125,2.52847,0.101088,22.9150,31.2250
+startup,-,1,warm engine hosted,ms,wasm,10,82.4750,81.3700,90.9050,92.6760,84.8805,4.71303,0.0555255,80.8300,94.1250
+startup,-,1,warm wasm fetch (resource timing),ms,wasm,10,5.07250,4.57000,5.45000,6.03300,5.13900,0.574499,0.111792,4.45000,6.51000
+startup,-,1,warm wasm compile and instantiate (boot path),ms,wasm,10,3.53500,3.18500,3.68500,3.70700,3.47900,0.226615,0.0651380,3.12500,3.72500
+transfer,-,1,warm bytes served before ready,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,warm bytes served before ready,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,warm bytes served total,bytes,ts,10,0,0,0,0,0,0,0,0,0
+transfer,-,1,warm bytes served total,bytes,wasm,10,0,0,0,0,0,0,0,0,0
+startup,-,4,cold game ready,ms,ts,10,527.510,524.560,561.615,565.297,534.409,16.5994,0.0310612,519.995,568.310
+startup,-,4,cold game ready,ms,wasm,10,661.020,655.025,680.625,757.994,678.009,50.9991,0.0752189,651.960,821.295
+startup,-,4,cold first frame after ready,ms,ts,10,822.045,814.515,857.865,870.944,829.511,22.5662,0.0272042,808.690,881.645
+startup,-,4,cold first frame after ready,ms,wasm,10,945.050,939.820,960.770,1041.17,961.813,51.4012,0.0534420,939.490,1106.95
+startup,-,4,cold DOMContentLoaded,ms,ts,10,747.562,740.495,783.815,796.707,755.375,22.4370,0.0297030,736.235,807.255
+startup,-,4,cold DOMContentLoaded,ms,wasm,10,319.125,316.120,342.395,395.632,333.359,38.0603,0.114172,314.195,439.190
+startup,-,4,cold load event,ms,ts,10,849.638,842.605,884.980,899.060,857.869,22.5439,0.0262790,837.220,910.580
+startup,-,4,cold load event,ms,wasm,10,322.943,319.585,346.025,400.002,337.146,38.4639,0.114087,317.850,444.165
+startup,-,4,cold engine hosted,ms,wasm,10,660.217,654.040,679.645,757.019,677.128,50.9637,0.0752645,651.120,820.325
+startup,-,4,cold wasm fetch (resource timing),ms,wasm,10,5.96500,5.59000,6.43000,7.05975,6.10400,0.597294,0.0978529,5.47500,7.57500
+startup,-,4,cold wasm compile and instantiate (boot path),ms,wasm,10,17.9425,17.1200,18.4400,21.0552,18.3765,1.76946,0.0962892,17.0100,23.1950
+transfer,-,1,"first visit with service worker, bytes served",bytes,ts,10,858408,858408,858408,858408,858408,0,0,858408,858408
+transfer,-,1,"first visit with service worker, bytes served",bytes,wasm,10,1196091,1196091,1196091,1196091,1196091,0,0,1196091,1196091
+wasm-load,-,1,cold fetch,ms,ts,10,11.3900,10.2800,12.5800,12.8467,11.3485,1.05717,0.0931552,10.0100,13.0650
+wasm-load,-,1,cold compile,ms,ts,10,1.67750,1.56000,1.71500,3.39525,1.94500,0.995043,0.511590,1.53000,4.77000
+wasm-load,-,1,cold instantiate,ms,ts,10,0.285000,0.255000,0.395000,0.400500,0.304000,0.0544569,0.179135,0.255000,0.405000
+wasm-load,-,1,cold first Engine,ms,ts,10,253.375,251.670,272.725,318.944,265.983,32.6632,0.122802,248.320,356.760
+memory,large,1,adopt (load the save),ms,ts,10,52.4425,51.9250,53.1150,53.1783,52.4445,0.618935,0.0118017,51.4300,53.2300
+memory,large,1,adopt (load the save),ms,wasm,10,343.010,335.965,351.330,352.562,343.498,6.88959,0.0200571,334.330,353.570
+memory,large,1,JS heap used,bytes,ts,10,77317760,77296908,77336084,7.73361e+7,7.73164e+7,17557.4,0.000227085,77294096,77336100
+memory,large,1,JS heap used,bytes,wasm,10,76039148,76022548,77202888,7.72291e+7,7.62718e+7,503704,0.00660407,76002596,77250620
+memory,large,1,WASM linear memory,bytes,wasm,10,134545408,134545408,134545408,134545408,134545408,0,0,134545408,134545408
+memory,large,1,browser process PSS,bytes,ts,0,,,,,,,,,
+memory,large,1,browser process PSS,bytes,wasm,0,,,,,,,,,
+memory,large,1,JS heap + WASM linear memory,bytes,ts,10,77317760,77296908,77336084,7.73361e+7,7.73164e+7,17557.4,0.000227085,77294096,77336100
+memory,large,1,JS heap + WASM linear memory,bytes,wasm,10,210584556,210567956,211748296,2.11775e+8,2.10817e+8,503704,0.00238929,210548004,211796028
+sim-hosted,large,1,total for fixed duration,ms,ts,10,803.497,790.580,842.645,907.333,818.882,52.2690,0.0638297,781.085,960.260
+sim-hosted,large,1,total for fixed duration,ms,wasm,10,6500.37,6306.04,6566.71,6570.64,6450.25,112.053,0.0173718,6284.62,6573.86
+sim-hosted,large,1,step median,ms,ts,10,0.548750,0.535000,0.552500,0.606125,0.554750,0.0343683,0.0619528,0.530000,0.650000
+sim-hosted,large,1,step median,ms,wasm,10,3.72250,3.67000,3.76000,3.77925,3.72450,0.0409912,0.0110058,3.66500,3.79500
+sim-hosted,large,1,step p95,ms,ts,10,3.13062,3.08075,3.24050,3.38790,3.17205,0.130401,0.0411094,3.04525,3.50850
+sim-hosted,large,1,step p95,ms,wasm,10,7.28600,7.10675,7.61550,7.73430,7.34215,0.257256,0.0350382,7.01700,7.83150
+sim-hosted,large,1,step p99,ms,ts,10,6.77925,6.56740,7.34075,7.62724,6.86606,0.443005,0.0645210,6.30205,7.86165
+sim-hosted,large,1,step p99,ms,wasm,10,147.618,142.377,154.826,155.770,148.549,5.43669,0.0365987,139.630,156.542
+sim-hosted,large,1,share in the engine's tick,ratio,wasm,10,0.0532701,0.0523739,0.0547426,0.0547537,0.0532977,0.000930656,0.0174615,0.0522166,0.0547628
+sim-hosted,large,1,share in exports the host reads,ratio,wasm,10,0.224093,0.222245,0.227874,0.231047,0.224961,0.00354686,0.0157666,0.221826,0.233643
+sim-hosted,large,1,share in host JS sync,ratio,wasm,10,0.723344,0.717363,0.724738,0.725092,0.721741,0.00425206,0.00589140,0.711614,0.725381
+sim-hosted,large,1,share in the hourly serialize,ratio,wasm,10,0.130654,0.128234,0.133352,0.133786,0.130529,0.00208521,0.0159751,0.128176,0.134142
+sim-hosted,large,1,share in per-step sync reads,ratio,wasm,10,0.0937697,0.0919883,0.0950449,0.100254,0.0944322,0.00387888,0.0410758,0.0895669,0.104516
+sim-hosted,large,1,share in JSON.parse,ratio,wasm,10,0.0302371,0.0297260,0.0310826,0.0311633,0.0303220,0.000543869,0.0179364,0.0295734,0.0312293
+sim-hosted,large,1,share in merge and the rest of host JS,ratio,wasm,10,0.692605,0.687790,0.694620,0.695059,0.691419,0.00401228,0.00580296,0.681888,0.695419
+sim-hosted,large,1,serialize calls,count,wasm,10,25,25,25,25,25,0,0,25,25
+sim-raw,large,1,total for fixed duration,ms,ts,10,725.920,708.350,750.365,836.544,741.963,59.5629,0.0802775,704.275,907.055
+sim-raw,large,1,total for fixed duration,ms,wasm,10,309.263,302.455,384.510,409.945,327.228,43.9691,0.134368,300.545,430.755
+sim-raw,large,1,step median,ms,ts,10,0.547500,0.540000,0.557500,0.587750,0.553750,0.0217067,0.0391995,0.535000,0.612500
+sim-raw,large,1,step median,ms,wasm,10,0.255000,0.250000,0.352500,0.360750,0.275250,0.0449297,0.163232,0.250000,0.367500
+sim-raw,large,1,step p95,ms,ts,10,3.01537,2.94200,3.06525,3.16191,3.02887,0.0860908,0.0284234,2.93075,3.24100
+sim-raw,large,1,step p95,ms,wasm,10,0.625875,0.580250,0.885750,0.904725,0.676200,0.125399,0.185446,0.570250,0.920250
+sim-raw,large,1,step p99,ms,ts,10,4.91838,4.66825,5.18035,5.65423,5.02246,0.401673,0.0799753,4.62030,6.04195
+sim-raw,large,1,step p99,ms,wasm,10,3.00740,2.93405,4.85005,4.87320,3.37961,0.790846,0.234005,2.89405,4.89215
+sim-raw,large,1,instance from save,ms,ts,10,42.1800,41.4300,43.9400,44.8008,42.6170,1.29082,0.0302889,41.2950,45.5050
+sim-raw,large,1,instance from save,ms,wasm,10,92.5000,91.0950,98.1800,115.865,96.8200,12.0337,0.124290,90.4600,130.335
+frames,large,1,frame time median,ms,ts,10,14.1200,14.0950,14.2075,14.2556,14.1505,0.0661942,0.00467787,14.0950,14.2950
+frames,large,1,frame time median,ms,wasm,10,14.5075,14.5000,14.5250,14.5814,14.5162,0.0420689,0.00289806,14.4650,14.6275
+frames,large,1,frame time p95,ms,ts,10,15.0400,15.0350,15.0450,15.0495,15.0415,0.00564020,0.000374975,15.0350,15.0533
+frames,large,1,frame time p95,ms,wasm,10,44.9526,44.5605,45.0050,45.0050,44.8461,0.192036,0.00428211,44.5235,45.0050
+frames,large,1,frame time p99,ms,ts,10,29.3336,24.9580,29.5138,29.5182,27.2835,4.16011,0.152477,16.4948,29.5218
+frames,large,1,frame time p99,ms,wasm,10,148.511,147.954,148.970,149.209,148.495,0.498618,0.00335781,147.637,149.404
+frames,large,1,mean FPS,fps,ts,10,68.4310,68.1468,68.7569,68.7789,68.4266,0.258357,0.00377568,68.0729,68.7970
+frames,large,1,mean FPS,fps,wasm,10,45.3595,44.4133,45.7841,45.8216,45.2199,0.586381,0.0129673,44.1686,45.8523
+frames,large,1,1% low FPS,fps,ts,10,31.2248,30.3762,33.4896,33.6640,31.4214,1.46400,0.0465925,29.2107,33.8066
+frames,large,1,1% low FPS,fps,wasm,10,6.01416,5.70801,6.21920,6.31064,5.95619,0.271504,0.0455835,5.45901,6.38546
+frames,large,1,sim minutes per real second,min/s,ts,10,120.019,119.942,120.050,120.132,120.016,0.0776148,0.000646702,119.914,120.198
+frames,large,1,sim minutes per real second,min/s,wasm,10,117.756,117.549,119.962,119.998,118.211,1.15204,0.00974563,116.358,120.027
+frames,large,1,share of frame time in sim.tick,ratio,ts,10,0.0663075,0.0641555,0.0675380,0.0696256,0.0662958,0.00225650,0.0340368,0.0630718,0.0713336
+frames,large,1,share of frame time in sim.tick,ratio,wasm,10,0.541300,0.537881,0.554739,0.555737,0.544392,0.00790546,0.0145216,0.534844,0.556553
+frames,large,1,share of frame time in ui.update,ratio,ts,10,0.00263507,0.00254285,0.00268524,0.00269484,0.00261931,0.0000635034,0.0242444,0.00251645,0.00270269
+frames,large,1,share of frame time in ui.update,ratio,wasm,10,0.00310843,0.00286938,0.00355688,0.00359719,0.00318087,0.000306159,0.0962502,0.00282185,0.00363017
+frames,large,1,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,ts,10,0.931077,0.929919,0.933212,0.933872,0.931085,0.00228156,0.00245043,0.925964,0.934412
+frames,large,1,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,wasm,10,0.455592,0.442264,0.459249,0.460946,0.452427,0.00798120,0.0176409,0.440100,0.462334
+frames,large,1,frames over 200 ms (game time clamped),frames,ts,10,0,0,0,0,0,0,0,0,0
+frames,large,1,frames over 200 ms (game time clamped),frames,wasm,10,1,0,1,1.55000,0.800000,0.632456,0.790569,0,2
+frames-audio,large,1,frame time median,ms,ts,10,14.3287,14.2850,14.4125,14.4152,14.3372,0.0515920,0.00359846,14.2800,14.4175
+frames-audio,large,1,frame time median,ms,wasm,10,14.5250,14.5100,14.5350,14.5432,14.5245,0.0121221,0.000834594,14.5100,14.5500
+frames-audio,large,1,frame time p95,ms,ts,10,15.0476,15.0387,15.0847,15.1517,15.0664,0.0517630,0.00343565,15.0300,15.2065
+frames-audio,large,1,frame time p95,ms,wasm,10,50.0759,44.8720,57.8400,58.0870,50.4537,5.60691,0.111130,44.5770,58.2890
+frames-audio,large,1,frame time p99,ms,ts,10,29.1493,29.0333,29.4748,29.4962,29.1916,0.202348,0.00693172,28.8675,29.5137
+frames-audio,large,1,frame time p99,ms,wasm,10,160.914,155.575,173.428,173.638,161.858,6.65121,0.0410930,155.359,173.809
+frames-audio,large,1,mean FPS,fps,ts,10,68.1479,67.9927,68.3912,68.4061,68.1702,0.178464,0.00261792,67.8735,68.4183
+frames-audio,large,1,mean FPS,fps,wasm,10,43.1448,42.0254,43.6271,43.9313,42.9340,0.823071,0.0191706,41.4060,44.1802
+frames-audio,large,1,1% low FPS,fps,ts,10,30.1076,28.2020,32.1110,33.0867,30.2571,1.77435,0.0586423,28.1476,33.8851
+frames-audio,large,1,1% low FPS,fps,wasm,10,5.62658,5.22817,5.82264,5.90465,5.58509,0.291585,0.0522077,4.98484,5.97175
+frames-audio,large,1,sim minutes per real second,min/s,ts,10,120.009,119.915,120.092,120.108,120.006,0.0819319,0.000682733,119.847,120.120
+frames-audio,large,1,sim minutes per real second,min/s,wasm,10,117.632,116.694,117.852,119.045,117.573,0.989752,0.00841818,116.666,120.021
+frames-audio,large,1,share of frame time in sim.tick,ratio,ts,10,0.0704680,0.0692067,0.0722047,0.0725564,0.0705956,0.00140620,0.0199191,0.0689158,0.0728441
+frames-audio,large,1,share of frame time in sim.tick,ratio,wasm,10,0.569111,0.559211,0.579802,0.582446,0.569244,0.00968104,0.0170068,0.556391,0.584610
+frames-audio,large,1,share of frame time in ui.update,ratio,ts,10,0.00280670,0.00274711,0.00285767,0.00293241,0.00280990,0.0000826849,0.0294263,0.00268073,0.00299355
+frames-audio,large,1,share of frame time in ui.update,ratio,wasm,10,0.00318984,0.00297326,0.00365574,0.00374241,0.00330719,0.000332517,0.100544,0.00295410,0.00381332
+frames-audio,large,1,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,ts,10,0.926750,0.924938,0.928106,0.928229,0.926594,0.00141837,0.00153074,0.924366,0.928330
+frames-audio,large,1,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,wasm,10,0.427489,0.416577,0.437173,0.439063,0.427449,0.00972878,0.0227601,0.412436,0.440608
+frames-audio,large,1,frames over 200 ms (game time clamped),frames,ts,10,0,0,0,0,0,0,0,0,0
+frames-audio,large,1,frames over 200 ms (game time clamped),frames,wasm,10,1,0,2,2,1,0.666667,0.666667,0,2
+sim-hosted,large,4,total for fixed duration,ms,ts,10,4767.58,4695.99,4825.92,4837.32,4764.94,54.6732,0.0114741,4682.28,4846.66
+sim-hosted,large,4,total for fixed duration,ms,wasm,10,38213.8,37911.2,38445.6,38451.1,38195.0,216.852,0.00567749,37851.1,38455.7
+sim-hosted,large,4,step median,ms,ts,10,2.82125,2.74750,2.84000,2.84275,2.79975,0.0515920,0.0184274,2.68250,2.84500
+sim-hosted,large,4,step median,ms,wasm,10,23.1675,23.0625,23.2900,23.3931,23.1885,0.140911,0.00607675,23.0600,23.4775
+sim-hosted,large,4,step p95,ms,ts,10,20.2305,20.2065,20.4110,20.4432,20.2835,0.103560,0.00510562,20.1963,20.4695
+sim-hosted,large,4,step p95,ms,wasm,10,29.7359,29.2755,30.0935,30.1838,29.7183,0.380467,0.0128025,29.1550,30.2578
+sim-hosted,large,4,step p99,ms,ts,10,30.8720,29.9420,31.5013,31.8781,30.8727,0.713089,0.0230977,29.8290,32.1864
+sim-hosted,large,4,step p99,ms,wasm,10,879.998,876.503,890.649,891.972,881.396,6.51180,0.00738806,870.772,893.054
+sim-hosted,large,4,share in the engine's tick,ratio,wasm,10,0.0550358,0.0547577,0.0555974,0.0556511,0.0551323,0.000358966,0.00651099,0.0546134,0.0556950
+sim-hosted,large,4,share in exports the host reads,ratio,wasm,10,0.224490,0.223863,0.226564,0.227083,0.224721,0.00139121,0.00619083,0.222501,0.227507
+sim-hosted,large,4,share in host JS sync,ratio,wasm,10,0.720250,0.718678,0.720828,0.721786,0.720147,0.00133339,0.00185155,0.717505,0.722569
+sim-hosted,large,4,share in the hourly serialize,ratio,wasm,10,0.138033,0.136991,0.139000,0.139411,0.138028,0.000969463,0.00702366,0.136445,0.139747
+sim-hosted,large,4,share in per-step sync reads,ratio,wasm,10,0.0864732,0.0855102,0.0881135,0.0884100,0.0866924,0.00112651,0.0129943,0.0853060,0.0886527
+sim-hosted,large,4,share in JSON.parse,ratio,wasm,10,0.0322740,0.0314904,0.0324204,0.0324627,0.0320614,0.000472375,0.0147334,0.0310085,0.0324973
+sim-hosted,large,4,share in merge and the rest of host JS,ratio,wasm,10,0.687982,0.686391,0.689227,0.690510,0.688086,0.00168043,0.00244218,0.685244,0.691561
+sim-hosted,large,4,serialize calls,count,wasm,10,25,25,25,25,25,0,0,25,25
+sim-raw,large,4,total for fixed duration,ms,ts,10,4845.93,4721.47,4954.57,4989.51,4841.34,107.658,0.0222372,4641.54,5018.09
+sim-raw,large,4,total for fixed duration,ms,wasm,10,1975.43,1931.41,1989.37,1989.68,1962.81,34.2841,0.0174669,1879.54,1989.94
+sim-raw,large,4,step median,ms,ts,10,2.84750,2.68500,2.86250,2.91887,2.82575,0.0856434,0.0303082,2.67500,2.96500
+sim-raw,large,4,step median,ms,wasm,10,1.63250,1.61000,1.64000,1.64000,1.62050,0.0341524,0.0210752,1.52750,1.64000
+sim-raw,large,4,step p95,ms,ts,10,20.7316,20.3757,21.0773,21.1589,20.4415,1.11537,0.0545638,17.3980,21.2258
+sim-raw,large,4,step p95,ms,wasm,10,3.98862,3.89575,4.07500,4.07514,3.98798,0.0826794,0.0207322,3.89500,4.07525
+sim-raw,large,4,step p99,ms,ts,10,31.8959,30.8500,32.3264,32.3541,31.6506,0.703374,0.0222231,30.3450,32.3768
+sim-raw,large,4,step p99,ms,wasm,10,19.7826,19.6150,19.9991,20.0150,19.8159,0.167738,0.00846483,19.5138,20.0281
+sim-raw,large,4,instance from save,ms,ts,10,365.570,281.595,373.605,378.882,345.623,44.1713,0.127802,251.805,383.200
+sim-raw,large,4,instance from save,ms,wasm,10,611.308,605.475,616.825,620.271,611.219,6.81699,0.0111531,597.480,623.090
+frames,large,4,frame time median,ms,ts,10,15.0100,15.0050,15.0750,15.1809,15.0417,0.0820742,0.00545643,15.0050,15.2675
+frames,large,4,frame time median,ms,wasm,10,134.001,133.600,134.393,134.454,133.967,0.338422,0.00252617,133.430,134.505
+frames,large,4,frame time p95,ms,ts,10,124.747,118.706,132.357,132.469,124.543,5.50440,0.0441967,118.658,132.561
+frames,large,4,frame time p95,ms,wasm,10,979.439,973.039,988.790,990.690,979.067,7.92740,0.00809689,963.476,992.245
+frames,large,4,frame time p99,ms,ts,10,176.351,164.830,177.888,178.084,172.222,6.22451,0.0361424,164.046,178.244
+frames,large,4,frame time p99,ms,wasm,10,995.289,984.634,1003.49,1015.77,997.019,12.0629,0.0120990,984.278,1025.81
+frames,large,4,mean FPS,fps,ts,10,25.8294,25.1346,26.1376,26.2124,25.7427,0.399874,0.0155335,25.0525,26.2736
+frames,large,4,mean FPS,fps,wasm,10,3.98665,3.83660,4.11747,4.11984,3.98545,0.117562,0.0294977,3.83409,4.12177
+frames,large,4,1% low FPS,fps,ts,10,5.39265,5.32038,5.47046,5.47246,5.36828,0.128512,0.0239392,5.05710,5.47410
+frames,large,4,1% low FPS,fps,wasm,10,1.00170,0.991665,1.00766,1.01057,0.994498,0.0225306,0.0226553,0.933694,1.01295
+frames,large,4,sim minutes per real second,min/s,ts,10,105.318,104.359,105.760,105.962,105.203,0.684446,0.00650598,104.054,106.127
+frames,large,4,sim minutes per real second,min/s,wasm,10,30.5011,30.2611,31.4787,31.4968,30.7698,0.556408,0.0180829,30.2450,31.5116
+frames,large,4,share of frame time in sim.tick,ratio,ts,10,0.340483,0.336458,0.344421,0.345710,0.340653,0.00371853,0.0109159,0.333779,0.346765
+frames,large,4,share of frame time in sim.tick,ratio,wasm,10,0.798250,0.791864,0.844139,0.844919,0.809919,0.0242969,0.0299991,0.786339,0.845557
+frames,large,4,share of frame time in ui.update,ratio,ts,10,0.0146529,0.0141666,0.0148403,0.0148512,0.0145670,0.000276687,0.0189941,0.0140682,0.0148602
+frames,large,4,share of frame time in ui.update,ratio,wasm,10,0.00832638,0.00777272,0.0100890,0.0101551,0.00867056,0.000978856,0.112894,0.00753272,0.0102091
+frames,large,4,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,ts,10,0.644752,0.640718,0.649097,0.650724,0.644780,0.00376385,0.00583742,0.639167,0.652055
+frames,large,4,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,wasm,10,0.193148,0.145772,0.199740,0.202609,0.181410,0.0247722,0.136553,0.144234,0.204957
+frames,large,4,frames over 200 ms (game time clamped),frames,ts,10,0,0,1,1,0.200000,0.421637,2.10819,0,1
+frames,large,4,frames over 200 ms (game time clamped),frames,wasm,10,16,16,17,17,16.4000,0.516398,0.0314877,16,17
+frames-audio,large,4,frame time median,ms,ts,10,29.0612,28.7800,29.2350,29.2762,29.0460,0.207653,0.00714910,28.6400,29.3100
+frames-audio,large,4,frame time median,ms,wasm,10,148.563,147.315,159.210,159.922,151.578,5.11473,0.0337431,147.190,160.505
+frames-audio,large,4,frame time p95,ms,ts,10,135.392,131.746,146.581,146.671,136.835,5.98920,0.0437696,129.984,146.745
+frames-audio,large,4,frame time p95,ms,wasm,10,984.370,977.159,1001.02,1001.21,985.837,9.49749,0.00963394,972.603,1001.36
+frames-audio,large,4,frame time p99,ms,ts,10,177.327,176.561,184.174,184.897,179.248,3.69214,0.0205979,175.927,185.489
+frames-audio,large,4,frame time p99,ms,wasm,10,1012.65,992.779,1020.10,1022.84,1007.46,13.9774,0.0138739,981.830,1025.09
+frames-audio,large,4,mean FPS,fps,ts,10,23.3050,22.6437,23.8038,24.0823,23.2004,0.684624,0.0295092,21.7985,24.3102
+frames-audio,large,4,mean FPS,fps,wasm,10,3.91600,3.84152,3.93213,3.94662,3.88114,0.0926457,0.0238708,3.63656,3.95847
+frames-audio,large,4,1% low FPS,fps,ts,10,5.17692,5.09974,5.26833,5.29974,5.18240,0.0843265,0.0162717,5.08332,5.32543
+frames-audio,large,4,1% low FPS,fps,wasm,10,0.981812,0.967258,1.00158,1.00966,0.983912,0.0204744,0.0208091,0.947239,1.01627
+frames-audio,large,4,sim minutes per real second,min/s,ts,10,101.343,100.578,102.662,102.684,101.414,0.779081,0.00768215,100.362,102.702
+frames-audio,large,4,sim minutes per real second,min/s,wasm,10,28.4857,27.9455,28.7912,28.9354,28.3272,0.595398,0.0210186,26.9607,29.0534
+frames-audio,large,4,share of frame time in sim.tick,ratio,ts,10,0.315396,0.311845,0.320815,0.323665,0.316325,0.00462155,0.0146101,0.310730,0.325998
+frames-audio,large,4,share of frame time in sim.tick,ratio,wasm,10,0.753848,0.748386,0.756405,0.760151,0.750660,0.0133512,0.0177859,0.714244,0.763215
+frames-audio,large,4,share of frame time in ui.update,ratio,ts,10,0.0144358,0.0142933,0.0147369,0.0152634,0.0145408,0.000452075,0.0310900,0.0139770,0.0156942
+frames-audio,large,4,share of frame time in ui.update,ratio,wasm,10,0.00916294,0.00861818,0.0109191,0.0109780,0.00950304,0.000909088,0.0956629,0.00841693,0.0110261
+frames-audio,large,4,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,ts,10,0.670129,0.665208,0.673862,0.674355,0.669134,0.00485738,0.00725919,0.658308,0.674759
+frames-audio,large,4,"share of frame time elsewhere (render, compositor, GC, idle)",ratio,wasm,10,0.237293,0.232568,0.242403,0.260637,0.239837,0.0131428,0.0547990,0.228368,0.275555
+frames-audio,large,4,frames over 200 ms (game time clamped),frames,ts,10,1,0,1,1.55000,0.900000,0.567646,0.630718,0,2
+frames-audio,large,4,frames over 200 ms (game time clamped),frames,wasm,10,17,17,18,18,17.1000,0.567646,0.0331957,16,18
