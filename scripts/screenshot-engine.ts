@@ -38,6 +38,9 @@
  * `pg*` functions are BROWSER-INJECTED: self-contained, no module-scope refs.
  */
 import { type Page } from "playwright";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type ShotEngine = "ts" | "wasm";
 
@@ -51,6 +54,15 @@ export function resolveShotEngine(raw: string | undefined): ShotEngine {
 }
 
 export const SHOT_ENGINE: ShotEngine = resolveShotEngine(process.env.VC_SHOT_ENGINE);
+
+/** The Rust render needs the engine package in the build this script serves.
+ *  Say so up front instead of timing out on every game scene. A run against an
+ *  already-served BASE_URL builds nothing here, so it is not checked. */
+export function assertEnginePackage(): void {
+  if (SHOT_ENGINE !== "wasm" || process.env.BASE_URL) return;
+  if (existsSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "src", "public", "engine", "BUILD.json"))) return;
+  throw new Error("VC_SHOT_ENGINE is the Rust engine (the default), but src/public/engine/ has no engine package: run `npm run wasm:build`, or set VC_SHOT_ENGINE=ts for the TypeScript parity render.");
+}
 
 /** The shots whose setup edits the tower past the relay (a unit's state or
  *  occupancy, a fire, a placed room), as "scene/shot". Both legs settle after

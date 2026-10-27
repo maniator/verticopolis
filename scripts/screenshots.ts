@@ -51,14 +51,12 @@
  */
 import { chromium, type Browser, type Page } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
 import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
 import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
-import { SHOT_ENGINE, SETTLE_AFTER_SETUP, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, seedEngineChoice, settleUnlessSettled } from "./screenshot-engine.ts";
+import { SHOT_ENGINE, SETTLE_AFTER_SETUP, assertEnginePackage, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, seedEngineChoice, settleUnlessSettled } from "./screenshot-engine.ts";
 import { resolveOnlyFilter } from "../src/tests/screenshotOnlyFilter.ts";
 
 // ---- Runner -----------------------------------------------------------------
@@ -411,12 +409,7 @@ async function main(): Promise<void> {
   }
   const scenes = SCENES.filter((sc) => selected.includes(sc.id));
   console.log(`engine: ${SHOT_ENGINE === "wasm" ? "Rust (WASM, hosted)" : "TypeScript (parity leg, not for commit)"}`);
-  // The Rust render needs the engine package in the build this script serves.
-  // Say so up front instead of timing out on every game scene. A run against
-  // an already-served BASE_URL builds nothing here, so it is not checked.
-  if (SHOT_ENGINE === "wasm" && !process.env.BASE_URL && !existsSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "src", "public", "engine", "BUILD.json"))) {
-    throw new Error("VC_SHOT_ENGINE is the Rust engine (the default), but src/public/engine/ has no engine package: run `npm run wasm:build`, or set VC_SHOT_ENGINE=ts for the TypeScript parity render.");
-  }
+  assertEnginePackage();
 
   let server: ChildProcess | null = null;
   if (process.env.RUN_SERVER) {
