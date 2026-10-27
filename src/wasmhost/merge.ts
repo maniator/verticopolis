@@ -1,7 +1,7 @@
 import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
 import type { Transport, Unit } from "../engine/types";
-import { roomUnits } from "../engine/tower/rooms";
+import { forgetRoomUnits, roomUnits } from "../engine/tower/rooms";
 
 /**
  * Bring a live read model up to a fresh deserialization of the engine's
@@ -141,7 +141,7 @@ function mergeTower(target: Tower, fresh: Tower, marks: MergeMarks): void {
       t[key] = fv;
     }
   }
-  mergeById(target.units, fresh.units, target.byId);
+  if (mergeById(target.units, fresh.units, target.byId)) forgetRoomUnits(target);
   mergeById(target.transports, fresh.transports, target.transportsById);
   target.revision = marks.revision;
   target.mealOverlayRevision = marks.mealOverlayRevision;
@@ -150,17 +150,23 @@ function mergeTower(target: Tower, fresh: Tower, marks: MergeMarks): void {
 /** Rewrite `live` to hold `fresh`'s records in `fresh`'s order, keeping the
  *  object a record's id already had and making its fields the fresh ones
  *  (an optional field the fresh record lacks, a finished construction's
- *  `completeAt`, goes too), and rebuild the id index to match. */
-function mergeById<T extends Unit | Transport>(live: T[], fresh: T[], index: Map<number, T>): void {
+ *  `completeAt`, goes too), and rebuild the id index to match. True when a
+ *  record had no object yet. */
+function mergeById<T extends Unit | Transport>(live: T[], fresh: T[], index: Map<number, T>): boolean {
+  let added = false;
   const next: T[] = fresh.map((record) => {
     const held = index.get(record.id);
-    if (!held) return record;
+    if (!held) {
+      added = true;
+      return record;
+    }
     assignRecord(held, record);
     return held;
   });
   live.splice(0, live.length, ...next);
   index.clear();
   for (const record of next) index.set(record.id, record);
+  return added;
 }
 
 /** Make `held`'s fields `record`'s, keeping the object: an optional field

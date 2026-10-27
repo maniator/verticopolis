@@ -78,7 +78,16 @@ export function parseDelta(sim: Simulation, m: DeltaText): ParsedDelta | null {
     if (unit.floor !== held.floor || unit.x !== held.x || unit.width !== held.width) return null;
     coerced.push(unit);
   }
-  const records: DeltaRecords = { rest: fresh, units: coerced, transports: transports.map((t) => coerceTransportRecord(t as SerializedGame["transports"][number])) };
+  // The same for a shaft: the delta's transports skip the load-time
+  // repairs (the overlap filter and the express lobby-stop lock), which only
+  // a moved or retyped shaft could need.
+  const coercedTransports = transports.map((t) => coerceTransportRecord(t as SerializedGame["transports"][number]));
+  for (let i = 0; i < coercedTransports.length; i++) {
+    const a = coercedTransports[i];
+    const b = tower.transports[i];
+    if (a.kind !== b.kind || a.x !== b.x || a.width !== b.width || a.bottom !== b.bottom || a.top !== b.top) return null;
+  }
+  const records: DeltaRecords = { rest: fresh, units: coerced, transports: coercedTransports };
   const telemetry = JSON.parse(m.telemetry) as unknown;
   if (!isTelemetryDocument(telemetry)) throw new Error("delta: the telemetry is not the engine's shape");
   const housekeeping = m.housekeeping ? (JSON.parse(m.housekeeping) as { cleaned: number; leftover: number }) : null;

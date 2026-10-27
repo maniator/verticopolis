@@ -119,7 +119,7 @@ impl FloorRooms {
 }
 
 impl Tower {
-    fn index_key(&self) -> IndexKey {
+    pub(crate) fn index_key(&self) -> IndexKey {
         (self.revision, self.units.len())
     }
 

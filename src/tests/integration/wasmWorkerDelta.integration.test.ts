@@ -267,11 +267,12 @@ describe.skipIf(!hasWasmPackage())("serializeForSync", () => {
         expect(engine.serializeForSync()).toBe(engine.serialize());
         for (let hour = 0; hour < 3; hour++) {
           for (let i = 0; i < 30; i++) engine.tick(2);
+          const before = engine.serialize();
           const delta = engine.saveDelta();
           expect(delta, "a delta against the last sync").toBeDefined();
           // Taking a delta moves nothing in the save the engine reports.
-          const text = engine.serialize();
-          expect(engine.serializeForSync()).toBe(text);
+          expect(engine.serialize()).toBe(before);
+          expect(engine.serializeForSync()).toBe(before);
         }
       } finally {
         engine.free();

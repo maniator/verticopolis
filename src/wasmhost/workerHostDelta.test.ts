@@ -5,7 +5,8 @@ import { Simulation } from "../engine/Simulation";
 import { parseDelta } from "./workerApply";
 import { sameJson } from "./workerCore";
 import { fakeModule } from "./fakeEngine.fixture";
-import { mergeSimulationDelta } from "./merge";
+import { mergeSimulation, mergeSimulationDelta, rebuildUnitSets } from "./merge";
+import { roomUnits } from "../engine/tower/rooms";
 
 /**
  * The hourly delta on the worker host (#1045), on the fake engine: an hour
@@ -141,6 +142,31 @@ describe("the worker host's hourly delta", () => {
     r.host.detach();
   });
 
+  it("counts the commands a refused delta covers as acknowledged once, when the full save lands", async () => {
+    const r = rig();
+    await r.settleTasks();
+    r.sim.money = 4242; // a command, ahead of the hour pass
+    r.sim.tick(1);
+    r.gate().flush();
+    const ops = r.toWorker.filter((m): m is Extract<ToWorker, { type: "ops" }> => m.type === "ops");
+    // The request in flight is the first one asked; the worker has not
+    // answered it yet.
+    const req = ops.find((m) => m.request)!.request!.req;
+    const seq = Math.max(...ops.flatMap((m) => m.ops.map((o) => o.seq)));
+    const view = r.engine().frameView();
+    view[0] = r.sim.clock.minutes;
+    const rest = { ...JSON.parse(r.engine().serialize()), minutes: r.sim.clock.minutes };
+    delete rest.units;
+    r.host.receive({ type: "frame", gen: 1, req, seq, view, events: "[]", dropped: 0, log: null, pending: null, merge: null, delta: { delta: JSON.stringify({ units: [], rest }), telemetry: '{"util":[],"hourly":[],"origins":[]}', housekeeping: null, base: 7, sync: 8 }, workMs: { ops: 0, reply: 0, save: 0 }, memoryBytes: null });
+    expect(r.fatal).toEqual([]);
+    expect(r.host.stats.deltasRefused).toBe(1);
+    expect(r.host.stats.commandAckMs.length, "not visible yet").toBe(0);
+    await r.settleTasks();
+    expect(r.host.stats.merges).toBe(1);
+    expect(r.host.stats.commandAckMs.length).toBe(1);
+    r.host.detach();
+  });
+
   it("asks for a full save after a stale reply that carried a delta", async () => {
     const r = rig();
     await r.settleTasks();
@@ -201,6 +227,17 @@ describe("the worker host's hourly delta", () => {
     expect(parseDelta(sim, payload([{ ...units[0], x: units[0].x + 5 }], rest)), "a unit moved in place").toBeNull();
     expect(parseDelta(sim, payload([{ ...units[0], floor: units[0].floor + 1 }], rest)), "a unit on another floor").toBeNull();
     expect(parseDelta(sim, payload([], { ...rest, transports: [{ id: 5, kind: "stairs" }] }))).toBeNull();
+    for (let x = 101; x < 113; x++) {
+      expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+      expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    }
+    expect(sim.tower.placeTransport("stairs", 104, 1, 2), "stairs").toMatchObject({ ok: true });
+    const held = (sim.serialize() as unknown as { transports: Record<string, unknown>[] }).transports;
+    expect(held.length).toBe(1);
+    expect(parseDelta(sim, payload([], { ...rest, transports: held }))?.records.transports.length).toBe(1);
+    for (const moved of [{ kind: "escalator" }, { x: 110 }, { bottom: 2 }, { top: 5 }, { width: 6 }]) {
+      expect(parseDelta(sim, payload([], { ...rest, transports: [{ ...held[0], ...moved }] })), `a shaft that changed ${Object.keys(moved)[0]}`).toBeNull();
+    }
     expect(() => parseDelta(sim, payload([], { ...rest, units: [] }))).toThrow(/remainder/);
     expect(() => parseDelta(sim, payload([{ id: "x" }], rest))).toThrow(/record/);
   });
@@ -219,6 +256,70 @@ describe("mergeSimulationDelta", () => {
     expect(() => mergeSimulationDelta(sim, records, { revision: 5, mealOverlayRevision: 0 })).toThrow(/unit 99999/);
     expect(JSON.stringify(Simulation.prototype.serialize.call(sim)), "nothing written").toBe(before);
     expect(sim.money).toBe(1e9);
+  });
+
+  it("copies the billed rooms rather than sharing the delta's list", () => {
+    const sim = Simulation.newGame(7, "modern");
+    const rest = Simulation.newGame(7, "modern");
+    rest.exterminationRoomIds = [3, 4];
+    mergeSimulationDelta(sim, { rest, units: [], transports: [] }, { revision: 0, mealOverlayRevision: 0 });
+    expect(sim.exterminationRoomIds).toEqual([3, 4]);
+    expect(sim.exterminationRoomIds).not.toBe(rest.exterminationRoomIds);
+    rest.exterminationRoomIds = undefined;
+    mergeSimulationDelta(sim, { rest, units: [], transports: [] }, { revision: 0, mealOverlayRevision: 0 });
+    expect(sim.exterminationRoomIds, "a list the engine cleared").toBeUndefined();
+  });
+});
+
+describe("rebuildUnitSets", () => {
+  it("rebuilds the units under construction and the fires from the read model's rooms", () => {
+    const sim = Simulation.newGame(7, "classic");
+    sim.money = 1e9;
+    for (let x = 100; x < 130; x++) {
+      expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+      expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    }
+    expect(sim.tower.place("office", 2, 102), "office").toMatchObject({ ok: true });
+    expect(sim.tower.place("office", 2, 115), "office 2").toMatchObject({ ok: true });
+    const [a, b] = sim.tower.units.filter((u) => u.kind === "office");
+    // Stale sets, as a delta leaves them: one unit listed that is no longer
+    // building, and none listed that now is or burns.
+    sim.constructing.clear();
+    sim.constructing.add(b.id);
+    sim.events.restore([b.id]);
+    a.state = "construction";
+    b.state = "active" as typeof b.state;
+    rebuildUnitSets(sim);
+    expect([...sim.constructing]).toEqual([a.id]);
+    expect(sim.events.count).toBe(0);
+    a.state = "active" as typeof a.state;
+    b.state = "fire";
+    rebuildUnitSets(sim);
+    expect(sim.constructing.size).toBe(0);
+    expect(sim.events.count).toBe(1);
+  });
+});
+
+describe("a full merge that brings in a unit object", () => {
+  it("does not leave the room list the delta's unit sets read stale", () => {
+    const sim = Simulation.newGame(7, "classic");
+    sim.money = 1e9;
+    for (let x = 100; x < 130; x++) {
+      expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+      expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    }
+    expect(sim.tower.place("office", 2, 102).ok).toBe(true);
+    const old = roomUnits(sim.tower)[0];
+    // The engine holds the same revision and unit count with another id.
+    const save = JSON.parse(JSON.stringify(sim.serialize())) as { units: { id: number }[] };
+    save.units.find((u) => u.id === old.id)!.id = 99_999;
+    const fresh = Simulation.deserialize(save as unknown as Parameters<typeof Simulation.deserialize>[0]);
+    mergeSimulation(sim, fresh, { revision: sim.tower.revision, mealOverlayRevision: 0 });
+    const room = sim.tower.byId.get(99_999)!;
+    expect(roomUnits(sim.tower)).toContain(room);
+    room.state = "fire";
+    rebuildUnitSets(sim);
+    expect(sim.events.count).toBe(1);
   });
 });
 

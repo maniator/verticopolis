@@ -1,3 +1,5 @@
+import type { ShadowCommand } from "../dualrun/commands";
+
 /**
  * When a command ahead of an hour pass still lets the engine send a delta
  * (#1045). Any other command makes the next hour pass a full save: the
@@ -16,7 +18,7 @@
  * - `setTowerName`: the save's remainder carries `towerName` whole, and the
  *   engine's setter has no failure path.
  */
-export const KEYFRAME_EXEMPT_OPS: ReadonlySet<string> = new Set(["setView", "emit", "setTowerName"]);
+export const KEYFRAME_EXEMPT_OPS: ReadonlySet<ShadowCommand["op"]> = new Set<ShadowCommand["op"]>(["setView", "emit", "setTowerName"]);
 
 /** What a host needs to patch its read model with one delta: the engine's
  *  `saveDelta()` text and the telemetry and housekeeping texts that ride

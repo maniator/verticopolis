@@ -31,4 +31,11 @@ export function roomUnits(tower: Tower): readonly Unit[] {
   return rooms;
 }
 
+/** Drop the memoized room list. A merge that brings in unit objects the
+ *  tower did not hold calls this, since the array, its length and the
+ *  revision can all read the same afterwards with other objects in it. */
+export function forgetRoomUnits(tower: Tower): void {
+  cache.delete(tower);
+}
+
 const cache = new WeakMap<Tower, { units: Unit[]; length: number; revision: number; rooms: readonly Unit[] }>();

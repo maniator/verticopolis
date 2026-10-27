@@ -122,6 +122,7 @@ fn a_unit_added_or_removed_asks_for_a_full_save_and_clears_the_mirror() {
     let mut m = SaveMirror::default();
     m.full(&sim);
     sim.tower.units.pop();
+    sim.tower.revision += 1;
     assert!(m.delta(&mut sim).is_none());
     // Cleared: the next one needs a full save too, even with nothing moved.
     assert!(m.delta(&mut sim).is_none());
@@ -134,8 +135,10 @@ fn units_in_a_new_order_ask_for_a_full_save() {
     let mut sim = busy();
     let mut m = SaveMirror::default();
     m.full(&sim);
-    assert!(sim.tower.units.len() > 1);
-    sim.tower.units.swap(0, 1);
+    let rooms = sim.tower.room_indices();
+    assert!(rooms.len() > 1);
+    // The revision is left alone: the id check alone must catch the swap.
+    sim.tower.units.swap(rooms[0], rooms[1]);
     assert!(m.delta(&mut sim).is_none());
 }
 
@@ -144,12 +147,13 @@ fn a_late_reorder_clears_even_a_partially_updated_mirror() {
     let mut sim = busy();
     let mut m = SaveMirror::default();
     m.full(&sim);
-    let n = sim.tower.units.len();
+    let rooms = sim.tower.room_indices();
+    let n = rooms.len();
     assert!(n > 3);
     // A mismatch near the end must still force a full save even if earlier
     // records have already been compared and provisionally copied.
     sim.tick(60.0);
-    sim.tower.units.swap(n - 2, n - 1);
+    sim.tower.units.swap(rooms[n - 2], rooms[n - 1]);
     assert!(m.delta(&mut sim).is_none());
     assert!(m.delta(&mut sim).is_none(), "mirror must stay unprimed");
     m.full(&sim);
@@ -166,4 +170,41 @@ fn clear_forgets_the_mirror() {
     m.full(&sim);
     m.clear();
     assert!(m.delta(&mut sim).is_none());
+}
+
+#[test]
+fn only_rooms_are_mirrored() {
+    let sim = busy();
+    let mut m = SaveMirror::default();
+    m.full(&sim);
+    let rooms = sim.tower.room_units().count();
+    assert!(rooms < sim.tower.units.len(), "the tower has tiles");
+    assert_eq!(m.rooms.len(), rooms);
+}
+
+#[test]
+fn an_edit_moves_the_key_and_asks_for_a_full_save() {
+    let mut sim = busy();
+    let mut m = SaveMirror::default();
+    m.full(&sim);
+    // A placement or removal bumps the revision even when the unit count
+    // is back where it was, and the tiles are not in the mirror to notice.
+    sim.tower.revision += 1;
+    assert!(m.delta(&mut sim).is_none());
+    assert!(m.delta(&mut sim).is_none(), "the mirror stays unprimed");
+    m.full(&sim);
+    assert!(m.delta(&mut sim).is_some(), "a full save primes it again");
+}
+
+#[test]
+fn a_load_primes_a_new_mirror() {
+    let sim = busy();
+    let mut a = SaveMirror::default();
+    let save = a.full(&sim);
+    let raw = crate::load::parse_save_json(save.as_bytes()).unwrap();
+    let mut loaded = crate::load::deserialize(&raw).unwrap();
+    let mut b = SaveMirror::default();
+    assert!(b.delta(&mut loaded).is_none(), "nothing sent yet");
+    b.full(&loaded);
+    assert!(b.delta(&mut loaded).is_some());
 }
