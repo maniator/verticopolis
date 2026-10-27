@@ -19,7 +19,38 @@ import type { FacilityKind, GameMode, UnitState, WeatherKind } from "../engine/t
 export interface SimView {
   readonly header: HeaderView;
   readonly tower: TowerView;
+  /** The tower's rooms: every unit but the floor and lobby tiles, in
+   *  `tower.units` order (about 2,900 of the large tower's 43,358 units).
+   *  A reader that needs only rooms reads this, never `tower.units`. The
+   *  same array comes back until `tower.revision` moves or the tower is
+   *  replaced, so a reader may keep it for that long, and an adapter builds
+   *  it at most once per revision. A reader that keeps it tells a change by
+   *  the array's identity, not the revision, which a WASM host can repeat
+   *  over other units after a re-host (#1296). Its entries stay as current as
+   *  `tower.getUnit` gives them: a label, state or occupant count that
+   *  changes without a revision move shows in the kept array's entry. */
+  readonly rooms: ReadonlyArray<UnitView>;
+  /** The floor and lobby tiles as runs (about 110 on the large tower for
+   *  about 40,000 tiles), ordered by floor and then x, each tile in exactly
+   *  one run and each run as long as it can be: a run ends at a gap, a
+   *  change of kind or a change of width, never at a tile's state or
+   *  counters. Kept and rebuilt like `rooms`. */
+  readonly structure: ReadonlyArray<StructureRunView>;
   readonly crowd: CrowdView;
+}
+
+/** `count` floor or lobby tiles of one kind and width side by side on one
+ *  floor: tile i sits at `x + i * width`. These are the fields of a run in
+ *  the Rust engine's structural snapshot (6a, #1213), whose runs carry no
+ *  ids and may split where these join, so a Rust adapter joins them once per
+ *  revision. The view gives no tile ids: on a tile a room stands on,
+ *  `tower.unitAt` gives the room, and no reader needs a tile's id today. */
+export interface StructureRunView {
+  readonly kind: "floor" | "lobby";
+  readonly floor: number;
+  readonly x: number;
+  readonly width: number;
+  readonly count: number;
 }
 
 /** The scalar state the HUD and the renderer's triggers read. */
@@ -91,9 +122,9 @@ export interface PendingChoiceView {
 export interface TowerView {
   /** Every unit, the bare floor and lobby tiles included (about 40,000 of the
    *  large tower's 43,358). A Rust adapter builds this array at most once per
-   *  revision, never per read. A reader that needs only rooms, or the
-   *  structure, does not walk it per frame or per step; a room list and
-   *  structure runs come with #1253. */
+   *  revision, never per read. A reader that needs only rooms reads
+   *  `SimView.rooms`, and one that draws the structure reads
+   *  `SimView.structure`; neither walks this per frame or per step. */
   readonly units: ReadonlyArray<UnitView>;
   readonly transports: ReadonlyArray<TransportView>;
   readonly revision: number;

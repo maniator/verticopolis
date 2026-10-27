@@ -1,5 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
+import { forgetUnitLists } from "../engine/tower/rooms";
 import type { Transport, Unit } from "../engine/types";
 
 /**
@@ -69,10 +70,29 @@ function mergeTower(target: Tower, fresh: Tower, marks: MergeMarks): void {
       t[key] = fv;
     }
   }
+  // The unit array keeps its identity and the revision becomes the engine's,
+  // which counts from its own load, so a revision can come back with other
+  // units behind it. The per-revision lists go when the revision moves or the
+  // units do, and stay over an hourly merge that changed neither (#1253).
+  const moved = target.revision !== marks.revision || unitsMoved(target.units, fresh.units);
   mergeById(target.units, fresh.units, target.byId);
   mergeById(target.transports, fresh.transports, target.transportsById);
   target.revision = marks.revision;
+  if (moved) forgetUnitLists(target);
   target.mealOverlayRevision = marks.mealOverlayRevision;
+}
+
+/** Whether `fresh` lists other units than `live`, or the same ones in
+ *  another order, of another kind or in another place: what the
+ *  per-revision room list and structure runs are built from. */
+function unitsMoved(live: readonly Unit[], fresh: readonly Unit[]): boolean {
+  if (live.length !== fresh.length) return true;
+  for (let i = 0; i < live.length; i++) {
+    const a = live[i];
+    const b = fresh[i];
+    if (a.id !== b.id || a.kind !== b.kind || a.floor !== b.floor || a.x !== b.x || a.width !== b.width) return true;
+  }
+  return false;
 }
 
 /** Rewrite `live` to hold `fresh`'s records in `fresh`'s order, keeping the

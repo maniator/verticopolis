@@ -38,6 +38,5 @@ engine-rs/src/services.rs
 engine-rs/src/tdt/export_gather.rs
 engine-rs/src/tdt/parse.rs
 engine-rs/src/tower.rs
-engine-rs/src/tower_query.rs
 engine-rs/src/wasm.rs
 engine-rs/tests/independence.rs
