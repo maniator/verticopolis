@@ -301,9 +301,9 @@ pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     }
     let p = &crowd.people[i];
     if let Some(oid) = p.origin_unit_id {
-        if let Some(origin) = tower.get_unit_mut(oid) {
+        if let Some((origin, at)) = tower.marked_by_id(oid) {
             if origin.out_for_meal.unwrap_or(0) > 0 {
-                origin.out_for_meal = Some(origin.out_for_meal.unwrap_or(0) - 1);
+                origin.set_out_for_meal(at, Some(origin.out_for_meal.unwrap_or(0) - 1));
                 tower.bump_meal_overlay_revision();
             }
         }
@@ -311,12 +311,13 @@ pub fn finish(crowd: &mut Crowd, i: usize, tower: &mut Tower) {
     let p = &crowd.people[i];
     if let Some(vid) = p.venue_unit_id {
         let counted_hotel = p.counted_hotel_guest;
-        if let Some(venue) = tower.get_unit_mut(vid) {
+        if let Some((venue, at)) = tower.marked_by_id(vid) {
             if venue.customers_in.unwrap_or(0) > 0 {
-                venue.customers_in = Some(venue.customers_in.unwrap_or(0) - 1);
-                venue.sync_attendance_occupants();
+                venue.set_customers_in(at, Some(venue.customers_in.unwrap_or(0) - 1));
+                venue.sync_attendance_occupants(at);
                 if counted_hotel && venue.hotel_customers_in.unwrap_or(0) > 0 {
-                    venue.hotel_customers_in = Some(venue.hotel_customers_in.unwrap_or(0) - 1);
+                    let n = venue.hotel_customers_in.unwrap_or(0) - 1;
+                    venue.set_hotel_customers_in(at, Some(n));
                 }
                 tower.bump_meal_overlay_revision();
             }

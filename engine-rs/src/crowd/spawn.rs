@@ -513,8 +513,8 @@ fn spawn_meal_outbound(
     crowd.people[i].dest_x = crowd.rng.int(vx, vx + vw - 1) as f64;
     crowd.people[i].meal_venue_id = Some(venue_id);
     crowd.people[i].origin_unit_id = Some(origin_id);
-    let origin = tower.get_unit_mut(origin_id).unwrap();
-    origin.out_for_meal = Some(origin.out_for_meal.unwrap_or(0) + 1);
+    let (origin, at) = tower.marked_by_id(origin_id).unwrap();
+    origin.set_out_for_meal(at, Some(origin.out_for_meal.unwrap_or(0) + 1));
     tower.bump_meal_overlay_revision();
 }
 

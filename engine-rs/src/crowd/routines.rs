@@ -74,8 +74,8 @@ pub fn spawn_school_departure(crowd: &mut Crowd, tower: &mut Tower, floors: &Spa
     p.routine = Some("schoolRun");
     p.origin_unit_id = Some(origin_id);
     p.returning = true;
-    let o = tower.get_unit_mut(origin_id).unwrap();
-    o.out_for_meal = Some(o.out_for_meal.unwrap_or(0) + 1);
+    let (o, at) = tower.marked_by_id(origin_id).unwrap();
+    o.set_out_for_meal(at, Some(o.out_for_meal.unwrap_or(0) + 1));
     tower.bump_meal_overlay_revision();
 }
 
@@ -108,7 +108,7 @@ pub fn spawn_sales_call(crowd: &mut Crowd, tower: &mut Tower, floors: &SpawnFloo
     let p = &mut crowd.people[i];
     p.routine = Some("salesCall");
     p.origin_unit_id = Some(origin_id);
-    let o = tower.get_unit_mut(origin_id).unwrap();
-    o.out_for_meal = Some(o.out_for_meal.unwrap_or(0) + 1);
+    let (o, at) = tower.marked_by_id(origin_id).unwrap();
+    o.set_out_for_meal(at, Some(o.out_for_meal.unwrap_or(0) + 1));
     tower.bump_meal_overlay_revision();
 }

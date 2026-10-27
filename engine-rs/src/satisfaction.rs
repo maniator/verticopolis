@@ -474,8 +474,8 @@ impl Simulation {
                 }
                 let rescind_noise = noise_cannot_evict && !non_noise_problem;
                 if !is_relocation && (u.satisfaction >= VACATE_RESCIND || rescind_noise) {
-                    let w = &mut self.tower.units[i];
-                    w.state = UnitState::Occupied;
+                    let (w, at) = self.tower.marked(i);
+                    w.set_state(at, UnitState::Occupied);
                     w.vacate_reason = None;
                     w.vacate_at = None;
                     if rescind_noise {
@@ -487,8 +487,8 @@ impl Simulation {
                 }
             } else if lease_tenant && u.satisfaction <= 0.0 {
                 let reason = self.vacate_cause(&u, &r);
-                let w = &mut self.tower.units[i];
-                w.state = UnitState::Vacating;
+                let (w, at) = self.tower.marked(i);
+                w.set_state(at, UnitState::Vacating);
                 w.vacate_reason = Some(reason);
                 w.vacate_at = Some(self.clock.minutes + VACATE_NOTICE_MINUTES);
                 notices.push((u.floor, u.kind, reason));

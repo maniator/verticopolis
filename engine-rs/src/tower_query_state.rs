@@ -79,18 +79,6 @@ impl Unit {
         self.resident_count()
     }
 
-    /// `syncAttendanceOccupants`.
-    pub fn sync_attendance_occupants(&mut self) {
-        if self.kind.attendance_cap().is_none() {
-            return;
-        }
-        self.occupants = if self.is_operational() {
-            self.customers_in.unwrap_or(0)
-        } else {
-            0
-        };
-    }
-
     /// `visibleOccupants`.
     pub fn visible_occupants(&self) -> i64 {
         (self.occupants - self.out_for_meal.unwrap_or(0)).max(0)

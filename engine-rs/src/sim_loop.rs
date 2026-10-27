@@ -175,8 +175,8 @@ impl Simulation {
             };
             if self.clock.minutes >= threshold {
                 let (name, floor) = (u.kind.facility().name, u.floor);
-                let u = self.tower.get_unit_mut(id).unwrap();
-                u.state = UnitState::Empty;
+                let (u, at) = self.tower.marked_by_id(id).unwrap();
+                u.set_state(at, UnitState::Empty);
                 u.complete_at = None;
                 u.complete_at_raw = None;
                 self.constructing.shift_remove(&id);

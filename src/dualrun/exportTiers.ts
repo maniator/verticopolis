@@ -128,6 +128,12 @@ export const BINDING_EXPORT_TIERS = {
   floorHeatmap: T2,
   peakCongestionHotspot: T2,
   onboardingFacts: T2,
+  // Tier 2, the engine view (facade slice 6a): the layout, the structure
+  // per revision, the metadata per meta revision and undo's signature.
+  viewLayout: T2,
+  viewStructure: T2,
+  unitMetaSince: T2,
+  towerSignature: T2,
   // Tier 2, the host loop and the engine's lifetime.
   tick: LOOP,
   frameView: LOOP,
@@ -137,6 +143,9 @@ export const BINDING_EXPORT_TIERS = {
   gameplayEventsDropped: LOOP,
   commuteStress: LOOP,
   commuteStressRevision: LOOP,
+  // The view's frame reader remembers what it last sent, so a second caller
+  // would see only what moved since the host's read: the host's alone.
+  viewFrame: LOOP,
   free: LOOP,
 
   // Tier 3: relay, test and seed ops.
