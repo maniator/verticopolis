@@ -214,7 +214,7 @@ consumer and is out of scope here.
       defers filed (see the round 4 review section below).
 - [x] Round 5 on round 4's fixes; its patch findings fixed and its defers
       filed (see the round 5 review section below); main merged again
-      (#1298, #1325).
+      (#1298, #1325, then #1332).
 - [ ] The round 3 to 5 HP-1 to HP-12 records on the PR; a confirming pass
       on round 5's fixes and the merge; the independent review; the owner's
       human review and his call on the deferrals of B6 and H5-2 (no
@@ -694,7 +694,10 @@ The pass ran `/gds-code-review` on `2ea5c05d` (round 4's fixes) with the same
 four layers. `main` then moved to `035231a6` (#1298), whose new
 `tower_query_state.rs` carries `sync_attendance_occupants`; this PR keeps that
 method in `view/marks.rs` behind a mark, so the merge drops the copy in
-`tower_query_state.rs`. Its patch findings, fixed in this PR:
+`tower_query_state.rs`. A second merge, at `c0787c1f`, brought #1332's
+streamed loader: the loader's one list assignment now sits in `assemble`,
+which both readers end with, and the exemption's test follows it. Its patch
+findings, fixed in this PR:
 
 - The source scan still missed spellings of the writes it guards, each layer
   with its own list. The rules changed shape instead of growing a case at a

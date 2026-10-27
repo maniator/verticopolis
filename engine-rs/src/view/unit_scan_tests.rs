@@ -197,8 +197,8 @@ fn place_before(code: &str, end: usize) -> &str {
 
 /// `writes` without the loader's one assignment of a new tower's unit list,
 /// `sim.tower.units = units;` in `load.rs`, where `sim` is the
-/// `Simulation::new` that `deserialize` has just made, with its own mark
-/// log (`the_loader_fills_only_a_new_tower` pins that).
+/// `Simulation::new` that `assemble` has just made, with its own mark log
+/// (`the_loader_fills_only_a_new_tower` pins that).
 pub(super) fn new_list_aside(rel: &str, code: &str, writes: Vec<usize>) -> Vec<usize> {
     let filled = |at: usize| {
         rel == "load.rs"

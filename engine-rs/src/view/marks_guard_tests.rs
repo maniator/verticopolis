@@ -322,8 +322,8 @@ fn only_the_setters_write_the_frame_fields() {
 }
 
 /// `load.rs`'s one fill of a unit list, the scan's one exemption, is of the
-/// tower `deserialize` has just made with `Simulation::new`, whose mark log
-/// is new.
+/// tower `assemble` (the rest of `deserialize` and of the streamed reader)
+/// has just made with `Simulation::new`, whose mark log is new.
 #[test]
 fn the_loader_fills_only_a_new_tower() {
     let sources = engine_sources();
@@ -335,7 +335,7 @@ fn the_loader_fills_only_a_new_tower() {
         .collect();
     assert_eq!(fills.len(), 1, "{fills:?}");
     let body = &load.code[load.code[..fills[0]].rfind("fn ").unwrap()..fills[0]];
-    assert!(body.starts_with("fn deserialize("), "{}", &body[..40]);
+    assert!(body.starts_with("fn assemble("), "{}", &body[..40]);
     assert_eq!(body.matches("let mut sim=").count(), 1);
     assert!(body.contains("let mut sim=Simulation::new("));
     // Only that statement: another receiver or list, or another file, counts.

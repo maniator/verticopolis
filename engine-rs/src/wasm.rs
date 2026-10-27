@@ -6,9 +6,9 @@ use serde_json::Value;
 use wasm_bindgen::prelude::*;
 
 use crate::canonical::{canonical_json, digest};
-use crate::clock::GameMode;
 use crate::facilities::Kind;
 pub use crate::frame::{frame_view, log_since, FRAME_HEADER, PERSON_FIXED, UNKNOWN_ROUTINE};
+use crate::load_stream::parse_mode;
 use crate::sim::Simulation;
 use crate::snapshot::state_view;
 
@@ -17,10 +17,6 @@ use crate::snapshot::state_view;
 /// convert at the boundary.
 fn err(what: impl std::fmt::Display) -> JsError {
     JsError::new(&what.to_string())
-}
-
-fn parse_mode(s: &str) -> Result<GameMode, String> {
-    GameMode::parse(s).ok_or_else(|| format!("mode must be classic or modern, got {s}"))
 }
 
 fn parse_kind(s: &str) -> Result<Kind, String> {
@@ -245,18 +241,6 @@ fn apply_markers(sim: &mut Simulation, text: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// `raw.mode = mode`, the override a scenario start applies before loading.
-/// The TypeScript throws on a non-object; here that is an error rather than
-/// a panic, which under WASM would trap and poison the module.
-fn override_mode(raw: &mut Value, mode: &str) -> Result<(), String> {
-    parse_mode(mode)?;
-    let obj = raw
-        .as_object_mut()
-        .ok_or_else(|| "the file does not hold a saved game".to_string())?;
-    obj.insert("mode".into(), Value::String(mode.to_string()));
-    Ok(())
-}
-
 /// The catalog text for a mode, as [`catalog`] returns it.
 fn catalog_text(mode: &str) -> Result<String, String> {
     Ok(crate::catalog::catalog_json(parse_mode(mode)?))
@@ -331,8 +315,9 @@ impl Engine {
     /// so a shadow can start exactly where the live engine stands.
     #[wasm_bindgen(js_name = fromSave)]
     pub fn from_save(text: &str, markers: Option<String>) -> Result<Engine, JsError> {
-        let raw = crate::load::parse_save_json(text.as_bytes()).map_err(err)?;
-        let mut sim = crate::load::deserialize(&raw).map_err(err)?;
+        // A current save is read without a whole-save tree; any other text
+        // goes through `load::parse_save_json` and `load::deserialize`.
+        let mut sim = crate::load_stream::load_save_text(text.as_bytes()).map_err(err)?;
         if let Some(m) = markers {
             apply_markers(&mut sim, &m).map_err(err)?;
         }
@@ -344,12 +329,8 @@ impl Engine {
     /// overwrites the save's mode before loading, as a scenario start does.
     #[wasm_bindgen(js_name = fromVctower)]
     pub fn from_vctower(text: &str, mode: Option<String>) -> Result<Engine, JsError> {
-        let mut raw = crate::load::decode_vctower(text).map_err(err)?;
-        if let Some(m) = &mode {
-            override_mode(&mut raw, m).map_err(err)?;
-        }
-        let mut sim = crate::load::deserialize(&raw).map_err(err)?;
-        crate::load::mark_founder_from_loaded_file(&mut sim, &raw);
+        // Decoded, then read as `fromSave` reads a save, with the mode set.
+        let sim = crate::load_stream::load_vctower_text(text, mode.as_deref()).map_err(err)?;
         Ok(Engine { sim })
     }
 
@@ -1209,6 +1190,8 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::clock::GameMode;
+    use crate::load_stream::override_mode;
 
     /// The binding stamps the save and hands back the crate encoder's text.
     /// (A refusal is a JavaScript error, which cannot be built off the wasm

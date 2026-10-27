@@ -421,7 +421,9 @@ broken live deployment remains refused after repair.
 Because Repair touches only the running build's keys, another tab or a
 waiting install is not affected by it; their integrity checks and the page
 byte gate still refuse any mix.
-Repair never activates a worker itself or triggers an automatic reload.
+Repair never activates a worker itself or triggers an automatic reload. A stop
+screen has no tower to save, so its update handler (not Repair) activates a
+waiting build at once; Repair therefore never meets a waiting build there.
 
 Rules for both:
 
@@ -564,9 +566,12 @@ Specs:
    Offline, or with the engine fetch blocked, Repair stops at the first
    failed fetch and every existing entry is unchanged. A corrupt live
    response stays refused with no retry loop. Repeat with another A tab and
-   a waiting B worker: no tab may run mismatched bytes during repair, B's
-   engine entries are byte-identical before and after Repair, and after B
-   activates the page cold-starts offline on B's engine.
+   B deployed while the page is stopped: the stopped page activates B at
+   once and boots on B's engine, A's engine keys are removed at activation, a
+   tab that was running A loads B's consistent set on its next reload, and
+   the page cold-starts offline on B's engine. Repair never meets a waiting B
+   on a stop screen; that Repair leaves other-revision keys byte-identical
+   is pinned by the unit test (`engineRepair.test.ts`).
 9. **First-install race.** Start with an empty profile and no registration.
    Serve A's worker with B's engine response during installation. Assert the
    installer becomes redundant, the page stays uncontrolled, and no B bytes
