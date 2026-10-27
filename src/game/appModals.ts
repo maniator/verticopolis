@@ -61,10 +61,11 @@ export async function showStats(app: GameApp): Promise<void> {
 
 /** Confirm and pay for a tower-wide exterminator dispatch (Modern), then reopen
  *  the stats modal so the player sees the "en route" state. The engine charges
- *  and logs the booking; here we only confirm the spend and surface a refusal
- *  the gate above should already have prevented. The stats modal's button
- *  calls it; a failed coverage answer toasts and rejects, as `showStats`
- *  does. */
+ *  and logs the booking through the port; here we only confirm the spend and
+ *  surface a refusal the gate above should already have prevented. The stats
+ *  modal reopens once the engine has answered, so it shows the answer. The
+ *  modal's button calls it; a failed coverage answer toasts and rejects, as
+ *  `showStats` does. */
 export async function confirmExterminate(app: GameApp): Promise<void> {
   const asked = app.sim;
   if (exterminateAsks.has(asked)) return;
@@ -88,7 +89,8 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
     // button (a fire or bulldoze clears the last infested room, or the mode
     // rule-set no longer offers an exterminator), so say why nothing happens
     // instead of a silent no-op.
-    app.sim.emit(recovery ? "No infested rooms left to treat." : "The exterminator is unavailable.", "bad");
+    const why = recovery ? "No infested rooms left to treat." : "The exterminator is unavailable.";
+    await app.port.command({ op: "emit", text: why, kind: "bad" });
     await showStats(app);
     return;
   }
@@ -96,10 +98,10 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
   app.ui.confirmModal(
     "Call the exterminator?",
     `Clear ${cov.infested} infested room(s) for $${cost.toLocaleString()}? The crew arrives tomorrow.`,
-    () => {
+    async () => {
       // A load while the confirm was open: the quote was for the old tower.
       if (app.sim !== asked) return;
-      const res = app.sim.callExterminator();
+      const res = await app.port.command({ op: "callExterminator" });
       // Surface every refusal, not just funds: the tower can change between
       // rendering the stats modal and confirming (rooms cleared, or another
       // dispatch already booked), so a silent no-op would leave the player
@@ -119,7 +121,7 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
           default:
             why = "The exterminator is unavailable.";
         }
-        app.sim.emit(why, "bad");
+        await app.port.command({ op: "emit", text: why, kind: "bad" });
       }
       void showStats(app);
     },

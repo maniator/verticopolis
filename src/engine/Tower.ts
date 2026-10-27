@@ -7,6 +7,7 @@ import type { Facility, FacilityKind, PlaceResult, Transport, Unit } from "./typ
 import { isStructural } from "./tower/towerTopology";
 import * as placement from "./tower/placement";
 import * as transport from "./tower/transport";
+import * as removal from "./tower/removal";
 import * as expressStops from "./tower/expressStops";
 import * as routing from "./tower/routing";
 
@@ -321,12 +322,7 @@ export class Tower {
     return transport.placeTransportDryRun(this, kind, x, bottom, top);
   }
 
-  placeTransport(
-    kind: FacilityKind,
-    x: number,
-    bottom: number,
-    top: number,
-  ): PlaceResult {
+  placeTransport(kind: FacilityKind, x: number, bottom: number, top: number): PlaceResult {
     return transport.placeTransport(this, kind, x, bottom, top);
   }
 
@@ -339,7 +335,7 @@ export class Tower {
   }
 
   removeUnit(id: number): Unit | undefined {
-    return transport.removeUnit(this, id);
+    return removal.removeUnit(this, id);
   }
 
   /** The editor's rename: a trimmed, well-formed name (or the catalog name when empty), false for

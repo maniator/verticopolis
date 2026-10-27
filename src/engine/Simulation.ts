@@ -28,6 +28,7 @@ import * as gripe from "./sim/gripe";
 import * as churn from "./sim/churn";
 import * as congestion from "./sim/congestion";
 import * as build from "./sim/build";
+import * as brush from "./sim/brush";
 import * as charges from "./sim/charges";
 import * as capacity from "./sim/capacity";
 import * as star from "./sim/star";
@@ -233,6 +234,7 @@ export class Simulation implements SimContext {
   toggleAutoBridge(): boolean { return build.toggleAutoBridge(this); }
   canBuild(kind: FacilityKind, floor: number, x: number): { ok: boolean; reason?: string; cost: number } { return build.canBuild(this, kind, floor, x); }
   build(kind: FacilityKind, floor: number, x: number): { ok: boolean; reason?: string } { return build.build(this, kind, floor, x); }
+  paintBrush(kind: brush.BrushKind, floor: number, tiles: readonly number[]): brush.BrushResult { return brush.paintBrush(this, kind, floor, tiles); }
   buildTransport( kind: FacilityKind, x: number, bottom: number, top: number, ): { ok: boolean; reason?: string } { return build.buildTransport(this, kind, x, bottom, top); }
   sellAt(floor: number, x: number): boolean { return build.sellAt(this, floor, x); }
   // capacity_changed edits (sim/capacity.ts); charges move the money (sim/charges.ts).
@@ -248,9 +250,7 @@ export class Simulation implements SimContext {
   // ---- Main tick ---------------------------------------------------------
 
   tick(dtMinutes: number): void { loop.tick(this, dtMinutes); }
-
   advanceStep(dtMinutes: number): void { loop.advanceStep(this, dtMinutes); }
-
   finishConstruction(): void { loop.finishConstruction(this); }
 
   onHour(): void { loop.onHour(this); }

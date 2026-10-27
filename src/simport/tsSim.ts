@@ -1,9 +1,14 @@
 import type { GameplayEvent } from "../engine/gameplayEventBuffer";
 import type { Simulation } from "../engine/Simulation";
+import type { FacilityKind } from "../engine/types";
+import { findCatalogFacility } from "../engine/catalogTypes";
+import { towerCatalog } from "../engine/towerCatalog";
 import { roomUnits, structureRuns } from "../engine/tower/rooms";
+import { wellFormed as wellFormedText } from "../engine/wellFormed";
 import { settleEngine, stepGate } from "../wasmhost/stepGate";
 import type { Command, CommandOp, CommandResult, CommandResults } from "./commands";
 import type { SimPort } from "./port";
+import { INVALID_COMMAND, wellFormed } from "./request";
 import { queryKey, type Query, type QueryOp, type QueryResult, type QueryResults } from "./queries";
 import {
   tsFloorHeatmap,
@@ -41,14 +46,21 @@ import type { HeaderView, SimView } from "./view";
  * issue order is execution order. A throw from the instance rejects the
  * promise with that error.
  *
- * Engine types come in through `import type` only, with two exceptions that
- * carry their reasons in the frontend import ratchet: the room list and the
- * structure runs above come from the engine's own memos, and the panel
- * answers (`tsPanels.ts`) call the engine's own functions. The adapter
- * retires with the TypeScript engine, so neither edge costs the retirement
- * anything.
+ * A command whose shape is wrong (`wellFormed` in `request.ts`) is refused
+ * before the instance sees it, so the relay never forwards it.
+ *
+ * Engine types come in through `import type` only. The runtime edges into
+ * `src/engine/` are the catalog handle (#921), which names the tower's
+ * facility kinds and which the retirement inventory moves out of the engine,
+ * and three that carry their reasons in the frontend import ratchet: the
+ * text repair `wellFormed`, the room list and structure runs above (from the
+ * engine's own memos), and the panel answers (`tsPanels.ts`, which call the
+ * engine's own functions). Those three retire with the adapter and the
+ * TypeScript engine, so they cost the retirement nothing.
  */
 export function createTsSim(getSim: () => Simulation): SimPort {
+  /** Whether a value names a facility in the live tower's catalog. */
+  const isKind = (kind: unknown): boolean => typeof kind === "string" && findCatalogFacility(towerCatalog(getSim()), kind as FacilityKind) !== undefined;
   // Kept per tower, so a swap starts with none and a replaced tower is not
   // held alive by its answers.
   const answers = new WeakMap<Simulation, Answers>();
@@ -82,6 +94,9 @@ export function createTsSim(getSim: () => Simulation): SimPort {
     command<C extends Command>(c: C): Promise<CommandResult<C>> {
       try {
         const sim = getSim();
+        if (!wellFormed(c, isKind)) {
+          return Promise.resolve({ ...unchanged(sim, c), ok: false, reason: INVALID_COMMAND, delta: 0 } as CommandResult<C>);
+        }
         const before = sim.money;
         // The table is checked op by op; this cast only tells the compiler
         // that `c.op` picks the handler for `C`.
@@ -176,6 +191,19 @@ function readHeader(sim: Simulation): HeaderView {
   };
 }
 
+/** The fields a refusal of a malformed command carries beyond the base ones,
+ *  each reporting that nothing changed. */
+function unchanged(sim: Simulation, c: unknown): object {
+  const { op, id } = c !== null && typeof c === "object" ? (c as { op?: unknown; id?: unknown }) : {};
+  if (op === "paintBrush") return { placed: 0 };
+  if (op === "setAutoBridge") return { value: sim.autoBridge };
+  if (op === "extendTransport") {
+    const t = typeof id === "number" && Number.isSafeInteger(id) ? sim.tower.getTransport(id) : undefined;
+    return { bottom: t?.bottom ?? 0, top: t?.top ?? 0, added: 0 };
+  }
+  return {};
+}
+
 /** A command's answer before the port adds `delta`, the balance's change,
  *  which it measures the same way for every command. */
 type Answer<K extends CommandOp> = Omit<CommandResults[K], "delta">;
@@ -185,6 +213,12 @@ type Handler<K extends CommandOp> = (sim: Simulation, c: Extract<Command, { op: 
  *  fields that command's callers read. */
 const COMMANDS: { readonly [K in CommandOp]: Handler<K> } = {
   build: (sim, c) => sim.build(c.kind, c.floor, c.x),
+  // The engine's brush, one call that the mirror host's relay forwards as
+  // one command, so the Rust engine runs the same builds in the same order.
+  paintBrush: (sim, c) => {
+    const r = sim.paintBrush(c.kind, c.floor, c.tiles);
+    return { ...r, ok: r.placed > 0 };
+  },
   buildTransport: (sim, c) => sim.buildTransport(c.kind, c.x, c.bottom, c.top),
   removeFacility: (sim, c) => sim.removeFacility(c.id, c.method),
   beginExtend: (sim, c) => ({ ok: sim.beginExtend(c.id) }),
@@ -199,7 +233,11 @@ const COMMANDS: { readonly [K in CommandOp]: Handler<K> } = {
   setStop: (sim, c) => ({ ok: sim.tower.setStop(c.id, c.floor, c.stop) }),
   setExpressStops: (sim, c) => ({ ok: sim.tower.setExpressStops(c.id) }),
   clearStops: (sim, c) => ({ ok: sim.tower.clearStops(c.id) }),
-  setSchedule: (sim, c) => ({ ok: sim.tower.setSchedule(c.id, c.schedule) }),
+  // A JSON copy, as the host hands the Rust engine the schedule (NaN and a
+  // hole read as null, an undefined field and one that is not enumerable are
+  // dropped), so both engines harden the same value and the tower never
+  // holds the caller's object.
+  setSchedule: (sim, c) => ({ ok: sim.tower.setSchedule(c.id, JSON.parse(JSON.stringify(c.schedule ?? null)) as unknown) }),
   setLabel: (sim, c) => ({ ok: sim.tower.setLabel(c.id, c.label) }),
   adjustRent: (sim, c) => rentAnswer(sim.adjustRent(c.id, c.dir)),
   setNoRate: (sim, c) => ({ ok: sim.setNoRate(c.id) }),
@@ -239,16 +277,21 @@ const COMMANDS: { readonly [K in CommandOp]: Handler<K> } = {
     sim.autoBridge = c.value;
     return { ok: true, value: sim.autoBridge };
   },
+  // Text is repaired where the Rust engine repairs it, as a caller's string
+  // crosses into the engine (its binding reads a lone surrogate as U+FFFD;
+  // `engine/wellFormed.ts`), so both engines keep the same name and line.
   setTowerName: (sim, c) => {
-    sim.tower.towerName = c.name;
+    sim.tower.towerName = wellFormedText(c.name);
     return { ok: true };
   },
   setView: (sim, c) => {
-    sim.view = c.view;
+    // A JSON copy, as the Rust binding takes it: the tower never holds the
+    // caller's object, and keeps every field the camera carries.
+    sim.view = c.view === null ? null : (JSON.parse(JSON.stringify(c.view)) as typeof c.view);
     return { ok: true };
   },
   emit: (sim, c) => {
-    sim.emit(c.text, c.kind);
+    sim.emit(wellFormedText(c.text), c.kind);
     return { ok: true };
   },
 };

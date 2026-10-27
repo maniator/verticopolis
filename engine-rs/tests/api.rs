@@ -37,6 +37,7 @@ fn the_host_api_is_in_place() {
     let _ = Simulation::can_build;
     let _ = Simulation::can_build_transport;
     let _ = Simulation::build;
+    let _ = Simulation::paint_brush;
     let _ = Simulation::build_transport;
     let _ = Simulation::sell_at;
     let _ = Simulation::toggle_auto_bridge;

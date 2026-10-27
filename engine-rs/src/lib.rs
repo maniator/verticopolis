@@ -10,6 +10,7 @@
     clippy::collapsible_match
 )]
 
+pub mod brush;
 pub mod build;
 pub mod canonical;
 pub mod catalog;
@@ -73,6 +74,7 @@ pub mod tower;
 mod tower_index;
 pub mod tower_query;
 mod tower_query_state;
+mod tower_removal;
 pub mod view;
 #[cfg(feature = "wasm")]
 pub mod wasm;
