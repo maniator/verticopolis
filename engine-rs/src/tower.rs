@@ -282,9 +282,10 @@ pub struct Tower {
     pub(crate) transport_by_id: HashMap<i64, usize>,
     pub(crate) lobby_tiles: HashMap<i64, i64>,
     pub(crate) room_tiles: HashMap<i64, i64>,
-    /// Revision-keyed memos (`servedSet`, `stopsCache`, segment runs, staff
-    /// components), see `tower_query.rs`.
-    pub(crate) memo: RefCell<crate::tower_query::Memo>,
+    /// Revision-keyed memos and indexes (`servedSet`, `stopsCache`, segment
+    /// runs, staff components and the `tower_index.rs` indexes), see
+    /// `tower_query_state.rs`.
+    pub(crate) memo: RefCell<crate::tower_query_state::Memo>,
     /// `mealOverlayRevision`: bumped on every customersIn/outForMeal change.
     pub meal_overlay_revision: i64,
 }
