@@ -1187,6 +1187,25 @@ impl Engine {
     }
 }
 
+/// Facade slice 6c (#1215): the inspector's diagnostics facts.
+#[wasm_bindgen]
+impl Engine {
+    /// The facts behind the inspector's diagnostics for one unit, as JSON
+    /// text (`diagnostics::DiagnosticFacts`); TypeScript keeps the wording.
+    /// Undefined for an id that names no unit (a transport's, zero or a
+    /// negative one) and for a malformed one (fractional, not finite, past
+    /// the safe integers), read raw so it cannot wrap onto a real unit.
+    /// The read may fill the engine's caches, which sit outside the save; it
+    /// changes nothing in the game.
+    #[wasm_bindgen(js_name = diagnosticFacts)]
+    pub fn diagnostic_facts(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+    ) -> Option<String> {
+        crate::diagnostics::facts_json(&mut self.sim, id.as_f64())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
