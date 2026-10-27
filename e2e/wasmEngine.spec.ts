@@ -22,7 +22,7 @@ test("the game runs on the WASM engine behind ?engine=wasm", async ({ page }) =>
   }, undefined, { timeout: 30_000 });
   // The title screen names the engine next to the version, so a tester can
   // tell which engine runs without the console.
-  await expect(page.locator(".splash-version")).toContainText("WASM engine");
+  await expect(page.locator(".splash-version")).toContainText("Rust engine");
   // The sim does not tick behind the title screen; dismiss it the way the
   // other specs do.
   await page.evaluate(() => {

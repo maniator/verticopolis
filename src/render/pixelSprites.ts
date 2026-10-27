@@ -1,4 +1,5 @@
-import type { FacilityKind, Unit, UnitState } from "../engine/types";
+import type { FacilityKind, UnitState } from "../engine/types";
+import type { UnitView } from "../simport/view";
 import { hasBusinessHours, isOpenAt } from "../engine/facilities";
 import { facilityColor } from "../presentation/facilityPresentation";
 import { isLateHour } from "./lateNight";
@@ -38,7 +39,7 @@ import { shop } from "./pixelSprites/shop";
  *   - `pixelSprites/shop.ts`: shop + its look table.
  */
 
-export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+export function drawRoom(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const { ctx } = d;
   // Commercial shows its shutter whenever it's outside business hours.
   if (

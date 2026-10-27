@@ -14,7 +14,7 @@ describe("engine label", () => {
     const idle = { __vcEngine: { status: { hosted: false } } };
     expect(activeEngine(hosted)).toBe("wasm");
     expect(activeEngine(idle)).toBe("ts");
-    expect(versionLine("2.29.0", hosted)).toBe("v2.29.0 · WASM engine");
+    expect(versionLine("2.29.0", hosted)).toBe("v2.29.0 · Rust engine");
     expect(versionLine("2.29.0", idle)).toBe("v2.29.0");
   });
 

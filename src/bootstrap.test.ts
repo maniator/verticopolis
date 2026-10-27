@@ -13,9 +13,9 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // fallback (package fails to load, the game boots on the TypeScript engine)
 // can be asserted without a package.
 const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm", loadError: null as Error | null, module: null as unknown }));
-vi.mock("./wasmhost/engineChoice", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./wasmhost/engineChoice")>();
-  return { ...real, engineRequested: () => wasmStub.requested };
+vi.mock("./engineCohort/boot", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./engineCohort/boot")>();
+  return { ...real, selectBootEngine: () => wasmStub.requested, noteRustFailed: vi.fn() };
 });
 vi.mock("./wasmhost/startWasmHost", async (importOriginal) => {
   const real = await importOriginal<typeof import("./wasmhost/startWasmHost")>();
@@ -190,9 +190,9 @@ describe("showEngineFailure", () => {
   });
 
   it("stops the game with the stage, the reason, the steps to try and a Reload button", () => {
-    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "load", reason: "boot-error", message: "CompileError: <b>bad</b>" } }, false);
+    showEngineFailure({ build: "wasm-only", engine: "none", failure: { stage: "start", reason: "attach-refused", message: "CompileError: <b>bad</b>" } }, false);
     const box = document.getElementById("engine-failure")!;
-    expect(box.dataset.stage).toBe("load");
+    expect(box.dataset.stage).toBe("start");
     expect(box.textContent).toContain("could not start");
     // The reason is text, never markup.
     expect(box.textContent).toContain("Reason: CompileError: <b>bad</b>");
@@ -206,6 +206,27 @@ describe("showEngineFailure", () => {
     // The stop announces itself to assistive technology.
     expect(box.getAttribute("role")).toBe("alert");
     expect(box.getAttribute("aria-live")).toBe("assertive");
+  });
+
+  it("shows each load cause's sentence on a stopped screen that alerts and puts focus on Reload (#985)", () => {
+    const detail = { file: "wasm" as const, expected: null, found: null, expectedPackage: "111111111111", servedPackage: "222222222222", controlled: true };
+    const causes: Array<[string, Parameters<typeof showEngineFailure>[0]["failure"], RegExp, RegExp]> = [
+      ["mismatch", { stage: "load", reason: "package-mismatch", message: "m", package: { ...detail, kind: "mismatch" } }, /do not match this version of the game.*expected 111111111111, found 222222222222/, /^Reload the page/],
+      ["load-failed", { stage: "load", reason: "boot-error", message: "m", package: { ...detail, kind: "load-failed" } }, /could not be loaded/, /^Reload the page/],
+      ["timeout", { stage: "load", reason: "boot-timeout", message: "m" }, /took too long to load/, /^Reload the page/],
+      ["no save writer", { stage: "load", reason: "package-mismatch", message: "m", cause: "no-save-writer" }, /cannot save towers/, /^Reload the page/],
+    ];
+    for (const [name, failure, reason, firstStep] of causes) {
+      document.body.innerHTML = `<div id="stage"></div>`;
+      showEngineFailure({ build: "wasm-only", engine: "none", failure }, true);
+      const box = document.getElementById("engine-failure")!;
+      expect(box.textContent, name).toMatch(reason);
+      expect(box.getAttribute("role"), name).toBe("alert");
+      expect(box.querySelector("li")?.textContent, name).toMatch(firstStep);
+      const reload = document.querySelector<HTMLButtonElement>("#boot-fallback button:not([data-act])")!;
+      expect(reload.textContent, name).toBe("Reload");
+      expect(document.activeElement, name).toBe(reload);
+    }
   });
 
   it("offers Copy diagnostics on the stop screen, built from the page's own state", async () => {

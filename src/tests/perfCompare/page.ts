@@ -9,6 +9,28 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+/** Init script for perf:compare, added after {@link installProbes} so its
+ *  marks exist (perf:worker does not add it): stamp the moment boot first
+ *  publishes its engine state, `window.__vcEngineBoot` (publishBootState in
+ *  src/wasmhost/engineBoot.ts). Both engines do that just before the app is
+ *  created, so on WASM the mark ends the package load and splits the start
+ *  into the load and the app's creation plus the host attach (#1254). A
+ *  later publish (a fallback, a latched writer) replaces the state and keeps
+ *  the mark. */
+export function installEngineBootProbe(): void {
+  const w = window as any;
+  let bootState: unknown;
+  Object.defineProperty(w, "__vcEngineBoot", {
+    configurable: true,
+    get: () => bootState,
+    set: (v) => {
+      bootState = v;
+      const marks = w.__perfMarks as Record<string, number> | undefined;
+      if (marks && marks.engineLoaded === undefined) marks.engineLoaded = performance.now();
+    },
+  });
+}
+
 /** Init script: stamp the moment the app publishes `window.game` and the
  *  moment the WASM host publishes `window.__vcEngine`, by accessor, and the
  *  engine package's instantiate on the boot path, so the startup numbers

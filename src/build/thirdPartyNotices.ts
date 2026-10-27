@@ -26,7 +26,7 @@ export interface NoticePackage {
 
 /** The label a package carries in the notices, so an npm package and a crate of the same name stay apart. */
 function kindLabel(p: NoticePackage): string {
-  return p.kind === "crate" ? " (Rust, in the WASM engine)" : "";
+  return p.kind === "crate" ? " (Rust engine crate)" : "";
 }
 
 const NODE_MODULES = "/node_modules/";

@@ -26,7 +26,8 @@ import type { CompareConfig, EngineName, ProcessRun, StepSummary } from "./types
  *    during a run.
  * Warnings (reported, not failing): other page errors, frames longer than
  * the 200 ms clamp, frame windows under 100 frames, audio that did not
- * start, a first visit whose service worker never activated.
+ * start, a first visit whose service worker never activated, a saved-tower
+ * start that has no sample or logged page errors (#1254).
  */
 export interface Validation {
   ok: boolean;
@@ -130,6 +131,19 @@ export function validateResults(config: CompareConfig, runs: readonly ProcessRun
     if (!fv || fv.error || !fv.swActive) warnings.push(`rep ${r.rep} ${r.engine}: the service worker first visit ${fv?.error ? `failed (${fv.error})` : "never activated"}; its transfer and offline rows have no sample from it`);
     else if (fv.onlineEngineActive !== ran) warnings.push(`rep ${r.rep} ${r.engine}: the service worker first visit ran on ${fv.onlineEngineActive ?? "no engine"}; its bytes are left out`);
     if (fv?.onlinePageErrors.length) warnings.push(`rep ${r.rep} ${r.engine}: the service worker first visit logged ${fv.onlinePageErrors.length} page error(s), first: ${fv.onlinePageErrors[0]}`);
+    // The saved-tower starts are auxiliary (#1254): the runner keeps a sample
+    // only when its checks passed, so a gap empties those rows and fails
+    // nothing. Results from before them have none.
+    for (const name of r.coldSaved ? config.scenarios : []) {
+      const s = r.coldSaved?.[name];
+      if (!s?.sample) warnings.push(`rep ${r.rep} ${r.engine}: the ${name} saved-tower cold start ${s?.error ? `has no sample (${s.error})` : "is missing"}; its saved-tower rows have no sample from it`);
+      // Optional reads: a stored result from an earlier shape of this record must not throw here.
+      if (s?.pageErrors?.length) warnings.push(`rep ${r.rep} ${r.engine}: the ${name} saved-tower cold start logged ${s.pageErrors.length} page error(s), first: ${s.pageErrors[0]}`);
+    }
+  }
+  for (const name of config.scenarios) {
+    const seeds = new Set(good.flatMap((r) => { const sha = r.coldSaved?.[name]?.seedSha256; return typeof sha === "string" && sha ? [sha] : []; }));
+    if (seeds.size > 1) warnings.push(`${name}: the saved-tower starts booted ${seeds.size} different autosave seeds (a resumed run packs the seed again, with a new write time), and their rows pool them`);
   }
 
   // Same start and same end, everywhere a scenario ran.

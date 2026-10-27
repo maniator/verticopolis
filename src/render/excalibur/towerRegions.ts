@@ -5,7 +5,7 @@ import { towerCatalog } from "../../engine/towerCatalog";
 import { paintSettledUnit } from "../regionPaint";
 import { FLOOR, TILE } from "../scale";
 import { regionRect, regionsOf } from "../regionGrid";
-import type { Unit } from "../../engine/types";
+import type { UnitView } from "../../simport/view";
 import type { TowerEngine } from "./TowerEngine";
 
 /**
@@ -88,7 +88,7 @@ function materialize(engine: TowerEngine, key: number): RegionRec {
  *  placed unit today, but a footprint that silently outgrew its cached
  *  regions would render a permanent hole, so the four divisions are cheap
  *  insurance (the old per-unit bake kept a width guard for the same reason). */
-export function markRegionUnit(engine: TowerEngine, u: Unit, sameFrame = false): void {
+export function markRegionUnit(engine: TowerEngine, u: UnitView, sameFrame = false): void {
   const fresh = regionsOf(u.floor, u.x, u.width, catalogFacility(towerCatalog(engine.sim), u.kind).floors);
   const cached = engine.regionUnits.get(u.id);
   let keys = cached;

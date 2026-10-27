@@ -20,7 +20,7 @@ describe("liveDiagnostics", () => {
       __vcEngine: { status: { hosted: true, placement: "worker" } },
     });
     expect(r.rows.find((x) => x.label === "Engine in use")?.value).toBe(
-      "WASM engine (worker)",
+      "Rust engine (worker)",
     );
     expect(r.rows.find((x) => x.label === "Engine crate")?.value).toBe(
       "example-engine 9.8.7",
