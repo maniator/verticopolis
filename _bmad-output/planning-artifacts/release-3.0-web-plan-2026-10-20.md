@@ -216,6 +216,12 @@ planning preference: it authorizes no stage, no gate change, no new
 analytics field and no post. This section carries it. Where it changes an
 earlier statement in this plan, the earlier text now points here.
 
+> **Amended 2026-10-27 (1.3.10).** The owner chose 300 engaged eligible
+> sessions on the facade host as the field standard before the default flip,
+> and the 1,000 became the gate for removing TypeScript. Where 1.3.1 to 1.3.9
+> and section 10 give the 1,000 as the flip gate, offer the F1 and F2 freeze
+> options, or count only stage-3 sessions, 1.3.10 governs.
+
 #### 1.3.1 Scenario C as modified
 
 | Assumption | Value | Source |
@@ -644,6 +650,100 @@ Still open on their own cards and not repeated here: R6a, A7's real-save
 list, the #1068 recommendation when it arrives, #873's exception when it is
 proposed, and EX-1 at the sign-off. #1114's `fault_source` has no card of its
 own: the Runtime lane withdrew it, and item 1 carries the field.
+
+#### 1.3.10 The Rust-default release (owner decision, 2026-10-27)
+
+> **Snapshot, 2026-10-27 at about 12:30 UTC, against `main` at `c0787c1`
+> (app 2.47.0, engine crate 0.8.0). It does not refresh.** Live state is
+> #1104. Every date and count below is a projection from this plan's
+> durations and the governed traffic figures (about 14.2 engaged sessions a
+> day if everyone were on the engine), not a deadline, a measurement or
+> evidence. The decision packet is "Rust-default 3.0 replan: decision
+> packet" (https://claude.ai/artifact/VccZTZe6p2iBBaqBcSwwhn) and the
+> planning party's transcript is
+> `release-3.0/rust-default-replan/party-transcript-2026-10-27.md` in the
+> project files. This section carries the requirement the owner has decided
+> and what follows from it.
+
+**Direction.** On 2026-10-27 the owner proposed releasing 3.0 once Rust is
+the default engine and removing the TypeScript engine as an option in 3.x.
+That matches OD-5 and 7.3: 3.0.0 is the switchable build, with Rust/WASM as
+the default, TypeScript selectable and the automatic fallback kept. A
+planning party (twelve voices, three rounds) tested the idea and raised four
+decisions. The owner has decided the first. This section authorizes no
+stage, no flip, no deploy, no new analytics field and no post.
+
+**Decided (owner, 12:16 UTC, on the card "Choose the field standard before
+the Rust-default flip").** The field standard before the flip is 300 engaged
+eligible sessions on the facade host with zero failures. The 1,000 engaged
+eligible sessions move to the gate for removing TypeScript.
+
+| Topic | Before (1.3.1 to 1.3.9) | Now |
+| --- | --- | --- |
+| Count before the flip | 1,000 engaged eligible sessions | 300 on the facade host with zero failures, which bounds the rate under 1.0% at 95% |
+| The 1,000 | The flip gate | The gate for removing TypeScript, with the bound reported (0.30% at zero failures). The order of the removal steps is open (packet decision 4) |
+| Where sessions count | Stage 3 only, on the facade | Stages 2 and 3 on the facade host. The size gate applies to the mirror host in stage 1 and ends when slice 10 deploys. Stage 1's sessions run on the mirror host and do not count |
+| Freeze | F1 or F2 (1.3.2), after the soak and slice 11 | One freeze when slice 10 has deployed and every key-moving item is merged: about Dec 1 if slice 10 deploys Nov 22, about Dec 12 if it deploys on its latest date. The 14-night replay and the observation tail run side by side from it |
+| Observation tail | 14 nights and 100 engaged eligible sessions on the candidate | Stage 2's 100 engaged eligible sessions on the frozen candidate, side by side with the 14 nights |
+| Soak and slice 11 | Soak, then slice 11, then the freeze | The soak stays (7 nights and 50 engaged eligible sessions with no stop signal, as 1.3.2 proposes) and 100% is the flip. Slice 11 cannot precede a single freeze, so it leaves the pre-flip path. Its timing is open (packet decision 3) |
+
+Unchanged: conformance, dual run, the 14-night seeded replay, saves in both
+directions, M1 to M8 on the owner's PC with calibrated δ and ε, the offline
+cold start of #985, the forced-trap fallback spec, the rollback rehearsal,
+analytics, no flip on the mirror host, and facade slices 7 to 10 with the
+slice 9 PC run. Every stage, every drop-back and the flip stay on the owner's
+explicit approval.
+
+**The failure rule**, written before anyone reads a number and fixed before
+the freeze:
+
+- A failure is any fault event (recovered fallbacks included), any latch-off,
+  and any event the owner adds under packet decision 2 (a tap on a visible
+  TypeScript switch, an automatic pick of TypeScript).
+- The denominator is engaged eligible sessions on the facade host (the #1090
+  rule). It is printed beside assigned sessions, engaged share and early
+  exits by arm, with an early-exit threshold written before the first read.
+- One read, at 300. Zero failures supports "under 1.0% at 95%". A failure
+  voids that claim, and the owner chooses between extending the count and
+  flipping with the larger bound printed.
+- Browsers and device classes with no sessions in the count are named
+  unbounded in the sign-off. Whether an empty cell blocks the flip is the
+  owner's call then.
+- The stop signals of 4.1 are unchanged, and opt-in testers count toward
+  nothing.
+
+| Engaged eligible sessions | Failures | One-sided 95% upper bound |
+| --- | --- | --- |
+| 150 (stage 2's 100 and the soak's 50; the alternative the owner did not choose) | 0 | 1.98% |
+| 300 | 0 | 0.99% |
+| 300 | 1 | 1.57% |
+| 300 | 2 | 2.08% |
+| 1,000 | 0 | 0.30% |
+
+The bounds are exact (Clopper-Pearson), computed the way 1.3.4 states them.
+
+**Projected dates** at today's traffic, which gives about 3.55 engaged
+sessions a day at 25% and 7.1 a day at 50%. From the freeze, stage 2's 100
+sessions take 28 days, the soak 7 days and the 150 sessions after it 21
+days, so the 300th session comes about 56 days after the freeze.
+
+| Case | Freeze | Stage 2 | Soak | 300th session, flip decision |
+| --- | --- | --- | --- | --- |
+| Slice 10 deploys Nov 22 | Dec 1 | Dec 1 to Dec 29 | Dec 29 to Jan 5 | About Jan 26, 2027 |
+| Slice 10 deploys Dec 12 (the facade lane's current view, PR #1347) | Dec 12 | Dec 12 to Jan 9 | Jan 9 to Jan 16 | About Feb 6, 2027 |
+
+Slice 7 is six PRs, and two of them wait on owner cards (6a's per-frame room
+compare and the F2 amendment for slice 5a) while a third waits on 6c's
+remaining families, so Dec 12 is the likelier case. After the flip, the 1,000
+count at 100% of traffic (14.2 a day) closes about 49 days later if the 300
+count toward it (Mar 16 or Mar 27) and about 70 days later if they do not
+(Apr 6 or Apr 17). The plan's earlier gate review projection was Jan 17 at
+twice July's traffic and May 16 at today's.
+
+Still open, in the packet: the slow-player switch (decision 2), what waits
+for 3.x including slice 11's timing and the .TDT half of #1066 (decision 3),
+and the removal ladder and version (decision 4). 1.3.5's slice 11 row keeps
+its text until decision 3.
 
 ## 2. Where things stand (from the takeover inventory)
 
@@ -1912,7 +2012,7 @@ with its evidence.
 | Authority | No command answer comes from the instance (#954); exports tiered, tier 3 confined (#946); the UI reads no TypeScript rule table (#921, #926 items 1 to 4). **Proposed:** #1064, #1065, #1066 named (D5); under AD-9, normal WASM play constructs, executes and deserializes no TypeScript `Simulation` (1.2) | Guard tests, per-command tests, the forced-disagreement test (where two engines answer), the runtime and e2e no-`Simulation` checks | Not met |
 | Saves | Every fixture and the loader table byte for byte through the engine; 32 MiB and Unicode cases fail the same way (#858, #856 fixed in B6 or excepted). **Proposed:** the #902 booking field round-trips; every load path boots from engine bytes (#1066) | Loader table tests, WASM byte comparison | Unverified |
 | Performance (provisional) | **Proposed:** M1 to M8 of 5.3 under the protocol of 5.2, every desktop metric at 1x and 4x, on RUN-3: on every speed metric the paired interval's upper bound stays within δ or ε, calibrated from A/A noise under a fixed cap, and M7 is CI's tripwire (OD-4) | A committed results folder for RUN-3, with its A/A pass | Not met as last measured |
-| Reliability (provisional) | Over at least 1,000 engine sessions whose players consented to analytics, fallback under 0.1%, no latch-off, every divergence report triaged. **Proposed:** the staged cohort of OD-1 and the OD-2 rule of 4.1 (at least 1,000 eligible sessions, every failure triaged, the observation period on the candidate build, the bound reported as achieved), with eligibility under AD-9 per 1.2, without the consent wording; the 0.1% figure leaves the row, since 1,000 sessions cannot show it | The governed definition's report, by build, stage and arm | Not startable: no signal, no engine sessions |
+| Reliability (provisional) | Over at least 1,000 engine sessions whose players consented to analytics, fallback under 0.1%, no latch-off, every divergence report triaged. **Proposed:** the staged cohort of OD-1 and the OD-2 rule of 4.1 (at least 1,000 eligible sessions, every failure triaged, the observation period on the candidate build, the bound reported as achieved), with eligibility under AD-9 per 1.2, without the consent wording; the 0.1% figure leaves the row, since 1,000 sessions cannot show it. **Amended 2026-10-27 (1.3.10):** before the default flip the pass condition is 300 engaged eligible sessions on the facade host with zero failures, which bounds the rate under 1.0% at 95%; the 1,000 is the gate for removing TypeScript | The governed definition's report, by build, stage and arm | Not startable: no signal, no engine sessions |
 | Rollback | **Proposed, concretely:** on the switchable build, deploy a `ts` default, load towers the engine build wrote (including one mid-booking), play an hour, save, reload; then back to `wasm`; then a deploy rollback to the last release before #902 with a tower the candidate wrote mid-booking, confirming the loss the exception register names and nothing more; scripted and recorded on #945 | The checklist and its results | Not started |
 | Deployment | An old cached shell never runs a newer engine package (#985 criterion 5); offline cold start with the engine and today's sounds, tests green (#985); no deploy serves a package whose hash differs from its sources; a fallback-use signal exists (A1) | CI e2e for #985; the deploy's build log | Partial |
 | Version identity | About and Copy Diagnostics show UI version and commit, the active engine with any fallback reason, and the binding's identity record, including mismatch and unavailable (#963) | UI and e2e tests | Not met: lost work |
