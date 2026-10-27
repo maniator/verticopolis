@@ -122,14 +122,15 @@ impl Simulation {
 
     fn escalate_infestations(&mut self) {
         let mut floors: Vec<i64> = Vec::new();
-        for u in self.tower.units.iter_mut() {
+        let marks = &self.tower.view.marks;
+        for (i, u) in self.tower.units.iter_mut().enumerate() {
             if u.state != UnitState::Dirty || !u.kind.is_hotel() {
                 continue;
             }
             let days = u.dirty_days.unwrap_or(0) + 1;
             if days >= INFEST_DAYS {
-                u.state = UnitState::Infested;
-                u.occupants = 0;
+                u.set_state(marks.at(i), UnitState::Infested);
+                u.set_occupants(marks.at(i), 0);
                 u.dirty_days = None;
                 floors.push(u.floor);
             } else {
@@ -169,10 +170,10 @@ impl Simulation {
                 let Some(nid) = self.tower.room_at(floor, nx).map(|n| n.id) else {
                     continue;
                 };
-                let n = self.tower.get_unit_mut(nid).unwrap();
+                let (n, at) = self.tower.marked_by_id(nid).unwrap();
                 if n.kind.is_hotel() && matches!(n.state, UnitState::Asleep | UnitState::Empty) {
-                    n.state = UnitState::Dirty;
-                    n.occupants = 0;
+                    n.set_state(at, UnitState::Dirty);
+                    n.set_occupants(at, 0);
                     floors.push(n.floor);
                 }
             }
@@ -350,9 +351,9 @@ impl Simulation {
     /// `Housekeeping.onResult`.
     pub fn on_housekeeper_result(&mut self, room_id: i64, ok: bool) {
         self.housekeeping.release_assignment(room_id);
-        if let Some(room) = self.tower.get_unit_mut(room_id) {
+        if let Some((room, at)) = self.tower.marked_by_id(room_id) {
             if ok && room.state == UnitState::Dirty {
-                room.state = UnitState::Empty;
+                room.set_state(at, UnitState::Empty);
                 room.satisfaction = 1.0;
                 room.dirty_days = None;
                 self.housekeeping.cleaned_today += 1;

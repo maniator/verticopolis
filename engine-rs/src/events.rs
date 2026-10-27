@@ -185,11 +185,11 @@ impl Simulation {
     }
 
     fn gut(&mut self, i: usize) {
-        let u = &mut self.tower.units[i];
-        u.state = UnitState::Gutted;
-        u.occupants = 0;
+        let (u, at) = self.tower.marked(i);
+        u.set_state(at, UnitState::Gutted);
+        u.set_occupants(at, 0);
         u.ever_occupied = false;
-        u.residents = None;
+        u.set_residents(at, None);
         u.satisfaction = 0.0;
         u.pending_income = 0.0;
         u.patronage_today = None;
@@ -259,9 +259,9 @@ impl Simulation {
             return;
         }
         let i = *self.rng.pick(&candidates);
-        let u = &mut self.tower.units[i];
-        u.state = UnitState::Fire;
-        u.occupants = 0;
+        let (u, at) = self.tower.marked(i);
+        u.set_state(at, UnitState::Fire);
+        u.set_occupants(at, 0);
         let (id, name, floor) = (u.id, u.kind.facility().name, u.floor);
         self.events.active.insert(id);
         self.events.fires_started += 1;
@@ -308,9 +308,9 @@ impl Simulation {
         if ops <= 1 {
             return;
         }
-        let u = &mut self.tower.units[idx];
-        u.state = UnitState::Fire;
-        u.occupants = 0;
+        let (u, at) = self.tower.marked(idx);
+        u.set_state(at, UnitState::Fire);
+        u.set_occupants(at, 0);
         let (id, name, floor) = (u.id, kind.facility().name, u.floor);
         self.events.active.insert(id);
         let msg = format!(

@@ -323,7 +323,8 @@ impl Simulation {
             .take()
             .map(|ids| ids.into_iter().collect::<std::collections::HashSet<_>>());
         let mut cleared = 0;
-        for u in self.tower.units.iter_mut() {
+        let marks = &self.tower.view.marks;
+        for (i, u) in self.tower.units.iter_mut().enumerate() {
             if !u.kind.is_hotel() || u.state != UnitState::Infested {
                 continue;
             }
@@ -332,9 +333,9 @@ impl Simulation {
                     continue;
                 }
             }
-            u.state = UnitState::Empty;
+            u.set_state(marks.at(i), UnitState::Empty);
             u.satisfaction = 1.0;
-            u.occupants = 0;
+            u.set_occupants(marks.at(i), 0);
             u.dirty_days = None;
             cleared += 1;
         }

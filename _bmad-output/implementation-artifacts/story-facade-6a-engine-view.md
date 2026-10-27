@@ -10,7 +10,8 @@ depends_on: facade sign-off (F1 to F9, 2026-10-20 21:40 UTC)
 # Story 6a: the engine's renderer-facing view (#1213)
 
 Status: review (written before the first commit, 2026-10-20; brought up to date
-with the implementation and the first review round, 2026-10-21).
+with the implementation and review rounds 1 and 2, 2026-10-21, and with the
+write-site frame marks of round 3, 2026-10-27).
 
 ## Story
 
@@ -56,8 +57,8 @@ consumer and is out of scope here.
    the header, the drawn people as fixed 8-slot records (id, seed, staff,
    state, floor, x, fy, wait), the room records whose frame fields changed
    since the last read, addressed by slot, and every transport's cars. The
-   reader finds changed rooms by comparing the five frame fields over the
-   rooms index and never walks floor or lobby tiles. A revision change, a
+   reader finds changed rooms in the tower's frame mark log (AC 11) and
+   visits only those; it never walks floor or lobby tiles. A revision change, a
    unit-count change or `full = true` sends every room and sets the header's
    `FULL` flag. There is one reader per engine, so one caller; the header
    numbers its frames (`FRAME_SEQ`, 1 for the first), so a caller can tell
@@ -129,6 +130,20 @@ consumer and is out of scope here.
     state view and every hash are unchanged; `frameView` keeps its layout and
     output byte for byte. The crate takes a minor bump with
     `npm run engine:compat`; no app version bump (no player-facing change).
+11. **Write-site frame marks** (round 3, #1285 item 1; the owner asked on the
+    PR on 2026-10-22 and 2026-10-23 for this, or for a measured decision put
+    to him). Every engine write of a room's frame fields (state, occupants,
+    customersIn, hotelCustomersIn, outForMeal) and of its residents, which
+    the census counts, goes through one setter per field (`view/marks.rs`).
+    A setter logs the unit's index in the tower's mark log only when it
+    changes the value. A reader reads the log from where its last frame
+    stopped and visits only the rooms it names, so a frame with nothing
+    marked visits no room, and it keeps the population current from a
+    per-slot census. A reader that falls more than the log's 16,384 entries
+    behind compares every room once. A source check keeps those writes
+    inside the setters (the save loader, new-unit construction and tests
+    excepted), and the oracle (AC 6) checks the kept rooms and the kept
+    population after every step.
 
 ## Tasks
 
@@ -165,8 +180,14 @@ consumer and is out of scope here.
       `npm run wasm:build` (`RUSTUP_TOOLCHAIN=1.97.0`) and `npm run test:wasm`.
 - [x] `/gds-code-review` round 1 with the Hot-Path Auditor; its patch
       findings fixed (see the review section below).
-- [ ] Round 2 on the fixed diff; HP-1 to HP-12 record on the PR; every
-      defer in the backlog with an issue.
+- [x] Round 2 on the fixed diff; HP-1 to HP-12 record on the PR; every
+      defer in the backlog with an issue (see the round 2 section below).
+- [x] Write-site frame marks (AC 11): `view/marks.rs` (the setters and the
+      log), the reader on the log, 46 setter calls at the write sites in 14
+      files, the source check and tests (`view/marks_tests.rs`), and the
+      oracle's kept population.
+- [ ] Round 3 on the marks; HP-1 to HP-12 record on the PR; the
+      independent review; the owner's human review (no automatic merge).
 
 ## Dev notes
 
@@ -233,10 +254,13 @@ still exists, with its current values.
 
 ### Hot paths (HP record goes on the PR)
 
-- `viewFrame`: per frame. One pass over rooms (R = 2,900 on large), five
-  compares each, summing the population as it goes; people and cars as
-  `frameView` sends them; one allocation at the exact size. No walk over
-  floor and lobby tiles.
+- `viewFrame`: per frame. It visits the rooms the mark log names since the
+  reader's last frame (k of them: a sort and dedup of k indices and a binary
+  search of the rooms index for each, so O(k log k + k log R)), and no other
+  room; people and cars as `frameView` sends them; one allocation at the
+  exact size. No walk over floor and lobby tiles. A full frame (a revision
+  move, a unit-count change, `full = true`) is one pass over rooms
+  (R = 2,900 on large), at most one per frame.
 - `viewStructure`: per revision change, and on a new engine. One pass over
   units for the runs (with an open run per floor, so a tile extends its
   floor's run whatever was built between) and one over rooms; a stable sort
@@ -252,13 +276,15 @@ still exists, with its current values.
   units and transports with a word-at-a-time hash, too slow to read each
   frame.
 - Setters: O(1) plus the log push; the log is capped and trimmed by halves.
+  The frame field setters compare the old value first and push only on a
+  change; their log holds at most 16,384 indices (128 KiB) and drops its
+  older half when full, which is amortized one move per mark.
 
 ### Out of scope
 
 The TypeScript view, `RustSim`, the port's undo wiring (slices 1, 5 and 7),
-panel getters (6b), diagnostics facts (6c), command gaps (6d), write-site dirty
-marks (#1285 item 1, which waits on the owner's decision and the PC), the
-worker adapter (12).
+panel getters (6b), diagnostics facts (6c), command gaps (6d), the worker
+adapter (12).
 
 ### Project context rules
 
@@ -322,6 +348,15 @@ Opus 5.5, extra high effort.
   against `frameView`'s 209 us and 921 us; `towerSignature` 0.29 ms medium,
   1.19 ms large (the TypeScript `towerStateSig` it stands in for took 12.4 ms
   on large in the review's measurement).
+- After the marks (round 3, same container, paired against the round 2
+  commit; indicative only): `viewFrame` with nothing changed went from
+  17.9 us to 0.5 us on medium and from 35.3 us to 0.6 us on large, and the
+  frame after one 2-minute step (19 changed rooms on average on large) from
+  36.8 us to 1.7 us. A full frame is 9.5 us medium and 25.5 us large. The
+  step itself is unchanged: under callgrind, 750 steps took 1,290.5M
+  instructions before and 1,289.5M after on medium, and 1,633.2M and
+  1,634.5M on large (within 0.1%); the setters skip a write that changes
+  nothing.
 - Conformance, the frame layout pin, the save format, the state view and the
   digests are unchanged: the conformance runner passes, the frame layout pin
   in `identity_tests.rs` holds, and `engine-rs/src/frame_tests.rs` (which
@@ -359,8 +394,7 @@ this PR:
   `towerStateSig`.
 
 Its defer findings are filed: #1285 (backlog row `facade-view-followups`)
-holds the write-site dirty marks, which stay a patch finding until the owner
-accepts deferring them, the coalesced structure refresh for slices 2 and 7,
+held the write-site dirty marks (round 3 did them in this PR, AC 11), the coalesced structure refresh for slices 2 and 7,
 and the fire and bomb walks beside #1158 A16; #1170 item T1 holds the
 TypeScript per-frame population sum; #1257 item 3 already held the buy-back
 rebuild in `vacate`. The HP-8 table gains rows for the reader's last-sent
@@ -369,6 +403,64 @@ room fields and the meta revision and log.
 After the rebase on #1237, which added a per-revision floor bounds cache
 (`Tower::floor_bounds`), the structure reads its bounds from that cache
 instead of folding them in its own walk (HP-8).
+
+### Review round 2 (2026-10-21)
+
+The second `/gds-code-review` pass, on the round 1 fixes, found these patch
+findings, all fixed in this PR:
+
+- The join of runs that continue each other ran only when the runs came out
+  of order, so a run grown left up to the run before it (or tiles on a floor
+  off the grid) stayed split. The join now always runs; the sort runs only
+  when the runs are out of order.
+- A unit list scattered badly enough could give tens of thousands of raw
+  runs to sort (Hot-Path Auditor A2-1). Past 4,096 raw runs the walk now
+  reads the runs off a dense floor-by-x grid of the tiles instead, in one
+  more pass over the units.
+- The oracle now checks the mode and calendar slots by name, the run order
+  strictly, and the view's encoders against `frameView` after every step and
+  on every unit state, person state and weather. The corpus gained a new
+  Modern game grown by its own commands, and drags in both directions.
+- The metadata source check now catches compound writes and mutable borrows
+  of a label or subtype.
+- The integration test checks the structure in play.
+- The signature, `meta_since`, API and story docs said more than the code
+  guarantees; they were corrected.
+
+Its defer findings: A2-2 (a cold structure read makes three passes over the
+units, since the rooms index and the floor bounds each miss their cache on a
+revision's first read) is #1285 item 4. B6 (every revision move resends every
+room) stays a full frame, one pass over rooms per revision move and at most
+one per frame; a rooms-only revision that would spare a tile drag the resend
+is noted in #1285. B1, the per-frame compare over every room, waited on the
+owner's decision; round 3 removed it.
+
+### Round 3: write-site frame marks (2026-10-27)
+
+On 2026-10-22 and 2026-10-23 the owner asked on the PR for the write-site
+dirty marks, or for a measured decision with its tradeoffs, instead of an
+unbounded per-frame room compare. This round does the marks (AC 11), so no
+owner acceptance of a per-frame room walk is needed:
+
+- `view/marks.rs` holds one setter per frame field and for the residents.
+  Each takes a `Mark` (the tower's mark log and the unit's index) and logs the
+  index only when it changes the value. `Tower::marked` and
+  `Tower::marked_by_id` hand out a unit with its mark.
+- The log holds unit indices, which move only with `tower.revision` (a
+  removal shifts the list and `reindex` rebuilds it), and a moved revision
+  makes a reader's next frame full, so no index logged before a move is read
+  against the list after it.
+- The reader keeps its place in the log, a per-slot census and the running
+  population. A frame sorts and dedups the indices it reads, finds each in the
+  rooms index by binary search, and compares and sends only those rooms. A
+  repeat change after a read is logged again (an earlier draft skipped an
+  entry equal to the newest one, which a reader could already have passed;
+  the oracle caught it, and `a_change_after_a_read_is_sent` holds it).
+- Every engine write of those fields (46 setter calls in 14 files) goes
+  through the setters, and `only_the_setters_write_the_frame_fields` fails
+  on a direct write anywhere else outside the loader and tests.
+- The oracle also checks the kept frame's population against the tower
+  after every step.
 
 ### Departures from the architecture
 
@@ -389,15 +481,19 @@ New:
 
 - `_bmad-output/implementation-artifacts/story-facade-6a-engine-view.md`
 - `engine-rs/src/view/mod.rs`, `layout.rs`, `structure.rs`, `reader.rs`,
-  `meta.rs`, `signature.rs`
-- `engine-rs/src/view/layout_tests.rs`, `frame_tests.rs`, `meta_tests.rs`,
-  `signature_tests.rs`, `oracle_tests.rs`, `session_tests.rs`
+  `meta.rs`, `marks.rs`, `signature.rs`
+- `engine-rs/src/view/layout_tests.rs`, `frame_tests.rs`, `marks_tests.rs`,
+  `meta_tests.rs`, `signature_tests.rs`, `oracle_tests.rs`,
+  `session_tests.rs`
 - `src/tests/integration/engineView.integration.test.ts`
 
 Changed:
 
 - `engine-rs/src/frame.rs` (the view's copies of the frame's encoders), `tower.rs` (view state, meta
-  revision), `build.rs`, `churn.rs`, `events.rs` (setter calls), `lib.rs`
+  revision), `build.rs`, `churn.rs`, `events.rs` (setter calls), the frame
+  field write sites in `economy.rs`, `housekeeping.rs`, `presence.rs`,
+  `satisfaction.rs`, `services.rs`, `sim_loop.rs`, `tower_query.rs` and
+  `crowd/` (`motion.rs`, `routines.rs`, `spawn.rs`, `visits.rs`), `lib.rs`
   (the module), `wasm.rs` (the binding block), `identity_tests.rs`,
   `compat-record.json`
 - `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock`,
@@ -408,6 +504,6 @@ Changed:
 - `package.json` (`test:wasm` list), `CONTRIBUTING.md` (version list),
   `.github/workflows/engine-rs.yml` (the integration test in the engine
   job's file lists)
-- `docs/performance/hot-path-review.md` (two HP-8 rows),
+- `docs/performance/hot-path-review.md` (three HP-8 rows),
   `_bmad-output/implementation-artifacts/backlog.md` (the
   `facade-view-followups` row and the `ts-render-ui-hotpath-sweep` notes)

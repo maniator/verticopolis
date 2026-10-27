@@ -54,6 +54,7 @@ struct Kept {
     meta: Meta,
     delta_frames: usize,
     meta_deltas: usize,
+    population: f64,
 }
 
 impl Kept {
@@ -68,6 +69,7 @@ impl Kept {
             meta: Meta::new(),
             delta_frames: 0,
             meta_deltas: 0,
+            population: f64::NAN,
         };
         kept.read(sim);
         kept
@@ -78,6 +80,7 @@ impl Kept {
         let frame = self.reader.frame(sim, false);
         assert_eq!(frame[header::FRAME_SEQ], self.seq + 1.0, "frames count up");
         self.seq += 1.0;
+        self.population = frame[header::POPULATION];
         if frame[header::TOWER_REVISION] != self.structure[structure::REVISION] {
             self.structure = structure_view(sim);
             decode_structure(sim, &self.structure, "a refetched structure");
@@ -144,6 +147,11 @@ impl Kept {
             assert!(same(&self.rooms[slot], &want), "{what}: kept room {slot}");
         }
         assert_eq!(fresh[header::POPULATION], sim.population() as f64, "{what}");
+        assert_eq!(
+            self.population,
+            sim.population() as f64,
+            "{what}: kept population"
+        );
         let tail = at + rooms.len() * UNIT_RECORD;
         assert_eq!(
             fresh.len() - tail,

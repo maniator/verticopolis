@@ -77,16 +77,18 @@ impl Unit {
         self.resident_count()
     }
 
-    /// `syncAttendanceOccupants`.
-    pub fn sync_attendance_occupants(&mut self) {
+    /// `syncAttendanceOccupants`. `at` is the unit's mark, which logs a
+    /// change for the engine view's frame.
+    pub(crate) fn sync_attendance_occupants(&mut self, at: crate::view::Mark<'_>) {
         if self.kind.attendance_cap().is_none() {
             return;
         }
-        self.occupants = if self.is_operational() {
+        let occupants = if self.is_operational() {
             self.customers_in.unwrap_or(0)
         } else {
             0
         };
+        self.set_occupants(at, occupants);
     }
 
     /// `visibleOccupants`.

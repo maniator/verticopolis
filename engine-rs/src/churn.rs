@@ -191,13 +191,13 @@ impl Simulation {
             self.record_money("condos", -buyback);
         }
         let modern = self.mode.is_modern();
-        let u = &mut self.tower.units[i];
-        u.state = UnitState::Empty;
-        u.occupants = 0;
+        let (u, at) = self.tower.marked(i);
+        u.set_state(at, UnitState::Empty);
+        u.set_occupants(at, 0);
         if !kind.is_hotel() {
             u.ever_occupied = false;
         }
-        u.residents = None;
+        u.set_residents(at, None);
         if kind == Kind::Condo {
             if let Some(r) = u.rent {
                 u.rent = Some(if modern {
@@ -337,8 +337,8 @@ impl Simulation {
                 }
                 k if k.is_hotel() => {
                     if evening && self.rng.chance(0.5 * demand) {
-                        let w = &mut self.tower.units[i];
-                        w.state = UnitState::Asleep;
+                        let (w, at) = self.tower.marked(i);
+                        w.set_state(at, UnitState::Asleep);
                         w.ever_occupied = true;
                         self.move_ins_today.rooms += 1;
                         if let Some(ctx) = sat_ctx.as_mut() {
@@ -367,8 +367,8 @@ impl Simulation {
     pub fn move_in(&mut self, i: usize) {
         let kind = self.tower.units[i].kind;
         {
-            let u = &mut self.tower.units[i];
-            u.state = UnitState::Occupied;
+            let (u, at) = self.tower.marked(i);
+            u.set_state(at, UnitState::Occupied);
             u.satisfaction = 1.0;
             u.vacate_reason = None;
             u.vacate_at = None;
@@ -385,10 +385,10 @@ impl Simulation {
                 (asking, None)
             };
             let floor = self.tower.units[i].floor;
-            let u = &mut self.tower.units[i];
+            let (u, at) = self.tower.marked(i);
             u.ever_occupied = true;
             if residents.is_some() {
-                u.residents = residents;
+                u.set_residents(at, residents);
             }
             u.rent = Some(asking);
             self.money += price;
@@ -431,10 +431,10 @@ impl Simulation {
                 } else {
                     None
                 };
-                let u = &mut self.tower.units[i];
+                let (u, at) = self.tower.marked(i);
                 u.ever_occupied = true;
                 if residents.is_some() {
-                    u.residents = residents;
+                    u.set_residents(at, residents);
                 }
                 self.move_ins_today.rentals += 1;
             }
@@ -530,8 +530,8 @@ impl Simulation {
             if chance <= 0.0 || !self.rng.chance(chance) {
                 continue;
             }
-            let u = &mut self.tower.units[i];
-            u.state = UnitState::Vacating;
+            let (u, at) = self.tower.marked(i);
+            u.set_state(at, UnitState::Vacating);
             u.vacate_reason = Some("relocation");
             u.vacate_at = Some(self.clock.minutes + VACATE_NOTICE_MINUTES);
             let msg = format!(

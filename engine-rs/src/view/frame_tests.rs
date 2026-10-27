@@ -57,7 +57,8 @@ fn the_named_slots_read_their_values() {
     sim.events.pending = None;
     sim.fx.thief.caught = true;
     let rooms = sim.tower.room_index();
-    sim.tower.units[rooms[2]].occupants += 1;
+    let (u, at) = sim.tower.marked(rooms[2]);
+    u.set_occupants(at, u.occupants + 1);
     let delta = reader.frame(&sim, false);
     let mask = FACILITIES
         .iter()
@@ -262,8 +263,10 @@ fn a_reader_sends_every_room_only_when_it_must() {
     let again = r.frame(&sim, false);
     assert_eq!((again[header::FULL], again[header::UNITS]), (0.0, 0.0));
     let (a, b) = (rooms[3], rooms[1]);
-    sim.tower.units[a].occupants += 7;
-    sim.tower.units[b].state = UnitState::Fire;
+    let (u, at) = sim.tower.marked(a);
+    u.set_occupants(at, u.occupants + 7);
+    let (u, at) = sim.tower.marked(b);
+    u.set_state(at, UnitState::Fire);
     let changed = r.frame(&sim, false);
     assert_eq!((changed[header::FULL], changed[header::UNITS]), (0.0, 2.0));
     let at = HEADER + changed[header::PEOPLE] as usize * PERSON_RECORD;

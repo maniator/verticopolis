@@ -12,17 +12,19 @@
 //! - `Simulation::tower_signature`: undo's per-command fingerprint.
 //!
 //! None of them changes the simulation, the save, the state view or a hash.
-//! Two keep state between reads, in [`ViewState`] on the tower, outside the
-//! save, the state view and the digest, which a load starts fresh (every
-//! load builds a new `Tower`): the metadata log the setters write, and the
-//! binding's frame reader, which remembers what it last sent. A native host
-//! can hold its own [`ViewReader`] instead; the JavaScript binding uses the
-//! one on the tower, since its `Engine` holds nothing but the simulation.
+//! Three keep state between reads, in [`ViewState`] on the tower, outside
+//! the save, the state view and the digest, which a load starts fresh (every
+//! load builds a new `Tower`): the metadata log and the frame mark log the
+//! setters write, and the binding's frame reader, which remembers what it
+//! last sent and how far it has read the mark log. A native host can hold
+//! its own [`ViewReader`] instead; the JavaScript binding uses the one on the
+//! tower, since its `Engine` holds nothing but the simulation.
 //!
 //! A host that starts on an engine (a load, or an attach after undo, redo or
 //! a fault restore) reads the structure, a full frame and a full metadata
 //! listing before it reads anything incremental.
 pub mod layout;
+mod marks;
 mod meta;
 mod reader;
 mod signature;
@@ -31,6 +33,7 @@ mod structure;
 use std::cell::RefCell;
 
 pub use layout::{layout_json, VIEW_LAYOUT_VERSION};
+pub use marks::{FrameMarks, Mark};
 pub(crate) use meta::FIRST_META_REVISION;
 pub use meta::{meta_since, whole_revision, MetaLog};
 pub use reader::ViewReader;
@@ -38,10 +41,11 @@ pub use structure::structure_view;
 
 use crate::sim::Simulation;
 
-/// What the view keeps on the tower between reads: the metadata log the
-/// setters write and the binding's frame reader.
+/// What the view keeps on the tower between reads: the metadata log and the
+/// frame mark log the setters write, and the binding's frame reader.
 pub struct ViewState {
     pub(crate) meta_log: MetaLog,
+    pub(crate) marks: FrameMarks,
     pub(crate) reader: RefCell<ViewReader>,
 }
 
@@ -49,6 +53,7 @@ impl Default for ViewState {
     fn default() -> ViewState {
         ViewState {
             meta_log: MetaLog::new(),
+            marks: FrameMarks::default(),
             reader: RefCell::new(ViewReader::new()),
         }
     }
@@ -67,6 +72,9 @@ mod frame_tests;
 #[cfg(test)]
 #[path = "layout_tests.rs"]
 mod layout_tests;
+#[cfg(test)]
+#[path = "marks_tests.rs"]
+mod marks_tests;
 #[cfg(test)]
 #[path = "meta_tests.rs"]
 mod meta_tests;

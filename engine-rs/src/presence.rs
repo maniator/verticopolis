@@ -25,57 +25,59 @@ impl Simulation {
         let night = self.clock.is_night();
         let evening = self.clock.is_evening();
         for i in self.tower.room_indices() {
+            let at = self.tower.view.marks.at(i);
             let u = &mut self.tower.units[i];
             let f = u.kind.facility();
             if u.is_dormant() {
                 if u.state == UnitState::Empty && f.attendance.is_some() {
-                    u.sync_attendance_occupants();
+                    u.sync_attendance_occupants(at);
                 } else {
-                    u.occupants = 0;
+                    u.set_occupants(at, 0);
                 }
                 continue;
             }
-            match u.kind {
+            let occupants = match u.kind {
                 Kind::Office => {
-                    u.occupants = if !weekend && (8..18).contains(&hour) {
+                    if !weekend && (8..18).contains(&hour) {
                         f.population
                     } else {
                         0
-                    };
+                    }
                 }
                 Kind::Condo | Kind::RentalApartment => {
-                    u.occupants = if night || evening || weekend {
+                    if night || evening || weekend {
                         u.resident_count()
                     } else {
                         1
-                    };
+                    }
                 }
                 Kind::RentalStudio => {
-                    u.occupants = if night || evening || weekend {
+                    if night || evening || weekend {
                         f.population
                     } else {
                         0
-                    };
+                    }
                 }
                 Kind::HotelSingle | Kind::HotelDouble | Kind::HotelSuite => {
-                    u.occupants = if u.state == UnitState::Asleep {
+                    if u.state == UnitState::Asleep {
                         f.population
                     } else {
                         0
-                    };
+                    }
                 }
                 _ => {
                     if f.attendance.is_some() {
-                        u.sync_attendance_occupants();
+                        u.sync_attendance_occupants(at);
+                        continue;
+                    }
+                    if u.state == UnitState::Occupied && u.kind.is_open_at(hour) {
+                        f.population
                     } else {
-                        u.occupants = if u.state == UnitState::Occupied && u.kind.is_open_at(hour) {
-                            f.population
-                        } else {
-                            0
-                        };
+                        0
                     }
                 }
-            }
+            };
+            u.set_occupants(at, occupants);
         }
     }
 

@@ -1,32 +1,33 @@
 //! The dynamic frame: what a view reads every rendered frame. The header,
 //! the crowd's people and every transport's cars go in full each time; the
 //! rooms go only when their frame fields changed since this reader's last
-//! frame. The reader finds them by comparing over the rooms index, so it
-//! never walks the floor and lobby tiles (their fields move only with the
-//! revision, which the structural snapshot covers).
+//! frame. The reader finds them in the tower's mark log (`marks.rs`), which
+//! the setters of those fields write, so a frame visits only the rooms that
+//! changed (a full frame aside) and no floor or lobby tile (their fields
+//! move only with the revision, which the structural snapshot covers).
 use std::sync::Arc;
 
 use super::layout::{HEADER, PERSON_RECORD, UNIT_RECORD};
 use crate::frame::{person_state_code, push_transports, transports_len, unit_fields, weather_code};
 use crate::sim::Simulation;
+use crate::tower::Unit;
 
-/// The room records a reader last sent, by slot, the structure they were
+/// What a reader last sent, by slot: each room's frame fields (as bits) and
+/// its census, with their sum, the population. Also the structure they were
 /// sent against (the tower revision and unit count the rooms index is keyed
-/// on), the frames it has written, and a buffer it reuses for the changed
-/// rooms. A reader belongs to one simulation: a host that loads another
-/// starts a new reader (the binding's lives on the tower, which every load
-/// builds afresh).
-///
-/// This keeps the hot path simple and predictable: it compares the room slots
-/// the host has already indexed, and it only emits the ones whose frame fields
-/// changed. That is the measured tradeoff in this branch. The alternative is a
-/// wider write-site dirty-mark rollout, which would need explicit owner
-/// approval because it spreads a room-dirty signal through many game systems.
+/// on), how far it has read the tower's mark log, the frames it has written,
+/// and buffers it reuses. A reader belongs to one simulation: a host that
+/// loads another starts a new reader (the binding's lives on the tower,
+/// which every load builds afresh).
 #[derive(Default)]
 pub struct ViewReader {
     sent: Option<(i64, usize)>,
     last: Vec<[u64; 5]>,
+    census: Vec<i64>,
+    population: i64,
+    read: u64,
     seq: u64,
+    marked: Vec<usize>,
     changed: Vec<f64>,
 }
 
@@ -62,38 +63,68 @@ impl ViewReader {
     /// changed since its last frame, in slot order, a field compared bit for
     /// bit.
     ///
-    /// One pass over the rooms index (the compare and the population), and
-    /// one allocation, made after that pass at the frame's size.
+    /// A full frame makes one pass over the rooms index, which happens once
+    /// per revision move (a command) or when the host asks. Any other frame
+    /// visits the rooms the mark log names since this reader's last frame,
+    /// each once, plus a binary search of the rooms index for each; with
+    /// nothing marked it visits no room. Should the log have dropped marks
+    /// this reader never read (it fell `MARK_CAP` marks behind), the frame
+    /// compares every room once instead. The population is a running total
+    /// that each visited room corrects. One allocation, made at the frame's
+    /// size.
+    ///
+    /// The engine's own writes go through the setters, which mark the room.
+    /// A native host that writes a unit's frame fields or residents itself,
+    /// outside the commands and the tick, leaves the room unmarked, so its
+    /// next frame passes `full`.
     pub fn frame(&mut self, sim: &Simulation, full: bool) -> Vec<f64> {
         let tower = &sim.tower;
         let rooms: Arc<[usize]> = tower.room_index();
+        let marks = &tower.view.marks;
         let key = (tower.revision, tower.units.len());
         let full = full || self.sent != Some(key) || self.last.len() != rooms.len();
+        self.changed.clear();
         if full {
             self.last.clear();
             self.last.reserve(rooms.len());
-        }
-        self.changed.clear();
-        let mut population = 0i64;
-        for (slot, &i) in rooms.iter().enumerate() {
-            let u = &tower.units[i];
-            if u.is_present() {
-                population += u.census_count();
+            self.census.clear();
+            self.census.reserve(rooms.len());
+            self.changed.reserve(rooms.len() * UNIT_RECORD);
+            self.population = 0;
+            for (slot, &i) in rooms.iter().enumerate() {
+                let u = &tower.units[i];
+                let fields = unit_fields(u);
+                self.last.push(fields.map(f64::to_bits));
+                let census = census_of(u);
+                self.census.push(census);
+                self.population += census;
+                self.changed.push(slot as f64);
+                self.changed.extend_from_slice(&fields);
             }
-            let fields = unit_fields(u);
-            let bits = fields.map(f64::to_bits);
-            if full {
-                self.last.push(bits);
-            } else if self.last[slot] != bits {
-                self.last[slot] = bits;
+        } else {
+            let mut marked = std::mem::take(&mut self.marked);
+            marked.clear();
+            if marks.read_since(self.read, &mut marked) {
+                // Unit-list order is the rooms index's order, so sorted
+                // indices give the slots in order.
+                marked.sort_unstable();
+                marked.dedup();
+                for &i in &marked {
+                    if let Ok(slot) = rooms.binary_search(&i) {
+                        self.update(slot, &tower.units[i]);
+                    }
+                }
             } else {
-                continue;
+                for (slot, &i) in rooms.iter().enumerate() {
+                    self.update(slot, &tower.units[i]);
+                }
             }
-            self.changed.push(slot as f64);
-            self.changed.extend_from_slice(&fields);
+            self.marked = marked;
         }
+        self.read = marks.end();
         self.sent = Some(key);
         self.seq += 1;
+        let population = self.population;
         let people = &sim.crowd.people;
         let size = HEADER
             + people.len() * PERSON_RECORD
@@ -156,6 +187,32 @@ impl ViewReader {
         push_transports(&mut v, &tower.transports);
         debug_assert_eq!(v.len(), size);
         v
+    }
+
+    /// Bring the room in `slot` up to date: correct the population by the
+    /// change in its census, and queue its record when a frame field
+    /// changed, compared bit for bit.
+    fn update(&mut self, slot: usize, u: &Unit) {
+        let census = census_of(u);
+        self.population += census - self.census[slot];
+        self.census[slot] = census;
+        let fields = unit_fields(u);
+        let bits = fields.map(f64::to_bits);
+        let last = &mut self.last[slot];
+        if (0..5).any(|k| bits[k] != last[k]) {
+            *last = bits;
+            self.changed.push(slot as f64);
+            self.changed.extend_from_slice(&fields);
+        }
+    }
+}
+
+/// A room's part of the population, as `Tower::total_population` counts it.
+fn census_of(u: &Unit) -> i64 {
+    if u.is_present() {
+        u.census_count()
+    } else {
+        0
     }
 }
 

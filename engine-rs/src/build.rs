@@ -212,8 +212,8 @@ impl Simulation {
             }
             let dur = kind.build_minutes();
             if dur > 0.0 {
-                let u = self.tower.get_unit_mut(id).unwrap();
-                u.state = UnitState::Construction;
+                let (u, at) = self.tower.marked_by_id(id).unwrap();
+                u.set_state(at, UnitState::Construction);
                 u.complete_at = Some(self.clock.minutes + dur);
                 self.constructing.insert(id);
             }
