@@ -1,7 +1,7 @@
 # Story facade.5: The lifecycle through the port (load, saves, undo and redo, `.TDT`, the crash report)
 
-Status: ready-for-dev (story review round 1: conditional GO on 30624fa1;
-C1 and C2 folded in below)
+Status: in-progress (story review: GO on ad20180c, both conditions met; 5a
+written on the F2 amendment's recommended option, which waits on the owner)
 
 Slice 5 of the Rust-backed facade
 (`_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/slice-plan.md`),
@@ -228,21 +228,23 @@ its undo half).
 - [ ] PR 5a: the port's lifecycle members and undo through the port
   - [x] the slice plan's row 5 amended; D2's per-caller costs and the
         in-order primitive recorded on #1224
-  - [ ] `port.ts`: `TowerSource`, `SaveOptions`, the members, the ordering
+  - [x] `port.ts`: `TowerSource`, `SaveOptions`, the members, the ordering
         note (AC 1)
-  - [ ] `tsLifecycle.ts` and `createTsSim`'s `adopt` option (AC 2)
-  - [ ] the host's text registry, `RestorePoints.newestText`,
+  - [x] `tsLifecycle.ts` and `createTsSim`'s `adopt` option (AC 2)
+  - [x] the host's text registry, `RestorePoints.newestText`,
         `signatureOfSave`, the auto-bridge part of `carryLiveState` (AC 4,
         7, 8)
-  - [ ] `lifecycleContract.fixture.ts` and `tsSimLifecycle.test.ts`, on
+  - [x] `lifecycleContract.fixture.ts` and `tsSimLifecycle.test.ts`, on
         both hosts (AC 3)
-  - [ ] `UndoHistory` (async restore, `dropUnchanged(sigOf)`), `appHistory.ts`,
+  - [x] `UndoHistory` (async restore, `dropUnchanged(sigOf)`), `appHistory.ts`,
         `GameApp.undo`/`redo`/`dropEmptyUndo`, the auto-bridge carry out of
         `adoptSim`, the host's history wrappers passing the promise on (AC 4)
-  - [ ] the app's port wiring with `adopt` (one line in `main.ts`, through
+  - [x] the app's port wiring with `adopt` (one line in `main.ts`, through
         a helper if the line would wrap)
-  - [ ] guard lines for `appHistory.ts` and `tsLifecycle.ts`; `main.ts
-        autoBridge=` out of `LIFECYCLE` (AC 8, 9)
+  - [x] guard lines for `appHistory.ts` and `tsLifecycle.ts`
+  - [ ] `main.ts autoBridge=` out of `LIFECYCLE` (AC 8): the list arrives
+        with slice 2 (#1290), so it goes when this branch takes main after
+        #1290 merges
 - [ ] PR 5b: saves
   - [ ] the stamp splice (`src/storage/saveStamp.ts`) and its byte-equality
         tests (D8)
@@ -328,7 +330,9 @@ its undo half).
   port), and an awaited save for the flush. This story records both on
   #1224, with the costs above. Whether two synchronous members amend F2's
   "one interface, no pretend-sync" rule is the facade lead's call, and the
-  owner's if it does.
+  owner's if it does. The facade lead judged that it does (2026-10-21), so
+  the amendment is the owner's, pending; 5a is written on its recommended
+  option (main-thread only, with these guardrails).
 - **D3. `undoSignature`, a string.** Slice 6a's round 1 review replaced the
   change counter with `towerSignature()`, a pure fingerprint of
   `towerStateSig`'s tower half, with money compared beside it. A string
@@ -561,4 +565,43 @@ fallback and join `story-engine-retire-typescript.md`'s list.
 
 ### Completion Notes List
 
+5a (PR #1294), on main at d8e5a847 with Copilot's two commits (a2c854ef,
+429027a9) kept and their code replaced:
+
+- `createTsSim`'s second argument is optional: a port without `adopt`
+  rejects a load. Slice 2's `GameApp.port` line and the tests that build a
+  port over a fixed tower need none.
+- The host's text registry is `setSaveText`/`saveText` in
+  `src/wasmhost/stepGate.ts`, beside `setStepGate`, so `wasmHost.ts` gains
+  no import line (485 lines). A faulted tower keeps its text after detach,
+  as it keeps its `serialize` override; a healthy one gives it back.
+- The undo signature's coverage case (AC 3) runs its own script, one step
+  per command and a tick, typed so a new command fails to compile without
+  a step, and pins which steps move the signature. Slice 2's
+  `commandContract.fixture.ts` is not on main yet; the case does not need it.
+- `main.ts` carries the same `port` field slice 2 adds, with `adopt`; the
+  file stays at 497 lines (the auto-bridge copy and two comment lines left).
+  Whichever of #1290 and #1294 lands second takes the other's line.
+- `contract.fixture.ts` exports `start`, `sender`, `lobbyCenter` and
+  `mustFind`, the same four exports slice 2 makes.
+- `UndoHistory.dropUnchanged` takes the fingerprint; the test that ran it
+  without one went, since that path is gone.
+
 ### File List
+
+- `src/simport/port.ts`, `tsSim.ts`, `tsLifecycle.ts` (new),
+  `lifecycleContract.fixture.ts` (new), `tsSimLifecycle.test.ts` (new),
+  `contract.fixture.ts`
+- `src/engine/UndoHistory.ts`, `src/game/appHistory.ts`, `inputKeys.ts`,
+  `uiCallbacks.ts`, `src/main.ts`
+- `src/wasmhost/stepGate.ts`, `wasmHost.ts`, `hostFault.ts`,
+  `startWasmHost.ts`, and their tests (`hostFault.test.ts`,
+  `wasmHostPoints.test.ts`, `startWasmHost.test.ts`,
+  `startWasmHostRecovery.test.ts`)
+- `src/tests/integration/undoHistory.integration.test.ts`,
+  `wasmRollback.ts`, `wasmHostRollback.integration.test.ts`,
+  `wasmHostRollbackHistory.integration.test.ts`,
+  `wasmHostFallback.integration.test.ts`
+- `src/tests/simulationReach.ratchet.txt`,
+  `frontendEngineImports.ratchet.txt`
+- the slice plan's row 5 (pending the owner's F2 answer)
