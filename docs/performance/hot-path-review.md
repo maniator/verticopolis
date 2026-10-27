@@ -278,9 +278,10 @@ Between those PRs the table belongs to the repository owner (maniator), the
 | live staff count | `crowd.staffCount`, `src/engine/Crowd.ts` | counter | ported |
 | riders per car | `crowd.carRiders`, `src/engine/Crowd.ts` | counter | ported (`car_riders`) |
 | noise verdicts | `noiseMemo`, `src/engine/sim/satisfaction.ts` | revision | ported (`noise_memo`, `engine-rs/src/noise.rs`; #1139) |
-| served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported; `is_floor_served` reads the served set in place (#1237), `served_floors` and the staff components are still cloned on read (#859) |
+| served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported; `is_floor_served` reads the served set in place (#1237) and elevator dispatch reads `dispatch_floors` (below, #1143 item 5, #1298); `served_floors` and the staff components are still cloned on read (#859) |
 | stops, transport columns | `stopsCache` on `Tower`, `src/engine/tower/transport.ts` | revision | ported (cloned on read, #859) |
 | built floor bounds | `floorBounds`, `src/engine/Tower.ts` | revision | ported (`floor_bounds`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1237) |
+| served and lobby floors in ascending order, for elevator dispatch | none (`accumulateWaiting` reads `servedSet` in place and walks `lobbyFloors()`, which sorts the lobby tiles' floors, each step the population is above zero; `moveCars` builds a set from `lobbyFloors()` on every call) | revision and unit count | Rust-only: `dispatch_floors`, `engine-rs/src/tower_index.rs` (#1143 item 5, #1298) |
 | passenger and staff routing graphs | `adjacency`, `staffAdjacency`, `src/engine/crowd/routing.ts` | revision | ported |
 | shaft banks | `src/engine/crowd/shaftBanks.ts` | revision | ported |
 | segments served | `segServed`, `src/engine/crowd/segmentGraph.ts` | revision | ported (`connected_set`) |
