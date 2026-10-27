@@ -149,7 +149,7 @@ function testWasmArgs(script: string): {
   projects: string[];
 } {
   const args = script
-    .replace(/^VC_REQUIRE_WASM=1 vitest run\s+/, "")
+    .replace(/^(?:cross-env\s+)?VC_REQUIRE_WASM=1 vitest run\s+/, "")
     .split(/\s+/);
   const filters: string[] = [];
   const projects: string[] = [];
@@ -167,6 +167,24 @@ function testWasmArgs(script: string): {
 /** Vitest matches a filter as a case-insensitive substring of the file path. */
 const matches = (file: string, filters: string[]): boolean =>
   filters.some((x) => file.toLowerCase().includes(x.toLowerCase()));
+
+/** Minimum semver tuple in an npm engine range like ">=22.18.0". */
+function minTuple(range: string): [number, number, number] | null {
+  const m = /(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(range);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2] ?? 0), Number(m[3] ?? 0)];
+}
+
+function compareTuple(
+  a: [number, number, number],
+  b: [number, number, number],
+): number {
+  for (let i = 0; i < 3; i++) {
+    if (a[i] > b[i]) return 1;
+    if (a[i] < b[i]) return -1;
+  }
+  return 0;
+}
 
 /** Suites handed to the TypeScript side that no `test:wasm` filter reaches and that need the package. */
 function unrun(files: string[], filters: string[]): string[] {
@@ -186,7 +204,7 @@ describe("the host suites run in test:wasm", () => {
   });
 
   it("requires the package and runs the plain integration project, where the handed-over suites live", () => {
-    expect(script).toMatch(/^VC_REQUIRE_WASM=1 vitest run /);
+    expect(script).toMatch(/^(?:cross-env\s+)?VC_REQUIRE_WASM=1 vitest run /);
     expect(projects).toEqual(["integration"]);
   });
 
@@ -257,6 +275,61 @@ describe("the host suites run in test:wasm", () => {
         throw new Error("test-wasm-parity: the host suites step is gone");
       expect(step[1]).toMatch(/^ {8}run: npm run test:wasm$/m);
       expect(step[1]).not.toMatch(/\bif:|continue-on-error/);
+    });
+  });
+
+  describe("cross-env wiring for shell portability", () => {
+    const pkg = JSON.parse(read("package.json")) as {
+      scripts: Record<string, string>;
+      engines: { node: string };
+      devDependencies: Record<string, string>;
+    };
+    const lock = JSON.parse(read("package-lock.json")) as {
+      packages?: Record<
+        string,
+        { version?: string; engines?: { node?: string }; devDependencies?: Record<string, string> }
+      >;
+    };
+    const scripts = pkg.scripts;
+
+    const scriptNames = [
+      "test:wasm",
+      "test:wasm:parity",
+      "perf:capture",
+      "screenshots",
+    ] as const;
+
+    it("keeps cross-env in scripts that set inline environment variables", () => {
+      for (const name of scriptNames) {
+        const script = scripts[name];
+        expect(script, `${name} is defined`).toBeDefined();
+        expect(script, `${name} starts with cross-env`).toMatch(/^cross-env\s+/);
+        expect(
+          script,
+          `${name} keeps an inline environment assignment after cross-env`,
+        ).toMatch(/^cross-env\s+[^ ]+=/);
+      }
+    });
+
+    it("keeps cross-env as a dev dependency and pinned in the lockfile", () => {
+      expect(pkg.devDependencies["cross-env"]).toBeTruthy();
+      expect(lock.packages?.[""]?.devDependencies?.["cross-env"]).toBeTruthy();
+      expect(lock.packages?.["node_modules/cross-env"]?.version).toBeTruthy();
+    });
+
+    it("keeps the repo's Node engine compatible with cross-env", () => {
+      const repoNode = pkg.engines?.node;
+      const crossEnvNode = lock.packages?.["node_modules/cross-env"]?.engines?.node;
+      if (!repoNode) throw new Error("package.json: engines.node is missing");
+      if (!crossEnvNode)
+        throw new Error("package-lock.json: node_modules/cross-env engines.node is missing");
+      const repoMin = minTuple(repoNode);
+      const crossEnvMin = minTuple(crossEnvNode);
+      if (!repoMin || !crossEnvMin)
+        throw new Error(
+          `cannot compare Node engines: repo=${JSON.stringify(repoNode)} cross-env=${JSON.stringify(crossEnvNode)}`,
+        );
+      expect(compareTuple(repoMin, crossEnvMin)).not.toBe(-1);
     });
   });
 });

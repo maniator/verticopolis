@@ -7,7 +7,7 @@ body:
       value: |
         Thanks for reporting a bug! Please check the [live build](https://verticopolis.com)
         first, since the issue may already be fixed. The build version is shown on the splash screen,
-        and the line also says "WASM engine" when the WASM engine is running.
+        and the line also says "Rust engine" when the Rust engine is running.
   - type: input
     id: version
     attributes:
@@ -20,7 +20,7 @@ body:
     id: engine
     attributes:
       label: Engine
-      description: Which simulation engine was running? Rust/WASM is the Rust engine, which the game currently calls the "WASM engine" on the version line on the splash screen, in Settings and in Help. Choose Fallback if the game said the WASM engine stopped and it runs on the TypeScript engine now.
+      description: Which simulation engine was running? Rust/WASM is the Rust engine, which the game calls the "Rust engine" on the version line on the splash screen, in Settings and in Help (versions before 2.47.0 called it the "WASM engine"). Choose Fallback if the game said the Rust engine stopped and it runs on the TypeScript engine now.
       options:
         - Not sure
         - Rust/WASM
@@ -32,7 +32,7 @@ body:
     id: diagnostics
     attributes:
       label: Engine diagnostics
-      description: Optional. In Help, open About and press Copy diagnostics, then paste the result here. It names the engine, any fallback reason and the engine build, which the version line does not. It helps most if the game started on the TypeScript engine when you expected the WASM engine.
+      description: Optional. In Help, open About and press Copy diagnostics, then paste the result here. It names the engine, any fallback reason and the engine build, which the version line does not. It helps most if the game started on the TypeScript engine when you expected the Rust engine.
       render: shell
     validations:
       required: false

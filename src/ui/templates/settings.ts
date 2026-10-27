@@ -1,4 +1,35 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import type { EngineSettingsView } from "../../engineCohort/settingsView";
+
+/** The three engine choices, in the order the section lists them (#1197).
+ *  None of them is called "Classic", which names a gameplay mode. */
+export const ENGINE_OPTIONS = [
+  { value: "auto", label: "Automatic (recommended)", note: "The game picks the engine for you, following any engine test you are part of." },
+  { value: "rust", label: "Rust engine (experimental)", note: "The new engine, still being tested." },
+  { value: "typescript", label: "TypeScript engine (stable)", note: "The engine the game has used so far." },
+] as const;
+
+/**
+ * The "Game engine" section (#1197): a radio group for the choice, then a
+ * live status line the controller fills in (the engine actually running, why
+ * it differs, the retry button, and "restart needed"). The choice is stored
+ * when picked and takes effect at the next start; nothing here reloads the
+ * page. Absent when the build has no engine choice (a wasm-only build).
+ */
+export function engineSectionTemplate(view: EngineSettingsView): TemplateResult {
+  return html`
+      <h3>Game engine</h3>
+      <div class="set-engine" role="radiogroup" aria-labelledby="set-engine-h" aria-describedby="set-engine-status">
+        <span id="set-engine-h" class="visually-hidden">Game engine</span>
+        ${ENGINE_OPTIONS.map(
+          (o) => html`<div class="set-row">
+            <label class="set-radio"><input type="radio" name="set-engine" value=${o.value} aria-describedby=${`note-engine-${o.value}`} ?checked=${view.choice === o.value} ?disabled=${!view.storable}><span>${o.label}</span></label>
+            <p class="set-note" id=${`note-engine-${o.value}`}>${o.note}</p>
+          </div>`,
+        )}
+      </div>
+      <div class="set-engine-status" id="set-engine-status" aria-live="polite"></div>`;
+}
 
 /**
  * The Settings dialog body: sound levels plus the presentation toggles. Authored
@@ -26,7 +57,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
  * tower state, sets the initial checked value, and disables it when Manual
  * Structure was chosen at founding (which already places every tile by hand).
  */
-export function settingsTemplate(version: string, showBuilding = false, engine = ""): TemplateResult {
+export function settingsTemplate(version: string, showBuilding = false, engine = "", engineView: EngineSettingsView | null = null): TemplateResult {
   const building = showBuilding
     ? html`
       <h3>Building</h3>
@@ -52,6 +83,7 @@ export function settingsTemplate(version: string, showBuilding = false, engine =
         <p class="set-note" id="note-steady-clock">As in 1994, the clock normally runs slow through the lunch rush and fast overnight (a full day takes the same real time either way). Turn on for an even pace all day.</p>
       </div>
       ${building}
+      ${engineView ? engineSectionTemplate(engineView) : nothing}
       <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Close</button></div>
       <p class="set-version">Verticopolis <span class="app-version">v${version}</span>${engine}</p>
     `;

@@ -6,15 +6,25 @@ import { FACILITIES } from "../../engine/facilities";
 import type { SerializedGame } from "../../engine/serializedGame";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { buildWinningTower } from "../fixtures/winningTower";
+import { buildHotelTower } from "./fixtureHotelTower";
+import { buildBracketTower, buildManyUnitTower } from "./fixtureTowers";
+
+/** Every tower the harnesses can run, small to large by people with the
+ *  special-purpose towers after them. A run with no
+ *  `--scenarios` takes the first three kinds only (`DEFAULT_SCENARIOS`); the
+ *  bracket towers, the many-unit tower (issue #1270) and the hotel-heavy tower (#1279) are named on purpose. */
+export const SCENARIO_NAMES = ["small", "bracket-a", "bracket-b", "medium", "large", "many-unit", "hotel-heavy"] as const;
+export type ScenarioName = (typeof SCENARIO_NAMES)[number];
+export const DEFAULT_SCENARIOS: readonly ScenarioName[] = ["small", "medium", "large"];
 
 /**
- * The three towers the engine comparison runs (issue #972). Each one is a
+ * The towers the engine comparison runs (issue #972; #1270 added three). Each one is a
  * save, built or decoded here in Node and handed unchanged to both engines,
  * so the two start from the same bytes. None carries a crowd (saves never
  * do), so both engines grow their crowd from the same empty start.
  */
 export interface Scenario {
-  name: "small" | "medium" | "large";
+  name: ScenarioName;
   description: string;
   /** The save as JSON text, exactly as both engines receive it. */
   save: string;
@@ -92,10 +102,33 @@ function describeSave(name: Scenario["name"], description: string, data: Seriali
   };
 }
 
-export function buildScenarios(): Scenario[] {
-  return [
-    describeSave("small", "synthetic 15-floor tower (scripts: buildSmallTower)", buildSmallTower().serialize()),
-    describeSave("medium", "player fixture conformance/fixtures/sixseven_2.vctower", loadFixtureSave("conformance/fixtures/sixseven_2.vctower")),
-    describeSave("large", "Tier-1 win tower (src/tests/fixtures/winningTower.ts)", buildLargeTower().serialize()),
-  ];
+/** The bracket towers' sizes: geometric steps between small (729 people, 2,240
+ *  units, 15 floors) and medium (3,240, 12,062, 78), so the size threshold is
+ *  read off a curve. */
+const BRACKETS = {
+  "bracket-a": { seed: 11, floors: 26, population: 1150 },
+  "bracket-b": { seed: 11, floors: 48, population: 1800 },
+} as const;
+
+const BUILDERS: Record<ScenarioName, () => Scenario> = {
+  small: () => describeSave("small", "synthetic 15-floor tower (scripts: buildSmallTower)", buildSmallTower().serialize()),
+  "bracket-a": () => describeSave("bracket-a", "bracket tower: 26 floors, about 1,150 people (fixtureTowers: buildBracketTower)", buildBracketTower(BRACKETS["bracket-a"]).serialize()),
+  "bracket-b": () => describeSave("bracket-b", "bracket tower: 48 floors, about 1,800 people (fixtureTowers: buildBracketTower)", buildBracketTower(BRACKETS["bracket-b"]).serialize()),
+  medium: () => describeSave("medium", "player fixture conformance/fixtures/sixseven_2.vctower", loadFixtureSave("conformance/fixtures/sixseven_2.vctower")),
+  large: () => describeSave("large", "Tier-1 win tower (src/tests/fixtures/winningTower.ts)", buildLargeTower().serialize()),
+  "many-unit": () => describeSave("many-unit", "many units, few people: the large tower's shell with about 500 people (fixtureTowers: buildManyUnitTower)", buildManyUnitTower({ seed: 13, population: 500 }).serialize()),
+  "hotel-heavy": () => describeSave("hotel-heavy", "Modern hotel tower: 852 rooms, 24 housekeeping units, a split staff network and a wing no crew can route to (fixtureHotelTower: buildHotelTower)", buildHotelTower({ seed: 21, floors: 62, crews: 24 }).serialize()),
+};
+
+/** The names that are not a tower the harnesses can run. */
+export function unknownScenarios(names: readonly string[]): string[] {
+  return names.filter((n) => !(SCENARIO_NAMES as readonly string[]).includes(n));
+}
+
+/** The named towers, in `SCENARIO_NAMES` order, or the three default kinds when
+ *  no names are given. A name that is not a tower is left out; callers check
+ *  `unknownScenarios` first. */
+export function buildScenarios(names?: readonly string[] | null): Scenario[] {
+  const wanted = names ?? DEFAULT_SCENARIOS;
+  return SCENARIO_NAMES.filter((n) => wanted.includes(n)).map((n) => BUILDERS[n]());
 }

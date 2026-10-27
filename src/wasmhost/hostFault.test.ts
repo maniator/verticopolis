@@ -194,7 +194,7 @@ describe("a teardown's steps (#1113)", () => {
     expect(isEngineTrap(thrown)).toBe(true);
   });
 
-  it("names a wrapped trap's wrapper, and still finds the trap however deep it sat", () => {
+  it("names a wrapped trap's wrapper, and still finds the trap three wrappers deep", () => {
     const trap = new WebAssembly.RuntimeError("unreachable");
     const wrapped = [1, 2, 3].reduce<unknown>((cause, n) => Object.assign(new Error(`wrapper ${n}`), { cause }), trap);
     const thrown = thrownBy(throwing(new Error("the events do not go back")), throwing(wrapped));
@@ -214,7 +214,7 @@ describe("the fault latch (#874)", () => {
     expect(latch.guard("trap-tick", () => 7, 0)).toBe(7);
     context = "undo";
     expect(latch.guard("other", () => { throw new Error("unreachable"); }, -1)).toBe(-1);
-    expect(latch.fault).toEqual({ reason: "trap-undo", message: "the WASM engine failed during a save: unreachable" });
+    expect(latch.fault).toEqual({ reason: "trap-undo", message: "the Rust engine failed during a save: unreachable" });
     const later = vi.fn(() => 1);
     expect(latch.guard("trap-command", later, 0)).toBe(0); // frozen: the engine is not asked
     latch.freeze("trap-tick", new Error("again"));
@@ -227,9 +227,9 @@ describe("the fault latch (#874)", () => {
     expect(hostFault("other", "capture", "x").reason).toBe("trap-command");
     expect(hostFault("trap-tick", "capture", "x").reason).toBe("trap-tick");
     expect(hostFault("trap-tick", "undo", "x").reason).toBe("trap-undo");
-    expect(hostFault("trap-command", null, "x").message).toBe("the WASM engine failed during a command: x");
-    expect(hostFault("trap-tick", null, new Error("y")).message).toBe("the WASM engine failed during a tick: y");
-    expect(hostFault("other", null, "z", "while letting a tower go").message).toBe("the WASM engine failed while letting a tower go: z");
+    expect(hostFault("trap-command", null, "x").message).toBe("the Rust engine failed during a command: x");
+    expect(hostFault("trap-tick", null, new Error("y")).message).toBe("the Rust engine failed during a tick: y");
+    expect(hostFault("other", null, "z", "while letting a tower go").message).toBe("the Rust engine failed while letting a tower go: z");
     expect(["trap-command", "trap-tick", "trap-undo", "other"].every(isHostFault)).toBe(true);
     expect(["attach-refused", "package-mismatch", "none", "boot-error"].some(isHostFault)).toBe(false);
   });

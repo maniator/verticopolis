@@ -10,7 +10,7 @@ export function refuseForeignCatalog(c: Catalog): void {
   const own = catalogFor(c.mode);
   for (const field of Object.keys(own.world) as (keyof CatalogWorld)[]) {
     if (c.world[field] !== own.world[field]) {
-      throw new Error(`the WASM engine's ${c.mode} catalog states a different world from this build's tables (${field})`);
+      throw new Error(`the Rust engine's ${c.mode} catalog states a different world from this build's tables (${field})`);
     }
   }
   // `readCatalog` already refuses a kind listed twice.
@@ -21,6 +21,6 @@ export function refuseForeignCatalog(c: Catalog): void {
   const missing = [...kinds].filter((k) => !listed.has(k));
   if (extra.length > 0 || missing.length > 0) {
     const parts = [extra.length > 0 ? `unknown ${extra.join(", ")}` : "", missing.length > 0 ? `missing ${missing.join(", ")}` : ""];
-    throw new Error(`the WASM engine's ${c.mode} catalog lists other facility kinds than this build draws (${parts.filter(Boolean).join("; ")})`);
+    throw new Error(`the Rust engine's ${c.mode} catalog lists other facility kinds than this build draws (${parts.filter(Boolean).join("; ")})`);
   }
 }

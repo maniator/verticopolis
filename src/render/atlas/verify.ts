@@ -1,5 +1,5 @@
 import { FACILITIES, facilityFloors } from "../../engine/facilities";
-import type { Unit } from "../../engine/types";
+import type { UnitView } from "../../simport/view";
 import { paintAnimatedUnit, paintSettledUnit } from "../regionPaint";
 import { FLOOR, TILE } from "../scale";
 import { bake, type Renderer } from "./bake";
@@ -61,7 +61,7 @@ function region(doc: Document, w: number, h: number): CanvasRenderingContext2D {
 
 /** The game's paint of `unit`: inside a region with the room at `at`, or into
  *  its own canvas when `at` is null. */
-function webPaint(doc: Document, unit: Unit, s: LiveScene, anim: number, at: { x: number; y: number } | null): Image {
+function webPaint(doc: Document, unit: UnitView, s: LiveScene, anim: number, at: { x: number; y: number } | null): Image {
   const w = unit.width * TILE;
   const h = facilityFloors(unit.kind) * FLOOR;
   const ox = at?.x ?? 0;
@@ -76,7 +76,7 @@ function webPaint(doc: Document, unit: Unit, s: LiveScene, anim: number, at: { x
 
 export function verifySample(doc: Document, jobs: readonly Job[], renderer: Renderer, sample: Sample): SampleResult[] {
   const pl = variantPlacements(sample.unit.kind)[sample.variant];
-  const unit: Unit = {
+  const unit: UnitView = {
     ...sample.unit,
     floor: pl.floor,
     x: pl.x,
@@ -84,9 +84,6 @@ export function verifySample(doc: Document, jobs: readonly Job[], renderer: Rend
     // presence), so the sample keeps its own id there.
     id: sample.unit.kind === "parking" ? sample.unit.id : pl.id,
     width: FACILITIES[sample.unit.kind].width,
-    satisfaction: 1,
-    everOccupied: true,
-    pendingIncome: 0,
     label: "",
   };
   const found = lookupRoom(unit, sample.scene, sample.variant, { recyclingEighths: sample.eighths });

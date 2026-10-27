@@ -1,4 +1,4 @@
-import type { Unit } from "../../../engine/types";
+import type { UnitView } from "../../../simport/view";
 import type { DrawCtx } from "../common";
 import { hash } from "../../pixelSprites/common";
 import { layerBreak } from "../../pixelSprites/layers";
@@ -77,7 +77,7 @@ export function drawLobbyEntrance(
   drawLobbyTile(d, x, y, w, h, ENTRANCE_VARIANT[kind] ?? ENTRANCE_SERVICE, true);
 }
 
-export function drawLobby(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number) {
+export function drawLobby(d: DrawCtx, u: UnitView, x: number, y: number, w: number, h: number) {
   // One pattern slice per structural tile of the unit, scaled to whatever the
   // caller renders a tile as (the engine bakes at TILE px; the gallery draws
   // bigger). Keyed by absolute tile x so runs stay aligned however sliced.
