@@ -14,7 +14,7 @@ pub mod spawn_floors;
 pub mod visits;
 pub mod walk;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use serde_json::{json, Map, Value};
 
@@ -181,10 +181,11 @@ pub struct Edge {
 pub type AdjGraph = HashMap<i64, Vec<Edge>>;
 
 /// `ElevatorCalls`: hall (shaft -> floor -> count) and cab (shaft -> car -> floors).
+/// A car's cab floors are an ordered set, so dispatch reads them in floor order.
 #[derive(Default)]
 pub struct ElevatorCalls {
     pub hall: HashMap<i64, HashMap<i64, f64>>,
-    pub cab: HashMap<i64, HashMap<i64, HashSet<i64>>>,
+    pub cab: HashMap<i64, HashMap<i64, BTreeSet<i64>>>,
 }
 
 pub struct StaffResult {

@@ -170,8 +170,8 @@ impl Unit {
     }
 }
 
-/// The rules the setters and the frame share with the queries in
-/// `tower_query.rs`.
+/// The rules the setters and the frame share with the unit predicates in
+/// `tower_query_state.rs`.
 impl Unit {
     /// A room's share of the population: its census count while it is
     /// present, else 0, the rule `Tower::total_population` sums. The frame

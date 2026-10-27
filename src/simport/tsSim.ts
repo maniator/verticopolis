@@ -1,5 +1,6 @@
 import type { GameplayEvent } from "../engine/gameplayEventBuffer";
 import type { Simulation } from "../engine/Simulation";
+import { roomUnits, structureRuns } from "../engine/tower/rooms";
 import { settleEngine, stepGate } from "../wasmhost/stepGate";
 import type { Command, CommandOp, CommandResult, CommandResults } from "./commands";
 import type { SimPort } from "./port";
@@ -26,7 +27,11 @@ import type { HeaderView, SimView } from "./view";
  * per tower, so a new tower starts with none. The view hands out the live
  * tower and crowd, so a read copies nothing; the header is one small object
  * per read whose `population`, the one field that walks the rooms, is
- * computed only when read.
+ * computed only when read. `rooms` and `structure` are the engine's own
+ * lists, memoized per revision (`roomUnits` and `structureRuns`). On the
+ * TypeScript host the engine's per-step scans keep `roomUnits` warm; on the
+ * WASM hosts the instance does not step, so the first read of either after
+ * a revision move walks every unit once.
  *
  * Every command goes through a method or a field of the instance itself, the
  * ones the mirror host's relay (`relayCommands` in `src/dualrun/mirror.ts`)
@@ -36,10 +41,12 @@ import type { HeaderView, SimView } from "./view";
  * issue order is execution order. A throw from the instance rejects the
  * promise with that error.
  *
- * Engine types come in through `import type` only. The panel answers
- * (`tsPanels.ts`) call the engine's own functions, so that module carries the
- * adapter's runtime edge into `src/engine/`, with its reason in the frontend
- * import ratchet.
+ * Engine types come in through `import type` only, with two exceptions that
+ * carry their reasons in the frontend import ratchet: the room list and the
+ * structure runs above come from the engine's own memos, and the panel
+ * answers (`tsPanels.ts`) call the engine's own functions. The adapter
+ * retires with the TypeScript engine, so neither edge costs the retirement
+ * anything.
  */
 export function createTsSim(getSim: () => Simulation): SimPort {
   // Kept per tower, so a swap starts with none and a replaced tower is not
@@ -56,6 +63,12 @@ export function createTsSim(getSim: () => Simulation): SimPort {
     },
     get tower() {
       return getSim().tower;
+    },
+    get rooms() {
+      return roomUnits(getSim().tower);
+    },
+    get structure() {
+      return structureRuns(getSim().tower);
     },
     get crowd() {
       return getSim().crowd;
