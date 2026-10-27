@@ -263,6 +263,8 @@ describe("mergeSimulation", () => {
     mergeSimulationDelta(target, { rest: next, units: [office], transports: next.tower.transports }, { revision: target.tower.revision, mealOverlayRevision: 0 });
     expect(roomUnits(target.tower)).not.toBe(rooms);
     expect(target.stats()).toMatchObject({ ...walkedStats(target), offices: before.offices - 1, condos: before.condos + 1 });
+  });
+
   it("keeps the ramp index and the stop lists the congestion map reads in step with the engine", () => {
     // The render reads both every frame from the instance the host merges into.
     const target = parkingTower();
