@@ -18,6 +18,7 @@ pub mod churn;
 pub mod clock;
 pub mod crowd;
 pub mod demand;
+pub mod diagnostics;
 pub mod dispatch;
 pub mod econ;
 pub mod economy;

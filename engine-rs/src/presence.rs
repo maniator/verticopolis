@@ -110,6 +110,15 @@ impl Simulation {
         self.build_spatial_congestion().1
     }
 
+    /// Both maps from one pass, for a reader that needs a floor's ratio and
+    /// then its binding class (the inspector's congestion gripe, #1215),
+    /// where calling the two accessors above would build them twice.
+    pub(crate) fn spatial_congestion_with_attribution(
+        &self,
+    ) -> (IndexMap<i64, f64>, IndexMap<i64, CongestionAttribution>) {
+        self.build_spatial_congestion()
+    }
+
     /// `buildSpatialCongestion` (sim/congestion.ts): the ratio map and the
     /// per-class attribution, from one pass.
     fn build_spatial_congestion(

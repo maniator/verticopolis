@@ -44,6 +44,7 @@ export const INSTANCE_METHODS = [
   "towerResizeTransport", "previewRentBatch", "validateTransport", "placeTransportDryRun",
   "towerStats", "statsReport", "housekeepingCoverage", "unitDetail", "transportDetail", "floorHeatmap", "peakCongestionHotspot",
   "onboardingFacts", "viewStructure", "viewFrame", "unitMetaSince", "towerSignature",
+  "onboardingFacts", "diagnosticFacts",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 
