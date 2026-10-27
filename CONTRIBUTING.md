@@ -212,7 +212,10 @@ command below installs the version from `.nvmrc` inside the disposable container
 `node_modules` stays in a Docker volume, `dist/` stays in a temporary filesystem,
 and only the regenerated PNGs are written back to the working tree.
 
-To regenerate the committed `docs/screenshots/**` gallery and review its drift:
+To regenerate the committed `docs/screenshots/**` gallery and review its drift
+(the gallery renders on the Rust engine, and the image has no Rust toolchain, so
+run `npm run wasm:build` on the host first to leave the engine package in
+`src/public/engine/`; the mounted working tree carries it into the container):
 
 ```bash
 docker run --rm --ipc=host \
@@ -278,15 +281,19 @@ A plain host `npm run screenshots` is still preview-only because host Chromium
 and font rasterization may differ from the pinned image. See
 [`docs/screenshots.md`](./docs/screenshots.md) for the workflow details.
 
-Both checks run on two engines. The committed gallery and baselines are the
-TypeScript engine's, and engine legs render the same scenes with the WASM engine
-hosting the tower (`VC_SHOT_ENGINE=wasm` for `scripts/screenshots.ts`,
-`PW_WASM_VISUAL=1 npx playwright test e2e/visual.spec.ts --project=chromium-wasm`
-for the baselines): `pr-drift-check` compares the engine's gallery with the same
-run's TypeScript render (`engine-parity`) and the engine's visual specs with the
-committed baselines (`engine-parity-visual`), and `update-visual-baselines`
-repeats the visual comparison after a mint. Any pixel difference fails the leg
-as an engine parity finding to report; the engine legs never commit or mint.
+Both checks run on two engines. The committed gallery is the Rust engine's: the
+generator hosts the tower on the WASM engine unless `VC_SHOT_ENGINE=ts` says
+otherwise, so `drift-gate` and `commit-on-approval` work from the Rust render.
+While the TypeScript engine stays selectable, a parity leg renders the same
+scenes with `VC_SHOT_ENGINE=ts`: `pr-drift-check` compares it with the same
+run's Rust render (`engine-parity`), and any pixel difference fails that check
+as an engine parity finding to report. It is not a required check, and it never
+commits. The visual baselines are still the TypeScript engine's: the engine leg
+renders the visual specs with the WASM engine
+(`PW_WASM_VISUAL=1 npx playwright test e2e/visual.spec.ts --project=chromium-wasm`)
+and compares them with the committed baselines (`engine-parity-visual`), and
+`update-visual-baselines` repeats that comparison after a mint; that leg never
+mints.
 
 ### Coverage floors
 

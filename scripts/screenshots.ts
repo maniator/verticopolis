@@ -38,9 +38,11 @@
  * Env knobs: RUN_SERVER=1 spawns its own `vite preview`; ONLY=milestones,tablet
  * re-shoots just those scene ids; BASE_URL / PORT / PW_CHROME override targets;
  * SHOTS_DIR relocates the output gallery (used by the determinism guard to render
- * two independent legs into separate roots concurrently); VC_SHOT_ENGINE=wasm
- * renders the game scenes with the WASM engine hosting the tower (see
- * screenshot-engine.ts; the drift check's engine leg, never committed).
+ * two independent legs into separate roots concurrently); VC_SHOT_ENGINE picks
+ * the engine that hosts the tower: the Rust engine (WASM) by default, the
+ * committed gallery's engine, or "ts" for the TypeScript parity leg, which is
+ * never committed (see screenshot-engine.ts). The Rust render needs the engine
+ * package in src/public/engine/ (npm run wasm:build).
  *
  * TypeScript runs natively on Node ≥ 22.18 (type-stripping): no build step, no
  * extra dep. Keep every module here ERASABLE (type annotations / interfaces /
@@ -406,7 +408,7 @@ async function main(): Promise<void> {
     console.warn(`ONLY entries matched no scene and are ignored: ${unmatched.join(", ")}`);
   }
   const scenes = SCENES.filter((sc) => selected.includes(sc.id));
-  console.log(`engine: ${SHOT_ENGINE === "wasm" ? "WASM (hosted)" : "TypeScript"}`);
+  console.log(`engine: ${SHOT_ENGINE === "wasm" ? "Rust (WASM, hosted)" : "TypeScript (parity leg, not for commit)"}`);
 
   let server: ChildProcess | null = null;
   if (process.env.RUN_SERVER) {

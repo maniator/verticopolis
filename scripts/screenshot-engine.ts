@@ -1,14 +1,17 @@
 /**
- * The engine the gallery renders on (story-engine-test-parity AC3), and the
- * settle points that make the two engines render the same scenes (#899).
+ * The engine the gallery renders on (story-engine-test-parity AC3, #1353), and
+ * the settle points that make the two engines render the same scenes (#899).
  *
- * `VC_SHOT_ENGINE=wasm` renders every game scene with the WASM engine hosting
- * the tower, the way the `chromium-wasm` Playwright project does: the stored
+ * The committed gallery is the Rust engine's. By default (`VC_SHOT_ENGINE`
+ * unset, or `wasm`) every game scene renders with the WASM engine hosting the
+ * tower, the way the `chromium-wasm` Playwright project does: the stored
  * engine choice (`vc.engine`, src/wasmhost/engineChoice.ts) is seeded before
- * any page script runs. Unset (or `ts`) is the TypeScript engine. The
- * pr-drift-check engine leg renders this way and compares the result with the
- * TypeScript render of the same head; a pixel difference between the engines
- * is a parity finding.
+ * any page script runs. `VC_SHOT_ENGINE=ts` renders the same scenes on the
+ * TypeScript engine, which stays selectable until it is retired: the
+ * pr-drift-check parity leg renders this way and compares the result with the
+ * Rust render of the same head; a pixel difference between the engines is a
+ * parity finding. The TypeScript leg also seeds its choice, so it stays the
+ * TypeScript engine after the default flips.
  *
  * Under the host the TypeScript `Simulation` is a read model, and only relayed
  * commands and loads reach the engine. Scene builders build in place (a fresh
@@ -38,13 +41,13 @@ import { type Page } from "playwright";
 
 export type ShotEngine = "ts" | "wasm";
 
-/** Read the engine switch; a typo fails the run instead of silently rendering
- *  the TypeScript engine under a WASM label. */
+/** Read the engine switch; unset is the Rust engine. A typo fails the run
+ *  instead of silently rendering one engine under the other's label. */
 export function resolveShotEngine(raw: string | undefined): ShotEngine {
   const v = (raw ?? "").trim();
-  if (v === "" || v === "ts") return "ts";
-  if (v === "wasm") return "wasm";
-  throw new Error(`VC_SHOT_ENGINE="${raw}" is not an engine; use "ts" (the default) or "wasm".`);
+  if (v === "" || v === "wasm") return "wasm";
+  if (v === "ts") return "ts";
+  throw new Error(`VC_SHOT_ENGINE="${raw}" is not an engine; use "wasm" (the default) or "ts".`);
 }
 
 export const SHOT_ENGINE: ShotEngine = resolveShotEngine(process.env.VC_SHOT_ENGINE);
@@ -90,21 +93,19 @@ export function shotShape(v: any): any {
   };
 }
 
-/** Before navigation: seed the stored engine choice on the WASM leg, and
+/** Before navigation: seed the stored engine choice on both legs, and
  *  install the shared shape and the settle that builders call before they
  *  tick, on both legs. Playwright does not promise an order between init
  *  scripts, so a scene init script that cleared storage could drop the engine
  *  seed; the WASM leg's hosted checks would then fail the scene by name. */
 export async function seedEngineChoice(page: Page): Promise<void> {
-  if (SHOT_ENGINE === "wasm") {
-    await page.addInitScript(() => {
-      try {
-        localStorage.setItem("vc.engine", "wasm");
-      } catch {
-        /* storage blocked: the hosted check after boot fails the scene */
-      }
-    });
-  }
+  await page.addInitScript((engine) => {
+    try {
+      localStorage.setItem("vc.engine", engine);
+    } catch {
+      /* storage blocked: the WASM leg's hosted check after boot fails the scene */
+    }
+  }, SHOT_ENGINE);
   await page.addInitScript(`window.__vcShotShape = ${shotShape.toString()};`);
   await page.addInitScript(`window.__vcShotHandoff = () => (${pgSettle.toString()})(${JSON.stringify(SHOT_ENGINE)});`);
 }

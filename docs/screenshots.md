@@ -36,6 +36,11 @@ produce it, both in the image pinned to the **exact Playwright version locked in
   deployments -> approve `screenshot-approval`), which commits the regenerated
   pixels straight to the PR branch. It calls the reusable capture in
   [`screenshot-capture.yml`](../.github/workflows/screenshot-capture.yml).
+  The committed gallery is the **Rust engine's**: the capture hosts every game
+  scene on the WASM engine. While the TypeScript engine stays selectable, a
+  second capture renders the same scenes on it and `engine-parity` compares the
+  two byte for byte; a difference is a parity finding to report, and that leg
+  never commits.
 - [`update-visual-baselines.yml`](../.github/workflows/update-visual-baselines.yml)
   mints the `e2e/visual.spec.ts-snapshots` baselines the visual-regression gate
   compares against. A **marker push** triggers it: put `[update-baselines]` in the
@@ -88,6 +93,10 @@ your work, **not** to produce the images you commit. Env knobs:
 - `ONLY=milestones,tablet`: re-shoot just those scene ids (fast iteration).
 - `RUN_SERVER=1`: spawn a `vite preview` for the capture (what the script uses).
 - `BASE_URL` / `PORT` / `PW_CHROME`: point at an existing server / browser.
+- `VC_SHOT_ENGINE`: the engine that hosts the tower. Unset (or `wasm`) is the
+  Rust engine, whose package must be in `src/public/engine/` (`npm run
+  wasm:build`); `ts` renders on the TypeScript engine, the parity leg that
+  `pr-drift-check` compares with the Rust render.
 
 ### How a scene is built
 
