@@ -77,3 +77,29 @@ describe("the drift check's engines", () => {
     expect(job(drift, "engine-parity-visual")).toMatch(/needs: \[changes, capture\]/);
   });
 });
+
+describe("the visual baselines' engines", () => {
+  const config = read("playwright.config.ts");
+  const mint = read(".github/workflows/update-visual-baselines.yml");
+  const drift = read(".github/workflows/pr-drift-check.yml");
+
+  it("are minted and compared on chromium-wasm, with the TypeScript project only a parity leg", () => {
+    // The default run (npm run e2e) carries visual.spec.ts on chromium-wasm only.
+    expect(config).toMatch(/name: "chromium", testIgnore: TS_VISUAL \? \[\/wasmOnly\\\.spec\\\.ts\/\] : \[\/visual\\\.spec\\\.ts\/, \/wasmOnly\\\.spec\\\.ts\/\]/);
+    expect(config).toMatch(/name: "chromium-wasm",\n\s+testIgnore: TS_VISUAL \? \[\/visual\\\.spec\\\.ts\/, \/wasmOnly\\\.spec\\\.ts\/\] : \[\/wasmOnly\\\.spec\\\.ts\/\]/);
+    // Both projects name the baseline files the same way.
+    expect(config).toMatch(/snapshotPathTemplate: ".*\{arg\}-chromium\{-snapshotSuffix\}\{ext\}"/);
+    // The parity leg never writes a baseline.
+    expect(config).toContain("PW_TS_VISUAL=1 compares against the committed baselines; it never updates them.");
+    expect(config).toMatch(/ignoreSnapshots: !process\.env\.CI && !process\.env\.PW_VISUAL && !TS_VISUAL/);
+  });
+
+  it("are minted from chromium-wasm and compared on chromium by the parity legs", () => {
+    expect(mint).toContain("e2e/visual.spec.ts --project=chromium-wasm --update-snapshots");
+    for (const [name, text] of [["update-visual-baselines", mint], ["pr-drift-check", drift]] as const) {
+      expect(text, `${name} compares the TypeScript engine`).toContain("npx playwright test e2e/visual.spec.ts --project=chromium\n");
+      expect(text, `${name} compares without minting`).toContain('PW_TS_VISUAL: "1"');
+      expect(text, name).not.toContain("PW_WASM_VISUAL");
+    }
+  });
+});

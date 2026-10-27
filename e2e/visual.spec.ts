@@ -25,10 +25,11 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * gallery is no longer shot here: the drift-gate already pins gallery.html as
  * docs/screenshots/06-sprite-gallery.png, so a second baseline was redundant.)
  *
- * Two engines, one set of baselines: the baselines are minted on the
- * TypeScript engine (`chromium`), and the engine leg of
- * update-visual-baselines.yml runs these same tests on `chromium-wasm` with
- * `PW_WASM_VISUAL=1`, comparing against the same files. A pixel difference
+ * Two engines, one set of baselines: the baselines are the Rust engine's,
+ * minted on `chromium-wasm` (#1353), and while the TypeScript engine stays
+ * selectable the parity leg of pr-drift-check.yml and
+ * update-visual-baselines.yml runs these same tests on `chromium` with
+ * `PW_TS_VISUAL=1`, comparing against the same files. A pixel difference
  * there is an engine parity finding to report; that leg never mints.
  */
 

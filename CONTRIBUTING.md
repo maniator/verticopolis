@@ -267,7 +267,7 @@ docker run --rm --ipc=host \
     export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
     npm ci
     VC_TOOLING=1 npm run build
-    npx playwright test e2e/visual.spec.ts --update-snapshots
+    npx playwright test e2e/visual.spec.ts --project=chromium-wasm --update-snapshots
     chown -R "$HOST_UID:$HOST_GID" e2e/visual.spec.ts-snapshots 2>/dev/null || true
   '
 git status --short -- e2e/visual.spec.ts-snapshots
@@ -281,20 +281,18 @@ A plain host `npm run screenshots` is still preview-only because host Chromium
 and font rasterization may differ from the pinned image. See
 [`docs/screenshots.md`](./docs/screenshots.md) for the workflow details.
 
-Both checks run on two engines. The committed gallery is the Rust engine's: the
-generator hosts the tower on the WASM engine unless `VC_SHOT_ENGINE=ts` says
-otherwise, so `drift-gate` and `commit-on-approval` work from the Rust render.
-While the TypeScript engine stays selectable, a parity leg renders the same
-scenes with `VC_SHOT_ENGINE=ts`: `pr-drift-check` compares it with the same
-run's Rust render (`engine-parity`), and any pixel difference fails that check
-as an engine parity finding to report. It never commits.
-
-The visual baselines are still the TypeScript engine's: the engine leg renders
-the visual specs with the WASM engine
-(`PW_WASM_VISUAL=1 npx playwright test e2e/visual.spec.ts --project=chromium-wasm`)
-and compares them with the committed baselines (`engine-parity-visual`), and
-`update-visual-baselines` repeats that comparison after a mint; that leg never
-mints.
+Both checks run on two engines, and the Rust engine owns the committed pixels.
+The gallery generator hosts the tower on the WASM engine unless
+`VC_SHOT_ENGINE=ts` says otherwise, so `drift-gate` and `commit-on-approval`
+work from the Rust render. The visual baselines are minted and compared on the
+`chromium-wasm` project (`npm run e2e` compares them on every PR). While the
+TypeScript engine stays selectable, parity legs run the same checks on it:
+`pr-drift-check` compares a `VC_SHOT_ENGINE=ts` gallery with the same run's Rust
+render (`engine-parity`), and runs the visual specs on the `chromium` project
+with `PW_TS_VISUAL=1 npx playwright test e2e/visual.spec.ts --project=chromium`
+against the committed baselines (`engine-parity-visual`); `update-visual-baselines`
+repeats that comparison after a mint. Any pixel difference fails the parity leg
+red, as an engine parity finding to report. The legs never commit or mint.
 
 ### Coverage floors
 

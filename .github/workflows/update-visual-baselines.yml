@@ -15,11 +15,13 @@ name: Update visual baselines
 # baseline commit itself gets no CI run, push (or rebase) once more after
 # pulling it to get a green check on the final head.
 #
-# After the mint, the `engine-parity` job runs the same visual tests with the
-# WASM engine hosting the tower (the chromium-wasm project with
-# PW_WASM_VISUAL=1) against the baselines the mint left on the branch tip, and
-# fails on any pixel difference, naming each differing shot. It never mints or
-# commits: the baselines stay the TypeScript engine's until the 3.0.0 flip.
+# The baselines are the Rust engine's (#1353): the mint runs visual.spec.ts on
+# the chromium-wasm project, the way the e2e job compares it. After the mint,
+# the `engine-parity` job runs the same visual tests on the TypeScript engine
+# (the chromium project with PW_TS_VISUAL=1) against the baselines the mint
+# left on the branch tip, for as long as the TypeScript engine stays
+# selectable, and fails on any pixel difference, naming each differing shot.
+# It never mints or commits.
 
 on:
   push:
@@ -145,8 +147,10 @@ jobs:
         env:
           VC_TOOLING: "1"
 
+      # The Rust engine's render: visual.spec.ts only runs on chromium-wasm
+      # here (the project also names the files the TypeScript leg compares).
       - name: Regenerate baselines
-        run: npx playwright test e2e/visual.spec.ts --update-snapshots
+        run: npx playwright test e2e/visual.spec.ts --project=chromium-wasm --update-snapshots
 
       - name: Commit refreshed baselines
         id: commit
@@ -196,8 +200,8 @@ jobs:
           echo "could not push refreshed baselines after retries" >&2
           exit 1
 
-  # The engine leg. A separate job rather than a matrix entry on `update` so it
-  # holds a read-only token: it only compares, never pushes.
+  # The TypeScript parity leg. A separate job rather than a matrix entry on
+  # `update` so it holds a read-only token: it only compares, never pushes.
   engine-parity:
     needs: [resolve-image, engine-wasm, update]
     # Compare even when the mint failed (against the tip as it stands), so the
@@ -233,12 +237,13 @@ jobs:
         env:
           VC_TOOLING: "1"
 
-      # PW_WASM_VISUAL makes playwright.config.ts compare pixels (on CI or off)
-      # and turns snapshot writing off.
-      - name: Compare the WASM engine's render with the committed baselines
-        run: npx playwright test e2e/visual.spec.ts --project=chromium-wasm
+      # PW_TS_VISUAL makes playwright.config.ts run the visual specs on the
+      # TypeScript project, compare pixels (on CI or off) and turn snapshot
+      # writing off.
+      - name: Compare the TypeScript engine's render with the committed baselines
+        run: npx playwright test e2e/visual.spec.ts --project=chromium
         env:
-          PW_WASM_VISUAL: "1"
+          PW_TS_VISUAL: "1"
 
       - name: Name the first differing shot
         if: failure()
@@ -255,18 +260,18 @@ jobs:
           diff="$(find test-results -name '*-diff.png' 2>/dev/null | sort | head -1)"
           actual="$(find test-results -name '*-actual.png' 2>/dev/null | sort | head -1)"
           if [ -n "$diff" ]; then
-            echo "::error::engine parity: the first shot that differs on the WASM engine is $(basename "$diff" -diff.png) ($(basename "$(dirname "$diff")")); compared with the baselines this run just minted; report it as a parity finding"
+            echo "::error::engine parity: the first shot that differs on the TypeScript engine is $(basename "$diff" -diff.png) ($(basename "$(dirname "$diff")")); compared with the baselines this run just minted; report it as a parity finding"
           elif [ -n "$actual" ]; then
-            echo "::error::no baseline for $(basename "$actual" -actual.png) even after this run's mint; the TypeScript project skipped the spec or its snapshot path differs"
+            echo "::error::no baseline for $(basename "$actual" -actual.png) even after this run's mint; the Rust project skipped the spec or its snapshot path differs"
           else
-            echo "::error::a visual spec failed on the WASM engine without a pixel diff (setup, hosting, or a timeout): $(ls test-results 2>/dev/null | head -1)"
+            echo "::error::a visual spec failed on the TypeScript engine without a pixel diff (setup, hosting, or a timeout): $(ls test-results 2>/dev/null | head -1)"
           fi
           exit 0
 
-      - name: Upload the engine's visual diffs
+      - name: Upload the TypeScript engine's visual diffs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-visual-engine-diffs
+          name: playwright-visual-ts-diffs
           path: test-results/
           if-no-files-found: ignore

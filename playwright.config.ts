@@ -1,15 +1,17 @@
 import { defineConfig, devices } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
-// The engine legs of the visual gate (pr-drift-check.yml and
-// update-visual-baselines.yml) set PW_WASM_VISUAL=1 to run visual.spec.ts on
-// the WASM engine against the TypeScript engine's baselines. They compare
-// pixels even off CI (a host browser renders differently, so a local run is
-// expected to differ) and never mint: the committed baselines come from the
-// TypeScript engine until the 3.0.0 flip.
-const WASM_VISUAL = process.env.PW_WASM_VISUAL === "1";
-if (WASM_VISUAL && process.argv.some((a) => a === "-u" || (a.startsWith("--update-snapshots") && a !== "--update-snapshots=none"))) {
-  throw new Error("PW_WASM_VISUAL=1 compares against the committed baselines; it never updates them.");
+// The visual baselines (e2e/visual.spec.ts-snapshots) are the Rust engine's
+// (#1353): visual.spec.ts runs on the `chromium-wasm` project, in `npm run e2e`
+// and in the update-visual-baselines mint. While the TypeScript engine stays
+// selectable, the parity legs (pr-drift-check.yml and
+// update-visual-baselines.yml) set PW_TS_VISUAL=1 to run visual.spec.ts on the
+// TypeScript engine (the `chromium` project) against the same baselines. They
+// compare pixels even off CI (a host browser renders differently, so a local
+// run is expected to differ) and never mint.
+const TS_VISUAL = process.env.PW_TS_VISUAL === "1";
+if (TS_VISUAL && process.argv.some((a) => a === "-u" || (a.startsWith("--update-snapshots") && a !== "--update-snapshots=none"))) {
+  throw new Error("PW_TS_VISUAL=1 compares against the committed baselines; it never updates them.");
 }
 
 // Playwright drives the BUILT app (via `vite preview`) for the Tier-2 end-to-end
@@ -21,7 +23,7 @@ if (WASM_VISUAL && process.argv.some((a) => a === "-u" || (a.startsWith("--updat
 // replaces the other two projects, whose builds it does not serve.
 const WASM_ONLY = process.env.PW_WASM_ONLY === "1";
 if (process.env.PW_WASM_ONLY && !WASM_ONLY) throw new Error(`PW_WASM_ONLY must be "1" or unset; got "${process.env.PW_WASM_ONLY}".`);
-if (WASM_ONLY && WASM_VISUAL) throw new Error("PW_WASM_ONLY=1 and PW_WASM_VISUAL=1 are separate lanes; set one.");
+if (WASM_ONLY && TS_VISUAL) throw new Error("PW_WASM_ONLY=1 and PW_TS_VISUAL=1 are separate lanes; set one.");
 // The lane must match the build it serves: the projects of one lane fail in
 // confusing ways against the other's build. The build records its mode.
 const builtMode = (() => {
@@ -64,10 +66,11 @@ export default defineConfig({
   // browser is never the arbiter. Locally the visual tests still RUN (the
   // clicks and locators smoke the dialogs) but skip the pixel comparison;
   // set PW_VISUAL=1 to compare anyway (e.g. to eyeball a diff in progress).
-  ignoreSnapshots: !process.env.CI && !process.env.PW_VISUAL && !WASM_VISUAL,
-  // The engine leg never writes a baseline, a missing one included (the
-  // default "missing" would mint the engine's render under the chromium name).
-  ...(WASM_VISUAL ? { updateSnapshots: "none" as const } : {}),
+  ignoreSnapshots: !process.env.CI && !process.env.PW_VISUAL && !TS_VISUAL,
+  // The TypeScript parity leg never writes a baseline, a missing one included
+  // (the default "missing" would mint the TypeScript render under the
+  // chromium name).
+  ...(TS_VISUAL ? { updateSnapshots: "none" as const } : {}),
   use: {
     baseURL: "http://127.0.0.1:4173",
     trace: "on-first-retry",
@@ -80,16 +83,21 @@ export default defineConfig({
   projects: WASM_ONLY
     ? [{ name: "chromium-wasm-only", testIgnore: /visual\.spec\.ts/, use: { ...devices["Desktop Chrome"] } }]
     : [
-    { name: "chromium", testIgnore: /wasmOnly\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
+    // The TypeScript engine. The visual baselines are the Rust engine's, so
+    // visual.spec.ts runs here only in the parity leg (PW_TS_VISUAL=1), against
+    // the baseline files `chromium-wasm` mints.
+    { name: "chromium", testIgnore: TS_VISUAL ? [/wasmOnly\.spec\.ts/] : [/visual\.spec\.ts/, /wasmOnly\.spec\.ts/], use: { ...devices["Desktop Chrome"] } },
     // The same specs on the WASM engine: the stored engine choice (`vc.engine`,
     // see src/wasmhost/engineChoice.ts) is seeded into localStorage so every
-    // page the suite opens boots on the Rust engine. Visual baselines are the
-    // TypeScript engine's, so visual.spec.ts runs here only in the engine leg
-    // (PW_WASM_VISUAL=1), and it reads the `chromium` baseline files.
+    // page the suite opens boots on the Rust engine. This project owns the
+    // visual baselines: it mints and compares them, and keeps the files'
+    // historical `-chromium` names so the TypeScript parity leg (the
+    // `chromium` project, which names its baselines that way by default)
+    // reads the same images.
     {
       name: "chromium-wasm",
-      testIgnore: WASM_VISUAL ? [/wasmOnly\.spec\.ts/] : [/visual\.spec\.ts/, /wasmOnly\.spec\.ts/],
-      ...(WASM_VISUAL ? { snapshotPathTemplate: "{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}-chromium{-snapshotSuffix}{ext}" } : {}),
+      testIgnore: TS_VISUAL ? [/visual\.spec\.ts/, /wasmOnly\.spec\.ts/] : [/wasmOnly\.spec\.ts/],
+      snapshotPathTemplate: "{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}-chromium{-snapshotSuffix}{ext}",
       use: {
         ...devices["Desktop Chrome"],
         storageState: {

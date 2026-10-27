@@ -46,7 +46,10 @@ produce it, both in the image pinned to the **exact Playwright version locked in
 - [`update-visual-baselines.yml`](../.github/workflows/update-visual-baselines.yml)
   mints the `e2e/visual.spec.ts-snapshots` baselines the visual-regression gate
   compares against. A **marker push** triggers it: put `[update-baselines]` in the
-  head commit message and push.
+  head commit message and push. The baselines are the **Rust engine's**: the
+  mint runs `visual.spec.ts` on the `chromium-wasm` project, and the same specs
+  run on the TypeScript engine (`PW_TS_VISUAL=1`, the `chromium` project) as a
+  parity leg that compares and never mints.
 
 The bot commits the refreshed images on the same branch; review that commit's
 image diff like code.

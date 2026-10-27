@@ -23,7 +23,8 @@ name: PR screenshot drift-check
 #      engine stays selectable, `capture-ts` renders the same scenes with it,
 #      and `engine-parity` fails when that render differs from this run's Rust
 #      render, naming the first differing shot; `engine-parity-visual` runs the
-#      visual specs on the engine against the committed baselines. Both are
+#      visual specs on the TypeScript engine against the committed (Rust)
+#      baselines. Both are
 #      separate checks from `drift-gate` (which stays on the Rust engine's
 #      gallery) and never commit anything.
 #
@@ -134,9 +135,10 @@ jobs:
             case "$f" in engine-rs/*.md|conformance/events/*.md) sign=- ;; esac
             case "$f" in scripts/wasm-build.ts|scripts/build-engine-wasm.sh|.github/actions/engine-wasm/*|.github/actions/engine-wasm-download/*) sign=+ ;; esac
             # The visual specs and their harness: engine-parity-visual is the only
-            # job that runs visual.spec.ts on chromium-wasm (PW_WASM_VISUAL=1), so a
-            # change to the spec, its helpers, its baselines or the Playwright
-            # config must reach it.
+            # job here that runs visual.spec.ts (on the TypeScript engine,
+            # PW_TS_VISUAL=1; the Rust run is the e2e job's), so a change to the
+            # spec, its helpers, its baselines or the Playwright config must
+            # reach it.
             case "$f" in e2e/visual.spec.ts|e2e/helpers.ts|playwright.config.ts) sign=+ ;; esac
             case "$f" in e2e/visual.spec.ts-snapshots/*) sign=+ ;; esac
             # The pinned Playwright/browser + font versions come from the lockfile, and
@@ -288,11 +290,13 @@ jobs:
           echo "$changed"
           exit 1
 
-  # The visual baselines on the engine, on every render-affecting PR: the
-  # visual specs run on chromium-wasm (PW_WASM_VISUAL=1) in the pinned image
-  # against the committed baselines, and any pixel difference fails this job.
-  # It never mints. The image tag comes from the Rust capture's resolve step;
-  # without one the job fails to start rather than skipping.
+  # The TypeScript parity leg of the visual baselines, on every render-affecting
+  # PR: the baselines are the Rust engine's (the e2e job compares them on
+  # chromium-wasm), so the visual specs run here on the TypeScript engine
+  # (chromium, PW_TS_VISUAL=1) in the pinned image against the same committed
+  # baselines, and any pixel difference fails this job. It never mints. The image tag comes from the Rust
+  # capture's resolve step; without one the job fails to start rather than
+  # skipping.
   engine-parity-visual:
     needs: [changes, capture]
     if: ${{ !cancelled() && needs.changes.outputs.render == 'true' }}
@@ -328,12 +332,13 @@ jobs:
         env:
           VC_TOOLING: "1"
 
-      # PW_WASM_VISUAL makes playwright.config.ts compare pixels (on CI or off)
-      # and turns snapshot writing off.
-      - name: Compare the WASM engine's render with the committed baselines
-        run: npx playwright test e2e/visual.spec.ts --project=chromium-wasm
+      # PW_TS_VISUAL makes playwright.config.ts run the visual specs on the
+      # TypeScript project, compare pixels (on CI or off) and turn snapshot
+      # writing off.
+      - name: Compare the TypeScript engine's render with the committed baselines
+        run: npx playwright test e2e/visual.spec.ts --project=chromium
         env:
-          PW_WASM_VISUAL: "1"
+          PW_TS_VISUAL: "1"
 
       - name: Name the first differing shot
         if: failure()
@@ -344,19 +349,19 @@ jobs:
           diff="$(find test-results -name '*-diff.png' 2>/dev/null | sort | head -1)"
           actual="$(find test-results -name '*-actual.png' 2>/dev/null | sort | head -1)"
           if [ -n "$diff" ]; then
-            echo "::error::engine parity: the first shot that differs on the WASM engine is $(basename "$diff" -diff.png) ($(basename "$(dirname "$diff")")); if this PR changes rendering, mint the baselines first, then re-run"
+            echo "::error::engine parity: the first shot that differs on the TypeScript engine is $(basename "$diff" -diff.png) ($(basename "$(dirname "$diff")")); if this PR changes rendering, mint the Rust baselines first, then re-run"
           elif [ -n "$actual" ]; then
-            echo "::error::no committed baseline for $(basename "$actual" -actual.png); the TypeScript baselines must be minted first"
+            echo "::error::no committed baseline for $(basename "$actual" -actual.png); the Rust baselines must be minted first"
           else
-            echo "::error::a visual spec failed on the WASM engine without a pixel diff (setup, hosting, or a timeout): $(ls test-results 2>/dev/null | head -1)"
+            echo "::error::a visual spec failed on the TypeScript engine without a pixel diff (setup, hosting, or a timeout): $(ls test-results 2>/dev/null | head -1)"
           fi
           exit 0
 
-      - name: Upload the engine's visual diffs
+      - name: Upload the TypeScript engine's visual diffs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-visual-engine-diffs
+          name: playwright-visual-ts-diffs
           path: test-results/
           if-no-files-found: ignore
 
