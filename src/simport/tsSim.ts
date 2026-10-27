@@ -150,6 +150,15 @@ function readHeader(sim: Simulation): HeaderView {
     modernCalendar: sim.modernCalendar,
     revision: sim.tower.revision,
     mealOverlayRevision: sim.tower.mealOverlayRevision,
+    // Copied, so a header kept across a step still shows one moment's counters.
+    fx: {
+      santaSeq: sim.santaFxSeq,
+      vipSeq: sim.vipFxSeq,
+      explosion: { ...sim.explosionFx },
+      thief: { ...sim.thiefFx },
+      treasure: { ...sim.treasureFx },
+    },
+    camera: sim.view,
   };
 }
 
