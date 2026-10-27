@@ -3,7 +3,7 @@ import { Simulation } from "../engine/Simulation";
 import type { SerializedGame } from "../engine/types";
 import { towerStateSig } from "../engine/UndoHistory";
 import { MID, newSeededGame } from "../tests/fixtures/towerFixtures";
-import { onWasmParityProject, parityRestarts } from "../tests/parity/typescriptOnly";
+import { parityRestarts } from "../tests/parity/typescriptOnly";
 import { signatureOfSave } from "../wasmhost/hostFault";
 import { saveText, setSaveText, setStepGate } from "../wasmhost/stepGate";
 import { describeLifecycleContract } from "./lifecycleContract.fixture";
@@ -53,13 +53,13 @@ describe("TsSim's lifecycle over the live instance", () => {
 
   it("saves what the instance serializes, and hands over a host's own text for a copy kept in memory", () => {
     const { held, port } = adopting();
-    // In the unitWasm project the first tick hosts the tower, so this holds
-    // on both of today's hosts.
+    // In the unitWasm project the parity setup hosts the tower at its first
+    // tick, and wasmHostPoints.test.ts pins that an attach registers its
+    // text, so this holds on both of today's hosts.
     port.tick(1);
     expect(port.saveNow()).toBe(JSON.stringify(held.sim.serialize()));
     expect(JSON.parse(port.saveNow({ memory: true }))).toEqual(JSON.parse(port.saveNow()));
     const own = saveText(held.sim) ?? null;
-    expect(own !== null, "the host registered its text").toBe(onWasmParityProject());
     setSaveText(held.sim, () => "the host's text");
     try {
       expect(port.saveNow({ memory: true })).toBe("the host's text");

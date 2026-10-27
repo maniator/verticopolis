@@ -101,6 +101,7 @@ export function describeLifecycleContract(name: string, make: () => LifecycleSub
       // Not awaited: the synchronous members already see the load, as the
       // undo history's second undo in one task needs.
       const loading = port.load({ from: "history", text });
+      expect(port.generation, "moves before the load settles").not.toBe(generation);
       expect([port.undoSignature(), reference()], "read before the load settles").toEqual([signature, ref]);
       await loading;
       expect(port.generation).not.toBe(generation);
@@ -132,11 +133,15 @@ export function describeLifecycleContract(name: string, make: () => LifecycleSub
       const unloadable = null as unknown as SerializedGame;
       const alone = await port.load({ from: "legacy", save: unloadable }).then(() => null, (e: unknown) => e);
       expect(alone).toBeInstanceOf(Error);
-      // None loads: the error is the first save's, as a load of it alone gives.
+      // None loads: the error is the first save's, as a load of it alone
+      // gives. Which unloadable saves fail apart is the adapter's own; its
+      // own test shows these two do (TsSim's does), or this pins nothing.
       const other = undefined as unknown as SerializedGame;
       await expect(port.load({ from: "stored", saves: [unloadable, other] })).rejects.toEqual(alone);
       await expect(port.load({ from: "stored", saves: [] })).rejects.toBeInstanceOf(Error);
-      await expect(port.load({ from: "history", text: "not a save" })).rejects.toBeInstanceOf(Error);
+      const failing = port.load({ from: "history", text: "not a save" });
+      expect(port.generation, "a load that fails before its swap").toBe(generation);
+      await expect(failing).rejects.toBeInstanceOf(Error);
       expect(port.view.tower).toBe(tower);
       expect(port.generation).toBe(generation);
       port.tick(1);

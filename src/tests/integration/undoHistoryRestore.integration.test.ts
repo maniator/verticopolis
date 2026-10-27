@@ -118,7 +118,9 @@ describe("UndoHistory: restores that settle late or fail (slice 5)", () => {
     expect(world.v).toBe(1);
     await hist.undo();
     expect(world.v).toBe(0);
-    expect(notes).toEqual(["Redid: a", "Undid: a"]);
+    // The step that failed went, so nothing older is left.
+    await hist.undo();
+    expect(notes).toEqual(["Redid: a", "Undid: a", "Nothing to undo."]);
   });
 
   it("keeps the step when its snapshot throws, and rejects when its restore throws", async () => {
@@ -155,15 +157,15 @@ describe("UndoHistory: restores that settle late or fail (slice 5)", () => {
     expect(notes).toEqual(["Nothing to undo.", "Nothing to redo."]);
   });
 
-  it("settles a failed restore cleanly after a new step cleared the trail it pushed onto", async () => {
+  it("leaves the trail alone when a failed restore's way back is already gone", async () => {
     let world = { v: 0 };
     const notes: string[] = [];
-    let settle!: (ok: boolean) => void;
+    const settles: Array<(ok: boolean) => void> = [];
     const hist = new UndoHistory({
       snapshot: () => JSON.stringify(world),
       restore: (s) => {
         world = JSON.parse(s) as { v: number };
-        return new Promise<void>((resolve, reject) => (settle = (ok) => (ok ? resolve() : reject(new Error("no load")))));
+        return new Promise<void>((resolve, reject) => void settles.push((ok) => (ok ? resolve() : reject(new Error("no load")))));
       },
       signature: () => String(world.v),
       notify: (m) => notes.push(m),
@@ -173,19 +175,20 @@ describe("UndoHistory: restores that settle late or fail (slice 5)", () => {
     hist.commit();
     const undo = hist.undo();
     // A new gesture lands while the restore is out; its commit clears the
-    // redo trail the undo pushed onto.
+    // redo trail the undo pushed onto. A second undo goes out before the
+    // first fails, so its way back is the only step on that trail.
     hist.capture("c");
     world.v = 5;
     hist.commit();
-    settle(false);
-    await expect(undo).rejects.toThrow("no load");
     const next = hist.undo();
-    settle(true);
+    settles[0](false);
+    await expect(undo).rejects.toThrow("no load");
+    settles[1](true);
     await next;
     expect(world.v).toBe(0);
     await hist.undo();
     const again = hist.redo();
-    settle(true);
+    settles[2](true);
     await again;
     expect(world.v).toBe(5);
     expect(notes).toEqual(["Undid: c", "Nothing to undo.", "Redid: c"]);

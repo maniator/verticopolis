@@ -46,9 +46,10 @@ export interface SaveOptions {
  * - Commands, queries, loads and saves are asynchronous so a worker can host
  *   the engine. They run in the order they were issued, and a command's or a
  *   load's effect is on `view` once its promise settles.
- * - `tick`, `drainEvents`, `saveNow` and `undoSignature` are synchronous.
- *   They act after every command and load issued before them: an adapter
- *   that applies commands later applies the earlier ones first.
+ * - `tick`, `drainEvents`, `saveNow` and `undoSignature` are synchronous,
+ *   and so is reading `generation`. They act after every command and load
+ *   issued before them: an adapter that applies commands later applies the
+ *   earlier ones first.
  * - A save holds everything issued before it. On a host that steps in the
  *   background it is taken once the host has caught up, so it may also hold
  *   steps and commands issued after it.
@@ -65,9 +66,11 @@ export interface SaveOptions {
 export interface SimPort {
   /** The current state, read-only. Valid until the next tick or command. */
   readonly view: SimView;
-  /** Which tower the port holds. It moves on every load (undo and redo
-   *  included) and on any swap the adapter sees, and stays across commands
-   *  and ticks. */
+  /** Which tower the port holds. A load moves it before `load` returns
+   *  (undo and redo included), and so does any swap the adapter sees. A load
+   *  that fails before its swap leaves it, as commands and ticks do. The
+   *  undo history reads it around a restore to tell whether a failed one
+   *  swapped the tower. */
   readonly generation: number;
   /** Advance the game clock by `dtMinutes`, the frame loop's step. */
   tick(dtMinutes: number): void;
