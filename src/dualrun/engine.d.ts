@@ -270,6 +270,13 @@ export class Engine {
      */
     resolveChoice(accept: boolean): void;
     /**
+     * What moved in the save since the last sync: `{ units, rest }` as JSON
+     * text (the changed unit records, and every other top-level key).
+     * `undefined` when units were added, removed or reordered, or no full
+     * save was taken yet: the host then takes a full one.
+     */
+    saveDelta(): string | undefined;
+    /**
      * Replace the elevator telemetry with an `elevatorTelemetry` document.
      * Tooling only (the gallery's engine leg); no game command reaches it.
      */
@@ -287,6 +294,11 @@ export class Engine {
      * is refused with `false`, never coerced.
      */
     sellAt(floor: number, x: number): boolean;
+    /**
+     * `serialize()`, byte for byte, which also becomes the base the next
+     * `saveDelta` is taken against (#1045, `crate::save_delta`).
+     */
+    serializeForSync(): string;
     /**
      * `serialize()` as JSON text.
      */
@@ -375,13 +387,6 @@ export class Engine {
      * (#996), as `setCars`.
      */
     towerSetCars(id: number, cars: number): boolean;
-    /**
-     * The tower signature (`Simulation::tower_signature`) as a `bigint`: two
-     * reads are equal when the fields the tower half of `towerStateSig`
-     * reads are equal, and differ when they differ (but for a 64-bit
-     * collision). Undo reads it, beside money, at a gesture's capture and
-     * commit; it walks every unit, so it is too slow to read each frame.
-     */
     towerSignature(): bigint;
     /**
      * `stats()`: the HUD strip's counters, as JSON.
@@ -403,13 +408,6 @@ export class Engine {
      * The unit inspector and editor card for unit `id`, as JSON, or null.
      */
     unitDetail(id: number): string | undefined;
-    /**
-     * The labels and subtypes changed after the meta revision `since`, as
-     * JSON `{ revision, full, units: [[id, label, subtype], ...] }`
-     * (`view::meta_since`). Read raw: a `since` of 0, or of anything but a
-     * whole JS number from the log's reach up to the current revision
-     * (`undefined` from untyped JavaScript among them), gets a full listing.
-     */
     unitMetaSince(since: number): string;
     /**
      * `tower.validateTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`,
@@ -418,21 +416,7 @@ export class Engine {
      * is refused with `INVALID_REQUEST`, never coerced (#923).
      */
     validateTransport(kind: string, x: number, bottom: number, top: number): string;
-    /**
-     * The dynamic frame (`view::ViewReader::frame`): the header, the
-     * people, the rooms whose fields changed since the last call (every room
-     * when `full` is `true`, on the first call, or after a structural
-     * change, with the header's full flag set) and the cars. One reader per
-     * engine, so one caller: the header's frame number tells it when it
-     * missed a frame. Read raw: only a JS `true` asks for a full frame.
-     */
     viewFrame(full: boolean): Float64Array;
-    /**
-     * The structural snapshot (`view::structure_view`): the floor bounds,
-     * the mode and calendar, rooms by slot, floor and lobby tiles as runs,
-     * transports with their skipped floors. Read again when the frame
-     * header's tower revision moves.
-     */
     viewStructure(): Float64Array;
 }
 
@@ -483,11 +467,4 @@ export function exportTdt(save_json: string): Uint8Array;
  */
 export function importTdt(bytes: Uint8Array, filename: string): string;
 
-/**
- * The view's layout (facade slice 6a, #1213) as JSON: the version, every
- * slot and width of the dynamic frame and the structural snapshot by name,
- * and the kind, state, weather, mode and calendar codes
- * (`view::layout_json`). A host checks it on load and refuses a version or
- * width it does not know.
- */
 export function viewLayout(): string;

@@ -25,6 +25,9 @@ export class FakeEngine {
   pending: string | undefined = undefined;
   /** Throw from the next call of this name. */
   failOn: string | null = null;
+  /** Fields the engine's own serialization differs by from the save it
+   *  loaded, as when it repaired or migrated the save on load. */
+  readsAs: Record<string, unknown> | null = null;
   constructor(private readonly save: string) {
     const data = JSON.parse(save) as { minutes: number; money: number; star?: number };
     this.minutes = data.minutes;
@@ -47,6 +50,20 @@ export class FakeEngine {
     const data = JSON.parse(this.save) as Record<string, unknown>;
     return JSON.stringify({ ...data, minutes: this.minutes, money: this.money });
   }
+  serializeForSync(): string {
+    this.calls.push("serializeForSync");
+    return this.readsAs ? JSON.stringify({ ...(JSON.parse(this.serialize()) as Record<string, unknown>), ...this.readsAs }) : this.serialize();
+  }
+  /** The delta's shape with no unit records: the fake has no units of its
+   *  own to change. `noDelta` makes it answer nothing, as the engine does
+   *  when its units were added, removed or reordered. */
+  noDelta = false;
+  saveDelta(): string | undefined {
+    this.calls.push("saveDelta");
+    if (this.noDelta) return undefined;
+    const { units: _units, ...rest } = JSON.parse(this.serialize()) as Record<string, unknown>;
+    return JSON.stringify({ units: [], rest });
+  }
   tick(dt: number): void {
     this.check("tick");
     this.minutes += dt;
@@ -55,6 +72,12 @@ export class FakeEngine {
   setMoney(amount: number): void {
     this.check("setMoney");
     this.money = amount;
+  }
+  setView(_view: string | null): void {
+    this.check("setView");
+  }
+  setTowerName(_name: string): void {
+    this.check("setTowerName");
   }
   emit(text: string): void {
     this.check("emit");
@@ -92,12 +115,13 @@ export class FakeEngine {
   }
 }
 
-export function fakeModule(): WasmModule & { engines: FakeEngine[] } {
+export function fakeModule(opts: { readsAs?: Record<string, unknown> } = {}): WasmModule & { engines: FakeEngine[] } {
   const engines: FakeEngine[] = [];
   const Engine = {
     fromSave(save: string) {
       if (save === "refuse") throw new Error("bad save");
       const e = new FakeEngine(save);
+      if (opts.readsAs) e.readsAs = opts.readsAs;
       engines.push(e);
       // Commands the fake does not model are recorded and accepted.
       return new Proxy(e, {

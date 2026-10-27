@@ -9,6 +9,7 @@ use crate::canonical::{canonical_json, digest};
 use crate::facilities::Kind;
 pub use crate::frame::{frame_view, log_since, FRAME_HEADER, PERSON_FIXED, UNKNOWN_ROUTINE};
 use crate::load_stream::parse_mode;
+use crate::save_delta::SaveMirror;
 use crate::sim::Simulation;
 use crate::snapshot::state_view;
 
@@ -56,6 +57,8 @@ fn resize_json(r: crate::tower::ResizeResult) -> String {
 
 #[path = "wasm_relay.rs"]
 mod relay;
+#[path = "wasm_sync.rs"]
+mod sync;
 
 /// `canBuild`'s answer as the TypeScript spells it: `{ ok, reason?, cost }`.
 fn can_build_json(ok: bool, reason: Option<&str>, cost: f64) -> String {
@@ -274,10 +277,27 @@ pub fn engine_identity() -> String {
 #[wasm_bindgen]
 pub struct Engine {
     sim: Simulation,
+    mirror: SaveMirror,
 }
 
 #[wasm_bindgen]
 impl Engine {
+    /// `serialize()`, byte for byte, which also becomes the base the next
+    /// `saveDelta` is taken against (#1045, `crate::save_delta`).
+    #[wasm_bindgen(js_name = serializeForSync)]
+    pub fn serialize_for_sync(&mut self) -> String {
+        self.mirror.full(&self.sim)
+    }
+
+    /// What moved in the save since the last sync: `{ units, rest }` as JSON
+    /// text (the changed unit records, and every other top-level key).
+    /// `undefined` when units were added, removed or reordered, or no full
+    /// save was taken yet: the host then takes a full one.
+    #[wasm_bindgen(js_name = saveDelta)]
+    pub fn save_delta(&mut self) -> Option<String> {
+        self.mirror.delta(&mut self.sim)
+    }
+
     /// `Simulation.newGame(seed, mode, modernCalendar, startUnbridged)`; the
     /// calendar defaults to the real-world one and the tower starts bridged,
     /// as the TypeScript defaults do.
@@ -297,9 +317,12 @@ impl Engine {
                 ))
             })?,
         };
-        Ok(Engine {
-            sim: Simulation::new_game_with(seed, mode, calendar, start_unbridged.unwrap_or(false)),
-        })
+        Ok(Engine::of(Simulation::new_game_with(
+            seed,
+            mode,
+            calendar,
+            start_unbridged.unwrap_or(false),
+        )))
     }
 
     /// `Simulation.deserialize(JSON.parse(text))`: a serialized game, migrated
@@ -321,7 +344,7 @@ impl Engine {
         if let Some(m) = markers {
             apply_markers(&mut sim, &m).map_err(err)?;
         }
-        Ok(Engine { sim })
+        Ok(Engine::of(sim))
     }
 
     /// The import path for a `.vctower` file: decode, migrate and load, then
@@ -331,7 +354,7 @@ impl Engine {
     pub fn from_vctower(text: &str, mode: Option<String>) -> Result<Engine, JsError> {
         // Decoded, then read as `fromSave` reads a save, with the mode set.
         let sim = crate::load_stream::load_vctower_text(text, mode.as_deref()).map_err(err)?;
-        Ok(Engine { sim })
+        Ok(Engine::of(sim))
     }
 
     /// `serialize()` as JSON text.
@@ -1045,35 +1068,38 @@ impl Engine {
     }
 }
 
-/// The view's layout (facade slice 6a, #1213) as JSON: the version, every
-/// slot and width of the dynamic frame and the structural snapshot by name,
-/// and the kind, state, weather, mode and calendar codes
-/// (`view::layout_json`). A host checks it on load and refuses a version or
-/// width it does not know.
+// The view's layout (facade slice 6a, #1213) as JSON: the version, every
+// slot and width of the dynamic frame and the structural snapshot by name,
+// and the kind, state, weather, mode and calendar codes
+// (`view::layout_json`). A host checks it on load and refuses a version or
+// width it does not know.
 #[wasm_bindgen(js_name = viewLayout)]
 pub fn view_layout() -> String {
     crate::view::layout_json().to_string()
 }
 
 /// The renderer-facing view (facade slice 6a, #1213): one-line wrappers over
-/// `crate::view`, which documents each layout.
+/// `crate::view`, which documents each layout. Their notes, and
+/// `view_layout`'s above, are plain comments: wasm-bindgen copies doc
+/// comments into the generated `src/dualrun/engine.d.ts`, which the 500-line
+/// ceiling holds.
 #[wasm_bindgen]
 impl Engine {
-    /// The structural snapshot (`view::structure_view`): the floor bounds,
-    /// the mode and calendar, rooms by slot, floor and lobby tiles as runs,
-    /// transports with their skipped floors. Read again when the frame
-    /// header's tower revision moves.
+    // The structural snapshot (`view::structure_view`): the floor bounds,
+    // the mode and calendar, rooms by slot, floor and lobby tiles as runs,
+    // transports with their skipped floors. Read again when the frame
+    // header's tower revision moves.
     #[wasm_bindgen(js_name = viewStructure)]
     pub fn view_structure(&self) -> Vec<f64> {
         crate::view::structure_view(&self.sim)
     }
 
-    /// The dynamic frame (`view::ViewReader::frame`): the header, the
-    /// people, the rooms whose fields changed since the last call (every room
-    /// when `full` is `true`, on the first call, or after a structural
-    /// change, with the header's full flag set) and the cars. One reader per
-    /// engine, so one caller: the header's frame number tells it when it
-    /// missed a frame. Read raw: only a JS `true` asks for a full frame.
+    // The dynamic frame (`view::ViewReader::frame`): the header, the
+    // people, the rooms whose fields changed since the last call (every room
+    // when `full` is `true`, on the first call, or after a structural
+    // change, with the header's full flag set) and the cars. One reader per
+    // engine, so one caller: the header's frame number tells it when it
+    // missed a frame. Read raw: only a JS `true` asks for a full frame.
     #[wasm_bindgen(js_name = viewFrame)]
     pub fn view_frame(
         &self,
@@ -1082,11 +1108,11 @@ impl Engine {
         crate::view::view_frame(&self.sim, full.as_bool() == Some(true))
     }
 
-    /// The labels and subtypes changed after the meta revision `since`, as
-    /// JSON `{ revision, full, units: [[id, label, subtype], ...] }`
-    /// (`view::meta_since`). Read raw: a `since` of 0, or of anything but a
-    /// whole JS number from the log's reach up to the current revision
-    /// (`undefined` from untyped JavaScript among them), gets a full listing.
+    // The labels and subtypes changed after the meta revision `since`, as
+    // JSON `{ revision, full, units: [[id, label, subtype], ...] }`
+    // (`view::meta_since`). Read raw: a `since` of 0, or of anything but a
+    // whole JS number from the log's reach up to the current revision
+    // (`undefined` from untyped JavaScript among them), gets a full listing.
     #[wasm_bindgen(js_name = unitMetaSince)]
     pub fn unit_meta_since(
         &self,
@@ -1096,11 +1122,11 @@ impl Engine {
         crate::view::meta_since(&self.sim.tower, since).to_string()
     }
 
-    /// The tower signature (`Simulation::tower_signature`) as a `bigint`: two
-    /// reads are equal when the fields the tower half of `towerStateSig`
-    /// reads are equal, and differ when they differ (but for a 64-bit
-    /// collision). Undo reads it, beside money, at a gesture's capture and
-    /// commit; it walks every unit, so it is too slow to read each frame.
+    // The tower signature (`Simulation::tower_signature`) as a `bigint`: two
+    // reads are equal when the fields the tower half of `towerStateSig`
+    // reads are equal, and differ when they differ (but for a 64-bit
+    // collision). Undo reads it, beside money, at a gesture's capture and
+    // commit; it walks every unit, so it is too slow to read each frame.
     #[wasm_bindgen(js_name = towerSignature)]
     pub fn tower_signature(&self) -> u64 {
         self.sim.tower_signature()
@@ -1337,7 +1363,10 @@ mod tests {
         assert!(sim.build_transport(Kind::ElevatorStandard, 10, 1, 2).ok);
         let lift = sim.tower.transport_at(1, 10).unwrap().id;
         sim.money = 1_000_000.0;
-        let mut e = Engine { sim };
+        let mut e = Engine {
+            sim,
+            mirror: SaveMirror::default(),
+        };
         let before = e.serialize();
         e.sim.gameplay.drain();
         let refused = |text: String| -> Value {

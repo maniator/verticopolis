@@ -275,7 +275,8 @@ fn branches(value: &str) -> Option<Vec<&str>> {
 /// anywhere else would leave the room unmarked, and a frame reader would
 /// keep showing its old value. The loaders (`load.rs`, `tdt/`) are scanned
 /// like any other file, with one exemption: `load.rs` fills a new tower's
-/// list (`the_loader_fills_only_a_new_tower`).
+/// list (`the_loader_fills_only_a_new_tower`). `save_delta.rs` lends the
+/// list out and puts it straight back, which is no write (`lent`).
 #[test]
 fn only_the_setters_write_the_frame_fields() {
     let mut writers = Vec::new();
@@ -321,9 +322,10 @@ fn only_the_setters_write_the_frame_fields() {
     assert_eq!(writers.len(), 6, "{writers:?}");
 }
 
-/// `load.rs`'s one fill of a unit list, the scan's one exemption, is of the
-/// tower `assemble` (the rest of `deserialize` and of the streamed reader)
-/// has just made with `Simulation::new`, whose mark log is new.
+/// `load.rs`'s one fill of a unit list, one of the list half's two
+/// exemptions, is of the tower `assemble` (the rest of `deserialize` and of
+/// the streamed reader) has just made with `Simulation::new`, whose mark log
+/// is new. The other, a list lent out and put back, is pinned by its cases.
 #[test]
 fn the_loader_fills_only_a_new_tower() {
     let sources = engine_sources();
@@ -347,6 +349,41 @@ fn the_loader_fills_only_a_new_tower() {
     assert!(flagged("load.rs", "self.tower.units = units;"));
     assert!(flagged("load.rs", "sim.tower.units = rebuilt;"));
     assert!(flagged("x.rs", "sim.tower.units = units;"));
+    // A list lent out and put straight back (`save_delta.rs`), in any file:
+    // the take, what comes between, the return, and whether it is flagged.
+    const TAKE: &str = "let units = std::mem::take(&mut sim.tower.units);";
+    const BACK: &str = "sim.tower.units = units;";
+    for (take, between, back, writes) in [
+        (TAKE, "let rest = sim.serialize();", BACK, false),
+        (
+            "let units = mem::take(&mut sim.tower.units);",
+            "",
+            BACK,
+            false,
+        ),
+        (
+            "let mut units = mem::take(&mut sim.tower.units);",
+            "",
+            BACK,
+            true,
+        ),
+        (TAKE, "let units = sorted(units);", BACK, true),
+        (TAKE, "drop(units);", BACK, true),
+        (TAKE, "sim.tower.units.push(u);", BACK, true),
+        (TAKE, "} fn g() {", BACK, true),
+        (TAKE, "", "", true),
+        (TAKE, "", "old_sim.tower.units = units;", true),
+        (TAKE, "", "sim.tower.units = other;", true),
+        (
+            "let units = std::mem::take(&mut sims[i].tower.units);",
+            "i += 1;",
+            "sims[i].tower.units = units;",
+            true,
+        ),
+    ] {
+        let body = format!("fn f() {{ {take} {between} {back} }}");
+        assert_eq!(flagged("x.rs", &body), writes, "{body}");
+    }
 }
 
 /// No engine code writes a unit's kind in place (nor any other `kind`, so

@@ -195,17 +195,91 @@ fn place_before(code: &str, end: usize) -> &str {
     &code[start..end]
 }
 
-/// `writes` without the loader's one assignment of a new tower's unit list,
-/// `sim.tower.units = units;` in `load.rs`, where `sim` is the
-/// `Simulation::new` that `assemble` has just made, with its own mark log
-/// (`the_loader_fills_only_a_new_tower` pins that).
+/// `writes` without the two list writes no reader can miss: the loader's one
+/// assignment of a new tower's unit list, `sim.tower.units = units;` in
+/// `load.rs`, where `sim` is the `Simulation::new` that `assemble` has just
+/// made, with its own mark log (`the_loader_fills_only_a_new_tower` pins
+/// that); and a list lent out of a tower and put straight back (`lent`).
 pub(super) fn new_list_aside(rel: &str, code: &str, writes: Vec<usize>) -> Vec<usize> {
     let filled = |at: usize| {
         rel == "load.rs"
             && code[..at].ends_with("sim.tower.")
             && code[at..].starts_with("units=units;")
     };
-    writes.into_iter().filter(|&at| !filled(at)).collect()
+    let lent = lent(code);
+    writes
+        .into_iter()
+        .filter(|&at| !filled(at))
+        .filter(|&at| !lent.iter().any(|&(start, end)| start <= at && at < end))
+        .collect()
+}
+
+/// The statements that lend a tower's unit list out and put it back, as
+/// `save_delta.rs` does to serialize the rest of a save without the units:
+/// `let units = std::mem::take(&mut sim.tower.units);` and, later in the same
+/// function, `sim.tower.units = units;`. The binding is not `mut` and its
+/// name is not used in between, so the units that go back are the ones taken
+/// and the unit count is unchanged.
+fn lent(code: &str) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    for (take, call) in code.match_indices("mem::take(&mut ") {
+        let before = &code[..take];
+        let before = ["std::", "core::"]
+            .iter()
+            .find_map(|path| before.strip_suffix(path))
+            .unwrap_or(before);
+        let Some(head) = before.strip_suffix('=') else {
+            continue;
+        };
+        let name = &head[head.trim_end_matches(is_ident).len()..];
+        let Some(start) = head[..head.len() - name.len()]
+            .strip_suffix("let ")
+            .filter(|h| !name.is_empty() && !h.ends_with(is_ident))
+            .map(str::len)
+        else {
+            continue;
+        };
+        let at = take + call.len();
+        let Some(len) = code[at..].find(");") else {
+            continue;
+        };
+        let Some(tower) = code[at..at + len].strip_suffix("units") else {
+            continue;
+        };
+        let end = at + len + 2;
+        let restore = format!("{tower}units={name};");
+        let Some(back) = code[end..].find(&restore).map(|r| end + r) else {
+            continue;
+        };
+        let place = tower.ends_with('.') && tower.chars().all(|c| is_ident(c) || c == '.');
+        let exact = !code[..back].ends_with(|c: char| is_ident(c) || c == '.');
+        let used = code[end..back].split(|c| !is_ident(c)).any(|w| w == name);
+        let same_fn = enclosing_fn(code, take)
+            .zip(enclosing_fn(code, back))
+            .is_some_and(|(a, b)| std::ptr::eq(a, b));
+        if place && exact && !used && same_fn {
+            out.push((start, end));
+            out.push((back, back + restore.len()));
+        }
+    }
+    out
+}
+
+/// The body of the function `at` sits in, braces included.
+fn enclosing_fn(code: &str, at: usize) -> Option<&str> {
+    let mut end = at;
+    while let Some(f) = code[..end].rfind("fn ") {
+        end = f;
+        if code[..f].ends_with(is_ident) {
+            continue;
+        }
+        let open = f + code[f..].find('{')?;
+        let close = closing(code, open)?;
+        if open < at && at < close {
+            return Some(&code[open..=close]);
+        }
+    }
+    None
 }
 
 /// Whether a struct pattern's fields (the text inside its braces) bind one

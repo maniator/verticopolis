@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { buildScenarios } from "../perfCompare/scenarios";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
-import { fromSave, host } from "../wasmWorker/hostDriver";
+import { fromSave, host, script } from "../wasmWorker/hostDriver";
 import { stepGate } from "../../wasmhost/stepGate";
 import { advanceOwedMinutes, SPEEDS } from "../../game/frameLoop";
 import { ShadowEngine } from "../../dualrun/shadow";
 import { loadCommand } from "../../dualrun/mirror";
-import type { ToWorker } from "../../wasmhost/workerProtocol";
+import type { FromWorker, ToWorker } from "../../wasmhost/workerProtocol";
 
 /**
  * The synchronous saves on the worker host (#1018): the quick and slot
@@ -81,6 +81,54 @@ describe.skipIf(!hasWasmPackage())("synchronous saves on the worker host while s
       expect(acrossAnHour, "saves whose in-flight steps cross an hour").toBeGreaterThan(0);
     } finally {
       h.detach();
+    }
+  }, 300_000);
+});
+
+/**
+ * A save, an undo snapshot or a restore point taken right after an hourly
+ * delta (#1045). The read model's own save is the engine's at that sync (the
+ * delta oracle pins it), loads back to the same save, and a worker host
+ * started from it takes the next hours as deltas on top of the load.
+ */
+describe.skipIf(!hasWasmPackage())("a restore point taken after hourly deltas", () => {
+  it("is the engine's save, loads back unchanged, and restarts the deltas on a new worker host", async () => {
+    const sim = fromSave(SCENARIOS[1].save);
+    const h = await host("worker", sim);
+    const w = h.worker!;
+    const engine = (): ShadowEngine => (w.channel.core as unknown as { shadow: ShadowEngine }).shadow;
+    let seen = 0;
+    let snapshot: ReturnType<Simulation["serialize"]> | null = null;
+    try {
+      await script(h, 360, (_step, s) => {
+        const replies = w.channel.received.filter((m): m is Extract<FromWorker, { type: "frame" }> => m.type === "frame");
+        const fresh = replies.slice(seen);
+        seen = replies.length;
+        if (snapshot === null && w.host.stats.deltas >= 3 && fresh.some((r) => r.delta)) {
+          snapshot = JSON.parse(JSON.stringify(s.serialize())) as ReturnType<Simulation["serialize"]>;
+          expect(snapshot, "the restore point is the engine's save at this sync").toEqual(JSON.parse(engine().handle().serialize()));
+        }
+      });
+      expect(w.fatal).toEqual([]);
+      expect(w.host.stats.merges, "only deltas so far").toBe(0);
+    } finally {
+      h.detach();
+    }
+    expect(snapshot, "a delta arrived after the third").not.toBeNull();
+    // The restore: the same save back, as undo and a slot load do it.
+    const restored = Simulation.deserialize(snapshot!);
+    expect(JSON.parse(JSON.stringify(restored.serialize()))).toEqual(snapshot);
+    // A new worker host on the restored tower loads it and goes on in deltas.
+    const again = await host("worker", restored);
+    try {
+      await script(again, 120);
+      expect(again.worker!.fatal).toEqual([]);
+      expect(again.worker!.errors).toEqual([]);
+      expect(again.worker!.host.stats.deltasRefused).toBe(0);
+      expect(again.worker!.host.stats.deltas).toBeGreaterThanOrEqual(2);
+      expect(again.worker!.host.stats.merges).toBe(0);
+    } finally {
+      again.detach();
     }
   }, 300_000);
 });

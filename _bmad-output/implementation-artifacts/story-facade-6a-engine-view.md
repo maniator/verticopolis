@@ -11,7 +11,8 @@ depends_on: facade sign-off (F1 to F9, 2026-10-20 21:40 UTC)
 
 Status: review (written before the first commit, 2026-10-20; brought up to date
 with the implementation and review rounds 1 and 2, 2026-10-21, and with the
-write-site frame marks of round 3 and review rounds 3 to 5, 2026-10-27).
+write-site frame marks of round 3, review rounds 3 to 5 and the merge of
+#1068, 2026-10-27).
 
 ## Story
 
@@ -182,15 +183,19 @@ consumer and is out of scope here.
       `viewLayout`, `viewStructure`, `viewFrame`, `unitMetaSince`,
       `towerSignature`.
 - [x] `src/dualrun/engine.d.ts` (regenerated: lines added only, at the
-      places wasm-bindgen sorts them), `binding.ts`, `exportTiers.ts`.
+      places wasm-bindgen sorts them; the exports' notes are plain comments
+      in `wasm.rs`, so it gains signatures only), `binding.ts`,
+      `exportTiers.ts`.
 - [x] Compat record: `viewLayoutVersion` in `src/build/engineCompat.ts` and the
       Rust record test; the crate takes the next free minor in `Cargo.toml`
-      and both lock files, 0.9.0 since the second merge of main in round 3
-      (6d took 0.4.0, #1231 0.4.1, #1233 0.5.0, #1256 0.7.0 and 6b, #1321,
-      0.8.0, each merged first);
+      and both lock files, 0.10.0 since the merge of #1068 (6d took 0.4.0,
+      #1231 0.4.1, #1233 0.5.0, #1256 0.7.0, 6b and #1321 0.8.0, and #1068
+      0.9.0, each merged first);
       `npm run engine:compat`.
 - [x] `src/tests/integration/engineView.integration.test.ts` on the real WASM
-      package, listed in `npm run test:wasm`.
+      package, listed in `npm run test:wasm`. It starts its own engine, so
+      the `integrationWasm` project leaves it to the TypeScript side
+      (`vite.config.ts`), as it does the panel getter suites.
 - [x] Consumer crate: `read_view` in `engine-rs/consumer/src/lib.rs`, run by
       its smoke test; `engine-rs/tests/api.rs` names the view items.
 - [x] Docs: `engine-rs/API.md` row, CONTRIBUTING's version list.
@@ -772,6 +777,26 @@ allowance of 50,000, though the rewrite lowers the worst read on all three
 saves. With B6 (a revision move resends every room) it waits on the owner's
 acceptance of the deferral to #1285 items 4 and 2.
 
+### Merge of main with #1068 (2026-10-27)
+
+For the owner's PR stack, the branch took `main` with #1068's save delta.
+`save_delta.rs` lends the unit list out of the tower to serialize the rest of
+a save and puts it straight back (`let units = std::mem::take(&mut
+sim.tower.units);`, then `sim.tower.units = units;`), which three guards read
+as list writes. The list half sets that pair aside (`lent`): the binding is
+not `mut`, its name is not used in between, the place is a plain path and the
+same in both statements, and both sit in one function, so the units that go
+back are the ones taken and the count is unchanged. A case covers each
+condition. `src/dualrun/engine.d.ts` would have reached 505 lines, over the
+500-line ceiling, with slices 6c and 2 still to add theirs; the six exports'
+notes are plain comments in `wasm.rs` now, which wasm-bindgen does not copy,
+so the file gains the signatures and one blank line (470 lines). The crate
+takes 0.10.0. CI's `integrationWasm` job had run the engine view suite with
+its TypeScript `Simulation` on the engine's mirror, whose tower revision
+counts differently, so that project now leaves the suite to the TypeScript
+side. Review round 6's fixes wait until after the PC run, by the owner's
+order.
+
 ### Departures from the architecture
 
 - People go as interleaved 8-slot records, the shape `frameView` already
@@ -810,11 +835,12 @@ Changed:
   `view/marks.rs`), `lib.rs` (the module), `wasm.rs` (the binding block), `identity_tests.rs`,
   `compat-record.json`
 - `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock`,
-  `engine-rs/consumer/Cargo.lock` (0.9.0), `engine-rs/consumer/src/lib.rs`,
+  `engine-rs/consumer/Cargo.lock` (0.10.0), `engine-rs/consumer/src/lib.rs`,
   `engine-rs/tests/api.rs`, `engine-rs/API.md`
 - `src/dualrun/engine.d.ts`, `src/dualrun/binding.ts`,
   `src/dualrun/exportTiers.ts`, `src/build/engineCompat.ts`
-- `package.json` (`test:wasm` list), `CONTRIBUTING.md` (version list),
+- `package.json` (`test:wasm` list), `vite.config.ts` (the suite on the
+  TypeScript side of `integrationWasm`), `CONTRIBUTING.md` (version list),
   `.github/workflows/engine-rs.yml` (the integration test in the engine
   job's file lists)
 - `docs/performance/hot-path-review.md` (three HP-8 rows),
