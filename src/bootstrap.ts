@@ -17,8 +17,9 @@ import { showEngineLoading } from "./engineLoading";
 import { catalogVerdict } from "./wasmhost/foreignCatalog";
 import { bootFailure, bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState, type FallbackReason } from "./wasmhost/engineBoot";
 import type { BuildMetadataResult } from "./wasmhost/buildSection";
-import { liveDiagnostics } from "./wasmhost/engineDiagnosticsLive";
-import { copyText } from "./ui/copyText";
+import { copyEngineDiagnostics } from "./engineDiagnosticsCopy";
+import { pageControlled, repairOffered } from "./wasmhost/engineRepair";
+import { runEngineRepair } from "./engineRepairControl";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -115,33 +116,6 @@ export function showBootMessage(content: TemplateResult | string, withReload = f
 
 let inertWatch: MutationObserver | null = null;
 
-/** Copy the engine diagnostics from the stop screen, where Help cannot be
- *  opened (#963). The report is built from the page's own state, so it works
- *  when the engine never loaded. */
-function copyEngineDiagnostics(e: Event): void {
-  const status = (e.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(".engine-failure-copy-status");
-  const host = document.getElementById("boot-fallback-host") ?? document.body;
-  const { text } = liveDiagnostics();
-  void copyText(text, navigator, document, host).then((ok) => {
-    if (status) status.textContent = ok ? "Copied." : "Could not copy. Select the text below and copy it by hand.";
-    if (ok) return;
-    // Nothing reached the clipboard, so show the report where it can be selected.
-    let area = host.querySelector<HTMLTextAreaElement>(".engine-failure-copy-text");
-    if (!area) {
-      area = document.createElement("textarea");
-      area.className = "engine-failure-copy-text";
-      area.readOnly = true;
-      area.rows = 12;
-      area.setAttribute("aria-label", "Engine diagnostics");
-      area.style.cssText = "width:min(48em,100%);box-sizing:border-box;font:12px/1.4 ui-monospace,monospace;text-align:left";
-      status?.closest("p")?.insertAdjacentElement("afterend", area);
-    }
-    area.value = text;
-    area.focus();
-    area.select();
-  });
-}
-
 /** Stop the game with the wasm-only build's engine failure: what happened,
  *  why, and what to try. Covers the title screen and any running tower, like
  *  every other boot-fallback message. */
@@ -150,7 +124,8 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
   // An open modal dialog sits in the top layer above any z-index and makes
   // the rest of the page inert, the Reload button included, so close it.
   for (const dialog of Array.from(document.querySelectorAll("dialog[open]"))) (dialog as HTMLDialogElement).close();
-  const copy = engineFailureCopy(state.failure, online, typeof window === "undefined" || window.isSecureContext !== false);
+  const offerRepair = repairOffered(state.failure, pageControlled());
+  const copy = engineFailureCopy(state.failure, online, { secure: typeof window === "undefined" || window.isSecureContext !== false, repair: offerRepair });
   showBootMessage(
     html`<div id=${ENGINE_FAILURE_ID} data-stage=${state.failure.stage} role="alert" aria-live="assertive">
       <p><b>${copy.headline}</b></p>
@@ -159,6 +134,10 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
         ${copy.steps.map((step) => html`<li>${step}</li>`)}
       </ul>
       <p>
+        ${offerRepair
+          ? html`<button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="repair-engine" @click=${runEngineRepair}>Repair engine files</button>
+              <span class="engine-failure-repair-status" role="status" aria-live="polite" style="margin:0 .5em;opacity:.8"></span>`
+          : nothing}
         <button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="copy-diagnostics" @click=${copyEngineDiagnostics}>Copy diagnostics</button>
         <span class="engine-failure-copy-status" role="status" aria-live="polite" style="margin-left:.5em;opacity:.8"></span>
       </p>

@@ -28,7 +28,7 @@ import {
   drawTree,
   lampAlpha,
 } from "./towerSceneryDraw";
-import type { Simulation } from "../../engine/Simulation";
+import type { RenderSim } from "../renderSim";
 import type { TowerEngine } from "./TowerEngine";
 
 /**
@@ -60,7 +60,7 @@ import type { TowerEngine } from "./TowerEngine";
 
 interface SceneryRec {
   /** The sim these records were derived from (adoptSim swaps the instance). */
-  sim: Simulation | null;
+  sim: RenderSim | null;
   seed: number;
   /** Seed-derived actors, killed and rebuilt when the founding seed changes. */
   seeded: ex.Actor[];
