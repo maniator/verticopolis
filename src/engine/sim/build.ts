@@ -6,6 +6,7 @@ import { UNKNOWN_FACILITY, whole } from "../request";
 import { storeRent } from "./constants";
 
 import { FACILITIES, buildMinutes, facilityFloors, isElevatorKind, isFacilityKind } from "../facilities";
+import { setRoomState } from "../tower/rooms";
 import { groundFloorStructureKind } from "../tower/towerTopology";
 import type { FacilityKind, WeatherKind } from "../types";
 
@@ -160,7 +161,7 @@ export function build(sim: Simulation, kind: FacilityKind, floor: number, x: num
   if (dur > 0 && res.unitId !== undefined) {
     const u = sim.tower.getUnit(res.unitId);
     if (u) {
-      u.state = "construction";
+      setRoomState(sim.tower, u, "construction");
       u.completeAt = sim.clock.minutes + dur;
       sim.constructing.add(u.id);
     }

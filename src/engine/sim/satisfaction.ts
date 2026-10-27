@@ -11,7 +11,7 @@ import { isDormant, isOperational, VACATE_REASON_TEXT } from "../types";
 
 import { VACATE_NOTICE_MINUTES, VACATE_RESCIND, NOISE_CAP, OFFICE_NOISE_TILES, HOTEL_NOISE_TILES } from "./constants";
 import { buildSatisfactionContext, satisfactionStep } from "./satisfactionStep";
-import { roomUnits } from "../tower/rooms";
+import { roomUnits, setRoomState } from "../tower/rooms";
 
 /** Satisfaction, noise notices, and the amenity halos for the Simulation, as
  * friend functions taking the instance. Extracted from `Simulation.ts`; the
@@ -103,7 +103,7 @@ export function updateSatisfaction(sim: Simulation): void {
         // No toast: "silence when correct", and a per-tick good/bad pair on a
         // unit that flaps around the threshold would be pure noise. The
         // clearing inspector/ribbon is the (pull) cue that the fix worked.
-        u.state = "occupied";
+        setRoomState(sim.tower, u, "occupied");
         u.vacateReason = undefined;
         u.vacateAt = undefined;
         // Lift a rescinded noise-only tenant to the cap so a migrated save
@@ -116,7 +116,7 @@ export function updateSatisfaction(sim: Simulation): void {
       }
     } else if (leaseTenant && u.satisfaction <= 0) {
       // Give notice: enter the grace period with the attributed cause.
-      u.state = "vacating";
+      setRoomState(sim.tower, u, "vacating");
       u.vacateReason = sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar, unmetDemand, unmetCov);
       u.vacateAt = sim.clock.minutes + VACATE_NOTICE_MINUTES;
       notices.push({ floor: u.floor, kind: u.kind, reason: u.vacateReason });

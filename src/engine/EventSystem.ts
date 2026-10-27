@@ -3,6 +3,7 @@ import type { Unit } from "./types";
 import { isOperational, isPresent, isTenanted } from "./types";
 import { FACILITIES } from "./facilities";
 import { RNG } from "./rng";
+import { setRoomState } from "./tower/rooms";
 
 /**
  * SimTower's signature emergencies — fires (which spread unless contained) and
@@ -173,7 +174,7 @@ export class EventSystem {
    *  Single source of truth for the fire-destroys-rooms transition (canon:
    *  fires never silently restore a room to a fresh, re-leasable one). */
   private gut(u: Unit): void {
-    u.state = "gutted";
+    setRoomState(this.sim.tower, u, "gutted");
     u.occupants = 0;
     u.everOccupied = false;
     // A gutted shell houses no one: drop any Modern household so it stops counting
@@ -277,7 +278,7 @@ export class EventSystem {
     const candidates = this.flammableUnits();
     if (candidates.length === 0) return;
     const u = this.sim.rng.pick(candidates);
-    u.state = "fire";
+    setRoomState(this.sim.tower, u, "fire");
     u.occupants = 0;
     this.active.add(u.id);
     // A new fire outbreak. A blaze SPREADING to neighbors (spreadFireTo) is the
@@ -339,7 +340,7 @@ export class EventSystem {
       if (x.kind === target.kind && isOperational(x) && ++opsOfKind > 1) break;
     }
     if (opsOfKind <= 1) return; // last of its kind: spare it
-    target.state = "fire";
+    setRoomState(this.sim.tower, target, "fire");
     target.occupants = 0;
     this.active.add(target.id);
     this.sim.emit(`The fire spread to ${FACILITIES[target.kind].name} on ${this.sim.floorLabel(target.floor)}!`, "bad");
