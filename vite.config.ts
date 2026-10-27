@@ -247,6 +247,9 @@ function wasmParityProjects() {
     "**/dualRunDay.integration.test.ts",
     "**/dualRunEdits.integration.test.ts",
     "**/loaderCases.integration.test.ts",
+    // They run each engine themselves, like the conformance suites above.
+    "**/panelGettersWasm.integration.test.ts",
+    "**/panelGettersCost.integration.test.ts",
     // The engine comparison's own checks run each engine themselves (#972).
     "**/perfCompare/*.integration.test.ts",
     // Pure render: it paints in a software raster and never touches the engine,

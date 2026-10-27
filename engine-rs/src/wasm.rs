@@ -1087,6 +1087,86 @@ impl Engine {
     }
 }
 
+// ---- panel getters (facade slice 6b, #1214) ----------------------------
+//
+// One-line wrappers over `crate::panels`: each answers JSON text keyed with
+// the TypeScript field names, read-only, so a panel asks the engine for what
+// it used to compute on the mirrored `Simulation`. An id that is not a whole
+// JS number within `Number.isSafeInteger` is refused with null, as the
+// commands refuse it (#996).
+
+impl Engine {
+    pub(crate) fn unit_detail_checked(&mut self, id: Option<f64>) -> Option<String> {
+        let id = id.and_then(crate::charges::whole)?;
+        self.sim.unit_detail(id).map(|v| v.to_string())
+    }
+
+    pub(crate) fn transport_detail_checked(&self, id: Option<f64>) -> Option<String> {
+        let id = id.and_then(crate::charges::whole)?;
+        self.sim.transport_detail(id).map(|v| v.to_string())
+    }
+}
+
+#[wasm_bindgen]
+impl Engine {
+    /// `stats()`: the HUD strip's counters, as JSON.
+    #[wasm_bindgen(js_name = towerStats)]
+    pub fn tower_stats(&self) -> String {
+        self.sim.tower_stats().to_string()
+    }
+
+    /// Everything the stats screen reads beyond `stats()`, as JSON.
+    #[wasm_bindgen(js_name = statsReport)]
+    pub fn stats_report(&mut self) -> String {
+        self.sim.stats_report().to_string()
+    }
+
+    /// `housekeepingCoverage()`, as JSON.
+    #[wasm_bindgen(js_name = housekeepingCoverage)]
+    pub fn housekeeping_coverage(&self) -> String {
+        self.sim.housekeeping_coverage().to_json().to_string()
+    }
+
+    /// The unit inspector and editor card for unit `id`, as JSON, or null.
+    #[wasm_bindgen(js_name = unitDetail)]
+    pub fn unit_detail(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+    ) -> Option<String> {
+        self.unit_detail_checked(id.as_f64())
+    }
+
+    /// The transport inspector and editor card for shaft `id`, as JSON, or null.
+    #[wasm_bindgen(js_name = transportDetail)]
+    pub fn transport_detail(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+    ) -> Option<String> {
+        self.transport_detail_checked(id.as_f64())
+    }
+
+    /// `floorHeatmap(mode)`'s cells as JSON; a mode that is not one of the
+    /// four overlays is an error.
+    #[wasm_bindgen(js_name = floorHeatmap)]
+    pub fn floor_heatmap(&self, mode: &str) -> Result<String, JsError> {
+        let mode = crate::panels::heatmap::HeatmapMode::parse(mode)
+            .ok_or_else(|| err(format!("unknown heatmap mode {mode}")))?;
+        Ok(self.sim.floor_heatmap_json(mode))
+    }
+
+    /// `peakCongestionHotspot()`: `{ ratio, floor }` as JSON.
+    #[wasm_bindgen(js_name = peakCongestionHotspot)]
+    pub fn peak_congestion_hotspot(&self) -> String {
+        self.sim.peak_congestion_hotspot().to_string()
+    }
+
+    /// The five onboarding facts as JSON.
+    #[wasm_bindgen(js_name = onboardingFacts)]
+    pub fn onboarding_facts(&self) -> String {
+        self.sim.onboarding_facts().to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

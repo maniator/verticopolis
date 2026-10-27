@@ -231,3 +231,17 @@ Slice 3 adds the `view.ts` lines, the `TsSim` fills and assertions in its own fi
   member when the facade lane adds it.
 - The type test assigns the live `Simulation`. A test over `TsSim` comes with
   the first step that reads through the view instead of the instance.
+
+## 3a-2b notes (clock helper)
+
+- `src/simport/clockView.ts` adds `ClockReads`, the renderer's clock reads
+  (`hour`, `minute`, `minuteOfDay`, `isMorning`, `isEvening`, `isNight`)
+  derived from `header.minutes`. `clockView.test.ts` pins every minute from
+  two days before the start to four days after against `Clock`, so the windows
+  cannot drift, and checks the class is a `RenderClock`.
+- It is a reusable object (`set(header)`, then read) so a frame reads the clock
+  with no allocation. `headerClock.ts` (slice 4) builds a full `Clock` for the
+  panels, which suits a once-per-tick read; the renderer reads per frame, so it
+  gets the cheaper form.
+- Nothing reads it yet. The loop binding swaps `RenderSim.clock` for it when
+  `main.ts` hands the renderer a view.

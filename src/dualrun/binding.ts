@@ -37,6 +37,8 @@ export const INSTANCE_METHODS = [
   "seedLoopMemos", "loopMemos", "housekeepingReport", "commuteStress", "commuteStressRevision", "drainGameplayEvents", "gameplayEventsPending",
   "gameplayEventsDropped", "serializeForSync", "saveDelta", "addCar", "removeCar", "beginExtend", "extendTransport", "endExtend", "removeFacility", "towerSetCars",
   "towerResizeTransport", "previewRentBatch", "validateTransport", "placeTransportDryRun",
+  "towerStats", "statsReport", "housekeepingCoverage", "unitDetail", "transportDetail", "floorHeatmap", "peakCongestionHotspot",
+  "onboardingFacts",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 
