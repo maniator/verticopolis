@@ -5,20 +5,35 @@ name: Update perf baseline
 # the committed numbers are captured on the identical browser and (as far as CI
 # hardware allows) comparable to the gate's measurements. A local sandbox with
 # variable CPU is never the arbiter, exactly as with the visual baselines.
+#
+# The pinned environment: a GitHub-hosted ubuntu-latest runner; the container
+# mcr.microsoft.com/playwright:v<version>-jammy, where <version> is the
+# playwright entry of package-lock.json (resolve-image below; v1.61.1 when this
+# was written); Node from .nvmrc; a VC_TOOLING=1 build with the engine package
+# from this commit; one Playwright worker; and the spec's own harness (4,000
+# ui.update pumps in batches of 40, five 4-second speed windows under a 4x CPU
+# throttle), which each entry records and the gate checks.
+#
 # The file holds one entry per engine (#900), and a run mints ONE engine: push
 # so the HEAD commit's message contains "[update-perf-baseline:wasm]" or
 # "[update-perf-baseline:ts]" (only the head commit of the push is checked), or
 # dispatch the workflow with the engine as its input. The run measures that
-# engine's Playwright project only, five times, and makes the entry from the
-# median of the passes (scripts/perf-baseline-mint.ts); every other engine's
-# entry stays exactly the committed one, and the refreshed entry comes back as
-# a bot commit on the same branch. The run's summary also shows how the passes
-# spread around their median, the A/A reading M7's tolerances are calibrated
-# from (#900), and the passes are kept as an artifact. A bare "[update-perf-baseline]" names no engine
-# and fails. Review those numbers before relying on them: that commit IS the
-# blessing of a new perf truth. The TypeScript entry was minted on the pre-E5
-# render path (the E5-S0 commit) so later live-view PRs measure against it, so
-# re-mint it only on purpose.
+# engine's Playwright project only, five times by default (from 5 to 10), and
+# makes the entry from each value's median across the passes
+# (scripts/perf-baseline-mint.ts). Every other engine's entry stays exactly the
+# committed one, and the refreshed entry comes back as a bot commit on the same
+# branch, with the passes' within-run spread in its message. The passes are
+# kept as an artifact. A bare "[update-perf-baseline]" names no engine and
+# fails, and a dispatch that would commit to main or a tag is refused.
+#
+# A dispatch with dry_run measures and prints the same reading and commits
+# nothing. That is how the spread of the TypeScript engine is read: its entry
+# was minted on the pre-E5 render path (the E5-S0 commit) so later live-view
+# PRs measure against it, and it is the approved gate, so re-minting it is the
+# owner's call. A TypeScript re-mint also fails npm test until the pinned
+# numbers in src/tests/perfBaseline.test.ts are changed in the same PR, which
+# keeps an accidental one from landing. Review any minted numbers before
+# relying on them: that commit IS the blessing of a new perf truth.
 #
 # The bot pushes with GITHUB_TOKEN, which never triggers workflows, so the baseline
 # commit itself gets no CI run; push once more after pulling it to get a green
@@ -36,9 +51,14 @@ on:
         default: wasm
         required: true
       passes:
-        description: "How many times to measure the engine; the entry is each value's median"
+        description: "How many times to measure the engine (5 to 10); the entry is each value's median"
         type: number
         default: 5
+        required: true
+      dry_run:
+        description: "Measure and print the passes and their spread, and commit nothing"
+        type: boolean
+        default: false
         required: true
 
 concurrency:
@@ -66,20 +86,27 @@ jobs:
       engine: ${{ steps.engine.outputs.engine }}
       project: ${{ steps.engine.outputs.project }}
       passes: ${{ steps.engine.outputs.passes }}
+      dry_run: ${{ steps.engine.outputs.dry_run }}
     steps:
-      # The commit message and the input reach the shell as environment
-      # variables, never spliced into the script.
+      # The commit message and the inputs reach the shell as environment
+      # variables, so no text from them is spliced into the script.
+      # src/tests/perfBaselineWorkflow.test.ts runs this step's script.
       - id: engine
         env:
           EVENT: ${{ github.event_name }}
           INPUT_ENGINE: ${{ inputs.engine }}
           INPUT_PASSES: ${{ inputs.passes }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
           MESSAGE: ${{ github.event.head_commit.message }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
         run: |
           passes=5
+          dry_run=false
           if [ "$EVENT" = "workflow_dispatch" ]; then
             named="$INPUT_ENGINE"
             passes="$INPUT_PASSES"
+            [ "$INPUT_DRY_RUN" = "true" ] && dry_run=true
           else
             named=""
             for e in ts wasm; do
@@ -97,12 +124,17 @@ jobs:
             *) echo "::error::unknown engine \"$1\""; exit 1 ;;
           esac
           case "$passes" in
-            [1-9] | 1[0-9] | 20) ;;
-            *) echo "::error::passes must be a whole number from 1 to 20; got \"$passes\""; exit 1 ;;
+            [5-9] | 10) ;;
+            *) echo "::error::passes must be a whole number from 5 to 10; got \"$passes\""; exit 1 ;;
           esac
+          if [ "$dry_run" != "true" ] && { [ "$REF_TYPE" = "tag" ] || [ "$REF_NAME" = "main" ]; }; then
+            echo "::error::a mint commits to the branch it runs on, and main or a tag takes no bot commit; mint on a PR branch, or dispatch a dry run"
+            exit 1
+          fi
           echo "engine=$1" >> "$GITHUB_OUTPUT"
           echo "passes=$passes" >> "$GITHUB_OUTPUT"
           echo "project=$project" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -115,7 +147,8 @@ jobs:
   # from the Actions cache (or build and cache it) for the branch tip the jobs
   # below check out, and hand it to them: their container has no Rust toolchain.
   engine-wasm:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[update-perf-baseline')
+    # After resolve-image, so a refused marker builds nothing.
+    needs: resolve-image
     runs-on: ubuntu-latest
     # A cache miss compiles the crate (a few minutes); anything near this is a hang.
     timeout-minutes: 30
@@ -137,7 +170,7 @@ jobs:
   update:
     needs: [resolve-image, engine-wasm]
     runs-on: ubuntu-latest
-    # Up to 20 passes of a few minutes each in the container.
+    # Up to 10 passes of a few minutes each in the container.
     timeout-minutes: 90
     # Earns write: it pushes the refreshed baseline. The write token is only
     # ever exposed to the credentialed push step below, never to the steps
@@ -185,20 +218,25 @@ jobs:
         env:
           VC_TOOLING: "1"
 
-      # Only the named engine's project runs. Each pass records its
-      # measurement in perf-passes/ and leaves the baseline file alone.
+      # Only the named engine's project runs, one pass at a time. Each pass
+      # records its measurement in perf-passes/ and leaves the baseline file
+      # alone.
       - name: Measure the engine
-        run: npm run perf:capture -- --project="$PROJECT" --repeat-each="$PASSES"
+        run: npm run perf:capture -- --project="$PROJECT" --repeat-each="$PASSES" --workers=1
         env:
           PROJECT: ${{ needs.resolve-image.outputs.project }}
           PASSES: ${{ needs.resolve-image.outputs.passes }}
           PERF_PASSES_DIR: perf-passes
 
       - name: Mint the entry from the passes
-        run: npx tsx scripts/perf-baseline-mint.ts "$ENGINE" perf-passes "$PASSES"
+        run: |
+          flag=""
+          if [ "$DRY_RUN" = "true" ]; then flag="--dry-run"; fi
+          npx tsx scripts/perf-baseline-mint.ts "$ENGINE" perf-passes "$PASSES" $flag
         env:
           ENGINE: ${{ needs.resolve-image.outputs.engine }}
           PASSES: ${{ needs.resolve-image.outputs.passes }}
+          DRY_RUN: ${{ needs.resolve-image.outputs.dry_run }}
 
       - name: Keep the passes
         if: always()
@@ -207,9 +245,12 @@ jobs:
           name: perf-passes-${{ needs.resolve-image.outputs.engine }}
           path: perf-passes/
           if-no-files-found: warn
+          # A re-run of this job in the same run uploads under the same name.
+          overwrite: true
 
       - name: Commit refreshed baseline
         id: commit
+        if: needs.resolve-image.outputs.dry_run != 'true'
         env:
           ENGINE: ${{ needs.resolve-image.outputs.engine }}
         run: |
@@ -221,7 +262,7 @@ jobs:
             echo "committed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "Update the $ENGINE perf baseline from CI"
+          git commit -q -m "Update the $ENGINE perf baseline from CI" -m "$(cat perf-passes/spread.md)"
           echo "committed=true" >> "$GITHUB_OUTPUT"
 
       # The only step whose commands receive the write token, and every
@@ -250,7 +291,13 @@ jobs:
             if git -C "$pushdir" push "$remote" "HEAD:refs/heads/${GITHUB_REF_NAME}"; then exit 0; fi
             echo "push rejected, rebasing on the remote and retrying ($attempt)"
             git -C "$pushdir" fetch "$remote" "${GITHUB_REF_NAME}"
-            git -C "$pushdir" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" rebase FETCH_HEAD
+            # A conflict leaves HEAD at the remote tip, and the next push would
+            # report that tip as pushed; stop instead.
+            if ! git -C "$pushdir" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" rebase FETCH_HEAD; then
+              git -C "$pushdir" rebase --abort || true
+              echo "::error::the branch moved and the refreshed baseline no longer rebases onto it; pull and mint again" >&2
+              exit 1
+            fi
           done
           echo "could not push refreshed baseline after retries" >&2
           exit 1

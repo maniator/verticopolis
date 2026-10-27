@@ -207,10 +207,14 @@ jobs:
       # The E5-S0 perf gate: run the ui.update micro-benchmark, the throttled
       # end-to-end speed probe, and the node-identity check against the committed
       # baseline (e2e/perf/baseline.json), on both engines: each Playwright
-      # project is held to its own engine's entry (#900), and the WASM run also
-      # prints M7's reading against the TypeScript entry. Runs in the SAME
-      # pinned container the baselines were minted in, so the numbers are
-      # comparable. On CI a missing engine entry fails the gate; mint it with
+      # project is read against its own engine's entry (#900). The TypeScript
+      # engine's three budgets block; on the WASM engine the ui.update budgets
+      # block and the speed budget prints (BLOCKING in
+      # src/tests/perfBaseline.ts, the owner's call pending M7's calibration).
+      # M7's reading of the WASM run against the TypeScript entry prints to the
+      # log and the job summary and gates nothing. Runs in the SAME pinned
+      # container the baselines were minted in, so the numbers are comparable.
+      # On CI a missing or malformed engine entry fails the gate; mint it with
       # update-perf-baseline.yml.
       - name: Perf gate (E5-S0)
         run: npm run perf
