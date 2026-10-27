@@ -76,8 +76,8 @@ which now runs only for a refused transport; build-preview cost is unchanged
 Auditor patched two inherited costs on the touched paths: the meal-rush
 census now runs only on a frame where a rush is due, and a placed transport
 is no longer diagnosed. The owner chose to fix the `removeUnit` scan here
-(F2), and its remainder, one list shift per single removal, waits on his
-answer; the rest are deferred with issues (Completion Notes).
+(F2), and accepted its remainder, one list shift per single removal, as
+#1370; the rest are deferred with issues (Completion Notes).
 
 ## Acceptance Criteria
 
@@ -358,9 +358,13 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
     near the end; a 367-tile lobby drag in one move, TypeScript 29 ms and
     Rust 146 ms. Making a drag move's per-tile commands one command, which
     would let a lobby drag share one pass as the brush does, is #1273 item
-    8. The F2 card listed these paths, so the remainder went back to Naftali
-    (decision card, 2026-10-27, round 2); his answer goes here. Crate
-    0.10.0 for the binding (main took 0.9.0 first).
+    8. The F2 card listed these paths, so the remainder went back to
+    Naftali on a second decision card ("Accept one list shift per removal
+    in slice 2, tracked separately?"). On 2026-10-27 at 20:56 UTC he chose
+    "Accept it, tracked separately": #1370 (row
+    `single-removal-list-shift`) tracks the batched drag command and
+    cheaper Rust unit storage. Crate 0.10.0 for the binding (main took
+    0.9.0 first).
   - Review round 1 on the fix (2026-10-27, Blind Hunter, Edge Case Hunter,
     Acceptance Auditor): a stale position or index never takes another unit
     (TypeScript checks the slot, Rust checks the id at the index); the unit
@@ -541,6 +545,6 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
 - e2e: `auto-floor.spec.ts`, `offlineHelpers.ts`, `wasmEngine.spec.ts`
 - `_bmad-output/implementation-artifacts/backlog.md` (rows
   `facade-async-command-hazards`, `keyboard-bulldoze-refusal-announce`,
-  `brush-conformance-op`; notes
+  `brush-conformance-op`, `single-removal-list-shift`; notes
   on `auto-floor-bridge-distance`, `ts-render-ui-hotpath-sweep` and
   `engine-rs-hotpath-audit`)
