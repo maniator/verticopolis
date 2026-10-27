@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { markRoom, roomCounts, roomUnits, structureRuns } from "../engine/tower/rooms";
-import { mergeSimulation } from "./merge";
+import { mergeSimulation, mergeSimulationDelta } from "./merge";
 
 /** A tower with a lobby row, two offices and a shaft, ticked a little. */
 function tower(seed: number, mode: "classic" | "modern" = "classic"): Simulation {
@@ -227,5 +227,25 @@ describe("mergeSimulation", () => {
       markRoom(target.tower, venue);
       expect(target.stats().population).toBe(target.population);
     }
+  });
+
+  it("marks the rooms an hourly delta rewrites, and keeps the HUD's counts", () => {
+    const target = tower(5);
+    for (const u of target.tower.units) if (u.kind === "office") u.state = "empty";
+    const counts = roomCounts(target.tower); // the HUD's counts are kept from this read on
+    const before = { ...target.stats() };
+    const fresh = Simulation.deserialize(target.serialize());
+    const [a, b] = fresh.tower.units.filter((u) => u.kind === "office");
+    a.state = "occupied";
+    b.noRate = true;
+    const save = fresh.serialize();
+    // The worker's delta: the changed unit records and every transport.
+    const next = Simulation.deserialize(save);
+    const units = [a.id, b.id].map((id) => next.tower.getUnit(id)!);
+    mergeSimulationDelta(target, { rest: next, units, transports: next.tower.transports }, { revision: target.tower.revision, mealOverlayRevision: 0 });
+    expect(roomCounts(target.tower), "the same ledger, marked and not dropped").toBe(counts);
+    const hud = target.stats();
+    expect(hud).toEqual(Simulation.deserialize(save).stats());
+    expect(hud).toMatchObject({ occupiedOffices: before.occupiedOffices + 1, vacant: before.vacant - 1, vacantNoRate: before.vacantNoRate + 1 });
   });
 });
