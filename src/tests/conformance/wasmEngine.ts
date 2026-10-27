@@ -157,7 +157,18 @@ export const startWasmEngine: EngineStart = (start) => {
     return wasmEngine(w);
   };
   if ("newGame" in start) {
-    return checked(Engine.newGame(u32(start.newGame.seed, "seed"), start.newGame.mode), start.newGame.mode, "new game founded");
+    const founded = Engine.newGame(u32(start.newGame.seed, "seed"), start.newGame.mode);
+    // One star is the founded game itself (the other two runners do the same).
+    if (start.newGame.star === undefined || start.newGame.star === 1) return checked(founded, start.newGame.mode, "new game founded");
+    // The binding has no star setter: save the founded game, raise the star and
+    // load it back, the route the other two runners take.
+    try {
+      const save = JSON.parse(founded.serialize()) as { star: number };
+      save.star = start.newGame.star;
+      return checked(Engine.fromSave(JSON.stringify(save)), start.newGame.mode, "new game founded");
+    } finally {
+      founded.free();
+    }
   }
   return checked(Engine.fromVctower(readFileSync(resolve(REPO_ROOT, start.fixture), "utf8"), start.mode ?? null), start.mode, `${start.fixture} loaded`);
 };

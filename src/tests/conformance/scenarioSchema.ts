@@ -7,9 +7,9 @@ import { FACILITIES } from "../../engine/facilitiesData";
  *  that is not a transport, "shaft" a transport kind, "mode" classic or modern,
  *  "obj" a JSON object, "kind" any facility kind, "choice" fireRescue or
  *  bombThreat, "policy" a film policy, "target" a batch rent target (a finite
- *  number, default or noRate), "end" up or down, "method" sell or bulldoze.
+ *  number, default or noRate), "end" up or down, "method" sell or bulldoze, "star" a whole number from 1 to 5.
  *  A trailing "?" marks the field optional. */
-export type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind" | "choice" | "policy" | "target" | "end" | "method";
+export type FieldType = "int" | "u32" | "count" | "dir" | "num" | "str" | "bool" | "place" | "shaft" | "mode" | "obj" | "kind" | "choice" | "policy" | "target" | "end" | "method" | "star";
 
 function fits(type: FieldType, v: unknown): boolean {
   switch (type) {
@@ -30,6 +30,7 @@ function fits(type: FieldType, v: unknown): boolean {
     case "target": return v === "default" || v === "noRate" || (typeof v === "number" && Number.isFinite(v));
     case "end": return v === "up" || v === "down";
     case "method": return v === "sell" || v === "bulldoze";
+    case "star": return Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5;
   }
 }
 

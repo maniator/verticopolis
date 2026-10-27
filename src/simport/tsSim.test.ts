@@ -38,6 +38,8 @@ describe("TsSim over the live instance", () => {
       minuteOfDay: sim.clock.minuteOfDay,
       revision: sim.tower.revision,
       mealOverlayRevision: sim.tower.mealOverlayRevision,
+      mode: sim.mode,
+      modernCalendar: sim.modernCalendar,
     });
   });
 
