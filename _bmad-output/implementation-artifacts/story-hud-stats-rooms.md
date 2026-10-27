@@ -90,7 +90,9 @@ quoted in Review). So the HUD now reads counts kept as the rooms change.
   #1253) it first checks whether the revision or any unit's id, kind, floor,
   x or width moved, and drops the rooms list if so, which starts a new
   ledger. The same check now also compares the five counted fields and,
-  when the list stays, marks the rooms whose fields the merge rewrites.
+  when the list stays, marks the rooms whose fields the merge rewrites. The
+  worker host's hourly delta (`mergeSimulationDelta`, #1045) rewrites only
+  the units whose save form moved, and marks each of them.
 - **Costs.** A HUD read with nothing marked is a list identity check and the
   rest of `stats()`'s fields; with marks, constant work per marked room. A
   rebuild is one pass over the rooms, at the command, load or unit-moving
@@ -123,11 +125,13 @@ quoted in Review). So the HUD now reads counts kept as the rooms change.
   flat read of it (row `rust-reads-walk-every-unit`, #1237, keeps "the HUD
   getters still grow with the room count per UI tick" open).
 - Other per-frame and per-refresh reads of the rooms on the same path, all
-  older than this change: the crowd renderer reads `sim.population` every
-  frame, and so does the meal-rush bulletin check (`emitMealRushes`) before
-  it knows a meal starts (both #1234); the HUD's traffic readout and the
-  renderer rebuild the congestion map (#338); the host's hourly merge reads
-  the whole save (#868). The engine's own population reads keep their walk:
+  older than this change: the crowd renderer's population read (every
+  frame until facade slice 3's cadence fix closed #1234; about twice a
+  second now, #1335) and the meal-rush bulletin check (`emitMealRushes`),
+  which reads the population every frame before it knows a meal starts
+  (#1334); the HUD's traffic readout and the renderer rebuild the congestion
+  map (#338); the host's hourly merge reads the whole save (#868), which the
+  worker host's delta (#1045) now avoids on an unchanged layout. The engine's own population reads keep their walk:
   the kept counts serve the HUD only.
 
 ## Result
@@ -264,7 +268,8 @@ Tests:
   another empty and off the market, a condo sold with residents, a venue's
   customers taken away by a save that does not carry them), and checks the
   ledger is the same object afterwards, the HUD equals a fresh load's, and a
-  later mark still lands.
+  later mark still lands. A fourth applies the worker host's hourly delta
+  with two changed offices and checks the same.
 - `frameApply.test.ts` applies 30 random frames, for each of twelve seeds, to
   a tower standing in for the host's mirror (a plain `Simulation`, no host
   attached), on the decode path and the direct apply. The unit records come
@@ -283,7 +288,7 @@ Tests:
   computed key) is listed, and the unit writer among them, the merge, must
   call `markRoom`. It tests its own patterns on each form and on reads.
 - Seeded mutations, run against the behavioral tests above (the guard left
-  out) on the final code: 39 at the write sites, the hosts and the ledger.
+  out) on the final code: 40 at the write sites, the hosts and the ledger.
   - 18 `setRoomState` calls swapped back for a raw `state` write: 13 fail a
     test. The 5 that pass change no count: a notice served, rescinded or
     served for a relocation moves a room between occupied and vacating,
@@ -299,12 +304,12 @@ Tests:
   - 5 on the frame apply: either path's mark removed, the direct path's
     check narrowed to the state, and either path's position lookup made to
     ignore the record's id. All fail a test.
-  - 7 on the merge: its marks removed, the marks replaced by a drop of the
-    counts, and each of the five counted fields left out of its compare. All
-    fail a test (the No Rate one only once the merge test changed each field
-    on its own; it survived the first run, when the test moved the state with
-    it). The guard also fails the first, which leaves the merge without a
-    `markRoom` call.
+  - 8 on the merges: the full merge's marks removed, its marks replaced by
+    a drop of the counts, each of the five counted fields left out of its
+    compare, and the hourly delta's marks removed. All fail a test (the No
+    Rate one only once the merge test changed each field on its own; it
+    survived the first run, when the test moved the state with it). The guard catches neither mark removed alone, since the file keeps
+    a `markRoom` call either way.
   - 2 in the ledger (a room's old share kept, the marked rooms skipped):
     both fail.
   - The first version's 8 mutations, run again on the final code (the
@@ -383,6 +388,6 @@ on the hosts. Its record is on the PR.
 - [x] [Review][Patch] The HUD test watched only the `population` getter (Blind Hunter B12) [uiStatus.test.ts]: it also watches the tower's census.
 - [x] [Review][Patch] #1331 repeated the open #1296 (Acceptance Auditor A1) [backlog.md]: the row is dropped, its extra detail is on #1296's row and issue, #1331 is closed as a duplicate, and round 1's defer item points at #1296.
 - [x] [Review][Patch] Inexact test descriptions, stale review and backlog text, no pointer to a live number, and no row cited for the Rust `tower_stats` pass (Acceptance Auditor A8 to A11) [story, backlog.md]: each is corrected.
-- [x] [Review][Defer] The crowd renderer and the meal-rush check walk the rooms every frame for the population the ledger now holds (Hot-Path Auditor F4) [towerCrowd.ts, frameLoop.ts]: deferred onto #1234 by reference, with the ledger named in its remedy (row note and issue comment).
+- [x] [Review][Defer] The crowd renderer and the meal-rush check walk the rooms every frame for the population the ledger now holds (Hot-Path Auditor F4) [towerCrowd.ts, frameLoop.ts]: deferred by reference, with the ledger named in each remedy. Main has since split #1234: facade slice 3's cadence fix resolved its row (the renderer reads the population about twice a second, the rest tracked as #1335), and the meal-rush check is #1334. The note sits on the #1334 and #1335 rows and issues.
 - [x] [Review][Defer] Engine functions this diff touched walk every unit where the rooms list answers: the 08:00 checkout hour's up to five passes, the late checkout, condo relocations, the rent batch and three fire walks (Hot-Path Auditor F5) [EconomySystem.ts, housekeeping.ts, churn.ts, rent.ts, EventSystem.ts]: deferred onto #1170 (row note and issue comment); the housekeeping walks were already its T5, now widened to the hour, and the extermination walk is #1173 F1.
 - Dismissed (7): a periodic full recount as a safety net (Blind Hunter B1), since the guard, the tests, the mutation pass and the stress run are the nets and a recount would hide drift from them; a mark consumed by a listener between a `setRoomState` and a later counted write in the same function (B4), since the Edge Case Hunter found `emit` synchronous with no listener that reads the counts; inputs beyond the five fields (B5), since `censusCount`, `isPresent` and `isTenanted` read none of the others and the mutant that marks only on a state change fails the frame test; the smoke check and the reference predicate (B13), which the walk over every unit backs; the mark set's references to removed units (B17), since the Hot-Path Auditor found no leak (a removal rebuilds the list and replaces the ledger at the next read); the palette key the HUD test copies (B12's second half), a test-only coupling whose assertions hold either way; and the guard's blindness to generic copiers (Hot-Path Auditor's HP-10 note), now covered by the bulk-writer table.
