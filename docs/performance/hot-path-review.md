@@ -79,8 +79,9 @@ on its next review, over its whole diff.
 ## 2. Frequencies and sizes
 
 Cost is frequency times collection size. Use these reference numbers instead of
-guessing. Sizes were measured on 2026-10-20 at `main` c12bc1b; recount them
-with `buildLargeTower` and the fixture loaders in
+guessing. Sizes were measured on 2026-10-20 at `main` c12bc1b, and the
+hotel-heavy figures on 2026-10-27 at `main` d8e5a84; recount them
+with `buildLargeTower`, `buildHotelTower` and the fixture loaders in
 `src/tests/perfCompare/scenarios.ts` when they matter.
 
 **Entry points.** Rust names first, TypeScript second.
@@ -106,7 +107,7 @@ real towers can be bigger.
 | rooms (R) | 1,699 owner's save; 2,900 large | `room_units()` / `roomUnits` |
 | population | 3,240 medium; 6,019 owner's save; 17,322 large | census and statistical demand |
 | drawn people (P) | at most 140 trip spawns (`MAX_PEOPLE`), plus up to 6 housekeepers per housekeeping unit (`HK_MAIDS_PER_UNIT`) | the crowd that walks and rides; staff spawns skip `MAX_PEOPLE` |
-| housekeeping units | 15 medium (up to 90 staff); 8 owner's save (up to 48); none on the large tower | estimate a staff or housekeeping path on the tower with the most of them, since the large tower has none |
+| housekeeping units | 15 medium (up to 90 staff); 8 owner's save (up to 48); 24 hotel-heavy (up to 144, with 852 hotel rooms); none on the large tower | estimate a staff or housekeeping path on the hotel-heavy tower, the `perf:compare` scenario built by `buildHotelTower({ seed: 21, floors: 62, crews: 24 })` (#1279), since the large tower has none |
 | floors (F) | up to 110 (floors -9 to 100; floor 0 is the first basement) | |
 | transports (T) | up to 24 elevator shafts and 64 stair and escalator links | 8 cars per shaft |
 | x positions | 375 per floor (`LOT_WIDTH`) | |
@@ -273,17 +274,18 @@ Between those PRs the table belongs to the repository owner (maniator), the
 | each floor's segment runs | `src/engine/tower/segments.ts` | revision | ported (cloned on read, #859) |
 | housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision | ported (`housekeeping_units`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1143; now reads the census below) |
 | per-kind unit counts for the build caps, floors that hold an office | none (`countKind` and the Classic escalator office check walk every unit, A24 in #1158 and #1239) | revision and unit count | `census`, `engine-rs/src/tower_index.rs` (#1264) |
-| room units per floor, for the spawn step's picks | `unitsByFloor` in `spawnFloors`, `src/engine/crowd/spawn.ts` | one call (rebuilt every spawn step) | `floor_rooms`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count, so the step reads it instead of rebuilding it; the floor lists around it are still built on each spawn step that has room to spawn, where the TypeScript builds them on every spawn step (T2 in #1170; #1143 item 4, #1281) |
-| staff and venue floors deduped in one spawn step | `seenStaff`, `venuesByKindSet`, `src/engine/crowd/spawn.ts` | one call | ported as a bit per floor (`engine-rs/src/crowd/spawn_floors.rs`; #1143 item 4, #1281); before it the Rust searched the staff list for each staff room |
-| nearest crew and crew order per floor in one dispatch | `distByFloor`, `crewOrderByFloor`, `src/engine/economy/housekeeping.ts` | one pass | `dist_by_floor` ported; crew order missing, so the crews are cloned and sorted per room (A12 in #1158) |
+| room units per floor, for the spawn step's picks | `unitsByFloor` in `spawnFloors`, `src/engine/crowd/spawn.ts` | one call (rebuilt every spawn step) | `floor_rooms`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count, so the step reads it instead of rebuilding it; the floor lists around it are still built on each spawn step that has room to spawn, where the TypeScript builds them on every spawn step (T2 in #1170; #1143 item 4, 3a83957) |
+| staff and venue floors deduped in one spawn step | `seenStaff`, `venuesByKindSet`, `src/engine/crowd/spawn.ts` | one call | ported as a bit per floor (`engine-rs/src/crowd/spawn_floors.rs`; #1143 item 4, 3a83957); before it the Rust searched the staff list for each staff room |
+| nearest crew and crew order per floor in one dispatch | `distByFloor`, `crewOrderByFloor`, `src/engine/economy/housekeeping.ts` | one pass | ported as one list per floor of the staff-connected crews in dispatch order, whose head gives the nearest distance in Modern, kept between passes while the revision, the mode and the operational crews stay the same (`CrewOrders`, `engine-rs/src/housekeeping.rs`; #1143 item 6, #1343); before it the Rust cloned the crew list for each dirty room and, in Modern, sorted it (A12 in #1158). The crews' staff components are read once per key, where the TypeScript asks `staffConnected` for each crew of each room (T4 in #1170) |
 | live staff count | `crowd.staffCount`, `src/engine/Crowd.ts` | counter | ported |
 | riders per car | `crowd.carRiders`, `src/engine/Crowd.ts` | counter | ported (`car_riders`) |
 | noise verdicts | `noiseMemo`, `src/engine/sim/satisfaction.ts` | revision | ported (`noise_memo`, `engine-rs/src/noise.rs`; #1139) |
-| served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported; `is_floor_served` reads the served set in place (#1237) and elevator dispatch reads `dispatch_floors` (below, #1143 item 5, #1298); `served_floors` and the staff components are still cloned on read (#859) |
+| served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported; `is_floor_served` reads the served set in place (#1237), elevator dispatch reads `dispatch_floors` (below, #1143 item 5, #1298) and `staff_component` / `staff_connected` read the staff components (#1143 item 6, #1343); `served_floors` and `staff_components` still clone on read (#859) |
 | stops, transport columns | `stopsCache` on `Tower`, `src/engine/tower/transport.ts` | revision | ported (cloned on read, #859) |
 | built floor bounds | `floorBounds`, `src/engine/Tower.ts` | revision | ported (`floor_bounds`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1237) |
 | served and lobby floors in ascending order, for elevator dispatch | none (`accumulateWaiting` reads `servedSet` in place and walks `lobbyFloors()`, which sorts the lobby tiles' floors, each step the population is above zero; `moveCars` builds a set from `lobbyFloors()` on every call) | revision and unit count | Rust-only: `dispatch_floors`, `engine-rs/src/tower_index.rs` (#1143 item 5, #1298) |
 | passenger and staff routing graphs | `adjacency`, `staffAdjacency`, `src/engine/crowd/routing.ts` | revision | ported |
+| the part of the staff graph each segment lies in | none (`staffRoute` searches the whole first part before it fails, T3 in #1170) | revision | `graph_parts`, `engine-rs/src/crowd/routing.rs`, built with the staff graph and kept beside it on the crowd, so a staff route between two parts fails without a search (#1143 item 6, #1343) |
 | shaft banks | `src/engine/crowd/shaftBanks.ts` | revision | ported |
 | segments served | `segServed`, `src/engine/crowd/segmentGraph.ts` | revision | ported (`connected_set`) |
 | queue view | `queueView`, `src/engine/Crowd.ts` | step and revision | no counterpart yet; check before porting one |
