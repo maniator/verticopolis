@@ -52,8 +52,9 @@ integer floor keys:
    both (see Design and Review round 2).
 3. **AC3 No per-room hashing in the waiting pass.** Each room's floor is
    found by binary search in the served floors, kept ascending per tower
-   revision; the waiting map is read once and written once for each floor
-   that has rooms. `total_population` folds into the same pass.
+   revision; the waiting map is read once and written once for each served
+   floor with a room that adds to the estimate (the lobby pass then reads
+   the lobby floors again). `total_population` folds into the same pass.
 4. **AC4 Caches keyed and reset correctly.** The served and lobby floor lists
    live in `tower.memo` (reset by `Tower::reindex`, so on load), keyed on the
    revision and unit count like the other `tower_index.rs` indexes. Tests cover
@@ -78,7 +79,8 @@ integer floor keys:
   binary search away; a claimed floor that is not a stop (a dwelling car
   between stops) can never be asked about, so it is dropped. The flag pass
   reads the hall calls once per stop, and the waiting map only where the hall
-  has not already raised the call, as the TypeScript's `||` does.
+  has not already raised the call, as the TypeScript's `if` and `else if`
+  do.
 - Each active car reads its cab floors once into a third bit set over the
   stops, one binary search per cab floor; a cab floor that is not a stop is
   left out, as the scan never reached it. The crowd keeps each car's cab
@@ -97,9 +99,10 @@ integer floor keys:
   only a position far beyond any tower can produce; a position that is not
   finite still finds nothing. Round 1 walked out from the car instead (H5);
   round 2 replaced the walk because a car with nothing to serve still tested
-  every stop of its shaft in both directions (R2-1, below). A search now
-  reads at most two words per direction, since no shaft has more than 110
-  stops.
+  every stop of its shaft in both directions (R2-1, below). Each search
+  reads at most two words, since loading caps the floor range at 110 and so
+  any shaft at 110 stops (one built in play has at most 31); going down, the
+  tie check makes one more search.
 - The served list is built once per revision by asking the served-floor memo
   about each floor from the lowest to the highest a passenger shaft spans,
   so no set is iterated and nothing is sorted (review, H2).
@@ -109,7 +112,9 @@ integer floor keys:
   pass reads the map. `pop` sums the same rooms in the same order as
   `total_population`.
 - Dwell timers are pruned against the shaft index (`transport_index`), which
-  motion already relies on every chunk, instead of a fresh set.
+  motion already relies on every chunk, instead of a fresh set. They live in
+  a `BTreeMap` keyed by shaft id, so the prune's `retain` iterates no hashed
+  collection (R3-H2).
 - Dispatch only reads the schedule, so it borrows it.
 - Part A, pushed to the branch between the rounds (c5972de, c547890), also
   moved `Memo` and the `Unit` state predicates from `tower_query.rs` into
@@ -134,38 +139,59 @@ integer floor keys:
 - `total_population` is still walked by the spawn step (A10 in #1158).
   `accumulate` now computes the same sum one call earlier, so `spawn_step`
   could take it; `crowd/spawn.rs` belongs to the other hotspot lane.
+- The PR also carries the #1051 large-tower fresh-page PC run on 9cd44d1
+  (`docs/performance/results/2026-10-21-9cd44d1-1051-fresh-large`, added in
+  4b99d9e). It is #1051's evidence and measures nothing in this story.
 
 ## Result
 
 All figures are cloud estimates (native release build, this sandbox); the PC
 is the source for any gate figure. Round 1 measured against `main` efb4bdf
-(with #1237's change, PR #1276). Round 2 measured its final head, 835f46d
-merged with `main` d09aa64, against d09aa64.
+(with #1237's change, PR #1276) on 2026-10-21. Round 2 measured its final
+head, 835f46d merged with `main` d09aa64, against d09aa64 on 2026-10-27.
+Round 3 measured its head, d12a0e3 and 01e68a7 merged with `main` 4f49fc7,
+against 4f49fc7 the same day. The harness is not in the repository: a probe
+crate built against the engine at each commit, run under `valgrind
+--tool=callgrind`, with the instructions inside `Simulation::tick` read from
+`callgrind_annotate --inclusive=yes`, and the same probe timed for the
+wall-clock pairs.
 
 **Same results.** The state and crowd digests every 30 steps and the final
 save digest over 720 steps of 2 game minutes match the base on all 8
-conformance fixtures, in both rounds; round 2's final head also matches on
-the `large`, `many-unit` and `hotel-heavy` perf towers. On the final head the
-Rust referee (`cargo run --release --features conformance --bin
-conformance`) passes every scenario and catalog, the conformance lock is
-untouched, and `npm run test:wasm` on the built engine (the WASM conformance
-and parity suites, the seeded dual-run differential and the day gate in
-`dualRunDay.integration.test.ts`, the host and worker tests) passes:
-368 tests, 14 skipped. The fuzz seeds run in CI (`engine-fuzz.yml`).
+conformance fixtures, in every round; the final heads of rounds 2 and 3 also
+match on the `large`, `many-unit` and `hotel-heavy` perf towers. On the
+final head the Rust referee (`cargo run --release --features conformance
+--bin conformance`) passes every scenario and catalog, the conformance lock
+is untouched, and `npm run test:wasm` on the built engine (the WASM
+conformance and parity suites, the seeded dual-run differential and the day
+gate in `dualRunDay.integration.test.ts`, the host and worker tests) passes:
+398 tests, 14 skipped (round 2's head ran 368 before `main` added tests).
+Twenty fuzz seeds outside the nightly range (2075350001 to 2075350020, as
+`engine-fuzz.yml` generates and compares them) passed on the round 3 head:
+each recorded run replays in TypeScript with every checkpoint equal.
 
 The dispatch tests run this dispatcher beside the hashed one it replaced
 (kept in `dispatch_reference_tests.rs`):
 
 - `dispatch_matches_the_hashed_reference_step_for_step` runs both for 3,000
-  steps on a scenario tower with a scheduled shaft and an 80-floor express
-  shaft, under random occupancy, hall and cab calls, hours and weekends.
-  Shafts are placed and removed, a stop is taken from under a dwelling car
-  every 20 steps and given back every 100, and every room empties every 50
-  steps. It compares car positions, directions, loads and dwell timers (bit
-  for bit) and the waiting map after every step, and the boarding tally every
-  30 steps, and asserts the run reached a car dwelling on a dropped stop, an
-  empty tower, a raised call, a non-empty tally and a car past the express
-  shaft's 64th stop, where the bit sets need a second word.
+  steps on a scenario tower with a scheduled shaft and an express shaft
+  from floor 1 to floor 80, under random occupancy, hall and cab calls,
+  hours and weekends. Placing an express skips every floor without a lobby,
+  so the test clears that shaft's skip list, as a loaded save can, and
+  reindexes: it stops at all 80 floors, and the test asserts more than 64
+  stops at the start and the end (round 2 missed this and ran the shaft with
+  3 stops; the third reviewer found it). Shafts are placed and removed, a
+  stop is taken from under a dwelling car every 20 steps and given back
+  every 100 (the tall express takes no drops, since an express gets back
+  only lobby floors), every room empties every 50 steps, and hall calls high
+  in the tall shaft half the time keep its cars working up there. It
+  compares car positions, directions, loads and dwell timers (bit for bit)
+  and the waiting map after every step, and the boarding tally every 30
+  steps. It asserts the run reached a car dwelling on a dropped stop, an
+  empty tower, a stop the estimate raised where the hall call did not, a
+  non-empty tally, and at least 500 moves by tall-shaft cars from past the
+  shaft's 65th stop, where a search in either direction reads the second
+  word (1,623 in the run).
 - `the_stop_search_finds_what_the_full_scan_found` (in
   `dispatch_search_tests.rs`) compares the search with the full scan over
   20,000 random stop lists, more than 500 of them at each length from one
@@ -178,7 +204,9 @@ The dispatch tests run this dispatcher beside the hashed one it replaced
   empty words to reach it, and checks that a claim hides the call and leaves
   the cab stop.
 - The floor lists follow a shaft placed and removed, a new lobby floor and a
-  stop toggle at the same unit count; `reindex_resets_the_floor_lists` pins
+  stop toggle at the same unit count; the served list follows two flights
+  of stairs above every elevator and leaves out the floors only a service
+  car reaches above them; `reindex_resets_the_floor_lists` pins
   the memo reset with a stop list changed behind the revision; a reload
   rebuilds them; a removed shaft loses its dwell timers.
 - Seeded mutations, round 1: the dwelling claim dropped, `CLAIMED` ignored,
@@ -193,36 +221,45 @@ The dispatch tests run this dispatcher beside the hashed one it replaced
   the tests, since its tie step never moves, and CI's job timeout fails it.
   The tie step run on infinite distances survives as an equivalent mutant:
   the final check returns nothing for an infinite distance either way, and
-  the guard only spares the walk.
+  the guard only spares the walk. Round 3: the second word never
+  answering, the upward search stopping at the first word and the downward
+  search stopping before it each fail the step-for-step test alone; the
+  flag pass without the estimate fails it; and a served range over the
+  elevators alone fails the stairs test.
 
-**The bare step** (callgrind, instructions inside `Simulation::tick`), the
-final head against `main` d09aa64:
+**The bare step** (callgrind, instructions inside `Simulation::tick`), round
+3's head against `main` 4f49fc7 (round 2's head measured within 0.4% of
+these against d09aa64):
 
 | Tower | Steps | Step | `accumulate` | `move_cars` |
 | --- | --- | --- | --- | --- |
-| `split-tower-4` | 720 | 2,196.8M to 1,736.0M (-21.0%) | 287.6M to 118.2M | 383.0M to 92.6M |
-| `sixseven_2` | 720 | 1,204.1M to 959.7M (-20.3%) | 140.4M to 66.7M | 241.4M to 68.4M |
-| `large` | 240 | 827.5M to 634.7M (-23.3%) | 273.5M to 111.2M | 43.4M to 9.7M |
-| `many-unit` | 240 | 780.7M to 668.5M (-14.4%) | 61.9M to 45.5M | 134.0M to 37.7M |
+| `split-tower-4` | 720 | 2,196.7M to 1,729.3M (-21.3%) | 287.7M to 118.1M | 382.9M to 91.9M |
+| `sixseven_2` | 720 | 1,203.8M to 955.5M (-20.6%) | 140.4M to 66.6M | 241.3M to 67.8M |
+| `large` | 240 | 827.2M to 633.2M (-23.4%) | 273.4M to 111.2M | 43.4M to 9.5M |
+| `many-unit` | 240 | 780.5M to 666.9M (-14.5%) | 61.9M to 45.4M | 134.1M to 37.4M |
 
-The crowd's `elevator_calls` also drops (50.1M to 38.6M on `split-tower-4`,
-36.2M to 27.7M on `sixseven_2`), since an ordered cab set inserts without
+The crowd's `elevator_calls` also drops (50.4M to 38.6M on `split-tower-4`,
+36.2M to 27.6M on `sixseven_2`), since an ordered cab set inserts without
 hashing.
 
 The review asked whether the bit sets are cheaper than round 1's walk, which
 an earlier cross-base comparison could not show. `move_cars` with each
-round's dispatcher on the same engine (the first four columns built on
-`main` d8e5a84, whose dispatcher is the same as d09aa64's and whose step is
-within 0.3% of it; the final head on d09aa64):
+round's dispatcher: the first four columns are built on `main` d8e5a84,
+whose dispatcher is the same as d09aa64's and whose step is within 0.3% of
+it, and the last on d09aa64, so only that column crosses bases. Round 1's
+column is 46c37f4, the engine of the round-1 head 4b99d9e (which adds only
+the #1051 results); the bit-set column is c89902a, a local commit whose
+code is in 835f46d.
 
-| Tower | `main` | Round 1 walk (4b99d9e) | Part A (11f694b) | Bit sets (c89902a) | Final head |
+| Tower | `main` | Round 1 walk (46c37f4) | Part A (11f694b) | Bit sets (c89902a) | Round 2 head |
 | --- | --- | --- | --- | --- | --- |
 | `split-tower-4` | 383.0M | 97.1M | 103.7M | 100.0M | 92.6M |
 | `sixseven_2` | 241.5M | 73.7M | 79.8M | 73.5M | 68.4M |
 | `large` | 43.4M | 8.2M | 10.0M | 10.1M | 9.7M |
 | `many-unit` | 134.0M | 48.1M | 44.5M | 40.7M | 37.7M |
 
-The final head's `move_cars` is the lowest of the four dispatchers on three
+Round 3's head reads 91.9M, 67.8M, 9.5M and 37.4M on `main` 4f49fc7. The
+final head's `move_cars` is the lowest of the four dispatchers on three
 towers. On `large`,
 round 1 stays ahead: its flag pass read the waiting map with one `range` per
 shaft, which visits fewer entries on that tower's five shafts than Part A's
@@ -230,7 +267,7 @@ lookup per stop. On `many-unit`, whose 14 express shafts each span the tower
 with 9 stops, the lookup per stop wins.
 
 **Wall clock**, 20 interleaved pairs of 720 steps, median of the per-pair
-ratios, final head against d09aa64: `split-tower-4` 0.844 (medians 273.8 and
+ratios, round 2's head against d09aa64: `split-tower-4` 0.844 (medians 273.8 and
 231.8 ms), `sixseven_2` 0.909 (120.3 and 107.5 ms). The ratio is a median of
 pairs, so it differs a little from the ratio of the two medians. Single pairs
 range from 0.55 to 1.22 on this machine, so the instruction counts are the
@@ -243,7 +280,7 @@ size runs on `main` do not contain it until it merges.
 
 ## Review
 
-`/gds-code-review` round 1 on 327782b: Blind Hunter, Edge Case Hunter,
+`/gds-code-review` round 1 on 327782b (rebased onto `main` as 46c37f4): Blind Hunter, Edge Case Hunter,
 Acceptance Auditor and Hot-Path Auditor. No layer found a wrong result: the
 Acceptance Auditor traced every change against the base and
 `ElevatorDispatch.ts`, and the reference differs from the base dispatcher
@@ -283,7 +320,7 @@ owner's save and about 5,760 at the cap.
 - [x] [Review][Patch] R2-1: a car with nothing to serve tested every stop of its shaft (HP-2) [dispatch.rs]: bit sets and a word search, at most two words per direction.
 - [x] [Review][Patch] R2-H1: the cab fill iterated a std `HashSet` (HP-10; its order could not reach a result, but the item bars the iteration) [dispatch.rs, crowd/mod.rs]: `ElevatorCalls.cab` holds a `BTreeSet`, read in floor order.
 - [x] [Review][Patch] R2-H2: `held` still probed the cab set by hash, and the #1293 row, its remedy and the #1170 comment described round 1 [dispatch.rs, backlog.md]: `next_stop` returns the stop's index, `held` reads the cab bit and the claim reuses the index; the row and its remedy are rewritten and #1170 has a new comment. Round 1's H4 deferral now covers only the hall map and one cab-map lookup per car.
-- [x] [Review][Patch] The step-for-step test never had a shaft over 64 stops, and the search generator never reached four words or asserted the word-boundary lengths (Edge Case Hunter, Blind Hunter) [dispatch_tests.rs, dispatch_search_tests.rs]: an 80-floor express shaft with an asserted second-word visit, unbroken boundary lengths with per-length counts, and the empty-word test. The search tests moved to their own file to keep both under 500 lines.
+- [x] [Review][Patch] The step-for-step test never had a shaft over 64 stops, and the search generator never reached four words or asserted the word-boundary lengths (Edge Case Hunter, Blind Hunter) [dispatch_tests.rs, dispatch_search_tests.rs]: an 80-floor express shaft with an asserted second-word visit (wrong: that shaft had 3 stops; see R3-F1), unbroken boundary lengths with per-length counts, and the empty-word test. The search tests moved to their own file to keep both under 500 lines.
 - [x] [Review][Patch] The flag pass looked `waiting` up even where the hall had raised the call (Blind Hunter, Hot-Path Auditor) [dispatch.rs]: it short-circuits as the TypeScript does.
 - [x] [Review][Patch] `tower_query_state` was a public module, the `tower.rs` memo doc named four memos, the reference's doc named the wrong predecessor, and the module doc said the move kept a file under the ceiling that was over it [lib.rs, tower.rs, dispatch_reference_tests.rs, tower_query_state.rs]: a private module, a doc that points at the module and the indexes, the reference described as the dispatcher before item 5, and "bring".
 - [x] [Review][Patch] Measurements: round 2 set its `move_cars` beside round 1's across two bases, put the difference on the cab fill without measuring Part A's change, and ran the perf towers only for digests (Blind Hunter, Acceptance Auditor) [story]: a same-engine table of all four dispatchers on four towers, in Result.
@@ -294,3 +331,27 @@ owner's save and about 5,760 at the cap.
 - [x] [Review][Defer] R2-H6: the TypeScript twin keeps the costs this PR removed [src/engine/ElevatorDispatch.ts]: deferred by reference to #1170 (comment updated).
 - [x] [Review][Defer] A hand-edited save's fractional or huge `carDir` reads differently in the two engines (Edge Case Hunter) [load.rs]: pre-existing and already listed in #858.
 - Dismissed (3): a dense per-stop waiting slot, since the lookups are under the allowance (at most 105 per chunk on the large tower); an ascending-stops assert, which `move_cars` already has; and where the `Unit` predicates live, which is cosmetic, since they moved verbatim.
+
+### Review round 3
+
+The third reviewer's review of 6c23246 (a conditional GO) and
+`/gds-code-review` round 3 on the same head, a confirming pass run while
+Codex was out of review credits: Blind Hunter, Edge Case Hunter, Acceptance
+Auditor and Hot-Path Auditor over the whole PR against `main` d09aa64. No
+layer found a wrong result; the Acceptance Auditor traced the search, the
+claims, the reach test, the tally, the waiting fold and the floor lists
+against `ElevatorDispatch.ts` again. The fixes are in d12a0e3 and 01e68a7.
+
+- [x] [Review][Patch] R3-F1: the step-for-step test's 80-floor express had 3 stops, since placing an express skips every floor without a lobby, and its second-word counter was met at step 0 by the cars' starting floors (third reviewer; Edge Case Hunter, Blind Hunter, Acceptance Auditor) [dispatch_tests.rs, story, PR body]: the shaft stops at all 80 floors and takes no drops, the test asserts more than 64 stops, and it counts cars that move from past the 65th stop (1,623, at least 500 required). Round 2's patch line above claimed this and was wrong.
+- [x] [Review][Patch] R3-F2: `scenario()`'s doc comment sat on `TALL_X`, and it said the offices were on every other floor (third reviewer; Blind Hunter, Acceptance Auditor) [dispatch_tests.rs]: moved back, and corrected.
+- [x] [Review][Patch] R3-H2: the dwell prune's `retain` iterated a std `HashMap` (Hot-Path Auditor, HP-5 and HP-10; the predicate was rewritten, so HP-7 reads it as new) [dispatch.rs]: `car_dwell` is a `BTreeMap` by shaft id. Round 1 dismissed this as H7 because the order cannot reach a result; round 2's R2-H1 fixed the same kind of iteration, and section 7 dismisses only an unreachable path or a pass within its budget, so H7's dismissal is withdrawn.
+- [x] [Review][Patch] R3-H3: the HP-8 rows for the dispatch lists named the work item and not the PR (Hot-Path Auditor) [hot-path-review.md]: they name #1298.
+- [x] [Review][Patch] Nothing tested the served list's range where stairs carry passengers past every elevator or a service car reaches above them (Blind Hunter) [dispatch_tests.rs]: a test with two flights of stairs above the elevators and a service car above those.
+- [x] [Review][Patch] The raised-call counter passed on any waiting value of 1 or more, so it never showed the estimate deciding a stop (Blind Hunter) [dispatch_tests.rs]: it counts passenger stops the estimate raised where the hall call did not.
+- [x] [Review][Patch] The bit set in `move_cars` shadowed the `calls` parameter (Blind Hunter) [dispatch.rs]: `call_bits`.
+- [x] [Review][Patch] "At most two words per direction" left out the downward tie check's extra search, and "no shaft has more than 110 stops" did not say what caps it (Blind Hunter, Acceptance Auditor) [dispatch.rs, story]: the doc and Design count the tie check and name the load's floor range.
+- [x] [Review][Patch] AC1 names fuzz, and the Result pointed at a nightly workflow that never ran on this PR (Acceptance Auditor) [story]: 20 seeds run on the final head, recorded in Result.
+- [x] [Review][Patch] Docs (Acceptance Auditor, Blind Hunter): the #1170 row did not carry this item's TypeScript dispatcher costs; the #1143 row dated round 2's figures 2026-10-21 and called the base's second room pass hashed; the story named a round-1 commit that is not on the branch and labeled round 1's column with the results commit; the #1051 results this PR carries went unmentioned, and the #1051 row still listed that run as open; Result had no date or harness; the `tower_index.rs` header left out the transport edits behind the floor lists; AC3 and the HP-8 TypeScript note were loose; Design called the TypeScript's `if` and `else if` an `||`; the PR body did not name the `ElevatorCalls.cab` type change or `Memo`'s private module [story, backlog.md, hot-path-review.md, tower_index.rs, PR body]: all corrected.
+- [x] [Review][Defer] R3-H1: counted with the work per lookup, the flag pass's `BTreeMap` read is about 9 visits per stop: about 945 per chunk on the large tower, 2,500 on the owner's save, 3,000 on many-unit and 6,700 at the cap (Hot-Path Auditor, HP-2 and HP-7) [dispatch.rs]: under the small-collection allowance on the large tower, where section 7 counts it, so it is deferred onto #1293 with its remedy, a dense waiting slot per floor over the 128 floor slots, which takes the flag pass to about 210 visits on the large tower. Round 2's dismissal of the dense slot counted lookups without their compares and is withdrawn.
+- [x] [Review][Defer] Round 2 put R2-H5's share at 1.1% of the tick; at this head it is about 2.2% (38.6M of 1,729.3M on the owner's save), since its cost fell less than the tick did. Still deferred to #1158 and #1293.
+- Dismissed (4): `reindex_resets_the_floor_lists` reading the memo's old answer before the reset is the point of the test, which shows the reset is what refreshes the lists; the population fold in `accumulate` is checked by a `debug_assert` that CI's debug `cargo test` runs on every dispatch test, and the step-for-step test compares the waiting estimate with the reference, which reads `total_population`; the empty-tower counter is paired with `total_population() == 0`, which shows the state was reached; and a seeded mutant the Edge Case Hunter found in the working tree was one of this round's mutation runs, reverted before the commit.
