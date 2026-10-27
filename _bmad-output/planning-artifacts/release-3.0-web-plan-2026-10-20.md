@@ -378,9 +378,9 @@ Nov 22 keeps all of stage 2 on stage 3's host, and about Dec 12 is the latest
 that leaves RUN-1 and one fix-and-rerun before Dec 26. A slice 9 in early
 November costs nothing.
 
-States at about 03:15 UTC on Oct 21. "Merge" means merged with a merge
-commit on an independent GO at the exact head and green CI. Live states are
-in #1104.
+States at about 03:15 UTC on Oct 21, except the A8, #1242 and slice 7 to 10
+rows, revised on Oct 27. "Merge" means merged with a merge commit on an
+independent GO at the exact head and green CI. Live states are in #1104.
 
 **Stage-1 path (target: the GO decision on Oct 27)**
 
@@ -410,7 +410,7 @@ prepared drop-back PR alone. Item 2 lists #1126 as merged; it closes with the
 Runtime lane's follow-up PR.
 
 **Facade path (target: a readiness review on Oct 27; slice 9's readout
-realistically Oct 29 to Nov 4)**
+realistically Nov 13 to 18, revised Oct 27 from Oct 29 to Nov 4)**
 
 | Item | Lane | Depends on | Issue / PR | Review | CI | Measurement | Realistic |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -425,12 +425,13 @@ realistically Oct 29 to Nov 4)**
 | Slice 4, panels through the port (4a to 4d; 4e waits for #1237) | Facade panels | slices 1 and 2 | #1211 | Review skill rounds | n/a | none | 4a Oct 22 to 23; 4b to 4d Oct 23 to 26; 4e after #1237 |
 | Slice 3, the renderer reads the view | Rendering | spike 0 (passed); slice 5 for 3b | #1210 | n/a | n/a | visual baselines, drift gate | 3a Oct 23 to 24; 3b Oct 26 to 28 |
 | Slice 5, app lifecycle | Runtime | #1126 follow-up; slice 1 | #1212 | n/a | n/a | none | Oct 23 to 26 |
-| A8, load-time memory (slice 13) | Rust save-load memory peak | none | #1225 | PR not opened | n/a | load peak before and after on the PC | Oct 22 to 24 |
+| A8, load-time memory (slice 13) | Rust save-load memory peak | none | #1225; PR #1332 | GO at `bc08021c` | Green | load peak before and after on the PC | Merged Oct 27 (`511dadf6`) |
+| #1242, save-time memory (the save without a whole-save tree) | Rust save-load memory peak | slice 13 | #1242 | Review skill rounds | n/a | the save time and memory after a load on large against `main`'s; the PC run reads them | PR Oct 27 to 28; merge Oct 28 to 29, Oct 30 at the latest unless review finds a design problem |
 | M5 W1 harness (must be in slice 9's commit) | Rust engine cold start | none | #1254 | PR not opened | n/a | P1 on the PC, about 90 min | Oct 22 to 23 |
-| Slice 7, RustSim behind its flag; cue-timing test | Facade | 2 to 6, 6a to 6d, #1237, #1239 | #1217 | n/a | n/a | none | Oct 26 to 30 |
-| Slice 8, fallback from the Rust recovery point | Runtime with Facade | slice 7; R6a | #1218 | n/a | n/a | the 50 ms save budget on the PC | Oct 27 to Nov 1 |
-| Slice 9, the PC protocol run | PC | 8, 13, #1242, W1; the tolerance rule (1.3.9, item 3) | #1220 | n/a | n/a | 1.3.6, plus a structural edit (a revision change) timed on the large and many-unit towers against the 50 ms long-task bar at 1x | Best Oct 26 (reserved); realistic Oct 29 to Nov 4 |
-| Slice 10, the facade becomes the WASM host | Facade | slice 9 passing; owner approval | #1222 | n/a | n/a | RUN-1 after it | Target before about Nov 22 |
+| Slice 7, RustSim behind its flag; cue-timing test | Facade | 2 to 6, 6a to 6d, #1237, #1239 | #1217 | n/a | n/a | none | Merge about Nov 5 to 8 (projected Oct 27): slices 2, 3, 4, 5, 6a and 6c were still open on Oct 27 |
+| Slice 8, fallback from the Rust recovery point | Runtime with Facade | slice 7; R6a | #1218 | n/a | n/a | the 50 ms save budget on the PC | Merge about Nov 10 to 13 (projected Oct 27) |
+| Slice 9, the PC protocol run | PC | 8, 13, #1242, W1; the tolerance rule (1.3.9, item 3) | #1220 | n/a | n/a | 1.3.6, plus a structural edit (a revision change) timed on the large and many-unit towers against the 50 ms long-task bar at 1x; reported beside M6, the memory after that edit (#1259) and a Quick Save's memory and time on large (#1338) | About Nov 13 to 18 (projected Oct 27; was Oct 29 to Nov 4): slices 7 and 8 set it, not #1242 |
+| Slice 10, the facade becomes the WASM host | Facade | slice 9 passing; owner approval | #1222 | n/a | n/a | RUN-1 after it | Target before about Nov 22, tight after slice 9's revised window; about Dec 12 at the latest |
 
 **Concurrent work that lands before stage 3 or the freeze**
 
@@ -454,7 +455,9 @@ the analytics packet is approved by Oct 22, the fixtures merge by Oct 24 and
 the bracket run happens on Oct 25; each of those slipping moves the GO decision
 into Oct 28 to 31. The facade readiness review on Oct 27 can show slices 1 to
 6 and A8 mostly merged and slices 7 and 8 in review; slice 9's readout is
-more likely Oct 29 to Nov 4, which costs nothing under 1.3.1. The #1143 fixes
+more likely Oct 29 to Nov 4, which costs nothing under 1.3.1 (revised Oct 27:
+slices 7 and 8 had not opened, so the readout moves to about Nov 13 to 18;
+slice 10 stays inside Dec 12, and the Nov 22 target is tight). The #1143 fixes
 1 to 4 and A8 can merge before Oct 27; their PC before-and-after numbers are
 optimization evidence. Hosted acceptance comes only from a protocol run, and
 there is no release speed claim until one passes.
