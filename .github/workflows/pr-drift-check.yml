@@ -24,9 +24,8 @@ name: PR screenshot drift-check
 #      and `engine-parity` fails when that render differs from this run's Rust
 #      render, naming the first differing shot; `engine-parity-visual` runs the
 #      visual specs on the TypeScript engine against the committed (Rust)
-#      baselines. Both are
-#      separate checks from `drift-gate` (which stays on the Rust engine's
-#      gallery) and never commit anything.
+#      baselines. Both are separate checks from `drift-gate` (which stays on
+#      the Rust engine's gallery) and never commit anything.
 #
 # PREREQUISITE: the `screenshot-approval` Environment must exist with a required
 # reviewer (repo Settings -> Environments). Without a required reviewer the gate
@@ -294,9 +293,9 @@ jobs:
   # PR: the baselines are the Rust engine's (the e2e job compares them on
   # chromium-wasm), so the visual specs run here on the TypeScript engine
   # (chromium, PW_TS_VISUAL=1) in the pinned image against the same committed
-  # baselines, and any pixel difference fails this job. It never mints. The image tag comes from the Rust
-  # capture's resolve step; without one the job fails to start rather than
-  # skipping.
+  # baselines, and any pixel difference fails this job. It never mints. The
+  # image tag comes from the Rust capture's resolve step; without one the job
+  # fails to start rather than skipping.
   engine-parity-visual:
     needs: [changes, capture]
     if: ${{ !cancelled() && needs.changes.outputs.render == 'true' }}
