@@ -26,7 +26,8 @@ describe("shell-free worker comparison builds", () => {
     const root = fixture();
     writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: { prebuild: "node record.cjs", build: "node record.cjs", postbuild: "node record.cjs" } }));
     writeFileSync(join(root, "record.cjs"), 'require("node:fs").appendFileSync("lifecycle.txt", process.env.npm_lifecycle_event + ":" + process.env.VC_TEST_EXPAND + "\\n");');
-    buildProduction(root, { ...process.env, VC_TEST_EXPAND: "literal & value" });
+    // Started the way the owner's Windows run is: `npx vitest` puts npm_lifecycle_event=npx in the environment.
+    buildProduction(root, { ...process.env, npm_lifecycle_event: "npx", npm_lifecycle_script: "vitest", VC_TEST_EXPAND: "literal & value" });
     expect(readFileSync(join(root, "lifecycle.txt"), "utf8").split("\n")).toEqual(["prebuild:literal & value", "build:literal & value", "postbuild:literal & value", ""]);
   });
 
