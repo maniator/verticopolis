@@ -7,7 +7,7 @@ import type { Transport, Unit } from "../engine/types";
 import type { ShadowCommand } from "../dualrun/commands";
 import type { Command, CommandResults } from "./commands";
 import type { Query, QueryResults } from "./queries";
-import type { CrowdView, HeaderView, PersonView, TowerView, TransportView, UnitView } from "./view";
+import type { CrowdView, FxView, HeaderView, PersonView, TowerView, TransportView, UnitView } from "./view";
 
 /** The relay's ops that are not player commands: the shadow's own plumbing,
  *  edits no production code makes, and test and tooling hooks. A new
@@ -37,6 +37,11 @@ describe("the port's types", () => {
     expectTypeOf<Crowd>().toExtend<CrowdView>();
     expectTypeOf<Person>().toExtend<PersonView>();
     expectTypeOf<Simulation["pendingChoice"]>().toExtend<HeaderView["pendingChoice"]>();
+    expectTypeOf<Simulation["explosionFx"]>().toExtend<FxView["explosion"]>();
+    expectTypeOf<Simulation["thiefFx"]>().toExtend<FxView["thief"]>();
+    expectTypeOf<Simulation["treasureFx"]>().toExtend<FxView["treasure"]>();
+    expectTypeOf<Simulation["view"]>().toExtend<HeaderView["camera"]>();
+    expectTypeOf<Simulation["rng"]["initialSeed"]>().toEqualTypeOf<HeaderView["sceneSeed"]>();
   });
 
   it("the views are read-only", () => {
