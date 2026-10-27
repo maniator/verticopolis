@@ -300,7 +300,7 @@ run records below.
 | `hourCost.bench.integration.test.ts` | opt-in | n/a | skipped everywhere unless `RUN_HOUR_BENCH=1`; not a parity exclusion, listed so the 39 skips reconcile (38 marks plus this) |
 | `src/dualrun/dualRun.test.ts` (left out) | 6 | c | attaches the dual run's relay itself |
 | `e2e/regions.spec.ts` (Playwright, `chromium-wasm`) | skipped (1 test) | c | toggles a unit between fire and empty in place; see the e2e slice |
-| `e2e/perf.spec.ts` (Playwright, `chromium-wasm`) | skipped (1 test) | c | the perf baseline is the TypeScript engine's (#900) |
+| `e2e/perf.spec.ts` (Playwright, `chromium-wasm`) | runs since #900 (PR #1295) | n/a | no longer skipped: `e2e/perf/baseline.json` holds an entry per engine and each engine's run is held to its own; listed so the earlier counts reconcile |
 
 Tests that never tick (the construction and command-surface tests) pass
 on both projects without the engine; a later slice can count them apart.
@@ -683,11 +683,12 @@ relayed commands or `itTypeScriptOnly` in slice 2; this slice touches no
 ### TypeScript-only on `chromium-wasm`
 
 Every skip goes through `tsOnlyOnWasm(reason)` (grep `tsOnlyOnWasm(`).
+`e2e/perf.spec.ts` left this table with #900 (PR #1295): it now runs on
+both projects, each engine held to its own baseline entry.
 
 | Spec | Test | Reason |
 | --- | --- | --- |
 | `e2e/regions.spec.ts` | regions compose settled rooms, animate fires privately, and drain on budget | It toggles one office between fire and empty in place to pin the per-sync region move; no relayed command douses a fire, and a load would rebuild every region instead. The renderer mechanism it pins does not depend on the engine. |
-| `e2e/perf.spec.ts` | ui.update cost, end-to-end speed, and node identity clear the committed baseline | `e2e/perf/baseline.json` was measured on the TypeScript engine, so the WASM engine has no baseline to clear yet (`wasm-perf-baseline`, #900). |
 
 ### Results
 
