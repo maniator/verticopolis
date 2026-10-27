@@ -2,6 +2,7 @@
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { startDeployments, type Deployment, type Deployments } from "./deployments";
 import { onWasm } from "./helpers";
+import { engineEntries, engineEntriesOf as entriesOf, expectEngineIs as expectIs, newContext as makeContext, short } from "./engineDeployHelpers";
 import { expectControlledWithEngine, hostedGame, installWorker } from "./offlineHelpers";
 
 /**
@@ -33,50 +34,9 @@ test.afterAll(async () => {
   await deployments?.close();
 });
 
-const short = (id: string): string => id.slice(0, 12);
-
-/** A new context on the deployments' origin that chooses the engine, as the project's own contexts do. */
-const newContext = (browser: Browser): Promise<BrowserContext> =>
-  browser.newContext({
-    baseURL: deployments.origin,
-    storageState: { cookies: [], origins: [{ origin: deployments.origin, localStorage: [{ name: "vc.engine", value: "wasm" }] }] },
-  });
-
-/** What the precache holds for the engine files: each key (path and query) with the SHA-256 of its body. */
-async function engineEntries(page: Page): Promise<Record<string, string>> {
-  return page.evaluate(async () => {
-    const found: Record<string, string> = {};
-    for (const name of await caches.keys()) {
-      const cache = await caches.open(name);
-      for (const request of await cache.keys()) {
-        const url = new URL(request.url);
-        if (!url.pathname.startsWith("/engine/")) continue;
-        const digest = await crypto.subtle.digest("SHA-256", await (await cache.match(request))!.arrayBuffer());
-        found[`${url.pathname}${url.search}`] = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-      }
-    }
-    return found;
-  });
-}
-
-/** The engine keys and body digests that `which`'s sw.js and files describe. */
-function engineEntriesOf(which: Deployment): Record<string, string> {
-  const r = deployments.revisions[which];
-  const d = deployments.digests[which];
-  return {
-    [`/engine/verticopolis_engine.js?__WB_REVISION__=${r.glue}`]: d.glue,
-    [`/engine/verticopolis_engine_bg.wasm?__WB_REVISION__=${r.wasm}`]: d.wasm,
-    [`/engine/BUILD.json?__WB_REVISION__=${r.record}`]: d.record,
-  };
-}
-
-/** The cache holds exactly `which`'s three engine files under its keys, each with its own bytes. */
-async function expectEngineIs(page: Page, which: Deployment): Promise<void> {
-  const held = await engineEntries(page);
-  const expected = engineEntriesOf(which);
-  for (const [key, digest] of Object.entries(expected)) expect(held[key], `${key} holds ${which}'s bytes`).toBe(digest);
-  expect(Object.keys(held).sort(), `no engine key but ${which}'s`).toEqual(Object.keys(expected).sort());
-}
+const newContext = (browser: Browser): Promise<BrowserContext> => makeContext(browser, deployments);
+const engineEntriesOf = (which: Deployment): Record<string, string> => entriesOf(deployments, which);
+const expectEngineIs = (page: Page, which: Deployment): Promise<void> => expectIs(deployments, page, which);
 
 test("an update whose engine files come from another build fails to install and leaves the installed engine alone", async ({ browser }) => {
   const context = await newContext(browser);

@@ -44,6 +44,8 @@ export interface Deployments {
   reissueWorker(on: boolean): void;
   /** Answer every `/engine/` request from `which` whatever `serve()` picked, as a deploy that lands between the worker script and the engine files does; `null` ends it. */
   engineFrom(which: Deployment | null): void;
+  /** Cut the connection on requests the way a dropped network does (the worker's own requests too, which Playwright's offline flag does not cut): the engine files only, or everything; `null` ends it. */
+  failNetwork(scope: "engine" | "all" | null): void;
   /** Make `version.json` answer 404, as it does when the host or the network drops it. */
   failVersionJson(failing: boolean): void;
   /** Every path requested so far, in order, with the deployment that answered. */
@@ -198,6 +200,7 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
   let versionJsonFails = false;
   let workerReissued = false;
   let engineOverride: Deployment | null = null;
+  let networkFails: "engine" | "all" | null = null;
   const requests: Deployments["requests"] = [];
 
   const server: Server = createServer((req, res) => {
@@ -209,6 +212,10 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
     const from = engineOverride && path.startsWith("/engine/") ? engineOverride : current;
     const root = roots[from];
     requests.push({ path, from });
+    if (networkFails === "all" || (networkFails === "engine" && path.startsWith("/engine/"))) {
+      req.socket.destroy();
+      return;
+    }
     if (versionJsonFails && path === "/version.json") {
       res.writeHead(404, { "content-type": "text/plain" }).end("not found");
       return;
@@ -250,6 +257,9 @@ export async function startDeployments(distDir = fileURLToPath(new URL("../dist"
     },
     engineFrom: (which) => {
       engineOverride = which;
+    },
+    failNetwork: (scope) => {
+      networkFails = scope;
     },
     failVersionJson: (failing) => {
       versionJsonFails = failing;
