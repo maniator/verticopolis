@@ -40,7 +40,9 @@ produce it, both in the image pinned to the **exact Playwright version locked in
   scene on the WASM engine. While the TypeScript engine stays selectable, a
   second capture renders the same scenes on it and `engine-parity` compares the
   two byte for byte; a difference is a parity finding to report, and that leg
-  never commits.
+  never commits. Running the pinned image locally needs the engine package
+  too: the image has no Rust toolchain, so build `src/public/engine/` on the
+  host first (`npm run wasm:build`).
 - [`update-visual-baselines.yml`](../.github/workflows/update-visual-baselines.yml)
   mints the `e2e/visual.spec.ts-snapshots` baselines the visual-regression gate
   compares against. A **marker push** triggers it: put `[update-baselines]` in the

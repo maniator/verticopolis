@@ -166,6 +166,7 @@ jobs:
     uses: ./.github/workflows/screenshot-capture.yml
     with:
       ref: ${{ github.event.pull_request.head.sha }}
+      engine: wasm
     permissions:
       contents: read
 
@@ -191,9 +192,8 @@ jobs:
   # head keeps a PR that legitimately changes rendering from reading as an
   # engine difference while its gallery waits on commit-on-approval; on a
   # same-repo PR with drift-gate green, the Rust render is the committed
-  # gallery. A difference fails this job (red, though it is not a required
-  # check and never commits), names the first differing shot, and lists the
-  # rest. The TypeScript shards stay downloadable as the engine-ts-shots-*
+  # gallery. A difference fails this job (it never commits), names the first
+  # differing shot, and lists the rest. The TypeScript shards stay downloadable as the engine-ts-shots-*
   # artifacts. It runs when the TypeScript capture failed too, since that leg
   # uploads whatever rendered (a scene that failed on TypeScript is a missing
   # image here, and its shard is named).
@@ -317,8 +317,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The engine's WASM package is build output, not checked in; the WASM
-      # Rust capture's resolve job restored or built it for this same head.
+      # The engine's WASM package is build output, not checked in; the Rust
+      # capture's resolve job restored or built it for this same head.
       - uses: ./.github/actions/engine-wasm-download
         with:
           artifact-name: engine-wasm-package
@@ -610,7 +610,7 @@ jobs:
           fi
           # Render paths changed, so the determinism capture was expected to run.
           if [ "$CAPTURE" != "success" ]; then
-            echo "::error::the screenshot determinism guard did not pass (capture: $CAPTURE). Either a shard's two independent renders differ (nondeterminism), or the capture did not run because an upstream job did not succeed. This is the hard check, not the drift approval gate; fix it before merging."
+            echo "::error::the screenshot determinism guard did not pass (capture: $CAPTURE). Either a shard's two independent renders differ (nondeterminism), a scene or the engine package build failed on the Rust engine (see capture / resolve-image and the shard jobs), or the capture did not run because an upstream job did not succeed. This is the hard check, not the drift approval gate; fix it before merging."
             exit 1
           fi
           echo "Screenshot determinism check passed. ✅"

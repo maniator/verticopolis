@@ -287,9 +287,10 @@ otherwise, so `drift-gate` and `commit-on-approval` work from the Rust render.
 While the TypeScript engine stays selectable, a parity leg renders the same
 scenes with `VC_SHOT_ENGINE=ts`: `pr-drift-check` compares it with the same
 run's Rust render (`engine-parity`), and any pixel difference fails that check
-as an engine parity finding to report. It is not a required check, and it never
-commits. The visual baselines are still the TypeScript engine's: the engine leg
-renders the visual specs with the WASM engine
+as an engine parity finding to report. It never commits.
+
+The visual baselines are still the TypeScript engine's: the engine leg renders
+the visual specs with the WASM engine
 (`PW_WASM_VISUAL=1 npx playwright test e2e/visual.spec.ts --project=chromium-wasm`)
 and compares them with the committed baselines (`engine-parity-visual`), and
 `update-visual-baselines` repeats that comparison after a mint; that leg never

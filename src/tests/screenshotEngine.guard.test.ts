@@ -1,8 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { resolveShotEngine } from "../../scripts/screenshot-engine.ts";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 /**
  * The committed gallery is the Rust engine's (#1353): the generator hosts the
@@ -15,6 +14,8 @@ import { resolveShotEngine } from "../../scripts/screenshot-engine.ts";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (rel: string) => readFileSync(resolve(ROOT, rel), "utf8");
 
+type ResolveShotEngine = (raw: string | undefined) => "ts" | "wasm";
+
 /** The text of one top-level job of a workflow, up to the next job. */
 function job(yaml: string, name: string): string {
   const start = yaml.search(new RegExp(`^ {2}${name}:\\s*$`, "m"));
@@ -25,6 +26,17 @@ function job(yaml: string, name: string): string {
 }
 
 describe("the screenshot generator's engine", () => {
+  // scripts/ sits outside the app's tsconfig, so the module is loaded by path.
+  // It reads VC_SHOT_ENGINE when it loads, so a value exported in the
+  // developer's shell must not reach it.
+  let resolveShotEngine: ResolveShotEngine;
+  beforeAll(async () => {
+    vi.stubEnv("VC_SHOT_ENGINE", "");
+    const mod = (await import(pathToFileURL(resolve(ROOT, "scripts", "screenshot-engine.ts")).href)) as { resolveShotEngine: ResolveShotEngine };
+    resolveShotEngine = mod.resolveShotEngine;
+  });
+  afterAll(() => vi.unstubAllEnvs());
+
   it("is the Rust engine unless the TypeScript parity leg asks for it", () => {
     expect(resolveShotEngine(undefined)).toBe("wasm");
     expect(resolveShotEngine("")).toBe("wasm");
@@ -50,14 +62,18 @@ describe("the drift check's engines", () => {
   });
 
   it("gates and commits from the Rust capture, and only reports from the TypeScript one", () => {
-    const rust = job(drift, "capture");
-    expect(rust).not.toMatch(/engine:/);
+    expect(job(drift, "capture")).toMatch(/engine: wasm\b/);
     expect(job(drift, "capture-ts")).toMatch(/engine: ts\b/);
     for (const gated of ["verify-drift", "commit-on-approval", "drift-gate"]) {
       const text = job(drift, gated);
       expect(text, `${gated} reads the Rust capture`).toMatch(/needs: .*\bcapture\b/);
       expect(text, `${gated} must not wait on the TypeScript leg`).not.toContain("capture-ts");
     }
+    // The shards that feed the committed gallery are the Rust ones only.
+    for (const fed of ["verify-drift", "commit-on-approval"]) {
+      expect(job(drift, fed), `${fed} downloads only the Rust shards`).toMatch(/pattern: shots-\*\n/);
+    }
     expect(job(drift, "engine-parity")).toMatch(/needs: \[changes, capture, capture-ts\]/);
+    expect(job(drift, "engine-parity-visual")).toMatch(/needs: \[changes, capture\]/);
   });
 });

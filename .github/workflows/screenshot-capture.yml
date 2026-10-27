@@ -135,6 +135,18 @@ jobs:
       # loads it, so the TypeScript parity leg never waits on (or fails with)
       # a Rust build. The name holds no "shots-", so a shots download never
       # picks it up.
+      # The input is a free string: anything but these two would skip the
+      # package here while the generator (unset or empty means Rust) still
+      # needed it.
+      - name: Check the engine input
+        env:
+          ENGINE: ${{ inputs.engine }}
+        run: |
+          case "$ENGINE" in
+            wasm|ts) ;;
+            *) echo "::error::engine must be 'wasm' or 'ts', got '$ENGINE'"; exit 1 ;;
+          esac
+
       - if: inputs.engine == 'wasm'
         uses: ./.github/actions/engine-wasm
         with:
@@ -262,6 +274,9 @@ jobs:
         with:
           name: ${{ inputs.engine == 'ts' && 'engine-ts-' || '' }}shots-${{ matrix.shard }}
           path: /tmp/stage
+          # A re-run of a failed shard replaces the render its first attempt
+          # uploaded (the parity leg uploads on failure too).
+          overwrite: true
           retention-days: 5
           if-no-files-found: error
           include-hidden-files: true

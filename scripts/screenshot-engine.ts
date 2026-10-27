@@ -160,11 +160,12 @@ export async function beginSettleStep(page: Page, where: string): Promise<void> 
   if (state !== "synced") throw new Error(`WASM leg: could not merge ${where} (${state})`);
 }
 
-/** WASM leg only: the live sim is the hosted instance of an attached host.
+/** WASM leg: the live sim is the hosted instance of an attached host.
  *  Catches a leg that silently rendered on the TypeScript engine (the engine
- *  package never loaded, or a load the host refused). */
+ *  package never loaded, or a load the host refused). The TypeScript leg
+ *  checks the opposite (expectNotHosted). */
 async function expectHosted(page: Page, where: string): Promise<void> {
-  if (SHOT_ENGINE !== "wasm") return;
+  if (SHOT_ENGINE !== "wasm") return expectNotHosted(page, where);
   const hosted = await page.evaluate(() => {
     const w = window as unknown as { game?: any; __vcEngine?: any };
     if (!w.__vcEngine) return "no engine host (did the engine package load?)";
@@ -172,6 +173,18 @@ async function expectHosted(page: Page, where: string): Promise<void> {
     return Object.prototype.hasOwnProperty.call(w.game?.sim ?? {}, "serialize") ? "hosted" : "the live sim is not the hosted instance";
   });
   if (hosted !== "hosted") throw new Error(`WASM leg: the tower is not on the engine ${where} (${hosted})`);
+}
+
+/** TypeScript leg only: no host holds the tower. Catches a parity leg that
+ *  silently rendered on the Rust engine (a dropped `vc.engine` seed once the
+ *  app's default flips), which would make the parity comparison Rust against
+ *  Rust and pass for nothing. */
+async function expectNotHosted(page: Page, where: string): Promise<void> {
+  const hosted = await page.evaluate(() => {
+    const w = window as unknown as { game?: any; __vcEngine?: any };
+    return Boolean(w.__vcEngine?.status?.hosted) || Object.prototype.hasOwnProperty.call(w.game?.sim ?? {}, "serialize");
+  });
+  if (hosted) throw new Error(`TypeScript leg: the tower is on the Rust engine ${where}; the parity leg must render on the TypeScript engine`);
 }
 
 /** Fail the run when a SETTLE_AFTER_SETUP entry names no shot, or a shot

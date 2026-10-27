@@ -44,15 +44,17 @@ export function pgMaskVersion(): void {
     // The engine label (" · Rust engine", src/wasmhost/engineLabel.ts) follows
     // the Settings and Help version span as a sibling text node (lit puts a
     // marker comment between them). It names the engine for a tester and is
-    // masked with the version, so the engine leg of the drift check compares
-    // the game's pixels. Absent on the TypeScript engine.
+    // masked with the version, so the two legs of the drift check compare the
+    // game's pixels. Absent on the TypeScript engine.
     for (const n of el.parentElement?.childNodes ?? []) {
       if (n.nodeType === Node.TEXT_NODE && n.textContent?.includes(" · Rust engine")) n.textContent = n.textContent.replace(/ · Rust engine( \(worker\))?/, "");
     }
   });
   // The Settings "Game engine" section differs between the drift check's two
-  // legs: the WASM leg stores the Rust choice and runs Rust. Show the
-  // TypeScript leg's state, Automatic checked and the TypeScript engine running.
+  // legs: the Rust leg stores the Rust choice and runs Rust, the TypeScript leg
+  // stores the TypeScript choice. Both are masked to one fixed state, Automatic
+  // checked and the TypeScript engine running, so the committed pixels (the
+  // Rust leg's) do not depend on which engine the section reports.
   document.querySelectorAll<HTMLInputElement>('input[name="set-engine"]').forEach((r) => {
     r.checked = r.value === "auto";
   });
