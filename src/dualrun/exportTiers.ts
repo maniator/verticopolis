@@ -98,6 +98,8 @@ export const BINDING_EXPORT_TIERS = {
   exportTdt: T2,
   encodeVctower: T2,
   serialize: T2,
+  serializeForSync: LOOP,
+  saveDelta: LOOP,
   stateView: T2,
   crowdView: T2,
   stateDigest: T2,

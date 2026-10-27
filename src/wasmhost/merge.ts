@@ -1,6 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
-import { forgetUnitLists } from "../engine/tower/rooms";
+import { forgetUnitLists, roomUnits } from "../engine/tower/rooms";
 import type { Transport, Unit } from "../engine/types";
 
 /**
@@ -37,10 +37,87 @@ export interface MergeMarks {
 }
 
 export function mergeSimulation(target: Simulation, fresh: Simulation, marks: MergeMarks): void {
+  adoptSimulationFields(target, fresh);
+  mergeTower(target.tower, fresh.tower, marks);
+  // The fires, read from the merged rooms (a floor or lobby tile cannot
+  // burn) through the revision-keyed room list: after a merge that kept the
+  // revision it is warm, and after one that moved it the build is the one
+  // pass the read model's own queries would make next.
+  target.events.restore(roomUnits(target.tower).filter((u) => u.state === "fire").map((u) => u.id));
+}
+
+/** What an hourly delta carries (#1045), read and coerced: `rest` is a
+ *  fresh deserialization of the save's top-level keys with no units and no
+ *  transports, `units` the changed unit records (every id already in the
+ *  read model), and `transports` every transport record, in save order. */
+export interface DeltaRecords {
+  rest: Simulation;
+  units: Unit[];
+  transports: Transport[];
+}
+
+/**
+ * Patch the read model with an hourly delta, in place, to the engine's
+ * saved state, as a full merge would give it: the Simulation fields as
+ * `mergeSimulation` adopts them, the changed unit records written over the
+ * objects the read model holds (the rest are untouched, which is the
+ * saving), the transports merged by id as the engine saved them, and the
+ * tower's own saved fields. The load-time transport passes (the overlap
+ * filter, the express lobby-stop lock) are not run again: the engine's own
+ * placement keeps both, and a full merge's would change nothing.
+ * The sets `deserialize` derives from the units (construction, fires) are
+ * left to {@link rebuildUnitSets}, once the reply's frame has set every
+ * unit's state. The tower's caches stay:
+ * the revision did not move (a delta is only sent when it did not), and
+ * every revision-keyed cache reads layout, never unit state.
+ */
+export function mergeSimulationDelta(target: Simulation, d: DeltaRecords, marks: MergeMarks): void {
+  const tower = target.tower;
+  // Every unit named is checked before the first write, so a throw leaves
+  // the read model as it was.
+  const held = d.units.map((record) => {
+    const unit = tower.byId.get(record.id);
+    if (!unit) throw new Error(`delta: unit ${record.id} is not in the read model`);
+    return unit;
+  });
+  adoptSimulationFields(target, d.rest, true);
+  d.units.forEach((record, i) => assignRecord(held[i], record));
+  mergeById(tower.transports, d.transports, tower.transportsById);
+  tower.setNextId(d.rest.tower.getNextId());
+  tower.towerName = d.rest.tower.towerName;
+  tower.builtWeddingHall = d.rest.tower.builtWeddingHall;
+  tower.revision = marks.revision;
+  tower.mealOverlayRevision = marks.mealOverlayRevision;
+}
+
+/** Rebuild the sets `deserialize` derives from the unit states (the units
+ *  under construction and the fires) from the read model's units. After a
+ *  delta they are run once the reply's frame records are applied, so they
+ *  read the engine's states at the reply, as a full merge's fresh units do:
+ *  a unit whose save form did not move is not in the delta, and its state
+ *  before the frame is the last frame's. */
+export function rebuildUnitSets(target: Simulation): void {
+  const fires: number[] = [];
+  target.constructing.clear();
+  // Structural floor/lobby tiles cannot be under construction or on fire.
+  // The revision-keyed room index preserves the unit ordering and live states.
+  for (const u of roomUnits(target.tower)) {
+    if (u.state === "construction") target.constructing.add(u.id);
+    else if (u.state === "fire") fires.push(u.id);
+  }
+  target.events.restore(fires);
+}
+
+/** The Simulation-level half of a merge: every field the save carries,
+ *  from `fresh`, and the clock, events state and bookings. */
+function adoptSimulationFields(target: Simulation, fresh: Simulation, keepUnitSets = false): void {
   const t = target as unknown as Record<string, unknown>;
   const f = fresh as unknown as Record<string, unknown>;
   for (const key of Object.keys(f)) {
     if (KEEP.has(key) || typeof f[key] === "function") continue;
+    // A delta's `fresh` has no units, so the set derived from them is empty:
+    // the read model keeps its own until `rebuildUnitSets` runs.
+    if (keepUnitSets && key === "constructing") continue;
     t[key] = f[key];
   }
   target.clock.minutes = fresh.clock.minutes;
@@ -49,9 +126,7 @@ export function mergeSimulation(target: Simulation, fresh: Simulation, marks: Me
   // the save writer takes one.
   target.exterminationRoomIds = fresh.exterminationRoomIds && [...fresh.exterminationRoomIds];
   target.events.loadState(fresh.events.saveState());
-  target.events.restore(fresh.tower.units.filter((u) => u.state === "fire").map((u) => u.id));
   target.economy.restoreBlockbusters(fresh.economy.blockbusterIds);
-  mergeTower(target.tower, fresh.tower, marks);
 }
 
 function mergeTower(target: Tower, fresh: Tower, marks: MergeMarks): void {
@@ -103,13 +178,19 @@ function mergeById<T extends Unit | Transport>(live: T[], fresh: T[], index: Map
   const next: T[] = fresh.map((record) => {
     const held = index.get(record.id);
     if (!held) return record;
-    for (const key of Object.keys(held)) {
-      if (!(key in record)) delete (held as unknown as Record<string, unknown>)[key];
-    }
-    Object.assign(held, record);
+    assignRecord(held, record);
     return held;
   });
   live.splice(0, live.length, ...next);
   index.clear();
   for (const record of next) index.set(record.id, record);
+}
+
+/** Make `held`'s fields `record`'s, keeping the object: an optional field
+ *  the record lacks goes too. */
+function assignRecord<T extends Unit | Transport>(held: T, record: T): void {
+  for (const key of Object.keys(held)) {
+    if (!(key in record)) delete (held as unknown as Record<string, unknown>)[key];
+  }
+  Object.assign(held, record);
 }

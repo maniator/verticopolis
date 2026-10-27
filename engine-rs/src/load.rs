@@ -38,6 +38,11 @@ const LOT: i64 = LOT_WIDTH;
 
 /// `decodeVctower(text)`: the VCTOWER1 container (base64 of raw deflate).
 pub fn decode_vctower(text: &str) -> Result<Value, String> {
+    parse_save_json(&inflate_vctower(text)?).map_err(|e| format!("json: {e}"))
+}
+
+/// The save text inside a VCTOWER1 container, as `decode_vctower` parses it.
+pub(crate) fn inflate_vctower(text: &str) -> Result<Vec<u8>, String> {
     let trimmed = js_trim(text);
     if !trimmed.starts_with(TOWER_FILE_MAGIC) {
         return Err("not a VCTOWER1 file".into());
@@ -56,8 +61,10 @@ pub fn decode_vctower(text: &str) -> Result<Value, String> {
         );
     }
     // `TextDecoder` drops a leading byte order mark before `JSON.parse` sees it.
-    let text = out.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&out);
-    parse_save_json(text).map_err(|e| format!("json: {e}"))
+    if out.starts_with(b"\xEF\xBB\xBF") {
+        out.drain(..3);
+    }
+    Ok(out)
 }
 
 /// `JSON.parse` for save text that a JavaScript host wrote. A JavaScript
@@ -89,7 +96,7 @@ fn hex4(text: &[u8], at: usize) -> Option<u16> {
 /// The text with every lone surrogate escape inside a string rewritten to
 /// `\ufffd`, or `None` when there is none (the common case, which then
 /// costs one scan and no copy).
-fn repair_lone_surrogates(text: &[u8]) -> Option<Vec<u8>> {
+pub(crate) fn repair_lone_surrogates(text: &[u8]) -> Option<Vec<u8>> {
     let mut out: Option<Vec<u8>> = None;
     let mut copied = 0;
     let mut in_string = false;
@@ -886,12 +893,19 @@ struct Fp {
 
 /// `widenLegacyElevatorShafts`.
 pub fn widen_legacy_elevator_shafts(data: &Value) -> Value {
-    let Some(transports) = data.get("transports").and_then(Value::as_array) else {
-        return data.clone();
-    };
+    let transports = data.get("transports").and_then(Value::as_array);
+    match transports.and_then(|t| widen_shafts(t)) {
+        Some(out) => with(data, vec![("transports", Value::Array(out))]),
+        None => data.clone(),
+    }
+}
+
+/// The transports `widen_legacy_elevator_shafts` writes back, or `None` when
+/// the list is longer than the pools hold and it leaves the save as it is.
+pub(crate) fn widen_shafts(transports: &[Value]) -> Option<Vec<Value>> {
     let pool_cap: i64 = POOLED_CAPS.iter().map(|p| p.cap).sum();
     if transports.len() as i64 > pool_cap {
-        return data.clone();
+        return None;
     }
     let mut fps: Vec<Option<Fp>> = transports
         .iter()
@@ -952,7 +966,7 @@ pub fn widen_legacy_elevator_shafts(data: &Value) -> Value {
         }
         out.push(widened.unwrap_or_else(|| t.clone()));
     }
-    with(data, vec![("transports", Value::Array(out))])
+    Some(out)
 }
 
 // ---- migrations/v5tov6.ts ------------------------------------------------------
@@ -1225,6 +1239,8 @@ pub fn migrate_save(data: &Value) -> Value {
     if v(&migrated) == Some(6.0) {
         migrated = with(&migrated, vec![("version", json!(7))]);
     }
+    // `load_stream.rs` applies this step to a current save on its own, so a
+    // step added here for version 7 goes there too.
     if v(&migrated) == Some(7.0) {
         migrated = widen_legacy_elevator_shafts(&migrated);
     }
@@ -1243,15 +1259,19 @@ fn sane_id(v: Option<&Value>) -> Option<i64> {
 }
 
 /// `repairEntityIds`: hand corrupt or duplicate ids a fresh one; returns nextId.
-fn repair_entity_ids(ids: &mut [Option<i64>], raw_next_id: Option<&Value>) -> i64 {
+fn repair_entity_ids(
+    unit_ids: &mut [Option<i64>],
+    transport_ids: &mut [Option<i64>],
+    raw_next_id: Option<&Value>,
+) -> i64 {
     let mut max_loaded = 0;
-    for id in ids.iter().flatten() {
+    for id in unit_ids.iter().chain(transport_ids.iter()).flatten() {
         if *id > max_loaded {
             max_loaded = *id;
         }
     }
-    let mut seen: HashSet<i64> = HashSet::new();
-    for id in ids.iter_mut() {
+    let mut seen: HashSet<i64> = HashSet::with_capacity(unit_ids.len() + transport_ids.len());
+    for id in unit_ids.iter_mut().chain(transport_ids.iter_mut()) {
         match id {
             Some(v) if !seen.contains(v) => {}
             _ => {
@@ -1265,41 +1285,47 @@ fn repair_entity_ids(ids: &mut [Option<i64>], raw_next_id: Option<&Value>) -> i6
     saved.max(max_loaded + 1)
 }
 
-/// `dropOverlappingUnits`: first kept wins, per layer.
-fn drop_overlapping_units(units: Vec<(Unit, Option<i64>)>) -> Vec<(Unit, Option<i64>)> {
-    let mut claimed_structure: HashMap<i64, Vec<u8>> = HashMap::new();
-    let mut claimed_rooms: HashMap<i64, Vec<u8>> = HashMap::new();
-    let mut out = Vec::new();
-    for (u, id) in units {
+/// `dropOverlappingUnits`: first kept wins, per layer. The units and their
+/// saved ids are filtered in place, so the filter never holds a second copy
+/// of the units.
+fn drop_overlapping_units(units: &mut Vec<Unit>, ids: &mut Vec<Option<i64>>) {
+    debug_assert_eq!(units.len(), ids.len());
+    // A tile grid of the whole lot per layer, indexed by floor and x, where
+    // `dropOverlappingUnits` keeps one row per floor in a map. A unit's floor
+    // and span are clamped to the lot when it is read.
+    let lot = LOT as usize;
+    let grid = || vec![0u8; (MAX_FLOOR - MIN_FLOOR + 1) as usize * lot];
+    let (mut claimed_structure, mut claimed_rooms) = (grid(), grid());
+    let tile = |f: i64, i: i64| (f - MIN_FLOOR) as usize * lot + i as usize;
+    let mut keep = Vec::with_capacity(units.len());
+    for u in units.iter() {
         let layer = if u.kind.is_structural() {
             &mut claimed_structure
         } else {
             &mut claimed_rooms
         };
-        let stories = u.kind.floors();
-        let mut free = true;
-        'scan: for f in u.floor..u.floor + stories {
-            if let Some(row) = layer.get(&f) {
-                for i in u.x..u.x + u.width {
-                    if row[i as usize] != 0 {
-                        free = false;
-                        break 'scan;
-                    }
-                }
-            }
-        }
+        let floors = u.floor..u.floor + u.kind.floors();
+        debug_assert!(
+            u.floor >= MIN_FLOOR && floors.end - 1 <= MAX_FLOOR && u.x >= 0 && u.x + u.width <= LOT,
+            "a unit off the lot: {u:?}"
+        );
+        let free = floors
+            .clone()
+            .all(|f| (u.x..u.x + u.width).all(|i| layer[tile(f, i)] == 0));
+        keep.push(free);
         if !free {
             continue;
         }
-        for f in u.floor..u.floor + stories {
-            let row = layer.entry(f).or_insert_with(|| vec![0u8; LOT as usize]);
+        for f in floors {
             for i in u.x..u.x + u.width {
-                row[i as usize] = 1;
+                layer[tile(f, i)] = 1;
             }
         }
-        out.push((u, id));
     }
-    out
+    let mut kept = keep.iter();
+    units.retain(|_| *kept.next().unwrap());
+    let mut kept = keep.iter();
+    ids.retain(|_| *kept.next().unwrap());
 }
 
 // ---- coerce.ts -----------------------------------------------------------------
@@ -1451,6 +1477,189 @@ pub fn mark_founder_from_loaded_file(sim: &mut Simulation, raw: &Value) {
 /// `Simulation.deserialize(raw)`.
 pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     let data = migrate_save(raw);
+    let modern = data.get("mode").and_then(Value::as_str) == Some("modern");
+    let listed = data
+        .get("units")
+        .and_then(Value::as_array)
+        .map_or(&[][..], Vec::as_slice);
+    // The entries `unit_from_value` keeps, counted before any unit is built,
+    // so a save past the cap is refused first and the rest fill vectors of
+    // their exact size.
+    let kept = listed
+        .iter()
+        .filter(|u| kind_of(u).is_some())
+        .take(UNIT_CAP + 1)
+        .count();
+    if kept > UNIT_CAP {
+        return Err(format!(
+            "This save lists more than {UNIT_CAP} units, more than the whole lot can hold, so it cannot be a real tower."
+        ));
+    }
+    let (mut units, mut ids) = (Vec::with_capacity(kept), Vec::with_capacity(kept));
+    for (unit, id) in listed.iter().filter_map(|u| unit_from_value(u, modern)) {
+        units.push(unit);
+        ids.push(id);
+    }
+    debug_assert_eq!(units.len(), kept, "unit_from_value skipped a counted entry");
+    Ok(assemble(&data, units, ids, raw))
+}
+
+/// One entry of a save's `units` array as `deserialize` reads it, with its
+/// saved id; `None` for an entry it skips (null, or a kind the catalog does
+/// not know), exactly when `kind_of` gives `None`, which the unit cap's
+/// count in `deserialize` relies on. It reads nothing outside the entry but
+/// the save's mode.
+pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i64>)> {
+    let kind = kind_of(u)?;
+    let stories = kind.floors();
+    let cat = kind.facility().width;
+    // `drop_overlapping_units` indexes its tile grids by the floors and tiles
+    // these clamps allow, so a loosened clamp would trap there.
+    let floor =
+        (round(num(u.get("floor"), 1.0)) as i64).clamp(MIN_FLOOR, MAX_FLOOR - (stories - 1));
+    let x = (round(num(u.get("x"), 0.0)) as i64).clamp(0, LOT - 1);
+    let cap = if kind.is_structural() { cat } else { LOT - x };
+    let width = (round(num(u.get("width"), cat as f64)) as i64)
+        .min(cap)
+        .min(LOT - x)
+        .max(1);
+    let state = if kind.is_structural() {
+        UnitState::Empty
+    } else {
+        parse_state(u.get("state")).unwrap_or(UnitState::Empty)
+    };
+    let not_owned = matches!(
+        state,
+        UnitState::Empty | UnitState::Construction | UnitState::Gutted
+    );
+    let ever_occupied =
+        u.get("everOccupied") == Some(&Value::Bool(true)) && !(not_owned && !kind.is_hotel());
+    let sold_condo = kind == Kind::Condo && ever_occupied;
+    let keep_household = ever_occupied && kind.has_household();
+    let ladder_priced = !modern && classic_ladder(kind).is_some();
+    let mut rent: Option<f64> = match u.get("rent") {
+        None => None,
+        Some(r) if ladder_priced => Some(r.as_f64().unwrap_or(f64::NAN)),
+        Some(r) => Some(num(
+            Some(r),
+            rent_config(kind).map(|c| c.default).unwrap_or(0.0),
+        )),
+    };
+    if let Some(r) = rent {
+        if kind == Kind::Condo {
+            let ladder = if modern {
+                None
+            } else {
+                classic_ladder(Kind::Condo)
+            };
+            if sold_condo {
+                rent = Some(match ladder {
+                    Some(l) => js_max(l[0], js_min(l[3], r)),
+                    None => js_max(SOLD_CONDO_MIN_PRICE, js_min(SOLD_CONDO_MAX_PRICE, r)),
+                });
+            } else if ladder.is_none() {
+                let band = rent_config(Kind::Condo).unwrap();
+                rent = Some(js_max(band.min, js_min(band.max, r)));
+            }
+        }
+    }
+    let residents = if keep_household && modern {
+        match u.get("residents") {
+            None => None,
+            Some(r) => {
+                let v = if r.as_f64().is_some_and(|x| x.is_finite()) {
+                    r.as_f64().unwrap()
+                } else {
+                    3.0
+                };
+                Some((round(v) as i64).clamp(2, 5))
+            }
+        }
+    } else {
+        None
+    };
+    let film_policy: Option<&'static str> = match u.get("filmPolicy").and_then(Value::as_str) {
+        Some("feature") => Some("feature"),
+        Some("blockbuster") => Some("blockbuster"),
+        Some("auto") => Some("auto"),
+        _ => None,
+    };
+    let subtype: Option<&'static str> = match (
+        u.get("subtype").and_then(Value::as_str),
+        kind.subtype_list(),
+    ) {
+        (Some(s), Some(list)) => list.iter().copied().find(|c| *c == s),
+        _ => None,
+    };
+    let retail = kind.subtype_list().is_some();
+    let retail_field = |key: &str| -> Option<f64> {
+        if !retail {
+            return None;
+        }
+        let v = u.get(key)?;
+        Some(num(Some(v), 0.0).max(0.0))
+    };
+    let no_rate =
+        rent_config(kind).is_some() && !modern && u.get("noRate") == Some(&Value::Bool(true));
+    let unit = Unit {
+        id: 0,
+        kind,
+        floor,
+        x,
+        width,
+        state,
+        satisfaction: if kind.is_structural() {
+            1.0
+        } else {
+            num(u.get("satisfaction"), 1.0).min(1.0).max(0.0)
+        },
+        occupants: if kind.attendance_cap().is_some() || kind.is_structural() {
+            0
+        } else {
+            num(u.get("occupants"), 0.0).max(0.0) as i64
+        },
+        customers_in: None,
+        hotel_customers_in: None,
+        out_for_meal: None,
+        residents,
+        ever_occupied,
+        pending_income: num(u.get("pendingIncome"), 0.0),
+        rent,
+        no_rate,
+        label: u
+            .get("label")
+            .and_then(Value::as_str)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| kind.facility().name.to_string()),
+        vacate_reason: vacate_reason(u.get("vacateReason")),
+        vacate_at: u.get("vacateAt").map(|v| num(Some(v), 0.0)),
+        film_policy,
+        subtype,
+        patronage_today: retail_field("patronageToday"),
+        patronage_yest: retail_field("patronageYest"),
+        profit_today: retail_field("profitToday"),
+        profit_yest: retail_field("profitYest"),
+        complete_at: u.get("completeAt").and_then(Value::as_f64),
+        complete_at_raw: match u.get("completeAt") {
+            Some(v) if !v.is_number() => Some(v.clone()),
+            _ => None,
+        },
+        dirty_days: coerce_dirty_days(state, kind, u.get("dirtyDays")),
+    };
+    Some((unit, sane_id(u.get("id"))))
+}
+
+/// The rest of `deserialize` once the units are read: `data` is the migrated
+/// save, `units` its kept units in save order and `unit_ids` their saved ids
+/// (one per unit), and `raw` the save as written, which the founder test
+/// reads. It never reads `data["units"]`, which the streamed reader leaves
+/// out.
+pub(crate) fn assemble(
+    data: &Value,
+    mut units: Vec<Unit>,
+    mut unit_ids: Vec<Option<i64>>,
+    raw: &Value,
+) -> Simulation {
     let mode = match data.get("mode").and_then(Value::as_str) {
         Some("modern") => GameMode::Modern,
         _ => GameMode::Classic,
@@ -1572,161 +1781,10 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     sim.view = coerce_view(data.get("view"));
     sim.log = coerce_log(data.get("log"));
 
-    // ---- units ----
-    let mut raw_units: Vec<&Value> = Vec::new();
-    if let Some(arr) = data.get("units").and_then(Value::as_array) {
-        for u in arr {
-            if u.is_null() || kind_of(u).is_none() {
-                continue;
-            }
-            raw_units.push(u);
-            if raw_units.len() > UNIT_CAP {
-                return Err(format!(
-                    "This save lists more than {UNIT_CAP} units, more than the whole lot can hold, so it cannot be a real tower."
-                ));
-            }
-        }
-    }
-    let mut units: Vec<(Unit, Option<i64>)> = Vec::new();
-    for u in raw_units {
-        let kind = kind_of(u).unwrap();
-        let stories = kind.floors();
-        let cat = kind.facility().width;
-        let floor =
-            (round(num(u.get("floor"), 1.0)) as i64).clamp(MIN_FLOOR, MAX_FLOOR - (stories - 1));
-        let x = (round(num(u.get("x"), 0.0)) as i64).clamp(0, LOT - 1);
-        let cap = if kind.is_structural() { cat } else { LOT - x };
-        let width = (round(num(u.get("width"), cat as f64)) as i64)
-            .min(cap)
-            .min(LOT - x)
-            .max(1);
-        let state = if kind.is_structural() {
-            UnitState::Empty
-        } else {
-            parse_state(u.get("state")).unwrap_or(UnitState::Empty)
-        };
-        let not_owned = matches!(
-            state,
-            UnitState::Empty | UnitState::Construction | UnitState::Gutted
-        );
-        let ever_occupied =
-            u.get("everOccupied") == Some(&Value::Bool(true)) && !(not_owned && !kind.is_hotel());
-        let sold_condo = kind == Kind::Condo && ever_occupied;
-        let keep_household = ever_occupied && kind.has_household();
-        let ladder_priced = !modern && classic_ladder(kind).is_some();
-        let mut rent: Option<f64> = match u.get("rent") {
-            None => None,
-            Some(r) if ladder_priced => Some(r.as_f64().unwrap_or(f64::NAN)),
-            Some(r) => Some(num(
-                Some(r),
-                rent_config(kind).map(|c| c.default).unwrap_or(0.0),
-            )),
-        };
-        if let Some(r) = rent {
-            if kind == Kind::Condo {
-                let ladder = if modern {
-                    None
-                } else {
-                    classic_ladder(Kind::Condo)
-                };
-                if sold_condo {
-                    rent = Some(match ladder {
-                        Some(l) => js_max(l[0], js_min(l[3], r)),
-                        None => js_max(SOLD_CONDO_MIN_PRICE, js_min(SOLD_CONDO_MAX_PRICE, r)),
-                    });
-                } else if ladder.is_none() {
-                    let band = rent_config(Kind::Condo).unwrap();
-                    rent = Some(js_max(band.min, js_min(band.max, r)));
-                }
-            }
-        }
-        let residents = if keep_household && modern {
-            match u.get("residents") {
-                None => None,
-                Some(r) => {
-                    let v = if r.as_f64().is_some_and(|x| x.is_finite()) {
-                        r.as_f64().unwrap()
-                    } else {
-                        3.0
-                    };
-                    Some((round(v) as i64).clamp(2, 5))
-                }
-            }
-        } else {
-            None
-        };
-        let film_policy: Option<&'static str> = match u.get("filmPolicy").and_then(Value::as_str) {
-            Some("feature") => Some("feature"),
-            Some("blockbuster") => Some("blockbuster"),
-            Some("auto") => Some("auto"),
-            _ => None,
-        };
-        let subtype: Option<&'static str> = match (
-            u.get("subtype").and_then(Value::as_str),
-            kind.subtype_list(),
-        ) {
-            (Some(s), Some(list)) => list.iter().copied().find(|c| *c == s),
-            _ => None,
-        };
-        let retail = kind.subtype_list().is_some();
-        let retail_field = |key: &str| -> Option<f64> {
-            if !retail {
-                return None;
-            }
-            let v = u.get(key)?;
-            Some(num(Some(v), 0.0).max(0.0))
-        };
-        let no_rate =
-            rent_config(kind).is_some() && !modern && u.get("noRate") == Some(&Value::Bool(true));
-        let unit = Unit {
-            id: 0,
-            kind,
-            floor,
-            x,
-            width,
-            state,
-            satisfaction: if kind.is_structural() {
-                1.0
-            } else {
-                num(u.get("satisfaction"), 1.0).min(1.0).max(0.0)
-            },
-            occupants: if kind.attendance_cap().is_some() || kind.is_structural() {
-                0
-            } else {
-                num(u.get("occupants"), 0.0).max(0.0) as i64
-            },
-            customers_in: None,
-            hotel_customers_in: None,
-            out_for_meal: None,
-            residents,
-            ever_occupied,
-            pending_income: num(u.get("pendingIncome"), 0.0),
-            rent,
-            no_rate,
-            label: u
-                .get("label")
-                .and_then(Value::as_str)
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| kind.facility().name.to_string()),
-            vacate_reason: vacate_reason(u.get("vacateReason")),
-            vacate_at: u.get("vacateAt").map(|v| num(Some(v), 0.0)),
-            film_policy,
-            subtype,
-            patronage_today: retail_field("patronageToday"),
-            patronage_yest: retail_field("patronageYest"),
-            profit_today: retail_field("profitToday"),
-            profit_yest: retail_field("profitYest"),
-            complete_at: u.get("completeAt").and_then(Value::as_f64),
-            complete_at_raw: match u.get("completeAt") {
-                Some(v) if !v.is_number() => Some(v.clone()),
-                _ => None,
-            },
-            dirty_days: coerce_dirty_days(state, kind, u.get("dirtyDays")),
-        };
-        units.push((unit, sane_id(u.get("id"))));
-    }
-    let units = drop_overlapping_units(units);
-    let (mut units, mut unit_ids): (Vec<Unit>, Vec<Option<i64>>) = units.into_iter().unzip();
+    drop_overlapping_units(&mut units, &mut unit_ids);
+    // Exact sizes: a vector grown past its units would keep the spare room
+    // for the whole session.
+    units.shrink_to_fit();
     // Snap-on-load for ladder-priced kinds (Classic).
     let mut rents_snapped = 0;
     let mut has_condo = false;
@@ -1849,15 +1907,13 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     }
     let (mut transports, mut transport_ids): (Vec<Transport>, Vec<Option<i64>>) =
         transports.into_iter().unzip();
-    let mut all_ids: Vec<Option<i64>> = Vec::new();
-    all_ids.append(&mut unit_ids);
-    all_ids.append(&mut transport_ids);
-    let next_id = repair_entity_ids(&mut all_ids, data.get("nextId"));
-    for (i, u) in units.iter_mut().enumerate() {
-        u.id = all_ids[i].unwrap();
+    // Units first, then transports, as one id space.
+    let next_id = repair_entity_ids(&mut unit_ids, &mut transport_ids, data.get("nextId"));
+    for (u, id) in units.iter_mut().zip(unit_ids) {
+        u.id = id.unwrap();
     }
-    for (i, t) in transports.iter_mut().enumerate() {
-        t.id = all_ids[units.len() + i].unwrap();
+    for (t, id) in transports.iter_mut().zip(transport_ids) {
+        t.id = id.unwrap();
     }
     sim.tower.units = units;
     sim.tower.transports = transports;
@@ -1947,7 +2003,7 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     sim.last_hour = sim.clock.hour();
     sim.adopt_milestones();
     sim.founder = detect_founder(raw);
-    Ok(sim)
+    sim
 }
 
 #[cfg(test)]
@@ -2473,3 +2529,7 @@ mod loader_cases {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "load_assemble_tests.rs"]
+mod assemble_tests;

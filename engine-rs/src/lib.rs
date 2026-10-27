@@ -33,6 +33,10 @@ pub mod identity;
 pub mod jsmath;
 pub mod ledger;
 pub mod load;
+// The binding's save reader (#1225): `wasm.rs` loads through it, and the
+// crate's tests check it against `load::deserialize`.
+#[cfg(any(test, feature = "wasm"))]
+mod load_stream;
 mod noise;
 pub mod panels;
 pub mod presence;
@@ -40,6 +44,7 @@ pub mod rent;
 pub mod rng;
 pub mod rules;
 pub mod satisfaction;
+pub mod save_delta;
 // The conformance harness reads the suite's files, so a host links it only
 // with the `conformance` feature (tier 2 in API.md). The crate's unit tests
 // always have it; a test under `tests/` needs the feature like any host.

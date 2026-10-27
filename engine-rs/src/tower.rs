@@ -41,7 +41,7 @@ impl UnitState {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Unit {
     pub id: i64,
     pub kind: Kind,

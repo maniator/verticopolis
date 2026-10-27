@@ -347,7 +347,7 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
     `splice`, Rust's shift and the rewrite of the `by_id` entries after it
     (up to about 43k on the large tower). HP-6 and the per-command tier
     allow that; a drag run's per-tile commands as one is #1273 item 8.
-    Crate 0.9.0 for the binding.
+    Crate 0.10.0 for the binding (main took 0.9.0 first).
   - Review round 1 on the fix (2026-10-27, Blind Hunter, Edge Case Hunter,
     Acceptance Auditor): a stale position or index never takes another unit
     (TypeScript checks the slot, Rust checks the id at the index); the unit
@@ -468,7 +468,7 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
   `Tower.ts`, `tower/placement.ts`, `tower/transport.ts`, `sim/build.ts`;
   `engine-rs/src/tower_removal.rs` (new, with `tower_removal_tests.rs`),
   `brush.rs` (new), `tower.rs`, `build.rs`, `lib.rs`, `wasm.rs`,
-  `wasm_facade_commands.rs`, crate 0.9.0 and its pins; the relay
+  `wasm_facade_commands.rs`, crate 0.10.0 and its pins; the relay
   (`src/dualrun/commands.ts`, `mirror.ts`, `shadow.ts`, `binding.ts`,
   `exportTiers.ts`, `engine.d.ts`); `dualRunBrush.integration.test.ts`
   (new); `scripts/engine-bundle.allow.txt`
