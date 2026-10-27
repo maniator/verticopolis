@@ -77,18 +77,34 @@ impl Unit {
         self.resident_count()
     }
 
-    /// `syncAttendanceOccupants`. `at` is the unit's mark, which logs a
-    /// change for the engine view's frame.
-    pub(crate) fn sync_attendance_occupants(&mut self, at: crate::view::Mark<'_>) {
-        if self.kind.attendance_cap().is_none() {
-            return;
+    /// What a room's share of the population is, as `totalPopulation`
+    /// counts it: its census count while it is present, else 0. The engine
+    /// view's frame keeps its running population from the same rule.
+    pub fn census_share(&self) -> i64 {
+        if self.is_present() {
+            self.census_count()
+        } else {
+            0
         }
-        let occupants = if self.is_operational() {
+    }
+
+    /// The head count `syncAttendanceOccupants` sets on a room whose kind
+    /// has an attendance cap, or `None` for any other kind.
+    pub fn attendance_occupants(&self) -> Option<i64> {
+        self.kind.attendance_cap()?;
+        Some(if self.is_operational() {
             self.customers_in.unwrap_or(0)
         } else {
             0
-        };
-        self.set_occupants(at, occupants);
+        })
+    }
+
+    /// `syncAttendanceOccupants`. `at` is the unit's mark, which logs a
+    /// change for the engine view's frame.
+    pub(crate) fn sync_attendance_occupants(&mut self, at: crate::view::Mark<'_>) {
+        if let Some(occupants) = self.attendance_occupants() {
+            self.set_occupants(at, occupants);
+        }
     }
 
     /// `visibleOccupants`.
@@ -310,10 +326,7 @@ impl Tower {
 
     /// `totalPopulation`.
     pub fn total_population(&self) -> i64 {
-        self.room_units()
-            .filter(|u| u.is_present())
-            .map(|u| u.census_count())
-            .sum()
+        self.room_units().map(Unit::census_share).sum()
     }
 
     /// `associatedPopulation`.

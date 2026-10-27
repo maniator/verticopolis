@@ -13,15 +13,16 @@ use crate::sim::Simulation;
 use crate::tower::Unit;
 
 /// What a reader last sent, by slot: each room's frame fields (as bits) and
-/// its census, with their sum, the population. Also the structure they were
-/// sent against (the tower revision and unit count the rooms index is keyed
-/// on), how far it has read the tower's mark log, the frames it has written,
-/// and buffers it reuses. A reader belongs to one simulation: a host that
-/// loads another starts a new reader (the binding's lives on the tower,
-/// which every load builds afresh).
+/// its census share, with their sum, the population. Also what they were
+/// sent against (the mark log's id, and the tower revision and unit count
+/// the rooms index is keyed on), how far it has read the mark log, the
+/// frames it has written, and buffers it reuses. A reader belongs to one
+/// simulation: a host that loads another starts a new reader (the binding's
+/// lives on the tower, which every load builds afresh); one handed another
+/// tower sends a full frame, since the new tower's log has another id.
 #[derive(Default)]
 pub struct ViewReader {
-    sent: Option<(i64, usize)>,
+    sent: Option<(u64, i64, usize)>,
     last: Vec<[u64; 5]>,
     census: Vec<i64>,
     population: i64,
@@ -64,14 +65,16 @@ impl ViewReader {
     /// bit.
     ///
     /// A full frame makes one pass over the rooms index, which happens once
-    /// per revision move (a command) or when the host asks. Any other frame
-    /// visits the rooms the mark log names since this reader's last frame,
-    /// each once, plus a binary search of the rooms index for each; with
-    /// nothing marked it visits no room. Should the log have dropped marks
-    /// this reader never read (it fell `MARK_CAP` marks behind), the frame
-    /// compares every room once instead. The population is a running total
-    /// that each visited room corrects. One allocation, made at the frame's
-    /// size.
+    /// per revision move (a command), on a new tower, or when the host asks.
+    /// Any other frame visits the rooms the mark log names since this
+    /// reader's last frame, each once, plus a binary search of the rooms
+    /// index for each; with nothing marked it visits no room. When the marks
+    /// it reads reach half the rooms (an hour can mark nearly all of them),
+    /// or the log has dropped marks this reader never read (it fell more than
+    /// `MARK_CAP` marks behind), the frame compares every room once instead,
+    /// which sends the same rooms for less (`compare_all`). The population
+    /// is a running total that each visited room corrects. One allocation,
+    /// made at the frame's size.
     ///
     /// The engine's own writes go through the setters, which mark the room.
     /// A native host that writes a unit's frame fields or residents itself,
@@ -81,7 +84,7 @@ impl ViewReader {
         let tower = &sim.tower;
         let rooms: Arc<[usize]> = tower.room_index();
         let marks = &tower.view.marks;
-        let key = (tower.revision, tower.units.len());
+        let key = (marks.id(), tower.revision, tower.units.len());
         let full = full || self.sent != Some(key) || self.last.len() != rooms.len();
         self.changed.clear();
         if full {
@@ -95,7 +98,7 @@ impl ViewReader {
                 let u = &tower.units[i];
                 let fields = unit_fields(u);
                 self.last.push(fields.map(f64::to_bits));
-                let census = census_of(u);
+                let census = u.census_share();
                 self.census.push(census);
                 self.population += census;
                 self.changed.push(slot as f64);
@@ -104,7 +107,8 @@ impl ViewReader {
         } else {
             let mut marked = std::mem::take(&mut self.marked);
             marked.clear();
-            if marks.read_since(self.read, &mut marked) {
+            let read = marks.read_since(self.read, &mut marked);
+            if read && !compare_all(marked.len(), rooms.len()) {
                 // Unit-list order is the rooms index's order, so sorted
                 // indices give the slots in order.
                 marked.sort_unstable();
@@ -193,7 +197,7 @@ impl ViewReader {
     /// change in its census, and queue its record when a frame field
     /// changed, compared bit for bit.
     fn update(&mut self, slot: usize, u: &Unit) {
-        let census = census_of(u);
+        let census = u.census_share();
         self.population += census - self.census[slot];
         self.census[slot] = census;
         let fields = unit_fields(u);
@@ -207,13 +211,15 @@ impl ViewReader {
     }
 }
 
-/// A room's part of the population, as `Tower::total_population` counts it.
-fn census_of(u: &Unit) -> i64 {
-    if u.is_present() {
-        u.census_count()
-    } else {
-        0
-    }
+/// Whether a frame that read `marks` marks (repeats counted, before the
+/// sort) compares every room instead of finding each marked one. From
+/// about half the rooms the sort and a binary search per mark cost more
+/// than one compare over the rooms: the review measured a frame after an
+/// hour on the large tower (2,886 marks, 2,900 rooms) at 875K instructions
+/// on the marks and 489K with this threshold, the compare's cost. Both
+/// branches send the same rooms, since every write of a frame field marks.
+fn compare_all(marks: usize, rooms: usize) -> bool {
+    marks * 2 >= rooms
 }
 
 /// The unlocked kinds as a bitmask by kind code: bit k is set when the kind

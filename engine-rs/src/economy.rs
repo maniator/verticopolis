@@ -224,8 +224,7 @@ impl Simulation {
             };
             if !draws || !kind.is_open_at(hour) {
                 if state == UnitState::Occupied {
-                    let at = self.tower.view.marks.at(i);
-                    let u = &mut self.tower.units[i];
+                    let (u, at) = self.tower.marked(i);
                     if attends {
                         u.sync_attendance_occupants(at);
                     } else {
@@ -235,8 +234,7 @@ impl Simulation {
                 continue;
             }
             {
-                let at = self.tower.view.marks.at(i);
-                let u = &mut self.tower.units[i];
+                let (u, at) = self.tower.marked(i);
                 u.set_state(at, UnitState::Occupied);
                 if attends {
                     u.sync_attendance_occupants(at);
@@ -335,8 +333,7 @@ impl Simulation {
         }
         let mut revenue = 0.0;
         let mut deferred = 0.0;
-        let marks = &self.tower.view.marks;
-        for (i, u) in self.tower.units.iter_mut().enumerate() {
+        for (u, at) in self.tower.marked_units() {
             if !u.kind.is_hotel() {
                 continue;
             }
@@ -346,8 +343,8 @@ impl Simulation {
                     continue;
                 }
                 revenue += rent_of(u.kind, u.rent, u.no_rate);
-                u.set_state(marks.at(i), UnitState::Dirty);
-                u.set_occupants(marks.at(i), 0);
+                u.set_state(at, UnitState::Dirty);
+                u.set_occupants(at, 0);
             }
         }
         if revenue > 0.0 {
@@ -370,12 +367,11 @@ impl Simulation {
             return;
         }
         let mut revenue = 0.0;
-        let marks = &self.tower.view.marks;
-        for (i, u) in self.tower.units.iter_mut().enumerate() {
+        for (u, at) in self.tower.marked_units() {
             if u.kind.is_hotel() && u.state == UnitState::Asleep {
                 revenue += rent_of(u.kind, u.rent, u.no_rate);
-                u.set_state(marks.at(i), UnitState::Dirty);
-                u.set_occupants(marks.at(i), 0);
+                u.set_state(at, UnitState::Dirty);
+                u.set_occupants(at, 0);
             }
         }
         if revenue > 0.0 {

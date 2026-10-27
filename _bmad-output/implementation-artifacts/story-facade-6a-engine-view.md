@@ -87,8 +87,9 @@ consumer and is out of scope here.
 5. **Header additions.** The frame header carries the meta revision, the meal
    overlay revision, the unlocked kinds as a bitmask by kind code
    (`Simulation::is_unlocked`), the population (`Simulation::population`,
-   summed in the same room pass, so a host reads it at HUD cadence with no
-   walk of its own), the room count the slots index, the `FULL` flag and the
+   kept as a running total that each visited room corrects, by the rule
+   `Tower::total_population` sums, `Unit::census_share`, so a host reads it
+   at HUD cadence with no walk of its own), the room count the slots index, the `FULL` flag and the
    frame number, beside today's clock, money, star, weather, effects, event
    counts, pending choice and hour runs.
 6. **View freshness oracle.** Seeded sessions on several towers (a fixture, a
@@ -132,18 +133,27 @@ consumer and is out of scope here.
     `npm run engine:compat`; no app version bump (no player-facing change).
 11. **Write-site frame marks** (round 3, #1285 item 1; the owner asked on the
     PR on 2026-10-22 and 2026-10-23 for this, or for a measured decision put
-    to him). Every engine write of a room's frame fields (state, occupants,
-    customersIn, hotelCustomersIn, outForMeal) and of its residents, which
-    the census counts, goes through one setter per field (`view/marks.rs`).
-    A setter logs the unit's index in the tower's mark log only when it
-    changes the value. A reader reads the log from where its last frame
-    stopped and visits only the rooms it names, so a frame with nothing
-    marked visits no room, and it keeps the population current from a
-    per-slot census. A reader that falls more than the log's 16,384 entries
-    behind compares every room once. A source check keeps those writes
-    inside the setters (the save loader, new-unit construction and tests
-    excepted), and the oracle (AC 6) checks the kept rooms and the kept
-    population after every step.
+    to him). The engine's own writes of a room's frame fields (state,
+    occupants, customersIn, hotelCustomersIn, outForMeal) and of its
+    residents, which the census counts, go through one setter per field
+    (`view/marks.rs`). A setter logs the unit's index in the tower's mark log
+    only when it changes the value. A reader reads the log from where its
+    last frame stopped and visits only the rooms it names, so a frame with
+    nothing marked visits no room, and it keeps the population current from
+    a per-slot census. When the marks it reads reach half the rooms, or it
+    fell more than the log's 16,384 entries behind (the log drops its oldest
+    entry for each new one past that), it compares every room once instead.
+    Each tower's log has its own id, which the reader keys on, so a reader
+    handed another tower sends a full frame. The fields stay `pub`, so a
+    source scan (`only_the_setters_write_the_frame_fields`, on the code with
+    comments and whitespace removed, so a split statement reads as one)
+    keeps the engine's writes inside the setters, a new unit's struct
+    literal aside; the oracle (AC 6) checks the kept rooms and the kept
+    population after every step; and tests show that a field written past
+    the setters is not sent until a full frame or a frame that compares
+    every room, which proves a frame below half the rooms reads only the
+    log. A native host that writes a unit's fields itself passes
+    `full` on its next frame (API.md).
 
 ## Tasks
 
@@ -181,13 +191,18 @@ consumer and is out of scope here.
       `npm run wasm:build` (`RUSTUP_TOOLCHAIN=1.97.0`) and `npm run test:wasm`.
 - [x] `/gds-code-review` round 1 with the Hot-Path Auditor; its patch
       findings fixed (see the review section below).
-- [x] Round 2 on the fixed diff; HP-1 to HP-12 record on the PR; every
-      defer in the backlog with an issue (see the round 2 section below).
+- [x] Round 2 on the fixed diff; every defer in the backlog with an issue
+      (see the round 2 section below). Its HP-1 to HP-12 record on the PR
+      covered chunk C; the round 3 record carries chunks A and B's items
+      (A2-1, A2-2, B6).
 - [x] Write-site frame marks (AC 11): `view/marks.rs` (the setters and the
       log), the reader on the log, 46 setter calls at the write sites in 14
-      files, the source check and tests (`view/marks_tests.rs`), and the
+      files, the source check and tests (`view/marks_tests.rs`,
+      `view/marks_guard_tests.rs`), and the
       oracle's kept population.
-- [ ] Round 3 on the marks; HP-1 to HP-12 record on the PR; the
+- [x] Round 3 review on the marks; its patch findings fixed and its
+      defers filed (see the round 3 review section below).
+- [ ] The round 3 HP-1 to HP-12 record on the PR; a confirming pass; the
       independent review; the owner's human review (no automatic merge).
 
 ## Dev notes
@@ -201,11 +216,15 @@ change the `Engine` struct or its constructors
 (slice 13 edits `from_save` and `from_vctower`). That is why the reader's
 state hangs on `Tower` (initialized in `Tower::new`, which every load goes
 through) instead of on `Engine`. Not touched: `tower_query.rs`,
-`tower_index.rs`, `sim.rs` reachability, `housekeeping.rs` (the step-hotspot
-lane's), the load path (slice 13's), `src/simport/` (the facade thread's),
-`src/wasmhost/` (Runtime's). The one-line setter calls in `churn.rs`,
-`events.rs` and `build.rs` are the only edits outside 6a's files; 6d's command
-modules may touch the same files, and a conflict there is one line.
+`tower_index.rs`, `sim.rs` reachability, the load path (slice 13's),
+`src/simport/` (the facade thread's), `src/wasmhost/` (Runtime's). Round 1
+added one-line setter calls in `churn.rs`, `events.rs` and `build.rs`; round 3's
+frame marks route the frame field writes through setters in `build.rs`,
+`churn.rs`, `economy.rs`, `events.rs`, `housekeeping.rs`, `presence.rs`,
+`satisfaction.rs`, `services.rs`, `sim_loop.rs`, `tower_query.rs` and
+`crowd/` (`motion.rs`, `routines.rs`, `spawn.rs`, `visits.rs`), one or two
+lines a site, several of them in the step-hotspot lanes' files, so a conflict
+there is a line or two.
 
 6b (panel getters, #1228) merged first, with its `wasm.rs` wrappers held
 for this block; they append their own block after it. Its getters read
@@ -256,18 +275,27 @@ still exists, with its current values.
 ### Hot paths (HP record goes on the PR)
 
 - `viewFrame`: per frame. It visits the rooms the mark log names since the
-  reader's last frame (k of them: a sort and dedup of k indices and a binary
+  reader's last frame (k marks: a sort and dedup of k indices and a binary
   search of the rooms index for each, so O(k log k + k log R)), and no other
   room; people and cars as `frameView` sends them; one allocation at the
-  exact size. No walk over floor and lobby tiles. A full frame (a revision
-  move, a unit-count change, `full = true`) is one pass over rooms
-  (R = 2,900 on large), at most one per frame.
+  exact size. No walk over floor and lobby tiles. When the marks reach half
+  the rooms (an hour can mark nearly every room), or the log dropped marks
+  the reader had not read, the frame compares every room once instead
+  (O(R), which from about half the rooms costs less than the marks). A full frame (a revision move, a unit-count change,
+  another tower's reader, `full = true`) is one pass over rooms
+  (R = 2,900 on large), at most one per frame. That pass is a
+  revision-keyed cache rebuild, the per-command tier of section 2: the
+  rooms index and the structure each rebuild in O(U) on the same frame, and
+  U is 15 times R on large.
 - `viewStructure`: per revision change, and on a new engine. One pass over
   units for the runs (with an open run per floor, so a tile extends its
   floor's run whatever was built between) and one over rooms; a stable sort
   of the runs when they come out of order, and always a join of the runs
   that continue each other. Both are over the runs, about one per drag, and
-  leave the tiles alone. The floor bounds come from the tower's per-revision
+  leave the tiles alone. A unit list scattered into more raw runs than half
+  its units (4,096 at the least) is read off a floor-by-x grid instead, in
+  one more pass over the units, so the sort stays bounded; no reference save
+  comes near it (1,132 raw runs at most). The floor bounds come from the tower's per-revision
   cache (`Tower::floor_bounds`, #1237), which the panel getters share. One
   allocation at the exact size.
 - `unitMetaSince`: per frame only when the meta revision moved; answers from
@@ -276,10 +304,12 @@ still exists, with its current values.
 - `towerSignature`: per command (undo's capture and commit), one pass over
   units and transports with a word-at-a-time hash, too slow to read each
   frame.
-- Setters: O(1) plus the log push; the log is capped and trimmed by halves.
-  The frame field setters compare the old value first and push only on a
-  change; their log holds at most 16,384 indices (128 KiB) and drops its
-  older half when full, which is amortized one move per mark.
+- Setters: O(1) plus the log push; the metadata log is capped and trimmed
+  by halves. The frame field setters compare the old value first and push
+  only on a change; their log holds at most 16,384 indices (64 KiB) in a
+  ring and drops its oldest index for each new one past that, so a push is
+  O(1) every time, and a reader the drop left behind compares every room
+  once.
 
 ### Out of scope
 
@@ -292,8 +322,8 @@ adapter (12).
 American English, no em-dashes, no AI marketing words; the 500-line ceiling on
 new files (`fileSize.guard.test.ts`); `rustProse.guard.test.ts`; the engine
 stays free of host access (`independence.rs`) and `wasm_bindgen` stays in
-`wasm.rs`; merge commits only; no Copilot; no closing keyword before #868 or
-#954.
+`wasm.rs`; merge commits only; no automatic merge (the owner asked for a
+human review on the PR); no closing keyword before #868 or #954.
 
 ### References
 
@@ -358,6 +388,14 @@ Opus 5.5, extra high effort.
   instructions before and 1,289.5M after on medium, and 1,633.2M and
   1,634.5M on large (within 0.1%); the setters skip a write that changes
   nothing.
+- After the round 3 review's fixes (callgrind on the frames alone, a game
+  day of 2-minute frames on large): 6.2M instructions against 182.6M for
+  the round 2 reader, and the frame after an hour that marks 2,886 of the
+  2,900 rooms 489K against 457K (the compare it takes from half the rooms;
+  875K before the threshold). Wall, best of 5: that frame 58 to 62 us
+  against 83 to 91 us before the threshold. Every frame of the day hashes
+  the same as the round 2 reader's (an FNV hash over every slot but the
+  clock).
 - Conformance, the frame layout pin, the save format, the state view and the
   digests are unchanged: the conformance runner passes, the frame layout pin
   in `identity_tests.rs` holds, and `engine-rs/src/frame_tests.rs` (which
@@ -440,13 +478,19 @@ owner's decision; round 3 removed it.
 
 On 2026-10-22 and 2026-10-23 the owner asked on the PR for the write-site
 dirty marks, or for a measured decision with its tradeoffs, instead of an
-unbounded per-frame room compare. This round does the marks (AC 11), so no
-owner acceptance of a per-frame room walk is needed:
+unbounded per-frame room compare. This round does the marks (AC 11), so a
+frame visits only the rooms that changed. One pass over the rooms remains
+outside that: the full frame after a revision move (B6), which a floor or
+lobby drag makes once per frame while it moves. The checklist counts it per
+command, beside the O(U) rooms index and structure rebuilds on the same
+frame; #1285 item 2 holds the rooms-only revision that would drop it, and
+the PR puts it to the owner's review with its numbers.
 
 - `view/marks.rs` holds one setter per frame field and for the residents.
   Each takes a `Mark` (the tower's mark log and the unit's index) and logs the
-  index only when it changes the value. `Tower::marked` and
-  `Tower::marked_by_id` hand out a unit with its mark.
+  index only when it changes the value. `Tower::marked`,
+  `Tower::marked_units` and `Tower::marked_by_id` hand out a unit with its
+  mark, so a write site never pairs them by hand.
 - The log holds unit indices, which move only with `tower.revision` (a
   removal shifts the list and `reindex` rebuilds it), and a moved revision
   makes a reader's next frame full, so no index logged before a move is read
@@ -459,9 +503,93 @@ owner acceptance of a per-frame room walk is needed:
   the oracle caught it, and `a_change_after_a_read_is_sent` holds it).
 - Every engine write of those fields (46 setter calls in 14 files) goes
   through the setters, and `only_the_setters_write_the_frame_fields` fails
-  on a direct write anywhere else outside the loader and tests.
+  on a direct write anywhere else outside tests (the loaders included).
 - The oracle also checks the kept frame's population against the tower
   after every step.
+
+### Review round 3 (2026-10-27)
+
+`/gds-code-review` ran on the marks at `c383cf30` with the Blind Hunter,
+the Edge Case Hunter, the Acceptance Auditor and the Hot-Path Auditor. Its
+patch findings, all fixed in this PR:
+
+- A reader handed another tower's log, or a position past the log's end,
+  read "nothing changed". Each log now has its own id, which the reader
+  keys on beside the revision and the unit count, and a position the log
+  cannot answer makes the frame compare every room.
+- No test proved that a frame reads the log: the round 2 compare passed
+  every test. `a_frame_visits_only_the_marked_rooms` now writes a room past
+  the setters and checks it stays unsent until a full frame, and the
+  fallen-behind test uses a third room whose only mark the log dropped.
+  Each fails on the change it guards (a compare on every frame; a read from
+  the log's oldest entry). The readers test compares the whole kept table
+  with a fresh read, and all six setters are tested, residents and
+  hotelCustomersIn end to end.
+- The source check read one line at a time, missed split statements,
+  `ref mut` bindings, compound operators, mutating methods, destructuring
+  and whole-unit writes, and exempted every person `state` write, `rng.rs`
+  and the loaders wholesale. A shared scanner (`source_scan_tests.rs`) now
+  reads the code with comments and whitespace removed and finds all of
+  these, for the frame fields (`marks_guard_tests.rs`) and for labels and
+  subtypes (`meta_tests.rs`). Its exemptions are a person's `state` (by
+  receiver or a `PState` value), the RNG's own `state` and the satisfaction
+  pass's local copy, and the loaders are scanned. A test destructures every
+  `Unit` field, so a new field fails to compile until it is sorted into
+  what the frame and the census read or not.
+- The census rule was copied from `total_population`; both now call
+  `Unit::census_share`, and the attendance rule is
+  `Unit::attendance_occupants`. Write sites paired a mark with a unit by
+  hand; `Tower::marked` and `Tower::marked_units` hand them out together.
+- A frame after an hour that marks nearly every room cost more on the marks
+  than the compare it replaced (Hot-Path Auditor H3-1: 875K instructions
+  against 457K for 2,886 marks on 2,900 rooms). From half the rooms' worth
+  of marks the frame now compares every room (`compare_all`), 489K on that
+  frame, and `marks_from_half_the_rooms_compare_every_room` pins the
+  threshold from both sides.
+- The log trimmed its older half when full, so a reader could fall back
+  after about 8,192 marks, half what the docs said. It is now a ring that
+  drops its oldest index for each new one past 16,384, an O(1) push every
+  time.
+- `RUN_LIMIT` sent a large tower to the grid well before the sort would
+  cost more (H3-2: on large the grid wins only past about 29,000 raw runs).
+  The limit is now half the units, 4,096 at the least, and its doc carries
+  the measured crossovers. `a_tile_off_the_grid_falls_back_to_the_walk`
+  covers the walk with no limit.
+- A `continue` in a `match` arm in `presence.rs` would skip a statement
+  added after it; the match now yields the new count.
+- Docs: the engine's own writes go through the setters (the fields stay
+  `pub`); the cap; k counts marks; the signature's collision caveat; the
+  structure's stacked-tile notes; AC 5, the files-and-owners notes and the
+  project context rules.
+
+Its defer findings, each with an issue: H3-3 (the hotel and condo passes
+walk every unit where the rooms index answers) is #1158 A35; H3-5 (`by_id`
+hashes with SipHash under the per-person multiplier) is #1158 A36; H3-4 is
+#1173 F1; H3-7 is the #1158 items it names; H3-8 leaves B6 and A2-2 in
+#1285 items 2 and 4 and B3 in #1170 T1; the Blind Hunter's frames that
+compare every room with nothing to count them are #1285 item 5. H3-6 (two
+copies of the rooms index per hour, about 5,800 visits) is inside the
+hourly budget. B6, the full frame on a revision move, stays: it is one pass
+over the rooms per revision move, a revision-keyed rebuild of the
+per-command tier, on the same frame as the rooms index and structure
+rebuilds that each cost O(U).
+
+The native API changed: `Unit::sync_attendance_occupants` is crate-private
+and takes a mark, `Unit::census_share` and `Unit::attendance_occupants` are
+new public reads, and `FrameMarks` and `Mark` are crate-private. The
+JavaScript binding is unchanged.
+
+Parity on the round 3 head: the conformance runner passes every scenario,
+the frame layout pin holds, and the Hot-Path Auditor found every frame of
+a game day byte-identical between the round 2 and round 3 readers on
+medium, large and the owner's save at 2-minute, 6-minute and 4 x 20-minute
+steps, with money and population identical after 780 steps (the threshold
+keeps the same hash).
+
+Coordination: slice 3 (#1210, PR #1317) reads the person's discrete floor,
+which the frame's person record already carries (`person::FLOOR`, slot 4),
+so the layout did not change for it. Spike #1196 was not cherry-picked: the
+view is written from AD-9 in this PR, and the spike stays measurement-only.
 
 ### Departures from the architecture
 
@@ -484,8 +612,9 @@ New:
 - `engine-rs/src/view/mod.rs`, `layout.rs`, `structure.rs`, `reader.rs`,
   `meta.rs`, `marks.rs`, `signature.rs`
 - `engine-rs/src/view/layout_tests.rs`, `frame_tests.rs`, `marks_tests.rs`,
-  `meta_tests.rs`, `signature_tests.rs`, `oracle_tests.rs`,
-  `session_tests.rs`
+  `marks_guard_tests.rs`, `meta_tests.rs`, `signature_tests.rs`,
+  `oracle_tests.rs`, `session_tests.rs`, `source_scan_tests.rs`,
+  `structure_tests.rs`
 - `src/tests/integration/engineView.integration.test.ts`
 
 Changed:
@@ -507,4 +636,5 @@ Changed:
   job's file lists)
 - `docs/performance/hot-path-review.md` (three HP-8 rows),
   `_bmad-output/implementation-artifacts/backlog.md` (the
-  `facade-view-followups` row and the `ts-render-ui-hotpath-sweep` notes)
+  `facade-view-followups` row, and notes on the
+  `ts-render-ui-hotpath-sweep` and `engine-rs-hotpath-audit` rows)

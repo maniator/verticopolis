@@ -122,15 +122,14 @@ impl Simulation {
 
     fn escalate_infestations(&mut self) {
         let mut floors: Vec<i64> = Vec::new();
-        let marks = &self.tower.view.marks;
-        for (i, u) in self.tower.units.iter_mut().enumerate() {
+        for (u, at) in self.tower.marked_units() {
             if u.state != UnitState::Dirty || !u.kind.is_hotel() {
                 continue;
             }
             let days = u.dirty_days.unwrap_or(0) + 1;
             if days >= INFEST_DAYS {
-                u.set_state(marks.at(i), UnitState::Infested);
-                u.set_occupants(marks.at(i), 0);
+                u.set_state(at, UnitState::Infested);
+                u.set_occupants(at, 0);
                 u.dirty_days = None;
                 floors.push(u.floor);
             } else {

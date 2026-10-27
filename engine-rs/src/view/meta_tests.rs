@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 
 use super::meta::{FIRST_META_REVISION, LOG_CAP};
 use super::session_tests::at;
+use super::source_scan_tests::{engine_sources, field_writes, squeeze};
 use super::*;
 use crate::facilities::Kind;
 use crate::tower::Tower;
@@ -222,37 +223,12 @@ fn a_new_retail_room_moves_the_meta_revision() {
 /// the library would leave the meta revision behind it.
 #[test]
 fn only_the_setters_write_labels_and_subtypes() {
-    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let mut stack = vec![src.clone()];
     let mut writers = Vec::new();
-    while let Some(dir) = stack.pop() {
-        for entry in std::fs::read_dir(&dir).unwrap() {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                stack.push(path);
-                continue;
-            }
-            let rel = path
-                .strip_prefix(&src)
-                .unwrap()
-                .to_string_lossy()
-                .replace('\\', "/");
-            if !rel.ends_with(".rs") || rel.ends_with("_tests.rs") {
-                continue;
-            }
-            let text = std::fs::read_to_string(&path)
-                .unwrap()
-                .replace("\r\n", "\n");
-            let body = text.split("#[cfg(test)]\nmod tests").next().unwrap();
-            for (n, line) in body.lines().enumerate() {
-                let code = line.split("//").next().unwrap();
-                if writes_metadata(code) {
-                    writers.push(format!("{rel}:{}", n + 1));
-                }
-            }
+    for source in engine_sources() {
+        for at in metadata_writes(&source.code) {
+            writers.push(format!("{}:{}", source.rel, source.line(at)));
         }
     }
-    assert_eq!(writers.len(), 2, "{writers:?}");
     for (line, writes) in [
         ("u.label = x;", true),
         ("u.label=x;", true),
@@ -267,63 +243,63 @@ fn only_the_setters_write_labels_and_subtypes() {
         ("u.label.extend(chars)", true),
         ("u.label.pop()", true),
         ("u.subtype.as_mut()", true),
+        ("u.label.make_ascii_uppercase()", true),
+        ("let tail = u.label.split_off(3);", true),
         ("let n = &mut u.label;", true),
+        ("if let Some(s) = &mut u.subtype { *s = \"x\" }", true),
+        ("match &mut u.label { l => l.clear() }", true),
+        ("if let Some(ref mut s) = u.subtype { *s = \"x\" }", true),
         ("write!(&mut u.label, \"x\")", true),
         ("f(&mut self.units[i].subtype, x)", true),
         ("let n = u.label.len();", false),
         ("f(&mut u.label.len())", false),
+        ("let l = u.labels;", false),
     ] {
-        assert_eq!(writes_metadata(line), writes, "{line}");
+        let code = squeeze("x.rs".into(), line).code;
+        assert_eq!(!metadata_writes(&code).is_empty(), writes, "{line}");
     }
     assert!(
         writers.iter().all(|w| w.starts_with("view/meta.rs:")),
         "{writers:?}"
     );
+    assert_eq!(writers.len(), 2, "{writers:?}");
 }
 
-/// Whether a line of code writes a label or a subtype in place: an
-/// assignment (spaces or none, compound included), a mutating method on the
-/// field, a write through a destructured binding, or a `&mut` borrow of the
-/// field (a `mem` swap, a `write!`, an alias). A new unit gets its metadata
-/// in a struct literal (the loader and `Tower::place`), which a line check
-/// cannot tell from a rebuild elsewhere; the session oracle's metadata
-/// comparison covers that case.
-fn writes_metadata(code: &str) -> bool {
-    let squeezed: String = code.chars().filter(|c| !c.is_whitespace()).collect();
-    let assigns = |field: &str| {
-        squeezed
-            .match_indices(field)
-            .any(|(at, m)| !squeezed[at + m.len()..].starts_with('='))
-    };
-    let borrowed = squeezed.match_indices("&mut").any(|(at, m)| {
-        let rest = &squeezed[at + m.len()..];
-        let place = rest.split([')', ',', ';']).next().unwrap();
-        place.ends_with(".label") || place.ends_with(".subtype")
-    });
-    let methods = [
-        ".label+=",
-        ".label.push",
-        ".label.extend(",
-        ".label.pop(",
-        ".label.remove(",
-        ".label.drain(",
-        ".label.as_mut",
-        ".label.clear(",
-        ".label.insert",
-        ".label.truncate(",
-        ".label.retain(",
-        ".label.clone_from(",
-        ".label.replace_range(",
-        ".subtype.take(",
-        ".subtype.replace(",
-        ".subtype.insert(",
-        ".subtype.get_or_insert",
-        ".subtype.as_mut(",
-        "*label=",
-        "*subtype=",
-    ];
-    assigns(".label=")
-        || assigns(".subtype=")
-        || methods.iter().any(|m| squeezed.contains(m))
-        || borrowed
+/// The mutating methods of a label (a `String`) and a subtype (an
+/// `Option`).
+const METADATA_METHODS: [&str; 23] = [
+    "push",
+    "extend(",
+    "pop(",
+    "remove(",
+    "drain(",
+    "as_mut",
+    "clear(",
+    "insert",
+    "truncate(",
+    "retain(",
+    "clone_from(",
+    "replace_range(",
+    "make_ascii_",
+    "split_off(",
+    "extend_from_within(",
+    "take(",
+    "replace(",
+    "get_or_insert",
+    "as_deref_mut(",
+    "iter_mut(",
+    "take_if(",
+    "write_str(",
+    "write_fmt(",
+];
+
+/// Where `code` writes a label or a subtype in place (the shared scan's
+/// assignments, mutating methods, `&mut` borrows, `ref mut` bindings and
+/// writes through a binding of that name). A new unit gets its metadata in
+/// a struct literal (the loader and `Tower::place`), which the scan does not
+/// count; the session oracle's metadata comparison covers that case.
+fn metadata_writes(code: &str) -> Vec<usize> {
+    let mut out = field_writes(code, "label", &METADATA_METHODS, &|_| false);
+    out.extend(field_writes(code, "subtype", &METADATA_METHODS, &|_| false));
+    out
 }

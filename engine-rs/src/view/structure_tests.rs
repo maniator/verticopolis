@@ -1,0 +1,53 @@
+//! The structure's tile runs on hand-built towers: tiles laid out of order
+//! and a tile off the grid. The seeded sessions' runs are checked in
+//! `oracle_tests.rs`.
+use super::layout::{run, structure, ROOM_RECORD, RUN_RECORD, STRUCTURE_HEADER};
+use super::oracle_tests::same;
+use super::*;
+use crate::clock::GameMode;
+use crate::facilities::Kind;
+
+#[test]
+fn tiles_laid_out_of_order_join_one_run() {
+    let mut sim = Simulation::new_game(1, GameMode::Classic);
+    for x in 0..=2 {
+        assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+    }
+    for x in [0, 2, 1] {
+        assert!(sim.tower.place(Kind::Floor, 2, x).ok);
+    }
+    let v = structure_view(&sim);
+    let at = STRUCTURE_HEADER + v[structure::ROOMS] as usize * ROOM_RECORD;
+    let runs = &v[at..at + v[structure::RUNS] as usize * RUN_RECORD];
+    let floor2 = runs
+        .chunks_exact(RUN_RECORD)
+        .filter(|r| r[run::FLOOR] == 2.0)
+        .collect::<Vec<_>>();
+    assert_eq!(floor2.len(), 1, "the floor-2 tiles are one maximal run");
+    assert_eq!(floor2[0][run::X], 0.0);
+    assert_eq!(floor2[0][run::COUNT], 3.0);
+}
+
+#[test]
+fn a_tile_off_the_grid_falls_back_to_the_walk() {
+    // No save the loader accepts holds one, but a tile outside the grid
+    // still gives the walk's runs.
+    let mut sim = Simulation::new_game(1, GameMode::Classic);
+    for (kind, floor) in [(Kind::Lobby, 1), (Kind::Floor, 2)] {
+        for x in 0..=2 {
+            assert!(sim.tower.place(kind, floor, x).ok);
+        }
+    }
+    let at = |u: &crate::tower::Unit| u.floor == 2 && u.x == 2;
+    let i = sim.tower.units.iter().position(at).unwrap();
+    sim.tower.units[i].x = -1;
+    let walked = super::structure::run_records(&sim.tower, usize::MAX);
+    let grid = super::structure::run_records(&sim.tower, 0);
+    assert!(same(&grid, &walked), "the grid falls back to the walk");
+    let floor2: Vec<_> = grid
+        .chunks_exact(RUN_RECORD)
+        .filter(|r| r[run::FLOOR] == 2.0)
+        .collect();
+    assert_eq!(floor2.len(), 1, "the floor-2 tiles are one run");
+    assert_eq!((floor2[0][run::X], floor2[0][run::COUNT]), (-1.0, 3.0));
+}

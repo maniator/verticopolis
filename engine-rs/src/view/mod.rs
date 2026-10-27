@@ -33,7 +33,8 @@ mod structure;
 use std::cell::RefCell;
 
 pub use layout::{layout_json, VIEW_LAYOUT_VERSION};
-pub use marks::{FrameMarks, Mark};
+use marks::FrameMarks;
+pub(crate) use marks::Mark;
 pub(crate) use meta::FIRST_META_REVISION;
 pub use meta::{meta_since, whole_revision, MetaLog};
 pub use reader::ViewReader;
@@ -73,6 +74,9 @@ mod frame_tests;
 #[path = "layout_tests.rs"]
 mod layout_tests;
 #[cfg(test)]
+#[path = "marks_guard_tests.rs"]
+mod marks_guard_tests;
+#[cfg(test)]
 #[path = "marks_tests.rs"]
 mod marks_tests;
 #[cfg(test)]
@@ -87,3 +91,9 @@ mod session_tests;
 #[cfg(test)]
 #[path = "signature_tests.rs"]
 mod signature_tests;
+#[cfg(test)]
+#[path = "source_scan_tests.rs"]
+mod source_scan_tests;
+#[cfg(test)]
+#[path = "structure_tests.rs"]
+mod structure_tests;

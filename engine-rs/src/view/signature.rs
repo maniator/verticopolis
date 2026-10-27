@@ -21,7 +21,7 @@ impl Simulation {
     /// string runs together (a label holding the string's `:` or `;`
     /// separators, an empty film policy or subtype beside a missing one), so
     /// there it can see a change the string would not; where the string
-    /// sees one, so does the signature. One pass over units and transports
+    /// sees one, so does the signature, a collision aside. One pass over units and transports
     /// per read: a read for each command (undo's capture and commit), too
     /// slow for each frame.
     pub fn tower_signature(&self) -> u64 {

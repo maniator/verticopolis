@@ -451,24 +451,3 @@ fn the_runs_do_not_depend_on_the_unit_order() {
     let grid = super::structure::run_records(&sim.tower, 0);
     assert!(same(&grid, &want), "a shuffled list, off the grid");
 }
-
-#[test]
-fn tiles_laid_out_of_order_join_one_run() {
-    let mut sim = Simulation::new_game(1, crate::clock::GameMode::Classic);
-    for x in 0..=2 {
-        assert!(sim.tower.place(crate::facilities::Kind::Lobby, 1, x).ok);
-    }
-    for x in [0, 2, 1] {
-        assert!(sim.tower.place(crate::facilities::Kind::Floor, 2, x).ok);
-    }
-    let v = structure_view(&sim);
-    let at = STRUCTURE_HEADER + v[structure::ROOMS] as usize * ROOM_RECORD;
-    let runs = &v[at..at + v[structure::RUNS] as usize * RUN_RECORD];
-    let floor2 = runs
-        .chunks_exact(RUN_RECORD)
-        .filter(|r| r[run::FLOOR] == 2.0)
-        .collect::<Vec<_>>();
-    assert_eq!(floor2.len(), 1, "the floor-2 tiles are one maximal run");
-    assert_eq!(floor2[0][run::X], 0.0);
-    assert_eq!(floor2[0][run::COUNT], 3.0);
-}

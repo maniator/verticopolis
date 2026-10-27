@@ -84,18 +84,31 @@ impl Run {
 /// Floors a tower can have, `MIN_FLOOR` to `MAX_FLOOR`.
 const FLOORS: usize = (MAX_FLOOR - MIN_FLOOR + 1) as usize;
 
-/// The raw runs past which the walk stops and the runs are read off the
-/// grid instead: sorting n runs takes about n log n compares, and past
-/// this many that costs more than the grid's one more pass over the units
-/// and its `FLOORS * LOT_WIDTH` cells.
+/// The fewest raw runs past which the walk stops and the runs are read off
+/// the grid instead; `run_limit` raises it with the tower. The limit bounds
+/// the sort, which grows with the scatter while the grid does not: the grid
+/// is one more pass over the units and its `FLOORS * LOT_WIDTH` cells
+/// (41,250). The round 3 review measured where the grid starts to win, on
+/// a list scattered on purpose: at about 4,000 to 5,500 raw runs on medium
+/// (12,062 units), and only past about 29,000 on large (43,358), where the
+/// pass over the units is the larger cost.
 const RUN_LIMIT: usize = 4096;
+
+/// The raw runs past which `tower`'s walk gives way to the grid: half its
+/// units, or `RUN_LIMIT` on a small tower. No reference save comes near it
+/// (110 raw runs on large, 639 on medium, 1,132 on the owner's).
+fn run_limit(tower: &Tower) -> usize {
+    RUN_LIMIT.max(tower.units.len() / 2)
+}
 
 /// The runs of the floor and lobby tiles, by floor and then x, and
 /// maximal: no run continues the one before it. One walk in unit-list
 /// order makes them (`walk_runs`) unless the list is so scattered that it
 /// makes more than `limit`; then the runs come off a grid of the tiles
-/// (`grid_runs`). The runs are sorted by where they start when they come
-/// out of order, and the ones that continue each other joined. The join
+/// (`grid_runs`), or, should a tile stand outside the grid or two share a
+/// cell (no save the loader accepts holds either), from a walk with no
+/// limit. The runs are sorted by where they start when they come out of
+/// order, and the ones that continue each other joined. The join
 /// runs whatever the order: a run that grew left can end where the run
 /// before it starts with the two still in order (a drag over 0 to 4, then
 /// one from 9 down to 5), and a floor outside the grid gets one run per
@@ -109,8 +122,8 @@ fn tile_runs(tower: &Tower, limit: usize) -> Vec<Run> {
         .windows(2)
         .all(|w| (w[0].floor, w[0].x) < (w[1].floor, w[1].x));
     if !ordered {
-        // A stable sort, so two runs that start on the same tile (a save
-        // that stacks two tiles) keep their list order.
+        // A stable sort, so runs that start on the same tile (stacked
+        // tiles, which no accepted save holds) would keep their list order.
         runs.sort_by_key(|r| (r.floor, r.x));
     }
     // `dedup_by` hands the later run first: fold it into the earlier one
@@ -163,7 +176,7 @@ fn walk_runs(tower: &Tower, limit: usize) -> Option<Vec<Run>> {
 /// The runs read off a dense grid of the tiles by floor and x: one more pass
 /// over the units and one over the grid's cells, whatever the list's order.
 /// `None` when a tile stands outside the grid or two share a cell, which no
-/// save the loader accepts holds and the sort handles.
+/// save the loader accepts holds; `tile_runs` then walks with no limit.
 fn grid_runs(tower: &Tower) -> Option<Vec<Run>> {
     let width = LOT_WIDTH as usize;
     let mut grid = vec![u32::MAX; FLOORS * width];
@@ -235,7 +248,7 @@ pub(super) fn run_records(tower: &Tower, limit: usize) -> Vec<f64> {
 ///
 /// One pass over the units (the runs) and one over the rooms index, plus a
 /// sort of the runs when a floor was built in several drags (at most
-/// `RUN_LIMIT` of them; a list more scattered than that is read off the
+/// `run_limit` of them; a list more scattered than that is read off the
 /// grid in one more pass); the floor bounds and the rooms index are the
 /// tower's per-revision caches, shared with every other reader. The output
 /// is allocated once, after the walk, at its size. A read for each
@@ -248,7 +261,7 @@ pub fn structure_view(sim: &Simulation) -> Vec<f64> {
         .iter()
         .map(|t| t.skip_floors.as_ref().map_or(0, Vec::len))
         .sum();
-    let runs = tile_runs(tower, RUN_LIMIT);
+    let runs = tile_runs(tower, run_limit(tower));
     let (low, high) = tower.floor_bounds();
     let mut v = Vec::with_capacity(
         STRUCTURE_HEADER
