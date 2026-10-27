@@ -356,10 +356,10 @@ export class Engine {
     towerSetCars(id: number, cars: number): boolean;
     /**
      * The tower signature (`Simulation::tower_signature`) as a `bigint`: two
-     * reads are equal when the tower half of `towerStateSig` is, and differ
-     * when it differs (but for a 64-bit collision). Undo reads it, beside
-     * money, at a gesture's capture and commit; it walks every unit, so it
-     * is never a per-frame read.
+     * reads are equal when the fields the tower half of `towerStateSig`
+     * reads are equal, and differ when they differ (but for a 64-bit
+     * collision). Undo reads it, beside money, at a gesture's capture and
+     * commit; it walks every unit, so it is too slow to read each frame.
      */
     towerSignature(): bigint;
     /**

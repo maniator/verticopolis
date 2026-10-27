@@ -3,7 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import { rentOf } from "../../engine/econConfig";
 import { GRID } from "../../engine/facilities";
 import type { Unit } from "../../engine/types";
-import { statsTemplate } from "../../ui/templates/stats";
+import { statsBodyOf } from "../../ui/templates/stats.fixture";
 import { unitEditorTemplate } from "../../ui/templates/editor";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 
@@ -42,38 +42,38 @@ function tickUntil(sim: Simulation, pred: () => boolean, maxHours = 24 * 40): bo
 }
 
 describe("Not-present households never ghost the readout (gutted/empty)", () => {
-  it("excludes a gutted sold condo from both population and the Households section", () => {
+  it("excludes a gutted sold condo from both population and the Households section", async () => {
     const sim = Simulation.newGame(3, "modern");
     const condo = servedCondo(sim);
     tickUntil(sim, () => condo.everOccupied);
     expect(sim.tower.totalPopulation()).toBe(condo.residents);
-    expect(renderToFragment(statsTemplate(sim)).textContent).toContain("People housed");
+    expect(renderToFragment(await statsBodyOf(sim)).textContent).toContain("People housed");
     // A fire guts the only sold condo: it stops being present.
     condo.state = "gutted";
     // Population drops it (isPresent false) …
     expect(sim.tower.totalPopulation()).toBe(0);
     // … and the Households readout drops it too — no ghost family, back to the
     // empty-state placeholder rather than a stale "People housed".
-    expect(renderToFragment(statsTemplate(sim)).textContent).toContain("No households yet");
+    expect(renderToFragment(await statsBodyOf(sim)).textContent).toContain("No households yet");
   });
 });
 
 describe("Stats panel — Households section (Modern only)", () => {
-  it("shows a Households section on a Modern tower, and not on a Classic one", () => {
+  it("shows a Households section on a Modern tower, and not on a Classic one", async () => {
     const modern = Simulation.newGame(3, "modern");
     const mc = servedCondo(modern);
     tickUntil(modern, () => mc.everOccupied);
-    const modernText = renderToFragment(statsTemplate(modern)).textContent!;
+    const modernText = renderToFragment(await statsBodyOf(modern)).textContent!;
     expect(modernText).toContain("Households");
     expect(modernText).toMatch(/Avg household/);
 
     const classic = Simulation.newGame(3, "classic");
     const cc = servedCondo(classic);
     tickUntil(classic, () => cc.everOccupied);
-    expect(renderToFragment(statsTemplate(classic)).textContent).not.toContain("Households");
+    expect(renderToFragment(await statsBodyOf(classic)).textContent).not.toContain("Households");
   });
 
-  it("shows a sold Modern condo's editor price as the household-scaled amount (what buy-back reclaims)", () => {
+  it("shows a sold Modern condo's editor price as the household-scaled amount (what buy-back reclaims)", async () => {
     const sim = Simulation.newGame(7, "modern");
     const condo = servedCondo(sim);
     tickUntil(sim, () => condo.everOccupied);
@@ -81,7 +81,7 @@ describe("Stats panel — Households section (Modern only)", () => {
     expect(renderToFragment(unitEditorTemplate(sim, condo)).querySelector('[data-field="rent"]')!.textContent).toBe(`$${expected.toLocaleString()}`);
   });
 
-  it("keeps 'People housed' equal to the census even when a sold condo lacks residents", () => {
+  it("keeps 'People housed' equal to the census even when a sold condo lacks residents", async () => {
     // A corrupt/hand-edited Modern save: a present, sold condo with no household.
     // The census (residentCount) falls back to the classic 3, so the readout must
     // too — otherwise People housed would undercount total population.
@@ -95,7 +95,7 @@ describe("Stats panel — Households section (Modern only)", () => {
     bare.residents = undefined; // sold but no household on the record
     const pop = sim.tower.totalPopulation();
     expect(pop).toBe(a.residents! + 3); // census counts the bare condo as 3
-    const cell = [...renderToFragment(statsTemplate(sim)).querySelectorAll("span.k")].find((el) => el.textContent === "People housed")!.nextElementSibling!;
+    const cell = [...renderToFragment(await statsBodyOf(sim)).querySelectorAll("span.k")].find((el) => el.textContent === "People housed")!.nextElementSibling!;
     // Locale-proof digit-strip parse (toLocaleString's separator varies).
     expect(Number(cell.textContent!.replace(/\D/g, ""))).toBe(pop); // agrees with the census
   });

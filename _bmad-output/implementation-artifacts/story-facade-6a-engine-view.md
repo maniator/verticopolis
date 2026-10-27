@@ -167,8 +167,9 @@ consumer and is out of scope here.
 - [x] `src/dualrun/engine.d.ts` (regenerated: lines added only, at the
       places wasm-bindgen sorts them), `binding.ts`, `exportTiers.ts`.
 - [x] Compat record: `viewLayoutVersion` in `src/build/engineCompat.ts` and the
-      Rust record test; crate 0.5.0 to 0.6.0 in `Cargo.toml` and both lock
-      files (6d took 0.4.0, #1231 0.4.1 and #1233 0.5.0, each merged first);
+      Rust record test; the crate takes the next free minor in `Cargo.toml`
+      and both lock files, 0.8.0 since the round 3 merge of main (6d took
+      0.4.0, #1231 0.4.1, #1233 0.5.0 and #1256 0.7.0, each merged first);
       `npm run engine:compat`.
 - [x] `src/tests/integration/engineView.integration.test.ts` on the real WASM
       package, listed in `npm run test:wasm`.
@@ -497,7 +498,7 @@ Changed:
   (the module), `wasm.rs` (the binding block), `identity_tests.rs`,
   `compat-record.json`
 - `engine-rs/Cargo.toml`, `engine-rs/Cargo.lock`,
-  `engine-rs/consumer/Cargo.lock` (0.6.0), `engine-rs/consumer/src/lib.rs`,
+  `engine-rs/consumer/Cargo.lock` (0.8.0), `engine-rs/consumer/src/lib.rs`,
   `engine-rs/tests/api.rs`, `engine-rs/API.md`
 - `src/dualrun/engine.d.ts`, `src/dualrun/binding.ts`,
   `src/dualrun/exportTiers.ts`, `src/build/engineCompat.ts`

@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
+import { cumulativeStarGates, nextStarRequirements } from "../../engine/sim/star";
 import { nothing } from "lit-html";
-import { statsTemplate, incomeSection, statsModalTemplate, canCallExterminator } from "./stats";
+import { incomeSection, milestonesSection, nextStarSection, statsModalTemplate, canCallExterminator, STAR_GATE_LABELS } from "./stats";
+import { statsBodyOf, statsScreenOf } from "./stats.fixture";
 import { renderToFragment } from "../testing/litTestUtils";
+import type { StarGateId } from "../../simport/panels";
 
 /**
  * The Tower Statistics dialog body (E3-S5). Package: the window grammar
@@ -82,47 +85,47 @@ function withIncome(): Simulation {
 /** The VIP row's value cell (the span after the "VIP visits" key), so tests can
  *  assert the verdict COLOR directly; the builder-vs-builder equivalence guard
  *  alone would pass a wrong color applied identically to both builders. */
-function vipCell(sim: Simulation): HTMLElement | null {
-  const frag = renderToFragment(statsTemplate(sim));
+async function vipCell(sim: Simulation): Promise<HTMLElement | null> {
+  const frag = renderToFragment(await statsBodyOf(sim));
   const key = [...frag.querySelectorAll("span.k")].find((k) => k.textContent === "VIP visits");
   return (key?.nextElementSibling as HTMLElement) ?? null;
 }
 
 describe("statsTemplate structure", () => {
-  it("renders the stats grid with the Overview section", () => {
-    const frag = renderToFragment(statsTemplate(builtTower()));
+  it("renders the stats grid with the Overview section", async () => {
+    const frag = renderToFragment(await statsBodyOf(builtTower()));
     expect(frag.querySelector(".stats-grid")).not.toBeNull();
     expect(frag.textContent).toContain("Overview");
     expect(frag.textContent).toContain("Tower name");
   });
 
-  it("shows the VIP visits row from 3★ and reflects the earned review", () => {
+  it("shows the VIP visits row from 3★ and reflects the earned review", async () => {
     const sim = builtTower();
-    expect(renderToFragment(statsTemplate(sim)).textContent).not.toContain("VIP visits");
+    expect(renderToFragment(await statsBodyOf(sim)).textContent).not.toContain("VIP visits");
     sim.star = 3;
-    let frag = renderToFragment(statsTemplate(sim));
+    let frag = renderToFragment(await statsBodyOf(sim));
     expect(frag.textContent).toContain("VIP visits");
     expect(frag.textContent).toContain("None yet");
     sim.vipVisits = 3;
     sim.vipFavorable = true;
-    frag = renderToFragment(statsTemplate(sim));
+    frag = renderToFragment(await statsBodyOf(sim));
     expect(frag.textContent).toContain("3 · review earned");
     // The verdict trusts the flag alone: favorable with no recorded visits
     // (fixtures, tampered saves) still reads earned, never a muted "None yet".
     sim.vipVisits = 0;
-    frag = renderToFragment(statsTemplate(sim));
+    frag = renderToFragment(await statsBodyOf(sim));
     expect(frag.textContent).toContain("Review earned");
     expect(frag.textContent).not.toContain("None yet");
   });
 
-  it("colors the VIP verdict by the earned flag alone: good when earned, muted otherwise", () => {
+  it("colors the VIP verdict by the earned flag alone: good when earned, muted otherwise", async () => {
     const sim = builtTower();
     sim.star = 3;
     // No visits, no review: muted "None yet".
-    expect(vipCell(sim)!.getAttribute("style")).toContain("var(--muted)");
+    expect((await vipCell(sim))!.getAttribute("style")).toContain("var(--muted)");
     // Visits without the review: still muted, with the not-yet wording.
     sim.vipVisits = 2;
-    const struggling = vipCell(sim)!;
+    const struggling = (await vipCell(sim))!;
     expect(struggling.textContent).toContain("2 · review not yet earned");
     expect(struggling.getAttribute("style")).toContain("var(--muted)");
     // The review alone flips the color, even with zero visits, and the flag
@@ -130,32 +133,32 @@ describe("statsTemplate structure", () => {
     sim.vipFavorable = true;
     sim.vipVisits = 0;
     sim.star = 1;
-    const earned = vipCell(sim)!;
+    const earned = (await vipCell(sim))!;
     expect(earned.textContent).toContain("Review earned");
     expect(earned.getAttribute("style")).toContain("var(--good)");
   });
 
-  it("hides the parking demand row until parking unlocks at 3★", () => {
+  it("hides the parking demand row until parking unlocks at 3★", async () => {
     const sim = builtTower(); // occupied office at 1★, no parking buildable yet
-    expect(renderToFragment(statsTemplate(sim)).textContent).not.toContain("Parking demand");
+    expect(renderToFragment(await statsBodyOf(sim)).textContent).not.toContain("Parking demand");
     sim.star = 3;
-    expect(renderToFragment(statsTemplate(sim)).textContent).toContain("Parking demand");
+    expect(renderToFragment(await statsBodyOf(sim)).textContent).toContain("Parking demand");
   });
 
-  it("escapes a hostile tower name as text, injecting no element", () => {
+  it("escapes a hostile tower name as text, injecting no element", async () => {
     const sim = builtTower();
     sim.tower.towerName = `<img src=x onerror="alert(1)">`;
-    const frag = renderToFragment(statsTemplate(sim));
+    const frag = renderToFragment(await statsBodyOf(sim));
     expect(frag.querySelector("img")).toBeNull();
     expect(frag.textContent).toContain(`<img src=x onerror="alert(1)">`);
   });
 });
 
 describe("statsTemplate sections across fixture towers", () => {
-  it("renders every section as a mini title bar with the solvency-styled Funds cell", () => {
+  it("renders every section as a mini title bar with the solvency-styled Funds cell", async () => {
     // The window grammar the design system reads: section strips use the
     // documented .win-title.sm variant and Funds carries the money class.
-    const frag = renderToFragment(statsTemplate(builtTower()));
+    const frag = renderToFragment(await statsBodyOf(builtTower()));
     for (const section of ["Overview", "Tenancy", "Transport & access", "Milestones"]) {
       expect(frag.textContent).toContain(section);
     }
@@ -163,11 +166,11 @@ describe("statsTemplate sections across fixture towers", () => {
     expect(frag.querySelector(".v.money")).not.toBeNull();
   });
 
-  it("splits the milestones checklist into two kv columns; the achieved goal reads done with a filled gauge", () => {
+  it("splits the milestones checklist into two kv columns; the achieved goal reads done with a filled gauge", async () => {
     // builtTower forces one achieved milestone, so the done marker and a
     // non-zero gauge width must render (the ms-done markup the retired
     // equivalence guard used to verify).
-    const frag = renderToFragment(statsTemplate(builtTower()));
+    const frag = renderToFragment(await statsBodyOf(builtTower()));
     expect(frag.querySelectorAll(".col.ms.kv").length).toBe(2);
     expect(frag.querySelector(".ms-done")).not.toBeNull();
     expect(frag.textContent).toContain("\u2713");
@@ -175,34 +178,34 @@ describe("statsTemplate sections across fixture towers", () => {
     expect(gauge.getAttribute("style")).toMatch(/width:\s*[1-9]/); // non-zero progress
   });
 
-  it("an empty tower still renders the grid; a Modern tower gains the Households section", () => {
-    expect(renderToFragment(statsTemplate(new Simulation())).querySelector(".stats-grid")).not.toBeNull();
-    expect(renderToFragment(statsTemplate(Simulation.newGame(3, "classic"))).textContent).not.toContain("Households");
-    expect(renderToFragment(statsTemplate(Simulation.newGame(3, "modern"))).textContent).toContain("Households");
+  it("an empty tower still renders the grid; a Modern tower gains the Households section", async () => {
+    expect(renderToFragment(await statsBodyOf(new Simulation())).querySelector(".stats-grid")).not.toBeNull();
+    expect(renderToFragment(await statsBodyOf(Simulation.newGame(3, "classic"))).textContent).not.toContain("Households");
+    expect(renderToFragment(await statsBodyOf(Simulation.newGame(3, "modern"))).textContent).toContain("Households");
   });
 
-  it("a sold Modern household renders the multi-size mix", () => {
+  it("a sold Modern household renders the multi-size mix", async () => {
     // Scope to the Size mix VALUE cell: the elevator and VIP rows also join
     // with the same separator, so a whole-dialog probe could pass vacuously.
-    const frag = renderToFragment(statsTemplate(modernWithHousehold()));
+    const frag = renderToFragment(await statsBodyOf(modernWithHousehold()));
     const key = [...frag.querySelectorAll("span.k")].find((el) => el.textContent === "Size mix")!;
     expect(key).toBeTruthy();
     expect(key.nextElementSibling!.textContent).toMatch(/×.+·.+×/); // two buckets joined
   });
 
-  it("a multi-shaft tower renders EVERY shaft's utilization row; income history renders rows and Net", () => {
+  it("a multi-shaft tower renders EVERY shaft's utilization row; income history renders rows and Net", async () => {
     const shafts = manyShafts();
     expect(shafts.elevatorStats().length).toBe(4);
-    const frag = renderToFragment(statsTemplate(shafts));
+    const frag = renderToFragment(await statsBodyOf(shafts));
     // All four shafts render a "% full" value cell (the two-column split holds
     // every row, none silently dropped).
     expect([...frag.querySelectorAll("span.v")].filter((v) => /% full$/.test(v.textContent ?? "")).length).toBe(4);
     const income = withIncome();
     expect(income.incomeBreakdown().hasData).toBe(true);
-    expect(renderToFragment(statsTemplate(income)).textContent).toContain("Net");
+    expect(renderToFragment(await statsBodyOf(income)).textContent).toContain("Net");
   });
 
-  it("a 4-star tower whose hotel guests diverge the rating count shows the row and explainer", () => {
+  it("a 4-star tower whose hotel guests diverge the rating count shows the row and explainer", async () => {
     const sim = builtTower();
     const r = sim.tower.place("hotelSingle", 2, 22);
     expect(r.ok).toBe(true);
@@ -212,22 +215,22 @@ describe("statsTemplate sections across fixture towers", () => {
     sim.star = 4;
     // Guard the fixture: the divergence must be real or the row never renders.
     expect(sim.ratingPopulation()).toBeLessThan(sim.stats().population);
-    const frag = renderToFragment(statsTemplate(sim));
+    const frag = renderToFragment(await statsBodyOf(sim));
     expect(frag.textContent).toContain("Counts toward stars");
     expect(frag.textContent).toContain("Hotel guests count toward your star rating");
   });
 
-  it("an express shaft reads its Express label in the elevator list", () => {
+  it("an express shaft reads its Express label in the elevator list", async () => {
     const sim = builtTower();
     // Tower-level placement: the star/money gates live in sim.buildTransport
     // and are not what this pins.
     expect(sim.tower.placeTransport("elevatorExpress", 16, 1, 2).ok).toBe(true);
-    expect(renderToFragment(statsTemplate(sim)).textContent).toContain("Express");
+    expect(renderToFragment(await statsBodyOf(sim)).textContent).toContain("Express");
   });
 });
 
 describe("incomeSection (income breakdown)", () => {
-  it("Net sums only the shown rows, excluding hidden sub-dollar lines", () => {
+  it("Net sums only the shown rows, excluding hidden sub-dollar lines", async () => {
     const sim = Simulation.newGame(91);
     // One clearly-shown line and two sub-$0.50/day lines that the row filter
     // hides (a realistic case: a small annual-ish charge amortized over 90 days).
@@ -235,7 +238,7 @@ describe("incomeSection (income breakdown)", () => {
     sim.recordMoney("food", 0.3); // rounds to $0, hidden row
     sim.recordMoney("retail", 0.3); // rounds to $0, hidden row
 
-    const text = renderToFragment(incomeSection(sim) as Exclude<ReturnType<typeof incomeSection>, typeof nothing>).textContent!;
+    const text = renderToFragment(incomeSection((await statsScreenOf(sim)).report.income) as Exclude<ReturnType<typeof incomeSection>, typeof nothing>).textContent!;
 
     // The big line shows; the sub-dollar lines are omitted from the list.
     expect(text).toContain("Offices");
@@ -256,17 +259,17 @@ describe("incomeSection (income breakdown)", () => {
     expect(norm).not.toContain("$1001"); // the old, hidden-lines-included Net
   });
 
-  it("renders nothing before any money has been recorded", () => {
+  it("renders nothing before any money has been recorded", async () => {
     // `nothing` renders no nodes: the whole section is absent from the dialog,
     // and the section function itself returns the sentinel (not an empty shell).
     const sim = Simulation.newGame(92);
-    expect(incomeSection(sim)).toBe(nothing);
-    expect(renderToFragment(statsTemplate(sim)).textContent).not.toContain("Income (avg / day");
+    expect(incomeSection((await statsScreenOf(sim)).report.income)).toBe(nothing);
+    expect(renderToFragment(await statsBodyOf(sim)).textContent).not.toContain("Income (avg / day");
   });
 });
 
 describe("Tenancy vacancies split off-market (No Rate) counts out", () => {
-  it("plain vacancies read the bare number; off-market vacancies add the parenthetical", () => {
+  it("plain vacancies read the bare number; off-market vacancies add the parenthetical", async () => {
     const sim = builtTower();
     // Widen the strip first so both extra offices place cleanly, then add
     // them: one plain-vacant, one vacant AND off-market. Every placement is
@@ -278,19 +281,19 @@ describe("Tenancy vacancies split off-market (No Rate) counts out", () => {
     expect(a.ok).toBe(true);
     const c = sim.tower.place("office", 2, 30);
     expect(c.ok).toBe(true);
-    const vacantRow = () => {
-      const frag = renderToFragment(statsTemplate(sim));
+    const vacantRow = async () => {
+      const frag = renderToFragment(await statsBodyOf(sim));
       const key = [...frag.querySelectorAll("span.k")].find((k) => k.textContent === "Vacancies");
       return (key?.nextElementSibling as HTMLElement).textContent;
     };
-    expect(vacantRow()).toBe("2"); // two vacant, none off-market: unchanged
+    expect(await vacantRow()).toBe("2"); // two vacant, none off-market: unchanged
     sim.tower.units.find((u) => u.id === c.unitId)!.noRate = true;
-    expect(vacantRow()).toBe("2 (1 off-market)"); // the honest split
+    expect(await vacantRow()).toBe("2 (1 off-market)"); // the honest split
   });
 });
 
 describe("the exterminator row is never a dialog footer", () => {
-  it("renders nested, so the sticky-footer rule cannot reach it", () => {
+  it("renders nested, so the sticky-footer rule cannot reach it", async () => {
     // `.modal-box > .modal-actions:last-child` pins the DIALOG FOOTER. Tower
     // Statistics also renders a `.modal-actions` mid-body for the exterminator,
     // and pinning that would park a button on an opaque band over the sections
@@ -308,14 +311,50 @@ describe("the exterminator row is never a dialog footer", () => {
     sim.tower.units.find((u) => u.id === r.unitId)!.state = "infested";
     // Fixture premise: without an offerable extermination there is no row to
     // place, and this test would pass by rendering nothing.
-    expect(canCallExterminator(sim)).toBe(true);
+    const screen = await statsScreenOf(sim);
+    expect(canCallExterminator(screen.report, screen.catalog)).toBe(true);
 
-    const frag = renderToFragment(statsModalTemplate(statsTemplate(sim)));
+    const frag = renderToFragment(statsModalTemplate(await statsBodyOf(sim)));
     const footers = [...frag.children].filter((el) => el.classList.contains("modal-actions"));
     expect(footers).toHaveLength(1);
     expect(footers[0].querySelector('[data-act="close"]')).not.toBeNull();
     const exterm = frag.querySelector('[data-act="exterminate"]');
     expect(exterm).not.toBeNull();
     expect(footers[0].contains(exterm)).toBe(false);
+  });
+});
+
+describe("star gate copy", () => {
+  it("labels each star gate as the engine's own table does", () => {
+    // The engine answers gates by id; the screen's copy must stay the label
+    // the TypeScript engine attaches, gate for gate, on every rung.
+    const sim = Simulation.newGame(3, "modern");
+    const gates = [...cumulativeStarGates(sim, 5)];
+    sim.star = 5;
+    gates.push(...nextStarRequirements(sim)!.gates);
+    expect(new Set(gates.map((g) => g.id))).toEqual(new Set(Object.keys(STAR_GATE_LABELS)));
+    for (const g of gates) expect(STAR_GATE_LABELS[g.id], g.id).toBe(g.label);
+  });
+
+  it("shows a gate id the table does not know as the id itself", () => {
+    const req = { star: 4, isTower: false, popHave: 1, popNeed: 2, popMet: false, gates: [{ id: "observatory" as StarGateId, met: false }], allMet: false };
+    const section = nextStarSection(req);
+    expect(section).not.toBe(nothing);
+    expect(renderToFragment(section as Exclude<typeof section, typeof nothing>).textContent).toContain("observatory");
+  });
+
+  it("shows an id that names an Object prototype member as the id itself", () => {
+    const req = { star: 4, isTower: false, popHave: 1, popNeed: 2, popMet: false, gates: [{ id: "constructor" as StarGateId, met: false }], allMet: false };
+    const section = nextStarSection(req) as Exclude<ReturnType<typeof nextStarSection>, typeof nothing>;
+    const text = renderToFragment(section).textContent ?? "";
+    expect([text.includes("constructor"), text.includes("function")]).toEqual([true, false]);
+  });
+});
+
+describe("milestone copy", () => {
+  it("shows a milestone id the table does not know as the id itself, with no description", () => {
+    const fragment = renderToFragment(milestonesSection({ achieved: 1, total: 1, list: [{ id: "moonBase", done: true }] }));
+    const [label, desc] = [...fragment.querySelectorAll(".ms .k, .ms .v")].map((el) => el.textContent ?? "");
+    expect([label.includes("moonBase"), desc]).toEqual([true, ""]);
   });
 });

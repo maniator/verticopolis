@@ -4,6 +4,16 @@ import { settleEngine, stepGate } from "../wasmhost/stepGate";
 import type { Command, CommandOp, CommandResult, CommandResults } from "./commands";
 import type { SimPort } from "./port";
 import { queryKey, type Query, type QueryOp, type QueryResult, type QueryResults } from "./queries";
+import {
+  tsFloorHeatmap,
+  tsHousekeepingCoverage,
+  tsOnboardingFacts,
+  tsPeakCongestionHotspot,
+  tsStatsReport,
+  tsTowerStats,
+  tsTransportDetail,
+  tsUnitDetail,
+} from "./tsPanels";
 import type { HeaderView, SimView } from "./view";
 
 /**
@@ -26,8 +36,10 @@ import type { HeaderView, SimView } from "./view";
  * issue order is execution order. A throw from the instance rejects the
  * promise with that error.
  *
- * Engine types come in through `import type` only, so this module adds no
- * runtime edge into `src/engine/`.
+ * Engine types come in through `import type` only. The panel answers
+ * (`tsPanels.ts`) call the engine's own functions, so that module carries the
+ * adapter's runtime edge into `src/engine/`, with its reason in the frontend
+ * import ratchet.
  */
 export function createTsSim(getSim: () => Simulation): SimPort {
   // Kept per tower, so a swap starts with none and a replaced tower is not
@@ -134,6 +146,8 @@ function readHeader(sim: Simulation): HeaderView {
     pendingChoice: sim.pendingChoice,
     minutes: sim.clock.minutes,
     minuteOfDay: sim.clock.minuteOfDay,
+    mode: sim.mode,
+    modernCalendar: sim.modernCalendar,
     revision: sim.tower.revision,
     mealOverlayRevision: sim.tower.mealOverlayRevision,
   };
@@ -225,12 +239,34 @@ type Asker<K extends QueryOp> = (sim: Simulation, q: Extract<Query, { op: K }>) 
 const QUERIES: { readonly [K in QueryOp]: Asker<K> } = {
   canBuild: (sim, q) => sim.canBuild(q.kind, q.floor, q.x),
   isUnlocked: (sim, q) => sim.isUnlocked(q.kind),
+  towerStats: (sim) => tsTowerStats(sim),
+  statsReport: (sim) => tsStatsReport(sim),
+  housekeepingCoverage: (sim) => tsHousekeepingCoverage(sim),
+  unitDetail: (sim, q) => tsUnitDetail(sim, q.id),
+  transportDetail: (sim, q) => tsTransportDetail(sim, q.id),
+  floorHeatmap: (sim, q) => tsFloorHeatmap(sim, q.mode),
+  peakCongestionHotspot: (sim) => tsPeakCongestionHotspot(sim),
+  onboardingFacts: (sim) => tsOnboardingFacts(sim),
 };
 
 /** How many answers each query keeps for `cached`. A placement answer is per
  *  cell, so the build preview can ask for thousands; the oldest goes first.
- *  An unlock answer is per facility kind, a set the catalog bounds. */
-const CACHE_CAPS: { readonly [K in QueryOp]: number } = { canBuild: 256, isUnlocked: Infinity };
+ *  An unlock answer is per facility kind and a heat map per overlay mode, so
+ *  the catalog and the `HeatmapMode` union bound them. A card is per
+ *  facility, kept for the few a player looks at in turn. The rest have one
+ *  key each. */
+const CACHE_CAPS: { readonly [K in QueryOp]: number } = {
+  canBuild: 256,
+  isUnlocked: Infinity,
+  towerStats: 1,
+  statsReport: 1,
+  housekeepingCoverage: 1,
+  unitDetail: 16,
+  transportDetail: 16,
+  floorHeatmap: Infinity,
+  peakCongestionHotspot: 1,
+  onboardingFacts: 1,
+};
 
 interface Answers {
   put<Q extends Query>(q: Q, answer: QueryResult<Q>): void;
