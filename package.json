@@ -53,7 +53,7 @@
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
-    "happy-dom": "^20.10.6",
+    "happy-dom": "^21.0.4",
     "marked": "^18.0.6",
     "pixelarticons": "^2.2.0",
     "playwright": "^1.61.1",
