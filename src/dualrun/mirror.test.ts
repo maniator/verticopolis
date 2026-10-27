@@ -23,6 +23,34 @@ describe("attachMirror", () => {
     expect(cmds[0]).toEqual({ op: "build", kind: "lobby", floor: 1, x: 170 });
   });
 
+  it("reports a brush as one command, its tiles read by index", () => {
+    const sim = Simulation.newGame(1, "classic");
+    sim.money = 1e9;
+    const { cmds } = record(sim);
+    expect(sim.paintBrush("floor", 1, [170, 171, 172]).placed).toBe(3);
+    const loose = (v: unknown) => v as never;
+    // eslint-disable-next-line no-sparse-arrays
+    sim.paintBrush(loose(7), loose("2"), loose([173, "174", , 175.5]));
+    sim.paintBrush("floor", 2, loose({ length: 1, 0: 170 }));
+    sim.paintBrush("floor", 2, Array.from({ length: 33 }, (_, i) => 150 + i));
+    // A tile that reads 169 once and 300 after: the engine lays the copy it
+    // relays, so both engines see 169.
+    let reads = 0;
+    const shifty: number[] = [];
+    Object.defineProperty(shifty, 0, { get: () => (reads++ === 0 ? 169 : 300), enumerable: true });
+    expect(sim.paintBrush("floor", 1, shifty)).toEqual({ placed: 1 });
+    expect(reads).toBe(1);
+    expect(sim.tower.structureKindAt(1, 169)).toBeDefined();
+    expect(sim.tower.structureKindAt(1, 300)).toBeUndefined();
+    expect(cmds).toEqual([
+      { op: "paintBrush", kind: "floor", floor: 1, tiles: [170, 171, 172] },
+      { op: "paintBrush", kind: "", floor: Number.NaN, tiles: [173, Number.NaN, Number.NaN, 175.5] },
+      { op: "paintBrush", kind: "floor", floor: 2, tiles: null },
+      { op: "paintBrush", kind: "floor", floor: 2, tiles: null },
+      { op: "paintBrush", kind: "floor", floor: 1, tiles: [169] },
+    ]);
+  });
+
   it("reports the host's direct writes and not the engine's", () => {
     const sim = Simulation.newGame(1, "modern");
     const { cmds } = record(sim);

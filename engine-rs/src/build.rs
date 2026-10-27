@@ -188,9 +188,7 @@ impl Simulation {
         };
         let res = self.tower.place(kind, floor, x);
         if !res.ok {
-            for id in laid_bridge {
-                self.tower.remove_unit(id);
-            }
+            self.tower.remove_units(&laid_bridge);
             return BuildResult {
                 ok: false,
                 reason: res.reason,

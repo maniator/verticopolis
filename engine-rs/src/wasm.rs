@@ -418,6 +418,20 @@ impl Engine {
         Ok(build_result(self.sim.build(kind, floor.into(), x.into())))
     }
 
+    /// `paintBrush(kind, floor, tiles)` with the tiles as JSON text: JSON
+    /// `{ placed, reason? }`, the floor and lobby brush (`brush.rs`) in one
+    /// call. Every argument is read raw, so a malformed brush is refused
+    /// with "That request is not valid." as TypeScript refuses it.
+    #[wasm_bindgen(js_name = paintBrush)]
+    pub fn paint_brush(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] kind: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] floor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tiles: JsValue,
+    ) -> String {
+        self.paint_brush_checked(kind.as_string(), floor.as_f64(), tiles.as_string())
+    }
+
     /// `canBuild(kind, floor, x)`: JSON `{ ok, reason?, cost }`, the dry run
     /// `build` makes first. When the placement fits, `cost` is its full
     /// price: the facility, the floor tiles laid under a room, and the tiles

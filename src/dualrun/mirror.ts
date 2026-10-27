@@ -2,6 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
 import { canonicalJson } from "../engine/canonicalJson";
 import { crowdView, stateView } from "../engine/conformanceView";
+import { BRUSH_TILE_LIMIT, type BrushKind } from "../engine/sim/brush";
 import { extendGesture } from "../engine/sim/charges";
 import type { ShadowCommand } from "./commands";
 
@@ -50,6 +51,18 @@ export function loadCommand(sim: Simulation, gen: number): Extract<ShadowCommand
       commuteStress: [...sim.crowd.commuteStressByFloor].filter(([floor, seconds]) => Number.isSafeInteger(floor) && Number.isFinite(seconds)),
     },
   };
+}
+
+/** The brush's tiles as relayed: each slot read by index (a hole too), with
+ *  anything but a number as NaN, or null when `tiles` is not an array the
+ *  brush can carry. JSON writes NaN as null, so the Rust engine refuses
+ *  every brush the TypeScript engine refuses. */
+function brushTiles(tiles: unknown): number[] | null {
+  if (!Array.isArray(tiles) || tiles.length > BRUSH_TILE_LIMIT) return null;
+  return Array.from({ length: tiles.length }, (_, i) => {
+    const x: unknown = tiles[i];
+    return typeof x === "number" ? x : Number.NaN;
+  });
 }
 
 /** What a relay hands back: `detach` puts the instance back the way it was;
@@ -163,6 +176,15 @@ export function relayCommands(sim: Simulation, sink: CommandSink, opts: RelayOpt
       });
     }
     wrap(sim, "build", ([kind, floor, x]) => ({ op: "build", kind, floor: n(floor), x: n(x) }) as ShadowCommand);
+    // The brush is one engine call, so its builds are nested and relay as
+    // this one command. Its tiles are read once, by index, and both engines
+    // get that copy, so a tile that reads differently twice cannot split them.
+    const paint = sim.paintBrush;
+    let tiles: number[] | null = null;
+    wrap(sim, "paintBrush", ([kind, floor]) => ({ op: "paintBrush", kind: str(kind), floor: num(floor), tiles }), ([kind, floor, raw]) => {
+      tiles = brushTiles(raw);
+      return paint.call(sim, kind as BrushKind, floor as number, (tiles ?? raw) as number[]);
+    });
     wrap(sim, "buildTransport", ([kind, x, bottom, top]) => ({ op: "buildTransport", kind, x: n(x), bottom: n(bottom), top: n(top) }) as ShadowCommand);
     wrap(sim, "sellAt", ([floor, x]) => ({ op: "sellAt", floor: num(floor), x: num(x) }));
     // The engine-owned charges (#914): the command carries the money move, so

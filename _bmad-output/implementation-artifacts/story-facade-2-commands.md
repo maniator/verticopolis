@@ -24,7 +24,8 @@ files. This slice moves the ones in the game's command paths:
 `buildActions.ts`, `editorActions.ts`, `keyboardPlay.ts`, `appModals.ts`
 (the exterminator and its bulletins), `uiCallbacks.ts` (auto-bridge),
 `frameLoop.ts` (the emergency answer and the meal-rush bulletins) and
-`main.ts` (`renameTower`). The command paths reach two more files through
+`main.ts` (`renameTower`, which moved to `EditorActions` so a refused name
+toasts like a refused label). The command paths reach two more files through
 `BuildActions`: `placeSimpleBuild` in `buildPreview.ts` and the gesture
 handlers in `engineWiring.ts`. The lifecycle writes in the same inventory row
 (the camera stamped before a save in `saveLoad.ts` and `appModals.ts`
@@ -56,7 +57,7 @@ belong to slice 5 (#1212), agreed with the Runtime thread on 2026-10-21.
 | An awaited command reorders feedback or undo | every call site | `TsSim` applies a command at once and resolves in a microtask of the same task, so sound, toast and undo land in the same task as today. Each handler that brackets its own command with undo awaits the command before `commitUndo`. Tests await every controller method |
 | A drag issues commands faster than an async adapter answers | `onActionMove` paint and bulldoze steps | Drag steps are fire-and-forget (`void`); the port runs them in issue order (port contract). The paint anchor is set before the command is issued, so the next step never reads a stale anchor |
 | A command's result is read before it settles | after-command reads | Audit (Dev Notes): every read of the command's effect comes after `await`, and reads of the effect use `port.view` |
-| The brush changes order or charges | `paintBrush` | One port command over the brush's tile list, run by one shared loop (`src/simport/brush.ts`) that `TsSim` calls with `sim.build` per tile: the builds of today's loop, pass by pass in the same order, so the relay forwards the same calls and parity is unchanged. No tick can fall between its tiles |
+| The brush changes order or charges | `paintBrush` | One port command over the brush's tile list, run as one engine call in each engine (`src/engine/sim/brush.ts`, `engine-rs/src/brush.rs`): the builds of today's loop, pass by pass in the same order. The mirror relays the brush as one `paintBrush` command, and tests pin each engine's brush to the same builds issued one by one (save, unit order, events). No tick can fall between its tiles |
 | A TypeScript pre-check decides a refusal the engine owns | the stops dialog | The endpoint and express-lobby pre-checks go; the engine's answer decides, and an unchanged tower leaves no undo step (`UndoHistory.commit` compares signatures) |
 | A thrown command becomes a rejection | engine faults | The port rejects with the error; floating promises reach `analyticsErrors.ts`'s `unhandledrejection` listener, which reports them as it reports `error`. The fault-in-a-command path is #1218 (slice 8) |
 | Test churn hides a lost assertion | 230 test call sites | Each test awaits the controller method or flushes the queue; no assertion is removed or weakened. The coverage ratchet holds |
@@ -97,12 +98,13 @@ is no longer diagnosed. The rest are deferred with issues (Completion Notes).
    tiles }` answers `{ ok, reason?, delta, placed }`: `placed` tiles laid,
    `ok` when at least one was, `reason` the last refusal the engine gave, and
    `delta` the balance's change over the whole brush. `kind` is `"floor"` or
-   `"lobby"` (`BrushKind`). The loop is `runBrush` in `src/simport/brush.ts`,
-   today's loop moved (skip a tile already of this kind, let a lobby brush
-   upgrade plain floor, repeat while a pass laid something), so the brush
-   lays what its passes' builds, issued one by one, lay.
-   `view.types.test.ts` lists it as a port-level composite of `build` in the
-   drift check.
+   `"lobby"` (`BrushKind`). The loop is the engine's `paintBrush`
+   (`src/engine/sim/brush.ts`, Rust twin `engine-rs/src/brush.rs`), today's
+   loop moved (skip a tile already of this kind, let a lobby brush upgrade
+   plain floor, repeat while a pass laid something), so the brush lays what
+   its passes' builds, issued one by one, lay. The mirror relays it as one
+   `paintBrush` command and the binding refuses a malformed brush as
+   TypeScript does (F2).
 4. **Results replace re-reads.** `placeSimpleBuild` reports a room's `ok`
    from the build's answer (it compared `units.length` before and after); the
    brush's "already built here" check reads `port.view` after the command
@@ -172,8 +174,8 @@ is no longer diagnosed. The rest are deferred with issues (Completion Notes).
 ## Tasks / Subtasks
 
 - [x] Port wiring (AC 1): `GameApp.port`, `GameAppPorts.port`, controller deps
-- [x] `paintBrush` (AC 3): `commands.ts` member, `brush.ts`, `TsSim` handler,
-      drift-check exclusion
+- [x] `paintBrush` (AC 3): `commands.ts` member, `TsSim` handler; the
+      brush in both engines with its binding and relay (F2)
 - [x] Port shape check (AC 7): `src/simport/request.ts`, run by `TsSim`
 - [x] Call sites (AC 2, 4, 5, 6)
   - [x] `buildActions.ts`, `buildPreview.ts` `placeSimpleBuild`
@@ -183,7 +185,7 @@ is no longer diagnosed. The rest are deferred with issues (Completion Notes).
   - [x] `appModals.ts` exterminator
   - [x] `uiCallbacks.ts`, `UI.ts`, `uiSettings.ts` auto-bridge
   - [x] `frameLoop.ts` emergency answer and meal rush
-  - [x] `main.ts` `renameTower`
+  - [x] `main.ts` `renameTower` (now `EditorActions.renameTower`)
 - [x] Guard (AC 2): `src/tests/commandSites.guard.test.ts`
 - [x] Command contract (AC 7) and its `TsSim` test; `contract.fixture.ts`
       exports its helpers
@@ -236,11 +238,11 @@ commit across a drag (down, move, up), which slice 5 queues on the port.
 ### Constraints
 
 - American English, no em-dashes, plain prose in comments, no "X, not Y".
-- 500-line ceiling (`main.ts` sits at 499 after the port field).
+- 500-line ceiling (`main.ts` sits at 495 after `renameTower` moved out).
 - Engine values in `src/simport/` only where the adapter needs them: `TsSim`
   reads the catalog handle (`towerCatalog`, `findCatalogFacility`) for the
   shape check's kind test and `engine/wellFormed.ts` to repair text as the
-  Rust engine reads it; `request.ts` and `brush.ts` import types only.
+  Rust engine reads it; `request.ts` imports types only.
 - No closing keyword on #868 or #954.
 
 ### What it removes (temporary TypeScript)
@@ -289,7 +291,7 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
   #1299); the TypeScript `removeUnit` scan under the bulldoze drag (#1170
   item, Rust half #1158 A17, callers added there; round 2 found the lobby
   brush half always-patch, and round 3 widened that to every caller, so the
-  whole item waits on the owner, F2 below);
+  whole item went to the owner, who chose to fix it here: F2 below);
   `bridgeFillPlan` three times per build (#347, notes updated); the cap
   checks' unit walks (#1239, #1158 A24); the undo capture's JSON round trip on
   the WASM host (an item on #1170's row, fixed with #1212).
@@ -310,20 +312,57 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
   Dismissed: `setLabel` text (the engine repairs it, `Tower.setLabel`), a
   price target's range (the binding takes it as a float), `removeTransport`'s
   id scan (at most 88 shafts, under the small-collection bound).
-- The TypeScript `removeUnit` scan (F2) waits on the owner. Section 7
-  counts `runBrush` as a rewrite, and round 3 reads the in-place edits of
-  `tryBuild`, `paintFloorRun`, `tryRemoveUnit` and `bulldozePicked` (their
-  calls now go to the port) the same way, which makes it an always-`patch`
-  item on every slice 2 command that reaches `Tower.removeUnit`: the lobby
-  brush press over plain floor (about 8 × 43k element visits per press on the
-  large tower), the lobby drag run and the bulldoze drag (about 43k per
-  removal, per pointer move), the editor's Sell and the keyboard bulldoze (one
-  per action), and the rollbacks after a refusal (`ensureFloorUnder` and the
+- The TypeScript `removeUnit` scan (F2). Section 7 counts `runBrush` as a
+  rewrite, and round 3 reads the in-place edits of `tryBuild`,
+  `paintFloorRun`, `tryRemoveUnit` and `bulldozePicked` (their calls now go
+  to the port) the same way, which makes it an always-`patch` item on every
+  slice 2 command that reaches `Tower.removeUnit`: the lobby brush press over
+  plain floor (about 8 × 43k element visits per press on the large tower),
+  the lobby drag run and the bulldoze drag (about 43k per removal, per
+  pointer move), the editor's Sell and the keyboard bulldoze (one per
+  action), and the rollbacks after a refusal (`ensureFloorUnder` and the
   bridge rollback in `sim/build.ts` under a build, `layShaftFloors` under an
-  extend drag), which remove only what that command just laid. `main` has the
-  same cost today. Deferring it to #1170 and #1158 A17 needs Naftali's
-  acceptance in his own words, quoted here and in the PR; the decision card
-  of 2026-10-27, reposted in round 4 to name the whole item, asks for it.
+  extend drag). On 2026-10-27 Naftali chose "Fix it in this PR" on the
+  decision card ("I add a batched removal to both engines with a crate bump
+  and a conformance run"), so it is fixed here, in both engines:
+  - `src/engine/tower/removal.ts` and its Rust twin
+    `engine-rs/src/tower_removal.rs`: a removal finds its unit by id
+    (TypeScript's `byId`, Rust's `by_id` index), closes the gap in the list
+    and, in Rust, rewrites only the indexes after it; `removeUnits` takes a
+    command's several removals out in one pass, with the same list, indexes,
+    express stops, wedding hall flag and revision as removing them one by
+    one. The three rollbacks call it.
+  - The brush moved into both engines as one call (`paintBrush`,
+    `src/engine/sim/brush.ts` and `engine-rs/src/brush.rs`, with a
+    `paintBrush` binding that refuses malformed input as TypeScript does),
+    and the mirror relays it as one command. Inside it a lobby laid over one
+    plain floor tile takes that tile's place in the list, and at the end
+    what the brush placed moves to the end in one pass, so the list ends as
+    laying the tiles one by one would leave it, and the revision goes up
+    once more. A lobby brush press is one pass instead of one per tile.
+  - What stays: the id scan is gone, several removals in one command take
+    one pass, and a lobby brush's upgrades share one pass. A single removal
+    (bulldoze drag step, Sell, keyboard bulldoze, one lobby of a drag run)
+    is still one pass over the list per command: TypeScript's `indexOf` and
+    `splice`, Rust's shift and the rewrite of the `by_id` entries after it
+    (up to about 43k on the large tower). HP-6 and the per-command tier
+    allow that; a drag run's per-tile commands as one is #1273 item 8.
+    Crate 0.9.0 for the binding.
+  - Review round 1 on the fix (2026-10-27, Blind Hunter, Edge Case Hunter,
+    Acceptance Auditor): a stale position or index never takes another unit
+    (TypeScript checks the slot, Rust checks the id at the index); the unit
+    is made before its slot is taken, so nothing runs between the two; Rust
+    scopes the batch with `Simulation::with_lobby_upgrades`, as TypeScript
+    does; the binding reads the tiles raw, so a non-string is refused
+    instead of throwing in the glue; the mirror hands the engine the copy it
+    relays; tests add a wedding hall and two sky lobbies removed
+    interleaved, exact counts, a nested brush, raw binding refusals against
+    TypeScript, and a sky-lobby upgrade in the command contract. Deferred:
+    a `paintBrush` op in the conformance suite, which has none, so its run
+    only shows the lock unchanged (#1351).
+  - The wasm-only build ships the two new modules (`sim/brush.ts`,
+    `tower/removal.ts`): code moved out of `src/simport/brush.ts` and
+    `Tower.ts`, listed in `scripts/engine-bundle.allow.txt` with the reason.
 - 2026-10-22 to 10-23, at the owner's request on the PR, Copilot merged
   `main` into the branch (5049e5d, 54dc072, d8fddba; the merge kept #1299,
   `main`'s fix for #1274) and, in 54dc072, changed two things for the two Codex P2
@@ -416,12 +455,23 @@ Claude Code (the "Facade commands" thread), 2026-10-21.
   selected. A refused rename shows only for a label over 4,096 characters,
   which only a paste of that length reaches; on `main` it was stored, and now
   it is refused with "That request is not valid." and the error sound, the
-  name box keeping the text. A player notices only by pasting a name that
+  name box keeping the text. The tower name took the same path late: Copilot
+  found `renameTower` dropped the port's answer, so a refused name showed
+  nothing; it now lives on `EditorActions` and toasts like a refused label. A player notices only by pasting a name that
   long, so no version bump is due; the change is recorded here.
 
 ### File List
 
-- `src/simport/request.ts` (new), `brush.ts` (new), `commands.ts`, `tsSim.ts`
+- `src/simport/request.ts` (new), `commands.ts`, `tsSim.ts`
+- F2, both engines: `src/engine/tower/removal.ts` (new, with
+  `removal.test.ts`), `src/engine/sim/brush.ts` (new), `Simulation.ts`,
+  `Tower.ts`, `tower/placement.ts`, `tower/transport.ts`, `sim/build.ts`;
+  `engine-rs/src/tower_removal.rs` (new, with `tower_removal_tests.rs`),
+  `brush.rs` (new), `tower.rs`, `build.rs`, `lib.rs`, `wasm.rs`,
+  `wasm_facade_commands.rs`, crate 0.9.0 and its pins; the relay
+  (`src/dualrun/commands.ts`, `mirror.ts`, `shadow.ts`, `binding.ts`,
+  `exportTiers.ts`, `engine.d.ts`); `dualRunBrush.integration.test.ts`
+  (new); `scripts/engine-bundle.allow.txt`
 - `src/simport/commandContract.fixture.ts` (new), `tsSimCommands.test.ts`
   (new), `contract.fixture.ts`, `view.types.test.ts`
 - `src/tests/commandSites.guard.test.ts` (new),

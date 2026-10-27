@@ -288,6 +288,8 @@ pub struct Tower {
     pub(crate) memo: RefCell<crate::tower_query_state::Memo>,
     /// `mealOverlayRevision`: bumped on every customersIn/outForMeal change.
     pub meal_overlay_revision: i64,
+    /// The lobby brush's batch while it runs (`tower_removal.rs`).
+    pub(crate) lobby_upgrades: Option<crate::tower_removal::LobbyUpgrades>,
 }
 
 impl Tower {
@@ -310,6 +312,7 @@ impl Tower {
             room_tiles: HashMap::new(),
             memo: RefCell::new(Default::default()),
             meal_overlay_revision: 0,
+            lobby_upgrades: None,
         }
     }
 
@@ -435,7 +438,7 @@ impl Tower {
         }
     }
 
-    fn unregister(&mut self, u: &Unit) {
+    pub(crate) fn unregister(&mut self, u: &Unit) {
         self.by_id.remove(&u.id);
         let hgt = u.kind.floors();
         let structural = u.kind.is_structural();
@@ -464,13 +467,6 @@ impl Tower {
             if *c <= 0 {
                 map.remove(&floor);
             }
-        }
-    }
-
-    fn reindex_ids(&mut self) {
-        self.by_id.clear();
-        for (i, u) in self.units.iter().enumerate() {
-            self.by_id.insert(u.id, i);
         }
     }
 
@@ -719,13 +715,6 @@ impl Tower {
             return check;
         }
         let f = kind.facility();
-        if kind == Kind::Lobby {
-            for i in 0..f.width {
-                if let Some(&sid) = self.structure.get(&(floor, x + i)) {
-                    self.remove_unit(sid);
-                }
-            }
-        }
         let id = self.next_id;
         self.next_id += 1;
         let unit = Unit {
@@ -758,8 +747,23 @@ impl Tower {
             complete_at_raw: None,
             dirty_days: None,
         };
-        self.units.push(unit);
-        let idx = self.units.len() - 1;
+        // In-place floor to lobby upgrade: clear the plain floor tiles being
+        // replaced before registering the lobby. Inside the lobby brush a
+        // lobby over one tile takes that tile's place in the unit list, and
+        // the brush moves what it placed to the end once (tower_removal.rs).
+        let mut slot = None;
+        if kind == Kind::Lobby {
+            let under: Vec<i64> = (0..f.width)
+                .filter_map(|i| self.structure.get(&(floor, x + i)).copied())
+                .collect();
+            if let [only] = under[..] {
+                slot = self.take_floor_slot(only);
+            }
+            if slot.is_none() {
+                self.remove_units(&under);
+            }
+        }
+        let idx = self.add_unit(unit, slot);
         self.register(idx);
         if kind == Kind::WeddingHall {
             self.built_wedding_hall = Some(true);
@@ -773,21 +777,6 @@ impl Tower {
             reason: None,
             unit_id: Some(id),
         }
-    }
-
-    pub fn remove_unit(&mut self, id: i64) -> Option<Unit> {
-        let idx = self.units.iter().position(|u| u.id == id)?;
-        let u = self.units.remove(idx);
-        self.unregister(&u);
-        self.reindex_ids();
-        if u.kind == Kind::WeddingHall {
-            self.built_wedding_hall = Some(self.units.iter().any(|u| u.kind == Kind::WeddingHall));
-        }
-        if u.kind == Kind::Lobby && !self.floor_has_lobby(u.floor) {
-            self.sync_express_stops_for_floor(u.floor);
-        }
-        self.revision += 1;
-        Some(u)
     }
 
     /// `removalReason`: why a structure tile cannot be sold.
@@ -852,9 +841,7 @@ impl Tower {
         }
         let (placed, stuck) = self.place_structure_run(&tiles, Kind::Floor);
         if !stuck.is_empty() {
-            for id in placed {
-                self.remove_unit(id);
-            }
+            self.remove_units(&placed);
             return Err("Build next to the tower. You can't build in midair.".into());
         }
         Ok(placed.len() as i64)
@@ -1177,9 +1164,7 @@ impl Tower {
         }
         let (placed, stuck) = self.place_structure_run(&tiles, Kind::Floor);
         if !stuck.is_empty() {
-            for id in placed {
-                self.remove_unit(id);
-            }
+            self.remove_units(&placed);
             return None;
         }
         Some(placed)

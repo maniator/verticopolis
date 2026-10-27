@@ -24,7 +24,8 @@ export const INVALID_COMMAND = "That request is not valid.";
 
 /** The most tiles one brush command may carry. The web's brush sends
  *  `STRUCTURE_BRUSH` (8); the cap keeps a hostile request's repeated passes
- *  (at most one per tile) small. */
+ *  (at most one per tile) small. Both engines refuse more with the same
+ *  limit (`BRUSH_TILE_LIMIT`, pinned to this one). */
 export const MAX_BRUSH_TILES = 32;
 
 /** The longest text one command may store (a tower name, a label, a
@@ -59,8 +60,8 @@ const batchTarget = (v: unknown): boolean => v === "default" || v === "noRate" |
 
 /** A brush's tiles: a dense array of whole numbers, no longer than
  *  {@link MAX_BRUSH_TILES}. An index walk, so a hole counts as a bad tile,
- *  and a getter is refused as in {@link plain}: the brush reads each tile
- *  again on every pass. */
+ *  and a getter is refused as in {@link plain}, so the check reads the
+ *  values the engine then copies. */
 function tileList(v: unknown): boolean {
   if (!Array.isArray(v) || v.length > MAX_BRUSH_TILES) return false;
   for (let i = 0; i < v.length; i++) {

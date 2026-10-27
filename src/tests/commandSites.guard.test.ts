@@ -35,6 +35,7 @@ const NOT_FRONTEND = ["src/engine/", "src/simport/", "src/tests/", "src/wasmhost
  *  behind them (tests and tooling only). */
 const METHODS: ReadonlySet<string> = new Set([
   "build",
+  "paintBrush",
   "buildTransport",
   "removeFacility",
   "beginExtend",

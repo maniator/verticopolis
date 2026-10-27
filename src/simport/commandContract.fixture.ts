@@ -204,6 +204,36 @@ export function describeCommandContract(name: string, makePort: () => SimPort, o
       oneByOne.tick(1);
     });
 
+    // A lobby over plain floor takes the tile's place in the unit list, and
+    // the save, which keeps that order, must match the builds one by one.
+    it("upgrades plain floor to a sky lobby as the same builds issued one by one do", async () => {
+      const brushed = start(makePort);
+      const oneByOne = start(makePort);
+      const right = lobbyRight(brushed, lobbyCenter(brushed));
+      const column = [right - 4, right - 3, right - 2, right - 1];
+      for (const port of [brushed, oneByOne]) {
+        for (let floor = 2; floor <= 15; floor++) {
+          expect(await sender(port)({ op: "paintBrush", kind: "floor", floor, tiles: column }), `floor ${floor}`).toMatchObject({ placed: 4 });
+        }
+        port.drainEvents({ release: true });
+      }
+      // Two tiles of plain floor, then one with nothing under it, refused on
+      // both passes.
+      const tiles = [right - 2, right - 4, right];
+      const lobby = await sender(brushed)({ op: "paintBrush", kind: "lobby", floor: 15, tiles });
+      const builds: CommandResult<{ op: "build"; kind: "lobby"; floor: number; x: number }>[] = [];
+      for (const x of [...tiles, right]) builds.push(await sender(oneByOne)({ op: "build", kind: "lobby", floor: 15, x }));
+      expect(builds.map((b) => b.ok)).toEqual([true, true, false, false]);
+      expect(lobby).toMatchObject({ ok: true, placed: 2, reason: builds[3].reason });
+      expect(lobby.delta).toBe(builds.reduce((sum, b) => sum + b.delta, 0));
+      for (const x of [right - 2, right - 4]) expect(brushed.view.tower.structureKindAt(15, x)).toBe("lobby");
+      expect(brushed.view.tower.structureKindAt(15, right - 3)).toBe("floor");
+      expect(brushed.drainEvents({ release: true })).toEqual(oneByOne.drainEvents({ release: true }));
+      expect(await brushed.save()).toBe(await oneByOne.save());
+      brushed.tick(1);
+      oneByOne.tick(1);
+    });
+
     it("refuses each command it cannot run, and moves nothing", async () => {
       const port = start(makePort);
       const t = await furnish(port);

@@ -60,6 +60,7 @@ const T3: TierEntry = { tier: 3 };
 export const BINDING_EXPORT_TIERS = {
   // Tier 1: player commands.
   build: T1,
+  paintBrush: T1,
   buildTransport: T1,
   sellAt: T1,
   removeFacility: T1,

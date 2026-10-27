@@ -18,9 +18,9 @@ import type { FacilityKind, LogEntry, SerializedView } from "../engine/types";
  */
 export type Command =
   | { op: "build"; kind: FacilityKind; floor: number; x: number }
-  /** The floor and lobby brush: `build` over `tiles` on one floor, as
-   *  `runBrush` (`brush.ts`) defines it. One command, so no step falls
-   *  between its tiles on any host. */
+  /** The floor and lobby brush: `build` over `tiles` on one floor, as the
+   *  engine's `paintBrush` (`src/engine/sim/brush.ts`) defines it. One
+   *  command, so no step falls between its tiles on any host. */
   | { op: "paintBrush"; kind: BrushKind; floor: number; tiles: ReadonlyArray<number> }
   | { op: "buildTransport"; kind: FacilityKind; x: number; bottom: number; top: number }
   | { op: "removeFacility"; id: number; method: "sell" | "bulldoze" }

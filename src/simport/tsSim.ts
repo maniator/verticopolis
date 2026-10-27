@@ -6,7 +6,6 @@ import { towerCatalog } from "../engine/towerCatalog";
 import { roomUnits, structureRuns } from "../engine/tower/rooms";
 import { wellFormed as wellFormedText } from "../engine/wellFormed";
 import { settleEngine, stepGate } from "../wasmhost/stepGate";
-import { runBrush } from "./brush";
 import type { Command, CommandOp, CommandResult, CommandResults } from "./commands";
 import type { SimPort } from "./port";
 import { INVALID_COMMAND, wellFormed } from "./request";
@@ -214,10 +213,10 @@ type Handler<K extends CommandOp> = (sim: Simulation, c: Extract<Command, { op: 
  *  fields that command's callers read. */
 const COMMANDS: { readonly [K in CommandOp]: Handler<K> } = {
   build: (sim, c) => sim.build(c.kind, c.floor, c.x),
-  // One `sim.build` per tile, which the mirror host's relay forwards one by
-  // one, so the engine sees the same builds in the same order.
+  // The engine's brush, one call that the mirror host's relay forwards as
+  // one command, so the Rust engine runs the same builds in the same order.
   paintBrush: (sim, c) => {
-    const r = runBrush(c.kind, c.floor, c.tiles, (floor, x) => sim.tower.structureKindAt(floor, x), (kind, floor, x) => sim.build(kind, floor, x));
+    const r = sim.paintBrush(c.kind, c.floor, c.tiles);
     return { ...r, ok: r.placed > 0 };
   },
   buildTransport: (sim, c) => sim.buildTransport(c.kind, c.x, c.bottom, c.top),
