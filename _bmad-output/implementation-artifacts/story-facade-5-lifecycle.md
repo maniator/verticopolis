@@ -65,13 +65,16 @@ its undo half).
      floor, x, label, rent, the No Rate flag, the film policy, the subtype),
      every transport (kind, x, span, cars, skipped floors, schedule), and
      money. Main-thread adapters only.
-   - `readonly generation: number`: which tower the port holds. It moves on
-     every load (undo and redo included) and on any swap the adapter sees,
-     and stays across commands and ticks.
+   - `readonly generation: number`: which tower the port holds. A load moves
+     it before `load` returns (undo and redo included); any swap the adapter
+     sees moves it too. A load that fails before its swap leaves it, as
+     commands and ticks do. The undo history reads it around a restore
+     (AC 4).
 
    The port's ordering note adds: `saveNow` and `undoSignature`, like `tick`
-   and `drainEvents`, act after every command and load issued before them;
-   loads run in issue order with commands, queries and saves. Both are
+   and `drainEvents`, act after every command and load issued before them,
+   and reading `generation` is synchronous too; loads run in issue order
+   with commands, queries and saves. `saveNow` and `undoSignature` are
    synchronous, so only an adapter that runs the engine on the main thread
    can keep them (`TsSim`, slice 7's `RustSim`). A worker adapter needs an
    in-order primitive in their place, which slice 12 (#1224) owes (D2). The
@@ -121,8 +124,9 @@ its undo half).
      to the second), none rejects with the first save's error (the one a
      `legacy` load of that save alone gives; each adapter's own test shows
      its two unloadable saves fail apart) and leaves the tower and
-     `generation` as they were, a failed `history` load keeps `generation`
-     before it settles, and the founder rule holds both ways;
+     `generation` as they were, a `history` load that fails before its swap
+     keeps `generation` before it settles, and the founder rule holds both
+     ways;
      `legacy` never applies it; `found` honors the mode, the calendar and
      the no-bridging option and starts an empty lot.
    - **Undo signature coverage, command by command.** Over a scripted
@@ -294,7 +298,8 @@ dismissed. The confirming pass on the fix commit (7eab3cbd) found the
 first patch only partly fixed and the notes out of step in places; the
 second round's items follow the first round's. A confirming pass on the
 second round (dfad6548) found the logic sound and four small test and doc
-gaps, fixed as round 3.
+gaps, fixed as round 3. The pass on round 3 (05c63705) found only story
+wording, fixed as round 4, and no code to change.
 
 - [x] [Review][Patch] A failed undo or redo restore lost its step and left
       a step of the unchanged tower on the other trail [src/engine/UndoHistory.ts]
@@ -363,6 +368,9 @@ gaps, fixed as round 3.
 - [x] [Review][Defer] Hot path: a forced full merge on the first sync after
       every attach [src/wasmhost/wasmHost.ts]: deferred, pre-existing;
       #1158 A34 (new)
+- [x] [Review][Patch] Round 4 (docs): AC 1, AC 3, D2 and D13 now say when
+      `generation` moves and that the undo history reads it [this story,
+      #1224 comment]
 - [x] [Review][Dismiss] Round 2's check that `unitWasm` hosts the tower:
       branching on the parity project needs a ratchet exception, and the
       parity setup hosts every ticked tower while `wasmHostPoints.test.ts`
@@ -430,12 +438,17 @@ candidates that did not load (D11).
     kept as a step that undoes nothing;
   - the context-loss flush: an autosave older than the tower, so the reload
     loses the play since;
-  - the crash report: a summary and a save of different moments.
+  - the crash report: a summary and a save of different moments;
+  - the undo step's `generation` reads around a restore: a load's swap or
+    its early failure known only later, so a failed step keeps a way back
+    that changes nothing, or drops the real one.
 
   So a worker needs an in-order primitive for the capture and the commit (a
   checkpoint command answered in issue order, or an undo queue on the
-  port), and an awaited save for the flush. This story records both on
-  #1224, with the costs above. Whether two synchronous members amend F2's
+  port), an awaited save for the flush, and for the undo step a load that
+  says whether it swapped the tower when it settles (or an undo queue that
+  makes the question moot). This story records these on #1224, with the
+  costs above. Whether two synchronous members amend F2's
   "one interface, no pretend-sync" rule is the facade lead's call, and the
   owner's if it does. The facade lead judged that it does (2026-10-21), so
   the amendment is the owner's, pending; 5a is written on its recommended
@@ -518,7 +531,9 @@ candidates that did not load (D11).
 - **D13. `generation`.** The graphics-recovery bulletin goes to the tower
   that was live at the loss only, which today is an instance comparison.
   The autosave's and the export's own comparisons move into `save`
-  (`settledSave` already re-checks the tower), so this is the one caller.
+  (`settledSave` already re-checks the tower), so this is the one caller
+  outside undo. The undo history reads it around each restore (AC 4) to
+  tell a failure that swapped the tower from one that did not.
 - **D14. Bulletins are commands.** The boot's unreadable-save line, the 1994
   import's welcome and the graphics-recovery line go through
   `port.command({ op: "emit" })`. The WASM host's recovery lines stay on
