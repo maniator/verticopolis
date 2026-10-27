@@ -16,6 +16,7 @@ export function createAppHistory(app: HistoryApp): UndoHistory {
     snapshot: () => app.port.saveNow({ memory: true }),
     restore: (text) => app.port.load({ from: "history", text }),
     signature: () => app.port.undoSignature(),
+    generation: () => app.port.generation,
     notify: (msg) => app.ui.toast(msg, "info"),
   });
 }

@@ -519,9 +519,9 @@ How items flow:
 
 ### Deferred from: `gds-code-review` of facade slice 5a (#1212, PR #1294, 2026-10-27)
 
-- `saveNow` and `undoSignature` read the instance without waiting on a step gate, so on the experimental worker host (#1068, on hold) an undo copy or signature can be older than the commands issued before it. Pre-existing: the undo capture never checked the gate. The port now scopes both members to main-thread adapters, and the in-order primitive a worker needs is recorded on #1224 (slice 12) with the cost per caller (story D2).
-- Hot path, deferred by reference: a hosted save is still parsed and stringified again for stored writes (#1158 A31, its stored half; 5b's `stampText` takes it once EX-2 is decided), and every undo, redo or load re-serializes the tower it just loaded to build its engine (#1158 A32).
-- Hot path, new item: the first sync after every attach forces a full merge, about 429 ms on the large tower per undo or redo (cloud median); filed as #1158 A34, with the `engine-rs-hotpath-audit` row's notes updated.
+- **[TRIAGED 2026-10-27 -> absorbed into #1224 (facade slice 12), comment 6434689581.]** `saveNow` and `undoSignature` read the instance without waiting on a step gate, so on the experimental worker host (#1068, on hold) an undo copy or signature can be older than the commands issued before it. Pre-existing: the undo capture never checked the gate. The port now scopes both members to main-thread adapters, and the in-order primitive a worker needs is recorded on #1224 (slice 12) with the cost per caller (story D2).
+- **[TRIAGED 2026-10-27 -> absorbed into #1158 (`engine-rs-hotpath-audit`), items A31 and A32.]** Hot path, deferred by reference: a hosted save is still parsed and stringified again for stored writes (#1158 A31, its stored half; 5b's `stampText` takes it once EX-2 is decided), and every undo, redo or load re-serializes the tower it just loaded to build its engine (#1158 A32).
+- **[TRIAGED 2026-10-27 -> absorbed into #1158 (`engine-rs-hotpath-audit`), item A34.]** Hot path, new item: the first sync after every attach forces a full merge, about 429 ms on the large tower per undo or redo (cloud median); filed as #1158 A34, with the `engine-rs-hotpath-audit` row's notes updated.
 
 ### Deferred from: `bmad-code-review` of the window.game tooling gate (2026-07-29)
 

@@ -118,8 +118,9 @@ its undo half).
      live auto-bridge setting, and moves `generation`; a command issued after
      the load applies to the loaded tower.
    - `stored`: the first loadable save wins (an unloadable first falls back
-     to the second), none rejects with the first error and leaves the tower
-     and `generation` as they were, and the founder rule holds both ways;
+     to the second), none rejects with the first save's error (the one a
+     `legacy` load of that save alone gives) and leaves the tower and
+     `generation` as they were, and the founder rule holds both ways;
      `legacy` never applies it; `found` honors the mode, the calendar and
      the no-bridging option and starts an empty lot.
    - **Undo signature coverage, command by command.** Over a scripted
@@ -137,14 +138,19 @@ its undo half).
    history from `app.port` alone: the snapshot is
    `port.saveNow({ memory: true })`, the
    restore `port.load({ from: "history", text })`, the signature
-   `port.undoSignature()`. It imports nothing from `src/engine/` at runtime
+   `port.undoSignature()`, the generation `port.generation`. It imports nothing from `src/engine/` at runtime
    but `UndoHistory`.
    - `UndoPorts.restore` returns a promise. `UndoHistory.undo()` and
      `redo()` return it: the commit, the pop, the redo or undo step's
      snapshot and the restore's start all happen before the call returns, as
      today, and the "Undid:" or "Redid:" notice follows the settled restore.
      A rejected restore gives no notice and rejects the returned promise.
-     `GameApp.undo()` and `redo()` return it; their callers (`inputKeys.ts`,
+     The step it could not load goes, since it would fail again and would
+     block every older step. The opposite step it pushed stays only when the
+     tower moved before the failure (`UndoPorts.generation`, the port's
+     `generation` read around the restore), as the way back; otherwise it
+     holds the tower as it still is and comes off. A snapshot that throws
+     keeps the step. `GameApp.undo()` and `redo()` return it; their callers (`inputKeys.ts`,
      `uiCallbacks.ts`) pass it on or `void` it.
    - `UndoPorts.signatureOf` goes. `UndoHistory.dropUnchanged(sigOf)` takes
      the fingerprint function from its caller, and the WASM host passes
@@ -281,7 +287,9 @@ its undo half).
 ### Review Findings
 
 `/gds-code-review` of 5a at 9ab25dbc (2026-10-27): 16 patch, 4 defer, 10
-dismissed. The confirming pass runs on the fix commit.
+dismissed. The confirming pass on the fix commit (7eab3cbd) found the
+first patch only partly fixed and the notes out of step in places; the
+second round's items follow the first round's.
 
 - [x] [Review][Patch] A failed undo or redo restore lost its step and left
       a step of the unchanged tower on the other trail [src/engine/UndoHistory.ts]
@@ -316,6 +324,19 @@ dismissed. The confirming pass runs on the fix commit.
       stale after the merge of main, and nothing held the merge for F2 [this story]
 - [x] [Review][Patch] The File List and the Tests notes named the wrong
       test files [this story]
+- [x] [Review][Patch] Round 2: the put-back still lost a failed step under a
+      second undo in the same task, kept a step of the unchanged tower, put
+      a no-op step back after an `adopt` that threw post-swap, and lost the
+      step when the snapshot threw [src/engine/UndoHistory.ts, src/game/appHistory.ts]
+- [x] [Review][Patch] Round 2: the first-error pin ran on `TsSim` only, and
+      the hosted save check never asserted hosting [src/simport/lifecycleContract.fixture.ts, tsSimLifecycle.test.ts]
+- [x] [Review][Patch] Round 2: the camera case used the default zoom, and the
+      film and No Rate steps did not show they cost nothing
+      [src/simport/lifecycleContract.fixture.ts]
+- [x] [Review][Patch] Round 2: D9, the Tests notes, Constraints and the
+      Completion Notes disagreed with the code; the retire list filed the
+      text registry under the fallback; the review's inbox entries were not
+      triaged [this story, story-engine-retire-typescript.md, backlog.md]
 - [x] [Review][Defer] `saveNow` and `undoSignature` on a step-gated worker
       host can be stale [src/simport/tsLifecycle.ts]: deferred,
       pre-existing; #1224 (slice 12), D2
@@ -455,9 +476,9 @@ candidates that did not load (D11).
   matches, and stage-1 WASM-arm players run this host. A31's stored half
   stays on #1158 until EX-2 is decided; slice 7, whose saves are
   engine-written, depends on the same decision. In `wasmHost.ts` the text
-  function replaces the parse in `serializeHosted`, which becomes
-  `JSON.parse(text())` for the callers that still want an object, so the
-  file does not grow.
+  function sits beside `serializeHosted`, which stays main's code, and
+  reads the same restore point without the parse (the file grows by four
+  lines).
 - **D10. The camera rides the save options as a function.** The autosave
   and the export read the camera after the worker host's settle wait today,
   so the save carries where the camera is when it is written. A value taken
@@ -533,17 +554,26 @@ latch.
 ### Tests
 
 - `src/simport/tsSimLifecycle.test.ts` (AC 3), in the default and the
-  `unitWasm` projects.
-- `src/tests/integration/undoHistory.integration.test.ts`: undo and redo
-  return the restore's promise; the notice follows it and a rejection
-  gives none and puts the step back; two undos in one task pop two steps
-  in order; `dropUnchanged(sigOf)`.
+  `unitWasm` projects; its `TsSim` cases add that the two candidates'
+  errors differ, that `unitWasm` registers the host's text, and that
+  `signatureOfSave` of a memory copy equals `undoSignature`.
+- `src/tests/integration/undoHistory.integration.test.ts`:
+  `dropUnchanged(sigOf)` and the stack cases.
+  `undoHistoryRestore.integration.test.ts` (new): undo and redo return the
+  restore's promise; the notice follows it; two undos in one task pop two
+  steps in order; a failed restore drops its step and the unchanged way
+  back even under a later undo, keeps the way back when the tower moved,
+  and a snapshot or a restore that throws rejects.
 - `startWasmHost.test.ts` and the recovery tests: the wrappers pass
   the promise on and keep their fault codes; `dropEmptyUndo` receives
-  `signatureOfSave`; the recovery's tower keeps the live auto-bridge
-  setting (`carryLiveState`).
+  `signatureOfSave`.
 - `hostFault.test.ts`: `newestText` and `newestSave` agree and record the
-  answered point once.
+  answered point once; `carryLiveState` gives the recovery's tower the
+  live auto-bridge setting; `signatureOfSave` reads a save as
+  `towerStateSig` reads the tower.
+- `wasmHostPoints.test.ts`: the host registers its text at attach, a
+  healthy detach gives it back, and a faulted one keeps it (AC 7's undo
+  half).
 - `saveStamp.test.ts` (D8); the `SaveGame` writer and reader tests on text
   and decoded saves; the stored-text test on the host (AC 7).
 - `saveLoad`, `appModals`, `legacyImportAdopt`, `exportFlow` and
@@ -599,9 +629,9 @@ joins `newestSave` on that list's strict-build stay line.
 - #1068's files (`workerHost.ts`, `workerSaveSync.ts`, perfCompare,
   perfWorker) are not touched. The worker host keeps its step gate.
 - Lands after #1278 (merged, `02a9129`) and after slices 2 and 4; 5a's app
-  wiring rebases on slice 2's `port` field.
+  wiring builds on slice 4a's `port` field (on main since #1313).
 - 5a merges only once the owner has answered the F2 amendment, with his
-  answer quoted here. If he keeps F2 as signed, 5a is reworked around
+  answer quoted in D2. If he keeps F2 as signed, 5a is reworked around
   in-order asynchronous saves and an asynchronous signature before it
   merges.
 - Slice 5 needs only `towerStateSig` on `TsSim`. The `RustSim` half of
@@ -674,13 +704,17 @@ Copilot's two commits (a2c854ef, 429027a9) kept and their code replaced:
   `mustFind`, the same four exports slice 2 makes.
 - `UndoHistory.dropUnchanged` takes the fingerprint; the test that ran it
   without one went, since that path is gone. A failed undo or redo restore
-  puts its step back while nothing has moved the trail since.
+  drops the step it could not load, and the opposite step it pushed unless
+  the tower moved first (`UndoPorts.generation`); a snapshot that throws
+  keeps the step. Those cases live in
+  `undoHistoryRestore.integration.test.ts`.
 - `towerStateSig`'s own cases moved unchanged into
   `towerStateSig.integration.test.ts`, keeping
   `undoHistory.integration.test.ts` under 500 lines.
 - `/gds-code-review` ran on 9ab25dbc (Blind Hunter, Edge Case Hunter,
-  Acceptance Auditor, Hot-Path Auditor): see Review Findings. The
-  hot-path record is on the PR.
+  Acceptance Auditor, Hot-Path Auditor), with a confirming pass on the fix
+  commit and a second fix round: see Review Findings. The hot-path record
+  goes on the PR with the push.
 
 ### File List
 
@@ -694,6 +728,7 @@ Copilot's two commits (a2c854ef, 429027a9) kept and their code replaced:
   `wasmHostPoints.test.ts`, `startWasmHost.test.ts`,
   `startWasmHostRecovery.test.ts`)
 - `src/tests/integration/undoHistory.integration.test.ts`,
+  `undoHistoryRestore.integration.test.ts` (new, the restore cases),
   `towerStateSig.integration.test.ts` (new, moved cases), `wasmRollback.ts`, `wasmHostRollback.integration.test.ts`,
   `wasmHostRollbackHistory.integration.test.ts`,
   `wasmHostFallback.integration.test.ts`

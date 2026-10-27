@@ -3,7 +3,7 @@ import { Simulation } from "../engine/Simulation";
 import type { SerializedGame } from "../engine/types";
 import { towerStateSig } from "../engine/UndoHistory";
 import { MID, newSeededGame } from "../tests/fixtures/towerFixtures";
-import { parityRestarts } from "../tests/parity/typescriptOnly";
+import { onWasmParityProject, parityRestarts } from "../tests/parity/typescriptOnly";
 import { signatureOfSave } from "../wasmhost/hostFault";
 import { saveText, setSaveText, setStepGate } from "../wasmhost/stepGate";
 import { describeLifecycleContract } from "./lifecycleContract.fixture";
@@ -59,6 +59,7 @@ describe("TsSim's lifecycle over the live instance", () => {
     expect(port.saveNow()).toBe(JSON.stringify(held.sim.serialize()));
     expect(JSON.parse(port.saveNow({ memory: true }))).toEqual(JSON.parse(port.saveNow()));
     const own = saveText(held.sim) ?? null;
+    expect(own !== null, "the host registered its text").toBe(onWasmParityProject());
     setSaveText(held.sim, () => "the host's text");
     try {
       expect(port.saveNow({ memory: true })).toBe("the host's text");
@@ -71,18 +72,20 @@ describe("TsSim's lifecycle over the live instance", () => {
   it("rejects a stored load with the first save's error", async () => {
     const { held, port } = adopting();
     const tower = held.sim;
+    const generation = port.generation;
     const errorOf = (save: unknown) => {
       try {
         Simulation.deserialize(save as SerializedGame);
       } catch (e) {
-        return (e as Error).message;
+        return e as Error;
       }
       throw new Error("expected the save not to load");
     };
     const [first, second] = [errorOf(null), errorOf(undefined)];
-    expect(first).not.toBe(second);
-    await expect(port.load({ from: "stored", saves: [null, undefined] as unknown as SerializedGame[] })).rejects.toThrow(first);
+    expect(first.message).not.toBe(second.message);
+    await expect(port.load({ from: "stored", saves: [null, undefined] as unknown as SerializedGame[] })).rejects.toEqual(first);
     expect(held.sim).toBe(tower);
+    expect(port.generation).toBe(generation);
   });
 
   it("reads the camera after a background host catches up, on the tower held then", async () => {

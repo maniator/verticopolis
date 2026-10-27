@@ -62,15 +62,20 @@ own line: the PR, the files, and why the fallback needs them):
 - **Benchmark parity tooling that runs the TypeScript engine** (#1124, the cost-split, churn and calibration PR, with #1108's A/A mode): `perf:compare --aa ts` and the TypeScript slot of every `perf:compare` run (`src/tests/perfCompare/{runner,validate,metrics,limitations}.ts`), the TypeScript side of the Node check (`nodeCheck.ts`), `perf:calibrate`'s `ts` passes and cold-start cap, and the `perf:worker` `ts` mode and its gate column (`src/tests/perfWorker/`). The WASM-only parts (the export cost split, hourly churn, the working-tree record, calibration of WASM A/A passes) stay as permanent benchmark infrastructure. Removing the TypeScript engine retires the comparison, so these go with it or collapse to WASM-only runs.
 - **#985 slice 2a (the verified engine load, PR linked on #985).** The switchable build's branch that leaves the game on the TypeScript engine after a refused engine package: `loadBootEngine`'s `!wasmOnly` path in `src/wasmhost/engineBoot.ts` (the `engine: "ts"` result for a refused package, with its tests in `engineBoot.test.ts` and `bootstrapEngine.test.ts`) and the `chromium-wasm` assertions in `e2e/engineIntegrity.spec.ts` that expect the game on TypeScript (`expectRefused`'s non-wasm-only branch), plus the `!__WASM_ONLY__` worker-host branch in `src/bootstrap.ts` that gives a refused first tower its catalog verdict with its `workerCatalogs` cases in `src/bootstrapEngine.test.ts` (`catalogVerdict` itself stays: the main-thread host uses it too). Nothing else in the slice depends on the TypeScript engine: the loader (`loadEngineModule.ts`), the failure detail, the shell id check and the loading line stay.
 - PR #831 (room occupant seats): `roomOccupants` in `src/render/pixelSprites/common.ts` imports `visibleOccupants` from the TypeScript engine (through `engine/Crowd`), and `residential.ts`, `food.ts`, `clinic.ts` and `sprites/facilities/venue.ts` import it directly. After the removal, each reads the engine read model's visible-occupant count instead (backlog row `room-painters-read-ts-engine`, #1106). The PR cuts the render importers of `visibleOccupants` from 11 files on main to these five.
+- **Slice 5a (#1212, PR #1294): the host's save text for undo copies.**
+  `setSaveText` and `saveText` in `src/wasmhost/stepGate.ts`, and the
+  registration in `attachWasmHost` (`src/wasmhost/wasmHost.ts`). They let
+  `TsSim`'s `saveNow({ memory: true })` hand over a hosted tower's engine
+  text instead of printing the TypeScript instance again (#1158 A31, its
+  undo half). A port with no TypeScript instance hands its engine's text
+  out directly, so they go with the TypeScript engine.
 
 - **#1101 (#874, the runtime fallback).** They exist to re-adopt a faulted
   tower on a fresh TypeScript `Simulation`, so they go with it:
   - `src/wasmhost/hostFault.ts`: `RestorePoints` (all but `newestSave` and
     `newestText`, see below), `carryLiveState` and `signatureOfSave`.
   - `src/wasmhost/wasmHost.ts`: the restore-point bookkeeping
-    (`readPoint`, `pullTicks`, `restore`, the frozen tower's own tick), the
-    save text it registers for undo copies (`setSaveText` and `saveText` in
-    `stepGate.ts`, slice 5), and
+    (`readPoint`, `pullTicks`, `restore`, the frozen tower's own tick), and
     `src/wasmhost/hostEvents.ts` (`HostEvents`: the held command events and
     `lostEdits`); a Rust-only host hands its events out as it reads them.
   - `src/wasmhost/startWasmHost.ts`: `recover`, `playerState`,

@@ -55,6 +55,10 @@ export interface UndoPorts {
   restore(snap: string): Promise<void>;
   /** Fingerprint the current player-mutable state (see {@link towerStateSig}). */
   signature(): string;
+  /** Which tower is live (`SimPort.generation`), read around a restore to
+   *  tell whether it swapped the tower before it failed. Without it a failed
+   *  restore is taken to have left the tower as it was. */
+  generation?(): number;
   /** Surface a short user-facing message ("Undid: Bulldoze", "Nothing to undo."). */
   notify(message: string): void;
 }
@@ -147,10 +151,8 @@ export class UndoHistory {
 
   /** Undo the newest step. The commit, the pop, the redo step's snapshot
    *  and the restore's start all happen before this returns, so two undos in
-   *  one task pop two steps in order (a snapshot that throws throws from
-   *  here). The "Undid:" notice follows the settled restore. A restore that
-   *  fails gives none, puts the step back while nothing has moved the trail
-   *  since, and rejects. */
+   *  one task pop two steps in order. The "Undid:" notice follows the
+   *  settled restore; a failure gives none and rejects (see {@link step}). */
   undo(): Promise<void> {
     this.commit(); // finalize any in-flight gesture first
     const entry = this.undoStack.pop();
@@ -167,20 +169,38 @@ export class UndoHistory {
   }
 
   /** Restore `entry`, just popped by an undo or a redo, keeping today's
-   *  state as the opposite step. The trails are read again on a failure,
-   *  since the WASM fallback's tidy may have replaced them meanwhile. */
+   *  state as the opposite step. When the snapshot fails, `entry` goes back
+   *  where it was. When the restore fails, `entry` stays dropped: its save
+   *  would fail again and, kept on top, would block every older step. The
+   *  opposite step stays only when the restore swapped the tower before it
+   *  failed (it is then the way back); otherwise it holds the tower as it
+   *  still is and would change nothing, so it comes off wherever it now
+   *  sits. That trail is read again then, as the WASM fallback's tidy may
+   *  have replaced it. */
   private step(entry: Entry, kind: "undo" | "redo"): Promise<void> {
-    const trails = () => (kind === "undo" ? [this.undoStack, this.redoStack] : [this.redoStack, this.undoStack]);
-    const back: Entry = { snap: this.ports.snapshot(), label: entry.label };
-    trails()[1].push(back);
-    return this.ports.restore(entry.snap).then(
+    const opposite = () => (kind === "undo" ? this.redoStack : this.undoStack);
+    let back: Entry;
+    try {
+      back = { snap: this.ports.snapshot(), label: entry.label };
+    } catch (e) {
+      (kind === "undo" ? this.undoStack : this.redoStack).push(entry);
+      return Promise.reject(e);
+    }
+    opposite().push(back);
+    const before = this.ports.generation?.();
+    let restored: Promise<void>;
+    try {
+      restored = this.ports.restore(entry.snap);
+    } catch (e) {
+      restored = Promise.reject(e);
+    }
+    const swapped = this.ports.generation?.() !== before;
+    return restored.then(
       () => this.ports.notify(`${kind === "undo" ? "Undid" : "Redid"}: ${entry.label}`),
       (e: unknown) => {
-        const [from, to] = trails();
-        if (to[to.length - 1] === back) {
-          to.pop();
-          from.push(entry);
-        }
+        const trail = opposite();
+        const at = trail.lastIndexOf(back);
+        if (!swapped && at >= 0) trail.splice(at, 1);
         throw e;
       },
     );

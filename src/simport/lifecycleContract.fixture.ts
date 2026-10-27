@@ -79,7 +79,7 @@ export function describeLifecycleContract(name: string, make: () => LifecycleSub
       // A copy kept in memory carries the stamp too, on a host whose text is
       // its engine's own.
       port.tick(1);
-      const kept = { tile: 140, floor: 6, zoom: 1 };
+      const kept = { tile: 140, floor: 6, zoom: 3 };
       expect(parse(port.saveNow({ memory: true, view: () => kept })).view).toEqual(kept);
       port.tick(1);
     });
@@ -98,7 +98,7 @@ export function describeLifecycleContract(name: string, make: () => LifecycleSub
       port.tick(1);
       expect(port.generation, "a tick keeps the generation").toBe(generation);
 
-      // Not awaited: the synchronous members act after the load, as the
+      // Not awaited: the synchronous members already see the load, as the
       // undo history's second undo in one task needs.
       const loading = port.load({ from: "history", text });
       expect([port.undoSignature(), reference()], "read before the load settles").toEqual([signature, ref]);
@@ -130,7 +130,11 @@ export function describeLifecycleContract(name: string, make: () => LifecycleSub
       const tower = port.view.tower;
       const generation = port.generation;
       const unloadable = null as unknown as SerializedGame;
-      await expect(port.load({ from: "stored", saves: [unloadable, unloadable] })).rejects.toBeInstanceOf(Error);
+      const alone = await port.load({ from: "legacy", save: unloadable }).then(() => null, (e: unknown) => e);
+      expect(alone).toBeInstanceOf(Error);
+      // None loads: the error is the first save's, as a load of it alone gives.
+      const other = undefined as unknown as SerializedGame;
+      await expect(port.load({ from: "stored", saves: [unloadable, other] })).rejects.toEqual(alone);
       await expect(port.load({ from: "stored", saves: [] })).rejects.toBeInstanceOf(Error);
       await expect(port.load({ from: "history", text: "not a save" })).rejects.toBeInstanceOf(Error);
       expect(port.view.tower).toBe(tower);
@@ -186,21 +190,25 @@ export function describeLifecycleContract(name: string, make: () => LifecycleSub
       // A 3-star Classic tower with money to spare, through the port's own load.
       await port.load({ from: "legacy", save: { ...save, mode: "classic", star: 3, money: 1e9 } });
       port.tick(1);
-      const step = async (name: string, c: Command, moves: boolean) => {
+      const step = async (name: string, c: Command, moves: boolean, free = false) => {
         const before = [port.undoSignature(), reference()];
-        expect((await port.command(c)).ok, `${name}: applied`).toBe(true);
+        const result = await port.command(c);
+        expect(result.ok, `${name}: applied`).toBe(true);
+        // Money is in the signature, so a step that costs nothing shows the
+        // move came from the field itself.
+        if (free) expect(result.delta, `${name}: costs nothing`).toBe(0);
         const moved = port.undoSignature() !== before[0];
         expect(moved, `${name}: the signature moved as the reference did`).toBe(reference() !== before[1]);
         expect(moved, name).toBe(moves);
       };
       await step("a cinema", { op: "build", kind: "cinema", floor: 2, x: mid - 15 }, true);
       const cinema = mustFind(port.view.tower.units, (u) => u.kind === "cinema").id;
-      await step("a film policy", { op: "setFilmPolicy", id: cinema, policy: "feature" }, true);
-      await step("the same film policy", { op: "setFilmPolicy", id: cinema, policy: "feature" }, false);
+      await step("a film policy", { op: "setFilmPolicy", id: cinema, policy: "feature" }, true, true);
+      await step("the same film policy", { op: "setFilmPolicy", id: cinema, policy: "feature" }, false, true);
       await step("an office", { op: "build", kind: "office", floor: 4, x: mid - 4 }, true);
       const office = mustFind(port.view.tower.units, (u) => u.kind === "office").id;
-      await step("No Rate", { op: "setNoRate", id: office }, true);
-      await step("No Rate again", { op: "setNoRate", id: office }, false);
+      await step("No Rate", { op: "setNoRate", id: office }, true, true);
+      await step("No Rate again", { op: "setNoRate", id: office }, false, true);
       port.tick(1);
     });
   });
