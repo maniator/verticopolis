@@ -26,11 +26,14 @@ hold.
 
 As the developer moving the web game onto Rust authority,
 I want every save, load, import and export to reach its codec through one
-boundary that uses the Rust codec for what the WASM engine reads and writes
-once its package is loaded, and the TypeScript codec otherwise, with three
-stated exceptions (the asynchronous autosave's container, O1; a save that
-inflates past the 8 MiB bound, C9; the slot list's check on today's host,
-C5),
+boundary that uses the Rust codec for what the main-thread WASM host reads
+and writes once its package is loaded, and the TypeScript codec otherwise,
+with these stated exceptions: the asynchronous autosave's container (O1);
+a save past the 8 MiB bounds, read and written on TypeScript (C9 and the
+writer's existing skip); the slot list's check on today's host (C5); and
+`.TDT` until D2 lands, or where #932 moves its module out of the main
+package (Offline). The worker override keeps TypeScript containers until
+facade slice 12 (G6),
 so that 3.0 reads and writes saves by the engine's own rules, no player
 loses a save or gets a changed file when the engine fails, and retiring the
 TypeScript codec later is a deletion behind one interface.
@@ -95,7 +98,7 @@ cited files did not change between the two.
 | WASM, main thread | `?engine=wasm` or `wasm-frame`, the Settings choice "Rust engine (experimental)", a cohort arm that resolves to WASM (`selectBootEngine`, `src/bootstrap.ts:239`), or the wasm-only build. The package loads before `create()` (`:239-243`, `:297`); `startWasmHost` (`:348`) wraps `adoptSim` (`src/wasmhost/startWasmHost.ts:445-462`); the host replaces `sim.serialize` with the engine's save (`src/wasmhost/wasmHost.ts:185-191`, `:445-449`), and every such save is also a restore point | reads on TypeScript; the engine writer (`encodeVctower`) is set once the host has started without latching (`bootstrap.ts:374-394`), even when the first tower stayed on TypeScript, because the host follows every later adopt |
 | Tower not hosted | the host started but refused a tower cleanly (`attach-refused`, not latched; `startWasmHost.ts:400-412`) | that tower's content is TypeScript's; the engine writer stays set and writes its container (the same bytes, #939) |
 | Worker | `?engine=wasm-worker`, switchable builds only, measurement only; the module loads inside the worker (`src/wasmhost/engineWorker.ts:30`) | TypeScript containers; the engine writer is never set. The autosave and the export settle first and take the engine's exact save; a synchronous save takes the exact save when the last reply carried one, and otherwise the read model's own save with the engine's minute (`workerHost.ts:453-477`, #1018) |
-| Engine fault | a hosted call throws and `FaultLatch` freezes the host. A save answers with the newest restore point (`wasmHost.ts:446-447`, `hostFault.ts:265`); one always loads, since the attach save is kept (`hostFault.ts:260-264`) | `onFallback` turns the writer off (`bootstrap.ts:355-361`, "a trapped module may be corrupt"). Switchable builds recover onto a TypeScript `Simulation` from the newest loadable restore point (`hostFault.ts:244-258`) and never host again (`startWasmHost.ts:386`) |
+| Engine fault | a hosted call throws and `FaultLatch` freezes the host. A save answers with the newest restore point (`wasmHost.ts:446-447`, `hostFault.ts:265`); one always loads, since a merge's save or the attach save is kept (`hostFault.ts:260-264`) | `onFallback` turns the writer off (`bootstrap.ts:355-361`, "a trapped module may be corrupt"). Switchable builds recover onto a TypeScript `Simulation` from the newest loadable restore point (`hostFault.ts:244-258`) and never host again (`startWasmHost.ts:386`) |
 | Engine fault, wasm-only | the same fault in the wasm-only build | `onFatal` stops the game: `isEngineStopped()` blocks the autosave (`src/game/appBoot.ts:405-409`), the context-loss flush (`saveLoad.ts:224`) and every modal (`uiModal.ts:64`), so the play since the last write is lost and nothing exports |
 | Package unavailable | refused, missing, offline without its cache, or timed out (`engineBoot.ts:194`, `:230`, `:240-243`) | a switchable build runs on TypeScript; the wasm-only build throws before `create()` (`bootstrap.ts:280-291`), so storage is never touched |
 
@@ -207,7 +210,7 @@ production.
 | G1 | Every read decodes, migrates and checks on TypeScript; no binding decodes a stored value or a `.vctower` file without an `Engine`, and `decode_vctower` differs from `SaveGame.import` (a `VCTOWER1` prefix only, lenient base64, other error text) | C, D1 |
 | G2 | The slot list and the boot read build a TypeScript `Simulation` to check a save, which slice 10's runtime guard forbids on the healthy path | C (`inspectSave`), D1, used by slice 10 |
 | G3 | The founder rule runs only on TypeScript, and in Rust only inside `fromVctower` (#1066, first half) | C (the setter), facade 7 (its first caller) |
-| G4 | `.TDT` import and export never reach `importTdt`/`exportTdt`, which throw their refusals and return no report facts (#1066, second half) | D2, after A7 (OD-8); on today's host TypeScript still loads the result before the attach, so #1066 finishes with facade 7 |
+| G4 | `.TDT` import and export never reach `importTdt`/`exportTdt`, which throw their refusals and return no report facts. The import is #1066's second half; the export is #1301's own (requirement 2), under the same A7 prerequisites | D2, after A7 (OD-8); on today's host TypeScript still loads the import's result before the attach, so #1066 finishes with facade 7 |
 | G5 | A new tower is founded on TypeScript | facade 5c and 7 (#1212, #1217) |
 | G6 | The worker host never gets the engine writer | facade 12; the worker is a measurement-only override, held (#1068) and outside 3.0's scope |
 | G7 | The asynchronous autosave deflates on `CompressionStream` | kept by design (decision O1) |
@@ -271,32 +274,42 @@ same string to whatever loads it. The operations:
 The asynchronous autosave stays in storage (`SaveGame.saveToAsync`): it
 stamps and caps as today and deflates on `CompressionStream` itself (O1).
 
-**What each source accepts** (slice C pins every case in its differential
-test, so Rust accepts what TypeScript accepts today and refuses what it
-refuses):
+**What each source accepts** (slice C pins every case in its differential test, so up to C9's bounds
+Rust accepts what TypeScript accepts today and refuses what it refuses, with
+the one difference stated below; past the bounds Rust answers `over-bound`
+and TypeScript decodes):
 
 - `store`: the `VCZ1:` prefix; base64 by `atob`'s rules (WHATWG
   forgiving-base64: ASCII whitespace anywhere is dropped; when the length
   is a multiple of 4, one or two trailing `=` are dropped; a length of 1 mod
   4 is refused, and so is any other character, so a partial pad such as
   `QQ=` is refused; trailing bits are ignored); raw deflate as fflate reads
-  it (bytes after the final block are ignored); the 32 MiB cap; fatal
-  UTF-8, with one leading byte order mark dropped; no shape check.
-- `file`: the text trimmed; the greedy `^VCTOWER(\d+)` match, where any
-  number but 1 is `newer-version` and the newline after the magic is
+  it (bytes after the final block are ignored); the 32 MiB cap (reached
+  only on TypeScript, after C9's `over-bound`); fatal UTF-8, with one
+  leading byte order mark dropped; the text parses as JSON with the
+  lone-surrogate repair both codecs share (`parseSaveJson`,
+  `load::parse_save_json`), else `damaged`; no shape check. A store
+  refusal shows as today's unreadable save.
+- `file`: the text trimmed; the greedy `^VCTOWER(\d+)` match over ASCII
+  digits, where any digit run other than exactly `1` is `newer-version`
+  (`VCTOWER01` and `VCTOWER0` among them, since the code compares strings,
+  `SaveGame.ts:362`) and the newline after the magic is
   optional (so a version-1 file with no newline whose payload starts with a
   digit reads as `newer-version`, as it does today); every JavaScript
   whitespace character dropped from the rest, then `atob`'s rules; raw
-  deflate as `DecompressionStream("deflate-raw")` reads it in the browsers
-  the end-to-end projects run (data after the final block is
-  browser-dependent there, and C pins what those browsers do); the cap;
+  deflate as `DecompressionStream("deflate-raw")` reads it; the cap (on
+  TypeScript, as above);
   fatal UTF-8 with one leading byte order mark dropped; the shape check
   (`minutes` a number, `units` an array).
+- The one difference: in `file`, Rust refuses data after the final deflate
+  block as `damaged`. Browsers' `DecompressionStream` may not agree on such
+  data, so where one accepts the file, C5 reads it on TypeScript and the
+  player sees today's result in every browser. C pins Rust's refusal; the
+  end-to-end projects pin each browser's answer.
 
 Rules:
 
-- **C1. One door.** A guard test fails when a file outside `src/tests/`,
-  `e2e/` and `*.test.ts` names a codec binding (`encodeVctower`,
+- **C1. One door.** A guard test scans `src/` and fails when a file outside `src/tests/` and `*.test.ts` names a codec binding (`encodeVctower`,
   `importTdt`, `exportTdt`, `decodeSave`, `inspectSave`, `fromVctower`) as
   code, outside `src/storage/codec/` and the engine's binding plumbing,
   which it lists by name: `src/dualrun/binding.ts` (the required-method
@@ -309,8 +322,9 @@ Rules:
   loads (`bootstrap.ts:243`), before `create()` (`:297`), so the boot read
   can use it although the host starts later. Reads use Rust while the read
   bindings are present, the codec has not latched (C4), and the host has
-  not latched or faulted and its start did not throw (`bootstrap.ts:359-361`,
-  `:380-384`). Writes keep today's rule exactly (slice B changes no
+  not latched or faulted, its start did not throw (`bootstrap.ts:359-361`,
+  `:380-384`), and it has not refused a tower as `package-mismatch`
+  (`startWasmHost.ts:405`), since that verdict calls the package foreign. Writes keep today's rule exactly (slice B changes no
   behavior): the Rust writer is on once the host has started without
   latching (`bootstrap.ts:374-394`), a tower it refused cleanly included,
   and off after a latched fallback or a host fault; from D1 on, a host start
@@ -322,8 +336,9 @@ Rules:
   `inspectSave`) return refusals as data (`{ ok: false, code }`), and D2
   changes `importTdt` and `exportTdt`, which throw today, the same way.
   `encodeVctower` keeps throwing, which the writer's latch handles as today.
-  Any other JavaScript exception from a binding, and a refusal code slice B
-  does not know (a skewed package), is a failure.
+  Slice B's answer type lists every refusal code and `over-bound` (C9), and
+  D2 adds the `.TDT` codes. Any other JavaScript exception from a binding,
+  and a code the boundary does not list (a skewed package), is a failure.
 - **C4. A failure latches.** The first failure turns the Rust codec off for
   the page's life, reads and writes together, and the operation is redone on
   TypeScript in the same call. That extends today's writer latch to the
@@ -341,8 +356,12 @@ Rules:
     fallback, which slice 10's no-`Simulation` guard must allow. When
     TypeScript refuses it too, the player sees today's message. No save
     that loads today stops loading (O2).
-  - A save Rust reads and TypeScript refuses fails on today's host with
-    today's message, since its instance needs TypeScript. On the facade it
+  - Content Rust reads and TypeScript's load refuses fails on today's host
+    with today's message, since its instance needs TypeScript. A container
+    only Rust decodes (a browser without `DecompressionStream`, where
+    TypeScript says `browser-too-old`) does load on today's host after D1,
+    since the instance needs only the decoded text: a change a player can
+    notice, which D1 records and versions. On the facade such content
     loads on Rust (O2): such a save does not load at all today, and on the
     facade it has no TypeScript fallback, so an engine fault leaves that
     tower stopped (`startWasmHost.ts:323-326`, slice 8's "no point loads")
@@ -354,8 +373,9 @@ Rules:
   - On today's host the slot list keeps TypeScript's check, since its loads
     still need TypeScript; on the facade it is Rust's, wired by slice 10.
 - **C6. Same bytes either way.** For one stamped save the Rust writer and the
-  TypeScript writer write the same `.vctower` and `VCZ1:` bytes, pinned per
-  write path over every fixture, so a codec fallback never changes a file.
+  TypeScript writer write the same `.vctower` and `VCZ1:` bytes, pinned over
+  every fixture through `packSync`, which every synchronous write path
+  shares (today's conformance pins, which slice B keeps), so a codec fallback never changes a file.
   `.TDT` bytes are pinned by the TDT lock and differential (A7's scope). The
   content can differ between engines in one known way, EX-2's: a
   transport's key order (the canonical JSON is equal, and both engines read
@@ -372,35 +392,48 @@ Rules:
 - **C9. Cost.** No codec call runs per frame or per tick. Boot, loads, the
   slot list (up to five keys per read: both autosave keys and three slots,
   read again when the title picker renders), imports and exports are one-off
-  paths, and each slice's PR carries the hot-path record. The Rust decode
-  inflates at most 8 MiB, the writer's existing bound, since the engine's
-  shared memory grows for good: past it, the decode stops and answers
-  `over-bound`, which is neither a refusal nor a failure and latches
-  nothing, and the TypeScript codec decodes that save (a container step
-  that builds no `Simulation`). The bound covers the decode only: a load
-  parses the whole save in the engine anyway. Slice 13 (#1225) owns the
-  load's memory peak and may lift the bound.
+  paths, and each slice's PR carries the hot-path record. The engine's
+  shared memory grows for good, and a binding copies its argument into it
+  before Rust checks anything, so every Rust codec call is bounded twice.
+  Before the call, TypeScript checks the input's size, as the writer does
+  today (`vctowerWriter.ts:44`): a stored value or `.vctower` text longer
+  than an 8 MiB save can occupy (about 11 MiB of base64), `.TDT` bytes past
+  the importer's 4 MiB limit (`TDT_MAX_FILE_BYTES`, `tdt/format.rs`), and
+  save JSON past 8 MiB for `exportTdt` are never sent to Rust. Inside the
+  call, the decode inflates at most 8 MiB, the writer's existing bound.
+  Either way the boundary answers `over-bound`, which is neither a refusal
+  nor a failure and latches nothing, and the TypeScript codec runs that
+  operation as today (for a decode, a container step that builds no
+  `Simulation`). The bounds cover the codec only: a load parses the whole
+  save in the engine anyway. Slice 13 (#1225) owns the load's memory peak
+  and may lift them.
 - **C10. Write order.** A synchronous write of the autosave key, C4's redo
-  included, clears the asynchronous token first, as `saveTo` does today. In
-  a switchable build an engine fault also clears the token, so an autosave
-  in flight across the fault never commits: it took its save before the
-  fault, and the recovery may skip that point as one TypeScript cannot
-  load; the key keeps its last committed save until the recovered tower's
-  next write. Today nothing clears the token on a fault, so E1 makes this
-  change. In the wasm-only build, which has no recovery, the in-flight
-  autosave commits its pre-fault save.
+  included, clears the asynchronous token first, as `saveTo` does today (slice B keeps
+  this). In a switchable build, an autosave in flight across an engine
+  fault commits only when the save it took is the point the recovery
+  loaded. That is the usual case: every host save is the newest restore
+  point, and a save answered after the fault is the point the recovery
+  starts from (`hostFault.ts:238-243`). When the recovery skipped that
+  point as one TypeScript cannot load, or no point loads, the fault clears
+  the token, so that save never commits and the key keeps its last
+  committed save until the recovered tower's next write. A synchronous
+  write right after the recovery is no substitute, since the recovered
+  tower can be older than the last committed save. Today the in-flight
+  autosave always commits, so E1 makes this change. In the wasm-only build,
+  which has no recovery, it commits its pre-fault save as today.
 
 ## The fallback policy per operation (requirement 4)
 
-After slices B to D2, before any O3 change. "Rust, else TS" means C4 and
-C5; "stopped" means the wasm-only build's stop screen, where nothing new is
+After slices B to E1, before any O3 change. "Rust, else TS" means C4 and
+C5, within C9's bounds; "Package unavailable" is the switchable builds'
+column, since the wasm-only build does not start without its package; "stopped" means the wasm-only build's stop screen, where nothing new is
 read or written (an autosave already in flight commits, C10).
 
 | Operation | TS default | WASM, healthy | Tower not hosted | Rust codec latched | Engine fault, switchable | Engine fault, wasm-only | Package unavailable | Worker |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Save content | TS | the engine's | TS | the engine's | the newest restore point, then TS after recovery | stopped | TS | the worker's (see Modes) |
 | Synchronous writes, export, crash report | TS | Rust, else TS | Rust, else TS | TS | TS | stopped | TS | TS |
-| Asynchronous autosave | TS (`CompressionStream`); the synchronous row where the browser lacks it | the same | the same | the same | the same; one in flight is dropped (C10) | stopped | the same | the same |
+| Asynchronous autosave | TS (`CompressionStream`); the synchronous row where the browser lacks it | the same | the same | the same | the same; one in flight commits only if it holds the point the recovery loaded (C10) | stopped | the same | the same |
 | Boot read, slot and autosave loads, `.vctower` import | TS | Rust, else TS | Rust, else TS | TS | TS | stopped | TS | TS |
 | Slot list check | TS | TS on today's host; Rust, else TS, on the facade | TS | TS | TS | stopped | TS | TS |
 | `.TDT` import and export | TS | Rust, else TS (D2) | Rust, else TS | TS | TS | stopped | TS | TS |
@@ -445,8 +478,7 @@ read or written (an autosave already in flight commits, C10).
    engine under `story-engine-retire-typescript.md`'s gates, tracked by its
    own backlog row and issue (#1336). Before it goes:
    - a player build without it can still export a player's saves when the
-     package fails (a stored `VCZ1:` value re-headers into a `.vctower`
-     file with no decode, `towerFileCodec.ts`; a value the browser's
+     package fails (a stored `VCZ1:` value re-headers into a `.vctower` file with no decode in `toTowerFile`'s preserve mode, `towerFileCodec.ts`, whose default mode checks the value through the TypeScript inflate; a value the browser's
      `CompressionStream` wrote is valid there but not byte-pinned, and a
      legacy raw-JSON value needs a deflate first);
    - the 8 MiB decode and write bounds are lifted, or the saves past them
@@ -466,15 +498,21 @@ read or written (an autosave already in flight commits, C10).
 ## Freeze and gates
 
 Every code slice changes the seeded-replay key or the tail's paths
-(release plan 4.1 and 4.2): C and D2 change the crate, B and D1 change the
-storage codecs inside the nightly's import closure and paths such as
-`saveLoad.ts`, `exportFlow.ts` and `bootstrap.ts`. So each lands before
-the freeze (OD-3), and the matrix marks them "changes the key". #1301 adds
+(release plan 4.1 and 4.2): C and D2 change the crate, B and D1 change the storage codecs inside the
+nightly's import closure and paths such as `saveLoad.ts`, `exportFlow.ts`
+and `bootstrap.ts`, and E1 changes the fault path's write order (C10). So
+B, C, D1, D2 and E1 each land before the freeze (OD-3). Slice A asks the
+triage thread to list them in #1104's "Changes the key" column now, since
+Phase C ends when none of that work is open; E2 and F add tests and
+evidence only. #1301 adds
 an acceptance item to 3.0.0 and moves no stage date, threshold or gate.
 Two schedule risks, both the owner's to settle if they come due: D2 waits
 on A7 and #932 (if it cannot land before the freeze, the owner's OD-8 route
 decides: keep #1066 whole, or move its `.TDT` half into the exception
-register), and D1 merges only after O3 (if O3 is still open as the freeze
+register; on that route D2 and the `.TDT` cases of E2 and F move with
+#1066's `.TDT` half, this story proposes the `.TDT` export goes the same
+way as the import, and #1301 closes on the rest with that exception
+named), and D1 merges only after O3 (if O3 is still open as the freeze
 nears, D1 comes to the owner as a schedule question). This story decides
 neither.
 
@@ -487,20 +525,21 @@ closes when slices B to F have landed and its four acceptance items hold.
 
 | Slice | Scope | Depends on | Coordinates with | Review | Version |
 | --- | --- | --- | --- | --- | --- |
-| A | This story; the backlog rows for #1301 and the TypeScript codec's retirement (#1336); #1066's row and issue pointed at C, D2 and facade 7; comments on #1066, #1222 and #1301 | none | none | `/gds-code-review` (save round trip) | none |
-| B | `src/storage/codec/` with the TypeScript codec behind it and no behavior change; `SaveGame`, `saveLoad.ts`, `exportFlow.ts`, `crashReport.ts` and `legacyImportAdopt.ts` call through it; the codec takes the module from bootstrap (C1, C2); the C1 guard. Every byte pin and both test projects unchanged | A | facade 5b (#1212, the same writers; this lane owns both, and the second to land rebases) | `/gds-code-review` and `/bmad-code-review`, hot-path record | none |
-| C | Crate: `decodeSave(text, source)` with each source's rules above, and the `over-bound` answer (C9); `inspectSave(text)` (loads, population, predates the stamp); an engine founder setter, or a founder flag on the boot call, that runs before the first restore point and any save, which only stored and `.vctower` loads use, never the attach, undo, restore points, a new tower or a `.TDT` import (#1066's first half; no caller until facade 7). A differential test, per source, over the representative saves below, the loader table (`conformance/loader-cases.json`), the cap and Unicode cases (#856, #858), values a browser's `CompressionStream` wrote, each listed acceptance case (whitespace inside, `QQ=`, a byte order mark, no newline after the magic, a digit-led payload, data after the final block) and container refusals (bad magic, bad base64, truncated deflate, bad UTF-8, not JSON, the wrong shape): the same decoded text, string for string, the same refusal code, and the same `inspect` answers. Forged save contents stay out, listed as known divergences (#1282). A test that an over-bound value stops at 8 MiB. The save version pin stays | B (the refusal codes) | B6 (#1327, `load.rs`); the crate takes the next free version at merge | `/gds-code-review`, hot-path record | crate minor, `engine:compat` |
-| D1 | Rust reads on today's WASM host through the boundary: boot, slot and autosave loads, the title picker's loads, `.vctower` import; the founder rule from the read's answer; C2, C4, C5, C9 and C10's first sentence. `inspect` through the boundary, for slice 10 to wire into the slot list. Tests on `unitWasm` and `chromium-wasm`: every representative save loads to the same tower through either codec; a forced codec throw, and a forced trap, latch the codec and the load completes on TypeScript; a Rust refusal TypeScript reads still loads; a Rust answer TypeScript cannot load is redone on TypeScript; a file both refuse shows today's message; an over-bound save reads on TypeScript; after a codec latch at boot, the host start leaves the writer off; and, if O3 changes the trap path, a writer trap too | B, C; O3 answered before it merges | facade 5c (#1212, the same readers) | `/gds-code-review` and `/bmad-code-review`, hot-path record | minor if a player can notice it, else none |
-| D2 | `.TDT` through Rust (#1066's second half): `importTdt` and `exportTdt` return refusals and the report facts as data, the TypeScript report keeps its wording, C4 and C5 apply (a conversion TypeScript cannot load is redone on TypeScript), and a `.TDT` import still earns no founder mark | B, C; A7 under OD-8: #885 whole (the fuzzer, its round-trip properties, the nightly and the real-save check), #886, #887 closed by whatever route the owner approves (this story does not ask for #1292's merge), #920; #932's measurement | the A7 lane | `/gds-code-review`, hot-path record | crate minor; app as above |
-| E1 | The owner's trap-after-change test on today's write paths, as assertions added to `e2e/wasmFallback.spec.ts`, and C10's fault rule. The tower changes before and after the newest restore point (a build, a day of play, a price), the engine traps, then a Quick Save, the autosave (one of them in flight across the trap), a slot save, a `.vctower` export, a `.TDT` export, and "Update now" with the reload's boot read. Saves written before the trap are unchanged; the in-flight autosave does not commit; each later value reads with today's reader, keeps its container and the save version, loads in the engine (`Engine.fromSave`), and loads to the tower the player sees at that moment, which the recovery rewound to the newest point TypeScript loads. The same right after a load, when the attach save is the only point | B (or `main` directly) | facade slice 8 (#1218: its forced-trap tests, one offline) | `/gds-code-review` | none |
-| E2 | The rest of E: a codec failure and a codec trap through a tooling-build hook; the package refused, or offline without its cache, so every read and write runs on TypeScript and an exported file reads back on the WASM build; an offline cold start with the package cached, where D1's reads run; persistence assertions inside X2's rollback rehearsal (OD-5: saves the WASM build wrote load on the TypeScript default) and the previous release's reader reading them; Rust-decoded stored values; the `.TDT` cases. Run again on the facade before F, with the C5 cases a facade adds (a save only Rust reads, and its fault) | D1 (D2 for `.TDT`) | the Offline lane (#985's helpers); the Release lane (X2, which runs the rehearsal) | `/gds-code-review` | none |
-| F | Evidence from the candidate's WASM host: a comment on #945 per row (Saves, stating EX-2's status; Rollback; Reliability's writer latch; Deployment's offline start; End to end; Authority), the triage thread's #1104 update, and this policy moved into `docs/` if the owner wants it there. No gate text, timing or stage changes | E2, slice 10 | the triage thread | `/bmad-code-review` | none |
+| A | This story; the backlog rows for #1301 and the TypeScript codec's retirement (#1336); #1066's row and issue pointed at C, D2 and facade 7; comments on #1066, #1222 and #1301; a message asking the triage thread to list #1301 in #1104 as a 3.0.0 acceptance item, with B, C, D1, D2 and E1 as "Changes the key" | none | the triage thread | `/gds-code-review` (save round trip) | none |
+| B | `src/storage/codec/` with the TypeScript codec behind it and no behavior change; `SaveGame`, `saveLoad.ts`, `exportFlow.ts`, `crashReport.ts` and `legacyImportAdopt.ts` call through it; the codec takes the module from bootstrap (C1, C2); the answer type with every refusal code and `over-bound` (C3); C10's first sentence kept; the C1 guard. Every byte pin and both test projects unchanged | A | facade 5b and 5c (#1212: 5b's writers, and 5c's readers `readAuto`, `readSlotSave`, `import` and `SaveGame.readLegacy`; this lane owns all three, and the second to land rebases) | `/gds-code-review` and `/bmad-code-review`, hot-path record | none |
+| C | Crate: `decodeSave(text, source)` with each source's rules above, and the `over-bound` answer (C9); `inspectSave(text)` (loads, population, predates the stamp); an engine founder setter, or a founder flag on the boot call, that runs before the first restore point and any save, which only stored and `.vctower` loads use, never the attach, undo, restore points, a new tower or a `.TDT` import (#1066's first half; no caller until facade 7). A differential test, per source, over the representative saves below as `VCZ1:` values and `.vctower` texts, the loader table (`conformance/loader-cases.json`), the cap and Unicode cases (#856, #858), values a browser's `CompressionStream` wrote, each listed acceptance case (whitespace inside, `QQ=`, a byte order mark, no newline after the magic, a digit-led payload, `VCTOWER01`, a 30-digit version, data after the final block) and container refusals (bad magic, bad base64, truncated deflate, bad UTF-8, not JSON, the wrong shape): the same decoded text, string for string, the same refusal code, and the same `inspect` answers, except the one stated difference (data after the final block in `file`). Forged save contents stay out, listed as known divergences (#1282). A test that a decode stops at 8 MiB inflated and answers `over-bound`; for the cap cases Rust answers `over-bound` and TypeScript's answer stands. The save version pin stays | B (the refusal codes) | B6 (#1327, `load.rs`); the crate takes the next free version at merge | `/gds-code-review`, hot-path record | crate minor, `engine:compat` |
+| D1 | Rust reads on today's WASM host through the boundary: boot, slot and autosave loads, the title picker's loads, `.vctower` import; the founder rule stays `markFounderFromLoadedFile` on the TypeScript instance that loads the decoded text (the engine's setter waits for facade 7); C2, C4, C5, and C9 with its input bounds; a tooling-build hook that forces a codec failure or a codec trap, which E2 reuses. `inspect` through the boundary, for slice 10 to wire into the slot list. Tests on `unitWasm` and `chromium-wasm`: every representative save loads to the same tower through either codec, as a legacy raw-JSON value and under the legacy autosave key too; a container only Rust decodes loads (C5); a forced codec throw, and a forced trap, latch the codec and the load completes on TypeScript; a Rust refusal TypeScript reads still loads; a Rust answer TypeScript cannot load is redone on TypeScript; a file both refuse shows today's message; an over-bound save, or input past C9's bounds, reads on TypeScript; after a codec latch at boot, the host start leaves the writer off; and, if O3 changes the trap path, a writer trap too | B, C; O3 answered before it merges | facade 5c (#1212, the same readers) | `/gds-code-review` and `/bmad-code-review`, hot-path record | minor if a player can notice it (C5's container case), else none |
+| D2 | `.TDT` through Rust, the import (#1066's second half) and the export (#1301's own): `importTdt` and `exportTdt` return refusals and the report facts as data, behind C9's input bounds, the TypeScript report keeps its wording, C4 and C5 apply (a conversion TypeScript cannot load is redone on TypeScript), and a `.TDT` import still earns no founder mark | B, C; A7 under OD-8: #885 whole (the fuzzer, its round-trip properties, the nightly and the real-save check), #886, #887 closed by whatever route the owner approves (this story does not ask for #1292's merge), #920; #932's measurement | the A7 lane | `/gds-code-review`, hot-path record | crate minor; app as above |
+| E1 | The owner's trap-after-change test on today's write paths, as assertions added to `e2e/wasmFallback.spec.ts`, and C10's fault rule. The tower changes before and after the newest restore point (a build, a day of play, a price), the engine traps, then a Quick Save, the autosave (one of them in flight across the trap), a slot save, a `.vctower` export, a `.TDT` export, and "Update now" with the reload's boot read. Saves written before the trap are unchanged; the in-flight autosave commits only when it holds the point the recovery loaded, tested both ways (C10); each later value but the `.TDT` export reads with today's reader, keeps its container and the save version, loads in the engine (`Engine.fromSave`), and loads to the tower the player sees at that moment, which the recovery rewound to the newest point TypeScript loads. The `.TDT` export equals what `buildTDT` writes for that tower and reads back through `parseTDT` with only the losses its report lists. The same right after a load, when the attach save is the only point | B (or `main` directly) | facade slice 8 (#1218: its forced-trap tests, one offline); runs again on the facade before F | `/gds-code-review` | none |
+| E2 | The rest of E: a codec failure and a codec trap through D1's tooling-build hook; the package refused, or offline without its cache, so every read and write runs on TypeScript and an exported file reads back on the WASM build; an offline cold start with the package cached, where D1's reads run; persistence assertions inside X2's rollback rehearsal (OD-5: saves the WASM build wrote load on the TypeScript default) and the previous release's reader reading them; Rust-decoded stored values; the `.TDT` cases. Run again on the facade before F, with the C5 cases a facade adds (a save only Rust reads, and its fault) | D1 (D2 for `.TDT`) | the Offline lane (#985's helpers); the Release lane (X2, which runs the rehearsal) | `/gds-code-review` | none |
+| F | Evidence from the candidate's WASM host: a comment on #945 per row (Saves, stating EX-2's status; Rollback; Reliability's writer latch; Deployment's offline start; End to end; Authority), the triage thread's #1104 update, and this policy moved into `docs/` if the owner wants it there. No gate text, timing or stage changes. On OD-8's exception-register route, the `.TDT` evidence is replaced by that exception | E1 and E2 run again on the facade; slices 8 and 10 | the triage thread | `/bmad-code-review` | none |
 
 **The representative saves.** `conformance/fixtures/`: the version-1
 towers `towerone*` and the version-4 towers `sixseven*`, which carry no
 stamp, and the current towers `split-tower*`, which do; each also as a
-`VCZ1:` value from both writers, as a legacy raw-JSON value, and under the
-legacy autosave key; the loader table; and for `.TDT`, the lock cases plus
+`VCZ1:` value from both writers (C's differential), and as a legacy
+raw-JSON value and under the legacy autosave key (D1's load tests, since
+storage handles both before any codec); the loader table; and for `.TDT`, the lock cases plus
 #885's local check on the owner's real saves (results recorded on #885; no
 real save enters the repository).
 
@@ -508,9 +547,10 @@ real save enters the repository).
 (a save only TypeScript reads runs on the TypeScript fallback) as a
 recorded case its no-`Simulation` guard allows; the slot list's check
 wired to `inspect`; and, since slice 10 moves the `Simulation` module into
-a lazy chunk, that the TypeScript redo of C4 and C5 can reach it (loaded
-on demand or preloaded, and precached for offline play), the boot read's
-included.
+a lazy chunk, that the TypeScript redo of C4 and C5 can reach it: preloaded
+before any synchronous caller can need it (the boot read inside
+`create()`, `listSlots`, `loadSlot`), or with those paths made
+asynchronous by slice 10, and precached for offline play.
 
 Left to their owners, so #1301 does not duplicate them: a new tower through
 the engine (facade 5c and 7), the engine booting from the decoded text
@@ -557,8 +597,15 @@ answers.
     tower not hosted, the same latch, so the next adopt does not attach on
     the suspect module. At boot, before the host starts, hosting does not
     start: a boot failure (stage `start`, reason `boot-error`) in the boot
-    state and its settle row, and in the wasm-only build the stop screen
-    (`stopForEngine("start")`). If the owner declines, a trap latches the
+    state and its settle row, `rustFailed("start", ...)` so later boots
+    stay on TypeScript as after any start failure (`bootstrap.ts:380-384`),
+    and in the wasm-only build the stop screen (`stopForEngine("start")`).
+    The cost to weigh: a codec call on a path that takes no save first (the
+    slot list, a `.TDT` parse whose report the player cancels, a load both
+    codecs refuse) can trap with the live tower hosted, and the recovery
+    then rewinds it to the newest restore point, losing up to R6's 30
+    seconds of play and possibly the undo trail. A trap inside a write
+    loses nothing, since that save was just taken as a point. If the owner declines, a trap latches the
     codec only, as a writer trap does today.
   - (b) a codec failure that is not a trap reports through the existing
     `writer_latched` field, whose meaning widens to "the Rust save codec
@@ -572,7 +619,8 @@ answers.
 
 - [ ] A: this story, the backlog rows and #1336, #1066's row, comments on
       #1066, #1222 (the slice 10 carries above) and #1301 (the three
-      outline changes and O1 to O3)
+      outline changes and O1 to O3), and the triage thread asked to list
+      the slices in #1104
 - [ ] B: the boundary with no behavior change
 - [ ] C: `decodeSave`, `inspectSave`, the founder setter, the differential
       test
@@ -614,3 +662,23 @@ answers.
   reload; the slice 10 carries; D1's O3 risk in the freeze section; the
   three outline changes; #1336's preconditions; the scope statement's
   exceptions; small citation fixes.
+- Round 3 (the same layers on `e7ce0510`, a confirming pass). About 25
+  findings after merging duplicates, all `patch` and narrower than round
+  2's; every citation spot-checked was correct. Fixed: the exceptions
+  listed in full (the write bound, the worker, `.TDT` until D2) with no
+  count; Rust codec input bounded in TypeScript before the call, since a
+  binding copies its argument into the engine's memory (C9); the
+  differential scoped to C9's bounds; one Rust rule for data after the
+  final block in `file`, with C5 covering browsers that accept it; the
+  store's JSON parse; the magic's digit run compared as a string;
+  `over-bound` in slice B's answer type; reads stop after a
+  `package-mismatch` refusal; a container only Rust decodes loads on
+  today's host (a change D1 versions); the in-flight autosave commits when
+  it holds the point the recovery loaded (C10); the `.TDT` export as
+  #1301's own, with its own E1 check; D1 keeps the TypeScript founder call
+  and owns the forced-trap hook; E1 and E2 run again on the facade before
+  F; E1 in the freeze list, and the triage thread asked to list the slices
+  in #1104 now; #1301's closure on OD-8's exception-register route; B
+  coordinates with 5c's readers; O3(a)'s boot latch and its cost to recent
+  play; the slice 10 chunk preloaded for synchronous callers;
+  `toTowerFile`'s preserve mode in policy item 4.
