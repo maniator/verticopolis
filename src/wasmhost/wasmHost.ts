@@ -442,10 +442,15 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
   const ownDropped = Object.getOwnPropertyDescriptor(sim, "gameplayEventsDropped");
   // Every save the game reads (an undo capture, an autosave, an export) is
   // a restore point at no extra cost, and one asked of a faulted host is the
-  // point the fallback goes back to. An undo step takes the text itself.
-  const hostedText = (): string => guard("other", readPoint, null) ?? points.newestText();
-  Object.defineProperty(sim, "serialize", { value: () => JSON.parse(hostedText()), configurable: true, writable: true });
-  setSaveText(sim, hostedText);
+  // point the fallback goes back to.
+  const serializeHosted = () => {
+    const text = guard("other", readPoint, null);
+    return text === null ? points.newestSave() : JSON.parse(text);
+  };
+  Object.defineProperty(sim, "serialize", { value: serializeHosted, configurable: true, writable: true });
+  // An undo step takes the same save as text, with no parse and re-print
+  // (#1158 A31, its undo half).
+  setSaveText(sim, () => guard("other", readPoint, null) ?? points.newestText());
   // A reference to the override kept past detach drains the instance, which
   // is the authority again, and never reaches the freed engine. The
   // analytics session's own flush releases the held events (`release`),

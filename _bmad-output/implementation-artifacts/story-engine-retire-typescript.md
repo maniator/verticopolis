@@ -65,10 +65,12 @@ own line: the PR, the files, and why the fallback needs them):
 
 - **#1101 (#874, the runtime fallback).** They exist to re-adopt a faulted
   tower on a fresh TypeScript `Simulation`, so they go with it:
-  - `src/wasmhost/hostFault.ts`: `RestorePoints` (all but `newestSave`, see
-    below) and `carryLiveState`.
+  - `src/wasmhost/hostFault.ts`: `RestorePoints` (all but `newestSave` and
+    `newestText`, see below), `carryLiveState` and `signatureOfSave`.
   - `src/wasmhost/wasmHost.ts`: the restore-point bookkeeping
-    (`readPoint`, `pullTicks`, `restore`, the frozen tower's own tick), and
+    (`readPoint`, `pullTicks`, `restore`, the frozen tower's own tick), the
+    save text it registers for undo copies (`setSaveText` and `saveText` in
+    `stepGate.ts`, slice 5), and
     `src/wasmhost/hostEvents.ts` (`HostEvents`: the held command events and
     `lostEdits`); a Rust-only host hands its events out as it reads them.
   - `src/wasmhost/startWasmHost.ts`: `recover`, `playerState`,
@@ -76,8 +78,8 @@ own line: the PR, the files, and why the fallback needs them):
     (`REPLACED`, `LOST`, `RESTORED`, `UNDONE`, `STUCK`).
   - The undo trail's tidy after a recovery and its redo hold:
     `UndoHistory.dropUnchanged`, `UndoHistory.holdClearedRedo` with the
-    `cleared` field on its steps, and the `signatureOf` port
-    (`src/engine/UndoHistory.ts`, `src/game/appHistory.ts`),
+    `cleared` field on its steps, and the fingerprint the tidy takes
+    (`sigOf`, `src/engine/UndoHistory.ts`),
     `GameApp.dropEmptyUndo` and `GameApp.holdClearedRedo` (`src/main.ts`),
     and `WasmHostApp.dropEmptyUndo` and `WasmHostApp.holdClearedRedo`.
   - The analytics bridge's `release` option on `drainGameplayEvents`
@@ -117,8 +119,9 @@ own line: the PR, the files, and why the fallback needs them):
 
   What stays, because a Rust-only build still freezes and stops cleanly on a
   trap: the fault latch, the guards, the strict stop (`onFatal`) and
-  `RestorePoints.newestSave` without its TypeScript load check (the strict
-  build's save after a fault is the newest engine-written save). Their tests
+  `RestorePoints.newestSave` and `newestText` without their TypeScript load
+  check (the strict build's save after a fault is the newest engine-written
+  save). Their tests
   stay too: the trap helper `src/tests/integration/wasmTraps.ts`, and
   `wasmHostFallback.integration.test.ts`'s latch case ("records one fallback
   and one recovery however many paths fault after it", without its adopt

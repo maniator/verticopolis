@@ -147,14 +147,15 @@ export class UndoHistory {
 
   /** Undo the newest step. The commit, the pop, the redo step's snapshot
    *  and the restore's start all happen before this returns, so two undos in
-   *  one task pop two steps in order; the "Undid:" notice follows the
-   *  settled restore, and a restore that fails gives none and rejects. */
+   *  one task pop two steps in order (a snapshot that throws throws from
+   *  here). The "Undid:" notice follows the settled restore. A restore that
+   *  fails gives none, puts the step back while nothing has moved the trail
+   *  since, and rejects. */
   undo(): Promise<void> {
     this.commit(); // finalize any in-flight gesture first
     const entry = this.undoStack.pop();
     if (!entry) return this.say("Nothing to undo.");
-    this.redoStack.push({ snap: this.ports.snapshot(), label: entry.label });
-    return this.ports.restore(entry.snap).then(() => this.ports.notify(`Undid: ${entry.label}`));
+    return this.step(entry, "undo");
   }
 
   /** Redo the newest undone step, in the same order as {@link undo}. */
@@ -162,8 +163,27 @@ export class UndoHistory {
     this.commit(); // finalize any in-flight gesture first (matches undo)
     const entry = this.redoStack.pop();
     if (!entry) return this.say("Nothing to redo.");
-    this.undoStack.push({ snap: this.ports.snapshot(), label: entry.label });
-    return this.ports.restore(entry.snap).then(() => this.ports.notify(`Redid: ${entry.label}`));
+    return this.step(entry, "redo");
+  }
+
+  /** Restore `entry`, just popped by an undo or a redo, keeping today's
+   *  state as the opposite step. The trails are read again on a failure,
+   *  since the WASM fallback's tidy may have replaced them meanwhile. */
+  private step(entry: Entry, kind: "undo" | "redo"): Promise<void> {
+    const trails = () => (kind === "undo" ? [this.undoStack, this.redoStack] : [this.redoStack, this.undoStack]);
+    const back: Entry = { snap: this.ports.snapshot(), label: entry.label };
+    trails()[1].push(back);
+    return this.ports.restore(entry.snap).then(
+      () => this.ports.notify(`${kind === "undo" ? "Undid" : "Redid"}: ${entry.label}`),
+      (e: unknown) => {
+        const [from, to] = trails();
+        if (to[to.length - 1] === back) {
+          to.pop();
+          from.push(entry);
+        }
+        throw e;
+      },
+    );
   }
 
   private say(message: string): Promise<void> {

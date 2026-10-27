@@ -335,8 +335,9 @@ export function startWasmHost(app: WasmHostApp, mod: WasmModule, log: Pick<Conso
     } catch {
       // The command count alone answers.
     }
-    // The undo path: it keeps the camera, the undo trail and the bridging
-    // toggle, and a title screen still up. The release in the adopt wrapper
+    // The undo path: it keeps the camera, the undo trail and a title screen
+    // still up (the bridging toggle came over with `h.restore()`, in
+    // `carryLiveState`). The release in the adopt wrapper
     // lets the faulted host go, which hands back the events it holds, and the
     // adopt passes them on.
     try {

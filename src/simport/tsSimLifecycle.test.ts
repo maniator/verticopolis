@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Simulation } from "../engine/Simulation";
+import { Simulation } from "../engine/Simulation";
+import type { SerializedGame } from "../engine/types";
 import { towerStateSig } from "../engine/UndoHistory";
 import { MID, newSeededGame } from "../tests/fixtures/towerFixtures";
 import { parityRestarts } from "../tests/parity/typescriptOnly";
-import { setSaveText, setStepGate } from "../wasmhost/stepGate";
+import { signatureOfSave } from "../wasmhost/hostFault";
+import { saveText, setSaveText, setStepGate } from "../wasmhost/stepGate";
 import { describeLifecycleContract } from "./lifecycleContract.fixture";
 import { createTsSim } from "./tsSim";
 
@@ -51,15 +53,36 @@ describe("TsSim's lifecycle over the live instance", () => {
 
   it("saves what the instance serializes, and hands over a host's own text for a copy kept in memory", () => {
     const { held, port } = adopting();
+    // In the unitWasm project the first tick hosts the tower, so this holds
+    // on both of today's hosts.
+    port.tick(1);
     expect(port.saveNow()).toBe(JSON.stringify(held.sim.serialize()));
-    expect(port.saveNow({ memory: true })).toBe(port.saveNow());
+    expect(JSON.parse(port.saveNow({ memory: true }))).toEqual(JSON.parse(port.saveNow()));
+    const own = saveText(held.sim) ?? null;
     setSaveText(held.sim, () => "the host's text");
     try {
       expect(port.saveNow({ memory: true })).toBe("the host's text");
       expect(port.saveNow()).toBe(JSON.stringify(held.sim.serialize()));
     } finally {
-      setSaveText(held.sim, null);
+      setSaveText(held.sim, own);
     }
+  });
+
+  it("rejects a stored load with the first save's error", async () => {
+    const { held, port } = adopting();
+    const tower = held.sim;
+    const errorOf = (save: unknown) => {
+      try {
+        Simulation.deserialize(save as SerializedGame);
+      } catch (e) {
+        return (e as Error).message;
+      }
+      throw new Error("expected the save not to load");
+    };
+    const [first, second] = [errorOf(null), errorOf(undefined)];
+    expect(first).not.toBe(second);
+    await expect(port.load({ from: "stored", saves: [null, undefined] as unknown as SerializedGame[] })).rejects.toThrow(first);
+    expect(held.sim).toBe(tower);
   });
 
   it("reads the camera after a background host catches up, on the tower held then", async () => {
@@ -100,6 +123,15 @@ describe("TsSim's lifecycle over the live instance", () => {
     expect(second).not.toBe(first);
     sim = before;
     expect(port.generation).toBe(first);
+  });
+
+  it("fingerprints its own undo copies as the WASM fallback's tidy does", async () => {
+    const { port } = adopting();
+    port.tick(1);
+    expect(signatureOfSave(port.saveNow({ memory: true }))).toBe(port.undoSignature());
+    expect(await port.command({ op: "build", kind: "office", floor: 2, x: MID - 4 })).toMatchObject({ ok: true });
+    expect(signatureOfSave(port.saveNow({ memory: true }))).toBe(port.undoSignature());
+    port.tick(1);
   });
 
   it("fingerprints the tower as the undo history always has", async () => {

@@ -137,6 +137,51 @@ describe("UndoHistory — stack semantics", () => {
     fail = true;
     await expect(hist.redo()).rejects.toThrow("no load");
     expect(notes).toEqual(["Undid: b", "Undid: a"]);
+    // The failed step went back on its trail, and no step of the unchanged
+    // tower took its place on the other one.
+    expect(world.v).toBe(0);
+    fail = false;
+    await hist.redo();
+    expect(world.v).toBe(1);
+    fail = true;
+    await expect(hist.undo()).rejects.toThrow("no load");
+    fail = false;
+    await hist.undo();
+    expect(world.v).toBe(0);
+    await hist.undo();
+    expect(notes.slice(2)).toEqual(["Redid: a", "Undid: a", "Nothing to undo."]);
+  });
+
+  it("puts a failed step back only while nothing has moved the trail since", async () => {
+    let world = { v: 0 };
+    const notes: string[] = [];
+    let settle!: (ok: boolean) => void;
+    const hist = new UndoHistory({
+      snapshot: () => JSON.stringify(world),
+      restore: (s) => {
+        world = JSON.parse(s) as { v: number };
+        return new Promise<void>((resolve, reject) => (settle = (ok) => (ok ? resolve() : reject(new Error("no load")))));
+      },
+      signature: () => String(world.v),
+      notify: (m) => notes.push(m),
+    });
+    hist.capture("a");
+    world.v = 1;
+    hist.commit();
+    const undo = hist.undo();
+    // A new gesture lands while the restore is out; its commit clears the
+    // redo trail the undo pushed onto.
+    hist.capture("c");
+    world.v = 5;
+    hist.commit();
+    settle(false);
+    await expect(undo).rejects.toThrow("no load");
+    const next = hist.undo();
+    settle(true);
+    await next;
+    expect(world.v).toBe(0);
+    await hist.undo();
+    expect(notes).toEqual(["Undid: c", "Nothing to undo."]);
   });
 });
 

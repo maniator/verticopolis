@@ -8,8 +8,9 @@ interface HistoryApp {
 
 /** The app's undo/redo history, through the port alone: a step is the
  *  port's save of the tower as it stood, kept in memory, and a restore is a
- *  `history` load, which keeps the camera, the trail and the bridging
- *  setting. The port follows every adoptSim() swap. */
+ *  `history` load, which keeps the trail and the live bridging setting and
+ *  leaves the live camera where it is. The port follows every adoptSim()
+ *  swap. */
 export function createAppHistory(app: HistoryApp): UndoHistory {
   return new UndoHistory({
     snapshot: () => app.port.saveNow({ memory: true }),

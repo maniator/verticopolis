@@ -10,10 +10,11 @@ import { towerStateSig } from "../engine/UndoHistory";
  * host infrastructure that stays once the TypeScript simulation retires: a
  * Rust-only build still has to freeze the engine and stop cleanly (the
  * strict path), and a frozen tower's save still answers with the newest
- * engine-written save (`RestorePoints.newestText`, without its TypeScript
- * load check). The rest of the restore points and `carryLiveState` exist
- * only to re-adopt a tower on the TypeScript engine, which is temporary
- * compatibility code: the TypeScript-engine retirement removes them.
+ * engine-written save (`RestorePoints.newestSave` and the text it parses,
+ * `newestText`, without their TypeScript load check). The rest of the
+ * restore points and `carryLiveState` exist only to re-adopt a tower on the
+ * TypeScript engine, which is temporary compatibility code: the
+ * TypeScript-engine retirement removes them.
  */
 
 /** Which path into the engine threw, as the analytics code reports it. A
@@ -195,10 +196,10 @@ export interface RestoredPoint {
  * events between the two again; the recovery records the point it loaded
  * and says so (#1126).
  *
- * Temporary compatibility code, but for `newestText`: the points exist to
- * re-adopt a tower on the TypeScript engine, and go when the TypeScript
- * simulation retires. The strict path keeps the newest save a frozen tower
- * answers with (see the module note).
+ * Temporary compatibility code, but for `newestSave` and `newestText`: the
+ * points exist to re-adopt a tower on the TypeScript engine, and go when the
+ * TypeScript simulation retires. The strict path keeps the newest save a
+ * frozen tower answers with (see the module note).
  */
 export class RestorePoints {
   private latest: string | null = null;

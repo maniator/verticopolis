@@ -16,14 +16,16 @@ export type TsLifecycle = Pick<SimPort, "generation" | "load" | "save" | "saveNo
 
 /**
  * The TypeScript side of the port's lifecycle members (the slice 5 story,
- * AC 2). The one module in `src/simport/` that imports the TypeScript engine
- * at runtime: it builds, saves and fingerprints a `Simulation`, so it is the
- * adapter's edge into that engine and goes when the engine retires.
+ * AC 2). It builds, saves and fingerprints a `Simulation`, so like the panel
+ * answers (`tsPanels.ts`) it imports the TypeScript engine at runtime, and it
+ * goes when that engine retires.
  *
  * A load builds the tower and adopts it before the promise is returned, so a
  * synchronous reader sees the new tower at once, as with a command, and the
  * WASM host's undo wrappers still see the restore inside the call. A throw
- * rejects the promise and leaves the tower as it was.
+ * rejects the promise. One from building the tower leaves the tower as it
+ * was; one from `adopt` comes after the app began the swap (the WASM host
+ * codes its own faults there and falls back).
  *
  * `generation` is a number per instance, given the first time the port sees
  * it, so a swap made outside the port (the WASM host's recovery) moves it too.
@@ -102,8 +104,9 @@ function firstLoadable(saves: readonly SerializedGame[]): Simulation {
   throw first ?? new Error("There is no save to load.");
 }
 
-/** The save text: the camera stamped first when the caller passes one, and
- *  for a copy that stays in memory the host's own text when it offers one. */
+/** The save text: the camera stamped first when the caller passes one (the
+ *  WASM host relays the stamp to its engine), and for a copy that stays in
+ *  memory the host's own text when it offers one. */
 function write(sim: Simulation, opts?: SaveOptions): string {
   const view = opts?.view?.();
   if (view) sim.view = view;

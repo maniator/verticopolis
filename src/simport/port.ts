@@ -9,8 +9,8 @@ import type { SimView } from "./view";
  * Where a loaded tower comes from. Every source but `history` replaces the
  * tower and clears the undo history.
  * - `history`: an undo or a redo step, the text `saveNow` returned. The
- *   tower keeps the undo history, the camera and the live auto-bridge
- *   setting.
+ *   undo history stays, the live camera stays where it is, and the tower
+ *   takes the live auto-bridge setting.
  * - `stored`: saves the game wrote and read back (the autosave and its
  *   legacy key, a slot, a `.vctower` file), tried in order. The first that
  *   loads becomes the tower; when none does, the load rejects with the first
@@ -84,8 +84,8 @@ export interface SimPort {
    *  placements and 16 unit and 16 shaft cards, the card bounds owned by the
    *  panel queries). */
   cached<Q extends Query>(q: Q): QueryResult<Q> | undefined;
-  /** Replace the tower (see {@link TowerSource}). A load that fails rejects
-   *  and leaves the tower as it was. */
+  /** Replace the tower (see {@link TowerSource}). A load that fails rejects;
+   *  when the source does not load, the tower stays as it was. */
   load(source: TowerSource): Promise<void>;
   /** The tower's save, as the engine-format JSON the game stores. */
   save(opts?: SaveOptions): Promise<string>;

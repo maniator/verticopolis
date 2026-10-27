@@ -1,7 +1,8 @@
 # Story facade.5: The lifecycle through the port (load, saves, undo and redo, `.TDT`, the crash report)
 
 Status: in-progress (story review: GO on ad20180c, both conditions met; 5a
-written on the F2 amendment's recommended option, which waits on the owner)
+written on the F2 amendment's recommended option and reviewed with
+`/gds-code-review`; it merges only once the owner answers F2)
 
 Slice 5 of the Rust-backed facade
 (`_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/slice-plan.md`),
@@ -31,8 +32,8 @@ its undo half).
 1. **The port's lifecycle members.** `src/simport/port.ts` gains:
    - `load(source: TowerSource): Promise<void>`, where `TowerSource` is one of
      - `{ from: "history"; text: string }`: an undo or a redo step, the text
-       `saveNow` returned. The tower keeps the undo history, the camera and
-       the live auto-bridge setting.
+       `saveNow` returned. The undo history stays, the live camera stays
+       where it is, and the tower takes the live auto-bridge setting.
      - `{ from: "stored"; saves: readonly SerializedGame[] }`: saves the game
        wrote and read back (the autosave and its legacy key, a slot, a
        `.vctower` file), tried in order; the first that loads becomes the
@@ -46,7 +47,9 @@ its undo half).
        under the chosen rule set (`Simulation.newGame`'s arguments).
 
      Every source but `history` replaces the tower and clears the undo
-     history. The tower is on `view` once the promise settles.
+     history. The tower is on `view` once the promise settles. A load that
+     fails rejects; when the source does not load, the tower stays as it
+     was.
    - `saveNow(opts?: SaveOptions): string`, the save taken now, for the
      callers that cannot wait (D2). Main-thread adapters only.
    - `save(opts?: SaveOptions)` keeps its promise and gains the options.
@@ -74,15 +77,18 @@ its undo half).
    in-order primitive in their place, which slice 12 (#1224) owes (D2). The
    "Not on the port yet" paragraph goes.
 2. **`TsSim`'s lifecycle.** A new module `src/simport/tsLifecycle.ts` holds
-   the TypeScript side of these members; `createTsSim` takes a second
-   argument, `{ adopt(sim: Simulation, keepHistory: boolean): void }`, which
+   the TypeScript side of these members; `createTsSim` takes an optional
+   second argument, `{ adopt(sim: Simulation, keepHistory: boolean): void }`
+   (a port without it rejects every load), which
    the app wires to `app.adoptSim` read at call time (so the WASM host's
    wrapper sees every swap).
    - `load` builds the `Simulation` (`deserialize` or `newGame`) and calls
      `adopt` before the promise is returned, so a synchronous reader sees the
      new tower at once, as with commands. A `history` load copies the live
      `autoBridge` onto the new tower before the adopt. A throw rejects the
-     promise and leaves the tower as it was.
+     promise. One from building the tower leaves the tower as it was; one
+     from `adopt` comes after the app began the swap (the WASM host codes
+     its own faults there and falls back).
    - `saveNow` returns `JSON.stringify(sim.serialize())`, or, with
      `memory`, the WASM host's own text when the host offers it (AC 7). `save` waits as today when a
      step gate is registered (`settledSave`), then does the same. With
@@ -93,10 +99,10 @@ its undo half).
      time the port sees it (a `WeakMap`), so a swap made outside the port
      (the WASM host's recovery) moves it too.
 
-   `tsLifecycle.ts` is the one module in `src/simport/` that imports the
-   TypeScript engine at runtime (`Simulation`, `sim/founderStatus` and
-   `towerStateSig` from `UndoHistory`); `tsSim.ts` stays type-only. Both
-   guards get its line with that reason (AC 9).
+   `tsLifecycle.ts` imports the TypeScript engine at runtime (`Simulation`,
+   `sim/founderStatus` and `towerStateSig` from `UndoHistory`), beside slice
+   4's `tsPanels.ts`; `tsSim.ts` takes engine types only. Both guards get
+   its line with that reason (AC 9).
 3. **The lifecycle contract.** `src/simport/lifecycleContract.fixture.ts`
    exports `describeLifecycleContract(name, makePort)`, and
    `src/simport/tsSimLifecycle.test.ts` runs it over `TsSim`, so the
@@ -116,10 +122,13 @@ its undo half).
      and `generation` as they were, and the founder rule holds both ways;
      `legacy` never applies it; `found` honors the mode, the calendar and
      the no-bridging option and starts an empty lot.
-   - **Undo signature coverage, command by command.** Over the scripted
-     session of slice 2's command contract (`commandContract.fixture.ts`),
-     plus a tick, a camera change and a bulletin, `undoSignature` changes on
-     exactly the steps where a reference changes. The case takes the
+   - **Undo signature coverage, command by command.** Over a scripted
+     session with a step per command (slice 2's command contract script
+     once #1290 lands, the case's own until then), plus a tick, a camera
+     change and a bulletin, each step applies or is refused as written and
+     `undoSignature` changes on exactly the steps where a reference changes.
+     A second case, on a 3-star Classic tower loaded through the port,
+     covers a cinema's film policy and the No Rate flag. The cases take the
      reference as an argument: here `towerStateSig` on the live instance;
      slice 7 passes a `TsSim` twin fed the same script, which is how
      `RustSim`'s signature (slice 6a's `towerSignature()` with money beside
@@ -245,6 +254,9 @@ its undo half).
   - [ ] `main.ts autoBridge=` out of `LIFECYCLE` (AC 8): the list arrives
         with slice 2 (#1290), so it goes when this branch takes main after
         #1290 merges
+  - [ ] the coverage case on slice 2's command contract script, when this
+        branch takes main after #1290 merges (AC 3)
+  - [ ] the owner's F2 answer quoted in D2 before merge
 - [ ] PR 5b: saves
   - [ ] the stamp splice (`src/storage/saveStamp.ts`) and its byte-equality
         tests (D8)
@@ -256,6 +268,8 @@ its undo half).
   - [ ] the host's stored-text test (AC 7)
 - [ ] PR 5c: loads
   - [ ] `SaveGame` readers return decoded saves; `readLegacy` (AC 6)
+  - [ ] a `stored` load reports the candidates that did not load, so boot's
+        unreadable-save warning and stash keep working (D11)
   - [ ] `saveLoad.ts` load, import, `.TDT` confirm, new game;
         `appModals.ts` loads; `legacyImportAdopt.ts`; the tower picker's
         `onLoad` takes a promise
@@ -263,6 +277,60 @@ its undo half).
         lines go (AC 8, 9)
 - [ ] Each PR: the four gates, coverage, `test:wasm:parity`, the HP record,
       `/gds-code-review` and a confirming pass, the independent review
+
+### Review Findings
+
+`/gds-code-review` of 5a at 9ab25dbc (2026-10-27): 16 patch, 4 defer, 10
+dismissed. The confirming pass runs on the fix commit.
+
+- [x] [Review][Patch] A failed undo or redo restore lost its step and left
+      a step of the unchanged tower on the other trail [src/engine/UndoHistory.ts]
+- [x] [Review][Patch] "A load that fails leaves the tower as it was" was not
+      true for a throw from `adopt` [src/simport/port.ts, tsLifecycle.ts]
+- [x] [Review][Patch] The generation check read the generation twice with
+      no command between [src/simport/lifecycleContract.fixture.ts]
+- [x] [Review][Patch] The coverage script never asserted a command applied,
+      and never moved the film policy or No Rate [src/simport/lifecycleContract.fixture.ts]
+- [x] [Review][Patch] `EVERY_OP`'s comment promised a compile error for a
+      missing step [src/simport/lifecycleContract.fixture.ts]
+- [x] [Review][Patch] No case pinned a camera stamp on a memory copy
+      [src/simport/lifecycleContract.fixture.ts]
+- [x] [Review][Patch] The history source's doc said the tower keeps the
+      camera; the live camera stays where it is [src/simport/port.ts, src/game/appHistory.ts]
+- [x] [Review][Patch] Nothing pinned that a load not yet settled is seen by
+      the synchronous members [src/simport/lifecycleContract.fixture.ts]
+- [x] [Review][Patch] `signatureOfSave` was bound to the port's signature by
+      a comment only [src/simport/tsSimLifecycle.test.ts]
+- [x] [Review][Patch] "Rejects with the first error" was not pinned
+      [src/simport/tsSimLifecycle.test.ts]
+- [x] [Review][Patch] AC 3's hosted save check ran on a tower never hosted
+      [src/simport/tsSimLifecycle.test.ts]
+- [x] [Review][Patch] The host's `serialize` override was rewritten for no
+      change in cost, and the retire list disagreed with the module notes
+      [src/wasmhost/wasmHost.ts, hostFault.ts, story-engine-retire-typescript.md]
+- [x] [Review][Patch] A recovery comment still said `adoptSim` keeps the
+      bridging toggle [src/wasmhost/startWasmHost.ts]
+- [x] [Review][Patch] The "one runtime edge in `src/simport/`" claim is false
+      since slice 4a [src/simport/tsLifecycle.ts, this story]
+- [x] [Review][Patch] The completion notes allowed 5a before #1290, were
+      stale after the merge of main, and nothing held the merge for F2 [this story]
+- [x] [Review][Patch] The File List and the Tests notes named the wrong
+      test files [this story]
+- [x] [Review][Defer] `saveNow` and `undoSignature` on a step-gated worker
+      host can be stale [src/simport/tsLifecycle.ts]: deferred,
+      pre-existing; #1224 (slice 12), D2
+- [x] [Review][Defer] Hot path: a hosted save parsed and stringified again
+      for stored writes [src/wasmhost/wasmHost.ts]: deferred, pre-existing;
+      #1158 A31, waits on EX-2
+- [x] [Review][Defer] Hot path: every undo, redo or load re-serializes the
+      tower it loaded [src/dualrun/mirror.ts]: deferred, pre-existing;
+      #1158 A32
+- [x] [Review][Defer] Hot path: a forced full merge on the first sync after
+      every attach [src/wasmhost/wasmHost.ts]: deferred, pre-existing;
+      #1158 A34 (new)
+
+Also from this review, open for 5c: a `stored` load must report the
+candidates that did not load (D11).
 
 ## Dev Notes
 
@@ -399,7 +467,11 @@ its undo half).
   autosave's two keys travel as candidates, so the legacy-key fallback
   `loadResult` gives mid-game loads today needs no second deserialize.
   Slice 7 may switch the readers to hand over text for `fromSave`; that is
-  its call, with its own HP record.
+  its call, with its own HP record. Open for 5c (5a's review): `loadResult`
+  also reports a candidate that decoded but did not deserialize
+  (`corrupt`), so boot warns and stashes those bytes even when the legacy
+  key rescues the tower. A `stored` load must tell its caller the same, for
+  example by resolving with the number of candidates that did not load.
 - **D12. The `.TDT` check stays in storage.** The fidelity report shows
   only for a save that deserializes, so the check runs before the report,
   and the confirm loads the same save through the port: one more
@@ -462,10 +534,11 @@ latch.
 
 - `src/simport/tsSimLifecycle.test.ts` (AC 3), in the default and the
   `unitWasm` projects.
-- `UndoHistory.test.ts`: undo and redo return the restore's promise; the
-  notice follows it and a rejection gives none; two undos in one task pop
-  two steps in order; `dropUnchanged(sigOf)`.
-- `startWasmHostFallback.test.ts` and the recovery tests: the wrappers pass
+- `src/tests/integration/undoHistory.integration.test.ts`: undo and redo
+  return the restore's promise; the notice follows it and a rejection
+  gives none and puts the step back; two undos in one task pop two steps
+  in order; `dropUnchanged(sigOf)`.
+- `startWasmHost.test.ts` and the recovery tests: the wrappers pass
   the promise on and keep their fault codes; `dropEmptyUndo` receives
   `signatureOfSave`; the recovery's tower keeps the live auto-bridge
   setting (`carryLiveState`).
@@ -509,21 +582,28 @@ latch.
 - `UndoPorts.signatureOf`: the fingerprint of a snapshot moves into
   `hostFault.ts` with the rest of the fallback.
 
-It adds `src/simport/tsLifecycle.ts`, the adapter's one runtime edge into
-the TypeScript engine, which slice 10 loads lazily and which goes when the
-TypeScript engine retires. `RestorePoints.newestText`, `signatureOfSave`
-and the auto-bridge part of `carryLiveState` are temporary with the
-fallback and join `story-engine-retire-typescript.md`'s list.
+It adds `src/simport/tsLifecycle.ts`, one of the adapter's runtime edges
+into the TypeScript engine (beside slice 4's `tsPanels.ts`), which slice 10
+loads lazily and which goes when the TypeScript engine retires.
+`signatureOfSave`, the host's save text registry and the auto-bridge part
+of `carryLiveState` are temporary with the fallback and are on
+`story-engine-retire-typescript.md`'s list; `RestorePoints.newestText`
+joins `newestSave` on that list's strict-build stay line.
 
 ### Constraints
 
 - American English, no em-dashes, plain prose in comments, no "X, not Y".
 - 500-line ceiling per file; `main.ts` must not grow.
-- `src/simport/` imports engine values only in `tsLifecycle.ts`.
+- `src/simport/` imports engine values only in `tsLifecycle.ts` and slice
+  4's `tsPanels.ts` and `headerClock.ts`, each with its ratchet line.
 - #1068's files (`workerHost.ts`, `workerSaveSync.ts`, perfCompare,
   perfWorker) are not touched. The worker host keeps its step gate.
 - Lands after #1278 (merged, `02a9129`) and after slices 2 and 4; 5a's app
   wiring rebases on slice 2's `port` field.
+- 5a merges only once the owner has answered the F2 amendment, with his
+  answer quoted here. If he keeps F2 as signed, 5a is reworked around
+  in-order asynchronous saves and an asynchronous signature before it
+  merges.
 - Slice 5 needs only `towerStateSig` on `TsSim`. The `RustSim` half of
   `undoSignature` depends on slice 6a's `towerSignature()` (#1284, a draft
   waiting on an owner decision) landing.
@@ -565,27 +645,42 @@ fallback and join `story-engine-retire-typescript.md`'s list.
 
 ### Completion Notes List
 
-5a (PR #1294), on main at d8e5a847 with Copilot's two commits (a2c854ef,
-429027a9) kept and their code replaced:
+5a (PR #1294), on main at d09aa64a (slice 4a, #1313, merged in) with
+Copilot's two commits (a2c854ef, 429027a9) kept and their code replaced:
 
 - `createTsSim`'s second argument is optional: a port without `adopt`
-  rejects a load. Slice 2's `GameApp.port` line and the tests that build a
-  port over a fixed tower need none.
+  rejects a load. The tests that build a port over a fixed tower need none.
 - The host's text registry is `setSaveText`/`saveText` in
   `src/wasmhost/stepGate.ts`, beside `setStepGate`, so `wasmHost.ts` gains
-  no import line (485 lines). A faulted tower keeps its text after detach,
-  as it keeps its `serialize` override; a healthy one gives it back.
-- The undo signature's coverage case (AC 3) runs its own script, one step
-  per command and a tick, typed so a new command fails to compile without
-  a step, and pins which steps move the signature. Slice 2's
-  `commandContract.fixture.ts` is not on main yet; the case does not need it.
-- `main.ts` carries the same `port` field slice 2 adds, with `adopt`; the
-  file stays at 497 lines (the auto-bridge copy and two comment lines left).
-  Whichever of #1290 and #1294 lands second takes the other's line.
+  no import line. The host's `serialize` override is main's, unchanged; the
+  registered text reads the same restore point without the parse. A
+  faulted tower keeps its text after detach, as it keeps its `serialize`
+  override; a healthy one gives it back.
+- The undo signature's coverage case (AC 3) runs its own script until
+  #1290 lands: one step per command and a tick, each pinned to apply or be
+  refused and to move the signature or not. `satisfies` makes a new
+  command fail to compile until `EVERY_OP` lists it, and the run fails
+  until the script has its step. A second case loads a 3-star Classic tower
+  through the port for a cinema's film policy and No Rate.
+- `main.ts` takes slice 4a's `port` field and adds `adopt`; the auto-bridge
+  copy left `adoptSim`, so the file is 498 lines. Merging main resolved
+  `main.ts` (that field), `tsSim.ts` (the import lines and the module note,
+  which now names both runtime edges) and `frontendEngineImports.ratchet.txt`
+  (both sides' lines, sorted).
+- 5a lands after #1290 per the slice plan's merge order, and only once the
+  owner has answered F2 (Constraints). The `LIFECYCLE` and coverage-script
+  follow-ups wait for #1290 (tasks).
 - `contract.fixture.ts` exports `start`, `sender`, `lobbyCenter` and
   `mustFind`, the same four exports slice 2 makes.
 - `UndoHistory.dropUnchanged` takes the fingerprint; the test that ran it
-  without one went, since that path is gone.
+  without one went, since that path is gone. A failed undo or redo restore
+  puts its step back while nothing has moved the trail since.
+- `towerStateSig`'s own cases moved unchanged into
+  `towerStateSig.integration.test.ts`, keeping
+  `undoHistory.integration.test.ts` under 500 lines.
+- `/gds-code-review` ran on 9ab25dbc (Blind Hunter, Edge Case Hunter,
+  Acceptance Auditor, Hot-Path Auditor): see Review Findings. The
+  hot-path record is on the PR.
 
 ### File List
 
@@ -599,9 +694,11 @@ fallback and join `story-engine-retire-typescript.md`'s list.
   `wasmHostPoints.test.ts`, `startWasmHost.test.ts`,
   `startWasmHostRecovery.test.ts`)
 - `src/tests/integration/undoHistory.integration.test.ts`,
-  `wasmRollback.ts`, `wasmHostRollback.integration.test.ts`,
+  `towerStateSig.integration.test.ts` (new, moved cases), `wasmRollback.ts`, `wasmHostRollback.integration.test.ts`,
   `wasmHostRollbackHistory.integration.test.ts`,
   `wasmHostFallback.integration.test.ts`
 - `src/tests/simulationReach.ratchet.txt`,
   `frontendEngineImports.ratchet.txt`
 - the slice plan's row 5 (pending the owner's F2 answer)
+- `_bmad-output/implementation-artifacts/story-engine-retire-typescript.md`
+  (the fallback's lists), `backlog.md` (the review's deferrals, #1158 A34)

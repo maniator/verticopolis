@@ -76,24 +76,33 @@ export function describeLifecycleContract(name: string, make: () => LifecycleSub
       expect(parse(await port.save({ view: () => null })).view).toEqual(camera);
       const moved = { tile: 90, floor: 1 };
       expect(parse(await port.save({ view: () => moved })).view).toEqual(moved);
+      // A copy kept in memory carries the stamp too, on a host whose text is
+      // its engine's own.
+      port.tick(1);
+      const kept = { tile: 140, floor: 6, zoom: 1 };
+      expect(parse(port.saveNow({ memory: true, view: () => kept })).view).toEqual(kept);
       port.tick(1);
     });
 
     it("loads an earlier save of its own as an undo step: the same signature, the live bridging setting, a new generation", async () => {
       const { port, reference } = subject();
       const mid = lobbyCenter(port);
+      const generation = port.generation;
       expect(await port.command({ op: "build", kind: "office", floor: 2, x: mid - 4 })).toMatchObject({ ok: true });
       const text = port.saveNow({ memory: true });
       const [signature, ref] = [port.undoSignature(), reference()];
       expect(await port.command({ op: "build", kind: "office", floor: 3, x: mid - 4 })).toMatchObject({ ok: true });
       expect(await port.command({ op: "setAutoBridge", value: false })).toMatchObject({ ok: true, value: false });
       expect(port.undoSignature()).not.toBe(signature);
-      const generation = port.generation;
-      expect(port.generation, "a command keeps the generation").toBe(generation);
+      expect(port.generation, "commands keep the generation").toBe(generation);
       port.tick(1);
       expect(port.generation, "a tick keeps the generation").toBe(generation);
 
-      await port.load({ from: "history", text });
+      // Not awaited: the synchronous members act after the load, as the
+      // undo history's second undo in one task needs.
+      const loading = port.load({ from: "history", text });
+      expect([port.undoSignature(), reference()], "read before the load settles").toEqual([signature, ref]);
+      await loading;
       expect(port.generation).not.toBe(generation);
       expect([port.undoSignature(), reference()]).toEqual([signature, ref]);
       expect(port.view.tower.units.filter((u) => u.kind === "office")).toHaveLength(1);
@@ -155,26 +164,51 @@ export function describeLifecycleContract(name: string, make: () => LifecycleSub
       const seen = new Set<CommandOp>();
       for (const step of coverageScript(mid, ids)) {
         const before = [port.undoSignature(), reference()];
-        let ok = true;
         if (step.run === "tick") port.tick(1);
         else {
           const c = step.run();
           seen.add(c.op);
-          ok = (await port.command(c)).ok;
+          expect((await port.command(c)).ok, `${step.name}: applied`).toBe(!step.refused);
           step.after?.(port);
         }
         const moved = port.undoSignature() !== before[0];
         expect(moved, `${step.name}: the signature moved as the reference did`).toBe(reference() !== before[1]);
-        if (step.moves !== "either") expect(moved, `${step.name} (ok: ${String(ok)})`).toBe(step.moves === "ifOk" ? ok : step.moves);
+        if (step.moves !== "either") expect(moved, step.name).toBe(step.moves);
       }
       expect([...seen].sort(), "the script runs every command").toEqual(Object.keys(EVERY_OP).sort());
+      port.tick(1);
+    });
+
+    it("moves the undo signature on a cinema's film policy and on No Rate, which a grown Classic tower takes", async () => {
+      const { port, reference } = subject();
+      const mid = lobbyCenter(port);
+      const save = JSON.parse(port.saveNow()) as SerializedGame;
+      // A 3-star Classic tower with money to spare, through the port's own load.
+      await port.load({ from: "legacy", save: { ...save, mode: "classic", star: 3, money: 1e9 } });
+      port.tick(1);
+      const step = async (name: string, c: Command, moves: boolean) => {
+        const before = [port.undoSignature(), reference()];
+        expect((await port.command(c)).ok, `${name}: applied`).toBe(true);
+        const moved = port.undoSignature() !== before[0];
+        expect(moved, `${name}: the signature moved as the reference did`).toBe(reference() !== before[1]);
+        expect(moved, name).toBe(moves);
+      };
+      await step("a cinema", { op: "build", kind: "cinema", floor: 2, x: mid - 15 }, true);
+      const cinema = mustFind(port.view.tower.units, (u) => u.kind === "cinema").id;
+      await step("a film policy", { op: "setFilmPolicy", id: cinema, policy: "feature" }, true);
+      await step("the same film policy", { op: "setFilmPolicy", id: cinema, policy: "feature" }, false);
+      await step("an office", { op: "build", kind: "office", floor: 4, x: mid - 4 }, true);
+      const office = mustFind(port.view.tower.units, (u) => u.kind === "office").id;
+      await step("No Rate", { op: "setNoRate", id: office }, true);
+      await step("No Rate again", { op: "setNoRate", id: office }, false);
       port.tick(1);
     });
   });
 }
 
-/** Every command, so the coverage script fails to compile when one is added
- *  without a step. */
+/** Every command. `satisfies` makes a new command fail to compile until it
+ *  is listed here, and the coverage case fails until its script has a step
+ *  for it. */
 const EVERY_OP = {
   build: true, buildTransport: true, removeFacility: true, beginExtend: true, extendTransport: true, endExtend: true,
   addCar: true, removeCar: true, setStop: true, setExpressStops: true, clearStops: true, setSchedule: true,
@@ -186,15 +220,19 @@ const EVERY_OP = {
 interface Step {
   name: string;
   run: "tick" | (() => Command);
-  /** Whether the step changes what a player can undo: always, never, when
-   *  the command applied, or either (a tick may move the money). */
-  moves: boolean | "ifOk" | "either";
+  /** Whether the step changes what a player can undo, or either (a tick may
+   *  move the money). */
+  moves: boolean | "either";
+  /** The command is refused on this tower. */
+  refused?: true;
   after?: (port: SimPort) => void;
 }
 
-/** One step per command a 1-star Modern tower takes, plus a tick: the
- *  undo signature covers rooms, transports, labels, rents, the No Rate flag,
- *  the film policy, the subtype and the money, and nothing else. `ids` is
+/** One step per command, plus a tick, on a 1-star Modern tower: each step
+ *  applies or is refused as written, and the undo signature moves on exactly
+ *  the steps that change rooms, transports, stops, schedules, labels, rents,
+ *  the subtype or the money. The film policy and the No Rate flag need a
+ *  cinema or Classic rules, so the case after it covers them. `ids` is
  *  filled as the rooms are built. */
 function coverageScript(mid: number, ids: { office: number; shaft: number; food: number }): Step[] {
   const unit = (kind: string) => (port: SimPort) => mustFind(port.view.tower.units, (u) => u.kind === kind && u.floor >= 2).id;
@@ -211,18 +249,18 @@ function coverageScript(mid: number, ids: { office: number; shaft: number; food:
     { name: "the drag closed", run: () => ({ op: "endExtend" }), moves: false },
     { name: "a skipped stop", run: () => ({ op: "setStop", id: ids.shaft, floor: 2, stop: false }), moves: true },
     { name: "the stops cleared", run: () => ({ op: "clearStops", id: ids.shaft }), moves: true },
-    { name: "express stops", run: () => ({ op: "setExpressStops", id: ids.shaft }), moves: "ifOk" },
+    { name: "express stops", run: () => ({ op: "setExpressStops", id: ids.shaft }), moves: true },
     { name: "a schedule", run: () => ({ op: "setSchedule", id: ids.shaft, schedule: { waitingCarResponse: 7 } }), moves: true },
     { name: "a label", run: () => ({ op: "setLabel", id: ids.office, label: "Contract Office" }), moves: true },
     { name: "a rent step", run: () => ({ op: "adjustRent", id: ids.office, dir: 1 }), moves: true },
-    { name: "a price", run: () => ({ op: "priceUnit", id: ids.office, target: 0 }), moves: "ifOk" },
-    { name: "a rent batch", run: () => ({ op: "applyRentBatch", kind: "office", target: "default" }), moves: "ifOk" },
-    { name: "No Rate", run: () => ({ op: "setNoRate", id: ids.office }), moves: "ifOk" },
+    { name: "a price", run: () => ({ op: "priceUnit", id: ids.office, target: 0 }), moves: true },
+    { name: "a rent batch", run: () => ({ op: "applyRentBatch", kind: "office", target: "default" }), moves: true },
+    { name: "No Rate, which Modern rules refuse", run: () => ({ op: "setNoRate", id: ids.office }), moves: false, refused: true },
     { name: "a fast food", run: () => ({ op: "build", kind: "fastFood", floor: 3, x: mid - 4 }), moves: true, after: (p) => (ids.food = unit("fastFood")(p)) },
-    { name: "a variety reroll", run: () => ({ op: "rerollSubtype", id: ids.food }), moves: "either" },
-    { name: "a film policy on a room that has none", run: () => ({ op: "setFilmPolicy", id: ids.food, policy: "feature" }), moves: false },
-    { name: "the exterminator, with nothing to treat", run: () => ({ op: "callExterminator" }), moves: "ifOk" },
-    { name: "an answer with no emergency", run: () => ({ op: "resolveChoice", accept: true }), moves: false },
+    { name: "a variety reroll", run: () => ({ op: "rerollSubtype", id: ids.food }), moves: true },
+    { name: "a film policy on a room that has none", run: () => ({ op: "setFilmPolicy", id: ids.food, policy: "feature" }), moves: false, refused: true },
+    { name: "the exterminator, with nothing to treat", run: () => ({ op: "callExterminator" }), moves: false, refused: true },
+    { name: "an answer with no emergency", run: () => ({ op: "resolveChoice", accept: true }), moves: false, refused: true },
     { name: "bridging toggled", run: () => ({ op: "toggleAutoBridge" }), moves: false },
     { name: "bridging set", run: () => ({ op: "setAutoBridge", value: true }), moves: false },
     { name: "a tower name", run: () => ({ op: "setTowerName", name: "Lifecycle" }), moves: false },
