@@ -1,4 +1,4 @@
-import type { HeatmapMode } from "../../engine/Simulation";
+import type { HeatmapMode } from "../../engine/sim/constants";
 import { RAIN } from "../sprites/sky";
 import { isElevatorKind } from "../../engine/facilities";
 import { catalogFacility } from "../../engine/catalogTypes";

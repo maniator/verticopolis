@@ -26,9 +26,9 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { engineSourceHash } from "../../wasmhost/packageHash.ts";
 
-/** The scripts the nightly runs. The WASM runner and the shrinker join it
- *  when they land. */
-export const FUZZ_ENTRIES = ["scripts/fuzz-compare.ts", "scripts/fuzz-key.ts"];
+/** The scripts the nightly runs, and the shrinker and the corpus replay that
+ *  share its compare. The WASM runner joins it when it lands. */
+export const FUZZ_ENTRIES = ["scripts/fuzz-compare.ts", "scripts/fuzz-corpus.ts", "scripts/fuzz-key.ts", "scripts/fuzz-shrink.ts"];
 /** The entry of the WASM package build. */
 export const WASM_BUILD_ENTRY = "scripts/wasm-build.ts";
 

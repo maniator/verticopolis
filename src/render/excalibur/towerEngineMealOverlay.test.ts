@@ -8,6 +8,8 @@ import { syncMotion } from "./towerCrowd";
 // modules so this whitebox harness never bakes a canvas.
 vi.mock("./towerReconcile", () => ({ syncScene: vi.fn(), syncFacade: vi.fn() }));
 vi.mock("./towerCrowd", () => ({ syncMotion: vi.fn() }));
+// The frame prelude (towerFrame) calls the overlay's event-visual sync directly.
+vi.mock("./towerOverlay", async (orig) => ({ ...(await orig<typeof import("./towerOverlay")>()), syncEventFx: vi.fn() }));
 
 describe("TowerEngine meal-overlay repaint trigger", () => {
   it("re-runs syncScene when the transient meal overlay changes mid-hour", () => {
@@ -36,7 +38,6 @@ describe("TowerEngine meal-overlay repaint trigger", () => {
       regionDirty: new Set(),
       engine: { backgroundColor: null },
       onUpdate: null,
-      syncEventFx: vi.fn(),
       updateMotion,
       reconcileCrowd,
     };

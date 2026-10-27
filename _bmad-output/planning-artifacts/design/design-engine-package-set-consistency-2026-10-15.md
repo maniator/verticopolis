@@ -622,10 +622,12 @@ with the A-then-B fetcher covers its logic.
   the new worker installs the new set with integrity checks, and activation
   deletes the old keys. Workbox returns an already cached entry without
   checking its integrity, so a mixed set stored by a worker that predates
-  integrity would survive that update. The implementation either changes the
-  engine cache keys with the first schema 2 worker or purges the three
-  engine keys at its first activation; until then the page byte gate refuses
-  such a set and Repair fixes it. Players on older workers (R7) are
+  integrity would survive that update. The implementation changes the
+  engine cache keys with the first schema 2 worker: each engine entry's
+  revision is its MD5 plus a suffix no earlier worker used (`-i2`), so the
+  new worker fetches all three files with integrity and its activation drops
+  the old keys. Until the update lands the page byte gate refuses such a set
+  and Repair fixes it (slice 2b-3). Players on older workers (R7) are
   unaffected until they update.
 - **`BUILD.json` consumers.** Besides CI, the readers are
   `scripts/gen-third-party-notices.ts`, `src/build/rustNotices.ts`, the
