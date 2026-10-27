@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { ENGINE_REVISION_SUFFIX } from "../src/build/enginePackageBuild";
 import { startDeployments, type Deployment, type Deployments } from "./deployments";
 import { onWasm, expectEngineHosted } from "./helpers";
 import { expectControlledWithEngine, hostedGame, installWorker, watch } from "./offlineHelpers";
@@ -203,11 +205,14 @@ test("an update replaces the engine files in the cache, and the updated game pla
  * Engine entries stored by a worker from before the integrity attribute sit
  * under keys named by the plain MD5 of each file. Workbox trusts an entry it
  * finds under the key it expects, so the engine entries carry a revision no
- * earlier worker used (`-i2`, enginePackageBuild.ts, design section 8): the
- * first integrity-checked worker never sees those entries as its own, fetches
- * the files with integrity, and the update that follows removes them.
+ * earlier worker used (`ENGINE_REVISION_SUFFIX`, design section 8): a worker
+ * with the very same engine bytes still fetches all three files with
+ * integrity, and its activation removes the old keys. The second worker here
+ * is the first deployment's `sw.js` with one comment line added, so its manifest
+ * names the same files under the same keys; without the suffix it would find
+ * the damaged entries under its own keys and keep them.
  */
-test("engine entries stored under the pre-integrity keys are never served, and the next update removes them", async ({ browser }) => {
+test("a worker with the same engine bytes does not trust entries stored under the pre-integrity keys", async ({ browser }) => {
   let context: BrowserContext | undefined;
   try {
     // The earlier test leaves version.json failing; this one starts clean on the first build.
@@ -217,49 +222,69 @@ test("engine entries stored under the pre-integrity keys are never served, and t
     const { page } = first;
     context = first.context;
     const rev = deployments.revisions.A;
-    const plain = (revision: string) => revision.replace(/-i2$/, "");
-    for (const revision of [rev.glue, rev.wasm, rev.record]) expect(plain(revision), "the revision is not the plain MD5 an earlier worker used").not.toBe(revision);
+    const plain = (revision: string) => revision.slice(0, -ENGINE_REVISION_SUFFIX.length);
+    for (const revision of [rev.glue, rev.wasm, rev.record]) {
+      expect(revision.endsWith(ENGINE_REVISION_SUFFIX), "the revision carries the rotation suffix").toBe(true);
+    }
+    const paths = { glue: "/engine/verticopolis_engine.js", wasm: "/engine/verticopolis_engine_bg.wasm", record: "/engine/BUILD.json" } as const;
 
     // Leave the cache as an earlier worker would have: each engine file under
-    // its plain-MD5 key, the binary damaged, and nothing under the new keys.
+    // its plain-MD5 key, the binary not the build's bytes, nothing under the new keys.
     await page.evaluate(
-      async ([glue, wasm, record]) => {
-        const cache = await caches.open((await caches.keys())[0]);
-        for (const [path, revision] of [
-          ["/engine/verticopolis_engine.js", glue],
-          ["/engine/verticopolis_engine_bg.wasm", wasm],
-          ["/engine/BUILD.json", record],
-        ]) {
+      async ([entries, suffixLength]) => {
+        const names = (await caches.keys()).filter((n) => n.includes("precache"));
+        const cache = await caches.open(names[0]);
+        for (const [path, revision] of entries) {
           const current = new URL(`${path}?__WB_REVISION__=${revision}`, location.href).href;
-          const old = new URL(`${path}?__WB_REVISION__=${revision.replace(/-i2$/, "")}`, location.href).href;
+          const old = new URL(`${path}?__WB_REVISION__=${revision.slice(0, -suffixLength)}`, location.href).href;
           const response = (await cache.match(current))!;
           let bytes = new Uint8Array(await response.arrayBuffer());
           if (path.endsWith(".wasm")) bytes = new Uint8Array([...bytes, 0x00, 0x03, 0x01, 0x42, 0x00]);
           const headers = new Headers(response.headers);
           headers.delete("content-length");
           await cache.put(old, new Response(bytes, { headers }));
-          await cache.delete(current);
+          if (old !== current) await cache.delete(current);
         }
       },
-      [rev.glue, rev.wasm, rev.record] as const,
+      [
+        [
+          [paths.glue, rev.glue],
+          [paths.wasm, rev.wasm],
+          [paths.record, rev.record],
+        ],
+        ENGINE_REVISION_SUFFIX.length,
+      ] as const,
     );
 
-    // The worker finds nothing under its keys, fetches with integrity and
-    // starts the engine from the build's own bytes.
-    await page.reload();
-    await expectControlledWithEngine(page);
-    await hostedGame(page);
-    await expectEngineHosted(page);
-    const { keys } = await cacheContents(page);
-    expect(keys.filter((k) => k.includes("/engine/") && k.endsWith(`=${rev.wasm}`)), "the worker refilled its own key").toHaveLength(1);
-    expect(keys.filter((k) => k.includes("/engine/") && k.endsWith(`=${plain(rev.wasm)}`)), "the pre-integrity entries are still there until an update").toHaveLength(1);
+    // A new worker, the same files. It installs, the player takes the update.
+    deployments.reissueWorker(true);
+    const version = (JSON.parse(readFileSync(new URL("../dist/version.json", import.meta.url), "utf8")) as { version: string }).version;
+    await updateTo(page, "A", version);
+    await expectCacheIs(page, "A");
 
-    // An update to another build removes every engine key that is not its own.
-    await updateTo(page, "B", "999.0.0");
-    await expectCacheIs(page, "B");
-    const after = (await cacheContents(page)).keys;
-    expect(after.filter((k) => k.endsWith(`=${plain(rev.wasm)}`) || k.endsWith(`=${plain(rev.glue)}`) || k.endsWith(`=${plain(rev.record)}`))).toEqual([]);
+    // Every engine entry is the build's own bytes, and nothing is left under the plain keys.
+    const stored = await page.evaluate(async () => {
+      const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+      const out: Record<string, string> = {};
+      for (const name of await caches.keys()) {
+        const cache = await caches.open(name);
+        for (const request of await cache.keys()) {
+          if (new URL(request.url).pathname.startsWith("/engine/")) out[request.url] = hex(await crypto.subtle.digest("SHA-256", await (await cache.match(request))!.arrayBuffer()));
+        }
+      }
+      return out;
+    });
+    const record = JSON.parse(readFileSync(new URL("../dist/engine/BUILD.json", import.meta.url), "utf8")) as { files: Record<string, { sha256: string }> };
+    const byPath = (path: string) => Object.entries(stored).filter(([url]) => new URL(url).pathname === path);
+    expect(byPath(paths.wasm).map(([, sha]) => sha), "the binary is the build's, fetched under the new key").toEqual([record.files["verticopolis_engine_bg.wasm"].sha256]);
+    expect(byPath(paths.glue).map(([, sha]) => sha)).toEqual([record.files["verticopolis_engine.js"].sha256]);
+    for (const [revision, path] of [[rev.glue, paths.glue], [rev.wasm, paths.wasm], [rev.record, paths.record]] as const) {
+      expect(byPath(path).map(([url]) => url), `${path} has only its rotated key`).toEqual([new URL(`${path}?__WB_REVISION__=${revision}`, page.url()).href]);
+      expect(byPath(path).some(([url]) => url.endsWith(`=${plain(revision)}`)), `no plain-key entry for ${path}`).toBe(false);
+    }
+    await expectEngineHosted(page);
   } finally {
+    deployments.reissueWorker(false);
     await context?.close();
   }
 });

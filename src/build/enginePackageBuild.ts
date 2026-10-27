@@ -189,7 +189,7 @@ export function engineDistProblems(distDir: string, manifest: string): string[] 
 /**
  * What is wrong with the precache revisions the shell carries, as sentences:
  * Repair names the running build's cache keys by the revisions compiled into
- * its scripts, so each engine file's MD5 must appear in one of them. The
+ * its scripts, so each engine file's revision must appear in one of them. The
  * worker script and its runtime do not count: the worker's manifest carries
  * every revision whatever the shell was compiled with.
  */
@@ -198,8 +198,8 @@ export function shellRevisionProblems(distDir: string): string[] {
     .filter((f) => !/^(?:sw|workbox-[^/]*)\.js$/.test(f))
     .map((f) => readFileSync(resolve(distDir, f), "utf8"));
   const problems: string[] = [];
-  for (const [name, md5] of Object.entries(revisionsOf(resolve(distDir, ENGINE_DIR)))) {
-    if (!texts.some((t) => t.includes(md5))) problems.push(`no script in dist/ carries the precache revision of ${ENGINE_DIR}${name}, so Repair could not name its cache key`);
+  for (const [name, revision] of Object.entries(revisionsOf(resolve(distDir, ENGINE_DIR)))) {
+    if (!texts.some((t) => t.includes(revision))) problems.push(`no script in dist/ carries the precache revision of ${ENGINE_DIR}${name}, so Repair could not name its cache key`);
   }
   return problems;
 }

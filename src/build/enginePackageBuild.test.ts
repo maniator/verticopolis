@@ -91,7 +91,7 @@ describe("engineIntegrityTransform", () => {
   it("gives each engine entry a revision no worker before the integrity attribute used, and leaves the rest alone", () => {
     const d = pkg();
     const { manifest } = engineIntegrityTransform(d)(entries());
-    expect(manifest.slice(0, 2).map((e) => e.revision)).toEqual([engineRevision(glue), engineRevision(wasm)]);
+    expect(manifest.slice(0, 3).map((e) => e.revision)).toEqual([engineRevision(glue), engineRevision(wasm), engineRevision(new TextEncoder().encode(JSON.stringify(record)))]);
     for (const e of manifest.slice(0, 3)) {
       expect(e.revision, "not the plain MD5 an earlier worker keyed the file by").toMatch(new RegExp(`^[0-9a-f]{32}${ENGINE_REVISION_SUFFIX}$`));
       expect(e.revision).not.toMatch(/^[0-9a-f]{32}$/);
@@ -104,6 +104,7 @@ describe("engineIntegrityTransform", () => {
     const d = pkg();
     const { manifest } = engineIntegrityTransform(d)([{ url: `./${ENGINE_DIR}${ENGINE_GLUE}?v=1`, revision: null, size: 1 }]);
     expect(manifest[0].integrity).toBe(integrityOf(glue));
+    expect(manifest[0].revision, "an entry that arrived with no revision gets the rotated one").toBe(engineRevision(glue));
   });
 
   it("asks for the output folder when it is given a function, so a changed outDir is followed", () => {
