@@ -145,6 +145,27 @@ describe("worker controller (fake engine)", () => {
     expect((orphan.worker as ReturnType<typeof fakeWorker>).terminated).toBe(true);
   });
 
+  it("stops restarting after a refused package, and keeps restarting after a failed download", async () => {
+    const reasonOf = { mismatch: "package-mismatch", unverifiable: "unverifiable", "load-failed": "boot-error" } as const;
+    const refusal = (kind: "mismatch" | "unverifiable" | "load-failed") =>
+      new EngineBootError(reasonOf[kind], "refused", { kind, file: "wasm", expected: null, found: null, expectedPackage: null, servedPackage: null, controlled: true });
+    for (const [kind, latched] of [["mismatch", true], ["unverifiable", true], ["load-failed", false]] as const) {
+      const a = app();
+      let respawns = 0;
+      const h = startWorkerHost(a, await spawnEngineWorker(fakeWorker, "u"), () => { respawns++; return Promise.reject(refusal(kind)); }, quiet);
+      h.current()!.receive({ type: "error", fatal: true, message: "gone" });
+      a.adoptSim(Simulation.newGame(5, "classic"));
+      await tasks();
+      expect(respawns).toBe(1);
+      a.adoptSim(Simulation.newGame(6, "classic"));
+      await tasks();
+      expect(respawns, `${kind}: a later tower ${latched ? "does not ask again" : "asks again"}`).toBe(latched ? 1 : 2);
+      expect(h.status.refusal, kind).toEqual(latched ? expect.objectContaining({ kind, file: "wasm" }) : null);
+      if (latched) expect(last(h.status.errors)).toMatch(new RegExp(`package ${kind}, wasm; not trying again`));
+      h.stop();
+    }
+  });
+
   it("reports a tower it cannot host and keeps it on TypeScript", async () => {
     const a = app();
     a.sim.crowd.people.push({ id: 1 } as never);
