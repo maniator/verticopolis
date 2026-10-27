@@ -164,6 +164,9 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   "src/wasmhost/wasmHost.ts": { bulk: 7 },
   "src/wasmhost/workerApply.ts": { bulk: 2 },
   "src/wasmhost/workerHost.ts": { bulk: 3 },
+  // The command contract's malformed input for the port's shape check (a
+  // getter, a `toJSON`, a hidden key): test data that reaches no room.
+  "src/simport/commandContract.fixture.ts": { bulk: 7 },
   // Array slots: the section builder's output and the telemetry's tables.
   "src/wasmhost/buildSection.ts": { keyed: 1 },
   "src/wasmhost/telemetry.ts": { keyed: 2 },

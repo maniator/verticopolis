@@ -19,6 +19,7 @@ use super::session_tests::{run as run_session, starts};
 use super::signature_tests::ts_sig;
 use super::*;
 use crate::clock::{CalendarKind, GameMode};
+use crate::facilities::Kind;
 use crate::frame::{transports_len, unit_fields};
 use crate::tower::Tower;
 use sha2::{Digest, Sha256};
@@ -379,6 +380,39 @@ fn a_kept_view_matches_a_fresh_read_after_every_step() {
     assert!(t.signature_moved > 30 && t.signature_still > 200, "{t:?}");
     assert!(t.meta_moved > 20 && t.meta_deltas > 20, "{t:?}");
     assert!(t.delta_frames > 80, "{t:?}");
+}
+
+/// The lobby brush lays a lobby in the list slot of the plain floor tile it
+/// replaces (`the_brush_fills_only_an_emptied_slot`): the revision moves, so
+/// a kept view still matches a fresh read after it.
+#[test]
+fn a_kept_view_matches_a_fresh_read_after_a_lobby_brush() {
+    let mut sim = Simulation::new_game(7, GameMode::Classic);
+    sim.money = 1e9;
+    sim.star = 3;
+    for x in 150..200 {
+        assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+    }
+    for floor in 2..=15 {
+        for x in 150..200 {
+            assert!(sim.tower.place(Kind::Floor, floor, x).ok, "{floor} {x}");
+        }
+    }
+    assert!(sim.build_transport(Kind::ElevatorExpress, 152, 1, 15).ok);
+    for x in 160..164 {
+        assert!(sim.build(Kind::Lobby, 15, x).ok);
+    }
+    let mut kept = Kept::new(&sim);
+    let (revision, units) = (sim.tower.revision, sim.tower.units.len());
+    assert_eq!(sim.paint_brush(Kind::Lobby, 15, &[198, 199, 165]).placed, 3);
+    assert!(sim.tower.revision > revision);
+    assert_eq!(
+        sim.tower.units.len(),
+        units,
+        "each lobby took a tile's place"
+    );
+    kept.read(&sim);
+    kept.check(&sim, "after a lobby brush");
 }
 
 /// The runs do not depend on the order the unit list gives the tiles in: a

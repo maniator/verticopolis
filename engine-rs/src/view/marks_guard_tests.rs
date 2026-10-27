@@ -276,7 +276,9 @@ fn branches(value: &str) -> Option<Vec<&str>> {
 /// keep showing its old value. The loaders (`load.rs`, `tdt/`) are scanned
 /// like any other file, with one exemption: `load.rs` fills a new tower's
 /// list (`the_loader_fills_only_a_new_tower`). `save_delta.rs` lends the
-/// list out and puts it straight back, which is no write (`lent`).
+/// list out and puts it straight back, which is no write (`lent`), and the
+/// lobby brush lays a new unit in a slot a removal emptied
+/// (`the_brush_fills_only_an_emptied_slot`).
 #[test]
 fn only_the_setters_write_the_frame_fields() {
     let mut writers = Vec::new();
@@ -322,7 +324,7 @@ fn only_the_setters_write_the_frame_fields() {
     assert_eq!(writers.len(), 6, "{writers:?}");
 }
 
-/// `load.rs`'s one fill of a unit list, one of the list half's two
+/// `load.rs`'s one fill of a unit list, one of the list half's three
 /// exemptions, is of the tower `assemble` (the rest of `deserialize` and of
 /// the streamed reader) has just made with `Simulation::new`, whose mark log
 /// is new. The other, a list lent out and put back, is pinned by its cases.
@@ -384,6 +386,68 @@ fn the_loader_fills_only_a_new_tower() {
         let body = format!("fn f() {{ {take} {between} {back} }}");
         assert_eq!(flagged("x.rs", &body), writes, "{body}");
     }
+}
+
+/// The list half's third exemption, the lobby brush's slot fill, is a
+/// removal and a new unit, as any change of kind is: `add_unit`
+/// (`tower_removal.rs`) lays the unit `place` built in the slot that
+/// `take_floor_slot` answered, and that call has just settled the floor
+/// tile's removal, which moves the revision, so every reader's next frame is
+/// full (`a_kept_view_matches_a_fresh_read_after_a_lobby_brush`).
+#[test]
+fn the_brush_fills_only_an_emptied_slot() {
+    let sources = engine_sources();
+    let code = |rel: &str| &sources.iter().find(|s| s.rel == rel).unwrap().code;
+    let body = |code: &str, name: &str| {
+        let at = code.find(&format!("fn {name}(")).unwrap();
+        let open = at + code[at..].find('{').unwrap();
+        code[open..=closing(code, open).unwrap()].to_string()
+    };
+    let removal = code("tower_removal.rs");
+    let fills: Vec<usize> = removal
+        .match_indices("units[idx]=unit;")
+        .map(|(at, _)| at)
+        .collect();
+    assert_eq!(fills.len(), 1, "{fills:?}");
+    assert!(body(removal, "add_unit").contains("Some(idx)=>{self.units[idx]=unit;"));
+    let take = body(removal, "take_floor_slot");
+    assert!(
+        take.starts_with("{self.lobby_upgrades.as_ref()?;"),
+        "{take}"
+    );
+    assert!(take.contains("self.settle_removals("), "{take}");
+    assert!(body(removal, "settle_removals").contains("self.revision+=gone.len()as i64;"));
+    // `place` is the one caller, and its slot is `take_floor_slot`'s or none.
+    let callers: Vec<&str> = sources
+        .iter()
+        .filter(|s| s.code.contains(".add_unit("))
+        .map(|s| s.rel.as_str())
+        .collect();
+    assert_eq!(callers, ["tower.rs"]);
+    let place = body(code("tower.rs"), "place");
+    assert_eq!(place.matches(".add_unit(").count(), 1);
+    assert!(place.contains("self.add_unit(unit,slot)"));
+    assert_eq!(place.matches("slot=").count(), 2, "{place}");
+    assert!(place.contains("let mut slot=None;"));
+    assert!(place.contains("slot=self.take_floor_slot(only);"));
+    // Only that statement, in that file, counts as the fill.
+    let flagged = |rel: &str, line: &str| {
+        let code = squeeze(rel.into(), line).code;
+        !new_list_aside(rel, &code, unit_writes(&code, &[])).is_empty()
+    };
+    let arm = |fill: &str| format!("match slot {{ Some(idx) => {{ {fill} idx }} None => 0 }}");
+    assert!(!flagged(
+        "tower_removal.rs",
+        &arm("self.units[idx] = unit;")
+    ));
+    assert!(flagged("x.rs", &arm("self.units[idx] = unit;")));
+    assert!(flagged("tower_removal.rs", "self.units[idx] = unit;"));
+    assert!(flagged(
+        "tower_removal.rs",
+        &arm("self.units[idx] = other;")
+    ));
+    assert!(flagged("tower_removal.rs", &arm("self.units[i] = unit;")));
+    assert!(flagged("tower_removal.rs", &arm("sim.units[idx] = unit;")));
 }
 
 /// No engine code writes a unit's kind in place (nor any other `kind`, so
