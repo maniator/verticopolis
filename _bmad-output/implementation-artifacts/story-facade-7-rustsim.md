@@ -52,7 +52,11 @@ engine, a cohort, a gate or a production analytics field.
    `TsSim`. That keeps hazards 1 to 4 and 7 to 9 of #1273 out of reach on
    the main thread (they stay owed to the worker adapter, #1224); hazards 5
    (a swap mid-command) and 6 (a rejection from a trap) are real on
-   `RustSim` and are covered by AC 14 and slice 8.
+   `RustSim` and are covered by AC 14 and slice 8. Everything that touches
+   the engine runs in issue order through one queue per port (section 5.3):
+   commands, saves, loads, undo and redo, restore points. A test issues a
+   command, a save, a load and another command back to back and checks
+   that each sees the ones issued before it.
 4. **The port's shape check first (#1290).** `command()` calls `wellFormed`
    (`src/simport/request.ts`) before the binding and answers a malformed
    command with `INVALID_COMMAND` and `delta: 0`, never calling the engine.
@@ -104,9 +108,25 @@ engine, a cohort, a gate or a production analytics field.
     getters (`statsReport`, `unitDetail`, `transportDetail`, the overlays,
     `onboardingFacts`) and 6c's diagnostics facts, with `tsPanels`'
     TypeScript keeping only the wording. `cached` keeps `TsSim`'s bounds.
-    No `towerStats` or `peakCongestionHotspot` caller per UI tick until
-    #1237's floor-bounds memo (A11) and `functional_parking_set` seed are on
-    `main`, or the owner accepts the deferral (#1228's gate).
+    The gates on these callers:
+    - #1228's gate on a per-UI-tick `towerStats` or `peakCongestionHotspot`
+      caller is met: #1276 put #1237's floor-bounds memo (A11) and the
+      `functional_parking_set` seed on `main`.
+    - 6c's gate on `diagnosticFacts` (#1237's comment of 2026-10-21) carries
+      to the PR that wires its caller: #1158's A13, A14 and A33 on `main`
+      or the owner's acceptance of the deferral on that PR, and at most one
+      read per 160 ms panel refresh (HP-12).
+    - **The transport dry run.** `placeTransportDryRun` and
+      `validateTransport` run on every pointer move of a shaft drag, a
+      stairs or escalator hover and a keyboard cursor move. #1217's gate
+      from #1244's review (no per-move caller until #1239 is fixed) is met
+      for the Rust engine by #1264. #1261, the shaft overlap loop, is still
+      open on both engines: floors times transports, up to 9,680 visits per
+      move on a full-height express drag against a 1,000-visit per-frame
+      budget (P3). The PR that wires the build preview to `RustSim` (7b or
+      7d) records it in its hot-path record and either fixes it (one pass
+      over the transports, the refusal order kept, with #1261's
+      differential test) or carries the owner's acceptance of the deferral.
 11. **The lifecycle (slice 5).** `load(source)`: `history` and `stored`
     through `Engine.fromSave` on the save text, `legacy` through
     `importTdt`'s save, `found` through the engine's new game. `save()` and
@@ -116,7 +136,9 @@ engine, a cohort, a gate or a production analytics field.
     load settles and stays when a load fails before its swap. The lifecycle
     contract's undo coverage case runs with a `TsSim` twin fed the same
     script as its reference, which holds `RustSim`'s signature to
-    `towerStateSig`'s coverage command by command.
+    `towerStateSig`'s coverage command by command. Loads run in issue order
+    with commands, queries and saves, and a command issued after a load
+    applies to the loaded tower (slice 5's ordering note).
 12. **Engine-written saves need EX-2.** The stored saves `RustSim` writes
     are the engine's text, which differs from today's re-print in number
     forms and the transports' key order. That is EX-2
@@ -152,9 +174,11 @@ engine, a cohort, a gate or a production analytics field.
 15. **The facade's e2e run.** The `chromium-wasm` Playwright project gains
     a facade run (`?engine=wasm-facade`): boot, new game, load, play at 1x
     and top speed, the build, transport and editor commands, undo and redo,
-    a manual save, an autosave, and A5's audio cue-timing test (release
-    plan assumption 6, written here if no earlier slice has), each cue
-    within the bar the test pre-registers.
+    a manual save, an autosave, and A5's audio cue-timing test (written
+    here if no earlier slice has) with the bar release plan assumption 6
+    sets: each cue within one frame of the engine's event. A failure goes
+    to #965 (cues move to engine events), as assumption 6 says, never to a
+    looser bar.
 
 ### Restore points and the sidecar (PR 7e)
 
@@ -166,7 +190,9 @@ engine, a cohort, a gate or a production analytics field.
     in one synchronous turn: a sequence number, the save text, the sidecar,
     the play-time reading and a digest of the save. The sidecar carries the
     save's digest and sequence, and a reader refuses a record whose digest
-    does not match.
+    does not match. 7e builds the play-time counter the record reads
+    (foreground seconds the clock advanced, section 5.7 item 3); slice 8
+    adds the 30-second play-time deadline and proves both (section 5.7).
 18. **A versioned sidecar.** The transient state the save does not carry
     (the boundary markers `fromSave` accepts, the open extend gesture,
     commute stress, elevator telemetry, the housekeeping report), as a
@@ -202,11 +228,30 @@ engine, a cohort, a gate or a production analytics field.
 | PR | Content | Waits for |
 | --- | --- | --- |
 | 7a | `RustSim` view, tick and events (ACs 1 to 2, 7 to 9); the `view()` getter (crate minor) | 6a (#1284) on `main`; its open owner card (the per-frame room compare) |
-| 7b | Commands and queries (ACs 3 to 6, 10) | slice 2 (#1290); 6c complete (all four families, #1255 is the first); #1237's A11 for AC 10's per-tick callers |
+| 7b | Commands and queries (ACs 3 to 6, 10) | slice 2 (#1290); 6c complete (all four families, #1255 is the first); AC 10's gates for the callers it wires |
 | 7c | The lifecycle (ACs 11, 12) | slice 5a (#1294), which waits on the owner's answer to the F2 amendment (`saveNow`, `undoSignature`) |
-| 7d | Boot behind the flag, the e2e run, trap handling (ACs 13 to 15) | 7a to 7c; slices 3 and 4 (the renderer and panels read the port) |
+| 7d | Boot behind the flag, the e2e run, trap handling (ACs 13 to 15) | 7a to 7c; slices 3 and 4 (the renderer and panels read the port); #1237 and #1239 closed on `main` (below) |
 | 7e | Restore points and the sidecar, the R5 test (ACs 16 to 20) | 7c |
 | 7f | The cadence exclusions (AC 21) | 7a to 7c |
+
+**#1237 and #1239.** The slice plan's row 7 and the release plan's slice 7
+row list both as slice 7 prerequisites (added 2026-10-21), and the release
+plan's #1239 row says "Before slice 7". This story carries them unchanged:
+both are closed on `main` before 7d merges, since 7d is where the flag first
+serves the app. Still open on 2026-10-27:
+
+- #1237: `stats_report`'s repeated room passes (about 19 per refresh), the
+  HUD getters that grow with the room count on every UI tick, the discarded
+  attribution map in `spatial_congestion_by_floor` (6c removes it) and the
+  ramp's `powf`. Its floor-bounds memo and parking seed are on `main`
+  (#1276).
+- #1239: the TypeScript twins (`countKind` and the escalator office walk in
+  `src/engine/tower/transport.ts`). The Rust half is on `main` (#1264). The
+  release plan names the step-hotspot lane or this one as its owner; if no
+  lane has taken it when 7c merges, this lane does.
+
+Any narrowing of either (for example, that #1239's TypeScript half need not
+gate a Rust-only adapter) is a proposal for Naftali, never settled in a PR.
 
 7a can start as soon as 6a merges. 7e and 7f can run beside 7d. Slice 8
 needs 7e; slice 9 needs slice 8 (and #1242, slice 13, #1254's W1, #1270's
@@ -256,6 +301,8 @@ revision moved.
 - Per revision: `viewStructure`, the units build, the runs join, the room
   list, the indexes. Measured on large in the PR (cloud, exploratory).
 - Per command: the shape check, one binding call, the delta.
+- Per pointer move of a build preview: one dry-run call; #1261's overlap
+  loop as AC 10 says.
 - Per save (undo capture, autosave, manual save): `serialize()` plus, from
   7e, the sidecar read. The budget in AC 19.
 - HP-8: the per-revision view caches (units, indexes, rooms, runs, bounds)
