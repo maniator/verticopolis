@@ -110,6 +110,7 @@ pub(crate) fn add_records(layout: &mut serde_json::Value) {
     layout["logKinds"] = serde_json::json!(super::port_life::LOG_KINDS);
     layout["scheduleSlots"] = serde_json::json!(super::port_life::SCHEDULE_LEN);
     super::port_panels::add_panel_records(layout);
+    super::port_files::add_file_records(layout);
 }
 
 /// The layout `viewLayout()` hands over: the view's, with the port's

@@ -48,6 +48,22 @@ pub fn load_save_text(text: &[u8]) -> Result<Simulation, String> {
     read_save(text).map(|(sim, _)| sim)
 }
 
+/// A stored save as `SaveGame.loadResult` reads it: `load_save_text`, then a
+/// save with no `appVersion` stamp (one from before 2.0) marked as a
+/// founder's tower. An undo snapshot never comes this way. The port's
+/// `loadSave` is its only caller, so a build without the binding skips it.
+#[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+pub fn load_stored_text(text: &[u8]) -> Result<Simulation, String> {
+    if let Some((mut sim, data)) = streamed(text, None) {
+        mark_founder_from_loaded_file(&mut sim, &data);
+        return Ok(sim);
+    }
+    let raw = parse_save_json(text).map_err(|e| e.to_string())?;
+    let mut sim = deserialize(&raw)?;
+    mark_founder_from_loaded_file(&mut sim, &raw);
+    Ok(sim)
+}
+
 /// `load_save_text`, and whether the streamed reader took the text.
 pub(crate) fn read_save(text: &[u8]) -> Result<(Simulation, bool), String> {
     if let Some((sim, _)) = streamed(text, None) {
