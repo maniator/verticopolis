@@ -476,7 +476,7 @@ class GameApp implements GameAppPorts {
   /** Hand a harness's edits of `sim` to the engine now. @internal */
   syncSim(): void { syncToolingSim(this); }
   /** Tooling: draw the engine again after a hand edit on `sim` reached it. */
-  followEdit(): void { followToolingEdit(this); }
+  followEdit(shown?: Simulation): void { followToolingEdit(this, shown); }
 
   // ---- Undo / redo (state + logic live in engine/UndoHistory) -------------
   // Thin delegators kept so the many gesture call sites read unchanged.
