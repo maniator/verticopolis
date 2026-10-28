@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { toast } from "./uiStatus";
+import { Simulation } from "../engine/Simulation";
+import { towerCatalog } from "../engine/towerCatalog";
+import { toast, update } from "./uiStatus";
 import type { UI } from "./UI";
 
 /**
@@ -101,5 +103,34 @@ describe("toast rail", () => {
     for (const node of Array.from(rail.children)) {
       expect(node.getAttribute("role")).toBeNull();
     }
+  });
+});
+
+describe("update", () => {
+  it("reads stats() once and labels the population from it", () => {
+    const sim = Simulation.newGame(3, "classic");
+    sim.money = 1e9;
+    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
+    expect(sim.build("office", 2, 175).ok).toBe(true);
+    for (const u of sim.tower.units) if (u.kind === "office") u.state = "occupied";
+    const want = sim.stats().population;
+    expect(want).toBeGreaterThan(0);
+    // Elements on demand; the palette, catalog and log keys already match,
+    // so only the status bar, the mode badge and the stats grid draw.
+    const el = new Proxy({} as Record<string, HTMLElement>, {
+      get: (made, key: string) => (made[key] ??= document.createElement("div")),
+    });
+    const catalog = towerCatalog(sim);
+    let scanKey = sim.mode + ":" + sim.star;
+    for (const f of catalog.facilities) scanKey += sim.money >= f.cost ? "1" : "0";
+    const ui = { el, paletteCatalog: catalog, paletteScanKey: scanKey, lastLogSeq: sim.logSeq, tool: { type: "inspect" }, setTowerName: () => {} } as unknown as UI;
+    const reads = vi.spyOn(sim, "stats");
+    const population = vi.spyOn(sim, "population", "get");
+    const census = vi.spyOn(sim.tower, "totalPopulation");
+    update(ui, sim);
+    expect(reads).toHaveBeenCalledTimes(1);
+    expect(population).not.toHaveBeenCalled();
+    expect(census).not.toHaveBeenCalled();
+    expect(el.pop.textContent).toBe(want.toLocaleString());
   });
 });

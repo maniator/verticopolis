@@ -98,6 +98,16 @@ export class Engine {
      */
     crowdView(): string;
     /**
+     * The facts behind the inspector's diagnostics for one unit, as JSON
+     * text (`diagnostics::DiagnosticFacts`); TypeScript keeps the wording.
+     * Undefined for an id that names no unit (a transport's, zero or a
+     * negative one) and for a malformed one (fractional, not finite, past
+     * the safe integers), read raw so it cannot wrap onto a real unit.
+     * The read may fill the engine's caches, which sit outside the save; it
+     * changes nothing in the game.
+     */
+    diagnosticFacts(id: number): string | undefined;
+    /**
      * The gameplay events emitted since the last drain, oldest first, as
      * JSON `[{ name, payload }]` (`conformance/events/catalog.json`); the
      * buffer is empty afterwards.
@@ -208,6 +218,13 @@ export class Engine {
      * The five onboarding facts as JSON.
      */
     onboardingFacts(): string;
+    /**
+     * `paintBrush(kind, floor, tiles)` with the tiles as JSON text: JSON
+     * `{ placed, reason? }`, the floor and lobby brush (`brush.rs`) in one
+     * call. Every argument is read raw, so a malformed brush is refused
+     * with "That request is not valid." as TypeScript refuses it.
+     */
+    paintBrush(kind: string, floor: number, tiles: string): string;
     /**
      * `peakCongestionHotspot()`: `{ ratio, floor }` as JSON.
      */
@@ -387,6 +404,7 @@ export class Engine {
      * (#996), as `setCars`.
      */
     towerSetCars(id: number, cars: number): boolean;
+    towerSignature(): bigint;
     /**
      * `stats()`: the HUD strip's counters, as JSON.
      */
@@ -407,6 +425,7 @@ export class Engine {
      * The unit inspector and editor card for unit `id`, as JSON, or null.
      */
     unitDetail(id: number): string | undefined;
+    unitMetaSince(since: number): string;
     /**
      * `tower.validateTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`,
      * nothing written. An unknown kind is refused with "Unknown facility."; a
@@ -414,6 +433,8 @@ export class Engine {
      * is refused with `INVALID_REQUEST`, never coerced (#923).
      */
     validateTransport(kind: string, x: number, bottom: number, top: number): string;
+    viewFrame(full: boolean): Float64Array;
+    viewStructure(): Float64Array;
 }
 
 /**
@@ -462,3 +483,5 @@ export function exportTdt(save_json: string): Uint8Array;
  * the player-readable message.
  */
 export function importTdt(bytes: Uint8Array, filename: string): string;
+
+export function viewLayout(): string;

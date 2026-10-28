@@ -57,21 +57,19 @@ export function pickedAt(app: GameApp, floor: number, tile: number): Picked | nu
 
 /** The gesture-independent placement cases shared by tap, click, and the
  *  keyboard cursor: paint a structure strip, drop a fixed two-floor flight,
- *  or place a room. Returns null for drag-sized shafts, that anchor
- *  gesture belongs to the caller. */
-export function placeSimpleBuild(app: GameApp, kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null {
+ *  or place a room, each a command through the port. Returns null, at once,
+ *  for drag-sized shafts (that anchor gesture belongs to the caller), and
+ *  otherwise the outcome once the engine has answered. */
+export function placeSimpleBuild(app: GameApp, kind: FacilityKind, tile: number, floor: number): Promise<PlaceOutcome> | null {
   if (kind === "floor" || kind === "lobby") {
-    const r = app.build.paintBrush(kind, tile, floor);
-    return { what: "paint", ok: r.placed > 0, reason: r.reason };
+    return app.build.paintBrush(kind, tile, floor).then((r) => ({ what: "paint", ok: r.placed > 0, reason: r.reason }));
   }
   if (catalogFacility(towerCatalog(app.sim), kind).fixedSpan) {
-    const r = app.build.tryBuildTransport(kind, snapX(towerCatalog(app.sim), kind, tile), floor, floor + 1);
-    return { what: "flight", ok: r.ok, reason: r.reason };
+    const x = snapX(towerCatalog(app.sim), kind, tile);
+    return app.build.tryBuildTransport(kind, x, floor, floor + 1).then((r) => ({ what: "flight", ok: r.ok, reason: r.reason }));
   }
   if (isTransportTool(app)) return null;
-  const before = app.sim.tower.units.length;
-  app.build.tryBuild(kind, floor, snapX(towerCatalog(app.sim), kind, tile));
-  return { what: "room", ok: app.sim.tower.units.length > before };
+  return app.build.tryBuild(kind, floor, snapX(towerCatalog(app.sim), kind, tile)).then((ok) => ({ what: "room", ok }));
 }
 
 export function isTransportTool(app: GameApp): boolean {

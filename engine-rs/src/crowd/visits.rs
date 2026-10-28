@@ -233,8 +233,8 @@ pub fn spawn_venue_visit(
     }
     if let Some(rid) = origin_room {
         crowd.people[i].origin_unit_id = Some(rid);
-        let r = tower.get_unit_mut(rid).unwrap();
-        r.out_for_meal = Some(r.out_for_meal.unwrap_or(0) + 1);
+        let (r, at) = tower.marked_by_id(rid).unwrap();
+        r.set_out_for_meal(at, Some(r.out_for_meal.unwrap_or(0) + 1));
         tower.bump_meal_overlay_revision();
     }
 }
@@ -272,11 +272,11 @@ pub fn begin_dwell(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
             .origin_unit_id
             .and_then(|id| tower.get_unit(id))
             .is_some_and(|u| u.kind.is_hotel());
-        let v = tower.get_unit_mut(vid).unwrap();
-        v.customers_in = Some(customers + 1);
+        let (v, at) = tower.marked_by_id(vid).unwrap();
+        v.set_customers_in(at, Some(customers + 1));
         if origin_is_hotel {
             crowd.people[i].counted_hotel_guest = true;
-            v.hotel_customers_in = Some(v.hotel_customers_in.unwrap_or(0) + 1);
+            v.set_hotel_customers_in(at, Some(v.hotel_customers_in.unwrap_or(0) + 1));
         }
         tower.bump_meal_overlay_revision();
     } else if let Some(cap) = cap {
@@ -287,9 +287,9 @@ pub fn begin_dwell(crowd: &mut Crowd, tower: &mut Tower, i: usize) {
         };
         if gate && customers < cap {
             crowd.people[i].venue_unit_id = Some(vid);
-            let v = tower.get_unit_mut(vid).unwrap();
-            v.customers_in = Some(customers + 1);
-            v.sync_attendance_occupants();
+            let (v, at) = tower.marked_by_id(vid).unwrap();
+            v.set_customers_in(at, Some(customers + 1));
+            v.sync_attendance_occupants(at);
             tower.bump_meal_overlay_revision();
         }
     }
