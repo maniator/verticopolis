@@ -61,6 +61,7 @@ vi.mock("./editorActions", () => ({
 vi.mock("./saveLoad", async (orig) => ({
   ...(await orig<typeof import("./saveLoad")>()),
   SaveLoad: class {
+    autosave = vi.fn(async () => {});
     constructor(deps: Record<string, unknown>) {
       mocks.deps.save = deps;
     }
@@ -219,8 +220,8 @@ describe("wireControllers", () => {
     expect((d.enginePort as () => unknown)()).toBe(app.enginePort);
     expect(d.getView()).toEqual({ view: 1 });
     expect(app.engine.viewState).toHaveBeenCalled();
-    d.towerSwapped(); // breaks the report leash, then the app follows the swap
-    expect([vi.mocked(app.ui.precedence.towerSwapped).mock.calls.length, vi.mocked(app.followSwap).mock.calls.length]).toEqual([1, 1]);
+    d.towerSwapped(); // breaks the report leash, the app follows the swap, then it autosaves (the timer's guards, tested below)
+    expect([vi.mocked(app.ui.precedence.towerSwapped).mock.calls.length, vi.mocked(app.followSwap).mock.calls.length, vi.mocked(app.saveLoad.autosave).mock.calls.length]).toEqual([1, 1, 1]);
     d.ui.toast("t", "info");
     expect(app.ui.toast).toHaveBeenCalledWith("t", "info");
     expect(d.ui.downloadFile("f.json", "body")).toBe(false); // passed through for GH #997
@@ -440,7 +441,6 @@ describe("runBootFlow", () => {
 
   it("starts the autosave timer, which autosaves when no splash is up", () => {
     const app = makeApp({ hadReadableSave: true, saveWasCorrupt: false });
-
     runBootFlow(app);
     // No #splash element in the DOM, so the interval fires an autosave.
     vi.advanceTimersByTime(30000);
