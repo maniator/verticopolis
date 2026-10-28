@@ -3,7 +3,9 @@ import { BuildActions } from "./buildActions";
 import { EditorActions } from "./editorActions";
 import { SaveLoad, RESUME_AFTER_RECOVERY_KEY } from "./saveLoad";
 import { InspectorController } from "./inspector";
+import { createCardKit } from "./cardKit";
 import { KeyboardPlay } from "./keyboardPlay";
+import { catalogOf, isUnlocked } from "./portAccess";
 import { attemptContextRecovery } from "./contextRecovery";
 import { isEngineStopped, isSplashUp } from "./interactionState";
 import { showCrashScreen } from "../ui/crashScreen";
@@ -64,21 +66,28 @@ export function bootReason(flags: {
  *  re-asks `app.sim` per call, so an adoptSim() swap is picked up automatically. */
 export function wireControllers(app: GameApp): void {
   app.build = new BuildActions({
-    getSim: () => app.sim,
-    port: app.port,
+    enginePort: () => app.enginePort,
+    portCodes: () => app.portCodes,
+    reader: () => app.reader,
+    catalog: () => catalogOf(app),
+    isUnlocked: (kind) => isUnlocked(app, kind),
     ui: { toast: (text, kind) => app.ui.toast(text, kind) },
     audio: app.audio,
     selectedId: () => app.selected?.id ?? null,
     clearSelection: () => app.clearSelection(),
   });
+  app.cardKit = createCardKit(app);
   app.inspector = new InspectorController({
-    getSim: () => app.sim,
+    kit: () => app.cardKit,
+    reader: () => app.reader,
     ui: { showInspector: (html) => app.ui.showInspector(html) },
     setAnchor: (anchor) => (app.inspectAnchor = anchor),
   });
   app.editor = new EditorActions({
-    getSim: () => app.sim,
-    port: app.port,
+    engine: () => app.enginePort,
+    codes: () => app.portCodes,
+    reader: () => app.reader,
+    kit: () => app.cardKit,
     ui: {
       toast: (text, kind) => app.ui.toast(text, kind),
       showBatchPricingDialog: (ctx, cb) => app.ui.showBatchPricingDialog(ctx, cb),
@@ -87,8 +96,6 @@ export function wireControllers(app: GameApp): void {
     audio: app.audio,
     build: app.build,
     selected: () => app.selected,
-    selectedUnit: () => app.selectedUnit(),
-    selectedTransport: () => app.selectedTransport(),
     clearSelection: () => app.clearSelection(),
     refreshEditor: () => app.refreshEditor(),
     captureUndo: (label) => app.captureUndo(label),
@@ -164,8 +171,11 @@ export function wireControllers(app: GameApp): void {
     },
   });
   app.keyboard = new KeyboardPlay({
-    getSim: () => app.sim,
-    port: app.port,
+    enginePort: () => app.enginePort,
+    portCodes: () => app.portCodes,
+    reader: () => app.reader,
+    catalog: () => catalogOf(app),
+    isUnlocked: (kind) => isUnlocked(app, kind),
     engine: () => app.engine,
     audio: app.audio,
     ui: { toast: (text, kind) => app.ui.toast(text, kind) },

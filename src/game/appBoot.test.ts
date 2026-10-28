@@ -33,6 +33,8 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // Capture each controller's ctor deps so the wiring closures can be invoked.
 const mocks = vi.hoisted(() => ({ deps: {} as Record<string, Record<string, unknown>> }));
 
+vi.mock("./cardKit", () => ({ createCardKit: vi.fn(() => ({ kit: "kit" })) }));
+
 vi.mock("./buildActions", () => ({
   BuildActions: class {
     constructor(deps: Record<string, unknown>) {
@@ -103,11 +105,10 @@ describe("wireControllers", () => {
   /** A fake app whose every collaborator is a spy, so each wiring closure can be
    *  invoked and asserted to route to the matching app member. */
   function makeWiringApp() {
-    const sim = { id: "sim", star: 3, population: 800 };
+    const sim = { id: "sim", star: 3, population: 800, isUnlocked: vi.fn(() => true) };
     const engine = { viewState: vi.fn(() => ({ view: 1 })), onContextRestored: null as unknown };
     const app = {
-      sim, enginePort: { id: "port" },
-      engine,
+      sim, enginePort: { id: "engine port" }, portCodes: { id: "codes" }, reader: { id: "reader" }, engine,
       audio: { sfx: vi.fn(), setProgram: vi.fn() },
       speed: 2,
       frameErrors: [],
@@ -151,13 +152,12 @@ describe("wireControllers", () => {
   it("hands BuildActions closures that reach the live app", () => {
     const app = makeWiringApp();
     wireControllers(app);
-    const d = mocks.deps.build as {
-      getSim: () => unknown;
+    const d = mocks.deps.build as Record<string, (k?: string) => unknown> & {
       ui: { toast: (t: string, k: string) => void };
       selectedId: () => number | null;
       clearSelection: () => void;
     };
-    expect(d.getSim()).toBe(app.sim);
+    expect([d.enginePort(), d.portCodes(), d.reader(), d.isUnlocked("office")]).toEqual([app.enginePort, app.portCodes, app.reader, true]);
     d.ui.toast("hi", "bad");
     expect(app.ui.toast).toHaveBeenCalledWith("hi", "bad");
     expect(d.selectedId()).toBe(7);
@@ -169,11 +169,13 @@ describe("wireControllers", () => {
     const app = makeWiringApp();
     wireControllers(app);
     const d = mocks.deps.inspector as {
-      getSim: () => unknown;
+      kit: () => unknown;
+      reader: () => unknown;
       ui: { showInspector: (h: unknown) => void };
       setAnchor: (a: unknown) => void;
     };
-    expect(d.getSim()).toBe(app.sim);
+    expect(d.kit()).toBe(app.cardKit);
+    expect(d.reader()).toBe(app.reader);
     d.ui.showInspector("tpl");
     expect(app.ui.showInspector).toHaveBeenCalledWith("tpl");
     d.setAnchor({ x: 3, floor: 4 });
@@ -186,7 +188,8 @@ describe("wireControllers", () => {
     const d = mocks.deps.editor as Record<string, (...a: unknown[]) => unknown> & {
       ui: Record<string, (...a: unknown[]) => unknown>;
     };
-    expect(d.getSim()).toBe(app.sim);
+    const got = (name: string) => (d[name] as () => unknown)();
+    expect([got("engine"), got("codes"), got("reader"), got("kit")]).toEqual([app.enginePort, app.portCodes, app.reader, app.cardKit]);
     d.ui.toast("t", "info");
     expect(app.ui.toast).toHaveBeenCalledWith("t", "info");
     d.ui.showBatchPricingDialog("ctx", "cb");
@@ -194,10 +197,6 @@ describe("wireControllers", () => {
     d.ui.showElevatorScheduleDialog("ctx", "cb");
     expect(app.ui.showElevatorScheduleDialog).toHaveBeenCalledWith("ctx", "cb");
     expect(d.selected()).toBe(app.selected);
-    d.selectedUnit();
-    expect(app.selectedUnit).toHaveBeenCalled();
-    d.selectedTransport();
-    expect(app.selectedTransport).toHaveBeenCalled();
     d.clearSelection();
     expect(app.clearSelection).toHaveBeenCalled();
     d.refreshEditor();
@@ -264,7 +263,7 @@ describe("wireControllers", () => {
     const d = mocks.deps.keyboard as Record<string, (...a: unknown[]) => unknown> & {
       ui: Record<string, (...a: unknown[]) => unknown>;
     };
-    expect(d.getSim()).toBe(app.sim);
+    expect([d.enginePort(), d.portCodes(), d.reader(), d.isUnlocked("office")]).toEqual([app.enginePort, app.portCodes, app.reader, true]);
     expect(d.engine()).toBe(app.engine);
     d.ui.toast("t", "info");
     expect(app.ui.toast).toHaveBeenCalledWith("t", "info");

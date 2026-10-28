@@ -9,11 +9,12 @@ import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, type Prefs } from "./storage/Prefs";
 import { type TrafficTier } from "./engine/traffic";
 import { UI, type Tool } from "./ui/UI";
-import { unitEditorTemplate, transportEditorTemplate } from "./ui/templates/editor";
+import { refreshEditorCard } from "./game/editorCard";
 import { type PlaceOutcome } from "./ui/placement";
 import { OnboardingController } from "./ui/Onboarding";
 import type { BuildActions } from "./game/buildActions";
 import type { EditorActions } from "./game/editorActions";
+import type { CardKit } from "./game/cardKit";
 import type { SaveLoad } from "./game/saveLoad";
 import { announceLive } from "./game/liveRegion";
 import { isSplashUp } from "./game/interactionState";
@@ -66,6 +67,7 @@ class GameApp implements GameAppPorts {
   enginePort!: TsEngine;
   reader!: ViewReader;
   portCodes!: PortCodes;
+  /** The editor and inspector cards, and the reads the port lacks. @internal */ cardKit!: CardKit;
   get sim(): Simulation { return this.enginePort.sim; }
   set sim(sim: Simulation) { if (!(import.meta.env.DEV || __TOOLING_BUILD__)) throw new Error("app.sim is set only in tooling builds"); this.enginePort.take(sim); }
   /** The simulation as the game drives it (AD-9); follows every adoptSim swap. */
@@ -362,7 +364,7 @@ class GameApp implements GameAppPorts {
   // Kept as methods because KeyboardPlay's deps call them on the app, and the
   // gameControllers.integration.test.ts mirror re-implements the same bodies.
 
-  /** @internal */ placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): Promise<PlaceOutcome> | null { return placeSimpleBuild(this, kind, tile, floor); }
+  /** @internal */ placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null { return placeSimpleBuild(this, kind, tile, floor); }
   /** @internal */ isTransportTool(): boolean { return isTransportTool(this); }
   /** @internal */ updateBuildPreview(tile: number, floor: number): void { updateBuildPreview(this, tile, floor); }
   /** @internal */ pickedAt(floor: number, tile: number): Picked | null { return pickedAt(this, floor, tile); }
@@ -416,27 +418,7 @@ class GameApp implements GameAppPorts {
   }
 
   /** @internal */ refreshEditor(): void {
-    if (!this.selected) return;
-    // The template is a pure function of (sim, entity, mobile); lit's binding
-    // diff patches only the values that changed since the last pump, so the
-    // buttons and rename input keep their identity across stat ticks, and a
-    // shape change (a condo sells and loses its price adjuster, a cinema
-    // finishes construction and gains its "Now showing" row, the viewport
-    // crosses the mobile breakpoint) restructures just the affected rows.
-    // Mobile folds the inspector card's diagnostics into the editor (one
-    // panel, no hover).
-    const mobile = this.mobileMq.matches;
-    if (this.selected.type === "unit") {
-      const u = this.selectedUnit();
-      if (!u) return this.clearSelection();
-      this.engine.selectedId = u.id;
-      this.ui.renderEditor(unitEditorTemplate(this.sim, u, mobile));
-    } else {
-      const t = this.selectedTransport();
-      if (!t) return this.clearSelection();
-      this.engine.selectedId = t.id; // outlines the shaft + shows extend arrows
-      this.ui.renderEditor(transportEditorTemplate(this.sim, t, mobile));
-    }
+    refreshEditorCard(this);
   }
 
   // ---- Save / load / new --------------------------------------------------

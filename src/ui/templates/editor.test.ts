@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID, maxCarsFor } from "../../engine/facilities";
 import type { Transport, Unit } from "../../engine/types";
-import { unitEditorTemplate, transportEditorTemplate } from "./editor";
 import { renderToFragment } from "../testing/litTestUtils";
+import { unitEditor, transportEditor } from "../../game/cardKit.fixture";
 
 /**
  * The editor card bodies (E6-S1). Package: the title bar's ✕ a11y contract,
@@ -70,7 +70,7 @@ function withLift(
 describe("unit editor template structure", () => {
   it("title bar ✕ keeps the shared recipe and its aria-label; cells carry data-field markers", () => {
     const { sim, unit } = simWith("office");
-    const frag = renderToFragment(unitEditorTemplate(sim, unit));
+    const frag = renderToFragment(unitEditor(sim, unit));
     const x = frag.querySelector<HTMLButtonElement>("h4.win-title > button.ed-close")!;
     expect(x).not.toBeNull();
     expect(x.getAttribute("aria-label")).toBe("Close");
@@ -84,7 +84,7 @@ describe("unit editor template structure", () => {
   it("binds the unit label as the rename input's value", () => {
     const { sim, unit } = simWith("office");
     unit.label = "Acme Corp";
-    const frag = renderToFragment(unitEditorTemplate(sim, unit));
+    const frag = renderToFragment(unitEditor(sim, unit));
     expect(frag.querySelector<HTMLInputElement>("#ed-name")!.value).toBe("Acme Corp");
   });
 
@@ -92,7 +92,7 @@ describe("unit editor template structure", () => {
     const hostile = `<img src=x onerror="alert(1)">`;
     const { sim, unit } = simWith("shop");
     unit.subtype = hostile; // titles the card
-    const frag = renderToFragment(unitEditorTemplate(sim, unit));
+    const frag = renderToFragment(unitEditor(sim, unit));
     expect(frag.querySelector("img")).toBeNull();
     expect(frag.querySelector("h4.win-title")!.textContent).toContain(hostile);
   });
@@ -102,23 +102,23 @@ describe("transport editor template structure", () => {
   it("car buttons disable at the pool bounds", () => {
     const { sim, lift } = withLift("elevatorStandard");
     if (lift.cars !== 1) expect(sim.tower.setCars(lift.id, 1)).toBe(true);
-    let frag = renderToFragment(transportEditorTemplate(sim, lift));
+    let frag = renderToFragment(transportEditor(sim, lift));
     expect(frag.querySelector<HTMLButtonElement>('[data-edit="removecar"]')!.disabled).toBe(true);
     expect(frag.querySelector<HTMLButtonElement>('[data-edit="addcar"]')!.disabled).toBe(false);
     expect(sim.tower.setCars(lift.id, maxCarsFor(lift.kind))).toBe(true); // addcar disabled at the pool max
-    frag = renderToFragment(transportEditorTemplate(sim, lift));
+    frag = renderToFragment(transportEditor(sim, lift));
     expect(frag.querySelector<HTMLButtonElement>('[data-edit="removecar"]')!.disabled).toBe(false);
     expect(frag.querySelector<HTMLButtonElement>('[data-edit="addcar"]')!.disabled).toBe(true);
   });
 
   it("an express offers no stop-config actions; stairs get neither cars nor extend arrows", () => {
     const express = withLift("elevatorExpress");
-    const eFrag = renderToFragment(transportEditorTemplate(express.sim, express.lift));
+    const eFrag = renderToFragment(transportEditor(express.sim, express.lift));
     expect(eFrag.querySelector('[data-edit="stops"]')).toBeNull();
     expect(eFrag.querySelector('[data-edit="express"]')).toBeNull();
     expect(eFrag.querySelector('[data-edit="extendUp"]')).not.toBeNull();
     const stairs = withLift("stairs");
-    const sFrag = renderToFragment(transportEditorTemplate(stairs.sim, stairs.lift));
+    const sFrag = renderToFragment(transportEditor(stairs.sim, stairs.lift));
     expect(sFrag.querySelector('[data-field="cars"]')).toBeNull();
     expect(sFrag.querySelector('[data-edit="extendUp"]')).toBeNull();
     expect(sFrag.querySelector('[data-edit="sell"]')).not.toBeNull();
@@ -128,10 +128,10 @@ describe("transport editor template structure", () => {
 describe("unit editor row and action branches", () => {
   it("office: desktop keeps the access row; the mobile fold-in swaps it for diagnostics", () => {
     const { sim, unit } = simWith("office");
-    const desktop = renderToFragment(unitEditorTemplate(sim, unit));
+    const desktop = renderToFragment(unitEditor(sim, unit));
     expect(desktop.querySelector('[data-field="served"]')).not.toBeNull();
     expect(desktop.querySelector(".ed-diagnostics")).toBeNull();
-    const mobile = renderToFragment(unitEditorTemplate(sim, unit, true));
+    const mobile = renderToFragment(unitEditor(sim, unit, true));
     expect(mobile.querySelector('[data-field="served"]')).toBeNull();
     expect(mobile.querySelector(".ed-diagnostics")).not.toBeNull();
   });
@@ -140,27 +140,27 @@ describe("unit editor row and action branches", () => {
     // Service kinds' diagnostics emit no access line, so the mobile fold-in
     // keeps the Yes/No row (the !hasAccessDiagnostic branch).
     const { sim, unit } = simWith("security");
-    const frag = renderToFragment(unitEditorTemplate(sim, unit, true));
+    const frag = renderToFragment(unitEditor(sim, unit, true));
     expect(frag.querySelector('[data-field="served"]')).not.toBeNull();
   });
 
   it("office: gutted swaps resale for scrap rows; No Rate reads where the price shows", () => {
     const { sim, unit } = simWith("office");
     unit.state = "gutted";
-    const gutted = renderToFragment(unitEditorTemplate(sim, unit));
+    const gutted = renderToFragment(unitEditor(sim, unit));
     expect(gutted.textContent).toContain("Scrap value");
     expect(gutted.textContent).toContain("Gutted: bulldoze and rebuild.");
     expect(gutted.textContent).not.toContain("Resale value");
     unit.state = "occupied";
     unit.noRate = true;
-    const offMarket = renderToFragment(unitEditorTemplate(sim, unit));
+    const offMarket = renderToFragment(unitEditor(sim, unit));
     expect(offMarket.querySelector('[data-field="rent"]')!.textContent).toBe("No Rate");
   });
 
   it("condo (Classic): unsold offers the rung picker and batch action; sold locks the picker", () => {
     const unsold = simWith("condo");
     unsold.unit.state = "empty"; // built, never sold: the picker stays live
-    const uFrag = renderToFragment(unitEditorTemplate(unsold.sim, unsold.unit));
+    const uFrag = renderToFragment(unitEditor(unsold.sim, unsold.unit));
     expect(uFrag.textContent).toContain("Sale price");
     const picker = uFrag.querySelector<HTMLSelectElement>("#ed-rung")!;
     expect(picker).not.toBeNull();
@@ -172,7 +172,7 @@ describe("unit editor row and action branches", () => {
     const sold = simWith("condo");
     sold.unit.everOccupied = true;
     sold.unit.rent = 150_000;
-    const sFrag = renderToFragment(unitEditorTemplate(sold.sim, sold.unit));
+    const sFrag = renderToFragment(unitEditor(sold.sim, sold.unit));
     // Sold: price-locked, so the picker renders DISABLED at the locked rung
     // (showing why it cannot be pressed), and the batch action drops.
     const lockedPicker = sFrag.querySelector<HTMLSelectElement>("#ed-rung")!;
@@ -185,7 +185,7 @@ describe("unit editor row and action branches", () => {
   it("condo (Modern): unsold offers the price stepper; sold drops the price row", () => {
     const unsold = simWithModern("condo");
     unsold.unit.state = "empty";
-    const uFrag = renderToFragment(unitEditorTemplate(unsold.sim, unsold.unit));
+    const uFrag = renderToFragment(unitEditor(unsold.sim, unsold.unit));
     expect(uFrag.textContent).toContain("Sale price");
     expect(uFrag.querySelector('[data-edit="rentUp"]')).not.toBeNull();
     expect(uFrag.querySelector("#ed-rung")).toBeNull(); // no rung picker in Modern
@@ -193,7 +193,7 @@ describe("unit editor row and action branches", () => {
     const sold = simWithModern("condo");
     sold.unit.everOccupied = true;
     sold.unit.residents = 4;
-    const sFrag = renderToFragment(unitEditorTemplate(sold.sim, sold.unit));
+    const sFrag = renderToFragment(unitEditor(sold.sim, sold.unit));
     expect(sFrag.querySelector('[data-edit="rentUp"]')).toBeNull();
     expect(sFrag.querySelector("#ed-rung")).toBeNull(); // Modern keeps the hidden-row behavior
     expect(sFrag.querySelector('[data-edit="batchKind"]')).toBeNull();
@@ -201,7 +201,7 @@ describe("unit editor row and action branches", () => {
 
   it("hotel single: nightly room rate", () => {
     const { sim, unit } = simWith("hotelSingle");
-    const frag = renderToFragment(unitEditorTemplate(sim, unit));
+    const frag = renderToFragment(unitEditor(sim, unit));
     expect(frag.textContent).toContain("Room rate");
     expect(frag.querySelector('[data-field="rent"]')!.textContent).toContain("/night");
   });
@@ -209,32 +209,32 @@ describe("unit editor row and action branches", () => {
   it("fast food: open and closed customer readouts", () => {
     const { sim, unit } = simWith("fastFood");
     unit.customersIn = 7;
-    const open = renderToFragment(unitEditorTemplate(sim, unit)); // 07:00, open
+    const open = renderToFragment(unitEditor(sim, unit)); // 07:00, open
     expect(open.querySelector('[data-field="customers"]')!.textContent).toBe("7");
     sim.clock.minutes = 23 * 60; // 23:00, closed
-    const closed = renderToFragment(unitEditorTemplate(sim, unit));
+    const closed = renderToFragment(unitEditor(sim, unit));
     expect(closed.querySelector('[data-field="customers"]')!.textContent).toBe("7 (closed)");
   });
 
   it("cinema: operational shows the film row and booking action; gutted drops the row", () => {
     const { sim, unit } = simWith("cinema", 3);
     unit.filmPolicy = "blockbuster";
-    const op = renderToFragment(unitEditorTemplate(sim, unit));
+    const op = renderToFragment(unitEditor(sim, unit));
     expect(op.textContent).toContain("Now showing");
     expect(op.querySelector('[data-edit="filmPolicy"]')!.textContent).toContain("Blockbuster");
     unit.state = "gutted";
-    expect(renderToFragment(unitEditorTemplate(sim, unit)).textContent).not.toContain("Now showing");
+    expect(renderToFragment(unitEditor(sim, unit)).textContent).not.toContain("Now showing");
   });
 });
 
 describe("transport editor row and action branches", () => {
   it("standard elevator: a skipped floor reads plainly (never borrowing the express copy)", () => {
     const { sim, lift } = withLift("elevatorStandard", 4);
-    expect(renderToFragment(transportEditorTemplate(sim, lift)).querySelector('[data-field="stops"]')!.textContent).toBe(
+    expect(renderToFragment(transportEditor(sim, lift)).querySelector('[data-field="stops"]')!.textContent).toBe(
       "all floors",
     );
     expect(sim.tower.setStop(lift.id, 3, false)).toBe(true);
-    const stops = renderToFragment(transportEditorTemplate(sim, lift)).querySelector('[data-field="stops"]')!
+    const stops = renderToFragment(transportEditor(sim, lift)).querySelector('[data-field="stops"]')!
       .textContent!;
     expect(stops).toBe("skips 1 floor");
     expect(stops).not.toContain("express");
@@ -242,7 +242,7 @@ describe("transport editor row and action branches", () => {
 
   it("serves and height cells read the span in plain copy", () => {
     const { sim, lift } = withLift("elevatorStandard");
-    const frag = renderToFragment(transportEditorTemplate(sim, lift));
+    const frag = renderToFragment(transportEditor(sim, lift));
     expect(frag.querySelector('[data-field="serves"]')!.textContent).toBe("1 – 2");
     expect(frag.querySelector('[data-field="height"]')!.textContent).toBe("2 floors");
   });
@@ -254,11 +254,11 @@ describe("transport editor row and action branches", () => {
     // (an idle, never-ticked shaft has no measurement and no line, which the
     // mobile editor renders as no fold-in block at all).
     sim.elevatorUtil.set(lift.id, 0.5);
-    const mobile = renderToFragment(transportEditorTemplate(sim, lift, true));
+    const mobile = renderToFragment(transportEditor(sim, lift, true));
     expect(mobile.querySelector(".ed-diagnostics")).not.toBeNull();
     expect(mobile.textContent).toContain("Avg load: 50% full");
     // Desktop leaves the diagnostics to the hover card, so it carries no block.
-    expect(renderToFragment(transportEditorTemplate(sim, lift)).querySelector(".ed-diagnostics")).toBeNull();
+    expect(renderToFragment(transportEditor(sim, lift)).querySelector(".ed-diagnostics")).toBeNull();
   });
 
   it("mobile omits the diagnostics block for an idle elevator with no measured load", () => {
@@ -266,31 +266,31 @@ describe("transport editor row and action branches", () => {
     // editor renders no empty .ed-diagnostics box (parity with the old empty
     // div's `:empty { display:none }`, now expressed as no box at all).
     const { sim, lift } = withLift("elevatorStandard", 4);
-    expect(renderToFragment(transportEditorTemplate(sim, lift, true)).querySelector(".ed-diagnostics")).toBeNull();
+    expect(renderToFragment(transportEditor(sim, lift, true)).querySelector(".ed-diagnostics")).toBeNull();
   });
 
   it("express elevator surfaces a preserved skipped lobby honestly", () => {
     const express = withLift("elevatorExpress", 3);
     expect(
-      renderToFragment(transportEditorTemplate(express.sim, express.lift)).querySelector('[data-field="stops"]')!
+      renderToFragment(transportEditor(express.sim, express.lift)).querySelector('[data-field="stops"]')!
         .textContent,
     ).toBe("lobbies and sky lobbies");
     // A legacy/forged save can carry a deliberately skipped lobby; the Stops
     // readout surfaces the count instead of overstating the policy.
     express.lift.skipFloors = [1];
-    const frag = renderToFragment(transportEditorTemplate(express.sim, express.lift));
+    const frag = renderToFragment(transportEditor(express.sim, express.lift));
     expect(frag.querySelector('[data-field="stops"]')!.textContent).toBe("lobbies and sky lobbies (1 skipped)");
   });
 
   it("service elevator keeps the elevator rows; an escalator is a fixed-span flight", () => {
     const service = withLift("elevatorService");
-    const sFrag = renderToFragment(transportEditorTemplate(service.sim, service.lift));
+    const sFrag = renderToFragment(transportEditor(service.sim, service.lift));
     expect(sFrag.querySelector('[data-field="cars"]')).not.toBeNull();
     // Stops config folded into the Schedule dialog (#464): no card button remains.
     expect(sFrag.querySelector('[data-edit="stops"]')).toBeNull();
     expect(sFrag.querySelector('[data-edit="schedule"]')).not.toBeNull();
     const esc = withLift("escalator", 2, "shop");
-    const eFrag = renderToFragment(transportEditorTemplate(esc.sim, esc.lift));
+    const eFrag = renderToFragment(transportEditor(esc.sim, esc.lift));
     expect(eFrag.querySelector('[data-field="cars"]')).toBeNull();
     expect(eFrag.querySelector('[data-edit="extendUp"]')).toBeNull();
     expect(eFrag.querySelector('[data-edit="sell"]')).not.toBeNull();
@@ -300,7 +300,7 @@ describe("transport editor row and action branches", () => {
 describe("the Classic rung picker row (ux-pricing-split-editor §1)", () => {
   it("renders the four canon rungs, the divider, and No Rate, labels verbatim from the engine table", () => {
     const { sim, unit } = simWith("office");
-    const frag = renderToFragment(unitEditorTemplate(sim, unit));
+    const frag = renderToFragment(unitEditor(sim, unit));
     const picker = frag.querySelector<HTMLSelectElement>("#ed-rung")!;
     expect(picker).not.toBeNull();
     expect(picker.classList.contains("field")).toBe(true);
@@ -326,22 +326,22 @@ describe("the Classic rung picker row (ux-pricing-split-editor §1)", () => {
 
   it("the chip carries the rung color slot, is decorative, and hollows out for No Rate", () => {
     const { sim, unit } = simWith("office");
-    const priced = renderToFragment(unitEditorTemplate(sim, unit));
+    const priced = renderToFragment(unitEditor(sim, unit));
     const chip = priced.querySelector<HTMLElement>(".rung-chip")!;
     expect(chip).not.toBeNull();
     expect(chip.getAttribute("aria-hidden")).toBe("true"); // color never carries the state alone
     expect(chip.dataset.rung).toBe("2");
     sim.priceUnit(unit, 15_000);
-    expect(renderToFragment(unitEditorTemplate(sim, unit)).querySelector<HTMLElement>(".rung-chip")!.dataset.rung).toBe("3");
+    expect(renderToFragment(unitEditor(sim, unit)).querySelector<HTMLElement>(".rung-chip")!.dataset.rung).toBe("3");
     unit.noRate = true;
-    const off = renderToFragment(unitEditorTemplate(sim, unit));
+    const off = renderToFragment(unitEditor(sim, unit));
     expect(off.querySelector<HTMLElement>(".rung-chip")!.dataset.rung).toBe("none");
     expect(off.querySelector<HTMLSelectElement>("#ed-rung")!.dataset.current).toBe("noRate");
   });
 
   it("hotel kinds get the picker with their own canon ladder", () => {
     const { sim, unit } = simWith("hotelSuite");
-    const picker = renderToFragment(unitEditorTemplate(sim, unit)).querySelector<HTMLSelectElement>("#ed-rung")!;
+    const picker = renderToFragment(unitEditor(sim, unit)).querySelector<HTMLSelectElement>("#ed-rung")!;
     expect([...picker.querySelectorAll("option")].map((o) => o.textContent)).toEqual([
       "Very Low  $1,500",
       "Low  $4,000",
@@ -354,7 +354,7 @@ describe("the Classic rung picker row (ux-pricing-split-editor §1)", () => {
 
   it("Modern offices keep the stepper and never see a picker or a No Rate option", () => {
     const { sim, unit } = simWithModern("office");
-    const frag = renderToFragment(unitEditorTemplate(sim, unit));
+    const frag = renderToFragment(unitEditor(sim, unit));
     expect(frag.querySelector("#ed-rung")).toBeNull();
     expect(frag.querySelector('[data-edit="rentUp"]')).not.toBeNull();
     expect(frag.textContent).not.toContain("No Rate");
@@ -367,7 +367,7 @@ describe("the editor access row's third state (#370)", () => {
     expect(sim.tower.placeTransport("elevatorStandard", 10, 1, 2).ok).toBe(true); // served
     // Force the cut-off verdict: the template must read sim.floorReachable.
     sim.floorReachable = () => false;
-    const frag = renderToFragment(unitEditorTemplate(sim, unit));
+    const frag = renderToFragment(unitEditor(sim, unit));
     const cell = frag.querySelector('[data-field="served"]')!;
     expect(cell.textContent).toBe("No route");
     expect(cell.innerHTML).toContain("var(--bad)");
@@ -376,11 +376,11 @@ describe("the editor access row's third state (#370)", () => {
   it("served and reachable reads Yes in the good color; unserved reads No", () => {
     const { sim, unit } = simWith("office");
     expect(sim.tower.placeTransport("elevatorStandard", 10, 1, 2).ok).toBe(true); // served
-    const yes = renderToFragment(unitEditorTemplate(sim, unit)).querySelector('[data-field="served"]')!;
+    const yes = renderToFragment(unitEditor(sim, unit)).querySelector('[data-field="served"]')!;
     expect(yes.textContent).toBe("Yes");
     expect(yes.innerHTML).toContain("var(--good)");
     sim.tower.isFloorServed = () => false;
-    const no = renderToFragment(unitEditorTemplate(sim, unit)).querySelector('[data-field="served"]')!;
+    const no = renderToFragment(unitEditor(sim, unit)).querySelector('[data-field="served"]')!;
     expect(no.textContent).toBe("No");
     expect(no.innerHTML).toContain("var(--bad)");
   });
@@ -389,7 +389,7 @@ describe("the editor access row's third state (#370)", () => {
     const { sim, unit } = simWith("security");
     expect(sim.tower.placeTransport("elevatorStandard", 10, 1, 2).ok).toBe(true); // served
     sim.floorReachable = () => false; // must be ignored for service kinds
-    const cell = renderToFragment(unitEditorTemplate(sim, unit)).querySelector('[data-field="served"]')!;
+    const cell = renderToFragment(unitEditor(sim, unit)).querySelector('[data-field="served"]')!;
     expect(cell.textContent).toBe("Yes");
   });
 });

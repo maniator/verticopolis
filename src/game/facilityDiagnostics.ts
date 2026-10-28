@@ -183,7 +183,7 @@ export function retailStatsLines(
  * connectivity signal for a zero-population service kind (keep it). One source,
  * so the editor and the diagnostics can never disagree on which kinds carry it.
  */
-export function hasAccessDiagnostic(catalog: Catalog, u: Unit): boolean {
+export function hasAccessDiagnostic(catalog: Catalog, u: Pick<Unit, "kind">): boolean {
   const f = catalogFacility(catalog, u.kind);
   return f.population > 0 || f.dailyIncome !== null;
 }

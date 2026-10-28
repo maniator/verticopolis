@@ -12,9 +12,9 @@ import { Simulation } from "../../engine/Simulation";
 import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
 import type { Unit } from "../../engine/types";
-import { unitEditorTemplate } from "../../ui/templates/editor";
 import { toggleMute } from "../../game/audioPrefs";
 import { loadPrefs } from "../../storage/Prefs";
+import { unitEditor } from "../../game/cardKit.fixture";
 
 /**
  * Pins the dialog/window wiring contracts in src/ui/UI.ts — the layer where
@@ -575,7 +575,7 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
     const { ui } = makeUI();
     const { sim, office } = officeSim();
     office.satisfaction = 0.5;
-    ui.renderEditor(unitEditorTemplate(sim, office));
+    ui.renderEditor(unitEditor(sim, office));
     expect(ui.isEditorOpen()).toBe(true);
     const btn = editorEl().querySelector<HTMLElement>('[data-edit="rentUp"]')!;
     const name = editorEl().querySelector<HTMLInputElement>("#ed-name")!;
@@ -583,7 +583,7 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
     expect(evalCell.textContent).toContain("50%");
 
     office.satisfaction = 0.78;
-    ui.renderEditor(unitEditorTemplate(sim, office));
+    ui.renderEditor(unitEditor(sim, office));
     expect(evalCell.textContent).toContain("78%");
     expect(editorEl().querySelector('[data-edit="rentUp"]')).toBe(btn); // no swallowed click
     expect(editorEl().querySelector("#ed-name")).toBe(name);
@@ -592,7 +592,7 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
   it("a refresh landing between pointerdown and pointerup does not recreate the pressed button (the '+ rent' bug)", () => {
     const { ui, cb } = makeUI();
     const { sim, office } = officeSim();
-    ui.renderEditor(unitEditorTemplate(sim, office));
+    ui.renderEditor(unitEditor(sim, office));
     const btn = editorEl().querySelector<HTMLElement>('[data-edit="rentUp"]')!;
 
     // Press... the main loop's refresh gate (editorBusy) arms,
@@ -600,7 +600,7 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
     expect(ui.isEditorBusy()).toBe(true);
     // ...but even a refresh that slips through mid-click keeps the element:
     office.satisfaction = 0.9;
-    ui.renderEditor(unitEditorTemplate(sim, office));
+    ui.renderEditor(unitEditor(sim, office));
     expect(editorEl().querySelector('[data-edit="rentUp"]')).toBe(btn);
     // ...release, and the click that began before the refresh still lands.
     document.dispatchEvent(new Event("pointerup", { bubbles: true }));
@@ -612,9 +612,9 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
   it("[data-edit] clicks dispatch through the delegated listener after any re-render", () => {
     const { ui, cb } = makeUI();
     const { sim, office } = officeSim();
-    ui.renderEditor(unitEditorTemplate(sim, office));
+    ui.renderEditor(unitEditor(sim, office));
     office.state = "gutted"; // shape change: rows restructure
-    ui.renderEditor(unitEditorTemplate(sim, office));
+    ui.renderEditor(unitEditor(sim, office));
     editorEl().querySelector<HTMLElement>('[data-edit="sell"]')!.click();
     expect(cb.onEditAction).toHaveBeenCalledExactlyOnceWith("sell", editorEl());
   });
@@ -628,7 +628,7 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
     expect(r.ok).toBe(true);
     const office = sim.tower.units.find((u) => u.id === r.unitId)!;
     office.state = "occupied";
-    ui.renderEditor(unitEditorTemplate(sim, office));
+    ui.renderEditor(unitEditor(sim, office));
     const select = editorEl().querySelector<HTMLSelectElement>("#ed-rung")!;
     expect(select.value).toBe("2"); // renderEditor synced the Average selection post-render
     select.value = "3";
@@ -636,20 +636,20 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
     expect(cb.onEditAction).toHaveBeenCalledExactlyOnceWith("rung", editorEl());
     // An engine-side change re-syncs the picker on the next pump render.
     sim.priceUnit(office, 2_000);
-    ui.renderEditor(unitEditorTemplate(sim, office));
+    ui.renderEditor(unitEditor(sim, office));
     expect(editorEl().querySelector<HTMLSelectElement>("#ed-rung")!.value).toBe("0");
   });
 
   it("hideEditor clears the card through lit and a later render reopens it", () => {
     const { ui } = makeUI();
     const { sim, office } = officeSim();
-    ui.renderEditor(unitEditorTemplate(sim, office));
+    ui.renderEditor(unitEditor(sim, office));
     ui.hideEditor();
     expect(ui.isEditorOpen()).toBe(false);
     expect(editorEl().textContent?.trim()).toBe("");
     expect(editorEl().querySelector("[data-edit]")).toBeNull();
 
-    ui.renderEditor(unitEditorTemplate(sim, office));
+    ui.renderEditor(unitEditor(sim, office));
     expect(ui.isEditorOpen()).toBe(true);
     expect(editorEl().querySelector('[data-edit="sell"]')).not.toBeNull();
   });
@@ -657,7 +657,7 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
   it("the editor card's title-bar ✕ hides it via the delegated listener", () => {
     const { ui } = makeUI();
     const { sim, office } = officeSim();
-    ui.renderEditor(unitEditorTemplate(sim, office));
+    ui.renderEditor(unitEditor(sim, office));
     expect(ui.isEditorOpen()).toBe(true);
     editorEl().querySelector<HTMLElement>(".ed-close")!.click();
     expect(ui.isEditorOpen()).toBe(false);

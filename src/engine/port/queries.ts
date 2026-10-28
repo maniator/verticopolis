@@ -120,7 +120,7 @@ export function crewCoverage(sim: Simulation): Float64Array {
 
 /** What a unit charges: 0 off the market, else its rent or its kind's
  *  default (the panels' `unitPrice`, which the engine cannot import). */
-function price(sim: Simulation, u: Unit): number {
+export function price(sim: Simulation, u: Unit): number {
   if (u.noRate) return 0;
   return u.rent ?? catalogFacility(towerCatalog(sim), u.kind).rent?.default ?? 0;
 }

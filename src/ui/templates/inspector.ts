@@ -1,15 +1,12 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import type { Simulation } from "../../engine/Simulation";
-import type { Transport, Unit } from "../../engine/types";
 import { isTenanted } from "../../engine/types";
 import { isCommercialKind, isElevatorKind, isOpenAt, residentCount } from "../../engine/facilities";
-import { catalogFacility } from "../../engine/catalogTypes";
-import { facilityDiagnostics, transportDiagnostics } from "../../game/facilityDiagnostics";
+import { catalogFacility, type Catalog } from "../../engine/catalogTypes";
+import type { TransportDetail, UnitDetail } from "../../simport/panels";
 import { floorTag } from "../format";
-import { towerCatalog } from "../../engine/towerCatalog";
 
 /**
- * The hover inspector card bodies (E6-S2), pure functions of (sim, entity),
+ * The hover inspector card bodies (E6-S2), pure functions of (card, catalog, hour),
  * plus the Modern build-refusal tooltip that borrows the same DOM surface.
  * Authored to match the strings `InspectorController.inspectPicked` and
  * `GameApp.updateBuildRefusal` built inline (pinned by the legacy-replica
@@ -19,7 +16,8 @@ import { towerCatalog } from "../../engine/towerCatalog";
  * whitelist-coerced on load). The diagnostics blocks (`facilityDiagnostics` /
  * `transportDiagnostics`, shared with the mobile editor fold-in) return lit
  * `TemplateResult` lines and are interpolated directly; an empty array renders
- * nothing.
+ * nothing. The caller hands them over as `diagnostics`, built from the
+ * simulation, which the cards do not carry yet.
  *
  * The mobile-only ✕ is NOT part of these templates: `showInspector` appends
  * it from the one shared `titleBarClose` recipe after the h4's lit-managed
@@ -30,7 +28,7 @@ import { towerCatalog } from "../../engine/towerCatalog";
  *  as bare enums ("dirty", "asleep"); the diagnostics block adds the why + the
  *  fix. A relocation is a life event (Modern condos), not a complaint, so its
  *  status line reads differently. */
-function statusTextFor(u: Unit): string {
+function statusTextFor(u: Pick<UnitDetail, "state" | "vacateReason">): string {
   switch (u.state) {
     case "vacating":
       return u.vacateReason === "relocation" ? "on notice (household relocating)" : "on notice (tenant leaving)";
@@ -45,8 +43,8 @@ function statusTextFor(u: Unit): string {
   }
 }
 
-export function unitInspectorTemplate(sim: Simulation, u: Unit): TemplateResult {
-  const f = catalogFacility(towerCatalog(sim), u.kind);
+export function unitInspectorTemplate(u: UnitDetail, catalog: Catalog, hour: number, diagnostics: TemplateResult[]): TemplateResult {
+  const f = catalogFacility(catalog, u.kind);
   const statusText = statusTextFor(u);
   // Canon retail variant (§7): a shop / fastFood / restaurant with a subtype
   // titles as its specific name ("Chinese Cafe"), not the generic kind name.
@@ -63,24 +61,24 @@ export function unitInspectorTemplate(sim: Simulation, u: Unit): TemplateResult 
   // Attendance venues (cinema / party hall / wedding hall, catalog population
   // 0) show the same live line from their routed attendance tally: a mid-show
   // house must never inspect as empty while the audience is visibly seated.
-  const closed = isTenanted(u) && !isOpenAt(u.kind, sim.clock.hour);
+  const closed = isTenanted(u) && !isOpenAt(u.kind, hour);
   let peopleLine: TemplateResult | typeof nothing = nothing;
   if ((isCommercialKind(u.kind) && f.population > 0) || f.attendance !== null)
     peopleLine = html`<div>Customers: ${u.customersIn ?? 0}${closed ? " (closed)" : ""}</div>`;
-  else if (f.population) peopleLine = html`<div>Occupants: ${u.occupants}/${residentCount(u)}</div>`;
+  else if (f.population) peopleLine = html`<div>Occupants: ${u.occupants}/${residentCount({ kind: u.kind, residents: u.residents ?? undefined })}</div>`;
   return html`<h4 class="win-title">${title}</h4><div>${labelIsExtra ? html`${u.label}<br />` : nothing}${
     u.floor >= 1 ? `Floor ${u.floor}` : `B${1 - u.floor}`
-  }</div><div>Status: ${statusText}</div>${peopleLine}${facilityDiagnostics(sim, u)}<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`;
+  }</div><div>Status: ${statusText}</div>${peopleLine}${diagnostics}<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`;
 }
 
-export function transportInspectorTemplate(sim: Simulation, t: Transport): TemplateResult {
-  const f = catalogFacility(towerCatalog(sim), t.kind);
+export function transportInspectorTemplate(t: TransportDetail, catalog: Catalog, diagnostics: TemplateResult[]): TemplateResult {
+  const f = catalogFacility(catalog, t.kind);
   // Passenger elevators report how full their cars run on average (staff-only
   // service elevators carry no passenger load, so they show none). Shared
   // with the mobile transport editor via transportDiagnostics.
   return html`<h4 class="win-title">${f.name}</h4><div>Serves floors ${floorTag(t.bottom)}–${floorTag(t.top)}</div>${
     isElevatorKind(t.kind) ? html`<div>Cars: ${t.cars}</div>` : nothing
-  }${transportDiagnostics(sim, t)}`;
+  }${diagnostics}`;
 }
 
 /** The Modern build-refusal tooltip: the build-preview path borrows the

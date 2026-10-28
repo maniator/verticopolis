@@ -6,7 +6,7 @@ import { ECON, rentOf, carResaleRefund, resaleRefund } from "../../engine/econCo
 import type { FacilityKind, Transport, Unit } from "../../engine/types";
 import type { Picked, TowerEngine } from "../../render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
-import { unitEditorTemplate, transportEditorTemplate } from "../../ui/templates/editor";
+import { unitEditor, transportEditor, editorPortDeps, inspectorPortDeps } from "../../game/cardKit.fixture";
 import { announceForPlacement, snapX, type PlaceOutcome } from "../../ui/placement";
 import { BuildActions } from "../../game/buildActions";
 import { EditorActions } from "../../game/editorActions";
@@ -14,7 +14,7 @@ import { SaveLoad } from "../../game/saveLoad";
 import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
 import { render, type TemplateResult } from "lit-html";
-import { createTsSim } from "../../simport/tsSim";
+import { portDeps } from "../../game/portDeps.fixture";
 
 const CAT = catalogFor("classic");
 
@@ -93,8 +93,7 @@ describe("BuildActions (the money boundary)", () => {
     ({ sim, office, lift } = fixture());
     f = fakes();
     build = new BuildActions({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...portDeps(sim).deps,
       ui: f.ui,
       audio: f.audio,
       selectedId: () => null,
@@ -204,16 +203,14 @@ describe("EditorActions (editor-card money paths)", () => {
     undo = { captures: [], commits: 0 };
     root = document.createElement("div");
     const build = new BuildActions({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...portDeps(sim).deps,
       ui: f.ui,
       audio: f.audio,
       selectedId: () => sel?.id ?? null,
       clearSelection: () => (sel = null),
     });
     editor = new EditorActions({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...editorPortDeps(sim),
       ui: {
         toast: f.ui.toast,
         showBatchPricingDialog: () => {},
@@ -222,9 +219,6 @@ describe("EditorActions (editor-card money paths)", () => {
       audio: f.audio,
       build,
       selected: () => sel,
-      selectedUnit: () => (sel?.type === "unit" ? sim.tower.units.find((x) => x.id === sel!.id) : undefined),
-      selectedTransport: () =>
-        sel?.type === "transport" ? sim.tower.transports.find((x) => x.id === sel!.id) : undefined,
       clearSelection: () => (sel = null),
       refreshEditor: () => {},
       captureUndo: (label) => undo.captures.push(label),
@@ -235,7 +229,7 @@ describe("EditorActions (editor-card money paths)", () => {
 
   it("sell (unit) pays the resale refund, clears the selection, commits the undo step", async () => {
     sel = { type: "unit", id: office.id };
-    render(unitEditorTemplate(sim, office), root);
+    render(unitEditor(sim, office), root);
     const before = sim.money;
     await editor.handleEditAction("sell", root);
     expect(sim.money - before).toBe(resaleRefund("office"));
@@ -248,7 +242,7 @@ describe("EditorActions (editor-card money paths)", () => {
 
   it("sell (transport) routes through the one shared refund path", async () => {
     sel = { type: "transport", id: lift.id };
-    render(transportEditorTemplate(sim, lift), root);
+    render(transportEditor(sim, lift), root);
     const before = sim.money;
     await editor.handleEditAction("sell", root);
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
@@ -258,8 +252,8 @@ describe("EditorActions (editor-card money paths)", () => {
 
   it("mobile editor folds in the card's diagnostics and drops the duplicate access row", () => {
     const { sim, office } = fixture();
-    const mobile = renderedCard(unitEditorTemplate(sim, office, true));
-    const desktop = renderedCard(unitEditorTemplate(sim, office, false));
+    const mobile = renderedCard(unitEditor(sim, office, true));
+    const desktop = renderedCard(unitEditor(sim, office, false));
     // Mobile folds in the card's richer access reachability line as a live
     // block, so the plain "Elevator access: Yes/No" row that would duplicate it
     // is dropped.
@@ -284,7 +278,7 @@ describe("EditorActions (editor-card money paths)", () => {
     // Security has no population and no traffic income, so facilityDiagnostics
     // emits no access line: the mobile editor keeps the plain "Elevator access"
     // row so its connectivity still shows (parity with desktop, not a silent drop).
-    expect(renderedCard(unitEditorTemplate(sim, sec, true)).textContent).toContain("Elevator access");
+    expect(renderedCard(unitEditor(sim, sec, true)).textContent).toContain("Elevator access");
   });
 
   it("mobile editor folds the retail patronage block into a shop's panel", () => {
@@ -295,13 +289,13 @@ describe("EditorActions (editor-card money paths)", () => {
     expect(r.ok).toBe(true);
     const shop = sim.tower.units.find((u) => u.id === r.unitId)!;
     shop.state = "occupied";
-    expect(renderedCard(unitEditorTemplate(sim, shop, true)).textContent).toContain("patronage");
-    expect(renderedCard(unitEditorTemplate(sim, shop, false)).textContent).not.toContain("patronage");
+    expect(renderedCard(unitEditor(sim, shop, true)).textContent).toContain("patronage");
+    expect(renderedCard(unitEditor(sim, shop, false)).textContent).not.toContain("patronage");
   });
 
   it("rentUp/rentDown clamp a real office to the ends of the Classic ladder", async () => {
     sel = { type: "unit", id: office.id };
-    render(unitEditorTemplate(sim, office), root);
+    render(unitEditor(sim, office), root);
     // A default Simulation is Classic: nudges step whole rungs and clamp at
     // the ladder ends (High $15,000 / Very Low $2,000), never the Modern band.
     for (let i = 0; i < 100; i++) await editor.handleEditAction("rentUp", root);
@@ -312,7 +306,7 @@ describe("EditorActions (editor-card money paths)", () => {
 
   it("addcar charges and removecar refunds the half-back car resale", async () => {
     sel = { type: "transport", id: lift.id };
-    render(transportEditorTemplate(sim, lift), root);
+    render(transportEditor(sim, lift), root);
     const cars0 = lift.cars;
     const before = sim.money;
     await editor.handleEditAction("addcar", root);
@@ -325,7 +319,7 @@ describe("EditorActions (editor-card money paths)", () => {
 
   it("extendUp refuses when broke: toast, error sfx, shaft unchanged", async () => {
     sel = { type: "transport", id: lift.id };
-    render(transportEditorTemplate(sim, lift), root);
+    render(transportEditor(sim, lift), root);
     sim.money = 0;
     const { top, bottom } = lift;
     await editor.handleEditAction("extendUp", root);
@@ -464,7 +458,7 @@ describe("InspectorController (✕-dismissal latch)", () => {
     shown = [];
     anchor = null;
     inspector = new InspectorController({
-      getSim: () => sim,
+      ...inspectorPortDeps(sim),
       // The card is a lit template since E6-S2; record its rendered text so
       // the latch assertions keep reading plain content.
       ui: { showInspector: (tpl) => shown.push(tpl && renderedText(tpl)) },
@@ -545,8 +539,7 @@ describe("KeyboardPlay (commit announcements)", () => {
     tool = { type: "inspect" };
     const f = fakes();
     const build = new BuildActions({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...portDeps(sim).deps,
       ui: f.ui,
       audio: f.audio,
       selectedId: () => null,
@@ -565,15 +558,17 @@ describe("KeyboardPlay (commit announcements)", () => {
       return t ? { type: "transport", id: t.id, kind: t.kind } : null;
     };
     // Mirrors placeSimpleBuild in src/game/buildPreview.ts: the injected gesture-shared placement.
-    const placeSimpleBuild = (kind: FacilityKind, tile: number, floor: number): Promise<PlaceOutcome> | null => {
+    const placeSimpleBuild = (kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null => {
       if (kind === "floor" || kind === "lobby") {
-        return build.paintBrush(kind, tile, floor).then((r) => ({ what: "paint", ok: r.placed > 0, reason: r.reason }));
+        const r = build.paintBrush(kind, tile, floor);
+        return { what: "paint", ok: r.placed > 0, reason: r.reason };
       }
       if (isFixedSpanTransport(kind)) {
-        return build.tryBuildTransport(kind, snapX(CAT, kind, tile), floor, floor + 1).then((r) => ({ what: "flight", ok: r.ok, reason: r.reason }));
+        const r = build.tryBuildTransport(kind, snapX(CAT, kind, tile), floor, floor + 1);
+        return { what: "flight", ok: r.ok, reason: r.reason };
       }
       if (FACILITIES[kind].transport) return null;
-      return build.tryBuild(kind, floor, snapX(CAT, kind, tile)).then((ok) => ({ what: "room", ok }));
+      return { what: "room", ok: build.tryBuild(kind, floor, snapX(CAT, kind, tile)) };
     };
     const fakeEngine = {
       ensureVisible: () => {},
@@ -581,8 +576,7 @@ describe("KeyboardPlay (commit announcements)", () => {
       transportPreview: null as TowerEngine["transportPreview"],
     };
     keyboard = new KeyboardPlay({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...portDeps(sim).deps,
       engine: () => fakeEngine,
       audio: f.audio,
       ui: f.ui,
@@ -663,7 +657,7 @@ describe("InspectorController (data-rich cards: parking, recycling, notice)", ()
   function makeInspector(sim: Simulation) {
     const shown: (string | null)[] = [];
     const inspector = new InspectorController({
-      getSim: () => sim,
+      ...inspectorPortDeps(sim),
       ui: { showInspector: (tpl) => shown.push(tpl && renderedText(tpl)) },
       setAnchor: () => {},
     });
