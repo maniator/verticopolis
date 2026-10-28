@@ -110,6 +110,7 @@ pub(crate) fn add_panel_records(layout: &mut serde_json::Value) {
     layout["heatTints"] = serde_json::json!(HEAT_TINTS);
     layout["vacateReasons"] = serde_json::json!(VACATE_REASONS);
     super::port_reports::add_report_records(layout);
+    super::port_render::add_render_records(layout);
 }
 
 fn heat_mode(code: f64) -> Option<HeatmapMode> {
