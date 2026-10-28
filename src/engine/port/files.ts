@@ -7,6 +7,7 @@ import {
   encodeSaveJson,
   fromBase64,
   inflateCapped,
+  SaveTooLargeError,
   parseSaveJson,
   toBase64,
 } from "../../storage/saveCompression";
@@ -36,11 +37,24 @@ export function readVctower(text: string): Simulation {
   const trimmed = text.trim();
   if (!trimmed.startsWith(TOWER_FILE_MAGIC)) throw new Error("not a VCTOWER1 file");
   const packed = lenientBase64(trimmed.slice(TOWER_FILE_MAGIC.length));
-  const raw = parseSaveJson(new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(packed))) as SerializedGame;
+  const raw = parseSaveJson(new TextDecoder("utf-8", { fatal: true }).decode(inflate(packed))) as SerializedGame;
   // Best effort past the parse, as `loadSave` and the Rust reader are.
   const sim = deserializeSave(raw);
   markFounderFromLoadedFile(sim, raw);
   return sim;
+}
+
+/** `inflateCapped` with the Rust reader's refusal text past the cap
+ *  (`load::decode_vctower`); the cap's own error carries none. */
+function inflate(packed: Uint8Array): Uint8Array {
+  try {
+    return inflateCapped(packed);
+  } catch (e) {
+    if (e instanceof SaveTooLargeError) {
+      throw new Error("this .vctower expands to more data than we will hold; it looks crafted rather than saved");
+    }
+    throw e;
+  }
 }
 
 /** The payload as `Buffer.from(b64, "base64")` reads it, which the Rust

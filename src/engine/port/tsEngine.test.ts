@@ -1,4 +1,6 @@
+import { deflateSync } from "fflate";
 import { describe, expect, it } from "vitest";
+import { MAX_SAVE_INFLATED_BYTES, TOWER_FILE_MAGIC, toBase64 } from "../../storage/saveCompression";
 import { Simulation } from "../Simulation";
 import { INVALID_REQUEST, UNKNOWN_FACILITY } from "../request";
 import { KIND_CODES, UNIT_STATE_CODES, VIEW_LAYOUT, VIEW_LAYOUT_TEXT, codeOf } from "./layout";
@@ -318,6 +320,9 @@ describe("TsEngine's reports and files", () => {
     expect(e.loadVctower(`${magic}\n${body.slice(0, 40)}!${body.slice(40)}\n`)[0]).toBe(1);
     expect(e.loadVctower(`${magic}\n${body.replace(/\+/g, "-").replace(/\//g, "_")}\n`)[0]).toBe(1);
     expect(e.loadVctower(`${magic}\n${body.replace(/=+$/, "")}\n`)[0]).toBe(1);
+    const bomb = `${TOWER_FILE_MAGIC}\n${toBase64(deflateSync(new Uint8Array(MAX_SAVE_INFLATED_BYTES + 1)))}\n`;
+    expect(e.loadVctower(bomb)[0]).toBe(0);
+    expect(e.lastReason()).toContain("looks crafted");
     expect(Array.from(e.loadVctower("not a tower"))).toEqual([0, 4]);
     expect(e.lastReason()).toBeTruthy();
     // A stored save with no appVersion is a founder's tower; a restore is not.
