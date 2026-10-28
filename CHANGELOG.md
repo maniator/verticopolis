@@ -13,6 +13,15 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.48.0
+
+- Exporting to SimTower (1994) now works for a tower loaded from a save that has no tower name. The file is named TOWER1.TDT.
+
+## 2.47.1
+
+- A tower saved at a rare point in its run of random events now reloads with the same events still ahead of it.
+- A save edited by hand now loads the same way on the Rust engine and the TypeScript engine.
+
 ## 2.47.0
 
 - Settings has a new Game engine choice, Automatic, the Rust engine (experimental), or the TypeScript engine (stable). A change takes effect the next time the game starts.

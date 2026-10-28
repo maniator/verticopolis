@@ -133,7 +133,7 @@ const RAW_WRITES: Record<string, Record<string, number>> = {
 const NAMED_WRITES: Record<string, Record<string, number>> = {
   "src/engine/crowd/motion.ts": { state: 9 },
   "src/engine/crowd/visits.ts": { state: 1 },
-  "src/engine/rng.ts": { state: 3 },
+  "src/engine/rng.ts": { state: 4 },
   "src/simport/viewReader.ts": { label: 1 },
   "src/wasmhost/frameApply.ts": { state: 1 },
   "src/wasmhost/frameSync.ts": { state: 1 },
@@ -199,6 +199,9 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   // The command contract's malformed input for the port's shape check (a
   // getter, a `toJSON`, a hidden key): test data that reaches no room.
   "src/simport/commandContract.fixture.ts": { bulk: 7 },
+  // `buildTDT`'s reviver deletes a `toString` key from the export's own
+  // `JSON.parse` copy of the save: parsed data that reaches no room.
+  "src/storage/tdtExport.ts": { bulk: 1 },
   // Array slots: the section builder's output and the telemetry's tables.
   "src/wasmhost/buildSection.ts": { keyed: 1 },
   "src/wasmhost/telemetry.ts": { keyed: 2 },

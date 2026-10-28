@@ -28,7 +28,7 @@ import {
 } from "./tdtConstants";
 import { viewWordsFromView } from "./tdtViewMapping";
 import { ELEVATOR_KINDS } from "./tdtTables";
-import { LegacyExportError } from "./tdtExportTables";
+import { LegacyExportError, listOf } from "./tdtExportTables";
 import type { GatheredTower } from "./tdtExportGather";
 import { connectedStallCount } from "./tdtExportParking";
 import { writeFormatStamp } from "./tdtStamp";
@@ -251,7 +251,9 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
   const elevators: { kind: FacilityKind; x: number; bottom: number; top: number; cars: number; carPositions: number[]; skipFloors?: number[] }[] = [];
   const walkways: { kind: FacilityKind; x: number; bottom: number }[] = [];
   let transportsDropped = 0;
-  for (const t of save.transports) {
+  // As in Rust (#887): an entry that is not an object reads kindless and drops.
+  for (const entry of listOf(save, "transports")) {
+    const t = (typeof entry === "object" && entry !== null ? entry : {}) as SerializedGame["transports"][number];
     const width = FACILITIES[t.kind]?.width ?? 0;
     if (t.kind === "stairs" || t.kind === "escalator") {
       // A flight must sit fully inside the buildable range (same guard the
@@ -288,8 +290,8 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
       bottom,
       top,
       cars: t.cars,
-      carPositions: t.carPositions ?? [],
-      skipFloors: t.skipFloors,
+      carPositions: Array.isArray(t.carPositions) ? t.carPositions : [], // as in Rust: not a list, so empty
+      skipFloors: Array.isArray(t.skipFloors) ? t.skipFloors : [],
     });
   }
   // The 24-slot table can't hold more (only forged saves exceed the pooled

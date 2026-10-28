@@ -79,6 +79,7 @@ export function deserialize(raw: SerializedGame): Simulation {
     coerceCalendarKind(data.modernCalendar),
     false, // startUnbridged: the autoBridge restore below is authoritative
   );
+  restoreSavedState(sim.rng, data.seed); // #856: the saved live state, 0 included
   // Bridging is on by default (absent loads as on, byte-identical). Off when the
   // save turned it off OR it is a legacy "manual structure" tower (that option
   // became the founding "no bridging" default). Classic clamps a forged value on.
@@ -93,14 +94,12 @@ export function deserialize(raw: SerializedGame): Simulation {
   sim.star = Math.max(1, Math.min(6, Math.floor(typeof data.star === "number" && Number.isFinite(data.star) ? data.star : 1)));
   // Reuse the calendar the constructor already resolved from mode + choice, so
   // the restored clock reads the same week/quarter/year as a fresh tower would.
-  // Clamp minutes to a non-negative finite number (untrusted save): a forged
-  // NaN/negative would poison every clock.minutes consumer. Not floored, so a valid fractional (sub-minute) save round-trips.
-  sim.clock = new Clock(Math.max(0, typeof data.minutes === "number" && Number.isFinite(data.minutes) ? data.minutes : 0), sim.clock.calendar);
-  sim.evaluatedTower = data.evaluatedTower;
+  sim.clock = new Clock(coerceMinutes(data.minutes), sim.clock.calendar);
+  sim.evaluatedTower = savedFlag(data.evaluatedTower);
   // Restore the pending VIP inspection so saving during the post-Wedding-Hall
   // window doesn't permanently cancel the TOWER evaluation.
-  sim.vipVisitDay = data.vipVisitDay ?? -1;
-  sim.vipFavorable = data.vipFavorable ?? false;
+  sim.vipVisitDay = typeof data.vipVisitDay === "number" && Number.isFinite(data.vipVisitDay) ? data.vipVisitDay : -1;
+  sim.vipFavorable = data.vipFavorable === true;
   // Clamp to a bounded non-negative integer (untrusted save): a forged negative,
   // fractional, or absurd count would render nonsense in the stats dialog, and
   // past 2^53 the ++ would stop incrementing (same precision trap as ID_CAP).
@@ -122,10 +121,7 @@ export function deserialize(raw: SerializedGame): Simulation {
   // window early (that would both re-nag and inflate the persisted vipVisits).
   // Clamped to the save's own day so a forged future value can't mute the VIP
   // for years; missing (legacy) restores the fresh-tower default.
-  sim.lastVipNagDay = Math.min(
-    sim.clock.day,
-    typeof data.lastVipNagDay === "number" && Number.isFinite(data.lastVipNagDay) ? Math.floor(data.lastVipNagDay) : -100,
-  );
+  sim.lastVipNagDay = coerceLastVipNagDay(sim.clock.day, data.lastVipNagDay);
   // Clamp ≥0 (untrusted): a negative keeps `treasuresFound < 3` true and re-opens the treasure farm.
   sim.treasuresFound = Math.max(
     0,
@@ -245,8 +241,8 @@ export function deserialize(raw: SerializedGame): Simulation {
   // Repair corrupt/duplicate ids and park the id counter above them all
   // (forged-save guard; rationale and the sanity bound live in deserializeGuards).
   sim.tower.setNextId(repairEntityIds([...sim.tower.units, ...sim.tower.transports], data.nextId));
-  sim.tower.towerName = data.towerName;
-  sim.tower.builtWeddingHall = data.builtWeddingHall;
+  sim.tower.towerName = savedName(data.towerName);
+  sim.tower.builtWeddingHall = savedFlag(data.builtWeddingHall);
   sim.tower.reindex();
   // Re-assert the express lobby-stop lock at the trust boundary: the import
   // path above writes `skipFloors` directly (bypassing setStop), so a forged
@@ -291,5 +287,5 @@ export function newGame(seed = 12345, mode: GameMode = "classic", modernCalendar
   return sim;
 }
 
-import { serializeUnit, serializeTransport, coerceLog, coerceView, coerceExterminationDueDay, coerceExterminationRoomIds } from "./coerce";
+import { serializeUnit, serializeTransport, coerceLog, coerceView, coerceExterminationDueDay, coerceExterminationRoomIds, coerceLastVipNagDay, coerceMinutes, restoreSavedState, savedFlag, savedName } from "./coerce";
 import { coerceTransportRecord, coerceUnitRecord, snapUnitRent } from "./deserializeRecords";
