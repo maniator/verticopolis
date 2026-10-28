@@ -52,15 +52,27 @@ export interface WorkerHostStats {
   bytesReceived: number;
   frameBytes: number;
   mergeBytes: number;
+  /** Full-save merges. */
   merges: number;
+  /** Hourly deltas applied (#1045), their bytes, the unit records they
+   *  changed, and deltas that did not fit the read model (a full save was
+   *  asked for instead). */
+  deltas: number;
+  deltaBytes: number;
+  deltaUnits: number;
+  deltasRefused: number;
   replies: number;
   /** Replies that predated one of the instance's commands. */
   staleReplies: number;
   /** Main-thread time applying replies, and the worker's own time. */
   applyMs: number;
   mergeMs: number;
+  deltaMs: number;
   workerOpsMs: number;
   workerReplyMs: number;
+  /** The part of the worker's reply time spent on the save half (the full
+   *  save or the delta, with the telemetry). */
+  workerSaveMs: number;
   /** Command to the first reply that includes it (the ack) and to the end
    *  of applying the first fresh reply that includes it (the change visible
    *  in the read model), in ms, for the last commands (bounded). */
@@ -84,8 +96,8 @@ export const LATENCY_SAMPLES = 512;
 
 export function newWorkerHostStats(): WorkerHostStats {
   return {
-    messagesSent: 0, messagesReceived: 0, opsSent: 0, bytesReceived: 0, frameBytes: 0, mergeBytes: 0, merges: 0, replies: 0, staleReplies: 0,
-    applyMs: 0, mergeMs: 0, workerOpsMs: 0, workerReplyMs: 0, commandAckMs: [], commandVisibleMs: [], commandsAcked: 0, lastCommandSeq: 0, ackedSeq: 0, approximateSaves: 0, workerMemoryBytes: null,
+    messagesSent: 0, messagesReceived: 0, opsSent: 0, bytesReceived: 0, frameBytes: 0, mergeBytes: 0, merges: 0, deltas: 0, deltaBytes: 0, deltaUnits: 0, deltasRefused: 0, replies: 0, staleReplies: 0,
+    applyMs: 0, mergeMs: 0, deltaMs: 0, workerOpsMs: 0, workerReplyMs: 0, workerSaveMs: 0, commandAckMs: [], commandVisibleMs: [], commandsAcked: 0, lastCommandSeq: 0, ackedSeq: 0, approximateSaves: 0, workerMemoryBytes: null,
   };
 }
 

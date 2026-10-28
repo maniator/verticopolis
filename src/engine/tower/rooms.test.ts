@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../Simulation";
-import { roomUnits } from "./rooms";
+import { rampUnits, roomUnits } from "./rooms";
 import type { FacilityKind } from "../types";
 import { isStructural } from "./towerTopology";
-import { ensureStarterLobby, layTile, placeUnit, MID } from "../../tests/fixtures/towerFixtures";
+import { ensureStarterLobby, lay, layTile, placeUnit, MID } from "../../tests/fixtures/towerFixtures";
 import { atEngineFrameCadence, refreshFromEngine } from "../../tests/parity/typescriptOnly";
 
 function towerWithRooms(): Simulation {
@@ -95,6 +95,76 @@ describe("roomUnits", () => {
     roomUnits(sim.tower);
     const loaded = Simulation.deserialize(sim.serialize());
     expect(roomUnits(loaded.tower).map((u) => u.kind)).toEqual(["office"]);
+  });
+});
+
+describe("rampUnits", () => {
+  function towerWithBasement(): Simulation {
+    const sim = Simulation.newGame(13);
+    sim.money = 1e12;
+    sim.star = 3; // parking unlocks at 3 stars
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    lay(sim, "floor", 0);
+    return sim;
+  }
+
+  it("lists the ramps in tower.units order, cached until the tower changes", () => {
+    const sim = towerWithBasement();
+    const a = placeUnit(sim, "parkingRamp", 0, MID);
+    placeUnit(sim, "parking", 0, MID + 16);
+    placeUnit(sim, "office", 2, MID);
+    const b = placeUnit(sim, "parkingRamp", 0, MID - 40);
+    const first = rampUnits(sim.tower);
+    expect(first).toEqual(sim.tower.units.filter((u) => u.kind === "parkingRamp"));
+    expect(first.map((u) => u.id)).toEqual([a.id, b.id]);
+    expect(rampUnits(sim.tower)).toBe(first);
+    expect(Object.isFrozen(first)).toBe(true);
+
+    sim.tower.removeUnit(a.id);
+    expect(rampUnits(sim.tower).map((u) => u.id)).toEqual([b.id]);
+    const c = placeUnit(sim, "parkingRamp", 0, MID + 40);
+    expect(rampUnits(sim.tower).map((u) => u.id)).toEqual([b.id, c.id]);
+  });
+
+  it("rebuilds when the tower changes but its unit count does not", () => {
+    const sim = towerWithBasement();
+    const a = placeUnit(sim, "parkingRamp", 0, MID);
+    const before = rampUnits(sim.tower);
+    const length = sim.tower.units.length;
+    // A bulldoze and a rebuild between two reads: same count, new revision.
+    sim.tower.removeUnit(a.id);
+    const b = placeUnit(sim, "parkingRamp", 0, MID);
+    expect(sim.tower.units.length).toBe(length);
+    expect(rampUnits(sim.tower)).not.toBe(before);
+    expect(rampUnits(sim.tower).map((u) => u.id)).toEqual([b.id]);
+  });
+
+  it("keeps a ramp that is not working, and the parking set reads its state live", () => {
+    const sim = towerWithBasement();
+    const ramp = placeUnit(sim, "parkingRamp", 0, MID);
+    placeUnit(sim, "parking", 0, MID + 16);
+    expect(sim.tower.functionalParkingSet().size).toBe(1);
+    const revision = sim.tower.revision;
+    // A fire changes the state without bumping the revision.
+    ramp.state = "fire";
+    expect(sim.tower.revision).toBe(revision);
+    expect(rampUnits(sim.tower)).toEqual([ramp]);
+    expect(sim.tower.functionalParkingSet().size).toBe(0);
+    ramp.state = "empty";
+    expect(sim.tower.functionalParkingSet().size).toBe(1);
+  });
+
+  it("serves a freshly loaded tower its own ramps and the same parking set", () => {
+    const sim = towerWithBasement();
+    placeUnit(sim, "parkingRamp", 0, MID);
+    placeUnit(sim, "parking", 0, MID + 16);
+    placeUnit(sim, "parkingRamp", 0, MID - 40);
+    const warm = rampUnits(sim.tower);
+    const loaded = Simulation.deserialize(sim.serialize());
+    expect(rampUnits(loaded.tower)).not.toBe(warm);
+    expect(rampUnits(loaded.tower).map((u) => u.id)).toEqual(warm.map((u) => u.id));
+    expect([...loaded.tower.functionalParkingSet()]).toEqual([...sim.tower.functionalParkingSet()]);
   });
 });
 

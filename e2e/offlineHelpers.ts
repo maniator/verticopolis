@@ -176,12 +176,12 @@ export async function expectSoundsAfterGesture(page: Page): Promise<void> {
   await page.waitForFunction(() => (window as any).__audioCounts.music > 0, undefined, { timeout: 30_000 });
 
   expect(await lobbyAt(page, 160), "no lobby at the build spot yet").toBe(false);
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     const g = (window as any).game;
     // Count only what the build itself plays.
     Object.assign((window as any).__audioCounts, { bloop: 0, cues: [] });
     g.sim.money = 1e9;
-    g.build.tryBuild("lobby", 1, 160);
+    await g.build.tryBuild("lobby", 1, 160); // settles once the cue has played
     (window as any).__vcEngine.current().syncStructure();
   });
   expect(await lobbyAt(page, 160), "the lobby was built").toBe(true);

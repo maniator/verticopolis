@@ -56,8 +56,8 @@ export interface UICallbacks {
   onToggleSteadyClock(): boolean;
   /** The live steady-clock state, read from the same in-memory prefs the game loop consults (never a second localStorage read, which could disagree). */
   isSteadyClock(): boolean;
-  /** Modern bridging toggle for the Settings switch: flip (no-op in Classic) and read the live state. */
-  onToggleAutoBridge(): boolean;
+  /** Modern bridging toggle for the Settings switch: flip (no-op in Classic); resolves to the preference in force afterward. */
+  onToggleAutoBridge(): Promise<boolean>;
   isAutoBridge(): boolean;
   onReplayOnboarding(): void;
   onRenameTower(name: string): void;
@@ -421,7 +421,7 @@ export class UI {
 
   showElevatorScheduleDialog(
     ctx: dialogs.ScheduleDialogCtx,
-    cb: { apply: (schedule: ElevatorSchedule) => void },
+    cb: { apply: (schedule: ElevatorSchedule) => Promise<void> },
   ): void {
     dialogs.showElevatorScheduleDialog(this, ctx, cb);
   }

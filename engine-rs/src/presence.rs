@@ -25,56 +25,51 @@ impl Simulation {
         let night = self.clock.is_night();
         let evening = self.clock.is_evening();
         for i in self.tower.room_indices() {
-            let u = &mut self.tower.units[i];
+            let (u, at) = self.tower.marked(i);
             let f = u.kind.facility();
             if u.is_dormant() {
                 if u.state == UnitState::Empty && f.attendance.is_some() {
-                    u.sync_attendance_occupants();
+                    u.sync_attendance_occupants(at);
                 } else {
-                    u.occupants = 0;
+                    u.set_occupants(at, 0);
                 }
                 continue;
             }
-            match u.kind {
-                Kind::Office => {
-                    u.occupants = if !weekend && (8..18).contains(&hour) {
-                        f.population
-                    } else {
-                        0
-                    };
-                }
-                Kind::Condo | Kind::RentalApartment => {
-                    u.occupants = if night || evening || weekend {
-                        u.resident_count()
-                    } else {
-                        1
-                    };
-                }
-                Kind::RentalStudio => {
-                    u.occupants = if night || evening || weekend {
-                        f.population
-                    } else {
-                        0
-                    };
-                }
+            // `None` leaves the head count as it is.
+            let occupants = match u.kind {
+                Kind::Office => Some(if !weekend && (8..18).contains(&hour) {
+                    f.population
+                } else {
+                    0
+                }),
+                Kind::Condo | Kind::RentalApartment => Some(if night || evening || weekend {
+                    u.resident_count()
+                } else {
+                    1
+                }),
+                Kind::RentalStudio => Some(if night || evening || weekend {
+                    f.population
+                } else {
+                    0
+                }),
                 Kind::HotelSingle | Kind::HotelDouble | Kind::HotelSuite => {
-                    u.occupants = if u.state == UnitState::Asleep {
+                    Some(if u.state == UnitState::Asleep {
                         f.population
                     } else {
                         0
-                    };
+                    })
                 }
-                _ => {
-                    if f.attendance.is_some() {
-                        u.sync_attendance_occupants();
+                _ if f.attendance.is_some() => u.attendance_occupants(),
+                _ => Some(
+                    if u.state == UnitState::Occupied && u.kind.is_open_at(hour) {
+                        f.population
                     } else {
-                        u.occupants = if u.state == UnitState::Occupied && u.kind.is_open_at(hour) {
-                            f.population
-                        } else {
-                            0
-                        };
-                    }
-                }
+                        0
+                    },
+                ),
+            };
+            if let Some(n) = occupants {
+                u.set_occupants(at, n);
             }
         }
     }
@@ -113,6 +108,15 @@ impl Simulation {
     /// congestion copy (`bindingTransportClassAt`).
     pub fn spatial_congestion_attribution_by_floor(&self) -> IndexMap<i64, CongestionAttribution> {
         self.build_spatial_congestion().1
+    }
+
+    /// Both maps from one pass, for a reader that needs a floor's ratio and
+    /// then its binding class (the inspector's congestion gripe, #1215),
+    /// where calling the two accessors above would build them twice.
+    pub(crate) fn spatial_congestion_with_attribution(
+        &self,
+    ) -> (IndexMap<i64, f64>, IndexMap<i64, CongestionAttribution>) {
+        self.build_spatial_congestion()
     }
 
     /// `buildSpatialCongestion` (sim/congestion.ts): the ratio map and the

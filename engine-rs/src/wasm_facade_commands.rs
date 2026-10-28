@@ -12,6 +12,7 @@
 //! (`crate::charges::whole`) or the shaft call is refused with
 //! `INVALID_REQUEST` before the tower is read. Native tests call these
 //! directly, since a raw JS value needs a wasm target.
+use crate::brush::{BrushResult, BRUSH_TILE_LIMIT};
 use crate::charges::{whole, INVALID_REQUEST};
 use crate::facilities::Kind;
 use crate::services::ExterminatorRefusal;
@@ -39,7 +40,57 @@ pub(crate) fn exterminator_json(r: &Result<(f64, usize), ExterminatorRefusal>) -
     v.to_string()
 }
 
+/// The brush's tiles from their JSON text: an array of at most
+/// [`BRUSH_TILE_LIMIT`] whole numbers, or `None`. A JSON copy of a hole, NaN
+/// or an infinity is `null`, so it fails like any other value that is not a
+/// whole number. Text longer than any brush the host sends is not read.
+fn brush_tiles(text: &str) -> Option<Vec<i64>> {
+    // The host sends `JSON.stringify` output, which never pads and writes a
+    // whole number in the safe range in at most 17 characters
+    // ("-9007199254740991"), so 32 tiles, their commas and the brackets stay
+    // well under 1,024 characters.
+    if text.len() > 1024 {
+        return None;
+    }
+    let v: serde_json::Value = serde_json::from_str(text).ok()?;
+    let tiles = v.as_array()?;
+    if tiles.len() > BRUSH_TILE_LIMIT {
+        return None;
+    }
+    tiles.iter().map(|x| x.as_f64().and_then(whole)).collect()
+}
+
+/// `BrushResult` as the TypeScript spells it: `{ placed, reason? }`.
+pub(crate) fn brush_json(r: &BrushResult) -> String {
+    let v = match &r.reason {
+        Some(reason) => serde_json::json!({ "placed": r.placed, "reason": reason }),
+        None => serde_json::json!({ "placed": r.placed }),
+    };
+    v.to_string()
+}
+
 impl Engine {
+    /// `paintBrush(kind, floor, tiles)` with the tiles as JSON text, as the
+    /// host relays them: JSON `{ placed, reason? }`. A kind other than floor
+    /// or lobby, a floor that is not a whole number, or tiles that are not
+    /// text holding an array of at most [`BRUSH_TILE_LIMIT`] whole numbers
+    /// lays nothing and answers `INVALID_REQUEST`, as TypeScript's
+    /// `paintBrush` does.
+    pub(crate) fn paint_brush_checked(
+        &mut self,
+        kind: Option<String>,
+        floor: Option<f64>,
+        tiles: Option<String>,
+    ) -> String {
+        let kind = kind.as_deref().and_then(Kind::parse);
+        let tiles = tiles.as_deref().and_then(brush_tiles);
+        let r = match (kind, floor.and_then(whole), tiles) {
+            (Some(kind), Some(floor), Some(tiles)) => self.sim.paint_brush(kind, floor, &tiles),
+            _ => BrushResult::invalid(),
+        };
+        brush_json(&r)
+    }
+
     /// `previewRentBatch(kind, target, { onlyDefaultPriced })`: the counters
     /// `applyRentBatch` would report, with nothing written. `None` where
     /// TypeScript answers `null`: an unknown or unpriced kind, a No Rate
@@ -135,6 +186,7 @@ mod tests {
     fn fixture() -> Engine {
         let mut e = Engine {
             sim: Simulation::new_game(7, GameMode::Modern),
+            mirror: crate::save_delta::SaveMirror::default(),
         };
         e.sim.money = 1e9;
         for x in 150..200 {
@@ -322,5 +374,73 @@ mod tests {
         }
         let json = e.validate_transport_json("elevatorStandard", Some(180.0), Some(1.0), Some(3.0));
         assert_eq!(json, r#"{"ok":true}"#);
+    }
+
+    #[test]
+    fn a_malformed_brush_is_refused_and_lays_nothing() {
+        let mut e = fixture();
+        let save = e.sim.serialize();
+        let invalid = serde_json::json!({ "placed": 0, "reason": INVALID_REQUEST });
+        let mut brush = |kind: Option<&str>, floor: Option<f64>, tiles: Option<&str>| {
+            json(&e.paint_brush_checked(kind.map(String::from), floor, tiles.map(String::from)))
+        };
+        for kind in [
+            None,
+            Some(""),
+            Some("office"),
+            Some("Floor"),
+            Some("elevatorExpress"),
+        ] {
+            assert_eq!(brush(kind, Some(4.0), Some("[150]")), invalid, "{kind:?}");
+        }
+        let far = 9_007_199_254_740_992.0;
+        for floor in [
+            None,
+            Some(4.5),
+            Some(f64::NAN),
+            Some(f64::INFINITY),
+            Some(far),
+        ] {
+            assert_eq!(
+                brush(Some("floor"), floor, Some("[150]")),
+                invalid,
+                "{floor:?}"
+            );
+        }
+        let many = format!("[{}]", ["150"; 33].join(","));
+        let padded = format!("[{}150]", " ".repeat(1100));
+        for tiles in [
+            None,
+            Some(""),
+            Some("null"),
+            Some("{}"),
+            Some("150"),
+            Some("[150.5]"),
+            Some("[null]"),
+            Some("[\"150\"]"),
+            Some("[true]"),
+            Some("[[150]]"),
+            Some("[1e400]"),
+            Some("[9007199254740992]"),
+            Some("not json"),
+            Some(&many),
+            Some(&padded),
+        ] {
+            assert_eq!(brush(Some("floor"), Some(4.0), tiles), invalid, "{tiles:?}");
+        }
+        assert_eq!(e.sim.serialize(), save, "a refusal moved nothing");
+
+        let mut brush = |kind: &str, tiles: &str| {
+            json(&e.paint_brush_checked(Some(kind.into()), Some(4.0), Some(tiles.into())))
+        };
+        assert_eq!(brush("floor", "[]"), serde_json::json!({ "placed": 0 }));
+        assert_eq!(
+            brush("floor", "[150,151,-0]"),
+            serde_json::json!({ "placed": 2, "reason": "Floors and lobbies must sit on the story below: no floating overhangs." })
+        );
+        assert_eq!(
+            brush("floor", "[150,151]"),
+            serde_json::json!({ "placed": 0 })
+        );
     }
 }

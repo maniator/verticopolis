@@ -11,7 +11,9 @@ import { SETTLE_TIMEOUT_MS, setStepGate } from "./stepGate";
 import { parseCommuteStress } from "./telemetry";
 import { refuseForeignCatalog } from "./wasmHost";
 import type { FrameReply, FrameRequest, Op, ToWorker } from "./workerProtocol";
-import { applyHeaderFields, isEventItem, isLogItem, mergeSave, parseArray, parseCount, parseMerge, parsePending, replyWatchdog, restoreOwn, structuredCloneOf } from "./workerApply";
+import { applyHeaderFields, isEventItem, isLogItem, parseArray, parseCount, parsePending, replyWatchdog, restoreOwn, structuredCloneOf } from "./workerApply";
+import { applySaveSync, countSaveBytes, readSaveSync } from "./workerSaveSync";
+import { rebuildUnitSets } from "./merge";
 import { LATENCY_SAMPLES, newWorkerHostStats, pushSample, type WorkerHost, type WorkerHostOptions } from "./workerStats";
 
 export type { WorkerHost, WorkerHostOptions, WorkerHostStats } from "./workerStats";
@@ -91,6 +93,9 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
   let outbox: Op[] = [];
   let sendScheduled = false;
   let needMerge = false;
+  /** The last full save or delta the read model applied (#1045). A delta
+   *  taken against any other is refused, and a full save asked for. */
+  let appliedSync = 0;
   /** The engine's exact save at `seq`, while nothing but camera stamps
    *  (`view`, which the save carries and the simulation never reads) was
    *  sent after it. */
@@ -189,12 +194,9 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     stats.bytesReceived += r.view.byteLength + 2 * (r.events.length + (r.log?.length ?? 0) + (r.pending?.length ?? 0) + (r.commute?.length ?? 0));
     stats.workerOpsMs += r.workMs.ops;
     stats.workerReplyMs += r.workMs.reply;
+    stats.workerSaveMs += r.workMs.save;
     stats.workerMemoryBytes = r.memoryBytes;
-    if (r.merge) {
-      const bytes = 2 * (r.merge.save.length + r.merge.telemetry.length + (r.merge.housekeeping?.length ?? 0) + (r.merge.commute?.length ?? 0));
-      stats.mergeBytes += bytes;
-      stats.bytesReceived += bytes;
-    }
+    countSaveBytes(stats, r);
     const h = decodeHeader(r.view);
     checkRecords(r.view, h);
     const events = parseArray<GameplayEvent>(r.events, "event batch", isEventItem);
@@ -208,19 +210,18 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     // new steps, so the read model waits one round trip, not a frame.
     const fresh = r.seq >= cmdSeq;
     lastFresh = fresh;
-    if (!fresh) {
-      stats.staleReplies++;
-      // The commands this reply includes are acknowledged now, though not
-      // yet visible.
-      for (const [s] of commandTimes) {
-        if (s > r.seq) break;
-        if (!ackedAt.has(s)) ackedAt.set(s, t0);
-      }
-      staleStreak++;
+    // A held reply (stale or refused) acknowledges its commands, not yet visible.
+    const hold = (): void => {
       droppedEngine = dropped;
       for (const e of events) held.push(e);
       heldCommute = commute;
-      if (r.merge) needMerge = true;
+      for (const [s] of commandTimes) if (s <= r.seq && !ackedAt.has(s)) ackedAt.set(s, t0);
+    };
+    if (!fresh) {
+      stats.staleReplies++;
+      staleStreak++;
+      hold();
+      if (r.merge || r.delta) needMerge = true;
       stats.applyMs += now() - t0;
       // Asked again at once, so the read model waits a round trip; after a
       // streak (a command every round trip, as while dragging out a build)
@@ -235,19 +236,22 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     // drop count were read above): one that does not parse, or is not the
     // engine's shape, is fatal with the read model as the last reply left
     // it, so the fallback's clock (rolled back to that minute) and state agree.
-    const tParse = now();
-    const merge = r.merge ? parseMerge(r.merge) : null;
-    const parseMs = now() - tParse;
+    const saved = readSaveSync(sim, r, appliedSync);
+    if (r.delta && !saved) {
+      // A delta the read model cannot take: held like a stale reply (its
+      // events kept), nothing else written, and a full save asked for at once.
+      stats.deltasRefused++;
+      hold();
+      needMerge = true;
+      stats.applyMs += now() - t0;
+      requestFrame();
+      return;
+    }
     const pending = h.pending && r.pending ? parsePending<NonNullable<typeof sim.events.pending>>(r.pending) : undefined;
     const log = r.log !== null ? parseArray<LogEntry>(r.log, "log", isLogItem) : null;
     droppedEngine = dropped;
     relay.suppress(() => {
-      if (merge) {
-        const t = now();
-        mergeSave(sim, merge, h);
-        stats.merges++;
-        stats.mergeMs += now() - t + parseMs;
-      }
+      if (saved) appliedSync = applySaveSync(sim, saved, h, stats);
       if (h.mealOverlayRevision !== engineMealRev) {
         engineMealRev = h.mealOverlayRevision;
         sim.tower.bumpMealOverlayRevision();
@@ -264,6 +268,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
         simLogSeqAtSync = sim.logSeq;
       }
       applyRecords(sim, r.view, h);
+      if (saved?.kind === "delta") rebuildUnitSets(sim);
       if (commute) sim.crowd.adoptCommuteStress(commute);
     });
     // Applied: every command so far is in the read model, so its copies of
@@ -286,7 +291,7 @@ export function attachWorkerHost(sim: Simulation, opts: WorkerHostOptions): Work
     }
     if (!caughtUp) exact = null;
     else if (r.merge) exact = { save: r.merge.save, seq, view: lastView && lastView.seq > r.seq ? { value: lastView.value } : undefined };
-    else if (exact?.seq !== seq) exact = null;
+    else if (r.delta || exact?.seq !== seq) exact = null;
     stats.ackedSeq = r.seq;
     const t1 = now();
     for (const [s, sent] of commandTimes) {

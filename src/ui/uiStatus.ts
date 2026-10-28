@@ -43,9 +43,12 @@ const toastTimers = new WeakMap<Element, number>();
 
 /** Refresh status bar, palette locks, tower stats and the bulletin log. */
 export function update(ui: UI, sim: Simulation): void {
+  // One read of the kept room counts gives the population label and the
+  // stats grid.
+  const stats = sim.stats();
   ui.el.money.textContent = `$${Math.round(sim.money).toLocaleString()}`;
   ui.el.money.style.color = sim.money < 0 ? "var(--bad)" : "var(--money)";
-  ui.el.pop.textContent = sim.population.toLocaleString();
+  ui.el.pop.textContent = stats.population.toLocaleString();
   ui.el.star.textContent = sim.star >= 6 ? "TOWER" : "★".repeat(sim.star) + "☆".repeat(5 - sim.star);
   ui.el.time.textContent = sim.clock.format();
   ui.el.date.textContent = sim.clock.formatRetroDate();
@@ -113,7 +116,7 @@ export function update(ui: UI, sim: Simulation): void {
   // lit render, not innerHTML: patches the changed text in place each pump, so
   // the grid's nodes keep their identity (E5-S0 gate) instead of a full reparse.
   // #tower-stats is lit's container exclusively (one container, one renderer).
-  render(towerStatsTemplate(sim.stats()), ui.el.towerStats);
+  render(towerStatsTemplate(stats), ui.el.towerStats);
 
   renderLog(ui, sim.log, sim.logSeq);
 }
