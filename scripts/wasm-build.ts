@@ -22,6 +22,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { engineSourceHash } from "../src/wasmhost/packageHash.ts";
@@ -154,7 +155,14 @@ if (which === "engine") {
   const catalog = checkCatalog(JSON.parse(readFileSync(resolve(crate, "../conformance/events/catalog.json"), "utf8")));
   writeFileSync(resolve(crate, "../src/engine/gameplayEvents.d.ts"), renderGameplayEventsDts(catalog));
   writeFileSync(resolve(crate, "../src/engine/gameplayEventRules.ts"), renderGameplayEventRules(catalog));
-  console.log("engine-rs/pkg and src/public/engine: built; src/dualrun/engine.d.ts, src/engine/gameplayEvents.d.ts and gameplayEventRules.ts refreshed");
+  // The port's layout (slots, widths, code tables and records) as the Rust
+  // engine hands it over, so the TypeScript engine (`src/engine/tsEngine.ts`)
+  // answers the same `viewLayout()` without a hand copy of the tables.
+  const { Engine } = createRequire(import.meta.url)(resolve(crate, "pkg/verticopolis_engine.js")) as { Engine: { newGame(seed: number, mode: string): { viewLayout(): string; free(): void } } };
+  const probe = Engine.newGame(1, "modern");
+  writeFileSync(resolve(crate, "../src/engine/viewLayout.json"), `${JSON.stringify(JSON.parse(probe.viewLayout()), null, 2)}\n`);
+  probe.free();
+  console.log("engine-rs/pkg and src/public/engine: built; src/dualrun/engine.d.ts, src/engine/gameplayEvents.d.ts, gameplayEventRules.ts and viewLayout.json refreshed");
 } else {
   console.log(`${target.dir}/pkg: built`);
 }

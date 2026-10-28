@@ -15,6 +15,11 @@ import type { WasmEngine } from "./binding";
  *   and game code (`src/ui/`, `src/game/`, `src/render/`, everything outside
  *   the engine, the relay and the host) may reach. They reach it through the
  *   TypeScript instance, which the relay mirrors (`mirror.ts`).
+ * - **The port's members** (`EnginePort`, `src/simport/enginePort.ts`) follow
+ *   one rule: a member that writes the tower is Tier 1, and one that only
+ *   reads (a quote, a query, a view, a text getter, `lastReason`) is Tier 2,
+ *   as are the swaps and the drains. The UI reaches either tier only through
+ *   the port, never by importing the binding.
  * - **Tier 2, restores and reads.** Constructors from a save or a seed,
  *   getters and views, and the save writers. Entries marked `hostLoop` drive,
  *   drain or free the running engine (`tick`, the frame and log reads, the
@@ -142,13 +147,10 @@ export const BINDING_EXPORT_TIERS = {
   view: T2,
   towerName: T2,
   // Tier 1, the engine's own port (facade slice 7, the 2026-10-28 redesign):
-  // numeric commands answering a result record, the refusal text, and the
-  // numeric queries the HUD and the build preview ask per UI tick or pointer
-  // move. The editing commands are named apart from the legacy exports the
-  // conformance suites still call.
+  // numeric commands answering a result record. The editing commands are
+  // named apart from the legacy exports the conformance suites still call.
   chooseAutoBridge: T1,
   answerChoice: T1,
-  lastReason: T1,
   buildAt: T1,
   paintTiles: T1,
   buildShaft: T1,
@@ -158,11 +160,6 @@ export const BINDING_EXPORT_TIERS = {
   bookExterminator: T1,
   setCamera: T1,
   setFilm: T1,
-  quoteBuild: T1,
-  quoteShaft: T1,
-  statsStrip: T1,
-  hotspot: T1,
-  onboarding: T1,
   markStop: T1,
   expressStops: T1,
   dropStops: T1,
@@ -176,6 +173,14 @@ export const BINDING_EXPORT_TIERS = {
   stopExtend: T1,
   labelUnit: T1,
   nameTower: T1,
+  // Tier 2, the port's reads: the refusal text, and the quotes and queries
+  // the HUD and the build preview ask per UI tick or pointer move.
+  lastReason: T2,
+  quoteBuild: T2,
+  quoteShaft: T2,
+  statsStrip: T2,
+  hotspot: T2,
+  onboarding: T2,
   // Tier 2, the port's lifecycle, events, log and text getters (facade
   // slice 7, PR 1b): a swap per load, undo or new game, a drain per step,
   // and text read only for what changed.
