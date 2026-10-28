@@ -64,7 +64,7 @@ function makeApp(over: Record<string, unknown> = {}) {
     shownUpdate: false,
     speed: 3,
     prefs: { steadyClock: true },
-    sim,
+    sim, events: sim, // the fake sim drains as the port's events do
     enginePort: fakeEnginePort(sim), // commands land on the fake's spies
     portCodes,
     accMinutes: 0,

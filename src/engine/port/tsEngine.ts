@@ -160,7 +160,7 @@ export class TsEngine implements PortState {
 
   drainEvents(): Float64Array {
     this.drained = this.current.drainGameplayEvents();
-    return Float64Array.of(this.current.gameplayEvents.dropped, this.drained.length);
+    return Float64Array.of(this.current.gameplayEventsDropped, this.drained.length);
   }
 
   eventText(i: number): string | undefined {

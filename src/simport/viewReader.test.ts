@@ -6,6 +6,7 @@ import { TsEngine } from "../engine/port/tsEngine";
 import { roomUnits } from "../engine/tower/rooms";
 import { readFileSync } from "node:fs";
 import { decodeVctower } from "../storage/vctowerContainer";
+import type { SerializedGame } from "../engine/types";
 import { ViewReader } from "./viewReader";
 
 /**
@@ -72,7 +73,7 @@ describe("ViewReader over TsEngine", () => {
 
   it("answers every story of a taller room as the tower's own index does", () => {
     // split-tower-4 holds cinemas and party halls (2 floors) and a metro (3).
-    const sim = Simulation.deserialize(decodeVctower(readFileSync("conformance/fixtures/split-tower-4.vctower", "utf8")));
+    const sim = Simulation.deserialize(decodeVctower(readFileSync("conformance/fixtures/split-tower-4.vctower", "utf8")) as SerializedGame);
     const r = new ViewReader(new TsEngine(sim), facilityFloors);
     let tall = 0;
     for (const u of sim.tower.units) {

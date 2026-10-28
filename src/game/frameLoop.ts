@@ -48,7 +48,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // a stopped game samples no frames for the session either. Events the
   // engine emitted before it stopped still reach analytics.
   if (isEngineStopped()) {
-    drainEngineEvents(app.sim);
+    drainEngineEvents(app.events);
     app.accMinutes = 0;
     return;
   }
@@ -64,7 +64,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // stars, emergencies and their answers, pricing and capacity. Drained every
   // frame and ahead of the modal freeze below, so an emergency answered in a
   // modal reports on the next frame rather than when the freeze lifts.
-  drainEngineEvents(app.sim);
+  drainEngineEvents(app.events);
   // While a blocking modal is open, freeze time so nothing changes under it:
   // an emergency choice (canon: the modal pauses the game) must not auto-resolve
   // out from under the player, and the update prompt must not let a distracted

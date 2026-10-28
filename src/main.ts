@@ -38,6 +38,8 @@ import { createTsSim } from "./simport/tsSim";
 import { TsEngine } from "./engine/port/tsEngine";
 import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
+import { PortEvents } from "./simport/portEvents";
+import type { GameplayEventSource } from "./analyticsEngineBridge";
 import { hudSource } from "./game/hudSource";
 import { catalogOf } from "./game/portAccess";
 import { loadStored } from "./game/portLifecycle";
@@ -70,6 +72,7 @@ class GameApp implements GameAppPorts {
   enginePort!: TsEngine;
   reader!: ViewReader;
   portCodes!: PortCodes;
+  /** The engine's gameplay events, for the analytics bridge. */ events!: PortEvents;
   /** The editor and inspector cards, and the reads the port lacks. @internal */ cardKit!: CardKit;
   get sim(): Simulation { return this.enginePort.sim; }
   set sim(sim: Simulation) { if (!(import.meta.env.DEV || __TOOLING_BUILD__)) throw new Error("app.sim is set only in tooling builds"); this.enginePort.take(sim); }
@@ -217,6 +220,8 @@ class GameApp implements GameAppPorts {
     this.enginePort.handOff = (sim, keep) => this.adoptSim(sim, keep);
     this.reader = new ViewReader(this.enginePort, facilityFloors);
     this.portCodes = new PortCodes(this.enginePort);
+    // The WASM mirror host releases the events it held on a session flush (#874).
+    this.events = new PortEvents(this.enginePort, () => (this.sim as GameplayEventSource).drainGameplayEvents({ release: true }));
     // Seed the promotion latch to the boot tower's rating (adoptSim does the same
     // for later swaps). The boot sim is assigned directly, never through
     // adoptSim, so without this a reloaded 2★-6★ tower reads star > lastStar(1)
