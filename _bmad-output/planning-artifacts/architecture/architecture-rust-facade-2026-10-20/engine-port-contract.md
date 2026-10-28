@@ -377,7 +377,14 @@ they resume.
    reads of the simulation; then the boot of either engine through the port
    and the mirror host's removal with `SimPort`, `TsSim` and `handOff`.
 6. Restore points and the sidecar, the cadence exclusions, the fault
-   fallback (story ACs 16 to 21 and slice 8), unchanged in substance.
+   fallback (story ACs 16 to 21 and slice 8). The fault fallback changed
+   (#1422, owner 2026-10-28): a trap in the running engine no longer hands
+   the tower to TypeScript mid-game. The page stops the engine and reloads
+   onto its last autosave, still on Rust. The tab's second trap on a build
+   latches `trap-loop`, so that reload boots TypeScript and offers the crash
+   report once (a zip the player downloads; nothing is sent). A wasm-only
+   build stops on the engine-failure screen instead. The staged-cohort spec,
+   section 3, has the detail.
 7. The integration suites on the Rust engine (owner, 2026-10-28: before
    3.0, almost every integration test runs on Rust). It lands right after
    PR 5, beside PR 6. Before PR 5 the suites' WASM leg runs on the mirror
@@ -412,4 +419,4 @@ they resume.
 | 13 to 15 boot, trap freeze, e2e | PR 5, unchanged in substance. |
 | 16 to 20 restore points, sidecar, R5 | PR 6, unchanged; owner: this lane. |
 | 21 cadence exclusions | PR 6, unchanged. |
-| Slice 8 fault fallback | Unchanged; adopts the TypeScript engine from a restore point. Owner: this lane after PR 6. |
+| Slice 8 fault fallback | Replaced by the crash reload (#1422, PR 6 above): a trap reloads onto the last autosave, and a second one in the tab reloads onto TypeScript. Nothing adopts a tower mid-game. |
