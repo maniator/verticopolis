@@ -50,6 +50,11 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a
   deliberate TypeScript-only build; see CONTRIBUTING.md.
 - **American English everywhere;** keep `src/engine/` free of DOM/rendering.
+- **Preserve readable intent at call sites.** Never obscure gameplay or UI
+  rules behind positional shorthand like `done: bit(0)` or an unexplained
+  numeric mask. Use named facts/predicates and keep bit offsets at the
+  protocol or algorithm boundary, with mapping tests. Review refactors for
+  lost readability. See `AGENTS.md` → "Intent-revealing gameplay and UI conditions".
 - **No em-dashes in prose** (player-facing copy, docs, comments, commit and PR
   text) in anything new you write. Use commas, colons, parentheses, or separate
   sentences instead. Two standing exceptions: en-dashes in numeric ranges
