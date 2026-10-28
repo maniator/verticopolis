@@ -106,7 +106,7 @@ describe("wireControllers", () => {
     const sim = { id: "sim", star: 3, population: 800, isUnlocked: vi.fn(() => true) };
     const engine = { viewState: vi.fn(() => ({ view: 1 })), onContextRestored: null as unknown };
     const app = {
-      sim, enginePort: { id: "port" },
+      sim,
       engine,
       enginePort: { id: "engine port" }, portCodes: { id: "codes" }, reader: { id: "reader" },
       audio: { sfx: vi.fn(), setProgram: vi.fn() },
