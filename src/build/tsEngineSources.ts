@@ -47,8 +47,11 @@ export function tsEngineSourceHash(engineDir: string, srcDir = resolve(engineDir
     for (const m of readFileSync(p, "utf8").matchAll(RELATIVE_IMPORT)) add(resolveImport(p, m[1]!));
   }
   const hash = createHash("sha256");
-  for (const p of [...files].sort()) {
-    hash.update(relative(srcDir, p).split("\\").join("/"));
+  // Sort by the normalized path, so a Windows build hashes in the same order.
+  const named = [...files].map((p) => ({ p, name: relative(srcDir, p).split("\\").join("/") }));
+  named.sort((a, b) => Number(a.name > b.name) - Number(a.name < b.name));
+  for (const { p, name } of named) {
+    hash.update(name);
     hash.update("\0");
     hash.update(readFileSync(p));
     hash.update("\0");
