@@ -8,7 +8,8 @@ import { WASM_PROJECT } from "./helpers";
  * sets the stage and the test seeds the bucket, so the policy runs as a
  * player's browser would: no `?engine=` and no stored choice. Covers the
  * cohort's own pick, a trap that reloads and a second one that keeps every
- * later boot on TypeScript until the player retries, a test link's tab held
+ * later boot on TypeScript until the player retries (its first boot offering
+ * the crash report), a test link's tab held
  * after two traps, a TypeScript choice that survives a reload and a stage
  * change that enrolls the browser, and a crash loop.
  */
@@ -80,7 +81,19 @@ test("a trap reloads on Rust, and a second keeps every later boot on TypeScript 
   // The second reloads onto TypeScript and says why.
   expect(await trapAndReload(page)).toBe("ts");
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("vc.engineSafety")!))).toMatchObject({ reason: "trap-loop", stage: "crash-loop", scope: "fault" });
-  for (let i = 0; i < 2; i++) expect(await bootedEngine(page, true)).toBe("ts");
+  // That boot offers the crash report once (#1422): a zip of both engines,
+  // the fault and the save the TypeScript engine writes.
+  const report = page.locator("#modal[open]");
+  await expect(report).toContainText("The Rust engine crashed twice, so this game is running on the TypeScript engine for now.");
+  const [download] = await Promise.all([page.waitForEvent("download"), report.locator('[data-act="download"]').click()]);
+  expect(download.suggestedFilename()).toMatch(/^verticopolis-crash-report-.*\.zip$/);
+  await expect(report.locator(".crash-status")).toContainText("Crash report ready.");
+  await report.locator('[data-act="close"]').click();
+  await expect(page.locator("#modal[open]")).toHaveCount(0);
+  for (let i = 0; i < 2; i++) {
+    expect(await bootedEngine(page, true)).toBe("ts");
+    await expect(page.locator("#modal[open]")).toHaveCount(0);
+  }
   expect(await settingsStatus(page)).toContain("it stopped twice while running");
   await page.locator("[data-engine-retry]").click();
   expect(await settingsStatus(page)).toContain("Restart the game to switch engines.");

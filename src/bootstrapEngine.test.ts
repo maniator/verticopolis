@@ -53,7 +53,7 @@ import { SaveGame } from "./storage/SaveGame";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { EngineBootError } from "./wasmhost/engineBoot";
 import { noteEngineThrow, watchEngineTraps } from "./game/engineFault";
-import { countRustCrash, reloadSoon } from "./engineCohort/crashReload";
+import { countRustCrash, crashReportDue, reloadSoon } from "./engineCohort/crashReload";
 
 /** A tab whose storage keeps nothing, so a crash cannot be counted. */
 function fullTabStore(): void {
@@ -222,11 +222,18 @@ describe("bootGame engine", () => {
     requestWasm();
     document.body.innerHTML = '<div id="stage"></div>';
     vi.spyOn(console, "error").mockImplementation(() => {});
+    wasmStub.binary = { state: "ok", sourceHash: "b".repeat(64) };
     countRustCrash(sessionStorage, __APP_SHA__);
     await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn(), setSpeed: vi.fn() })));
     expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
     expect(document.getElementById("boot-fallback-host")?.textContent).toContain("on the TypeScript engine.");
     expect(reloadSoon).toHaveBeenCalledOnce();
+    // The tab keeps the fault and the engine that crashed for the TypeScript
+    // boot's crash report (the stub package records no identity).
+    expect(crashReportDue(sessionStorage, __APP_SHA__)).toEqual({
+      count: 2,
+      last: { reason: "trap-tick", stage: "start", rust: { version: null, sourceHash: "b".repeat(64) } },
+    });
   });
 
   it("stops the game at a trap whose count storage did not keep", async () => {
