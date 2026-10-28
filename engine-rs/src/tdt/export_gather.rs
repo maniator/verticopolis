@@ -267,8 +267,11 @@ fn is_present(state: &str) -> bool {
 fn norm(raw: &Value) -> Result<GatheredRoom, LegacyExportError> {
     let kind_str = raw.get("kind").and_then(Value::as_str).unwrap_or("");
     let Some(kind) = Kind::parse(kind_str) else {
+        // Quoted as JSON quotes it, so the TypeScript exporter can write the
+        // same message with `JSON.stringify` (#887).
+        let quoted = serde_json::to_string(kind_str).unwrap_or_default();
         return Err(LegacyExportError(format!(
-            "unit kind {kind_str:?} is not in the catalog"
+            "unit kind {quoted} is not in the catalog"
         )));
     };
     let nullish = |k: &str| matches!(raw.get(k), None | Some(Value::Null));

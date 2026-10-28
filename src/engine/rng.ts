@@ -41,4 +41,13 @@ export class RNG {
   get seed(): number {
     return this.state >>> 0;
   }
+
+  /** Put the stream at exactly `state >>> 0`, the live state a save carries.
+   *  The constructor maps a seed of 0 to 1 (a new game never starts at 0),
+   *  but Mulberry32 passes through state 0 once every 2^32 draws, so a save
+   *  can hold it, and loading it as 1 would draw a different stream (#856).
+   *  `initialSeed` is left as it is. */
+  restore(state: number): void {
+    this.state = state >>> 0;
+  }
 }

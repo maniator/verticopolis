@@ -27,11 +27,22 @@ pub fn sign(x: f64) -> f64 {
     }
 }
 
-/// `Number.prototype.toString()` for a finite double: the shortest digits
-/// that round-trip, laid out by ECMA-262 Number::toString (section 6.1.6.1.20).
+/// `Number.prototype.toString()`: the shortest digits that round-trip, laid
+/// out by ECMA-262 Number::toString (section 6.1.6.1.20), and NaN and the
+/// infinities spelled as JavaScript spells them (ryu leaves those unspecified).
 pub fn number_to_string(x: f64) -> String {
     if x == 0.0 {
         return "0".to_string();
+    }
+    if !x.is_finite() {
+        return if x.is_nan() {
+            "NaN"
+        } else if x > 0.0 {
+            "Infinity"
+        } else {
+            "-Infinity"
+        }
+        .to_string();
     }
     let mut buf = ryu::Buffer::new();
     let s = buf.format_finite(x);
@@ -133,11 +144,14 @@ mod tests {
             1e6,
             1e-6,
             0.1 + 0.7,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
         ];
         let got: Vec<String> = cases.iter().map(|&x| number_to_string(x)).collect();
         assert_eq!(
             got.join(" "),
-            "0 0 0.1 1e+21 1e-7 123456789.125 5 100000000000000000000 0.000001 1.7976931348623157e+308 5e-324 1.5e-7 1.23e-18 0.30000000000000004 0.3333333333333333 -1e+21 100 1000000 0.000001 0.7999999999999999"
+            "0 0 0.1 1e+21 1e-7 123456789.125 5 100000000000000000000 0.000001 1.7976931348623157e+308 5e-324 1.5e-7 1.23e-18 0.30000000000000004 0.3333333333333333 -1e+21 100 1000000 0.000001 0.7999999999999999 NaN Infinity -Infinity"
         );
     }
 }

@@ -38,7 +38,7 @@ export interface EditorActionsDeps {
   /** The code tables and record slots of the engine's layout. */
   codes(): PortCodes;
   /** The view, for the clock and the rules. */
-  reader(): Pick<ViewReader, "header">;
+  reader(): Pick<ViewReader, "header" | "update">;
   /** The cards and the reads the port lacks. */
   kit(): CardKit;
   ui: Pick<UI, "toast" | "showBatchPricingDialog" | "showElevatorScheduleDialog">;
@@ -90,6 +90,8 @@ export class EditorActions {
   openSchedule(): void {
     const selected = this.deps.selected();
     if (!selected || selected.type !== "transport") return;
+    // The reader has no per-frame pass yet, so read the tower's mode and clock now.
+    this.deps.reader().update();
     const t = this.deps.kit().cards.shaft(selected.id);
     if (!t || !isElevatorKind(t.kind)) return;
     const id = t.id;
