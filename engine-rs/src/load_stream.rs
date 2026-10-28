@@ -30,9 +30,11 @@ use serde::de::{self, DeserializeSeed, Deserializer as _, MapAccess, SeqAccess, 
 use serde_json::{Map, Value};
 
 use crate::clock::GameMode;
+#[cfg(test)]
+use crate::load::deserialize;
 use crate::load::{
-    assemble, deserialize, inflate_vctower, mark_founder_from_loaded_file, parse_save_json,
-    repair_lone_surrogates, unit_from_value, widen_shafts, UNIT_CAP,
+    assemble, deserialize_owned, founder_keys, inflate_vctower, mark_founder_from_loaded_file,
+    parse_save_json, repair_lone_surrogates, unit_from_value, widen_shafts, UNIT_CAP,
 };
 use crate::sim::Simulation;
 use crate::tower::Unit;
@@ -59,8 +61,9 @@ pub fn load_stored_text(text: &[u8]) -> Result<Simulation, String> {
         return Ok(sim);
     }
     let raw = parse_save_json(text).map_err(|e| e.to_string())?;
-    let mut sim = deserialize(&raw)?;
-    mark_founder_from_loaded_file(&mut sim, &raw);
+    let written = founder_keys(&raw);
+    let mut sim = deserialize_owned(raw)?;
+    mark_founder_from_loaded_file(&mut sim, &written);
     Ok(sim)
 }
 
@@ -70,7 +73,7 @@ pub(crate) fn read_save(text: &[u8]) -> Result<(Simulation, bool), String> {
         return Ok((sim, true));
     }
     let raw = parse_save_json(text).map_err(|e| e.to_string())?;
-    Ok((deserialize(&raw)?, false))
+    Ok((deserialize_owned(raw)?, false))
 }
 
 /// `Engine.fromVctower`: the file decoded, its mode set to `mode` when one is
@@ -93,8 +96,9 @@ fn read_vctower(text: &str, mode: Option<&str>) -> Result<(Simulation, bool), St
     if let Some(m) = mode {
         override_mode(&mut raw, m)?;
     }
-    let mut sim = deserialize(&raw)?;
-    mark_founder_from_loaded_file(&mut sim, &raw);
+    let written = founder_keys(&raw);
+    let mut sim = deserialize_owned(raw)?;
+    mark_founder_from_loaded_file(&mut sim, &written);
     Ok((sim, false))
 }
 
