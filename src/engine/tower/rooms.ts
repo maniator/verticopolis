@@ -112,6 +112,11 @@ export interface RoomCounts {
  *  scans for writes of these. */
 export const COUNTED_FIELDS = ["state", "noRate", "everOccupied", "residents", "customersIn"] as const;
 
+/** The unit fields the port's view reads besides {@link COUNTED_FIELDS}: the
+ *  frame's counters and the meta log's text. A write of one marks its room as
+ *  well, for {@link watchRooms}; the writers guard scans for these too. */
+export const VIEW_FIELDS = ["occupants", "hotelCustomersIn", "outForMeal", "label", "subtype"] as const;
+
 /**
  * The tower's {@link RoomCounts}, kept as the rooms change so that a HUD
  * refresh does not pass over the rooms (HP-12 in
@@ -132,7 +137,7 @@ export const COUNTED_FIELDS = ["state", "noRate", "everOccupied", "residents", "
  */
 export function roomCounts(tower: Tower): Readonly<RoomCounts> {
   const rooms = roomUnits(tower);
-  const ledger = ledgers.get(tower);
+  const ledger = marks.get(tower)?.ledger;
   if (!ledger || ledger.rooms !== rooms) return countRooms(tower, rooms);
   for (const u of ledger.changed) {
     const share = ledger.shares.get(u);
@@ -155,16 +160,47 @@ export function setRoomState(tower: Tower, u: Unit, state: UnitState): void {
 }
 
 /** Mark `u` as changed since the counts were last read, after a write to one
- *  of the fields {@link roomCounts} reads (or before it: the next read takes
- *  the fields as they stand then, so one mark covers every write made before
- *  that read). Nothing to do before the tower's first count. */
+ *  of the fields {@link roomCounts} reads or the view reads
+ *  ({@link VIEW_FIELDS}), or before it: the next read takes the fields as
+ *  they stand then, so one mark covers every write made before that read.
+ *  The mark goes to the counts once the tower has been counted, and to the
+ *  {@link watchRooms} set once something watches the tower. */
 export function markRoom(tower: Tower, u: Unit): void {
-  ledgers.get(tower)?.changed.add(u);
+  const m = marks.get(tower);
+  if (!m) return;
+  m.ledger?.changed.add(u);
+  m.watch?.add(u);
+}
+
+/**
+ * The rooms marked on `tower` since its watcher last emptied this set, which
+ * starts empty at the first call: the TypeScript engine's frame and meta log
+ * take their changed rooms from it rather than walk every room (#1389). A
+ * marked unit can be a floor or lobby tile, or a unit since removed; the
+ * reader skips any unit {@link roomSlots} does not hold. One watcher a tower.
+ */
+export function watchRooms(tower: Tower): Set<Unit> {
+  let m = marks.get(tower);
+  if (!m) marks.set(tower, (m = {}));
+  return (m.watch ??= new Set());
+}
+
+/** Each room's index in {@link roomUnits}, memoized per list as
+ *  {@link rampUnits} is: one pass when the list is rebuilt. */
+export function roomSlots(tower: Tower): ReadonlyMap<Unit, number> {
+  const rooms = roomUnits(tower);
+  const hit = slots.get(tower);
+  if (hit && hit.rooms === rooms) return hit.slots;
+  const map = new Map<Unit, number>();
+  for (let i = 0; i < rooms.length; i++) map.set(rooms[i], i);
+  slots.set(tower, { rooms, slots: map });
+  return map;
 }
 
 const cache = new WeakMap<Tower, { units: Unit[]; length: number; revision: number; rooms: readonly Unit[] }>();
 const runsCache = new WeakMap<Tower, { units: Unit[]; length: number; revision: number; runs: readonly StructureRun[] }>();
 const ramps = new WeakMap<Tower, { rooms: readonly Unit[]; ramps: readonly Unit[] }>();
+const slots = new WeakMap<Tower, { rooms: readonly Unit[]; slots: ReadonlyMap<Unit, number> }>();
 
 /**
  * The tower's parking ramps, in the same order as `tower.units`. The parking
@@ -232,7 +268,9 @@ interface RoomLedger {
   changed: Set<Unit>;
 }
 
-const ledgers = new WeakMap<Tower, RoomLedger>();
+/** A tower's mark sinks: the counts' ledger and the view's watch set. One
+ *  map, so a mark costs one lookup. */
+const marks = new WeakMap<Tower, { ledger?: RoomLedger; watch?: Set<Unit> }>();
 
 const OCCUPIED_OFFICE = 1;
 const VACANT = 2;
@@ -289,6 +327,9 @@ function countRooms(tower: Tower, rooms: readonly Unit[]): RoomCounts {
     tally(counts, share, 1);
     shares.set(u, share);
   }
-  ledgers.set(tower, { rooms, counts, shares, changed: new Set() });
+  const ledger = { rooms, counts, shares, changed: new Set<Unit>() };
+  const m = marks.get(tower);
+  if (m) m.ledger = ledger;
+  else marks.set(tower, { ledger });
   return counts;
 }
