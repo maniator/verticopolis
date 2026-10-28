@@ -4,6 +4,7 @@ import { INVALID_REQUEST, UNKNOWN_FACILITY } from "../request";
 import type { Simulation } from "../Simulation";
 import type { HeatmapMode } from "../sim/constants";
 import { towerCatalog } from "../towerCatalog";
+import { roomUnits } from "../tower/rooms";
 import type { Unit } from "../types";
 import { KIND_CODES, UNIT_STATE_CODES, VIEW_LAYOUT, codeOf, kindOf } from "./layout";
 import { flag, whole, type PortState } from "./record";
@@ -72,19 +73,22 @@ export function hotspot(sim: Simulation): Float64Array {
 /** The Getting Started facts as bits in the layout's `onboarding` order:
  *  lobby, floor, office, connect, play. */
 export function onboarding(sim: Simulation): number {
+  const { tower } = sim;
+  // The same reads as the Rust engine's `onboarding_flags`: the lobby tile
+  // counts, an early-exit scan for a floor above the lobby, and one pass over
+  // the rooms that stops once the connect and play steps are both true.
   let lobby = false;
-  let floor = false;
+  for (const n of tower.lobbyTiles.values()) lobby ||= n > 0;
+  const floor = tower.units.some((u) => u.kind === "floor" && u.floor >= 2);
   let office = false;
   let connect = false;
   let play = false;
-  for (const u of sim.tower.units) {
-    if (u.kind === "lobby") lobby = true;
-    else if (u.kind === "floor") floor ||= u.floor >= 2;
-    else if (u.kind === "office") {
-      office = true;
-      connect ||= sim.tower.isFloorServed(u.floor);
-      play ||= u.state === "occupied";
-    }
+  for (const u of roomUnits(tower)) {
+    if (u.kind !== "office") continue;
+    office = true;
+    connect ||= tower.isFloorServed(u.floor);
+    play ||= u.state === "occupied";
+    if (connect && play) break;
   }
   return [lobby, floor, office, connect, play].reduce((bits, on, i) => (on ? bits + 2 ** i : bits), 0);
 }
