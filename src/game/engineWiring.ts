@@ -244,8 +244,11 @@ export function wireEngine(app: GameApp): void {
   app.engine.onSecondary = (picked) => app.selectPicked(picked);
   // In-world extend arrows on the selected elevator: drag an end to grow or
   // shrink the shaft floor-by-floor.
-  app.engine.onExtendTo = (end, target) => void app.editor.extendSelectedTo(end, target);
-  app.engine.onExtendEnd = () => commitAfter(app, app.editor.endExtend());
+  app.engine.onExtendTo = (end, target) => app.editor.extendSelectedTo(end, target);
+  app.engine.onExtendEnd = () => {
+    app.editor.endExtend();
+    return commitAfter(app, null);
+  };
   // Suppress the browser context menu so right-click is ours to use.
   app.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 

@@ -75,7 +75,7 @@ function makeApp(toolOver: Record<string, unknown> = {}) {
       isUnlocked: vi.fn(() => true),
     },
     ui: { toast: vi.fn(), setInspectorPeek: vi.fn() },
-    editor: { extendSelectedTo: vi.fn(async () => {}), endExtend: vi.fn(async () => {}) },
+    editor: { extendSelectedTo: vi.fn(), endExtend: vi.fn() },
     inspector: { inspectPicked: vi.fn(), hide: vi.fn(), resetLatch: vi.fn() },
     saveLoad: { recoverFromContextLoss: vi.fn() },
     selectPicked: vi.fn(),
@@ -293,16 +293,14 @@ describe("secondary + extend", () => {
     expect(app.selectPicked).toHaveBeenCalledWith(picked);
   });
 
-  it("onExtendTo delegates to the editor and onExtendEnd commits once the drag has closed", async () => {
+  it("onExtendTo delegates to the editor and onExtendEnd commits once the drag has closed", () => {
     const app = makeApp();
     wireEngine(app);
     app.engine.onExtendTo!("top", 12);
     expect(app.editor.extendSelectedTo).toHaveBeenCalledWith("top", 12);
     app.engine.onExtendEnd!();
     expect(app.editor.endExtend).toHaveBeenCalled();
-    expect(app.commitUndo).not.toHaveBeenCalled();
-    await flush();
-    expect(app.commitUndo).toHaveBeenCalled();
+    expect(app.commitUndo).toHaveBeenCalledTimes(1);
   });
 });
 

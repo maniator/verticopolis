@@ -9,7 +9,7 @@ import type { ElevatorSchedule } from "../../engine/elevatorSchedule";
 import type { Transport, Unit } from "../../engine/types";
 import type { Picked, TowerEngine } from "../../render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
-import { unitEditorTemplate, transportEditorTemplate } from "../../ui/templates/editor";
+import { unitEditor, transportEditor, editorPortDeps, inspectorPortDeps } from "../../game/cardKit.fixture";
 import { render, type TemplateResult } from "lit-html";
 import { SaveGame } from "../../storage/SaveGame";
 import type { ExportReport } from "../../storage/tdtExport";
@@ -23,7 +23,7 @@ import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
 import { createTsSim } from "../../simport/tsSim";
 import type { SimPort } from "../../simport/port";
-import { INVALID_COMMAND, MAX_TEXT } from "../../simport/request";
+import { INVALID_COMMAND } from "../../simport/request";
 import type { Command, CommandResult } from "../../simport/commands";
 
 /** Coverage companion to gameControllers.integration.test.ts: the same harness idioms
@@ -354,6 +354,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
   let stairs: Transport;
   let f: ReturnType<typeof fakes>;
   let editor: EditorActions;
+  let ports: ReturnType<typeof editorPortDeps>;
   let sel: { type: "unit" | "transport"; id: number } | null;
   let undo: { captures: string[]; commits: number };
   let refreshed: number;
@@ -412,9 +413,9 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
       selectedId: () => sel?.id ?? null,
       clearSelection: () => (sel = null),
     });
+    ports = editorPortDeps(sim);
     editor = new EditorActions({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...ports,
       ui: {
         toast: f.ui.toast,
         showBatchPricingDialog: (ctx, cb) => (batchDlg = { ctx, cb }),
@@ -423,9 +424,6 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
       audio: f.audio,
       build,
       selected: () => sel,
-      selectedUnit: () => (sel?.type === "unit" ? sim.tower.units.find((x) => x.id === sel!.id) : undefined),
-      selectedTransport: () =>
-        sel?.type === "transport" ? sim.tower.transports.find((x) => x.id === sel!.id) : undefined,
       clearSelection: () => (sel = null),
       refreshEditor: () => refreshed++,
       captureUndo: (label) => undo.captures.push(label),
@@ -452,7 +450,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
   it("sell on a burning unit refuses: the unit survives and the undo step never commits", async () => {
     office.state = "fire";
     sel = { type: "unit", id: office.id };
-    render(unitEditorTemplate(sim, office), root);
+    render(unitEditor(sim, office), root);
     await editor.handleEditAction("sell", root);
     expect(sim.tower.units.some((u) => u.id === office.id)).toBe(true);
     expect(undo.captures).toEqual(["Sell"]);
@@ -462,7 +460,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("rename takes #ed-name's trimmed value and falls back to the facility name when blank", async () => {
     sel = { type: "unit", id: office.id };
-    render(unitEditorTemplate(sim, office), root);
+    render(unitEditor(sim, office), root);
     const input = root.querySelector<HTMLInputElement>("#ed-name")!;
     input.value = "  Corner Office  ";
     await editor.handleEditAction("rename", root);
@@ -473,34 +471,35 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(f.sfx).toContain("click");
   });
 
-  it("a refused rename keeps the label and says why, with no click and no undo step", async () => {
+  it("rename saves the typed label through the port, with a click", async () => {
     sel = { type: "unit", id: office.id };
-    render(unitEditorTemplate(sim, office), root);
-    const before = office.label;
-    root.querySelector<HTMLInputElement>("#ed-name")!.value = "x".repeat(MAX_TEXT + 1);
+    render(unitEditor(sim, office), root);
+    root.querySelector<HTMLInputElement>("#ed-name")!.value = "Annex";
     await editor.handleEditAction("rename", root);
-    expect(office.label).toBe(before);
-    expect(f.sfx).toEqual(["error"]);
-    expect(f.toasts).toEqual([{ text: INVALID_COMMAND, kind: "bad" }]);
-    expect(undo.commits).toBe(0);
+    expect(office.label).toBe("Annex");
+    expect(f.sfx).toEqual(["click"]);
+    expect(f.toasts).toEqual([]);
+    expect(undo.commits).toBe(1);
   });
 
-  it("a refused tower name keeps the old one and says why; an accepted one is quiet", async () => {
-    const before = sim.tower.towerName;
-    await editor.renameTower("x".repeat(MAX_TEXT + 1));
-    expect(sim.tower.towerName).toBe(before);
-    expect(f.sfx).toEqual(["error"]);
-    expect(f.toasts).toEqual([{ text: INVALID_COMMAND, kind: "bad" }]);
-    await editor.renameTower("Skyspire");
+  it("a rename of a unit the port no longer has clears the selection and says nothing", async () => {
+    sel = { type: "unit", id: 99_999 };
+    await editor.handleEditAction("rename", root);
+    expect(sel).toBeNull();
+    expect(f.toasts).toEqual([]);
+  });
+
+  it("renameTower names the tower through the port, quietly", () => {
+    editor.renameTower("Skyspire");
     expect(sim.tower.towerName).toBe("Skyspire");
-    expect(f.sfx).toEqual(["error"]);
-    expect(f.toasts).toHaveLength(1);
+    expect(f.sfx).toEqual([]);
+    expect(f.toasts).toEqual([]);
   });
 
   it("a sold condo can't be repriced: rent nudges are silent no-ops", async () => {
     condo.everOccupied = true; // sold — the engine's priceUnit returns null
     sel = { type: "unit", id: condo.id };
-    render(unitEditorTemplate(sim, condo), root);
+    render(unitEditor(sim, condo), root);
     const before = rentOf(condo);
     await editor.handleEditAction("rentDown", root);
     expect(rentOf(condo)).toBe(before);
@@ -509,7 +508,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("filmPolicy cycles auto → feature → blockbuster → auto on a cinema", async () => {
     sel = { type: "unit", id: cinema.id };
-    render(unitEditorTemplate(sim, cinema), root);
+    render(unitEditor(sim, cinema), root);
     await editor.handleEditAction("filmPolicy", root);
     expect(cinema.filmPolicy).toBe("feature");
     await editor.handleEditAction("filmPolicy", root);
@@ -521,7 +520,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("the rung action applies the picked rung through the choke point and announces the pinned string", async () => {
     sel = { type: "unit", id: office.id };
-    render(unitEditorTemplate(sim, office), root);
+    render(unitEditor(sim, office), root);
     const select = root.querySelector<HTMLSelectElement>("#ed-rung")!;
     expect(select).not.toBeNull();
     select.value = "1"; // Low
@@ -535,7 +534,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("the rung action's No Rate entry takes the unit off the market and announces the off-market string", async () => {
     sel = { type: "unit", id: office.id };
-    render(unitEditorTemplate(sim, office), root);
+    render(unitEditor(sim, office), root);
     const select = root.querySelector<HTMLSelectElement>("#ed-rung")!;
     select.value = "noRate";
     await editor.handleEditAction("rung", root);
@@ -544,7 +543,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(rentOf(office)).toBe(0);
     expect(last(announced)).toBe("No Rate: off the market. Charges nothing; no one moves in.");
     // Picking a rung afterwards returns it to the market.
-    render(unitEditorTemplate(sim, office), root);
+    render(unitEditor(sim, office), root);
     root.querySelector<HTMLSelectElement>("#ed-rung")!.value = "3";
     await editor.handleEditAction("rung", root);
     expect(office.noRate).toBeUndefined();
@@ -554,7 +553,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("the rung action announces condo and hotel phrasing per the copy inventory", async () => {
     sel = { type: "unit", id: condo.id };
-    render(unitEditorTemplate(sim, condo), root);
+    render(unitEditor(sim, condo), root);
     root.querySelector<HTMLSelectElement>("#ed-rung")!.value = "0";
     await editor.handleEditAction("rung", root);
     expect(rentOf(condo)).toBe(50_000); // the canon firesale floor, below build cost
@@ -563,7 +562,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("batchKind opens the batch-pricing dialog wired to the engine's preview/apply, with undo around apply", async () => {
     sel = { type: "unit", id: office.id };
-    render(unitEditorTemplate(sim, office), root);
+    render(unitEditor(sim, office), root);
     await editor.handleEditAction("batchKind", root);
     expect(batchDlg).not.toBeNull();
     // A default Simulation is Classic, so the dialog is handed the ladder shape.
@@ -590,14 +589,14 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(last(announced)).toBe("1 office repriced");
     expect(refreshed).toBeGreaterThan(0);
     // A refused apply says why and hands the dialog nothing to summarize.
-    expect(await batchDlg!.cb.apply(Number.NaN, {})).toBeNull();
+    expect(await batchDlg!.cb.apply(-5, {})).toBeNull(); // -1 is No Rate; other negatives are invalid
     expect(last(f.toasts)).toEqual({ text: "That request is not valid.", kind: "bad" });
     expect(rentOf(office)).toBe(high);
   });
 
   it("batchKind on a kind without a rent band does nothing", async () => {
     sel = { type: "unit", id: cinema.id };
-    render(unitEditorTemplate(sim, cinema), root);
+    render(unitEditor(sim, cinema), root);
     await editor.handleEditAction("batchKind", root);
     expect(batchDlg).toBeNull();
   });
@@ -605,7 +604,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
   it("schedule opens the elevator-schedule dialog wired to setSchedule, with undo around apply", async () => {
     lift.cars = 4;
     sel = { type: "transport", id: lift.id };
-    render(transportEditorTemplate(sim, lift), root);
+    render(transportEditor(sim, lift), root);
     await editor.handleEditAction("schedule", root);
     expect(scheduleDlg).not.toBeNull();
     // The dialog is handed the shaft's live geometry and the mode UX flags.
@@ -634,20 +633,20 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     const spoken = announced.length;
     await scheduleDlg!.cb.apply({ activeCars: { weekday: [], weekend: [] }, waitingCarResponse: 0, standardFloorDeparture: 0, homeFloors: [] });
     expect(last(f.sfx)).toBe("error");
-    expect(last(f.toasts)).toEqual({ text: "That schedule could not be saved.", kind: "bad" });
+    expect(last(f.toasts)).toEqual({ text: INVALID_COMMAND, kind: "bad" });
     expect(announced.length).toBe(spoken);
   });
 
   it("schedule on a non-elevator transport (stairs) does nothing", async () => {
     sel = { type: "transport", id: stairs.id };
-    render(transportEditorTemplate(sim, stairs), root);
+    render(transportEditor(sim, stairs), root);
     await editor.handleEditAction("schedule", root);
     expect(scheduleDlg).toBeNull();
   });
 
   it("addcar refuses at the car cap (before any money talk) and when broke", async () => {
     sel = { type: "transport", id: lift.id };
-    render(transportEditorTemplate(sim, lift), root);
+    render(transportEditor(sim, lift), root);
     lift.cars = maxCarsFor(lift.kind);
     const before = sim.money;
     await editor.handleEditAction("addcar", root);
@@ -721,14 +720,14 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(r.ok).toBe(true);
     const ex = sim.tower.transports.find((t) => t.id === r.transportId)!;
     for (const t of [ex, lift]) {
-      const card = renderedCard(transportEditorTemplate(sim, t));
+      const card = renderedCard(transportEditor(sim, t));
       expect(card.querySelector('[data-edit="stops"]')).toBeNull();
       expect(card.querySelector('[data-edit="express"]')).toBeNull();
       expect(card.querySelector('[data-edit="allstops"]')).toBeNull();
       expect(card.querySelector('[data-edit="schedule"]')).not.toBeNull();
     }
     // The express card's fixed policy caption survives on its Stops row.
-    expect(renderedCard(transportEditorTemplate(sim, ex)).textContent).toContain("lobbies and sky lobbies");
+    expect(renderedCard(transportEditor(sim, ex)).textContent).toContain("lobbies and sky lobbies");
   });
 
   it("the express Stops readout reports a deliberately skipped (sky) lobby honestly", () => {
@@ -744,9 +743,9 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     const r = s.tower.placeTransport("elevatorExpress", 42, 1, 30);
     expect(r.ok).toBe(true);
     const ex = s.tower.transports.find((t) => t.id === r.transportId)!;
-    expect(renderedCard(transportEditorTemplate(s, ex)).textContent).toContain("lobbies and sky lobbies");
+    expect(renderedCard(transportEditor(s, ex)).textContent).toContain("lobbies and sky lobbies");
     expect(s.tower.setStop(ex.id, 15, false)).toBe(true); // skip the interior sky lobby
-    expect(renderedCard(transportEditorTemplate(s, ex)).textContent).toContain("lobbies and sky lobbies (1 skipped)");
+    expect(renderedCard(transportEditor(s, ex)).textContent).toContain("lobbies and sky lobbies (1 skipped)");
   });
 
   it("the schedule dialog's stops port lists floors top-down and each toggle is its own undo-bracketed setStop (#464)", async () => {
@@ -778,6 +777,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     editor.openSchedule();
     const stops = scheduleDlg!.ctx.stops;
     sim.tower.removeTransport(lift.id);
+    ports.viewReader.update(); // the UI pass moves the revision the kept cards follow
     expect(stops.read()).toEqual([]);
     const before = undo.captures.length;
     await stops.setServe(1, false); // silent no-op: no undo step, no crash
@@ -788,7 +788,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("extendUp bills a floor when it fits and auto-lays the floor behind it in open sky", async () => {
     sel = { type: "transport", id: lift.id };
-    render(transportEditorTemplate(sim, lift), root);
+    render(transportEditor(sim, lift), root);
     const before = sim.money;
     await editor.handleEditAction("extendUp", root); // floor 3 is built → grows
     expect(lift.top).toBe(3);
@@ -812,7 +812,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     // the extend: the editor surfaces the engine's refusal as an error toast.
     expect(sim.buildTransport("elevatorStandard", 58, 3, 4).ok).toBe(true);
     sel = { type: "transport", id: lift.id };
-    render(transportEditorTemplate(sim, lift), root);
+    render(transportEditor(sim, lift), root);
     await editor.handleEditAction("extendUp", root); // floor 3 is occupied by the other shaft
     expect(lift.top).toBe(2); // unchanged
     expect(last(f.sfx)).toBe("error");
@@ -857,7 +857,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     // for is not billed twice.
     await editor.extendSelectedTo("up", 6); // paid floor 6
     await editor.extendSelectedTo("up", 5); // shrank back, the gesture still open
-    render(transportEditorTemplate(sim, lift), root);
+    render(transportEditor(sim, lift), root);
     await editor.handleEditAction("extendUp", root);
     expect(lift.top).toBe(6);
     expect(before - sim.money).toBe(5 * ECON.transportFloorCost);
@@ -872,6 +872,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     const snapshot = Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())));
     expect(snapshot.tower.resizeTransport(lift.id, 1, 2).ok).toBe(true);
     sim = snapshot;
+    ports.tsEngine.take(snapshot); // adoptSim hands the swapped-in tower to the engine
     const before = sim.money;
     await editor.extendSelectedTo("up", 4); // the stale mark (top 4) must not make this free
     expect(sim.tower.transportById(lift.id)!.top).toBe(4);
@@ -1390,7 +1391,7 @@ describe("InspectorController (stale-pick hygiene)", () => {
     const shown: unknown[] = [];
     let anchor: { x: number; floor: number } | null = null;
     const inspector = new InspectorController({
-      getSim: () => sim,
+      ...inspectorPortDeps(sim),
       ui: { showInspector: (tpl) => shown.push(tpl) },
       setAnchor: (a) => (anchor = a),
     });

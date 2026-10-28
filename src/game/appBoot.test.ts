@@ -33,6 +33,8 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // Capture each controller's ctor deps so the wiring closures can be invoked.
 const mocks = vi.hoisted(() => ({ deps: {} as Record<string, Record<string, unknown>> }));
 
+vi.mock("./cardKit", () => ({ createCardKit: vi.fn(() => ({ kit: "kit" })) }));
+
 vi.mock("./buildActions", () => ({
   BuildActions: class {
     constructor(deps: Record<string, unknown>) {
@@ -106,8 +108,7 @@ describe("wireControllers", () => {
     const sim = { id: "sim", star: 3, population: 800 };
     const engine = { viewState: vi.fn(() => ({ view: 1 })), onContextRestored: null as unknown };
     const app = {
-      sim,
-      engine,
+      sim, engine, enginePort: { id: "enginePort" }, portCodes: { id: "portCodes" }, reader: { id: "reader" },
       audio: { sfx: vi.fn(), setProgram: vi.fn() },
       speed: 2,
       frameErrors: [],
@@ -169,11 +170,13 @@ describe("wireControllers", () => {
     const app = makeWiringApp();
     wireControllers(app);
     const d = mocks.deps.inspector as {
-      getSim: () => unknown;
+      kit: () => unknown;
+      reader: () => unknown;
       ui: { showInspector: (h: unknown) => void };
       setAnchor: (a: unknown) => void;
     };
-    expect(d.getSim()).toBe(app.sim);
+    expect(d.kit()).toBe(app.cardKit);
+    expect(d.reader()).toBe(app.reader);
     d.ui.showInspector("tpl");
     expect(app.ui.showInspector).toHaveBeenCalledWith("tpl");
     d.setAnchor({ x: 3, floor: 4 });
@@ -186,7 +189,8 @@ describe("wireControllers", () => {
     const d = mocks.deps.editor as Record<string, (...a: unknown[]) => unknown> & {
       ui: Record<string, (...a: unknown[]) => unknown>;
     };
-    expect(d.getSim()).toBe(app.sim);
+    const got = (name: string) => (d[name] as () => unknown)();
+    expect([got("engine"), got("codes"), got("reader"), got("kit")]).toEqual([app.enginePort, app.portCodes, app.reader, app.cardKit]);
     d.ui.toast("t", "info");
     expect(app.ui.toast).toHaveBeenCalledWith("t", "info");
     d.ui.showBatchPricingDialog("ctx", "cb");
@@ -194,10 +198,6 @@ describe("wireControllers", () => {
     d.ui.showElevatorScheduleDialog("ctx", "cb");
     expect(app.ui.showElevatorScheduleDialog).toHaveBeenCalledWith("ctx", "cb");
     expect(d.selected()).toBe(app.selected);
-    d.selectedUnit();
-    expect(app.selectedUnit).toHaveBeenCalled();
-    d.selectedTransport();
-    expect(app.selectedTransport).toHaveBeenCalled();
     d.clearSelection();
     expect(app.clearSelection).toHaveBeenCalled();
     d.refreshEditor();

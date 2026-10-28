@@ -3,6 +3,7 @@ import { BuildActions } from "./buildActions";
 import { EditorActions } from "./editorActions";
 import { SaveLoad, RESUME_AFTER_RECOVERY_KEY } from "./saveLoad";
 import { InspectorController } from "./inspector";
+import { createCardKit } from "./cardKit";
 import { KeyboardPlay } from "./keyboardPlay";
 import { attemptContextRecovery } from "./contextRecovery";
 import { isEngineStopped, isSplashUp } from "./interactionState";
@@ -71,14 +72,18 @@ export function wireControllers(app: GameApp): void {
     selectedId: () => app.selected?.id ?? null,
     clearSelection: () => app.clearSelection(),
   });
+  app.cardKit = createCardKit(app);
   app.inspector = new InspectorController({
-    getSim: () => app.sim,
+    kit: () => app.cardKit,
+    reader: () => app.reader,
     ui: { showInspector: (html) => app.ui.showInspector(html) },
     setAnchor: (anchor) => (app.inspectAnchor = anchor),
   });
   app.editor = new EditorActions({
-    getSim: () => app.sim,
-    port: app.port,
+    engine: () => app.enginePort,
+    codes: () => app.portCodes,
+    reader: () => app.reader,
+    kit: () => app.cardKit,
     ui: {
       toast: (text, kind) => app.ui.toast(text, kind),
       showBatchPricingDialog: (ctx, cb) => app.ui.showBatchPricingDialog(ctx, cb),
@@ -87,8 +92,6 @@ export function wireControllers(app: GameApp): void {
     audio: app.audio,
     build: app.build,
     selected: () => app.selected,
-    selectedUnit: () => app.selectedUnit(),
-    selectedTransport: () => app.selectedTransport(),
     clearSelection: () => app.clearSelection(),
     refreshEditor: () => app.refreshEditor(),
     captureUndo: (label) => app.captureUndo(label),

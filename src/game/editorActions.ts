@@ -1,14 +1,18 @@
-import type { Simulation } from "../engine/Simulation";
 import { isElevatorKind, isHotelKind } from "../engine/facilities";
 import { catalogFacility } from "../engine/catalogTypes";
 import { priceOptionsFor } from "../ui/catalogPricing";
-import type { FacilityKind, Transport, Unit } from "../engine/types";
+import type { FacilityKind } from "../engine/types";
+import type { BatchRentResult } from "../engine/sim/constants";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import type { BuildActions } from "./buildActions";
-import type { SimPort } from "../simport/port";
+import type { EnginePort } from "../simport/enginePort";
+import { outcome, type PortCodes } from "../simport/portCodes";
+import { clockOf, rulesOf } from "../simport/headerClock";
+import { scheduleSlots } from "../simport/scheduleSlots";
+import type { ViewReader } from "../simport/viewReader";
 import { NOT_ENOUGH_MONEY } from "../engine/sim/charges";
-import { towerCatalog } from "../engine/towerCatalog";
+import type { CardKit } from "./cardKit";
 
 /**
  * The editor-card actions: everything the selected facility's buttons can do
@@ -19,25 +23,33 @@ import { towerCatalog } from "../engine/towerCatalog";
  * getters; money paths route through {@link BuildActions} so refunds can't
  * drift from the bulldozer's.
  *
- * Every command goes through the port (AD-9) and the action reads only its
- * answer; an action resolves once the engine has answered, its feedback has
- * played and its undo step is closed. Never stores a Simulation: adoptSim()
- * swaps the live instance, so every read asks `deps.getSim()` fresh (dialog
- * callbacks re-ask when they fire).
+ * Every command goes through the engine port (contract section 7) and the
+ * action reads only its record; the port answers synchronously, so an action
+ * has played its feedback and closed its undo step by the time it returns.
+ * The facility's fields come from the port's cards (`deps.kit().cards`), asked
+ * on selection and after a command, never per frame. Nothing of the tower is
+ * stored: the engine, the codes, the view and the kit are getters read per
+ * call (dialog callbacks re-ask when they fire).
  */
 export interface EditorActionsDeps {
-  /** The live simulation (never cached — adoptSim swaps the instance). */
-  getSim(): Simulation;
-  /** The port every command goes through; it follows adoptSim itself. */
-  port: SimPort;
+  /** The engine the commands go to; it follows adoptSim itself. */
+  engine(): EnginePort;
+  /** The code tables and record slots of the engine's layout. */
+  codes(): PortCodes;
+  /** The view, for the clock and the rules. */
+  reader(): Pick<ViewReader, "header">;
+  /** The cards and the reads the port lacks. */
+  kit(): CardKit;
   ui: Pick<UI, "toast" | "showBatchPricingDialog" | "showElevatorScheduleDialog">;
   audio: Pick<AudioEngine, "sfx">;
   /** Sell/refund paths shared with the bulldozer. */
-  build: Pick<BuildActions, "tryRemoveUnit" | "removeTransportWithRefund">;
+  build: {
+    // Both read only the facility's id, so a card serves as the argument.
+    tryRemoveUnit(u: { id: number }, verb: "sell" | "bulldoze"): ReturnType<BuildActions["tryRemoveUnit"]>;
+    removeTransportWithRefund(t: { id: number }, verb: "sell" | "bulldoze"): ReturnType<BuildActions["removeTransportWithRefund"]>;
+  };
   /** Current selection (id-based; the entity may have been removed). */
   selected(): { type: "unit" | "transport"; id: number } | null;
-  selectedUnit(): Unit | undefined;
-  selectedTransport(): Transport | undefined;
   clearSelection(): void;
   refreshEditor(): void;
   captureUndo(label: string): void;
@@ -45,123 +57,106 @@ export interface EditorActionsDeps {
   announce(msg: string): void;
 }
 
+/** `rentBatch`'s own slots: the fields of the dialog's tally. */
+const BATCH_SLOTS = ["matched", "eligible", "changed", "skippedSold", "skippedCustom", "customOverwritten", "clampedLow", "clampedHigh"] as const;
+
 export class EditorActions {
-  /** The shaft and sim of the extend-arrow drag in progress. The engine holds
-   *  the gesture's high-water mark (`Simulation.beginExtend`, #990), so a
-   *  back-and-forth wiggle is billed once; a tower swapped in mid-drag (a load,
-   *  an undo) has no gesture open, so the drag begins a new one on it. */
-  private extendDrag: { id: number; sim: Simulation } | null = null;
+  /** The shaft, tower generation and ends of the extend-arrow drag in
+   *  progress. The engine holds the gesture's high-water mark (`startExtend`,
+   *  #990), so a back-and-forth wiggle is billed once; a tower swapped in
+   *  mid-drag (a load, an undo) has no gesture open, so the drag begins a new
+   *  one on it. The ends follow each step's record, so a pointer move asks
+   *  the port for no card. */
+  private extendDrag: { id: number; generation: number; bottom: number; top: number } | null = null;
 
   constructor(private readonly deps: EditorActionsDeps) {}
 
   /** Close the extend gesture (the extend-arrow drag ended). Closes it on the
    *  live tower: one swapped in mid-drag either has no gesture open or one
    *  this drag began on it (see {@link extendSelectedTo}). */
-  async endExtend(): Promise<void> {
+  endExtend(): void {
     if (!this.extendDrag) return;
     this.extendDrag = null;
-    await this.deps.port.command({ op: "endExtend" });
+    this.deps.engine().stopExtend();
   }
 
   /** Open the per-shaft elevator Schedule dialog for the selected elevator
    *  (elevator-scheduling #305 Phase 3, floors fold-in #464): the ONE per-shaft
    *  config surface. The stops port applies Serve toggles and the bulk stop
-   *  actions LIVE against the current sim (each its own undo step, the retired
+   *  actions LIVE against the current tower (each its own undo step, the retired
    *  stops dialog's semantics); the schedule working copy writes once through
-   *  `Tower.setSchedule` on OK (hardened, undoable). */
+   *  `scheduleShaft` on OK (hardened, undoable). */
   openSchedule(): void {
     const selected = this.deps.selected();
     if (!selected || selected.type !== "transport") return;
-    const t = this.deps.selectedTransport();
+    const t = this.deps.kit().cards.shaft(selected.id);
     if (!t || !isElevatorKind(t.kind)) return;
-    const sim = this.deps.getSim();
     const id = t.id;
-    // Every stops-port method re-reads the LIVE sim: undo/redo stays live while
-    // the dialog is open and adoptSim swaps the instance underneath us.
-    const live = () => this.deps.getSim();
+    // Every stops-port method re-reads the LIVE card: undo/redo stays live while
+    // the dialog is open and adoptSim swaps the tower underneath us.
     const liveShaft = () => {
-      const cur = live();
-      const shaft = cur.tower.getTransport(id);
-      return shaft && isElevatorKind(shaft.kind) ? { sim: cur, shaft } : undefined;
+      const shaft = this.deps.kit().cards.shaft(id);
+      return shaft && isElevatorKind(shaft.kind) ? shaft : undefined;
+    };
+    // A stops command changed the shaft, so the next card read asks the port.
+    const stopsCommand = (run: (engine: EnginePort) => void, sound: boolean) => {
+      if (!liveShaft()) return;
+      this.deps.captureUndo("Elevator stops");
+      run(this.deps.engine());
+      this.deps.kit().cards.forget();
+      this.deps.commitUndo();
+      if (sound) this.deps.audio.sfx("click");
+      this.deps.refreshEditor();
     };
     const stops = {
-      read: () => {
-        const at = liveShaft();
-        if (!at) return [];
-        const lobbies = new Set(at.sim.tower.lobbyFloors());
-        const rows: { floor: number; served: boolean; lobby: boolean; endpoint: boolean }[] = [];
-        for (let fl = at.shaft.top; fl >= at.shaft.bottom; fl--) {
-          rows.push({
-            floor: fl,
-            served: at.sim.tower.stopsAt(at.shaft, fl),
-            lobby: lobbies.has(fl),
-            endpoint: fl === at.shaft.bottom || fl === at.shaft.top,
-          });
-        }
-        return rows;
-      },
+      read: () => [...(liveShaft()?.stops ?? [])],
       // The engine decides each refusal (an endpoint always stops, an express
       // serves only lobby floors); a refused or no-op toggle leaves the tower
       // as it was, so its commit records no undo step.
-      setServe: async (floor: number, serve: boolean) => {
-        if (!liveShaft()) return;
-        this.deps.captureUndo("Elevator stops");
-        await this.deps.port.command({ op: "setStop", id, floor, stop: serve });
-        this.deps.commitUndo();
-        this.deps.refreshEditor();
-      },
-      expressStops: async () => {
-        if (!liveShaft()) return;
-        this.deps.captureUndo("Elevator stops");
-        await this.deps.port.command({ op: "setExpressStops", id });
-        this.deps.commitUndo();
-        this.deps.audio.sfx("click");
-        this.deps.refreshEditor();
-      },
-      allStops: async () => {
-        if (!liveShaft()) return;
-        this.deps.captureUndo("Elevator stops");
-        await this.deps.port.command({ op: "clearStops", id });
-        this.deps.commitUndo();
-        this.deps.audio.sfx("click");
-        this.deps.refreshEditor();
-      },
+      setServe: (floor: number, serve: boolean) => (stopsCommand((e) => e.markStop(id, floor, serve), false), Promise.resolve()),
+      expressStops: () => (stopsCommand((e) => e.expressStops(id), true), Promise.resolve()),
+      allStops: () => (stopsCommand((e) => e.dropStops(id), true), Promise.resolve()),
     };
+    const kit = this.deps.kit();
+    const header = this.deps.reader().header;
     this.deps.ui.showElevatorScheduleDialog(
       {
-        title: `Schedule: ${catalogFacility(towerCatalog(sim), t.kind).name} (floors ${t.bottom}-${t.top})`,
-        ux: sim.rules.elevatorScheduleUX(),
+        title: `Schedule: ${catalogFacility(kit.catalog(), t.kind).name} (floors ${t.bottom}-${t.top})`,
+        ux: rulesOf(header).elevatorScheduleUX(),
         isExpress: t.kind === "elevatorExpress",
         cars: t.cars,
         bottom: t.bottom,
         top: t.top,
         stops,
-        hourly: sim.elevatorHourlyLoad(id),
-        origins: sim.elevatorOriginLoad(id),
-        current: t.schedule,
-        initialWeekend: sim.clock.isWeekend,
+        hourly: t.hourly ?? undefined,
+        origins: t.origins
+          ? { weekday: t.origins.weekday.map((ring) => new Map(ring)), weekend: t.origins.weekend.map((ring) => new Map(ring)) }
+          : undefined,
+        current: kit.currentSchedule(id),
+        initialWeekend: clockOf(header).isWeekend,
         announce: (msg) => this.deps.announce(msg),
       },
       {
-        apply: async (schedule) => {
-          // Re-read the LIVE sim here, never the open-time capture: undo/redo
+        apply: (schedule) => {
+          // Re-read the LIVE card here, never the open-time capture: undo/redo
           // stays live while the dialog is open (main.ts runs it ahead of the
-          // modal guard) and adoptSim swaps the instance underneath us. The id
+          // modal guard) and adoptSim swaps the tower underneath us. The id
           // survives serialization, so the shaft resolves on the restored tower.
-          const shaft = this.deps.getSim().tower.getTransport(t.id);
-          if (!shaft || !isElevatorKind(shaft.kind)) {
+          if (!liveShaft()) {
             // The shaft no longer exists (undone past its construction, or
             // demolished). Nothing to write; say so instead of "saved".
             this.deps.ui.toast("That elevator is gone.", "bad");
-            return;
+            return Promise.resolve();
           }
           this.deps.captureUndo("Set elevator schedule");
-          const res = await this.deps.port.command({ op: "setSchedule", id: shaft.id, schedule });
+          const engine = this.deps.engine();
+          const res = outcome(engine, engine.scheduleShaft(id, scheduleSlots(schedule)));
           this.deps.commitUndo();
-          if (!res.ok) return this.refuse(res.reason ?? "That schedule could not be saved.");
+          if (!res.ok) return Promise.resolve(this.refuse(res.reason ?? "That schedule could not be saved."));
           this.deps.audio.sfx("build");
           this.deps.announce("Elevator schedule saved.");
           this.deps.refreshEditor();
+          return Promise.resolve();
         },
       },
     );
@@ -175,24 +170,31 @@ export class EditorActions {
    *  separate floor-build step"; at $5,000 per shaft-floor the extend costs
    *  more per floor than laying the footprint with the floor tool, so it is
    *  never an exploit. */
-  async extendSelectedTo(end: "up" | "down", targetFloor: number): Promise<void> {
+  extendSelectedTo(end: "up" | "down", targetFloor: number): void {
     const selected = this.deps.selected();
     if (!selected || selected.type !== "transport") return;
-    const t = this.deps.selectedTransport();
-    if (!t || !isElevatorKind(t.kind)) return; // only lifts have extend handles / billing
-    const sim = this.deps.getSim();
-    const before = { bottom: t.bottom, top: t.top };
-    if (!this.extendDrag || this.extendDrag.id !== t.id || this.extendDrag.sim !== sim) {
-      this.extendDrag = { id: t.id, sim };
+    const engine = this.deps.engine();
+    const generation = engine.generation();
+    if (!this.extendDrag || this.extendDrag.id !== selected.id || this.extendDrag.generation !== generation) {
+      const t = this.deps.kit().cards.shaft(selected.id);
+      if (!t || !isElevatorKind(t.kind)) return; // only lifts have extend handles / billing
+      this.extendDrag = { id: t.id, generation, bottom: t.bottom, top: t.top };
       this.deps.captureUndo("Extend");
-      void this.deps.port.command({ op: "beginExtend", id: t.id });
+      engine.startExtend(t.id);
     }
-    const res = await this.deps.port.command({ op: "extendTransport", id: t.id, end, targetFloor });
+    const drag = this.extendDrag;
+    const rec = engine.extendShaft(drag.id, end === "up", targetFloor);
+    const res = outcome(engine, rec);
+    const bottom = this.deps.codes().slot(rec, "extendShaft", "bottom");
+    const top = this.deps.codes().slot(rec, "extendShaft", "top");
     // A blocked or broke step (cap reached, no structure, another shaft in the
     // way, no money left) is silent so a drag doesn't spam toasts; the shaft
     // simply stops growing.
-    if (!res.ok || (res.bottom === before.bottom && res.top === before.top)) return;
-    this.deps.audio.sfx(res.added > 0 ? "build" : "click");
+    if (!res.ok || (bottom === drag.bottom && top === drag.top)) return;
+    drag.bottom = bottom;
+    drag.top = top;
+    this.deps.kit().cards.forget();
+    this.deps.audio.sfx(this.deps.codes().slot(rec, "extendShaft", "added") > 0 ? "build" : "click");
     this.deps.refreshEditor();
   }
 
@@ -201,26 +203,33 @@ export class EditorActions {
    *  dialog renders a rung picker or the range editor off the SHAPE of the
    *  mode's price options, never the mode string. */
   private openBatchPricing(kind: FacilityKind): void {
-    const catalog = towerCatalog(this.deps.getSim());
+    const kit = this.deps.kit();
+    const catalog = kit.catalog();
     const options = priceOptionsFor(catalog, kind);
     if (!options) return;
     this.deps.ui.showBatchPricingDialog(
       { kind, kindLabel: catalogFacility(catalog, kind).name, options },
       {
-        preview: (target, opts) => this.deps.getSim().previewRentBatch(kind, target, opts)!,
-        apply: async (target, opts) => {
+        preview: (target, opts) => this.deps.kit().previewRentBatch(kind, target, opts)!,
+        apply: (target, opts) => {
           // Capture BEFORE the mutation (the dialog applies asynchronously, so the
           // synchronous captureUndo in handleEditAction is stale) → an undoable batch.
           this.deps.captureUndo("Set prices");
-          const res = await this.deps.port.command({ op: "applyRentBatch", kind, target, onlyDefaultPriced: opts.onlyDefaultPriced });
+          const engine = this.deps.engine();
+          const codes = this.deps.codes();
+          // The port takes NaN for the default price and -1 for No Rate.
+          const code = target === "default" ? NaN : target === "noRate" ? -1 : target;
+          const rec = engine.rentBatch(codes.kind(kind), code, opts.onlyDefaultPriced ?? false);
+          const res = outcome(engine, rec);
           this.deps.commitUndo();
           // The dialog offers only priced kinds and their targets, so a refusal
           // is the engine's call; say why and let the dialog close unsummed.
-          if (!res.ok || !res.batch) {
+          if (!res.ok) {
             this.refuse(res.reason ?? "Those prices could not be set.");
-            return null;
+            return Promise.resolve(null);
           }
-          return res.batch;
+          const batch = Object.fromEntries(BATCH_SLOTS.map((name) => [name, codes.slot(rec, "rentBatch", name)])) as unknown as BatchRentResult;
+          return Promise.resolve(batch);
         },
         onApplied: (summary) => {
           this.deps.audio.sfx("build");
@@ -235,8 +244,9 @@ export class EditorActions {
   async handleEditAction(action: string, root: HTMLElement): Promise<void> {
     const selected = this.deps.selected();
     if (!selected) return;
-    const sim = this.deps.getSim();
-    const port = this.deps.port;
+    const kit = this.deps.kit();
+    const engine = this.deps.engine();
+    const codes = this.deps.codes();
     const UNDO_LABELS: Record<string, string> = {
       sell: "Sell",
       rename: "Rename",
@@ -252,10 +262,11 @@ export class EditorActions {
       extendDown: "Extend",
       filmPolicy: "Film policy",
       changeVariety: "Change variety",
+      batchKind: "Edit",
     };
     this.deps.captureUndo(UNDO_LABELS[action] ?? "Edit");
     if (selected.type === "unit") {
-      const u = this.deps.selectedUnit();
+      const u = kit.cards.unit(selected.id);
       if (!u) return this.deps.clearSelection();
       if (action === "sell") {
         if (!(await this.deps.build.tryRemoveUnit(u, "sell"))) return;
@@ -266,13 +277,13 @@ export class EditorActions {
       if (action === "rename") {
         const input = root.querySelector<HTMLInputElement>("#ed-name");
         if (input) {
-          const res = await port.command({ op: "setLabel", id: u.id, label: input.value });
+          const res = outcome(engine, engine.labelUnit(u.id, input.value));
           if (!res.ok) return this.refuse(res.reason ?? "That name could not be saved.");
         }
         this.deps.audio.sfx("click");
         this.deps.refreshEditor();
       } else if (action === "rentUp" || action === "rentDown") {
-        if ((await port.command({ op: "adjustRent", id: u.id, dir: action === "rentUp" ? 1 : -1 })).ok) {
+        if (outcome(engine, engine.stepRent(u.id, action === "rentUp" ? 1 : -1)).ok) {
           this.deps.audio.sfx("click");
           this.deps.refreshEditor();
         }
@@ -282,16 +293,16 @@ export class EditorActions {
         // market (charges nothing, blocks move-ins, never evicts). Announced
         // with the pinned strings (ux-pricing-split-editor §1.4 / §5).
         const sel = root.querySelector<HTMLSelectElement>("#ed-rung");
-        const shape = priceOptionsFor(towerCatalog(sim), u.kind);
+        const shape = priceOptionsFor(kit.catalog(), u.kind);
         if (sel && shape?.shape === "ladder") {
           if (sel.value === "noRate") {
-            if ((await port.command({ op: "setNoRate", id: u.id })).ok) {
+            if (outcome(engine, engine.noRate(u.id)).ok) {
               this.deps.audio.sfx("click");
               this.deps.announce("No Rate: off the market. Charges nothing; no one moves in.");
             }
           } else {
             const rung = shape.rungs[Number(sel.value)];
-            if (rung && (await port.command({ op: "priceUnit", id: u.id, target: rung.value })).ok) {
+            if (rung && outcome(engine, engine.setRent(u.id, rung.value)).ok) {
               let what = "Rent";
               if (u.kind === "condo") what = "Sale price";
               else if (isHotelKind(u.kind)) what = "Room rate";
@@ -308,15 +319,15 @@ export class EditorActions {
       } else if (action === "filmPolicy") {
         const order = ["auto", "feature", "blockbuster"] as const;
         const next = order[(order.indexOf(u.filmPolicy ?? "auto") + 1) % order.length];
-        await port.command({ op: "setFilmPolicy", id: u.id, policy: next });
+        engine.setFilm(u.id, codes.code("filmPolicies", next));
         this.deps.audio.sfx("click");
         this.deps.refreshEditor();
       } else if (action === "changeVariety") {
         // Canon retail reroll: picks a §7 name different from the current
-        // (`Simulation.rerollSubtype`). Returns undefined for non-retail kinds
-        // and for single-entry lists; both cases are already gated by the
-        // editor card only rendering the button for retail.
-        if ((await port.command({ op: "rerollSubtype", id: u.id })).ok) {
+        // (`Simulation.rerollSubtype`). Refused for non-retail kinds and for
+        // single-entry lists; both cases are already gated by the editor card
+        // only rendering the button for retail.
+        if (outcome(engine, engine.rerollUnit(u.id)).ok) {
           this.deps.audio.sfx("click");
           this.deps.refreshEditor();
         }
@@ -324,7 +335,7 @@ export class EditorActions {
         this.openBatchPricing(u.kind);
       }
     } else {
-      const t = this.deps.selectedTransport();
+      const t = kit.cards.shaft(selected.id);
       if (!t) return this.deps.clearSelection();
       if (action === "sell") {
         if (!(await this.deps.build.removeTransportWithRefund(t, "sell"))) return this.deps.clearSelection();
@@ -337,7 +348,8 @@ export class EditorActions {
         // (a removed car is a sale, so it pays out half back). Only the money
         // refusal speaks: at the car limit or on the last car the button is
         // disabled anyway, and a toast would blame the wrong constraint.
-        const res = await port.command({ op: action === "addcar" ? "addCar" : "removeCar", id: t.id });
+        const res = outcome(engine, engine.changeCars(t.id, action === "addcar"));
+        kit.cards.forget();
         if (!res.ok) return res.reason === NOT_ENOUGH_MONEY ? this.refuse(res.reason) : undefined;
         this.deps.audio.sfx(action === "addcar" ? "build" : "click");
         this.deps.refreshEditor();
@@ -347,7 +359,8 @@ export class EditorActions {
         this.openSchedule();
       } else if (action === "extendUp" || action === "extendDown") {
         const up = action === "extendUp";
-        const res = await port.command({ op: "extendTransport", id: t.id, end: up ? "up" : "down", targetFloor: up ? t.top + 1 : t.bottom - 1 });
+        const res = outcome(engine, engine.extendShaft(t.id, up, up ? t.top + 1 : t.bottom - 1));
+        kit.cards.forget();
         if (!res.ok) {
           // Short of money: refused before anything moved, so no undo step.
           if (res.reason === NOT_ENOUGH_MONEY) return this.refuse(res.reason);
@@ -364,8 +377,9 @@ export class EditorActions {
 
   /** Rename the tower from the top bar. A refused name (longer than the
    *  engine takes) says why, as a refused unit name does. */
-  async renameTower(name: string): Promise<void> {
-    const res = await this.deps.port.command({ op: "setTowerName", name });
+  renameTower(name: string): void {
+    const engine = this.deps.engine();
+    const res = outcome(engine, engine.nameTower(name));
     if (!res.ok) this.refuse(res.reason ?? "That name could not be saved.");
   }
 

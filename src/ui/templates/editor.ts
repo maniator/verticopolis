@@ -1,7 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { keyed } from "lit-html/directives/keyed.js";
-import type { Simulation } from "../../engine/Simulation";
-import type { Transport, Unit } from "../../engine/types";
 import { isOperational, isTenanted } from "../../engine/types";
 import {
   isCommercialKind,
@@ -10,16 +8,16 @@ import {
   residentCount,
 } from "../../engine/facilities";
 import { householdPrice, ladderRungFor } from "../../engine/gameRules";
-import { catalogFacility } from "../../engine/catalogTypes";
-import { priceOptionsFor, unitPrice } from "../catalogPricing";
+import { catalogFacility, type Catalog } from "../../engine/catalogTypes";
+import type { TransportDetail, UnitDetail } from "../../simport/panels";
+import { priceOptionsFor } from "../catalogPricing";
 import { isRentalKind } from "../../engine/residentialRentals";
-import { facilityDiagnostics, hasAccessDiagnostic, transportDiagnostics } from "../../game/facilityDiagnostics";
+import { hasAccessDiagnostic } from "../../game/facilityDiagnostics";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
 import { floorTag } from "../format";
-import { towerCatalog } from "../../engine/towerCatalog";
 
 /**
- * The editor card bodies (E6-S1), pure functions of (sim, entity, mobile).
+ * The editor card bodies (E6-S1), pure functions of (card, catalog, mobile).
  * Authored to match `unitEditorHtml` / `transportEditorHtml` structurally
  * (proven by transitional guards, retired with the string builders) but rendered every
  * pump: lit's binding diff patches only the values that changed, so the
@@ -30,8 +28,9 @@ import { towerCatalog } from "../../engine/towerCatalog";
  * read them, and they document which cells carry live values.
  *
  * The mobile diagnostics block folds in `facilityDiagnostics` /
- * `transportDiagnostics` (shared with the desktop inspector card). They return
- * lit `TemplateResult` lines, so the block interpolates them directly; the
+ * `transportDiagnostics` (shared with the desktop inspector card). The caller
+ * builds those lit `TemplateResult` lines (on mobile only) and hands them over
+ * as `diagnostics`, so the block interpolates them directly; the
  * wrapper renders only when there is at least one line (an empty array leaves no
  * `.ed-diagnostics` box, matching the old empty `:empty { display:none }` div).
  */
@@ -64,8 +63,14 @@ const editorShell = (
 ): TemplateResult =>
   html`${keyed(key, html`${titleBar(name)}<div class="ed-stats kv">${rows}</div>${diagnostics}${actions}`)}`;
 
-export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): TemplateResult {
-  const f = catalogFacility(towerCatalog(sim), u.kind);
+export function unitEditorTemplate(
+  u: UnitDetail,
+  catalog: Catalog,
+  hour: number,
+  mobile = false,
+  diag: TemplateResult[] = [],
+): TemplateResult {
+  const f = catalogFacility(catalog, u.kind);
   const floorLabel = u.floor >= 1 ? `Floor ${u.floor}` : `Basement ${1 - u.floor}`;
   const canRename = u.kind === "office" || u.kind === "condo";
   const rcfg = f.rent;
@@ -77,17 +82,17 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
   // unit's real occupancy (a Modern condo's household, the flat catalog value
   // for the rest), never a bare `5/3` for a big family.
   if (isCommercialKind(u.kind) && f.population > 0) {
-    const closed = isTenanted(u) && !isOpenAt(u.kind, sim.clock.hour);
+    const closed = isTenanted(u) && !isOpenAt(u.kind, hour);
     rows.push(kv("Customers", `${u.customersIn ?? 0}${closed ? " (closed)" : ""}`, "customers"));
   } else if (f.population) {
-    rows.push(kv("Occupants", `${u.occupants}/${residentCount(u)}`, "occupants"));
+    rows.push(kv("Occupants", `${u.occupants}/${residentCount({ kind: u.kind, residents: u.residents ?? undefined })}`, "occupants"));
   }
   // On mobile the folded-in diagnostics carry the richer access reachability
   // line, so the plain Yes/No row would duplicate it: drop it there. But keep
   // it for a zero-population service kind (security/medical/housekeeping/metro),
   // whose diagnostics emit NO access line, so its connectivity still shows.
-  if (!mobile || !hasAccessDiagnostic(towerCatalog(sim), u)) {
-    const served = sim.tower.isFloorServed(u.floor);
+  if (!mobile || !hasAccessDiagnostic(catalog, u)) {
+    const served = u.served;
     // The third state (#370): the floor is CONNECTED to the lobby (served) yet no
     // commuter completes the trip, so "Yes" would lie. Reachability is uncapped
     // now (#503), so this happens only in Classic, when the sole path is a
@@ -95,7 +100,7 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
     // commuters/visitors read it (hasAccessDiagnostic, the same predicate the
     // diagnostics line uses); zero-population service kinds keep plain Yes/No.
     // "No route" echoes the inspector sentence and the stats footnote.
-    const cutOff = served && hasAccessDiagnostic(towerCatalog(sim), u) && !sim.floorReachable(u.floor);
+    const cutOff = served && hasAccessDiagnostic(catalog, u) && !u.reachable;
     let text = "Yes";
     if (!served) text = "No";
     else if (cutOff) text = "No route";
@@ -123,12 +128,12 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
     // where the price normally shows for a unit taken off the market.
     const rent = u.noRate
       ? "No Rate"
-      : `$${(u.kind === "condo" ? householdPrice(unitPrice(towerCatalog(sim), u), u.residents) : unitPrice(towerCatalog(sim), u)).toLocaleString()}${isHotelKind(u.kind) ? "/night" : ""}`;
+      : `$${(u.kind === "condo" ? householdPrice(u.price, u.residents ?? undefined) : u.price).toLocaleString()}${isHotelKind(u.kind) ? "/night" : ""}`;
     rows.push(kv(label, rent, "rent"));
   }
   if (u.kind === "cinema" && isOperational(u)) {
     // A gutted/burning/under-construction cinema books no film, omit the row.
-    rows.push(kv("Now showing", sim.isShowingBlockbuster(u.id) ? "Blockbuster" : "Feature", "showing"));
+    rows.push(kv("Now showing", u.blockbuster ? "Blockbuster" : "Feature", "showing"));
   }
   if (u.state === "gutted") {
     rows.push(kv("Scrap value", "$0"));
@@ -153,10 +158,10 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
   // nudge steppers. A SOLD condo is price-locked: the ladder shows the picker
   // DISABLED at the locked rung (the design system's "show why a thing cannot
   // be pressed"); the band keeps today's hidden-row behavior.
-  const priceShape = priceOptionsFor(towerCatalog(sim), u.kind);
+  const priceShape = priceOptionsFor(catalog, u.kind);
   if (priceShape?.shape === "ladder") {
     const locked = u.kind === "condo" && u.everOccupied;
-    const current: RungChoice = u.noRate ? "noRate" : ladderRungFor(priceShape.rungs, unitPrice(towerCatalog(sim), u)).level;
+    const current: RungChoice = u.noRate ? "noRate" : ladderRungFor(priceShape.rungs, u.price).level;
     let ariaLabel = "Rent level";
     if (u.kind === "condo") ariaLabel = "Sale price level";
     else if (isHotelKind(u.kind)) ariaLabel = "Room rate level";
@@ -207,17 +212,16 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
   // On mobile, fold the inspector card's diagnostics in as a live block between
   // the stats and the controls (one panel, no separate card). Desktop leaves
   // them to the hover card, so the block only exists on mobile.
-  // Only the mobile fold-in shows the diagnostics, so only the mobile path pays
-  // for computing them (facilityDiagnostics can run a parking flood-fill etc.);
-  // desktop leaves the block to the hover card.
-  const diag = mobile ? facilityDiagnostics(sim, u) : [];
+  // Only the mobile fold-in shows the diagnostics, so only the mobile caller
+  // pays for computing them (facilityDiagnostics can run a parking flood-fill
+  // etc.); desktop leaves the block to the hover card.
   const diagnostics = diag.length ? html`<div class="ed-diagnostics" data-field="diagnostics">${diag}</div>` : nothing;
   // Canon retail variant titles the editor card too, matching the inspector.
   return editorShell(`unit:${u.id}`, u.subtype ?? f.name, rows, actions, diagnostics);
 }
 
-export function transportEditorTemplate(sim: Simulation, t: Transport, mobile = false): TemplateResult {
-  const f = catalogFacility(towerCatalog(sim), t.kind);
+export function transportEditorTemplate(t: TransportDetail, catalog: Catalog, tdiag: TemplateResult[] = []): TemplateResult {
+  const f = catalogFacility(catalog, t.kind);
   // The catalog lists a car limit for elevators and no other kind.
   const maxCars = f.maxCars;
   const isEl = maxCars !== null;
@@ -227,7 +231,7 @@ export function transportEditorTemplate(sim: Simulation, t: Transport, mobile = 
   ];
   if (isEl) {
     rows.push(kv("Cars", `${t.cars} / ${maxCars} max`, "cars"));
-    rows.push(kv("Capacity", `${sim.transportCapacity(t)} riders/trip`, "capacity"));
+    rows.push(kv("Capacity", `${t.capacity} riders/trip`, "capacity"));
     // An express is locked to (sky) lobbies (1994 parity), so it reads a fixed
     // policy line rather than a free per-floor skip count. A legacy/forged save
     // may still carry a deliberately skipped lobby (coerceExpressStops preserves
@@ -235,10 +239,10 @@ export function transportEditorTemplate(sim: Simulation, t: Transport, mobile = 
     // Standard/service keep their configurable stop readout.
     let stops: string;
     if (t.kind === "elevatorExpress") {
-      const skippedLobbies = (t.skipFloors ?? []).filter((fl) => sim.tower.floorHasLobby(fl)).length;
+      const skippedLobbies = t.stops.filter((row) => !row.served && row.lobby).length;
       stops = skippedLobbies ? `lobbies and sky lobbies (${skippedLobbies} skipped)` : "lobbies and sky lobbies";
     } else {
-      const skipped = t.skipFloors?.length ?? 0;
+      const skipped = t.stops.filter((row) => !row.served).length;
       stops = skipped ? `skips ${skipped} floor${skipped === 1 ? "" : "s"}` : "all floors";
     }
     rows.push(kv("Stops", stops, "stops"));
@@ -268,8 +272,7 @@ export function transportEditorTemplate(sim: Simulation, t: Transport, mobile = 
   }
   actions.push(edRow(html`<button class="btn danger" data-edit="sell">Sell / Bulldoze</button>`));
 
-  // Desktop leaves the diagnostics to the hover card, so skip the work off mobile.
-  const tdiag = mobile ? transportDiagnostics(sim, t) : [];
+  // Desktop leaves the diagnostics to the hover card; its caller passes none.
   const diagnostics = tdiag.length ? html`<div class="ed-diagnostics" data-field="diagnostics">${tdiag}</div>` : nothing;
   return editorShell(`transport:${t.id}`, f.name, rows, actions, diagnostics);
 }
