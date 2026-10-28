@@ -42,7 +42,7 @@ describe("PortEvents", () => {
 
   it("adds the held events only on a release", () => {
     const held = vi.fn(() => [{ name: "star_reached", payload: { star: 2 } }] as never[]);
-    const events = new PortEvents(founded(), held);
+    const events = new PortEvents(founded(), { held, marked: () => false });
     events.drainGameplayEvents();
     expect(held).not.toHaveBeenCalled();
     expect(events.drainGameplayEvents({ release: true })).toEqual([{ name: "star_reached", payload: { star: 2 } }]);

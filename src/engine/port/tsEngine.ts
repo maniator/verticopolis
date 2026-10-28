@@ -107,6 +107,9 @@ export class TsEngine implements PortState {
     if (next === this.current) return;
     this.current = next;
     this.restart();
+    // A fault fallback hands over a fresh copy of the same tower, carrying
+    // the backdrop's mark on its buffer; a new tower's buffer has none.
+    this.backdrop = next.gameplayEvents.discardOnHandOff;
   }
 
   // ---- Lifecycle -----------------------------------------------------------
@@ -170,6 +173,8 @@ export class TsEngine implements PortState {
 
   setBackdrop(on: boolean): void {
     this.backdrop = on;
+    // On the buffer too, where a hand-off (`GameApp.adoptSim`) reads it.
+    this.current.gameplayEvents.discardOnHandOff = on;
   }
 
   private swapRecord(done: boolean): Float64Array {

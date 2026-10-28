@@ -218,16 +218,15 @@ class GameApp implements GameAppPorts {
     // overwrite them: a save from a *newer* build is only unreadable here, and a
     // future version may recover it. Best-effort, never blocks boot.
     if (boot.corrupt) SaveGame.preserveUnreadable();
-    // A swap through the port reaches the app as a swap the game made (PR 5's bridge, see `TsEngine.handOff`).
-    this.enginePort.handOff = (sim, keep) => this.adoptSim(sim, keep);
+    this.enginePort.handOff = (sim, keep) => this.adoptSim(sim, keep); // PR 5's bridge, see `TsEngine.handOff`
     this.reader = new ViewReader(this.enginePort, facilityFloors);
     this.portCodes = new PortCodes(this.enginePort);
-    // The WASM mirror host releases the events it held on a session flush (#874).
-    this.events = new PortEvents(this.enginePort, () => (this.sim as GameplayEventSource).drainGameplayEvents({ release: true }));
-    // Seed the promotion latch to the boot tower's rating (adoptSim does the same
-    // for later swaps). The boot sim is assigned directly, never through
-    // adoptSim, so without this a reloaded 2★-6★ tower reads star > lastStar(1)
-    // on the first frame and fires a phantom promotion (jingle + star_reached).
+    // The WASM mirror host's held events (#874) and backdrop mark.
+    const held = () => (this.sim as GameplayEventSource).drainGameplayEvents({ release: true });
+    this.events = new PortEvents(this.enginePort, { held, marked: () => this.sim.gameplayEvents.discardOnHandOff });
+    // Seed the promotion latch to the boot tower's rating (adoptSim does it for
+    // later swaps): the boot sim skips adoptSim, so a reloaded 2★-6★ tower would
+    // otherwise fire a phantom promotion (jingle + star_reached) on frame one.
     this.lastStar = this.sim.star;
     this.renderSim = new PortRenderSim(this.enginePort, this.reader);
     this.engine = new TowerEngine(this.canvas, this.renderSim, this.reader);
@@ -462,6 +461,8 @@ class GameApp implements GameAppPorts {
     // restore keeps the camera under the player (preserveHistory is only ever
     // true on that path); a real tower swap restores the save's view.
     this.reader.update();
+    // Renderer caches (scenery seed, walker reach) key on the sim it draws.
+    this.renderSim = new PortRenderSim(this.enginePort, this.reader);
     this.engine.setSim(this.renderSim, { keepCamera: preserveHistory });
     // Rebase the UI log cursor so old entries don't replay as toasts, and
     // refresh the palette to the new star level so it never shows the prior

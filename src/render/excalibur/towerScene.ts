@@ -319,7 +319,7 @@ export { skyColor };
 // ---- Engine lifecycle ---------------------------------------------------
 
 export function disposeScene(engine: TowerEngine): void {
-  for (const cell of engine.structTiles.values()) cell.clearGraphics();
+  for (const cell of engine.structTiles) cell.clearGraphics();
   // Region canvases, their membership, the dirty queue and the dead-parking
   // set all clear together, so no queued repaint can survive into (and paint
   // against) a swapped-in tower.
