@@ -44,7 +44,8 @@ export interface HostedRun {
 
 /**
  * The hosted simulation, as the frame loop drives it, without rendering:
- * load the stashed save the way a player's load does (the engine port's
+ * load the stashed save the way a player's load does (its stamped copy, see
+ * `stashSave`, through the engine port's
  * stored source, then the app follows the swap), then run `steps` steps of
  * `dt` minutes through the port in batches of `batch` (the frame loop's cap
  * of four), with the frame's view read after each batch. A warm-up run on a
@@ -56,7 +57,7 @@ export async function hostedRun(arg: { name: string; steps: number; warmSteps: n
   const g = w.game;
   w.__perfStash = w.__perfStash ?? {};
   const adopt = () => {
-    if (g.enginePort.loadSave(w.__perfSaves[arg.name])[0] !== 1) throw new Error(`${arg.name}: the engine refused the scenario's save`);
+    if (g.enginePort.loadSave(w.__perfStoredSaves[arg.name])[0] !== 1) throw new Error(`${arg.name}: the engine refused the scenario's save`);
     g.followSwap();
     g.speed = 0;
     g.engine.paused = true;

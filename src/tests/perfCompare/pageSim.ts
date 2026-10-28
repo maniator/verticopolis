@@ -72,8 +72,10 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
     const t0 = performance.now();
     if (arg.mode === "hosted") {
       // A player's load: the stored source, then the app follows the swap.
+      // It reads the stamped copy (see stashSave), so it starts where the
+      // raw run does.
       const port = g.enginePort;
-      const loaded = port.loadSave(save)[0] === 1;
+      const loaded = port.loadSave(w.__perfStoredSaves[arg.name] as string)[0] === 1;
       if (loaded) g.followSwap();
       const loadMs = performance.now() - t0;
       if (!loaded) throw new Error(`${arg.name}: the engine refused the scenario's save`);

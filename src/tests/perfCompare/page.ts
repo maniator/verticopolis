@@ -194,11 +194,25 @@ export function pageInfo(): PageInfo {
   };
 }
 
-/** Keep a scenario's save in the page, so it crosses the boundary once. */
+/** Keep a scenario's save in the page, so it crosses the boundary once,
+ *  with the copy the hosted runs load (`__perfStoredSaves`).
+ *
+ *  The hosted runs load through the port's `stored` source, whose founder
+ *  rule marks a save with no `appVersion` stamp as a tower from before 2.0
+ *  (`markFounderFromLoadedFile`). A scenario is a tower of this build, and a
+ *  save a player's game writes carries the stamp, so the hosted copy carries
+ *  one too. Without it the hosted runs start from a `founder: true` tower and
+ *  the raw runs (and the Node check) from one without, and the validation
+ *  rejects every scenario. A save that has a stamp keeps it; the added one
+ *  is any 2.0 or later build, saying only that the file is not a pre-stamp
+ *  save. */
 export function stashSave(arg: { name: string; save: string }): number {
   const w = window as any;
   w.__perfSaves = w.__perfSaves ?? {};
+  w.__perfStoredSaves = w.__perfStoredSaves ?? {};
   w.__perfSaves[arg.name] = arg.save;
+  const parsed = JSON.parse(arg.save) as { appVersion?: unknown };
+  w.__perfStoredSaves[arg.name] = JSON.stringify({ ...parsed, appVersion: parsed.appVersion ?? "2.0.0" });
   return arg.save.length;
 }
 
@@ -268,7 +282,7 @@ export interface AdoptResult {
 export function adoptScenario(name: string): AdoptResult {
   const w = window as any;
   const g = w.game;
-  const save = w.__perfSaves[name] as string;
+  const save = w.__perfStoredSaves[name] as string;
   const h = w.__vcEngine;
   const t0 = performance.now();
   if (g.enginePort.loadSave(save)[0] !== 1) throw new Error(`${name}: the engine refused the scenario's save`);
