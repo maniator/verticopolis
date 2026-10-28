@@ -1,6 +1,6 @@
 import type { Simulation } from "../Simulation";
 import type { Tower } from "../Tower";
-import { roomCounts, roomUnits } from "../tower/rooms";
+import { roomCounts, roomSlots, roomUnits } from "../tower/rooms";
 import { isStructural } from "../tower/towerTopology";
 import type { Transport, Unit } from "../types";
 import type { MetaLog } from "./metaLog";
@@ -133,9 +133,10 @@ const transportsLen = (ts: readonly Transport[]): number => ts.reduce((n, t) => 
  * The dynamic frame (`viewFrame(full)`), with what this reader last sent:
  * every room on a full frame (asked for, the first, or after the tower, its
  * revision or its unit count moved), else the rooms whose fields changed.
- * The TypeScript engine keeps no mark log, so a frame that is not full
- * compares every room's five fields with what it last sent, in one pass over
- * the rooms that also runs the meta log's comparison.
+ * A frame that is not full compares only the rooms marked since the last
+ * frame (`mark`, from `markRoom` through `watchRooms`) with what it last
+ * sent, in slot order, so it costs the rooms written, not every room
+ * (#1389).
  */
 export class FrameEncoder {
   private tower: Tower | undefined;
@@ -143,28 +144,36 @@ export class FrameEncoder {
   private units = -1;
   private last = new Float64Array(0);
   private seq = 0;
+  /** The units marked since the last frame. */
+  private readonly marked = new Set<Unit>();
+  /** One room's fields, the scratch `send` compares from. */
+  private readonly now = [0, 0, 0, 0, 0];
 
-  /** The frame for `sim`. Its walk over the rooms is also the meta log's
-   *  pass (`MetaLog.visit`), so a frame walks the rooms once. */
+  /** Note the units written since the last call, for the next frame. */
+  mark(units: Iterable<Unit>): void {
+    for (const u of units) this.marked.add(u);
+  }
+
+  /** The frame for `sim`; `meta` gives the header's meta revision. */
   frame(sim: Simulation, askFull: boolean, meta: MetaLog): Float64Array {
     const tower = sim.tower;
-    const rooms = meta.begin(tower);
+    const rooms = roomUnits(tower);
     const full = askFull || tower !== this.tower || tower.revision !== this.revision || tower.units.length !== this.units || this.last.length !== rooms.length * FIELDS;
-    if (full) this.last = new Float64Array(rooms.length * FIELDS);
-    const now = [0, 0, 0, 0, 0];
     const changed: number[] = [];
-    for (let slot = 0; slot < rooms.length; slot++) {
-      const u = rooms[slot];
-      meta.visit(slot, u);
-      fieldsOf(u, now, 0);
-      const at = slot * FIELDS;
-      let moved = full;
-      for (let k = 0; k < FIELDS && !moved; k++) moved = now[k] !== this.last[at + k];
-      if (moved) {
-        for (let k = 0; k < FIELDS; k++) this.last[at + k] = now[k];
-        changed.push(slot, now[0], now[1], now[2], now[3], now[4]);
+    if (full) {
+      this.last = new Float64Array(rooms.length * FIELDS);
+      for (let slot = 0; slot < rooms.length; slot++) this.send(slot, rooms[slot], true, changed);
+    } else if (this.marked.size > 0) {
+      const at = roomSlots(tower);
+      const slots: number[] = [];
+      for (const u of this.marked) {
+        const slot = at.get(u);
+        if (slot !== undefined) slots.push(slot);
       }
+      if (slots.length > 1) slots.sort((a, b) => a - b);
+      for (const slot of slots) this.send(slot, rooms[slot], false, changed);
     }
+    this.marked.clear();
     this.tower = tower;
     this.revision = tower.revision;
     this.units = tower.units.length;
@@ -233,5 +242,16 @@ export class FrameEncoder {
       }
     }
     return v;
+  }
+  /** Push the room in `slot` onto `changed` when its fields moved since the
+   *  last frame (or always, on a full frame), and keep them as sent. */
+  private send(slot: number, u: Unit, full: boolean, changed: number[]): void {
+    const at = slot * FIELDS;
+    fieldsOf(u, this.now, 0);
+    let moved = full;
+    for (let k = 0; k < FIELDS && !moved; k++) moved = this.now[k] !== this.last[at + k];
+    if (!moved) return;
+    for (let k = 0; k < FIELDS; k++) this.last[at + k] = this.now[k];
+    changed.push(slot, this.now[0], this.now[1], this.now[2], this.now[3], this.now[4]);
   }
 }

@@ -6,7 +6,7 @@ import { UNKNOWN_FACILITY, whole } from "../request";
 import { storeRent } from "./constants";
 
 import { FACILITIES, buildMinutes, facilityFloors, isElevatorKind, isFacilityKind } from "../facilities";
-import { setRoomState } from "../tower/rooms";
+import { markRoom, setRoomState } from "../tower/rooms";
 import { groundFloorStructureKind } from "../tower/towerTopology";
 import { removeUnits } from "../tower/removal";
 import type { FacilityKind, WeatherKind } from "../types";
@@ -143,7 +143,10 @@ export function build(sim: Simulation, kind: FacilityKind, floor: number, x: num
     const name = sim.rollRetailSubtype(kind);
     if (name !== undefined) {
       const u = sim.tower.getUnit(res.unitId);
-      if (u) u.subtype = name;
+      if (u) {
+        u.subtype = name;
+        markRoom(sim.tower, u);
+      }
     }
     // A new build in a ladder-priced mode starts on the Average rung (epics
     // AR6). Stored explicitly whenever Average differs from the band default

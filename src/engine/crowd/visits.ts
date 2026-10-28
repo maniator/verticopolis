@@ -278,6 +278,7 @@ export function spawnVenueVisit(
     // path balances the decrement through finish().
     spawned.originUnitId = originRoom.id;
     originRoom.outForMeal = (originRoom.outForMeal ?? 0) + 1;
+    markRoom(tower, originRoom);
     tower.bumpMealOverlayRevision();
   }
 }

@@ -13,6 +13,7 @@ import * as ask from "./queries";
 import * as draw from "./render";
 import { flag, whole, type PortState } from "./record";
 import { FrameEncoder, encodeStructure } from "./viewEncode";
+import { watchRooms } from "../tower/rooms";
 
 const LOG_KINDS = VIEW_LAYOUT.logKinds;
 const MODES = VIEW_LAYOUT.modes as readonly GameMode[];
@@ -33,12 +34,11 @@ const CALENDARS = VIEW_LAYOUT.calendars as readonly CalendarKind[];
  * undrained gameplay events go ahead of the new tower's own, unless it was
  * the title screen's backdrop (`setBackdrop`).
  *
- * The TypeScript engine keeps no mark log and writes labels in place, so the
- * frame compares every room's fields with what it last sent, and the meta log
- * compares labels and subtypes in that same walk (a listing runs a pass of
- * its own): one pass over the rooms a frame. That cost is the fallback
- * engine's only, and it goes when the
- * TypeScript engine retires.
+ * The TypeScript engine writes rooms in place, and each write of a field the
+ * view reads marks its room (`markRoom`). The engine watches its tower's
+ * marks (`watchRooms`) and hands them to the meta log and the frame encoder
+ * (`takeMarks`), so a frame or a listing costs the rooms written since the
+ * last one, not every room (#1389).
  */
 export class TsEngine implements PortState {
   reason: string | undefined;
@@ -71,7 +71,7 @@ export class TsEngine implements PortState {
 
   constructor(sim: Simulation) {
     this.current = sim;
-    this.meta.sync(sim.tower);
+    this.watch(sim);
   }
 
   static newGame(seed: number, mode?: GameMode, calendar?: CalendarKind, unbridged?: boolean): TsEngine {
@@ -171,7 +171,7 @@ export class TsEngine implements PortState {
     prev.discardOnHandOff = this.backdrop;
     next.gameplayEvents.inherit(prev);
     this.current = next;
-    this.meta.sync(next.tower);
+    this.watch(next);
     // A new tower's frames count from 1 again, as the Rust engine's do.
     this.frames = new FrameEncoder();
     this.drained = [];
@@ -190,12 +190,31 @@ export class TsEngine implements PortState {
   }
 
   viewFrame(full: boolean): Float64Array {
+    this.takeMarks();
     return this.frames.frame(this.current, full === true, this.meta);
   }
 
   unitMetaChanged(since: number): Float64Array {
-    this.meta.sync(this.current.tower);
+    this.takeMarks();
     return this.meta.changed(this.current.tower, since);
+  }
+
+  /** Start watching `sim`'s tower: its marks from here on, and the meta log's
+   *  baseline as the text stands now. */
+  private watch(sim: Simulation): void {
+    watchRooms(sim.tower).clear();
+    this.meta.sync(sim.tower);
+  }
+
+  /** Hand the rooms marked since the last call to the meta log, which logs
+   *  their text changes now, and to the frame encoder, which compares their
+   *  fields on the next frame. */
+  private takeMarks(): void {
+    const tower = this.current.tower;
+    const marked = watchRooms(tower);
+    this.meta.sync(tower, marked);
+    this.frames.mark(marked);
+    marked.clear();
   }
 
   unitLabel(id: number): string | undefined {
