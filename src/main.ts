@@ -34,7 +34,9 @@ import { onUpdateAvailable } from "./game/updateFlow";
 import { bootGame } from "./bootstrap";
 import { gameplaySession } from "./analytics";
 import { createTsSim } from "./simport/tsSim";
-import type { SimPort } from "./simport/port";
+import { TsEngine } from "./engine/port/tsEngine";
+import { ViewReader } from "./simport/viewReader";
+import { PortCodes } from "./simport/portCodes";
 
 /**
  * The game controller. Excalibur (via {@link TowerEngine}) owns the render
@@ -59,9 +61,14 @@ import type { SimPort } from "./simport/port";
  * traffic chip); renaming any needs every consumer updated (TypeScript won't catch it).
  */
 class GameApp implements GameAppPorts {
-  sim: Simulation;
+  /** The port's engine (slice 7, PR 4), its view and code tables; `sim` is its tower, set directly only by the tooling scenes. */
+  enginePort!: TsEngine;
+  reader!: ViewReader;
+  portCodes!: PortCodes;
+  get sim(): Simulation { return this.enginePort.sim; }
+  set sim(sim: Simulation) { if (!(import.meta.env.DEV || __TOOLING_BUILD__)) throw new Error("app.sim is set only in tooling builds"); this.enginePort.take(sim); }
   /** The simulation as the game drives it (AD-9); follows every adoptSim swap. */
-  readonly port: SimPort = createTsSim(() => this.sim, { adopt: (sim, keep) => this.adoptSim(sim, keep) });
+  readonly port = createTsSim(() => this.sim, { adopt: (sim, keep) => this.adoptSim(sim, keep) });
   engine: TowerEngine;
   audio = new AudioEngine();
   ui: UI;
@@ -195,7 +202,9 @@ class GameApp implements GameAppPorts {
     // overwrite them: a save from a *newer* build is only unreadable here, and a
     // future version may recover it. Best-effort, never blocks boot.
     if (boot.corrupt) SaveGame.preserveUnreadable();
-    this.sim = boot.sim ?? Simulation.newGame(Date.parse("2024-01-01"));
+    this.enginePort = new TsEngine(boot.sim ?? Simulation.newGame(Date.parse("2024-01-01")));
+    this.reader = new ViewReader(this.enginePort);
+    this.portCodes = new PortCodes(this.enginePort);
     // Seed the promotion latch to the boot tower's rating (adoptSim does the same
     // for later swaps). The boot sim is assigned directly, never through
     // adoptSim, so without this a reloaded 2★-6★ tower reads star > lastStar(1)
@@ -356,12 +365,11 @@ class GameApp implements GameAppPorts {
   /** @internal */ isTransportTool(): boolean { return isTransportTool(this); }
   /** @internal */ updateBuildPreview(tile: number, floor: number): void { updateBuildPreview(this, tile, floor); }
   /** @internal */ pickedAt(floor: number, tile: number): Picked | null { return pickedAt(this, floor, tile); }
-  /** Refresh the traffic HUD chip. Settles once the answer is drawn or dropped
-   *  (overtaken, or about a replaced tower), and rejects if a failure was not
-   *  dropped. Body in game/trafficHud.ts; a method on the instance because the
+  /** Refresh the traffic HUD chip; throws if the engine's answer or the draw
+   *  fails. Body in game/trafficHud.ts; a method on the instance because the
    *  screenshot tooling (scripts/scenes/features.ts, screenshot-page-ops.ts)
    *  awaits `window.game.refreshTraffic()` to pin the chip. @internal */
-  refreshTraffic(): Promise<void> { return refreshTraffic(this); }
+  refreshTraffic(): void { refreshTraffic(this); }
 
   // ---- PWA update ---------------------------------------------------------
 
@@ -436,7 +444,7 @@ class GameApp implements GameAppPorts {
    *  @internal */
   adoptSim(sim: Simulation, preserveHistory = false): void {
     sim.gameplayEvents.inherit(this.sim.gameplayEvents); // what the replaced tower still owed, and its drop count
-    this.sim = sim;
+    this.enginePort.take(sim);
     this.clearSelection();
     // Facility ids restart in a fresh tower. A stale ✕-latch (or anchor) from the old tower
     // would silently mute the inspector on whichever new facility happens to reuse the id.

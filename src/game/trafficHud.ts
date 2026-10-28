@@ -1,26 +1,15 @@
 import type { GameApp } from "../main";
 import { trafficTier, TRAFFIC_BOUNDS, TRAFFIC_LABELS, trafficGlyph } from "../engine/traffic";
 import { floorLabel } from "../ui/floorLabel";
-import { inOrderPer } from "../simport/latest";
-import type { CongestionHotspot } from "../simport/panels";
 import { noteFrameError } from "./frameErrors";
 
 /**
  * The color-blind-safe traffic HUD, split out of the `GameApp` class. It asks
- * the port for the tower's peak hotspot on every UI tick and draws the answer,
- * reaching the tower through `app` (never captured), so an `adoptSim` swap
- * stays visible. On `TsSim` the chip reads the same as under the former
- * synchronous `GameApp.updateTraffic`, drawn a microtask later in the same UI
- * tick; the one difference is that `adoptSim` restarts its hysteresis on
- * another tower.
+ * the engine port for the tower's peak hotspot on every UI tick and draws the
+ * answer, reaching the engine through `app` (never captured), so an `adoptSim`
+ * swap stays visible. The port answers at once, so every answer is drawn in
+ * the order it was asked and the tier's hysteresis steps from one to the next.
  */
-
-/** Each app's hotspot answers, never an older one drawn after a newer one: the
- *  tier's hysteresis steps from one answer to the next, so a port that answers
- *  in order (`TsSim`) has every answer drawn. An answer that lands after a
- *  newer question has settled (drawn, failed, or dropped as stale) is
- *  dropped. */
-const hotspotAsks = inOrderPer<CongestionHotspot>();
 
 /** Color-blind-safe traffic cue: word + shape-coded bar glyph (never color
  *  alone), driven by the tower's PEAK per-floor congestion, its busiest
@@ -31,37 +20,29 @@ const hotspotAsks = inOrderPer<CongestionHotspot>();
  *
  *  The frame loop's refresh: a failed answer or draw skips this refresh, as a
  *  thrown frame skips its frame, and goes to the throttled frame error log, so
- *  the promise never rejects and a failure that repeats at ~6 Hz cannot flood
+ *  the call never throws and a failure that repeats at ~6 Hz cannot flood
  *  the error tracking. */
-export async function updateTraffic(app: GameApp): Promise<void> {
+export function updateTraffic(app: GameApp): void {
   try {
-    await refreshTraffic(app);
+    refreshTraffic(app);
   } catch (e) {
     noteFrameError(app, e, "traffic");
   }
 }
 
-/** Ask once and draw the answer. Settles when the answer is drawn or dropped
- *  (overtaken, or about a tower replaced while it was out, failures included),
- *  and rejects when the answer or the draw fails for the current tower. The
- *  screenshot tooling awaits it (`GameApp.refreshTraffic`), so a failure stops
+/** Ask once and draw the answer. Throws when the answer or the draw fails. The
+ *  screenshot tooling calls it (`GameApp.refreshTraffic`), so a failure stops
  *  the capture. */
-export async function refreshTraffic(app: GameApp): Promise<void> {
-  const asked = app.sim;
-  try {
-    // One pass over the spatial map: the ratio drives the tier, the floor
-    // names the hotspot, asked together so this ~6 Hz loop doesn't rebuild the
-    // map twice per refresh on a large tower.
-    await hotspotAsks(app)(app.port.query({ op: "peakCongestionHotspot" }), (hot) => {
-      // A load or a new tower while the answer was out: it describes the old one.
-      if (app.sim === asked) drawTraffic(app, hot);
-    });
-  } catch (e) {
-    if (app.sim === asked) throw e;
-  }
+export function refreshTraffic(app: GameApp): void {
+  // One pass over the spatial map: the ratio drives the tier, the floor
+  // names the hotspot, asked together so this ~6 Hz loop doesn't rebuild the
+  // map twice per refresh on a large tower.
+  const rec = app.enginePort.hotspot();
+  const floor = app.portCodes.slot(rec, "hotspot", "floor");
+  drawTraffic(app, { ratio: app.portCodes.slot(rec, "hotspot", "ratio"), floor: Number.isNaN(floor) ? null : floor });
 }
 
-function drawTraffic(app: GameApp, { ratio: cong, floor: hotspot }: CongestionHotspot): void {
+function drawTraffic(app: GameApp, { ratio: cong, floor: hotspot }: { ratio: number; floor: number | null }): void {
   const B: readonly number[] = TRAFFIC_BOUNDS; // single source shared with trafficTier(), can't desync
   const raw = trafficTier(cong);
   if (raw > app.lastTrafficTier && cong >= B[app.lastTrafficTier] + 0.03) app.lastTrafficTier = raw;

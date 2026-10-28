@@ -116,9 +116,9 @@ const RAW_WRITES: Record<string, Record<string, number>> = {
   "src/engine/sim/services.ts": { occupants: 1 },
   // setRoomState itself.
   "src/engine/tower/rooms.ts": { state: 1 },
-  // The hosts' unit records: markRoom when state or customersIn moves. Their
-  // view fields go unmarked: nothing watches the WASM mirror's tower
-  // (watchRooms is the TypeScript engine's), and port PR 5 deletes it.
+  // The hosts' unit records: markRoom when any of the five fields moves, as
+  // the app's TsEngine watches the read model on the Rust path until port
+  // PR 5 deletes it (frameApply.test.ts holds a reader over it to a walk).
   "src/wasmhost/frameApply.ts": { state: 1, customersIn: 1, occupants: 1, hotelCustomersIn: 1, outForMeal: 1 },
   "src/wasmhost/frameSync.ts": { state: 1, customersIn: 1, occupants: 1, hotelCustomersIn: 1, outForMeal: 1 },
   // The shared reader's own decoded rooms, never an engine unit: it keeps

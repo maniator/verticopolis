@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
+import { TsEngine } from "../engine/port/tsEngine";
 import { roomUnits } from "../engine/tower/rooms";
+import { ViewReader } from "../simport/viewReader";
 import { walkedStats } from "../tests/fixtures/walkedStats";
 import { FRAME_HEADER, PERSON_FIXED, UNIT_STATES, decodeFrame, decodeHeader } from "./frameView";
 import { appendEngineLog, applyRecords } from "./frameApply";
@@ -71,6 +73,26 @@ describe("applyRecords", () => {
         syncCars(a, frame);
         applyRecords(b, v, decodeHeader(v));
         expect(snapshot(b), `seed ${seed} frame ${f}`).toBe(snapshot(a));
+      }
+    }
+  });
+
+  it("keeps a reader over the read model in step with a full walk, on both paths", () => {
+    // On the Rust path the app's engine sits over this read model, so every
+    // view field the host writes has to mark its room for the view frame.
+    const fields = (us: readonly { id: number }[]) =>
+      JSON.stringify(us.map((u) => ["id", "state", "occupants", "customersIn", "hotelCustomersIn", "outForMeal"].map((k) => (u as Record<string, unknown>)[k])));
+    for (const apply of [true, false]) {
+      const r = rng(apply ? 3 : 4);
+      const sim = tower();
+      const reader = new ViewReader(new TsEngine(sim));
+      const rooms = roomUnits(sim.tower).map((u) => u.id);
+      for (let f = 0; f < 20; f++) {
+        const v = Float64Array.from(randomFrame(r, sim, [1, 2, 3], rooms));
+        if (apply) applyRecords(sim, v, decodeHeader(v));
+        else syncUnits(sim, decodeFrame(v));
+        reader.update();
+        expect(fields(reader.rooms), `${apply ? "apply" : "sync"} frame ${f}`).toBe(fields(roomUnits(sim.tower)));
       }
     }
   });
