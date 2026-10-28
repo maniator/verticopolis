@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { EngineBootError } from "./engineBoot";
-import { FaultLatch, RestorePoints, carryLiveState, hostFault, isEngineTrap, isHostFault, runEach, type FaultContext } from "./hostFault";
+import { towerStateSig } from "../engine/UndoHistory";
+import { FaultLatch, RestorePoints, carryLiveState, hostFault, isEngineTrap, isHostFault, runEach, signatureOfSave, type FaultContext } from "./hostFault";
 
 /** A save told apart by its clock. */
 const save = (minutes: number) => {
@@ -121,6 +122,19 @@ describe("restore points (#874)", () => {
     } finally {
       load.mockRestore();
     }
+  });
+
+  it("answers with the point's own text, the save `newestSave` parses, and chooses it once (slice 5, #1158 A31)", () => {
+    const points = new RestorePoints(save(1));
+    const merged = save(2);
+    points.noteMerge(merged);
+    points.note("{not a save");
+    const walk = vi.spyOn(points, "restore");
+    expect(points.newestText()).toBe(merged);
+    expect(points.newestSave()).toEqual(JSON.parse(merged));
+    expect(points.newestText()).toBe(merged);
+    expect(walk).toHaveBeenCalledTimes(1);
+    expect(points.answered).toEqual({ point: "merge", skipped: 1 });
   });
 
   it("drops the attach save once a merge's loads in its place", () => {
@@ -256,6 +270,14 @@ describe("live state carried to the fresh tower (#874)", () => {
     expect(to.gameplayEvents.discardOnHandOff).toBe(true);
   });
 
+  it("keeps the live bridging setting, which the point may hold from before the player switched it (slice 5)", () => {
+    const from = Simulation.newGame(5, "modern");
+    const to = Simulation.deserialize(from.serialize());
+    from.autoBridge = !to.autoBridge;
+    carryLiveState(from, to);
+    expect(to.autoBridge).toBe(from.autoBridge);
+  });
+
   it("carries each part on its own, so one that throws costs only itself", () => {
     const from = Simulation.newGame(6, "classic");
     const to = Simulation.deserialize(from.serialize());
@@ -265,5 +287,17 @@ describe("live state carried to the fresh tower (#874)", () => {
     };
     expect(() => carryLiveState(from, to)).not.toThrow();
     expect([...to.crowd.commuteStressByFloor]).toEqual([[3, 12]]);
+  });
+});
+
+describe("the undo signature of a save (slice 5)", () => {
+  it("fingerprints a save's tower the way the port reads a live one", () => {
+    const sim = Simulation.newGame(5, "classic");
+    sim.money = 1e9;
+    for (let x = 170; x < 180; x++) sim.build("lobby", 1, x);
+    const text = JSON.stringify(sim.serialize());
+    expect(signatureOfSave(text)).toBe(towerStateSig(sim.tower, sim.money));
+    sim.build("lobby", 1, 180);
+    expect(signatureOfSave(text)).not.toBe(towerStateSig(sim.tower, sim.money));
   });
 });

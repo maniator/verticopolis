@@ -55,11 +55,13 @@ export function bindKeys(app: GameApp): void {
         const k = e.key.toLowerCase();
         if (k === "z" && !e.shiftKey) {
           e.preventDefault();
-          return app.undo();
+          void app.undo();
+          return;
         }
         if ((k === "z" && e.shiftKey) || k === "y") {
           e.preventDefault();
-          return app.redo();
+          void app.redo();
+          return;
         }
       }
     }

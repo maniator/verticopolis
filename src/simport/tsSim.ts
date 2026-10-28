@@ -5,11 +5,11 @@ import { findCatalogFacility } from "../engine/catalogTypes";
 import { towerCatalog } from "../engine/towerCatalog";
 import { roomUnits, structureRuns } from "../engine/tower/rooms";
 import { wellFormed as wellFormedText } from "../engine/wellFormed";
-import { settleEngine, stepGate } from "../wasmhost/stepGate";
 import type { Command, CommandOp, CommandResult, CommandResults } from "./commands";
 import type { SimPort } from "./port";
 import { INVALID_COMMAND, wellFormed } from "./request";
 import { queryKey, type Query, type QueryOp, type QueryResult, type QueryResults } from "./queries";
+import { createTsLifecycle, type TsSimOptions } from "./tsLifecycle";
 import {
   tsFloorHeatmap,
   tsHousekeepingCoverage,
@@ -52,13 +52,14 @@ import type { HeaderView, SimView } from "./view";
  * Engine types come in through `import type` only. The runtime edges into
  * `src/engine/` are the catalog handle (#921), which names the tower's
  * facility kinds and which the retirement inventory moves out of the engine,
- * and three that carry their reasons in the frontend import ratchet: the
- * text repair `wellFormed`, the room list and structure runs above (from the
- * engine's own memos), and the panel answers (`tsPanels.ts`, which call the
- * engine's own functions). Those three retire with the adapter and the
- * TypeScript engine, so they cost the retirement nothing.
+ * and four that carry their reasons in the frontend import ratchet: the text
+ * repair `wellFormed`, the room list and structure runs above (from the
+ * engine's own memos), the panel answers (`tsPanels.ts`, which call the
+ * engine's own functions), and the loads, saves and undo signature
+ * (`tsLifecycle.ts`). Those four retire with the adapter and the TypeScript
+ * engine, so they cost the retirement nothing.
  */
-export function createTsSim(getSim: () => Simulation): SimPort {
+export function createTsSim(getSim: () => Simulation, opts: TsSimOptions = {}): SimPort {
   /** Whether a value names a facility in the live tower's catalog. */
   const isKind = (kind: unknown): boolean => typeof kind === "string" && findCatalogFacility(towerCatalog(getSim()), kind as FacilityKind) !== undefined;
   // Kept per tower, so a swap starts with none and a replaced tower is not
@@ -86,8 +87,16 @@ export function createTsSim(getSim: () => Simulation): SimPort {
       return getSim().crowd;
     },
   };
+  const life = createTsLifecycle(getSim, opts);
   return {
     view,
+    get generation() {
+      return life.generation;
+    },
+    load: life.load,
+    save: life.save,
+    saveNow: life.saveNow,
+    undoSignature: life.undoSignature,
     tick(dtMinutes) {
       getSim().tick(dtMinutes);
     },
@@ -121,18 +130,6 @@ export function createTsSim(getSim: () => Simulation): SimPort {
     cached<Q extends Query>(q: Q): QueryResult<Q> | undefined {
       return answersFor(getSim()).get(q);
     },
-    save() {
-      try {
-        const sim = getSim();
-        // A host that steps in the background (the experimental worker and
-        // coalesced hosts) registers a step gate; without one the save is
-        // taken now, so it holds exactly what was issued before it.
-        if (!stepGate(sim)) return Promise.resolve(JSON.stringify(sim.serialize()));
-        return settledSave(getSim);
-      } catch (e) {
-        return Promise.reject(e);
-      }
-    },
     drainEvents(opts?: { release?: boolean }): GameplayEvent[] {
       // The WASM host's drain takes `release`; the instance's own ignores it.
       const source: EventSource = getSim();
@@ -146,17 +143,6 @@ export function createTsSim(getSim: () => Simulation): SimPort {
  *  `release`. */
 interface EventSource {
   drainGameplayEvents(opts?: { release?: boolean }): GameplayEvent[];
-}
-
-/** The save of a host that steps in the background, once it has caught up
- *  (as `saveLoad.ts`'s autosave waits). A tower adopted during the wait is
- *  not the one asked for, so the wait starts again on the tower held now. */
-async function settledSave(getSim: () => Simulation): Promise<string> {
-  for (;;) {
-    const sim = getSim();
-    await settleEngine(sim);
-    if (getSim() === sim) return JSON.stringify(sim.serialize());
-  }
 }
 
 /** The header as one object: the scalars copied, `population` computed on

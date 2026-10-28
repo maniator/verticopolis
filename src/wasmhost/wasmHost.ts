@@ -9,7 +9,7 @@ import { ShadowEngine } from "../dualrun/shadow";
 import { drainEngineBatch } from "./engineEvents";
 import { decodeFrame, decodeHeader, type FrameHeader, type FrameView } from "./frameView";
 import { appendEngineLog, applyRecords, checkRecords } from "./frameApply";
-import { setStepGate } from "./stepGate";
+import { setSaveText, setStepGate } from "./stepGate";
 import { mergeSimulation } from "./merge";
 import { adoptTelemetry, parseCommuteStress, type TelemetryDocument } from "./telemetry";
 import { useTowerCatalogSource } from "../engine/towerCatalog";
@@ -274,6 +274,7 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
         // A faulted tower never runs on TypeScript: its tick does nothing and
         // its save stays the newest restore point (temporary, with them).
         faulted ? () => Object.defineProperty(sim, "tick", { value: () => {}, configurable: true, writable: true }) : () => restoreOwn(sim, "serialize", ownSerialize),
+        faulted ? () => {} : () => setSaveText(sim, null),
         () => restoreOwn(sim, "drainGameplayEvents", ownDrain),
         () => restoreOwn(sim, "gameplayEventsDropped", ownDropped),
         () => sim.gameplayEvents.restore(handOff.events, handOff.dropped),
@@ -447,6 +448,9 @@ export function attachWasmHost(sim: Simulation, mod: WasmModule, options: WasmHo
     return text === null ? points.newestSave() : JSON.parse(text);
   };
   Object.defineProperty(sim, "serialize", { value: serializeHosted, configurable: true, writable: true });
+  // An undo step takes the same save as text, with no parse and re-print
+  // (#1158 A31, its undo half).
+  setSaveText(sim, () => guard("other", readPoint, null) ?? points.newestText());
   // A reference to the override kept past detach drains the instance, which
   // is the authority again, and never reaches the freed engine. The
   // analytics session's own flush releases the held events (`release`),
