@@ -371,8 +371,8 @@ impl Engine {
             .iter()
             .enumerate()
             .filter(|(_, on)| **on)
-            .map(|(i, _)| f64::from(1u8 << i))
-            .sum()
+            // A fold from 0, since an empty float `sum` is -0.
+            .fold(0.0, |bits, (i, _)| bits + f64::from(1u8 << i))
     }
 }
 

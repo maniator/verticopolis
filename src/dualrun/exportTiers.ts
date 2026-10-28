@@ -11,10 +11,12 @@ import type { WasmEngine } from "./binding";
  *
  * - **Tier 1, player commands.** What a player can do, with the engine's own
  *   rules and charges, plus the few host writes the game makes on a player's
- *   behalf (the tower's name, the camera, a log line). The only tier the UI
- *   and game code (`src/ui/`, `src/game/`, `src/render/`, everything outside
- *   the engine, the relay and the host) may reach. They reach it through the
- *   TypeScript instance, which the relay mirrors (`mirror.ts`).
+ *   behalf (the tower's name, the camera, a log line). Of the binding's own
+ *   exports, the only tier the UI and game code (`src/ui/`, `src/game/`,
+ *   `src/render/`, everything outside the engine, the relay and the host)
+ *   may call to change the tower. Today they reach it through the TypeScript
+ *   instance, which the relay mirrors (`mirror.ts`); on the port they reach
+ *   it, and the port's Tier 2 reads, through `EnginePort` (below).
  * - **The port's members** (`EnginePort`, `src/simport/enginePort.ts`) follow
  *   one rule: a member that writes the tower is Tier 1, and one that only
  *   reads (a quote, a query, a view, a text getter, `lastReason`) is Tier 2,
