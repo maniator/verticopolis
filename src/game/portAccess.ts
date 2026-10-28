@@ -1,10 +1,10 @@
 import type { Catalog } from "../engine/catalogTypes";
-import type { Simulation } from "../engine/Simulation";
 import { towerCatalog } from "../engine/towerCatalog";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { SimView } from "../simport/view";
+import type { ViewReader } from "../simport/viewReader";
 
 /**
  * What the game's callers read through the engine port to price and preview a
@@ -51,13 +51,8 @@ export function catalogOf(app: { readonly sim: { readonly mode: GameMode }; read
   return towerCatalog(app.sim, app.reader.header.mode);
 }
 
-/**
- * GAP: the port has no member that says whether a kind is unlocked (the star
- * gate, and Modern-only kinds in a Classic tower), and no quote answers it
- * without also asking about money or placement. This is the one read left on
- * the simulation; the Rust engine's answer replaces it when the boot path
- * moves.
- */
-export function isUnlocked(app: { readonly sim: Pick<Simulation, "isUnlocked"> }, kind: FacilityKind): boolean {
-  return app.sim.isUnlocked(kind);
+/** Whether the tower has unlocked `kind` (the star gate, and Modern-only
+ *  kinds in a Classic tower), from the reader's header as of its last update. */
+export function isUnlocked(app: { readonly reader: Pick<ViewReader, "unlocked"> }, kind: FacilityKind): boolean {
+  return app.reader.unlocked(kind);
 }

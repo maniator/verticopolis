@@ -158,6 +158,9 @@ export class ViewReader implements SimView {
   private pool = new Map<number, { person: Person; seen: number }>();
   private seq = NaN;
   private scalars = { mode: "classic" as GameMode, calendar: "canon" as CalendarKind, sceneSeed: 0 };
+  /** The header's `unlocked` bitset: bit k set for the kind with code k. */
+  private unlockedKinds = 0;
+  private readonly kindCodes: ReadonlyMap<FacilityKind, number>;
   rooms: Room[] = [];
   structure: StructureRunView[] = [];
   header!: HeaderView;
@@ -166,6 +169,7 @@ export class ViewReader implements SimView {
 
   constructor(private readonly port: EnginePort) {
     this.l = JSON.parse(port.viewLayout()) as Layout;
+    this.kindCodes = new Map(this.l.kinds.map((k, i) => [k, i]));
     const lookups = {
       getUnit: (id: number) => this.byId.get(id),
       getTransport: (id: number) => this.shaftById.get(id),
@@ -211,6 +215,15 @@ export class ViewReader implements SimView {
     }
     this.readFrame(f);
     if (f[h.metaRevision] !== this.metaRevision) this.readMeta();
+  }
+
+  /** Whether the tower has unlocked `kind` (its star gate, and the
+   *  Modern-only kinds in a Classic tower), as of the last update. */
+  unlocked(kind: FacilityKind): boolean {
+    const code = this.kindCodes.get(kind);
+    // The bitset is keyed by kind code and spans up to 53 bits, past what
+    // the 32-bit `&` reads, so the bit is read by division.
+    return code !== undefined && Math.floor(this.unlockedKinds / 2 ** code) % 2 === 1;
   }
 
   /** Decode the structure; true when no room was kept from the last one. */
@@ -311,6 +324,7 @@ export class ViewReader implements SimView {
       this.choice = null;
     }
     this.choiceUp = up;
+    this.unlockedKinds = f[h.unlocked];
     const minutes = f[h.minutes];
     this.header = {
       money: f[h.money],

@@ -7,6 +7,7 @@ import { buildRefusalTemplate } from "../ui/templates/inspector";
 import { isPaintKind } from "./gesture";
 import { FLOOR } from "../render/scale";
 import { catalogOf, isUnlocked, quoteBuild, quoteShaft } from "./portAccess";
+import { rulesOf } from "../simport/headerClock";
 
 /**
  * How far above the touch point a room's placement ghost floats, in SCREEN pixels
@@ -33,8 +34,8 @@ export function touchBuildLiftFloors(app: GameApp): number {
 
 /**
  * Build-preview, placement, and pick resolution, split out of the `GameApp`
- * class as friend functions taking the app. They read `app.sim`/`app.engine`
- * live (never captured), so an `adoptSim` swap stays visible. Behavior unchanged
+ * class as friend functions taking the app. They read the shared reader and
+ * `app.engine` live (never captured), so an `adoptSim` swap stays visible. Behavior unchanged
  * from the former methods.
  *
  * NOTE: src/tests/integration/gameControllers.integration.test.ts mirrors
@@ -44,9 +45,9 @@ export function touchBuildLiftFloors(app: GameApp): number {
 
 /** The inspectable/bulldozable entity at a cell (room or transport), if any. */
 export function pickedAt(app: GameApp, floor: number, tile: number): Picked | null {
-  const u = app.sim.tower.unitAt(floor, tile);
+  const u = app.reader.tower.unitAt(floor, tile);
   if (u && u.kind !== "floor" && u.kind !== "lobby") return { type: "unit", id: u.id, kind: u.kind };
-  const t = app.sim.tower.transports.find(
+  const t = app.reader.tower.transports.find(
     // Use the shaft's OWN stored width (matches render + overlap checks), not
     // the catalog width, an old save keeps its stored width, so after a canon
     // width change (e.g. stairs 4→8) the catalog would give a phantom click zone.
@@ -128,14 +129,14 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     // column. This also tightens the plain Floor/Lobby brush above ground.
     const perTile = catalogFacility(catalog, ghostKind).cost;
     const laid = [...new Set(tiles)].filter((tx) => {
-      const at = app.sim.tower.structureKindAt(floor, tx);
+      const at = app.reader.tower.structureKindAt(floor, tx);
       return ghostKind === "lobby" ? at !== "lobby" : at === undefined;
     }).length;
     const stripCost = laid === 0 ? 0 : can.cost + (laid - 1) * perTile;
-    const affordsStrip = app.sim.money >= stripCost;
+    const affordsStrip = app.reader.header.money >= stripCost;
     const valid = can.ok && affordsStrip;
     let reason: string | undefined;
-    if (!valid && app.sim.rules.showsPreviewReason) reason = !can.ok ? can.reason : "Not enough money.";
+    if (!valid && rulesOf(app.reader.header).showsPreviewReason) reason = !can.ok ? can.reason : "Not enough money.";
     app.engine.preview = { kind: ghostKind, floor, x: left, span, valid, reason };
     app.engine.transportPreview = null;
     if (showReasonCard) updateBuildRefusal(app, reason, floor, left + Math.floor(span / 2));
@@ -147,7 +148,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const can = quoteBuild(app.enginePort, app.portCodes, kind, floor, x);
     // Modern surfaces the refusal reason on the preview so a hover teaches the
     // rule before the click; Classic keeps the '94 click-to-refuse pedagogy.
-    const reason = !can.ok && app.sim.rules.showsPreviewReason ? can.reason : undefined;
+    const reason = !can.ok && rulesOf(app.reader.header).showsPreviewReason ? can.reason : undefined;
     app.engine.preview = { kind, floor, x, valid: can.ok, reason };
     app.engine.transportPreview = null;
     if (showReasonCard) updateBuildRefusal(app, reason, floor, x + Math.floor(catalogFacility(catalog, kind).width / 2));

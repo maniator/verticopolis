@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { towerCatalog } from "../engine/towerCatalog";
+import { catalogFor } from "../engine/catalog";
+import type { GameMode } from "../engine/types";
 import { createUICallbacks, type GameAppPorts } from "./uiCallbacks";
 import { Simulation } from "../engine/Simulation";
 import type { EnginePort } from "../simport/enginePort";
@@ -18,10 +19,11 @@ import { PortCodes } from "../simport/portCodes";
  */
 
 function makePorts() {
-  const sim = { mode: "classic", tower: {}, autoBridge: true } as unknown as Simulation;
+  const reader = { header: { mode: "classic" as GameMode } };
   const ports: GameAppPorts = {
-    getSim: vi.fn(() => sim),
-    enginePort: { flipAutoBridge: vi.fn(() => Float64Array.of(1, 0, 0)) } as unknown as EnginePort,
+    getCatalog: vi.fn(() => catalogFor("classic")),
+    reader,
+    enginePort: { flipAutoBridge: vi.fn(() => Float64Array.of(1, 0, 0)), autoBridge: vi.fn(() => true) } as unknown as EnginePort,
     portCodes: new PortCodes(new TsEngine(Simulation.newGame(1))),
     audio: { muted: true, musicVolume: 0.4, ambienceVolume: 0.7, sfxVolume: 0.6 },
     saveLoad: {
@@ -54,7 +56,7 @@ function makePorts() {
     loadFromSlot: vi.fn(),
     deleteSlot: vi.fn(),
   };
-  return { ports, sim };
+  return { ports, reader };
 }
 
 describe("createUICallbacks delegates every callback to its port", () => {
@@ -98,35 +100,21 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(ports.saveLoad.newGame).toHaveBeenCalledExactlyOnceWith("modern", "realWorld", true);
   });
 
-  it("getMode reads the live sim's mode", () => {
-    const { ports } = makePorts();
+  it("getMode reads the reader's header per call, so an adoptSim-style swap is seen", () => {
+    const { ports, reader } = makePorts();
     const cb = createUICallbacks(ports);
     expect(cb.getMode()).toBe("classic");
-    expect(ports.getSim).toHaveBeenCalled();
-  });
-
-  it("getMode re-reads the sim per call, so an adoptSim-style swap is seen", () => {
-    // The whole point of the getSim() thunk: never cache the sim. Swap what the
-    // port returns and confirm the callback reflects it rather than a stale hold.
-    let current = { mode: "classic" } as unknown as Simulation;
-    const { ports } = makePorts();
-    ports.getSim = vi.fn(() => current);
-    const cb = createUICallbacks(ports);
-    expect(cb.getMode()).toBe("classic");
-    current = { mode: "modern" } as unknown as Simulation;
+    reader.header = { mode: "modern" };
     expect(cb.getMode()).toBe("modern");
   });
 
-  it("getCatalog reads the live tower's catalog per call (#921)", () => {
-    let current = { mode: "classic" } as unknown as Simulation;
+  it("getCatalog asks the app's catalog per call (#921)", () => {
     const { ports } = makePorts();
-    ports.getSim = vi.fn(() => current);
     const cb = createUICallbacks(ports);
-    expect(cb.getCatalog()).toBe(towerCatalog(current));
     expect(cb.getCatalog().mode).toBe("classic");
-    current = { mode: "modern" } as unknown as Simulation;
-    expect(cb.getCatalog()).toBe(towerCatalog(current));
+    vi.mocked(ports.getCatalog).mockReturnValue(catalogFor("modern"));
     expect(cb.getCatalog().mode).toBe("modern");
+    expect(ports.getCatalog).toHaveBeenCalledTimes(2);
   });
 
   it("audio: toggle, mute state, volume set and read", () => {
@@ -161,11 +149,12 @@ describe("createUICallbacks delegates every callback to its port", () => {
   it("the bridging switch is an engine port command that resolves to the engine's answer", async () => {
     const { ports } = makePorts();
     const cb = createUICallbacks(ports);
-    // The fake engine answers false while the live sim still reads true: the
-    // switch takes the answer.
+    // The fake flip answers false while the fake engine's getter still reads
+    // true: the switch takes the flip's answer, the getter is asked apart.
     expect(await cb.onToggleAutoBridge()).toBe(false);
     expect(ports.enginePort.flipAutoBridge).toHaveBeenCalledOnce();
     expect(cb.isAutoBridge()).toBe(true);
+    expect(ports.enginePort.autoBridge).toHaveBeenCalledOnce();
   });
 
   it("onboarding, rename, stats, inspector close", () => {

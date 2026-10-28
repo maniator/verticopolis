@@ -39,6 +39,8 @@ import { TsEngine } from "./engine/port/tsEngine";
 import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
 import { hudSource } from "./game/hudSource";
+import { catalogOf } from "./game/portAccess";
+import type { Catalog } from "./engine/catalogTypes";
 
 /**
  * The game controller. Excalibur (via {@link TowerEngine}) owns the render
@@ -269,8 +271,8 @@ class GameApp implements GameAppPorts {
 
   // ---- UI command ports (GameAppPorts; createUICallbacks delegates here) ----
 
-  getSim(): Simulation {
-    return this.sim;
+  getCatalog(): Catalog {
+    return catalogOf(this);
   }
 
   /** Switch the active build/inspect tool, dropping any in-flight gesture. */

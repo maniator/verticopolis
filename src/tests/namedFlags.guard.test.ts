@@ -19,6 +19,7 @@ import { repoRel, sourceFiles } from "./guardFiles";
 const ALLOWED: Readonly<Record<string, string>> = {
   "src/engine/port/viewEncode.ts": "the unlocked-kinds mask, bit k = kind code k (the whole catalog, past 32 bits)",
   "engine-rs/src/view/reader.rs": "the unlocked-kinds mask, bit k = kind code k",
+  "src/simport/viewReader.ts": "reads the unlocked-kinds mask, bit k = kind code k (the whole catalog, past 32 bits)",
   "engine-rs/src/dispatch.rs": "the car's cab-floor bitset, indexed by stop",
   "engine-rs/src/crowd/spawn_floors.rs": "a per-floor bitset, indexed by floor",
   "engine-rs/src/fflate.rs": "the deflate port: shift widths and masks of the compression format",

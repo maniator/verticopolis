@@ -253,12 +253,14 @@ describe("updateBuildPreview", () => {
     // the lobby price. But the 8-wide brush would lay ~4 empty tiles past the
     // edge; a single-tile check would show green, the whole-brush guard must not.
     sim.money = FACILITIES.lobby.cost; // enough for exactly one tile
+    app.reader.update();
     updateBuildPreview(app, 30, 1);
     const cheap = raw.engine.preview as { kind: string; valid: boolean };
     expect(cheap.kind).toBe("lobby");
     expect(cheap.valid).toBe(false); // red: the full strip is unaffordable
     // Ample money: the same hover is valid.
     sim.money = 10_000_000;
+    app.reader.update();
     updateBuildPreview(app, 30, 1);
     expect((raw.engine.preview as { valid: boolean }).valid).toBe(true);
   });
@@ -271,10 +273,12 @@ describe("updateBuildPreview", () => {
     // at 40k, but the real cost including the bridge run is higher, so the ghost
     // must be red rather than promise a run that only partial-builds.
     sim.money = 40_000;
+    app.reader.update();
     updateBuildPreview(app, 35, 1);
     expect((raw.engine.preview as { valid: boolean }).valid).toBe(false);
     // Ample money clears it.
     sim.money = 1_000_000;
+    app.reader.update();
     updateBuildPreview(app, 35, 1);
     expect((raw.engine.preview as { valid: boolean }).valid).toBe(true);
   });

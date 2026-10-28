@@ -94,6 +94,7 @@ function sameReads(p: [EnginePort, EnginePort]): void {
   same(p, (e) => e.statsStrip(), "statsStrip");
   same(p, (e) => e.hotspot(), "hotspot");
   same(p, (e) => e.onboarding(), "onboarding");
+  same(p, (e) => e.autoBridge(), "autoBridge");
   same(p, (e) => e.evaluatedTower(), "evaluatedTower");
   same(p, (e) => e.crewCoverage(), "crewCoverage");
   for (let m = 0; m < VIEW_LAYOUT.heatModes.length; m++) same(p, (e) => e.heatCells(m), `heat ${m}`);

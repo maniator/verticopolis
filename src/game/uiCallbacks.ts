@@ -1,14 +1,14 @@
 import { trackAppAction } from "../analytics";
 import { wellFormed } from "../engine/wellFormed";
 import type { UICallbacks, Tool } from "../ui/UI";
-import type { Simulation } from "../engine/Simulation";
+import type { Catalog } from "../engine/catalogTypes";
+import type { GameMode } from "../engine/types";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { AudioEngine } from "../audio/Audio";
 import type { SaveLoad } from "./saveLoad";
 import type { EditorActions } from "./editorActions";
 import type { InspectorController } from "./inspector";
-import { towerCatalog } from "../engine/towerCatalog";
 
 /**
  * The narrow slice of `GameApp` that {@link createUICallbacks} wires the UI to.
@@ -18,14 +18,16 @@ import { towerCatalog } from "../engine/towerCatalog";
  * makes the compiler prove every callback is backed by a real method with the
  * right type.
  *
- * Live state is always re-read (`getSim()`, the audio facade, the controllers'
- * own `getSim` thunks), never destructured, so an `adoptSim()` swap stays
+ * Live state is always re-read (`getCatalog()`, the reader, the engine port,
+ * the audio facade, the controllers' own thunks), never destructured, so an `adoptSim()` swap stays
  * visible to the callbacks. Keep the factory parameter typed `GameAppPorts`, not
  * `GameApp`, or that boundary is lost.
  */
 export interface GameAppPorts {
-  /** The live simulation, re-read per call so an adoptSim() swap is seen. */
-  getSim(): Simulation;
+  /** The live tower's catalog, re-read per call so an adoptSim() swap is seen. */
+  getCatalog(): Catalog;
+  /** The shared reader, for the mode the header carries. */
+  readonly reader: { readonly header: { readonly mode: GameMode } };
   /** The engine port every command goes through (AD-9), read per call: an
    *  `adoptSim()` swap hands the new tower to the same engine. */
   readonly enginePort: EnginePort;
@@ -80,7 +82,7 @@ export interface GameAppPorts {
  */
 export function createUICallbacks(app: GameAppPorts): UICallbacks {
   return {
-    getCatalog: () => towerCatalog(app.getSim()),
+    getCatalog: () => app.getCatalog(),
     onSelectTool: (tool) => app.handleSelectTool(tool),
     onSpeed: (speed) => app.setSpeed(speed),
     getSpeed: () => app.getSpeed(),
@@ -105,7 +107,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
       trackAppAction("export_tdt");
       app.saveLoad.exportLegacy();
     },
-    getMode: () => app.getSim().mode,
+    getMode: () => app.reader.header.mode,
     onNew: (mode, modernCalendar, startUnbridged) => app.saveLoad.newGame(mode, modernCalendar, startUnbridged),
     onToggleAudio: () => app.toggleMute(),
     isMuted: () => app.audio.muted,
@@ -124,7 +126,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     // The preference the engine holds after the toggle (a Classic tower
     // always bridges, so there it stays on).
     onToggleAutoBridge: async () => app.portCodes.slot(app.enginePort.flipAutoBridge(), "flipAutoBridge", "value") === 1,
-    isAutoBridge: () => app.getSim().autoBridge,
+    isAutoBridge: () => app.enginePort.autoBridge(),
     onReplayOnboarding: () => {
       trackAppAction("replay_onboarding");
       app.replayOnboarding();

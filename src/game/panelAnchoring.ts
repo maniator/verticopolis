@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import { catalogFacility } from "../engine/catalogTypes";
-import { towerCatalog } from "../engine/towerCatalog";
+import { catalogOf } from "./portAccess";
 
 /**
  * World-anchoring for the DOM panels (selected-facility editor, hover
@@ -62,7 +62,7 @@ export function selectedScreenRect(app: GameApp): { x: number; y: number; w: num
     if (!u) return null;
     left = u.x;
     right = u.x + u.width;
-    topFloor = u.floor + catalogFacility(towerCatalog(app.sim), u.kind).floors - 1;
+    topFloor = u.floor + catalogFacility(catalogOf(app), u.kind).floors - 1;
   } else {
     const t = app.selectedTransport();
     if (!t) return null;

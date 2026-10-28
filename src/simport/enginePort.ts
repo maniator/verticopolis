@@ -125,6 +125,8 @@ export interface EnginePortQueries {
   hotspot(): PortRecord;
   /** Bits in the layout's `onboarding` order. */
   onboarding(): number;
+  /** The auto-bridge preference the tower holds (always on in Classic). */
+  autoBridge(): boolean;
   /** Whether the VIP has rated the tower a TOWER, the win. */
   evaluatedTower(): boolean;
   heatCells(modeCode: number): PortRecord;
