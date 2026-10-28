@@ -10,7 +10,7 @@ import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, reloadSoon, tabStore }
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rustEngine";
 import { tsBootTower, type BootTower } from "./game/bootTower";
 import { setEngineWriter } from "./storage/vctowerWriter";
-import { noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "./analyticsEngineStatus";
+import { noteEngineCrashReload, noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "./analyticsEngineStatus";
 import { runningTowerStage, watchEngineTraps } from "./game/engineFault";
 import { ENGINE_FAILURE_ID, isEngineStopped } from "./game/interactionState";
 import { showEngineLoading } from "./engineLoading";
@@ -357,9 +357,11 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
           else rustFailed("host", "trap-tick");
           publishBootState(bootState);
           // Both builds count the trap in the reliability rows, as the stage
-          // its tower was hosted at. The row goes out by beacon, so it
-          // survives the reload.
-          noteEngineFallback({ reason: "trap-tick", stage: runningTowerStage() });
+          // its tower was hosted at. A reload's row names the engine that
+          // crashed, and goes out by beacon, so it survives the reload.
+          const fault = { reason: "trap-tick", stage: runningTowerStage() } as const;
+          if (outcome === "stop") noteEngineFallback(fault);
+          else noteEngineCrashReload(fault);
           app.setSpeed?.(0);
           if (outcome === "stop") showEngineFailure(bootState);
           else {
