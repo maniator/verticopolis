@@ -3,7 +3,7 @@ import { strFromU8, unzipSync } from "fflate";
 import { Simulation } from "../../engine/Simulation";
 import { SaveGame } from "../../storage/SaveGame";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../../game/crashReport";
-import type { CrashDescription, CrashTower } from "../../game/crashReport";
+import type { CrashDescription, CrashEngines, CrashTower, RustCrashDescription } from "../../game/crashReport";
 import { facilityFloors } from "../../engine/facilities";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { ViewReader } from "../../simport/viewReader";
@@ -99,5 +99,32 @@ describe("crash report packaging", () => {
     expect(what).toContain("graphics context was lost");
     expect(what).toContain("crashed twice in a row");
     expect(what).toContain("attaching it to this issue");
+  });
+
+  const RUST_CRASH: RustCrashDescription = { kind: "rust-engine-trap", crashes: 2, reason: "trap-tick", stage: "start" };
+  const ENGINES: CrashEngines = { rust: { version: "0.21.0", sourceHash: "d".repeat(64) }, typescript: { version: "2.0", sources: "e".repeat(64) } };
+
+  it("a Rust crash report names both engines and the fault, with the running engine's save", async () => {
+    const sim = new Simulation();
+    sim.tower.towerName = "Held Tower";
+    const tower = towerOf(sim);
+    const details = buildCrashDetails(tower, RUST_CRASH, { version: "2.53.0", speed: 1, frameErrors: [], engines: ENGINES });
+    expect(details.crash).toEqual(RUST_CRASH);
+    expect(details.engines).toEqual(ENGINES);
+    const files = unzipSync((await buildCrashReportZip(tower, details)).bytes);
+    expect(JSON.parse(strFromU8(files["crash-report.json"]))).toMatchObject({ crash: RUST_CRASH, engines: ENGINES, tower: { name: "Held Tower" } });
+    expect(files["tower.vctower"]).toBeDefined();
+  });
+
+  it("bugReportUrl titles a Rust crash and names its engine and fault", () => {
+    const url = new URL(bugReportUrl({ version: "2.53.0", crash: RUST_CRASH, engines: ENGINES }));
+    expect(url.searchParams.get("title")).toBe("Rust engine crashed");
+    const what = url.searchParams.get("what-happened")!;
+    expect(what).toContain("crashed twice, so the game switched to the TypeScript engine");
+    expect(what).toContain(`Rust engine: 0.21.0, source ${"d".repeat(12)}. Fault: trap-tick at start.`);
+    expect(what).toContain("attaching it to this issue");
+    // An engine the boot could not name still reads.
+    const unnamed = new URL(bugReportUrl({ version: "2.53.0", crash: RUST_CRASH, engines: { ...ENGINES, rust: { version: null, sourceHash: null } } }));
+    expect(unnamed.searchParams.get("what-happened")).toContain("Rust engine: version unknown. Fault:");
   });
 });

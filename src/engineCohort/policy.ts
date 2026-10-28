@@ -105,6 +105,9 @@ export interface Selection {
   /** Rust was wanted without the URL asking, while only the URL boots it
    *  (`rustOnlyByUrl`), so the boot runs TypeScript. */
   heldForUrl?: true;
+  /** Rust was chosen, but this tab's Rust engine crashed `CRASH_LOOP_PAGES`
+   *  times on this build (`crashReload.ts`), so the boot runs TypeScript. */
+  heldAfterCrashes?: true;
 }
 
 const CHOICES: readonly string[] = ["ts", "wasm", "wasm-frame", "wasm-worker"];

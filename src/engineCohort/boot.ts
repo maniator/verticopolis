@@ -1,6 +1,7 @@
 import type { EngineChoice } from "../wasmhost/engineChoice";
 import { COHORT_STAGE, COHORT_TELEMETRY, RUST_ONLY_BY_URL, STAGE_SHARE, type CohortStage } from "./config";
-import { exitCleanly } from "./crashMarker";
+import { exitCleanly, stepAside } from "./crashMarker";
+import { heldAfterCrashes, tabStore } from "./crashReload";
 import { setCurrentSelection, currentSelection } from "./current";
 import { latchSafety, selectEngine, suppressionApplies, type SafetyStage, type Selection } from "./policy";
 import { browserStore, readSafety, type KeyValueStore } from "./records";
@@ -80,7 +81,7 @@ function chooseAndWatch(search: string): EngineChoice {
   const testStage = tooling ? toolingStage(store) : null;
   const stage = testStage ?? COHORT_STAGE;
   safetyOn = safetyRuns(COHORT_TELEMETRY, testStage);
-  const selection = selectEngine({
+  let selection = selectEngine({
     store,
     url: new URLSearchParams(search).get("engine"),
     drawOn: drawRuns(tooling, testStage),
@@ -93,6 +94,12 @@ function chooseAndWatch(search: string): EngineChoice {
     safetyOn,
     rustOnlyByUrl: RUST_ONLY_BY_URL,
   });
+  if (selection.boot !== "ts" && heldAfterCrashes(tabStore(), __APP_SHA__)) {
+    // This tab's Rust engine crashed twice on this build (#1422): its boots
+    // run TypeScript and say why, a `?engine=wasm` visit included.
+    if (selection.markerId) stepAside(store, { id: selection.markerId, sha: __APP_SHA__ });
+    selection = { ...selection, boot: "ts", markerId: null, notice: "none", heldAfterCrashes: true };
+  }
   setCurrentSelection(selection);
   if (selection.markerId) stopWatch = watchSurvival(store, { id: selection.markerId, sha: __APP_SHA__ });
   return selection.boot;
@@ -134,14 +141,33 @@ export function noteRustFailed(stage: SafetyStage, reason: string, engine?: stri
   }
 }
 
+/** The running Rust engine crashed and this page reloads (#1422): the crash
+ *  is counted in the tab (`crashReload.ts`), not as a stale page life, so the
+ *  watch stops and this page life's marker entry goes. */
+export function noteRustCrashed(): void {
+  try {
+    const sel = currentSelection();
+    stopWatch?.();
+    stopWatch = null;
+    if (sel?.markerId) stepAside(store, { id: sel.markerId, sha: __APP_SHA__ });
+  } catch (e) {
+    console.error("[engine] could not record the Rust engine's crash:", e);
+  }
+}
+
+/** The line for a boot held on TypeScript after this tab's crashes. */
+export const CRASH_HOLD_NOTICE = "The Rust engine stopped twice, so this game is running on the TypeScript engine for now. You can change this in Settings.";
+
 const NOTICES = {
   enrolled: "This game now runs on the new Rust engine as part of a test. You can change this in Settings.",
   withdrawn: "This game runs on the TypeScript engine again, since the Rust engine test changed. You can change this in Settings.",
 } as const;
 
 /** The once-only line for a stage change that moved this browser's engine, or
- *  null. The policy sets it only for an Automatic choice the cohort decided. */
+ *  null. The policy sets it only for an Automatic choice the cohort decided.
+ *  A boot held on TypeScript after this tab's crashes says so on each boot. */
 export function stageNotice(): string | null {
+  if (currentSelection()?.heldAfterCrashes) return CRASH_HOLD_NOTICE;
   const notice = currentSelection()?.notice ?? "none";
   return notice === "none" ? null : NOTICES[notice];
 }

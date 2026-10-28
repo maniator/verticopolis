@@ -7,6 +7,7 @@ import { isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } fro
 import { catalogFacility, type Catalog } from "../engine/catalogTypes";
 import { isRentalKind } from "../engine/residentialRentals";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
+import { recyclingLines } from "./recyclingDiagnostics";
 import { reachesLobby } from "../engine/sim/gripe";
 import { gripeLineText, wontLeaseText } from "./gripeCopy";
 import { isOperational, isPresent, VACATE_REASON_TEXT } from "../engine/types";
@@ -39,22 +40,6 @@ function parkingDemandLine(sim: Simulation, have: number): TemplateResult {
   const d = sim.parkingDemand();
   const color = have < d.total ? "var(--bad)" : "var(--good)";
   return html`<div style="color:${color}">Demand: ${have}/${d.total} spaces (${d.offices} for offices, ${d.suites} for suites).</div>`;
-}
-
-/** The recycling block: current fill and the capacity/demand verdict.
- *  Population and capacity are each scanned once and reused across the lines
- *  (the demand-met check is `pop <= cap`, exactly {@link Simulation.recyclingDemandMet}),
- *  so a hover doesn't rescan the unit list several times over. */
-function recyclingLines(sim: Simulation): TemplateResult[] {
-  const pop = sim.tower.totalPopulation();
-  const cap = sim.recyclingCapacity();
-  const fillPct = Math.round(sim.recyclingFill() * 100);
-  return [
-    html`<div>Fill: ${fillPct}%. Truck collects each morning.</div>`,
-    pop <= cap
-      ? html`<div style="color:var(--good)">Capacity: ${pop.toLocaleString()}/${cap.toLocaleString()} population; demand met.</div>`
-      : html`<div style="color:var(--bad)">Over capacity: ${pop.toLocaleString()} population vs ${cap.toLocaleString()} processed. Build another center (4★ requires demand met).</div>`,
-  ];
 }
 
 /** Below this raw demand `share` (pool / reachable capacity) the tower reads as

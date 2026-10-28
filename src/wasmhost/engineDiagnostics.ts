@@ -1,6 +1,7 @@
 import type { EngineBootState } from "./engineBoot";
 import { parseEngineIdentity, type EngineIdentity } from "./engineIdentity";
 import { shortId, type ExpectedEnginePackage } from "./enginePackageRecord";
+import { TS_ENGINE_SOURCES, TS_ENGINE_VERSION } from "./tsEngineIdentity";
 import type { BuildMetadataResult } from "./buildSection";
 
 /**
@@ -216,6 +217,12 @@ export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsReport {
   if (input.userAgent)
     rows.push({ label: "Browser", value: cap(input.userAgent) });
   rows.push({ label: "Engine in use", value: engineName(input) });
+  // A wasm-only build carries no TypeScript engine to name.
+  if (boot?.build !== "wasm-only")
+    rows.push({
+      label: "TypeScript engine",
+      value: `${TS_ENGINE_VERSION} (source hash ${shortId(TS_ENGINE_SOURCES)})`,
+    });
   if (boot) rows.push({ label: "Build", value: boot.build });
   if (failure) {
     rows.push({ label: "Failed at", value: failure.stage });

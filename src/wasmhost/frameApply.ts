@@ -66,9 +66,10 @@ export function checkRecords(v: ArrayLike<number>, h: FrameHeader): void {
   if (i !== v.length) throw new Error(`frame view: ${v.length - i} numbers left after the last record`);
 }
 
-// The engine sends -1 for no count. A NaN, which no engine sends, reads as
-// none as well, so the HUD's kept counts never take one in.
-const counter = (n: number) => (n >= 0 ? n : undefined);
+// The engine sends -1 for no count. Anything but a whole count (a NaN, an
+// infinity, a fraction), which no engine sends, reads as none as well, so the
+// HUD's kept counts never take one in and a share always cancels exactly.
+const counter = (n: number) => (Number.isSafeInteger(n) && n >= 0 ? n : undefined);
 
 /** Make `target` hold `v[from..from+n)`, in place, writing only when it
  *  differs (a holder of the array sees the new legs either way). */

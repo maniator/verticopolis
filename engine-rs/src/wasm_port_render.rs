@@ -131,6 +131,11 @@ impl Engine {
         self.sim.recycling_fill()
     }
 
+    /// The population the working recycling centers can process.
+    pub(crate) fn port_recycling_capacity(&self) -> f64 {
+        self.sim.recycling_capacity()
+    }
+
     /// Whether a walker can stand at `floor`, `x`; a position that is not a
     /// whole tile is not one. `&mut` because reachability memoizes its graph
     /// by tower revision.

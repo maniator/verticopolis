@@ -85,6 +85,12 @@ describe("engineSettingsView", () => {
     expect(engineSettingsView(input({ preference: "ts", selection: sel({ markerBlocked: true }) })).note).toBeNull();
   });
 
+  it("explains a tab held on TypeScript after its crashes, and expects TypeScript at its next start", () => {
+    const v = engineSettingsView(input({ preference: "wasm", selection: sel({ selectedBy: "setting", requested: "wasm", preference: "wasm", heldAfterCrashes: true }) }));
+    expect(v.note).toBe("The Rust engine stopped twice in this tab, so the game uses the TypeScript engine here. A new tab tries it again.");
+    expect(v).toMatchObject({ retry: false, restart: false });
+  });
+
   it("asks for a restart after a retry in the page life where Rust failed", () => {
     const failed = { selection: sel({ assignedArm: "wasm", boot: "wasm", requested: "wasm" }), running: "ts" as const, pageFallback: "trap-tick" };
     expect(engineSettingsView(input({ ...failed, suppression: fault })).restart).toBe(false);
@@ -93,13 +99,13 @@ describe("engineSettingsView", () => {
   });
 
   it("puts every code in words", () => {
-    for (const c of ["trap-command", "trap-tick", "trap-undo", "boot-error", "boot-timeout", "package-mismatch", "unverifiable", "attach-refused", "unclean-exit", "corrupt", "other"]) {
+    for (const c of ["trap-command", "trap-tick", "trap-undo", "boot-error", "boot-timeout", "package-mismatch", "unverifiable", "attach-refused", "unclean-exit", "trap-loop", "corrupt", "other"]) {
       expect(reasonWords(c)).toMatch(/^[a-z]/);
     }
     // Every coded fallback reason has its own words, so a new code cannot fall through unnoticed.
     for (const c of FALLBACK_REASONS.filter((r) => r !== "none" && r !== "other")) expect(reasonWords(c)).not.toBe(reasonWords("other"));
     // The traps share one phrase; every other kind of failure reads differently.
-    const kinds = ["trap-tick", "boot-error", "boot-timeout", "package-mismatch", "unverifiable", "attach-refused", "unclean-exit", "corrupt", "other"];
+    const kinds = ["trap-tick", "trap-loop", "boot-error", "boot-timeout", "package-mismatch", "unverifiable", "attach-refused", "unclean-exit", "corrupt", "other"];
     expect(new Set(kinds.map(reasonWords)).size).toBe(kinds.length);
   });
 });

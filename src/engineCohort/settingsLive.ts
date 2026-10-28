@@ -3,6 +3,7 @@ import { activeEngine } from "../wasmhost/engineLabel";
 import type { EngineBootState } from "../wasmhost/engineBoot";
 import { RUST_ONLY_BY_URL } from "./config";
 import { currentSelection } from "./current";
+import { clearRustCrashes, tabStore } from "./crashReload";
 import { clearSafety, readPreference, setPreference, suppressionApplies, type Preference, type Selection } from "./policy";
 import { browserStore, readSafety, remove, writeChecked, type KeyValueStore, type SafetyRecord } from "./records";
 
@@ -89,6 +90,7 @@ export function wireEngineSection(box: ParentNode, src: LiveSources = browserSou
   const radios = [...box.querySelectorAll<HTMLInputElement>('input[name="set-engine"]')];
   const retry = () => {
     clearSafety(src.store);
+    clearRustCrashes(tabStore());
     retriedThisPage = true;
     refresh();
     // The button is gone now; keep keyboard focus in the section.
