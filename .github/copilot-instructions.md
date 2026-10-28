@@ -164,6 +164,16 @@ agents, convened as a party for larger changes.
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
 - Match the surrounding code's formatting, naming, and comment density.
+- **Readable conditions and semantic flags:** at gameplay, UI, and feature
+  call sites, spell out the domain meaning. Reject opaque replacements such as
+  `done: bit(0)`, `if (flags & 4)`, and `check(2)` when the number is a
+  hidden domain fact. Prefer `facts.lobbyBuilt` or
+  `hasOnboardingFact(bits, "lobbyBuilt")` with one named, tested mapping to
+  the wire layout. Numeric positions are appropriate inside codecs,
+  serialization, dispatch bitsets, and deliberately low-level tests, but
+  should not leak into player-facing decisions. During review, compare the
+  changed call site to the old one and flag any loss of readable intent.
+  See `AGENTS.md` for the full rule.
 - **A published analytics number comes from a governed definition, or from
   reviewed code that a test binds to one.** What is banned is improvising a
   measure in a session and publishing it. The governed sources are the

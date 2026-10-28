@@ -256,3 +256,39 @@ fn a_schedule_crosses_as_slots() {
     assert!(v.get("standardFloorDeparture").is_none());
     assert!(v.get("homeFloors").is_none());
 }
+
+#[test]
+fn advance_steps_a_frame_as_the_host_stepper_does() {
+    let mut e = engine();
+    let mut sim = Simulation::new_game(7, GameMode::Modern);
+    sim.money = 1e9;
+    let mut host = crate::fixed_step::FrameStepper::default();
+    let mut owed = 0.0;
+    // Fastest speed with the breathing clock, a held-back frame, a pause, a
+    // poisoned frame time and the steady clock: the carry and the steps
+    // match the stepper's frame for frame.
+    let frames = [
+        (16.7, 120.0, false, true),
+        (250.0, 120.0, false, true),
+        (16.7, 120.0, false, false),
+        (16.7, 0.0, false, true),
+        (f64::NAN, 30.0, false, true),
+        (1000.0, 30.0, true, true),
+    ];
+    for (dt, rate, steady, step) in frames {
+        let steps = host.advance(&mut sim, dt, rate, steady, step);
+        let r = e.port_advance(owed, dt, rate, steady, step);
+        assert_eq!(
+            r,
+            vec![f64::from(steps), host.acc_minutes],
+            "frame {dt} {rate}"
+        );
+        owed = r[1];
+    }
+    assert_eq!(e.sim.clock.minutes, sim.clock.minutes);
+    assert!(e.sim.clock.minutes > 0.0);
+    // The mode outlives a swap: the same rate after a load keeps the carry.
+    let save = e.sim.serialize().to_string();
+    e.port_load_save(&save);
+    assert_eq!(e.port_advance(1.5, 0.0, 30.0, true, false), vec![0.0, 1.5]);
+}

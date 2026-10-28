@@ -4,6 +4,7 @@ import { INVALID_REQUEST, UNKNOWN_FACILITY } from "../request";
 import { KIND_CODES, UNIT_STATE_CODES, VIEW_LAYOUT, VIEW_LAYOUT_TEXT, codeOf } from "./layout";
 import { roomUnits, watchRooms } from "../tower/rooms";
 import { MetaLog } from "./metaLog";
+import { ONBOARDING_FLAG } from "./queries";
 import { TsEngine } from "./tsEngine";
 
 /**
@@ -117,7 +118,7 @@ describe("TsEngine", () => {
     expect(e.quoteShaft(code("stairs"), 275, 1, 2)[0]).toBe(1);
     expect(e.statsStrip()).toHaveLength(VIEW_LAYOUT.records.statsStrip.length);
     expect(e.hotspot()).toHaveLength(2);
-    expect(e.onboarding() & 1).toBe(1);
+    expect(e.onboarding() & ONBOARDING_FLAG.lobby).toBe(ONBOARDING_FLAG.lobby);
     for (let m = 0; m < 4; m++) expect(e.heatCells(m).length % 5).toBe(0);
     expect(e.crewCoverage()).toHaveLength(7);
     expect(e.unitCard(idOf(e, "cinema"))).toHaveLength(20);
@@ -135,6 +136,21 @@ describe("TsEngine", () => {
     expect(e.logText(NaN)).toBeUndefined();
     expect(e.eventText(0)).toBeUndefined();
     expect(e.undoSignature()).toContain("office");
+  });
+
+  it("steps a frame's time and keeps the step mode across a swap", () => {
+    const e = engine();
+    const before = e.sim.clock.minutes;
+    const [steps, owed] = Array.from(e.advance(0, 1000, 120, true, true));
+    expect(steps).toBeGreaterThan(0);
+    expect(owed).toBeGreaterThanOrEqual(0);
+    expect(e.sim.clock.minutes).toBeGreaterThan(before);
+    expect(Array.from(e.advance(5, 16, 120, true, false))[0]).toBe(0);
+    e.loadSave(e.serialize());
+    // The same rate and pacing: nothing owed is dropped.
+    expect(Array.from(e.advance(1.5, 0, 120, true, false))).toEqual([0, 1.5]);
+    // A new rate drops the carry.
+    expect(Array.from(e.advance(1.5, 0, 30, true, false))).toEqual([0, 0]);
   });
 
   it("swaps towers, keeping the generation and the events' rules", () => {

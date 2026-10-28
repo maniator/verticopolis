@@ -47,6 +47,7 @@ means a `Float64Array` whose slots `viewLayout().records.<name>` names.
 | Member | Answer | Tier | Notes |
 | --- | --- | --- | --- |
 | `tick(dtMinutes)` | void | frame | The frame loop's step; `dtMinutes` is a finite real, 0 or more. |
+| `advance(owed, dtMs, minutesPerSecond, steadyClock, step)` | record: steps, owed | frame | One frame's time through the fixed step (`advanceOwedMinutes`, Rust `FrameStepper`), so the frame loop reads no clock: `owed` is the minutes the host carried and the answer the steps run and the minutes still owed. The engine keeps the step mode they were owed under, across a swap; the host resets `owed` on a speed change or an adopted tower. Like `tick` it refuses nothing: a non-finite carry or frame time owes nothing. PR 5. |
 | `serialize()` | string | rare | The save; JSON is the save format. |
 | `loadSave(text)` | record: status, generation | rare | The `stored` and `legacy` sources (below). |
 | `restore(text)` | record: status, generation | per undo or redo | The `history` source: loads the snapshot but keeps the live camera and the auto-bridge preference. The auto-bridge preference is kept as `TowerSource` `history` does today. The camera is kept in the engine's own view (the one `setCamera` last stamped), the same camera the app's history adoption keeps with `keepCamera`, so a reader that rebuilds on the generation move reads the camera under the player. `TsEngine` does the same. |
@@ -342,7 +343,8 @@ they resume.
    reader's test needs both engines.
 4. Callers onto the port; `SimPort` and `TsSim` deleted.
 5. Boot behind `?engine=wasm-facade` (tooling builds), the e2e run, then the
-   one-tower PC check through the coordinator.
+   one-tower PC check through the coordinator. It starts with `advance`, the frame
+   loop's one time call (5a), which needs no caller moved.
 6. Restore points and the sidecar, the cadence exclusions, the fault
    fallback (story ACs 16 to 21 and slice 8), unchanged in substance.
 7. The integration suites on the Rust engine (owner, 2026-10-28: before

@@ -396,4 +396,31 @@ describe("TsEngine against the Rust Engine", () => {
     }
     expect(sections).toBeGreaterThan(0);
   });
+
+  it.skipIf(!hasWasmPackage())("steps each frame's time the same way", () => {
+    const p = pair();
+    // Fastest speed on the breathing clock, a hitch, a held-back frame, a
+    // pause, a poisoned frame time, the steady clock, then a swap that keeps
+    // the step mode: the steps and the carry match frame for frame.
+    const frames: [number, number, boolean, boolean][] = [
+      [16.7, 120, false, true],
+      [250, 120, false, true],
+      [16.7, 120, false, false],
+      [16.7, 0, false, true],
+      [NaN, 30, false, true],
+      [1000, 30, true, true],
+    ];
+    const owed = [0, 0];
+    const step = () => {
+      for (const [dt, rate, steady, run] of frames) {
+        const r = same(p, (e) => Array.from(e.advance(owed[p.indexOf(e)], dt, rate, steady, run)), `advance ${dt} ${rate}`);
+        owed.fill(r[1]);
+      }
+    };
+    for (let i = 0; i < 20; i++) step();
+    sameFrame(p, true);
+    same(p, (e) => e.loadSave(e.serialize()), "a swap");
+    same(p, (e) => Array.from(e.advance(1.5, 0, 30, true, false)), "the mode outlives the swap");
+    sameReads(p);
+  });
 });

@@ -24,6 +24,12 @@ export type PortRecord = Float64Array;
 export interface EnginePortLifecycle {
   /** The frame loop's step; `dtMinutes` is a finite real, 0 or more. */
   tick(dtMinutes: number): void;
+  /** One frame's time through the fixed step (`advanceOwedMinutes`):
+   *  `owed` is the minutes the host carried, and the answer is
+   *  `[steps, owed]`, the steps run and the minutes still owed. The engine
+   *  keeps the step mode they were owed under; `step` false owes the frame's
+   *  minutes without stepping them. */
+  advance(owed: number, dtMs: number, minutesPerSecond: number, steadyClock: boolean, step: boolean): PortRecord;
   /** The save; JSON is the save format. */
   serialize(): string;
   /** The `stored` source: `[status, generation]`. A save with no
