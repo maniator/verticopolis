@@ -5,14 +5,16 @@ import { canCallExterminator, statsScreen, statsTemplate } from "../ui/templates
 import { trackAppAction } from "../analytics";
 import { towerCatalog } from "../engine/towerCatalog";
 import { latestPer } from "../simport/latest";
-import type { HousekeepingCoverageView, StatsReport } from "../simport/panels";
+import { outcome } from "../simport/portCodes";
+import type { StatsReport } from "../simport/panels";
 
 /**
  * The tower-statistics modal, its exterminator action, and the manual save-slot
  * commands, split out of the `GameApp` class as friend functions taking the app.
- * They read the live sim through `app`. The stats screen and the exterminator
- * ask the port and draw when the answer lands; each keeps the tower it asked
- * about only to drop an answer about a tower since replaced. The `GameAppPorts`
+ * They read the live sim through `app`. The stats screen asks the port and
+ * draws when the answer lands, keeping the tower it asked about only to drop an
+ * answer about a tower since replaced. The exterminator talks to the engine
+ * port, which answers at once. The `GameAppPorts`
  * members (`showStats`/`showSaves`/`saveToSlot`/`loadFromSlot`/`deleteSlot`) stay
  * on `GameApp` as one-line delegators into these.
  */
@@ -20,11 +22,6 @@ import type { HousekeepingCoverageView, StatsReport } from "../simport/panels";
 /** The newest stats report each app asked for: a report overtaken by a newer
  *  ask (a reopen after a booking) is never drawn over it. */
 const statsAsks = latestPer<StatsReport>();
-
-/** Towers with an exterminator click still waiting for the coverage answer,
- *  so a second click while it is out opens no second confirm. Kept per tower,
- *  so an ask about a tower since replaced never holds the button. */
-const exterminateAsks = new WeakSet<Simulation>();
 
 /** Open (or redraw) the stats modal from the engine's stats report. The
  *  promise settles once the modal is drawn, or once the answer is dropped
@@ -64,44 +61,40 @@ export async function showStats(app: GameApp): Promise<void> {
  *  and logs the booking through the port; here we only confirm the spend and
  *  surface a refusal the gate above should already have prevented. The stats
  *  modal reopens once the engine has answered, so it shows the answer. The
- *  modal's button calls it; a failed coverage answer toasts and rejects, as
+ *  modal's button calls it; a failed coverage answer toasts and throws, as
  *  `showStats` does. */
 export async function confirmExterminate(app: GameApp): Promise<void> {
   const asked = app.sim;
-  if (exterminateAsks.has(asked)) return;
-  exterminateAsks.add(asked);
-  let cov: HousekeepingCoverageView;
+  const bad = app.portCodes.code("logKinds", "bad");
+  let infested: number;
   try {
     // Asked again rather than read off the drawn report: the tower can change
     // between drawing the modal and clicking the button.
-    cov = await app.port.query({ op: "housekeepingCoverage" });
+    infested = app.portCodes.slot(app.enginePort.crewCoverage(), "crewCoverage", "infested");
   } catch (e) {
     app.ui.toast("The exterminator could not be booked right now.", "bad");
     throw e;
-  } finally {
-    exterminateAsks.delete(asked);
   }
-  // A load or a new tower while the answer was out: the click was for the old one.
-  if (app.sim !== asked) return;
   const recovery = towerCatalog(app.sim).economy.exterminator;
-  if (!recovery || cov.infested === 0) {
+  if (!recovery || infested === 0) {
     // The tower can change between rendering the stats modal and clicking the
     // button (a fire or bulldoze clears the last infested room, or the mode
     // rule-set no longer offers an exterminator), so say why nothing happens
     // instead of a silent no-op.
     const why = recovery ? "No infested rooms left to treat." : "The exterminator is unavailable.";
-    await app.port.command({ op: "emit", text: why, kind: "bad" });
+    app.enginePort.logLine(why, bad);
     await showStats(app);
     return;
   }
-  const cost = recovery.calloutFee + recovery.perRoomFee * cov.infested;
+  const cost = recovery.calloutFee + recovery.perRoomFee * infested;
   app.ui.confirmModal(
     "Call the exterminator?",
-    `Clear ${cov.infested} infested room(s) for $${cost.toLocaleString()}? The crew arrives tomorrow.`,
-    async () => {
+    `Clear ${infested} infested room(s) for $${cost.toLocaleString()}? The crew arrives tomorrow.`,
+    () => {
       // A load while the confirm was open: the quote was for the old tower.
       if (app.sim !== asked) return;
-      const res = await app.port.command({ op: "callExterminator" });
+      const rec = app.enginePort.bookExterminator();
+      const res = outcome(app.enginePort, rec);
       // Surface every refusal, not just funds: the tower can change between
       // rendering the stats modal and confirming (rooms cleared, or another
       // dispatch already booked), so a silent no-op would leave the player
@@ -110,7 +103,7 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
         let why: string;
         switch (res.reason) {
           case "funds":
-            why = `Not enough funds to book the exterminator ($${(res.cost ?? cost).toLocaleString()}).`;
+            why = `Not enough funds to book the exterminator ($${(app.portCodes.slot(rec, "bookExterminator", "cost") || cost).toLocaleString()}).`;
             break;
           case "pending":
             why = "An exterminator is already on the way.";
@@ -121,7 +114,7 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
           default:
             why = "The exterminator is unavailable.";
         }
-        await app.port.command({ op: "emit", text: why, kind: "bad" });
+        app.enginePort.logLine(why, bad);
       }
       void showStats(app);
     },

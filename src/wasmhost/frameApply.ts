@@ -160,13 +160,19 @@ function applyUnits(sim: Simulation, v: ArrayLike<number>, count: number, start:
     if (!u) continue;
     const state = UNIT_STATES[v[i + 1]];
     const customersIn = counter(v[i + 3]);
-    // The HUD's room counts recount a room only when a field they read moved.
-    if (u.state !== state || u.customersIn !== customersIn) markRoom(sim.tower, u);
+    const occupants = v[i + 2];
+    const hotelCustomersIn = counter(v[i + 4]);
+    const outForMeal = counter(v[i + 5]);
+    // The HUD's room counts and the engine's view frame recount a room only
+    // when a field they read moved, so any of the five marks it.
+    if (u.state !== state || u.occupants !== occupants || u.customersIn !== customersIn || u.hotelCustomersIn !== hotelCustomersIn || u.outForMeal !== outForMeal) {
+      markRoom(sim.tower, u);
+    }
     u.state = state;
-    u.occupants = v[i + 2];
+    u.occupants = occupants;
     u.customersIn = customersIn;
-    u.hotelCustomersIn = counter(v[i + 4]);
-    u.outForMeal = counter(v[i + 5]);
+    u.hotelCustomersIn = hotelCustomersIn;
+    u.outForMeal = outForMeal;
   }
   return i;
 }
