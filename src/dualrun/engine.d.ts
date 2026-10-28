@@ -24,6 +24,7 @@ export class Engine {
      * refused with null.
      */
     adjustRent(id: number, dir: number): number | undefined;
+    adoptTdt(): Float64Array;
     /**
      * Move the clock by `minutes` and run nothing: the TypeScript
      * `clock.advance(minutes)`. Whatever pass the move skips is owed and runs
@@ -138,6 +139,7 @@ export class Engine {
     endExtend(): void;
     evaluateStar(): void;
     eventText(i: number): string | undefined;
+    exportVctower(app_version: string, saved_at_ms: number): string | undefined;
     expressStops(id: number): Float64Array;
     extendShaft(id: number, up: boolean, target_floor: number): Float64Array;
     /**
@@ -214,6 +216,8 @@ export class Engine {
     labelUnit(id: number, text: string): Float64Array;
     lastReason(): string | undefined;
     loadSave(text: string): Float64Array;
+    loadTdt(bytes: Uint8Array, filename: string): Float64Array;
+    loadVctower(text: string): Float64Array;
     logAfter(seq: number): Float64Array;
     logLine(text: string, kind: number): Float64Array;
     /**
@@ -425,9 +429,14 @@ export class Engine {
      * Everything the stats screen reads beyond `stats()`, as JSON.
      */
     statsReport(): string;
+    statsSheet(): Float64Array;
     statsStrip(): Float64Array;
     stepRent(id: number, dir: number): Float64Array;
     stopExtend(): Float64Array;
+    tdtExport(): Float64Array;
+    tdtFile(): Uint8Array | undefined;
+    tdtNote(i: number): string | undefined;
+    tdtTowerName(): string | undefined;
     tick(dt_minutes: number): void;
     /**
      * `toggleAutoBridge()`: the preference after the flip.
@@ -476,6 +485,7 @@ export class Engine {
      * The unit inspector and editor card for unit `id`, as JSON, or null.
      */
     unitDetail(id: number): string | undefined;
+    unitFacts(id: number): Float64Array;
     unitLabel(id: number): string | undefined;
     unitMetaChanged(since: number): Float64Array;
     unitMetaSince(since: number): string;

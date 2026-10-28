@@ -61,6 +61,9 @@ export const INSTANCE_METHODS = [
   "scheduleShaft",
   // PR 1c's panel queries.
   "heatCells", "crewCoverage", "unitCard", "shaftCard",
+  // PR 1d's report queries and file members.
+  "statsSheet", "unitFacts", "loadVctower", "exportVctower", "loadTdt", "tdtNote", "tdtTowerName",
+  "adoptTdt", "tdtExport", "tdtFile",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 

@@ -1,7 +1,9 @@
 import type { Simulation } from "../Simulation";
+import type { Tower } from "../Tower";
 import { FACILITIES, isOpenAt, residentCount, syncAttendanceOccupants } from "../facilities";
 import { isDormant } from "../types";
-import { roomUnits } from "../tower/rooms";
+import { markRoom, roomUnits } from "../tower/rooms";
+import type { Unit } from "../types";
 
 /**
  * Per-hour occupancy (`u.occupants`) for every unit, split out of
@@ -13,59 +15,79 @@ import { roomUnits } from "../tower/rooms";
  */
 export function updatePresence(sim: Simulation): void {
   const weekend = sim.clock.isWeekend;
-  for (const u of roomUnits(sim.tower)) {
-    const f = FACILITIES[u.kind];
-    if (isDormant(u)) {
-      // The wedding hall is never tenanted, so its lifetime state is "empty"
-      // (dormant); mirror its live routed attendance rather than stamping 0
-      // over a mid-wedding house. Real dormancy (construction / fire /
-      // gutted) still zeroes: the spawn side gates on isOperational, so no
-      // new guest can be inside one.
-      if (u.state === "empty" && f.attendance !== undefined) syncAttendanceOccupants(u);
-      else u.occupants = 0;
-      continue;
-    }
-    switch (u.kind) {
-      case "office":
-        // Offices staffed on weekday working hours.
-        u.occupants = !weekend && sim.clock.hour >= 8 && sim.clock.hour < 18 ? f.population : 0;
-        break;
-      case "condo":
-        // Residents home in evenings/night/weekends, the whole household
-        // (its real size in Modern, the flat 3 in Classic); one person stays
-        // home during the weekday workday.
-        u.occupants = sim.clock.isNight() || sim.clock.isEvening() || weekend ? residentCount(u) : 1;
-        break;
-      case "rentalStudio":
-        // A single renter: home evenings/nights/weekends, out at work on weekdays.
-        u.occupants = sim.clock.isNight() || sim.clock.isEvening() || weekend ? f.population : 0;
-        break;
-      case "rentalApartment":
-        // A renting household, like a condo: home evenings/nights/weekends (the
-        // whole household), one member home during the weekday workday.
-        u.occupants = sim.clock.isNight() || sim.clock.isEvening() || weekend ? residentCount(u) : 1;
-        break;
-      case "hotelSingle":
-      case "hotelDouble":
-      case "hotelSuite":
-        u.occupants = u.state === "asleep" ? f.population : 0;
-        break;
-      default:
-        // Attendance venues (cinema / party hall / wedding hall): occupants
-        // mirrors the live routed attendance, never the catalog population
-        // (0). The mirror is also written at every tally change; this hourly
-        // write keeps presence from stamping 0 over a mid-show house.
-        if (f.attendance !== undefined) {
-          syncAttendanceOccupants(u);
-          break;
-        }
-        // Every kind without its own case above takes this open-hours gate.
-        // It only changes behavior for commercial venues (fastFood,
-        // restaurant, shop): they show their ambient crowd only while open,
-        // so a tenanted but closed venue reads zero and the heatmap and
-        // lit-window sprite go dark after closing time. Kinds without
-        // business hours pass isOpenAt unconditionally.
-        u.occupants = u.state === "occupied" && isOpenAt(u.kind, sim.clock.hour) ? f.population : 0;
-    }
+  const tower = sim.tower;
+  for (const u of roomUnits(tower)) {
+    const was = u.occupants;
+    stamp(sim, u, weekend);
+    // Only a room whose count moved is marked, so the view's next frame
+    // reads the rooms that changed, not every room each hour.
+    if (u.occupants !== was) markRoom(tower, u);
   }
+}
+
+/** One room's occupancy for this hour. */
+function stamp(sim: Simulation, u: Unit, weekend: boolean): void {
+  const f = FACILITIES[u.kind];
+  if (isDormant(u)) {
+    // The wedding hall is never tenanted, so its lifetime state is "empty"
+    // (dormant); mirror its live routed attendance rather than stamping 0
+    // over a mid-wedding house. Real dormancy (construction / fire /
+    // gutted) still zeroes: the spawn side gates on isOperational, so no
+    // new guest can be inside one.
+    if (u.state === "empty" && f.attendance !== undefined) syncAttendanceOccupants(u);
+    else u.occupants = 0;
+    return;
+  }
+  switch (u.kind) {
+    case "office":
+      // Offices staffed on weekday working hours.
+      u.occupants = !weekend && sim.clock.hour >= 8 && sim.clock.hour < 18 ? f.population : 0;
+      break;
+    case "condo":
+      // Residents home in evenings/night/weekends, the whole household
+      // (its real size in Modern, the flat 3 in Classic); one person stays
+      // home during the weekday workday.
+      u.occupants = sim.clock.isNight() || sim.clock.isEvening() || weekend ? residentCount(u) : 1;
+      break;
+    case "rentalStudio":
+      // A single renter: home evenings/nights/weekends, out at work on weekdays.
+      u.occupants = sim.clock.isNight() || sim.clock.isEvening() || weekend ? f.population : 0;
+      break;
+    case "rentalApartment":
+      // A renting household, like a condo: home evenings/nights/weekends (the
+      // whole household), one member home during the weekday workday.
+      u.occupants = sim.clock.isNight() || sim.clock.isEvening() || weekend ? residentCount(u) : 1;
+      break;
+    case "hotelSingle":
+    case "hotelDouble":
+    case "hotelSuite":
+      u.occupants = u.state === "asleep" ? f.population : 0;
+      break;
+    default:
+      // Attendance venues (cinema / party hall / wedding hall): occupants
+      // mirrors the live routed attendance, never the catalog population
+      // (0). The mirror is also written at every tally change; this hourly
+      // write keeps presence from stamping 0 over a mid-show house.
+      if (f.attendance !== undefined) {
+        syncAttendanceOccupants(u);
+        break;
+      }
+      // Every kind without its own case above takes this open-hours gate.
+      // It only changes behavior for commercial venues (fastFood,
+      // restaurant, shop): they show their ambient crowd only while open,
+      // so a tenanted but closed venue reads zero and the heatmap and
+      // lit-window sprite go dark after closing time. Kinds without
+      // business hours pass isOpenAt unconditionally.
+      u.occupants = u.state === "occupied" && isOpenAt(u.kind, sim.clock.hour) ? f.population : 0;
+  }
+}
+
+/** A venue with no patrons this hour (closed, or out of reach): an
+ *  attendance venue keeps its live mirror, any other reads 0, and the room is
+ *  marked when its count moved. */
+export function emptyVenue(tower: Tower, u: Unit): void {
+  const was = u.occupants;
+  if (FACILITIES[u.kind].attendance !== undefined) syncAttendanceOccupants(u);
+  else u.occupants = 0;
+  if (u.occupants !== was) markRoom(tower, u);
 }

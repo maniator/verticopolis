@@ -5,6 +5,7 @@ import { INVALID_REQUEST, UNKNOWN_FACILITY, whole } from "./request";
 import { wellFormed } from "./wellFormed";
 import type { Facility, FacilityKind, PlaceResult, Transport, Unit } from "./types";
 import { isStructural } from "./tower/towerTopology";
+import { markRoom } from "./tower/rooms";
 import * as placement from "./tower/placement";
 import * as transport from "./tower/transport";
 import * as removal from "./tower/removal";
@@ -344,6 +345,7 @@ export class Tower {
     const u = this.getUnit(id);
     if (!u) return false;
     u.label = wellFormed(label).trim() || FACILITIES[u.kind].name;
+    markRoom(this, u);
     return true;
   }
 
