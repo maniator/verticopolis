@@ -48,6 +48,8 @@ export function reasonWords(code: string): string {
     case "trap-tick":
     case "trap-undo":
       return "it stopped while running";
+    case "trap-loop":
+      return "it stopped twice while running";
     case "boot-error":
       return "it could not start";
     case "boot-timeout":
@@ -83,7 +85,7 @@ function wantedEngine(i: EngineSettingsInput): "ts" | "wasm" {
 /** The engine the stored choice gives at the next start. A browser that
  *  cannot keep the crash marker gets TypeScript again. */
 function nextEngine(i: EngineSettingsInput): "ts" | "wasm" {
-  return i.suppression || i.selection?.markerBlocked || i.rustOnlyByUrl ? "ts" : wantedEngine(i);
+  return i.suppression || i.selection?.markerBlocked || i.selection?.heldAfterCrashes || i.rustOnlyByUrl ? "ts" : wantedEngine(i);
 }
 
 /** The engine this page life's boot started (any Rust host counts as Rust). */
@@ -100,6 +102,8 @@ export function engineSettingsView(i: EngineSettingsInput): EngineSettingsView {
     note = `The Rust engine had a problem in this session (${reasonWords(i.pageFallback)}), so the game switched to the TypeScript engine.`;
   } else if (i.selection?.selectedBy === "safety" && i.selection.suppression) {
     note = `The Rust engine had a problem on this device earlier (${reasonWords(i.selection.suppression.reason)}), so the game uses the TypeScript engine.`;
+  } else if (i.selection?.heldAfterCrashes) {
+    note = "The Rust engine stopped twice in this tab, so the game uses the TypeScript engine here. A new tab tries it again.";
   } else if (i.selection?.markerBlocked && wantedEngine(i) === "wasm") {
     note = "This browser could not save the Rust engine's crash check, so the game uses the TypeScript engine.";
   } else if (i.rustOnlyByUrl && i.running === "ts" && wantedEngine(i) === "wasm") {

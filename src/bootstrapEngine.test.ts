@@ -36,6 +36,11 @@ vi.mock("./game/bootTower", async (importOriginal) => {
   const real = await importOriginal<typeof import("./game/bootTower")>();
   return { ...real, tsBootTower: vi.fn(() => ({ port: { engine: "ts" }, corrupt: wasmStub.tsCorrupt, loaded: !wasmStub.tsCorrupt, savedAt: undefined })) };
 });
+// The crash reload (#1422), so a test can say whether the page would reload.
+vi.mock("./engineCohort/crashReload", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./engineCohort/crashReload")>();
+  return { ...real, reloadSoon: vi.fn() };
+});
 // The relay, so the reliability rows (`engine_status`) can be read back.
 vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 import { rustBootTower } from "./wasmhost/rustEngine";
@@ -48,6 +53,15 @@ import { SaveGame } from "./storage/SaveGame";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { EngineBootError } from "./wasmhost/engineBoot";
 import { noteEngineThrow, watchEngineTraps } from "./game/engineFault";
+import { countRustCrash, reloadSoon } from "./engineCohort/crashReload";
+
+/** A tab whose storage keeps nothing, so a crash cannot be counted. */
+function fullTabStore(): void {
+  const quota = () => {
+    throw new Error("quota");
+  };
+  vi.stubGlobal("sessionStorage", { getItem: () => null, setItem: quota, removeItem: () => {} });
+}
 
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */
 function stubWebGL(): void {
@@ -72,6 +86,9 @@ const published = (): { status: { hosted: boolean }; port: unknown } | undefined
 
 /** Put every stub back to a TypeScript boot with nothing stored. */
 function resetStubs(): void {
+  vi.unstubAllGlobals();
+  sessionStorage.clear();
+  vi.mocked(reloadSoon).mockClear();
   setEngineWriter(null);
   watchEngineTraps(null);
   vi.mocked(rustBootTower).mockClear();
@@ -178,7 +195,7 @@ describe("bootGame engine", () => {
     expect(encodeVctower).toHaveBeenCalledTimes(1);
   });
 
-  it("stops the game at the running engine's first trap, with the writer off and the reason shown", async () => {
+  it("reloads the game at the running engine's first trap, with the writer off and the reason shown", async () => {
     const encodeVctower = requestWasm();
     document.body.innerHTML = '<div id="stage"></div>';
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -191,11 +208,37 @@ describe("bootGame engine", () => {
     const message = "the Rust engine failed during a tick: unreachable";
     expect(published()?.status).toMatchObject({ hosted: false, lastError: message });
     expect(bootState()).toEqual({ build: "switchable", engine: "none", failure: { stage: "host", reason: "trap-tick", message } });
-    expect(document.getElementById("engine-failure")?.getAttribute("data-stage")).toBe("host");
+    expect(document.getElementById("boot-fallback-host")?.textContent).toContain("Reloading your tower from its last autosave.");
+    // The game stops behind the line, as behind the failure message, until the reload.
+    expect(document.getElementById("engine-failure")?.getAttribute("data-stage")).toBe("reload");
+    expect(reloadSoon).toHaveBeenCalledOnce();
     expect(setSpeed).toHaveBeenCalledWith(0);
     expect(error).toHaveBeenCalledWith(`[wasm] ${message}`);
     await SaveGame.export(saveOf(new Simulation(1)));
     expect(encodeVctower).not.toHaveBeenCalled();
+  });
+
+  it("reloads onto TypeScript at the tab's second trap", async () => {
+    requestWasm();
+    document.body.innerHTML = '<div id="stage"></div>';
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    countRustCrash(sessionStorage, __APP_SHA__);
+    await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn(), setSpeed: vi.fn() })));
+    expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
+    expect(document.getElementById("boot-fallback-host")?.textContent).toContain("on the TypeScript engine.");
+    expect(reloadSoon).toHaveBeenCalledOnce();
+  });
+
+  it("stops the game at a trap whose count storage did not keep", async () => {
+    requestWasm();
+    document.body.innerHTML = '<div id="stage"></div>';
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    fullTabStore();
+    await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn(), setSpeed: vi.fn() })));
+    expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
+    vi.unstubAllGlobals();
+    expect(document.getElementById("engine-failure")?.getAttribute("data-stage")).toBe("host");
+    expect(reloadSoon).not.toHaveBeenCalled();
   });
 
   it("leaves the game and its saves on TypeScript when the Rust engine does not start", async () => {
@@ -344,8 +387,11 @@ describe("bootGame engine_status", () => {
     const activate = vi.fn(() => Promise.resolve());
     onUpdate!(activate);
     expect(prompt).toHaveBeenCalledOnce();
+    // A count storage did not keep stops the game rather than reload it.
+    fullTabStore();
     expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
-    // A switchable build's row reads ts-fallback until PR 6 makes it so (#1422).
+    vi.unstubAllGlobals();
+    // The row reads ts-fallback until the crash-reload trigger lands (#1422).
     expect(lastRow(engineRows())).toMatchObject({ trigger: "fallback", engine: "ts-fallback", fallback_reason: "trap-tick", fallback_stage: "start", fallbacks: 1 });
     onUpdate!(activate);
     expect(activate).toHaveBeenCalledOnce();

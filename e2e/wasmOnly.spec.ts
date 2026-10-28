@@ -27,6 +27,35 @@ async function hostedGame(page: Page): Promise<void> {
   await page.evaluate(() => document.getElementById("splash")?.remove());
 }
 
+/** Run the next frame's real step, then trap: that call and every later one
+ *  on the engine throws, as a poisoned wasm-bindgen object does. */
+async function trapNextStep(page: Page): Promise<void> {
+  await page.evaluate(() => (window as any).game.setSpeed(1));
+  await page.evaluate(() => {
+    const engine = (window as any).__vcEngine.port;
+    const proto = Object.getPrototypeOf(engine);
+    const real = engine.advance.bind(engine);
+    Object.defineProperty(engine, "advance", {
+      value: (...args: unknown[]) => {
+        real(...args);
+        for (const key of Object.getOwnPropertyNames(proto)) {
+          if (key === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function") continue;
+          Object.defineProperty(engine, key, {
+            value: () => {
+              throw new Error("recursive use of an object detected which would lead to unsafe aliasing in rust");
+            },
+            configurable: true,
+            writable: true,
+          });
+        }
+        throw new WebAssembly.RuntimeError("unreachable");
+      },
+      configurable: true,
+      writable: true,
+    });
+  });
+}
+
 function pageErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -202,36 +231,17 @@ test.describe("never falls back to the TypeScript engine", () => {
     expect(await page.evaluate(() => ({ game: !!(window as any).game, host: !!(window as any).__vcEngine }))).toEqual({ game: false, host: false });
   });
 
-  test("an engine that traps mid-game stops the game instead of running it on TypeScript (#874)", async ({ page }) => {
+  test("an engine that traps mid-game reloads once, then stops the game instead of running it on TypeScript (#874, #1422)", async ({ page }) => {
     const errors = pageErrors(page);
     await page.goto("/");
     await hostedGame(page);
-    await page.evaluate(() => (window as any).game.setSpeed(1));
-    // The frame's real step runs, then the call traps and every later call
-    // on the engine throws, as a poisoned wasm-bindgen object does.
-    await page.evaluate(() => {
-      const engine = (window as any).__vcEngine.port;
-      const proto = Object.getPrototypeOf(engine);
-      const real = engine.advance.bind(engine);
-      Object.defineProperty(engine, "advance", {
-        value: (...args: unknown[]) => {
-          real(...args);
-          for (const key of Object.getOwnPropertyNames(proto)) {
-            if (key === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function") continue;
-            Object.defineProperty(engine, key, {
-              value: () => {
-                throw new Error("recursive use of an object detected which would lead to unsafe aliasing in rust");
-              },
-              configurable: true,
-              writable: true,
-            });
-          }
-          throw new WebAssembly.RuntimeError("unreachable");
-        },
-        configurable: true,
-        writable: true,
-      });
-    });
+    // The first trap reloads the tower from its last autosave, on Rust.
+    await trapNextStep(page);
+    await expect(page.locator("#boot-fallback-host")).toContainText("Reloading your tower from its last autosave");
+    await page.waitForEvent("load", { timeout: 30_000 });
+    await hostedGame(page);
+    // The second in this tab stops the game: this build has no other engine.
+    await trapNextStep(page);
     const failure = page.locator("#engine-failure");
     await expect(failure).toBeVisible({ timeout: 30_000 });
     await expect(failure).toHaveAttribute("data-stage", "host");

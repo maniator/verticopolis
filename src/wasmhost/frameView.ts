@@ -113,8 +113,9 @@ export function decodeFrame(v: ArrayLike<number>): FrameView {
   const need = (n: number) => {
     if (i + n > v.length) throw new Error(`frame view: ${v.length} numbers, record at ${i} needs ${n}`);
   };
-  // -1 is no count; a NaN, which no engine sends, reads as none as well.
-  const counter = (n: number) => (n >= 0 ? n : undefined);
+  // -1 is no count; anything but a whole count, which no engine sends, reads
+  // as none as well.
+  const counter = (n: number) => (Number.isSafeInteger(n) && n >= 0 ? n : undefined);
   // A route length the record reads before it reads the route: a negative
   // or non-integer one would misalign every record after it.
   const routeCount = (n: number, what: string) => {
