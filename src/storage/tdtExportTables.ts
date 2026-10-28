@@ -10,6 +10,14 @@ import { TENANT_KIND, rentFromClass } from "./tdtTables";
 /** Thrown for towers the 1994 format cannot represent at all. */
 export class LegacyExportError extends Error {}
 
+/** `save[key]` as a list, refused with the Rust codec's message when it is not
+ *  an array (#887): a string would iterate its characters. */
+export function listOf(save: unknown, key: "units" | "transports"): unknown[] {
+  const list: unknown = typeof save === "object" && save !== null ? (save as Record<string, unknown>)[key] : undefined;
+  if (!Array.isArray(list)) throw new LegacyExportError(`save.${key} is not an array`);
+  return list;
+}
+
 /** Kind to canonical single-story tenant ID: {@link TENANT_KIND} inverted,
  *  first (lowest) ID wins so security exports as 14 (never 17/SECOM). */
 export const KIND_TENANT: ReadonlyMap<FacilityKind, number> = (() => {

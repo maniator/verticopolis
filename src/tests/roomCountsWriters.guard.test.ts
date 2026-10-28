@@ -167,6 +167,9 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   // The command contract's malformed input for the port's shape check (a
   // getter, a `toJSON`, a hidden key): test data that reaches no room.
   "src/simport/commandContract.fixture.ts": { bulk: 7 },
+  // `buildTDT`'s reviver deletes a `toString` key from the export's own
+  // `JSON.parse` copy of the save: parsed data that reaches no room.
+  "src/storage/tdtExport.ts": { bulk: 1 },
   // Array slots: the section builder's output and the telemetry's tables.
   "src/wasmhost/buildSection.ts": { keyed: 1 },
   "src/wasmhost/telemetry.ts": { keyed: 2 },

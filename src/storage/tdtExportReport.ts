@@ -123,9 +123,13 @@ export function buildExportReport(save: SerializedGame, gathered: GatheredTower,
   staysBehind.push("People in transit are not carried; the crowd re-simulates on load.");
   staysBehind.push("Satisfaction detail resets; tenants re-judge the tower as it runs.");
 
+  // A save without a string name still exports (the bytes carry no name), so
+  // the report reads it as an empty name and the file falls back to TOWER1
+  // rather than throwing (#887).
+  const towerName = typeof save.towerName === "string" ? save.towerName : "";
   return {
-    towerName: save.towerName,
-    filename: legacyFilename(save.towerName),
+    towerName,
+    filename: legacyFilename(towerName),
     star,
     money: balance * 100,
     floors: topFloor,
