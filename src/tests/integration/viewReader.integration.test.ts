@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { facilityFloors } from "../../engine/facilities";
 import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../engine/serializedGame";
 import { KIND_CODES, codeOf } from "../../engine/port/layout";
@@ -100,8 +101,8 @@ function check(rust: ViewReader, ts: ViewReader, sim: Simulation): void {
 describe("ViewReader on both engines", () => {
   it.skipIf(!hasWasmPackage())("decodes the same view, and the view the simulation holds", () => {
     const { rust, ts } = pair();
-    const r = new ViewReader(rust);
-    const t = new ViewReader(ts);
+    const r = new ViewReader(rust, facilityFloors);
+    const t = new ViewReader(ts, facilityFloors);
     check(r, t, ts.sim);
     const kept = r.rooms;
     for (let i = 0; i < 8; i++) {
@@ -130,8 +131,8 @@ describe("ViewReader on both engines", () => {
 
   it.skipIf(!hasWasmPackage())("takes a full frame after another caller took one", () => {
     const { rust, ts } = pair();
-    const r = new ViewReader(rust);
-    const t = new ViewReader(ts);
+    const r = new ViewReader(rust, facilityFloors);
+    const t = new ViewReader(ts, facilityFloors);
     for (let i = 0; i < 6; i++) {
       for (const e of [rust, ts]) {
         e.tick(45);
@@ -144,8 +145,8 @@ describe("ViewReader on both engines", () => {
 
   it.skipIf(!hasWasmPackage())("keeps a person's object by id, for one generation", () => {
     const { rust, ts } = pair();
-    const r = new ViewReader(rust);
-    const t = new ViewReader(ts);
+    const r = new ViewReader(rust, facilityFloors);
+    const t = new ViewReader(ts, facilityFloors);
     for (const e of [rust, ts]) e.tick(480);
     check(r, t, ts.sim);
     const held = new Map(r.crowd.people.map((p) => [p.id, p]));

@@ -1,3 +1,4 @@
+import { facilityFloors } from "../../engine/facilities";
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { GameApp } from "../../main";
@@ -61,7 +62,7 @@ function makeApp(sim: Simulation, ui: UI) {
     sim,
     port: createTsSim(() => sim),
     enginePort,
-    reader: new ViewReader(enginePort),
+    reader: new ViewReader(enginePort, facilityFloors),
     portCodes: new PortCodes(enginePort),
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn() },

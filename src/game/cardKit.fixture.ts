@@ -1,4 +1,5 @@
 import type { TemplateResult } from "lit-html";
+import { facilityFloors } from "../engine/facilities";
 import type { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { towerCatalog } from "../engine/towerCatalog";
@@ -21,7 +22,7 @@ import type { InspectorDeps } from "./inspector";
  */
 export function kitOf(sim: Simulation): { kit: CardKit; engine: TsEngine; reader: ViewReader } {
   const engine = new TsEngine(sim);
-  const reader = new ViewReader(engine);
+  const reader = new ViewReader(engine, facilityFloors);
   return { kit: createCardKit({ enginePort: engine, reader, sim }), engine, reader };
 }
 

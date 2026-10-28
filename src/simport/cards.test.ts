@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { facilityFloors } from "../engine/facilities";
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { towerCatalog } from "../engine/towerCatalog";
@@ -27,7 +28,7 @@ function engine(): TsEngine {
 }
 
 function cardsOf(e: TsEngine): { cards: Cards; reader: ViewReader } {
-  const reader = new ViewReader(e);
+  const reader = new ViewReader(e, facilityFloors);
   return { cards: new Cards(e, reader), reader };
 }
 

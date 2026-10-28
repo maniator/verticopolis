@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { facilityFloors } from "../engine/facilities";
 import { Simulation } from "../engine/Simulation";
 import type { HeatmapMode } from "../engine/sim/constants";
 import { TsEngine } from "../engine/port/tsEngine";
@@ -54,7 +55,7 @@ describe("PortRenderSim over TsEngine", () => {
   it("reads what the simulation answers, before and after play", () => {
     const sim = tower();
     const engine = new TsEngine(sim);
-    const reader = new ViewReader(engine);
+    const reader = new ViewReader(engine, facilityFloors);
     const r = new PortRenderSim(engine, reader);
     sameReads(sim, r);
     for (let i = 0; i < 8; i++) {
@@ -67,7 +68,7 @@ describe("PortRenderSim over TsEngine", () => {
   it("keeps the queue projection until the clock or the tower moves", () => {
     const sim = tower();
     const engine = new TsEngine(sim);
-    const reader = new ViewReader(engine);
+    const reader = new ViewReader(engine, facilityFloors);
     const r = new PortRenderSim(engine, reader);
     engine.tick(600);
     reader.update();

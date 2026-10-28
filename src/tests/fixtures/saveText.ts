@@ -1,4 +1,5 @@
 import { Simulation } from "../../engine/Simulation";
+import { facilityFloors } from "../../engine/facilities";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { SaveGame } from "../../storage/SaveGame";
 import { loadStored } from "../../game/portLifecycle";
@@ -51,7 +52,7 @@ export function withPorts(deps: Omit<SaveLoadDeps, PortDeps>): SaveLoadDeps {
     return engine;
   };
   const codes = new PortCodes(engine);
-  const reader = new ViewReader(engine);
+  const reader = new ViewReader(engine, facilityFloors);
   return Object.assign(deps, {
     enginePort: port,
     portCodes: () => codes,

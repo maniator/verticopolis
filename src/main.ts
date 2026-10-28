@@ -1,7 +1,7 @@
 import { Simulation, type HeatmapMode } from "./engine/Simulation";
 import type { UndoHistory } from "./engine/UndoHistory";
 import { createAppHistory } from "./game/appHistory";
-import { GRID } from "./engine/facilities";
+import { GRID, facilityFloors } from "./engine/facilities";
 import type { FacilityKind, Transport, Unit } from "./engine/types";
 import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/TowerEngine";
 import { AudioEngine } from "./audio/Audio";
@@ -215,7 +215,7 @@ class GameApp implements GameAppPorts {
     if (boot.corrupt) SaveGame.preserveUnreadable();
     // A swap through the port reaches the app as a swap the game made (PR 5's bridge, see `TsEngine.handOff`).
     this.enginePort.handOff = (sim, keep) => this.adoptSim(sim, keep);
-    this.reader = new ViewReader(this.enginePort);
+    this.reader = new ViewReader(this.enginePort, facilityFloors);
     this.portCodes = new PortCodes(this.enginePort);
     // Seed the promotion latch to the boot tower's rating (adoptSim does the same
     // for later swaps). The boot sim is assigned directly, never through

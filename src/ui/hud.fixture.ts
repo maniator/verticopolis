@@ -1,4 +1,5 @@
 import type { Simulation } from "../engine/Simulation";
+import { facilityFloors } from "../engine/facilities";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
 import { ViewReader } from "../simport/viewReader";
@@ -13,7 +14,7 @@ function hudOf(sim: Simulation): { src: HudSource; reader: ViewReader } {
   let h = sources.get(sim);
   if (!h) {
     const port = new TsEngine(sim);
-    const reader = new ViewReader(port);
+    const reader = new ViewReader(port, facilityFloors);
     h = { src: { reader, port, codes: new PortCodes(port) }, reader };
     sources.set(sim, h);
   }
