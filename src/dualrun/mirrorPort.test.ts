@@ -38,7 +38,7 @@ describe("port commands on the hosted read model", () => {
     expect(ops()).toEqual([{ op: "resolveChoice", accept: false }]);
   });
 
-  it("relay the building commands as the Simulation call the shadow replays", () => {
+  it("relay the building commands as the Simulation calls the shadow replays", () => {
     const { engine, codes, sim, ops } = relayed();
     expect(engine.buildAt(codes.kind("office"), 2, 190)[0]).toBe(1);
     expect(ops()).toEqual([{ op: "build", kind: "office", floor: 2, x: 190 }]);
