@@ -16,6 +16,7 @@ import { dwellSecondsRange, visibleOccupants } from "./person";
 import { matchesMealOriginKind } from "./meals";
 import { add, insideX, venueHasRoom } from "./trips";
 import { isMetroPlatformServed } from "../tower/routing";
+import { markRoom } from "../tower/rooms";
 
 /**
  * Attendance visits: round-trip trips to the entertainment venues (cinema,
@@ -332,6 +333,7 @@ export function beginDwell(crowd: Crowd, tower: Tower, p: Person): void {
   ) {
     p.venueUnitId = venueUnit.id;
     venueUnit.customersIn = (venueUnit.customersIn ?? 0) + 1;
+    markRoom(tower, venueUnit);
     // Origin split for the rating census: hotel guests drop out of the
     // 4-star-plus census, so a guest eating here must not re-enter it
     // through the venue tally. Flag the person so the decrement in finish()
@@ -360,6 +362,7 @@ export function beginDwell(crowd: Crowd, tower: Tower, p: Person): void {
     // not seat a counted audience; the visitor dwells uncounted and leaves.
     p.venueUnitId = venueUnit.id;
     venueUnit.customersIn = (venueUnit.customersIn ?? 0) + 1;
+    markRoom(tower, venueUnit);
     syncAttendanceOccupants(venueUnit);
     tower.bumpMealOverlayRevision();
   }

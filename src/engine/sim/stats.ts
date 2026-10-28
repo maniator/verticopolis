@@ -2,10 +2,10 @@ import type { Simulation } from "../Simulation";
 
 import { ledgerCatFor, type LedgerCat } from "../Ledger";
 
-import { isElevatorKind, isHotelKind } from "../facilities";
+import { isElevatorKind } from "../facilities";
+import { roomCounts } from "../tower/rooms";
 import type { FacilityKind } from "../types";
 import type { LogEntry } from "../types";
-import { isTenanted } from "../types";
 
 import { LOG_RING_CAP } from "./constants";
 
@@ -13,44 +13,30 @@ import { LOG_RING_CAP } from "./constants";
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
 
 export function stats(sim: Simulation) {
-  let offices = 0,
-    occupiedOffices = 0,
-    condos = 0,
-    soldCondos = 0,
-    hotelRooms = 0,
-    occupiedHotel = 0,
-    dirty = 0,
-    shops = 0,
-    restaurants = 0,
-    vacant = 0,
-    vacantNoRate = 0,
-    parkingSpaces = 0;
-  for (const u of sim.tower.units) {
-    if (u.kind === "office") {
-      offices++;
-      if (isTenanted(u)) occupiedOffices++; // a lame-duck on notice still holds the space
-      if (u.state === "empty") {
-        vacant++;
-        // Off-market (No Rate) vacancies are split out so the headline count
-        // stays honest: these will never fill at the current setting.
-        if (u.noRate) vacantNoRate++;
-      }
-    } else if (u.kind === "condo") {
-      condos++;
-      if (u.everOccupied) soldCondos++;
-    } else if (isHotelKind(u.kind)) {
-      hotelRooms++;
-      if (u.state === "asleep") occupiedHotel++;
-      if (u.state === "dirty") dirty++;
-    } else if (u.kind === "shop") shops++;
-    else if (u.kind === "restaurant" || u.kind === "fastFood") restaurants++;
-    else if (u.kind === "parking") parkingSpaces++;
-  }
+  // The room counts are kept as the rooms change (`roomCounts`), so this HUD
+  // refresh, about 6 a second, reads them without a pass over the rooms: a
+  // read recounts only the rooms written since the last one, and counts them
+  // all once after a build command, a load, or a merge that moved the units.
+  const {
+    population,
+    parkingSpaces,
+    offices,
+    occupiedOffices,
+    condos,
+    soldCondos,
+    hotelRooms,
+    occupiedHotel,
+    dirty,
+    shops,
+    restaurants,
+    vacant,
+    vacantNoRate,
+  } = roomCounts(sim.tower);
   return {
-    population: sim.population,
-    // Cheap loop-counter field only. The modal-only diagnostics that need a
-    // full scan or flood fill (ratingPopulation, the functional parking count)
-    // are computed for the stats report when the modal opens
+    population,
+    // A kept count only. The modal-only diagnostics that need a full scan or
+    // flood fill (ratingPopulation, the functional parking count) are
+    // computed for the stats report when the modal opens
     // (`src/simport/tsPanels.ts`), since stats() runs on the ~6 Hz HUD refresh
     // (UI.update).
     parkingSpaces,

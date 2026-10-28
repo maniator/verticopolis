@@ -9,8 +9,7 @@ const last = <T>(xs: readonly T[]): T | undefined => xs[xs.length - 1];
 
 /** A loopback between the host and a core on the fake engine: every
  *  message is structured-cloned and delivered in a later task. */
-export function rig(sim = Simulation.newGame(7, "classic")) {
-  const mod = fakeModule();
+export function rig(sim = Simulation.newGame(7, "classic"), mod = fakeModule()) {
   const toHost: FromWorker[] = [];
   const toWorker: ToWorker[] = [];
   const fatal: string[] = [];

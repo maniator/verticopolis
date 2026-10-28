@@ -3,7 +3,8 @@
  * `engine-rs/src/compat-record.json` pins the crate version beside what must
  * move it: the conformance lock (the scenario, catalog, loader and `.TDT`
  * tables and the gameplay event catalog), the save version it writes and the
- * oldest it loads, the frame layout, catalog and identity record versions, and
+ * oldest it loads, the frame layout, view layout, catalog and identity record
+ * versions, and
  * the public Rust/WASM interface (the checked-in `src/dualrun/engine.d.ts`,
  * comments and spacing aside).
  * `src/tests/engineCompat.guard.test.ts` recomputes all of it from the tree and
@@ -45,6 +46,7 @@ export interface CompatRecord {
   saveVersion: number;
   oldestSaveVersion: number;
   frameLayoutVersion: number;
+  viewLayoutVersion: number;
   catalogVersion: number;
   identitySchema: number;
   interfaceDigest: string;
@@ -55,6 +57,7 @@ export const VERSION_CONSTANTS: Record<
   | "saveVersion"
   | "oldestSaveVersion"
   | "frameLayoutVersion"
+  | "viewLayoutVersion"
   | "catalogVersion"
   | "identitySchema",
   { file: string; name: string; type: string }
@@ -72,6 +75,11 @@ export const VERSION_CONSTANTS: Record<
   frameLayoutVersion: {
     file: "engine-rs/src/frame.rs",
     name: "FRAME_LAYOUT_VERSION",
+    type: "u32",
+  },
+  viewLayoutVersion: {
+    file: "engine-rs/src/view/layout.rs",
+    name: "VIEW_LAYOUT_VERSION",
     type: "u32",
   },
   catalogVersion: {
@@ -202,6 +210,7 @@ export function computeCompat(root: string): CompatRecord {
     saveVersion: constant("saveVersion"),
     oldestSaveVersion: constant("oldestSaveVersion"),
     frameLayoutVersion: constant("frameLayoutVersion"),
+    viewLayoutVersion: constant("viewLayoutVersion"),
     catalogVersion: constant("catalogVersion"),
     identitySchema: constant("identitySchema"),
     interfaceDigest: interfaceDigest(read("src/dualrun/engine.d.ts")),

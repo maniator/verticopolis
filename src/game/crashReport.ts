@@ -10,9 +10,10 @@ import { SaveGame } from "../storage/SaveGame";
  * automatically and the report contains only what this module writes into it.
  */
 
-/** One captured tick-guard failure (see GameApp's frame-error ring buffer). */
+/** One failure the frame guard or the traffic chip caught and carried on
+ *  through (see GameApp's frame-error ring buffer, game/frameErrors.ts). */
 export interface FrameErrorEntry {
-  /** ISO timestamp of the throw. */
+  /** ISO timestamp of when it was logged. */
   at: string;
   message: string;
 }

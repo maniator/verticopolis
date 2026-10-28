@@ -6,9 +6,10 @@ use serde_json::Value;
 use wasm_bindgen::prelude::*;
 
 use crate::canonical::{canonical_json, digest};
-use crate::clock::GameMode;
 use crate::facilities::Kind;
 pub use crate::frame::{frame_view, log_since, FRAME_HEADER, PERSON_FIXED, UNKNOWN_ROUTINE};
+use crate::load_stream::parse_mode;
+use crate::save_delta::SaveMirror;
 use crate::sim::Simulation;
 use crate::snapshot::state_view;
 
@@ -17,10 +18,6 @@ use crate::snapshot::state_view;
 /// convert at the boundary.
 fn err(what: impl std::fmt::Display) -> JsError {
     JsError::new(&what.to_string())
-}
-
-fn parse_mode(s: &str) -> Result<GameMode, String> {
-    GameMode::parse(s).ok_or_else(|| format!("mode must be classic or modern, got {s}"))
 }
 
 fn parse_kind(s: &str) -> Result<Kind, String> {
@@ -60,6 +57,8 @@ fn resize_json(r: crate::tower::ResizeResult) -> String {
 
 #[path = "wasm_relay.rs"]
 mod relay;
+#[path = "wasm_sync.rs"]
+mod sync;
 
 /// `canBuild`'s answer as the TypeScript spells it: `{ ok, reason?, cost }`.
 fn can_build_json(ok: bool, reason: Option<&str>, cost: f64) -> String {
@@ -245,18 +244,6 @@ fn apply_markers(sim: &mut Simulation, text: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// `raw.mode = mode`, the override a scenario start applies before loading.
-/// The TypeScript throws on a non-object; here that is an error rather than
-/// a panic, which under WASM would trap and poison the module.
-fn override_mode(raw: &mut Value, mode: &str) -> Result<(), String> {
-    parse_mode(mode)?;
-    let obj = raw
-        .as_object_mut()
-        .ok_or_else(|| "the file does not hold a saved game".to_string())?;
-    obj.insert("mode".into(), Value::String(mode.to_string()));
-    Ok(())
-}
-
 /// The catalog text for a mode, as [`catalog`] returns it.
 fn catalog_text(mode: &str) -> Result<String, String> {
     Ok(crate::catalog::catalog_json(parse_mode(mode)?))
@@ -290,10 +277,27 @@ pub fn engine_identity() -> String {
 #[wasm_bindgen]
 pub struct Engine {
     sim: Simulation,
+    mirror: SaveMirror,
 }
 
 #[wasm_bindgen]
 impl Engine {
+    /// `serialize()`, byte for byte, which also becomes the base the next
+    /// `saveDelta` is taken against (#1045, `crate::save_delta`).
+    #[wasm_bindgen(js_name = serializeForSync)]
+    pub fn serialize_for_sync(&mut self) -> String {
+        self.mirror.full(&self.sim)
+    }
+
+    /// What moved in the save since the last sync: `{ units, rest }` as JSON
+    /// text (the changed unit records, and every other top-level key).
+    /// `undefined` when units were added, removed or reordered, or no full
+    /// save was taken yet: the host then takes a full one.
+    #[wasm_bindgen(js_name = saveDelta)]
+    pub fn save_delta(&mut self) -> Option<String> {
+        self.mirror.delta(&mut self.sim)
+    }
+
     /// `Simulation.newGame(seed, mode, modernCalendar, startUnbridged)`; the
     /// calendar defaults to the real-world one and the tower starts bridged,
     /// as the TypeScript defaults do.
@@ -313,9 +317,12 @@ impl Engine {
                 ))
             })?,
         };
-        Ok(Engine {
-            sim: Simulation::new_game_with(seed, mode, calendar, start_unbridged.unwrap_or(false)),
-        })
+        Ok(Engine::of(Simulation::new_game_with(
+            seed,
+            mode,
+            calendar,
+            start_unbridged.unwrap_or(false),
+        )))
     }
 
     /// `Simulation.deserialize(JSON.parse(text))`: a serialized game, migrated
@@ -331,12 +338,13 @@ impl Engine {
     /// so a shadow can start exactly where the live engine stands.
     #[wasm_bindgen(js_name = fromSave)]
     pub fn from_save(text: &str, markers: Option<String>) -> Result<Engine, JsError> {
-        let raw = crate::load::parse_save_json(text.as_bytes()).map_err(err)?;
-        let mut sim = crate::load::deserialize(&raw).map_err(err)?;
+        // A current save is read without a whole-save tree; any other text
+        // goes through `load::parse_save_json` and `load::deserialize`.
+        let mut sim = crate::load_stream::load_save_text(text.as_bytes()).map_err(err)?;
         if let Some(m) = markers {
             apply_markers(&mut sim, &m).map_err(err)?;
         }
-        Ok(Engine { sim })
+        Ok(Engine::of(sim))
     }
 
     /// The import path for a `.vctower` file: decode, migrate and load, then
@@ -344,13 +352,9 @@ impl Engine {
     /// overwrites the save's mode before loading, as a scenario start does.
     #[wasm_bindgen(js_name = fromVctower)]
     pub fn from_vctower(text: &str, mode: Option<String>) -> Result<Engine, JsError> {
-        let mut raw = crate::load::decode_vctower(text).map_err(err)?;
-        if let Some(m) = &mode {
-            override_mode(&mut raw, m).map_err(err)?;
-        }
-        let mut sim = crate::load::deserialize(&raw).map_err(err)?;
-        crate::load::mark_founder_from_loaded_file(&mut sim, &raw);
-        Ok(Engine { sim })
+        // Decoded, then read as `fromSave` reads a save, with the mode set.
+        let sim = crate::load_stream::load_vctower_text(text, mode.as_deref()).map_err(err)?;
+        Ok(Engine::of(sim))
     }
 
     /// `serialize()` as JSON text.
@@ -416,6 +420,20 @@ impl Engine {
             return Ok(facade_commands::unknown_facility());
         };
         Ok(build_result(self.sim.build(kind, floor.into(), x.into())))
+    }
+
+    /// `paintBrush(kind, floor, tiles)` with the tiles as JSON text: JSON
+    /// `{ placed, reason? }`, the floor and lobby brush (`brush.rs`) in one
+    /// call. Every argument is read raw, so a malformed brush is refused
+    /// with "That request is not valid." as TypeScript refuses it.
+    #[wasm_bindgen(js_name = paintBrush)]
+    pub fn paint_brush(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] kind: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] floor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tiles: JsValue,
+    ) -> String {
+        self.paint_brush_checked(kind.as_string(), floor.as_f64(), tiles.as_string())
     }
 
     /// `canBuild(kind, floor, x)`: JSON `{ ok, reason?, cost }`, the dry run
@@ -1064,6 +1082,71 @@ impl Engine {
     }
 }
 
+// The view's layout (facade slice 6a, #1213) as JSON: the version, every
+// slot and width of the dynamic frame and the structural snapshot by name,
+// and the kind, state, weather, mode and calendar codes
+// (`view::layout_json`). A host checks it on load and refuses a version or
+// width it does not know.
+#[wasm_bindgen(js_name = viewLayout)]
+pub fn view_layout() -> String {
+    crate::view::layout_json().to_string()
+}
+
+/// The renderer-facing view (facade slice 6a, #1213): one-line wrappers over
+/// `crate::view`, which documents each layout. Their notes, and
+/// `view_layout`'s above, are plain comments: wasm-bindgen copies doc
+/// comments into the generated `src/dualrun/engine.d.ts`, which the 500-line
+/// ceiling holds.
+#[wasm_bindgen]
+impl Engine {
+    // The structural snapshot (`view::structure_view`): the floor bounds,
+    // the mode and calendar, rooms by slot, floor and lobby tiles as runs,
+    // transports with their skipped floors. Read again when the frame
+    // header's tower revision moves.
+    #[wasm_bindgen(js_name = viewStructure)]
+    pub fn view_structure(&self) -> Vec<f64> {
+        crate::view::structure_view(&self.sim)
+    }
+
+    // The dynamic frame (`view::ViewReader::frame`): the header, the
+    // people, the rooms whose fields changed since the last call (every room
+    // when `full` is `true`, on the first call, or after a structural
+    // change, with the header's full flag set) and the cars. One reader per
+    // engine, so one caller: the header's frame number tells it when it
+    // missed a frame. Read raw: only a JS `true` asks for a full frame.
+    #[wasm_bindgen(js_name = viewFrame)]
+    pub fn view_frame(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "boolean")] full: JsValue,
+    ) -> Vec<f64> {
+        crate::view::view_frame(&self.sim, full.as_bool() == Some(true))
+    }
+
+    // The labels and subtypes changed after the meta revision `since`, as
+    // JSON `{ revision, full, units: [[id, label, subtype], ...] }`
+    // (`view::meta_since`). Read raw: a `since` of 0, or of anything but a
+    // whole JS number from the log's reach up to the current revision
+    // (`undefined` from untyped JavaScript among them), gets a full listing.
+    #[wasm_bindgen(js_name = unitMetaSince)]
+    pub fn unit_meta_since(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] since: JsValue,
+    ) -> String {
+        let since = crate::view::whole_revision(since.as_f64());
+        crate::view::meta_since(&self.sim.tower, since).to_string()
+    }
+
+    // The tower signature (`Simulation::tower_signature`) as a `bigint`: two
+    // reads are equal when the fields the tower half of `towerStateSig`
+    // reads are equal, and differ when they differ (but for a 64-bit
+    // collision). Undo reads it, beside money, at a gesture's capture and
+    // commit; it walks every unit, so it is too slow to read each frame.
+    #[wasm_bindgen(js_name = towerSignature)]
+    pub fn tower_signature(&self) -> u64 {
+        self.sim.tower_signature()
+    }
+}
+
 // ---- panel getters (facade slice 6b, #1214) ----------------------------
 //
 // One-line wrappers over `crate::panels`: each answers JSON text keyed with
@@ -1144,9 +1227,30 @@ impl Engine {
     }
 }
 
+/// Facade slice 6c (#1215): the inspector's diagnostics facts.
+#[wasm_bindgen]
+impl Engine {
+    /// The facts behind the inspector's diagnostics for one unit, as JSON
+    /// text (`diagnostics::DiagnosticFacts`); TypeScript keeps the wording.
+    /// Undefined for an id that names no unit (a transport's, zero or a
+    /// negative one) and for a malformed one (fractional, not finite, past
+    /// the safe integers), read raw so it cannot wrap onto a real unit.
+    /// The read may fill the engine's caches, which sit outside the save; it
+    /// changes nothing in the game.
+    #[wasm_bindgen(js_name = diagnosticFacts)]
+    pub fn diagnostic_facts(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
+    ) -> Option<String> {
+        crate::diagnostics::facts_json(&mut self.sim, id.as_f64())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::clock::GameMode;
+    use crate::load_stream::override_mode;
 
     /// The binding stamps the save and hands back the crate encoder's text.
     /// (A refusal is a JavaScript error, which cannot be built off the wasm
@@ -1292,7 +1396,10 @@ mod tests {
         assert!(sim.build_transport(Kind::ElevatorStandard, 10, 1, 2).ok);
         let lift = sim.tower.transport_at(1, 10).unwrap().id;
         sim.money = 1_000_000.0;
-        let mut e = Engine { sim };
+        let mut e = Engine {
+            sim,
+            mirror: SaveMirror::default(),
+        };
         let before = e.serialize();
         e.sim.gameplay.drain();
         let refused = |text: String| -> Value {

@@ -186,19 +186,19 @@ function buildSpatialCongestion(sim: Simulation): {
   for (const t of sim.tower.transports) {
     // Staff-only service elevators carry no passenger load.
     if (isStaffOnlyTransport(t.kind)) continue;
-    let active = false;
-    for (let f = t.bottom; f <= t.top; f++) {
-      if (sim.tower.stopsAt(t, f) && served.has(f)) { active = true; break; }
-    }
-    if (!active) continue;
+    // The shaft's stop list, ascending and cached per revision: on the v2 model
+    // this map is rebuilt every rendered frame, and testing each floor of the
+    // span against an express shaft's skip list costs span times skips.
+    const stops = sim.tower.stopsOf(t);
+    if (!stops.some((f) => served.has(f))) continue;
     const cap = sim.transportCapacity(t);
-    for (let f = t.bottom; f <= t.top; f++) {
+    for (const f of stops) {
       // Floor 1 (the ground lobby) IS recorded here: every rider on a
       // lobby-boarding shaft passes through it, so the lobby carries that
       // shaft's boarding pressure. Excluding it used to displace a lobby jam's
       // report up to the first office floor (the "backed up on 2F" the player
       // reads as off by one when the queue they see is at the main lobby, 1F).
-      if (sim.tower.stopsAt(t, f) && served.has(f)) {
+      if (served.has(f)) {
         const arr = shaftsByFloor.get(f) ?? [];
         arr.push({ id: t.id, cap, kind: t.kind });
         shaftsByFloor.set(f, arr);

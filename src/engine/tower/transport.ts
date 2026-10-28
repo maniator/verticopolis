@@ -4,6 +4,7 @@ import type { FacilityKind, PlaceResult, Transport, Unit } from "../types";
 import { isStructural, isSkyLobbyFloor, NEEDS_FLOORS, SHAFT_OVERLAP } from "./towerTopology";
 import { coerceSchedule, snapHomesToStops } from "../elevatorSchedule";
 import { INVALID_REQUEST, whole } from "../request";
+import { removeUnits } from "./removal";
 
 /** Transport CRUD, stops, and resize (friend functions of {@link Tower}). */
 
@@ -136,25 +137,6 @@ export function removalReason(tower: Tower, id: number): string | undefined {
   return undefined;
 }
 
-export function removeUnit(tower: Tower, id: number): Unit | undefined {
-  const idx = tower.units.findIndex((u) => u.id === id);
-  if (idx === -1) return undefined;
-  const [u] = tower.units.splice(idx, 1);
-  tower.unregister(u);
-  // Derive from what actually still stands, so bulldozing one of two halls
-  // doesn't wrongly clear the flag while a hall remains.
-  if (u.kind === "weddingHall") {
-    tower.builtWeddingHall = tower.units.some((x) => x.kind === "weddingHall");
-  }
-  // Last lobby tile gone → the floor is no longer a lobby, so express elevators
-  // spanning it stop stopping there.
-  if (u.kind === "lobby" && !tower.floorHasLobby(u.floor)) {
-    tower.syncExpressStopsForFloor(u.floor);
-  }
-  tower.revision++;
-  return u;
-}
-
 /** Lay plain floor across `[x, x + width)` on each floor in `floors` that lacks
  *  it, in support order (upward runs bottom-up, basements top-down, exactly like
  *  {@link ensureFloorUnder}). Returns the ids laid, or `null` if some tile can
@@ -171,7 +153,7 @@ export function layShaftFloors(tower: Tower, floors: number[], x: number, width:
   if (tiles.length === 0) return [];
   const { placed, stuck } = tower.placeStructureRun(tiles, "floor");
   if (stuck.length > 0) {
-    for (const id of placed) tower.removeUnit(id);
+    removeUnits(tower, placed);
     return null;
   }
   return placed;

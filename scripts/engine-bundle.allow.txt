@@ -40,6 +40,9 @@ src/engine/Tower.ts
 src/engine/UndoHistory.ts
 
 # Simulation friend modules (commands, reads, the save codec)
+# The floor and lobby brush moved here from src/simport/brush.ts (#1290) so
+# both engines run it as one command; it runs on the instance first (item 2)
+src/engine/sim/brush.ts
 src/engine/sim/build.ts
 src/engine/sim/capacity.ts
 src/engine/sim/charges.ts
@@ -49,6 +52,7 @@ src/engine/sim/congestion.ts
 src/engine/sim/constants.ts
 src/engine/sim/demand.ts
 src/engine/sim/deserializeGuards.ts
+src/engine/sim/deserializeRecords.ts
 src/engine/sim/events.ts
 src/engine/sim/founderStatus.ts
 src/engine/sim/gripe.ts
@@ -87,6 +91,8 @@ src/engine/crowd/walk.ts
 # The tower model
 src/engine/tower/expressStops.ts
 src/engine/tower/placement.ts
+# Unit removal, split out of Tower.ts (#1290); Tower ships whole (item 4)
+src/engine/tower/removal.ts
 src/engine/tower/rooms.ts
 src/engine/tower/routing.ts
 src/engine/tower/segments.ts

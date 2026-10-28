@@ -20,7 +20,7 @@ import { VACATE_NOTICE_MINUTES } from "./constants";
 import { buildSatisfactionContext, wouldEvictFreshTenant, type SatisfactionContext } from "./satisfactionStep";
 import { foldOriginDemand } from "./demand";
 import { bindingTransportClassAt, type CongestionBindingClass } from "./gripe";
-import { roomUnits } from "../tower/rooms";
+import { roomUnits, setRoomState } from "../tower/rooms";
 
 /** Vacate, move-in, subtype churn for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -84,7 +84,7 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
     sim.money -= buyback;
     sim.recordMoney("condos", -buyback);
   }
-  u.state = "empty";
+  setRoomState(sim.tower, u, "empty");
   u.occupants = 0;
   // Return the unit to market by clearing the "currently leased/sold" flag, a
   // repurchased condo can then sell fresh, a vacated office re-lease. But
@@ -265,7 +265,7 @@ export function attemptMoveIns(sim: Simulation): void {
     } else if (isHotelKind(u.kind)) {
       // Hotel rooms fill in the evening only and must be clean.
       if (sim.clock.isEvening() && sim.rng.chance(0.5 * demand)) {
-        u.state = "asleep";
+        setRoomState(sim.tower, u, "asleep");
         u.everOccupied = true;
         sim.moveInsToday.rooms++;
         // A guest checking in mid-pass becomes a demand origin (computeDemandMap
@@ -303,7 +303,7 @@ export function rollCondoRelocations(sim: Simulation): void {
       sim.rules.condoRelocationChance(u.residents) *
       (sim.clock.calendar.maintPeriodDays / REAL_WORLD.maintPeriodDays);
     if (chance <= 0 || !sim.rng.chance(chance)) continue;
-    u.state = "vacating";
+    setRoomState(sim.tower, u, "vacating");
     u.vacateReason = "relocation";
     u.vacateAt = sim.clock.minutes + VACATE_NOTICE_MINUTES;
     sim.emit(
@@ -370,7 +370,7 @@ export function rerollSubtype(sim: Simulation, id: number): string | undefined {
 }
 
 export function moveIn(sim: Simulation, u: Unit): void {
-  u.state = "occupied";
+  setRoomState(sim.tower, u, "occupied");
   u.satisfaction = 1;
   // A fresh tenant carries no prior eviction, clear any leftover notice
   // bookkeeping so a recycled unit can never present stale departure data.

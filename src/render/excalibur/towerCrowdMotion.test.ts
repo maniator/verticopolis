@@ -125,3 +125,24 @@ describe("eased car motion wiring (GH #688)", () => {
   });
 
 });
+
+describe("walker busyness gate reads the population once per step (#1234)", () => {
+  it("reads it once over many frames with no step, and once more after a step", () => {
+    let reads = 0;
+    const sim = simFixture({
+      clock: { minutes: 600, hour: 10, minuteOfDay: 600, isMorning: () => false, isEvening: () => false, isNight: () => false },
+    });
+    Object.defineProperty(sim, "population", {
+      get: () => {
+        reads++;
+        return 400;
+      },
+    });
+    const e = eng({ sim });
+    for (let frame = 0; frame < 30; frame++) updateMotion(e);
+    expect(reads).toBe(1);
+    sim.clock.minutes += 1; // the sim steps
+    for (let frame = 0; frame < 30; frame++) updateMotion(e);
+    expect(reads).toBe(2);
+  });
+});

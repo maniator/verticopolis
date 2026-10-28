@@ -1829,9 +1829,9 @@ describe("showSettings: the Settings dialog", () => {
     expect(dialog().querySelector("#set-auto-bridge")).toBeNull();
   });
 
-  it("follows the callback across toggles for the Modern bridging switch", () => {
+  it("follows the callback across toggles for the Modern bridging switch", async () => {
     let on = true;
-    const toggle = vi.fn(() => (on = !on));
+    const toggle = vi.fn(async () => (on = !on));
     const { ui, cb } = makeUI({
       getMode: () => "modern" as const,
       isAutoBridge: vi.fn(() => on),
@@ -1842,9 +1842,40 @@ describe("showSettings: the Settings dialog", () => {
     expect(sw.checked).toBe(true); // initial live state
     sw.click();
     expect(cb.onToggleAutoBridge).toHaveBeenCalledTimes(1);
+    await toggle.mock.results[0].value;
     expect(sw.checked).toBe(false);
     sw.click();
+    await toggle.mock.results[1].value;
     expect(sw.checked).toBe(true);
+  });
+
+  it("sets the Modern bridging switch to the engine's answer once the toggle settles", async () => {
+    // The engine kept bridging on (a refused toggle): the click's own uncheck
+    // must not stick once the answer arrives.
+    const toggle = vi.fn(async () => true);
+    const { ui } = makeUI({ getMode: () => "modern" as const, isAutoBridge: vi.fn(() => true), onToggleAutoBridge: toggle });
+    ui.showSettings();
+    const sw = dialog().querySelector<HTMLInputElement>("#set-auto-bridge")!;
+    sw.click();
+    expect(sw.checked).toBe(false); // the browser's own toggle, before the answer
+    await toggle.mock.results[0].value;
+    await Promise.resolve();
+    expect(sw.checked).toBe(true);
+  });
+
+  it("puts the Modern bridging switch back on the live preference when the toggle fails, and reports the fault", async () => {
+    const fault = new Error("engine fault");
+    const toggle = vi.fn(() => Promise.reject(fault));
+    const { ui } = makeUI({ getMode: () => "modern" as const, isAutoBridge: vi.fn(() => true), onToggleAutoBridge: toggle });
+    ui.showSettings();
+    const sw = dialog().querySelector<HTMLInputElement>("#set-auto-bridge")!;
+    const seen = await unhandled(async () => {
+      sw.click();
+      expect(sw.checked).toBe(false);
+      await settle();
+    });
+    expect(sw.checked).toBe(true);
+    expect(seen).toEqual([fault]);
   });
 
   it("disables the Reduced motion switch with a (system) suffix when the OS forces it", () => {
@@ -2215,13 +2246,33 @@ describe("showUpdatePrompt — Later / Update now, resolved once", () => {
   });
 });
 
+/** Lets queued answers settle. */
+const settle = () => new Promise((r) => setTimeout(r, 0));
+
+/** The rejections `run` leaves unhandled, caught in place of the runner's own
+ *  report. */
+async function unhandled(run: () => Promise<void>): Promise<unknown[]> {
+  const others = process.listeners("unhandledRejection");
+  const seen: unknown[] = [];
+  const watch = (e: unknown) => void seen.push(e);
+  process.removeAllListeners("unhandledRejection");
+  process.on("unhandledRejection", watch);
+  try {
+    await run();
+  } finally {
+    process.off("unhandledRejection", watch);
+    for (const l of others) process.on("unhandledRejection", l);
+  }
+  return seen;
+}
+
 describe("showBatchPricingDialog — set-all rent/price with a reset confirm", () => {
   const result = { matched: 5, eligible: 5, changed: 3, skippedSold: 0, skippedCustom: 2, customOverwritten: 0, clampedLow: 0, clampedHigh: 0 };
   function open() {
     const { ui } = makeUI();
     const band = { default: 10000, min: 5000, max: 20000, step: 1000 };
     const preview = vi.fn(() => ({ ...result }));
-    const apply = vi.fn(() => ({ ...result }));
+    const apply = vi.fn(async () => ({ ...result }));
     const onApplied = vi.fn();
     ui.showBatchPricingDialog(
       { kind: "office", kindLabel: "Office", options: { shape: "band", band } },
@@ -2248,12 +2299,55 @@ describe("showBatchPricingDialog — set-all rent/price with a reset confirm", (
     expect(preview.mock.calls.length).toBeGreaterThan(1);
   });
 
-  it("Apply commits and reports a summary, then closes", () => {
+  it("Apply commits and reports a summary, then closes", async () => {
     const { apply, onApplied } = open();
     dialog().querySelector<HTMLButtonElement>("#bp-apply")!.click();
     expect(apply).toHaveBeenCalledOnce();
+    // The summary and the close wait for the engine's answer.
+    expect(onApplied).not.toHaveBeenCalled();
+    await settle();
     expect(onApplied).toHaveBeenCalledWith(expect.stringContaining("Set 3 offices"));
     expect(dialog().open).toBe(false);
+  });
+
+  it("applies once while the engine answers, and closes without a summary on a refusal", async () => {
+    const { apply, onApplied } = open();
+    apply.mockImplementationOnce(async () => null as never);
+    dialog().querySelector<HTMLButtonElement>("#bp-apply")!.click();
+    dialog().querySelector<HTMLButtonElement>("#bp-apply")!.click();
+    expect(apply).toHaveBeenCalledOnce();
+    await settle();
+    expect(onApplied).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
+
+  it("closes when the apply fails, and leaves the failure to the error report", async () => {
+    const { apply, onApplied } = open();
+    const fault = new Error("engine fault");
+    apply.mockImplementationOnce(() => Promise.reject(fault));
+    // The failure stays unhandled so analyticsErrors reports it; catch it here.
+    const seen = await unhandled(async () => {
+      dialog().querySelector<HTMLButtonElement>("#bp-apply")!.click();
+      await settle();
+    });
+    expect(seen).toEqual([fault]);
+    expect(onApplied).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
+
+  it("does not announce an answer that lands after the player closed the dialog", async () => {
+    const { ui } = makeUI();
+    let answer!: (r: typeof result) => void;
+    const apply = vi.fn(() => new Promise<typeof result>((r) => (answer = r)));
+    const onApplied = vi.fn();
+    const band = { default: 10000, min: 5000, max: 20000, step: 1000 };
+    ui.showBatchPricingDialog({ kind: "office", kindLabel: "Office", options: { shape: "band", band } }, { preview: () => ({ ...result }), apply, onApplied });
+    dialog().querySelector<HTMLButtonElement>("#bp-apply")!.click();
+    dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click();
+    expect(dialog().open).toBe(false);
+    answer({ ...result });
+    await settle();
+    expect(onApplied).not.toHaveBeenCalled();
   });
 
   it("a bulk Reset-to-default requires a confirming second click", () => {
@@ -2309,7 +2403,7 @@ describe("showBatchPricingDialog — the Classic ladder variant (rung picker + a
     const { ui } = makeUI();
     const options = CLASSIC_RULES.priceOptions("office")!;
     const preview = vi.fn(() => ({ ...result }));
-    const apply = vi.fn(() => ({ ...result }));
+    const apply = vi.fn(async () => ({ ...result }));
     const onApplied = vi.fn();
     ui.showBatchPricingDialog({ kind: "office", kindLabel: "Office", options }, { preview, apply, onApplied });
     return { preview, apply, onApplied };
@@ -2336,16 +2430,29 @@ describe("showBatchPricingDialog — the Classic ladder variant (rung picker + a
     expect(dialog().querySelector("#bp-preview")!.textContent).toBe("Set 9 of 12 offices to Low ($5,000).");
   });
 
-  it("Apply on a rung commits once and reports the pinned summary", () => {
+  it("Apply on a rung commits once and reports the pinned summary", async () => {
     const { apply, onApplied } = openLadder();
     pick("3");
     applyBtn().click();
     expect(apply).toHaveBeenCalledWith(15_000, { onlyDefaultPriced: false });
+    await settle();
     expect(onApplied).toHaveBeenCalledWith("Set 9 offices to High ($15,000).");
     expect(dialog().open).toBe(false);
   });
 
-  it("batch No Rate is armed: first click relabels to Confirm No Rate, second applies", () => {
+  it("does not announce a rung answer that lands after the player closed the dialog", async () => {
+    let answer!: (r: typeof result) => void;
+    const { apply, onApplied } = openLadder();
+    apply.mockImplementationOnce(() => new Promise<typeof result>((r) => (answer = r)));
+    applyBtn().click();
+    dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click();
+    expect(dialog().open).toBe(false);
+    answer({ ...result });
+    await settle();
+    expect(onApplied).not.toHaveBeenCalled();
+  });
+
+  it("batch No Rate is armed: first click relabels to Confirm No Rate, second applies", async () => {
     const { apply, onApplied } = openLadder();
     pick("noRate");
     expect(dialog().querySelector("#bp-preview")!.textContent).toBe(
@@ -2356,7 +2463,19 @@ describe("showBatchPricingDialog — the Classic ladder variant (rung picker + a
     expect(apply).not.toHaveBeenCalled();
     applyBtn().click(); // confirms
     expect(apply).toHaveBeenCalledWith("noRate", { onlyDefaultPriced: false });
+    await apply.mock.results[0].value;
     expect(onApplied).toHaveBeenCalledWith("Took 9 offices off the market (No Rate).");
+  });
+
+  it("applies a rung once while the engine answers, and closes without a summary on a refusal", async () => {
+    const { apply, onApplied } = openLadder();
+    apply.mockImplementationOnce(async () => null as never);
+    applyBtn().click();
+    applyBtn().click();
+    expect(apply).toHaveBeenCalledOnce();
+    await settle();
+    expect(onApplied).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
   });
 
   it("any other change disarms a pending No Rate confirm", () => {
@@ -2398,15 +2517,16 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
           lobby: lobbySet.has(floor),
           endpoint: floor === 1 || floor === top,
         })),
-      setServe: vi.fn((floor: number, serve: boolean) => {
+      // Async like the real port: the dialog re-reads once the answer settles.
+      setServe: vi.fn(async (floor: number, serve: boolean) => {
         if (floor === 1 || floor === top) return; // endpoints always stop
         if (serve) served.add(floor);
         else served.delete(floor);
       }),
-      expressStops: vi.fn(() => {
+      expressStops: vi.fn(async () => {
         served = new Set([1, top, ...lobbies]);
       }),
-      allStops: vi.fn(() => {
+      allStops: vi.fn(async () => {
         served = new Set(Array.from({ length: top }, (_, i) => i + 1));
       }),
     };
@@ -2427,7 +2547,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   }
   function open(over: Partial<ScheduleDialogCtx> = {}) {
     const { ui } = makeUI();
-    const apply = vi.fn();
+    const apply = vi.fn(async (_schedule: any) => {});
     ui.showElevatorScheduleDialog(baseCtx(over), { apply });
     return { ui, apply };
   }
@@ -2466,8 +2586,10 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   const okBtn = () => dialog().querySelector<HTMLButtonElement>('[data-act="apply"]')!;
   const simText = () => dialog().querySelector(".es-sim")!.textContent!;
 
-  it("opens with every hour at the full fleet, homes at the base lobby, and the defaults", () => {
+  it("opens with every hour at the full fleet, homes at the base lobby, and the defaults", async () => {
     const { apply } = open();
+    okBtn().click();
+    // One OK per open, and the dialog closes once the engine has answered.
     okBtn().click();
     expect(apply).toHaveBeenCalledOnce();
     const s = apply.mock.calls[0][0];
@@ -2476,6 +2598,9 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(s.homeFloors).toEqual([1, 1, 1, 1]);
     expect(s.waitingCarResponse).toBe(0);
     expect(s.standardFloorDeparture).toBe(48);
+    expect(dialog().open).toBe(true);
+    await apply.mock.results[0].value;
+    await Promise.resolve();
     expect(dialog().open).toBe(false);
   });
 
@@ -2705,7 +2830,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     hourly[8] = 0.9;
     const { ui } = makeUI();
     const current = { activeCars: { weekday: Array(24).fill(1) } };
-    ui.showElevatorScheduleDialog(baseCtx({ hourly: { weekday: hourly }, current }), { apply: vi.fn() });
+    ui.showElevatorScheduleDialog(baseCtx({ hourly: { weekday: hourly }, current }), { apply: vi.fn(async () => {}) });
     const advice = dialog().querySelector(".es-advice");
     expect(advice).not.toBeNull();
     expect(advice!.textContent).toBe("This shaft is short at 08:00 on weekdays.");
@@ -2718,7 +2843,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     // which must read as one 00:00-23:00 span, not 24 comma'd stamps.
     const hourly = Array(24).fill(0.9);
     const { ui } = makeUI();
-    ui.showElevatorScheduleDialog(baseCtx({ hourly: { weekday: hourly }, current: { activeCars: { weekday: Array(24).fill(1) } } }), { apply: vi.fn() });
+    ui.showElevatorScheduleDialog(baseCtx({ hourly: { weekday: hourly }, current: { activeCars: { weekday: Array(24).fill(1) } } }), { apply: vi.fn(async () => {}) });
     expect(dialog().querySelector(".es-advice")!.textContent).toBe("This shaft is short at 00:00–23:00 on weekdays.");
   });
 
@@ -2777,7 +2902,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     const { ui } = makeUI();
     ui.showElevatorScheduleDialog(
       baseCtx({ hourly: { weekday: hourly }, current: { activeCars: { weekday: Array(24).fill(1), weekend: Array(24).fill(1) } } }),
-      { apply: vi.fn() },
+      { apply: vi.fn(async () => {}) },
     );
     expect(dialog().querySelector(".es-legend")).not.toBeNull();
     expect(dialog().querySelector(".es-advice")!.textContent).toContain("on weekdays");
@@ -2899,7 +3024,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(row[9]).toBe(3);
   });
 
-  it("a Serve toggle applies live, refreshes the rows, and re-snaps the working homes", () => {
+  it("a Serve toggle applies live, refreshes the rows, and re-snaps the working homes", async () => {
     const stops = fakeStops();
     const { apply } = open({ stops, current: { homeFloors: [5, 1, 1, 1] } });
     // Uncheck floor 5: the port mutates, the grid refreshes, car 1's home snaps off it.
@@ -2909,6 +3034,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     serve5.checked = false;
     serve5.dispatchEvent(new Event("change", { bubbles: true }));
     expect(stops.setServe).toHaveBeenCalledWith(5, false);
+    await new Promise((r) => setTimeout(r, 0)); // the rows refresh once the engine answers
     const row5 = Array.from(rows()).find((r) => r.querySelector(".es-cell-floor")!.textContent!.includes("5"))!;
     expect(row5.classList.contains("es-skipped")).toBe(true);
     expect(row5.querySelectorAll(".es-chip")).toHaveLength(0);
@@ -2916,27 +3042,35 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(apply.mock.calls[0][0].homeFloors[0]).not.toBe(5); // snapped off the skipped floor
   });
 
-  it("stop edits do not arm the discard guard (they applied live; Cancel cannot take them back)", () => {
-    open();
+  it("stop edits do not arm the discard guard (they applied live; Cancel cannot take them back)", async () => {
+    const announce = vi.fn();
+    open({ announce });
     const serve = dialog().querySelectorAll<HTMLInputElement>(".es-grid input[type=checkbox]")[1];
     serve.checked = false;
     serve.dispatchEvent(new Event("change", { bubbles: true }));
     dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click();
     expect(dialog().open).toBe(false); // closed at once: no schedule edit pending
+    // The answer lands after the close: the gone dialog neither repaints nor speaks.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(announce).not.toHaveBeenCalled();
   });
 
-  it("the bulk stop quick actions ride the port and announce", () => {
+  it("the bulk stop quick actions ride the port and announce once it answers", async () => {
     const announce = vi.fn();
     const stops = fakeStops();
     open({ stops, announce });
+    const flush = () => new Promise((r) => setTimeout(r, 0));
     const quick = dialog().querySelectorAll<HTMLButtonElement>(".es-quick .btn");
     quick[0].click(); // Express (lobbies)
     expect(stops.expressStops).toHaveBeenCalledOnce();
+    expect(announce).not.toHaveBeenCalledWith("Stops set to lobbies only.");
+    await flush();
     expect(announce).toHaveBeenLastCalledWith("Stops set to lobbies only.");
     // The grid follows: non-lobby floors read skipped now.
     expect(dialog().querySelectorAll(".es-grid-row.es-skipped").length).toBeGreaterThan(0);
     quick[1].click(); // All stops
     expect(stops.allStops).toHaveBeenCalledOnce();
+    await flush();
     expect(announce).toHaveBeenLastCalledWith("Stopping at every floor.");
     expect(dialog().querySelectorAll(".es-grid-row.es-skipped")).toHaveLength(0);
   });

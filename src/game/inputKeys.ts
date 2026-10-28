@@ -92,8 +92,8 @@ export function bindKeys(app: GameApp): void {
       case "ArrowRight": case "d": case "D": app.keyboard.moveCursor(step, 0); break;
       case "ArrowUp": case "w": case "W": app.keyboard.moveCursor(0, step); break;
       case "ArrowDown": case "s": case "S": app.keyboard.moveCursor(0, -step); break;
-      case "Enter": case " ": case "Spacebar": app.keyboard.commitCursor(); break;
-      case "Delete": case "Backspace": case "x": case "X": app.keyboard.bulldozeCursor(); break;
+      case "Enter": case " ": case "Spacebar": void app.keyboard.commitCursor(); break;
+      case "Delete": case "Backspace": case "x": case "X": void app.keyboard.bulldozeCursor(); break;
       case "+": case "=": app.engine.zoomBy(1.15); return;
       case "-": case "_": app.engine.zoomBy(1 / 1.15); return;
       case "c": case "C": {

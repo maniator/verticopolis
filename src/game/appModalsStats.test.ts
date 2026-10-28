@@ -141,8 +141,8 @@ describe("confirmExterminate refusals surfaced by the confirm callback", () => {
       const { app, ui } = makeApp(sim);
       await fireExterminate(app, ui);
       expect(ui.confirmModal).toHaveBeenCalledTimes(1);
-      const onConfirm = ui.confirmModal.mock.calls[0][2] as () => void;
-      onConfirm();
+      const onConfirm = ui.confirmModal.mock.calls[0][2] as () => Promise<void>;
+      await onConfirm();
       expect(sim.callExterminator).toHaveBeenCalledTimes(1);
       expect(sim.emit).toHaveBeenCalledExactlyOnceWith(message, "bad");
     });
@@ -153,7 +153,7 @@ describe("confirmExterminate refusals surfaced by the confirm callback", () => {
     const sim = makeSim({ callExterminator: vi.fn(() => ({ ok: false, reason: "funds" })) });
     const { app, ui } = makeApp(sim);
     await fireExterminate(app, ui);
-    (ui.confirmModal.mock.calls[0][2] as () => void)();
+    await (ui.confirmModal.mock.calls[0][2] as () => Promise<void>)();
     expect(sim.emit).toHaveBeenCalledExactlyOnceWith("Not enough funds to book the exterminator ($200).", "bad");
   });
 
@@ -161,7 +161,7 @@ describe("confirmExterminate refusals surfaced by the confirm callback", () => {
     const sim = makeSim({ callExterminator: vi.fn(() => ({ ok: true })) });
     const { app, ui } = makeApp(sim);
     await fireExterminate(app, ui);
-    (ui.confirmModal.mock.calls[0][2] as () => void)();
+    await (ui.confirmModal.mock.calls[0][2] as () => Promise<void>)();
     await settle();
     expect(sim.emit).not.toHaveBeenCalled();
     // showStats runs again after the confirm (initial open + reopen).
@@ -238,10 +238,10 @@ describe("confirmExterminate refusals surfaced by the confirm callback", () => {
     const sim = makeSim();
     const { app, ui } = makeApp(sim);
     await fireExterminate(app, ui);
-    const onConfirm = ui.confirmModal.mock.calls[0][2] as () => void;
+    const onConfirm = ui.confirmModal.mock.calls[0][2] as () => Promise<void>;
     const loaded = makeSim();
     (app as { sim: unknown }).sim = loaded;
-    onConfirm();
+    await onConfirm();
     expect(sim.callExterminator).not.toHaveBeenCalled();
     expect(loaded.callExterminator).not.toHaveBeenCalled();
     expect(ui.showStats).toHaveBeenCalledTimes(1);

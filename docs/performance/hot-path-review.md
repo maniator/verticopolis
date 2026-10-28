@@ -79,8 +79,9 @@ on its next review, over its whole diff.
 ## 2. Frequencies and sizes
 
 Cost is frequency times collection size. Use these reference numbers instead of
-guessing. Sizes were measured on 2026-10-20 at `main` c12bc1b; recount them
-with `buildLargeTower` and the fixture loaders in
+guessing. Sizes were measured on 2026-10-20 at `main` c12bc1b, and the
+hotel-heavy figures on 2026-10-27 at `main` d8e5a84; recount them
+with `buildLargeTower`, `buildHotelTower` and the fixture loaders in
 `src/tests/perfCompare/scenarios.ts` when they matter.
 
 **Entry points.** Rust names first, TypeScript second.
@@ -106,7 +107,7 @@ real towers can be bigger.
 | rooms (R) | 1,699 owner's save; 2,900 large | `room_units()` / `roomUnits` |
 | population | 3,240 medium; 6,019 owner's save; 17,322 large | census and statistical demand |
 | drawn people (P) | at most 140 trip spawns (`MAX_PEOPLE`), plus up to 6 housekeepers per housekeeping unit (`HK_MAIDS_PER_UNIT`) | the crowd that walks and rides; staff spawns skip `MAX_PEOPLE` |
-| housekeeping units | 15 medium (up to 90 staff); 8 owner's save (up to 48); none on the large tower | estimate a staff or housekeeping path on the tower with the most of them, since the large tower has none |
+| housekeeping units | 15 medium (up to 90 staff); 8 owner's save (up to 48); 24 hotel-heavy (up to 144, with 852 hotel rooms); none on the large tower | estimate a staff or housekeeping path on the hotel-heavy tower, the `perf:compare` scenario built by `buildHotelTower({ seed: 21, floors: 62, crews: 24 })` (#1279), since the large tower has none |
 | floors (F) | up to 110 (floors -9 to 100; floor 0 is the first basement) | |
 | transports (T) | up to 24 elevator shafts and 64 stair and escalator links | 8 cars per shaft |
 | x positions | 375 per floor (`LOT_WIDTH`) | |
@@ -213,7 +214,7 @@ a per-candidate loop, or an ordered set rebuilt every step.
 **HP-5 Check containers and hashing.** Rust's default `HashMap` / `HashSet`
 hasher (SipHash) is slow for small integer keys, and a search that builds
 `prev` and `seen` maps on every call pays it on every insert. For a map that
-is only inserted into and looked up, never iterated, prefer a dense `Vec`
+is never iterated (only inserted into, looked up, removed from or cleared), prefer a dense `Vec`
 indexed by unit, floor or segment, a reused scratch buffer, or a fast
 deterministic hasher: `FastMap` / `FastSet` in
 `engine-rs/src/crowd/fasthash.rs`, which offer no iteration at all. A map
@@ -263,35 +264,44 @@ Between those PRs the table belongs to the repository owner (maniator), the
 
 | What it keeps | TypeScript | Keyed on | Rust (at 9cd44d1 unless noted) |
 | --- | --- | --- | --- |
-| units and transports by id | `byId`, `transportsById`, `src/engine/Tower.ts` | kept on every edit | `by_id`, `transport_by_id`; `remove_unit` still finds the unit by a scan and rebuilds the whole index per removal (A17 in #1158) |
+| units and transports by id | `byId`, `transportsById`, `src/engine/Tower.ts`; a removal looks its unit up in `byId` and finds its place at the end of the list or with one `indexOf`, and a removal of several searches from the end (#1290) | kept on every edit | `by_id` (a `FastMap` since #1290), `transport_by_id`; `remove_unit` reads the unit's index from `by_id` and rewrites only the entries after it, and `remove_units` takes a command's removals in one pass (#1290; a single removal is still O(U) in both engines, accepted by the owner as #1370; A17 in #1158) |
+| positions of plain floor tiles on the brush's floor | `LobbyUpgrades.at`, `src/engine/tower/removal.ts` (#1290), with `first`, the lowest place a unit placed can stand, kept on add and remove | one brush command; dropped on any removal inside it, read again for another floor | not needed: `take_floor_slot` reads the index from `by_id` |
 | tiles and rooms by position | `structure`, `structKind`, `rooms`, `src/engine/Tower.ts` | kept on every edit | ported (`structure`, `struct_kind`, `rooms`) |
 | lobby and room tiles per floor | `lobbyTiles`, `roomTiles`, `src/engine/Tower.ts` | counter | ported (`lobby_tiles`, `room_tiles`) |
 | rooms without floor and lobby tiles | `roomUnits`, `src/engine/tower/rooms.ts` | unit array, length, revision; the hosts' merge drops it when the revision or the units moved (#1253) | ported (`room_index`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1139) |
+| parking ramps, for the parking flood fill's seed (the congestion map reads the fill every frame) | `rampUnits`, `src/engine/tower/rooms.ts` (facade slice 4e-1, #1329) | the `roomUnits` list (unit array, length, revision): a loaded tower starts empty, and it rebuilds when the hosts' merge drops the room list (`forgetUnitLists`); callers check `isOperational` as they read | none: `functional_parking_set` seeds from `room_units()` (A14 in #1158) |
 | floor and lobby tiles as runs, ordered by floor and x (the port's `SimView.structure`) | `structureRuns`, `src/engine/tower/rooms.ts` (#1253) | unit array, length, revision; the hosts' merge drops it with the room list (`forgetUnitLists`) when the revision or the units moved (#1253) | none on its own; 6a's structural runs (#1213) serve the view through `RustSim` (#1217) |
+| HUD room counts and population (`stats()`) | the room-count ledger (`roomCounts`), `src/engine/tower/rooms.ts` (#1340) | the rooms list it was counted from (a new `roomUnits` list counts every room again), plus a mark at every write of `state`, `noRate`, `everOccupied`, `residents` or `customersIn` (`setRoomState`, `markRoom`; the hosts' frame apply and full merge mark the rooms whose fields they change, the hourly delta marks every unit it rewrites, and either merge drops the rooms list when a unit's kind or place moved); the HUD and the stats report both read it | none: `tower_stats` (`engine-rs/src/panels/stats.rs`) walks the rooms twice per call and has no production caller; when facade 4e routes the HUD there, HP-12 asks the same flat read of it (#1237) |
 | floor and lobby tiles per floor, for `pickX` | none (`pickX` walks every unit, #539) | revision and unit count | `structural_tiles`, `engine-rs/src/tower_index.rs` (#1139) |
+| room units as last sent to the worker host, for the hourly save delta | none (the host keeps its own read model) | tower revision and unit count, held by the mirror | `SaveMirror`, `engine-rs/src/save_delta.rs`, on the engine handle (not `tower.memo`); rooms only, positions from `room_index`; every constructor goes through `Engine::of`, so a load starts with an empty mirror (#1045, #1068) |
 | each floor's segment runs | `src/engine/tower/segments.ts` | revision | ported (cloned on read, #859) |
 | housekeeping staff ceiling | `staffCeiling` (`maxStaffFor`), `src/engine/crowd/spawn.ts` | revision | ported (`housekeeping_units`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1143; now reads the census below) |
 | per-kind unit counts for the build caps, floors that hold an office | none (`countKind` and the Classic escalator office check walk every unit, A24 in #1158 and #1239) | revision and unit count | `census`, `engine-rs/src/tower_index.rs` (#1264) |
-| room units per floor, for the spawn step's picks | `unitsByFloor` in `spawnFloors`, `src/engine/crowd/spawn.ts` | one call (rebuilt every spawn step) | `floor_rooms`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count, so the step reads it instead of rebuilding it; the floor lists around it are still built on each spawn step that has room to spawn, where the TypeScript builds them on every spawn step (T2 in #1170; #1143 item 4, #1281) |
-| staff and venue floors deduped in one spawn step | `seenStaff`, `venuesByKindSet`, `src/engine/crowd/spawn.ts` | one call | ported as a bit per floor (`engine-rs/src/crowd/spawn_floors.rs`; #1143 item 4, #1281); before it the Rust searched the staff list for each staff room |
-| nearest crew and crew order per floor in one dispatch | `distByFloor`, `crewOrderByFloor`, `src/engine/economy/housekeeping.ts` | one pass | `dist_by_floor` ported; crew order missing, so the crews are cloned and sorted per room (A12 in #1158) |
+| room units per floor, for the spawn step's picks | `unitsByFloor` in `spawnFloors`, `src/engine/crowd/spawn.ts` | one call (rebuilt every spawn step) | `floor_rooms`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count, so the step reads it instead of rebuilding it; the floor lists around it are still built on each spawn step that has room to spawn, where the TypeScript builds them on every spawn step (T2 in #1170; #1143 item 4, 3a83957) |
+| staff and venue floors deduped in one spawn step | `seenStaff`, `venuesByKindSet`, `src/engine/crowd/spawn.ts` | one call | ported as a bit per floor (`engine-rs/src/crowd/spawn_floors.rs`; #1143 item 4, 3a83957); before it the Rust searched the staff list for each staff room |
+| nearest crew and crew order per floor in one dispatch | `distByFloor`, `crewOrderByFloor`, `src/engine/economy/housekeeping.ts` | one pass | ported as one list per floor of the staff-connected crews in dispatch order, whose head gives the nearest distance in Modern, kept between passes while the revision, the mode and the operational crews stay the same (`CrewOrders`, `engine-rs/src/housekeeping.rs`; #1143 item 6, #1343); before it the Rust cloned the crew list for each dirty room and, in Modern, sorted it (A12 in #1158). The crews' staff components are read once per key, where the TypeScript asks `staffConnected` for each crew of each room (T4 in #1170) |
 | live staff count | `crowd.staffCount`, `src/engine/Crowd.ts` | counter | ported |
 | riders per car | `crowd.carRiders`, `src/engine/Crowd.ts` | counter | ported (`car_riders`) |
 | noise verdicts | `noiseMemo`, `src/engine/sim/satisfaction.ts` | revision | ported (`noise_memo`, `engine-rs/src/noise.rs`; #1139) |
-| served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported; `is_floor_served` reads the served set in place (#1237) and elevator dispatch reads `dispatch_floors` (below, #1143 item 5, #1298); `served_floors` and the staff components are still cloned on read (#859) |
+| served floors, staff components | `src/engine/tower/routing.ts` (`servedSet`, `staffComp` on `Tower`) | revision | ported; `is_floor_served` reads the served set in place (#1237), elevator dispatch reads `dispatch_floors` (below, #1143 item 5, #1298) and `staff_component` / `staff_connected` read the staff components (#1143 item 6, #1343); `served_floors` and `staff_components` still clone on read (#859) |
 | stops, transport columns | `stopsCache` on `Tower`, `src/engine/tower/transport.ts` | revision | ported (cloned on read, #859) |
-| built floor bounds | `floorBounds`, `src/engine/Tower.ts` | revision | ported (`floor_bounds`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1237) |
+| built floor bounds | `floorBounds`, `src/engine/Tower.ts` | revision | ported (`floor_bounds`, `engine-rs/src/tower_index.rs`, keyed on revision and unit count; #1237); the inspector's top-floor read goes through it (#1255) |
 | served and lobby floors in ascending order, for elevator dispatch | none (`accumulateWaiting` reads `servedSet` in place and walks `lobbyFloors()`, which sorts the lobby tiles' floors, each step the population is above zero; `moveCars` builds a set from `lobbyFloors()` on every call) | revision and unit count | Rust-only: `dispatch_floors`, `engine-rs/src/tower_index.rs` (#1143 item 5, #1298) |
 | passenger and staff routing graphs | `adjacency`, `staffAdjacency`, `src/engine/crowd/routing.ts` | revision | ported |
+| the part of the staff graph each segment lies in | none (`staffRoute` searches the whole first part before it fails, T3 in #1170) | revision | `graph_parts`, `engine-rs/src/crowd/routing.rs`, built with the staff graph and kept beside it on the crowd, so a staff route between two parts fails without a search (#1143 item 6, #1343) |
 | shaft banks | `src/engine/crowd/shaftBanks.ts` | revision | ported |
 | segments served | `segServed`, `src/engine/crowd/segmentGraph.ts` | revision | ported (`connected_set`) |
 | queue view | `queueView`, `src/engine/Crowd.ts` | step and revision | no counterpart yet; check before porting one |
+| tower population for the walkers' busyness gate | the room-count ledger's `population` (`roomCounts`, #1340) holds it in the engine, but the walkers' read does not use it yet (`totalPopulation` walks `roomUnits` per read; #1335); `crowdPopulation`, `src/render/excalibur/towerPopulation.ts`, caches it in the renderer (the PR that fixes #1234) | revision, sim identity, and the clock minute plus a 30-frame window, per sim | none: render side only, goes with the engine handle |
 | floor reachable from the lobby (`floorReachable`) | `reachMemos`, `src/engine/sim/services.ts` | revision | ported (`reach_memo` in `sim.rs`) |
 | segments reachable from a lobby (`segReachable`, behind `floorReachable` and the per-room checks) | none: one route search per lobby segment for each check (#849) | n/a in TypeScript; revision in Rust | Rust-only: a set of every segment reachable from a lobby, which answers as those searches do: `connected_set` (Modern) and `lobby_reach` (Classic walk budget), `engine-rs/src/crowd/graph.rs` (#1143) |
 | commute averages revision (the hosts key their copies on it) | none (the TypeScript reads `commuteWaitByFloor` in place) | counter | `commute_revision`, `engine-rs/src/crowd/mod.rs` |
 | meal overlay revision (the frame header carries it and the renderer keys its overlay on it every frame) | `mealOverlayRevision`, `src/engine/Tower.ts` | counter | `meal_overlay_revision`, `engine-rs/src/tower.rs` |
+| rooms' frame fields as last sent, each room's census, the population and the reader's place in the frame mark log (the engine view's dynamic frame sends only the rooms that changed) | none (the TypeScript renderer reads the live units) | the mark log's id, revision and unit count, so a reader handed a loaded or another tower sends a full frame | Rust-only: `ViewReader`, `engine-rs/src/view/reader.rs`, one per tower (#1284) |
+| frame mark log (the unit indices whose frame fields or residents a setter changed, so a frame visits only those rooms) | none (the TypeScript renderer reads the live units) | written by the setters in `engine-rs/src/view/marks.rs` on a change only; a ring of at most 16,384 indices that drops its oldest index for each new one past that, and a reader whose unread marks were dropped compares every room once; each log has its own id; a revision move makes the next frame full | Rust-only: `FrameMarks`, `engine-rs/src/view/marks.rs`, on the tower's view state; a load builds a fresh `Tower` (#1284) |
+| unit metadata revision and change log (labels and subtypes; the engine view's frame header carries the revision) | none (the TypeScript host gets labels through the hourly merge) | counter; the log holds at most 4,096 ids | Rust-only: `meta_revision`, `MetaLog`, `engine-rs/src/view/meta.rs`; a load builds a fresh `Tower` at meta revision 1 (#1284) |
 | excavated basement tiles | `excavated` (a `Set`), `src/engine/Simulation.ts` | kept on every dig and load | a `Vec` searched linearly on each dig and load (`build.rs`, `load.rs`; #1173) |
-| demand map (inspector reads) | `demandMemo`, `src/engine/sim/demand.ts` | revision and game hour | none (no inspector in Rust) |
+| demand map (inspector reads) | `demandMemo`, `src/engine/sim/demand.ts` | revision and game hour | ported for the inspector (`diag_memo`, `engine-rs/src/diagnostics/memo.rs`, keyed on revision, unit count and game hour, on the `Simulation` a load builds fresh; #1255) |
 | reachability within one demand or income pass | `reachCache`, `src/engine/sim/demand.ts`, `src/engine/EconomySystem.ts` | one call | ported |
 | reachability during one move-in pass | `reachMemo`, `src/engine/sim/churn.ts` | one pass | ported |
 

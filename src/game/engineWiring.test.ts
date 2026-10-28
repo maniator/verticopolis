@@ -52,6 +52,9 @@ interface FakeEngine {
   transportPreview?: unknown;
 }
 
+/** Let the settled command promises run their follow-ups (the undo commit). */
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
 function makeApp(toolOver: Record<string, unknown> = {}) {
   const engine: FakeEngine = {};
   const canvas = document.createElement("canvas");
@@ -61,9 +64,9 @@ function makeApp(toolOver: Record<string, unknown> = {}) {
     audio: { start: vi.fn() },
     tool: { type: "inspect", kind: "office", ...toolOver },
     build: {
-      bulldozePicked: vi.fn(),
+      bulldozePicked: vi.fn(async () => {}),
       clearPaint: vi.fn(),
-      seedPaint: vi.fn(),
+      seedPaint: vi.fn(async () => {}),
       paintFloorRun: vi.fn(),
       tryBuildTransport: vi.fn(),
     },
@@ -72,7 +75,7 @@ function makeApp(toolOver: Record<string, unknown> = {}) {
       isUnlocked: vi.fn(() => true),
     },
     ui: { toast: vi.fn(), setInspectorPeek: vi.fn() },
-    editor: { extendSelectedTo: vi.fn(), endExtend: vi.fn() },
+    editor: { extendSelectedTo: vi.fn(async () => {}), endExtend: vi.fn(async () => {}) },
     inspector: { inspectPicked: vi.fn(), hide: vi.fn(), resetLatch: vi.fn() },
     saveLoad: { recoverFromContextLoss: vi.fn() },
     selectPicked: vi.fn(),
@@ -83,14 +86,13 @@ function makeApp(toolOver: Record<string, unknown> = {}) {
     paintAnchor: null as unknown,
     buildAnchor: null as unknown,
     transportStart: null as unknown,
-    lastTickErrorLog: -1e9,
     frameErrors: [] as Array<{ at: string; message: string }>,
   };
   return app as unknown as GameApp & typeof app & { engine: FakeEngine };
 }
 
 beforeEach(() => {
-  mockPlaceSimpleBuild.mockReturnValue({} as never);
+  mockPlaceSimpleBuild.mockReturnValue(Promise.resolve({}) as never);
   mockIsTransportTool.mockReturnValue(false);
   mockIsPaintTool.mockReturnValue(false);
   mockRunFrame.mockReset();
@@ -138,21 +140,24 @@ describe("onTap", () => {
     expect(app.selectPicked).toHaveBeenCalledWith(picked);
   });
 
-  it("a touch build tap captures undo, places, and commits", () => {
+  it("a touch build tap captures undo, places, and commits once the engine answers", async () => {
     const app = makeApp({ type: "build", kind: "office" });
     wireEngine(app);
     app.engine.onTap!(3, 4, true, null);
     expect(app.captureUndo).toHaveBeenCalled();
     expect(mockPlaceSimpleBuild).toHaveBeenCalledWith(app, "office", 3, 4);
+    expect(app.commitUndo).not.toHaveBeenCalled();
+    await flush();
     expect(app.commitUndo).toHaveBeenCalled();
   });
 
-  it("a touch bulldoze tap bulldozes the picked entity", () => {
+  it("a touch bulldoze tap bulldozes the picked entity", async () => {
     const app = makeApp({ type: "bulldoze", kind: "office" });
     wireEngine(app);
     const picked = { id: "r1" };
     app.engine.onTap!(3, 4, true, picked);
     expect(app.build.bulldozePicked).toHaveBeenCalledWith(picked);
+    await flush();
     expect(app.commitUndo).toHaveBeenCalled();
   });
 
@@ -288,13 +293,15 @@ describe("secondary + extend", () => {
     expect(app.selectPicked).toHaveBeenCalledWith(picked);
   });
 
-  it("onExtendTo delegates to the editor and onExtendEnd commits", () => {
+  it("onExtendTo delegates to the editor and onExtendEnd commits once the drag has closed", async () => {
     const app = makeApp();
     wireEngine(app);
     app.engine.onExtendTo!("top", 12);
     expect(app.editor.extendSelectedTo).toHaveBeenCalledWith("top", 12);
     app.engine.onExtendEnd!();
     expect(app.editor.endExtend).toHaveBeenCalled();
+    expect(app.commitUndo).not.toHaveBeenCalled();
+    await flush();
     expect(app.commitUndo).toHaveBeenCalled();
   });
 });

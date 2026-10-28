@@ -2,7 +2,7 @@ import type { Tower } from "../Tower";
 import { FACILITIES, censusCount, isHotelKind, isStaffOnlyTransport, isStaffTransportKind } from "../facilities";
 import { isOperational, isPresent } from "../types";
 import type { Facility, Unit } from "../types";
-import { roomUnits } from "./rooms";
+import { rampUnits, roomUnits } from "./rooms";
 
 /** Reachability / staff-network / parking routing for the Tower, as friend
  * functions taking the {@link Tower} instance. Extracted from `Tower.ts`. */
@@ -131,14 +131,19 @@ export function functionalParkingSpots(tower: Tower): number {
  * those transitions don't bump {@link revision} (finishConstruction / the fire
  * handlers mutate `state` directly), so a revision cache would go stale. The
  * flood-fill is bounded by the parking region with O(1) `roomAt`, so it's cheap
- * enough for the callers (inspector, economy, and a once-per-sync render read).
+ * enough for the callers (inspector, economy, the traffic chip, and the
+ * per-frame render read of the congestion map; #338 tracks memoizing that).
  */
 export function functionalParkingSet(tower: Tower): ReadonlySet<number> {
   const usable = (u?: Unit): boolean =>
     !!u && (u.kind === "parking" || u.kind === "parkingRamp") && isOperational(u);
   const stack: [number, number][] = [];
-  for (const u of tower.units) {
-    if (u.kind === "parkingRamp" && isOperational(u)) {
+  // Seeded from the ramp index, rebuilt only when the tower changes: the
+  // congestion map reads this set once per rendered frame (`beginFrame`,
+  // render/excalibur/towerFrame.ts) and on each traffic chip refresh, too
+  // often to walk the units or the rooms each time.
+  for (const u of rampUnits(tower)) {
+    if (isOperational(u)) {
       for (let i = 0; i < u.width; i++) stack.push([u.floor, u.x + i]);
     }
   }
