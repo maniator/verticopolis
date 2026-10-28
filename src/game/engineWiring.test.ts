@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
+import { Simulation } from "../engine/Simulation";
 import { wireEngine } from "./engineWiring";
+import { portDeps } from "./portDeps.fixture";
 import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors } from "./buildPreview";
 import { runFrame } from "./frameLoop";
 
@@ -58,8 +60,12 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 function makeApp(toolOver: Record<string, unknown> = {}) {
   const engine: FakeEngine = {};
   const canvas = document.createElement("canvas");
+  const { engine: enginePort, codes: portCodes, reader } = portDeps(new Simulation());
   const app = {
     engine,
+    enginePort,
+    portCodes,
+    reader,
     canvas,
     audio: { start: vi.fn() },
     tool: { type: "inspect", kind: "office", ...toolOver },
@@ -92,7 +98,7 @@ function makeApp(toolOver: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
-  mockPlaceSimpleBuild.mockReturnValue(Promise.resolve({}) as never);
+  mockPlaceSimpleBuild.mockReturnValue({} as never);
   mockIsTransportTool.mockReturnValue(false);
   mockIsPaintTool.mockReturnValue(false);
   mockRunFrame.mockReset();
@@ -140,15 +146,13 @@ describe("onTap", () => {
     expect(app.selectPicked).toHaveBeenCalledWith(picked);
   });
 
-  it("a touch build tap captures undo, places, and commits once the engine answers", async () => {
+  it("a touch build tap captures undo, places, and commits once the engine has answered", () => {
     const app = makeApp({ type: "build", kind: "office" });
     wireEngine(app);
     app.engine.onTap!(3, 4, true, null);
     expect(app.captureUndo).toHaveBeenCalled();
     expect(mockPlaceSimpleBuild).toHaveBeenCalledWith(app, "office", 3, 4);
-    expect(app.commitUndo).not.toHaveBeenCalled();
-    await flush();
-    expect(app.commitUndo).toHaveBeenCalled();
+    expect(app.commitUndo).toHaveBeenCalledTimes(1);
   });
 
   it("a touch bulldoze tap bulldozes the picked entity", async () => {
@@ -412,5 +416,28 @@ describe("touch room-build offset-ghost flow", () => {
     wireEngine(app);
     app.engine.onActionDown!(10, 5, true, null);
     expect(app.buildAnchor).toMatchObject({ tile: 10, floor: 5, lifting: false }); // stale anchor replaced by the fresh gesture
+  });
+});
+
+describe("the shaft drag preview", () => {
+  it("asks the engine port whether the dragged span fits, and the star gate", () => {
+    const app = makeApp({ type: "build", kind: "elevatorStandard" });
+    const sim = new Simulation(1, "classic");
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const { engine, codes, reader } = portDeps(sim);
+    Object.assign(app, { sim, enginePort: engine, portCodes: codes, reader });
+    mockIsTransportTool.mockReturnValue(true);
+    wireEngine(app);
+    app.transportStart = { x: 10, floor: 1 };
+    app.engine.onActionMove!(10, 2, null);
+    expect(app.engine.transportPreview).toEqual({ kind: "elevatorStandard", x: 10, bottom: 1, top: 2, valid: true });
+    // Floor 5 has no structure at the column: the engine refuses the span.
+    app.engine.onActionMove!(10, 5, null);
+    expect(app.engine.transportPreview).toMatchObject({ bottom: 1, top: 5, valid: false });
+    // A kind the star rating has not unlocked is invalid on a fitting span.
+    app.tool = { type: "build", kind: "elevatorExpress" } as never;
+    app.engine.onActionMove!(10, 2, null);
+    expect(app.engine.transportPreview).toMatchObject({ kind: "elevatorExpress", valid: false });
   });
 });

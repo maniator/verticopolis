@@ -22,9 +22,8 @@ import { SaveLoad } from "../../game/saveLoad";
 import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
 import { createTsSim } from "../../simport/tsSim";
-import type { SimPort } from "../../simport/port";
+import { portDeps } from "../../game/portDeps.fixture";
 import { INVALID_COMMAND, MAX_TEXT } from "../../simport/request";
-import type { Command, CommandResult } from "../../simport/commands";
 
 /** Coverage companion to gameControllers.integration.test.ts: the same harness idioms
  *  (recording fakes, fixture placements asserted with .ok, real Simulation)
@@ -114,8 +113,7 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     sel = null;
     cleared = 0;
     build = new BuildActions({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...portDeps(sim).deps,
       ui: f.ui,
       audio: f.audio,
       selectedId: () => sel,
@@ -148,40 +146,28 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     for (let x = 13; x <= 14; x++) expect(sim.tower.structureKindAt(4, x)).toBe("floor");
   });
 
-  it("paintFloorRun sends each drag tile once, in order, before any answer, and moves the anchor at once", async () => {
-    // A port that applies each command when it is issued but holds every
-    // answer, the way a port that answers later (RustSim, the worker) would.
-    const live = createTsSim(() => sim);
-    const sent: string[] = [];
-    const held: (() => void)[] = [];
-    const port: SimPort = {
-      ...live,
-      command: <C extends Command>(c: C): Promise<CommandResult<C>> => {
-        sent.push(c.op === "build" ? `build@${c.x}` : c.op);
-        const answer = live.command(c);
-        return new Promise((resolve, reject) => held.push(() => void answer.then(resolve, reject)));
-      },
-    };
+  it("paintFloorRun sends each drag tile once, in order, and moves the anchor with each step", () => {
+    const { engine, deps } = portDeps(sim);
+    const sent: number[] = [];
+    const buildAt = engine.buildAt.bind(engine);
+    vi.spyOn(engine, "buildAt").mockImplementation((kind, floor, x) => {
+      sent.push(x);
+      return buildAt(kind, floor, x);
+    });
     const drag = new BuildActions({
-      getSim: () => sim,
-      port,
+      ...deps,
       ui: f.ui,
       audio: f.audio,
       selectedId: () => sel,
       clearSelection: () => cleared++,
     });
-    const steps = [drag.paintFloorRun("floor", 14, 3), drag.paintFloorRun("floor", 20, 3), drag.paintFloorRun("floor", 25, 3)];
+    drag.paintFloorRun("floor", 14, 3);
+    drag.paintFloorRun("floor", 20, 3);
+    drag.paintFloorRun("floor", 25, 3);
     // The second and third steps extend from the anchors the first two set,
-    // so no tile goes out twice while the answers are held.
-    expect(sent).toEqual(Array.from({ length: 12 }, (_, i) => `build@${14 + i}`));
+    // so no tile goes out twice.
+    expect(sent).toEqual(Array.from({ length: 12 }, (_, i) => 14 + i));
     for (let x = 14; x <= 25; x++) expect(sim.tower.structureKindAt(3, x)).toBe("floor");
-    let settled = false;
-    const all = Promise.all(steps).then(() => (settled = true));
-    await Promise.resolve();
-    expect(settled).toBe(false);
-    for (const release of held) release();
-    await all;
-    expect(sent).toHaveLength(12);
     expect(f.sfx).toEqual([]); // drag steps stay quiet
   });
 
@@ -306,17 +292,26 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
 
   it("bulldozePicked: null and stale picks are no-ops (no sfx, no refund)", async () => {
     const before = sim.money;
-    await expect(build.bulldozePicked(null)).resolves.toBe(false);
-    await expect(build.bulldozePicked({ type: "unit", id: 99_999, kind: "office" })).resolves.toBe(false);
-    await expect(build.bulldozePicked({ type: "transport", id: 99_999, kind: "elevatorStandard" })).resolves.toBe(false);
+    expect(build.bulldozePicked(null)).toBe(false);
+    expect(build.bulldozePicked({ type: "unit", id: 99_999, kind: "office" })).toBe(false);
+    expect(build.bulldozePicked({ type: "transport", id: 99_999, kind: "elevatorStandard" })).toBe(false);
     expect(sim.money).toBe(before);
     expect(f.sfx).toEqual([]);
+  });
+
+  it("bulldozePicked reads again once when the reader lags a just-built unit", async () => {
+    sim.money = ECON.startingMoney;
+    expect(build.tryBuild("office", 2, 21)).toBe(true);
+    const built = sim.tower.units.find((u) => u.kind === "office" && u.x === 21)!;
+    expect(build.bulldozePicked({ type: "unit", id: built.id, kind: built.kind })).toBe(true);
+    expect(sim.tower.units.some((u) => u.id === built.id)).toBe(false);
+    expect(last(f.sfx)).toBe("sell");
   });
 
   it("bulldozePicked on a transport refunds the shaft resale and clears a matching selection", async () => {
     sel = lift.id;
     const before = sim.money;
-    await expect(build.bulldozePicked({ type: "transport", id: lift.id, kind: lift.kind })).resolves.toBe(true);
+    expect(build.bulldozePicked({ type: "transport", id: lift.id, kind: lift.kind })).toBe(true);
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
     expect(sim.tower.transports.some((t) => t.id === lift.id)).toBe(false);
     expect(f.sfx).toEqual(["sell"]);
@@ -325,10 +320,10 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
 
   it("bulldozePicked on a burning unit refuses: loud toasts, the quiet drag path doesn't", async () => {
     office.state = "fire";
-    await expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }, true)).resolves.toBe(false); // drag step
+    expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }, true)).toBe(false); // drag step
     expect(f.toasts).toEqual([]);
     expect(f.sfx).toEqual([]);
-    await expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" })).resolves.toBe(false); // deliberate click
+    expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" })).toBe(false); // deliberate click
     expect(f.sfx).toEqual(["error"]);
     expect(f.toasts).toEqual([
       { text: "You can't bulldoze a burning unit. Call fire rescue or let it burn out.", kind: "bad" },
@@ -405,8 +400,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     scheduleDlg = null;
     root = document.createElement("div");
     const build = new BuildActions({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...portDeps(sim).deps,
       ui: f.ui,
       audio: f.audio,
       selectedId: () => sel?.id ?? null,
@@ -1433,8 +1427,7 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     undoLog = [];
     engine = { ensureVisible: () => {}, preview: null, transportPreview: null };
     const build = new BuildActions({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...portDeps(sim).deps,
       ui: f.ui,
       audio: f.audio,
       selectedId: () => null,
@@ -1451,8 +1444,7 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
       return t ? { type: "transport", id: t.id, kind: t.kind } : null;
     };
     keyboard = new KeyboardPlay({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...portDeps(sim).deps,
       engine: () => engine,
       audio: f.audio,
       ui: f.ui,
