@@ -15,6 +15,7 @@ import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
 import { render, type TemplateResult } from "lit-html";
 import { createTsSim } from "../../simport/tsSim";
+import { portDeps } from "../../game/portDeps.fixture";
 
 const CAT = catalogFor("classic");
 
@@ -93,8 +94,7 @@ describe("BuildActions (the money boundary)", () => {
     ({ sim, office, lift } = fixture());
     f = fakes();
     build = new BuildActions({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...portDeps(sim).deps,
       ui: f.ui,
       audio: f.audio,
       selectedId: () => null,
@@ -204,8 +204,7 @@ describe("EditorActions (editor-card money paths)", () => {
     undo = { captures: [], commits: 0 };
     root = document.createElement("div");
     const build = new BuildActions({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...portDeps(sim).deps,
       ui: f.ui,
       audio: f.audio,
       selectedId: () => sel?.id ?? null,
@@ -545,8 +544,7 @@ describe("KeyboardPlay (commit announcements)", () => {
     tool = { type: "inspect" };
     const f = fakes();
     const build = new BuildActions({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...portDeps(sim).deps,
       ui: f.ui,
       audio: f.audio,
       selectedId: () => null,
@@ -565,15 +563,17 @@ describe("KeyboardPlay (commit announcements)", () => {
       return t ? { type: "transport", id: t.id, kind: t.kind } : null;
     };
     // Mirrors placeSimpleBuild in src/game/buildPreview.ts: the injected gesture-shared placement.
-    const placeSimpleBuild = (kind: FacilityKind, tile: number, floor: number): Promise<PlaceOutcome> | null => {
+    const placeSimpleBuild = (kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null => {
       if (kind === "floor" || kind === "lobby") {
-        return build.paintBrush(kind, tile, floor).then((r) => ({ what: "paint", ok: r.placed > 0, reason: r.reason }));
+        const r = build.paintBrush(kind, tile, floor);
+        return { what: "paint", ok: r.placed > 0, reason: r.reason };
       }
       if (isFixedSpanTransport(kind)) {
-        return build.tryBuildTransport(kind, snapX(CAT, kind, tile), floor, floor + 1).then((r) => ({ what: "flight", ok: r.ok, reason: r.reason }));
+        const r = build.tryBuildTransport(kind, snapX(CAT, kind, tile), floor, floor + 1);
+        return { what: "flight", ok: r.ok, reason: r.reason };
       }
       if (FACILITIES[kind].transport) return null;
-      return build.tryBuild(kind, floor, snapX(CAT, kind, tile)).then((ok) => ({ what: "room", ok }));
+      return { what: "room", ok: build.tryBuild(kind, floor, snapX(CAT, kind, tile)) };
     };
     const fakeEngine = {
       ensureVisible: () => {},
@@ -581,8 +581,7 @@ describe("KeyboardPlay (commit announcements)", () => {
       transportPreview: null as TowerEngine["transportPreview"],
     };
     keyboard = new KeyboardPlay({
-      getSim: () => sim,
-      port: createTsSim(() => sim),
+      ...portDeps(sim).deps,
       engine: () => fakeEngine,
       audio: f.audio,
       ui: f.ui,
