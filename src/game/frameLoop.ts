@@ -152,6 +152,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
   if (now - app.lastUiUpdate > 160) {
     app.lastUiUpdate = now;
     app.audio.update(app.engine.focus());
+    app.reader.update();
     app.ui.update(app.sim);
     updateTraffic(app);
     app.onboarding.tick(); // advance the first-run checklist on real progress (no-op when inactive)
