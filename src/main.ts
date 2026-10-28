@@ -367,12 +367,11 @@ class GameApp implements GameAppPorts {
   /** @internal */ isTransportTool(): boolean { return isTransportTool(this); }
   /** @internal */ updateBuildPreview(tile: number, floor: number): void { updateBuildPreview(this, tile, floor); }
   /** @internal */ pickedAt(floor: number, tile: number): Picked | null { return pickedAt(this, floor, tile); }
-  /** Refresh the traffic HUD chip. Settles once the answer is drawn or dropped
-   *  (overtaken, or about a replaced tower), and rejects if a failure was not
-   *  dropped. Body in game/trafficHud.ts; a method on the instance because the
+  /** Refresh the traffic HUD chip; throws if the engine's answer or the draw
+   *  fails. Body in game/trafficHud.ts; a method on the instance because the
    *  screenshot tooling (scripts/scenes/features.ts, screenshot-page-ops.ts)
    *  awaits `window.game.refreshTraffic()` to pin the chip. @internal */
-  refreshTraffic(): Promise<void> { return refreshTraffic(this); }
+  refreshTraffic(): void { refreshTraffic(this); }
 
   // ---- PWA update ---------------------------------------------------------
 

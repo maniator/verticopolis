@@ -3,39 +3,24 @@ import { refreshTraffic, updateTraffic } from "./trafficHud";
 import { Simulation } from "../engine/Simulation";
 import { GRID } from "../engine/facilities";
 import { TRAFFIC_LABELS, trafficTier } from "../engine/traffic";
-import { createTsSim } from "../simport/tsSim";
-import type { CongestionHotspot } from "../simport/panels";
+import { TsEngine } from "../engine/port/tsEngine";
+import { PortCodes } from "../simport/portCodes";
 import type { GameApp } from "../main";
 
 /**
- * The traffic chip on the port: it draws every answer in the order it was
- * asked (its hysteresis steps from one answer to the next), drops an answer
- * that lands after a newer question has settled and one about a tower that
- * was replaced while it was out, and sends a failed answer to the frame error
- * log without rejecting. The drawing itself is pinned in `trafficHud.test.ts`.
+ * The traffic chip on the engine port: the port answers at once, so it draws
+ * every answer in the order it was asked (its hysteresis steps from one answer
+ * to the next) and sends a failed answer to the frame error log without
+ * throwing. The drawing itself is pinned in `trafficHud.test.ts`.
  */
 
-interface Deferred {
-  answer: Promise<CongestionHotspot>;
-  resolve: (hot: CongestionHotspot) => void;
-  reject: (e: unknown) => void;
-}
+const codes = new PortCodes(new TsEngine(Simulation.newGame(1)));
 
-function deferred(): Deferred {
-  let resolve!: Deferred["resolve"];
-  let reject!: Deferred["reject"];
-  const answer = new Promise<CongestionHotspot>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { answer, resolve, reject };
-}
-
-/** A fake app whose port hands out the answers a test controls. */
-function fakeApp(query: () => Promise<CongestionHotspot>) {
+/** A fake app whose engine port hands out the records a test controls. */
+function fakeApp(hotspot: () => Float64Array) {
   return {
-    sim: {},
-    port: { query: vi.fn(query) },
+    enginePort: { hotspot: vi.fn(hotspot) },
+    portCodes: codes,
     lastTrafficTier: 0,
     frameErrors: [] as Array<{ at: string; message: string }>,
   };
@@ -55,121 +40,52 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("updateTraffic on the port", () => {
-  it("asks the port once per refresh", async () => {
-    const app = fakeApp(() => Promise.resolve({ ratio: 0.2, floor: null }));
-    await updateTraffic(app as unknown as GameApp);
-    expect(app.port.query).toHaveBeenCalledExactlyOnceWith({ op: "peakCongestionHotspot" });
+describe("updateTraffic on the engine port", () => {
+  it("asks the port once per refresh, and reads NaN as no hotspot floor", () => {
+    const app = fakeApp(() => Float64Array.of(0.2, NaN));
+    updateTraffic(app as unknown as GameApp);
+    expect(app.enginePort.hotspot).toHaveBeenCalledOnce();
     expect(label()).toBe("Smooth");
   });
 
-  it("draws every answer in the order it was asked, stepping the hysteresis through each", async () => {
-    // Three questions out at once, as a stepped clock asks them. 0.42 is not
-    // past Busy's margin (0.43) from Smooth, 0.9 is, and 0.78 then holds Backed
-    // up, since it is not down to 0.77: a skipped middle answer would show Busy.
-    const out = [deferred(), deferred(), deferred()];
-    const asks = [...out];
-    const app = fakeApp(() => asks.shift()!.answer);
-    const refreshes = [0, 1, 2].map(() => updateTraffic(app as unknown as GameApp));
+  it("draws every answer in the order it was asked, stepping the hysteresis through each", () => {
+    // 0.42 is not past Busy's margin (0.43) from Smooth, 0.9 is, and 0.78 then
+    // holds Backed up, since it is not down to 0.77: a skipped middle answer
+    // would show Busy.
+    const answers = [0.42, 0.9, 0.78];
+    const app = fakeApp(() => Float64Array.of(answers.shift()!, 7));
     const tiers: number[] = [];
-    for (const [i, ratio] of [0.42, 0.9, 0.78].entries()) {
-      out[i].resolve({ ratio, floor: 7 });
-      await refreshes[i];
+    for (let i = 0; i < 3; i++) {
+      updateTraffic(app as unknown as GameApp);
       tiers.push(app.lastTrafficTier);
     }
     expect(tiers).toEqual([0, 2, 2]);
     expect([label(), floor()]).toEqual(["Backed up", " · 7F"]);
   });
 
-  it("drops an older answer that lands after a newer one was drawn", async () => {
-    const older = deferred();
-    const newer = deferred();
-    const asks = [older, newer];
-    const app = fakeApp(() => asks.shift()!.answer);
-    const first = updateTraffic(app as unknown as GameApp);
-    const second = updateTraffic(app as unknown as GameApp);
-    newer.resolve({ ratio: 0.5, floor: 7 });
-    await second;
-    older.resolve({ ratio: 0.9, floor: 42 });
-    await first;
-    expect([label(), floor(), app.lastTrafficTier]).toEqual(["Busy", " · 7F", 1]);
-  });
-
-  it("draws nothing when another tower was loaded while the answer was out", async () => {
-    const out = deferred();
-    const app = fakeApp(() => out.answer);
-    const refresh = updateTraffic(app as unknown as GameApp);
-    app.sim = {};
-    out.resolve({ ratio: 0.9, floor: 42 });
-    await refresh;
-    expect(label()).toBe("");
-    expect(app.lastTrafficTier).toBe(0);
-  });
-
-  it("logs a failed answer to the frame error log and still resolves", async () => {
+  it("logs a port that throws to the frame error log and still returns", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const app = fakeApp(() => Promise.reject(new Error("no hotspot")));
-    await expect(updateTraffic(app as unknown as GameApp)).resolves.toBeUndefined();
-    expect(app.frameErrors.map((e) => e.message.split("\n")[0])).toEqual(["[traffic] no hotspot"]);
+    const app = fakeApp(() => {
+      throw new Error("port down");
+    });
+    expect(updateTraffic(app as unknown as GameApp)).toBeUndefined();
+    expect(app.frameErrors.map((e) => e.message.split("\n")[0])).toEqual(["[traffic] port down"]);
     expect(consoleSpy).toHaveBeenCalledExactlyOnceWith("[tick] traffic error, continuing:", expect.any(Error));
     expect(label()).toBe("");
   });
 
-  it("logs a port that throws as it is asked the same way", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const app = fakeApp(() => {
-      throw new Error("port down");
-    });
-    await expect(updateTraffic(app as unknown as GameApp)).resolves.toBeUndefined();
-    expect(app.frameErrors.map((e) => e.message.split("\n")[0])).toEqual(["[traffic] port down"]);
-  });
-
-  it("logs a failed draw, and the tooling's refresh rejects with it", async () => {
+  it("logs a failed draw, and the tooling's refresh throws it", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(document, "getElementById").mockImplementation(() => {
       throw new Error("draw failed");
     });
-    const app = fakeApp(() => Promise.resolve({ ratio: 0.5, floor: 7 }));
-    await expect(refreshTraffic(app as unknown as GameApp)).rejects.toThrow("draw failed");
-    await expect(updateTraffic(app as unknown as GameApp)).resolves.toBeUndefined();
+    const app = fakeApp(() => Float64Array.of(0.5, 7));
+    expect(() => refreshTraffic(app as unknown as GameApp)).toThrow("draw failed");
+    updateTraffic(app as unknown as GameApp);
     expect(app.frameErrors.map((e) => e.message.split("\n")[0])).toEqual(["[traffic] draw failed"]);
   });
 
-  it("drops a failure that lands after a newer answer was drawn", async () => {
-    const older = deferred();
-    const newer = deferred();
-    const asks = [older, newer];
-    const app = fakeApp(() => asks.shift()!.answer);
-    const first = updateTraffic(app as unknown as GameApp);
-    const second = updateTraffic(app as unknown as GameApp);
-    newer.resolve({ ratio: 0.2, floor: null });
-    await second;
-    older.reject(new Error("stale"));
-    await first;
-    expect(app.frameErrors).toEqual([]);
-    expect(label()).toBe("Smooth");
-  });
-
-  it("drops a failure about a tower that was replaced while the answer was out", async () => {
-    const out = deferred();
-    const app = fakeApp(() => out.answer);
-    const refresh = updateTraffic(app as unknown as GameApp);
-    app.sim = {};
-    out.reject(new Error("old tower"));
-    await refresh;
-    expect(app.frameErrors).toEqual([]);
-  });
-
-  it("settles the tooling's refresh quietly when its failure is about a replaced tower", async () => {
-    const out = deferred();
-    const app = fakeApp(() => out.answer);
-    const refresh = refreshTraffic(app as unknown as GameApp);
-    app.sim = {};
-    out.reject(new Error("old tower"));
-    await expect(refresh).resolves.toBeUndefined();
-  });
-
-  it("draws the real engine's answer through the TypeScript adapter", async () => {
+  it("draws the real engine's answer through the TypeScript engine", () => {
     // A lobby-served bank with one weak car under a heavy office stack: the
     // lobby is the hotspot, and the jam is past the hysteresis margin.
     const sim = Simulation.newGame(7);
@@ -193,11 +109,9 @@ describe("updateTraffic on the port", () => {
     expect(offices).toBe(9 * Math.floor(GRID.width / 9));
     expect(sim.tower.stopsOf(bank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect([...sim.tower.servedFloors()].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    // One tick, so under the WASM parity projects the Rust engine runs the
-    // tower and the read model the adapter answers from is its merge.
     sim.tick(1);
-    const app = { sim, lastTrafficTier: 0, frameErrors: [], port: createTsSim((): Simulation => app.sim) };
-    await updateTraffic(app as unknown as GameApp);
+    const app = { enginePort: new TsEngine(sim), portCodes: codes, lastTrafficTier: 0, frameErrors: [] };
+    updateTraffic(app as unknown as GameApp);
     const hot = sim.peakCongestionHotspot();
     expect(hot.floor).toBe(1);
     expect(app.lastTrafficTier).toBe(trafficTier(hot.ratio));

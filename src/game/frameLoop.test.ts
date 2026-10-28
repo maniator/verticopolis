@@ -5,8 +5,7 @@ import { MAX_QUANTUM_MINUTES } from "../engine/sim/fixedStep";
 import { decideMealRush } from "./mealRush";
 import { gameplaySession } from "../analytics";
 import * as analyticsActions from "../analyticsActions";
-import type { Simulation } from "../engine/Simulation";
-import { createTsSim } from "../simport/tsSim";
+import { fakeEnginePort, portCodes } from "./frameLoop.fixture";
 
 /**
  * These pin the per-frame simulation + throttled UI/audio refresh (`runFrame`)
@@ -66,7 +65,8 @@ function makeApp(over: Record<string, unknown> = {}) {
     speed: 3,
     prefs: { steadyClock: true },
     sim, reader: { update: vi.fn() },
-    port: createTsSim(() => sim as unknown as Simulation), // commands land on the fake's spies
+    enginePort: fakeEnginePort(sim), // commands land on the fake's spies
+    portCodes,
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn() },
     engine: { focus: vi.fn(() => ({})) },
@@ -355,7 +355,7 @@ describe("runFrame star-promotion jingle", () => {
 });
 
 describe("runFrame auto-surfaced emergency choice", () => {
-  it("opens the event choice once and latches shownChoice", async () => {
+  it("opens the event choice once and latches shownChoice", () => {
     const pc = { message: "Fire on floor 30!", cost: 5000 };
     const sim = makeSim({ pendingChoice: pc });
     const { app, raw } = makeApp({ speed: 0, sim });
@@ -366,11 +366,9 @@ describe("runFrame auto-surfaced emergency choice", () => {
     const [msg, cost, cb] = raw.ui.showEventChoice.mock.calls[0];
     expect(msg).toBe(pc.message);
     expect(cost).toBe("$5,000");
-    // Answered through the port: the latch holds until the engine has answered.
+    // Answered through the port, which answers at once: the latch clears after the call.
     (cb as (opt: unknown) => void)("accept");
     expect(sim.resolveChoice).toHaveBeenCalledWith("accept");
-    expect(raw.shownChoice).toBe(true);
-    await new Promise((r) => setTimeout(r, 0));
     expect(raw.shownChoice).toBe(false);
   });
 

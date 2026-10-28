@@ -6,6 +6,8 @@ import { runFrame } from "../../game/frameLoop";
 import { hasBlockingModal } from "../../game/interactionState";
 import type { UI } from "../../ui/UI";
 import { mountAppDom, makeUI } from "../uiFixture";
+import { TsEngine } from "../../engine/port/tsEngine";
+import { PortCodes } from "../../simport/portCodes";
 import { createTsSim } from "../../simport/tsSim";
 
 /**
@@ -48,6 +50,7 @@ function savedTower(withChoice: boolean): Simulation {
 }
 
 function makeApp(sim: Simulation, ui: UI) {
+  const enginePort = new TsEngine(sim);
   const app = {
     shownChoice: false,
     shownUpdate: false,
@@ -56,6 +59,8 @@ function makeApp(sim: Simulation, ui: UI) {
     prefs: { steadyClock: true },
     sim,
     reader: { update: vi.fn() },
+    enginePort,
+    portCodes: new PortCodes(enginePort),
     port: createTsSim(() => sim),
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn() },
