@@ -43,8 +43,10 @@ describe("catalogOf", () => {
   it("is the catalog of the reader's mode, kept across header updates", () => {
     const classic = new Simulation(1, "classic");
     const modern = new Simulation(1, "modern");
-    const c = { sim: classic, reader: portDeps(classic).reader };
-    const m = { sim: modern, reader: portDeps(modern).reader };
+    const cd = portDeps(classic);
+    const md = portDeps(modern);
+    const c = { enginePort: cd.engine, reader: cd.reader };
+    const m = { enginePort: md.engine, reader: md.reader };
     expect(catalogOf(c).mode).toBe("classic");
     expect(catalogOf(m).mode).toBe("modern");
     const first = catalogOf(c);
@@ -52,21 +54,21 @@ describe("catalogOf", () => {
     expect(catalogOf(c)).toBe(first);
   });
 
-  it("follows the catalog source the host installed on the live tower", () => {
+  it("follows the catalog source installed on the engine port", () => {
     const sim = new Simulation(1, "classic");
-    const { reader } = portDeps(sim);
-    const base = catalogOf({ sim, reader });
+    const { engine: enginePort, reader } = portDeps(sim);
+    const base = catalogOf({ enginePort, reader });
     const office = catalogFacility(base, "office");
     const hosted = {
       ...base,
       facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, width: f.width + 2, cost: f.cost + 1000 } : f)),
     };
-    useTowerCatalogSource(sim, () => hosted);
-    const read = catalogFacility(catalogOf({ sim, reader }), "office");
+    useTowerCatalogSource(enginePort, () => hosted);
+    const read = catalogFacility(catalogOf({ enginePort, reader }), "office");
     expect(read.width).toBe(office.width + 2);
     expect(read.cost).toBe(office.cost + 1000);
-    useTowerCatalogSource(sim, null);
-    expect(catalogFacility(catalogOf({ sim, reader }), "office").width).toBe(office.width);
+    useTowerCatalogSource(enginePort, null);
+    expect(catalogFacility(catalogOf({ enginePort, reader }), "office").width).toBe(office.width);
   });
 });
 

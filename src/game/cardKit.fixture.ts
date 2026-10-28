@@ -23,7 +23,7 @@ import type { InspectorDeps } from "./inspector";
 export function kitOf(sim: Simulation): { kit: CardKit; engine: TsEngine; reader: ViewReader } {
   const engine = new TsEngine(sim);
   const reader = new ViewReader(engine, facilityFloors);
-  return { kit: createCardKit({ enginePort: engine, reader, sim }), engine, reader };
+  return { kit: createCardKit({ enginePort: engine, reader }), engine, reader };
 }
 
 export function unitEditor(sim: Simulation, u: Pick<Unit, "id">, mobile = false): TemplateResult {

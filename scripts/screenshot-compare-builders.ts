@@ -74,7 +74,7 @@ export function buildEscalatorOfficeModern(): void {
     throw new Error("Modern escalators should reach the office floors but a flight was refused");
   }
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, 2, 1.2);
   g.speed = 0;
   g.engine.paused = true;
@@ -137,7 +137,7 @@ export function buildEscalatorOfficeClassic(): void {
     }
   }
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, 2, 1.2);
   g.speed = 0;
   g.engine.paused = true;

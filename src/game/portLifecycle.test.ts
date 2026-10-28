@@ -57,26 +57,19 @@ describe("loadStored", () => {
   });
 });
 
-describe("TsEngine.handOff (PR 5's bridge to GameApp.adoptSim)", () => {
-  it("hands a done swap's tower to the app, keeping history only for a restore", () => {
+describe("loadStored's follow (PR 5e: the app follows a swap itself)", () => {
+  it("calls the follow once a load is done, after the engine holds the new tower", () => {
     const engine = new TsEngine(Simulation.newGame(1));
-    const handOff = vi.fn<(next: Simulation, keepHistory: boolean) => void>((next) => engine.take(next));
-    engine.handOff = handOff;
     const before = engine.generation();
-    const loaded = engine.loadSave(textOf(Simulation.newGame(2)));
-    expect(handOff).toHaveBeenCalledOnce();
-    expect(handOff.mock.calls[0][1]).toBe(false);
-    expect(handOff.mock.calls[0][0]).toBe(engine.sim);
-    expect(loaded[1]).toBeGreaterThan(before);
-    engine.restore(engine.serialize());
-    expect(handOff.mock.calls[1][1]).toBe(true);
+    const followed = vi.fn(() => expect(engine.generation()).toBeGreaterThan(before));
+    expect(loadStored(engine, followed)(textOf(Simulation.newGame(2)))).toBe(true);
+    expect(followed).toHaveBeenCalledOnce();
   });
 
-  it("hands nothing over for a refused swap", () => {
+  it("calls nothing for a refused load", () => {
     const engine = new TsEngine(Simulation.newGame(1));
-    const handOff = vi.fn();
-    engine.handOff = handOff;
-    expect(engine.loadSave("nope")[0]).toBe(0);
-    expect(handOff).not.toHaveBeenCalled();
+    const followed = vi.fn();
+    expect(loadStored(engine, followed)("nope")).toBe(false);
+    expect(followed).not.toHaveBeenCalled();
   });
 });

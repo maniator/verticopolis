@@ -89,7 +89,9 @@ export function parseArgs(argv: readonly string[]): Args {
   return a;
 }
 
-export const MODES: readonly ModeName[] = ["ts", "wasm", "wasm-frame", "wasm-worker"];
+/** The engines a run measures. The Rust engine is the game's engine port
+ *  (PR 5e), so the old `wasm-frame` and `wasm-worker` hosts are gone. */
+export const MODES: readonly ModeName[] = ["ts", "wasm"];
 
 /** A phone-sized CSS viewport. On the 4-CPU container with software WebGL
  *  the harness was built on, a 1280x720 frame took about 250 ms, past the

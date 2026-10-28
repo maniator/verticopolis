@@ -51,7 +51,9 @@ export interface CrashDetails {
   viewport: { width: number; height: number; dpr: number };
   /** Chrome-only heap numbers when present; absent elsewhere. */
   memoryMB?: { usedJSHeap: number; totalJSHeap: number; jsHeapLimit: number };
-  tower: {
+  /** Null when the engine could not be read (a Rust engine that trapped),
+   *  with the reason in `towerError`, so the report still downloads. */
+  tower: null | {
     name: string;
     star: number;
     population: number;
@@ -61,8 +63,11 @@ export interface CrashDetails {
     transports: number;
     speed: number;
   };
+  towerError?: string;
   recentFrameErrors: FrameErrorEntry[];
 }
+
+const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /** The tower as a crash report captures it, through the port: the reader's
  *  view as of its last frame, and the engine's save. */
@@ -86,7 +91,11 @@ export function buildCrashDetails(
       typeof window !== "undefined"
         ? { width: window.innerWidth, height: window.innerHeight, dpr: window.devicePixelRatio || 1 }
         : { width: 0, height: 0, dpr: 1 },
-    tower: {
+    tower: null,
+    recentFrameErrors: [...opts.frameErrors],
+  };
+  try {
+    details.tower = {
       name: view.tower.towerName,
       star: view.header.star,
       population: view.header.population,
@@ -95,9 +104,10 @@ export function buildCrashDetails(
       units: view.tower.units.length,
       transports: view.tower.transports.length,
       speed: opts.speed,
-    },
-    recentFrameErrors: [...opts.frameErrors],
-  };
+    };
+  } catch (e) {
+    details.towerError = messageOf(e);
+  }
   // performance.memory is a Chrome extension; include it when the browser has
   // it (it is the strongest signal for memory-pressure crashes on Android).
   const mem = (globalThis.performance as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } } | undefined)?.memory;
@@ -112,7 +122,8 @@ export function buildCrashDetails(
  * Pack the crash details and the tower save into a zip. The save travels in
  * the normal `.vctower` container so it opens through the regular import flow;
  * if this browser can't build one (no CompressionStream), the raw save JSON
- * goes in instead, which the devs can still load.
+ * goes in instead, which the devs can still load. An engine that cannot
+ * write a save (a Rust engine that trapped) leaves the reason in its place.
  */
 export async function buildCrashReportZip(
   { port }: CrashTower,
@@ -121,11 +132,18 @@ export async function buildCrashReportZip(
   const files: Record<string, Uint8Array> = {
     "crash-report.json": strToU8(JSON.stringify(details, null, 2)),
   };
-  const save = port.serialize();
+  let save: string | null = null;
   try {
-    files["tower.vctower"] = strToU8(await SaveGame.export(save));
-  } catch {
-    files["tower.json"] = strToU8(save);
+    save = port.serialize();
+  } catch (e) {
+    files["tower-unavailable.txt"] = strToU8(`The engine could not write the tower: ${messageOf(e)}\n`);
+  }
+  if (save !== null) {
+    try {
+      files["tower.vctower"] = strToU8(await SaveGame.export(save));
+    } catch {
+      files["tower.json"] = strToU8(save);
+    }
   }
   // Timestamp in the name so repeated crashes don't overwrite each other in
   // the downloads folder. Colons are not filename-safe; keep digits and dashes.

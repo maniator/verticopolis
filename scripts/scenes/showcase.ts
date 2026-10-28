@@ -307,7 +307,7 @@ export const SHOWCASE_SCENES: Scene[] = [
           if (s.tower.units.length > before) x += s.tower.units[s.tower.units.length - 1].width;
           else x += 1;
         }
-      g.engine.setSim(s);
+      g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
       g.engine.setCamera(left + 18, 4, 1.4);
       g.speed = 0;
       g.engine.paused = false;

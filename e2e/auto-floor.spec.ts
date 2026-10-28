@@ -51,7 +51,7 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       // no-error assertion clean, not sim.build directly.
       await g.build.tryBuild("office", 2, x0, true); // A: [x0, x0+9)
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).__vcEngine?.current()?.syncStructure();
+      (window as any).game.syncSim();
       const gapBare = t.structureKindAt(2, x0 + 11); // still empty before B
       // Read the quoted cost from the sim itself, not a hard-coded catalog value,
       // so a future balance tweak doesn't rot this test.
@@ -59,7 +59,7 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       const moneyBeforeB = s.money;
       await g.build.tryBuild("office", 2, x0 + 15, true); // B: [x0+15, x0+24)
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).__vcEngine?.current()?.syncStructure();
+      (window as any).game.syncSim();
       const gap: (string | undefined)[] = [];
       for (let i = 9; i < 15; i++) gap.push(t.structureKindAt(2, x0 + i));
       return {
@@ -112,7 +112,7 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       s.money = cost - 1; // one dollar short of the whole run
       await g.build.tryBuild("office", 2, x0 + 15, true);
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).__vcEngine?.current()?.syncStructure();
+      (window as any).game.syncSim();
       return {
         placed: Boolean(t.unitAt(2, x0 + 15)),
         gapFilled: t.structureKindAt(2, x0 + 11) !== undefined,
@@ -152,7 +152,7 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       // ground tile that would otherwise float land connected.
       await g.build.tryBuild("lobby", 1, x0 + 45, true);
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).__vcEngine?.current()?.syncStructure();
+      (window as any).game.syncSim();
       const kinds: (string | undefined)[] = [];
       for (let i = 40; i <= 45; i++) kinds.push(t.structureKindAt(1, x0 + i));
       return { kinds };
@@ -195,12 +195,12 @@ test.describe("sky-lobby canon (e2e)", () => {
       // Claim floor 15 by placing a lobby there (goes through the real gesture).
       await g.build.tryBuild("lobby", 15, x0 + 20, true);
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).__vcEngine?.current()?.syncStructure();
+      (window as any).game.syncSim();
       const claimed = t.floorHasLobby(15);
       // Now try to drop a plain floor tile elsewhere on floor 15.
       await g.build.tryBuild("floor", 15, x0 + 5, true);
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).__vcEngine?.current()?.syncStructure();
+      (window as any).game.syncSim();
       const kindAfterFloorAttempt = t.structureKindAt(15, x0 + 5);
       return { claimed, kindAtLobby: t.structureKindAt(15, x0 + 20), kindAfterFloorAttempt };
     });
@@ -238,7 +238,7 @@ test.describe("sky-lobby canon (e2e)", () => {
       const kindBefore = lobby?.kind;
       const removed = await g.build.tryRemoveUnit(lobby, "bulldoze");
       // On the WASM engine, read back the engine's tower (a no-op on TypeScript).
-      (window as any).__vcEngine?.current()?.syncStructure();
+      (window as any).game.syncSim();
       const kindAfter = t.unitAt(1, x0)?.kind;
       return { kindBefore, removed, kindAfter };
     });

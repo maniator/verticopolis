@@ -2,7 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { ShadowCommand } from "./commands";
 import { attachMirror, loadCommand } from "./mirror";
 import type { WorkerInit, WorkerReply } from "./worker";
-import { enginePackageUrl } from "../wasmhost/startWasmHost";
+import { enginePackageUrl } from "../wasmhost/rustEngine";
 
 /**
  * The browser side of the dual run (story-engine-dual-run): behind a

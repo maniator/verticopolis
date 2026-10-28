@@ -27,15 +27,16 @@
 src/analyticsEngineBridge.ts gameplayCatalog gameplayEventRules
 src/gallery.ts catalog facilities retailSubtypes
 src/game/appHistory.ts UndoHistory # moved from src/main.ts with the app's undo history (#874): no new engine import
+src/game/bootTower.ts Simulation port/tsEngine # moved from src/main.ts with the TypeScript engine's first tower (PR 5e): no new engine import
 src/game/editorActions.ts facilities sim/charges
 src/game/facilityDiagnostics.ts EconomySystem Simulation facilities residentialRentals sim/constants sim/gripe types
 src/game/frameLoop.ts sim/frameStep # the host step driver, moved here from frameLoop and shared with TsEngine.advance (PR 5a); it goes with #867
 src/game/gripeCopy.ts facilities residentialRentals sim/gripe sim/satisfactionStep
 src/game/housekeepingDiagnostics.ts economy/housekeeping
-src/game/saveLoad.ts Simulation
+src/game/toolingSim.ts Simulation port/tsEngine # moved from src/main.ts with the tooling harnesses' hand-built towers (PR 5e): no new engine import
 src/game/trafficHud.ts traffic
 src/game/uiCallbacks.ts wellFormed
-src/main.ts Simulation facilities port/tsEngine # port/tsEngine: GameApp holds the TypeScript engine behind EnginePort while the callers move (facade slice 7, PR 4); the boot path picks the engine in PR 5
+src/main.ts facilities
 src/preview.ts catalog facilities
 src/render/atlas/browserEntry.ts catalog
 src/render/atlas/catalog.ts facilities households residentialRentals retailSubtypes

@@ -22,7 +22,7 @@ export function portDeps(sim: Simulation) {
       enginePort: () => engine,
       portCodes: () => codes,
       reader: () => reader,
-      catalog: () => catalogOf({ sim, reader }),
+      catalog: () => catalogOf({ enginePort: engine, reader }),
       isUnlocked: (kind: Parameters<Simulation["isUnlocked"]>[0]) => sim.isUnlocked(kind),
     },
   };

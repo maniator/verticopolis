@@ -36,15 +36,17 @@ export interface SimRun {
 }
 
 /**
- * Simulation-only timing. `hosted`: tick the live app's tower through
- * `sim.tick` (on the WASM project that is the engine's tick plus the
- * host's read-model sync; on TypeScript it is the engine itself). `raw`:
+ * Simulation-only timing. `hosted`: tick the live app's tower through its
+ * engine port and read the app's view after each step, as a frame with one
+ * step does (the port's tick plus the view frame and its decode, on either
+ * engine; PR 5e). `raw`:
  * tick a detached instance with nothing attached (a TypeScript Simulation,
  * or a bare WASM Engine from the served package). Each mode warms up on a
  * throwaway instance first, then measures a fresh one from the same save.
  *
  * `attribute` (hosted WASM only) wraps the engine's methods to split the
- * time. The wrappers cost time themselves, so the runner times an
+ * time: its tick, the other exports (the view frame among them), and the
+ * JavaScript left (the view's decode). The wrappers cost time themselves, so the runner times an
  * unwrapped pass and takes only the split from a separate wrapped pass.
  * Nothing here touches a pending emergency: a write to the read model
  * would not reach the engine, and both engines must see the same state.
@@ -54,7 +56,9 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
   const g = w.game;
   const save = w.__perfSaves[arg.name] as string;
   w.__perfStash = w.__perfStash ?? {};
-  const Sim = g.sim.constructor;
+  // The TypeScript engine's Simulation class, for the raw TypeScript pass
+  // (only on the TypeScript project; the Rust engine has no `sim`).
+  const Sim = g.sim?.constructor;
   const hostOf = () => w.__vcEngine;
   const errorsNow = (): string[] => [...((hostOf()?.status?.errors ?? []) as string[])];
 
@@ -67,25 +71,30 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
   const make = (): { d: Driver; loadMs: number; hostedWasm: boolean } => {
     const t0 = performance.now();
     if (arg.mode === "hosted") {
-      const startsBefore = Number(hostOf()?.status?.starts ?? 0);
-      const errorsBefore = errorsNow().length;
-      g.adoptSim(Sim.deserialize(JSON.parse(save)));
+      // A player's load: the stored source, then the app follows the swap.
+      const port = g.enginePort;
+      const loaded = port.loadSave(save)[0] === 1;
+      if (loaded) g.followSwap();
       const loadMs = performance.now() - t0;
+      if (!loaded) throw new Error(`${arg.name}: the engine refused the scenario's save`);
       g.speed = 0;
       g.engine.paused = true;
-      const live = g.sim;
-      const h = hostOf();
-      // Hosted means: this adopt started a new engine, it raised no error,
-      // and the live sim is the instance the host attached to.
-      const hostedWasm =
-        Boolean(h?.status?.hosted) && Number(h.status.starts) === startsBefore + 1 && errorsNow().length === errorsBefore && Boolean(h.current()) && Object.prototype.hasOwnProperty.call(live, "serialize");
+      const reader = g.reader;
+      // Hosted means the Rust engine the boot published is the app's port.
+      const hostedWasm = Boolean(hostOf()?.status?.hosted) && hostOf().port === port;
       return {
         loadMs,
         hostedWasm,
         d: {
-          tick: (dt) => live.tick(dt),
-          save: () => live.serialize(),
-          fields: () => ({ minutes: live.clock.minutes, money: live.money, star: live.star, population: live.population, people: live.crowd.people.length }),
+          tick: (dt) => {
+            port.tick(dt);
+            reader.update();
+          },
+          save: () => JSON.parse(port.serialize()) as unknown,
+          fields: () => {
+            const h = reader.header;
+            return { minutes: h.minutes, money: h.money, star: h.star, population: h.population, people: reader.crowd.people.length };
+          },
           free: () => {},
         },
       };
@@ -112,8 +121,10 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
         tick: (dt) => e.tick(dt),
         save: () => JSON.parse(e.serialize()),
         fields: () => {
-          const sim = Sim.deserialize(JSON.parse(e.serialize()));
-          return { minutes: sim.clock.minutes, money: e.money(), star: sim.star, population: sim.population, people: (JSON.parse(e.crowdView()).people as unknown[]).length };
+          // The engine's own view header, as the app's view reads it.
+          const l = JSON.parse(e.viewLayout()).header;
+          const f = e.viewFrame(true);
+          return { minutes: f[l.minutes], money: f[l.money], star: f[l.star], population: f[l.population], people: (JSON.parse(e.crowdView()).people as unknown[]).length };
         },
         free: () => e.free(),
       },
@@ -135,11 +146,10 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
   w.__perfStash[`${tag}:start`] = JSON.stringify(d.save());
   const startMinutes = d.fields().minutes;
 
-  const h = hostOf()?.current?.();
+  const h = hostOf()?.port;
   const acc = { tick: 0, exp: 0, ticks: 0, calls: 0, parse: 0, parses: 0 };
   const byExport: Record<string, { calls: number; ms: number }> = {};
   const restore: (() => void)[] = [];
-  const mergesBefore = hostedWasm ? (h.merges as number) : 0;
   const attributing = arg.attribute && hostedWasm;
   let exportsWrapped = 0;
   // Only the outermost wrapped call is timed, and JSON.parse is timed only
@@ -150,7 +160,7 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
   let t0 = 0;
   try {
     if (attributing) {
-      const e = h.engine;
+      const e = h;
       const wrap = (name: string, slot: "tick" | "exp") => {
         if (slot === "exp") exportsWrapped++;
         const own = Object.getOwnPropertyDescriptor(e, name);
@@ -224,7 +234,7 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
   d.free();
   const hostErrorsAdded = errorsNow().slice(errorsAtStart);
   // Still hosted at the end: the same host, no new error.
-  const stillHosted = hostedWasm && hostErrorsAdded.length === 0 && hostOf()?.current?.() === h && Boolean(hostOf()?.status?.hosted);
+  const stillHosted = hostedWasm && hostErrorsAdded.length === 0 && hostOf()?.port === h && g.enginePort === h && Boolean(hostOf()?.status?.hosted);
   const sum = stepMs.reduce((s, x) => s + x, 0);
   return {
     mode: arg.mode,
@@ -235,7 +245,7 @@ export async function simRun(arg: { name: string; mode: "hosted" | "raw"; engine
     totalMs,
     stepMs,
     attribution: attributing
-      ? { engineTickMs: acc.tick, engineExportMs: acc.exp, hostJsMs: Math.max(0, sum - acc.tick - acc.exp), wrappedTotalMs: sum, merges: (h.merges as number) - mergesBefore, engineTicks: acc.ticks, exportCalls: acc.calls, byExport, parseMs: acc.parse, parseCalls: acc.parses, exportsWrapped }
+      ? { engineTickMs: acc.tick, engineExportMs: acc.exp, hostJsMs: Math.max(0, sum - acc.tick - acc.exp), wrappedTotalMs: sum, merges: 0, engineTicks: acc.ticks, exportCalls: acc.calls, byExport, parseMs: acc.parse, parseCalls: acc.parses, exportsWrapped }
       : null,
     hostErrorsAdded,
     gcAvailable,

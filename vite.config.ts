@@ -267,16 +267,6 @@ function wasmParityProjects() {
     "**/wasmHostCatalog.integration.test.ts",
     "**/wasmHostLogText.integration.test.ts",
     "**/wasmHostTelemetry.integration.test.ts",
-    // These start their own host (in process, or the worker's).
-    "**/wasmHostAnalyticsBridge.integration.test.ts",
-    "**/wasmHostAttachTrap.integration.test.ts",
-    "**/wasmWorkerDelta.integration.test.ts",
-    "**/wasmHostExtermination.integration.test.ts",
-    "**/wasmHostFallback.integration.test.ts",
-    "**/wasmHostRollback*.integration.test.ts",
-    "**/wasmWorkerHost.integration.test.ts",
-    "**/wasmWorkerLifecycle.integration.test.ts",
-    "**/wasmWorkerSaves.integration.test.ts",
   ];
   const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts", "src/tests/ci/testStartLogSetup.ts"];
   // Every hosted tick also syncs the engine's frame (and in tick mode merges
@@ -688,9 +678,6 @@ export default defineConfig(({ command }) => ({
         // the shadow engine and the command vocabulary are measured and
         // tested in Node (the controller against a worker stand-in).
         "src/dualrun/worker.ts",
-        // The engine worker's entry point, for the same reason: the glue
-        // around EngineWorkerCore, which is measured and tested in Node.
-        "src/wasmhost/engineWorker.ts",
         // The atlas bake's browser half: the page API the export script
         // drives and the pixel checks, all of which read pixels back from a
         // live canvas (getImageData). The pipeline they call (bake, compose,

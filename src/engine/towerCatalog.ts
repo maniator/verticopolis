@@ -28,7 +28,13 @@ function handleOf(tower: object): Handle {
 /** The catalog of `mode` (the tower's own by default) from the tower's
  *  source, read once and kept. */
 export function towerCatalog(tower: { readonly mode: GameMode }, mode: GameMode = tower.mode): Catalog {
-  const h = handleOf(tower);
+  return catalogOn(tower, mode);
+}
+
+/** The catalog of `mode` from the source set on `key` (a tower, or the engine
+ *  the game holds), read once and kept. */
+export function catalogOn(key: object, mode: GameMode): Catalog {
+  const h = handleOf(key);
   let c = h.read.get(mode);
   if (!c) {
     c = h.source(mode);

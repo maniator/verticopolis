@@ -4,8 +4,6 @@ import type { SerializedGame } from "../engine/types";
 import { towerStateSig } from "../engine/UndoHistory";
 import { MID, newSeededGame } from "../tests/fixtures/towerFixtures";
 import { parityRestarts } from "../tests/parity/typescriptOnly";
-import { signatureOfSave } from "../wasmhost/hostFault";
-import { saveText, setSaveText, setStepGate } from "../wasmhost/stepGate";
 import { describeLifecycleContract } from "./lifecycleContract.fixture";
 import { createTsSim } from "./tsSim";
 
@@ -51,22 +49,11 @@ describe("TsSim's lifecycle over the live instance", () => {
     expect(port.view.tower).toBe(sim.tower);
   });
 
-  it("saves what the instance serializes, and hands over a host's own text for a copy kept in memory", () => {
+  it("saves what the instance serializes, a copy kept in memory included", () => {
     const { held, port } = adopting();
-    // In the unitWasm project the parity setup hosts the tower at its first
-    // tick, and wasmHostPoints.test.ts pins that an attach registers its
-    // text, so this holds on both of today's hosts.
     port.tick(1);
     expect(port.saveNow()).toBe(JSON.stringify(held.sim.serialize()));
-    expect(JSON.parse(port.saveNow({ memory: true }))).toEqual(JSON.parse(port.saveNow()));
-    const own = saveText(held.sim) ?? null;
-    setSaveText(held.sim, () => "the host's text");
-    try {
-      expect(port.saveNow({ memory: true })).toBe("the host's text");
-      expect(port.saveNow()).toBe(JSON.stringify(held.sim.serialize()));
-    } finally {
-      setSaveText(held.sim, own);
-    }
+    expect(port.saveNow({ memory: true })).toBe(port.saveNow());
   });
 
   it("rejects a stored load with the first save's error", async () => {
@@ -88,32 +75,6 @@ describe("TsSim's lifecycle over the live instance", () => {
     expect(port.generation).toBe(generation);
   });
 
-  it("reads the camera after a background host catches up, on the tower held then", async () => {
-    let sim: Simulation = newSeededGame(7, "modern");
-    const first = sim;
-    const order: string[] = [];
-    let caughtUp!: () => void;
-    const settled = new Promise<void>((resolve) => (caughtUp = resolve));
-    setStepGate(first, { canStep: () => true, flush: () => undefined, settle: () => settled.then(() => void order.push("settled")) });
-    try {
-      const port = createTsSim(() => sim);
-      const pending = port.save({
-        view: () => {
-          order.push("camera");
-          return { tile: 7, floor: 3 };
-        },
-      });
-      sim = newSeededGame(9, "modern");
-      caughtUp();
-      expect(JSON.parse(await pending)).toMatchObject({ view: { tile: 7, floor: 3 } });
-      expect(order).toEqual(["settled", "camera"]);
-      expect(sim.view).toEqual({ tile: 7, floor: 3 });
-      expect(first.view).not.toEqual({ tile: 7, floor: 3 });
-    } finally {
-      setStepGate(first, null);
-    }
-  });
-
   it("gives each tower its own generation, moved by a swap made outside the port", () => {
     let sim = newSeededGame(7, "modern");
     const port = createTsSim(() => sim);
@@ -126,15 +87,6 @@ describe("TsSim's lifecycle over the live instance", () => {
     expect(second).not.toBe(first);
     sim = before;
     expect(port.generation).toBe(first);
-  });
-
-  it("fingerprints its own undo copies as the WASM fallback's tidy does", async () => {
-    const { port } = adopting();
-    port.tick(1);
-    expect(signatureOfSave(port.saveNow({ memory: true }))).toBe(port.undoSignature());
-    expect(await port.command({ op: "build", kind: "office", floor: 2, x: MID - 4 })).toMatchObject({ ok: true });
-    expect(signatureOfSave(port.saveNow({ memory: true }))).toBe(port.undoSignature());
-    port.tick(1);
   });
 
   it("fingerprints the tower as the undo history always has", async () => {

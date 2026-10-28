@@ -64,7 +64,7 @@ function buildRentalTower(): void {
     last.residents = undefined;
   }
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, 2, 1.15); // frame the Studio + Apartment floors
   g.speed = 0;
   g.engine.paused = true;

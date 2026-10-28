@@ -15,7 +15,7 @@ import {
   ENGINE_WASM,
   glueLoads,
 } from "./engineAssets";
-import { enginePackageUrl } from "./startWasmHost";
+import { enginePackageUrl } from "./rustEngine";
 
 /**
  * ENGINE_PACKAGE is what scripts/verify-precache.ts checks against the

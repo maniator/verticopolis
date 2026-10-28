@@ -17,15 +17,15 @@ vi.mock("./engineCohort/boot", async (importOriginal) => {
   const real = await importOriginal<typeof import("./engineCohort/boot")>();
   return { ...real, selectBootEngine: () => wasmStub.requested, noteRustFailed: vi.fn() };
 });
-vi.mock("./wasmhost/startWasmHost", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./wasmhost/startWasmHost")>();
+vi.mock("./wasmhost/rustEngine", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./wasmhost/rustEngine")>();
   return {
     ...real,
     loadWasmEngine: vi.fn(async () => {
       if (wasmStub.module) return wasmStub.module;
       throw wasmStub.loadError ?? new Error("no package in this test");
     }),
-    startWasmHost: vi.fn(() => ({ status: { engine: "wasm", starts: 1, hosted: true, errors: [] }, current: () => null, stop: () => {} })),
+    rustBootTower: vi.fn(() => ({ port: {}, corrupt: false, loaded: false, savedAt: undefined })),
   };
 });
 

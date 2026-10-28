@@ -30,10 +30,10 @@ describe("crash report packaging", () => {
     expect(details.report).toBe("verticopolis-crash");
     expect(details.version).toBe("9.9.9");
     expect(details.crash).toEqual(CRASH);
-    expect(details.tower.name).toBe("Crash Test Tower");
-    expect(details.tower.money).toBe(424_242);
-    expect(details.tower.units).toBe(sim.tower.units.length);
-    expect(details.tower.speed).toBe(3);
+    expect(details.tower?.name).toBe("Crash Test Tower");
+    expect(details.tower?.money).toBe(424_242);
+    expect(details.tower?.units).toBe(sim.tower.units.length);
+    expect(details.tower?.speed).toBe(3);
     expect(details.recentFrameErrors).toEqual([{ at: "2026-07-12T00:00:00.000Z", message: "boom" }]);
     // createdAt must be a real ISO timestamp; it becomes the zip's filename stamp.
     expect(new Date(details.createdAt).toISOString()).toBe(details.createdAt);
@@ -74,6 +74,20 @@ describe("crash report packaging", () => {
     } finally {
       SaveGame.export = original;
     }
+  });
+
+  it("still builds the report when the engine cannot be read, with the reason in place of the tower", async () => {
+    const trapped = (): never => {
+      throw new Error("unreachable executed");
+    };
+    const view = { get header(): never { return trapped(); }, get tower(): never { return trapped(); } };
+    const tower = { view, port: { serialize: trapped } };
+    const details = buildCrashDetails(tower, CRASH, { version: "1.2.3", speed: 1, frameErrors: [] });
+    expect(details.tower).toBeNull();
+    expect(details.towerError).toBe("unreachable executed");
+    const files = unzipSync((await buildCrashReportZip(tower, details)).bytes);
+    expect(Object.keys(files).sort()).toEqual(["crash-report.json", "tower-unavailable.txt"]);
+    expect(strFromU8(files["tower-unavailable.txt"])).toContain("unreachable executed");
   });
 
   it("bugReportUrl targets the bug-report form with the version and attach instructions prefilled", () => {

@@ -8,6 +8,7 @@ import { runFrame, SPEEDS } from "./frameLoop";
 import { applyReducedMotion } from "./audioPrefs";
 import { catalogOf, isUnlocked, quoteShaft } from "./portAccess";
 import { noteFrameError } from "./frameErrors";
+import { noteEngineThrow } from "./engineFault";
 
 /**
  * Engine wiring and post-context-loss engine rebuild, split out of the `GameApp`
@@ -254,10 +255,12 @@ export function wireEngine(app: GameApp): void {
     try {
       runFrame(app, ms);
     } catch (err) {
-      // Logged at most once per two seconds per source, to the console and
-      // the crash report's ring buffer, so a per-frame throw can't spam
-      // either (game/frameErrors.ts has the window's rules).
-      noteFrameError(app, err);
+      // A trap in the Rust engine stops the game, which logs it
+      // (engineFault.ts). Any other throw is logged at most once per two
+      // seconds per source, to the console and the crash report's ring
+      // buffer, so a per-frame throw can't spam either (game/frameErrors.ts
+      // has the window's rules).
+      if (!noteEngineThrow(err)) noteFrameError(app, err);
     }
   };
 

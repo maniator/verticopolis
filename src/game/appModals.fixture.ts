@@ -4,7 +4,7 @@ import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
 import { catalogFor } from "../engine/catalog";
-import { useTowerCatalogSource } from "../engine/towerCatalog";
+import { catalogOn, useTowerCatalogSource } from "../engine/towerCatalog";
 import type { CatalogEconomy } from "../engine/catalogTypes";
 
 /**
@@ -13,7 +13,7 @@ import type { CatalogEconomy } from "../engine/catalogTypes";
  * pieces a test dials, and a fake `EnginePort` that answers the layout's
  * records (the stats sheet, the coverage, the booking and the log line) from
  * the app's tower at the time of each ask, and saves and loads stand-in text (`app.sim`, so a test that swaps it
- * gets answers about the new one and a moved generation).
+ * gets answers about the new one, its catalog and a moved generation).
  */
 
 /** Let the port's answers and the renders queued behind them run. */
@@ -50,13 +50,33 @@ export function makeSim(over: Partial<SimShape> = {}): SimShape {
   return sim;
 }
 
+/** The fake ports each fake tower is loaded in. The commands read the
+ *  catalog through the engine the app holds (#921, PR 5e), so a catalog
+ *  dialed on a tower reaches the port showing it. */
+const portsShowing = new WeakMap<SimShape, Set<object>>();
+
+/** Have `port` answer the catalog of `sim`, read afresh. */
+function showCatalog(port: object, sim: SimShape): void {
+  useTowerCatalogSource(port, (mode) => catalogOn(sim, mode));
+}
+
 /** Point the fake tower's catalog at one whose exterminator is `rec` (null:
- *  no exterminator, the Classic case). The commands read it from the tower's
- *  catalog (#921). */
+ *  no exterminator, the Classic case). The commands read it from the
+ *  engine's catalog (#921). */
 export function withExterminator(sim: SimShape, rec: CatalogEconomy["exterminator"]): void {
   const base = catalogFor("modern");
   const catalog = { ...base, economy: { ...base.economy, exterminator: rec } };
   useTowerCatalogSource(sim, () => catalog);
+  for (const port of portsShowing.get(sim) ?? []) showCatalog(port, sim);
+}
+
+/** Load `sim` into the fake `port`, out of whichever tower it showed. */
+function loadInto(port: object, sim: SimShape, before?: SimShape): void {
+  if (before) portsShowing.get(before)?.delete(port);
+  const ports = portsShowing.get(sim) ?? new Set<object>();
+  ports.add(port);
+  portsShowing.set(sim, ports);
+  showCatalog(port, sim);
 }
 
 export function makeApp(sim: SimShape) {
@@ -102,12 +122,11 @@ export function makeApp(sim: SimShape) {
       current().view = { tile, floor, zoom };
     }),
     serialize: vi.fn(() => "SAVE TEXT"),
-    /** Loads any text but "BAD": the swap moves the generation and hands the
-     *  text to `adoptSim`, as the engine hands the app its new tower. */
+    /** Loads any text but "BAD": the swap moves the generation, and the
+     *  caller has the app follow it. */
     loadSave: vi.fn((text: string) => {
       if (text === "BAD") return Float64Array.of(0, generation);
       generation++;
-      (app.adoptSim as (next: string) => void)(text);
       return Float64Array.of(1, generation);
     }),
   };
@@ -124,13 +143,14 @@ export function makeApp(sim: SimShape) {
     reader: typeof reader;
     enginePort: typeof enginePort;
     portCodes: PortCodes;
-    adoptSim: ReturnType<typeof vi.fn>;
+    followSwap: ReturnType<typeof vi.fn>;
   } = {
     /** A swap moves the generation, as the engine's swaps do. */
     get sim() {
       return tower;
     },
     set sim(next: SimShape) {
+      loadInto(enginePort, next, tower);
       tower = next;
       generation++;
     },
@@ -139,7 +159,8 @@ export function makeApp(sim: SimShape) {
     reader,
     enginePort,
     portCodes,
-    adoptSim: vi.fn(),
+    followSwap: vi.fn(),
   };
-  return { app: app as unknown as GameApp, ui, engine, reader, enginePort, adoptSim: app.adoptSim };
+  loadInto(enginePort, sim);
+  return { app: app as unknown as GameApp, ui, engine, reader, enginePort, followSwap: app.followSwap };
 }

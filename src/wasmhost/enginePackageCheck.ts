@@ -7,7 +7,7 @@
  * _bmad-output/planning-artifacts/design/design-engine-package-set-consistency-2026-10-15.md, section 5.3.
  *
  * `fetch`, the digest and the abort signal are injected, so the unit tests run
- * in Node with no browser. The loader (startWasmHost.ts) owns the deadline and
+ * in Node with no browser. The loader (rustEngine.ts) owns the deadline and
  * hands its signal in; this module checks the signal after every await and
  * throws `EnginePackageAborted` once it fires, so a late result is dropped.
  */

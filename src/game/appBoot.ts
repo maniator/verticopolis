@@ -27,7 +27,7 @@ import { showTowerPicker } from "./appModals";
 /**
  * Constructor collaborators for `GameApp`, split out to keep the class body a
  * thin shell: {@link wireControllers} builds the `src/game/` controller modules
- * (each closing over `app`, re-reading `app.sim` so an `adoptSim` swap stays
+ * (each closing over `app`, re-reading its engine so a tower swap stays
  * visible), and {@link runBootFlow} drives the first-paint boot: resume-flag
  * handling, splash/onboarding, the corrupt-save message, and the autosave timer.
  * Behavior unchanged from the former inline constructor bodies.
@@ -64,7 +64,7 @@ export function bootReason(flags: {
  *  synchronously (which resets the keyboard anchor), so `app.keyboard` /
  *  `app.build` must already exist. Their UI-facing deps are lazy closures for
  *  the same reason: `app.ui` is assigned just after this returns. Every module
- *  re-asks `app.sim` per call, so an adoptSim() swap is picked up automatically. */
+ *  re-asks the app per call, so a tower swap is picked up automatically. */
 export function wireControllers(app: GameApp): void {
   app.build = new BuildActions({
     enginePort: () => app.enginePort,
@@ -104,19 +104,17 @@ export function wireControllers(app: GameApp): void {
     announce: (msg) => app.announce(msg),
   });
   app.saveLoad = new SaveLoad({
-    getSim: () => app.sim,
     getView: () => app.engine.viewState(),
     enginePort: () => app.enginePort,
     portCodes: () => app.portCodes,
     reader: () => app.reader,
-    towerSwapped: () => app.ui.precedence.towerSwapped(),
     // A report parsed against the OLD tower is stale the moment one is adopted,
     // and dialog lifecycle cannot see it: New Tower closes perfectly normally
     // and swaps afterwards. Breaking the leash here covers every swap SaveLoad
     // drives (found, load, import). See SPEC-modal-precedence-reports CAP-5.
-    adoptSim: (sim) => {
+    towerSwapped: () => {
       app.ui.precedence.towerSwapped();
-      app.adoptSim(sim);
+      app.followSwap();
     },
     ui: {
       toast: (text, kind) => app.ui.toast(text, kind),

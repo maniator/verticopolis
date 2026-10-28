@@ -12,11 +12,11 @@
  *
  * They stage the sim off the public `window.game` API (sim / engine / grid / ui)
  * and read CANON facility widths from the sim so a hardcoded stride can't gap or
- * overlap a floor. The runner (screenshots.ts) and the manifest
- * (screenshot-scenes.ts) pass these by identity to `page.evaluate`. The in-page
- * primitives they lean on (clock adoption, stepping, chrome sweeps) live in
- * `screenshot-page-ops.ts`; every set is re-exported from
- * `screenshot-builders.ts` so importers keep their existing paths.
+ * overlap a floor (`g.sim` on Rust: see screenshot-scene-builders.ts). The runner
+ * (screenshots.ts) and the manifest (screenshot-scenes.ts) pass these by
+ * identity to `page.evaluate`. The in-page primitives they lean on (clock
+ * adoption, stepping, chrome sweeps) live in `screenshot-page-ops.ts`; every
+ * set is re-exported from `screenshot-builders.ts` so importers keep paths.
  *
  * Keep this file ERASABLE (no enums / namespaces / parameter properties).
  */
@@ -117,7 +117,7 @@ export function buildCanonTower(): void {
     else x += 1;
   }
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, 20, 0.5);
   // Keep the hero tower LIVE so commuters spawn and elevators move for the
   // people-rush shot; the per-shot pre-capture sweep clears any stray fire the
@@ -171,7 +171,7 @@ export function buildBasement(): void {
   s.tower.place("recycling", -3, left + 4);
   s.tower.place("recycling", -3, left + 26);
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, -1, 1.6);
   // Freeze: the basement shots jump the clock hours to fill recycling / summon
   // the garbage truck, and a running sim would roll random fires into the frame.
@@ -260,7 +260,7 @@ export function buildModernPricingTower(): void {
     u.occupants = 0;
   }
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, 4, 0.9);
   // Freeze: every shot here is a DOM panel/dialog over a static backdrop, and a
   // running sim would churn the frame between regens.
@@ -336,7 +336,7 @@ export function buildScheduleTowerModern(): void {
     homeFloors: [1, 1, 8, 8],
   });
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, 6, 0.7);
   // Freeze: the shots are a dialog over a static backdrop.
   g.speed = 0;
@@ -392,7 +392,7 @@ export function buildScheduleTowerClassic(): void {
     homeFloors: [1, 1, 8, 8],
   });
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, 6, 0.7);
   g.speed = 0;
   g.engine.paused = true;
@@ -404,10 +404,9 @@ export function buildScheduleTowerClassic(): void {
  *  The ladder's real gates (facilities.ts / Simulation.evaluateStar):
  *    2★ ≥ 300 pop · 3★ ≥ 1,000 + Security · 4★ ≥ 5,000 (non-hotel) + Medical +
  *    recycling demand met + ≥2 Hotel Suites + a favorable VIP · 5★ ≥ 10,000 +
- *    Metro. Offices (population 6) are the population workhorse; we build enough
- *    to clear each threshold with margin, add exactly the amenities that tier
- *    needs, leave star at 1, then let evaluateStar() raise it. place() has no
- *    minStar gate, so a 1★ tower can still host a Metro for the 5★ build. */
+ *    Metro. Offices (population 6) are the population workhorse; we build enough to clear each
+ *    threshold with margin, add exactly the amenities that tier needs, leave star at 1, then let
+ *    evaluateStar() raise it. place() has no minStar gate, so a 1★ tower can host a 5★ Metro. */
 export function pgGrowToStar(target: number): number {
   const g = (window as unknown as { game: any }).game;
   const Sim = g.sim.constructor;
@@ -457,10 +456,11 @@ export function pgGrowToStar(target: number): number {
   if (target >= 3) s.tower.place("security", amenityFloor, left);
   if (target >= 4) {
     s.tower.place("medical", amenityFloor, left + 10);
-    // Two hotel suites so the 4★ suite gate is met (clear of the 16-wide Medical).
+    // Two hotel suites so the 4★ suite gate is met (clear of the 16-wide Medical), on the Average rent
+    // a game build gives them: unpriced, the settle's load snaps them and says so over the star line.
     for (let i = 0; i < 2; i++) {
       const r = s.tower.place("hotelSuite", amenityFloor, left + 30 + i * 12);
-      if (r.ok) s.tower.getUnit(r.unitId).state = "asleep";
+      if (r.ok) Object.assign(s.tower.getUnit(r.unitId), { state: "asleep", rent: s.rules.priceOptions("hotelSuite").rungs[2].value });
     }
     s.vipFavorable = true; // stands in for a favorable VIP review
     // A basement stack, laid top-down so each deck rests on the one above:
@@ -489,7 +489,7 @@ export function pgGrowToStar(target: number): number {
     }
   }
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, Math.max(2, Math.floor(top / 2)), Math.max(0.18, 0.95 - top / 70));
   // Freeze so the milestone shots are byte-stable across regens (nothing here needs
   // a live crowd, unlike the showcase people-rush shot); a moving sim would churn

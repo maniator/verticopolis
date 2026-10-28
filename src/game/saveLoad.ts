@@ -1,5 +1,3 @@
-import { settleEngine } from "../wasmhost/stepGate";
-import { Simulation } from "../engine/Simulation";
 import type { GameMode, SerializedView } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
 import { SaveGame, isStorageWriteError, saveFailureMessage } from "../storage/SaveGame";
@@ -20,24 +18,21 @@ import type { UI } from "../ui/UI";
  * Save/load/new-game flows for the game shell. Split out of the GameApp class
  * so the tower-swap contracts (a new/imported tower invalidates the undo
  * trail; a garbage import never reaches the sim) can be unit-tested without a
- * DOM game shell. Swapping the live simulation in — rewiring the engine,
- * selection, inspector and undo history — is the app spine's job, so adoptSim
- * stays in GameApp and arrives here as an injected callback.
+ * DOM game shell. Following a swapped-in tower (rewiring the renderer,
+ * selection, inspector and undo history) is the app spine's job, so it
+ * arrives here as the injected `towerSwapped`.
  */
 export interface SaveLoadDeps {
-  /** The live simulation (never cached — adoptSim swaps the instance), for
-   *  the file flows and the background hosts' settle that have not moved to
-   *  the engine port yet. */
-  getSim(): Simulation;
-  /** The engine port the saves, loads and new towers go through; a done swap
-   *  reaches the app's adoptSim inside the call. */
+  /** The engine port the saves, loads and new towers go through. */
   enginePort(): EnginePort;
   /** The layout's code tables, for the port's mode, calendar and log codes. */
   portCodes(): PortCodes;
   /** The shared reader, current as of the last swap. */
   reader(): Pick<ViewReader, "rooms" | "structure">;
-  /** A tower arrived through the port (load or found): break the report
-   *  dialogs' leash, as `adoptSim` does for the file imports. */
+  /** A tower arrived through the port (a load, a new tower, an import): the
+   *  app follows it and breaks the report dialogs' leash. Every path here
+   *  brings a *different* tower, so the undo trail goes too; only the app's
+   *  own undo and redo keep it, and they do not come through here. */
   towerSwapped(): void;
   /** The live camera as save cargo (GameApp reads TowerEngine.viewState).
    *  Stamped onto the sim right before every save/export of the CURRENT
@@ -46,12 +41,6 @@ export interface SaveLoadDeps {
    *  exists (headless tests); a null stamp never ERASES a view the sim
    *  already carries (see stampView). */
   getView(): SerializedView | null;
-  /** Swap in a freshly loaded/created simulation (GameApp owns the rewiring).
-   *  Deliberately takes NO preserveHistory flag: every path here adopts a
-   *  *different* tower, which must invalidate the undo trail — otherwise Undo
-   *  could resurrect an unrelated old tower. Only GameApp's own undo/redo
-   *  restore may preserve history, and it doesn't go through this module. */
-  adoptSim(sim: Simulation): void;
   ui: Pick<UI, "toast" | "sayVisibly" | "downloadFile" | "showImportReport" | "showExportReport">;
   /** Full-screen crash card (src/ui/crashScreen.ts, wired by main.ts with the
    *  app-side context: version, live sim, frame-error buffer). SaveLoad hands
@@ -166,20 +155,8 @@ export class SaveLoad {
     try {
       do {
         this.autosaveQueued = false;
-        const tower = this.deps.enginePort().generation();
         // Re-stamp per iteration: the camera may have moved while the
         // previous async compression was in flight.
-        // The experimental worker host answers `serialize` from the engine
-        // only once its read model has caught up; wait for that here, where
-        // waiting costs nothing (no-op on every other engine). The camera is
-        // stamped after the wait, so the save carries where it is now.
-        await settleEngine(this.deps.getSim());
-        // A tower adopted during the wait is not the one to write: go round
-        // again with the tower the app holds now.
-        if (this.deps.enginePort().generation() !== tower) {
-          this.autosaveQueued = true;
-          continue;
-        }
         await SaveGame.saveAsync(this.saveText());
       } while (this.autosaveQueued);
     } catch {

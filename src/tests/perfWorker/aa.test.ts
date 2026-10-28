@@ -29,7 +29,7 @@ describe("the arguments and the configuration", () => {
     expect(c.aa).toBe("wasm");
     expect(c.modes).toEqual(["ts", "wasm"]);
     expect(comparisonConfig.aa).toBeNull();
-    expect(comparisonConfig.modes).toEqual(["ts", "wasm", "wasm-frame", "wasm-worker"]);
+    expect(makeConfig(parseArgs(["--reps", "6"]), ["small"]).modes).toEqual(["ts", "wasm"]);
   });
 
   it("opens the limitations with the A/A line, which a comparison does not have", () => {

@@ -2,7 +2,6 @@ import { Simulation } from "../engine/Simulation";
 import { towerStateSig } from "../engine/UndoHistory";
 import { markFounderFromLoadedFile } from "../engine/sim/founderStatus";
 import type { SerializedGame } from "../engine/types";
-import { saveText, settleEngine, stepGate } from "../wasmhost/stepGate";
 import type { SaveOptions, SimPort, TowerSource } from "./port";
 
 /** How `TsSim` hands over a tower it built: the app's `adoptSim`, read when
@@ -52,12 +51,10 @@ export function createTsLifecycle(getSim: () => Simulation, opts: TsSimOptions):
     },
     save(saveOpts) {
       try {
-        const sim = getSim();
-        // A host that steps in the background (the experimental worker and
-        // coalesced hosts) registers a step gate; without one the save is
-        // taken now, so it holds exactly what was issued before it.
-        if (!stepGate(sim)) return Promise.resolve(write(sim, saveOpts));
-        return settledSave(getSim, saveOpts);
+        // No engine steps in the background (the hosts that did went in PR
+        // 5e), so the save is taken now and holds exactly what was issued
+        // before it.
+        return Promise.resolve(write(getSim(), saveOpts));
       } catch (e) {
         return Promise.reject(e);
       }
@@ -110,17 +107,5 @@ function firstLoadable(saves: readonly SerializedGame[]): Simulation {
 function write(sim: Simulation, opts?: SaveOptions): string {
   const view = opts?.view?.();
   if (view) sim.view = view;
-  const hosted = opts?.memory ? saveText(sim) : undefined;
-  return hosted ? hosted() : JSON.stringify(sim.serialize());
-}
-
-/** The save of a host that steps in the background, once it has caught up
- *  (as `saveLoad.ts`'s autosave waits). A tower adopted during the wait is
- *  not the one asked for, so the wait starts again on the tower held now. */
-async function settledSave(getSim: () => Simulation, opts?: SaveOptions): Promise<string> {
-  for (;;) {
-    const sim = getSim();
-    await settleEngine(sim);
-    if (getSim() === sim) return write(sim, opts);
-  }
+  return JSON.stringify(sim.serialize());
 }

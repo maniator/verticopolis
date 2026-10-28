@@ -3,7 +3,6 @@ import { Simulation } from "../engine/Simulation";
 import { roomUnits, structureRuns } from "../engine/tower/rooms";
 import { MID, newSeededGame } from "../tests/fixtures/towerFixtures";
 import { parityRestarts } from "../tests/parity/typescriptOnly";
-import { setStepGate } from "../wasmhost/stepGate";
 import { describePortContract } from "./contract.fixture";
 import { createTsSim } from "./tsSim";
 
@@ -271,24 +270,6 @@ describe("TsSim over the live instance", () => {
     port.drainEvents({ release: false });
     port.drainEvents({ release: true });
     expect(seen).toEqual([[], [], [{ release: true }]]);
-  });
-
-  it("waits for a host that steps in the background before saving, and saves the tower held then", async () => {
-    let sim = newSeededGame(7, "modern");
-    const first = sim;
-    let caughtUp!: () => void;
-    const settled = new Promise<void>((resolve) => (caughtUp = resolve));
-    setStepGate(first, { canStep: () => true, flush: () => undefined, settle: () => settled });
-    try {
-      const port = createTsSim(() => sim);
-      const pending = port.save();
-      sim = newSeededGame(9, "modern");
-      sim.money = 123_456;
-      caughtUp();
-      expect(JSON.parse(await pending)).toMatchObject({ money: 123_456 });
-    } finally {
-      setStepGate(first, null);
-    }
   });
 
   it("rejects with the instance's own error", async () => {

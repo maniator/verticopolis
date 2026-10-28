@@ -15,14 +15,10 @@ import { facilityDiagnostics, transportDiagnostics } from "./facilityDiagnostics
 /**
  * What the facility editor and the inspector cards read: the decoded cards,
  * a shaft's schedule (`shaftSchedule`) and the batch dialog's dry run
- * (`quoteRentBatch`) through the port, and two reads the port has no member
- * for yet. Each of those two is read per call (adoptSim swaps the instance),
- * and is a gap the PR lists:
- *
- * - `catalog`: the tower's price and size tables (`catalogOf`), which the
- *   catalog handle points at whichever engine runs the tower.
- * - `diagnostics`: the cards' gripe lines (`facilityDiagnostics`), which move
- *   when `unitFacts` reaches `TsEngine`.
+ * (`quoteRentBatch`) through the port, the catalog of the engine the game
+ * holds (`catalogOf`), and the cards' gripe lines (`facilityDiagnostics`),
+ * which read the TypeScript engine's tower and so are empty on the Rust
+ * engine until the port carries them (#1420).
  */
 export interface CardKit {
   readonly cards: Cards;
@@ -55,20 +51,27 @@ export const BATCH_COUNTERS = [
   "clampedHigh",
 ] as const satisfies readonly (keyof BatchRentResult)[];
 
-export function createCardKit(app: { readonly enginePort: EnginePort; readonly reader: ViewReader; readonly sim: Simulation }): CardKit {
+export function createCardKit(app: { readonly enginePort: EnginePort; readonly reader: ViewReader }): CardKit {
   const port = app.enginePort;
   const codes = new PortCodes(port);
+  // The gripe lines read the TypeScript engine's own tower, never the
+  // tooling's copy of the Rust engine's (`game.sim`), which a read would
+  // rebuild from a save; the Rust engine shows none until the port carries
+  // them (#1420).
+  const tsTower = (): Simulation | undefined => (app.enginePort as { readonly sim?: Simulation }).sim;
   return {
     cards: new Cards(app.enginePort, app.reader),
     catalog: () => catalogOf(app),
     diagnostics: {
       unit: (id) => {
-        const u = app.sim.tower.getUnit(id);
-        return u ? facilityDiagnostics(app.sim, u) : [];
+        const sim = tsTower();
+        const u = sim?.tower.getUnit(id);
+        return sim && u ? facilityDiagnostics(sim, u) : [];
       },
       transport: (id) => {
-        const t = app.sim.tower.getTransport(id);
-        return t ? transportDiagnostics(app.sim, t) : [];
+        const sim = tsTower();
+        const t = sim?.tower.getTransport(id);
+        return sim && t ? transportDiagnostics(sim, t) : [];
       },
     },
     currentSchedule: (id) => scheduleFromSlots(port.shaftSchedule(id)),

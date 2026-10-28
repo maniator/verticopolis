@@ -183,7 +183,6 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   "src/dualrun/catalog.ts": { bulk: 1 },
   "src/render/pixelSprites/food.kit.ts": { bulk: 1 },
   "src/wasmhost/hostFault.ts": { bulk: 2 },
-  "src/wasmhost/workerController.ts": { bulk: 4 },
   // The sprite atlas's tables and a canvas context's method.
   "src/render/atlas/bake.ts": { bulk: 4 },
   "src/render/atlas/bakeAdditions.ts": { bulk: 1 },
@@ -192,16 +191,17 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   // fields (money, view, the tower's name).
   "src/dualrun/dualRun.ts": { bulk: 3 },
   "src/dualrun/mirror.ts": { bulk: 5 },
-  "src/wasmhost/startWasmHost.ts": { bulk: 6 },
   "src/wasmhost/wasmHost.ts": { bulk: 7 },
-  "src/wasmhost/workerApply.ts": { bulk: 2 },
-  "src/wasmhost/workerHost.ts": { bulk: 3 },
   // The command contract's malformed input for the port's shape check (a
   // getter, a `toJSON`, a hidden key): test data that reaches no room.
   "src/simport/commandContract.fixture.ts": { bulk: 7 },
   // `buildTDT`'s reviver deletes a `toString` key from the export's own
   // `JSON.parse` copy of the save: parsed data that reaches no room.
   "src/storage/tdtExport.ts": { bulk: 1 },
+  // A harness's field write on the tooling copy of the Rust engine's tower,
+  // which reaches the engine as a load (the engine counts its own rooms): the
+  // copy's own fields and the parts of it a harness holds (liveOf), no live unit.
+  "src/game/toolingSim.ts": { bulk: 3 },
   // Array slots: the section builder's output and the telemetry's tables.
   "src/wasmhost/buildSection.ts": { keyed: 1 },
   "src/wasmhost/telemetry.ts": { keyed: 2 },

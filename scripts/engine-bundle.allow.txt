@@ -132,9 +132,7 @@ src/engine/towerCatalog.ts
 src/engine/traffic.ts
 
 # Shared utilities and event plumbing
-src/engine/canonicalJson.ts
 src/engine/census.ts
-src/engine/conformanceView.ts
 src/engine/gameplayCatalog.ts
 src/engine/gameplayEventBuffer.ts
 src/engine/gameplayEventRules.ts

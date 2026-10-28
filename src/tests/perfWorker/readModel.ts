@@ -1,6 +1,6 @@
 import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../engine/serializedGame";
-import type { UnitRecord } from "../../wasmhost/frameView";
+import type { Unit } from "../../engine/types";
 import { quantile } from "../perfCompare/stats";
 
 /**
@@ -89,8 +89,12 @@ export interface ReadModelShape {
   outsideFrame: Spread | null;
 }
 
-/** The fields of the frame view's per-unit record besides its id
- *  (`UnitRecord`, `src/wasmhost/frameView.ts`); the record type makes the
+/** The per-unit record of the mirror host's frame view, which went with
+ *  that host in PR 5e. Kept here so this section still measures what the
+ *  committed runs measured. */
+type UnitRecord = Pick<Unit, "id" | "state" | "occupants" | "customersIn" | "hotelCustomersIn" | "outForMeal">;
+
+/** The fields of that record besides its id; the record type makes the
  *  list exhaustive. A save writes only `state` and `occupants` of them
  *  (`serializeUnit` drops the three visit counters as transient), so those
  *  two are the ones a save comparison can see. */

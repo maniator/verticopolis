@@ -42,8 +42,8 @@ function makeApp(parts: FakeParts = {}) {
     selected: parts.selected ?? null,
     inspectAnchor: parts.inspectAnchor ?? null,
     buildRefusalShowing: parts.buildRefusalShowing ?? false,
-    // The tower the catalog handle reads unit heights for (#921).
-    sim: { mode: "classic" },
+    // The engine the catalog handle reads unit heights from (#921).
+    enginePort: {},
     reader: { header: { mode: "classic" } },
     selectedUnit: () => parts.unit ?? null,
     selectedTransport: () => parts.transport ?? null,

@@ -69,7 +69,7 @@ export function watch(page: Page): { errors: string[]; failed: string[] } {
 /** Whether the engine's own save holds a lobby at floor 1, column `x`. */
 export function lobbyAt(page: Page, x: number): Promise<boolean> {
   return page.evaluate(
-    (at) => (JSON.parse((window as any).__vcEngine.current().engine.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === at),
+    (at) => (JSON.parse((window as any).__vcEngine.port.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === at),
     x,
   );
 }
@@ -182,7 +182,7 @@ export async function expectSoundsAfterGesture(page: Page): Promise<void> {
     Object.assign((window as any).__audioCounts, { bloop: 0, cues: [] });
     g.sim.money = 1e9;
     await g.build.tryBuild("lobby", 1, 160); // settles once the cue has played
-    (window as any).__vcEngine.current().syncStructure();
+    (window as any).game.syncSim();
   });
   expect(await lobbyAt(page, 160), "the lobby was built").toBe(true);
   const cue = await page.evaluate(() => ({ ...(window as any).__audioCounts }));

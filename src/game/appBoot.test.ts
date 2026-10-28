@@ -133,7 +133,7 @@ describe("wireControllers", () => {
       captureUndo: vi.fn(),
       commitUndo: vi.fn(),
       announce: vi.fn(),
-      adoptSim: vi.fn(),
+      followSwap: vi.fn(),
       isTransportTool: vi.fn(() => true),
       pickedAt: vi.fn(() => ({ picked: 1 })),
       selectPicked: vi.fn(),
@@ -216,11 +216,11 @@ describe("wireControllers", () => {
     const d = mocks.deps.save as Record<string, (...a: unknown[]) => unknown> & {
       ui: Record<string, (...a: unknown[]) => unknown>;
     };
-    expect(d.getSim()).toBe(app.sim);
+    expect((d.enginePort as () => unknown)()).toBe(app.enginePort);
     expect(d.getView()).toEqual({ view: 1 });
     expect(app.engine.viewState).toHaveBeenCalled();
-    d.adoptSim("newsim");
-    expect(app.adoptSim).toHaveBeenCalledWith("newsim");
+    d.towerSwapped(); // breaks the report leash, then the app follows the swap
+    expect([vi.mocked(app.ui.precedence.towerSwapped).mock.calls.length, vi.mocked(app.followSwap).mock.calls.length]).toEqual([1, 1]);
     d.ui.toast("t", "info");
     expect(app.ui.toast).toHaveBeenCalledWith("t", "info");
     expect(d.ui.downloadFile("f.json", "body")).toBe(false); // passed through for GH #997

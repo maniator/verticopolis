@@ -8,7 +8,7 @@ import { engineBuildRecord, expectedOf } from "./enginePackageRecord";
 import { EngineBootError } from "./engineBoot";
 import type { BuildMetadataResult } from "./buildSection";
 import { compileEngineBytes } from "./engineLoad";
-import { loadWasmEngine } from "./startWasmHost";
+import { loadWasmEngine } from "./rustEngine";
 import { enginePackageUrls, loadEngineModule, type EngineGlue, type LoadEngineOptions } from "./loadEngineModule";
 
 const sha = (d: Uint8Array | string) => createHash("sha256").update(d).digest("hex");

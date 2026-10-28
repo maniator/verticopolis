@@ -12,7 +12,10 @@
  *
  * They stage the sim off the public `window.game` API (sim / engine / grid / ui)
  * and read CANON facility widths from the sim so a hardcoded stride can't gap or
- * overlap a floor. The runner (screenshots.ts) and the manifest
+ * overlap a floor. On the Rust engine `g.sim` is a copy of the engine's
+ * tower (src/game/toolingSim.ts), so a builder done editing hands its edits on
+ * (`g.syncSim()`) and shows the engine's own view (`g.renderSim`), not the copy.
+ * The runner (screenshots.ts) and the manifest
  * (screenshot-scenes.ts) pass these by identity to `page.evaluate`. The in-page
  * primitives they lean on (clock adoption, stepping, chrome sweeps) live in
  * `screenshot-page-ops.ts`; every set is re-exported from
@@ -97,7 +100,7 @@ export function buildCrowdTower(): void {
   const c = s.clock;
   c.minutes = c.minutes - c.minuteOfDay + 8 * 60; // Monday 08:00
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(left + 22, 5, 1.5);
   g.speed = 2;
   g.engine.paused = false;
@@ -136,7 +139,7 @@ export function buildFireTower(): void {
   const mid = targets[Math.floor(targets.length / 2)];
   for (const u of targets) if (Math.abs(u.x - (mid?.x ?? 0)) <= 12) u.state = "fire";
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, 5, 1.2);
   g.speed = 0; // freeze so the flames hold
   g.engine.paused = false;
@@ -202,7 +205,7 @@ export function buildStatsTower(): void {
   }
   for (let i = 0; i < 90; i++) s.tick(60);
   s.money = 9_126_661;
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, 7, 0.6);
   g.speed = 1;
   g.engine.paused = false;
@@ -249,7 +252,7 @@ export function buildHotspotTower(): void {
   for (const f of [11, 12, 13]) fill(f, 30);
   s.evaluateStar();
   s.money = 9_126_661;
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(Math.floor(W / 2), 10, 0.5);
   g.speed = 1;
   g.engine.paused = false;
@@ -339,7 +342,7 @@ export function buildOverlayTower(): void {
     if (u.floor >= 16) sat -= 0.18; // upper zone rides the under-carred jammed shaft
     u.satisfaction = Math.max(0.08, Math.min(0.95, sat));
   }
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, 14, 0.42);
   g.speed = 0;
   g.engine.paused = true;
@@ -400,7 +403,7 @@ export function buildCleanlinessTower(): void {
     dirtiedByFloor[u.floor] = n + 1;
   }
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, 7, 0.5);
   g.speed = 0;
   g.engine.paused = true;
@@ -438,7 +441,7 @@ export function buildTabletTower(): void {
   for (let f = 13; f <= 16; f++) fill(f, "hotelDouble");
   s.money = 9_126_661;
   s.evaluateStar();
-  g.engine.setSim(s);
+  g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(C, 9, 0.45);
   g.speed = 1;
   g.engine.paused = false;

@@ -86,16 +86,6 @@ test("the main-thread engine shows its record and the source hash BUILD.json rec
   expect(copied).toContain("Package id this page expects: ");
 });
 
-test("the worker host reports the same stamped hash", async ({ page }) => {
-  const record = await buildRecord(page);
-  await page.goto("/?engine=wasm-worker");
-  await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted, undefined, { timeout: 30_000 });
-  await openHelp(page);
-  expect(await state(page)).toBe("ok");
-  expect((await page.evaluate(() => (window as any).__vcEngineBoot)).binary).toEqual({ state: "ok", sourceHash: record.sources });
-  expect(await copyDiagnostics(page)).toContain("Rust engine (worker)");
-});
-
 // A binary that is not the one this shell was built for never runs (the byte
 // check, #985), so its build section is never read: the states "mismatch",
 // "no section" and "malformed section" are reachable only on a development serve,

@@ -205,7 +205,7 @@ describe("TsEngine", () => {
 });
 
 describe("TsEngine.take", () => {
-  it("starts its own state again on a tower the app swapped in, and leaves the events to the app", () => {
+  it("starts its own state again on a tower a tooling scene swapped in, carrying the events as a swap does", () => {
     const e = TsEngine.newGame(5, "modern");
     e.tick(60);
     e.viewFrame(true);
@@ -221,7 +221,7 @@ describe("TsEngine.take", () => {
     e.take(next);
     expect([e.sim, e.generation()]).toEqual([next, gen + 1]);
     expect(e.viewFrame(true)[JSON.parse(e.viewLayout()).header.frameSeq]).toBe(1);
-    expect([next.gameplayEvents.length, old.gameplayEvents.length], "the app hands the events on, not the engine").toEqual([own, left]);
+    expect(next.gameplayEvents.length, "the replaced tower's events go ahead of the new tower's own").toBe(left + own);
   });
 });
 

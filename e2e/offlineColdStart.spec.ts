@@ -101,7 +101,7 @@ async function offlineStart(context: BrowserContext): Promise<{ page: Page; seen
 
 /** The engine's own save, parsed: the tower and clock the WASM engine holds. */
 function engineSave(page: Page): Promise<unknown> {
-  return page.evaluate(() => JSON.parse((window as any).__vcEngine.current().engine.serialize()));
+  return page.evaluate(() => JSON.parse((window as any).__vcEngine.port.serialize()));
 }
 
 /** The engine's own clock, read from its save. */
@@ -117,9 +117,9 @@ test("after one online visit, a fresh offline browser session opens the game on 
   try {
     const { page, seen, audio } = await offlineStart(context);
     const engine = await page.evaluate(() => (window as any).__vcEngine.status);
-    expect({ hosted: engine.hosted, errors: engine.errors }, "the engine hosts the tower with no fallback").toEqual({ hosted: true, errors: [] });
+    expect({ hosted: engine.hosted, lastError: engine.lastError }, "the engine hosts the tower with no fallback").toEqual({ hosted: true, lastError: null });
     // Read the clock from the engine's own save, so the advance is the
-    // engine's and no copy the host keeps.
+    // engine's.
     const start = await engineMinutes(page);
     await advanceClock(page);
     expect(await engineMinutes(page), "the engine's own clock advances").toBeGreaterThan(start);
@@ -142,7 +142,7 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
       const g = (window as any).game;
       g.sim.money = 1e9;
       if (!g.sim.build("lobby", 1, 160).ok) throw new Error("the online lobby was refused");
-      (window as any).__vcEngine.current().syncStructure();
+      (window as any).game.syncSim();
     });
     savedAt = await advanceClock(page);
     await page.evaluate(() => (window as any).game.saveToSlot(1));
@@ -158,7 +158,7 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
       const g = (window as any).game;
       g.setSpeed(0);
       g.loadFromSlot(1);
-      (window as any).__vcEngine.current().syncStructure();
+      (window as any).game.syncSim();
     });
     expect(await lobbyAt(page, 160), "the online save's lobby loaded").toBe(true);
     expect(await page.evaluate(() => (window as any).game.sim.clock.minutes), "the online save's clock loaded").toBe(savedAt);
@@ -169,7 +169,7 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
     const resaved = await page.evaluate(() => {
       const g = (window as any).game;
       const ok = g.sim.build("lobby", 1, 200).ok;
-      (window as any).__vcEngine.current().syncStructure();
+      (window as any).game.syncSim();
       g.saveToSlot(1);
       return { ok, minutes: g.sim.clock.minutes as number };
     });
@@ -185,7 +185,7 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
       const g = (window as any).game;
       g.setSpeed(0);
       g.loadFromSlot(1);
-      (window as any).__vcEngine.current().syncStructure();
+      (window as any).game.syncSim();
     });
     const reloaded = {
       lobby160: await lobbyAt(page, 160),
