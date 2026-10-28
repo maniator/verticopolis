@@ -3,8 +3,8 @@ import { describe, it, expect, vi } from "vitest";
 import { render } from "lit-html";
 import { Simulation } from "../engine/Simulation";
 import type { Transport, Unit } from "../engine/types";
-import { unitEditorTemplate, transportEditorTemplate } from "./templates/editor";
 import { syncRungSelects } from "./templates/rungPicker";
+import { unitEditor, transportEditor } from "../game/cardKit.fixture";
 
 /**
  * The editor card's update-in-place invariant, rewritten for lit (E6-S1).
@@ -39,14 +39,14 @@ describe("editor card lit diffing — updates in place, element identity survive
     const { sim, office } = fixture();
     office.satisfaction = 0.5;
     const card = document.createElement("div");
-    render(unitEditorTemplate(sim, office), card);
+    render(unitEditor(sim, office), card);
     const btn = card.querySelector<HTMLElement>('[data-edit="rentUp"]')!;
     const name = card.querySelector<HTMLInputElement>("#ed-name")!;
     const evalCell = card.querySelector('[data-field="eval"]')!;
     expect(evalCell.textContent).toContain("50%");
 
     office.satisfaction = 0.78;
-    render(unitEditorTemplate(sim, office), card);
+    render(unitEditor(sim, office), card);
 
     expect(evalCell.textContent).toContain("78%");
     // Same element identities → a click that began before the refresh still lands.
@@ -66,11 +66,11 @@ describe("editor card lit diffing — updates in place, element identity survive
     const officeB = sim.tower.units.find((u) => u.id === r2.unitId)!;
     officeB.state = "occupied";
     const card = document.createElement("div");
-    render(unitEditorTemplate(sim, office), card);
+    render(unitEditor(sim, office), card);
     const inputA = card.querySelector<HTMLInputElement>("#ed-name")!;
     inputA.value = "half-typed"; // player is mid-rename when the selection moves
 
-    render(unitEditorTemplate(sim, officeB), card);
+    render(unitEditor(sim, officeB), card);
     const inputB = card.querySelector<HTMLInputElement>("#ed-name")!;
     expect(inputB).not.toBe(inputA); // new selection, new input
     expect(inputB.value).toBe(officeB.label);
@@ -79,13 +79,13 @@ describe("editor card lit diffing — updates in place, element identity survive
   it("a click listener attached before a refresh still fires on the same button after it", () => {
     const { sim, office } = fixture();
     const card = document.createElement("div");
-    render(unitEditorTemplate(sim, office), card);
+    render(unitEditor(sim, office), card);
     const btn = card.querySelector<HTMLElement>('[data-edit="rentUp"]')!;
     const onClick = vi.fn();
     btn.addEventListener("click", onClick);
 
     office.satisfaction = 0.3; // a stat tick lands "mid-click"
-    render(unitEditorTemplate(sim, office), card);
+    render(unitEditor(sim, office), card);
 
     btn.click();
     expect(onClick).toHaveBeenCalledOnce();
@@ -110,7 +110,7 @@ describe("editor card lit diffing — updates in place, element identity survive
     // Mirror renderEditor: selection is written post-render by syncRungSelects
     // (a select's options must be attached before its value can be set).
     const paint = () => {
-      render(unitEditorTemplate(sim, office), card);
+      render(unitEditor(sim, office), card);
       syncRungSelects(card);
     };
     paint();
@@ -142,7 +142,7 @@ describe("editor card lit diffing — updates in place, element identity survive
     document.body.appendChild(card); // focus needs a connected element
     try {
       const paint = () => {
-        render(unitEditorTemplate(sim, office), card);
+        render(unitEditor(sim, office), card);
         syncRungSelects(card);
       };
       paint();
@@ -163,13 +163,13 @@ describe("editor card lit diffing — updates in place, element identity survive
   it("a shape change (gutted) restructures rows while the action buttons keep identity", () => {
     const { sim, office } = fixture();
     const card = document.createElement("div");
-    render(unitEditorTemplate(sim, office), card);
+    render(unitEditor(sim, office), card);
     expect(card.textContent).toContain("Resale value");
     const sell = card.querySelector<HTMLElement>('[data-edit="sell"]')!;
     const status = card.querySelector('[data-field="status"]')!;
 
     office.state = "gutted";
-    render(unitEditorTemplate(sim, office), card);
+    render(unitEditor(sim, office), card);
 
     expect(status.textContent).toBe("gutted");
     expect(card.textContent).toContain("Scrap value");
@@ -180,14 +180,14 @@ describe("editor card lit diffing — updates in place, element identity survive
   it("a car button crossing its disabled bound flips the attribute on the SAME element", () => {
     const { sim, lift } = fixture();
     const card = document.createElement("div");
-    render(transportEditorTemplate(sim, lift), card);
+    render(transportEditor(sim, lift), card);
     const remove = card.querySelector<HTMLButtonElement>('[data-edit="removecar"]')!;
     // The legacy protocol REBUILT the whole card at this bound (it was part of
     // the shape key); lit just patches the attribute, so even this refresh can
     // no longer swallow an in-flight click.
     expect(remove.disabled).toBe(lift.cars <= 1);
     expect(sim.tower.setCars(lift.id, lift.cars <= 1 ? 2 : 1)).toBe(true);
-    render(transportEditorTemplate(sim, lift), card);
+    render(transportEditor(sim, lift), card);
     expect(card.querySelector('[data-edit="removecar"]')).toBe(remove);
     expect(remove.disabled).toBe(lift.cars <= 1);
   });

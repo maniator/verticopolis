@@ -1,6 +1,7 @@
-import type { Simulation } from "../engine/Simulation";
 import { catalogFacility } from "../engine/catalogTypes";
-import { towerCatalog } from "../engine/towerCatalog";
+import { clockOf } from "../simport/headerClock";
+import type { ViewReader } from "../simport/viewReader";
+import type { CardKit } from "./cardKit";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import { unitInspectorTemplate, transportInspectorTemplate } from "../ui/templates/inspector";
@@ -18,12 +19,15 @@ export { retailStatsLines } from "./facilityDiagnostics";
  * swap) can be unit-tested without a DOM game shell. The anchor cell stays in GameApp — its per-frame panel
  * positioning reads it — and is written through `deps.setAnchor`.
  *
- * Never stores a Simulation — adoptSim() swaps the live instance, so every
- * method asks `deps.getSim()` fresh.
+ * Each pick asks the port for the facility's card (one `unitCard` or
+ * `shaftCard`, the shaft's kept per revision and hour) and keeps nothing of
+ * the tower: the kit is read per call, so an adoptSim() swap is picked up.
  */
 export interface InspectorDeps {
-  /** The live simulation (never cached — adoptSim swaps the instance). */
-  getSim(): Simulation;
+  /** The cards and the reads the port lacks (read per call). */
+  kit(): CardKit;
+  /** The view, for the clock. */
+  reader(): Pick<ViewReader, "header">;
   ui: Pick<UI, "showInspector">;
   /** World cell the card describes (GameApp anchors the panel to it each frame). */
   setAnchor(anchor: { x: number; left: number; floor: number } | null): void;
@@ -44,7 +48,6 @@ export class InspectorController {
   constructor(private readonly deps: InspectorDeps) {}
 
   inspectPicked(p: Picked | null): void {
-    const sim = this.deps.getSim();
     if (!p || p.kind === "floor" || p.kind === "lobby") {
       // Hide, but keep any ✕-dismissal latch: a transient empty/floor pick
       // (pointer jitter crossing a gap) must not re-arm the card the user
@@ -59,12 +62,13 @@ export class InspectorController {
     }
     this.inspectDismissed = null;
     if (p.type === "unit") {
-      const u = sim.tower.getUnit(p.id);
+      const kit = this.deps.kit();
+      const u = kit.cards.unit(p.id);
       if (!u) {
         this.hide();
         return;
       }
-      this.deps.setAnchor({ x: u.x + u.width, left: u.x, floor: u.floor + catalogFacility(towerCatalog(sim), u.kind).floors - 1 });
+      this.deps.setAnchor({ x: u.x + u.width, left: u.x, floor: u.floor + catalogFacility(kit.catalog(), u.kind).floors - 1 });
       this.inspectTarget = { type: p.type, id: p.id };
       // The card body (title/label/status/census/diagnostics/satisfaction) is
       // the lit template in ui/templates/inspector.ts (E6-S2); the access
@@ -72,16 +76,17 @@ export class InspectorController {
       // capacity, and retail patronage lines all come from facilityDiagnostics
       // inside it, shared with the mobile editor fold-in so the two surfaces
       // can't drift.
-      this.deps.ui.showInspector(unitInspectorTemplate(sim, u));
+      this.deps.ui.showInspector(unitInspectorTemplate(u, kit.catalog(), clockOf(this.deps.reader().header).hour, kit.diagnostics.unit(u.id)));
     } else {
-      const t = sim.tower.getTransport(p.id);
+      const kit = this.deps.kit();
+      const t = kit.cards.shaft(p.id);
       if (!t) {
         this.hide();
         return;
       }
       this.deps.setAnchor({ x: t.x + t.width, left: t.x, floor: t.top });
       this.inspectTarget = { type: p.type, id: p.id };
-      this.deps.ui.showInspector(transportInspectorTemplate(sim, t));
+      this.deps.ui.showInspector(transportInspectorTemplate(t, kit.catalog(), kit.diagnostics.transport(t.id)));
     }
   }
 
