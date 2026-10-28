@@ -243,6 +243,41 @@ in a wasm-only build, because the read model, the command path and the save
 loader use it; [the bundle report](docs/performance/wasm-only-bundle.md)
 measures it and names the cutover items that remove it.
 
+## The engine port (the cutover in progress)
+
+The read model above is what the cutover removes. The target, settled with
+the owner on 2026-10-28, is one synchronous, numeric interface, `EnginePort`,
+that both engines implement directly:
+
+```mermaid
+flowchart LR
+    UI["src/game · src/ui · src/render"] --> Port["EnginePort<br/>(synchronous, numeric)"]
+    Port -. one of .-> Rust["Engine (Rust → WASM)<br/>engine-rs/src/wasm_port.rs"]
+    Port -. one of .-> Ts["TsEngine<br/>src/engine (fallback)"]
+    Render["renderer records"] --> Reader["shared view reader<br/>src/simport/viewReader.ts"]
+    Reader --> Port
+```
+
+- **The engine is the port.** The game holds the WASM `Engine` class itself,
+  or the TypeScript engine, and calls it with nothing in between: no
+  TypeScript mirror of the Rust simulation and no adapter layer. Refusals,
+  the argument checks and the money delta live inside each engine.
+- **Numeric.** The view is the engine's `Float64Array`s (structure once per
+  tower revision, one frame per frame), decoded by the slots and code tables
+  of `viewLayout()`. Commands take numbers and answer a result record;
+  queries answer numeric records. JSON stays only on rare paths (the layout
+  once per boot, saves and loads, tooling).
+- **One shared view reader** turns the arrays into the records the renderer
+  draws. Both engines feed it the same arrays, and it decodes but never
+  decides.
+- **Workers wrap the port on their own side.** A worker host, if one ships,
+  runs an `EnginePort` inside the worker behind a separate async gateway;
+  the main-thread port stays synchronous.
+
+The full contract (every member, the input rules, the exceptions, the PR
+order) is
+[`engine-port-contract.md`](_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/engine-port-contract.md).
+
 ## Where to go next
 
 - **[CONTRIBUTING.md](./CONTRIBUTING.md)** — the contributor guide: dev setup,
