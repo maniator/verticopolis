@@ -227,7 +227,7 @@ const EVERY_OP = {
   addCar: true, removeCar: true, setStop: true, setExpressStops: true, clearStops: true, setSchedule: true,
   setLabel: true, adjustRent: true, setNoRate: true, priceUnit: true, applyRentBatch: true, setFilmPolicy: true,
   rerollSubtype: true, callExterminator: true, resolveChoice: true, toggleAutoBridge: true, setAutoBridge: true,
-  setTowerName: true, setView: true, emit: true,
+  setTowerName: true, setView: true, emit: true, paintBrush: true,
 } satisfies Record<CommandOp, true>;
 
 interface Step {
@@ -254,6 +254,7 @@ function coverageScript(mid: number, ids: { office: number; shaft: number; food:
     ...[2, 3].flatMap((floor) =>
       Array.from({ length: 11 }, (_, i): Step => ({ name: `a floor tile on ${floor} at ${mid + 5 + i}`, run: () => ({ op: "build", kind: "floor", floor, x: mid + 5 + i }), moves: true })),
     ),
+    { name: "a floor brush", run: () => ({ op: "paintBrush", kind: "floor", floor: 2, tiles: [mid + 16, mid + 17] }), moves: true },
     { name: "a shaft", run: () => ({ op: "buildTransport", kind: "elevatorStandard", x: mid + 8, bottom: 1, top: 2 }), moves: true, after: (p) => (ids.shaft = p.view.tower.transports[0].id) },
     { name: "a car", run: () => ({ op: "addCar", id: ids.shaft }), moves: true },
     { name: "a car off", run: () => ({ op: "removeCar", id: ids.shaft }), moves: true },
