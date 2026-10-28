@@ -177,6 +177,9 @@ export async function buildCrashReportZip(
   };
 }
 
+/** "twice", or the count for any other number of crashes. */
+export const timesText = (n: number): string => (n === 2 ? "twice" : `${n} times`);
+
 /** The issue title and the first lines of its description, per crash. */
 function crashSummary(details: Pick<CrashDetails, "crash" | "engines">): { title: string; lines: string[] } {
   const { crash } = details;
@@ -191,7 +194,7 @@ function crashSummary(details: Pick<CrashDetails, "crash" | "engines">): { title
   return {
     title: "Rust engine crashed",
     lines: [
-      `The Rust engine crashed ${crash.crashes} times, so the game switched to the TypeScript engine.`,
+      `The Rust engine crashed ${timesText(crash.crashes)}, so the game switched to the TypeScript engine.`,
       `Rust engine: ${named}. Fault: ${crash.reason} at ${crash.stage}.`,
     ],
   };
