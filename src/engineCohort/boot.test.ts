@@ -8,11 +8,11 @@ import { ENGINE_STORAGE_KEY } from "../wasmhost/engineChoice";
 // The suites below test the Rust paths the Settings choice and the cohort
 // reach once the test link no longer holds them (#1422); the hold that keeps
 // them on TypeScript until then is tested on its own.
-const flags = vi.hoisted(() => ({ rustOnlyByUrl: false }));
+const flags = vi.hoisted(() => ({ rustOnlyByChoice: false }));
 vi.mock("./config", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./config")>()),
-  get RUST_ONLY_BY_URL() {
-    return flags.rustOnlyByUrl;
+  get RUST_ONLY_BY_CHOICE() {
+    return flags.rustOnlyByChoice;
   },
 }));
 
@@ -21,16 +21,18 @@ beforeEach(() => {
   sessionStorage.clear();
 });
 
-describe("the boot while only the URL boots Rust", () => {
+describe("the boot while only a choice boots Rust", () => {
   afterEach(() => {
-    flags.rustOnlyByUrl = false;
+    flags.rustOnlyByChoice = false;
   });
 
-  it("runs TypeScript for a stored Rust choice and Rust for the test link", () => {
-    flags.rustOnlyByUrl = true;
+  it("runs Rust for a stored Rust choice and the test link, and TypeScript for an old host", () => {
+    flags.rustOnlyByChoice = true;
     localStorage.setItem(ENGINE_STORAGE_KEY, "wasm");
-    expect(selectBootEngine("")).toBe("ts");
+    expect(selectBootEngine("")).toBe("wasm");
     expect(selectBootEngine("?engine=wasm")).toBe("wasm");
+    localStorage.setItem(ENGINE_STORAGE_KEY, "wasm-frame");
+    expect(selectBootEngine("")).toBe("ts");
   });
 });
 afterEach(() => {

@@ -14,13 +14,19 @@ function input(over: Partial<EngineSettingsInput> = {}): EngineSettingsInput {
   return { selection: sel(), running: "ts", preference: "auto", suppression: null, pageFallback: null, storable: true, ...over };
 }
 
-describe("engineSettingsView while only the URL boots Rust", () => {
-  it("says why a Rust choice runs TypeScript and offers no restart", () => {
-    const v = engineSettingsView(input({ preference: "wasm", rustOnlyByUrl: true, selection: sel({ selectedBy: "setting", requested: "wasm", heldForUrl: true }) }));
-    expect(v.note).toBe("For now the Rust engine runs only from a test link, so the game uses the TypeScript engine.");
+describe("engineSettingsView while only a choice boots Rust", () => {
+  it("says why an old test host runs TypeScript and offers no restart", () => {
+    const v = engineSettingsView(input({ preference: "wasm-frame", rustOnlyByChoice: true, selection: sel({ selectedBy: "setting", requested: "wasm-frame", heldForChoice: true }) }));
+    expect(v.note).toBe("For now the Rust engine runs only when you pick it here or open a test link, so the game uses the TypeScript engine.");
     expect(v.restart).toBe(false);
     // A test link's Rust page says nothing.
-    expect(engineSettingsView(input({ preference: "wasm", rustOnlyByUrl: true, running: "wasm", selection: sel({ selectedBy: "url", boot: "wasm" }) })).note).toBeNull();
+    expect(engineSettingsView(input({ preference: "wasm", rustOnlyByChoice: true, running: "wasm", selection: sel({ selectedBy: "url", boot: "wasm" }) })).note).toBeNull();
+  });
+
+  it("lets the Rust engine itself run: picked on TypeScript, it asks for a restart and explains nothing", () => {
+    const v = engineSettingsView(input({ preference: "wasm", rustOnlyByChoice: true, selection: sel({ selectedBy: "default", requested: "ts" }) }));
+    expect(v.note).toBeNull();
+    expect(v.restart).toBe(true);
   });
 });
 
