@@ -9,6 +9,9 @@ import { mountAppDom, makeUI } from "../uiFixture";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { PortCodes } from "../../simport/portCodes";
 import { createTsSim } from "../../simport/tsSim";
+import { TsEngine } from "../../engine/port/tsEngine";
+import { PortCodes } from "../../simport/portCodes";
+import { ViewReader } from "../../simport/viewReader";
 
 /**
  * The TOWER congratulations and the dialogs that freeze time (#1120).
@@ -62,6 +65,9 @@ function makeApp(sim: Simulation, ui: UI) {
     enginePort,
     portCodes: new PortCodes(enginePort),
     port: createTsSim(() => sim),
+    enginePort,
+    reader: new ViewReader(enginePort),
+    portCodes: new PortCodes(enginePort),
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn() },
     engine: { focus: vi.fn(() => ({})) },
