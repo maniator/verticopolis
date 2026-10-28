@@ -114,6 +114,7 @@ export class Engine {
      * changes nothing in the game.
      */
     diagnosticFacts(id: number): string | undefined;
+    drainEvents(): Float64Array;
     /**
      * The gameplay events emitted since the last drain, oldest first, as
      * JSON `[{ name, payload }]` (`conformance/events/catalog.json`); the
@@ -135,6 +136,7 @@ export class Engine {
      */
     endExtend(): void;
     evaluateStar(): void;
+    eventText(i: number): string | undefined;
     expressStops(id: number): Float64Array;
     extendShaft(id: number, up: boolean, target_floor: number): Float64Array;
     /**
@@ -157,6 +159,7 @@ export class Engine {
      * four overlays is an error.
      */
     floorHeatmap(mode: string): string;
+    foundTower(seed: number, mode: number, calendar: number, unbridged: boolean): Float64Array;
     /**
      * The per-frame read model as one flat number array (see
      * `frame_view` for the layout): what the host reads every frame while
@@ -194,6 +197,7 @@ export class Engine {
      * lost (the drain empties the buffer either way).
      */
     gameplayEventsPending(): number;
+    generation(): number;
     hotspot(): Float64Array;
     /**
      * `housekeepingCoverage()`, as JSON.
@@ -207,6 +211,9 @@ export class Engine {
     housekeepingReport(): string | undefined;
     labelUnit(id: number, text: string): Float64Array;
     lastReason(): string | undefined;
+    loadSave(text: string): Float64Array;
+    logAfter(seq: number): Float64Array;
+    logLine(text: string, kind: number): Float64Array;
     /**
      * The log entries emitted after `seq` (the `logSeq` the host last saw),
      * oldest first, as JSON `[{ seq, minute, text, kind }]`. The engine keeps
@@ -214,6 +221,7 @@ export class Engine {
      * the ring gets the ring.
      */
     logSince(seq: number): string;
+    logText(seq: number): string | undefined;
     /**
      * The loop's pass memos as `[lastHour, lastDay, lastMonth, lastQuarter]`,
      * the counterpart of `seedLoopMemos`. Tooling only: the gallery's handoff
@@ -309,6 +317,7 @@ export class Engine {
      * `resolveChoice(accept ? "accept" : "decline")`.
      */
     resolveChoice(accept: boolean): void;
+    restore(text: string): Float64Array;
     /**
      * What moved in the save since the last sync: `{ units, rest }` as JSON
      * text (the changed unit records, and every other top-level key).
@@ -316,6 +325,7 @@ export class Engine {
      * save was taken yet: the host then takes a full one.
      */
     saveDelta(): string | undefined;
+    scheduleShaft(id: number, slots: Float64Array): Float64Array;
     /**
      * Replace the elevator telemetry with an `elevatorTelemetry` document.
      * Tooling only (the gallery's engine leg); no game command reaches it.
@@ -347,6 +357,7 @@ export class Engine {
      * `sim.autoBridge = value`, the direct write an undo restore makes.
      */
     setAutoBridge(value: boolean): void;
+    setBackdrop(on: boolean): void;
     setCamera(tile: number, floor: number, zoom: number): Float64Array;
     /**
      * `setCars(id, cars)`: the simulation-layer edit, which reports
@@ -452,6 +463,7 @@ export class Engine {
      * The transport inspector and editor card for shaft `id`, as JSON, or null.
      */
     transportDetail(id: number): string | undefined;
+    undoSignature(): string;
     /**
      * The unit covering a tile, serialized as the save would, or null.
      */
@@ -460,7 +472,10 @@ export class Engine {
      * The unit inspector and editor card for unit `id`, as JSON, or null.
      */
     unitDetail(id: number): string | undefined;
+    unitLabel(id: number): string | undefined;
+    unitMetaChanged(since: number): Float64Array;
     unitMetaSince(since: number): string;
+    unitSubtype(id: number): string | undefined;
     /**
      * `tower.validateTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`,
      * nothing written. An unknown kind is refused with "Unknown facility."; a

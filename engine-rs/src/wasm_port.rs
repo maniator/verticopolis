@@ -37,7 +37,7 @@ pub(crate) const FILM_POLICIES: [&str; 3] = ["auto", "feature", "blockbuster"];
 pub(crate) const ONBOARDING: [&str; 5] = ["lobby", "floor", "office", "connect", "play"];
 
 /// Each command's own slots after [`DELTA`], for the view layout.
-pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 24] = [
+pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 26] = [
     ("buildAt", &[]),
     ("paintTiles", &["placed"]),
     ("buildShaft", &[]),
@@ -62,13 +62,23 @@ pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 24] = [
     ("stopExtend", &[]),
     ("labelUnit", &[]),
     ("nameTower", &[]),
+    ("logLine", &[]),
+    ("scheduleShaft", &[]),
 ];
 
 /// Each query record's slots, for the view layout.
-const QUERY_RECORDS: [(&str, &[&str]); 3] = [
+const QUERY_RECORDS: [(&str, &[&str]); 9] = [
     ("quoteBuild", &["ok", "cost"]),
     ("quoteShaft", &["ok"]),
     ("hotspot", &["ratio", "floor"]),
+    ("loadSave", &["status", "generation"]),
+    ("restore", &["status", "generation"]),
+    ("foundTower", &["status", "generation"]),
+    ("drainEvents", &["dropped", "count"]),
+    // A header, then the changed ids.
+    ("unitMetaChanged", &["revision", "full"]),
+    // One entry per log line, repeated.
+    ("logAfter", &["seq", "kindCode", "minute"]),
 ];
 
 /// The port's records and codes in the view layout, under `records`: each
@@ -97,6 +107,8 @@ pub(crate) fn add_records(layout: &mut serde_json::Value) {
     layout["records"] = serde_json::Value::Object(records);
     layout["onboarding"] = serde_json::json!(ONBOARDING);
     layout["filmPolicies"] = serde_json::json!(FILM_POLICIES);
+    layout["logKinds"] = serde_json::json!(super::port_life::LOG_KINDS);
+    layout["scheduleSlots"] = serde_json::json!(super::port_life::SCHEDULE_LEN);
 }
 
 /// The layout `viewLayout()` hands over: the view's, with the port's

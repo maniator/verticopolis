@@ -156,24 +156,39 @@ pub fn whole_revision(raw: Option<f64>) -> Option<i64> {
 /// builds a tower that starts again at revision 1, so a host on a new
 /// engine asks with nothing or 0, as it reads a fresh structure.
 pub fn meta_since(tower: &Tower, since: Option<i64>) -> Value {
-    let reachable = since.filter(|&s| s <= tower.meta_revision);
-    let changed = reachable.and_then(|s| tower.view.meta_log.since(s));
-    let units: Vec<Value> = match &changed {
-        Some(ids) => ids
-            .iter()
-            .filter_map(|id| tower.get_unit(*id))
-            .map(|u| record(u.id, &u.label, u.subtype))
-            .collect(),
-        None => tower
-            .units
-            .iter()
-            .filter(|u| u.subtype.is_some() || u.label != u.kind.facility().name)
-            .map(|u| record(u.id, &u.label, u.subtype))
-            .collect(),
-    };
+    let (full, ids) = meta_changed(tower, since);
+    let units: Vec<Value> = ids
+        .iter()
+        .filter_map(|id| tower.get_unit(*id))
+        .map(|u| record(u.id, &u.label, u.subtype))
+        .collect();
     json!({
         "revision": tower.meta_revision,
-        "full": changed.is_none(),
+        "full": full,
         "units": units,
     })
+}
+
+/// The ids `meta_since` lists, with whether the listing is full: the units
+/// changed after `since` when the log still reaches it, else every unit
+/// whose label or subtype is not its kind's default.
+pub fn meta_changed(tower: &Tower, since: Option<i64>) -> (bool, Vec<i64>) {
+    let reachable = since.filter(|&s| s <= tower.meta_revision);
+    match reachable.and_then(|s| tower.view.meta_log.since(s)) {
+        Some(ids) => (
+            false,
+            ids.into_iter()
+                .filter(|id| tower.get_unit(*id).is_some())
+                .collect(),
+        ),
+        None => (
+            true,
+            tower
+                .units
+                .iter()
+                .filter(|u| u.subtype.is_some() || u.label != u.kind.facility().name)
+                .map(|u| u.id)
+                .collect(),
+        ),
+    }
 }

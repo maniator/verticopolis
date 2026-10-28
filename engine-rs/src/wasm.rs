@@ -280,6 +280,12 @@ pub struct Engine {
     mirror: SaveMirror,
     /// The text of the last port refusal (`wasm_port.rs`).
     reason: Option<String>,
+    /// Moves on every done tower swap (`wasm_port_life.rs`).
+    generation: u64,
+    /// Whether the current tower is the title screen's scenery.
+    backdrop: bool,
+    /// The batch the last `drainEvents()` took, for `eventText(i)`.
+    drained: Vec<crate::gameplay::GameplayEvent>,
 }
 
 #[wasm_bindgen]
@@ -1039,6 +1045,9 @@ mod port;
 #[path = "wasm_port_edit.rs"]
 mod port_edit;
 
+#[path = "wasm_port_life.rs"]
+mod port_life;
+
 /// The engine's port (facade slice 7, the owner's 2026-10-28 redesign): the
 /// game calls these on `Engine` directly, every argument a number and every
 /// answer a number or a record of numbers, with no JSON. A command answers
@@ -1180,6 +1189,75 @@ impl Engine {
     #[wasm_bindgen(js_name = nameTower)]
     pub fn name_tower(&mut self, text: Option<String>) -> Vec<f64> {
         self.port_name_tower(text)
+    }
+}
+
+/// The port's lifecycle, events, log and text getters (`wasm_port_life.rs`).
+#[wasm_bindgen]
+impl Engine {
+    #[wasm_bindgen(js_name = loadSave)]
+    pub fn load_save(&mut self, text: &str) -> Vec<f64> {
+        self.port_load_save(text)
+    }
+    pub fn restore(&mut self, text: &str) -> Vec<f64> {
+        self.port_restore(text)
+    }
+    #[wasm_bindgen(js_name = foundTower)]
+    pub fn found_tower(
+        &mut self,
+        seed: f64,
+        mode: f64,
+        calendar: f64,
+        unbridged: bool,
+    ) -> Vec<f64> {
+        self.port_found(seed, mode, calendar, unbridged)
+    }
+    pub fn generation(&self) -> f64 {
+        self.generation as f64
+    }
+    #[wasm_bindgen(js_name = undoSignature)]
+    pub fn undo_signature(&self) -> String {
+        self.port_undo_signature()
+    }
+    #[wasm_bindgen(js_name = drainEvents)]
+    pub fn drain_events(&mut self) -> Vec<f64> {
+        self.port_drain_events()
+    }
+    #[wasm_bindgen(js_name = eventText)]
+    pub fn event_text(&self, i: f64) -> Option<String> {
+        self.port_event_text(i)
+    }
+    #[wasm_bindgen(js_name = setBackdrop)]
+    pub fn set_backdrop(&mut self, on: bool) {
+        self.port_set_backdrop(on)
+    }
+    #[wasm_bindgen(js_name = unitMetaChanged)]
+    pub fn unit_meta_changed(&self, since: f64) -> Vec<f64> {
+        self.port_unit_meta_changed(since)
+    }
+    #[wasm_bindgen(js_name = unitLabel)]
+    pub fn unit_label(&self, id: f64) -> Option<String> {
+        self.port_unit_label(id)
+    }
+    #[wasm_bindgen(js_name = unitSubtype)]
+    pub fn unit_subtype(&self, id: f64) -> Option<String> {
+        self.port_unit_subtype(id)
+    }
+    #[wasm_bindgen(js_name = logAfter)]
+    pub fn log_after(&self, seq: f64) -> Vec<f64> {
+        self.port_log_after(seq)
+    }
+    #[wasm_bindgen(js_name = logText)]
+    pub fn log_text(&self, seq: f64) -> Option<String> {
+        self.port_log_text(seq)
+    }
+    #[wasm_bindgen(js_name = logLine)]
+    pub fn log_line(&mut self, text: &str, kind: f64) -> Vec<f64> {
+        self.port_log_line(text, kind)
+    }
+    #[wasm_bindgen(js_name = scheduleShaft)]
+    pub fn schedule_shaft(&mut self, id: f64, slots: &[f64]) -> Vec<f64> {
+        self.port_schedule_shaft(id, slots)
     }
 }
 
@@ -1556,11 +1634,7 @@ mod tests {
         assert!(sim.build_transport(Kind::ElevatorStandard, 10, 1, 2).ok);
         let lift = sim.tower.transport_at(1, 10).unwrap().id;
         sim.money = 1_000_000.0;
-        let mut e = Engine {
-            sim,
-            mirror: SaveMirror::default(),
-            reason: None,
-        };
+        let mut e = Engine::of(sim);
         let before = e.serialize();
         e.sim.gameplay.drain();
         let refused = |text: String| -> Value {
