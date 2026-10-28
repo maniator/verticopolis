@@ -278,6 +278,8 @@ pub fn engine_identity() -> String {
 pub struct Engine {
     sim: Simulation,
     mirror: SaveMirror,
+    /// The text of the last port refusal (`wasm_port.rs`).
+    reason: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -1031,6 +1033,156 @@ pub fn encode_vctower(
 #[path = "wasm_facade_commands.rs"]
 mod facade_commands;
 
+#[path = "wasm_port.rs"]
+mod port;
+
+#[path = "wasm_port_edit.rs"]
+mod port_edit;
+
+/// The engine's port (facade slice 7, the owner's 2026-10-28 redesign): the
+/// game calls these on `Engine` directly, every argument a number and every
+/// answer a number or a record of numbers, with no JSON. A command answers
+/// its result record (status, the balance's change, its own slots); a
+/// refusal's text is `lastReason()`. The logic is in `wasm_port.rs`.
+#[wasm_bindgen]
+impl Engine {
+    // The view's layout (facade slice 6a, #1213) as JSON: the version,
+    // every slot and width of the dynamic frame and the structural snapshot
+    // by name, the kind, state, weather, mode and calendar codes
+    // (`view::layout_json`), and the port's records and codes
+    // (`port::exported_layout`). A host checks it on load and refuses a
+    // version or width it does not know. An instance member, so `Engine`
+    // itself satisfies the port's interface.
+    #[wasm_bindgen(js_name = viewLayout)]
+    pub fn instance_view_layout(&self) -> String {
+        port::exported_layout().to_string()
+    }
+    #[wasm_bindgen(js_name = lastReason)]
+    pub fn last_reason(&self) -> Option<String> {
+        self.last_reason_text()
+    }
+    #[wasm_bindgen(js_name = buildAt)]
+    pub fn build_at(&mut self, kind: f64, floor: f64, x: f64) -> Vec<f64> {
+        self.port_build(kind, floor, x)
+    }
+    #[wasm_bindgen(js_name = paintTiles)]
+    pub fn paint_tiles(&mut self, kind: f64, floor: f64, tiles: &[f64]) -> Vec<f64> {
+        self.port_paint(kind, floor, tiles)
+    }
+    #[wasm_bindgen(js_name = buildShaft)]
+    pub fn build_shaft(&mut self, kind: f64, x: f64, bottom: f64, top: f64) -> Vec<f64> {
+        self.port_build_shaft(kind, x, bottom, top)
+    }
+    pub fn demolish(&mut self, id: f64, bulldoze: bool) -> Vec<f64> {
+        self.port_demolish(id, bulldoze)
+    }
+    #[wasm_bindgen(js_name = changeCars)]
+    pub fn change_cars(&mut self, id: f64, add: bool) -> Vec<f64> {
+        self.port_cars(id, add)
+    }
+    #[wasm_bindgen(js_name = extendShaft)]
+    pub fn extend_shaft(&mut self, id: f64, up: bool, target_floor: f64) -> Vec<f64> {
+        self.port_extend(id, up, target_floor)
+    }
+    #[wasm_bindgen(js_name = bookExterminator)]
+    pub fn book_exterminator(&mut self) -> Vec<f64> {
+        self.port_book_exterminator()
+    }
+    #[wasm_bindgen(js_name = setCamera)]
+    pub fn set_camera(&mut self, tile: f64, floor: f64, zoom: f64) -> Vec<f64> {
+        self.port_set_camera(tile, floor, zoom)
+    }
+    #[wasm_bindgen(js_name = setFilm)]
+    pub fn set_film(&mut self, id: f64, policy: f64) -> Vec<f64> {
+        self.port_set_film(id, policy)
+    }
+    #[wasm_bindgen(js_name = quoteBuild)]
+    pub fn quote_build(&mut self, kind: f64, floor: f64, x: f64) -> Vec<f64> {
+        self.port_quote_build(kind, floor, x).to_vec()
+    }
+    #[wasm_bindgen(js_name = quoteShaft)]
+    pub fn quote_shaft(&mut self, kind: f64, x: f64, bottom: f64, top: f64) -> Vec<f64> {
+        vec![self.port_quote_shaft(kind, x, bottom, top)]
+    }
+    #[wasm_bindgen(js_name = statsStrip)]
+    pub fn stats_strip(&self) -> Vec<f64> {
+        self.sim.tower_stats_record().to_vec()
+    }
+    pub fn hotspot(&self) -> Vec<f64> {
+        self.port_hotspot().to_vec()
+    }
+    pub fn onboarding(&self) -> f64 {
+        self.port_onboarding()
+    }
+}
+
+/// The port's editing commands (`wasm_port_edit.rs`): named apart from the
+/// legacy exports the conformance suites still call, which keep their old
+/// answers until the callers move.
+#[wasm_bindgen]
+impl Engine {
+    #[wasm_bindgen(js_name = markStop)]
+    pub fn mark_stop(&mut self, id: f64, floor: f64, stop: bool) -> Vec<f64> {
+        self.port_mark_stop(id, floor, stop)
+    }
+    #[wasm_bindgen(js_name = expressStops)]
+    pub fn express_stops(&mut self, id: f64) -> Vec<f64> {
+        self.port_express_stops(id)
+    }
+    #[wasm_bindgen(js_name = dropStops)]
+    pub fn drop_stops(&mut self, id: f64) -> Vec<f64> {
+        self.port_drop_stops(id)
+    }
+    #[wasm_bindgen(js_name = stepRent)]
+    pub fn step_rent(&mut self, id: f64, dir: f64) -> Vec<f64> {
+        self.port_step_rent(id, dir)
+    }
+    #[wasm_bindgen(js_name = noRate)]
+    pub fn no_rate(&mut self, id: f64) -> Vec<f64> {
+        self.port_no_rate(id)
+    }
+    #[wasm_bindgen(js_name = setRent)]
+    pub fn set_rent(&mut self, id: f64, target: f64) -> Vec<f64> {
+        self.port_set_rent(id, target)
+    }
+    #[wasm_bindgen(js_name = rentBatch)]
+    pub fn rent_batch(&mut self, kind: f64, target: f64, only_default: bool) -> Vec<f64> {
+        self.port_rent_batch(kind, target, only_default)
+    }
+    #[wasm_bindgen(js_name = rerollUnit)]
+    pub fn reroll_unit(&mut self, id: f64) -> Vec<f64> {
+        self.port_reroll_unit(id)
+    }
+    #[wasm_bindgen(js_name = answerChoice)]
+    pub fn answer_choice(&mut self, accept: bool) -> Vec<f64> {
+        self.port_answer_choice(accept)
+    }
+    #[wasm_bindgen(js_name = chooseAutoBridge)]
+    pub fn choose_auto_bridge(&mut self, value: bool) -> Vec<f64> {
+        self.port_choose_auto_bridge(value)
+    }
+    #[wasm_bindgen(js_name = flipAutoBridge)]
+    pub fn flip_auto_bridge(&mut self) -> Vec<f64> {
+        self.port_flip_auto_bridge()
+    }
+    #[wasm_bindgen(js_name = startExtend)]
+    pub fn start_extend(&mut self, id: f64) -> Vec<f64> {
+        self.port_start_extend(id)
+    }
+    #[wasm_bindgen(js_name = stopExtend)]
+    pub fn stop_extend(&mut self) -> Vec<f64> {
+        self.port_stop_extend()
+    }
+    #[wasm_bindgen(js_name = labelUnit)]
+    pub fn label_unit(&mut self, id: f64, text: &str) -> Vec<f64> {
+        self.port_label_unit(id, text)
+    }
+    #[wasm_bindgen(js_name = nameTower)]
+    pub fn name_tower(&mut self, text: Option<String>) -> Vec<f64> {
+        self.port_name_tower(text)
+    }
+}
+
 /// The command answers the Rust-backed facade reads (slice 6d, #1216); the
 /// logic is in `wasm_facade_commands.rs`.
 #[wasm_bindgen]
@@ -1082,19 +1234,9 @@ impl Engine {
     }
 }
 
-// The view's layout (facade slice 6a, #1213) as JSON: the version, every
-// slot and width of the dynamic frame and the structural snapshot by name,
-// and the kind, state, weather, mode and calendar codes
-// (`view::layout_json`). A host checks it on load and refuses a version or
-// width it does not know.
-#[wasm_bindgen(js_name = viewLayout)]
-pub fn view_layout() -> String {
-    crate::view::layout_json().to_string()
-}
-
 /// The renderer-facing view (facade slice 6a, #1213): one-line wrappers over
 /// `crate::view`, which documents each layout. Their notes, and
-/// `view_layout`'s above, are plain comments: wasm-bindgen copies doc
+/// `viewLayout`'s above, are plain comments: wasm-bindgen copies doc
 /// comments into the generated `src/dualrun/engine.d.ts`, which the 500-line
 /// ceiling holds.
 #[wasm_bindgen]
@@ -1243,6 +1385,24 @@ impl Engine {
         #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
     ) -> Option<String> {
         crate::diagnostics::facts_json(&mut self.sim, id.as_f64())
+    }
+}
+
+/// Facade slice 7a (#1217): what a host with no TypeScript tower reads once
+/// per engine, beside the view's structure and frame.
+#[wasm_bindgen]
+impl Engine {
+    /// The camera the save carries, as JSON text, or undefined when there is
+    /// none. Read on a new engine; `setView` is how it changes.
+    pub fn view(&self) -> Option<String> {
+        self.sim.view.as_ref().map(|v| v.to_string())
+    }
+
+    /// The tower's name, or undefined when it has none (the save then leaves
+    /// the key out). Read on a new engine; `setTowerName` is how it changes.
+    #[wasm_bindgen(js_name = towerName)]
+    pub fn tower_name(&self) -> Option<String> {
+        self.sim.tower.tower_name.clone()
     }
 }
 
@@ -1399,6 +1559,7 @@ mod tests {
         let mut e = Engine {
             sim,
             mirror: SaveMirror::default(),
+            reason: None,
         };
         let before = e.serialize();
         e.sim.gameplay.drain();

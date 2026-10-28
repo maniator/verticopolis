@@ -89,7 +89,7 @@ behavior needs an owner decision and the analytics review.
 
 | Member | Answer | Tier | Notes |
 | --- | --- | --- | --- |
-| `viewLayout()` | string (JSON) | once per boot | Slots, widths, code tables and record slots; the reader refuses a `version` other than its own before any read. |
+| `viewLayout()` | string (JSON) | once per boot | Slots, widths, code tables and record slots; the reader refuses a `version` other than its own before any read. An instance member, so `Engine` satisfies the interface; the binding has no module-level `viewLayout` export. |
 | `viewStructure()` | `Float64Array` | per tower revision | A fresh copy the caller owns. |
 | `viewFrame(full)` | `Float64Array` | frame | A fresh copy the caller owns; `full` asks for every room row. |
 | `unitMetaChanged(since)` | `Float64Array` of ids | on a `metaRevision` move | The rooms whose label or subtype changed after revision `since`; the caller reads each one's text with `unitLabel` and `unitSubtype`. It replaces the JSON `unitMetaSince` listing on the port. `unitMetaSince` stays as a legacy export for the conformance suites until PR 4 moves its last caller, the same way the other port names avoid the legacy JSON exports. |
@@ -129,24 +129,33 @@ with the count in its slot.
 | `buildShaft` | kind, x, bottom, top | none | per command |
 | `demolish` | id, bulldoze | none | per command |
 | `changeCars` | id, add | cars | per command |
-| `beginExtend` / `endExtend` | id / none | none | per drag |
+| `startExtend` / `stopExtend` | id / none | none | per drag |
 | `extendShaft` | id, up, targetFloor | bottom, top, added | per drag step |
-| `setStop` | id, floor, stop | none | per command |
-| `setExpressStops` / `clearStops` | id | none | per command |
-| `setSchedule` | id, slots `Float64Array` (the schedule's fixed slots, layout-named) | none | per command |
-| `setLabel` | id, text | none | per command (string, section 4) |
-| `adjustRent` | id, dir | rent | per command |
-| `setNoRate` | id | none | per command |
-| `priceUnit` | id, target (NaN = default) | rent | per command |
-| `applyRentBatch` | kind, target (NaN = default, -1 = No Rate), onlyDefault | the batch counters | per command |
+| `markStop` | id, floor, stop | none | per command |
+| `expressStops` / `dropStops` | id | none | per command |
+| `scheduleShaft` | id, slots `Float64Array` (the schedule's fixed slots, layout-named) | none | per command |
+| `labelUnit` | id, text | none | per command (string, section 4) |
+| `stepRent` | id, dir | rent | per command |
+| `noRate` | id | none | per command |
+| `setRent` | id, target (0 or more) | rent | per command |
+| `rentBatch` | kind, target (NaN = default, -1 = No Rate), onlyDefault | the batch counters | per command |
 | `setFilm` | id, policyCode | policyCode | per command |
-| `rerollSubtype` | id | subtypeCode | per command |
+| `rerollUnit` | id | subtypeCode | per command |
 | `bookExterminator` | none | cost, rooms | per command |
 | `answerChoice` | accept | none | per command |
-| `chooseAutoBridge` / `toggleAutoBridge` | value / none | value | per command |
-| `setTowerName` | text | none | per command (string, section 4) |
+| `chooseAutoBridge` / `flipAutoBridge` | value / none | value | per command |
+| `nameTower` | text (undefined clears) | none | per command (string, section 4) |
 | `setCamera` | tile, floor, zoom (NaN = none) | none | per camera save |
 | `emit` | text, kindCode | none | rare (string, section 4) |
+
+**Port names.** A command whose natural name is already a legacy binding
+export (`setStop`, `adjustRent`, `priceUnit`, `applyRentBatch`,
+`rerollSubtype`, `setLabel`, `setTowerName`, `toggleAutoBridge`, `setSchedule`,
+`beginExtend`, `endExtend`, `setExpressStops`, `clearStops`) takes the port
+name above instead, because the conformance suites still call the legacy
+export with its old answer. The legacy exports go when PR 4 moves their last
+callers. `chooseAutoBridge` and `answerChoice` had no caller, so they answer
+records under their own names.
 
 ### Queries
 
@@ -181,19 +190,21 @@ project for `TsEngine`, `unitWasm` for `Engine`):
     (`crate::charges::whole` and its TypeScript twin). Ids, floors,
     columns, tiles, counts, seeds, codes, revisions and sequence numbers.
   - **finite real**: any finite number, with the range its member states.
-    `tick`'s `dtMinutes` (0 or more), `setCamera`'s `zoom` (above 0),
-    `priceUnit`'s and `applyRentBatch`'s `target` (0 or more), and
-    `adjustRent`'s `dir` (exactly 1 or -1).
+    `tick`'s `dtMinutes` (0 or more), `setCamera`'s `tile` and `floor`
+    (any finite value: the renderer's camera center is fractional, and the
+    save loader clamps it on read) and `zoom` (above 0), `setRent`'s and
+    `rentBatch`'s `target` (0 or more), and `stepRent`'s `dir` (exactly 1
+    or -1).
   - **sentinel**: a value with a stated meaning in one slot only. NaN for
-    "none" in `setCamera`'s `zoom` and the price targets ("default"), and
-    -1 for `applyRentBatch`'s No Rate target.
+    "none" in `setCamera`'s `zoom` and `rentBatch`'s target ("default"), and
+    -1 for `rentBatch`'s No Rate target.
 - Boundary tests on both engines cover NaN, both infinities, a fraction,
   `2^53` and a negative value for each class, and the camera and clock
   calls the game makes today stay accepted.
 - A code outside its table is refused (`UNKNOWN_FACILITY` for a kind,
   `INVALID_REQUEST` otherwise).
 - A refusal changes nothing and its delta is `0`.
-- The contract is versioned with the layout (`VIEW_LAYOUT_VERSION`): a
+- The contract is versioned with the layout (`VIEW_LAYOUT_VERSION`, 2 from PR 1a; a native test pins the whole exported layout, records included): a
   record's slots and the code tables are part of it, and a reader built
   against another version refuses to start.
 
@@ -209,7 +220,7 @@ stays the one that survives (3.x).
 | --- | --- | --- | --- |
 | `viewLayout()` | JSON | static tables, read once | once per boot |
 | `serialize()` / `loadSave()` / `restore()` | JSON | the save format | rare |
-| `setLabel`, `setTowerName`, `emit` | string argument | free text | per command, short |
+| `labelUnit`, `nameTower`, `emit` | string argument | free text | per command, short |
 | text getters (`lastReason`, `unitLabel`, `logText`, `towerName`) | string | free text | on demand |
 | digests, telemetry, dual-run views | JSON | tooling only, never in a player build's loop | tooling |
 
@@ -264,8 +275,12 @@ they resume.
 
 ## 8. PRs
 
-1. Rust port members on `Engine` (`wasm_port.rs`), result records and
-   `lastReason`, with native tests; crate minor.
+1. Rust port members on `Engine`, result records and `lastReason`, with
+   native tests; crate minor. It lands in two parts: 1a the commands, the
+   quotes and the HUD queries (`wasm_port.rs`, `wasm_port_edit.rs`); 1b
+   `scheduleShaft`, `emit`, the lifecycle members, `drainEvents` and
+   `eventText`, `setBackdrop`, `unitMetaChanged` and the text getters, and
+   the panel queries.
 2. `EnginePort`, the shared reader, the contract fixture on `Engine`, the
    compile-time check; R2's notes from `3a8e4008` (room-count guard rows,
    the import-walk guard over the port's modules, no per-frame `Set`).

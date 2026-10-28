@@ -31,6 +31,7 @@ export class Engine {
      * gallery's clock pin); no game command reaches it.
      */
     advanceClock(minutes: number): void;
+    answerChoice(accept: boolean): Float64Array;
     /**
      * `applyRentBatch(kind, target, onlyDefaultPriced)` with the target as
      * JSON text (a number, `"default"` or `"noRate"`): the result counters
@@ -51,6 +52,9 @@ export class Engine {
      */
     beginExtend(id: number): boolean;
     bombThreat(): void;
+    bookExterminator(): Float64Array;
+    buildAt(kind: number, floor: number, x: number): Float64Array;
+    buildShaft(kind: number, x: number, bottom: number, top: number): Float64Array;
     /**
      * `buildTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`. An
      * unknown kind is refused with "Unknown facility.".
@@ -78,6 +82,8 @@ export class Engine {
      * "Unknown facility." and a cost of 0.
      */
     canBuild(kind: string, floor: number, x: number): string;
+    changeCars(id: number, add: boolean): Float64Array;
+    chooseAutoBridge(value: boolean): Float64Array;
     clearStops(id: number): boolean;
     /**
      * Changes whenever a completed trip contributes a commute sample.
@@ -97,6 +103,7 @@ export class Engine {
      * The hashed crowd view (people, id source, rng), as canonical JSON.
      */
     crowdView(): string;
+    demolish(id: number, bulldoze: boolean): Float64Array;
     /**
      * The facts behind the inspector's diagnostics for one unit, as JSON
      * text (`diagnostics::DiagnosticFacts`); TypeScript keeps the wording.
@@ -113,6 +120,7 @@ export class Engine {
      * buffer is empty afterwards.
      */
     drainGameplayEvents(): string;
+    dropStops(id: number): Float64Array;
     /**
      * The hourly elevator telemetry (`elevatorUtil`, `elevatorHourly`,
      * `elevatorOrigins`) as JSON; see `Simulation::telemetry_json`.
@@ -127,6 +135,8 @@ export class Engine {
      */
     endExtend(): void;
     evaluateStar(): void;
+    expressStops(id: number): Float64Array;
+    extendShaft(id: number, up: boolean, target_floor: number): Float64Array;
     /**
      * `extendTransport(id, end, targetFloor)`: JSON `{ ok, reason?, delta,
      * bottom, top, added }`, the floors billed past the high-water mark: the
@@ -141,6 +151,7 @@ export class Engine {
      * The number of units on fire.
      */
     fires(): number;
+    flipAutoBridge(): Float64Array;
     /**
      * `floorHeatmap(mode)`'s cells as JSON; a mode that is not one of the
      * four overlays is an error.
@@ -183,6 +194,7 @@ export class Engine {
      * lost (the drain empties the buffer either way).
      */
     gameplayEventsPending(): number;
+    hotspot(): Float64Array;
     /**
      * `housekeepingCoverage()`, as JSON.
      */
@@ -193,6 +205,8 @@ export class Engine {
      * morning checkout.
      */
     housekeepingReport(): string | undefined;
+    labelUnit(id: number, text: string): Float64Array;
+    lastReason(): string | undefined;
     /**
      * The log entries emitted after `seq` (the `logSeq` the host last saw),
      * oldest first, as JSON `[{ seq, minute, text, kind }]`. The engine keeps
@@ -206,18 +220,22 @@ export class Engine {
      * carries a hosted tower's owed passes across the load that restarts it.
      */
     loopMemos(): Float64Array;
+    markStop(id: number, floor: number, stop: boolean): Float64Array;
     mode(): string;
     money(): number;
+    nameTower(text?: string | null): Float64Array;
     /**
      * `Simulation.newGame(seed, mode, modernCalendar, startUnbridged)`; the
      * calendar defaults to the real-world one and the tower starts bridged,
      * as the TypeScript defaults do.
      */
     static newGame(seed: number, mode: string, modern_calendar?: string | null, start_unbridged?: boolean | null): Engine;
+    noRate(id: number): Float64Array;
     /**
      * The five onboarding facts as JSON.
      */
     onboardingFacts(): string;
+    onboarding(): number;
     /**
      * `paintBrush(kind, floor, tiles)` with the tiles as JSON text: JSON
      * `{ placed, reason? }`, the floor and lobby brush (`brush.rs`) in one
@@ -225,6 +243,7 @@ export class Engine {
      * with "That request is not valid." as TypeScript refuses it.
      */
     paintBrush(kind: string, floor: number, tiles: string): string;
+    paintTiles(kind: number, floor: number, tiles: Float64Array): Float64Array;
     /**
      * `peakCongestionHotspot()`: `{ ratio, floor }` as JSON.
      */
@@ -250,6 +269,8 @@ export class Engine {
      * `priceUnit(u, target)`: the new price, or null when not repriceable.
      */
     priceUnit(id: number, target: number): number | undefined;
+    quoteBuild(kind: number, floor: number, x: number): Float64Array;
+    quoteShaft(kind: number, x: number, bottom: number, top: number): Float64Array;
     /**
      * `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
      * The id is read raw, as for `addCar` (#923).
@@ -270,10 +291,12 @@ export class Engine {
      * `tower.removeUnit(id)`: whether a unit went.
      */
     removeUnit(id: number): boolean;
+    rentBatch(kind: number, target: number, only_default: boolean): Float64Array;
     /**
      * `rerollSubtype(id)`: the new subtype, or null.
      */
     rerollSubtype(id: number): string | undefined;
+    rerollUnit(id: number): Float64Array;
     /**
      * `resizeTransport(id, bottom, top)`, the simulation-layer edit that
      * reports `capacity_changed`: JSON `{ ok: true, added,
@@ -324,6 +347,7 @@ export class Engine {
      * `sim.autoBridge = value`, the direct write an undo restore makes.
      */
     setAutoBridge(value: boolean): void;
+    setCamera(tile: number, floor: number, zoom: number): Float64Array;
     /**
      * `setCars(id, cars)`: the simulation-layer edit, which reports
      * `capacity_changed`. Read raw (#996): an id or count that is not a
@@ -339,6 +363,7 @@ export class Engine {
      * `setFilmPolicy(id, policy)`: the policy stored, or null.
      */
     setFilmPolicy(id: number, policy: string): string | undefined;
+    setFilm(id: number, policy: number): Float64Array;
     /**
      * The editor's rename of a unit.
      */
@@ -349,6 +374,7 @@ export class Engine {
      * read raw (#996), as for `sellAt`.
      */
     setNoRate(id: number): boolean;
+    setRent(id: number, target: number): Float64Array;
     /**
      * `Tower.setSchedule(id, schedule)` with the schedule as JSON text. The
      * id is read raw (#996): one that is not a whole JS number within
@@ -371,6 +397,7 @@ export class Engine {
      * `sim.view = view`, the camera a save carries, as JSON text (null clears).
      */
     setView(view?: string | null): void;
+    startExtend(id: number): Float64Array;
     startFire(): void;
     /**
      * The state view's hash, as the lock records it.
@@ -384,11 +411,19 @@ export class Engine {
      * Everything the stats screen reads beyond `stats()`, as JSON.
      */
     statsReport(): string;
+    statsStrip(): Float64Array;
+    stepRent(id: number, dir: number): Float64Array;
+    stopExtend(): Float64Array;
     tick(dt_minutes: number): void;
     /**
      * `toggleAutoBridge()`: the preference after the flip.
      */
     toggleAutoBridge(): boolean;
+    /**
+     * The tower's name, or undefined when it has none (the save then leaves
+     * the key out). Read on a new engine; `setTowerName` is how it changes.
+     */
+    towerName(): string | undefined;
     /**
      * `tower.resizeTransport(id, bottom, top)`, the bare tower edit, silent
      * in both engines (#906): the same JSON, read raw the same way (#996).
@@ -434,7 +469,13 @@ export class Engine {
      */
     validateTransport(kind: string, x: number, bottom: number, top: number): string;
     viewFrame(full: boolean): Float64Array;
+    viewLayout(): string;
     viewStructure(): Float64Array;
+    /**
+     * The camera the save carries, as JSON text, or undefined when there is
+     * none. Read on a new engine; `setView` is how it changes.
+     */
+    view(): string | undefined;
 }
 
 /**
@@ -483,5 +524,3 @@ export function exportTdt(save_json: string): Uint8Array;
  * the player-readable message.
  */
 export function importTdt(bytes: Uint8Array, filename: string): string;
-
-export function viewLayout(): string;

@@ -1,4 +1,4 @@
-import type { Engine, catalog, encodeVctower, engineIdentity, viewLayout } from "./engine";
+import type { Engine, catalog, encodeVctower, engineIdentity } from "./engine";
 
 /**
  * The WASM binding's surface, as wasm-bindgen declares it from
@@ -21,11 +21,6 @@ export interface WasmModule {
    *  package built before it still runs, and About says the identity is
    *  unavailable. */
   engineIdentity?: typeof engineIdentity;
-  /** The renderer-facing view's layout as JSON (facade slice 6a, #1213).
-   *  Optional here, as the catalog is, so a test double need not carry it;
-   *  a real package has it beside the view's instance methods, which
-   *  `checkBinding` requires. */
-  viewLayout?: typeof viewLayout;
 }
 
 /** Every method the adapters call on an instance, and on the class. Each
@@ -43,7 +38,9 @@ export const INSTANCE_METHODS = [
   "gameplayEventsDropped", "serializeForSync", "saveDelta", "addCar", "removeCar", "beginExtend", "extendTransport", "endExtend", "removeFacility", "towerSetCars",
   "towerResizeTransport", "previewRentBatch", "validateTransport", "placeTransportDryRun",
   "towerStats", "statsReport", "housekeepingCoverage", "unitDetail", "transportDetail", "floorHeatmap", "peakCongestionHotspot",
-  "onboardingFacts", "viewStructure", "viewFrame", "unitMetaSince", "towerSignature", "diagnosticFacts",
+  "onboardingFacts", "viewStructure", "viewFrame", "unitMetaSince", "towerSignature", "diagnosticFacts", "view", "towerName", "chooseAutoBridge", "answerChoice",
+  "viewLayout", "lastReason", "buildAt", "paintTiles", "buildShaft", "demolish", "changeCars", "extendShaft", "bookExterminator", "setCamera", "setFilm", "quoteBuild", "quoteShaft", "statsStrip", "hotspot", "onboarding",
+  "markStop", "expressStops", "dropStops", "stepRent", "noRate", "setRent", "rentBatch", "rerollUnit", "flipAutoBridge", "startExtend", "stopExtend", "labelUnit", "nameTower",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 
