@@ -52,7 +52,12 @@ means a `Float64Array` whose slots `viewLayout().records.<name>` names.
 | `loadSave(text)` | record: status, generation | rare | The `stored` and `legacy` sources (below). |
 | `restore(text)` | record: status, generation | per undo or redo | The `history` source: loads the snapshot but keeps the live camera and the auto-bridge preference. The auto-bridge preference is kept as `TowerSource` `history` does today. The camera is kept in the engine's own view (the one `setCamera` last stamped), the same camera the app's history adoption keeps with `keepCamera`, so a reader that rebuilds on the generation move reads the camera under the player. `TsEngine` does the same. |
 | `foundTower(seed, modeCode, calendarCode, unbridged)` | record: status, generation | rare | The `found` source. Named apart from the static `newGame` constructor. The seed is a whole number that fits 32 bits unsigned. |
-| `generation()` | number | frame | Moves on every successful `loadSave`, `restore` or `foundTower`; the reader resets on a move (section 5). |
+| `loadVctower(text)` | record: status, generation | rare | A `.vctower` file (the `stored` source from a file); a save from before 2.0 is marked as a founder's tower. |
+| `exportVctower(appVersion, savedAtMs)` | string or undefined | rare | The current tower's `.vctower` file text, stamped as `SaveGame.export` stamps it; undefined on a refused stamp, with the text in `lastReason()`. |
+| `loadTdt(bytes, filename)` | record, the layout's `loadTdt` slots; `[0]` refused | rare | Reads a `.TDT` file and stages its tower without touching the live one, answering the import report's numbers. `tdtNote(i)` reads the header's notes then the walk's warnings, `tdtTowerName()` the staged name; the sentences stay in TypeScript. |
+| `adoptTdt()` | record: status, generation | rare | The `legacy` source: swaps the staged tower in, never marked as a founder's; refused with nothing staged. Any done swap drops a staged tower and any written bytes `tdtFile()` has not handed over. |
+| `tdtExport()` | record, the layout's `tdtExport` slots; `[0]` refused | rare | Writes the current tower as a `.TDT` file; `tdtFile()` hands the bytes over once. Named apart from the legacy `exportTdt` free function. |
+| `generation()` | number | frame | Moves on every successful `loadSave`, `restore`, `foundTower`, `loadVctower` or `adoptTdt`; the reader resets on a move (section 5). |
 | `undoSignature()` | string | per command | Slice 5a's F2 signature, kept as text. |
 | `drainEvents()` | record: dropped, count | per step | Takes the gameplay events since the last drain as this batch. `dropped` counts the events a full ring pushed out since the engine was made; `count` is the batch's size, 0 on almost every step. |
 | `eventText(i)` | string or undefined | per event | The `{ name, payload }` JSON of event `i` of the batch the last `drainEvents()` took (section 4). The engine keeps that batch's texts until the next `drainEvents()`, so a caller reads them after draining and before draining again. |
@@ -61,9 +66,10 @@ means a `Float64Array` whose slots `viewLayout().records.<name>` names.
 **The four sources.** `found`: `foundTower` (with `unbridged` for an unbridged
 founding). `history`: `restore` with the undo or redo snapshot. `stored`:
 the game code tries each stored save in order with `loadSave` until one is
-done (founder detection stays in `src/storage/`, which reads the slot list,
-not the engine). `legacy`: the existing `.TDT` import converts the file to
-save text in `src/storage/tdt*`, then `loadSave`.
+done; `loadSave` marks a save with no `appVersion` stamp (from before 2.0)
+as a founder's tower, as `SaveGame.loadResult` does, and `restore` never
+does (PR 1d). `legacy`: `loadTdt` stages the file, the game shows the
+report, then `adoptTdt` swaps it in.
 
 **Atomic.** A refused `loadSave`, `restore` or `foundTower` (text that does not
 parse, a refused founding; like the TypeScript loader today, the engine
@@ -114,7 +120,8 @@ Every command answers a **result record**, `Float64Array`, slots:
 - `2..` the op's own slots, named in `viewLayout().records.<op>`.
 
 **The refusal text.** Only the members that answer a status (the
-commands, `quoteBuild`, `quoteShaft`, `loadSave`, `restore`, `foundTower`)
+commands, `quoteBuild`, `quoteShaft`, `loadSave`, `restore`, `foundTower`,
+and PR 1d's `loadVctower`, `exportVctower`, `loadTdt`, `adoptTdt`, `tdtExport`)
 clear `lastReason()` at their start and set it on a refusal. `lastReason()`
 itself, the view and text getters, `generation()` and the other queries
 never touch it, so the reader's reads between a refusal and its display
@@ -172,9 +179,9 @@ records under their own names.
 | `heatCells` | modeCode (layout `heatModes`) | record: per cell, the layout's `heatCell` slots (floor, minX, maxX, severity, tint code from `heatTints`); an unknown mode answers no cells | overlay refresh |
 | `unitCard` | id | record, the layout's `unitCard` slots (NaN for absent fields, flags 0 or 1, codes from `kinds`, `unitStates`, `vacateReasons`, `filmPolicies`); empty for no such unit; `unitLabel(id)`, `unitSubtype(id)` text | selection, revision or hour change |
 | `shaftCard` | id | record: the layout's `shaftCard` header, then the 48 hourly demand slots when `hourly` is 1, the `stops` stop rows (`stopRow`), and the origin rings when `origins` is 1 (per hour, a pair count and that many floor, count pairs); empty for no such shaft | selection, revision or hour change |
-| `statsReport` | none | record with counted sections (PR 1d) | stats screen open |
+| `statsSheet` | none | record: the layout's `statsSheet` header (NaN for an absent value), then the sections its last six slots count: the `statsStrip` slots, the `crewCoverage` slots, the income averages in `ledgerCats` order, the next rung (`nextStar`) and its gate rows (`gateRow`, codes from `starGates`), the stranded floors, one done flag per `milestones` entry, the elevator rows (`elevatorRow`) and the household mix rows (`mixRow`). Named apart from the legacy `statsReport` JSON getter | stats screen open |
 | `crewCoverage` | none | record, the layout's `crewCoverage` slots | exterminator gate |
-| `diagnosticFacts` | id | record (PR 1d; the port name is chosen there, apart from the legacy JSON export) | diagnostics readout |
+| `unitFacts` | id | record, the layout's `unitFacts` slots: a present flag per section with NaN slots when it is 0, codes from `modes`, `accessLines`, `noRateLines`, `vacateReasons` and `bindings`; empty for no such unit. Named apart from the legacy `diagnosticFacts` JSON getter | diagnostics readout |
 | `logAfter` | seq | record of (seq, kindCode, minute) triples; `logText(seq)` | per new log line |
 
 `towerName()`, `unitLabel(id)`, `logText(seq)` and the other text getters
@@ -254,7 +261,9 @@ stays the one that survives (3.x).
 | `labelUnit`, `nameTower`, `logLine` | string argument | free text | per command, short |
 | `eventText(i)` | JSON string | an analytics event's `{ name, payload }` | per gameplay event, rare (a drain's `count` is 0 on almost every step) |
 | `scheduleShaft` (inside the engine) | a small JSON value built from the slots | the slots cross as numbers; the engine builds the input `Schedule::coerce` reads, so the schedule's coercion rules stay in one place for this setter and the legacy one | per schedule edit (one value of two 24-hour rows and a few fields, under 1 KB) |
-| text getters (`lastReason`, `unitLabel`, `logText`, `towerName`) | string | free text | on demand |
+| `loadVctower()` / `exportVctower()` | `.vctower` text | the save's file format | rare |
+| `loadTdt()` / `tdtFile()` | bytes (`Uint8Array`) | the 1994 file format | rare |
+| text getters (`lastReason`, `unitLabel`, `logText`, `towerName`, `tdtNote`, `tdtTowerName`) | string | free text | on demand |
 | `pendingChoice()` / `view()` | JSON string | an emergency's `{ kind, cost, message }`, the saved camera | when the frame's `pendingChoice` flag rises; once per tower |
 | digests, telemetry, dual-run views | JSON | tooling only, never in a player build's loop | tooling |
 
@@ -315,8 +324,14 @@ they resume.
    lifecycle members, `drainEvents` and `eventText`, `setBackdrop`, the log,
    `unitMetaChanged` and the text getters, and `scheduleShaft`
    (`wasm_port_life.rs`); 1c the panel queries `heatCells`, `crewCoverage`,
-   `unitCard` and `shaftCard` (`wasm_port_panels.rs`); 1d `statsReport`
-   and `diagnosticFacts`.
+   `unitCard` and `shaftCard` (`wasm_port_panels.rs`); 1d `statsSheet`
+   and `unitFacts` (`wasm_port_reports.rs`), the founder rule on
+   `loadSave`, and the file members `loadVctower`, `exportVctower`,
+   `loadTdt`, `tdtNote`, `tdtTowerName`, `adoptTdt`, `tdtExport` and
+   `tdtFile` (`wasm_port_files.rs`). A follow-up after PR 3 adds them to
+   `EnginePort` and `TsEngine`, with the founder rule on `TsEngine.loadSave`
+   and `loadVctower` (never `restore` or `adoptTdt`) and a golden step
+   comparing `serialize()` after each.
 2. `EnginePort` and the compile-time check on `Engine`; the layout as
    `src/engine/viewLayout.json`, written by `npm run wasm:build` from the
    package and held to it by a test; one tier rule for the port's members.

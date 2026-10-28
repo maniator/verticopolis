@@ -286,6 +286,11 @@ pub struct Engine {
     backdrop: bool,
     /// The batch the last `drainEvents()` took, for `eventText(i)`.
     drained: Vec<crate::gameplay::GameplayEvent>,
+    /// A `.TDT` file read by `loadTdt`, waiting for `adoptTdt`.
+    staged_tdt: Option<Box<port_files::StagedTdt>>,
+    /// The bytes the last `tdtExport` wrote, for `tdtFile()`; a done swap
+    /// drops them.
+    tdt_file: Option<Vec<u8>>,
     /// The step mode `advance` last stepped under; it outlives a swap, as
     /// the web host's step debt outlives an adopted tower.
     stepper: crate::fixed_step::FrameStepper,
@@ -1054,6 +1059,12 @@ mod port_life;
 #[path = "wasm_port_panels.rs"]
 mod port_panels;
 
+#[path = "wasm_port_reports.rs"]
+mod port_reports;
+
+#[path = "wasm_port_files.rs"]
+mod port_files;
+
 /// The engine's port (facade slice 7, the owner's 2026-10-28 redesign): the
 /// game calls these on `Engine` directly, every argument a number and every
 /// answer a number or a record of numbers, with no JSON. A command answers
@@ -1147,6 +1158,51 @@ impl Engine {
     #[wasm_bindgen(js_name = shaftCard)]
     pub fn shaft_card(&self, id: f64) -> Vec<f64> {
         self.port_shaft_card(id)
+    }
+    #[wasm_bindgen(js_name = statsSheet)]
+    pub fn stats_sheet(&mut self) -> Vec<f64> {
+        self.port_stats_sheet()
+    }
+    #[wasm_bindgen(js_name = unitFacts)]
+    pub fn unit_facts(&mut self, id: f64) -> Vec<f64> {
+        self.port_unit_facts(id)
+    }
+}
+
+/// The port's file members (`wasm_port_files.rs`).
+#[wasm_bindgen]
+impl Engine {
+    #[wasm_bindgen(js_name = loadVctower)]
+    pub fn load_vctower(&mut self, text: &str) -> Vec<f64> {
+        self.port_load_vctower(text)
+    }
+    #[wasm_bindgen(js_name = exportVctower)]
+    pub fn export_vctower(&mut self, app_version: &str, saved_at_ms: f64) -> Option<String> {
+        self.port_export_vctower(app_version, saved_at_ms)
+    }
+    #[wasm_bindgen(js_name = loadTdt)]
+    pub fn load_tdt(&mut self, bytes: &[u8], filename: &str) -> Vec<f64> {
+        self.port_load_tdt(bytes, filename)
+    }
+    #[wasm_bindgen(js_name = tdtNote)]
+    pub fn tdt_note(&self, i: f64) -> Option<String> {
+        self.port_tdt_note(i)
+    }
+    #[wasm_bindgen(js_name = tdtTowerName)]
+    pub fn tdt_tower_name(&self) -> Option<String> {
+        self.port_tdt_tower_name()
+    }
+    #[wasm_bindgen(js_name = adoptTdt)]
+    pub fn adopt_tdt(&mut self) -> Vec<f64> {
+        self.port_adopt_tdt()
+    }
+    #[wasm_bindgen(js_name = tdtExport)]
+    pub fn tdt_export(&mut self) -> Vec<f64> {
+        self.port_tdt_export()
+    }
+    #[wasm_bindgen(js_name = tdtFile)]
+    pub fn tdt_file(&mut self) -> Option<Vec<u8>> {
+        self.port_tdt_file()
     }
 }
 

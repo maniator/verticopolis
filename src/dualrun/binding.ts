@@ -61,6 +61,9 @@ export const INSTANCE_METHODS = [
   "scheduleShaft",
   // PR 1c's panel queries.
   "heatCells", "crewCoverage", "unitCard", "shaftCard",
+  // PR 1d's report queries and file members.
+  "statsSheet", "unitFacts", "loadVctower", "exportVctower", "loadTdt", "tdtNote", "tdtTowerName",
+  "adoptTdt", "tdtExport", "tdtFile",
   // PR 5's frame step.
   "advance",
 ] as const satisfies readonly (keyof WasmEngine)[];

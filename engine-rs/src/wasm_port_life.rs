@@ -98,7 +98,7 @@ fn schedule_json(slots: &[f64]) -> Option<serde_json::Value> {
 
 impl Engine {
     /// `[status, generation]`, the answer every swap gives.
-    fn swap_record(&self, done: bool) -> Vec<f64> {
+    pub(super) fn swap_record(&self, done: bool) -> Vec<f64> {
         vec![f64::from(u8::from(done)), self.generation as f64]
     }
 
@@ -106,7 +106,7 @@ impl Engine {
     /// gameplay events and drop count go ahead of `next`'s own, oldest
     /// first, as `GameplayEventBuffer.inherit` does for `GameApp.adoptSim`,
     /// unless the replaced tower was the title screen's backdrop.
-    fn adopt(&mut self, mut next: Simulation) {
+    pub(super) fn adopt(&mut self, mut next: Simulation) {
         let prev = std::mem::take(&mut self.sim.gameplay);
         if !self.backdrop {
             let mut buf: GameplayEvents = prev;
@@ -119,19 +119,23 @@ impl Engine {
         self.sim = next;
         self.mirror = SaveMirror::default();
         self.drained.clear();
+        self.staged_tdt = None;
+        self.tdt_file = None;
         self.backdrop = false;
         self.generation += 1;
     }
 
-    fn refuse_swap(&mut self, reason: String) -> Vec<f64> {
+    pub(super) fn refuse_swap(&mut self, reason: String) -> Vec<f64> {
         self.reason = Some(reason);
         self.swap_record(false)
     }
 
-    /// Load a save (the `stored` and `legacy` sources).
+    /// Load a stored save (the `stored` source): a save with no `appVersion`
+    /// stamp (from before 2.0) is marked as a founder's tower, as
+    /// `SaveGame.loadResult` does. `restore` never marks one.
     pub(crate) fn port_load_save(&mut self, text: &str) -> Vec<f64> {
         self.reason = None;
-        match crate::load_stream::load_save_text(text.as_bytes()) {
+        match crate::load_stream::load_stored_text(text.as_bytes()) {
             Ok(next) => {
                 self.adopt(next);
                 self.swap_record(true)
