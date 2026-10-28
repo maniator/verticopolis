@@ -47,7 +47,7 @@ function boot(e: SelectionEnv) {
 
 let pages = 0;
 function env(store: KeyValueStore | null, over: Partial<SelectionEnv> = {}): SelectionEnv {
-  return { store, url: null, drawOn: true, safetyOn: true, stage: 1, share: 10, sha: "aaa1111", pageId: `p${++pages}`, now: 1_000, random: () => 0.5, rustOnlyByUrl: false, ...over };
+  return { store, url: null, drawOn: true, safetyOn: true, stage: 1, share: 10, sha: "aaa1111", pageId: `p${++pages}`, now: 1_000, random: () => 0.5, rustOnlyByChoice: false, ...over };
 }
 
 const withBucket = (bucket: number, extra: Record<string, unknown> = {}) => {
@@ -56,25 +56,27 @@ const withBucket = (bucket: number, extra: Record<string, unknown> = {}) => {
   return s;
 };
 
-describe("selectEngine while only the URL boots Rust", () => {
-  it("runs TypeScript for the Settings choice and the cohort's draw, and Rust for the URL", () => {
+describe("selectEngine while only a choice boots Rust", () => {
+  it("runs Rust for the Settings choice and the URL, and TypeScript for the cohort's draw and the old hosts", () => {
     const chose = new MemoryStore();
     setPreference(chose, "wasm");
     for (const drawOn of [true, false]) {
-      const held = selectEngine(env(chose, { drawOn, rustOnlyByUrl: true }));
-      expect(held).toMatchObject({ boot: "ts", requested: "wasm", heldForUrl: true, markerId: null, notice: "none" });
-      expect(selectEngine(env(chose, { drawOn, rustOnlyByUrl: true, url: "wasm" }))).toMatchObject({ boot: "wasm" });
+      // The player's own pick of the Rust engine runs it (owner, 2026-10-28).
+      const picked = selectEngine(env(chose, { drawOn, rustOnlyByChoice: true }));
+      expect(picked).toMatchObject({ boot: "wasm", requested: "wasm" });
+      expect(picked.heldForChoice).toBeUndefined();
+      expect(selectEngine(env(chose, { drawOn, rustOnlyByChoice: true, url: "wasm" }))).toMatchObject({ boot: "wasm" });
       // The old measurement hosts' links are held too (owner, 2026-10-28).
       for (const url of ["wasm-frame", "wasm-worker"]) {
-        expect(selectEngine(env(chose, { drawOn, rustOnlyByUrl: true, url }))).toMatchObject({ boot: "ts", requested: url, heldForUrl: true });
-        expect(selectEngine(env(chose, { drawOn, rustOnlyByUrl: false, url }))).toMatchObject({ boot: url });
+        expect(selectEngine(env(chose, { drawOn, rustOnlyByChoice: true, url }))).toMatchObject({ boot: "ts", requested: url, heldForChoice: true });
+        expect(selectEngine(env(chose, { drawOn, rustOnlyByChoice: false, url }))).toMatchObject({ boot: url });
       }
     }
     // Bucket 0 draws the WASM arm at a 10% share.
-    expect(selectEngine(env(withBucket(0), { rustOnlyByUrl: true }))).toMatchObject({ boot: "ts", requested: "wasm", selectedBy: "cohort", heldForUrl: true });
+    expect(selectEngine(env(withBucket(0), { rustOnlyByChoice: true }))).toMatchObject({ boot: "ts", requested: "wasm", selectedBy: "cohort", heldForChoice: true });
     // A TypeScript choice is no hold.
     setPreference(chose, "ts");
-    expect(selectEngine(env(chose, { rustOnlyByUrl: true })).heldForUrl).toBeUndefined();
+    expect(selectEngine(env(chose, { rustOnlyByChoice: true })).heldForChoice).toBeUndefined();
   });
 });
 
