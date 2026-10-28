@@ -3,6 +3,8 @@ import { buildDiagnostics, identityMismatches } from "./engineDiagnostics";
 import type { EngineBootState } from "./engineBoot";
 import type { ExpectedEnginePackage } from "./enginePackageRecord";
 import { IDENTITY_FIXTURE } from "./engineIdentity.fixture";
+import { shortId } from "./enginePackageRecord";
+import { TS_ENGINE_SOURCES, TS_ENGINE_VERSION } from "./tsEngineIdentity";
 
 const identity = JSON.stringify(IDENTITY_FIXTURE);
 const expected = (
@@ -46,6 +48,12 @@ describe("buildDiagnostics", () => {
     expect(r.state).toBe("typescript");
     expect(row(r, "Engine in use")).toEqual(["TypeScript engine"]);
     expect(row(r, "App")).toEqual(["v1.2.3 (abc1234)"]);
+    expect(row(r, "TypeScript engine")).toEqual([`${TS_ENGINE_VERSION} (source hash ${shortId(TS_ENGINE_SOURCES)})`]);
+  });
+
+  it("names no TypeScript engine on a wasm-only build, which has none", () => {
+    const r = buildDiagnostics({ ...base, boot: { build: "wasm-only", engine: "none", failure: null } });
+    expect(row(r, "TypeScript engine")).toEqual([]);
   });
 
   it("reports a healthy WASM engine with every field of its record", () => {

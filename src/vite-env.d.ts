@@ -4,6 +4,8 @@
 declare const __APP_VERSION__: string;
 /** Short git SHA of this build, or "unknown" outside a checkout. */
 declare const __APP_SHA__: string;
+/** SHA-256 of the TypeScript engine's sources (`src/build/tsEngineSources.ts`). */
+declare const __TS_ENGINE_SOURCES__: string;
 /** True only in a tooling build (`VC_TOOLING=1`, set by the e2e, screenshot,
  *  and perf pipelines). Gates the `window.game` handle: a production build
  *  compiles the publish away entirely (see bootstrap.ts). */
