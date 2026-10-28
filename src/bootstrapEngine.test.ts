@@ -391,11 +391,23 @@ describe("bootGame engine_status", () => {
     fullTabStore();
     expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
     vi.unstubAllGlobals();
-    // The row reads ts-fallback until the crash-reload trigger lands (#1422).
+    // A trap that stops the game, with no reload, is a fallback row.
     expect(lastRow(engineRows())).toMatchObject({ trigger: "fallback", engine: "ts-fallback", fallback_reason: "trap-tick", fallback_stage: "start", fallbacks: 1 });
     onUpdate!(activate);
     expect(activate).toHaveBeenCalledOnce();
     expect(prompt).toHaveBeenCalledOnce();
+  });
+
+  it("names the Rust engine that crashed on the row sent before a crash reload", async () => {
+    stubWebGL();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    wasmStub.requested = "wasm";
+    wasmStub.module = { Engine: class {} };
+    document.body.innerHTML = '<div id="stage"></div>';
+    await boot({ setSpeed: vi.fn() });
+    expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
+    expect(reloadSoon).toHaveBeenCalledOnce();
+    expect(lastRow(engineRows())).toMatchObject({ trigger: "crash-reload", engine: "wasm", fallback_reason: "trap-tick", fallback_stage: "start", fallbacks: 1 });
   });
 
   it("keeps the row when a boot step after the engine throws, and sends none when the game never existed", async () => {

@@ -24,6 +24,9 @@ import type { EngineChoice } from "./wasmhost/engineChoice";
  *   boot state the settle row reads, so it is not sent on its own.
  * - `fallback`, on each later fallback (a tower the host refused at a load, a
  *   new game or an undo restore, or a running engine's fault, #874).
+ * - `crash-reload`, when a running Rust engine traps and the page reloads
+ *   from its last autosave (#1422). It names the engine that crashed: the
+ *   reload, a new page life with its own settle row, says what runs next.
  * - `writer-latch`, when the engine save writer turns itself off.
  * - `summary`, at a hide, only when the cap below dropped a row since the last
  *   row went out, so the count it carries is the true one. It is outside the
@@ -47,7 +50,7 @@ export const ENGINE_KINDS = ["ts", "wasm", "wasm-frame", "wasm-worker", "ts-fall
 export type EngineKind = (typeof ENGINE_KINDS)[number];
 
 /** Why a row was sent; see the module comment. */
-export const ENGINE_STATUS_TRIGGERS = ["settle", "fallback", "writer-latch", "summary"] as const;
+export const ENGINE_STATUS_TRIGGERS = ["settle", "fallback", "crash-reload", "writer-latch", "summary"] as const;
 export type EngineStatusTrigger = (typeof ENGINE_STATUS_TRIGGERS)[number];
 
 /** The bundle kind (see `src/build/engineBundle.ts`). */
@@ -193,6 +196,18 @@ export function noteEngineFallback(fallback: { reason: FallbackReason; stage: Fa
   status.stage = fallback.stage;
   status.engine = engineKind(status.build, status.requested, true);
   sendCapped(status, "fallback", !reasonsSent.has(fallback.reason));
+}
+
+/** A running Rust engine trapped and the page reloads from its last autosave
+ *  (#1422). The row keeps the engine that crashed, and goes out past the cap,
+ *  since a page life reloads once. Before `settle` it is ignored, as a
+ *  fallback is. */
+export function noteEngineCrashReload(fault: { reason: FallbackReason; stage: FallbackStage }): void {
+  if (!status) return;
+  status.fallbacks++;
+  status.reason = fault.reason;
+  status.stage = fault.stage;
+  sendCapped(status, "crash-reload", true);
 }
 
 /** The engine save writer turned itself off (`vctowerWriter.ts`). Reported
