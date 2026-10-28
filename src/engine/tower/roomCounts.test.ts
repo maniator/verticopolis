@@ -101,15 +101,26 @@ describe("the HUD's kept counts read", () => {
       // Each of the four flag fields set or not, independently, and the
       // occupants at none or one, so a field read on one branch only (a sold
       // condo with no household, a let office off the market) is reached.
-      const combos = Array.from({ length: 32 }, (_, bits) => bits);
+      const yesNo = [false, true];
+      const combos = yesNo.flatMap((noRate) =>
+        yesNo.flatMap((everOccupied) =>
+          yesNo.flatMap((hasResidents) =>
+            yesNo.flatMap((hasCustomers) =>
+              yesNo.map((hasOccupants) => ({
+                noRate,
+                everOccupied,
+                residents: hasResidents ? 3 : undefined,
+                customersIn: hasCustomers ? 2 : undefined,
+                occupants: hasOccupants ? 1 : 0,
+              })),
+            ),
+          ),
+        ),
+      );
       const units = ALL_KINDS.flatMap((kind) =>
         states.flatMap((state) =>
-          combos.map((bits) => {
-            const fields = {
-              id: id++, kind, floor: 2, x: 0, width: 1, state,
-              noRate: (bits & 1) !== 0, everOccupied: (bits & 2) !== 0,
-              residents: bits & 4 ? 3 : undefined, customersIn: bits & 8 ? 2 : undefined, occupants: bits & 16 ? 1 : 0,
-            };
+          combos.map((combo) => {
+            const fields = { id: id++, kind, floor: 2, x: 0, width: 1, state, ...combo };
             const note = (key: string | symbol) => read.add(String(key));
             return new Proxy(fields as unknown as Unit, {
               get: (target, key, receiver) => (note(key), Reflect.get(target, key, receiver)),
