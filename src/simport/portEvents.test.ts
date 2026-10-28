@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortEvents } from "./portEvents";
@@ -38,13 +38,5 @@ describe("PortEvents", () => {
     };
     expect(afterSwap(false)).toEqual(["tower_founded"]);
     expect(afterSwap(true)).toEqual([]);
-  });
-
-  it("adds the held events only on a release", () => {
-    const held = vi.fn(() => [{ name: "star_reached", payload: { star: 2 } }] as never[]);
-    const events = new PortEvents(founded(), { held, marked: () => false });
-    events.drainGameplayEvents();
-    expect(held).not.toHaveBeenCalled();
-    expect(events.drainGameplayEvents({ release: true })).toEqual([{ name: "star_reached", payload: { star: 2 } }]);
   });
 });

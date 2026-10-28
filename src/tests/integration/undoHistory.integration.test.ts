@@ -385,7 +385,7 @@ describe("UndoHistory + Simulation — round-trip", () => {
     // autoBridge across, so undoing a BUILD never silently flips a Settings
     // toggle the player changed after that build (Codex P2).
     const enginePort = new TsEngine(Simulation.newGame(3, "modern", "realWorld"));
-    const hist = createAppHistory({ enginePort, ui: { toast: () => {} } });
+    const hist = createAppHistory({ enginePort, ui: { toast: () => {} }, followSwap: () => {} });
     const cx = Math.floor(GRID.width / 2);
     hist.capture("Build"); // snapshot taken while bridging is on
     expect(enginePort.sim.tower.place("lobby", 1, cx).ok).toBe(true); // ground lobby: the first valid placement

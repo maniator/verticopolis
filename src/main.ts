@@ -1,4 +1,4 @@
-import { Simulation, type HeatmapMode } from "./engine/Simulation";
+import type { HeatmapMode, Simulation } from "./engine/Simulation";
 import type { UndoHistory } from "./engine/UndoHistory";
 import { createAppHistory } from "./game/appHistory";
 import { GRID, facilityFloors } from "./engine/facilities";
@@ -35,16 +35,16 @@ import { refreshTraffic } from "./game/trafficHud";
 import { onUpdateAvailable } from "./game/updateFlow";
 import { bootGame } from "./bootstrap";
 import { gameplaySession } from "./analytics";
-import { createTsSim } from "./simport/tsSim";
-import { TsEngine } from "./engine/port/tsEngine";
+import { adoptToolingSim, followToolingEdit, syncToolingSim, toolingSim } from "./game/toolingSim";
+import { noteTowerSwap } from "./game/engineFault";
 import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
 import { PortEvents } from "./simport/portEvents";
 import { PortRenderSim } from "./simport/portRenderSim";
-import type { GameplayEventSource } from "./analyticsEngineBridge";
 import { hudSource } from "./game/hudSource";
 import { catalogOf } from "./game/portAccess";
-import { loadStored } from "./game/portLifecycle";
+import type { BootTower } from "./game/bootTower";
+import type { EnginePort } from "./simport/enginePort";
 import type { Catalog } from "./engine/catalogTypes";
 
 /**
@@ -70,17 +70,16 @@ import type { Catalog } from "./engine/catalogTypes";
  * traffic chip); renaming any needs every consumer updated (TypeScript won't catch it).
  */
 class GameApp implements GameAppPorts {
-  /** The port's engine (slice 7, PR 4), its view and code tables; `sim` is its tower, set directly only by the tooling scenes. */
-  enginePort!: TsEngine;
+  /** The engine (either one, through the port), its view and code tables. */
+  enginePort: EnginePort;
   reader!: ViewReader;
   portCodes!: PortCodes;
   /** The engine's gameplay events, for the analytics bridge. */ events!: PortEvents;
   /** What the renderer draws: the reader's view and the port's render queries. */ renderSim!: PortRenderSim;
   /** The editor and inspector cards, and the reads the port lacks. @internal */ cardKit!: CardKit;
-  get sim(): Simulation { return this.enginePort.sim; }
-  set sim(sim: Simulation) { if (!(import.meta.env.DEV || __TOOLING_BUILD__)) throw new Error("app.sim is set only in tooling builds"); this.enginePort.take(sim); }
-  /** The simulation as the game drives it (AD-9); follows every adoptSim swap. */
-  readonly port = createTsSim(() => this.sim, { adopt: (sim, keep) => this.adoptSim(sim, keep) });
+  /** The tower the tooling harnesses edit by hand (`toolingSim.ts`); undefined on the Rust engine in production. */
+  get sim(): Simulation | undefined { return toolingSim(this); }
+  set sim(sim: Simulation) { this.adoptSim(sim); }
   engine: TowerEngine;
   audio = new AudioEngine();
   ui: UI;
@@ -200,35 +199,28 @@ class GameApp implements GameAppPorts {
    *  constructor once `ui` exists. */
   private history!: UndoHistory;
 
-  constructor() {
+  constructor(tower: BootTower) {
     this.canvas = document.getElementById("view") as HTMLCanvasElement;
-    // Distinguish "no save" from "save present but unreadable": a corrupt/
-    // incompatible autosave must NOT masquerade as a continuable tower (that
-    // would offer "Continue", then silently start fresh and let the autosave
-    // clobber it). We fall back to a new tower either way, but remember the
-    // corruption so the splash stays honest and the player is told (below).
-    // The engine starts on a fresh tower and loads the autosave over it. The
-    // fresh tower's events never reach the loaded one (`setBackdrop`).
-    this.enginePort = new TsEngine(Simulation.newGame(Date.parse("2024-01-01")));
-    this.enginePort.setBackdrop(true);
-    const boot = SaveGame.loadResult(loadStored(this.enginePort));
-    this.enginePort.setBackdrop(false);
-    this.saveWasCorrupt = boot.corrupt;
-    this.hadReadableSave = boot.loaded;
+    // Boot loaded the stored tower into the engine (`bootTower`). It tells
+    // "no save" from "save present but unreadable": a corrupt/incompatible
+    // autosave must NOT masquerade as a continuable tower (that would offer
+    // "Continue", then silently start fresh and let the autosave clobber it).
+    // We start fresh either way, but remember the corruption so the splash
+    // stays honest and the player is told (below).
+    this.enginePort = tower.port;
+    this.saveWasCorrupt = tower.corrupt;
+    this.hadReadableSave = tower.loaded;
     // Stash the unreadable bytes off the autosave slot before the 30s timer can
     // overwrite them: a save from a *newer* build is only unreadable here, and a
     // future version may recover it. Best-effort, never blocks boot.
-    if (boot.corrupt) SaveGame.preserveUnreadable();
-    this.enginePort.handOff = (sim, keep) => this.adoptSim(sim, keep); // PR 5's bridge, see `TsEngine.handOff`
+    if (tower.corrupt) SaveGame.preserveUnreadable();
     this.reader = new ViewReader(this.enginePort, facilityFloors);
     this.portCodes = new PortCodes(this.enginePort);
-    // The WASM mirror host's held events (#874) and backdrop mark.
-    const held = () => (this.sim as GameplayEventSource).drainGameplayEvents({ release: true });
-    this.events = new PortEvents(this.enginePort, { held, marked: () => this.sim.gameplayEvents.discardOnHandOff });
-    // Seed the promotion latch to the boot tower's rating (adoptSim does it for
-    // later swaps): the boot sim skips adoptSim, so a reloaded 2★-6★ tower would
-    // otherwise fire a phantom promotion (jingle + star_reached) on frame one.
-    this.lastStar = this.sim.star;
+    this.events = new PortEvents(this.enginePort);
+    // Seed the promotion latch to the boot tower's rating (followSwap does it
+    // for later swaps), or a reloaded 2★-6★ tower would fire a phantom
+    // promotion (jingle + star_reached) on frame one.
+    this.lastStar = this.reader.header.star;
     this.renderSim = new PortRenderSim(this.enginePort, this.reader);
     this.engine = new TowerEngine(this.canvas, this.renderSim, this.reader);
 
@@ -281,7 +273,7 @@ class GameApp implements GameAppPorts {
 
     // First-paint boot flow: onboarding, resume-flag handling, splash, the
     // corrupt-save message, and the autosave timer (see runBootFlow).
-    runBootFlow(this, boot.savedAt);
+    runBootFlow(this, tower.savedAt);
   }
 
   // ---- UI command ports (GameAppPorts; createUICallbacks delegates here) ----
@@ -439,44 +431,52 @@ class GameApp implements GameAppPorts {
 
   // ---- Save / load / new --------------------------------------------------
 
-  /** Swap in a freshly loaded/created simulation and point the engine at it.
+  /** Follow the tower the engine just swapped in (a load, a new tower, an
+   *  import, an undo or redo restore): drop what belonged to the old tower and
+   *  point the view and the renderer at the new one. `keepHistory` is an
+   *  undo or redo restore, which keeps the camera and the undo trail.
    *  @internal */
-  adoptSim(sim: Simulation, preserveHistory = false): void {
-    sim.gameplayEvents.inherit(this.sim.gameplayEvents); // what the replaced tower still owed, and its drop count
-    this.enginePort.take(sim);
+  followSwap(keepHistory = false): void {
     this.clearSelection();
     // Facility ids restart in a fresh tower. A stale ✕-latch (or anchor) from the old tower
     // would silently mute the inspector on whichever new facility happens to reuse the id.
     this.inspector.clear();
-    // A live Getting Started session must follow the swap, or it keeps
-    // ticking the abandoned sim and teaches that tower's next step.
-    this.onboarding.adoptSim(this.enginePort, preserveHistory);
+    // Getting Started and the engine's trap report follow the swap too.
+    this.onboarding.adoptSim(this.enginePort, keepHistory);
+    noteTowerSwap(keepHistory);
     this.shownWin = false;
-    this.lastStar = sim.star;
     this.accMinutes = 0;
     this.lastMealRushDay = { breakfast: -1, lunch: -1, dinner: -1 };
     // A crash report pairs the CURRENT tower's save with these entries, so drop a previous tower's.
     this.frameErrors.length = 0;
-    // Read the swapped-in tower now, before the renderer takes it. An undo/redo
-    // restore keeps the camera under the player (preserveHistory is only ever
-    // true on that path); a real tower swap restores the save's view.
+    // Read the swapped-in tower now, before the renderer takes it.
     this.reader.update();
+    this.lastStar = this.reader.header.star;
     // Renderer caches (scenery seed, walker reach) key on the sim it draws.
+    // An undo/redo restore keeps the camera under the player; a real tower
+    // swap restores the save's view.
     this.renderSim = new PortRenderSim(this.enginePort, this.reader);
-    this.engine.setSim(this.renderSim, { keepCamera: preserveHistory });
+    this.engine.setSim(this.renderSim, { keepCamera: keepHistory });
     // Rebase the UI log cursor so old entries don't replay as toasts, and
     // refresh the palette to the new star level so it never shows the prior
     // tower's unlock set.
     this.ui.resetLog(hudSource(this));
     this.ui.update(hudSource(this));
-    if (!preserveHistory) {
+    if (!keepHistory) {
       // A *different* tower (New Tower / Load / a slot / Import) invalidates the
       // undo trail; otherwise Undo could resurrect an unrelated old tower and a
-      // later autosave persist it. Undo/redo restores pass preserveHistory.
+      // later autosave persist it. Undo/redo restores keep it.
       this.history.clear();
       this.lastTrafficTier = 0; // the chip's hysteresis starts over on another tower
     }
   }
+
+  /** Swap in a tower a tooling harness built by hand, on either engine. @internal */
+  adoptSim(sim: Simulation, preserveHistory = false): void { adoptToolingSim(this, sim, preserveHistory); }
+  /** Hand a harness's edits of `sim` to the engine now. @internal */
+  syncSim(): void { syncToolingSim(this); }
+  /** Tooling: draw the engine again after a hand edit on `sim` reached it. */
+  followEdit(): void { followToolingEdit(this); }
 
   // ---- Undo / redo (state + logic live in engine/UndoHistory) -------------
   // Thin delegators kept so the many gesture call sites read unchanged.
@@ -497,4 +497,4 @@ export { GameApp };
 // bootstrap.ts) and calls it after this module has fully initialized, so the
 // runtime `import { GameApp }` reference in game/ modules resolves via live
 // bindings.
-void bootGame(() => new GameApp()); // async since #729; see bootGame's return note
+void bootGame((tower) => new GameApp(tower)); // async since #729; see bootGame's return note

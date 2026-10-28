@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "lit-html";
 import { engineSectionTemplate } from "../ui/templates/settings";
 import { setCurrentSelection } from "./current";
@@ -7,6 +7,17 @@ import { SAFETY_KEY, type KeyValueStore } from "./records";
 import { forgetRetry, liveEngineSettings, wireEngineSection } from "./settingsLive";
 import { ENGINE_STORAGE_KEY } from "../wasmhost/engineChoice";
 import type { EngineBootState } from "../wasmhost/engineBoot";
+
+// The suites below test the Rust paths the Settings choice and the cohort
+// reach once PR 6 brings back the fallback (#1422); the hold that keeps them on
+// TypeScript until then is tested on its own.
+const flags = vi.hoisted(() => ({ rustOnlyByUrl: false }));
+vi.mock("./config", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./config")>()),
+  get RUST_ONLY_BY_URL() {
+    return flags.rustOnlyByUrl;
+  },
+}));
 
 class MemoryStore implements KeyValueStore {
   readonly data = new Map<string, string>();

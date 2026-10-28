@@ -14,8 +14,8 @@ export interface FrameRun {
   tickMs: number;
   ticks: number;
   uiMs: number;
-  /** "wasm" only when the host held the tower from start to end with no
-   *  new error (a trap mid-window drops the sample to "ts"). */
+  /** "wasm" only when the app's engine port was the Rust engine boot
+   *  published from start to end. */
   engineActive: "ts" | "wasm";
   hostErrorsAdded: string[];
 }
@@ -23,34 +23,48 @@ export interface FrameRun {
 /**
  * Gameplay frames: the real frame loop at the fastest speed (steady clock,
  * emergencies declined through the app's own path, autosave off), sampled by
- * rAF for `windowMs` after `warmMs`. Time inside `sim.tick` and `ui.update`
- * is summed alongside, so the report can tell engine time from the rest of
- * the frame. The window is wall-clock time, so a slower engine simulates
+ * rAF for `windowMs` after `warmMs`. Time inside the frame's engine step
+ * (the port's `advance` and the view read after it, the engine's part of a
+ * frame on either engine since PR 5e) and `ui.update` is summed alongside,
+ * so the report can tell engine time from the rest of the frame; `ticks`
+ * counts the steps the engine ran. The window is wall-clock time, so a slower engine simulates
  * fewer in-game minutes in it; the achieved sim speed is reported with it.
  */
 export function measureFrames(arg: { windowMs: number; warmMs: number; speed: number }): Promise<FrameRun> {
   const w = window as any;
   const g = w.game;
-  const sim = g.sim;
+  const port = g.enginePort;
+  const reader = g.reader;
   const ui = g.ui;
   const host = w.__vcEngine;
-  const h = host?.current?.();
-  const hostedAtStart = Boolean(h) && Boolean(host?.status?.hosted) && Object.prototype.hasOwnProperty.call(sim, "serialize");
-  const errorsAtStart = ((host?.status?.errors ?? []) as string[]).length;
-  const ownTick = Object.getOwnPropertyDescriptor(sim, "tick");
+  const hosted = (): boolean => Boolean(host?.status?.hosted) && host.port === port && w.game.enginePort === port;
+  const hostedAtStart = hosted();
+  const ownAdvance = Object.getOwnPropertyDescriptor(port, "advance");
+  const ownRead = Object.getOwnPropertyDescriptor(reader, "update");
   const ownUpdate = Object.getOwnPropertyDescriptor(ui, "update");
-  const tick = sim.tick;
+  const advance = port.advance;
+  const read = reader.update;
   const update = ui.update;
   const acc = { tick: 0, ticks: 0, ui: 0, on: false };
-  sim.tick = function (this: unknown, dt: number) {
+  port.advance = function (this: unknown, ...a: unknown[]) {
     const t = performance.now();
+    let out: Float64Array | undefined;
     try {
-      return tick.call(this, dt);
+      out = advance.apply(this, a);
+      return out;
     } finally {
       if (acc.on) {
         acc.tick += performance.now() - t;
-        acc.ticks++;
+        acc.ticks += out ? out[0] : 0;
       }
+    }
+  };
+  reader.update = function (this: unknown, ...a: unknown[]) {
+    const t = performance.now();
+    try {
+      return read.apply(this, a);
+    } finally {
+      if (acc.on) acc.tick += performance.now() - t;
     }
   };
   ui.update = function (this: unknown, ...a: unknown[]) {
@@ -76,22 +90,23 @@ export function measureFrames(arg: { windowMs: number; warmMs: number; speed: nu
       g.speed = 0;
       g.engine.paused = true;
       acc.on = false;
-      if (ownTick) Object.defineProperty(sim, "tick", ownTick);
-      else delete sim.tick;
+      if (ownAdvance) Object.defineProperty(port, "advance", ownAdvance);
+      else delete port.advance;
+      if (ownRead) Object.defineProperty(reader, "update", ownRead);
+      else delete reader.update;
       if (ownUpdate) Object.defineProperty(ui, "update", ownUpdate);
       else delete ui.update;
-      const hostErrorsAdded = ((host?.status?.errors ?? []) as string[]).slice(errorsAtStart);
-      const stillHosted = hostedAtStart && hostErrorsAdded.length === 0 && host.current() === h && Boolean(host.status.hosted) && w.game.sim === sim;
+      const stillHosted = hostedAtStart && hosted();
       resolve({
         audioStarted: Boolean(g.audio?.started),
         intervalsMs: intervals,
         wallMs: last - start,
-        simMinutes: sim.clock.minutes - startMinutes,
+        simMinutes: reader.header.minutes - startMinutes,
         tickMs: acc.tick,
         ticks: acc.ticks,
         uiMs: acc.ui,
         engineActive: stillHosted ? "wasm" : "ts",
-        hostErrorsAdded,
+        hostErrorsAdded: [],
       });
     };
     const frame = (ts: number): void => {
@@ -99,7 +114,7 @@ export function measureFrames(arg: { windowMs: number; warmMs: number; speed: nu
         if (ts - begin >= arg.warmMs) {
           start = ts;
           last = ts;
-          startMinutes = sim.clock.minutes;
+          startMinutes = reader.header.minutes;
           acc.on = true;
         }
         requestAnimationFrame(frame);

@@ -40,9 +40,10 @@ export function isCrashed(): boolean {
 /** The engine-failure message's element id (bootstrap.ts renders it). */
 export const ENGINE_FAILURE_ID = "engine-failure";
 
-/** A wasm-only build stopped on its engine (the engine-failure message from
- *  bootstrap.ts is up): no engine holds the tower, so nothing may advance,
- *  change or save it. Read like the crash card, from its element. */
+/** The game stopped on its engine (the engine-failure message from
+ *  bootstrap.ts is up: a wasm-only build's engine that did not start, or a
+ *  Rust engine that trapped): no engine holds the tower, so nothing may
+ *  advance, change or save it. Read like the crash card, from its element. */
 export function isEngineStopped(): boolean {
   return !!document.getElementById(ENGINE_FAILURE_ID);
 }

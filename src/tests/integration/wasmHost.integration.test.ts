@@ -3,7 +3,6 @@ import { Simulation } from "../../engine/Simulation";
 import type { Person } from "../../engine/crowd/person";
 import { canonicalJson } from "../../engine/canonicalJson";
 import { stateView } from "../../engine/conformanceView";
-import { startWasmHost } from "../../wasmhost/startWasmHost";
 import { attachWasmHost } from "../../wasmhost/wasmHost";
 import { attachMirror } from "../../dualrun/mirror";
 import { decodeFrame } from "../../wasmhost/frameView";
@@ -301,38 +300,6 @@ describe.skipIf(!hasWasmPackage())("WASM host: the read model follows the engine
     const fresh = host.restore().sim;
     expect(fresh.tower.units.filter((u) => u.kind === "lobby")).toHaveLength(3);
     expect(() => host.engine.mode()).toThrow(); // let go by the detach (#1113)
-  });
-
-  // A paused player builds, then undoes before anything drains: the app swaps
-  // in the restored tower and the host follows it. The events the engine
-  // still owed reach the restored tower ahead of its own, once; the
-  // abandoned instance keeps none.
-  it("hands the events still owed to the tower that replaces it", () => {
-    const sim = Simulation.newGame(45, "classic");
-    sim.money = 1e9;
-    for (let x = 170; x < 200; x++) expect(sim.build("lobby", 1, x).ok).toBe(true);
-    sim.drainGameplayEvents();
-    const app = {
-      sim,
-      adoptSim(next: Simulation) {
-        next.gameplayEvents.inherit(this.sim.gameplayEvents); // as GameApp.adoptSim does
-        this.sim = next;
-      },
-    };
-    const handle = startWasmHost(app, wasm(), { info: () => {}, error: () => {} });
-    const snapshot = JSON.stringify(sim.serialize());
-    for (let x = 170; x < 180; x++) expect(sim.build("floor", 2, x).ok).toBe(true);
-    const restored = Simulation.deserialize(JSON.parse(snapshot));
-    expect(restored.build("office", 2, 190).ok).toBe(true); // the restored tower's own, after the swap's
-    app.adoptSim(restored);
-    expect(handle.status).toMatchObject({ starts: 2, hosted: true, errors: [] });
-    const events = restored.drainGameplayEvents();
-    expect(events).toHaveLength(11);
-    expect(events.slice(0, 10).every((e) => e.name === "facility_placed" && e.payload.kind === "floor")).toBe(true);
-    expect(events[10]).toEqual({ name: "facility_placed", payload: { kind: "office", floor: 2, count: 1 } });
-    expect(sim.drainGameplayEvents()).toEqual([]);
-    expect(restored.gameplayEventsDropped).toBe(0);
-    handle.stop();
   });
 
   // A merge copies the fresh deserialization's empty buffer; the host puts

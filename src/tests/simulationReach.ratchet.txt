@@ -5,11 +5,9 @@
 # facade's slices (#1207) move each consumer behind the port; a new line needs
 # a reason the PR states and a reviewer accepts.
 src/game/facilityDiagnostics.ts Simulation # reads the gripe thresholds Simulation exports; facade slice 4 (#1211)
-src/game/saveLoad.ts Simulation # load and new game build a Simulation; facade slice 5 (#1212)
-src/main.ts Simulation port/tsEngine # GameApp founds the first Simulation at boot, and holds it in the TypeScript engine behind EnginePort (facade slice 7, PR 4); facade slices 5 and 10 (#1212, #1222)
+src/game/bootTower.ts Simulation port/tsEngine # the TypeScript engine's first tower, moved from src/main.ts (PR 5e)
+src/game/toolingSim.ts Simulation port/tsEngine # the tooling harnesses' hand-built towers on either engine, moved from src/main.ts (PR 5e); tooling builds only past the TsEngine check
 src/simport/tsLifecycle.ts Simulation # the TypeScript adapter loads, saves and fingerprints the tower it hosts (facade slice 5, #1212); slice 10 loads it lazily, and it goes when the TypeScript engine retires
 src/storage/SaveGame.ts Simulation # slot listing and loads deserialize a save into a Simulation; facade slice 5 (#1212)
 src/wasmhost/hostFault.ts Simulation # the fallback deserializes the Simulation the TypeScript engine resumes on; facade slice 8 (#1218)
 src/wasmhost/wasmHost.ts Simulation # the mirror host rebuilds its Simulation from the engine's save; facade slices 10 and 11 (#1222, #1223)
-src/wasmhost/workerApply.ts Simulation # the worker host deserializes engine saves into its Simulation read model; facade slice 12 (#1224)
-src/wasmhost/workerHost.ts Simulation # the worker host serializes its Simulation read model; facade slice 12 (#1224)

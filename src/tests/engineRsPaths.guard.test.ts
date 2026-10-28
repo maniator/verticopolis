@@ -232,14 +232,10 @@ describe("the host suites run in test:wasm", () => {
     expect(unrun(files, filters)).toEqual([]);
   });
 
-  it("covers the six host suites and the perf-compare engine check by name", () => {
+  it("covers the mirror host's suites and the perf-compare engine check by name", () => {
     for (const name of [
-      "src/tests/integration/wasmHostAnalyticsBridge.integration.test.ts",
       "src/tests/integration/wasmHostLogText.integration.test.ts",
       "src/tests/integration/wasmHostTelemetry.integration.test.ts",
-      "src/tests/integration/wasmWorkerHost.integration.test.ts",
-      "src/tests/integration/wasmWorkerLifecycle.integration.test.ts",
-      "src/tests/integration/wasmWorkerSaves.integration.test.ts",
       "src/tests/perfCompare/scenarios.integration.test.ts",
     ])
       expect(
@@ -252,7 +248,7 @@ describe("the host suites run in test:wasm", () => {
     expect(
       unrun(
         files,
-        filters.filter((x) => x !== "wasmWorker"),
+        filters.filter((x) => x !== "wasmHost"),
       ).length,
     ).toBeGreaterThan(0);
   });

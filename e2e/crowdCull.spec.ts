@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { buildToStar, expectEngineHosted, syncEngine } from "./helpers";
+import { buildToStar, expectEngineHosted } from "./helpers";
 
 // On chromium-wasm every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
@@ -24,20 +24,18 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     if (!g.sim.buildTransport("elevatorStandard", 186, 1, 3).ok) throw new Error("shaft placement failed");
   });
   await expectEngineHosted(page);
-  // Read the tower back from the engine before staging the crowd (a merge
-  // replaces the people list with the engine's, which is empty at speed 0).
-  await page.evaluate(syncEngine);
   await page.evaluate(() => {
     const g = (window as any).game;
-    // The fixture freezes game speed, so no routed people ever spawn; seed a
-    // few directly into sim.crowd.people (the render reads only these fields)
+    // The fixture freezes game speed, so no routed people spawn on their own.
+    // Run the clock a minute at a time, on the engine itself, until someone
+    // the render draws is out walking (a rider shows only in the car's count),
     // so the crowd-actor half of the cull is exercised for real, not over an
-    // empty map. Speed stays 0, so neither engine nor the host's per-frame
-    // sync touches them: these are render inputs on the read model, and the
-    // render path under test is the same for both engines.
-    for (let i = 0; i < 3; i++) {
-      g.sim.crowd.people.push({ id: 9000 + i, seed: i, staff: false, state: "walking", x: 180 + i * 4, fy: 2, wait: 0 });
-    }
+    // empty map. Speed stays 0 afterward, so the crowd holds still.
+    // The render reads the crowd from the app's view of the engine, which a
+    // frame refreshes; no frame runs inside this loop, so refresh it here.
+    const walking = () => (g.reader.update(), g.engine.sim.crowd.people.some((p: any) => p.state !== "riding"));
+    for (let minute = 0; minute < 24 * 60 && !walking(); minute++) g.sim.tick(1);
+    if (!walking()) throw new Error("no one walked the tower in a day");
     g.engine.paused = false;
   });
   // Let one frame pass at a normal zoom so the moving layer exists and shows.

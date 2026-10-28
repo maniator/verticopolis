@@ -53,19 +53,20 @@ test("the cohort puts a WASM-arm browser on the Rust engine with no URL or store
 test("a fault keeps every later boot on TypeScript until the player retries", async ({ page }) => {
   await seed(page, 1, 3);
   expect(await bootedEngine(page)).toBe("wasm");
-  // Force a trap in a tick, as wasmFallback.spec.ts does.
+  // Force a trap in a frame's step: the real step runs, then the call throws.
   await page.evaluate(() => {
     const g = (window as any).game;
     g.onboarding.dismissSplash();
-    const engine = (window as any).__vcEngine.current().engine;
-    const real = engine.tick.bind(engine);
-    engine.tick = (...args: unknown[]) => {
+    const engine = (window as any).__vcEngine.port;
+    const real = engine.advance.bind(engine);
+    engine.advance = (...args: unknown[]) => {
       real(...args);
       throw new WebAssembly.RuntimeError("unreachable");
     };
     g.setSpeed(1);
   });
-  await page.waitForFunction(() => (window as any).__vcEngine.status.fallbacks >= 1, undefined, { timeout: 30_000 });
+  // The trap stops the game (no fallback until PR 6).
+  await page.waitForFunction(() => !!document.getElementById("engine-failure"), undefined, { timeout: 30_000 });
   for (let i = 0; i < 2; i++) expect(await bootedEngine(page, true)).toBe("ts");
   expect(await settingsStatus(page)).toContain("The Rust engine had a problem on this device earlier");
   await page.locator("[data-engine-retry]").click();

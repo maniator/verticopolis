@@ -47,14 +47,6 @@ const CALENDARS = VIEW_LAYOUT.calendars as readonly CalendarKind[];
  */
 export class TsEngine implements PortState {
   reason: string | undefined;
-  /**
-   * PR 5's bridge while the WASM mirror host still follows `GameApp.adoptSim`:
-   * when set, a done swap hands the new tower to the app (`adoptSim`, which
-   * calls `take`), so the app and the host follow it as they follow a swap
-   * the game made itself. The hand-off runs inside the swap member, before it
-   * answers. Goes with the mirror host in 5e.
-   */
-  handOff: ((next: Simulation, keepHistory: boolean) => void) | undefined;
   private current: Simulation;
   private gen = 0;
   private backdrop = false;
@@ -99,17 +91,12 @@ export class TsEngine implements PortState {
     return this.current;
   }
 
-  /** Take over a tower the game swapped in itself (`GameApp.adoptSim`), for
-   *  PR 4's transition while callers still load through `SimPort`. The app
-   *  has already carried the replaced tower's events over, so this only
-   *  starts the engine's own state again, as a swap does. Not on the port. */
+  /** Take over a tower a tooling scene built by hand (`GameApp.adoptSim`,
+   *  in tooling builds only). The replaced tower's events go ahead of the new
+   *  tower's own, as a swap's do. Not on the port. */
   take(next: Simulation): void {
     if (next === this.current) return;
-    this.current = next;
-    this.restart();
-    // A fault fallback hands over a fresh copy of the same tower, carrying
-    // the backdrop's mark on its buffer; a new tower's buffer has none.
-    this.backdrop = next.gameplayEvents.discardOnHandOff;
+    this.adopt(next);
   }
 
   // ---- Lifecycle -----------------------------------------------------------
@@ -173,8 +160,6 @@ export class TsEngine implements PortState {
 
   setBackdrop(on: boolean): void {
     this.backdrop = on;
-    // On the buffer too, where a hand-off (`GameApp.adoptSim`) reads it.
-    this.current.gameplayEvents.discardOnHandOff = on;
   }
 
   private swapRecord(done: boolean): Float64Array {
@@ -196,15 +181,11 @@ export class TsEngine implements PortState {
       next.autoBridge = this.current.autoBridge;
       next.view = this.current.view;
     }
-    this.adopt(next, keepLive);
+    this.adopt(next);
     return this.swapRecord(true);
   }
 
-  private adopt(next: Simulation, keepHistory = false): void {
-    if (this.handOff) {
-      this.handOff(next, keepHistory);
-      return;
-    }
+  private adopt(next: Simulation): void {
     const prev = this.current.gameplayEvents;
     prev.discardOnHandOff = this.backdrop;
     next.gameplayEvents.inherit(prev);

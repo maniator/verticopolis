@@ -89,19 +89,29 @@ test.describe("dialog chrome", () => {
     await page.evaluate(() => {
       const g = (window as any).game;
       const W = g.grid.width;
-      // Relayed builds, so on the WASM engine the floors and the shaft are the
-      // engine's; the merge below reads them back before the dialog opens.
+      // On the WASM engine the ten thousand builds go on a scratch copy of the
+      // engine's tower, which the engine then loads in one step, as buildToStar
+      // hands its tower over: built one at a time through the engine, each
+      // build would read the engine's whole state back, far past the test's
+      // budget. On the TypeScript engine they go on the engine's own tower.
+      const port = (window as any).__vcEngine?.port;
+      const hosted = Boolean(port) && g.enginePort === port;
+      const s = hosted ? g.sim.constructor.deserialize(JSON.parse(JSON.stringify(g.sim.serialize()))) : g.sim;
       for (let f = 4; f <= 30; f++) {
         for (let x = 4; x < W - 4; x++) {
-          const fl = g.sim.build("floor", f, x);
+          const fl = s.build("floor", f, x);
           if (!fl.ok) throw new Error(`floor ${f} at x=${x}: ${fl.reason ?? "refused"}`);
         }
       }
-      const r = g.sim.buildTransport("elevatorStandard", 10, 1, 30);
+      const r = s.buildTransport("elevatorStandard", 10, 1, 30);
       if (!r.ok) throw new Error(`could not place the shaft this shot needs: ${JSON.stringify(r)}`);
+      if (hosted) {
+        g.adoptSim(s, true);
+        g.speed = 0; // a load can resume play; the shot is of a paused game
+      }
       // The merge also copies the engine's clock over the beforeEach pin, so
       // pin it again (the dialog shot is of a paused game at 07:00).
-      (window as any).__vcEngine?.current()?.syncStructure();
+      (window as any).game.syncSim();
       g.sim.clock.minutes = 7 * 60;
       const t = g.sim.tower;
       const shaft = t.transports.find((x: { kind: string }) => x.kind === "elevatorStandard");

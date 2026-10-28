@@ -6,14 +6,12 @@
  * (`tsOnlyOnWasm`, `expectEngineHosted`) run in the test itself.
  *
  * Engine parity (story-engine-test-parity AC2): the `chromium-wasm` project
- * boots every page on the WASM engine, where the TypeScript `Simulation` is a
- * read model and only relayed commands (`sim.build`, `sim.buildTransport`,
- * `sim.evaluateStar`, `sim.tick`, a money write, a save the app adopts) reach
- * the engine. A direct `tower.place` or field write changes the read model
- * alone, so a spec that scripted its tower that way left the engine untested.
- * The helpers here stage towers through those relayed routes, and the specs'
- * own commands are the same on both projects. One exception: `buildToStar`
- * keeps its in-place build on the TypeScript engine (see there).
+ * boots every page on the WASM engine, where `game.sim` is a copy of the
+ * engine's save (src/game/toolingSim.ts). Commands and field writes on the
+ * copy reach the engine when the task ends, or at `syncEngine`, as a restore
+ * of the copy's save; the next read is a fresh copy. The engine itself runs
+ * whatever a spec ticks through the app or the port. `buildToStar` keeps its
+ * in-place build on the TypeScript engine (see there).
  */
 
 import { test, expect, type Page } from "@playwright/test";
@@ -44,11 +42,10 @@ export function tsOnlyOnWasm(reason: string): void {
 
 /**
  * Fail a `chromium-wasm` test unless the live tower runs on the engine: the
- * host is up, it reports the current tower hosted with no errors, and the
- * app's `sim` is the instance the host attached to (the host installs its own
- * `serialize` on that instance, so a `sim` swapped in behind the host's back
- * has none). Without this a spec could pass on the project while the page
- * silently ran the TypeScript engine. A no-op on the other projects.
+ * Rust engine is published, it reports itself hosting with no error, and it
+ * is the port the app holds. Without this a spec could pass on the project
+ * while the page silently ran the TypeScript engine. A no-op on the other
+ * projects.
  */
 export async function expectEngineHosted(page: Page): Promise<void> {
   const info = test.info();
@@ -61,38 +58,38 @@ export async function expectEngineHosted(page: Page): Promise<void> {
     return {
       host: Boolean(h),
       hosted: Boolean(h?.status?.hosted),
-      errors: (h?.status?.errors ?? []) as string[],
-      liveSimHosted: Boolean(w.game?.sim) && Object.prototype.hasOwnProperty.call(w.game.sim, "serialize"),
+      lastError: h?.status?.lastError ?? null,
+      onEngine: Boolean(h?.port) && w.game?.enginePort === h.port,
     };
   });
   expect(state, "the chromium-wasm project must run the live tower on the WASM engine").toEqual({
     host: true,
     hosted: true,
-    errors: [],
-    liveSimHosted: true,
+    lastError: null,
+    onEngine: true,
   });
 }
 
 /**
  * The engine's own save on the `chromium-wasm` project (null elsewhere), for a
- * spec that asserts the engine reached a state rather than the read model.
+ * spec that asserts the engine reached a state.
  */
 export async function engineSave(page: Page): Promise<Record<string, any> | null> {
   if (!onWasm(test.info().project.name)) return null;
   return page.evaluate(() => {
-    const host = (window as any).__vcEngine?.current();
-    return host ? JSON.parse(host.engine.serialize()) : null;
+    const port = (window as any).__vcEngine?.port;
+    return port ? JSON.parse(port.serialize()) : null;
   });
 }
 
 /**
- * Refresh the read model from the engine now (a full merge of the engine's
- * save), so what a test reads next is the engine's state. The specs run at
- * speed 0, where no frame ticks the engine and so nothing syncs on its own.
- * A no-op on the TypeScript engine.
+ * Hand the edits a test made to `game.sim` to the engine now. On the Rust
+ * engine `game.sim` is a copy of the engine's save (src/game/toolingSim.ts),
+ * whose edits otherwise reach the engine when the task ends. A no-op on the
+ * TypeScript engine, whose tower a test edits in place.
  */
 export function syncEngine(): void {
-  (window as any).__vcEngine?.current()?.syncStructure();
+  (window as any).game.syncSim();
 }
 
 /**
@@ -106,21 +103,21 @@ export function syncEngine(): void {
  * on it in place (the perf gate's committed baseline measures exactly that
  * tower). On the WASM engine the structure and the occupancy are scripted on a
  * scratch copy of the live tower, loaded from the engine's own save, and the
- * app then adopts that copy, which is the load a player's save takes: the host
- * follows `adoptSim` and starts the engine from it. Every later step there is a
- * relayed command, so the engine evaluates the star and, at TOWER, runs the
- * VIP inspection itself. The undo-restore flavor of `adoptSim` keeps the
- * camera, as the in-place build does.
+ * app then adopts that copy, which the engine restores. The minute that runs
+ * the VIP inspection at TOWER is a tick of the engine itself. The
+ * undo-restore flavor of `adoptSim` keeps the camera, as the in-place build
+ * does.
  */
 export function buildToStar(target: number): number {
   const g = (window as any).game;
-  const sync = () => (window as any).__vcEngine?.current()?.syncStructure();
+  const sync = () => (window as any).game.syncSim();
   const scratch = () => {
     const Sim = g.sim.constructor;
     return Sim.deserialize(JSON.parse(JSON.stringify(g.sim.serialize())));
   };
   const W = g.grid.width;
-  const hosted = Boolean((window as any).__vcEngine?.current());
+  const port = (window as any).__vcEngine?.port;
+  const hosted = Boolean(port) && g.enginePort === port;
   // The WASM engine was asked for but holds no tower: building in place here
   // would script the read model alone, so fail loudly instead.
   // A wasm-only build has no other engine, whatever the URL or storage say.
@@ -210,7 +207,7 @@ export function buildToStar(target: number): number {
     // finishing and the calendar reaching the visit are scripted on a second
     // save (no command fast-forwards either), parked one minute before the
     // inspection day, and one relayed minute then runs the engine's own day
-    // pass: the real win logic (`checkVip`) on whichever engine hosts the tower.
+    // pass: the real win logic (`checkVip`) on the engine.
     const r = g.sim.build("weddingHall", 100, c);
     if (!r.ok) throw new Error(`wedding hall refused: ${r.reason ?? "unknown"}`);
     sync();
@@ -221,8 +218,8 @@ export function buildToStar(target: number): number {
     s2.clock.minutes = s2.vipVisitDay * 24 * 60 - 1;
     g.adoptSim(s2, true);
     g.speed = 0;
-    g.sim.tick(1);
-    sync();
+    port.tick(1);
+    g.reader.update();
     // The relayed minute runs the whole day pass, random events included. The
     // seeded tower rolls none; an emergency here would pre-empt the TOWER
     // modal, so it fails loudly rather than as a missing modal later.

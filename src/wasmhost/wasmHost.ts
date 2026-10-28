@@ -45,6 +45,12 @@ import { HostEvents, type EventRead } from "./hostEvents";
  * command's events wait in the host until a restore point covers the command
  * (#874): the next merge (the sync after a structural command, or the hour
  * pass) or the next save the game reads (an undo capture, an autosave).
+ *
+ * Since PR 5e the game no longer runs on this host: boot hands the app the
+ * Rust engine as its engine port (`rustEngine.ts`). It stays as test
+ * infrastructure only, for the `unitWasm` and `integrationWasm` projects
+ * (`src/tests/parity/wasmHostSetup.ts`), which run the TypeScript suites'
+ * towers on the Rust engine through it. No app module imports it.
  */
 export interface WasmHost {
   /** The engine behind the instance. */

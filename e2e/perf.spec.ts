@@ -120,7 +120,7 @@ test.describe("E5-S0 perf gate @perf", () => {
           };
         }).game;
         document.getElementById("splash")?.remove();
-        g.sim.events.pending = null;
+        if (g.sim.events.pending) g.sim.events.pending = null;
         g.ui.showEventChoice = (_m, _c, onResolve) => onResolve("decline");
         g.shownWin = true;
         g.shownChoice = false;

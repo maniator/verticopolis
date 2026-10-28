@@ -19,8 +19,7 @@ const COPY_MODULES = [
   "src/wasmhost/engineDiagnostics.ts",
   "src/wasmhost/engineBoot.ts",
   "src/wasmhost/hostFault.ts",
-  "src/wasmhost/startWasmHost.ts",
-  "src/wasmhost/engineWorker.ts",
+  "src/wasmhost/rustEngine.ts",
   "src/wasmhost/catalogCheck.ts",
   "src/wasmhost/stepLoopAbsent.ts",
   "src/build/thirdPartyNotices.ts",
@@ -55,11 +54,5 @@ describe("Rust engine name guard", () => {
   it("no player-facing string says WASM engine", () => {
     const files = [...ui, ...COPY_MODULES.map((f) => resolve(f))];
     expect(files.flatMap(hits)).toEqual([]);
-  });
-
-  it("names the engine in the recovery notices", () => {
-    const notices = readFileSync(resolve("src/wasmhost/startWasmHost.ts"), "utf8").match(/const [A-Z_]+ = "The \w+ engine stopped/g) ?? [];
-    expect(notices.length).toBeGreaterThanOrEqual(7);
-    for (const n of notices) expect(n).toContain("The Rust engine stopped");
   });
 });

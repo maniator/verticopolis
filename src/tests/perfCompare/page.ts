@@ -4,7 +4,8 @@
  * module-scope references, helpers declared inside) because Playwright
  * serializes it into `page.evaluate` or `addInitScript`. They read the
  * `window.game` handle a VC_TOOLING=1 build publishes and the
- * `window.__vcEngine` handle the WASM host publishes, and return plain JSON.
+ * `window.__vcEngine` handle boot publishes when the Rust engine runs the
+ * game, and return plain JSON.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -14,7 +15,7 @@
  *  publishes its engine state, `window.__vcEngineBoot` (publishBootState in
  *  src/wasmhost/engineBoot.ts). Both engines do that just before the app is
  *  created, so on WASM the mark ends the package load and splits the start
- *  into the load and the app's creation plus the host attach (#1254). A
+ *  into the load and the engine's boot plus the app's creation (#1254). A
  *  later publish (a fallback, a latched writer) replaces the state and keeps
  *  the mark. */
 export function installEngineBootProbe(): void {
@@ -32,7 +33,8 @@ export function installEngineBootProbe(): void {
 }
 
 /** Init script: stamp the moment the app publishes `window.game` and the
- *  moment the WASM host publishes `window.__vcEngine`, by accessor, and the
+ *  moment boot publishes the Rust engine on `window.__vcEngine` (just before
+ *  the app is created, with the stored tower loaded), by accessor, and the
  *  engine package's instantiate on the boot path, so the startup numbers
  *  need no polling and no change to the app. */
 export function installProbes(): void {
@@ -133,8 +135,8 @@ export function watchContextLoss(): void {
 }
 
 export interface PageInfo {
-  /** What actually runs the live tower: "wasm" only when the host holds it
-   *  with no errors and the live sim is the hosted instance. */
+  /** What actually runs the live tower: "wasm" only when the Rust engine
+   *  boot published is the app's engine port. */
   engineActive: "ts" | "wasm";
   host: { present: boolean; hosted: boolean; starts: number; errors: string[]; liveSimHosted: boolean };
   marks: Record<string, number>;
@@ -149,15 +151,17 @@ export interface PageInfo {
 export function pageInfo(): PageInfo {
   const w = window as any;
   const h = w.__vcEngine;
-  const liveSimHosted = Boolean(w.game?.sim) && Object.prototype.hasOwnProperty.call(w.game.sim, "serialize");
+  // The Rust engine is the port itself (PR 5e): one engine for the page
+  // life, with no host that restarts per tower or collects errors.
+  const liveSimHosted = Boolean(h?.port) && w.game?.enginePort === h.port;
   const host = {
     present: Boolean(h),
     hosted: Boolean(h?.status?.hosted),
-    starts: Number(h?.status?.starts ?? 0),
-    errors: [...((h?.status?.errors ?? []) as string[])],
+    starts: h?.status?.hosted ? 1 : 0,
+    errors: [] as string[],
     liveSimHosted,
   };
-  const engineActive = host.present && host.hosted && host.errors.length === 0 && Boolean(h.current?.()) && liveSimHosted ? "wasm" : "ts";
+  const engineActive = host.present && host.hosted && liveSimHosted ? "wasm" : "ts";
   const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
   // The smallest step performance.now() takes here, sampled.
   let res = Infinity;
@@ -234,9 +238,9 @@ export async function digestStashed(key: string): Promise<string> {
 /** Calm the live app for scripted measurement, the way e2e/perf.spec.ts
  *  does: no title screen, no autosave, steady clock, paused, and an
  *  emergency answered "decline" the moment the frame loop raises it (through
- *  `sim.resolveChoice`, which the WASM host relays, so both engines see the
- *  same answer; the pending field itself is never written, since a write to
- *  the read model would not reach the engine). Identical on both engines. */
+ *  the app's answer, which goes to the engine port, so both engines see the
+ *  same answer; the view's pending field itself is never written). Identical
+ *  on both engines. */
 export function prepareLiveApp(): void {
   const g = (window as any).game;
   document.getElementById("splash")?.remove();
@@ -257,29 +261,23 @@ export interface AdoptResult {
   population: number;
 }
 
-/** Load a stashed scenario into the live app through `adoptSim`, the path a
- *  player's load takes on either engine. On WASM it counts as hosted only
- *  when this adopt started a new engine and raised no new host error. */
+/** Load a stashed scenario into the live app the way a player's load does
+ *  on either engine: the engine port's stored source, then the app follows
+ *  the swap. On WASM it counts as hosted when the app's port is the Rust
+ *  engine boot published. */
 export function adoptScenario(name: string): AdoptResult {
   const w = window as any;
   const g = w.game;
   const save = w.__perfSaves[name] as string;
   const h = w.__vcEngine;
-  const startsBefore = Number(h?.status?.starts ?? 0);
-  const errorsBefore = ((h?.status?.errors ?? []) as string[]).length;
   const t0 = performance.now();
-  const sim = g.sim.constructor.deserialize(JSON.parse(save));
-  g.adoptSim(sim);
+  if (g.enginePort.loadSave(save)[0] !== 1) throw new Error(`${name}: the engine refused the scenario's save`);
+  g.followSwap();
   const adoptMs = performance.now() - t0;
   g.speed = 0;
   g.engine.paused = true;
-  const hosted =
-    Boolean(h?.status?.hosted) &&
-    Number(h.status.starts) === startsBefore + 1 &&
-    (h.status.errors as string[]).length === errorsBefore &&
-    Boolean(h.current()) &&
-    Object.prototype.hasOwnProperty.call(g.sim, "serialize");
-  return { adoptMs, engineActive: hosted ? "wasm" : "ts", starts: Number(h?.status?.starts ?? 0), population: g.sim.population };
+  const hosted = Boolean(h?.status?.hosted) && h.port === g.enginePort;
+  return { adoptMs, engineActive: hosted ? "wasm" : "ts", starts: hosted ? 1 : 0, population: g.reader.header.population };
 }
 
 /** Size of the engine's linear memory, when the page hosts the tower on it:

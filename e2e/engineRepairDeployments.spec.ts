@@ -61,7 +61,7 @@ test("a repair leaves a save that was made online, and the repaired engine loads
       const g = (window as any).game;
       g.sim.money = 1e9;
       const ok = g.sim.build("lobby", 1, 160).ok;
-      (window as any).__vcEngine.current().syncStructure();
+      (window as any).game.syncSim();
       g.saveToSlot(1);
       return ok;
     });
@@ -83,7 +83,7 @@ test("a repair leaves a save that was made online, and the repaired engine loads
 
     const loaded = await page.evaluate(() => {
       (window as any).game.loadFromSlot(1);
-      return (JSON.parse((window as any).__vcEngine.current().engine.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === 160);
+      return (JSON.parse((window as any).__vcEngine.port.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === 160);
     });
     expect(loaded, "the save made before the repair loads on the repaired engine").toBe(true);
     expect(await lobbyAt(page, 160)).toBe(true);

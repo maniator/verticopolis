@@ -42,7 +42,7 @@ describe("the boot point the engine-loaded mark stamps (#1254)", () => {
     const src = read("bootstrap.ts");
     const load = src.indexOf("await loadBootEngine(");
     const publish = src.indexOf("publishBootState(");
-    const create = src.indexOf("create();");
+    const create = src.indexOf("create(tower)");
     expect(load).toBeGreaterThan(-1);
     expect(publish).toBeGreaterThan(load);
     expect(create).toBeGreaterThan(publish);

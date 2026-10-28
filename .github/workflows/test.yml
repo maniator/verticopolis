@@ -126,8 +126,8 @@ jobs:
         run: npx vitest run --project ${{ matrix.project }}
 
       # The integrationWasm project hands some suites to the TypeScript side
-      # because they host the engine themselves: the wasmHost and wasmWorker
-      # suites, the analytics bridge and the perf-compare engine check. The
+      # because they host the engine themselves: the mirror host's wasmHost
+      # suites and the perf-compare engine check. The
       # engine-rs workflow runs them too, but only when its path filter
       # matches, which misses the analytics modules and the suites' own files
       # (#1122). Running them here puts them on every PR and every push to

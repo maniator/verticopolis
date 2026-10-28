@@ -2,8 +2,10 @@ import { makeConfig, parseArgs } from "./main";
 import type { ModeName } from "./pageWorker";
 import type { ModeRun } from "./runner";
 
-/** The finished runs the analysis tests share: every sample set from a scale, the same digests everywhere. */
-export const config = { ...makeConfig(parseArgs(["--reps", "6"]), ["small"]) };
+/** The finished runs the analysis tests share: every sample set from a scale, the same digests everywhere.
+ *  They have the four modes of the runs committed before PR 5e (a run now
+ *  measures `ts` and `wasm` only), so the analysis keeps reading those. */
+export const config = { ...makeConfig(parseArgs(["--reps", "6"]), ["small"]), modes: ["ts", "wasm", "wasm-frame", "wasm-worker"] as ModeName[] };
 
 /** A finished run with every sample set from `scale` (so the modes and
  *  repetitions differ by a known factor), the same digests everywhere. */

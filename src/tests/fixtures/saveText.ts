@@ -35,18 +35,21 @@ export function loadSlotSim(n: number): Simulation | null {
 
 type PortDeps = "enginePort" | "portCodes" | "reader" | "towerSwapped";
 
+/** A test's own tower, and where a swap's new tower goes. */
+interface TestTower {
+  getSim(): Simulation;
+  adoptSim(sim: Simulation): void;
+}
+
 /**
  * Give a test's `SaveLoad` deps the engine port pieces, over whatever tower
- * the test's `getSim` answers. A done swap hands the new tower to the deps'
- * `adoptSim`, as the game's `TsEngine.handOff` does, and the port follows
- * `getSim` again on its next use, so a test that keeps its own tower keeps it.
+ * the test's `getSim` answers. A done swap hands the new tower to the test's
+ * `adoptSim` when `SaveLoad` reports it (`towerSwapped`, as the game follows
+ * a swap), and the port follows `getSim` again on its next use, so a test
+ * that keeps its own tower keeps it.
  */
-export function withPorts(deps: Omit<SaveLoadDeps, PortDeps>): SaveLoadDeps {
+export function withPorts(deps: Omit<SaveLoadDeps, PortDeps> & TestTower): SaveLoadDeps {
   const engine = new TsEngine(deps.getSim());
-  engine.handOff = (next) => {
-    engine.take(next);
-    deps.adoptSim(next);
-  };
   const port = (): TsEngine => {
     engine.take(deps.getSim());
     return engine;
@@ -61,6 +64,6 @@ export function withPorts(deps: Omit<SaveLoadDeps, PortDeps>): SaveLoadDeps {
       reader.update();
       return reader;
     },
-    towerSwapped: () => {},
+    towerSwapped: () => deps.adoptSim(engine.sim),
   });
 }

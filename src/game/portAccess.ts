@@ -1,6 +1,6 @@
 import type { Catalog } from "../engine/catalogTypes";
-import { towerCatalog } from "../engine/towerCatalog";
-import type { FacilityKind, GameMode } from "../engine/types";
+import { catalogOn } from "../engine/towerCatalog";
+import type { FacilityKind } from "../engine/types";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { SimView } from "../simport/view";
@@ -42,13 +42,12 @@ export function quoteShaft(
   return { ok, reason: ok ? undefined : port.lastReason() };
 }
 
-/** The catalog of the mode the reader shows, from the live tower's catalog
- *  source. The catalog handle is keyed on the tower, and the WASM host
- *  installs its catalog there (`useTowerCatalogSource`), so the tower is the
- *  key: any other object reads the TypeScript tables whatever the host runs.
- *  The tower is only a key here, never asked a question. */
-export function catalogOf(app: { readonly sim: { readonly mode: GameMode }; readonly reader: Pick<SimView, "header"> }): Catalog {
-  return towerCatalog(app.sim, app.reader.header.mode);
+/** The catalog of the mode the reader shows, from the engine's catalog
+ *  source: boot points the Rust engine at its own tables
+ *  (`useTowerCatalogSource`), and the TypeScript engine reads the TypeScript
+ *  tables. The engine is only a key here, never asked a question. */
+export function catalogOf(app: { readonly enginePort: object; readonly reader: Pick<SimView, "header"> }): Catalog {
+  return catalogOn(app.enginePort, app.reader.header.mode);
 }
 
 /** Whether the tower has unlocked `kind` (the star gate, and Modern-only

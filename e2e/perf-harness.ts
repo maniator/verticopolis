@@ -27,6 +27,9 @@ export interface UiUpdateSample {
  * floor and a 5% gate would be noise. Batching lifts each sample to tens of
  * milliseconds, well above the floor, and the per-pump cost is the batch time
  * divided by the batch size. Returns the median/p95/mean of those per-pump costs.
+ * On the TypeScript engine the minute moves the clock alone. The Rust engine
+ * has no clock-only step, so there each pump's sample includes one engine
+ * tick, and the two engines' numbers are not comparable.
  */
 export function benchmarkUiUpdate(opts: { n: number; batch: number }): UiUpdateSample {
   const { n, batch } = opts;
@@ -35,8 +38,11 @@ export function benchmarkUiUpdate(opts: { n: number; batch: number }): UiUpdateS
   // collection; enforcing it here keeps the helper honest for any other caller.
   if (n % batch !== 0) throw new Error(`n (${n}) must be divisible by batch (${batch})`);
   const g = (window as any).game;
+  // One minute on: the TypeScript engine's clock, or a tick of the Rust engine.
+  const ts = g.enginePort.sim;
+  const advance = ts ? () => ts.clock.advance(1) : () => g.enginePort.tick(1);
   for (let i = 0; i < 50; i++) {
-    g.sim.clock.advance(1);
+    advance();
     g.reader.update();
     g.ui.update({ reader: g.reader, port: g.enginePort, codes: g.portCodes });
   } // warm up on the change path
@@ -45,9 +51,9 @@ export function benchmarkUiUpdate(opts: { n: number; batch: number }): UiUpdateS
   for (let i = 0; i < iters; i++) {
     const t0 = performance.now();
     for (let k = 0; k < batch; k++) {
-      g.sim.clock.advance(1);
+      advance();
       g.reader.update();
-    g.ui.update({ reader: g.reader, port: g.enginePort, codes: g.portCodes });
+      g.ui.update({ reader: g.reader, port: g.enginePort, codes: g.portCodes });
     }
     samples.push((performance.now() - t0) / batch);
   }
@@ -72,7 +78,7 @@ export function benchmarkUiUpdate(opts: { n: number; batch: number }): UiUpdateS
 export function measureSimSpeed(windowMs: number): Promise<number> {
   const g = (window as any).game;
   return new Promise<number>((resolve) => {
-    const startClock = g.sim.clock.minutes as number;
+    const startClock = g.reader.header.minutes as number;
     const startWall = performance.now();
     let done = false;
     let fallback = 0;
@@ -81,7 +87,7 @@ export function measureSimSpeed(windowMs: number): Promise<number> {
       done = true;
       clearTimeout(fallback); // no stray timer bleeding into the next window
       const elapsed = performance.now() - startWall;
-      const simMinutes = (g.sim.clock.minutes as number) - startClock;
+      const simMinutes = (g.reader.header.minutes as number) - startClock;
       resolve(simMinutes / (elapsed / 1000));
     };
     const tick = (): void => {
@@ -116,11 +122,13 @@ export function checkNodeIdentity(pumps: number): {
   const el = g.ui.el;
   const before = { money: el.money, pop: el.pop, star: el.star, time: el.time, date: el.date, towerStats: el.towerStats };
   const beforeChild = el.towerStats.firstElementChild;
+  const ts = g.enginePort.sim;
   for (let i = 0; i < pumps; i++) {
     // One minute per pump: enough to change the time leaf (the change path)
     // without shoving the tower hours into a different time-of-day regime for
     // the measurements that follow in the same run.
-    g.sim.clock.advance(1);
+    if (ts) ts.clock.advance(1);
+    else g.enginePort.tick(1);
     g.reader.update();
     g.ui.update({ reader: g.reader, port: g.enginePort, codes: g.portCodes });
   }

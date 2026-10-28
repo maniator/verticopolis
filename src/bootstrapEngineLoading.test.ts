@@ -14,8 +14,8 @@ const held = vi.hoisted(() => ({ fail: (_e: Error) => {} }));
 const noop = held.fail;
 // The cohort's selection picks the boot engine (#1197); this page life asks for Rust.
 vi.mock("./engineCohort/boot", async (importOriginal) => ({ ...(await importOriginal<typeof import("./engineCohort/boot")>()), selectBootEngine: () => "wasm", noteRustFailed: vi.fn() }));
-vi.mock("./wasmhost/startWasmHost", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./wasmhost/startWasmHost")>()),
+vi.mock("./wasmhost/rustEngine", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./wasmhost/rustEngine")>()),
   loadWasmEngine: vi.fn(() => new Promise((_, reject) => (held.fail = reject))),
 }));
 

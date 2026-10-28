@@ -78,6 +78,15 @@ export class TowerEngine {
   /** Called every frame with elapsed milliseconds (sim ticking lives here). */
   onUpdate: ((ms: number) => void) | null = null;
 
+  /** Hears a throw from any step of the frame, the scene's own reads of the
+   *  simulation included, so none reaches Excalibur, whose loop stops for good
+   *  on an uncaught throw. Unset, a throw goes on to Excalibur. */
+  onFrameError: ((err: unknown) => void) | null = null;
+
+  /** The frame no longer reads the simulation (its engine failed and must
+   *  not be called again); the last drawn scene stays on screen. */
+  halted = false;
+
   /** The GPU dropped the WebGL context (mobile browsers reset it under memory
    *  pressure or after backgrounding). Excalibur can't rebuild its textures in
    *  place, so the controller must recover, else its default handler paints a
@@ -337,8 +346,20 @@ export class TowerEngine {
   }
 
   private tick(elapsedMs: number): void {
+    if (this.halted) return;
+    try {
+      this.runTick(elapsedMs);
+    } catch (err) {
+      if (!this.onFrameError) throw err;
+      this.onFrameError(err);
+    }
+  }
+
+  private runTick(elapsedMs: number): void {
     beginFrame(this, elapsedMs);
     if (this.onUpdate) this.onUpdate(elapsedMs);
+    // The step heard a trap: nothing below may read the engine again.
+    if (this.halted) return;
 
     // Scene reconcile scheduling lives in towerSyncSchedule (spec CAP-3):
     // hour-driven repaints defer to the next frame's drain above.

@@ -73,6 +73,10 @@ export interface SelectionEnv {
    *  boot never moves to TypeScript where the reliability data could not say
    *  why; a stored Rust choice then boots Rust as it always has. */
   safetyOn: boolean;
+  /** Rust boots only when the visit's URL asks for it (`?engine=wasm`): the
+   *  Settings choice and the cohort's draw both get TypeScript. On while a trap
+   *  stops the game instead of handing it to TypeScript (#1422). */
+  rustOnlyByUrl: boolean;
 }
 
 export interface Selection {
@@ -98,6 +102,9 @@ export interface Selection {
   /** Rust was wanted, but storage would not keep this page life's crash
    *  marker, so the boot runs TypeScript (a crash could not be counted). */
   markerBlocked?: true;
+  /** Rust was wanted without the URL asking, while only the URL boots it
+   *  (`rustOnlyByUrl`), so the boot runs TypeScript. */
+  heldForUrl?: true;
 }
 
 const CHOICES: readonly string[] = ["ts", "wasm", "wasm-frame", "wasm-worker"];
@@ -176,6 +183,10 @@ export function armOf(bucket: number, share: number): Arm {
 /** Choose the engine for this boot. Reads and writes the cohort's records;
  *  never throws. */
 export function selectEngine(env: SelectionEnv): Selection {
+  // While only `?engine=wasm` boots Rust (`rustOnlyByUrl`), every other way to
+  // ask for it runs TypeScript: the Settings choice, the cohort's draw, and the
+  // old measurement hosts' links (`wasm-frame`, `wasm-worker`), owner,
+  // 2026-10-28.
   const url = isChoice(env.url) ? env.url : null;
   const preference = readPreference(env.store);
   const base = { stage: env.stage, preference, suppression: null, crashLoop: false, transition: "none" as Transition, notice: "none" as Transition, markerId: null };
@@ -183,6 +194,7 @@ export function selectEngine(env: SelectionEnv): Selection {
   if (!env.drawOn) {
     // Today's behavior, reported as the default rule whatever picked it.
     const chosen = url ?? stored ?? "ts";
+    if (chosen !== "ts" && url !== "wasm" && env.rustOnlyByUrl) return { ...base, boot: "ts", requested: chosen, selectedBy: "default", assignedArm: "none", heldForUrl: true };
     return { ...base, boot: chosen, requested: chosen, selectedBy: "default", assignedArm: "none" };
   }
   const drawn = bucketOf(env);
@@ -190,7 +202,10 @@ export function selectEngine(env: SelectionEnv): Selection {
   const assignedArm: AssignedArm = arm ?? "unassigned";
   // A test visit leaves the enrollment alone, so the next ordinary boot still
   // sees a stage change and tells the player.
-  if (url) return { ...base, assignedArm, boot: url, requested: url, selectedBy: "url" };
+  if (url) {
+    if (url !== "ts" && url !== "wasm" && env.rustOnlyByUrl) return { ...base, assignedArm, boot: "ts", requested: url, selectedBy: "url", heldForUrl: true };
+    return { ...base, assignedArm, boot: url, requested: url, selectedBy: "url" };
+  }
   const transition = drawn && arm ? applyEnrollment(env, drawn.bucket, drawn.applied, arm) : "none";
   const common = { ...base, assignedArm, transition };
 
@@ -206,6 +221,8 @@ export function selectEngine(env: SelectionEnv): Selection {
     const quiet = notice === "none" || (env.safetyOn && activeSuppression(env.store, env.sha, env.now) !== null);
     return { ...common, boot: "ts", requested, selectedBy, notice: quiet ? "none" : notice };
   }
+  // Held on TypeScript, so the engine did not change and no notice is due.
+  if (env.rustOnlyByUrl) return { ...common, boot: "ts", requested, selectedBy, heldForUrl: true };
   if (!env.safetyOn) return { ...common, boot: requested, requested, selectedBy, notice };
   const suppression = activeSuppression(env.store, env.sha, env.now);
   if (suppression) return { ...common, boot: "ts", requested, selectedBy: "safety", suppression };

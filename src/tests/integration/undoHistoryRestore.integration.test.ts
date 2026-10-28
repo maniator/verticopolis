@@ -194,17 +194,16 @@ describe("UndoHistory: restores that settle late or fail (slice 5)", () => {
     expect(notes).toEqual(["Undid: c", "Nothing to undo.", "Redid: c"]);
   });
 
-  it("keeps the way back through the app's history when the adopt throws after the swap", async () => {
+  it("keeps the way back through the app's history when the follow throws after the swap", async () => {
     const enginePort = new TsEngine(Simulation.newGame(3, "modern", "realWorld"));
     let throwing = false;
-    // The app's adopt, which the engine hands each swap to: it takes the
-    // tower, then fails.
-    enginePort.handOff = (next) => {
-      enginePort.take(next);
+    // The app's follow of each swap, which fails after the engine took the
+    // tower.
+    const followSwap = () => {
       if (throwing) throw new Error("no attach");
     };
     const notes: string[] = [];
-    const hist = createAppHistory({ enginePort, ui: { toast: (m) => void notes.push(m) } });
+    const hist = createAppHistory({ enginePort, ui: { toast: (m) => void notes.push(m) }, followSwap });
     const cx = Math.floor(GRID.width / 2);
     hist.capture("Build");
     expect(enginePort.sim.tower.place("lobby", 1, cx).ok).toBe(true);

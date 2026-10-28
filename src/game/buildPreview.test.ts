@@ -188,14 +188,14 @@ describe("isTransportTool / isPaintTool", () => {
 });
 
 describe("updateBuildPreview", () => {
-  it("snaps to the host's catalog when the host installed one on the tower", () => {
+  it("snaps to the engine's catalog when the engine installed one", () => {
     const { sim } = fixture();
     const { app, raw } = makeApp(sim, buildTool("office"));
     const tile = GRID.width - 1;
     updateBuildPreview(app, tile, 2);
     const own = (raw.engine.preview as { x: number }).x;
     expect(own).toBe(snapX(CAT, "office", tile));
-    useTowerCatalogSource(sim, (mode) => {
+    useTowerCatalogSource(app.enginePort, (mode) => {
       const base = catalogFor(mode);
       return { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, width: f.width + 2 } : f)) };
     });

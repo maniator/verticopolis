@@ -3,11 +3,11 @@ import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
 import { tickInstallAffordance } from "./installAffordance";
 import { hasBlockingModal, isEditorBusy, isEngineStopped, isSplashUp } from "./interactionState";
+import { engineTrapped } from "./engineFault";
 import { positionPanels } from "./panelAnchoring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
 import { gameplaySession } from "../analytics";
 import { drainEngineEvents } from "../analyticsEngineBridge";
-import { stepGate } from "../wasmhost/stepGate";
 import { hudSource } from "./hudSource";
 import { calendarOf } from "../simport/headerClock";
 
@@ -37,12 +37,15 @@ export function applySpeed(app: GameApp, s: number): void {
 }
 
 export function runFrame(app: GameApp, dtMs: number): void {
-  // A wasm-only build stopped on its engine: no engine holds the tower, so
+  // The game stopped on its engine (a wasm-only build's engine that did not
+  // start, or a Rust engine that trapped): no engine holds the tower, so
   // time stops for good (the speed buttons and keys cannot restart it), and
   // a stopped game samples no frames for the session either. Events the
-  // engine emitted before it stopped still reach analytics.
+  // engine emitted before it stopped still reach analytics, unless it
+  // trapped.
   if (isEngineStopped()) {
-    drainEngineEvents(app.events);
+    // A trapped engine is never called again (engineFault.ts).
+    if (!engineTrapped()) drainEngineEvents(app.events);
     app.accMinutes = 0;
     return;
   }
@@ -77,21 +80,14 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // The clock as the last frame left it. A swap since then (a load, an undo)
   // is a different clock, and no meal rush is judged across it.
   const minutesBeforeTicks = app.reader.generation === app.enginePort.generation() ? app.reader.header.minutes : NaN;
-  // An experimental engine host that syncs once per frame registers a gate:
-  // it may hold the steps back while its last batch is in flight, and it
-  // brings the read model up to date (or sends the batch) once the steps
-  // ran. Without one (the TypeScript engine, the default WASM host) this is
-  // the same frame as before.
-  const gate = stepGate(app.sim);
   try {
-    app.accMinutes = app.enginePort.advance(app.accMinutes, dtMs, minutesPerSecond, steadyClock, gate ? gate.canStep() : true)[1];
+    app.accMinutes = app.enginePort.advance(app.accMinutes, dtMs, minutesPerSecond, steadyClock, true)[1];
   } catch (err) {
     // A step threw (the frame-error guard catches it). The carry is dropped,
     // so the steps that already ran are never owed again.
     app.accMinutes = 0;
     throw err;
   }
-  gate?.flush();
   // The view follows every frame, so the header, the HUD and the painters
   // read this frame's tower.
   app.reader.update();

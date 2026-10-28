@@ -37,6 +37,8 @@ export interface EngineSettingsInput {
   /** The player pressed "Try the Rust engine again" in this page life. */
   retried?: boolean;
   storable: boolean;
+  /** Only a `?engine=wasm` visit boots Rust for now (`RUST_ONLY_BY_URL`). */
+  rustOnlyByUrl?: boolean;
 }
 
 /** A fallback code in words, for the note. */
@@ -81,7 +83,7 @@ function wantedEngine(i: EngineSettingsInput): "ts" | "wasm" {
 /** The engine the stored choice gives at the next start. A browser that
  *  cannot keep the crash marker gets TypeScript again. */
 function nextEngine(i: EngineSettingsInput): "ts" | "wasm" {
-  return i.suppression || i.selection?.markerBlocked ? "ts" : wantedEngine(i);
+  return i.suppression || i.selection?.markerBlocked || i.rustOnlyByUrl ? "ts" : wantedEngine(i);
 }
 
 /** The engine this page life's boot started (any Rust host counts as Rust). */
@@ -100,6 +102,8 @@ export function engineSettingsView(i: EngineSettingsInput): EngineSettingsView {
     note = `The Rust engine had a problem on this device earlier (${reasonWords(i.selection.suppression.reason)}), so the game uses the TypeScript engine.`;
   } else if (i.selection?.markerBlocked && wantedEngine(i) === "wasm") {
     note = "This browser could not save the Rust engine's crash check, so the game uses the TypeScript engine.";
+  } else if (i.rustOnlyByUrl && i.running === "ts" && wantedEngine(i) === "wasm") {
+    note = "For now the Rust engine runs only from a test link, so the game uses the TypeScript engine.";
   }
   return {
     choice,

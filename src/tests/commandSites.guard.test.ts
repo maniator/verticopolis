@@ -15,8 +15,7 @@ import { isTestFile } from "./importScan";
  *
  * It scans every non-test file under `src/` except the engine, the port
  * itself, the host, dual-run and save code and the test tree: the frontend
- * the engine-import guard reads, less the port. The host's own bulletin
- * (`startWasmHost.ts`) is slice 5's too, and sits outside this scan. It reads
+ * the engine-import guard reads, less the port. It reads
  * each file's syntax tree, so comments and strings never count, and matches
  * a receiver whose name contains `sim` or is `tower` (a `getSim()` call
  * included), or a local the file declares from one (`const s = app.sim`,

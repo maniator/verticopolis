@@ -31,14 +31,14 @@ async function playSaveAndLoad(page: Page): Promise<void> {
     g.setSpeed(0);
     g.sim.money = 1e9;
     const ok = g.sim.build("lobby", 1, 160).ok;
-    (window as any).__vcEngine.current().syncStructure();
+    (window as any).game.syncSim();
     const host = (window as any).__vcEngine;
-    const lobbyAt = (x: number) => (JSON.parse(host.current().engine.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === x);
+    const lobbyAt = (x: number) => (JSON.parse(host.port.serialize()).units as { kind: string; x: number }[]).some((u) => u.kind === "lobby" && u.x === x);
     g.saveToSlot(1);
     // A change after the save, which the load must undo (it lands in the
     // engine first, so a load that did nothing would leave it there).
     const after = g.sim.build("lobby", 1, 200).ok;
-    host.current().syncStructure();
+    g.syncSim();
     const beforeLoad = lobbyAt(200);
     g.loadFromSlot(1);
     return {
@@ -46,12 +46,12 @@ async function playSaveAndLoad(page: Page): Promise<void> {
       after,
       beforeLoad,
       hosted: host.status.hosted,
-      errors: host.status.errors,
+      lastError: host.status.lastError,
       saved: lobbyAt(160),
       afterLoad: lobbyAt(200),
     };
   });
-  expect(built).toEqual({ ok: true, after: true, beforeLoad: true, hosted: true, errors: [], saved: true, afterLoad: false });
+  expect(built).toEqual({ ok: true, after: true, beforeLoad: true, hosted: true, lastError: null, saved: true, afterLoad: false });
 }
 
 test("an installed game starts the WASM engine on its first reload offline, and plays, saves and loads", async ({ page, context }) => {

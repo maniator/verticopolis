@@ -223,10 +223,10 @@ async function newContext(browser: Browser, config: WorkerConfig, serviceWorkers
  *  startup rows compare like with like. */
 async function waitMode(page: Page, mode: ModeName, ms = 120_000): Promise<void> {
   await page.waitForFunction((m) => {
-    const w = window as unknown as { game?: unknown; __perfMarks?: Record<string, number>; __vcEngine?: { status: { hosted: boolean; placement?: string }; current(): { loaded?: () => boolean } | null } };
+    const w = window as unknown as { game?: { enginePort?: unknown }; __perfMarks?: Record<string, number>; __vcEngine?: { status: { hosted: boolean }; port?: unknown } };
     if (!w.game) return false;
     const h = w.__vcEngine;
-    const ready = m === "ts" || (Boolean(h?.status.hosted) && Boolean(h?.current()) && (m !== "wasm-worker" || (h!.status.placement === "worker" && Boolean(h!.current()?.loaded?.()))));
+    const ready = m === "ts" || (Boolean(h?.status.hosted) && h?.port !== undefined && w.game.enginePort === h.port);
     // The first time the poll sees the mode hold the tower, in page time.
     if (ready && w.__perfMarks && w.__perfMarks.modeReady === undefined) w.__perfMarks.modeReady = performance.now();
     return ready;
@@ -450,9 +450,9 @@ async function offline(browser: Browser, config: WorkerConfig, url: string, mode
   // the wait, otherwise whatever holds the tower then.
   const settled = async (page: Page, ms: number): Promise<ModeName> => {
     await page.waitForFunction((m) => {
-      const w = window as unknown as { __vcEngine?: { status: { hosted: boolean; placement?: string }; current(): { loaded?: () => boolean } | null } };
+      const w = window as unknown as { game?: { enginePort?: unknown }; __vcEngine?: { status: { hosted: boolean }; port?: unknown } };
       const h = w.__vcEngine;
-      return m === "ts" ? true : Boolean(h?.status.hosted && h.current() && (m !== "wasm-worker" || h.current()?.loaded?.()));
+      return m === "ts" ? true : Boolean(h?.status.hosted && h.port !== undefined && w.game?.enginePort === h.port);
     }, mode, { timeout: ms, polling: 50 }).catch(() => {});
     return page.evaluate(activeMode);
   };

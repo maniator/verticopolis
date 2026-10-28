@@ -4,7 +4,31 @@ import { setCurrentSelection } from "./current";
 import { BOOT_MARKER_KEY, COHORT_KEY, readSafety, SAFETY_KEY } from "./records";
 import { ENGINE_STORAGE_KEY } from "../wasmhost/engineChoice";
 
+// The suites below test the Rust paths the Settings choice and the cohort
+// reach once PR 6 brings back the fallback (#1422); the hold that keeps them on
+// TypeScript until then is tested on its own.
+const flags = vi.hoisted(() => ({ rustOnlyByUrl: false }));
+vi.mock("./config", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./config")>()),
+  get RUST_ONLY_BY_URL() {
+    return flags.rustOnlyByUrl;
+  },
+}));
+
 beforeEach(() => localStorage.clear());
+
+describe("the boot while only the URL boots Rust", () => {
+  afterEach(() => {
+    flags.rustOnlyByUrl = false;
+  });
+
+  it("runs TypeScript for a stored Rust choice and Rust for the test link", () => {
+    flags.rustOnlyByUrl = true;
+    localStorage.setItem(ENGINE_STORAGE_KEY, "wasm");
+    expect(selectBootEngine("")).toBe("ts");
+    expect(selectBootEngine("?engine=wasm")).toBe("wasm");
+  });
+});
 afterEach(() => {
   vi.unstubAllGlobals();
   window.dispatchEvent(new Event("pagehide"));

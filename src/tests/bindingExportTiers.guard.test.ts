@@ -22,6 +22,7 @@ import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
  *    TypeScript engine itself (`src/engine/`, whose own calls are its
  *    implementation), the relay (`src/dualrun/`), the host and its suppressed
  *    frame sync (`src/wasmhost/`), the generated package (`src/public/engine/`),
+ *    the tooling harnesses' tower on the Rust engine (`src/game/toolingSim.ts`),
  *    tests (`src/tests/`, `*.test.*`, `e2e/`, which is not scanned) and the
  *    tooling in `scripts/` (not scanned). Everything else under `src/`, `api/`
  *    and `tools/` is scanned, untracked new files included: the UI, the game,
@@ -34,8 +35,8 @@ import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
  *    something named `engine` (`handle.current()?.engine.tick(dt)`) and on
  *    any use of the global host handle `__vcEngine`, and the import check
  *    covers the rest: the boot (`src/bootstrap.ts`) holds
- *    the loaded module through `wasmhost/startWasmHost` and hands it straight
- *    to the host.
+ *    the loaded module through `wasmhost/rustEngine` and hands it straight
+ *    to `rustBootTower`.
  *
  * The matchers read call and write shapes written out on one line
  * (`x.setCars(`, `x.setCars?.(`, `x.setCars.call(`, `x.money = `,
@@ -147,7 +148,11 @@ function scannedSources(): string[] {
   return [...new Set(out.split("\0"))].filter((file) => SOURCE.test(file) && !TEST.test(file) && existsSync(resolve(repoRoot, file)));
 }
 
-const allowed = (file: string) => ALLOWED_DIRS.some((dir) => file.startsWith(dir));
+/** The tooling harnesses' `game.sim` on the Rust engine (dev serves and
+ *  tooling builds only), which hands a hand edit to the engine as a load and
+ *  carries the telemetry and memos a load starts empty. */
+const ALLOWED_FILES = ["src/game/toolingSim.ts"];
+const allowed = (file: string) => ALLOWED_DIRS.some((dir) => file.startsWith(dir)) || ALLOWED_FILES.includes(file);
 /** The port's own loop callers outside the host scope: the shared view
  *  reader takes the frames through `EnginePort` (contract section 5,
  *  `viewFrame`), and the frame loop steps the engine through it (`advance`).

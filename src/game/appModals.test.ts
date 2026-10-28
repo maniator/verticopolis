@@ -85,10 +85,11 @@ describe("loadFromSlot", () => {
     const loaded = "TOWER";
     vi.mocked(SaveGame.loadSlot).mockImplementationOnce((_slot, load) => load(loaded));
     const sim = makeSim();
-    const { app, ui, adoptSim } = makeApp(sim);
+    const { app, ui, enginePort, followSwap } = makeApp(sim);
     loadFromSlot(app, 1);
     expect(SaveGame.loadSlot).toHaveBeenCalledExactlyOnceWith(1, expect.any(Function));
-    expect(adoptSim).toHaveBeenCalledExactlyOnceWith(loaded);
+    expect(enginePort.loadSave).toHaveBeenCalledExactlyOnceWith(loaded);
+    expect(followSwap).toHaveBeenCalledTimes(1);
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Tower loaded.", "good");
   });
 
@@ -96,19 +97,20 @@ describe("loadFromSlot", () => {
     const loaded = "AUTO";
     vi.mocked(SaveGame.load).mockImplementationOnce((load) => load(loaded));
     const sim = makeSim();
-    const { app, adoptSim } = makeApp(sim);
+    const { app, enginePort, followSwap } = makeApp(sim);
     loadFromSlot(app, "auto");
     expect(SaveGame.load).toHaveBeenCalledTimes(1);
     expect(SaveGame.loadSlot).not.toHaveBeenCalled();
-    expect(adoptSim).toHaveBeenCalledExactlyOnceWith(loaded);
+    expect(enginePort.loadSave).toHaveBeenCalledExactlyOnceWith(loaded);
+    expect(followSwap).toHaveBeenCalledTimes(1);
   });
 
   it("toasts failure and does not adopt on a null (empty/corrupt) load", () => {
     vi.mocked(SaveGame.loadSlot).mockImplementationOnce((_slot, load) => load("BAD"));
     const sim = makeSim();
-    const { app, ui, adoptSim } = makeApp(sim);
+    const { app, ui, followSwap } = makeApp(sim);
     loadFromSlot(app, 3);
-    expect(adoptSim).not.toHaveBeenCalled();
+    expect(followSwap).not.toHaveBeenCalled();
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith("That slot is empty or corrupt.", "bad");
   });
 });
@@ -127,16 +129,17 @@ describe("deleteSlot", () => {
  * The title-screen load commands (SPEC-splash-load-tower). They are separate
  * from {@link loadFromSlot} because the splash changes two contracts: failures
  * must not toast (the title screen paints over the toast rail), and the
- * teardown plus re-pause belong to `adoptSim`, not here.
+ * teardown plus re-pause belong to the app's `followSwap`, not here.
  */
 describe("loadFromSplash", () => {
   it("adopts the tower and reports success, without toasting or re-pausing", () => {
     const loaded = "TOWER";
     vi.mocked(SaveGame.loadSlot).mockImplementationOnce((_slot, load) => load(loaded));
-    const { app, ui, adoptSim } = makeApp(makeSim());
+    const { app, ui, enginePort, followSwap } = makeApp(makeSim());
     expect(loadFromSplash(app, 2)).toBe(true);
-    expect(adoptSim).toHaveBeenCalledExactlyOnceWith(loaded);
-    // adoptSim owns the "Welcome back" toast and the speed-0 re-pause, so that
+    expect(enginePort.loadSave).toHaveBeenCalledExactlyOnceWith(loaded);
+    expect(followSwap).toHaveBeenCalledTimes(1);
+    // followSwap owns the "Welcome back" toast and the speed-0 re-pause, so that
     // every arrival route (slot, .vctower, .TDT) behaves identically.
     expect(ui.toast).not.toHaveBeenCalled();
   });
@@ -144,9 +147,10 @@ describe("loadFromSplash", () => {
   it("reads the autosave via load() for the 'auto' slot", () => {
     const loaded = "AUTO";
     vi.mocked(SaveGame.load).mockImplementationOnce((load) => load(loaded));
-    const { app, adoptSim } = makeApp(makeSim());
+    const { app, enginePort, followSwap } = makeApp(makeSim());
     expect(loadFromSplash(app, "auto")).toBe(true);
-    expect(adoptSim).toHaveBeenCalledExactlyOnceWith(loaded);
+    expect(enginePort.loadSave).toHaveBeenCalledExactlyOnceWith(loaded);
+    expect(followSwap).toHaveBeenCalledTimes(1);
   });
 
   it("reports failure rather than throwing when storage is blocked outright", () => {
@@ -156,19 +160,19 @@ describe("loadFromSplash", () => {
     vi.mocked(SaveGame.loadSlot).mockImplementationOnce(() => {
       throw new DOMException("denied", "SecurityError");
     });
-    const { app, ui, adoptSim } = makeApp(makeSim());
+    const { app, ui, followSwap } = makeApp(makeSim());
     expect(loadFromSplash(app, 1)).toBe(false);
-    expect(adoptSim).not.toHaveBeenCalled();
+    expect(followSwap).not.toHaveBeenCalled();
     expect(ui.toast).not.toHaveBeenCalled();
   });
 
   it("reports failure WITHOUT adopting or toasting, so the title screen survives", () => {
     // The picker renders the reason inline instead. Adopting nothing is what
-    // keeps the splash up: adoptSim is the only thing that takes it down.
+    // keeps the splash up: followSwap is the only thing that takes it down.
     vi.mocked(SaveGame.loadSlot).mockImplementationOnce((_slot, load) => load("BAD"));
-    const { app, ui, adoptSim } = makeApp(makeSim());
+    const { app, ui, followSwap } = makeApp(makeSim());
     expect(loadFromSplash(app, 1)).toBe(false);
-    expect(adoptSim).not.toHaveBeenCalled();
+    expect(followSwap).not.toHaveBeenCalled();
     expect(ui.toast).not.toHaveBeenCalled();
   });
 });
@@ -203,10 +207,11 @@ describe("showTowerPicker", () => {
   it("routes a picked slot through loadFromSplash", () => {
     const loaded = "TOWER";
     vi.mocked(SaveGame.loadSlot).mockImplementationOnce((_slot, load) => load(loaded));
-    const { app, ui, adoptSim } = makeApp(makeSim());
+    const { app, ui, enginePort, followSwap } = makeApp(makeSim());
     showTowerPicker(app);
     const cb = ui.showTowerPicker.mock.calls[0][0] as { onLoad: (s: number | "auto") => boolean };
     expect(cb.onLoad(3)).toBe(true);
-    expect(adoptSim).toHaveBeenCalledExactlyOnceWith(loaded);
+    expect(enginePort.loadSave).toHaveBeenCalledExactlyOnceWith(loaded);
+    expect(followSwap).toHaveBeenCalledTimes(1);
   });
 });

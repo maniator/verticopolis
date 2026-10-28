@@ -1,5 +1,5 @@
 import type { EngineChoice } from "../wasmhost/engineChoice";
-import { COHORT_STAGE, COHORT_TELEMETRY, STAGE_SHARE, type CohortStage } from "./config";
+import { COHORT_STAGE, COHORT_TELEMETRY, RUST_ONLY_BY_URL, STAGE_SHARE, type CohortStage } from "./config";
 import { exitCleanly } from "./crashMarker";
 import { setCurrentSelection, currentSelection } from "./current";
 import { latchSafety, selectEngine, suppressionApplies, type SafetyStage, type Selection } from "./policy";
@@ -91,6 +91,7 @@ function chooseAndWatch(search: string): EngineChoice {
     now: Date.now(),
     random: randomUnit,
     safetyOn,
+    rustOnlyByUrl: RUST_ONLY_BY_URL,
   });
   setCurrentSelection(selection);
   if (selection.markerId) stopWatch = watchSurvival(store, { id: selection.markerId, sha: __APP_SHA__ });

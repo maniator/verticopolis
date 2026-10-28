@@ -282,7 +282,7 @@ describe("perf:worker analysis", () => {
       expect(cp.retried).toBe(1);
       expect(readFileSync(join(dir, "runs.jsonl"), "utf8").endsWith("\n")).toBe(true);
       expect(() => loadWorkerCheckpoint(dir, { ...meta, commit: "other" })).toThrow(/its commit differs/);
-      expect(() => loadWorkerCheckpoint(dir, { ...meta, config: makeConfig(parseArgs(["--reps", "6", "--viewport", "1280x720"]), ["small"]) })).toThrow(/its config differs from this run's \(viewport; pass the options the run started with\)/);
+      expect(() => loadWorkerCheckpoint(dir, { ...meta, config: { ...config, viewport: { width: 1280, height: 720 } } })).toThrow(/its config differs from this run's \(viewport; pass the options the run started with\)/);
       // The refusal names the machine keys that differ (channel, switches, renderer, exception), so the resume can repeat them.
       expect(() => loadWorkerCheckpoint(dir, { ...meta, machine: { cpu: "a", channel: "chrome", args: ["--use-angle=d3d11"] } })).toThrow(/its machine differs from this run's \(channel, args; run on the machine and browser the run started with\)/);
       expect(() => loadWorkerCheckpoint(dir, { ...meta, dirty: true })).toThrow(/clean tree/);

@@ -1,6 +1,6 @@
 {
   "name": "verticopolis",
-  "version": "2.48.1",
+  "version": "2.49.0",
   "description": "Verticopolis: a browser-native SimTower clone in TypeScript",
   "license": "MIT",
   "type": "module",
@@ -26,7 +26,6 @@
     "perf:compare": "tsx scripts/perf-compare.ts",
     "perf:worker": "tsx scripts/perf-worker.ts",
     "perf:worker-diff": "tsx scripts/perf-worker-diff.ts",
-    "perf:restore": "tsx scripts/perf-restore-points.ts",
     "perf:calibrate": "tsx scripts/perf-calibrate.ts",
     "perf:before-after": "tsx scripts/perf-before-after.ts",
     "perf:load-memory": "tsx scripts/perf-load-memory.ts",
@@ -41,7 +40,7 @@
     "gen:events": "node scripts/gen-gameplay-events.ts",
     "wasm:build": "node scripts/wasm-build.ts",
     "engine:compat": "node scripts/engine-compat.ts",
-    "test:wasm": "cross-env VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost wasmWorker chargeBindingRaw panelGettersWasm panelGettersCost engineView perfCompare/scenarios.integration tsEngine.golden viewReader.integration viewLayoutJson",
+    "test:wasm": "cross-env VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost chargeBindingRaw panelGettersWasm panelGettersCost engineView perfCompare/scenarios.integration tsEngine.golden viewReader.integration viewLayoutJson",
     "test:wasm:parity": "cross-env VC_REQUIRE_WASM=1 vitest run --project integrationWasm --project unitWasm"
   },
   "devDependencies": {
