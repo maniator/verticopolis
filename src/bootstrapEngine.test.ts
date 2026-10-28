@@ -209,7 +209,8 @@ describe("bootGame engine", () => {
     expect(published()?.status).toMatchObject({ hosted: false, lastError: message });
     expect(bootState()).toEqual({ build: "switchable", engine: "none", failure: { stage: "host", reason: "trap-tick", message } });
     expect(document.getElementById("boot-fallback-host")?.textContent).toContain("Reloading your tower from its last autosave.");
-    expect(document.getElementById("engine-failure")).toBeNull();
+    // The game stops behind the line, as behind the failure message, until the reload.
+    expect(document.getElementById("engine-failure")?.getAttribute("data-stage")).toBe("reload");
     expect(reloadSoon).toHaveBeenCalledOnce();
     expect(setSpeed).toHaveBeenCalledWith(0);
     expect(error).toHaveBeenCalledWith(`[wasm] ${message}`);

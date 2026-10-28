@@ -120,12 +120,9 @@ let inertWatch: MutationObserver | null = null;
  *  every other boot-fallback message. */
 export function showEngineFailure(state: EngineBootState, online = typeof navigator === "undefined" || navigator.onLine !== false): void {
   if (!state.failure) return;
-  // An open modal dialog sits in the top layer above any z-index and makes
-  // the rest of the page inert, the Reload button included, so close it.
-  for (const dialog of Array.from(document.querySelectorAll("dialog[open]"))) (dialog as HTMLDialogElement).close();
   const offerRepair = repairOffered(state.failure, pageControlled());
   const copy = engineFailureCopy(state.failure, online, { secure: typeof window === "undefined" || window.isSecureContext !== false, repair: offerRepair });
-  showBootMessage(
+  stopGame(
     html`<div id=${ENGINE_FAILURE_ID} data-stage=${state.failure.stage} role="alert" aria-live="assertive">
       <p><b>${copy.headline}</b></p>
       <p style="opacity:.8">Reason: ${copy.reason}</p>
@@ -143,6 +140,27 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
     </div>`,
     true,
   );
+}
+
+/** The running Rust engine crashed and the page reloads in a moment (#1422):
+ *  the game stops behind the line as it does behind the failure message, so
+ *  nothing calls the trapped engine while the line is read. */
+export function showCrashReload(line: string): void {
+  stopGame(
+    html`<div id=${ENGINE_FAILURE_ID} data-stage="reload" role="alert" aria-live="assertive">
+      <p><b>${line}</b></p>
+    </div>`,
+    false,
+  );
+}
+
+/** Stop the game behind `message` (it carries `ENGINE_FAILURE_ID`, which
+ *  `isEngineStopped` reads, so no key, autosave or dialog reaches the engine). */
+function stopGame(message: TemplateResult, withReload: boolean): void {
+  // An open modal dialog sits in the top layer above any z-index and makes
+  // the rest of the page inert, the Reload button included, so close it.
+  for (const dialog of Array.from(document.querySelectorAll("dialog[open]"))) (dialog as HTMLDialogElement).close();
+  showBootMessage(message, withReload);
   // Everything behind the message goes inert, so a button that kept focus
   // cannot be pressed with Enter or Space and the title screen's keys do
   // nothing: the message and its Reload button are all that is left.
@@ -345,7 +363,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
           app.setSpeed?.(0);
           if (outcome === "stop") showEngineFailure(bootState);
           else {
-            showBootMessage(CRASH_RELOAD_LINE[outcome]);
+            showCrashReload(CRASH_RELOAD_LINE[outcome]);
             reloadSoon();
           }
         });
