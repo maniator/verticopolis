@@ -36,6 +36,20 @@ pub(crate) const FILM_POLICIES: [&str; 3] = ["auto", "feature", "blockbuster"];
 /// The onboarding facts by bit, as `onboarding()` packs them.
 pub(crate) const ONBOARDING: [&str; 5] = ["lobby", "floor", "office", "connect", "play"];
 
+/// Each onboarding fact's flag in the `onboarding()` answer, in [`ONBOARDING`] order.
+pub(crate) const ONBOARDING_LOBBY: u8 = 1;
+pub(crate) const ONBOARDING_FLOOR: u8 = 2;
+pub(crate) const ONBOARDING_OFFICE: u8 = 4;
+pub(crate) const ONBOARDING_CONNECT: u8 = 8;
+pub(crate) const ONBOARDING_PLAY: u8 = 16;
+pub(crate) const ONBOARDING_FLAGS: [u8; 5] = [
+    ONBOARDING_LOBBY,
+    ONBOARDING_FLOOR,
+    ONBOARDING_OFFICE,
+    ONBOARDING_CONNECT,
+    ONBOARDING_PLAY,
+];
+
 /// Each command's own slots after [`DELTA`], for the view layout.
 pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 26] = [
     ("buildAt", &[]),
@@ -67,7 +81,7 @@ pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 26] = [
 ];
 
 /// Each query record's slots, for the view layout.
-const QUERY_RECORDS: [(&str, &[&str]); 9] = [
+const QUERY_RECORDS: [(&str, &[&str]); 10] = [
     ("quoteBuild", &["ok", "cost"]),
     ("quoteShaft", &["ok"]),
     ("hotspot", &["ratio", "floor"]),
@@ -75,6 +89,7 @@ const QUERY_RECORDS: [(&str, &[&str]); 9] = [
     ("restore", &["status", "generation"]),
     ("foundTower", &["status", "generation"]),
     ("drainEvents", &["dropped", "count"]),
+    ("advance", &["steps", "owed"]),
     // A header, then the changed ids.
     ("unitMetaChanged", &["revision", "full"]),
     // One entry per log line, repeated.
@@ -370,10 +385,10 @@ impl Engine {
         self.sim
             .onboarding_flags()
             .iter()
-            .enumerate()
-            .filter(|(_, on)| **on)
+            .zip(ONBOARDING_FLAGS)
+            .filter(|(on, _)| **on)
             // A fold from 0, since an empty float `sum` is -0.
-            .fold(0.0, |bits, (i, _)| bits + f64::from(1u8 << i))
+            .fold(0.0, |bits, (_, flag)| bits + f64::from(flag))
     }
 }
 

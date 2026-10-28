@@ -291,6 +291,9 @@ pub struct Engine {
     /// The bytes the last `tdtExport` wrote, for `tdtFile()`; a done swap
     /// drops them.
     tdt_file: Option<Vec<u8>>,
+    /// The step mode `advance` last stepped under; it outlives a swap, as
+    /// the web host's step debt outlives an adopted tower.
+    stepper: crate::fixed_step::FrameStepper,
 }
 
 #[wasm_bindgen]
@@ -1292,6 +1295,16 @@ impl Engine {
     }
     pub fn generation(&self) -> f64 {
         self.generation as f64
+    }
+    pub fn advance(
+        &mut self,
+        owed: f64,
+        dt_ms: f64,
+        minutes_per_second: f64,
+        steady_clock: bool,
+        step: bool,
+    ) -> Vec<f64> {
+        self.port_advance(owed, dt_ms, minutes_per_second, steady_clock, step)
     }
     #[wasm_bindgen(js_name = undoSignature)]
     pub fn undo_signature(&self) -> String {

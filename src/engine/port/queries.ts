@@ -70,8 +70,11 @@ export function hotspot(sim: Simulation): Float64Array {
   return Float64Array.of(h.ratio, nan(h.floor));
 }
 
-/** The Getting Started facts as bits in the layout's `onboarding` order:
- *  lobby, floor, office, connect, play. */
+/** Each Getting Started fact's flag in the `onboarding()` answer (the layout's
+ *  `onboarding` order: lobby, floor, office, connect, play). */
+export const ONBOARDING_FLAG = { lobby: 1, floor: 2, office: 4, connect: 8, play: 16 } as const;
+
+/** The Getting Started facts as the flags in {@link ONBOARDING_FLAG}. */
 export function onboarding(sim: Simulation): number {
   const { tower } = sim;
   // The same reads as the Rust engine's `onboarding_flags`: the lobby tile
@@ -90,7 +93,13 @@ export function onboarding(sim: Simulation): number {
     play ||= u.state === "occupied";
     if (connect && play) break;
   }
-  return [lobby, floor, office, connect, play].reduce((bits, on, i) => (on ? bits + 2 ** i : bits), 0);
+  return (
+    (lobby ? ONBOARDING_FLAG.lobby : 0) +
+    (floor ? ONBOARDING_FLAG.floor : 0) +
+    (office ? ONBOARDING_FLAG.office : 0) +
+    (connect ? ONBOARDING_FLAG.connect : 0) +
+    (play ? ONBOARDING_FLAG.play : 0)
+  );
 }
 
 /** The overlay's cells as `heatCell` rows; an unknown mode answers none. */
