@@ -41,6 +41,7 @@ export const INSTANCE_METHODS = [
   "onboardingFacts", "viewStructure", "viewFrame", "unitMetaSince", "towerSignature", "diagnosticFacts", "view", "towerName", "chooseAutoBridge", "answerChoice",
   "viewLayout", "lastReason", "buildAt", "paintTiles", "buildShaft", "demolish", "changeCars", "extendShaft", "bookExterminator", "setCamera", "setFilm", "quoteBuild", "quoteShaft", "statsStrip", "hotspot", "onboarding",
   "markStop", "expressStops", "dropStops", "stepRent", "noRate", "setRent", "rentBatch", "rerollUnit", "flipAutoBridge", "startExtend", "stopExtend", "labelUnit", "nameTower",
+  "loadSave", "restore", "foundTower", "generation", "undoSignature", "drainEvents", "eventText", "setBackdrop", "unitMetaChanged", "unitLabel", "unitSubtype", "logAfter", "logText", "logLine", "scheduleShaft",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 

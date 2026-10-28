@@ -17,7 +17,7 @@ use sha2::{Digest, Sha256};
 /// refusal, as for the frame's pins. Version 1 was pinned again before its
 /// first merge (#1284 added the scene seed slot), which CONTRIBUTING allows
 /// for a version that has not merged.
-const VIEW_LAYOUT_PINS: &[&str] = &["147e0ae8ebe711f1", "0ac6f447cd1ea936"];
+const VIEW_LAYOUT_PINS: &[&str] = &["147e0ae8ebe711f1", "0ac6f447cd1ea936", "df6acf952f9fbf89"];
 
 fn pinned_text() -> String {
     let mut v = layout_json();

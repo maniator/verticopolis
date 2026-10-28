@@ -35,7 +35,7 @@ TypeScript adapter over the Rust engine:
   and code tables of `viewLayout`. Commands take numbers (facility kinds as
   layout codes) and answer a result record: status, the signed money delta
   the engine measured, then the op's own slots; a refusal's text is
-  `lastReason()`, valid until the next port call. Queries answer a
+  `lastReason()`, valid until the next status call. Queries answer a
   `Float64Array` record whose slots the layout names; text fields (a label,
   a name) come from their own getters.
 - **JSON only where it is rare,** each listed here as it lands: `viewLayout`

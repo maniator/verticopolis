@@ -35,7 +35,7 @@ use std::cell::RefCell;
 pub use layout::{layout_json, VIEW_LAYOUT_VERSION};
 use marks::FrameMarks;
 pub(crate) use meta::FIRST_META_REVISION;
-pub use meta::{meta_since, whole_revision, MetaLog};
+pub use meta::{meta_changed, meta_since, whole_revision, MetaLog};
 pub use reader::ViewReader;
 pub use structure::structure_view;
 

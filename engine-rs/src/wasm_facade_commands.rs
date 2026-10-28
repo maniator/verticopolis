@@ -184,11 +184,7 @@ mod tests {
     /// A Modern tower with a lobby run, two floor runs, an office and a
     /// hotel room, plenty of money; the shaft checks need structure to stand on.
     fn fixture() -> Engine {
-        let mut e = Engine {
-            sim: Simulation::new_game(7, GameMode::Modern),
-            mirror: crate::save_delta::SaveMirror::default(),
-            reason: None,
-        };
+        let mut e = Engine::of(Simulation::new_game(7, GameMode::Modern));
         e.sim.money = 1e9;
         for x in 150..200 {
             assert!(e.sim.tower.place(Kind::Lobby, 1, x).ok);
