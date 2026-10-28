@@ -57,8 +57,8 @@ export function showStats(ui: UI, body: TemplateResult, handlers: Record<string,
 }
 
 /** Saves manager: auto-save + numbered slots, plus export/import. */
-export function showSaves(ui: UI, slots: SlotInfo[]): void {
-  const box = ui.openModalTemplate(savesTemplate(slots), { displaceable: true });
+export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null = null): void {
+  const box = ui.openModalTemplate(savesTemplate(slots, unreadable !== null), { displaceable: true });
   box.querySelectorAll<HTMLElement>("[data-save]").forEach((b) =>
     b.addEventListener("click", () => {
       ui.cb.onSaveSlot(Number(b.dataset.save));
@@ -90,8 +90,14 @@ export function showSaves(ui: UI, slots: SlotInfo[]): void {
       ui.closeModal();
       openImport(ui);
     },
+    // The kept text downloads as stored, with no engine involved. A .txt is a
+    // file type GitHub accepts on an issue. The button exists only when text is kept.
+    ...(unreadable === null ? {} : { unreadable: () => void ui.downloadFile(UNREADABLE_SAVE_FILENAME, unreadable) }),
   });
 }
+
+/** The file name of a downloaded unreadable autosave. */
+export const UNREADABLE_SAVE_FILENAME = "verticopolis-unreadable-save.txt";
 
 /** Open the Add-to-Home-Screen how-to (SPEC-pwa-install CAP-3 / CAP-5). The
  *  install controller calls this directly (keeping UI.ts under its size ceiling);

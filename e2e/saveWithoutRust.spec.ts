@@ -10,8 +10,8 @@ import { WASM_PROJECT } from "./helpers";
  * TypeScript engine, and that engine must keep every save path working on
  * its own. It loads the autosave, plays, saves and reloads; it loads a save
  * from an older version; a failed import leaves the tower alone; an
- * unreadable autosave is kept, not overwritten; and the tower still
- * downloads as a file.
+ * unreadable autosave is kept, not overwritten, and downloads as it was
+ * stored; and the tower still downloads as a file.
  */
 test.beforeEach(({}, info) => test.skip(info.project.name !== WASM_PROJECT, "one switchable project is enough"));
 test.setTimeout(90_000);
@@ -101,7 +101,7 @@ test("an older version's autosave loads, a failed import changes nothing, and an
   await page.waitForFunction((money) => (window as any).game.reader.header.money === money, old.money, { timeout: 10_000 });
 });
 
-test("an unreadable autosave is kept for a later version, not overwritten", async ({ page }) => {
+test("an unreadable autosave is kept, not overwritten, and downloads as it was stored", async ({ page }) => {
   await noEnginePackage(page);
   const unreadable = "VCTOWER1\nnot a tower this version can read";
   await page.addInitScript(
@@ -117,4 +117,9 @@ test("an unreadable autosave is kept for a later version, not overwritten", asyn
   // A new tower saves over the autosave slot, and the kept copy stays.
   await playAndSave(page, 0);
   expect(await page.evaluate((k) => localStorage.getItem(k), UNREADABLE_KEY)).toBe(unreadable);
+  // The kept text downloads from Saved Towers exactly as it was stored.
+  await page.evaluate(() => (window as any).game.showSaves());
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download unreadable save" }).click()]);
+  expect(download.suggestedFilename()).toBe("verticopolis-unreadable-save.txt");
+  expect(readFileSync((await download.path())!, "utf8")).toBe(unreadable);
 });
