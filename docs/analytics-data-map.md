@@ -123,7 +123,7 @@ error does; see above.)
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `trigger` | `settle`, `fallback`, `writer-latch`, `summary` | Why this row was sent |
+| `trigger` | `settle`, `fallback`, `crash-reload`, `writer-latch`, `summary` | Why this row was sent. `crash-reload` is a running Rust engine that trapped, sent just before the page reloads from its last autosave (#1422); it keeps the `engine` that crashed and counts as that page life's fallback |
 | `engine_requested` | `ts`, `wasm`, `wasm-frame`, `wasm-worker` | The engine the page life asked for (`?engine=` or `vc.engine`; `ts` when neither is set). A wasm-only build always sends `wasm`, whatever the URL says. |
 | `engine` | `ts`, `wasm`, `wasm-frame`, `wasm-worker`, `ts-fallback`, `none` | What runs when the row is sent. `ts-fallback` is a switchable build back on TypeScript; `none` is a wasm-only build that stopped. After a fallback it stays `ts-fallback` for the rest of the page life. After a running engine's fault (#874) that is exact, since no later tower is hosted; after a refused tower the host can take a later one again, and no row reports that. |
 | `build` | `switchable`, `wasm-only` | The bundle kind (`src/build/engineBundle.ts`) |

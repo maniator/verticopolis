@@ -47,11 +47,11 @@ interface ToolingApp {
   readonly enginePort: EnginePort;
   readonly reader: HudSource["reader"] & { update(): void };
   readonly portCodes: HudSource["codes"] & { kind(kind: FacilityKind): number };
-  readonly ui: { lastLogSeq: number; resetLog(src: HudSource): void };
+  readonly ui: { lastLogSeq: number; resetLog(src: HudSource): void; update(src: HudSource): void };
   followSwap(keepHistory?: boolean): void;
   /** Draw the engine again after a hand edit reached it as a load
    *  ({@link followToolingEdit}). */
-  followEdit(): void;
+  followEdit(shown?: Simulation): void;
 }
 
 /** The Rust binding's tooling members the copy carries the telemetry and
@@ -85,6 +85,9 @@ interface Copy {
   fresh: boolean;
   /** A hand-on of deeper edits is queued for the end of the task. */
   queued: boolean;
+  /** How many of the copy's log lines (its `logSeq`) the bulletin has had,
+   *  from the engine's own log or from {@link followToolingEdit}. */
+  logged: number;
   /** The views of the tower's parts handed out, by path (`liveOf`). */
   readonly parts: Map<string, object>;
 }
@@ -129,7 +132,7 @@ export function toolingSim(app: ToolingApp): Simulation | undefined {
   if (!(import.meta.env.DEV || __TOOLING_BUILD__)) return undefined;
   let copy = copies.get(app);
   if (!copy) {
-    copy = { view: null as unknown as Simulation, sim: null, baseline: null, stamp: null, fresh: false, queued: false, parts: new Map() };
+    copy = { view: null as unknown as Simulation, sim: null, baseline: null, stamp: null, fresh: false, queued: false, logged: 0, parts: new Map() };
     (copy as { view: Simulation }).view = viewOf(app, copy);
     viewed.set(copy.view, copy);
     copies.set(app, copy);
@@ -149,6 +152,7 @@ function current(app: ToolingApp, copy: Copy): Simulation {
       copy.sim = null;
       if (pending) throw new Error(STALE);
       copy.sim = copyOf(app.enginePort);
+      copy.logged = copy.sim.logSeq;
       copy.baseline = null;
       copy.stamp = stamp;
     }
@@ -282,8 +286,10 @@ function alongside<T extends { ok: boolean }>(app: ToolingApp, copy: Copy, what:
   const done = onEngine()[0] === 1;
   if (done !== Boolean(out.ok)) throw new Error(`the engines disagree on ${what}: ${done ? "the Rust engine took it" : `the Rust engine refused it (${port.lastReason() ?? "no reason given"})`}`);
   app.reader.update();
-  // Both made the same edit, so the copy still matches the engine.
+  // Both made the same edit, so the copy still matches the engine, and the
+  // lines the copy logged for it are the engine's own, which the bulletin reads.
   if (copy.baseline !== null) copy.baseline = stateOf(sim);
+  copy.logged = sim.logSeq;
   copy.stamp = null;
   return out;
 }
@@ -303,8 +309,19 @@ function push(app: ToolingApp, copy: Copy, endOfTask = false): void {
         copy.sim = null;
         throw new Error(STALE);
       }
+      // The bulletin reads the engine's new lines first: a load numbers the
+      // log from nothing, so the next read would skip them.
+      app.reader.update();
+      app.ui.update({ reader: app.reader, codes: app.portCodes, port });
       restoreInto(port, copy.sim);
-      app.followEdit();
+      // Lines the copy logged by itself (a star reached, say) reached the
+      // engine only inside the save, which a load reads as no new lines.
+      const logged = copy.sim.logSeq !== copy.logged;
+      // A copy read from a save numbers its log from nothing, so its saved
+      // tail would count as before the cursor; number it as the tail's own.
+      if (logged && copy.sim.logSeq < copy.sim.log.length) copy.sim.logSeq = copy.sim.log.length;
+      app.followEdit(logged ? copy.sim : undefined);
+      copy.logged = copy.sim.logSeq;
       copy.stamp = stampOf(port);
     }
     copy.baseline = state;
@@ -349,16 +366,23 @@ export function adoptToolingSim(app: ToolingApp, built: Simulation, preserveHist
  *  an edit in place leaves it on the TypeScript engine (the selection, the
  *  latches, the undo trail). A load numbers the engine's log from nothing, so
  *  the bulletin keeps the lines it shows and its cursor moves to the engine's
- *  count, from which the next line is read. */
-export function followToolingEdit(app: {
-  readonly enginePort: EnginePort;
-  readonly reader: ViewReader;
-  renderSim: PortRenderSim;
-  readonly engine: { setSim(sim: PortRenderSim, opts?: { keepCamera?: boolean }): void };
-  readonly ui: { lastLogSeq: number };
-}): void {
+ *  count, from which the next line is read. `shown` is the harness's tower
+ *  when it logged lines the engine never saw: the bulletin is rebuilt from
+ *  that tower's log, which holds the lines it showed and the new ones. */
+export function followToolingEdit(
+  app: {
+    readonly enginePort: EnginePort;
+    readonly reader: ViewReader;
+    readonly portCodes: HudSource["codes"];
+    renderSim: PortRenderSim;
+    readonly engine: { setSim(sim: PortRenderSim, opts?: { keepCamera?: boolean }): void };
+    readonly ui: { lastLogSeq: number; resetLog(src: HudSource): void };
+  },
+  shown?: Simulation,
+): void {
   app.reader.update();
   app.renderSim = new PortRenderSim(app.enginePort, app.reader);
   app.engine.setSim(app.renderSim, { keepCamera: true });
+  if (shown) app.ui.resetLog({ reader: app.reader, codes: app.portCodes, port: new TsEngine(shown) });
   app.ui.lastLogSeq = app.reader.header.logSeq;
 }
