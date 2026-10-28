@@ -95,6 +95,7 @@ export class Engine {
      * it; it rebuilds as trips finish, as on the TypeScript engine.
      */
     commuteStress(): string;
+    crewCoverage(): Float64Array;
     /**
      * The crowd view's hash, as the lock records it.
      */
@@ -198,6 +199,7 @@ export class Engine {
      */
     gameplayEventsPending(): number;
     generation(): number;
+    heatCells(mode: number): Float64Array;
     hotspot(): Float64Array;
     /**
      * `housekeepingCoverage()`, as JSON.
@@ -408,6 +410,7 @@ export class Engine {
      * `sim.view = view`, the camera a save carries, as JSON text (null clears).
      */
     setView(view?: string | null): void;
+    shaftCard(id: number): Float64Array;
     startExtend(id: number): Float64Array;
     startFire(): void;
     /**
@@ -468,6 +471,7 @@ export class Engine {
      * The unit covering a tile, serialized as the save would, or null.
      */
     unitAt(floor: number, x: number): string | undefined;
+    unitCard(id: number): Float64Array;
     /**
      * The unit inspector and editor card for unit `id`, as JSON, or null.
      */

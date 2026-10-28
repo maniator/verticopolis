@@ -1048,6 +1048,9 @@ mod port_edit;
 #[path = "wasm_port_life.rs"]
 mod port_life;
 
+#[path = "wasm_port_panels.rs"]
+mod port_panels;
+
 /// The engine's port (facade slice 7, the owner's 2026-10-28 redesign): the
 /// game calls these on `Engine` directly, every argument a number and every
 /// answer a number or a record of numbers, with no JSON. A command answers
@@ -1122,6 +1125,25 @@ impl Engine {
     }
     pub fn onboarding(&self) -> f64 {
         self.port_onboarding()
+    }
+    // The panel queries (`wasm_port_panels.rs`): the overlay's cells, the
+    // crew coverage and the unit and shaft cards, each a record the layout
+    // names.
+    #[wasm_bindgen(js_name = heatCells)]
+    pub fn heat_cells(&self, mode: f64) -> Vec<f64> {
+        self.port_heat_cells(mode)
+    }
+    #[wasm_bindgen(js_name = crewCoverage)]
+    pub fn crew_coverage(&self) -> Vec<f64> {
+        self.port_crew_coverage()
+    }
+    #[wasm_bindgen(js_name = unitCard)]
+    pub fn unit_card(&mut self, id: f64) -> Vec<f64> {
+        self.port_unit_card(id)
+    }
+    #[wasm_bindgen(js_name = shaftCard)]
+    pub fn shaft_card(&self, id: f64) -> Vec<f64> {
+        self.port_shaft_card(id)
     }
 }
 

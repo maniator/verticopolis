@@ -28,20 +28,39 @@ export interface WasmModule {
  *  `towerResizeTransport` are relay-only (the mirror's bare tower edits; see
  *  `towerRelayOps.guard.test.ts`). */
 export const INSTANCE_METHODS = [
-  "free", "mode", "money", "setMoney", "build", "paintBrush", "canBuild", "buildTransport", "sellAt", "unitAt", "transportAt",
-  "adjustRent", "setNoRate", "priceUnit", "setCars", "setSchedule", "setStop", "setExpressStops", "clearStops",
-  "resizeTransport", "removeUnit", "removeTransport", "setLabel", "setTowerName", "setView", "setAutoBridge", "emit",
-  "startFire", "fires", "bombThreat", "evaluateStar", "callExterminator", "autoBridge", "toggleAutoBridge", "setFilmPolicy",
-  "rerollSubtype", "applyRentBatch", "pendingChoice", "resolveChoice", "tick", "serialize", "stateView", "crowdView",
-  "stateDigest", "crowdDigest", "frameView", "logSince", "elevatorTelemetry", "seedElevatorTelemetry", "advanceClock",
-  "seedLoopMemos", "loopMemos", "housekeepingReport", "commuteStress", "commuteStressRevision", "drainGameplayEvents", "gameplayEventsPending",
-  "gameplayEventsDropped", "serializeForSync", "saveDelta", "addCar", "removeCar", "beginExtend", "extendTransport", "endExtend", "removeFacility", "towerSetCars",
+  // The legacy commands, reads and host plumbing the conformance suites and the
+  // mirror host call.
+  "free", "mode", "money", "setMoney", "build", "paintBrush", "canBuild", "buildTransport",
+  "sellAt", "unitAt", "transportAt", "adjustRent", "setNoRate", "priceUnit", "setCars",
+  "setSchedule", "setStop", "setExpressStops", "clearStops", "resizeTransport", "removeUnit",
+  "removeTransport", "setLabel", "setTowerName", "setView", "setAutoBridge", "emit", "startFire",
+  "fires", "bombThreat", "evaluateStar", "callExterminator", "autoBridge", "toggleAutoBridge",
+  "setFilmPolicy", "rerollSubtype", "applyRentBatch", "pendingChoice", "resolveChoice", "tick",
+  "serialize", "stateView", "crowdView", "stateDigest", "crowdDigest", "frameView", "logSince",
+  "elevatorTelemetry", "seedElevatorTelemetry", "advanceClock", "seedLoopMemos", "loopMemos",
+  "housekeepingReport", "commuteStress", "commuteStressRevision", "drainGameplayEvents",
+  "gameplayEventsPending", "gameplayEventsDropped", "serializeForSync", "saveDelta", "addCar",
+  "removeCar", "beginExtend", "extendTransport", "endExtend", "removeFacility", "towerSetCars",
   "towerResizeTransport", "previewRentBatch", "validateTransport", "placeTransportDryRun",
-  "towerStats", "statsReport", "housekeepingCoverage", "unitDetail", "transportDetail", "floorHeatmap", "peakCongestionHotspot",
-  "onboardingFacts", "viewStructure", "viewFrame", "unitMetaSince", "towerSignature", "diagnosticFacts", "view", "towerName", "chooseAutoBridge", "answerChoice",
-  "viewLayout", "lastReason", "buildAt", "paintTiles", "buildShaft", "demolish", "changeCars", "extendShaft", "bookExterminator", "setCamera", "setFilm", "quoteBuild", "quoteShaft", "statsStrip", "hotspot", "onboarding",
-  "markStop", "expressStops", "dropStops", "stepRent", "noRate", "setRent", "rentBatch", "rerollUnit", "flipAutoBridge", "startExtend", "stopExtend", "labelUnit", "nameTower",
-  "loadSave", "restore", "foundTower", "generation", "undoSignature", "drainEvents", "eventText", "setBackdrop", "unitMetaChanged", "unitLabel", "unitSubtype", "logAfter", "logText", "logLine", "scheduleShaft",
+  // The panel getters (facade slice 6b) and the engine view (slice 6a).
+  "towerStats", "statsReport", "housekeepingCoverage", "unitDetail", "transportDetail",
+  "floorHeatmap", "peakCongestionHotspot", "onboardingFacts", "viewStructure", "viewFrame",
+  "unitMetaSince", "towerSignature", "diagnosticFacts",
+  // The camera and tower name a host reads once per engine (slice 7a).
+  "view", "towerName",
+  // The engine port (slice 7, `src/simport/enginePort.ts`): PR 1a's commands,
+  // quotes and HUD queries.
+  "chooseAutoBridge", "answerChoice", "viewLayout", "lastReason", "buildAt", "paintTiles",
+  "buildShaft", "demolish", "changeCars", "extendShaft", "bookExterminator", "setCamera",
+  "setFilm", "quoteBuild", "quoteShaft", "statsStrip", "hotspot", "onboarding", "markStop",
+  "expressStops", "dropStops", "stepRent", "noRate", "setRent", "rentBatch", "rerollUnit",
+  "flipAutoBridge", "startExtend", "stopExtend", "labelUnit", "nameTower",
+  // PR 1b's lifecycle, events, log and text getters.
+  "loadSave", "restore", "foundTower", "generation", "undoSignature", "drainEvents", "eventText",
+  "setBackdrop", "unitMetaChanged", "unitLabel", "unitSubtype", "logAfter", "logText", "logLine",
+  "scheduleShaft",
+  // PR 1c's panel queries.
+  "heatCells", "crewCoverage", "unitCard", "shaftCard",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 
