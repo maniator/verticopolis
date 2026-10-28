@@ -12,6 +12,7 @@ import { clockOf, rulesOf } from "../simport/headerClock";
 import { scheduleSlots } from "../simport/scheduleSlots";
 import type { ViewReader } from "../simport/viewReader";
 import { NOT_ENOUGH_MONEY } from "../engine/sim/charges";
+import { INVALID_COMMAND, MAX_TEXT } from "../simport/request";
 import type { CardKit } from "./cardKit";
 
 /**
@@ -218,7 +219,10 @@ export class EditorActions {
           const engine = this.deps.engine();
           const codes = this.deps.codes();
           // The port takes NaN for the default price and -1 for No Rate.
-          const code = target === "default" ? NaN : target === "noRate" ? -1 : target;
+          let code: number;
+          if (target === "default") code = NaN;
+          else if (target === "noRate") code = -1;
+          else code = target;
           const rec = engine.rentBatch(codes.kind(kind), code, opts.onlyDefaultPriced ?? false);
           const res = outcome(engine, rec);
           this.deps.commitUndo();
@@ -277,6 +281,8 @@ export class EditorActions {
       if (action === "rename") {
         const input = root.querySelector<HTMLInputElement>("#ed-name");
         if (input) {
+          // The port takes any length; the cap stays here until it moves into the engines (see the PR).
+          if (input.value.length > MAX_TEXT) return this.refuse(INVALID_COMMAND);
           const res = outcome(engine, engine.labelUnit(u.id, input.value));
           if (!res.ok) return this.refuse(res.reason ?? "That name could not be saved.");
         }
@@ -378,6 +384,7 @@ export class EditorActions {
   /** Rename the tower from the top bar. A refused name (longer than the
    *  engine takes) says why, as a refused unit name does. */
   renameTower(name: string): void {
+    if (name.length > MAX_TEXT) return this.refuse(INVALID_COMMAND);
     const engine = this.deps.engine();
     const res = outcome(engine, engine.nameTower(name));
     if (!res.ok) this.refuse(res.reason ?? "That name could not be saved.");

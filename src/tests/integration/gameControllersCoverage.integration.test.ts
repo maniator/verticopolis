@@ -23,7 +23,7 @@ import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
 import { createTsSim } from "../../simport/tsSim";
 import type { SimPort } from "../../simport/port";
-import { INVALID_COMMAND } from "../../simport/request";
+import { INVALID_COMMAND, MAX_TEXT } from "../../simport/request";
 import type { Command, CommandResult } from "../../simport/commands";
 
 /** Coverage companion to gameControllers.integration.test.ts: the same harness idioms
@@ -482,6 +482,18 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(undo.commits).toBe(1);
   });
 
+  it("a refused rename keeps the label and says why, with no click and no undo step", async () => {
+    sel = { type: "unit", id: office.id };
+    render(unitEditor(sim, office), root);
+    const before = office.label;
+    root.querySelector<HTMLInputElement>("#ed-name")!.value = "x".repeat(MAX_TEXT + 1);
+    await editor.handleEditAction("rename", root);
+    expect(office.label).toBe(before);
+    expect(f.sfx).toEqual(["error"]);
+    expect(f.toasts).toEqual([{ text: INVALID_COMMAND, kind: "bad" }]);
+    expect(undo.commits).toBe(0);
+  });
+
   it("a rename of a unit the port no longer has clears the selection and says nothing", async () => {
     sel = { type: "unit", id: 99_999 };
     await editor.handleEditAction("rename", root);
@@ -489,11 +501,16 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(f.toasts).toEqual([]);
   });
 
-  it("renameTower names the tower through the port, quietly", () => {
+  it("a refused tower name keeps the old one and says why; an accepted one is quiet", () => {
+    const before = sim.tower.towerName;
+    editor.renameTower("x".repeat(MAX_TEXT + 1));
+    expect(sim.tower.towerName).toBe(before);
+    expect(f.sfx).toEqual(["error"]);
+    expect(f.toasts).toEqual([{ text: INVALID_COMMAND, kind: "bad" }]);
     editor.renameTower("Skyspire");
     expect(sim.tower.towerName).toBe("Skyspire");
-    expect(f.sfx).toEqual([]);
-    expect(f.toasts).toEqual([]);
+    expect(f.sfx).toEqual(["error"]);
+    expect(f.toasts).toHaveLength(1);
   });
 
   it("a sold condo can't be repriced: rent nudges are silent no-ops", async () => {
