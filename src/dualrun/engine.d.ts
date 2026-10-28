@@ -97,6 +97,7 @@ export class Engine {
      * it; it rebuilds as trips finish, as on the TypeScript engine.
      */
     commuteStress(): string;
+    congestion(): number;
     crewCoverage(): Float64Array;
     /**
      * The crowd view's hash, as the lock records it.
@@ -259,6 +260,8 @@ export class Engine {
      */
     paintBrush(kind: string, floor: number, tiles: string): string;
     paintTiles(kind: number, floor: number, tiles: Float64Array): Float64Array;
+    parkingSet(): Float64Array;
+    parkingUsage(spots: number): number;
     /**
      * `peakCongestionHotspot()`: `{ ratio, floor }` as JSON.
      */
@@ -272,6 +275,7 @@ export class Engine {
      * `validateTransport` accepts the shaft, read the same way.
      */
     placeTransportDryRun(kind: string, x: number, bottom: number, top: number): boolean;
+    positionReachable(floor: number, x: number): boolean;
     /**
      * `previewRentBatch(kind, target, onlyDefaultPriced)` with the target as
      * JSON text, as for `applyRentBatch`: the counters that call would
@@ -284,8 +288,10 @@ export class Engine {
      * `priceUnit(u, target)`: the new price, or null when not repriceable.
      */
     priceUnit(id: number, target: number): number | undefined;
+    queueView(): Float64Array;
     quoteBuild(kind: number, floor: number, x: number): Float64Array;
     quoteShaft(kind: number, x: number, bottom: number, top: number): Float64Array;
+    recyclingFill(): number;
     /**
      * `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
      * The id is read raw, as for `addCar` (#923).

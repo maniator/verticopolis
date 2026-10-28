@@ -37,7 +37,8 @@ export function benchmarkUiUpdate(opts: { n: number; batch: number }): UiUpdateS
   const g = (window as any).game;
   for (let i = 0; i < 50; i++) {
     g.sim.clock.advance(1);
-    g.ui.update(g.sim);
+    g.reader.update();
+    g.ui.update({ reader: g.reader, port: g.enginePort, codes: g.portCodes });
   } // warm up on the change path
   const samples: number[] = [];
   const iters = Math.ceil(n / batch);
@@ -45,7 +46,8 @@ export function benchmarkUiUpdate(opts: { n: number; batch: number }): UiUpdateS
     const t0 = performance.now();
     for (let k = 0; k < batch; k++) {
       g.sim.clock.advance(1);
-      g.ui.update(g.sim);
+      g.reader.update();
+    g.ui.update({ reader: g.reader, port: g.enginePort, codes: g.portCodes });
     }
     samples.push((performance.now() - t0) / batch);
   }
@@ -119,7 +121,8 @@ export function checkNodeIdentity(pumps: number): {
     // without shoving the tower hours into a different time-of-day regime for
     // the measurements that follow in the same run.
     g.sim.clock.advance(1);
-    g.ui.update(g.sim);
+    g.reader.update();
+    g.ui.update({ reader: g.reader, port: g.enginePort, codes: g.portCodes });
   }
   const statusLeavesStable =
     before.money === el.money &&

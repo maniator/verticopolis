@@ -29,7 +29,13 @@ export interface EnginePortLifecycle {
    *  `[steps, owed]`, the steps run and the minutes still owed. The engine
    *  keeps the step mode they were owed under; `step` false owes the frame's
    *  minutes without stepping them. */
-  advance(owed: number, dtMs: number, minutesPerSecond: number, steadyClock: boolean, step: boolean): PortRecord;
+  advance(
+    owed: number,
+    dtMs: number,
+    minutesPerSecond: number,
+    steadyClock: boolean,
+    step: boolean,
+  ): PortRecord;
   /** The save; JSON is the save format. */
   serialize(): string;
   /** The `stored` source: `[status, generation]`. A save with no
@@ -39,7 +45,12 @@ export interface EnginePortLifecycle {
    *  preference, and never applies the founder rule. */
   restore(text: string): PortRecord;
   /** The `found` source. */
-  foundTower(seed: number, modeCode: number, calendarCode: number, unbridged: boolean): PortRecord;
+  foundTower(
+    seed: number,
+    modeCode: number,
+    calendarCode: number,
+    unbridged: boolean,
+  ): PortRecord;
   /** Moves on every done swap; the reader rebuilds on a move. */
   generation(): number;
   undoSignature(): string;
@@ -148,5 +159,30 @@ export interface EnginePortFiles {
   tdtFile(): Uint8Array | undefined;
 }
 
+/** The renderer's reads beyond the view frame (contract section 2, PR 5b).
+ *  The overlay's peak congestion is `hotspot`'s ratio. */
+export interface EnginePortRender {
+  /** The mean congestion over populated floors; read per frame. */
+  congestion(): number;
+  /** The elevator queue projection as `queueView`, `queueLanding` and
+   *  `queueCar` slots; kept per step and revision, so read per frame. */
+  queueView(): PortRecord;
+  /** `[count, ids...]`: the working garage spaces, ascending. */
+  parkingSet(): PortRecord;
+  /** The garage fill, 0 to 1, for `spots` working spaces. */
+  parkingUsage(spots: number): number;
+  /** The recycling bins' fill, 0 to 1. */
+  recyclingFill(): number;
+  /** Whether a walker can stand at `floor`, `x`; false off a whole tile. */
+  positionReachable(floor: number, x: number): boolean;
+}
+
 /** The whole port: what the game holds, whichever engine runs. */
-export interface EnginePort extends EnginePortLifecycle, EnginePortView, EnginePortCommands, EnginePortQueries, EnginePortFiles {}
+export interface EnginePort
+  extends
+    EnginePortLifecycle,
+    EnginePortView,
+    EnginePortCommands,
+    EnginePortQueries,
+    EnginePortFiles,
+    EnginePortRender {}

@@ -38,6 +38,26 @@ describe("port commands on the hosted read model", () => {
     expect(ops()).toEqual([{ op: "resolveChoice", accept: false }]);
   });
 
+  it("relay the building commands as the Simulation calls the shadow replays", () => {
+    const { engine, codes, sim, ops } = relayed();
+    expect(engine.buildAt(codes.kind("office"), 2, 190)[0]).toBe(1);
+    expect(ops()).toEqual([{ op: "build", kind: "office", floor: 2, x: 190 }]);
+    expect(engine.paintTiles(codes.kind("floor"), 3, Float64Array.of(185, 186))[0]).toBe(1);
+    expect(ops()).toEqual([{ op: "paintBrush", kind: "floor", floor: 3, tiles: [185, 186] }]);
+    expect(engine.buildShaft(codes.kind("elevatorStandard"), 172, 1, 2)[0]).toBe(1);
+    expect(ops()).toEqual([{ op: "buildTransport", kind: "elevatorStandard", x: 172, bottom: 1, top: 2 }]);
+    const id = sim.tower.units.find((u) => u.kind === "office")!.id;
+    expect(engine.demolish(id, true)[0]).toBe(1);
+    expect(ops()).toEqual([{ op: "removeFacility", id, method: "bulldoze" }]);
+  });
+
+  it("relay nothing for a quote, which asks the tower and changes nothing", () => {
+    const { engine, codes, ops } = relayed();
+    expect(engine.quoteBuild(codes.kind("office"), 2, 190)[0]).toBe(1);
+    expect(engine.quoteShaft(codes.kind("elevatorStandard"), 172, 1, 2)[0]).toBe(1);
+    expect(ops()).toEqual([]);
+  });
+
   it("relay nothing for a command the port refuses before the tower", () => {
     const { engine, ops } = relayed();
     expect(engine.answerChoice(true)[0]).toBe(0);

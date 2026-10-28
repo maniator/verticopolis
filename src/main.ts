@@ -37,6 +37,7 @@ import { createTsSim } from "./simport/tsSim";
 import { TsEngine } from "./engine/port/tsEngine";
 import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
+import { hudSource } from "./game/hudSource";
 
 /**
  * The game controller. Excalibur (via {@link TowerEngine}) owns the render
@@ -210,7 +211,7 @@ class GameApp implements GameAppPorts {
     // adoptSim, so without this a reloaded 2★-6★ tower reads star > lastStar(1)
     // on the first frame and fires a phantom promotion (jingle + star_reached).
     this.lastStar = this.sim.star;
-    this.engine = new TowerEngine(this.canvas, this.sim);
+    this.engine = new TowerEngine(this.canvas, this.sim, this.reader);
 
     // Restore persisted audio prefs onto the facade BEFORE any UI wiring or
     // gesture listener exists, so the very first interaction (which starts the
@@ -247,12 +248,12 @@ class GameApp implements GameAppPorts {
     // facility button present; without this pass a returning player (who skips
     // the splash) would briefly see the full locked catalog before the throttled
     // render loop first hides the locked tools, a visible collapse/reflow.
-    this.ui.update(this.sim);
+    this.ui.update(hudSource(this));
     // Adopt the boot sim's log baseline the same way adoptSim does for later
     // swaps: the boot sim is assigned directly (never through adoptSim), and
     // without this the bulletin history a save carries would sit unrendered
     // after a plain page reload, the restore path players hit most.
-    this.ui.resetLog(this.sim);
+    this.ui.resetLog(hudSource(this));
     void this.engine.start();
 
     // Accessibility: apply reduced motion now and whenever the OS pref flips.
@@ -316,7 +317,7 @@ class GameApp implements GameAppPorts {
     if (isSplashUp()) return; // never arm behind the splash
     OnboardingController.clearOnboarded();
     this.ui.closeModal();
-    if (!this.onboarding.arm(this.sim)) {
+    if (!this.onboarding.arm(this.enginePort)) {
       this.ui.toast("You've already completed Getting Started.", "info");
     }
   }
@@ -361,7 +362,7 @@ class GameApp implements GameAppPorts {
   // Kept as methods because KeyboardPlay's deps call them on the app, and the
   // gameControllers.integration.test.ts mirror re-implements the same bodies.
 
-  /** @internal */ placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): Promise<PlaceOutcome> | null { return placeSimpleBuild(this, kind, tile, floor); }
+  /** @internal */ placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null { return placeSimpleBuild(this, kind, tile, floor); }
   /** @internal */ isTransportTool(): boolean { return isTransportTool(this); }
   /** @internal */ updateBuildPreview(tile: number, floor: number): void { updateBuildPreview(this, tile, floor); }
   /** @internal */ pickedAt(floor: number, tile: number): Picked | null { return pickedAt(this, floor, tile); }
@@ -451,7 +452,7 @@ class GameApp implements GameAppPorts {
     this.inspector.clear();
     // A live Getting Started session must follow the swap, or it keeps
     // ticking the abandoned sim and teaches that tower's next step.
-    this.onboarding.adoptSim(sim, preserveHistory);
+    this.onboarding.adoptSim(this.enginePort, preserveHistory);
     this.shownWin = false;
     this.lastStar = sim.star;
     this.accMinutes = 0;
@@ -461,13 +462,12 @@ class GameApp implements GameAppPorts {
     // An undo/redo restore keeps the camera under the player (preserveHistory is
     // only ever true on that path); a real tower swap restores the save's view.
     this.engine.setSim(sim, { keepCamera: preserveHistory });
-    // Rebase the UI log cursor onto the new tower's log so its old entries don't
-    // replay as toasts and its next entry isn't skipped against a stale cursor.
-    this.ui.resetLog(sim);
-    // Refresh the palette to the swapped-in tower's star level immediately, so a
-    // load/new-tower into a different star doesn't briefly show the prior tower's
-    // unlock set until the next throttled render tick.
-    this.ui.update(sim);
+    // Read the swapped-in tower now, not on the next throttled pass. Rebase the
+    // UI log cursor so old entries don't replay as toasts, and refresh the palette
+    // to the new star level so it never shows the prior tower's unlock set.
+    this.reader.update();
+    this.ui.resetLog(hudSource(this));
+    this.ui.update(hudSource(this));
     if (!preserveHistory) {
       // A *different* tower (New Tower / Load / a slot / Import) invalidates the
       // undo trail; otherwise Undo could resurrect an unrelated old tower and a

@@ -1,13 +1,14 @@
-import type { Simulation } from "../engine/Simulation";
-import { catalogFacility } from "../engine/catalogTypes";
+import { catalogFacility, type Catalog } from "../engine/catalogTypes";
 import type { FacilityKind } from "../engine/types";
 import type { Picked, TowerEngine } from "../render/excalibur/TowerEngine";
 import type { Tool, UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import { announceForPlacement, snapX, stepCursor, type PlaceOutcome } from "../ui/placement";
 import type { BuildActions } from "./buildActions";
-import type { SimPort } from "../simport/port";
-import { towerCatalog } from "../engine/towerCatalog";
+import type { EnginePort } from "../simport/enginePort";
+import { outcome, type PortCodes } from "../simport/portCodes";
+import type { ViewReader } from "../simport/viewReader";
+import { quoteShaft } from "./portAccess";
 
 /**
  * Keyboard play (F50–52): the virtual build cursor moved with arrows/WASD,
@@ -18,17 +19,24 @@ import { towerCatalog } from "../engine/towerCatalog";
  * {@link BuildActions} and placeSimpleBuild paths as mouse and touch, so all
  * three gestures stay pinned to one contract.
  *
- * Commands go through the port (AD-9); a commit or bulldoze resolves once the
- * engine has answered and its undo step is closed. Never stores a Simulation:
- * adoptSim() swaps the live instance, so every read asks `deps.getSim()` fresh.
+ * Commands go through the engine port, which answers synchronously: a commit
+ * or bulldoze has its answer and its undo step closed when it returns. Never
+ * stores the engine or the reader: they are getters, read per call, since
+ * adoptSim() swaps the tower.
  */
 export interface KeyboardPlayDeps {
-  /** The live simulation (never cached — adoptSim swaps the instance). */
-  getSim(): Simulation;
-  /** The port every command goes through; it follows adoptSim itself. */
-  port: SimPort;
+  /** The engine every command and quote goes through. */
+  enginePort(): EnginePort;
+  /** The code tables a kind passes through. */
+  portCodes(): PortCodes;
+  /** The shared reader (the tower reads). */
+  reader(): ViewReader;
+  /** The live tower's catalog for the reader's mode (`portAccess.catalogOf`). */
+  catalog(): Catalog;
+  /** The one read the port cannot answer (`portAccess.isUnlocked`). */
+  isUnlocked(kind: FacilityKind): boolean;
   /** The live renderer (never cached: context-loss recovery swaps the
-   *  instance, same contract as getSim). */
+   *  instance, same contract as the getters above). */
   engine(): Pick<TowerEngine, "ensureVisible" | "preview" | "transportPreview">;
   audio: Pick<AudioEngine, "sfx">;
   ui: Pick<UI, "toast">;
@@ -51,9 +59,9 @@ export interface KeyboardPlayDeps {
   /** The inspectable/bulldozable entity at a cell (room or transport), if any. */
   pickedAt(floor: number, tile: number): Picked | null;
   selectPicked(p: Picked | null): void;
-  /** The gesture-independent placement shared with tap and click: null at
-   *  once for a drag-sized shaft, otherwise the engine's outcome. */
-  placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): Promise<PlaceOutcome> | null;
+  /** The gesture-independent placement shared with tap and click: null for
+   *  a drag-sized shaft, otherwise the engine's outcome. */
+  placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null;
   updateBuildPreview(tile: number, floor: number): void;
 }
 
@@ -87,7 +95,6 @@ export class KeyboardPlay {
     if (!c) return;
     const tool = this.deps.tool();
     if (this.kbAnchor && tool.type === "build" && this.deps.isTransportTool()) {
-      const sim = this.deps.getSim();
       const kind = tool.kind;
       const bottom = Math.min(this.kbAnchor.floor, c.floor);
       const top = Math.max(this.kbAnchor.floor, c.floor);
@@ -99,7 +106,9 @@ export class KeyboardPlay {
         x: this.kbAnchor.tile,
         bottom,
         top,
-        valid: sim.tower.placeTransportDryRun(kind, this.kbAnchor.tile, bottom, top) && sim.isUnlocked(kind),
+        valid:
+          quoteShaft(this.deps.enginePort(), this.deps.portCodes(), kind, this.kbAnchor.tile, bottom, top).ok &&
+          this.deps.isUnlocked(kind),
       };
       engine.preview = null;
     } else {
@@ -112,24 +121,25 @@ export class KeyboardPlay {
     if (!c) return;
     const loc = c.floor >= 1 ? `floor ${c.floor}` : `basement ${1 - c.floor}`;
     const here = this.deps.pickedAt(c.floor, c.tile);
-    this.deps.announce(`Cursor: ${loc}, column ${c.tile}. ${here ? catalogFacility(towerCatalog(this.deps.getSim()), here.kind).name : "Empty"}.`);
+    this.deps.announce(`Cursor: ${loc}, column ${c.tile}. ${here ? catalogFacility(this.deps.catalog(), here.kind).name : "Empty"}.`);
   }
 
-  async commitCursor(): Promise<void> {
+  commitCursor(): void {
     if (!this.kbCursor) {
       this.moveCursor(0, 0); // first press: just reveal the cursor
       return;
     }
+    const catalog = this.deps.catalog();
     const c = this.kbCursor;
     const tool = this.deps.tool();
     if (tool.type === "inspect") {
       const p = this.deps.pickedAt(c.floor, c.tile);
       this.deps.selectPicked(p);
-      this.deps.announce(p ? `Selected ${catalogFacility(towerCatalog(this.deps.getSim()), p.kind).name}` : "Nothing to inspect here");
+      this.deps.announce(p ? `Selected ${catalogFacility(catalog, p.kind).name}` : "Nothing to inspect here");
       return;
     }
     if (tool.type === "bulldoze") {
-      await this.bulldozeCursor();
+      this.bulldozeCursor();
       return;
     }
     if (tool.type !== "build") return;
@@ -137,31 +147,29 @@ export class KeyboardPlay {
     // Undo parity with the mouse path (onActionDown captures, onActionUp
     // commits): without this, Ctrl+Z fused a keyboard build into the previous
     // mouse gesture and keyboard builds were never individually undoable.
-    this.deps.captureUndo(`Build ${catalogFacility(towerCatalog(this.deps.getSim()), kind).name}`);
+    this.deps.captureUndo(`Build ${catalogFacility(catalog, kind).name}`);
     const placing = this.deps.placeSimpleBuild(kind, c.tile, c.floor);
     if (placing) {
-      const placed = await placing;
-      this.deps.announce(announceForPlacement(placed, towerCatalog(this.deps.getSim()), kind, c.floor));
+      this.deps.announce(announceForPlacement(placing, catalog, kind, c.floor));
       this.refreshCursorPreview();
     } else if (this.deps.isTransportTool()) {
       if (!this.kbAnchor) {
         // Snap the anchor column like the mouse path, so a wide shaft near the
         // right edge places instead of failing.
-        this.kbAnchor = { tile: snapX(towerCatalog(this.deps.getSim()), kind, c.tile), floor: c.floor };
+        this.kbAnchor = { tile: snapX(catalog, kind, c.tile), floor: c.floor };
         this.refreshCursorPreview();
-        this.deps.announce(`${catalogFacility(towerCatalog(this.deps.getSim()), kind).name} anchored at floor ${c.floor}. Move to the other end and press Enter.`);
+        this.deps.announce(`${catalogFacility(catalog, kind).name} anchored at floor ${c.floor}. Move to the other end and press Enter.`);
       } else {
         const bottom = Math.min(this.kbAnchor.floor, c.floor);
         const top = Math.max(this.kbAnchor.floor, c.floor);
         const x = this.kbAnchor.tile;
-        // The anchor is spent as the shaft is ordered, so a second Enter
-        // before the answer starts a new one.
         this.kbAnchor = null;
         this.deps.engine().transportPreview = null;
-        const res = await this.deps.port.command({ op: "buildTransport", kind, x, bottom, top });
+        const port = this.deps.enginePort();
+        const res = outcome(port, port.buildShaft(this.deps.portCodes().kind(kind), x, bottom, top));
         if (res.ok) {
           this.deps.audio.sfx("build");
-          this.deps.announce(`${catalogFacility(towerCatalog(this.deps.getSim()), kind).name} built, floors ${bottom} to ${top}`);
+          this.deps.announce(`${catalogFacility(catalog, kind).name} built, floors ${bottom} to ${top}`);
         } else {
           this.deps.audio.sfx("error");
           if (res.reason) this.deps.ui.toast(res.reason, "bad");
@@ -173,7 +181,7 @@ export class KeyboardPlay {
     this.deps.commitUndo();
   }
 
-  async bulldozeCursor(): Promise<void> {
+  bulldozeCursor(): void {
     const c = this.kbCursor;
     if (!c) return;
     const p = this.deps.pickedAt(c.floor, c.tile);
@@ -181,9 +189,9 @@ export class KeyboardPlay {
       this.deps.announce("Nothing to bulldoze here");
       return;
     }
-    const name = catalogFacility(towerCatalog(this.deps.getSim()), p.kind).name;
+    const name = catalogFacility(this.deps.catalog(), p.kind).name;
     this.deps.captureUndo("Bulldoze");
-    const removed = await this.deps.build.bulldozePicked(p);
+    const removed = this.deps.build.bulldozePicked(p);
     this.deps.commitUndo();
     this.deps.announce(removed ? `Bulldozed ${name}` : `Could not bulldoze ${name}`);
     this.refreshCursorPreview();

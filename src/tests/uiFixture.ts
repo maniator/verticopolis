@@ -75,8 +75,9 @@ export function mountAppDom(): void {
 }
 
 export function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks } {
+  const classic = catalogFor("classic"); // one object, as a tower's catalog is, so the palette redraws only on a change
   const cb: UICallbacks = {
-    getCatalog: vi.fn(() => catalogFor("classic")),
+    getCatalog: vi.fn(() => classic),
     onSelectTool: vi.fn(),
     onSpeed: vi.fn(),
     getSpeed: vi.fn(() => 1),

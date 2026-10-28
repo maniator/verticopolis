@@ -1,10 +1,10 @@
 import { deflateSync } from "fflate";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MAX_SAVE_INFLATED_BYTES, TOWER_FILE_MAGIC, toBase64 } from "../../storage/saveCompression";
 import { Simulation } from "../Simulation";
 import { INVALID_REQUEST, UNKNOWN_FACILITY } from "../request";
 import { KIND_CODES, UNIT_STATE_CODES, VIEW_LAYOUT, VIEW_LAYOUT_TEXT, codeOf } from "./layout";
-import { roomUnits, watchRooms } from "../tower/rooms";
+import { roomUnits, setRoomState, watchRooms } from "../tower/rooms";
 import { MetaLog } from "./metaLog";
 import { ONBOARDING_FLAG } from "./queries";
 import { TsEngine } from "./tsEngine";
@@ -139,6 +139,25 @@ describe("TsEngine", () => {
     expect(e.logText(NaN)).toBeUndefined();
     expect(e.eventText(0)).toBeUndefined();
     expect(e.undoSignature()).toContain("office");
+  });
+
+  it("keeps congestion until a step, an edit or a room's change", () => {
+    const e = engine();
+    const walk = vi.spyOn(e.sim, "congestion");
+    const office = e.sim.tower.units.find((u) => u.kind === "office")!;
+    const first = e.congestion();
+    expect(e.congestion()).toBe(first);
+    expect(walk).toHaveBeenCalledTimes(1);
+    // A room's change, an edit and a step each move the key once.
+    setRoomState(e.sim.tower, office, office.state === "occupied" ? "empty" : "occupied");
+    e.congestion();
+    e.sim.build("office", 3, 200);
+    e.congestion();
+    e.tick(2);
+    e.congestion();
+    e.congestion();
+    expect(walk).toHaveBeenCalledTimes(4);
+    expect(e.congestion()).toBe(e.sim.congestion());
   });
 
   it("steps a frame's time and keeps the step mode across a swap", () => {

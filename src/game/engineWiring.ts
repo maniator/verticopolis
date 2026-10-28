@@ -6,7 +6,7 @@ import { classifyGesture, isPaintKind } from "./gesture";
 import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors, clearBuildRefusal } from "./buildPreview";
 import { runFrame, SPEEDS } from "./frameLoop";
 import { applyReducedMotion } from "./audioPrefs";
-import { towerCatalog } from "../engine/towerCatalog";
+import { catalogOf, isUnlocked, quoteShaft } from "./portAccess";
 import { noteFrameError } from "./frameErrors";
 
 /**
@@ -17,13 +17,13 @@ import { noteFrameError } from "./frameErrors";
  * an engine rebuild stay visible. Behavior unchanged from the former methods.
  */
 
-/** Close the gesture's undo step once the commands it issued have been
- *  answered, or at once when it issued none, so the step holds their effect
- *  on any port. A rejected command skips the commit, as a throw did before
- *  commands went through the port: the open capture is replaced by the next
- *  gesture's, so no half step is recorded, and the rejection is left
- *  unhandled for the error tracking (`analyticsErrors.ts`) to report. The
- *  promise is returned so a test can await the gesture. */
+/** Close the gesture's undo step once the editor's commands it issued have
+ *  been answered, or at once when it issued none, so the step holds their
+ *  effect on any port. A rejected command skips the commit: the open capture
+ *  is replaced by the next gesture's, so no half step is recorded, and the
+ *  rejection is left unhandled for the error tracking (`analyticsErrors.ts`)
+ *  to report. The promise is returned so a test can await the gesture. The
+ *  build commands answer at once and close their own step above. */
 function commitAfter(app: GameApp, pending: Promise<unknown> | null): Promise<void> | undefined {
   if (!pending) {
     app.commitUndo();
@@ -40,7 +40,7 @@ export function wireEngine(app: GameApp): void {
   // also zooms). Before this, a floor/lobby/parking drag only ever panned on
   // touch, so mobile couldn't paint a run at all. On mouse the pan key
   // (Space or Shift, resolved in towerInputCamera) pans with any tool armed.
-  app.engine.classifyDown = (button, touch, panKey) => classifyGesture(towerCatalog(app.sim), app.tool, button, touch, panKey);
+  app.engine.classifyDown = (button, touch, panKey) => classifyGesture(catalogOf(app), app.tool, button, touch, panKey);
 
   // A press-without-drag: select (inspect) or, on touch, run the tool. The
   // picked entity resolves transports by collider hit-test and units by the
@@ -56,18 +56,17 @@ export function wireEngine(app: GameApp): void {
       return;
     }
     if (!touch) return; // mouse pan-taps with a build/bulldoze tool do nothing
-    app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(towerCatalog(app.sim), app.tool.kind).name}`);
-    let placing: Promise<unknown> | null = null;
-    if (app.tool.type === "bulldoze") placing = app.build.bulldozePicked(picked);
+    app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
+    if (app.tool.type === "bulldoze") app.build.bulldozePicked(picked);
     else if (app.tool.type === "build") {
       // Touch taps land here for every simple placement, including the
       // stairway/escalator flight (classifyDown routes them through the
       // pan/tap gesture so a finger-down can still pan). Drag-sized shafts
       // return null, they never place on a tap.
-      placing = placeSimpleBuild(app, app.tool.kind, tile, floor);
+      placeSimpleBuild(app, app.tool.kind, tile, floor);
     }
-    // The undo step closes once the engine has answered the command.
-    return commitAfter(app, placing);
+    // The command is answered, so the step holds its effect.
+    app.commitUndo();
   };
 
   app.engine.onActionDown = (tile, floor, touch, picked) => {
@@ -79,10 +78,10 @@ export function wireEngine(app: GameApp): void {
     app.buildAnchor = null;
     app.build.clearPaint();
     if (app.tool.type === "bulldoze" || app.tool.type === "build") {
-      app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(towerCatalog(app.sim), app.tool.kind).name}`);
+      app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
     }
     if (app.tool.type === "bulldoze") {
-      void app.build.bulldozePicked(picked);
+      app.build.bulldozePicked(picked);
     } else if (app.tool.type === "build") {
       // Simple placements (strip paint, two-floor flight, room) happen on
       // the press; a drag-sized shaft instead anchors here and sizes with
@@ -98,19 +97,15 @@ export function wireEngine(app: GameApp): void {
         updateBuildPreview(app, tile, floor, false); // false: red ghost carries validity, no DOM reason card on touch
       } else {
         // A drag-sized shaft anchors here; anything else places on the press.
-        // That command settles on its own: the release closes the undo step
-        // without waiting for it, which is safe while the port applies a
-        // command when it is issued (#1273 tracks it for a later answer).
         const placing = placeSimpleBuild(app, app.tool.kind, tile, floor);
-        if (placing) void placing;
-        else app.transportStart = { x: snapX(towerCatalog(app.sim), app.tool.kind, tile), floor };
+        if (!placing) app.transportStart = { x: snapX(catalogOf(app), app.tool.kind, tile), floor };
       }
     }
   };
 
   app.engine.onActionMove = (tile, floor, picked) => {
     if (app.tool.type === "bulldoze") {
-      void app.build.bulldozePicked(picked, true); // drag: blocked tiles fail silently
+      app.build.bulldozePicked(picked, true); // drag: blocked tiles fail silently
       return;
     }
     if (app.tool.type !== "build") return;
@@ -119,19 +114,19 @@ export function wireEngine(app: GameApp): void {
       const bottom = Math.min(app.transportStart.floor, floor);
       const top = Math.max(app.transportStart.floor, floor);
       const x = app.transportStart.x;
-      const valid = app.sim.tower.placeTransportDryRun(kind, x, bottom, top) && app.sim.isUnlocked(kind);
+      const valid = quoteShaft(app.enginePort, app.portCodes, kind, x, bottom, top).ok && isUnlocked(app, kind);
       app.engine.transportPreview = { kind, x, bottom, top, valid };
       app.engine.preview = null;
     } else if (isPaintKind(kind)) {
       if (app.paintAnchor) {
         // First move of a deferred touch paint: stamp the same brush strip a
         // desktop press lays at the press point, then extend from it.
-        void app.build.seedPaint(kind, app.paintAnchor.tile, app.paintAnchor.floor);
+        app.build.seedPaint(kind, app.paintAnchor.tile, app.paintAnchor.floor);
         app.paintAnchor = null;
       }
       // For a wide unit (parking) each tile-step re-attempts a build; overlaps
       // fail silently, so successful placements land flush → a contiguous chain.
-      void app.build.paintFloorRun(kind, tile, floor);
+      app.build.paintFloorRun(kind, tile, floor);
     } else if (app.buildAnchor) {
       // Touch room-build drag. The lift latches once this is a deliberate drag
       // (moved to a different floor, or a couple of tiles across), not a tap's
@@ -146,13 +141,11 @@ export function wireEngine(app: GameApp): void {
   };
 
   app.engine.onActionUp = () => {
-    // The commands this release issues; the undo step closes after the last.
-    const placing: Promise<unknown>[] = [];
     // A deferred touch paint that never moved is a TAP: lay the same brush
     // strip a desktop click lays (a drag already laid its run via
     // onActionMove and cleared the anchor).
     if (app.paintAnchor) {
-      if (app.tool.type === "build") placing.push(app.build.seedPaint(app.tool.kind, app.paintAnchor.tile, app.paintAnchor.floor));
+      if (app.tool.type === "build") app.build.seedPaint(app.tool.kind, app.paintAnchor.tile, app.paintAnchor.floor);
       app.paintAnchor = null;
     }
     // Touch room-build release: commit the room where the ghost sits (the lifted
@@ -163,28 +156,28 @@ export function wireEngine(app: GameApp): void {
       const valid = app.engine.preview?.valid ?? false;
       app.buildAnchor = null;
       app.engine.preview = null;
-      const room = valid && app.tool.type === "build" ? placeSimpleBuild(app, app.tool.kind, a.tile, a.floor) : null;
-      if (room) placing.push(room);
+      if (valid && app.tool.type === "build") placeSimpleBuild(app, app.tool.kind, a.tile, a.floor);
     }
     app.build.clearPaint();
     // Only drag-sized transports (elevators) commit on release. Stairs and
     // escalators already placed on the DOWN event, and their hover ghost
     // also lives in transportPreview, treating it as a drag commit here
     // would double-place on every desktop click.
-    if (app.tool.type === "build" && isTransportTool(app) && !catalogFacility(towerCatalog(app.sim), app.tool.kind).fixedSpan) {
+    if (app.tool.type === "build" && isTransportTool(app) && !catalogFacility(catalogOf(app), app.tool.kind).fixedSpan) {
       const tp = app.engine.transportPreview;
       if (tp) {
         // The helper explains failures (invalid spot, not enough money)
         // instead of failing silently.
-        placing.push(app.build.tryBuildTransport(tp.kind, tp.x, tp.bottom, tp.top));
+        app.build.tryBuildTransport(tp.kind, tp.x, tp.bottom, tp.top);
         app.engine.transportPreview = null;
       } else if (app.transportStart) {
         // Pressed without dragging, teach the drag-to-size gesture.
-        app.ui.toast(`Drag up or down to set the ${catalogFacility(towerCatalog(app.sim), app.tool.kind).name.toLowerCase()}'s height.`, "info");
+        app.ui.toast(`Drag up or down to set the ${catalogFacility(catalogOf(app), app.tool.kind).name.toLowerCase()}'s height.`, "info");
       }
     }
     app.transportStart = null;
-    return commitAfter(app, placing.length > 0 ? Promise.all(placing) : null);
+    // Every command this release issued is answered, so the step holds them.
+    app.commitUndo();
   };
 
   app.engine.onHover = (tile, floor, picked) => {
