@@ -299,6 +299,15 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     expect(f.sfx).toEqual([]);
   });
 
+  it("bulldozePicked reads again once when the reader lags a just-built unit", async () => {
+    sim.money = ECON.startingMoney;
+    expect(build.tryBuild("office", 2, 21)).toBe(true);
+    const built = sim.tower.units.find((u) => u.kind === "office" && u.x === 21)!;
+    expect(build.bulldozePicked({ type: "unit", id: built.id, kind: built.kind })).toBe(true);
+    expect(sim.tower.units.some((u) => u.id === built.id)).toBe(false);
+    expect(last(f.sfx)).toBe("sell");
+  });
+
   it("bulldozePicked on a transport refunds the shaft resale and clears a matching selection", async () => {
     sel = lift.id;
     const before = sim.money;
