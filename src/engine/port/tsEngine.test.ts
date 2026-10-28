@@ -161,6 +161,27 @@ describe("TsEngine", () => {
   });
 });
 
+describe("TsEngine.take", () => {
+  it("starts its own state again on a tower the app swapped in, and leaves the events to the app", () => {
+    const e = TsEngine.newGame(5, "modern");
+    e.tick(60);
+    e.viewFrame(true);
+    const gen = e.generation();
+    e.take(e.sim);
+    expect(e.generation(), "the same tower is no swap").toBe(gen);
+    const old = e.sim;
+    old.gameplayEvents.drain();
+    old.build("lobby", 1, 160);
+    const left = old.gameplayEvents.length;
+    const next = Simulation.newGame(9, "classic");
+    const own = next.gameplayEvents.length;
+    e.take(next);
+    expect([e.sim, e.generation()]).toEqual([next, gen + 1]);
+    expect(e.viewFrame(true)[JSON.parse(e.viewLayout()).header.frameSeq]).toBe(1);
+    expect([next.gameplayEvents.length, old.gameplayEvents.length], "the app hands the events on, not the engine").toEqual([own, left]);
+  });
+});
+
 describe("MetaLog", () => {
   it("lists edits after a revision, and everything when it cannot", () => {
     const e = engine();

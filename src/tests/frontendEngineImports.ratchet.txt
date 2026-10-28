@@ -35,7 +35,7 @@ src/game/housekeepingDiagnostics.ts economy/housekeeping
 src/game/saveLoad.ts Simulation
 src/game/trafficHud.ts traffic
 src/game/uiCallbacks.ts wellFormed
-src/main.ts Simulation facilities
+src/main.ts Simulation facilities port/tsEngine # port/tsEngine: GameApp holds the TypeScript engine behind EnginePort while the callers move (facade slice 7, PR 4); the boot path picks the engine in PR 5
 src/preview.ts catalog facilities
 src/render/atlas/browserEntry.ts catalog
 src/render/atlas/catalog.ts facilities households residentialRentals retailSubtypes

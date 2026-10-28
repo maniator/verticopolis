@@ -12,7 +12,8 @@ import { dirname, resolve } from "node:path";
  * pins that `adoptSim` really does it, before the swap (after it, the new
  * tower would inherit from itself and the replaced tower's events would be
  * lost), and that the constructor and `adoptSim` stay the only places the
- * app's tower is assigned, so no swap can skip the hand-off.
+ * app's tower is assigned (through its engine, `enginePort`), so no swap can
+ * skip the hand-off.
  */
 
 const src = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -35,18 +36,21 @@ describe("GameApp hands the replaced tower's gameplay events on", () => {
     const body = main.slice(start, main.indexOf("\n  }\n", start));
     // A plain statement of its own (not commented out, not behind a branch).
     const handOff = body.search(/^ {4}sim\.gameplayEvents\.inherit\(this\.sim\.gameplayEvents\);/m);
-    const swap = body.search(/^ {4}this\.sim = sim;/m);
+    const swap = body.search(/^ {4}this\.enginePort\.take\(sim\);/m);
     expect(handOff).toBeGreaterThan(-1);
     expect(swap).toBeGreaterThan(handOff);
   });
 
   it("assigns the app's tower only in the constructor and adoptSim", () => {
-    const assignments = main.match(/this\.sim\s*(\?\?|\|\||&&)?=(?!=)/g) ?? [];
-    expect(assignments).toHaveLength(2);
+    // The app's tower is its engine's (`sim` reads `enginePort.sim`): the
+    // constructor builds the engine once, and adoptSim alone hands it a tower.
+    expect(main.match(/this\.sim\s*(\?\?|\|\||&&)?=(?!=)/g) ?? []).toEqual([]);
+    expect(main.match(/this\.enginePort\s*=(?!=)/g) ?? []).toHaveLength(1);
+    expect(main.match(/\.take\(/g) ?? []).toHaveLength(1);
     // No other module swaps the app's tower behind adoptSim's back.
     const elsewhere = shellFiles(src)
       .filter((file) => file !== resolve(src, "main.ts"))
-      .filter((file) => /\bapp\.sim\s*(\?\?|\|\||&&)?=(?!=)/.test(readFileSync(file, "utf8")));
+      .filter((file) => /\bapp\.(sim|enginePort)\s*(\?\?|\|\||&&)?=(?!=)|\benginePort\.take\(/.test(readFileSync(file, "utf8")));
     expect(elsewhere).toEqual([]);
   });
 });

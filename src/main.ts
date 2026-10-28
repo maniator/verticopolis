@@ -35,6 +35,9 @@ import { bootGame } from "./bootstrap";
 import { gameplaySession } from "./analytics";
 import { createTsSim } from "./simport/tsSim";
 import type { SimPort } from "./simport/port";
+import { TsEngine } from "./engine/port/tsEngine";
+import { ViewReader } from "./simport/viewReader";
+import { PortCodes } from "./simport/portCodes";
 
 /**
  * The game controller. Excalibur (via {@link TowerEngine}) owns the render
@@ -59,7 +62,11 @@ import type { SimPort } from "./simport/port";
  * traffic chip); renaming any needs every consumer updated (TypeScript won't catch it).
  */
 class GameApp implements GameAppPorts {
-  sim: Simulation;
+  /** The port's engine (slice 7, PR 4), its view (updated with the UI) and code tables; `sim` is its tower. */
+  enginePort!: TsEngine;
+  reader!: ViewReader;
+  portCodes!: PortCodes;
+  get sim(): Simulation { return this.enginePort.sim; }
   /** The simulation as the game drives it (AD-9); follows every adoptSim swap. */
   readonly port: SimPort = createTsSim(() => this.sim, { adopt: (sim, keep) => this.adoptSim(sim, keep) });
   engine: TowerEngine;
@@ -195,7 +202,9 @@ class GameApp implements GameAppPorts {
     // overwrite them: a save from a *newer* build is only unreadable here, and a
     // future version may recover it. Best-effort, never blocks boot.
     if (boot.corrupt) SaveGame.preserveUnreadable();
-    this.sim = boot.sim ?? Simulation.newGame(Date.parse("2024-01-01"));
+    this.enginePort = new TsEngine(boot.sim ?? Simulation.newGame(Date.parse("2024-01-01")));
+    this.reader = new ViewReader(this.enginePort);
+    this.portCodes = new PortCodes(this.enginePort);
     // Seed the promotion latch to the boot tower's rating (adoptSim does the same
     // for later swaps). The boot sim is assigned directly, never through
     // adoptSim, so without this a reloaded 2★-6★ tower reads star > lastStar(1)
@@ -436,7 +445,7 @@ class GameApp implements GameAppPorts {
    *  @internal */
   adoptSim(sim: Simulation, preserveHistory = false): void {
     sim.gameplayEvents.inherit(this.sim.gameplayEvents); // what the replaced tower still owed, and its drop count
-    this.sim = sim;
+    this.enginePort.take(sim);
     this.clearSelection();
     // Facility ids restart in a fresh tower. A stale ✕-latch (or anchor) from the old tower
     // would silently mute the inspector on whichever new facility happens to reuse the id.
