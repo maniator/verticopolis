@@ -14,7 +14,6 @@ import { SaveLoad } from "../../game/saveLoad";
 import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
 import { render, type TemplateResult } from "lit-html";
-import { createTsSim } from "../../simport/tsSim";
 import { portDeps } from "../../game/portDeps.fixture";
 
 const CAT = catalogFor("classic");

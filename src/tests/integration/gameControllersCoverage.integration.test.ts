@@ -21,7 +21,6 @@ import { EditorActions } from "../../game/editorActions";
 import { SaveLoad } from "../../game/saveLoad";
 import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
-import { createTsSim } from "../../simport/tsSim";
 import { portDeps } from "../../game/portDeps.fixture";
 import { INVALID_COMMAND, MAX_TEXT } from "../../simport/request";
 
