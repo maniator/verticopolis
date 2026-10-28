@@ -1,6 +1,6 @@
 import { SLOT_COUNT, SaveGame } from "../storage/SaveGame";
 import type { PortRecord } from "../simport/enginePort";
-import { swapDone } from "./portLifecycle";
+import { saveText, swapDone } from "./portLifecycle";
 import type { SaveLoadDeps } from "./saveLoad";
 
 /**
@@ -55,8 +55,9 @@ export function adoptConfirmedLegacyImport(
     for (let n = 1; n <= SLOT_COUNT; n++) {
       if (!SaveGame.hasSlot(n)) {
         // The engine holds the imported tower now; its save keeps the view
-        // the file carried.
-        SaveGame.saveSlot(n, port.serialize());
+        // the file carried (no camera is stamped). Through `saveText`, like
+        // every save, so an engine that trapped writes nothing.
+        SaveGame.saveSlot(n, saveText(port, null));
         savedTo = n;
         break;
       }

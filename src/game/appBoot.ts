@@ -115,6 +115,10 @@ export function wireControllers(app: GameApp): void {
     towerSwapped: () => {
       app.ui.precedence.towerSwapped();
       app.followSwap();
+      // Autosave the tower the player just loaded, imported or founded at
+      // once, so a Rust crash in the next half minute reloads it rather than
+      // the tower before it (#1422).
+      autosaveIfLive(app.saveLoad);
     },
     ui: {
       toast: (text, kind) => app.ui.toast(text, kind),
@@ -418,9 +422,13 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // Autosave periodically, but never while the first-run splash is up, so an
   // idle first visit can't persist the throwaway boot sim (which would flip
   // hasSave() true for a tower the player never started).
-  window.setInterval(() => {
-    // Nor once a wasm-only build has stopped on its engine: the tower is no
-    // longer the engine's, and the save the message points back to must stay.
-    if (!isSplashUp() && !isEngineStopped()) void app.saveLoad.autosave();
-  }, 30000);
+  window.setInterval(() => autosaveIfLive(app.saveLoad), 30000);
+}
+
+/** Autosave now, unless the first-run splash is up (see the timer above), or
+ *  the game stopped on its engine: the tower is no longer the engine's, and
+ *  the save the message points back to must stay. The timer and every tower
+ *  swap share these guards. */
+function autosaveIfLive(saveLoad: Pick<SaveLoad, "autosave">): void {
+  if (!isSplashUp() && !isEngineStopped()) void saveLoad.autosave();
 }
