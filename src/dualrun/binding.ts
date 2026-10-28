@@ -68,6 +68,8 @@ export const INSTANCE_METHODS = [
   "advance", "congestion", "queueView", "parkingSet", "parkingUsage", "recyclingFill", "positionReachable",
   // PR 5e's tile bulldoze, rent batch quote, schedule read and founder mark.
   "demolishTile", "quoteRentBatch", "shaftSchedule", "founder",
+  // The recycling card's capacity line.
+  "recyclingCapacity",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 

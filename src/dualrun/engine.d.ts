@@ -295,6 +295,7 @@ export class Engine {
     quoteBuild(kind: number, floor: number, x: number): Float64Array;
     quoteRentBatch(kind: number, target: number, only_default: boolean): Float64Array;
     quoteShaft(kind: number, x: number, bottom: number, top: number): Float64Array;
+    recyclingCapacity(): number;
     recyclingFill(): number;
     /**
      * `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
