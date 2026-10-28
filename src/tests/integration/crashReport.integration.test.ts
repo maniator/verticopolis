@@ -120,7 +120,7 @@ describe("crash report packaging", () => {
     const url = new URL(bugReportUrl({ version: "2.53.0", crash: RUST_CRASH, engines: ENGINES }));
     expect(url.searchParams.get("title")).toBe("Rust engine crashed");
     const what = url.searchParams.get("what-happened")!;
-    expect(what).toContain("crashed 2 times, so the game switched to the TypeScript engine");
+    expect(what).toContain("crashed twice, so the game switched to the TypeScript engine");
     expect(what).toContain(`Rust engine: 0.21.0, source ${"d".repeat(12)}. Fault: trap-tick at start.`);
     expect(what).toContain("attaching it to this issue");
     // An engine the boot could not name still reads.
