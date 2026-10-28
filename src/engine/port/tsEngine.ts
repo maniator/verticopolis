@@ -1,5 +1,7 @@
 import { Simulation } from "../Simulation";
 import { towerStateSig } from "../UndoHistory";
+import type { StepDebt } from "../sim/fixedStep";
+import { advanceOwedMinutes } from "../sim/frameStep";
 import type { GameplayEvent } from "../gameplayEventBuffer";
 import { INVALID_REQUEST } from "../request";
 import type { CalendarKind } from "../calendar";
@@ -45,6 +47,26 @@ export class TsEngine implements PortState {
   private drained: GameplayEvent[] = [];
   private frames = new FrameEncoder();
   private readonly meta = new MetaLog();
+  /** The step mode `advance` last stepped under, which outlives a swap as
+   *  the web host's step debt outlives an adopted tower. */
+  private readonly debt: StepDebt = { minutes: 0 };
+  /** `advanceOwedMinutes`'s host over the current tower, counting steps. */
+  private readonly stepHost = ((engine: TsEngine) => {
+    const host = {
+      accMinutes: 0,
+      steps: 0,
+      sim: {
+        tick(dt: number): void {
+          host.steps++;
+          engine.current.tick(dt);
+        },
+        get clock() {
+          return engine.current.clock;
+        },
+      },
+    };
+    return host;
+  })(this);
 
   constructor(sim: Simulation) {
     this.current = sim;
@@ -65,6 +87,14 @@ export class TsEngine implements PortState {
 
   tick(dtMinutes: number): void {
     this.current.tick(dtMinutes);
+  }
+
+  advance(owed: number, dtMs: number, minutesPerSecond: number, steadyClock: boolean, step: boolean): Float64Array {
+    const host = this.stepHost;
+    host.accMinutes = owed;
+    host.steps = 0;
+    advanceOwedMinutes(host, this.debt, dtMs, minutesPerSecond, steadyClock, step);
+    return Float64Array.of(host.steps, host.accMinutes);
   }
 
   serialize(): string {

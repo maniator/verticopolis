@@ -136,6 +136,21 @@ describe("TsEngine", () => {
     expect(e.undoSignature()).toContain("office");
   });
 
+  it("steps a frame's time and keeps the step mode across a swap", () => {
+    const e = engine();
+    const before = e.sim.clock.minutes;
+    const [steps, owed] = Array.from(e.advance(0, 1000, 120, true, true));
+    expect(steps).toBeGreaterThan(0);
+    expect(owed).toBeGreaterThanOrEqual(0);
+    expect(e.sim.clock.minutes).toBeGreaterThan(before);
+    expect(Array.from(e.advance(5, 16, 120, true, false))[0]).toBe(0);
+    e.loadSave(e.serialize());
+    // The same rate and pacing: nothing owed is dropped.
+    expect(Array.from(e.advance(1.5, 0, 120, true, false))).toEqual([0, 1.5]);
+    // A new rate drops the carry.
+    expect(Array.from(e.advance(1.5, 0, 30, true, false))).toEqual([0, 0]);
+  });
+
   it("swaps towers, keeping the generation and the events' rules", () => {
     const e = engine();
     const save = e.serialize();

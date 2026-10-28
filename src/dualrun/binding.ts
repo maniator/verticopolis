@@ -61,6 +61,8 @@ export const INSTANCE_METHODS = [
   "scheduleShaft",
   // PR 1c's panel queries.
   "heatCells", "crewCoverage", "unitCard", "shaftCard",
+  // PR 5's frame step.
+  "advance",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 

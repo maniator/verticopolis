@@ -140,6 +140,28 @@ impl Engine {
         }
     }
 
+    /// One frame's time (`advanceOwedMinutes`, `fixed_step::FrameStepper`):
+    /// `owed` is the minutes the host carried from the last frame, and the
+    /// answer is `[steps, owed]`, the steps run and the minutes still owed.
+    /// The host keeps the owed minutes, so a reset (a speed change, an
+    /// adopted tower) is the host's write; the step mode they were owed
+    /// under is the engine's. Like `tick`, it refuses nothing: a non-finite
+    /// carry or frame time owes nothing, and a rate of 0 steps nothing.
+    pub(crate) fn port_advance(
+        &mut self,
+        owed: f64,
+        dt_ms: f64,
+        minutes_per_second: f64,
+        steady_clock: bool,
+        step: bool,
+    ) -> Vec<f64> {
+        self.stepper.acc_minutes = owed;
+        let steps =
+            self.stepper
+                .advance(&mut self.sim, dt_ms, minutes_per_second, steady_clock, step);
+        vec![f64::from(steps), self.stepper.acc_minutes]
+    }
+
     /// Load an undo or redo snapshot (the `history` source), keeping the
     /// live camera and auto-bridge preference, as the approved contract
     /// says and as the app's history adoption does (`keepCamera`): the view

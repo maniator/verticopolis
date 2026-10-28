@@ -31,6 +31,7 @@ export class Engine {
      * gallery's clock pin); no game command reaches it.
      */
     advanceClock(minutes: number): void;
+    advance(owed: number, dt_ms: number, minutes_per_second: number, steady_clock: boolean, step: boolean): Float64Array;
     answerChoice(accept: boolean): Float64Array;
     /**
      * `applyRentBatch(kind, target, onlyDefaultPriced)` with the target as

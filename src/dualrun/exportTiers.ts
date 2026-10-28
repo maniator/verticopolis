@@ -210,6 +210,7 @@ export const BINDING_EXPORT_TIERS = {
   shaftCard: T2,
   // Tier 2, the host loop and the engine's lifetime.
   tick: LOOP,
+  advance: LOOP,
   frameView: LOOP,
   logSince: LOOP,
   drainGameplayEvents: LOOP,

@@ -15,6 +15,7 @@ impl Engine {
             generation: 0,
             backdrop: false,
             drained: Vec::new(),
+            stepper: Default::default(),
         }
     }
 }
