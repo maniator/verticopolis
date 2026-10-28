@@ -6,8 +6,6 @@ import { runFrame } from "../../game/frameLoop";
 import { hasBlockingModal } from "../../game/interactionState";
 import type { UI } from "../../ui/UI";
 import { mountAppDom, makeUI } from "../uiFixture";
-import { TsEngine } from "../../engine/port/tsEngine";
-import { PortCodes } from "../../simport/portCodes";
 import { createTsSim } from "../../simport/tsSim";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { PortCodes } from "../../simport/portCodes";
@@ -61,9 +59,6 @@ function makeApp(sim: Simulation, ui: UI) {
     speed: 1,
     prefs: { steadyClock: true },
     sim,
-    reader: { update: vi.fn() },
-    enginePort,
-    portCodes: new PortCodes(enginePort),
     port: createTsSim(() => sim),
     enginePort,
     reader: new ViewReader(enginePort),

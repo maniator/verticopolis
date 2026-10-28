@@ -64,7 +64,7 @@ function makeApp(over: Record<string, unknown> = {}) {
     shownUpdate: false,
     speed: 3,
     prefs: { steadyClock: true },
-    sim, reader: { update: vi.fn() },
+    sim,
     enginePort: fakeEnginePort(sim), // commands land on the fake's spies
     portCodes,
     accMinutes: 0,
