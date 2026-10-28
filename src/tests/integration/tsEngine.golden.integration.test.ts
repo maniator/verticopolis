@@ -1,9 +1,14 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { deflateSync } from "fflate";
 import { afterEach, describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../engine/serializedGame";
 import { VIEW_LAYOUT, VIEW_LAYOUT_TEXT, codeOf, KIND_CODES } from "../../engine/port/layout";
 import { TsEngine } from "../../engine/port/tsEngine";
 import type { EnginePort } from "../../simport/enginePort";
+import { MAX_SAVE_INFLATED_BYTES, TOWER_FILE_MAGIC, toBase64 } from "../../storage/saveCompression";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 
 /**
@@ -30,6 +35,8 @@ afterEach(() => {
 
 const code = (kind: string): number => codeOf(KIND_CODES, kind);
 const META = VIEW_LAYOUT.header.metaRevision;
+const FACTS = VIEW_LAYOUT.records.unitFacts;
+const FIXTURES = resolve(dirname(fileURLToPath(import.meta.url)), "../../../conformance/fixtures");
 
 /** A lobby and two floors, offices, a hotel room, a cinema, two fast food
  *  places (they carry a subtype), a renamed office, an elevator and stairs.
@@ -89,6 +96,7 @@ function sameReads(p: [EnginePort, EnginePort]): void {
   same(p, (e) => e.onboarding(), "onboarding");
   same(p, (e) => e.crewCoverage(), "crewCoverage");
   for (let m = 0; m < VIEW_LAYOUT.heatModes.length; m++) same(p, (e) => e.heatCells(m), `heat ${m}`);
+  same(p, (e) => e.statsSheet(), "statsSheet");
   same(p, (e) => e.congestion(), "congestion");
   same(p, (e) => e.queueView(), "queueView");
   same(p, (e) => e.parkingSet(), "parkingSet");
@@ -99,6 +107,7 @@ function sameReads(p: [EnginePort, EnginePort]): void {
   }
   for (const id of units(p[0])) {
     same(p, (e) => e.unitCard(id), `unit ${id}`);
+    same(p, (e) => e.unitFacts(id), `facts ${id}`);
     same(p, (e) => e.unitLabel(id), `label ${id}`);
     same(p, (e) => e.unitSubtype(id), `subtype ${id}`);
   }
@@ -238,6 +247,8 @@ describe("TsEngine against the Rust Engine", () => {
       ["quoteShaft", (e, v) => e.quoteShaft(v, 1, 1, 2)],
       ["heatCells", (e, v) => e.heatCells(v)],
       ["unitCard", (e, v) => e.unitCard(v)],
+      ["unitFacts", (e, v) => e.unitFacts(v)],
+      ["tdtNote", (e, v) => e.tdtNote(v)],
       ["shaftCard", (e, v) => e.shaftCard(v)],
       ["unitLabel", (e, v) => e.unitLabel(v)],
       ["logAfter", (e, v) => e.logAfter(v)],
@@ -300,6 +311,10 @@ describe("TsEngine against the Rust Engine", () => {
     same(p, (e) => e.view(), "restore keeps the live camera");
     same(p, (e) => e.loadSave(save), "loadSave");
     same(p, (e) => e.view(), "a load takes the saved camera");
+    const nul = `${TOWER_FILE_MAGIC}\n${toBase64(deflateSync(new TextEncoder().encode("null"), { level: 1 }))}\n`;
+    same(p, (e) => e.loadVctower(nul), "a null payload");
+    const bomb = `${TOWER_FILE_MAGIC}\n${toBase64(deflateSync(new Uint8Array(MAX_SAVE_INFLATED_BYTES + 1)))}\n`;
+    same(p, (e) => e.loadVctower(bomb), "a payload past the cap");
     // The parse error's text is each engine's own.
     same(p, (e) => e.loadSave("{"), "a refused load", false);
     expect(p[1].lastReason()).toBeTruthy();
@@ -311,6 +326,108 @@ describe("TsEngine against the Rust Engine", () => {
     p.forEach((e) => e.tick(600));
     same(p, (e) => e.drainEvents(), "drain");
     sameFrame(p, true);
+  });
+
+  it.skipIf(!hasWasmPackage())("applies the founder rule to stored loads only", () => {
+    const p = pair();
+    const founder = (e: EnginePort) => (JSON.parse(e.serialize()) as { founder?: boolean }).founder === true;
+    const unstamped = p[1].serialize();
+    const stamped = JSON.stringify({ ...(JSON.parse(unstamped) as object), appVersion: "2.5.0" });
+    same(p, (e) => e.restore(unstamped), "restore an unstamped snapshot");
+    same(p, founder, "restore leaves the tower unmarked");
+    same(p, (e) => e.loadSave(stamped), "a stamped load");
+    same(p, founder, "a stamped save is no founder's");
+    same(p, (e) => e.loadSave(unstamped), "an unstamped load");
+    same(p, founder, "an unstamped save is a founder's");
+    expect(founder(p[1])).toBe(true);
+    same(p, (e) => JSON.parse(e.serialize()) as unknown, "the saves after the loads");
+    same(p, (e) => e.loadSave("null"), "a null save");
+    same(p, (e) => e.restore("null"), "a null snapshot");
+    same(p, (e) => e.restore(stamped), "restore keeps no rule");
+    same(p, founder, "a restored snapshot carries what it says");
+  });
+
+  it.skipIf(!hasWasmPackage())("writes and reads .vctower files the same way", () => {
+    const p = pair();
+    const text = same(p, (e) => e.exportVctower("3.1.0", 1_700_000_000_000), "exportVctower")!;
+    same(p, (e) => e.exportVctower("1.9.0", 1_700_000_000_000), "a pre-2.0 build name");
+    same(p, (e) => e.exportVctower("3.1.0", NaN), "no time");
+    same(p, (e) => e.loadVctower(text), "loadVctower");
+    // The payload is read the way `Buffer.from(b64, "base64")` reads it: a
+    // character outside the alphabet is skipped, and the URL-safe alphabet
+    // and a dropped padding are all taken.
+    const [magic, body] = text.trim().split("\n");
+    const variants: [string, string][] = [
+      ["a stray character", `${magic}\n${body.slice(0, 40)}!${body.slice(40)}\n`],
+      ["the URL-safe alphabet", `${magic}\n${body.replace(/\+/g, "-").replace(/\//g, "_")}\n`],
+      ["no padding", `${magic}\n${body.replace(/=+$/, "")}\n`],
+    ];
+    for (const [what, file] of variants) {
+      same(p, (e) => e.loadVctower(file), what);
+      same(p, (e) => JSON.parse(e.serialize()) as unknown, `${what}: the save`);
+    }
+    same(p, (e) => (JSON.parse(e.serialize()) as { founder?: boolean }).founder, "a stamped file is no founder's");
+    // An unstamped file, as a build before 2.0 wrote it: a founder's tower.
+    const json = new TextEncoder().encode(p[1].serialize());
+    const unstamped = `${TOWER_FILE_MAGIC}\n${toBase64(deflateSync(json, { level: 1 }))}\n`;
+    same(p, (e) => e.loadVctower(unstamped), "an unstamped file");
+    expect((JSON.parse(p[1].serialize()) as { founder?: boolean }).founder).toBe(true);
+    same(p, (e) => JSON.parse(e.serialize()) as unknown, "the saves after the loads");
+    sameReads(p);
+    const nul = `${TOWER_FILE_MAGIC}\n${toBase64(deflateSync(new TextEncoder().encode("null"), { level: 1 }))}\n`;
+    same(p, (e) => e.loadVctower(nul), "a null payload");
+    const bomb = `${TOWER_FILE_MAGIC}\n${toBase64(deflateSync(new Uint8Array(MAX_SAVE_INFLATED_BYTES + 1)))}\n`;
+    same(p, (e) => e.loadVctower(bomb), "a payload past the cap");
+    // The parse error's text is each engine's own.
+    same(p, (e) => e.loadVctower("VCTOWER1\n!!!"), "a damaged file", false);
+    same(p, (e) => e.generation(), "generation", false);
+  });
+
+  it.skipIf(!hasWasmPackage())("writes and reads .TDT files the same way", () => {
+    same(pair(), (e) => e.tdtExport(), "a Modern tower is refused");
+    const p = pair("classic");
+    same(p, (e) => e.adoptTdt(), "nothing staged");
+    same(p, (e) => e.tdtFile(), "no file yet");
+    same(p, (e) => e.tdtExport(), "tdtExport");
+    const bytes = same(p, (e) => e.tdtFile(), "tdtFile")!;
+    same(p, (e) => e.tdtFile(), "handed over once");
+    const r = same(p, (e) => e.loadTdt(bytes, "SPIRE.TDT"), "loadTdt");
+    const notes = r[VIEW_LAYOUT.records.loadTdt.indexOf("notes")] + r[VIEW_LAYOUT.records.loadTdt.indexOf("warnings")];
+    for (let i = 0; i <= notes; i++) same(p, (e) => e.tdtNote(i), `note ${i}`);
+    same(p, (e) => e.tdtTowerName(), "tdtTowerName");
+    same(p, (e) => e.adoptTdt(), "adoptTdt");
+    same(p, (e) => e.tdtTowerName(), "nothing staged after");
+    sameReads(p);
+    // A done swap drops a staged file and an unclaimed export.
+    same(p, (e) => e.loadTdt(bytes, "SPIRE.TDT"), "staged again");
+    same(p, (e) => e.tdtExport(), "exported again");
+    same(p, (e) => e.loadSave(e.serialize()), "a swap");
+    same(p, (e) => e.adoptTdt(), "the staged tower is gone");
+    same(p, (e) => e.tdtFile(), "the export is gone");
+    same(p, (e) => e.loadTdt(Uint8Array.of(1, 2, 3), "BAD.TDT"), "an unreadable file");
+  });
+
+  it.skipIf(!hasWasmPackage())("reads the stats sheet and every room's facts the same on real towers", () => {
+    // Real towers reach the gripe, won't-lease and notice sections the small
+    // one does not.
+    let sections = 0;
+    for (const name of ["towerone-star4", "split-tower-4", "sixseven_2"]) {
+      const text = readFileSync(resolve(FIXTURES, `${name}.vctower`), "utf8");
+      const ts = TsEngine.newGame(1);
+      const rust = wasm().Engine.newGame(1, "modern") as unknown as RustEngine;
+      freed.push(rust);
+      const p: [EnginePort, EnginePort] = [rust, ts];
+      same(p, (e) => e.loadVctower(text), name);
+      for (let hour = 0; hour < 3; hour++) {
+        same(p, (e) => e.statsSheet(), `${name} statsSheet`);
+        for (const id of units(rust)) {
+          const r = same(p, (e) => e.unitFacts(id), `${name} facts ${id}`);
+          for (const slot of ["gripe", "wontLease", "notice"]) sections += r[FACTS.indexOf(slot)];
+        }
+        p.forEach((e) => e.tick(120));
+      }
+    }
+    expect(sections).toBeGreaterThan(0);
   });
 
   it.skipIf(!hasWasmPackage())("steps each frame's time the same way", () => {

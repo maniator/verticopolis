@@ -1,10 +1,9 @@
 import type { HeatmapMode } from "../engine/sim/constants";
 import type { Simulation } from "../engine/Simulation";
-import { isElevatorKind, residentCount } from "../engine/facilities";
+import { isElevatorKind } from "../engine/facilities";
+import { householdMix } from "../engine/households";
 import { MILESTONES } from "../engine/milestones";
-import { roomUnits } from "../engine/tower/rooms";
 import { towerCatalog } from "../engine/towerCatalog";
-import { isPresent } from "../engine/types";
 import { unitPrice } from "../ui/catalogPricing";
 import type {
   CongestionHotspot,
@@ -60,7 +59,7 @@ export function tsStatsReport(sim: Simulation): StatsReport {
     vipVisits: sim.vipVisits,
     vipFavorable: sim.vipFavorable,
     exterminationDueDay: nullish(sim.exterminationDueDay),
-    households: households(sim),
+    households: householdMix(sim.tower),
   };
 }
 
@@ -76,27 +75,6 @@ function nextStar(sim: Simulation): NextStarView | null {
     gates: n.gates.map((g) => ({ id: g.id, met: g.met })),
     allMet: n.allMet,
   };
-}
-
-/** The Modern "Households" readout: homes in residence (a condo or a rental
- *  Apartment holding its household, sized through the census's own
- *  `residentCount`), their people, and the size mix, smallest size first. A
- *  Studio is one occupant with no household, so it is not counted. Walks the
- *  rooms only, as the Rust getter does. */
-function households(sim: Simulation): StatsReport["households"] {
-  const counts = new Map<number, number>();
-  let homes = 0;
-  let residents = 0;
-  for (const u of roomUnits(sim.tower)) {
-    if ((u.kind === "condo" || u.kind === "rentalApartment") && isPresent(u)) {
-      const size = residentCount(u);
-      counts.set(size, (counts.get(size) ?? 0) + 1);
-      homes++;
-      residents += size;
-    }
-  }
-  const mix = [...counts.keys()].sort((a, b) => a - b).map((size) => [size, counts.get(size)!] as const);
-  return { households: homes, residents, mix };
 }
 
 export function tsHousekeepingCoverage(sim: Simulation): HousekeepingCoverageView {

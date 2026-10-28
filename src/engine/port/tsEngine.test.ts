@@ -1,4 +1,6 @@
+import { deflateSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
+import { MAX_SAVE_INFLATED_BYTES, TOWER_FILE_MAGIC, toBase64 } from "../../storage/saveCompression";
 import { Simulation } from "../Simulation";
 import { INVALID_REQUEST, UNKNOWN_FACILITY } from "../request";
 import { KIND_CODES, UNIT_STATE_CODES, VIEW_LAYOUT, VIEW_LAYOUT_TEXT, codeOf } from "./layout";
@@ -6,6 +8,7 @@ import { roomUnits, setRoomState, watchRooms } from "../tower/rooms";
 import { MetaLog } from "./metaLog";
 import { ONBOARDING_FLAG } from "./queries";
 import { TsEngine } from "./tsEngine";
+import type { SerializedGame } from "../types";
 
 /**
  * `TsEngine` on its own, in the `unit` project: each member's answer shape
@@ -299,5 +302,98 @@ describe("TsEngine's frames and meta log from the room marks", () => {
     }
     expect(partial).toBeGreaterThan(300);
     expect(since).toBeGreaterThan(1);
+  });
+});
+
+describe("TsEngine's reports and files", () => {
+  const slot = (record: string, name: string): number =>
+    (VIEW_LAYOUT.records as Record<string, string[]>)[record].indexOf(name);
+
+  it("answers the stats sheet and a room's facts", () => {
+    const e = engine();
+    e.tick(120);
+    expect(e.statsSheet().length).toBeGreaterThanOrEqual(VIEW_LAYOUT.records.statsSheet.length);
+    const office = idOf(e, "office");
+    const facts = e.unitFacts(office);
+    expect(facts).toHaveLength(VIEW_LAYOUT.records.unitFacts.length);
+    expect(facts[slot("unitFacts", "id")]).toBe(office);
+    for (const id of [0, 1.5, NaN, -1]) expect(e.unitFacts(id)).toHaveLength(0);
+    // Every room after a few days, so the gripe and lease sections fill.
+    for (let day = 0; day < 3; day++) e.tick(1440);
+    expect(e.statsSheet().length).toBeGreaterThanOrEqual(VIEW_LAYOUT.records.statsSheet.length);
+    for (const u of e.sim.tower.units) expect(e.unitFacts(u.id)).toHaveLength(VIEW_LAYOUT.records.unitFacts.length);
+  });
+
+  it("writes and reads .vctower files, with the founder rule", () => {
+    const e = engine();
+    const founder = (): boolean | undefined => (JSON.parse(e.serialize()) as { founder?: boolean }).founder;
+    expect(e.exportVctower("1.9.0", 1_700_000_000_000)).toBeUndefined();
+    expect(e.lastReason()).toContain("before 2.0");
+    expect(e.exportVctower("3.1.0", NaN)).toBeUndefined();
+    expect(e.lastReason()).toContain("is not a time");
+    const text = e.exportVctower("3.1.0", 1_700_000_000_000)!;
+    expect(Array.from(e.loadVctower(text))).toEqual([1, 1]);
+    expect(founder()).not.toBe(true);
+    // The payload is read the way `Buffer.from(b64, "base64")` reads it.
+    const [magic, body] = text.trim().split("\n");
+    expect(e.loadVctower(`${magic}\n${body.slice(0, 40)}!${body.slice(40)}\n`)[0]).toBe(1);
+    expect(e.loadVctower(`${magic}\n${body.replace(/\+/g, "-").replace(/\//g, "_")}\n`)[0]).toBe(1);
+    expect(e.loadVctower(`${magic}\n${body.replace(/=+$/, "")}\n`)[0]).toBe(1);
+    const bomb = `${TOWER_FILE_MAGIC}\n${toBase64(deflateSync(new Uint8Array(MAX_SAVE_INFLATED_BYTES + 1)))}\n`;
+    expect(e.loadVctower(bomb)[0]).toBe(0);
+    expect(e.lastReason()).toContain("looks crafted");
+    expect(Array.from(e.loadVctower("not a tower"))).toEqual([0, 4]);
+    expect(e.lastReason()).toBeTruthy();
+    // A stored save with no appVersion is a founder's tower; a restore is not.
+    const save = JSON.parse(e.serialize()) as Record<string, unknown>;
+    delete save.appVersion;
+    e.restore(JSON.stringify(save));
+    expect(founder()).not.toBe(true);
+    e.loadSave(JSON.stringify(save));
+    expect(founder()).toBe(true);
+    expect(e.loadSave("null")[0]).toBe(0);
+    expect(e.lastReason()).toBe("not a tower save (the save is null)");
+  });
+
+  it("writes, stages and adopts .TDT files", () => {
+    expect(engine().tdtExport()[0]).toBe(0);
+    const sim = Simulation.newGame(3, "classic");
+    sim.money = 1e8;
+    for (let x = 160; x < 280; x++) sim.build("lobby", 1, x);
+    for (let x = 160; x < 280; x++) sim.build("floor", 2, x);
+    sim.build("office", 2, 170);
+    const e = new TsEngine(sim);
+    expect(e.adoptTdt()[0]).toBe(0);
+    expect(e.lastReason()).toBe(INVALID_REQUEST);
+    expect(e.tdtFile()).toBeUndefined();
+    const out = e.tdtExport();
+    expect(out[0], String(e.lastReason())).toBe(1);
+    expect(out).toHaveLength(VIEW_LAYOUT.records.tdtExport.length);
+    const bytes = e.tdtFile()!;
+    expect(bytes.length).toBeGreaterThan(0);
+    expect(e.tdtFile()).toBeUndefined();
+    const staged = e.loadTdt(bytes, "SPIRE.TDT");
+    expect(staged[0], String(e.lastReason())).toBe(1);
+    expect(staged).toHaveLength(VIEW_LAYOUT.records.loadTdt.length);
+    expect(e.tdtTowerName()).toBeDefined();
+    expect(e.tdtNote(1.5)).toBeUndefined();
+    const notes = staged[slot("loadTdt", "notes")] + staged[slot("loadTdt", "warnings")];
+    for (let i = 0; i < notes; i++) expect(e.tdtNote(i)).toBeTruthy();
+    expect(e.adoptTdt()[0]).toBe(1);
+    expect(e.tdtTowerName()).toBeUndefined();
+    // A done swap drops a staged file and an unclaimed export.
+    e.loadTdt(bytes, "SPIRE.TDT");
+    e.tdtExport();
+    e.loadSave(e.serialize());
+    expect(e.adoptTdt()[0]).toBe(0);
+    expect(e.tdtFile()).toBeUndefined();
+    // So does a tower the game swapped in itself.
+    e.loadTdt(bytes, "SPIRE.TDT");
+    e.tdtExport();
+    e.take(Simulation.deserialize(JSON.parse(e.serialize()) as SerializedGame));
+    expect(e.tdtTowerName()).toBeUndefined();
+    expect(e.tdtFile()).toBeUndefined();
+    expect(Array.from(e.loadTdt(Uint8Array.of(1, 2, 3), "BAD.TDT"))).toEqual([0]);
+    expect(e.lastReason()).toContain("SimTower");
   });
 });
