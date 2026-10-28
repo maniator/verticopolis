@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import type { SerializedGame } from "../engine/serializedGame";
 import { decodeVctower } from "../storage/vctowerContainer";
-import { clockOf, rulesOf, type ClockView } from "./headerClock";
+import { calendarOf, clockOf, rulesOf, type ClockView } from "./headerClock";
 import { createTsSim } from "./tsSim";
 
 /**
@@ -53,6 +53,11 @@ describe("headerClock", () => {
     it(`${name}: the header's rule set is the engine's`, () => {
       const sim = found();
       expect(rulesOf(createTsSim(() => sim).view.header)).toBe(sim.rules);
+    });
+
+    it(`${name}: the header's calendar is the engine's`, () => {
+      const sim = found();
+      expect(calendarOf(createTsSim(() => sim).view.header)).toBe(sim.clock.calendar);
     });
   }
 

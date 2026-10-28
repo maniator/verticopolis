@@ -143,6 +143,10 @@ export function runFrame(app: GameApp, dtMs: number): void {
         // has answered (the port answers at once), so no frame sees the choice still pending and asks again.
         try {
           app.enginePort.answerChoice(opt === "accept");
+          // Refresh the header now: the reader fetches the choice text only
+          // when the pending flag rises, so a second choice raised before the
+          // next update would otherwise show this one's text.
+          app.reader.update();
         } finally {
           app.shownChoice = false;
         }
