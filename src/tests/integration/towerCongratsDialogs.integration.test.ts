@@ -55,6 +55,7 @@ function makeApp(sim: Simulation, ui: UI) {
     speed: 1,
     prefs: { steadyClock: true },
     sim,
+    reader: { update: vi.fn() },
     port: createTsSim(() => sim),
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn() },
