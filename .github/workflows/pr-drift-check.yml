@@ -5,7 +5,7 @@ name: PR screenshot drift-check
 # capture (screenshot-capture.yml) to render the gallery. This is the SOLE path
 # that regenerates the committed gallery: there is no separate marker-push
 # workflow anymore (update-screenshots.yml was retired once drift became a hard
-# gate here, so every gallery refresh flows through a PR). Three separate signals:
+# gate here, so every gallery refresh flows through a PR). Two separate signals:
 #
 #   1. HARD FAIL: the reusable `capture` renders every shard TWICE and fails if the
 #      two renders differ (nondeterminism, the exact leak PR #188 chased). If it
@@ -18,12 +18,9 @@ name: PR screenshot drift-check
 #      gallery straight to the PR branch in the SAME run: no marker push, no second
 #      run. Fork PRs cannot run that job, so they are exempt from the drift gate.
 #
-#   3. ENGINE PARITY: `capture-wasm` renders the same scenes with the WASM engine
-#      hosting the tower, and `engine-parity` fails when that render differs from
-#      this run's TypeScript render, naming the first differing shot. It is a
-#      separate check from `drift-gate` (which stays on the TypeScript engine's
-#      gallery) and never commits anything. The visual baselines are not
-#      checked here: the `e2e` job in test.yml compares them on the Rust engine.
+# The gallery renders on the Rust engine only (the WASM package hosts the tower;
+# #1353). There is no second, TypeScript render to compare it with, and the
+# visual baselines are checked in test.yml's `e2e` job.
 #
 # PREREQUISITE: the `screenshot-approval` Environment must exist with a required
 # reviewer (repo Settings -> Environments). Without a required reviewer the gate
@@ -118,8 +115,8 @@ jobs:
             case "$f" in scripts/scenes/*) sign=+ ;; esac
             case "$f" in .github/workflows/pr-drift-check.yml) sign=+ ;; esac
             case "$f" in .github/workflows/screenshot-capture.yml) sign=+ ;; esac
-            # The Rust engine and the build of its WASM package: the engine legs
-            # (capture-wasm, engine-parity) render on it.
+            # The Rust engine and the build of its WASM package: the capture
+            # renders on it.
             # The package is build output, so an engine change no longer shows
             # up as a src/public/engine/ change; its inputs count instead.
             # The engine's inputs that can reach the package: the crate but its
@@ -156,123 +153,6 @@ jobs:
       ref: ${{ github.event.pull_request.head.sha }}
     permissions:
       contents: read
-
-  # The engine leg (story-engine-test-parity AC3): the same scenes, rendered with
-  # the WASM engine hosting the tower (VC_SHOT_ENGINE=wasm), through the same
-  # sharded twice-render determinism guard. Its own job rather than a matrix
-  # entry on `capture`, so a parity difference never fails `capture` and with it
-  # the required drift-gate: the committed gallery stays the TypeScript
-  # engine's until the 3.0.0 flip, and this leg only reports against it.
-  capture-wasm:
-    needs: changes
-    if: needs.changes.outputs.render == 'true'
-    uses: ./.github/workflows/screenshot-capture.yml
-    with:
-      ref: ${{ github.event.pull_request.head.sha }}
-      engine: wasm
-    permissions:
-      contents: read
-
-  # The engine parity check: the WASM render must match this run's TypeScript
-  # render byte for byte (no threshold). Comparing the two renders of the same
-  # head keeps a PR that legitimately changes rendering from reading as an
-  # engine difference while its gallery waits on commit-on-approval; on a
-  # same-repo PR with drift-gate green, the TypeScript render is the committed
-  # gallery. A
-  # difference fails this job, names the first differing shot, and lists the
-  # rest. It never commits: the WASM shards stay downloadable as the
-  # engine-wasm-shots-* artifacts. It runs when the WASM capture failed too,
-  # since that leg uploads whatever rendered (a scene that failed on the engine
-  # is a missing image here, and its shard is named).
-  engine-parity:
-    needs: [changes, capture, capture-wasm]
-    if: ${{ !cancelled() && needs.changes.outputs.render == 'true' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      SHARDS_JSON: ${{ needs.capture.outputs.shards }}
-      CAPTURE: ${{ needs.capture.result }}
-    steps:
-      - name: Download both engines' shard artifacts
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          path: /tmp/dl
-          pattern: "*shots-*"
-
-      - name: Compare the WASM render with the TypeScript render
-        run: |
-          if [ "$CAPTURE" != "success" ]; then
-            echo "::error::the TypeScript capture did not succeed ($CAPTURE), so there is no render to compare the engine against; see drift-gate."
-            exit 1
-          fi
-          if [ -z "$SHARDS_JSON" ] || [ "$(echo "$SHARDS_JSON" | jq 'length')" -lt 1 ]; then
-            echo "::error::no shard list from the capture; cannot compare the engines."
-            exit 1
-          fi
-          ts=/tmp/ts; wasm=/tmp/wasm
-          mkdir -p "$ts" "$wasm"
-          missing=""; failed=""; present=0
-          for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
-            if [ ! -f "/tmp/dl/shots-$shard/.shard-complete" ]; then
-              echo "::error::the TypeScript render of shard $shard is missing from this run's artifacts; cannot compare it."
-              exit 1
-            fi
-            w="/tmp/dl/engine-wasm-shots-$shard"
-            # A shard with no WASM render is reported on its own, and its shots
-            # stay out of the comparison so they never read as engine differences.
-            if [ ! -f "$w/.shard-complete" ]; then missing="$missing $shard"; continue; fi
-            present=$((present + 1))
-            [ -d "/tmp/dl/shots-$shard/shots" ] && cp -a "/tmp/dl/shots-$shard/shots/." "$ts/"
-            [ -f "$w/.render-failed" ] && failed="$failed $shard ($(cat "$w/.render-failed"))"
-            [ -d "$w/shots" ] && cp -a "$w/shots/." "$wasm/"
-          done
-          compared=$(cd "$ts" && find . -name '*.png' | wc -l)
-          if [ "$compared" -lt 1 ] && [ "$present" -gt 0 ]; then
-            echo "::error::the TypeScript render holds no images; the artifact layout is not what this job expects."
-            exit 1
-          fi
-          if [ -n "$missing" ]; then
-            echo "::error::no WASM render was uploaded for shard(s):$missing; the engine leg failed before it rendered (see capture-wasm). The other shards are compared below."
-            failed="$failed$missing (no render)"
-          fi
-          changed="$(
-            { (cd "$ts" && find . -name '*.png'); (cd "$wasm" && find . -name '*.png'); } | sort -u | while read -r f; do
-              if [ ! -f "$wasm/$f" ]; then echo "missing on WASM  ${f#./}"
-              elif [ ! -f "$ts/$f" ]; then echo "only on WASM     ${f#./}"
-              elif ! cmp -s "$ts/$f" "$wasm/$f"; then echo "pixels differ    ${f#./}"
-              fi
-            done
-          )"
-          if [ -n "$failed" ]; then
-            echo "::warning::the WASM capture failed in shard(s):$failed (a scene error or a nondeterministic render, see capture-wasm); those shards' results below are not a clean parity reading."
-          fi
-          if [ -z "$changed" ] && [ -z "$failed" ]; then
-            echo "The WASM engine renders all $compared shots byte for byte as the TypeScript engine does." | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          if [ -z "$changed" ]; then
-            if [ "$compared" -lt 1 ]; then
-              echo "No shots were compared: the WASM capture failed in shard(s):$failed." | tee -a "$GITHUB_STEP_SUMMARY"
-            else
-              echo "Every compared shot matches, but the WASM capture failed in shard(s):$failed." | tee -a "$GITHUB_STEP_SUMMARY"
-            fi
-            exit 1
-          fi
-          n=$(echo "$changed" | wc -l | tr -d ' ')
-          echo "::error::engine parity: $n shot(s) differ between the engines; the first is: $(echo "$changed" | head -1)"
-          {
-            echo "### Engine parity: $n shot(s) differ on the WASM engine"
-            echo
-            echo "Each is a parity finding to report. This leg never commits; the WASM renders are in the engine-wasm-shots-* artifacts of this run."
-            [ -z "$failed" ] || echo "The WASM capture failed in shard(s):$failed."
-            echo
-            echo '```'
-            echo "$changed"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "$changed"
-          exit 1
 
   verify-drift:
     needs: capture
