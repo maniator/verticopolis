@@ -8,8 +8,10 @@ tenants, set the rents, keep everyone happy, and climb the star ratings all the
 way to a coveted **TOWER**.
 
 Written in **TypeScript** on the **[Excalibur.js](https://excaliburjs.com/)**
-game engine (camera, scene, culling, collision and the render loop), with a
-procedural **WebAudio** soundtrack that changes depending on which part of the
+game engine (camera, scene, culling, collision and the render loop). The
+simulation has two implementations that are held to the same conformance tests:
+the TypeScript one and a Rust one compiled to WebAssembly (see
+[Simulation engines](#simulation-engines)). A procedural **WebAudio** soundtrack that changes depending on which part of the
 tower you're looking at. No external art assets: every sprite is drawn in code.
 
 ![Sprite gallery](docs/screenshots/06-sprite-gallery.png)
@@ -120,6 +122,10 @@ compressed **`.vctower`** file (a fraction of the size of the old JSON
 exports), and Import loads one back through a file picker. Saves are managed
 from the in-game saves panel; clearing your browser storage erases them.
 
+The game can also **import and export the original game's `.TDT` save files**,
+so a 1994 tower can be opened here and a tower built here can be written out as a
+`.TDT`. The format is documented in [docs/canon/tdt-format.md](docs/canon/tdt-format.md).
+
 **How it works.** A save is a snapshot of the **headless simulation**, not the
 renderer. `Simulation.serialize()` writes the deterministic source of truth into a plain
 `SerializedGame` object: money, star rating, the game clock, the RNG seed,
@@ -225,6 +231,24 @@ camera or raw pointer math directly.
 
 For diagrams of the layers, the frame loop, the engine subsystems, input flow,
 and persistence, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+
+## Simulation engines
+
+The simulation runs on one of two engines that must produce the same tower:
+
+- **TypeScript** (`src/engine/`) is the default today.
+- **Rust** (`engine-rs/`), compiled to WebAssembly and hosted by `src/wasmhost/`.
+  Add `?engine=wasm` to the address to run it for one visit. If the Rust engine
+  fails to load, the game falls back to TypeScript. The Settings panel and the
+  version line show which engine is running.
+
+Version 3.0 is in development and is not released. The plan makes Rust the
+default engine while keeping TypeScript selectable. TypeScript would be removed
+in a later 3.x release. During the cutover the game moves onto one synchronous
+numeric interface, `EnginePort`, that the Rust engine implements directly; see
+[ARCHITECTURE.md](ARCHITECTURE.md#the-engine-port-the-cutover-in-progress) for
+the design and [CONTRIBUTING.md](CONTRIBUTING.md) for building the engine
+package (`npm run wasm:build`).
 
 ## Screenshots
 
