@@ -62,6 +62,9 @@ export function buildEngineTower(): void {
   }
   sim.tower.placeTransport("elevatorStandard", left + 6, 1, 12);
   sim.tower.placeTransport("stairs", left + 50, 1, 2); // stairs link exactly 2 floors (maxSpanFor === 1)
+  // The camera frames the tower the app's view shows, which follows the
+  // engine once per frame; bring it up to these edits first.
+  g.reader.update();
   g.engine.center();
   g.speed = 2;
   g.engine.paused = false;

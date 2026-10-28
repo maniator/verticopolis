@@ -25,8 +25,10 @@ function standIn(tier: TrafficTier) {
     inspector: { clear: vi.fn() },
     onboarding: { adoptSim: vi.fn() },
     engine: { setSim: vi.fn() },
-    enginePort: { take: vi.fn() },
-    reader: { update: vi.fn() },
+    // adoptSim builds the renderer's view over these two: the layout's heat
+    // tables and the reader's tower and crowd are all it reads up front.
+    enginePort: { take: vi.fn(), viewLayout: () => JSON.stringify({ heatModes: [], heatTints: [] }) },
+    reader: { update: vi.fn(), tower: {}, crowd: { people: [] } },
     ui: { resetLog: vi.fn(), update: vi.fn() },
     history: { clear: vi.fn() },
   };
