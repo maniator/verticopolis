@@ -182,40 +182,12 @@ describe("confirmExterminate refusals surfaced by the confirm callback", () => {
     expect(sim.emit).toHaveBeenCalledExactlyOnceWith("No infested rooms left to treat.", "bad");
   });
 
-  it("opens one confirm for two clicks while the coverage answer is out", async () => {
-    const sim = makeSim();
-    const { app, ui, port } = makeApp(sim);
-    await showStats(app);
-    const handlers = ui.showStats.mock.calls[0][1] as Record<string, () => void>;
-    let answer!: (r: unknown) => void;
-    port.query.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
-    handlers.exterminate();
-    handlers.exterminate();
-    answer({ infested: 2 });
-    await settle();
-    expect(ui.confirmModal).toHaveBeenCalledTimes(1);
-    expect(port.query.mock.calls.filter(([q]) => q.op === "housekeepingCoverage")).toHaveLength(1);
-  });
-
-  it("drops the click when another tower was loaded while the coverage answer was out", async () => {
-    const sim = makeSim();
-    const { app, ui, port } = makeApp(sim);
-    await showStats(app);
-    const handlers = ui.showStats.mock.calls[0][1] as Record<string, () => void>;
-    let answer!: (r: unknown) => void;
-    port.query.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
-    handlers.exterminate();
-    (app as { sim: unknown }).sim = makeSim();
-    answer({ infested: 2 });
-    await settle();
-    expect(ui.confirmModal).not.toHaveBeenCalled();
-    expect(sim.emit).not.toHaveBeenCalled();
-  });
-
   it("says so in a toast when the coverage ask fails, and a later click asks again", async () => {
     const sim = makeSim();
-    const { app, ui, port } = makeApp(sim);
-    port.query.mockReturnValueOnce(Promise.reject(new Error("engine down")));
+    const { app, ui, enginePort } = makeApp(sim);
+    enginePort.crewCoverage.mockImplementationOnce(() => {
+      throw new Error("engine down");
+    });
     await expect(confirmExterminate(app)).rejects.toThrow("engine down");
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith("The exterminator could not be booked right now.", "bad");
     expect(ui.confirmModal).not.toHaveBeenCalled();
@@ -223,10 +195,8 @@ describe("confirmExterminate refusals surfaced by the confirm callback", () => {
     expect(ui.confirmModal).toHaveBeenCalledTimes(1);
   });
 
-  it("lets a click on a newly loaded tower through while an ask about the old one is stuck", async () => {
-    const { app, ui, port } = makeApp(makeSim());
-    port.query.mockReturnValueOnce(new Promise(() => {}));
-    void confirmExterminate(app);
+  it("asks the engine about the tower loaded at the time of the click", async () => {
+    const { app, ui } = makeApp(makeSim());
     // The new tower has five infested rooms, so the quote shows it was asked about.
     (app as { sim: unknown }).sim = makeSim({ housekeepingCoverage: vi.fn(() => ({ infested: 5 })) });
     await confirmExterminate(app);

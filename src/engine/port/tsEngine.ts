@@ -84,6 +84,16 @@ export class TsEngine implements PortState {
     return this.current;
   }
 
+  /** Take over a tower the game swapped in itself (`GameApp.adoptSim`), for
+   *  PR 4's transition while callers still load through `SimPort`. The app
+   *  has already carried the replaced tower's events over, so this only
+   *  starts the engine's own state again, as a swap does. Not on the port. */
+  take(next: Simulation): void {
+    if (next === this.current) return;
+    this.current = next;
+    this.restart();
+  }
+
   // ---- Lifecycle -----------------------------------------------------------
 
   tick(dtMinutes: number): void {
@@ -171,7 +181,11 @@ export class TsEngine implements PortState {
     prev.discardOnHandOff = this.backdrop;
     next.gameplayEvents.inherit(prev);
     this.current = next;
-    this.watch(next);
+    this.restart();
+  }
+
+  private restart(): void {
+    this.watch(this.current);
     // A new tower's frames count from 1 again, as the Rust engine's do.
     this.frames = new FrameEncoder();
     this.drained = [];

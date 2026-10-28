@@ -6,7 +6,7 @@
 # a reason the PR states and a reviewer accepts.
 src/game/facilityDiagnostics.ts Simulation # reads the gripe thresholds Simulation exports; facade slice 4 (#1211)
 src/game/saveLoad.ts Simulation # load and new game build a Simulation; facade slice 5 (#1212)
-src/main.ts Simulation # GameApp founds the first Simulation at boot; facade slices 5 and 10 (#1212, #1222)
+src/main.ts Simulation port/tsEngine # GameApp founds the first Simulation at boot, and holds it in the TypeScript engine behind EnginePort (facade slice 7, PR 4); facade slices 5 and 10 (#1212, #1222)
 src/simport/tsLifecycle.ts Simulation # the TypeScript adapter loads, saves and fingerprints the tower it hosts (facade slice 5, #1212); slice 10 loads it lazily, and it goes when the TypeScript engine retires
 src/storage/SaveGame.ts Simulation # slot listing and loads deserialize a save into a Simulation; facade slice 5 (#1212)
 src/wasmhost/hostFault.ts Simulation # the fallback deserializes the Simulation the TypeScript engine resumes on; facade slice 8 (#1218)
