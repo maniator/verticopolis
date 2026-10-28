@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
+import { towerCatalog } from "../engine/towerCatalog";
+import { unitPrice } from "../ui/catalogPricing";
 import { Cards } from "./cards";
 import { PortCodes } from "./portCodes";
 import { scheduleSlots } from "./scheduleSlots";
@@ -38,7 +40,7 @@ describe("Cards.unit", () => {
     expect([card.id, card.kind, card.floor, card.x, card.width, card.state]).toEqual([office.id, "office", 2, 170, office.width, office.state]);
     expect([card.label, card.subtype, card.noRate, card.everOccupied, card.filmPolicy, card.blockbuster]).toEqual([office.label, null, false, false, null, null]);
     expect([card.served, card.reachable, card.floorHasLobby]).toEqual([e.sim.tower.isFloorServed(2), e.sim.floorReachable(2), e.sim.tower.floorHasLobby(2)]);
-    expect(card.price).toBe(office.rent ?? card.price);
+    expect(card.price).toBe(unitPrice(towerCatalog(e.sim), office));
   });
 
   it("carries a cinema's film policy and booking, and a renamed unit's label", () => {
