@@ -261,7 +261,8 @@ export function pgStepNoDraw(frames: number): boolean {
 export async function pgRefreshUi(): Promise<void> {
   const g = (window as unknown as { game?: any }).game;
   if (!g) return;
-  g.ui?.update?.(g.sim);
+  g.reader?.update?.();
+  g.ui?.update?.({ reader: g.reader, port: g.enginePort, codes: g.portCodes });
   await g.refreshTraffic();
   if (g.selected != null && g.ui?.isEditorOpen?.() && !g.ui?.isEditorBusy?.()) g.refreshEditor?.();
 }

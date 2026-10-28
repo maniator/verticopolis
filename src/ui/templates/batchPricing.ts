@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
-import type { BatchTarget, BatchRentResult } from "../../engine/Simulation";
+import type { BatchTarget, BatchRentResult } from "../../engine/sim/constants";
 import type { PriceRung } from "../../engine/gameRules";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
 

@@ -1,5 +1,5 @@
 import type { Catalog } from "../engine/catalogTypes";
-import type { Simulation, LogEntry } from "../engine/Simulation";
+import type { LogEntry } from "../engine/types";
 import type { SlotInfo } from "../storage/SaveGame";
 import type { ExportReport } from "../storage/tdtExport";
 import type { ImportReport } from "../storage/tdtImport";
@@ -15,6 +15,7 @@ import { toolInfoFor, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO } from "./templates/
 import * as dialogs from "./uiDialogs";
 import * as panels from "./uiPanels";
 import * as status from "./uiStatus";
+import type { HudSource } from "./uiStatus";
 import { buildPalette } from "./uiPalette";
 import { ModalPrecedence, routeNotice, type ModalOpts } from "./modalPrecedence";
 import { finishModal } from "./uiModal";
@@ -351,12 +352,12 @@ export class UI {
 
   // ---- Delegations to friend-modules --------------------------------------
 
-  update(sim: Simulation): void {
-    status.update(this, sim);
+  update(src: HudSource): void {
+    status.update(this, src);
   }
 
-  resetLog(sim: Simulation): void {
-    status.resetLog(this, sim);
+  resetLog(src: HudSource): void {
+    status.resetLog(this, src);
   }
 
   toast(text: string, kind: LogEntry["kind"] = "info"): void {
