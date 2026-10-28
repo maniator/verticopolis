@@ -5,6 +5,7 @@ import { FACILITIES } from "../engine/facilities";
 import { snapX, brushTiles } from "../ui/placement";
 import type { GameMode } from "../engine/types";
 import type { GameApp } from "../main";
+import { portDeps } from "./portDeps.fixture";
 import {
   pickedAt,
   placeSimpleBuild,
@@ -56,8 +57,12 @@ function makeApp(
     preview: null as unknown,
     transportPreview: null as unknown,
   };
+  const { engine: enginePort, codes: portCodes, reader } = portDeps(sim);
   const app = {
     sim,
+    enginePort,
+    portCodes,
+    reader,
     tool,
     engine,
     ui: { showInspector },
@@ -101,40 +106,40 @@ describe("pickedAt", () => {
 });
 
 describe("placeSimpleBuild", () => {
-  it("paint: reports ok from paintBrush placed count and passes the reason through", async () => {
+  it("paint: reports ok from paintBrush placed count and passes the reason through", () => {
     const { sim } = fixture();
-    const paintBrush = vi.fn(async () => ({ placed: 3, reason: undefined }));
+    const paintBrush = vi.fn(() => ({ placed: 3, reason: undefined }));
     const { app } = makeApp(sim, buildTool("floor"), { build: { paintBrush } });
-    expect(await placeSimpleBuild(app, "floor", 14, 2)).toEqual({ what: "paint", ok: true, reason: undefined });
+    expect(placeSimpleBuild(app, "floor", 14, 2)).toEqual({ what: "paint", ok: true, reason: undefined });
     expect(paintBrush).toHaveBeenCalledWith("floor", 14, 2);
 
-    const paintBrush0 = vi.fn(async () => ({ placed: 0, reason: "Floor already built here" }));
+    const paintBrush0 = vi.fn(() => ({ placed: 0, reason: "Floor already built here" }));
     const { app: app2 } = makeApp(sim, buildTool("floor"), { build: { paintBrush: paintBrush0 } });
-    expect(await placeSimpleBuild(app2, "floor", 14, 2)).toEqual({
+    expect(placeSimpleBuild(app2, "floor", 14, 2)).toEqual({
       what: "paint",
       ok: false,
       reason: "Floor already built here",
     });
   });
 
-  it("flight: routes a fixed-span transport through tryBuildTransport across two floors", async () => {
+  it("flight: routes a fixed-span transport through tryBuildTransport across two floors", () => {
     const { sim } = fixture();
-    const tryBuildTransport = vi.fn(async () => ({ ok: true, reason: "" }));
+    const tryBuildTransport = vi.fn(() => ({ ok: true, reason: "" }));
     const { app } = makeApp(sim, buildTool("stairs"), { build: { tryBuildTransport } });
-    expect(await placeSimpleBuild(app, "stairs", 14, 3)).toEqual({ what: "flight", ok: true, reason: "" });
+    expect(placeSimpleBuild(app, "stairs", 14, 3)).toEqual({ what: "flight", ok: true, reason: "" });
     expect(tryBuildTransport).toHaveBeenCalledWith("stairs", snapX(CAT, "stairs", 14), 3, 4);
   });
 
-  it("room: reports ok from the engine's answer to the build", async () => {
+  it("room: reports ok from the engine's answer to the build", () => {
     const { sim } = fixture();
     const before0 = sim.tower.units.length;
-    const tryBuild = vi.fn(async (kind: string, floor: number, x: number) => sim.build(kind as never, floor, x).ok);
+    const tryBuild = vi.fn((kind: string, floor: number, x: number) => sim.build(kind as never, floor, x).ok);
     const { app } = makeApp(sim, buildTool("office"), { build: { tryBuild } });
-    expect(await placeSimpleBuild(app, "office", 21, 2)).toEqual({ what: "room", ok: true });
+    expect(placeSimpleBuild(app, "office", 21, 2)).toEqual({ what: "room", ok: true });
     expect(sim.tower.units.length).toBe(before0 + 1);
     expect(tryBuild).toHaveBeenCalledWith("office", 2, snapX(CAT, "office", 21));
     // A refused build (the same spot again) reports not placed.
-    expect(await placeSimpleBuild(app, "office", 21, 2)).toEqual({ what: "room", ok: false });
+    expect(placeSimpleBuild(app, "office", 21, 2)).toEqual({ what: "room", ok: false });
   });
 
   it("null: a drag-sized shaft is left to the caller's anchor gesture", () => {

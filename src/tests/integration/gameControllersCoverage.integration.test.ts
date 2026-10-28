@@ -292,9 +292,9 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
 
   it("bulldozePicked: null and stale picks are no-ops (no sfx, no refund)", async () => {
     const before = sim.money;
-    await expect(build.bulldozePicked(null)).resolves.toBe(false);
-    await expect(build.bulldozePicked({ type: "unit", id: 99_999, kind: "office" })).resolves.toBe(false);
-    await expect(build.bulldozePicked({ type: "transport", id: 99_999, kind: "elevatorStandard" })).resolves.toBe(false);
+    expect(build.bulldozePicked(null)).toBe(false);
+    expect(build.bulldozePicked({ type: "unit", id: 99_999, kind: "office" })).toBe(false);
+    expect(build.bulldozePicked({ type: "transport", id: 99_999, kind: "elevatorStandard" })).toBe(false);
     expect(sim.money).toBe(before);
     expect(f.sfx).toEqual([]);
   });
@@ -302,7 +302,7 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
   it("bulldozePicked on a transport refunds the shaft resale and clears a matching selection", async () => {
     sel = lift.id;
     const before = sim.money;
-    await expect(build.bulldozePicked({ type: "transport", id: lift.id, kind: lift.kind })).resolves.toBe(true);
+    expect(build.bulldozePicked({ type: "transport", id: lift.id, kind: lift.kind })).toBe(true);
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
     expect(sim.tower.transports.some((t) => t.id === lift.id)).toBe(false);
     expect(f.sfx).toEqual(["sell"]);
@@ -311,10 +311,10 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
 
   it("bulldozePicked on a burning unit refuses: loud toasts, the quiet drag path doesn't", async () => {
     office.state = "fire";
-    await expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }, true)).resolves.toBe(false); // drag step
+    expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }, true)).toBe(false); // drag step
     expect(f.toasts).toEqual([]);
     expect(f.sfx).toEqual([]);
-    await expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" })).resolves.toBe(false); // deliberate click
+    expect(build.bulldozePicked({ type: "unit", id: office.id, kind: "office" })).toBe(false); // deliberate click
     expect(f.sfx).toEqual(["error"]);
     expect(f.toasts).toEqual([
       { text: "You can't bulldoze a burning unit. Call fire rescue or let it burn out.", kind: "bad" },

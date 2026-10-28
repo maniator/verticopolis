@@ -65,7 +65,7 @@ function makeApp(over: Record<string, unknown> = {}) {
     shownUpdate: false,
     speed: 3,
     prefs: { steadyClock: true },
-    sim,
+    sim, reader: { update: vi.fn() },
     port: createTsSim(() => sim as unknown as Simulation), // commands land on the fake's spies
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn() },

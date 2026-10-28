@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { GameApp } from "../../main";
 import { Simulation } from "../../engine/Simulation";
 import { runFrame } from "../../game/frameLoop";
+import { portDeps } from "../../game/portDeps.fixture";
 import { hasBlockingModal } from "../../game/interactionState";
 import type { UI } from "../../ui/UI";
 import { mountAppDom, makeUI } from "../uiFixture";
@@ -56,6 +57,7 @@ function makeApp(sim: Simulation, ui: UI) {
     prefs: { steadyClock: true },
     sim,
     port: createTsSim(() => sim),
+    reader: portDeps(sim).reader,
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn() },
     engine: { focus: vi.fn(() => ({})) },
