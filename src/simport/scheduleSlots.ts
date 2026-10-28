@@ -10,8 +10,8 @@ import type { ElevatorSchedule } from "../engine/elevatorSchedule";
 const HOURS = 24;
 const HOMES = 8;
 /** An hour the schedule leaves out: the engine clamps every hour to the
- *  shaft's cars on read, so a count past the car limit means all cars run. */
-const ALL_CARS = HOMES;
+ *  shaft's cars on read, so the most cars a shaft can have means all cars run. */
+const ALL_CARS = 8;
 
 export function scheduleSlots(schedule: ElevatorSchedule): Float64Array {
   const row = (hours: number[] | undefined): number[] =>
