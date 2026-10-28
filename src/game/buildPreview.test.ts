@@ -98,6 +98,23 @@ describe("pickedAt", () => {
     expect(pickedAt(app, lift.bottom, lift.x + lift.width)).toBeNull();
   });
 
+  it("resolves every story of a room taller than one floor, as the tower does", () => {
+    const { sim } = fixture();
+    for (let x = 30; x < 80; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (const floor of [2, 3]) for (let x = 30; x < 80; x++) expect(sim.tower.place("floor", floor, x).ok).toBe(true);
+    const r = sim.tower.place("cinema", 2, 40);
+    expect(r.reason).toBeUndefined();
+    const cinema = sim.tower.units.find((u) => u.id === r.unitId)!;
+    const { app } = makeApp(sim, buildTool("office"));
+    const want = { type: "unit", id: cinema.id, kind: "cinema" };
+    for (let floor = 2; floor <= 3; floor++) {
+      expect(sim.tower.unitAt(floor, cinema.x)?.id).toBe(cinema.id);
+      expect(pickedAt(app, floor, cinema.x), `floor ${floor}`).toEqual(want);
+      expect(pickedAt(app, floor, cinema.x + cinema.width - 1), `floor ${floor}`).toEqual(want);
+    }
+    expect(pickedAt(app, 4, cinema.x)).toBeNull();
+  });
+
   it("returns null for empty cells and for floor/lobby structure", () => {
     const { sim } = fixture();
     const { app } = makeApp(sim, buildTool("office"));
