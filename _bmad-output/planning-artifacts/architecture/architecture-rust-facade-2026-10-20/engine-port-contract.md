@@ -327,10 +327,12 @@ they resume.
    and `unitFacts` (`wasm_port_reports.rs`), the founder rule on
    `loadSave`, and the file members `loadVctower`, `exportVctower`,
    `loadTdt`, `tdtNote`, `tdtTowerName`, `adoptTdt`, `tdtExport` and
-   `tdtFile` (`wasm_port_files.rs`). A follow-up after PR 3 adds them to
-   `EnginePort` and `TsEngine`, with the founder rule on `TsEngine.loadSave`
-   and `loadVctower` (never `restore` or `adoptTdt`) and a golden step
-   comparing `serialize()` after each.
+   `tdtFile` (`wasm_port_files.rs`). A follow-up after PR 3 (1e) adds them
+   to `EnginePort` and `TsEngine` (`src/engine/port/reports.ts` and
+   `files.ts`), with the founder rule on `TsEngine.loadSave` and
+   `loadVctower` (never `restore` or `adoptTdt`), and golden steps that
+   compare `serialize()` after each load, the files both engines write, and
+   `statsSheet` and every room's `unitFacts` on three conformance towers.
 2. `EnginePort` and the compile-time check on `Engine`; the layout as
    `src/engine/viewLayout.json`, written by `npm run wasm:build` from the
    package and held to it by a test; one tier rule for the port's members.

@@ -65,6 +65,16 @@ export interface ImportCounts {
   widthMismatch: number;
 }
 
+/** What `parseTDT` builds the report from, which the engine port answers as
+ *  numbers (`TsEngine.loadTdt`, the Rust `loadTdt`'s record). */
+export interface ImportFacts {
+  counts: ImportCounts;
+  decoded: boolean;
+  decodeStats: { droppedShafts: number; adjustedShafts: number; droppedFlights: number };
+  headerNotes: string[];
+  tdt: TdtTower;
+}
+
 export function buildReport(
   save: SerializedGame,
   counts: ImportCounts,

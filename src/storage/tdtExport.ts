@@ -1,7 +1,7 @@
 import type { SerializedGame } from "../engine/types";
 import { LegacyExportError } from "./tdtExportTables";
-import { gatherTower } from "./tdtExportGather";
-import { encodeTower } from "./tdtEncoder";
+import { gatherTower, type ExportCounts } from "./tdtExportGather";
+import { encodeTower, type EncodeStats } from "./tdtEncoder";
 import { buildExportReport, type ExportReport } from "./tdtExportReport";
 
 /**
@@ -30,6 +30,10 @@ import { buildExportReport, type ExportReport } from "./tdtExportReport";
 export interface BuiltLegacyTower {
   bytes: Uint8Array;
   report: ExportReport;
+  /** The tallies the report reads, which the engine port answers
+   *  (`TsEngine.tdtExport`, the Rust `tdtExport`'s record). */
+  counts: ExportCounts;
+  stats: EncodeStats;
 }
 
 /** `JSON.parse` reviver: an object's own `toString` key (never a function in
@@ -125,7 +129,7 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   const gathered = gatherTower(input);
   const { bytes, stats } = encodeTower(input, gathered);
   const report = buildExportReport(input, gathered, stats);
-  return { bytes, report };
+  return { bytes, report, counts: gathered.counts, stats };
 }
 
 // ---- Barrel: preserve the original public surface of this module. ----

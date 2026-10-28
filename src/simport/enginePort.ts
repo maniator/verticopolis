@@ -26,9 +26,11 @@ export interface EnginePortLifecycle {
   tick(dtMinutes: number): void;
   /** The save; JSON is the save format. */
   serialize(): string;
-  /** The `stored` and `legacy` sources: `[status, generation]`. */
+  /** The `stored` source: `[status, generation]`. A save with no
+   *  `appVersion` is a founder's tower (before 2.0). */
   loadSave(text: string): PortRecord;
-  /** The `history` source: keeps the live camera and auto-bridge preference. */
+  /** The `history` source: keeps the live camera and auto-bridge
+   *  preference, and never applies the founder rule. */
   restore(text: string): PortRecord;
   /** The `found` source. */
   foundTower(seed: number, modeCode: number, calendarCode: number, unbridged: boolean): PortRecord;
@@ -112,7 +114,33 @@ export interface EnginePortQueries {
   unitCard(id: number): PortRecord;
   /** Empty for an id that names no shaft. */
   shaftCard(id: number): PortRecord;
+  /** The stats screen: the `statsSheet` header, then the sections its last
+   *  six slots count. */
+  statsSheet(): PortRecord;
+  /** One unit's diagnostics facts; empty for an id that names no unit. */
+  unitFacts(id: number): PortRecord;
+}
+
+/** The save files (contract section 2): `.vctower` and the 1994 `.TDT`. */
+export interface EnginePortFiles {
+  /** A `.vctower` file (the `stored` source): `[status, generation]`. */
+  loadVctower(text: string): PortRecord;
+  /** The tower as `.vctower` text; undefined, with `lastReason()`, when the
+   *  stamp refuses the build name or the time. */
+  exportVctower(appVersion: string, savedAtMs: number): string | undefined;
+  /** Reads and stages a `.TDT` file and answers its report's numbers; the
+   *  live tower is untouched until `adoptTdt`. */
+  loadTdt(bytes: Uint8Array, filename: string): PortRecord;
+  /** Note `i` of the staged file: the header's notes, then the warnings. */
+  tdtNote(i: number): string | undefined;
+  tdtTowerName(): string | undefined;
+  /** Swaps the staged tower in (the `legacy` source): `[status, generation]`. */
+  adoptTdt(): PortRecord;
+  /** Writes the tower as a `.TDT` file and answers the report's numbers. */
+  tdtExport(): PortRecord;
+  /** The last done `tdtExport`'s bytes, handed over once. */
+  tdtFile(): Uint8Array | undefined;
 }
 
 /** The whole port: what the game holds, whichever engine runs. */
-export interface EnginePort extends EnginePortLifecycle, EnginePortView, EnginePortCommands, EnginePortQueries {}
+export interface EnginePort extends EnginePortLifecycle, EnginePortView, EnginePortCommands, EnginePortQueries, EnginePortFiles {}

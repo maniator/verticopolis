@@ -2,12 +2,16 @@ import { Simulation } from "../Simulation";
 import { towerStateSig } from "../UndoHistory";
 import type { GameplayEvent } from "../gameplayEventBuffer";
 import { INVALID_REQUEST } from "../request";
+import { markFounderFromLoadedFile } from "../sim/founderStatus";
+import type { SerializedGame } from "../types";
 import type { CalendarKind } from "../calendar";
 import type { GameMode } from "../types";
 import * as cmd from "./commands";
+import { message, readVctower, stageTdt, writeTdt, writeVctower, type StagedTdt } from "./files";
 import { VIEW_LAYOUT, VIEW_LAYOUT_TEXT } from "./layout";
 import { MetaLog } from "./metaLog";
 import * as ask from "./queries";
+import { statsSheet, unitFacts } from "./reports";
 import { flag, whole, type PortState } from "./record";
 import { FrameEncoder, encodeStructure } from "./viewEncode";
 
@@ -25,8 +29,9 @@ const CALENDARS = VIEW_LAYOUT.calendars as readonly CalendarKind[];
  * together on one tower.
  *
  * Like the Rust `Engine`, it is one handle for the session: a done swap
- * (`loadSave`, `restore`, `foundTower`) replaces the simulation inside it and
- * moves `generation()`; a refused one changes nothing. The replaced tower's
+ * (`loadSave`, `restore`, `foundTower`, `loadVctower`, `adoptTdt`) replaces
+ * the simulation inside it, drops a staged `.TDT` tower and an unclaimed
+ * `.TDT` export, and moves `generation()`; a refused one changes nothing. The replaced tower's
  * undrained gameplay events go ahead of the new tower's own, unless it was
  * the title screen's backdrop (`setBackdrop`).
  *
@@ -45,6 +50,8 @@ export class TsEngine implements PortState {
   private drained: GameplayEvent[] = [];
   private frames = new FrameEncoder();
   private readonly meta = new MetaLog();
+  private staged: StagedTdt | undefined;
+  private tdtBytes: Uint8Array | undefined;
 
   constructor(sim: Simulation) {
     this.current = sim;
@@ -71,6 +78,8 @@ export class TsEngine implements PortState {
     return JSON.stringify(this.current.serialize());
   }
 
+  /** The `stored` source: a save with no `appVersion` is a founder's
+   *  tower, as `SaveGame` loads one (`restore` never applies the rule). */
   loadSave(text: string): Float64Array {
     return this.swap(text, false);
   }
@@ -122,9 +131,11 @@ export class TsEngine implements PortState {
     this.reason = undefined;
     let next: Simulation;
     try {
-      next = Simulation.deserialize(JSON.parse(text));
+      const raw = JSON.parse(text) as SerializedGame;
+      next = Simulation.deserialize(raw);
+      if (!keepLive) markFounderFromLoadedFile(next, raw);
     } catch (e) {
-      this.reason = e instanceof Error ? e.message : String(e);
+      this.reason = message(e);
       return this.swapRecord(false);
     }
     if (keepLive) {
@@ -145,7 +156,90 @@ export class TsEngine implements PortState {
     this.frames = new FrameEncoder();
     this.drained = [];
     this.backdrop = false;
+    this.staged = undefined;
+    this.tdtBytes = undefined;
     this.gen++;
+  }
+
+  // ---- Files -----------------------------------------------------------------
+
+  /** A `.vctower` file (the `stored` source), with the founder rule. */
+  loadVctower(text: string): Float64Array {
+    this.reason = undefined;
+    let next: Simulation;
+    try {
+      next = readVctower(text);
+    } catch (e) {
+      this.reason = message(e);
+      return this.swapRecord(false);
+    }
+    this.adopt(next);
+    return this.swapRecord(true);
+  }
+
+  /** The tower as `.vctower` text, or undefined with the reason. */
+  exportVctower(appVersion: string, savedAtMs: number): string | undefined {
+    this.reason = undefined;
+    try {
+      return writeVctower(this.current, appVersion, savedAtMs);
+    } catch (e) {
+      this.reason = message(e);
+      return undefined;
+    }
+  }
+
+  /** Read and stage a `.TDT` file; the live tower waits for `adoptTdt`. */
+  loadTdt(bytes: Uint8Array, filename: string): Float64Array {
+    this.reason = undefined;
+    this.staged = undefined;
+    try {
+      this.staged = stageTdt(bytes, filename);
+    } catch (e) {
+      this.reason = message(e);
+      return Float64Array.of(0);
+    }
+    return this.staged.record;
+  }
+
+  tdtNote(i: number): string | undefined {
+    return whole(i) ? this.staged?.notes[i] : undefined;
+  }
+
+  tdtTowerName(): string | undefined {
+    return this.staged?.name;
+  }
+
+  /** Swap the staged `.TDT` tower in (the `legacy` source). */
+  adoptTdt(): Float64Array {
+    this.reason = undefined;
+    const staged = this.staged;
+    if (!staged) {
+      this.reason = INVALID_REQUEST;
+      return this.swapRecord(false);
+    }
+    this.adopt(staged.sim);
+    return this.swapRecord(true);
+  }
+
+  /** Write the tower as a `.TDT` file; the bytes wait for `tdtFile()`. */
+  tdtExport(): Float64Array {
+    this.reason = undefined;
+    this.tdtBytes = undefined;
+    try {
+      const { record, bytes } = writeTdt(this.current);
+      this.tdtBytes = bytes;
+      return record;
+    } catch (e) {
+      this.reason = message(e);
+      return Float64Array.of(0);
+    }
+  }
+
+  /** The last done `tdtExport`'s bytes, handed over once. */
+  tdtFile(): Uint8Array | undefined {
+    const bytes = this.tdtBytes;
+    this.tdtBytes = undefined;
+    return bytes;
   }
 
   // ---- The view and its text -----------------------------------------------
@@ -263,4 +357,6 @@ export class TsEngine implements PortState {
   crewCoverage = () => ask.crewCoverage(this.current);
   unitCard = (id: number) => ask.unitCard(this.current, id);
   shaftCard = (id: number) => ask.shaftCard(this.current, id);
+  statsSheet = () => statsSheet(this.current);
+  unitFacts = (id: number) => unitFacts(this.current, id);
 }

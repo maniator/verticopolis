@@ -24,7 +24,7 @@ import {
 } from "./tdtTables";
 import { mergeParts, type PartRecord } from "./tdtPartMerge";
 import { synthesizeTransports, transportsFromDecoded } from "./tdtTransports";
-import { buildReport, type ImportCounts, type ImportReport } from "./tdtImportReport";
+import { buildReport, type ImportCounts, type ImportFacts, type ImportReport } from "./tdtImportReport";
 import { hashSeed, towerNameFromFilename } from "./tdtImportHelpers";
 
 /**
@@ -43,10 +43,12 @@ import { hashSeed, towerNameFromFilename } from "./tdtImportHelpers";
  * path ran. People, finance history and named tenants are queued follow-ups.
  */
 
-/** Result of a successful parse: the save plus its fidelity report. */
+/** Result of a successful parse: the save, its fidelity report, and the
+ *  numbers the report is built from (`TsEngine.loadTdt` answers those). */
 export interface ParsedLegacyTower {
   save: SerializedGame;
   report: ImportReport;
+  facts: ImportFacts;
 }
 
 /**
@@ -494,5 +496,5 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
   const view = viewFromViewWords(tdt.header.viewX, tdt.header.viewY);
   if (view) save.view = view;
 
-  return { save, report: buildReport(save, counts, tdt, decoded, decodeStats, headerNotes) };
+  return { save, report: buildReport(save, counts, tdt, decoded, decodeStats, headerNotes), facts: { counts, decoded, decodeStats, headerNotes, tdt } };
 }
