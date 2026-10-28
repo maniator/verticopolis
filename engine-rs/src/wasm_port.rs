@@ -81,7 +81,7 @@ pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 26] = [
 ];
 
 /// Each query record's slots, for the view layout.
-const QUERY_RECORDS: [(&str, &[&str]); 9] = [
+const QUERY_RECORDS: [(&str, &[&str]); 10] = [
     ("quoteBuild", &["ok", "cost"]),
     ("quoteShaft", &["ok"]),
     ("hotspot", &["ratio", "floor"]),
@@ -89,6 +89,7 @@ const QUERY_RECORDS: [(&str, &[&str]); 9] = [
     ("restore", &["status", "generation"]),
     ("foundTower", &["status", "generation"]),
     ("drainEvents", &["dropped", "count"]),
+    ("advance", &["steps", "owed"]),
     // A header, then the changed ids.
     ("unitMetaChanged", &["revision", "full"]),
     // One entry per log line, repeated.
