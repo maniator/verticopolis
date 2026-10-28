@@ -1,8 +1,6 @@
 import { vi } from "vitest";
 import type { GameApp } from "../main";
-import type { Simulation } from "../engine/Simulation";
-import { createTsSim } from "../simport/tsSim";
-import { Simulation as RealSimulation } from "../engine/Simulation";
+import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
 import { catalogFor } from "../engine/catalog";
@@ -12,13 +10,10 @@ import type { CatalogEconomy } from "../engine/catalogTypes";
 /**
  * The hand-built fake `GameApp` the `appModals` tests pin the stats,
  * exterminator and save-slot commands against: a fake sim whose exterminator
- * pieces a test dials, and a fake port that answers the stats screen's two
- * questions about the app's tower at the time of each ask (`app.sim`, so a
- * test that swaps it gets answers about the new one, as `TsSim` gives) and
- * refuses any other. Its commands go through the real adapter over the fake
- * sim, so they land on its spies. The exterminator, coverage and log line go
- * through a fake `EnginePort` that answers the layout's records from the same
- * fake sim.
+ * pieces a test dials, and a fake `EnginePort` that answers the layout's
+ * records (the stats sheet, the coverage, the booking and the log line) from
+ * the app's tower at the time of each ask (`app.sim`, so a test that swaps it
+ * gets answers about the new one and a moved generation).
  */
 
 /** Let the port's answers and the renders queued behind them run. */
@@ -76,10 +71,23 @@ export function makeApp(sim: SimShape) {
   const current = (): SimShape => app.sim;
   const coverage = () => (current().housekeepingCoverage as () => { infested: number })();
   let reason: string | undefined;
-  const portCodes = new PortCodes(new TsEngine(RealSimulation.newGame(1)));
+  let generation = 1;
+  const real = new TsEngine(Simulation.newGame(1, "modern"));
+  const portCodes = new PortCodes(real);
   const logKinds = ["info", "good", "bad", "money"];
   const enginePort = {
+    generation: () => generation,
     crewCoverage: vi.fn(() => Float64Array.of(0, 0, 0, 0, 0, 0, coverage().infested)),
+    /** A fresh Modern tower's sheet with the fake tower's infested rooms and
+     *  booking written in. */
+    statsSheet: vi.fn(() => {
+      const rec = real.statsSheet();
+      const head = portCodes.fields("statsSheet");
+      rec[head.indexOf("exterminationDueDay")] = current().exterminationDueDay ?? NaN;
+      const infested = head.length + portCodes.fields("statsStrip").length + portCodes.fields("crewCoverage").indexOf("infested");
+      rec[infested] = coverage().infested;
+      return rec;
+    }),
     bookExterminator: vi.fn(() => {
       const r = (current().callExterminator as () => { ok: boolean; reason?: string; cost?: number; rooms?: number })();
       reason = r.ok ? undefined : (r.reason ?? "unavailable");
@@ -91,31 +99,35 @@ export function makeApp(sim: SimShape) {
     }),
     lastReason: () => reason,
   };
-  const port = {
-    query: vi.fn((q: { op: string }): Promise<unknown> => {
-      if (q.op === "statsReport") return Promise.resolve({ housekeeping: coverage(), exterminationDueDay: current().exterminationDueDay ?? null });
-      if (q.op === "housekeepingCoverage") return Promise.resolve(coverage());
-      return Promise.reject(new Error(`the fake port answers no ${q.op}`));
-    }),
-    command: createTsSim(() => app.sim as unknown as Simulation).command,
-    view: { header: { minutes: 420, mode: "modern", modernCalendar: "realWorld" }, tower: { towerName: "Fake" } },
+  const reader = {
+    update: vi.fn(),
+    header: { minutes: 420, mode: "modern", modernCalendar: "realWorld" },
+    tower: { towerName: "Fake" },
   };
+  let tower = sim;
   const app: {
     sim: SimShape;
     ui: typeof ui;
     engine: typeof engine;
-    port: typeof port;
+    reader: typeof reader;
     enginePort: typeof enginePort;
     portCodes: PortCodes;
     adoptSim: ReturnType<typeof vi.fn>;
   } = {
-    sim,
+    /** A swap moves the generation, as the engine's swaps do. */
+    get sim() {
+      return tower;
+    },
+    set sim(next: SimShape) {
+      tower = next;
+      generation++;
+    },
     ui,
     engine,
-    port,
+    reader,
     enginePort,
     portCodes,
     adoptSim: vi.fn(),
   };
-  return { app: app as unknown as GameApp, ui, engine, port, enginePort, adoptSim: app.adoptSim };
+  return { app: app as unknown as GameApp, ui, engine, reader, enginePort, adoptSim: app.adoptSim };
 }
