@@ -380,6 +380,13 @@ impl Engine {
         [ratio, floor.map_or(f64::NAN, |f| f as f64)]
     }
 
+    /// Whether the VIP has rated the tower a TOWER, the win the frame loop
+    /// congratulates once. A 6 star save that never stored the rating does
+    /// not claim it, as the TypeScript `evaluatedTower` reads it.
+    pub(crate) fn port_evaluated_tower(&self) -> bool {
+        self.sim.evaluated_tower == Some(true)
+    }
+
     /// The onboarding facts as bits in [`ONBOARDING`] order.
     pub(crate) fn port_onboarding(&self) -> f64 {
         self.sim

@@ -140,6 +140,7 @@ export class Engine {
      */
     endExtend(): void;
     evaluateStar(): void;
+    evaluatedTower(): boolean;
     eventText(i: number): string | undefined;
     exportVctower(app_version: string, saved_at_ms: number): string | undefined;
     expressStops(id: number): Float64Array;

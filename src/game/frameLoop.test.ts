@@ -5,7 +5,7 @@ import { MAX_QUANTUM_MINUTES } from "../engine/sim/fixedStep";
 import { decideMealRush } from "./mealRush";
 import { gameplaySession } from "../analytics";
 import * as analyticsActions from "../analyticsActions";
-import { fakeEnginePort, portCodes } from "./frameLoop.fixture";
+import { fakeEnginePort, fakeReader, portCodes } from "./frameLoop.fixture";
 
 /**
  * These pin the per-frame simulation + throttled UI/audio refresh (`runFrame`)
@@ -69,7 +69,8 @@ function makeApp(over: Record<string, unknown> = {}) {
     portCodes,
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn() },
-    engine: { focus: vi.fn(() => ({})) }, reader: { update: vi.fn(), rooms: [], structure: [] },
+    engine: { focus: vi.fn(() => ({})) },
+    reader: fakeReader(sim),
     ui: {
       update: vi.fn(),
       isEditorOpen: vi.fn(() => false),

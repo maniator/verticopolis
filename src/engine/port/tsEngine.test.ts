@@ -121,6 +121,10 @@ describe("TsEngine", () => {
     expect(e.onboarding() & ONBOARDING_FLAG.lobby).toBe(ONBOARDING_FLAG.lobby);
     for (let m = 0; m < 4; m++) expect(e.heatCells(m).length % 5).toBe(0);
     expect(e.crewCoverage()).toHaveLength(7);
+    expect(e.evaluatedTower()).toBe(false);
+    e.sim.evaluatedTower = true;
+    expect(e.evaluatedTower()).toBe(true);
+    e.sim.evaluatedTower = false;
     expect(e.unitCard(idOf(e, "cinema"))).toHaveLength(20);
     expect(e.shaftCard(lift(e)).length).toBeGreaterThan(12);
     expect(e.viewStructure().length).toBeGreaterThan(VIEW_LAYOUT.structureWidth);

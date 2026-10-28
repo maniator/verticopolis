@@ -11,6 +11,7 @@ import { gameplaySession } from "../analytics";
 import { drainEngineEvents } from "../analyticsEngineBridge";
 import { stepGate } from "../wasmhost/stepGate";
 import { hudSource } from "./hudSource";
+import { calendarOf } from "../simport/headerClock";
 
 export { MAX_CATCHUP_MINUTES, advanceOwedMinutes } from "../engine/sim/frameStep";
 
@@ -112,10 +113,12 @@ export function runFrame(app: GameApp, dtMs: number): void {
       app.refreshEditor();
     }
     // A jingle on every star promotion (2★–5★), not just the TOWER win. The
-    // analytics side is the engine's star_reached, through the bridge.
-    if (app.sim.star > app.lastStar) {
-      app.lastStar = app.sim.star;
-      if (app.sim.star < 6) app.audio.sfx("promote");
+    // analytics side is the engine's star_reached, through the bridge. The
+    // header is this pass's: the reader was brought up to date above.
+    const header = app.reader.header;
+    if (header.star > app.lastStar) {
+      app.lastStar = header.star;
+      if (header.star < 6) app.audio.sfx("promote");
     }
     // Auto-surfaced modals must never stack over the boot/return splash. A
     // loaded save can carry a pending emergency (or an already-won TOWER), and
@@ -128,7 +131,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // self-guards on the splash via updateCoastClear.)
     const splashUp = isSplashUp();
     // Interactive emergency choice (fire rescue / bomb ransom).
-    const pc = app.sim.pendingChoice;
+    const pc = header.pendingChoice;
     if (pc && !hasBlockingModal(app) && !splashUp) {
       app.shownChoice = true;
       app.audio.sfx("error");
@@ -160,7 +163,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // owns (`shownChoice` or `shownUpdate`), and time would never move again.
     // Both can be latched by the lines above in this very pass: the win day
     // rolls an emergency, and a loaded TOWER save may carry an open one.
-    if (app.sim.evaluatedTower && !app.shownWin && !splashUp && !hasBlockingModal(app)) {
+    if (!app.shownWin && !splashUp && !hasBlockingModal(app) && app.enginePort.evaluatedTower()) {
       app.shownWin = true;
       app.audio.sfx("promote");
       app.ui.congratsTower();
@@ -188,7 +191,7 @@ export function emitMealRushes(app: GameApp, minutesBeforeTicks: number): void {
   // the once-per-day latch never sticks (NaN !== NaN), and the bulletin spams
   // every frame. Same defensive posture as timePacing's finite guards.
   if (!Number.isFinite(after) || !Number.isFinite(minutesBeforeTicks)) return;
-  const cal = app.sim.clock.calendar;
+  const cal = calendarOf(app.reader.header);
   let tenants: number | undefined;
   // Emit each meal's bulletin once per day at the START of its window.
   // Anchoring on the frame START keeps the crossing check correct for a
@@ -209,8 +212,13 @@ export function emitMealRushes(app: GameApp, minutesBeforeTicks: number): void {
     // Tenant-count floor: silence bulletins in a very small tower (1-star lot
     // with a handful of rooms), so the log does not chatter through the early
     // game. 30 occupied tenants is a modest bar; a mid-star tower clears it.
-    // Counted only when a rush is due, so a frame without one walks no units.
-    tenants ??= app.sim.tower.totalPopulation();
+    // Counted only when a rush is due, so a frame without one walks no units:
+    // the reader is brought up to date for it, and its header's population is
+    // the census `totalPopulation()` counts.
+    if (tenants === undefined) {
+      app.reader.update();
+      tenants = app.reader.header.population;
+    }
     if (tenants < 30) return;
     app.lastMealRushDay[kind] = dayOfKind;
     app.enginePort.logLine(text, app.portCodes.code("logKinds", "info"));

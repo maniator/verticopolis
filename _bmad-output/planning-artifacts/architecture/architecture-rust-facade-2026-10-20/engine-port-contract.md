@@ -176,6 +176,7 @@ records under their own names.
 | `statsStrip` | none | record, `TOWER_STATS` order | UI tick |
 | `hotspot` | none | record: ratio, floor (NaN = none) | UI tick |
 | `onboarding` | none | number, bits in `ONBOARDING` order | UI tick |
+| `evaluatedTower` | none | boolean: whether the VIP rated the tower a TOWER (the saved rating, which a 6 star save without it does not claim) | UI tick, for the win's congratulations |
 | `heatCells` | modeCode (layout `heatModes`) | record: per cell, the layout's `heatCell` slots (floor, minX, maxX, severity, tint code from `heatTints`); an unknown mode answers no cells | overlay refresh |
 | `unitCard` | id | record, the layout's `unitCard` slots (NaN for absent fields, flags 0 or 1, codes from `kinds`, `unitStates`, `vacateReasons`, `filmPolicies`); empty for no such unit; `unitLabel(id)`, `unitSubtype(id)` text | selection, revision or hour change |
 | `shaftCard` | id | record: the layout's `shaftCard` header, then the 48 hourly demand slots when `hourly` is 1, the `stops` stop rows (`stopRow`), and the origin rings when `origins` is 1 (per hour, a pair count and that many floor, count pairs); empty for no such shaft | selection, revision or hour change |
@@ -354,9 +355,13 @@ they resume.
    loop's one time call, which needs no caller moved; 5b the renderer's
    reads (`congestion`, `queueView`, `parkingSet`, `parkingUsage`,
    `recyclingFill`, `positionReachable`) and `PortRenderSim`, the
-   renderer's `RenderSim` over the reader and the port; 5c the frame loop
-   and modal reads; 5d the lifecycle callers, then `SimPort` and `TsSim`
-   deleted; 5e the boot and the mirror host's removal.
+   renderer's `RenderSim` over the reader and the port; 5c the frame loop's
+   reads (the star, the emergency and the meal-rush calendar and head count
+   from the reader's header, the win from `evaluatedTower`); 5d the
+   lifecycle callers and the stats modal, then `SimPort` and `TsSim`
+   deleted; 5e the boot and the mirror host's removal, with the frame loop's
+   time call on `advance`, its clock reads, its event drain on `drainEvents`
+   and the reader brought up to date every rendered frame.
 6. Restore points and the sidecar, the cadence exclusions, the fault
    fallback (story ACs 16 to 21 and slice 8), unchanged in substance.
 7. The integration suites on the Rust engine (owner, 2026-10-28: before

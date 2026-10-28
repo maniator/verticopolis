@@ -93,6 +93,18 @@ fn onboarding_packs_the_facts_in_order() {
 }
 
 #[test]
+fn the_tower_win_is_the_saved_rating_not_the_star() {
+    let mut e = engine();
+    assert!(!e.port_evaluated_tower());
+    // A 6 star tower that never stored the rating claims no win.
+    e.sim.star = 6;
+    e.sim.evaluated_tower = None;
+    assert!(!e.port_evaluated_tower());
+    e.sim.evaluated_tower = Some(true);
+    assert!(e.port_evaluated_tower());
+}
+
+#[test]
 fn the_onboarding_flags_are_one_per_fact_in_layout_order() {
     assert_eq!(ONBOARDING_FLAGS, [1, 2, 4, 8, 16]);
     assert_eq!(ONBOARDING_FLAGS.len(), ONBOARDING.len());

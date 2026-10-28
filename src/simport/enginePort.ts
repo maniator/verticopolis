@@ -112,6 +112,8 @@ export interface EnginePortQueries {
   hotspot(): PortRecord;
   /** Bits in the layout's `onboarding` order. */
   onboarding(): number;
+  /** Whether the VIP has rated the tower a TOWER, the win. */
+  evaluatedTower(): boolean;
   heatCells(modeCode: number): PortRecord;
   crewCoverage(): PortRecord;
   /** Empty for an id that names no unit. */
