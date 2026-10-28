@@ -21,7 +21,7 @@ interface EngineHandle {
 interface LabelSource {
   __vcEngine?: EngineHandle;
   /** `window.__vcEngineBoot`: the identity and binary the Rust package reported. */
-  __vcEngineBoot?: Pick<EngineBootState, "identity" | "binary">;
+  __vcEngineBoot?: Partial<Pick<EngineBootState, "identity" | "binary" | "build" | "engine">>;
 }
 
 const pageSource = () => globalThis as LabelSource;
@@ -35,12 +35,21 @@ export function activeEngine(g: LabelSource = pageSource()): "ts" | "wasm" {
 
 /** The engine's name, version and short hash, as the version lines append it. */
 export function engineSuffix(g: LabelSource = pageSource()): string {
-  if (activeEngine(g) !== "wasm") return ` · TypeScript engine ${TS_ENGINE_VERSION} (${shortId(TS_ENGINE_SOURCES)})`;
+  // The host's status decides once there is a host, as in the diagnostics:
+  // a later tower can fall back to TypeScript. Before it attaches, the boot
+  // state says which engine is starting. A Rust engine that stopped after a
+  // trap (`engine: "none"`) and a wasm-only build, which has no TypeScript
+  // engine, are never named TypeScript.
+  const boot = g.__vcEngineBoot;
+  const hosted = activeEngine(g) === "wasm";
+  const stopped = !hosted && boot?.engine === "none";
+  const rust = hosted || stopped || boot?.build === "wasm-only" || (!g.__vcEngine && boot?.engine === "wasm");
+  if (!rust) return ` · TypeScript engine ${TS_ENGINE_VERSION} (${shortId(TS_ENGINE_SOURCES)})`;
   const version = parseEngineIdentity(g.__vcEngineBoot?.identity)?.crate.version;
   const binary = g.__vcEngineBoot?.binary;
   const hash = binary?.state === "ok" ? shortId(binary.sourceHash) : null;
   // The experimental worker host says so, so a tester can tell the two apart.
-  const extras = [hash, g.__vcEngine?.status.placement === "worker" ? "worker" : null].filter((x) => x !== null);
+  const extras = [hash, g.__vcEngine?.status.placement === "worker" ? "worker" : null, stopped ? "stopped" : null].filter((x) => x !== null);
   return ` · Rust engine${version ? ` ${version}` : ""}${extras.length > 0 ? ` (${extras.join(", ")})` : ""}`;
 }
 

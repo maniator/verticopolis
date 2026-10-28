@@ -24,6 +24,26 @@ describe("engine label", () => {
     expect(engineSuffix({ __vcEngine: { status: { hosted: true } }, __vcEngineBoot: { binary: { state: "missing" } } })).toBe(" · Rust engine");
   });
 
+  it("never names the TypeScript engine where none runs: a wasm-only build, or a Rust engine that stopped", () => {
+    const hash = "cd".repeat(32);
+    const v = IDENTITY_FIXTURE.crate.version;
+    const identity = JSON.stringify(IDENTITY_FIXTURE);
+    const idle = { status: { hosted: false } };
+    // A trap stops the engine: the boot state reads none until the reload.
+    const trapped = { build: "switchable" as const, engine: "none" as const, identity, binary: { state: "ok" as const, sourceHash: hash } };
+    expect(engineSuffix({ __vcEngine: idle, __vcEngineBoot: trapped })).toBe(` · Rust engine ${v} (${shortId(hash)}, stopped)`);
+    // A wasm-only build before its engine hosts a tower, and after it stopped.
+    expect(engineSuffix({ __vcEngineBoot: { build: "wasm-only", engine: "wasm" } })).toBe(" · Rust engine");
+    expect(engineSuffix({ __vcEngine: idle, __vcEngineBoot: { build: "wasm-only", engine: "none" } })).toBe(" · Rust engine (stopped)");
+    // A switchable build starting Rust, before the host attaches.
+    expect(engineSuffix({ __vcEngineBoot: { build: "switchable", engine: "wasm" } })).toBe(" · Rust engine");
+    // A later tower the host would not take runs on TypeScript.
+    expect(engineSuffix({ __vcEngine: idle, __vcEngineBoot: { build: "switchable", engine: "wasm" } })).toBe(ts);
+    expect(engineSuffix({ __vcEngine: { status: { hosted: true } }, __vcEngineBoot: { build: "wasm-only", engine: "wasm", identity } })).toBe(` · Rust engine ${v}`);
+    // A switchable build back on TypeScript names it.
+    expect(engineSuffix({ __vcEngineBoot: { build: "switchable", engine: "ts" } })).toBe(ts);
+  });
+
   it("names the WASM engine only while a tower is hosted", () => {
     const hosted = { __vcEngine: { status: { hosted: true } } };
     const idle = { __vcEngine: { status: { hosted: false } } };
