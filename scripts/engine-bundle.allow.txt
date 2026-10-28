@@ -140,3 +140,14 @@ src/engine/gameplayEventRules.ts
 src/engine/rng.ts
 src/engine/types.ts
 src/engine/wellFormed.ts
+
+# The TypeScript engine port the app holds over the read model (slice 7,
+# PR 4, #1217): the caller moves run through it before PR 5's boot picks the
+# WASM Engine, and these leave this bundle then
+src/engine/port/commands.ts
+src/engine/port/layout.ts
+src/engine/port/metaLog.ts
+src/engine/port/queries.ts
+src/engine/port/record.ts
+src/engine/port/tsEngine.ts
+src/engine/port/viewEncode.ts
