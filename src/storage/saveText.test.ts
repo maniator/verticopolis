@@ -4,7 +4,7 @@ import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import type { SerializedGame } from "../engine/types";
 import { decodeVctower } from "./vctowerContainer";
-import { parseSaveText } from "./saveCompression";
+import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
 import { stampText } from "./saveStamp";
 
 const FIXTURES = "conformance/fixtures";
@@ -44,15 +44,32 @@ describe("stampText", () => {
   });
 });
 
-describe("parseSaveText", () => {
-  it("hands on the text itself when nothing needed repair", () => {
+describe("the save text reads", () => {
+  it("hands an engine the text itself when nothing needs repair", () => {
     const text = JSON.stringify({ name: "Spire" });
-    expect(parseSaveText(text).text).toBe(text);
+    expect(engineSaveText(text)).toBe(text);
   });
 
-  it("hands on the repaired save when a lone surrogate needed it", () => {
-    const read = parseSaveText('{"name":"a\\ud800b"}');
-    expect(read.data).toEqual({ name: "a�b" });
-    expect(JSON.parse(read.text)).toEqual({ name: "a�b" });
+  it("hands an engine the repaired save when a lone surrogate needs it", () => {
+    expect(JSON.parse(engineSaveText('{"name":"a\\ud800b"}'))).toEqual({ name: "a\ufffdb" });
+  });
+
+  it("reads the write time as a parse would, from the stamp the writers print", () => {
+    vi.useFakeTimers({ now: 1_760_000_000_123 });
+    const { json } = stampText(new TsEngine(Simulation.newGame(1)).serialize());
+    expect(readSavedAt(json)).toBe((JSON.parse(json) as SerializedGame).savedAt);
+    expect(readSavedAt('{"savedAt":1,"x":{"savedAt":2.5e3}}')).toBe(2500);
+    expect(readSavedAt('{"name":"\\"savedAt\\":9"}')).toBeUndefined();
+    expect(readSavedAt("{}")).toBeUndefined();
+  });
+
+  it("tells a damaged or foreign save apart, and holds nothing against a tower", () => {
+    const tower = new TsEngine(Simulation.newGame(1)).serialize();
+    expect([looksLikeTowerSave(tower), importObjection(tower)]).toEqual([true, undefined]);
+    expect(importObjection('{"minutes": 5, "units": []}')).toBeUndefined();
+    expect(looksLikeTowerSave('{"minutes": 5, "units": []}')).toBe(false);
+    expect(importObjection('{"minutes":')).toBe("This tower file is damaged and can't be read.");
+    expect(importObjection("{}")).toBe("Not a valid tower save file.");
+    expect(importObjection("null")).toBe("Not a valid tower save file.");
   });
 });

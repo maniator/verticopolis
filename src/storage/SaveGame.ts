@@ -16,7 +16,7 @@ import {
   fromBase64,
   inflate,
   inflateCapped,
-  parseSaveText,
+  parseSaveJson,
   STORE_MAGIC,
   toBase64,
   TOWER_FILE_MAGIC,
@@ -24,6 +24,7 @@ import {
 } from "./saveCompression";
 import { packVctower, payloadLine } from "./vctowerWriter";
 import { stampText } from "./saveStamp";
+import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
 
 /**
  * Persistence. Games are stored in localStorage: one auto-save slot plus a
@@ -82,12 +83,10 @@ export type SaveText = string;
  *  tower. */
 export type TryLoad = (text: SaveText) => boolean;
 
-function readSlot(key: string): SerializedGame | null {
-  return readSlotText(key)?.data ?? null;
-}
-
-/** A slot's save and the text an engine loads it from (`parseSaveText`). */
-function readSlotText(key: string): { data: SerializedGame; text: SaveText } | null {
+/** A slot's save as the text an engine loads it from (`engineSaveText`), or
+ *  null for an absent or undecodable slot. Nothing parses the tower here: the
+ *  engine does, once. */
+function readSlotText(key: string): SaveText | null {
   const raw = localStorage.getItem(key);
   if (!raw) return null;
   try {
@@ -99,8 +98,7 @@ function readSlotText(key: string): { data: SerializedGame; text: SaveText } | n
     const json = raw.startsWith(STORE_MAGIC)
       ? new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(fromBase64(raw.slice(STORE_MAGIC.length))))
       : raw;
-    const read = parseSaveText(json);
-    return { data: read.data as SerializedGame, text: read.text };
+    return engineSaveText(json);
   } catch {
     return null;
   }
@@ -143,17 +141,18 @@ function parseSavedAt(value: unknown): number | undefined {
  * null payload); it keeps the guarantee free if that ever changes.
  */
 function infoFrom(slot: number | "auto", ...keys: string[]): SlotInfo {
-  // From the RAW keys, before any parse: readSlot returns null for an absent
-  // key and an undecodable one alike (see SlotInfo.present).
+  // From the RAW keys, before any parse: readSlotText returns null for an
+  // absent key and an undecodable one alike (see SlotInfo.present).
   const present = keys.some((k) => localStorage.getItem(k) !== null);
   for (const key of keys) {
-    const data = readSlot(key);
-    if (!data) continue;
-    let population: number;
+    const text = readSlotText(key);
+    if (text === null) continue;
+    let data: SerializedGame, population: number;
     try {
+      data = parseSaveJson(text) as SerializedGame;
       population = Simulation.deserialize(data).population;
     } catch {
-      continue; // decoded, but the schema will not load: try the next key
+      continue; // undecodable, or the schema will not load: try the next key
     }
     return {
       slot,
@@ -230,7 +229,7 @@ export const SaveGame = {
     let corrupt = false;
     for (const key of [AUTO_KEY, LEGACY_AUTO_KEY]) {
       if (localStorage.getItem(key) === null) continue; // absent, not corrupt
-      const read = readSlotText(key); // null ⇒ present but undecodable
+      const text = readSlotText(key); // null ⇒ present but undecodable
       // The engine applies the founder rule: an unstamped stored tower
       // predates the appVersion stamp (pre-2.0). Surface the loaded tower's
       // write time from the SAME decoded data and the SAME key that actually
@@ -238,7 +237,7 @@ export const SaveGame = {
       // needs no second decode of the slot. A forged or out-of-range stamp
       // reads as absent (parseSavedAt). A save the engine refuses is
       // unreadable, as below.
-      if (read && tryLoad(read.text)) return { loaded: true, corrupt, savedAt: parseSavedAt(read.data.savedAt) };
+      if (text !== null && tryLoad(text)) return { loaded: true, corrupt, savedAt: parseSavedAt(readSavedAt(text)) };
       corrupt = true;
     }
     return { loaded: false, corrupt, savedAt: undefined };
@@ -277,8 +276,8 @@ export const SaveGame = {
   /** Load a manual slot through `tryLoad` (the engine applies the founder
    *  rule); false for an empty, undecodable or refused slot. */
   loadSlot(n: number, tryLoad: TryLoad): boolean {
-    const read = readSlotText(SLOT_KEY(n));
-    return read !== null && tryLoad(read.text);
+    const text = readSlotText(SLOT_KEY(n));
+    return text !== null && tryLoad(text);
   },
   deleteSlot(n: number): void {
     localStorage.removeItem(SLOT_KEY(n));
@@ -383,16 +382,13 @@ export const SaveGame = {
     if (!compressionDecodeSupported()) {
       throw new Error("This browser is too old to open compressed tower files. Try a current browser.");
     }
-    let data: SerializedGame;
     let json: SaveText;
     try {
       // Whitespace-tolerant: survives files re-wrapped by editors or mailers.
       const packed = fromBase64(trimmed.slice(magic[0].length).replace(/\s+/g, ""));
       // fatal decoder: a flipped byte must fail the import loudly, never
       // silently half-load a tower with U+FFFD-mangled strings.
-      const read = parseSaveText(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed)));
-      data = read.data as SerializedGame;
-      json = read.text;
+      json = engineSaveText(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed)));
     } catch (err) {
       // A crafted tiny file can inflate to gigabytes (a decompression bomb);
       // inflate() caps the output and throws this, distinct from "damaged".
@@ -403,11 +399,17 @@ export const SaveGame = {
       // the container was recognized, so the file is OURS but broken. Say so.
       throw new Error("This tower file is damaged and can't be read.");
     }
-    if (typeof data.minutes !== "number" || !Array.isArray(data.units)) {
-      throw new Error("Not a valid tower save file.");
-    }
+    // The engine parses the save; a text the scan is unsure of is checked
+    // here first, and a save the engine refuses is told apart by the caller
+    // (`importObjection`), with the same copy.
+    const objection = looksLikeTowerSave(json) ? undefined : importObjection(json);
+    if (objection) throw new Error(objection);
     return json;
   },
+
+  /** What the import's checks hold against a save the engine refused, in the
+   *  player's words (`importObjection`), or undefined to give the engine's. */
+  importObjection,
 };
 
 /** True when a failed save write is STORAGE's fault (quota full, private

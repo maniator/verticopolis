@@ -135,19 +135,10 @@ export function repairSurrogateEscapes(text: string): string {
  * one string collapse to one entry, as the Rust loader dedupes them.
  */
 export function parseSaveJson(text: string): unknown {
-  return parseSaveText(text).data;
-}
-
-/** Only text holding a surrogate (escaped, or raw) can need repair. */
-const SURROGATE = /\\u[dD][89a-fA-F]|[\uD800-\uDFFF]/;
-
-/** {@link parseSaveJson}, with the text a reader hands on to an engine: the
- *  text itself, or, when its surrogates needed repair, the repaired save
- *  printed again, so the engine reads the save the checks passed. */
-export function parseSaveText(text: string): { data: unknown; text: string } {
-  if (!SURROGATE.test(text)) return { data: JSON.parse(text), text };
-  const data = JSON.parse(repairSurrogateEscapes(wellFormed(text)));
-  return { data, text: JSON.stringify(data) };
+  // Only text holding a surrogate (escaped, or raw) can need repair; every
+  // other save is parsed as is.
+  if (!/\\u[dD][89a-fA-F]|[\uD800-\uDFFF]/.test(text)) return JSON.parse(text);
+  return JSON.parse(repairSurrogateEscapes(wellFormed(text)));
 }
 
 /**

@@ -11,7 +11,7 @@ import { shouldArm } from "../ui/Onboarding";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
-import { loadStored, saveText, stampCamera, swapDone } from "./portLifecycle";
+import { SWAP_REFUSED, loadStored, saveText, stampCamera, swapDone } from "./portLifecycle";
 import { exportFacts, importFacts } from "../simport/tdtRecords";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import type { UI } from "../ui/UI";
@@ -410,7 +410,9 @@ export class SaveLoad {
       // (the `stored` source, with the founder rule) and the app follows.
       const text = await SaveGame.importText(data);
       const port = this.deps.enginePort();
-      swapDone(port, port.loadSave(text));
+      const loaded = port.loadSave(text);
+      // A refused file is told apart in the import's own words when they have any.
+      if (loaded[0] !== 1) throw new Error(SaveGame.importObjection(text) ?? port.lastReason() ?? SWAP_REFUSED);
       this.deps.towerSwapped();
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
