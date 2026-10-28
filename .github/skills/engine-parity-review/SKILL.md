@@ -35,7 +35,7 @@ not replace it.
    migrations) needs a row in `conformance/loader-cases.json`, written by
    `src/tests/integration/loaderCases.integration.test.ts` and replayed by
    the Rust `loader_cases` test. A `knownDivergence` marker is a recorded gap
-   (#858), never a way to skip a case.
+   between the engines, never a way to skip a case.
 5. **JavaScript number semantics survive the port.** `Math.round`,
    `Number()` of strings, `Math.min`/`Math.max` with NaN, `-0`, and
    `toString` formatting are mirrored in `engine-rs/src/jsmath.rs`,
