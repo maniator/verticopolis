@@ -134,6 +134,7 @@ export interface EnginePortRender {
   parkingUsage(spots: number): number;
   /** The recycling bins' fill, 0 to 1. */
   recyclingFill(): number;
+  /** Whether a walker can stand at `floor`, `x`; false off a whole tile. */
   positionReachable(floor: number, x: number): boolean;
 }
 
