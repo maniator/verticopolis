@@ -382,7 +382,7 @@ they resume.
    the tower to TypeScript mid-game. The page stops the engine and reloads
    onto its last autosave, still on Rust. The tab's second trap on a build
    latches `trap-loop`, so that reload boots TypeScript and offers the crash
-   report once (a zip the player downloads; nothing is sent). A wasm-only
+   report once (a zip the player downloads; the game never sends it). A wasm-only
    build stops on the engine-failure screen instead. The staged-cohort spec,
    section 3, has the detail.
 7. The integration suites on the Rust engine (owner, 2026-10-28: before
