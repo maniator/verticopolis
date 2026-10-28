@@ -189,10 +189,12 @@ describe("TsEngine against the Rust Engine", () => {
       ["expressStops", (e) => e.expressStops(lift)],
       ["dropStops", (e) => e.dropStops(lift)],
       ["scheduleShaft", (e) => e.scheduleShaft(lift, schedule)],
+      ["shaftSchedule", (e) => e.shaftSchedule(lift)],
       ["labelUnit", (e) => e.labelUnit(office, "Big Office")],
       ["stepRent", (e) => e.stepRent(office, 1)],
       ["setRent", (e) => e.setRent(office, 5000)],
       ["noRate", (e) => e.noRate(office)],
+      ["quoteRentBatch", (e) => e.quoteRentBatch(code("office"), NaN, false)],
       ["rentBatch", (e) => e.rentBatch(code("office"), NaN, false)],
       ["setFilm", (e) => e.setFilm(cinema, 2)],
       ["rerollUnit", (e) => e.rerollUnit(food)],
@@ -204,6 +206,7 @@ describe("TsEngine against the Rust Engine", () => {
       ["setCamera", (e) => e.setCamera(180.5, 2, 1.5)],
       ["logLine", (e) => e.logLine("Hello", 1)],
       ["demolish", (e) => e.demolish(food, false)],
+      ["demolishTile", (e) => e.demolishTile(4, 165, true)],
     ];
     // A taken cell, No Rate in Modern (its prices are free, with no
     // off-market rung), no emergency pending and no room infested: refused
@@ -217,6 +220,7 @@ describe("TsEngine against the Rust Engine", () => {
       sameReads(p);
     }
     same(p, (e) => e.undoSignature() !== "", "undoSignature");
+    same(p, (e) => e.founder(), "founder");
     same(p, (e) => e.nameTower(null), "nameTower cleared");
     same(p, (e) => e.towerName(), "no name");
   });
@@ -255,6 +259,9 @@ describe("TsEngine against the Rust Engine", () => {
       ["unitLabel", (e, v) => e.unitLabel(v)],
       ["logAfter", (e, v) => e.logAfter(v)],
       ["scheduleShaft", (e, v) => e.scheduleShaft(1, Float64Array.of(v))],
+      ["demolishTile", (e, v) => e.demolishTile(v, 160, true)],
+      ["quoteRentBatch", (e, v) => e.quoteRentBatch(v, 1, false)],
+      ["shaftSchedule", (e, v) => e.shaftSchedule(v)],
     ];
     for (const [what, call] of calls) for (const v of bad) same(p, (e) => call(e, v) as Float64Array, `${what} ${v}`);
     // NaN is the batch's "default" and the camera's "no zoom", so these two

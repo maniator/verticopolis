@@ -3,7 +3,7 @@ import type { FacilityKind } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
-import type { EnginePort } from "../simport/enginePort";
+import type { EnginePort, PortRecord } from "../simport/enginePort";
 import { outcome, type PortCodes } from "../simport/portCodes";
 import type { BrushKind } from "../simport/commands";
 import type { ViewReader } from "../simport/viewReader";
@@ -210,7 +210,12 @@ export class BuildActions {
    */
   tryRemoveUnit(u: { readonly id: number }, verb: "sell" | "bulldoze", quiet = false): boolean {
     const port = this.deps.enginePort();
-    const res = outcome(port, port.demolish(u.id, verb === "bulldoze"));
+    return this.removed(port.demolish(u.id, verb === "bulldoze"), quiet);
+  }
+
+  /** The demolish's outcome, with a refusal's toast unless `quiet`. */
+  private removed(rec: PortRecord, quiet: boolean): boolean {
+    const res = outcome(this.deps.enginePort(), rec);
     if (!res.ok) {
       if (!quiet && res.reason) {
         this.deps.audio.sfx("error");
@@ -240,6 +245,12 @@ export class BuildActions {
    *  Returns true only when the engine removed the picked facility. */
   bulldozePicked(p: Picked | null, quiet = false): boolean {
     if (!p) return false;
+    // A floor or lobby tile has no id in the view, so it goes by its cell (#1417).
+    if (p.type === "unit" && (p.kind === "floor" || p.kind === "lobby") && p.cell) {
+      if (!this.removed(this.deps.enginePort().demolishTile(p.cell.floor, p.cell.x, true), quiet)) return false;
+      this.deps.audio.sfx("sell");
+      return true;
+    }
     // The reader lags the tower by up to one UI pass, so a miss reads again
     // once before it calls the pick stale.
     const reader = this.deps.reader();

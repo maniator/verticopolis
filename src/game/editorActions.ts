@@ -13,7 +13,7 @@ import { scheduleSlots } from "../simport/scheduleSlots";
 import type { ViewReader } from "../simport/viewReader";
 import { NOT_ENOUGH_MONEY } from "../engine/sim/charges";
 import { INVALID_COMMAND, MAX_TEXT } from "../simport/request";
-import type { CardKit } from "./cardKit";
+import { BATCH_COUNTERS, batchTargetCode, type CardKit } from "./cardKit";
 
 /**
  * The editor-card actions: everything the selected facility's buttons can do
@@ -57,9 +57,6 @@ export interface EditorActionsDeps {
   commitUndo(): void;
   announce(msg: string): void;
 }
-
-/** `rentBatch`'s own slots: the fields of the dialog's tally. */
-const BATCH_SLOTS = ["matched", "eligible", "changed", "skippedSold", "skippedCustom", "customOverwritten", "clampedLow", "clampedHigh"] as const;
 
 export class EditorActions {
   /** The shaft, tower generation and ends of the extend-arrow drag in
@@ -220,12 +217,7 @@ export class EditorActions {
           this.deps.captureUndo("Set prices");
           const engine = this.deps.engine();
           const codes = this.deps.codes();
-          // The port takes NaN for the default price and -1 for No Rate.
-          let code: number;
-          if (target === "default") code = NaN;
-          else if (target === "noRate") code = -1;
-          else code = target;
-          const rec = engine.rentBatch(codes.kind(kind), code, opts.onlyDefaultPriced ?? false);
+          const rec = engine.rentBatch(codes.kind(kind), batchTargetCode(target), opts.onlyDefaultPriced ?? false);
           const res = outcome(engine, rec);
           this.deps.commitUndo();
           // The dialog offers only priced kinds and their targets, so a refusal
@@ -234,7 +226,7 @@ export class EditorActions {
             this.refuse(res.reason ?? "Those prices could not be set.");
             return Promise.resolve(null);
           }
-          const batch = Object.fromEntries(BATCH_SLOTS.map((name) => [name, codes.slot(rec, "rentBatch", name)])) as unknown as BatchRentResult;
+          const batch = Object.fromEntries(BATCH_COUNTERS.map((name) => [name, codes.slot(rec, "rentBatch", name)])) as unknown as BatchRentResult;
           return Promise.resolve(batch);
         },
         onApplied: (summary) => {

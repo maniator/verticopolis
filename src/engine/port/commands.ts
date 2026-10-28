@@ -1,4 +1,3 @@
-import { SCHEDULE_HOURS } from "../elevatorSchedule";
 import { INVALID_REQUEST, UNKNOWN_FACILITY } from "../request";
 import { subtypeListFor } from "../retailSubtypes";
 import type { BrushKind } from "../sim/brush";
@@ -6,6 +5,7 @@ import type { BatchRentResult, BatchTarget } from "../sim/constants";
 import type { LogEntry } from "../types";
 import { wellFormed } from "../wellFormed";
 import { VIEW_LAYOUT, kindOf } from "./layout";
+import { scheduleFromSlots } from "../../simport/scheduleSlots";
 import { finish, flag, record, refuse, whole, type PortState } from "./record";
 
 /**
@@ -22,12 +22,8 @@ import { finish, flag, record, refuse, whole, type PortState } from "./record";
 const FILM_POLICIES = VIEW_LAYOUT.filmPolicies as readonly ("auto" | "feature" | "blockbuster")[];
 const LOG_KINDS = VIEW_LAYOUT.logKinds as readonly LogEntry["kind"][];
 
-/** The most home floors a schedule carries: one per car. */
-const SCHEDULE_HOMES = 8;
-const SCHEDULE_LEN = 2 * (1 + SCHEDULE_HOURS) + 2 + 1 + SCHEDULE_HOMES;
-
 /** `rentBatch`'s own slots, in the layout's order. */
-const BATCH_SLOTS = VIEW_LAYOUT.records.rentBatch.slice(2) as (keyof BatchRentResult)[];
+export const BATCH_SLOTS = VIEW_LAYOUT.records.rentBatch.slice(2) as (keyof BatchRentResult)[];
 
 export function buildAt(e: PortState, kind: number, floor: number, x: number): Float64Array {
   e.reason = undefined;
@@ -67,6 +63,16 @@ export function demolish(e: PortState, id: number, bulldoze: boolean): Float64Ar
   const before = e.sim.money;
   const r = e.sim.removeFacility(id, bulldoze ? "bulldoze" : "sell");
   return finish(e, before, r.ok, r.reason);
+}
+
+/** The floor or lobby tile at a cell (the view gives tiles no ids); a cell
+ *  with no tile is refused. */
+export function demolishTile(e: PortState, floor: number, x: number, bulldoze: boolean): Float64Array {
+  e.reason = undefined;
+  if (!whole(floor, x)) return refuse(e, INVALID_REQUEST);
+  const u = e.sim.tower.unitAt(floor, x);
+  if (!u || (u.kind !== "floor" && u.kind !== "lobby")) return refuse(e, INVALID_REQUEST);
+  return demolish(e, u.id, bulldoze);
 }
 
 /** One car more or fewer, with the cars the shaft has after. */
@@ -167,7 +173,7 @@ export function setRent(e: PortState, id: number, target: number): Float64Array 
 
 /** A batch price target: NaN for the default, -1 for No Rate, or a finite
  *  number of 0 or more. */
-function batchTarget(target: number): BatchTarget | undefined {
+export function batchTarget(target: number): BatchTarget | undefined {
   if (Number.isNaN(target)) return "default";
   if (target === -1) return "noRate";
   return Number.isFinite(target) && target >= 0 ? target : undefined;
@@ -258,48 +264,9 @@ export function logLine(e: PortState, text: string, kindCode: number): Float64Ar
   return record(true, 0);
 }
 
-/** The schedule's slots as the raw value `setSchedule` reads, or undefined
- *  when they break the input classes: the Rust engine's `schedule_json`. Row
- *  flags 0 or 1, a set row's hours and the home floors safe integers, the
- *  home count a safe integer up to {@link SCHEDULE_HOMES}, each timing finite
- *  or NaN for unset. The ranges stay with the setter, which clamps them. */
-export function scheduleValue(slots: Float64Array): object | undefined {
-  if (slots.length !== SCHEDULE_LEN) return undefined;
-  const ints = (from: number, n: number): number[] | undefined => {
-    const xs = Array.from(slots.subarray(from, from + n));
-    return whole(...xs) ? xs : undefined;
-  };
-  const activeCars: Record<string, number[]> = {};
-  for (const [name, at] of [["weekday", 0], ["weekend", 1 + SCHEDULE_HOURS]] as const) {
-    if (slots[at] === 1) {
-      const hours = ints(at + 1, SCHEDULE_HOURS);
-      if (!hours) return undefined;
-      activeCars[name] = hours;
-    } else if (slots[at] !== 0) {
-      return undefined;
-    }
-  }
-  const v: Record<string, unknown> = { activeCars };
-  const timing = 2 * (1 + SCHEDULE_HOURS);
-  for (const [i, name] of ["waitingCarResponse", "standardFloorDeparture"].entries()) {
-    const t = slots[timing + i];
-    if (Number.isFinite(t)) v[name] = t;
-    else if (!Number.isNaN(t)) return undefined;
-  }
-  const homes = timing + 2;
-  const n = slots[homes];
-  if (!whole(n) || n < 0 || n > SCHEDULE_HOMES) return undefined;
-  if (n > 0) {
-    const floors = ints(homes + 1, n);
-    if (!floors) return undefined;
-    v.homeFloors = floors;
-  }
-  return v;
-}
-
 export function scheduleShaft(e: PortState, id: number, slots: Float64Array): Float64Array {
   e.reason = undefined;
-  const raw = scheduleValue(slots);
+  const raw = scheduleFromSlots(slots);
   if (!whole(id) || !raw) return refuse(e, INVALID_REQUEST);
   return finish(e, e.sim.money, e.sim.tower.setSchedule(id, raw));
 }

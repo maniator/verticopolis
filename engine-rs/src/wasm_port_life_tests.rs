@@ -157,6 +157,11 @@ fn a_schedule_reaches_the_shaft_and_reads_back() {
     assert_eq!(sch.waiting_car_response, Some(15.0));
     assert_eq!(sch.standard_floor_departure, None);
     assert_eq!(sch.home_floors, Some(vec![3]));
+    // It reads back as the slots it was set from.
+    let back = e.port_shaft_schedule(id);
+    assert_eq!(schedule_json(&back), schedule_json(&slots));
+    assert!(e.port_shaft_schedule(id + 1000.0).is_empty());
+    assert!(e.port_shaft_schedule(0.5).is_empty());
     // The legacy JSON setter, given the same schedule, stores the same one.
     let mut legacy = engine();
     let lid = shaft(&mut legacy) as i64;
@@ -221,6 +226,7 @@ fn the_log_and_the_text_getters() {
     assert_eq!(meta[1], 1.0, "a since of 0 is a full listing");
     assert_eq!(e.port_unit_label(99_999.0), None);
     assert_eq!(e.port_schedule_shaft(1.0, &[0.0; 3])[0], 0.0);
+    assert!(!e.port_founder(), "a new tower is no founder's");
 }
 
 #[test]

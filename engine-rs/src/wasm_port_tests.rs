@@ -172,7 +172,7 @@ fn office(e: &Engine) -> f64 {
 
 /// The exported layout's hash; raise `VIEW_LAYOUT_VERSION` (and append its
 /// pin in `view/layout_tests.rs`) in the same commit as any change here.
-const EXPORTED_LAYOUT_PIN: &str = "5c98b18cbf5276ef";
+const EXPORTED_LAYOUT_PIN: &str = "d225fcbbaf63cc82";
 
 #[test]
 fn the_exported_layout_is_pinned() {
@@ -272,4 +272,40 @@ fn a_shaft_takes_stops_and_the_extend_gesture() {
     assert_eq!(e.port_start_extend(id)[STATUS], 1.0);
     assert_eq!(e.port_stop_extend()[STATUS], 1.0);
     assert_eq!(e.port_start_extend(0.5)[STATUS], 0.0);
+}
+
+#[test]
+fn the_rent_batch_quote_is_the_batch_without_the_write() {
+    let mut e = built();
+    let before = e.sim.serialize();
+    let quote = e.port_quote_rent_batch(code(Kind::Office), 0.0, false);
+    assert_eq!(quote[0], 1.0);
+    assert_eq!(e.sim.serialize(), before, "a quote writes nothing");
+    let batch = e.port_rent_batch(code(Kind::Office), 0.0, false);
+    assert_eq!(&quote[1..], &batch[2..]);
+    let lobby = e.port_quote_rent_batch(code(Kind::Lobby), f64::NAN, false);
+    assert_eq!(lobby[0], 0.0, "a lobby carries no price");
+    assert_eq!(e.port_quote_rent_batch(999.0, 1.0, false)[0], 0.0);
+    assert_eq!(e.last_reason_text().as_deref(), Some(UNKNOWN_FACILITY));
+    let bad = e.port_quote_rent_batch(code(Kind::Office), f64::INFINITY, false);
+    assert_eq!(bad[0], 0.0);
+    assert_eq!(e.last_reason_text().as_deref(), Some(INVALID_REQUEST));
+}
+
+#[test]
+fn a_tile_is_demolished_by_its_cell() {
+    let mut e = built();
+    let units = e.sim.tower.units.len();
+    let done = e.port_demolish_tile(3.0, 199.0, true);
+    assert_eq!(done[STATUS], 1.0, "{:?}", e.last_reason_text());
+    assert_eq!(e.sim.tower.units.len(), units - 1);
+    assert!(e.sim.tower.unit_at(3, 199).is_none());
+    // A room's cell, an empty cell and a cell that is no cell are refused.
+    for (floor, x) in [(2.0, 160.0), (9.0, 160.0), (0.5, 160.0)] {
+        assert_eq!(
+            e.port_demolish_tile(floor, x, true)[STATUS],
+            0.0,
+            "{floor}, {x}"
+        );
+    }
 }

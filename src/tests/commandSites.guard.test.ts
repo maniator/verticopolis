@@ -70,12 +70,11 @@ const METHODS: ReadonlySet<string> = new Set([
 /** The settings a command owns, which the frontend never writes. */
 const SETTINGS: ReadonlySet<string> = new Set(["towerName", "autoBridge", "view", "money"]);
 
-/** Slice 5's lifecycle writes, as `file member` (a write as `member=`):
- *  - appBoot: the bulletin at boot when a save could not be read.
- *  The graphics-reset bulletin, the imported 1994 tower's welcome, and the
- *  camera stamped before every save and export now go through the port
- *  (`logLine`, `setCamera`). */
-const LIFECYCLE: ReadonlyMap<string, number> = new Map([["src/game/appBoot.ts emit", 1]]);
+/** Slice 5's lifecycle writes, as `file member` (a write as `member=`).
+ *  None is left: the unreadable-save bulletin at boot, the graphics-reset
+ *  bulletin, the imported 1994 tower's welcome, and the camera stamped before
+ *  every save and export go through the port (`logLine`, `setCamera`). */
+const LIFECYCLE: ReadonlyMap<string, number> = new Map();
 
 const RECEIVER = /^(?:[A-Za-z_$]*[Ss]im[A-Za-z_$0-9]*|tower)$/;
 

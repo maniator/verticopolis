@@ -308,6 +308,17 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     expect(last(f.sfx)).toBe("sell");
   });
 
+  it("bulldozePicked removes a floor tile by its cell, which the view gives no id (#1417)", async () => {
+    expect(sim.tower.structureKindAt(2, 29)).toBe("floor");
+    expect(build.bulldozePicked({ type: "unit", id: NaN, kind: "floor", cell: { floor: 2, x: 29 } })).toBe(true);
+    expect(sim.tower.structureKindAt(2, 29)).toBeUndefined();
+    expect(f.sfx).toEqual(["sell"]);
+    // A lobby tile is load-bearing: refused, with the engine's reason.
+    expect(build.bulldozePicked({ type: "unit", id: NaN, kind: "lobby", cell: { floor: 1, x: 29 } })).toBe(false);
+    expect(sim.tower.structureKindAt(1, 29)).toBe("lobby");
+    expect(f.toasts).toHaveLength(1);
+  });
+
   it("bulldozePicked on a transport refunds the shaft resale and clears a matching selection", async () => {
     sel = lift.id;
     const before = sim.money;

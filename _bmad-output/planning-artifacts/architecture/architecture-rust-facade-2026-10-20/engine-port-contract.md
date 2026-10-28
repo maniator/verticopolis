@@ -137,6 +137,7 @@ with the count in its slot.
 | `paintTiles` | kind, floor, tiles `Float64Array` (at most 32) | placed | per drag step |
 | `buildShaft` | kind, x, bottom, top | none | per command |
 | `demolish` | id, bulldoze | none | per command |
+| `demolishTile` | floor, x, bulldoze | none | per command: the floor or lobby tile in that cell, which the view gives no id (#1417); any other cell is refused |
 | `changeCars` | id, add | cars | per command |
 | `startExtend` / `stopExtend` | id / none | none | per drag |
 | `extendShaft` | id, up, targetFloor | bottom, top, added | per drag step |
@@ -182,6 +183,9 @@ records under their own names.
 | `shaftCard` | id | record: the layout's `shaftCard` header, then the 48 hourly demand slots when `hourly` is 1, the `stops` stop rows (`stopRow`), and the origin rings when `origins` is 1 (per hour, a pair count and that many floor, count pairs); empty for no such shaft | selection, revision or hour change |
 | `statsSheet` | none | record: the layout's `statsSheet` header (NaN for an absent value), then the sections its last six slots count: the `statsStrip` slots, the `crewCoverage` slots, the income averages in `ledgerCats` order, the next rung (`nextStar`) and its gate rows (`gateRow`, codes from `starGates`), the stranded floors, one done flag per `milestones` entry, the elevator rows (`elevatorRow`) and the household mix rows (`mixRow`). Named apart from the legacy `statsReport` JSON getter | stats screen open |
 | `crewCoverage` | none | record, the layout's `crewCoverage` slots | exterminator gate |
+| `quoteRentBatch` | kind, target, onlyDefault, as `rentBatch` | record: ok, then `rentBatch`'s counters, with nothing written; a refusal's text by `lastReason()` | price dialog preview |
+| `shaftSchedule` | id | record: the shaft's schedule in the `scheduleSlots` layout `scheduleShaft` takes; empty for no such shaft or no schedule | schedule editor open |
+| `founder` | none | boolean: whether the tower carries the founder mark | boot |
 | `unitFacts` | id | record, the layout's `unitFacts` slots: a present flag per section with NaN slots when it is 0, codes from `modes`, `accessLines`, `noRateLines`, `vacateReasons` and `bindings`; empty for no such unit. Named apart from the legacy `diagnosticFacts` JSON getter | diagnostics readout |
 | `logAfter` | seq | record of (seq, kindCode, minute) triples; `logText(seq)` | per new log line |
 | `congestion` | none | number: the mean congestion over populated floors, the lobby left out. The overlay's peak is `hotspot`'s ratio | frame |

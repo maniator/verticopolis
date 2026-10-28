@@ -48,12 +48,13 @@ export interface ViewFocus {
   crowd: number;
 }
 
-/** What the pointer is over: transports by Excalibur collider hit-test,
- *  every unit kind by the tower's grid lookup (see pickEntityAt). */
+/** What the pointer is over (see pickEntityAt), with its cell: a floor or
+ *  lobby tile has no id in the view (#1417). */
 export interface Picked {
   type: "unit" | "transport";
   id: number;
   kind: FacilityKind;
+  cell?: { floor: number; x: number };
 }
 
 export interface ScreenRect {
@@ -98,8 +99,7 @@ export function bindInput(engine: TowerEngine): void {
   });
 }
 
-/** Top-most unit/transport under the point: transports by their Excalibur
- *  colliders (z 1, they overlay every unit), units by grid lookup. */
+/** Top-most entity under the point: transports by collider (they overlay units), units by grid. */
 export function pickEntityAt(engine: TowerEngine, world: ex.Vector): Picked | null {
   let best: Picked | null = null;
   let bestZ = -Infinity;
@@ -118,7 +118,7 @@ export function pickEntityAt(engine: TowerEngine, world: ex.Vector): Picked | nu
   if (!best) {
     const { tile, floor } = worldToCell(world);
     const u = engine.sim.tower.unitAt(floor, tile);
-    if (u) best = { type: "unit", id: u.id, kind: u.kind };
+    if (u) best = { type: "unit", id: u.id, kind: u.kind, cell: { floor, x: tile } };
   }
   return best;
 }

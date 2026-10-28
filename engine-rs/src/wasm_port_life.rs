@@ -9,7 +9,7 @@ use crate::charges::{whole, INVALID_REQUEST};
 use crate::clock::{CalendarKind, GameMode};
 use crate::gameplay::GameplayEvents;
 use crate::save_delta::SaveMirror;
-use crate::schedule::SCHEDULE_HOURS;
+use crate::schedule::{Schedule, SCHEDULE_HOURS};
 use crate::sim::{LogKind, Simulation};
 use crate::view::layout::{CALENDARS, MODES};
 
@@ -21,6 +21,9 @@ pub(crate) const LOG_KINDS: [&str; 4] = ["info", "good", "bad", "money"];
 
 /// The most home floors a schedule carries: one per car.
 const SCHEDULE_HOMES: usize = 8;
+
+/// An hour a stored row leaves out runs every car: the most a shaft can have.
+const ALL_CARS: f64 = 8.0;
 
 /// `scheduleShaft`'s slots: whether a weekday row is set, its 24 hours,
 /// the same for the weekend, the two timings (NaN when unset), then the
@@ -94,6 +97,31 @@ fn schedule_json(slots: &[f64]) -> Option<serde_json::Value> {
         v["homeFloors"] = serde_json::json!(ints(&slots[homes + 1..homes + 1 + n])?);
     }
     Some(v)
+}
+
+/// A stored schedule as its [`SCHEDULE_LEN`] slots, the shape
+/// [`schedule_json`] reads back.
+fn schedule_slots(s: &Schedule) -> Vec<f64> {
+    let mut out = Vec::with_capacity(SCHEDULE_LEN);
+    for row in [&s.weekday, &s.weekend] {
+        match row {
+            Some(hours) => {
+                out.push(1.0);
+                out.extend(
+                    (0..SCHEDULE_HOURS).map(|h| hours.get(h).map_or(ALL_CARS, |&n| n as f64)),
+                );
+            }
+            None => out.resize(out.len() + 1 + SCHEDULE_HOURS, 0.0),
+        }
+    }
+    out.push(s.waiting_car_response.unwrap_or(f64::NAN));
+    out.push(s.standard_floor_departure.unwrap_or(f64::NAN));
+    let homes = s.home_floors.as_deref().unwrap_or(&[]);
+    let homes = &homes[..homes.len().min(SCHEDULE_HOMES)];
+    out.push(homes.len() as f64);
+    out.extend(homes.iter().map(|&f| f as f64));
+    out.resize(SCHEDULE_LEN, 0.0);
+    out
 }
 
 impl Engine {
@@ -297,6 +325,20 @@ impl Engine {
         };
         let done = self.sim.tower.set_schedule(id, &raw);
         self.finish(self.sim.money, done, None, &[])
+    }
+
+    /// An elevator's schedule as the [`SCHEDULE_LEN`] slots `scheduleShaft`
+    /// takes; empty for an id that names no shaft, or a shaft with none.
+    pub(crate) fn port_shaft_schedule(&self, id: f64) -> Vec<f64> {
+        whole(id)
+            .and_then(|id| self.sim.tower.get_transport(id))
+            .and_then(|t| t.schedule.as_ref())
+            .map_or_else(Vec::new, schedule_slots)
+    }
+
+    /// Whether the tower came from a pre-2.0 save (the founder's welcome).
+    pub(crate) fn port_founder(&self) -> bool {
+        self.sim.founder
     }
 }
 

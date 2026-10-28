@@ -93,6 +93,8 @@ export interface EnginePortCommands {
   paintTiles(kind: number, floor: number, tiles: Float64Array): PortRecord;
   buildShaft(kind: number, x: number, bottom: number, top: number): PortRecord;
   demolish(id: number, bulldoze: boolean): PortRecord;
+  /** The floor or lobby tile at a cell, which the view gives no id (#1417). */
+  demolishTile(floor: number, x: number, bulldoze: boolean): PortRecord;
   changeCars(id: number, add: boolean): PortRecord;
   startExtend(id: number): PortRecord;
   stopExtend(): PortRecord;
@@ -121,6 +123,12 @@ export interface EnginePortCommands {
 export interface EnginePortQueries {
   quoteBuild(kind: number, floor: number, x: number): PortRecord;
   quoteShaft(kind: number, x: number, bottom: number, top: number): PortRecord;
+  /** What `rentBatch` would do, nothing written; `ok` 0 for an unpriced kind. */
+  quoteRentBatch(kind: number, target: number, onlyDefault: boolean): PortRecord;
+  /** A shaft's schedule as `scheduleShaft`'s slots; empty when it has none. */
+  shaftSchedule(id: number): PortRecord;
+  /** Whether the tower came from a pre-2.0 save (the founder's welcome). */
+  founder(): boolean;
   statsStrip(): PortRecord;
   hotspot(): PortRecord;
   /** Bits in the layout's `onboarding` order. */

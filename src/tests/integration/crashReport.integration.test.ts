@@ -3,7 +3,16 @@ import { strFromU8, unzipSync } from "fflate";
 import { Simulation } from "../../engine/Simulation";
 import { SaveGame } from "../../storage/SaveGame";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../../game/crashReport";
-import type { CrashDescription } from "../../game/crashReport";
+import type { CrashDescription, CrashTower } from "../../game/crashReport";
+import { facilityFloors } from "../../engine/facilities";
+import { TsEngine } from "../../engine/port/tsEngine";
+import { ViewReader } from "../../simport/viewReader";
+
+/** The crash report's view of `sim`, through the port as the game reads it. */
+function towerOf(sim: Simulation): CrashTower {
+  const port = new TsEngine(sim);
+  return { port, view: new ViewReader(port, facilityFloors) };
+}
 
 const CRASH: CrashDescription = { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false, recoveryFailed: false };
 
@@ -12,7 +21,8 @@ describe("crash report packaging", () => {
     const sim = new Simulation();
     sim.tower.towerName = "Crash Test Tower";
     sim.money = 424_242;
-    const details = buildCrashDetails(sim, CRASH, {
+    const tower = towerOf(sim);
+    const details = buildCrashDetails(tower, CRASH, {
       version: "9.9.9",
       speed: 3,
       frameErrors: [{ at: "2026-07-12T00:00:00.000Z", message: "boom" }],
@@ -32,8 +42,9 @@ describe("crash report packaging", () => {
   it("the zip holds crash-report.json and a .vctower save that re-imports to the same tower", async () => {
     const sim = new Simulation();
     sim.money = 314_159;
-    const details = buildCrashDetails(sim, CRASH, { version: "1.2.3", speed: 2, frameErrors: [] });
-    const { filename, bytes } = await buildCrashReportZip(sim, details);
+    const tower = towerOf(sim);
+    const details = buildCrashDetails(tower, CRASH, { version: "1.2.3", speed: 2, frameErrors: [] });
+    const { filename, bytes } = await buildCrashReportZip(tower, details);
     expect(filename).toMatch(/^verticopolis-crash-report-[\d-]+\.zip$/);
     const files = unzipSync(bytes);
     expect(Object.keys(files).sort()).toEqual(["crash-report.json", "tower.vctower"]);
@@ -49,12 +60,13 @@ describe("crash report packaging", () => {
   it("falls back to raw tower.json when the .vctower container can't be built", async () => {
     const sim = new Simulation();
     sim.money = 271_828;
+    const tower = towerOf(sim);
     // Simulate a browser without CompressionStream: SaveGame.export throws.
     const original = SaveGame.export;
     SaveGame.export = () => Promise.reject(new Error("no CompressionStream"));
     try {
-      const details = buildCrashDetails(sim, CRASH, { version: "1.2.3", speed: 0, frameErrors: [] });
-      const { bytes } = await buildCrashReportZip(sim, details);
+      const details = buildCrashDetails(tower, CRASH, { version: "1.2.3", speed: 0, frameErrors: [] });
+      const { bytes } = await buildCrashReportZip(tower, details);
       const files = unzipSync(bytes);
       expect(Object.keys(files).sort()).toEqual(["crash-report.json", "tower.json"]);
       const save = JSON.parse(strFromU8(files["tower.json"]));

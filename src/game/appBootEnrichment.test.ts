@@ -52,6 +52,14 @@ vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 
 const DAY = 86_400_000;
 
+/** The reader's header and tower as of the boot, on day `day`. */
+function readerAt(t: { mode: string; star: number; population: number; highestFloor: number; day: number }) {
+  return {
+    header: { mode: t.mode, modernCalendar: "realWorld", star: t.star, population: t.population, minutes: t.day * 1440 + 420 },
+    tower: { highestFloor: t.highestFloor },
+  };
+}
+
 describe("runBootFlow analytics enrichment wiring (S4)", () => {
   function makeApp(over: Partial<Record<string, unknown>> = {}): GameApp {
     return {
@@ -59,7 +67,7 @@ describe("runBootFlow analytics enrichment wiring (S4)", () => {
       audio: { sfx: vi.fn(), setProgram: vi.fn() },
       setSpeed: vi.fn(),
       ui: { toast: vi.fn(), newTowerModal: vi.fn(), showHelp: vi.fn() },
-      sim: { emit: vi.fn(), mode: "modern", star: 3, population: 100, tower: { highestFloor: 10 }, clock: { day: 12 } },
+      reader: readerAt({ mode: "modern", star: 3, population: 100, highestFloor: 10, day: 12 }),
       saveLoad: { autosave: vi.fn(), newGame: vi.fn() },
       hadReadableSave: true,
       saveWasCorrupt: false,
@@ -109,7 +117,7 @@ describe("runBootFlow analytics enrichment wiring (S4)", () => {
     // A day-0 tower (tenure "d0") last saved 10 days ago (recency "30d"): the two
     // axes must not be crossed. A no-marker web launch reads platform "web".
     const app = makeApp({
-      sim: { emit: vi.fn(), mode: "classic", star: 1, population: 0, tower: { highestFloor: 1 }, clock: { day: 0 } },
+      reader: readerAt({ mode: "classic", star: 1, population: 0, highestFloor: 1, day: 0 }),
     });
 
     runBootFlow(app, Date.now() - 10 * DAY);

@@ -24,6 +24,20 @@ pub(crate) const BATCH_SLOTS: [&str; 8] = [
     "clampedHigh",
 ];
 
+/// `quoteRentBatch`'s slots: whether the kind carries a price, then
+/// [`BATCH_SLOTS`].
+pub(crate) const QUOTE_BATCH_SLOTS: [&str; 9] = [
+    "ok",
+    "matched",
+    "eligible",
+    "changed",
+    "skippedSold",
+    "skippedCustom",
+    "customOverwritten",
+    "clampedLow",
+    "clampedHigh",
+];
+
 fn batch_slots(r: &BatchRentResult) -> [f64; 8] {
     [
         r.matched,
@@ -142,6 +156,32 @@ impl Engine {
             Some(r) => self.finish(before, true, None, &batch_slots(&r)),
             None => self.finish(before, false, None, &none),
         }
+    }
+
+    /// What `rentBatch` would do, nothing written: [`QUOTE_BATCH_SLOTS`],
+    /// `ok` 0 for a kind that carries no price. A bad kind or target gives
+    /// its reason in `lastReason()`.
+    pub(crate) fn port_quote_rent_batch(
+        &mut self,
+        kind: f64,
+        target: f64,
+        only_default: bool,
+    ) -> [f64; 9] {
+        self.reason = None;
+        let mut out = [0.0; 9];
+        let Some(kind) = kind_of(kind) else {
+            self.reason = Some(UNKNOWN_FACILITY.into());
+            return out;
+        };
+        let Some(target) = price_target(target, true) else {
+            self.reason = Some(INVALID_REQUEST.into());
+            return out;
+        };
+        if let Some(r) = self.sim.compute_batch(kind, target, only_default, false) {
+            out[0] = 1.0;
+            out[1..].copy_from_slice(&batch_slots(&r));
+        }
+        out
     }
 
     /// A new subtype for a unit, with its index in the kind's subtype list

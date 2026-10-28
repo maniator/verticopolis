@@ -7,6 +7,7 @@ import { showCrashScreen } from "../ui/crashScreen";
 import { attemptContextRecovery } from "./contextRecovery";
 import { rebuildEngine } from "./engineWiring";
 import { gameplaySession } from "../analytics";
+import { portCodes } from "./frameLoop.fixture";
 
 // The default adapter sends every custom event to the PostHog relay. This suite
 // drives gameplaySession on a deployed host in places, so stub the relay to keep a
@@ -72,10 +73,10 @@ vi.mock("./keyboardPlay", () => ({
     }
   },
 }));
-// showCrashScreen: invoke the getSim it is handed so that closure is covered too.
+// showCrashScreen: invoke the tower read it is handed so that closure is covered too.
 vi.mock("../ui/crashScreen", async (orig) => ({
   ...(await orig<typeof import("../ui/crashScreen")>()),
-  showCrashScreen: vi.fn((info: { getSim?: () => unknown }) => void info.getSim?.()),
+  showCrashScreen: vi.fn((info: { tower?: () => unknown }) => void info.tower?.()),
 }));
 vi.mock("./engineWiring", () => ({ rebuildEngine: vi.fn() }));
 // Drive the recovery hooks so onRestored (+ its unsub) and rebuild all run.
@@ -108,7 +109,7 @@ describe("wireControllers", () => {
     const sim = { id: "sim", star: 3, population: 800 };
     const engine = { viewState: vi.fn(() => ({ view: 1 })), onContextRestored: null as unknown };
     const app = {
-      sim, enginePort: { id: "engine port" }, portCodes: { id: "codes" }, reader: { id: "reader", unlocked: vi.fn(() => true) }, engine,
+      sim, enginePort: { id: "engine port" }, portCodes: { id: "codes" }, reader: { id: "reader", unlocked: vi.fn(() => true), header: { star: 3, population: 800 } }, engine,
       audio: { sfx: vi.fn(), setProgram: vi.fn() },
       speed: 2,
       frameErrors: [],
@@ -229,7 +230,7 @@ describe("wireControllers", () => {
     d.ui.showExportReport("r", "cb");
     expect(app.ui.showExportReport).toHaveBeenCalledWith("r", "cb");
     // Crash screen: the dep forwards the app context (version) and its own
-    // getSim, and reports the crash to analytics with its flattened description.
+    // tower read, and reports the crash to analytics with its flattened description.
     const crashSpy = vi.spyOn(gameplaySession, "noteCrash");
     d.showCrashScreen({
       crash: { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false, recoveryFailed: false },
@@ -297,7 +298,7 @@ describe("runBootFlow", () => {
       // The boot snapshot (gameplaySession.noteBoot) reads these off the live
       // sim; stub the shape so runBootFlow's snapshot call doesn't throw.
       sim: { emit: vi.fn(), mode: "classic", star: 1, population: 0, tower: { highestFloor: 1 }, gameplayEvents: {} },
-      saveLoad: { autosave: vi.fn(), newGame: vi.fn() }, events: { setBackdrop: vi.fn() },
+      saveLoad: { autosave: vi.fn(), newGame: vi.fn() }, events: { setBackdrop: vi.fn() }, enginePort: { logLine: vi.fn(), founder: () => false }, portCodes,
       hadReadableSave: false,
       saveWasCorrupt: false,
       ...over,
@@ -426,7 +427,7 @@ describe("runBootFlow", () => {
 
     runBootFlow(app);
 
-    expect(app.sim.emit).toHaveBeenCalledWith(expect.stringContaining("older saved tower"), "bad");
+    expect(app.enginePort.logLine).toHaveBeenCalledWith(expect.stringContaining("older saved tower"), portCodes.code("logKinds", "bad"));
   });
 
   it("emits the fresh-start bulletin when a corrupt save had nothing behind it", () => {
@@ -434,7 +435,7 @@ describe("runBootFlow", () => {
 
     runBootFlow(app);
 
-    expect(app.sim.emit).toHaveBeenCalledWith(expect.stringContaining("Starting a new tower"), "bad");
+    expect(app.enginePort.logLine).toHaveBeenCalledWith(expect.stringContaining("Starting a new tower"), portCodes.code("logKinds", "bad"));
   });
 
   it("starts the autosave timer, which autosaves when no splash is up", () => {

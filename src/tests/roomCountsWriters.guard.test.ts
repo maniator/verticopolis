@@ -208,6 +208,9 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   // The shared reader's tower handle (its getters) and its decoded rooms,
   // people and cars, written into its own objects: no engine unit.
   "src/simport/viewReader.ts": { bulk: 2, keyed: 5 },
+  // A shaft schedule decoded from its slots, written into the new schedule's
+  // own hour rows and wait times: no engine unit.
+  "src/simport/scheduleSlots.ts": { keyed: 2 },
 };
 
 function scan(): { raw: Record<string, Record<string, number>>; named: Record<string, Record<string, number>>; opaque: Record<string, OpaqueWrites> } {

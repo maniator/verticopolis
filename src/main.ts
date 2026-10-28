@@ -2,7 +2,8 @@ import { Simulation, type HeatmapMode } from "./engine/Simulation";
 import type { UndoHistory } from "./engine/UndoHistory";
 import { createAppHistory } from "./game/appHistory";
 import { GRID, facilityFloors } from "./engine/facilities";
-import type { FacilityKind, Transport, Unit } from "./engine/types";
+import type { FacilityKind } from "./engine/types";
+import type { TransportView, UnitView } from "./simport/view";
 import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/TowerEngine";
 import { AudioEngine } from "./audio/Audio";
 import { SaveGame } from "./storage/SaveGame";
@@ -416,15 +417,14 @@ class GameApp implements GameAppPorts {
     this.refreshEditor();
   }
 
-  /** The currently selected unit/transport, re-looked-up from the live tower
-   *  (selection stores only an id, the entity may have been removed). @internal */
-  selectedUnit(): Unit | undefined {
+  /** The selected unit, looked up again: selection keeps only an id. @internal */
+  selectedUnit(): UnitView | undefined {
     if (this.selected?.type !== "unit") return undefined;
-    return this.sim.tower.getUnit(this.selected.id);
+    return this.reader.tower.getUnit(this.selected.id);
   }
-  /** @internal */ selectedTransport(): Transport | undefined {
+  /** @internal */ selectedTransport(): TransportView | undefined {
     if (this.selected?.type !== "transport") return undefined;
-    return this.sim.tower.getTransport(this.selected.id);
+    return this.reader.tower.getTransport(this.selected.id);
   }
 
   /** @internal */ clearSelection(): void {
