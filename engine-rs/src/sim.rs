@@ -1,8 +1,8 @@
-//! The simulation root: a port of `src/engine/Simulation.ts` and the
-//! serialize side of `src/engine/sim/serialization.ts`.
+//! The simulation root: a port of `src/engine/Simulation.ts`. The serialize
+//! side of `src/engine/sim/serialization.ts` is in `sim_save.rs`.
 
 use indexmap::IndexSet;
-use serde_json::{json, Map, Value};
+use serde_json::Value;
 
 use std::collections::HashMap;
 
@@ -327,81 +327,5 @@ impl Simulation {
         if self.log.len() > LOG_RING_CAP {
             self.log.remove(0);
         }
-    }
-
-    /// `serialize()`: the saved game as JSON. Absent optional fields are left
-    /// out of the map, which is what the canonical writer expects.
-    pub fn serialize(&self) -> Value {
-        let mut m = Map::new();
-        m.insert("version".into(), json!(SAVE_VERSION));
-        m.insert("seed".into(), json!(self.rng.seed()));
-        m.insert("initialSeed".into(), json!(self.rng.initial_seed));
-        m.insert("money".into(), json!(self.money));
-        m.insert("star".into(), json!(self.star));
-        m.insert("minutes".into(), json!(self.clock.minutes));
-        m.insert("mode".into(), json!(self.mode.as_str()));
-        m.insert(
-            "modernCalendar".into(),
-            json!(self.modern_calendar.as_str()),
-        );
-        if !self.auto_bridge {
-            m.insert("autoBridge".into(), json!(false));
-        }
-        if self.founder {
-            m.insert("founder".into(), json!(true));
-        }
-        m.insert("lastQuarterMoney".into(), json!(self.last_quarter_money));
-        m.insert(
-            "units".into(),
-            Value::Array(self.tower.units.iter().map(|u| u.serialize()).collect()),
-        );
-        m.insert(
-            "transports".into(),
-            Value::Array(
-                self.tower
-                    .transports
-                    .iter()
-                    .map(|t| t.serialize())
-                    .collect(),
-            ),
-        );
-        m.insert("nextId".into(), json!(self.tower.next_id));
-        if let Some(n) = &self.tower.tower_name {
-            m.insert("towerName".into(), json!(n));
-        }
-        if let Some(b) = self.tower.built_wedding_hall {
-            m.insert("builtWeddingHall".into(), json!(b));
-        }
-        if let Some(b) = self.evaluated_tower {
-            m.insert("evaluatedTower".into(), json!(b));
-        }
-        m.insert("vipVisitDay".into(), json!(self.vip_visit_day));
-        m.insert("vipFavorable".into(), json!(self.vip_favorable));
-        m.insert("vipVisits".into(), json!(self.vip_visits));
-        m.insert("lastVipNagDay".into(), json!(self.last_vip_nag_day));
-        m.insert("treasuresFound".into(), json!(self.treasures_found));
-        if let Some(d) = self.extermination_due_day {
-            m.insert("exterminationDueDay".into(), json!(d));
-            if let Some(ids) = &self.extermination_room_ids {
-                m.insert("exterminationRoomIds".into(), json!(ids));
-            }
-        }
-        m.insert("events".into(), self.events.save_state());
-        m.insert("excavated".into(), json!(self.excavated));
-        m.insert("blockbusters".into(), json!(self.blockbusters));
-        m.insert("milestones".into(), json!(self.milestones));
-        m.insert("ledger".into(), self.ledger.serialize());
-        if let Some(v) = &self.view {
-            m.insert("view".into(), v.clone());
-        }
-        if !self.log.is_empty() {
-            let start = self.log.len().saturating_sub(LOG_SAVE_CAP);
-            let log: Vec<Value> = self.log[start..]
-                .iter()
-                .map(|e| json!({ "minute": e.minute, "text": e.text, "kind": e.kind.as_str() }))
-                .collect();
-            m.insert("log".into(), Value::Array(log));
-        }
-        Value::Object(m)
     }
 }

@@ -1,6 +1,6 @@
 ---
 story: facade-13-load-memory-peak
-status: review
+status: done
 issue: 1225
 ---
 
@@ -197,11 +197,15 @@ check of the streamed load's peak.
 - `load_memory_tests.rs`: counts allocations per thread (every `realloc`
   counts both blocks) and holds `load_save_text` on a 41,460-unit tower to a
   peak at most 1.25 times what it keeps, and checks that the save streamed.
-  Without the reservation it peaks at 1.9 times and fails. On the engine's
-  saves and every committed tower, the object count equals the number of
-  entries in `units`, and each entry takes at least 40 bytes of the text
-  with its comma, over the 24 the length bound allows per unit, so the
-  vectors are reserved once and never regrow (AC2).
+  Without the reservation it peaks at 1.9 times and fails. (#1242 later made
+  that tower a modern game with both transport pools full, a full log and
+  ledger, excavated basements, room ids, blockbuster cinemas, milestones, a
+  long name and a pending choice with an 80,000-byte message; the bound
+  still holds, and the 1.9 times was read on the tower before that.) On the
+  engine's saves and every committed tower, the object count equals the
+  number of entries in `units`, and each entry takes at least 40 bytes of
+  the text with its comma, over the 24 the length bound allows per unit, so
+  the vectors are reserved once and never regrow (AC2).
 - `npm run perf:load-memory` (`scripts/perf-load-memory.ts`): two fresh
   Node processes per repetition. One records the WASM memory before the
   load, after it, after an hour of play and after one `serialize` (each a

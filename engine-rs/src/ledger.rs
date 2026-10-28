@@ -12,7 +12,7 @@ pub struct Ledger {
     pub history: Vec<DayTotals>,
 }
 
-fn totals_json(t: &DayTotals) -> Value {
+pub(crate) fn totals_json(t: &DayTotals) -> Value {
     let mut m = Map::new();
     for (k, v) in t {
         m.insert((*k).into(), json!(v));
@@ -46,6 +46,9 @@ impl Ledger {
         }
     }
 
+    /// The save's `ledger`. `sim_save.rs` writes this object's two keys
+    /// itself, a day at a time (#1242); its tests hold the two to the same
+    /// text.
     pub fn serialize(&self) -> Value {
         json!({ "today": totals_json(&self.today), "history": self.history.iter().map(totals_json).collect::<Vec<_>>() })
     }
