@@ -198,6 +198,11 @@ export class ViewReader implements SimView {
     this.update();
   }
 
+  /** The engine generation the view was last read in. */
+  get generation(): number {
+    return this.gen;
+  }
+
   /** Read the next frame. */
   update(): void {
     const gen = this.port.generation();
