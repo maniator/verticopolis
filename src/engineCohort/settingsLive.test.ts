@@ -11,11 +11,11 @@ import type { EngineBootState } from "../wasmhost/engineBoot";
 // The suites below test the Rust paths the Settings choice and the cohort
 // reach once PR 6 brings back the fallback (#1422); the hold that keeps them on
 // TypeScript until then is tested on its own.
-const flags = vi.hoisted(() => ({ rustOnlyByUrl: false }));
+const flags = vi.hoisted(() => ({ rustOnlyByChoice: false }));
 vi.mock("./config", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./config")>()),
-  get RUST_ONLY_BY_URL() {
-    return flags.rustOnlyByUrl;
+  get RUST_ONLY_BY_CHOICE() {
+    return flags.rustOnlyByChoice;
   },
 }));
 

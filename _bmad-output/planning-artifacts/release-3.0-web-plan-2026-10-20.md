@@ -1439,10 +1439,12 @@ every ratio in the orientation of 5.2:
 | M2 | Hosted main-thread time, 720 steps | medium, large; 1x, 4x | As M1 |
 | M3 | Frame time p99, and 1% low FPS | medium, large; 1x, 4x | As M1, for each |
 | M4 | Main-thread blocking (long tasks past 50 ms) | large; 1x, 4x | The paired difference in ms (WASM minus TypeScript): its upper bound at most ε |
-| M5 | Cold start to ready | 1x, 4x | The paired difference in ms: its upper bound at most that throttle's ε. This replaces the existing row's 500 ms allowance, since a fixed allowance would let a measured regression pass |
+| M5a | Fresh cold start to ready (an empty cache, no saved tower) | 1x, 4x | The paired difference in ms: its upper bound at most that throttle's ε. This replaces the existing row's 500 ms allowance, since a fixed allowance would let a measured regression pass. M5 splits into M5a and M5b (owner, Oct 28, 2026) |
+| M5b | Saved-tower cold start to ready (a start that resumes a saved tower) | 1x, 4x | As M5a, with its own ε. An explicit expansion of the gate (owner, Oct 28, 2026); any exception is the owner's |
 | M6 | Peak JS heaps plus WASM linear memory | large; 1x, 4x | At most 1.25x TypeScript (existing row), read on the paired ratio's upper bound; a memory ceiling, outside the speed rule |
 | M7 | A 5,000+ population fixture in `npm run perf` | e2e | A CI tripwire outside the desktop protocol, read on the candidate commit's CI run: the WASM run within the TypeScript engine's own baseline (existing row). #900 adds a baseline per engine and calibrates M7's tolerances from A/A CI runs under the same cap as δ, with the same exit to the owner, so CI also catches each engine regressing against itself. The desktop protocol decides speed |
 | M8 | Edits: a scripted build-and-demolish scene (PF2) | large; 1x, 4x | Frame p99 as M1; long tasks as M4 |
+| M9 | Gameplay sequence (owner, Oct 28, 2026): load, build one room, advance 720 steps, save, export `.vctower` and `.TDT` | large, many-unit; 1x, 4x | Proposed bars, awaiting the owner: memory growth during the sequence (after it minus after load) at most 1.25x TypeScript's, read as Rust growth divided by the larger of TypeScript's growth and a floor (8 MiB, or the A/A noise of TypeScript's growth if larger, fixed before the run); no single main-thread task over 200 ms from build, save or export at 1x; the unit count after the first build equals the count before it plus what was built. Reports growth in MiB, the sampled JS heap peak and the ratio. Decides whether #1259 and #1338 stay deferred: a failure means both are fixed before stage 3. M6 is unchanged |
 
 **Scenarios.** The existing Performance row names a late-game fixture on
 Modern, and no fixture of that kind exists yet (#864, P3). The proposal uses
@@ -1463,8 +1465,8 @@ harness would exceed each tolerance, and adds passes until that is under 5%
 for each family. Each ratio family (M1 and M2 times, M3 frames) gets its own
 δ: the smallest round value that clears the largest A/A upper bound across
 both engines and both throttles, fixed before RUN-1. ε does the same for the
-paired differences: one ε for M4's long tasks, and one for cold start (M5)
-at each throttle. δ tracks the harness's noise, so a slowdown can pass
+paired differences: one ε for M4's long tasks, and one for each cold start (M5a
+and M5b) at each throttle. δ tracks the harness's noise, so a slowdown can pass
 only when it is smaller than the noise can resolve, and the cap keeps a
 noisy harness from passing a material one: a δ above 0.05, a long-task ε
 above 50 ms of blocking (one 100 ms task), or a cold-start ε above 5% of
@@ -1751,7 +1753,7 @@ Review: `/gds-code-review` for engine and test-parity work,
 | B5 | S8 #867, the step driver | none | After #1062; `frameLoop.ts` after A5's cue-timing test; `src/engine/sim/fixedStep.ts` after A2 |
 | B6 | S12 (#858, #856) fixed, or entered in the exception register; the Saves-row audit (32 MiB, Unicode, every fixture byte for byte) | none | Before the freeze: S12 edits `engine-rs/src/load.rs`, which is in the key |
 | B7 | #1068 CI repair under the hold: tier entries for `saveDelta` and `serializeForSync`, merge `main` | `perf-worker-1068.patch` (tier half) | No gate row needs it; no merge (D2) |
-| B8 | The screenshot gallery, its drift gate and the visual baselines render on the Rust engine (owner, 2026-10-27; backlog row `screenshots-on-rust-engine`, #1353). In small PRs: the gallery capture, `drift-gate` and `commit-on-approval` first, then `e2e/visual.spec.ts` and `update-visual-baselines.yml`. The TypeScript engine stays as the report-only parity leg (a second render compared byte for byte, and the visual specs on the TypeScript engine against the same baselines) for as long as it is selectable. Images change only where the engine change explains them; both parity jobs were byte-identical on `main` at `9ebf538`, so none is expected | none | Required before 3.0. The CI half of AC3 in `story-engine-test-parity` (#878), which that story left for the flip. Tooling and CI only, so `/bmad-code-review`; avoids the files the open facade PRs own; no app version bump |
+| B8 | The screenshot gallery, its drift gate and the visual baselines render on the Rust engine (owner, 2026-10-27; backlog row `screenshots-on-rust-engine`, #1353). In small PRs: the gallery capture, `drift-gate` and `commit-on-approval` first, then `e2e/visual.spec.ts` and `update-visual-baselines.yml`. Owner direction 2026-10-28: the Rust engine only, with no dual-engine legs and no report-only TypeScript parity jobs; the whole Playwright suite runs on the Rust project, and the TypeScript engine is a `PW_ENGINE=ts` flag on the same project (CI runs one `@ts-smoke` test and the perf gate that way) for as long as it is selectable. Delivered as #1429 (Playwright suite and visual baselines) and #1430 (gallery and drift gate). Images change only where the engine change explains them; both parity jobs were byte-identical on `main` at `9ebf538`, so none is expected | none | Required before 3.0. The CI half of AC3 in `story-engine-test-parity` (#878), which that story left for the flip. Tooling and CI only, so `/bmad-code-review`; avoids the files the open facade PRs own; no app version bump |
 
 ### 9.3 Later lanes, in thread order
 

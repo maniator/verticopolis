@@ -248,8 +248,8 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     }
     // The WASM engine is fetched before the app exists, so the first tower
     // runs on it from its first tick. A switchable player build loads it
-    // only on a `?engine=wasm` visit until the Rust fallback returns (#1422,
-    // `RUST_ONLY_BY_URL`); a tooling build still honors the stored
+    // only when the player asks for it, by a `?engine=wasm` visit or the
+    // Settings choice (#1422, `RUST_ONLY_BY_CHOICE`); a tooling build still honors the stored
     // `vc.engine` choice. Either stays on the TypeScript engine when the
     // package fails to load. A wasm-only build
     // (`VC_ENGINE=wasm`) always loads it and stops here when it cannot: the

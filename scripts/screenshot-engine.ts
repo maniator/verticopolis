@@ -2,13 +2,14 @@
  * The engine the gallery renders on (story-engine-test-parity AC3), and the
  * settle points that make the two engines render the same scenes (#899).
  *
- * `VC_SHOT_ENGINE=wasm` renders every game scene with the WASM engine hosting
- * the tower, the way the `chromium-wasm` Playwright project does: the stored
- * engine choice (`vc.engine`, src/wasmhost/engineChoice.ts) is seeded before
- * any page script runs. Unset (or `ts`) is the TypeScript engine. The
- * pr-drift-check engine leg renders this way and compares the result with the
- * TypeScript render of the same head; a pixel difference between the engines
- * is a parity finding.
+ * The committed gallery is the Rust engine's (#1353): every game scene renders
+ * with the WASM engine hosting the tower, the way the `chromium-wasm`
+ * Playwright project does. The stored engine choice (`vc.engine`,
+ * src/wasmhost/engineChoice.ts) is seeded before any page script runs, and
+ * the hosted checks below fail a scene that did not end up on the engine, so
+ * a missing engine package can never render the TypeScript engine under a
+ * green gate. `VC_SHOT_ENGINE=ts` is a flag for looking at the TypeScript
+ * engine by hand; nothing in CI sets it and its output is never committed.
  *
  * On the Rust engine `game.sim` is a copy of the engine's save
  * (src/game/toolingSim.ts): scene builders build in place (a fresh
@@ -37,19 +38,31 @@
  * `pg*` functions are BROWSER-INJECTED: self-contained, no module-scope refs.
  */
 import { type Page } from "playwright";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type ShotEngine = "ts" | "wasm";
 
-/** Read the engine switch; a typo fails the run instead of silently rendering
- *  the TypeScript engine under a WASM label. */
+/** Read the engine switch; unset is the Rust engine. A typo fails the run
+ *  instead of silently rendering one engine under the other's label. */
 export function resolveShotEngine(raw: string | undefined): ShotEngine {
   const v = (raw ?? "").trim();
-  if (v === "" || v === "ts") return "ts";
-  if (v === "wasm") return "wasm";
-  throw new Error(`VC_SHOT_ENGINE="${raw}" is not an engine; use "ts" (the default) or "wasm".`);
+  if (v === "" || v === "wasm") return "wasm";
+  if (v === "ts") return "ts";
+  throw new Error(`VC_SHOT_ENGINE="${raw}" is not an engine; use "wasm" (the default) or "ts".`);
 }
 
 export const SHOT_ENGINE: ShotEngine = resolveShotEngine(process.env.VC_SHOT_ENGINE);
+
+/** The Rust render needs the engine package in the build this script serves.
+ *  Say so up front instead of timing out on every game scene. A run against an
+ *  already-served BASE_URL builds nothing here, so it is not checked. */
+export function assertEnginePackage(): void {
+  if (SHOT_ENGINE !== "wasm" || process.env.BASE_URL) return;
+  if (existsSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "src", "public", "engine", "BUILD.json"))) return;
+  throw new Error("VC_SHOT_ENGINE is the Rust engine (the default), but src/public/engine/ has no engine package: run `npm run wasm:build`, or set VC_SHOT_ENGINE=ts to look at the TypeScript engine by hand.");
+}
 
 /** The shots whose setup edits the tower in place (a unit's state or
  *  occupancy, a fire, a placed room), as "scene/shot". On the WASM leg such an
