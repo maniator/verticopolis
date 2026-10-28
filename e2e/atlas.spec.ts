@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { bundleBake } from "../scripts/atlas-bundle.ts";
+import { WASM_PROJECT } from "./helpers";
 
 /**
  * The sprite atlas (issue #909, `scripts/export-atlas.ts`) must reproduce the
@@ -18,7 +19,7 @@ import { bundleBake } from "../scripts/atlas-bundle.ts";
 
 test.describe("sprite atlas matches the web bake", () => {
   test("composed frames equal the region compositor's paint", async ({ page }, info) => {
-    test.skip(info.project.name !== "chromium", "the comparison is engine-independent, so it runs on one project");
+    test.skip(info.project.name !== WASM_PROJECT, "the comparison is engine-independent, so it runs once, on the default project");
     test.setTimeout(180_000);
     await page.setContent("<!doctype html><html><body></body></html>");
     await page.addScriptTag({ content: await bundleBake() });
