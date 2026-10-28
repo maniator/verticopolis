@@ -288,10 +288,11 @@ function wasmParityProjects() {
         name: "unitWasm",
         include: ["src/**/*.test.ts"],
         // The mirror's and the dual run's own unit tests attach a relay
-        // themselves. `TsEngine`'s own tests cover the TypeScript engine
-        // behind the port, which the parity setup would host on the Rust
-        // engine; the golden test holds the two engines together.
-        exclude: [...configDefaults.exclude, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/dualrun/dualRun.test.ts", "**/engine/port/tsEngine.test.ts"],
+        // themselves. `TsEngine`'s own tests and the shared reader's over
+        // it cover the TypeScript engine behind the port, which the parity
+        // setup would host on the Rust engine; the golden and reader
+        // integration tests hold the two engines together.
+        exclude: [...configDefaults.exclude, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/dualrun/dualRun.test.ts", "**/engine/port/tsEngine.test.ts", "**/simport/viewReader.test.ts"],
         setupFiles,
         testTimeout,
         hookTimeout: testTimeout,
