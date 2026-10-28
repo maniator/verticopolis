@@ -224,7 +224,10 @@ export class ViewReader implements SimView {
     this.seq = f[h.frameSeq];
     // A rebuild reads the text of every room new to it, so after one that
     // found no room it knew (a new tower) the frame's meta revision is read.
-    if (f[h.towerRevision] !== this.revision || f[h.rooms] !== this.rooms.length) {
+    // A full frame rebuilds too: an engine sends one when its room list
+    // moved, which can happen without the revision or the count moving, and
+    // its slots then follow the new list.
+    if (f[h.full] === 1 || f[h.towerRevision] !== this.revision || f[h.rooms] !== this.rooms.length) {
       if (this.rebuild() && this.metaRevision === 0) this.metaRevision = f[h.metaRevision];
     }
     this.readFrame(f);

@@ -132,7 +132,11 @@ const transportsLen = (ts: readonly Transport[]): number => ts.reduce((n, t) => 
 /**
  * The dynamic frame (`viewFrame(full)`), with what this reader last sent:
  * every room on a full frame (asked for, the first, or after the tower, its
- * revision or its unit count moved), else the rooms whose fields changed.
+ * revision, its unit count or its room list moved), else the rooms whose
+ * fields changed. The room list moves on its own when a writer drops it
+ * (`forgetUnitLists`) without moving the revision, as the WASM mirror host's
+ * merge does when the engine's units differ from the held ones; its slots
+ * may then name other rooms, so only a full frame is safe.
  * A frame that is not full compares only the rooms marked since the last
  * frame (`mark`, from `markRoom` through `watchRooms`) with what it last
  * sent, in slot order, so it costs the rooms written, not every room
@@ -140,6 +144,7 @@ const transportsLen = (ts: readonly Transport[]): number => ts.reduce((n, t) => 
  */
 export class FrameEncoder {
   private tower: Tower | undefined;
+  private rooms: readonly Unit[] | undefined;
   private revision = -1;
   private units = -1;
   private last = new Float64Array(0);
@@ -158,7 +163,7 @@ export class FrameEncoder {
   frame(sim: Simulation, askFull: boolean, meta: MetaLog): Float64Array {
     const tower = sim.tower;
     const rooms = roomUnits(tower);
-    const full = askFull || tower !== this.tower || tower.revision !== this.revision || tower.units.length !== this.units || this.last.length !== rooms.length * FIELDS;
+    const full = askFull || tower !== this.tower || rooms !== this.rooms || tower.revision !== this.revision || tower.units.length !== this.units || this.last.length !== rooms.length * FIELDS;
     const changed: number[] = [];
     if (full) {
       this.last = new Float64Array(rooms.length * FIELDS);
@@ -175,6 +180,7 @@ export class FrameEncoder {
     }
     this.marked.clear();
     this.tower = tower;
+    this.rooms = rooms;
     this.revision = tower.revision;
     this.units = tower.units.length;
     this.seq++;

@@ -3,7 +3,7 @@ import { facilityFloors } from "../engine/facilities";
 import { Simulation } from "../engine/Simulation";
 import { KIND_CODES, codeOf } from "../engine/port/layout";
 import { TsEngine } from "../engine/port/tsEngine";
-import { roomUnits } from "../engine/tower/rooms";
+import { forgetUnitLists, roomUnits } from "../engine/tower/rooms";
 import { readFileSync } from "node:fs";
 import { decodeVctower } from "../storage/vctowerContainer";
 import type { SerializedGame } from "../engine/types";
@@ -137,5 +137,23 @@ describe("ViewReader over TsEngine", () => {
       r.update();
       expect(plain(r.rooms.map((u) => [u.state, u.occupants]))).toEqual(plain(roomUnits(e.sim.tower).map((u) => [u.state, u.occupants])));
     }
+  });
+
+  it("follows a room list rebuilt without a revision or a count move", () => {
+    // The WASM mirror host's merge: the held units are rewritten and reordered
+    // in place, the room list dropped, and the revision kept as the engine's.
+    const e = engine();
+    const r = new ViewReader(e, facilityFloors);
+    const tower = e.sim.tower;
+    const revision = tower.revision;
+    tower.units.reverse();
+    roomUnits(tower).find((u) => u.kind === "office")!.occupants = 6;
+    forgetUnitLists(tower);
+    expect(tower.revision).toBe(revision);
+    r.update();
+    const rooms = roomUnits(tower);
+    expect(r.rooms.map((u) => u.id)).toEqual(rooms.map((u) => u.id));
+    expect(plain(r.rooms.map((u) => [u.state, u.occupants]))).toEqual(plain(rooms.map((u) => [u.state, u.occupants])));
+    expect(r.rooms.find((u) => u.kind === "office")!.occupants).toBe(6);
   });
 });
