@@ -23,7 +23,7 @@ use crate::gameplay::RemovalMethod;
 use crate::services::ExterminatorRefusal;
 
 use super::facade_commands::UNKNOWN_FACILITY;
-use super::port_edit::BATCH_SLOTS;
+use super::port_edit::{BATCH_SLOTS, QUOTE_BATCH_SLOTS};
 use super::Engine;
 
 /// A result record's slots: done (1) or refused (0), then the balance's change.
@@ -51,11 +51,12 @@ pub(crate) const ONBOARDING_FLAGS: [u8; 5] = [
 ];
 
 /// Each command's own slots after [`DELTA`], for the view layout.
-pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 26] = [
+pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 27] = [
     ("buildAt", &[]),
     ("paintTiles", &["placed"]),
     ("buildShaft", &[]),
     ("demolish", &[]),
+    ("demolishTile", &[]),
     ("changeCars", &["cars"]),
     ("extendShaft", &["bottom", "top", "added"]),
     ("bookExterminator", &["cost", "rooms"]),
@@ -81,9 +82,10 @@ pub(crate) const COMMAND_RECORDS: [(&str, &[&str]); 26] = [
 ];
 
 /// Each query record's slots, for the view layout.
-const QUERY_RECORDS: [(&str, &[&str]); 10] = [
+const QUERY_RECORDS: [(&str, &[&str]); 11] = [
     ("quoteBuild", &["ok", "cost"]),
     ("quoteShaft", &["ok"]),
+    ("quoteRentBatch", &QUOTE_BATCH_SLOTS),
     ("hotspot", &["ratio", "floor"]),
     ("loadSave", &["status", "generation"]),
     ("restore", &["status", "generation"]),
@@ -253,6 +255,26 @@ impl Engine {
         let before = self.sim.money;
         let r = self.sim.remove_facility(id, method);
         self.finish(before, r.ok, r.reason, &[])
+    }
+
+    /// A sell or bulldoze of the floor or lobby tile at a cell; the delta is
+    /// the refund. The view gives tiles no ids, so a picked tile goes by its
+    /// cell. A cell with no tile is refused.
+    pub(crate) fn port_demolish_tile(&mut self, floor: f64, x: f64, bulldoze: bool) -> Vec<f64> {
+        self.reason = None;
+        let (Some(floor), Some(x)) = (whole(floor), whole(x)) else {
+            return self.refuse(INVALID_REQUEST, &[]);
+        };
+        let tile = self
+            .sim
+            .tower
+            .unit_at(floor, x)
+            .filter(|u| matches!(u.kind, Kind::Floor | Kind::Lobby))
+            .map(|u| u.id);
+        let Some(id) = tile else {
+            return self.refuse(INVALID_REQUEST, &[]);
+        };
+        self.port_demolish(id as f64, bulldoze)
     }
 
     /// One car more (`add`) or fewer on an elevator, with the cars it has after.

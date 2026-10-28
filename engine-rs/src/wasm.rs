@@ -1107,6 +1107,10 @@ impl Engine {
     pub fn demolish(&mut self, id: f64, bulldoze: bool) -> Vec<f64> {
         self.port_demolish(id, bulldoze)
     }
+    #[wasm_bindgen(js_name = demolishTile)]
+    pub fn demolish_tile(&mut self, floor: f64, x: f64, bulldoze: bool) -> Vec<f64> {
+        self.port_demolish_tile(floor, x, bulldoze)
+    }
     #[wasm_bindgen(js_name = changeCars)]
     pub fn change_cars(&mut self, id: f64, add: bool) -> Vec<f64> {
         self.port_cars(id, add)
@@ -1134,6 +1138,11 @@ impl Engine {
     #[wasm_bindgen(js_name = quoteShaft)]
     pub fn quote_shaft(&mut self, kind: f64, x: f64, bottom: f64, top: f64) -> Vec<f64> {
         vec![self.port_quote_shaft(kind, x, bottom, top)]
+    }
+    #[wasm_bindgen(js_name = quoteRentBatch)]
+    pub fn quote_rent_batch(&mut self, kind: f64, target: f64, only_default: bool) -> Vec<f64> {
+        self.port_quote_rent_batch(kind, target, only_default)
+            .to_vec()
     }
     #[wasm_bindgen(js_name = statsStrip)]
     pub fn stats_strip(&self) -> Vec<f64> {
@@ -1382,6 +1391,13 @@ impl Engine {
     #[wasm_bindgen(js_name = scheduleShaft)]
     pub fn schedule_shaft(&mut self, id: f64, slots: &[f64]) -> Vec<f64> {
         self.port_schedule_shaft(id, slots)
+    }
+    #[wasm_bindgen(js_name = shaftSchedule)]
+    pub fn shaft_schedule(&self, id: f64) -> Vec<f64> {
+        self.port_shaft_schedule(id)
+    }
+    pub fn founder(&self) -> bool {
+        self.port_founder()
     }
 }
 

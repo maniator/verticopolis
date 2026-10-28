@@ -107,6 +107,7 @@ export class Engine {
      * The hashed crowd view (people, id source, rng), as canonical JSON.
      */
     crowdView(): string;
+    demolishTile(floor: number, x: number, bulldoze: boolean): Float64Array;
     demolish(id: number, bulldoze: boolean): Float64Array;
     /**
      * The facts behind the inspector's diagnostics for one unit, as JSON
@@ -166,6 +167,7 @@ export class Engine {
      */
     floorHeatmap(mode: string): string;
     foundTower(seed: number, mode: number, calendar: number, unbridged: boolean): Float64Array;
+    founder(): boolean;
     /**
      * The per-frame read model as one flat number array (see
      * `frame_view` for the layout): what the host reads every frame while
@@ -291,6 +293,7 @@ export class Engine {
     priceUnit(id: number, target: number): number | undefined;
     queueView(): Float64Array;
     quoteBuild(kind: number, floor: number, x: number): Float64Array;
+    quoteRentBatch(kind: number, target: number, only_default: boolean): Float64Array;
     quoteShaft(kind: number, x: number, bottom: number, top: number): Float64Array;
     recyclingFill(): number;
     /**
@@ -423,6 +426,7 @@ export class Engine {
      */
     setView(view?: string | null): void;
     shaftCard(id: number): Float64Array;
+    shaftSchedule(id: number): Float64Array;
     startExtend(id: number): Float64Array;
     startFire(): void;
     /**

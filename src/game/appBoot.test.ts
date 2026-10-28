@@ -298,7 +298,7 @@ describe("runBootFlow", () => {
       // The boot snapshot (gameplaySession.noteBoot) reads these off the live
       // sim; stub the shape so runBootFlow's snapshot call doesn't throw.
       sim: { emit: vi.fn(), mode: "classic", star: 1, population: 0, tower: { highestFloor: 1 }, gameplayEvents: {} },
-      saveLoad: { autosave: vi.fn(), newGame: vi.fn() }, events: { setBackdrop: vi.fn() }, enginePort: { logLine: vi.fn() }, portCodes,
+      saveLoad: { autosave: vi.fn(), newGame: vi.fn() }, events: { setBackdrop: vi.fn() }, enginePort: { logLine: vi.fn(), founder: () => false }, portCodes,
       hadReadableSave: false,
       saveWasCorrupt: false,
       ...over,

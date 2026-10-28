@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -245,6 +245,10 @@
       "status",
       "delta"
     ],
+    "demolishTile": [
+      "status",
+      "delta"
+    ],
     "changeCars": [
       "status",
       "delta",
@@ -359,6 +363,17 @@
     ],
     "quoteShaft": [
       "ok"
+    ],
+    "quoteRentBatch": [
+      "ok",
+      "matched",
+      "eligible",
+      "changed",
+      "skippedSold",
+      "skippedCustom",
+      "customOverwritten",
+      "clampedLow",
+      "clampedHigh"
     ],
     "hotspot": [
       "ratio",

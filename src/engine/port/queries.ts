@@ -6,6 +6,8 @@ import type { HeatmapMode } from "../sim/constants";
 import { towerCatalog } from "../towerCatalog";
 import { roomUnits } from "../tower/rooms";
 import type { Unit } from "../types";
+import { scheduleSlots } from "../../simport/scheduleSlots";
+import { BATCH_SLOTS, batchTarget } from "./commands";
 import { KIND_CODES, UNIT_STATE_CODES, VIEW_LAYOUT, codeOf, kindOf } from "./layout";
 import { flag, whole, type PortState } from "./record";
 
@@ -57,6 +59,34 @@ export function quoteShaft(e: PortState, kind: number, x: number, bottom: number
   const r = e.sim.tower.validateTransport(k, x, bottom, top);
   if (!r.ok) e.reason = r.reason ?? INVALID_REQUEST;
   return Float64Array.of(flag(r.ok));
+}
+
+/** What `rentBatch` would do, nothing written: `ok`, then `rentBatch`'s
+ *  counters; `ok` 0 for a kind that carries no price. */
+export function quoteRentBatch(e: PortState, kind: number, target: number, onlyDefault: boolean): Float64Array {
+  e.reason = undefined;
+  const out = new Float64Array(1 + BATCH_SLOTS.length);
+  const k = kindOf(kind);
+  if (!k) {
+    e.reason = UNKNOWN_FACILITY;
+    return out;
+  }
+  const t = batchTarget(target);
+  if (t === undefined) {
+    e.reason = INVALID_REQUEST;
+    return out;
+  }
+  const r = e.sim.previewRentBatch(k, t, { onlyDefaultPriced: onlyDefault });
+  if (!r) return out;
+  out[0] = 1;
+  BATCH_SLOTS.forEach((name, i) => (out[1 + i] = r[name]));
+  return out;
+}
+
+/** A shaft's schedule as `scheduleShaft`'s slots; empty when it has none. */
+export function shaftSchedule(e: PortState, id: number): Float64Array {
+  const schedule = whole(id) ? e.sim.tower.getTransport(id)?.schedule : undefined;
+  return schedule ? scheduleSlots(schedule) : new Float64Array(0);
 }
 
 /** The HUD strip's counters in the layout's `statsStrip` order. */

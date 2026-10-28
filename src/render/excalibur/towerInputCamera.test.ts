@@ -265,7 +265,7 @@ describe("pickEntityAt: transports by collider, every unit by grid lookup", () =
       transportActors: new Map([[7, miss(1)]]),
       sim: { tower: { highestFloor: 40, lowestFloor: 1, getTransport: () => undefined, unitAt: () => ({ id: 3, kind: "office" }) } },
     });
-    expect(pickEntityAt(e, world)).toEqual({ type: "unit", id: 3, kind: "office" });
+    expect(pickEntityAt(e, world)).toEqual({ type: "unit", id: 3, kind: "office", cell: { floor: 3, x: 10 } });
   });
 
   it("returns null when nothing is under the point and the tile is empty", () => {
@@ -283,7 +283,7 @@ describe("pickEntityAt: transports by collider, every unit by grid lookup", () =
       transportActors: new Map([[7, hit(1)]]),
       sim: { tower: { highestFloor: 40, lowestFloor: 1, getTransport: () => undefined, unitAt: () => ({ id: 3, kind: "office" }) } },
     });
-    expect(pickEntityAt(stale, world)).toEqual({ type: "unit", id: 3, kind: "office" });
+    expect(pickEntityAt(stale, world)).toEqual({ type: "unit", id: 3, kind: "office", cell: { floor: 3, x: 10 } });
 
     // Two overlapping transports at the same z: the >= comparison keeps the
     // later map entry, the same tie-break the actor scan always had.
@@ -319,9 +319,9 @@ describe("pickEntityAt: transports by collider, every unit by grid lookup", () =
     const e = eng({ transportActors: new Map(), sim: { tower } });
 
     const at = (tile: number, floor: number) => pickEntityAt(e, ex.vec((tile + 0.5) * TILE, -(floor - 0.5) * FLOOR));
-    expect(at(141, 2)).toEqual({ type: "unit", id: office.unitId, kind: "office" });
-    expect(at(110, 2)).toEqual({ type: "unit", id: cinema.unitId, kind: "cinema" });
-    expect(at(110, 3)).toEqual({ type: "unit", id: cinema.unitId, kind: "cinema" }); // upper story
+    expect(at(141, 2)).toEqual({ type: "unit", id: office.unitId, kind: "office", cell: { floor: 2, x: 141 } });
+    expect(at(110, 2)).toEqual({ type: "unit", id: cinema.unitId, kind: "cinema", cell: { floor: 2, x: 110 } });
+    expect(at(110, 3)).toEqual({ type: "unit", id: cinema.unitId, kind: "cinema", cell: { floor: 3, x: 110 } }); // upper story
     expect(at(141, 3)!.kind).toBe("floor"); // bare structure above the office
     expect(at(141, 1)!.kind).toBe("lobby");
     expect(at(50, 20)).toBeNull(); // open sky

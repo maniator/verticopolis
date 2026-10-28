@@ -24,7 +24,7 @@ vi.mock("../ui/Onboarding", () => ({
  * Boot-flow coverage for the 2.0 Ground-floor welcome. Split out of
  * appBoot.test.ts (which sits at the 500-line file-size ceiling).
  *
- * The welcome is gated `app.sim?.founder && shouldWelcomeFounder()`: the Founder
+ * The welcome is gated `app.enginePort.founder() && shouldWelcomeFounder()`: the Founder
  * check MUST come first, because shouldWelcomeFounder() is a check-and-SET on a
  * one-shot localStorage latch. If that order ever flips, a non-Founder's first
  * boot would spend the latch and a real Founder would never be greeted. These
@@ -40,7 +40,8 @@ function makeApp(over: Partial<Record<string, unknown>> = {}): GameApp {
     audio: { sfx: vi.fn(), setProgram: vi.fn() },
     setSpeed: vi.fn(),
     ui: { toast: vi.fn(), newTowerModal: vi.fn(), showHelp: vi.fn() },
-    sim: { emit: vi.fn(), mode: "modern", star: 3, population: 500, tower: { highestFloor: 20 }, founder: false },
+    sim: { emit: vi.fn(), mode: "modern", star: 3, population: 500, tower: { highestFloor: 20 } },
+    enginePort: founderPort(false),
     saveLoad: { autosave: vi.fn(), newGame: vi.fn() },
     hadReadableSave: false,
     saveWasCorrupt: false,
@@ -48,8 +49,10 @@ function makeApp(over: Partial<Record<string, unknown>> = {}): GameApp {
   } as unknown as GameApp;
 }
 
-const founderSim = (founder: boolean) =>
-  ({ emit: vi.fn(), mode: "modern", star: 3, population: 500, tower: { highestFloor: 20 }, founder }) as unknown;
+/** The port's founder mark, which the loaded tower carries. */
+function founderPort(founder: boolean): unknown {
+  return { founder: () => founder, logLine: vi.fn() };
+}
 
 describe("runBootFlow: the Ground floor welcome (2.0)", () => {
   beforeEach(() => {
@@ -67,7 +70,7 @@ describe("runBootFlow: the Ground floor welcome (2.0)", () => {
 
   it("greets a Founder once on the resume path and spends the latch", () => {
     sessionStorage.setItem(RESUME_AFTER_RECOVERY_KEY, String(Date.now()));
-    const app = makeApp({ hadReadableSave: true, sim: founderSim(true) });
+    const app = makeApp({ hadReadableSave: true, enginePort: founderPort(true) });
     runBootFlow(app);
     expect(app.ui.toast).toHaveBeenCalledWith(expect.stringContaining(FOUNDER_TOAST), "good");
     expect(localStorage.getItem(LATCH)).toBe("1");
@@ -75,7 +78,7 @@ describe("runBootFlow: the Ground floor welcome (2.0)", () => {
 
   it("does NOT greet a non-Founder and leaves the one-shot latch unspent", () => {
     sessionStorage.setItem(RESUME_AFTER_RECOVERY_KEY, String(Date.now()));
-    const app = makeApp({ hadReadableSave: true, sim: founderSim(false) });
+    const app = makeApp({ hadReadableSave: true, enginePort: founderPort(false) });
     runBootFlow(app);
     expect(app.ui.toast).not.toHaveBeenCalledWith(expect.stringContaining(FOUNDER_TOAST), "good");
     // The latch is preserved, so a genuine Founder booted later still gets greeted.
@@ -83,7 +86,7 @@ describe("runBootFlow: the Ground floor welcome (2.0)", () => {
   });
 
   it("wires the badge and greets a Founder via the splash Continue path", () => {
-    const app = makeApp({ hadReadableSave: true, sim: founderSim(true) });
+    const app = makeApp({ hadReadableSave: true, enginePort: founderPort(true) });
     runBootFlow(app);
     const splashArg = (app.onboarding.showSplash as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(splashArg.founder()).toBe(true); // badge shown for a Founder
@@ -92,7 +95,7 @@ describe("runBootFlow: the Ground floor welcome (2.0)", () => {
   });
 
   it("does not show the badge for a non-Founder splash", () => {
-    const app = makeApp({ hadReadableSave: true, sim: founderSim(false) });
+    const app = makeApp({ hadReadableSave: true, enginePort: founderPort(false) });
     runBootFlow(app);
     const splashArg = (app.onboarding.showSplash as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(splashArg.founder()).toBe(false);

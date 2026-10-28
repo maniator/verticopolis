@@ -404,6 +404,7 @@ export class TsEngine implements PortState {
   paintTiles = (kind: number, floor: number, tiles: Float64Array) => cmd.paintTiles(this, kind, floor, tiles);
   buildShaft = (kind: number, x: number, bottom: number, top: number) => cmd.buildShaft(this, kind, x, bottom, top);
   demolish = (id: number, bulldoze: boolean) => cmd.demolish(this, id, bulldoze);
+  demolishTile = (floor: number, x: number, bulldoze: boolean) => cmd.demolishTile(this, floor, x, bulldoze);
   changeCars = (id: number, add: boolean) => cmd.changeCars(this, id, add);
   startExtend = (id: number) => cmd.startExtend(this, id);
   stopExtend = () => cmd.stopExtend(this);
@@ -431,6 +432,9 @@ export class TsEngine implements PortState {
 
   quoteBuild = (kind: number, floor: number, x: number) => ask.quoteBuild(this, kind, floor, x);
   quoteShaft = (kind: number, x: number, bottom: number, top: number) => ask.quoteShaft(this, kind, x, bottom, top);
+  quoteRentBatch = (kind: number, target: number, onlyDefault: boolean) => ask.quoteRentBatch(this, kind, target, onlyDefault);
+  shaftSchedule = (id: number) => ask.shaftSchedule(this, id);
+  founder = () => this.current.founder;
   statsStrip = () => ask.statsStrip(this.current);
   hotspot = () => ask.hotspot(this.current);
   onboarding = () => ask.onboarding(this.current);

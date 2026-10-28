@@ -338,7 +338,7 @@ describe("long-press to peek (touch hold)", () => {
     handlers.down(ptr({ touch: true, tile: 8, floor: 3, sx: 400, sy: 300 }));
     expect(e.onLongPress).not.toHaveBeenCalled(); // not yet at the knee
     vi.advanceTimersByTime(500);
-    expect(e.onLongPress).toHaveBeenCalledWith(8, 3, { type: "unit", id: 7, kind: "office" });
+    expect(e.onLongPress).toHaveBeenCalledWith(8, 3, { type: "unit", id: 7, kind: "office", cell: { floor: 3, x: 8 } });
     expect(e.longPressFired).toBe(true);
   });
 

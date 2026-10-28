@@ -316,12 +316,12 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   });
 
   // The 2.0 "Ground floor" recognition (party 2026-07-23): the STATUS lives on
-  // the loaded tower (`sim.founder`, set at load from a pre-2.0 save and persisted),
+  // the loaded tower (`founder()`, set at load from a pre-2.0 save and persisted),
   // so it travels with the tower and a brand-new 2.0 tower never carries it. Here
   // we only fire the one-time welcome, once per profile, when a ground-floor tower
   // lands back on screen (on whichever boot path this turns out to be).
   const welcomeFounder = (): void => {
-    if (app.sim?.founder && shouldWelcomeFounder()) {
+    if (app.enginePort.founder() && shouldWelcomeFounder()) {
       app.ui.toast("Welcome back. You got in on the ground floor, before 2.0. Thanks for building with us.", "good");
     }
   };
@@ -365,8 +365,8 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
       installOffered: () => splashInstallOffered(),
       onInstall: () => void activateInstall(app, "splash").catch(() => {}),
       // The 2.0 "Ground floor" badge (party 2026-07-23): a small, quiet mark by the
-      // version, shown only when the loaded tower predates 2.0 (`sim.founder`).
-      founder: () => app.sim?.founder ?? false,
+      // version, shown only when the loaded tower predates 2.0 (`founder()`).
+      founder: () => app.enginePort.founder(),
       onContinue: () => {
         // Only rendered when `hasSave`. teardownSplash() resumes the engine to
         // play speed, so re-pause: a returning player lands back in their tower
