@@ -218,16 +218,19 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       return;
     }
     // The WASM engine is fetched before the app exists, so the first tower
-    // runs on it from its first tick. A switchable build loads it only when
-    // asked (`?engine=wasm`, or `vc.engine` in storage) and stays on the
-    // TypeScript engine when it fails to load. A wasm-only build
+    // runs on it from its first tick. A switchable player build loads it
+    // only on a `?engine=wasm` visit until the Rust fallback returns (#1422,
+    // `RUST_ONLY_BY_URL`); a tooling build still honors the stored
+    // `vc.engine` choice. Either stays on the TypeScript engine when the
+    // package fails to load. A wasm-only build
     // (`VC_ENGINE=wasm`) always loads it and stops here when it cannot: the
     // TypeScript step loop is not in that bundle, and a silent fallback is
     // what the build rules out. The engine switch is compiled away there with
     // the `__WASM_ONLY__` define. A TypeScript boot does not await, so it
     // stays synchronous as before.
     // The engine is the port (PR 5e), so the old measurement hosts
-    // (`wasm-frame`, `wasm-worker`) have nothing left to measure: they boot
+    // (`wasm-frame`, `wasm-worker`) have nothing left to measure: a player
+    // build runs them on the TypeScript engine, and a tooling build boots
     // the same engine on the main thread.
     // A switchable build asks the staged cohort's policy (#1197): the URL, a
     // safety suppression, the Settings choice, then the cohort arm.

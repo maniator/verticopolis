@@ -55,7 +55,7 @@ export interface UndoPorts {
   restore(snap: string): Promise<void>;
   /** Fingerprint the current player-mutable state (see {@link towerStateSig}). */
   signature(): string;
-  /** Which tower is live (`SimPort.generation`), read around a restore to
+  /** Which tower is live (`EnginePort.generation`), read around a restore to
    *  tell whether it swapped the tower before it failed. Without it a failed
    *  restore is taken to have left the tower as it was. */
   generation?(): number;

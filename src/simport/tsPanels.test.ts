@@ -15,8 +15,9 @@ import {
   tsTransportDetail,
   tsUnitDetail,
 } from "./tsPanels";
-import { createTsSim } from "./tsSim";
+import { facilityFloors } from "../engine/facilities";
 import { TsEngine } from "../engine/port/tsEngine";
+import { ViewReader } from "./viewReader";
 import { PortCodes } from "./portCodes";
 import { statsReport } from "./statsSheet";
 
@@ -363,12 +364,12 @@ describe("tsPanels answers", () => {
   });
 });
 
-describe("TsSim's header", () => {
+describe("the header through the port", () => {
   it("carries the founding mode and calendar as the save stores them", () => {
     const classic = Simulation.newGame(1, "classic", "canon");
-    expect(createTsSim(() => classic).view.header).toMatchObject({ mode: "classic", modernCalendar: classic.modernCalendar });
+    expect(new ViewReader(new TsEngine(classic), facilityFloors).header).toMatchObject({ mode: "classic", modernCalendar: classic.modernCalendar });
     expect(classic.modernCalendar).toBe("realWorld"); // Classic clamps it; its clock still runs canon
     const modern = Simulation.newGame(1, "modern", "canon");
-    expect(createTsSim(() => modern).view.header).toMatchObject({ mode: "modern", modernCalendar: "canon" });
+    expect(new ViewReader(new TsEngine(modern), facilityFloors).header).toMatchObject({ mode: "modern", modernCalendar: "canon" });
   });
 });

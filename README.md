@@ -239,13 +239,14 @@ and persistence, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 The simulation runs on one of two engines that must produce the same tower:
 
 - **TypeScript** (`src/engine/`) is the default today.
-- **Rust** (`engine-rs/`), compiled to WebAssembly and hosted by `src/wasmhost/`.
-  Add `?engine=wasm` to the address to run it for one visit. If the Rust engine
-  fails to load, the game falls back to TypeScript.
+- **Rust** (`engine-rs/`), compiled to WebAssembly, which the game drives
+  directly through `EnginePort`. Add `?engine=wasm` to the address to run it for
+  one visit. If the Rust engine fails to load, the game falls back to TypeScript.
 - **Settings** has a *Game engine* choice, saved for the next start: *Automatic
   (recommended)*, *Rust engine (experimental)* or *TypeScript engine (stable)*.
-  Automatic runs TypeScript today. The Settings panel and the version line show
-  which engine is running.
+  For now every choice starts TypeScript, and only the `?engine=wasm` link runs
+  Rust, until the switch back to TypeScript after a Rust failure returns. The
+  Settings panel and the version line show which engine is running.
 
 Version 3.0 is in development and is not released. The plan makes Rust the
 default engine while keeping TypeScript selectable. TypeScript would be removed

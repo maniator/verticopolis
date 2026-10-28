@@ -5,7 +5,12 @@ import { Simulation } from "../engine/Simulation";
 import type { SerializedGame } from "../engine/serializedGame";
 import { decodeVctower } from "../storage/vctowerContainer";
 import { calendarOf, clockOf, rulesOf, type ClockView } from "./headerClock";
-import { createTsSim } from "./tsSim";
+import { facilityFloors } from "../engine/facilities";
+import { TsEngine } from "../engine/port/tsEngine";
+import { ViewReader } from "./viewReader";
+
+/** The header the panels read for `sim`, through the port and the reader. */
+const headerOf = (sim: Simulation) => new ViewReader(new TsEngine(sim), facilityFloors).header;
 
 /**
  * A panel's clock and rule set, derived from the header alone, read the same
@@ -40,24 +45,26 @@ describe("headerClock", () => {
   for (const [name, found] of towers) {
     it(`${name}: the header's clock reads as the engine's, minute by minute`, () => {
       const sim = found();
-      const port = createTsSim(() => sim);
+      const engine = new TsEngine(sim);
+      const reader = new ViewReader(engine, facilityFloors);
       // The tower ticks once so the clock is the running one, then moves to
       // each minute directly: the readings are pure functions of the minute.
-      sim.tick(1);
+      engine.tick(1);
       for (const m of MINUTES) {
         sim.clock.minutes = m;
-        expect(readings(clockOf(port.view.header)), `at minute ${m}`).toEqual(readings(sim.clock));
+        reader.update();
+        expect(readings(clockOf(reader.header)), `at minute ${m}`).toEqual(readings(sim.clock));
       }
     });
 
     it(`${name}: the header's rule set is the engine's`, () => {
       const sim = found();
-      expect(rulesOf(createTsSim(() => sim).view.header)).toBe(sim.rules);
+      expect(rulesOf(headerOf(sim))).toBe(sim.rules);
     });
 
     it(`${name}: the header's calendar is the engine's`, () => {
       const sim = found();
-      expect(calendarOf(createTsSim(() => sim).view.header)).toBe(sim.clock.calendar);
+      expect(calendarOf(headerOf(sim))).toBe(sim.clock.calendar);
     });
   }
 
@@ -67,7 +74,7 @@ describe("headerClock", () => {
     expect(saves.length).toBeGreaterThan(0);
     for (const f of saves) {
       const sim = Simulation.deserialize(decodeVctower(readFileSync(resolve(dir, f), "utf8"), f) as SerializedGame);
-      const { header } = createTsSim(() => sim).view;
+      const header = headerOf(sim);
       expect(readings(clockOf(header)), f).toEqual(readings(sim.clock));
       expect(rulesOf(header), f).toBe(sim.rules);
     }
