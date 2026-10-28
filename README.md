@@ -11,8 +11,9 @@ Written in **TypeScript** on the **[Excalibur.js](https://excaliburjs.com/)**
 game engine (camera, scene, culling, collision and the render loop). The
 simulation has two implementations that are held to the same conformance tests:
 the TypeScript one and a Rust one compiled to WebAssembly (see
-[Simulation engines](#simulation-engines)). A procedural **WebAudio** soundtrack that changes depending on which part of the
-tower you're looking at. No external art assets: every sprite is drawn in code.
+[Simulation engines](#simulation-engines)). A procedural **WebAudio** soundtrack
+changes depending on which part of the tower you're looking at. No external art
+assets: every sprite is drawn in code.
 
 ![Sprite gallery](docs/screenshots/06-sprite-gallery.png)
 
@@ -123,8 +124,9 @@ exports), and Import loads one back through a file picker. Saves are managed
 from the in-game saves panel; clearing your browser storage erases them.
 
 The game can also **import and export the original game's `.TDT` save files**,
-so a 1994 tower can be opened here and a tower built here can be written out as a
-`.TDT`. The format is documented in [docs/canon/tdt-format.md](docs/canon/tdt-format.md).
+so a 1994 tower can be opened here and a Classic tower built here can be written
+out as a `.TDT` (Modern towers are refused, since SimTower can only load Classic
+ones). The format is documented in [docs/canon/tdt-format.md](docs/canon/tdt-format.md).
 
 **How it works.** A save is a snapshot of the **headless simulation**, not the
 renderer. `Simulation.serialize()` writes the deterministic source of truth into a plain
@@ -239,8 +241,11 @@ The simulation runs on one of two engines that must produce the same tower:
 - **TypeScript** (`src/engine/`) is the default today.
 - **Rust** (`engine-rs/`), compiled to WebAssembly and hosted by `src/wasmhost/`.
   Add `?engine=wasm` to the address to run it for one visit. If the Rust engine
-  fails to load, the game falls back to TypeScript. The Settings panel and the
-  version line show which engine is running.
+  fails to load, the game falls back to TypeScript.
+- **Settings** has a *Game engine* choice, saved for the next start: *Automatic
+  (recommended)*, *Rust engine (experimental)* or *TypeScript engine (stable)*.
+  Automatic runs TypeScript today. The Settings panel and the version line show
+  which engine is running.
 
 Version 3.0 is in development and is not released. The plan makes Rust the
 default engine while keeping TypeScript selectable. TypeScript would be removed
