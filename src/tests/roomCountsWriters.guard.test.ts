@@ -124,6 +124,9 @@ const RAW_WRITES: Record<string, Record<string, number>> = {
   // The shared reader's own decoded rooms, never an engine unit: it keeps
   // no counts.
   "src/simport/viewReader.ts": { state: 2, customersIn: 1, occupants: 1, hotelCustomersIn: 1, outForMeal: 1, label: 2, subtype: 3 },
+  // The port contract's grown-tower setup: an infested room on a tower that
+  // reaches the engine only through its save, which recounts its rooms.
+  "src/simport/engineLifecycle.fixture.ts": { state: 1 },
 };
 
 /** Writes through a person's or a class's own name, per file: the crowd's
@@ -192,9 +195,9 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   "src/dualrun/dualRun.ts": { bulk: 3 },
   "src/dualrun/mirror.ts": { bulk: 5 },
   "src/wasmhost/wasmHost.ts": { bulk: 7 },
-  // The command contract's malformed input for the port's shape check (a
-  // getter, a `toJSON`, a hidden key): test data that reaches no room.
-  "src/simport/commandContract.fixture.ts": { bulk: 7 },
+  // The port contract's grown-tower setup (the star and the balance) on a
+  // tower that reaches the engine only through its save: no live unit.
+  "src/simport/engineLifecycle.fixture.ts": { bulk: 4 },
   // `buildTDT`'s reviver deletes a `toString` key from the export's own
   // `JSON.parse` copy of the save: parsed data that reaches no room.
   "src/storage/tdtExport.ts": { bulk: 1 },

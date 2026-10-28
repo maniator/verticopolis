@@ -11,7 +11,7 @@ import { globRegex, isTestFile, resolveGlob, resolveRelative, scanRuntimeImports
  * ratchet.
  *
  * The facade (AD-9, #1207) takes the TypeScript `Simulation` off the healthy
- * WASM path: the page talks to a `SimPort` (`src/simport/`), and the
+ * WASM path: the page talks to an `EnginePort` (`src/simport/`), and the
  * TypeScript engine runs only as the fallback. Each production file that
  * imports `Simulation` at runtime, directly or through an engine module that
  * does, is one more place that path still needs it, so this guard pins those
@@ -240,7 +240,7 @@ describe("where production code crosses into the TypeScript Simulation", () => {
   it("scans all of src/, the engine, host and save code included, and leaves out the tests", () => {
     // A scan that silently found nothing would pass forever.
     expect(files.length).toBeGreaterThan(300);
-    for (const rel of [SIMULATION, "src/main.ts", "src/storage/SaveGame.ts", "src/wasmhost/wasmHost.ts", "src/dualrun/dualRun.ts", "src/simport/tsSim.ts"]) expect(files).toContain(rel);
+    for (const rel of [SIMULATION, "src/main.ts", "src/storage/SaveGame.ts", "src/wasmhost/wasmHost.ts", "src/dualrun/dualRun.ts", "src/engine/port/tsEngine.ts"]) expect(files).toContain(rel);
     expect(files.some((rel) => rel.startsWith("src/tests/") || isTestFile(rel))).toBe(false);
     expect(graph.edges.length).toBeGreaterThan(1000);
   });

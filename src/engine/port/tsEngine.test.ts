@@ -385,6 +385,8 @@ describe("TsEngine's reports and files", () => {
     for (let i = 0; i < notes; i++) expect(e.tdtNote(i)).toBeTruthy();
     expect(e.adoptTdt()[0]).toBe(1);
     expect(e.tdtTowerName()).toBeUndefined();
+    // A 1994 import is no founder's tower.
+    expect((JSON.parse(e.serialize()) as { founder?: boolean }).founder, "an adopted .TDT").not.toBe(true);
     // A done swap drops a staged file and an unclaimed export.
     e.loadTdt(bytes, "SPIRE.TDT");
     e.tdtExport();
