@@ -16,6 +16,9 @@ import {
   tsUnitDetail,
 } from "./tsPanels";
 import { createTsSim } from "./tsSim";
+import { TsEngine } from "../engine/port/tsEngine";
+import { PortCodes } from "./portCodes";
+import { statsReport } from "./statsSheet";
 
 /**
  * The TypeScript adapter's panel answers against the `Simulation` functions
@@ -179,6 +182,25 @@ describe("tsPanels answers", () => {
     expect(tsStatsReport(sim).exterminationDueDay).toBeNull();
     sim.exterminationDueDay = 9;
     expect(tsStatsReport(sim).exterminationDueDay).toBe(9);
+  });
+
+  it("reads the port's statsSheet record back as the same report", () => {
+    const booked = classicTower();
+    booked.exterminationDueDay = 9;
+    const tower = classicTower();
+    tower.star = 6;
+    const ticked = modernTower();
+    for (let i = 0; i < 24 * 60; i++) ticked.tick(1);
+    for (const [what, sim] of [
+      ["classic", classicTower()],
+      ["modern", modernTower()],
+      ["a day in", ticked],
+      ["a booked exterminator", booked],
+      ["the TOWER rung", tower],
+    ] as const) {
+      const port = new TsEngine(sim);
+      expect(statsReport(port.statsSheet(), new PortCodes(port)), what).toEqual(tsStatsReport(sim));
+    }
   });
 
   it("names each star gate by the id the Rust getter answers", () => {

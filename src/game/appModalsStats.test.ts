@@ -4,6 +4,7 @@ import type { Simulation } from "../engine/Simulation";
 import { showStats, confirmExterminate } from "./appModals";
 import { statsTemplate } from "../ui/templates/stats";
 import { towerCatalog } from "../engine/towerCatalog";
+import { statsReport } from "../simport/statsSheet";
 import { makeApp, makeSim, settle, withExterminator, type Refusal } from "./appModals.fixture";
 
 /**
@@ -12,8 +13,8 @@ import { makeApp, makeSim, settle, withExterminator, type Refusal } from "./appM
  * port only answers the handful of fields the commands themselves read, while
  * `canCallExterminator` and `statsScreen` stay REAL, so the handler gate and
  * the screen's assembly are exercised against the port's answer. The stats
- * screen and the exterminator check ask the port (facade slice 4), so the
- * fake port answers from the fake sim's state at the time of each ask.
+ * screen and the exterminator check ask the engine port, so the fake port
+ * answers from the fake sim's state at the time of each ask.
  */
 
 vi.mock("../ui/templates/stats", async (importActual) => {
@@ -55,33 +56,26 @@ describe("showStats", () => {
     expect(ui.showStats.mock.calls[0][1]).toEqual({});
   });
 
-  it("draws the report with the port's header and tower name and the tower's catalog", async () => {
+  it("draws the report with the reader's header and tower name and the tower's catalog", async () => {
     const sim = makeSim();
-    const { app, port } = makeApp(sim);
+    const { app, enginePort, reader } = makeApp(sim);
     await showStats(app);
-    const report = await port.query.mock.results[0].value;
+    expect(reader.update).toHaveBeenCalledOnce();
     expect(vi.mocked(statsTemplate)).toHaveBeenLastCalledWith({
-      report,
-      header: port.view.header,
+      report: statsReport(enginePort.statsSheet.mock.results[0].value as Float64Array, app.portCodes),
+      header: reader.header,
       towerName: "Fake",
       catalog: towerCatalog(sim as unknown as Simulation),
     });
   });
 
   it("says so in a toast and rejects when the engine fails to answer", async () => {
-    const { app, ui, port } = makeApp(makeSim());
-    port.query.mockReturnValueOnce(Promise.reject(new Error("engine down")));
+    const { app, ui, enginePort } = makeApp(makeSim());
+    enginePort.statsSheet.mockImplementationOnce(() => {
+      throw new Error("engine down");
+    });
     await expect(showStats(app)).rejects.toThrow("engine down");
     expect(ui.showStats).not.toHaveBeenCalled();
-    expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Tower Statistics could not be shown.", "bad");
-  });
-
-  it("says so in a toast and rejects when the port throws as it is asked", async () => {
-    const { app, ui, port } = makeApp(makeSim());
-    port.query.mockImplementationOnce(() => {
-      throw new Error("port closed");
-    });
-    await expect(showStats(app)).rejects.toThrow("port closed");
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Tower Statistics could not be shown.", "bad");
   });
 
@@ -94,26 +88,12 @@ describe("showStats", () => {
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Tower Statistics could not be shown.", "bad");
   });
 
-  it("draws nothing when another tower was loaded while the report was out", async () => {
-    const { app, ui, port } = makeApp(makeSim());
-    let answer!: (r: unknown) => void;
-    port.query.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
-    const shown = showStats(app);
-    (app as { sim: unknown }).sim = makeSim();
-    answer({ housekeeping: { infested: 2 }, exterminationDueDay: null });
-    await shown;
-    expect(ui.showStats).not.toHaveBeenCalled();
-  });
-
-  it("draws only the newest report when two asks overlap", async () => {
-    const { app, ui, port } = makeApp(makeSim());
-    let first!: (r: unknown) => void;
-    port.query.mockReturnValueOnce(new Promise((resolve) => (first = resolve)));
-    const older = showStats(app);
+  it("describes the tower loaded at the time of the ask", async () => {
+    const { app, ui } = makeApp(makeSim());
+    (app as { sim: unknown }).sim = makeSim({ exterminationDueDay: 5 });
     await showStats(app);
-    first({ housekeeping: { infested: 2 }, exterminationDueDay: null });
-    await older;
-    expect(ui.showStats).toHaveBeenCalledTimes(1);
+    // The new tower has a booking en route, so the action is not offered.
+    expect(ui.showStats.mock.calls[0][1]).toEqual({});
   });
 });
 

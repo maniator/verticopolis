@@ -3,53 +3,43 @@ import type { Simulation } from "../engine/Simulation";
 import { SaveGame, saveFailureMessage } from "../storage/SaveGame";
 import { canCallExterminator, statsScreen, statsTemplate } from "../ui/templates/stats";
 import { trackAppAction } from "../analytics";
-import { towerCatalog } from "../engine/towerCatalog";
-import { latestPer } from "../simport/latest";
 import { outcome } from "../simport/portCodes";
-import type { StatsReport } from "../simport/panels";
+import { statsReport } from "../simport/statsSheet";
+import { catalogOf } from "./portAccess";
 
 /**
  * The tower-statistics modal, its exterminator action, and the manual save-slot
  * commands, split out of the `GameApp` class as friend functions taking the app.
- * They read the live sim through `app`. The stats screen asks the port and
- * draws when the answer lands, keeping the tower it asked about only to drop an
- * answer about a tower since replaced. The exterminator talks to the engine
- * port, which answers at once. The `GameAppPorts`
+ * The stats screen and the exterminator talk to the engine port, which answers
+ * at once; the save slots still read the live sim through `app`. The `GameAppPorts`
  * members (`showStats`/`showSaves`/`saveToSlot`/`loadFromSlot`/`deleteSlot`) stay
  * on `GameApp` as one-line delegators into these.
  */
 
-/** The newest stats report each app asked for: a report overtaken by a newer
- *  ask (a reopen after a booking) is never drawn over it. */
-const statsAsks = latestPer<StatsReport>();
-
-/** Open (or redraw) the stats modal from the engine's stats report. The
- *  promise settles once the modal is drawn, or once the answer is dropped
- *  because a newer ask or another tower replaced it. When the engine fails to
- *  answer (a port that throws as it is asked included) or the screen fails to
- *  draw, a toast says so and the promise rejects with the failure. The callers
- *  leave the rejection to the global error tracking's `unhandledrejection`
- *  listener, as a throw from the old synchronous read reached its `error`
- *  listener. */
+/** Open (or redraw) the stats modal from the engine's `statsSheet` record,
+ *  which the port answers at once, so the modal always shows the tower loaded
+ *  now. The promise settles once the modal is drawn. When the engine fails to
+ *  answer or the screen fails to draw, a toast says so and the promise
+ *  rejects with the failure. The callers leave the rejection to the global
+ *  error tracking's `unhandledrejection` listener, as a throw from the old
+ *  synchronous read reached its `error` listener. */
 export async function showStats(app: GameApp): Promise<void> {
   // NOTE: no `stats_open` here. `confirmExterminate` re-invokes `showStats` to
   // refresh the modal, so instrumenting this shared function would double-count.
   // The user-open telemetry lives on the `onShowStats` callback (uiCallbacks).
-  const asked = app.sim;
   try {
-    await statsAsks(app)(app.port.query({ op: "statsReport" }), (report) => {
-      // A load or a new tower while the answer was out: it describes the old one.
-      if (app.sim !== asked) return;
-      const catalog = towerCatalog(app.sim);
-      // The "Call exterminator" button only exists in the modal when it's
-      // offerable (Modern, infested rooms, none already en route). Gate the
-      // handler on the same predicate the template uses, since wireActions
-      // throws if it binds to a button that was not rendered.
-      const handlers: Record<string, () => void> = canCallExterminator(report, catalog)
-        ? { exterminate: () => void confirmExterminate(app) }
-        : {};
-      app.ui.showStats(statsTemplate(statsScreen(report, app.port.view, catalog)), handlers);
-    });
+    const report = statsReport(app.enginePort.statsSheet(), app.portCodes);
+    // The header's date as of now, not as of the last throttled UI pass.
+    app.reader.update();
+    const catalog = catalogOf(app);
+    // The "Call exterminator" button only exists in the modal when it's
+    // offerable (Modern, infested rooms, none already en route). Gate the
+    // handler on the same predicate the template uses, since wireActions
+    // throws if it binds to a button that was not rendered.
+    const handlers: Record<string, () => void> = canCallExterminator(report, catalog)
+      ? { exterminate: () => void confirmExterminate(app) }
+      : {};
+    app.ui.showStats(statsTemplate(statsScreen(report, app.reader, catalog)), handlers);
   } catch (e) {
     app.ui.toast("Tower Statistics could not be shown.", "bad");
     throw e;
@@ -64,7 +54,7 @@ export async function showStats(app: GameApp): Promise<void> {
  *  modal's button calls it; a failed coverage answer toasts and throws, as
  *  `showStats` does. */
 export async function confirmExterminate(app: GameApp): Promise<void> {
-  const asked = app.sim;
+  const asked = app.enginePort.generation();
   const bad = app.portCodes.code("logKinds", "bad");
   let infested: number;
   try {
@@ -75,7 +65,7 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
     app.ui.toast("The exterminator could not be booked right now.", "bad");
     throw e;
   }
-  const recovery = towerCatalog(app.sim).economy.exterminator;
+  const recovery = catalogOf(app).economy.exterminator;
   if (!recovery || infested === 0) {
     // The tower can change between rendering the stats modal and clicking the
     // button (a fire or bulldoze clears the last infested room, or the mode
@@ -92,7 +82,7 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
     `Clear ${infested} infested room(s) for $${cost.toLocaleString()}? The crew arrives tomorrow.`,
     () => {
       // A load while the confirm was open: the quote was for the old tower.
-      if (app.sim !== asked) return;
+      if (app.enginePort.generation() !== asked) return;
       const rec = app.enginePort.bookExterminator();
       const res = outcome(app.enginePort, rec);
       // Surface every refusal, not just funds: the tower can change between

@@ -14,7 +14,10 @@ export interface PortOutcome {
   readonly delta: number;
 }
 
-interface Tables extends Record<CodeTable, readonly string[]> {
+/** The name lists a decoder reads a record's codes and sections by. */
+export type NameTable = "kinds" | "ledgerCats" | "milestones" | "starGates";
+
+interface Tables extends Record<CodeTable | NameTable, readonly string[]> {
   records: Record<string, readonly string[]>;
 }
 
@@ -27,6 +30,7 @@ interface Tables extends Record<CodeTable, readonly string[]> {
 export class PortCodes {
   private readonly maps = new Map<CodeTable, ReadonlyMap<string, number>>();
   private readonly records: Record<string, readonly string[]>;
+  private readonly lists: Record<NameTable, readonly string[]>;
 
   constructor(port: Pick<EnginePort, "viewLayout">) {
     const l = JSON.parse(port.viewLayout()) as Tables;
@@ -34,6 +38,18 @@ export class PortCodes {
       this.maps.set(t, new Map(l[t].map((n, i) => [n, i])));
     }
     this.records = l.records;
+    this.lists = { kinds: l.kinds, ledgerCats: l.ledgerCats, milestones: l.milestones, starGates: l.starGates };
+  }
+
+  /** The names of `table`, in code order. */
+  names(table: NameTable): readonly string[] {
+    return this.lists[table];
+  }
+
+  /** The slot names of `op`'s record, in slot order (empty for an op the
+   *  layout lacks). */
+  fields(op: string): readonly string[] {
+    return this.records[op] ?? [];
   }
 
   /** The code for `name` in `table`, or NaN for a name the table lacks (the
