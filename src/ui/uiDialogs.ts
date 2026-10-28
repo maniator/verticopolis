@@ -91,8 +91,17 @@ export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null =
       openImport(ui);
     },
     // The kept text downloads as stored, with no engine involved. A .txt is a
-    // file type GitHub accepts on an issue. The button exists only when text is kept.
-    ...(unreadable === null ? {} : { unreadable: () => void ui.downloadFile(UNREADABLE_SAVE_FILENAME, unreadable) }),
+    // file type GitHub accepts on an issue. The button exists only when text
+    // is kept, and closes the dialog first, as export does, so a failure toast
+    // is not hidden behind it.
+    ...(unreadable === null
+      ? {}
+      : {
+          unreadable: () => {
+            ui.closeModal();
+            ui.downloadFile(UNREADABLE_SAVE_FILENAME, unreadable);
+          },
+        }),
   });
 }
 
