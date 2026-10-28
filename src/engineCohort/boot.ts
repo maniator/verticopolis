@@ -1,5 +1,5 @@
 import type { EngineChoice } from "../wasmhost/engineChoice";
-import { COHORT_STAGE, COHORT_TELEMETRY, RUST_ONLY_BY_URL, STAGE_SHARE, type CohortStage } from "./config";
+import { COHORT_STAGE, COHORT_TELEMETRY, RUST_ONLY_BY_CHOICE, STAGE_SHARE, type CohortStage } from "./config";
 import { exitCleanly, stepAside } from "./crashMarker";
 import { heldAfterCrashes, tabStore } from "./crashReload";
 import { setCurrentSelection, currentSelection } from "./current";
@@ -92,7 +92,7 @@ function chooseAndWatch(search: string): EngineChoice {
     now: Date.now(),
     random: randomUnit,
     safetyOn,
-    rustOnlyByUrl: RUST_ONLY_BY_URL,
+    rustOnlyByChoice: RUST_ONLY_BY_CHOICE,
   });
   if (selection.boot !== "ts" && heldAfterCrashes(tabStore(), __APP_SHA__)) {
     // This tab's Rust engine crashed twice on this build (#1422): its boots
