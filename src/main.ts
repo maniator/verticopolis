@@ -39,6 +39,7 @@ import { TsEngine } from "./engine/port/tsEngine";
 import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
 import { PortEvents } from "./simport/portEvents";
+import { PortRenderSim } from "./simport/portRenderSim";
 import type { GameplayEventSource } from "./analyticsEngineBridge";
 import { hudSource } from "./game/hudSource";
 import { catalogOf } from "./game/portAccess";
@@ -73,6 +74,7 @@ class GameApp implements GameAppPorts {
   reader!: ViewReader;
   portCodes!: PortCodes;
   /** The engine's gameplay events, for the analytics bridge. */ events!: PortEvents;
+  /** What the renderer draws: the reader's view and the port's render queries. */ renderSim!: PortRenderSim;
   /** The editor and inspector cards, and the reads the port lacks. @internal */ cardKit!: CardKit;
   get sim(): Simulation { return this.enginePort.sim; }
   set sim(sim: Simulation) { if (!(import.meta.env.DEV || __TOOLING_BUILD__)) throw new Error("app.sim is set only in tooling builds"); this.enginePort.take(sim); }
@@ -227,7 +229,8 @@ class GameApp implements GameAppPorts {
     // adoptSim, so without this a reloaded 2★-6★ tower reads star > lastStar(1)
     // on the first frame and fires a phantom promotion (jingle + star_reached).
     this.lastStar = this.sim.star;
-    this.engine = new TowerEngine(this.canvas, this.sim, this.reader);
+    this.renderSim = new PortRenderSim(this.enginePort, this.reader);
+    this.engine = new TowerEngine(this.canvas, this.renderSim, this.reader);
 
     // Restore persisted audio prefs onto the facade BEFORE any UI wiring or
     // gesture listener exists, so the very first interaction (which starts the
@@ -455,13 +458,14 @@ class GameApp implements GameAppPorts {
     this.lastMealRushDay = { breakfast: -1, lunch: -1, dinner: -1 };
     // A crash report pairs the CURRENT tower's save with these entries, so drop a previous tower's.
     this.frameErrors.length = 0;
-    // An undo/redo restore keeps the camera under the player (preserveHistory is
-    // only ever true on that path); a real tower swap restores the save's view.
-    this.engine.setSim(sim, { keepCamera: preserveHistory });
-    // Read the swapped-in tower now, not on the next throttled pass. Rebase the
-    // UI log cursor so old entries don't replay as toasts, and refresh the palette
-    // to the new star level so it never shows the prior tower's unlock set.
+    // Read the swapped-in tower now, before the renderer takes it. An undo/redo
+    // restore keeps the camera under the player (preserveHistory is only ever
+    // true on that path); a real tower swap restores the save's view.
     this.reader.update();
+    this.engine.setSim(this.renderSim, { keepCamera: preserveHistory });
+    // Rebase the UI log cursor so old entries don't replay as toasts, and
+    // refresh the palette to the new star level so it never shows the prior
+    // tower's unlock set.
     this.ui.resetLog(hudSource(this));
     this.ui.update(hudSource(this));
     if (!preserveHistory) {
