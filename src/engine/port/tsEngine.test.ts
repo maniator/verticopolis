@@ -6,6 +6,7 @@ import { roomUnits, watchRooms } from "../tower/rooms";
 import { MetaLog } from "./metaLog";
 import { ONBOARDING_FLAG } from "./queries";
 import { TsEngine } from "./tsEngine";
+import type { SerializedGame } from "../types";
 
 /**
  * `TsEngine` on its own, in the `unit` project: each member's answer shape
@@ -361,6 +362,12 @@ describe("TsEngine's reports and files", () => {
     e.tdtExport();
     e.loadSave(e.serialize());
     expect(e.adoptTdt()[0]).toBe(0);
+    expect(e.tdtFile()).toBeUndefined();
+    // So does a tower the game swapped in itself.
+    e.loadTdt(bytes, "SPIRE.TDT");
+    e.tdtExport();
+    e.take(Simulation.deserialize(JSON.parse(e.serialize()) as SerializedGame));
+    expect(e.tdtTowerName()).toBeUndefined();
     expect(e.tdtFile()).toBeUndefined();
     expect(Array.from(e.loadTdt(Uint8Array.of(1, 2, 3), "BAD.TDT"))).toEqual([0]);
     expect(e.lastReason()).toContain("SimTower");
