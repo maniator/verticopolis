@@ -1,7 +1,7 @@
 import { html, type TemplateResult } from "lit-html";
 import { APP_VERSION } from "../appVersion";
 import { crashReportDue, markCrashReportShown, tabStore, type RustCrashFacts } from "../engineCohort/crashReload";
-import { buildCrashDetails, buildCrashReportZip, bugReportUrl, type CrashEngines, type CrashTower, type RustCrashDescription } from "../game/crashReport";
+import { buildCrashDetails, buildCrashReportZip, bugReportUrl, timesText, type CrashEngines, type CrashTower, type RustCrashDescription } from "../game/crashReport";
 import { TS_ENGINE_SOURCES, TS_ENGINE_VERSION } from "../wasmhost/tsEngineIdentity";
 import { downloadFile } from "./downloadFile";
 import type { UI } from "./UI";
@@ -24,9 +24,6 @@ export interface RustCrashApp {
   enginePort: CrashTower["port"];
   speed?: number;
 }
-
-/** "twice", or the count for any other number of crashes. */
-const timesText = (n: number): string => (n === 2 ? "twice" : `${n} times`);
 
 export function rustCrashTemplate(crash: RustCrashDescription, reportHref: string): TemplateResult {
   return html`
@@ -84,6 +81,8 @@ export function offerRustCrashReport(app: RustCrashApp, sha: string): boolean {
   if (!due) return false;
   const crash: RustCrashDescription = { kind: "rust-engine-trap", crashes: due.count, reason: due.last.reason, stage: due.last.stage };
   showRustCrashReport(app, crash, crashEngines(due.last));
+  // A mark storage did not keep shows the report again on the next boot,
+  // which errs toward telling the player, so its result is not checked.
   markCrashReportShown(store, sha);
   return true;
 }
