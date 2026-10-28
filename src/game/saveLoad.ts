@@ -3,16 +3,16 @@ import { Simulation } from "../engine/Simulation";
 import type { GameMode, SerializedView } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
 import { SaveGame, isStorageWriteError, saveFailureMessage } from "../storage/SaveGame";
-import { LegacyExportError, buildTDT, type BuiltLegacyTower } from "../storage/tdtExport";
-import { LegacyImportError, parseTDT } from "../storage/tdtImport";
-import type { ImportReport } from "../storage/tdtImport";
+import { exportReport, type ExportReport } from "../storage/tdtExportReport";
+import { importReport } from "../storage/tdtImportReport";
 import { runExportFlow, runLegacyDownload } from "./exportFlow";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
 import { shouldArm } from "../ui/Onboarding";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
-import { loadStored, saveText, swapDone } from "./portLifecycle";
+import { loadStored, saveText, stampCamera, swapDone } from "./portLifecycle";
+import { exportFacts, importFacts } from "../simport/tdtRecords";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import type { UI } from "../ui/UI";
 
@@ -115,15 +115,6 @@ export class SaveLoad {
     } catch {
       /* best effort; the in-memory shadow still counts */
     }
-  }
-
-  /** Stamp the live camera onto the sim before a save/export. A null camera
-   *  (headless context) stamps nothing rather than null, so it can never
-   *  erase a view the sim already carries (e.g. one a TDT import brought
-   *  over before any camera existed). */
-  private stampView(sim: Simulation): void {
-    const view = this.deps.getView();
-    if (view) sim.view = view;
   }
 
   /** The live tower's save text through the port, the camera stamped first. */
@@ -382,33 +373,45 @@ export class SaveLoad {
    * refused outright (the 1994 rule set cannot represent them).
    */
   exportLegacy(): void {
-    let built: BuiltLegacyTower;
+    const port = this.deps.enginePort();
+    let bytes: Uint8Array | undefined;
+    let report: ExportReport;
     try {
-      const sim = this.deps.getSim();
-      this.stampView(sim);
-      built = buildTDT(sim.serialize());
+      // A null camera (headless) stamps nothing, so it never erases the view
+      // a TDT import brought over before any camera existed.
+      stampCamera(port, this.deps.getView());
+      const rec = port.tdtExport();
+      bytes = rec[0] === 1 ? port.tdtFile() : undefined;
+      if (!bytes) {
+        // The engine's refusal is the player's sentence (a Modern tower, a
+        // tower too deep for 1994).
+        this.deps.ui.sayVisibly(port.lastReason() ?? "Export failed."); // not a toast: a dialog may be up (GH #658)
+        return;
+      }
+      report = exportReport(exportFacts(rec, this.deps.portCodes(), port.towerName()));
     } catch (err) {
-      const msg =
-        err instanceof LegacyExportError
-          ? err.message
-          : "Export failed: " + (err instanceof Error ? err.message : String(err));
-      this.deps.ui.sayVisibly(msg); // not a toast: a dialog may be up (GH #658)
+      this.deps.ui.sayVisibly("Export failed: " + (err instanceof Error ? err.message : String(err)));
       return;
     }
-    this.deps.ui.showExportReport(built.report, {
+    const file = bytes;
+    this.deps.ui.showExportReport(report, {
       // Through the shared export latch (GH #760 follow-on), so a .TDT download
       // and a .vctower export can never run at once.
       onDownload: () =>
         void runLegacyDownload(this.deps.ui, () => {
-          this.deps.ui.downloadFile(built.report.filename, built.bytes);
+          this.deps.ui.downloadFile(report.filename, file);
         }),
     });
   }
 
   async importGame(data: string): Promise<void> {
     try {
-      const sim = await SaveGame.import(data);
-      this.deps.adoptSim(sim);
+      // SaveGame holds the file to its checks and copy; the engine loads it
+      // (the `stored` source, with the founder rule) and the app follows.
+      const text = await SaveGame.importText(data);
+      const port = this.deps.enginePort();
+      swapDone(port, port.loadSave(text));
+      this.deps.towerSwapped();
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
       this.deps.ui.sayVisibly("Import failed: " + (err as Error).message);
@@ -416,39 +419,28 @@ export class SaveLoad {
   }
 
   /**
-   * Import an original 1994 SimTower save (`.TDT`). Parse and validate FIRST
-   * (through both the binary walker's hardening and `Simulation.deserialize`'s
-   * trust-boundary coercion), then show the fidelity report; nothing is
-   * adopted or persisted until the player confirms with "Open tower". A
-   * garbage file never reaches the sim, the same contract as importGame.
+   * Import an original 1994 SimTower save (`.TDT`). The engine reads and
+   * checks it first (the binary walker's hardening, then the trust boundary
+   * every save goes through) and stages it; the fidelity report comes from
+   * its record. Nothing is adopted or persisted until the player confirms
+   * with "Open tower". A garbage file never reaches the tower, the same
+   * contract as importGame.
    */
   importLegacy(buffer: ArrayBuffer, filename: string): void {
-    let sim: Simulation;
-    let report: ImportReport;
-    try {
-      const parsed = parseTDT(buffer, filename);
-      // Deliberate second hardening layer: the importer's output goes through
-      // the exact trust boundary every other save does.
-      sim = Simulation.deserialize(parsed.save);
-      report = parsed.report;
-    } catch (err) {
-      // LegacyImportError messages are already player-readable; anything else
-      // (a deserialize trust-boundary refusal, an importer bug) keeps the
-      // plain lead but carries the underlying detail, matching importGame's
-      // "Import failed: <message>" diagnosability.
-      const detail = err instanceof Error && err.message ? ` (${err.message})` : "";
-      const msg =
-        err instanceof LegacyImportError
-          ? err.message
-          : `This SimTower save couldn't be read.${detail}`;
-      this.deps.ui.toast(msg, "bad");
+    const port = this.deps.enginePort();
+    const rec = port.loadTdt(new Uint8Array(buffer), filename);
+    if (rec[0] !== 1) {
+      // The refusal is already player-readable: the importer's own sentence,
+      // or "This SimTower save couldn't be read." with the detail.
+      this.deps.ui.toast(port.lastReason() ?? "This SimTower save couldn't be read.", "bad");
       return;
     }
+    const report = importReport(importFacts(rec, this.deps.portCodes(), port));
     this.deps.ui.showImportReport(report, {
       // The confirmed-adoption flow (flush, adopt, fresh-slot copy, honest
       // toasts) lives in ./legacyImportAdopt, split out at the 500-line guard.
       // The flush stays a bound thunk so its throw contract is owned here.
-      onOpen: () => adoptConfirmedLegacyImport(this.deps, sim, () => this.saveBeforeUpdate()),
+      onOpen: () => adoptConfirmedLegacyImport(this.deps, report.towerName, () => this.saveBeforeUpdate()),
     });
   }
 

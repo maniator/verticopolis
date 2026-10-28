@@ -349,8 +349,18 @@ export const SaveGame = {
     return (slug || "tower") + TOWER_FILE_EXT;
   },
 
-  /** Parse a `.vctower` tower file. */
+  /** Parse a `.vctower` tower file into a tower (tests and tools). */
   async import(text: string): Promise<Simulation> {
+    const data = JSON.parse(await this.importText(text)) as SerializedGame;
+    const sim = Simulation.deserialize(data);
+    markFounderFromLoadedFile(sim, data); // an unstamped imported tower predates the appVersion stamp (pre-2.0)
+    return sim;
+  },
+
+  /** Read a `.vctower` file into save text for the engine's `loadSave`. The
+   *  checks and refusal copy stay here, in front of the engine, whose own
+   *  `.vctower` reader is more lenient (#1410 N4). */
+  async importText(text: string): Promise<SaveText> {
     const trimmed = text.trim();
     // Match the whole VCTOWER family, not just this version's magic, so a file
     // from a newer build gets an honest "update the game" rather than a generic
@@ -388,9 +398,7 @@ export const SaveGame = {
     if (typeof data.minutes !== "number" || !Array.isArray(data.units)) {
       throw new Error("Not a valid tower save file.");
     }
-    const sim = Simulation.deserialize(data);
-    markFounderFromLoadedFile(sim, data); // an unstamped imported tower predates the appVersion stamp (pre-2.0)
-    return sim;
+    return JSON.stringify(data);
   },
 };
 
