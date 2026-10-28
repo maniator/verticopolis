@@ -1,7 +1,9 @@
-//! The streamed reader's memory (#1225): a large tower loads in little more
-//! than the memory the loaded game keeps. Allocations are counted per thread,
-//! so the tests running beside this one do not move its figures.
+//! The memory of a large tower's load and save: it loads in little more than
+//! the memory the loaded game keeps (#1225), and saves in the buffer its text
+//! grows in, with no tree beside it (#1242). Allocations are counted per
+//! thread, so the tests running beside these do not move their figures.
 use super::*;
+use crate::facilities::{Kind, Pool, LOT_WIDTH, MIN_FLOOR, POOLED_CAPS};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 
@@ -68,34 +70,111 @@ fn measure<T>(f: impl FnOnce() -> T) -> (T, isize, isize) {
     )
 }
 
-/// A lobby on floor 1 and floors 2 to 100 of tiles above it, with a row of
-/// occupied offices on each of those floors: 41,460 units, close to the large
-/// perf tower's 43,358.
+/// The synthetic tower's top floor, and where its offices stand along each
+/// floor from 2 up.
+const TOP_FLOOR: i64 = 100;
+const OFFICE_XS: std::ops::Range<i64> = 3..360;
+const OFFICE_STEP: usize = 9;
+/// How many blockbuster cinemas and milestones it carries, and the length of
+/// its name and of its pending choice's message: the loader keeps any number
+/// of each, and any length.
+const MANY: usize = 2_000;
+const LONG: usize = 80_000;
+
+/// The pool a transport kind counts against.
+fn pool_of(kind: Kind) -> &'static Pool {
+    POOLED_CAPS
+        .iter()
+        .find(|p| p.kinds.contains(&kind))
+        .unwrap()
+}
+
+/// A modern game with a lobby on floor 1 and floors 2 to `TOP_FLOOR` of tiles
+/// above it, with a row of occupied offices on each of those floors: 41,460
+/// units, close to the large perf tower's 43,358. Three lists are at their
+/// caps: the whole elevator and stair pools, a full log and a full ledger.
+/// The other lists and strings are large: all ten basement floors excavated
+/// (the loader keeps any distinct tile), an exterminator booked for every
+/// office (room ids are capped at `UNIT_CAP`, far above that), `MANY`
+/// blockbuster cinemas and milestones, and a tower name and a pending
+/// choice's message `LONG` bytes each.
 fn large_save() -> String {
     let mut units = Vec::new();
+    let mut offices = Vec::new();
     let mut id = 0;
     let mut unit = |body: String| {
         id += 1;
         units.push(format!("{{\"id\":{id},{body}}}"));
+        id
     };
-    for x in 0..375 {
+    for x in 0..LOT_WIDTH {
         unit(format!("\"kind\":\"lobby\",\"floor\":1,\"x\":{x}"));
     }
-    for floor in 2..=100 {
-        for x in 0..375 {
+    for floor in 2..=TOP_FLOOR {
+        for x in 0..LOT_WIDTH {
             unit(format!("\"kind\":\"floor\",\"floor\":{floor},\"x\":{x}"));
         }
-        for x in (3..360).step_by(9) {
-            unit(format!(
+        for x in OFFICE_XS.step_by(OFFICE_STEP) {
+            offices.push(unit(format!(
                 "\"kind\":\"office\",\"floor\":{floor},\"x\":{x},\"state\":\"occupied\",\"everOccupied\":true,\"occupants\":6,\"satisfaction\":0.8,\"rent\":10000"
-            ));
+            )));
         }
     }
+    let mut transports = Vec::new();
+    let shaft = Kind::ElevatorStandard.facility().width;
+    for k in 0..pool_of(Kind::ElevatorStandard).cap {
+        id += 1;
+        transports.push(format!(
+            "{{\"id\":{id},\"kind\":\"elevatorStandard\",\"x\":{},\"width\":{shaft},\"bottom\":1,\"top\":30,\"cars\":8,\"carPositions\":[1,1,1,1,1,1,1,1],\"carDir\":[0,0,0,0,0,0,0,0],\"load\":0}}",
+            15 * k
+        ));
+    }
+    let stairs = Kind::Stairs.facility().width;
+    for floor in 1..=pool_of(Kind::Stairs).cap {
+        id += 1;
+        transports.push(format!(
+            "{{\"id\":{id},\"kind\":\"stairs\",\"x\":{},\"width\":{stairs},\"bottom\":{floor},\"top\":{}}}",
+            LOT_WIDTH - stairs,
+            floor + 1
+        ));
+    }
+    let log = (0..crate::sim::LOG_SAVE_CAP)
+        .map(|i| format!("{{\"minute\":{i},\"text\":\"Line {i}: a tenant moved into an office on the fortieth floor.\",\"kind\":\"info\"}}"))
+        .collect::<Vec<_>>()
+        .join(",");
+    let day = crate::ledger::LEDGER_CATS
+        .iter()
+        .enumerate()
+        .map(|(i, cat)| format!("\"{cat}\":{}.25", 12_345 * (i + 1)))
+        .collect::<Vec<_>>()
+        .join(",");
+    let history = vec![format!("{{{day}}}"); crate::ledger::WINDOW].join(",");
+    let excavated = (MIN_FLOOR..=0)
+        .flat_map(|floor| (0..LOT_WIDTH).map(move |x| format!("\"{floor}:{x}\"")))
+        .collect::<Vec<_>>()
+        .join(",");
+    let rooms = offices
+        .iter()
+        .map(i64::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    let blockbusters = (0..MANY)
+        .map(|i| format!("{i}.5"))
+        .collect::<Vec<_>>()
+        .join(",");
+    let milestones = (0..MANY)
+        .map(|i| format!("\"goal {i}: a milestone this game does not know\""))
+        .collect::<Vec<_>>()
+        .join(",");
+    let phrase = "The Tall Tower. ";
+    let name = phrase.repeat(LONG / phrase.len());
+    let phrase = "Pay for the rescue. ";
+    let message = phrase.repeat(LONG / phrase.len());
     format!(
-        "{{\"version\":7,\"seed\":1,\"initialSeed\":1,\"money\":1000000000,\"star\":5,\"minutes\":420,\"mode\":\"classic\",\"modernCalendar\":\"realWorld\",\"lastQuarterMoney\":0,\"units\":[{}],\"transports\":[{{\"id\":{},\"kind\":\"elevatorStandard\",\"x\":0,\"width\":4,\"bottom\":1,\"top\":30,\"cars\":2,\"carPositions\":[1,1],\"carDir\":[0,0],\"load\":0}}],\"nextId\":{}}}",
+        "{{\"version\":7,\"seed\":1,\"initialSeed\":1,\"money\":1000000000,\"star\":5,\"minutes\":420,\"mode\":\"modern\",\"modernCalendar\":\"realWorld\",\"lastQuarterMoney\":0,\"units\":[{}],\"transports\":[{}],\"nextId\":{},\"towerName\":\"{name}\",\"events\":{{\"lastSantaYear\":-1,\"rngState\":1,\"pending\":{{\"kind\":\"fireRescue\",\"cost\":500000,\"message\":\"{message}\"}}}},\"exterminationDueDay\":0,\"exterminationRoomIds\":[{rooms}],\"excavated\":[{excavated}],\"blockbusters\":[{blockbusters}],\"milestones\":[{milestones}],\"ledger\":{{\"today\":{{{day}}},\"history\":[{history}]}},\"log\":[{log}]}}",
         units.join(","),
-        id + 1,
-        id + 2
+        transports.join(","),
+        id + 1
     )
 }
 
@@ -127,6 +206,113 @@ fn a_large_load_peaks_near_what_it_keeps() {
     assert!(
         peak * 4 <= kept * 5,
         "the streamed load peaked at {peak} bytes for {kept} kept"
+    );
+}
+
+/// The large tower's save is written without the whole-save tree (#1242).
+/// Its text's buffer doubles as it grows, so the save peaks at that buffer
+/// plus the half it last grew from, under three times the text, where
+/// writing it through the tree peaks at several times the text. Written
+/// into a buffer reserved to the text's length, it builds no more than
+/// `SLACK` beside that buffer. The test prints its figures, which
+/// `-- --nocapture` shows.
+#[test]
+fn a_large_save_peaks_near_its_text() {
+    let sim = load_save_text(large_save().as_bytes()).unwrap();
+    // Every list the save writes came through the load whole.
+    let days = &sim.ledger.history;
+    let cats = crate::ledger::LEDGER_CATS.len();
+    assert_eq!(days.len(), crate::ledger::WINDOW);
+    assert!(days
+        .iter()
+        .chain([&sim.ledger.today])
+        .all(|d| d.len() == cats));
+    let basement_floors = (MIN_FLOOR..=0).count();
+    assert_eq!(sim.excavated.len(), basement_floors * LOT_WIDTH as usize);
+    assert_eq!(sim.log.len(), crate::sim::LOG_SAVE_CAP);
+    let pools = pool_of(Kind::ElevatorStandard).cap + pool_of(Kind::Stairs).cap;
+    assert_eq!(sim.tower.transports.len(), pools as usize);
+    let offices = OFFICE_XS.step_by(OFFICE_STEP).count() * (2..=TOP_FLOOR).count();
+    let rooms = sim.extermination_room_ids.as_ref().map_or(0, Vec::len);
+    assert_eq!(rooms, offices);
+    assert_eq!(sim.blockbusters.len(), MANY);
+    let goals = sim.milestones.iter().filter(|m| m.starts_with("goal "));
+    assert_eq!(goals.count(), MANY);
+    let name = sim.tower.tower_name.as_ref().map_or(0, String::len);
+    let message = sim.events.pending.as_ref().map_or(0, |p| p.message.len());
+    assert_eq!((name, message), (LONG, LONG));
+    let (text, peak, kept) = measure(|| sim.save_text());
+    // With its buffer reserved, the same write builds no more than `SLACK`
+    // beside the buffer at any point, so a value built whole while it is
+    // written shows here even after the buffer's last doubling.
+    let mut buf = Vec::with_capacity(text.len());
+    let ((), built, _) = measure(|| sim.write_save(&mut buf));
+    assert!(
+        buf == text.as_bytes(),
+        "the reserved write wrote other text"
+    );
+    let (tree_text, tree_peak, _) = measure(|| sim.serialize().to_string());
+    assert!(text == tree_text, "the tree wrote other text");
+    let mib = |n: isize| n as f64 / f64::from(1 << 20);
+    println!(
+        "{:.2} MiB of text in a {:.2} MiB buffer; the save peaked at {:.2} MiB, {} KiB above the \
+         buffer and the half it grew from; into a reserved buffer it built {} KiB; the tree \
+         peaked at {:.2} MiB",
+        mib(text.len() as isize),
+        mib(kept),
+        mib(peak),
+        (peak - kept - kept / 2) >> 10,
+        built >> 10,
+        mib(tree_peak)
+    );
+    within_its_buffer(text.len(), peak, kept);
+    assert!(
+        built <= SLACK,
+        "the write built {built} bytes beside its buffer"
+    );
+    assert!(
+        tree_peak >= 4 * text.len() as isize,
+        "the tree peaked at only {tree_peak} bytes for {} of text",
+        text.len()
+    );
+}
+
+/// `Engine.serialize` writes the same text the same way.
+#[cfg(feature = "wasm")]
+#[test]
+fn the_binding_saves_without_the_tree() {
+    let text = large_save();
+    let want = load_save_text(text.as_bytes()).unwrap().save_text();
+    let e = crate::wasm::Engine::from_save(&text, None).expect("the save loads");
+    let (got, peak, kept) = measure(|| e.serialize());
+    assert!(got == want, "the binding wrote other text");
+    within_its_buffer(got.len(), peak, kept);
+}
+
+/// What the save builds beside its text: the top-level values it owns, and
+/// one list element at a time. It measures 4 to 5 KiB on `large_save`,
+/// where any one of its lists, its name or its pending choice held or built
+/// whole takes 80 KiB or more.
+const SLACK: isize = 16 << 10;
+
+/// A save's text sits in a buffer under twice its length, and the save
+/// peaks at that buffer plus the half it last grew from (the buffer doubles
+/// as it grows), with `SLACK` for the values it builds along the way. The
+/// text sits far enough above the buffer's last doubling that a second copy
+/// of it, or a tree, does not fit.
+fn within_its_buffer(len: usize, peak: isize, kept: isize) {
+    let len = len as isize;
+    assert!(
+        kept >= len && kept < 2 * len,
+        "{kept} bytes kept for {len} of text"
+    );
+    assert!(
+        len > kept / 2 + SLACK,
+        "{len} bytes of text sit too close to the {kept}-byte buffer's last doubling"
+    );
+    assert!(
+        peak <= kept + kept / 2 + SLACK,
+        "the save peaked at {peak} bytes for a {kept}-byte buffer"
     );
 }
 

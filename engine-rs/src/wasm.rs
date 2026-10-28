@@ -377,7 +377,7 @@ impl Engine {
 
     /// `serialize()` as JSON text.
     pub fn serialize(&self) -> String {
-        self.sim.serialize().to_string()
+        self.sim.save_text()
     }
 
     /// The hashed state view: the saved game minus prose, as canonical JSON.
