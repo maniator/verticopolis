@@ -4,10 +4,9 @@ import { isEngineTrap } from "../wasmhost/hostFault";
  * A trap in the running Rust engine (#874), heard where the frame loop
  * catches it. After a trap the module may be corrupt and every later call on
  * the engine throws, so the frame loop's next step would throw too: the first
- * trap is handed, once, to the handler boot installs, which stops the game.
- * Until PR 6 brings back the fallback to the TypeScript engine, a trap stops
- * the game on both builds. A throw that is not a trap is a frame error like
- * any other.
+ * trap is handed, once, to the handler boot installs, which stops the game
+ * and reloads it from its last autosave (#1422). A throw that is not a trap
+ * is a frame error like any other.
  */
 
 let onTrap: ((error: unknown) => void) | null = null;

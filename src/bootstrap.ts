@@ -5,7 +5,8 @@ import { startGameplaySession, trackAppActionOnce } from "./analytics";
 import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
-import { noteRustFailed, selectBootEngine, stageNotice } from "./engineCohort/boot";
+import { noteRustCrashed, noteRustFailed, selectBootEngine, stageNotice } from "./engineCohort/boot";
+import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, reloadSoon, tabStore } from "./engineCohort/crashReload";
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rustEngine";
 import { tsBootTower, type BootTower } from "./game/bootTower";
 import { setEngineWriter } from "./storage/vctowerWriter";
@@ -318,9 +319,11 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
           noteEngineWriterLatched();
         });
       }
-      // A trap in the running engine (#874) stops the game on both builds
-      // until PR 6 brings back the fallback to TypeScript: the module may be
-      // corrupt, so nothing calls it again, and the saves stay as last written.
+      // A trap in the running engine (#874) never hands the tower to the
+      // TypeScript engine mid-game (#1422): the module may be corrupt, so
+      // nothing calls it again, the saves stay as last written, and the page
+      // reloads onto the last autosave. This tab's second crash on a build
+      // reloads onto TypeScript, and a wasm-only build stops there instead.
       if (rust) {
         watchEngineTraps((e) => {
           const message = `the Rust engine failed during a tick: ${e instanceof Error ? e.message : String(e)}`;
@@ -330,14 +333,21 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
           // Nothing runs the tower now, on either build.
           bootState = { ...failBoot(bootState, "host", "trap-tick", message), engine: "none" };
           setEngineWriter(null);
-          rustFailed("host", "trap-tick");
+          const outcome = crashOutcome(countRustCrash(tabStore(), __APP_SHA__), __WASM_ONLY__);
+          if (outcome === "reload") noteRustCrashed();
+          else if (outcome === "reload-on-ts") rustFailed("crash-loop", "trap-loop");
+          else rustFailed("host", "trap-tick");
           publishBootState(bootState);
           // Both builds count the trap in the reliability rows, as the stage
-          // its tower was hosted at. A switchable build's row reads
-          // ts-fallback until PR 6 makes that so again (owner, 2026-10-28).
+          // its tower was hosted at. The row goes out by beacon, so it
+          // survives the reload.
           noteEngineFallback({ reason: "trap-tick", stage: runningTowerStage() });
-          showEngineFailure(bootState);
           app.setSpeed?.(0);
+          if (outcome === "stop") showEngineFailure(bootState);
+          else {
+            showBootMessage(CRASH_RELOAD_LINE[outcome]);
+            reloadSoon();
+          }
         });
       }
       // The engine is settled. Sent before the tooling and service-worker
