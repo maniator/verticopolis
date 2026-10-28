@@ -4,13 +4,14 @@ import { METRO_PLATFORM_CUTOFF_MSG } from "./constants";
 import { isTenantFloorUnit } from "../milestones";
 import { isMetroPlatformServed } from "../tower/routing";
 import { segmentsOf } from "../tower/segments";
+import { isStructural } from "../tower/towerTopology";
 
 import { FACILITIES, GARBAGE_COLLECT_HOUR, PARKING_WORKERS_PER_SPACE, RECYCLING_POP_PER_CENTER, isHotelKind } from "../facilities";
 import type { FacilityKind, Unit } from "../types";
 
 import { isOperational, isTenanted } from "../types";
 import { HK_MAIDS_PER_UNIT, HK_NOMINAL_ROOMS_PER_MAID } from "../economy/housekeeping";
-import { roomUnits, setRoomState } from "../tower/rooms";
+import { roomCounts, roomUnits, setRoomState } from "../tower/rooms";
 
 /** Recycling / parking / staff / stranded advisories for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -43,7 +44,8 @@ export function recyclingFill(sim: Simulation): number {
   const cap = sim.recyclingCapacity();
   if (cap === 0) return 0;
   const sinceCollect = (sim.clock.minuteOfDay - GARBAGE_COLLECT_HOUR * 60 + 1440) % 1440;
-  return Math.min(1, (sim.tower.totalPopulation() / cap) * (sinceCollect / 1440));
+  // The kept room counts' population is `totalPopulation()` without the walk.
+  return Math.min(1, (roomCounts(sim.tower).population / cap) * (sinceCollect / 1440));
 }
 
 /** Functional parking spaces the tower NEEDS: one per ~24 office workers
@@ -232,11 +234,12 @@ export function parkingUsage(sim: Simulation, spots: number = sim.tower.function
   // star never decreases).
   if (sim.star < FACILITIES.parking.minStar) return 0;
   const h = sim.clock.hour;
-  const d = sim.parkingDemand();
-  const officeCars = !sim.clock.isWeekend && h >= 8 && h < 18 ? d.offices : 0;
+  // Office cars park by day and suite cars by night, so one room walk at
+  // most answers it.
+  const officeCars = !sim.clock.isWeekend && h >= 8 && h < 18 ? sim.parkingDemand().offices : 0;
   let suiteCars = 0;
   if (h >= 19 || h < 8) {
-    for (const u of sim.tower.units) if (u.kind === "hotelSuite" && u.state === "asleep") suiteCars++;
+    for (const u of roomUnits(sim.tower)) if (u.kind === "hotelSuite" && u.state === "asleep") suiteCars++;
   }
   return Math.min(1, (officeCars + suiteCars) / spots);
 }
@@ -413,7 +416,8 @@ export function hasOperational(sim: Simulation, kind: FacilityKind): boolean {
 /** Count of operational (finished, not-on-fire) units of a kind. */
 export function countOperational(sim: Simulation, kind: FacilityKind): number {
   let n = 0;
-  for (const u of sim.tower.units) {
+  // A room kind walks the rooms only: the same count without the floor tiles.
+  for (const u of isStructural(kind) ? sim.tower.units : roomUnits(sim.tower)) {
     if (u.kind === kind && isOperational(u)) n++;
   }
   return n;

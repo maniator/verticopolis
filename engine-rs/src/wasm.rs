@@ -294,6 +294,8 @@ pub struct Engine {
     /// The step mode `advance` last stepped under; it outlives a swap, as
     /// the web host's step debt outlives an adopted tower.
     stepper: crate::fixed_step::FrameStepper,
+    /// The last `queueView` and `congestion` answers and their keys.
+    render_memo: port_render::RenderMemo,
 }
 
 #[wasm_bindgen]
@@ -1065,6 +1067,9 @@ mod port_reports;
 #[path = "wasm_port_files.rs"]
 mod port_files;
 
+#[path = "wasm_port_render.rs"]
+mod port_render;
+
 /// The engine's port (facade slice 7, the owner's 2026-10-28 redesign): the
 /// game calls these on `Engine` directly, every argument a number and every
 /// answer a number or a record of numbers, with no JSON. A command answers
@@ -1166,6 +1171,30 @@ impl Engine {
     #[wasm_bindgen(js_name = unitFacts)]
     pub fn unit_facts(&mut self, id: f64) -> Vec<f64> {
         self.port_unit_facts(id)
+    }
+    // The render queries (`wasm_port_render.rs`).
+    pub fn congestion(&mut self) -> f64 {
+        self.port_congestion()
+    }
+    #[wasm_bindgen(js_name = queueView)]
+    pub fn queue_view(&mut self) -> Vec<f64> {
+        self.port_queue_view()
+    }
+    #[wasm_bindgen(js_name = parkingSet)]
+    pub fn parking_set(&self) -> Vec<f64> {
+        self.port_parking_set()
+    }
+    #[wasm_bindgen(js_name = parkingUsage)]
+    pub fn parking_usage(&self, spots: f64) -> f64 {
+        self.port_parking_usage(spots)
+    }
+    #[wasm_bindgen(js_name = recyclingFill)]
+    pub fn recycling_fill(&self) -> f64 {
+        self.port_recycling_fill()
+    }
+    #[wasm_bindgen(js_name = positionReachable)]
+    pub fn position_reachable(&mut self, floor: f64, x: f64) -> bool {
+        self.port_position_reachable(floor, x)
     }
 }
 

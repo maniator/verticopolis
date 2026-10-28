@@ -183,6 +183,12 @@ records under their own names.
 | `crewCoverage` | none | record, the layout's `crewCoverage` slots | exterminator gate |
 | `unitFacts` | id | record, the layout's `unitFacts` slots: a present flag per section with NaN slots when it is 0, codes from `modes`, `accessLines`, `noRateLines`, `vacateReasons` and `bindings`; empty for no such unit. Named apart from the legacy `diagnosticFacts` JSON getter | diagnostics readout |
 | `logAfter` | seq | record of (seq, kindCode, minute) triples; `logText(seq)` | per new log line |
+| `congestion` | none | number: the mean congestion over populated floors, the lobby left out. The overlay's peak is `hotspot`'s ratio | frame |
+| `queueView` | none | record: the layout's `queueView` header (landing rows, car rows), then a `queueLanding` row (shaft, floor, count, worst wait tier 0 to 2) per waiting line in the crowd's order, then a `queueCar` row (shaft, car, riders) per elevator car in tower order. Kept per tower, crowd step and revision, so a frame between steps walks nothing | frame |
+| `parkingSet` | none | record: count, then the working garage space ids, ascending | scene sync |
+| `parkingUsage` | spots | number, 0 to 1: the garage fill for that many working spaces; a count that is not a positive finite number reads as none | scene sync |
+| `recyclingFill` | none | number, 0 to 1 | scene sync |
+| `positionReachable` | floor, x | boolean: whether a walker can stand there; a position that is not a whole tile is not one | walker placement |
 
 `towerName()`, `unitLabel(id)`, `logText(seq)` and the other text getters
 return a plain string, never JSON.
@@ -339,10 +345,18 @@ they resume.
    reader with R2's notes from `3a8e4008` (room-count guard rows, the
    import-walk guard over the port's modules, no per-frame `Set`), since the
    reader's test needs both engines.
-4. Callers onto the port; `SimPort` and `TsSim` deleted.
-5. Boot behind `?engine=wasm-facade` (tooling builds), the e2e run, then the
-   one-tower PC check through the coordinator. It starts with `advance`, the frame
-   loop's one time call (5a), which needs no caller moved.
+4. Callers onto the port: a base PR, then the caller moves on it. `SimPort` and `TsSim` go in 5d.
+5. `?engine=wasm` itself boots the Rust `Engine` through the port, and the
+   mirror host is deleted (owner, 2026-10-28 03:49 UTC: no separate flag and
+   no tooling-only boot; Rust stays behind the URL flag until PR 6, and the
+   TypeScript engine stays selectable). Then the e2e run and the one-tower PC
+   check through the coordinator. It lands in parts: 5a `advance`, the frame
+   loop's one time call, which needs no caller moved; 5b the renderer's
+   reads (`congestion`, `queueView`, `parkingSet`, `parkingUsage`,
+   `recyclingFill`, `positionReachable`) and `PortRenderSim`, the
+   renderer's `RenderSim` over the reader and the port; 5c the frame loop
+   and modal reads; 5d the lifecycle callers, then `SimPort` and `TsSim`
+   deleted; 5e the boot and the mirror host's removal.
 6. Restore points and the sidecar, the cadence exclusions, the fault
    fallback (story ACs 16 to 21 and slice 8), unchanged in substance.
 7. The integration suites on the Rust engine (owner, 2026-10-28: before

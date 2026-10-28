@@ -222,6 +222,14 @@ export const BINDING_EXPORT_TIERS = {
   adoptTdt: T2,
   tdtExport: T2,
   tdtFile: T2,
+  // Tier 2, the port's render queries (facade slice 7, PR 5b): what the
+  // renderer reads beyond the view frame, per frame or per scene sync.
+  congestion: T2,
+  queueView: T2,
+  parkingSet: T2,
+  parkingUsage: T2,
+  recyclingFill: T2,
+  positionReachable: T2,
   // Tier 2, the host loop and the engine's lifetime.
   tick: LOOP,
   advance: LOOP,
