@@ -1,12 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { repoRel, sourceFiles } from "./guardFiles";
-import { COUNTED_FIELDS } from "../engine/tower/rooms";
+import { COUNTED_FIELDS, VIEW_FIELDS } from "../engine/tower/rooms";
 
 /**
  * The HUD's kept room counts (`roomCounts` in `src/engine/tower/rooms.ts`) are
  * right only while every write of a field they read (`COUNTED_FIELDS`) marks
- * its room. A room's `state` goes through `setRoomState`, which marks it; the
+ * its room, and the TypeScript engine's view frame and meta log (`watchRooms`,
+ * #1389) only while every write of a field the view reads (`VIEW_FIELDS`)
+ * does too. This guard scans both lists. A room's `state` goes through `setRoomState`, which marks it; the
  * other fields are written raw in the few places below, each of which marks
  * the room or is covered by a `setRoomState` in the same function.
  *
@@ -43,7 +45,7 @@ import { COUNTED_FIELDS } from "../engine/tower/rooms";
  * `scripts/scenes/features.ts`, as `e2e/regions.spec.ts` does for its fire).
  */
 
-const FIELD = COUNTED_FIELDS.join("|");
+const FIELD = [...COUNTED_FIELDS, ...VIEW_FIELDS].join("|");
 const MEMBER = String.raw`(?:\.(${FIELD})\b|\[\s*(["'\`])(${FIELD})\3\s*\])`;
 const OPERATOR = String.raw`(?:\*\*=|<<=|>>>?=|\?\?=|\|\|=|&&=|[-+*/%&|^]?=(?![=>])|\+\+|--)`;
 /** `x.f op` and `x["f"] op`, for every assignment operator and a postfix step. */
@@ -76,36 +78,63 @@ function writesIn(text: string): { field: string; named: boolean }[] {
 
 /** Raw writes per file and field, and what marks each file's rooms. */
 const RAW_WRITES: Record<string, Record<string, number>> = {
-  // gut(): covered by its setRoomState.
-  "src/engine/EventSystem.ts": { everOccupied: 1, residents: 1 },
-  // finish(): markRoom after the decrement.
-  "src/engine/crowd/motion.ts": { customersIn: 1 },
-  // beginDwell(): markRoom after each increment.
-  "src/engine/crowd/visits.ts": { customersIn: 2 },
-  // vacate(), attemptMoveIns(), moveIn(): covered by their setRoomState.
-  "src/engine/sim/churn.ts": { everOccupied: 7, residents: 3 },
+  // The open stamp and the checkouts: covered by their setRoomState (a
+  // closed venue goes through presence's emptyVenue).
+  "src/engine/EconomySystem.ts": { occupants: 3 },
+  // gut(), startFire(), spreadFireTo(): covered by their setRoomState.
+  "src/engine/EventSystem.ts": { everOccupied: 1, residents: 1, label: 1, occupants: 3 },
+  // setLabel(): markRoom after the write.
+  "src/engine/Tower.ts": { label: 1 },
+  // syncAttendanceOccupants(): each caller marks the venue, the crowd beside
+  // its customersIn mark, presence and emptyVenue when the count moved.
+  "src/engine/census.ts": { occupants: 1 },
+  // finish(): markRoom after the origin's decrement and after the venue's
+  // customersIn decrement, which also covers its hotelCustomersIn.
+  "src/engine/crowd/motion.ts": { customersIn: 1, hotelCustomersIn: 1, outForMeal: 1 },
+  // The school run and the sales call: markRoom after each increment.
+  "src/engine/crowd/routines.ts": { outForMeal: 2 },
+  // The meal trip: markRoom after the increment.
+  "src/engine/crowd/spawn.ts": { outForMeal: 1 },
+  // beginDwell(): markRoom after each customersIn increment, which also
+  // covers the hotelCustomersIn one; the visit's origin: markRoom.
+  "src/engine/crowd/visits.ts": { customersIn: 2, hotelCustomersIn: 1, outForMeal: 1 },
+  // escalateInfestations(), spreadCockroaches(): covered by their setRoomState.
+  "src/engine/economy/housekeeping.ts": { occupants: 2 },
+  // The retail subtype at placement: markRoom.
+  "src/engine/sim/build.ts": { subtype: 1 },
+  // vacate(), attemptMoveIns(), moveIn(): covered by their setRoomState; the
+  // retail reroll: markRoom.
+  "src/engine/sim/churn.ts": { everOccupied: 7, residents: 3, label: 4, occupants: 1, subtype: 1 },
   // The save writer, serializeUnit(): its writes go only into the new record
   // it builds from a unit.
-  "src/engine/sim/coerce.ts": { state: 1, everOccupied: 1, residents: 1, noRate: 1 },
+  "src/engine/sim/coerce.ts": { state: 1, everOccupied: 1, residents: 1, noRate: 1, occupants: 1, label: 1, subtype: 1 },
+  // updatePresence(), emptyVenue(): markRoom when a room's count moved.
+  "src/engine/sim/presence.ts": { occupants: 8 },
   // priceUnit(), setNoRate(), computeBatch(): markRoom after each write.
   "src/engine/sim/rent.ts": { noRate: 4 },
+  // The paid extermination: covered by its setRoomState.
+  "src/engine/sim/services.ts": { occupants: 1 },
   // setRoomState itself.
   "src/engine/tower/rooms.ts": { state: 1 },
-  // The hosts' unit records: markRoom when either field moves.
-  "src/wasmhost/frameApply.ts": { state: 1, customersIn: 1 },
-  "src/wasmhost/frameSync.ts": { state: 1, customersIn: 1 },
+  // The hosts' unit records: markRoom when state or customersIn moves. Their
+  // view fields go unmarked: nothing watches the WASM mirror's tower
+  // (watchRooms is the TypeScript engine's), and port PR 5 deletes it.
+  "src/wasmhost/frameApply.ts": { state: 1, customersIn: 1, occupants: 1, hotelCustomersIn: 1, outForMeal: 1 },
+  "src/wasmhost/frameSync.ts": { state: 1, customersIn: 1, occupants: 1, hotelCustomersIn: 1, outForMeal: 1 },
   // The shared reader's own decoded rooms, never an engine unit: it keeps
   // no counts.
-  "src/simport/viewReader.ts": { state: 2, customersIn: 1 },
+  "src/simport/viewReader.ts": { state: 2, customersIn: 1, occupants: 1, hotelCustomersIn: 1, outForMeal: 1, label: 2, subtype: 3 },
 };
 
 /** Writes through a person's or a class's own name, per file: the crowd's
- *  people (`motion.ts`, `visits.ts`, the hosts' crowd apply) and the
- *  generator's own `this.state` (`rng.ts`). */
+ *  people (`motion.ts`, `visits.ts`, the hosts' crowd apply), the generator's
+ *  own `this.state` (`rng.ts`) and the shared reader's room view's own
+ *  `this.label`. */
 const NAMED_WRITES: Record<string, Record<string, number>> = {
   "src/engine/crowd/motion.ts": { state: 9 },
   "src/engine/crowd/visits.ts": { state: 1 },
   "src/engine/rng.ts": { state: 3 },
+  "src/simport/viewReader.ts": { label: 1 },
   "src/wasmhost/frameApply.ts": { state: 1 },
   "src/wasmhost/frameSync.ts": { state: 1 },
 };
@@ -206,7 +235,7 @@ describe("writes of the fields the HUD's room counts read", () => {
   it("are the marked ones the table lists", () => {
     expect(
       found.raw,
-      "A write of a room's state goes through setRoomState; any other counted field needs markRoom (src/engine/tower/rooms.ts) and a row here.",
+      "A write of a room's state goes through setRoomState; any other counted or view field needs markRoom (src/engine/tower/rooms.ts) and a row here.",
     ).toEqual(RAW_WRITES);
   });
 
