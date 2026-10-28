@@ -4,7 +4,7 @@ import { EditorActions } from "./editorActions";
 import { SaveLoad, RESUME_AFTER_RECOVERY_KEY } from "./saveLoad";
 import { InspectorController } from "./inspector";
 import { KeyboardPlay } from "./keyboardPlay";
-import { isUnlocked } from "./portAccess";
+import { catalogOf, isUnlocked } from "./portAccess";
 import { attemptContextRecovery } from "./contextRecovery";
 import { isEngineStopped, isSplashUp } from "./interactionState";
 import { showCrashScreen } from "../ui/crashScreen";
@@ -68,6 +68,7 @@ export function wireControllers(app: GameApp): void {
     enginePort: () => app.enginePort,
     portCodes: () => app.portCodes,
     reader: () => app.reader,
+    catalog: () => catalogOf(app),
     isUnlocked: (kind) => isUnlocked(app, kind),
     ui: { toast: (text, kind) => app.ui.toast(text, kind) },
     audio: app.audio,
@@ -170,6 +171,7 @@ export function wireControllers(app: GameApp): void {
     enginePort: () => app.enginePort,
     portCodes: () => app.portCodes,
     reader: () => app.reader,
+    catalog: () => catalogOf(app),
     isUnlocked: (kind) => isUnlocked(app, kind),
     engine: () => app.engine,
     audio: app.audio,

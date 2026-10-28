@@ -40,7 +40,7 @@ export function wireEngine(app: GameApp): void {
   // also zooms). Before this, a floor/lobby/parking drag only ever panned on
   // touch, so mobile couldn't paint a run at all. On mouse the pan key
   // (Space or Shift, resolved in towerInputCamera) pans with any tool armed.
-  app.engine.classifyDown = (button, touch, panKey) => classifyGesture(catalogOf(app.reader), app.tool, button, touch, panKey);
+  app.engine.classifyDown = (button, touch, panKey) => classifyGesture(catalogOf(app), app.tool, button, touch, panKey);
 
   // A press-without-drag: select (inspect) or, on touch, run the tool. The
   // picked entity resolves transports by collider hit-test and units by the
@@ -56,7 +56,7 @@ export function wireEngine(app: GameApp): void {
       return;
     }
     if (!touch) return; // mouse pan-taps with a build/bulldoze tool do nothing
-    app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app.reader), app.tool.kind).name}`);
+    app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
     if (app.tool.type === "bulldoze") app.build.bulldozePicked(picked);
     else if (app.tool.type === "build") {
       // Touch taps land here for every simple placement, including the
@@ -78,7 +78,7 @@ export function wireEngine(app: GameApp): void {
     app.buildAnchor = null;
     app.build.clearPaint();
     if (app.tool.type === "bulldoze" || app.tool.type === "build") {
-      app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app.reader), app.tool.kind).name}`);
+      app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
     }
     if (app.tool.type === "bulldoze") {
       app.build.bulldozePicked(picked);
@@ -98,7 +98,7 @@ export function wireEngine(app: GameApp): void {
       } else {
         // A drag-sized shaft anchors here; anything else places on the press.
         const placing = placeSimpleBuild(app, app.tool.kind, tile, floor);
-        if (!placing) app.transportStart = { x: snapX(catalogOf(app.reader), app.tool.kind, tile), floor };
+        if (!placing) app.transportStart = { x: snapX(catalogOf(app), app.tool.kind, tile), floor };
       }
     }
   };
@@ -163,7 +163,7 @@ export function wireEngine(app: GameApp): void {
     // escalators already placed on the DOWN event, and their hover ghost
     // also lives in transportPreview, treating it as a drag commit here
     // would double-place on every desktop click.
-    if (app.tool.type === "build" && isTransportTool(app) && !catalogFacility(catalogOf(app.reader), app.tool.kind).fixedSpan) {
+    if (app.tool.type === "build" && isTransportTool(app) && !catalogFacility(catalogOf(app), app.tool.kind).fixedSpan) {
       const tp = app.engine.transportPreview;
       if (tp) {
         // The helper explains failures (invalid spot, not enough money)
@@ -172,7 +172,7 @@ export function wireEngine(app: GameApp): void {
         app.engine.transportPreview = null;
       } else if (app.transportStart) {
         // Pressed without dragging, teach the drag-to-size gesture.
-        app.ui.toast(`Drag up or down to set the ${catalogFacility(catalogOf(app.reader), app.tool.kind).name.toLowerCase()}'s height.`, "info");
+        app.ui.toast(`Drag up or down to set the ${catalogFacility(catalogOf(app), app.tool.kind).name.toLowerCase()}'s height.`, "info");
       }
     }
     app.transportStart = null;

@@ -1,4 +1,5 @@
 import type { Simulation } from "../engine/Simulation";
+import { catalogOf } from "./portAccess";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
 import { ViewReader } from "../simport/viewReader";
@@ -20,6 +21,7 @@ export function portDeps(sim: Simulation) {
       enginePort: () => engine,
       portCodes: () => codes,
       reader: () => reader,
+      catalog: () => catalogOf({ sim, reader }),
       isUnlocked: (kind: Parameters<Simulation["isUnlocked"]>[0]) => sim.isUnlocked(kind),
     },
   };

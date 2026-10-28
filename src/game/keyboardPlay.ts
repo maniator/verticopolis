@@ -1,4 +1,4 @@
-import { catalogFacility } from "../engine/catalogTypes";
+import { catalogFacility, type Catalog } from "../engine/catalogTypes";
 import type { FacilityKind } from "../engine/types";
 import type { Picked, TowerEngine } from "../render/excalibur/TowerEngine";
 import type { Tool, UI } from "../ui/UI";
@@ -8,7 +8,7 @@ import type { BuildActions } from "./buildActions";
 import type { EnginePort } from "../simport/enginePort";
 import { outcome, type PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
-import { catalogOf, quoteShaft } from "./portAccess";
+import { quoteShaft } from "./portAccess";
 
 /**
  * Keyboard play (F50–52): the virtual build cursor moved with arrows/WASD,
@@ -29,8 +29,10 @@ export interface KeyboardPlayDeps {
   enginePort(): EnginePort;
   /** The code tables a kind passes through. */
   portCodes(): PortCodes;
-  /** The shared reader (the catalog's mode and the tower reads). */
+  /** The shared reader (the tower reads). */
   reader(): ViewReader;
+  /** The live tower's catalog for the reader's mode (`portAccess.catalogOf`). */
+  catalog(): Catalog;
   /** The one read the port cannot answer (`portAccess.isUnlocked`). */
   isUnlocked(kind: FacilityKind): boolean;
   /** The live renderer (never cached: context-loss recovery swaps the
@@ -119,7 +121,7 @@ export class KeyboardPlay {
     if (!c) return;
     const loc = c.floor >= 1 ? `floor ${c.floor}` : `basement ${1 - c.floor}`;
     const here = this.deps.pickedAt(c.floor, c.tile);
-    this.deps.announce(`Cursor: ${loc}, column ${c.tile}. ${here ? catalogFacility(catalogOf(this.deps.reader()), here.kind).name : "Empty"}.`);
+    this.deps.announce(`Cursor: ${loc}, column ${c.tile}. ${here ? catalogFacility(this.deps.catalog(), here.kind).name : "Empty"}.`);
   }
 
   commitCursor(): void {
@@ -127,7 +129,7 @@ export class KeyboardPlay {
       this.moveCursor(0, 0); // first press: just reveal the cursor
       return;
     }
-    const catalog = catalogOf(this.deps.reader());
+    const catalog = this.deps.catalog();
     const c = this.kbCursor;
     const tool = this.deps.tool();
     if (tool.type === "inspect") {
@@ -187,7 +189,7 @@ export class KeyboardPlay {
       this.deps.announce("Nothing to bulldoze here");
       return;
     }
-    const name = catalogFacility(catalogOf(this.deps.reader()), p.kind).name;
+    const name = catalogFacility(this.deps.catalog(), p.kind).name;
     this.deps.captureUndo("Bulldoze");
     const removed = this.deps.build.bulldozePicked(p);
     this.deps.commitUndo();

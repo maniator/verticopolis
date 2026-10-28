@@ -42,16 +42,13 @@ export function quoteShaft(
   return { ok, reason: ok ? undefined : port.lastReason() };
 }
 
-const catalogKeys = new WeakMap<object, { readonly mode: GameMode }>();
-
-/** The catalog of the tower the view shows. The catalog handle keeps what it
- *  reads per object, so the key is one object per view: the header is
- *  replaced on every update. */
-export function catalogOf(view: Pick<SimView, "header">): Catalog {
-  const mode = view.header.mode;
-  let key = catalogKeys.get(view);
-  if (!key) catalogKeys.set(view, (key = { mode }));
-  return towerCatalog(key, mode);
+/** The catalog of the mode the reader shows, from the live tower's catalog
+ *  source. The catalog handle is keyed on the tower, and the WASM host
+ *  installs its catalog there (`useTowerCatalogSource`), so the tower is the
+ *  key: any other object reads the TypeScript tables whatever the host runs.
+ *  The tower is only a key here, never asked a question. */
+export function catalogOf(app: { readonly sim: { readonly mode: GameMode }; readonly reader: Pick<SimView, "header"> }): Catalog {
+  return towerCatalog(app.sim, app.reader.header.mode);
 }
 
 /**

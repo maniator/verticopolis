@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { catalogFacility } from "../engine/catalogTypes";
 import { Simulation } from "../engine/Simulation";
+import { useTowerCatalogSource } from "../engine/towerCatalog";
 import { catalogOf, isUnlocked, quoteBuild, quoteShaft } from "./portAccess";
 import { portDeps } from "./portDeps.fixture";
 
@@ -37,14 +39,33 @@ describe("quoteShaft", () => {
 });
 
 describe("catalogOf", () => {
-  it("is the catalog of the view's mode, kept across header updates", () => {
-    const classic = portDeps(new Simulation(1, "classic")).reader;
-    const modern = portDeps(new Simulation(1, "modern")).reader;
-    expect(catalogOf(classic).mode).toBe("classic");
-    expect(catalogOf(modern).mode).toBe("modern");
-    const first = catalogOf(classic);
-    classic.update();
-    expect(catalogOf(classic)).toBe(first);
+  it("is the catalog of the reader's mode, kept across header updates", () => {
+    const classic = new Simulation(1, "classic");
+    const modern = new Simulation(1, "modern");
+    const c = { sim: classic, reader: portDeps(classic).reader };
+    const m = { sim: modern, reader: portDeps(modern).reader };
+    expect(catalogOf(c).mode).toBe("classic");
+    expect(catalogOf(m).mode).toBe("modern");
+    const first = catalogOf(c);
+    c.reader.update();
+    expect(catalogOf(c)).toBe(first);
+  });
+
+  it("follows the catalog source the host installed on the live tower", () => {
+    const sim = new Simulation(1, "classic");
+    const { reader } = portDeps(sim);
+    const base = catalogOf({ sim, reader });
+    const office = catalogFacility(base, "office");
+    const hosted = {
+      ...base,
+      facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, width: f.width + 2, cost: f.cost + 1000 } : f)),
+    };
+    useTowerCatalogSource(sim, () => hosted);
+    const read = catalogFacility(catalogOf({ sim, reader }), "office");
+    expect(read.width).toBe(office.width + 2);
+    expect(read.cost).toBe(office.cost + 1000);
+    useTowerCatalogSource(sim, null);
+    expect(catalogFacility(catalogOf({ sim, reader }), "office").width).toBe(office.width);
   });
 });
 

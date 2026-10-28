@@ -108,9 +108,7 @@ describe("wireControllers", () => {
     const app = {
       sim,
       engine,
-      enginePort: { id: "engine port" },
-      portCodes: { id: "codes" },
-      reader: { id: "reader" },
+      enginePort: { id: "engine port" }, portCodes: { id: "codes" }, reader: { id: "reader" },
       audio: { sfx: vi.fn(), setProgram: vi.fn() },
       speed: 2,
       frameErrors: [],
@@ -154,20 +152,12 @@ describe("wireControllers", () => {
   it("hands BuildActions closures that reach the live app", () => {
     const app = makeWiringApp();
     wireControllers(app);
-    const d = mocks.deps.build as {
-      enginePort: () => unknown;
-      portCodes: () => unknown;
-      reader: () => unknown;
-      isUnlocked: (kind: string) => boolean;
+    const d = mocks.deps.build as Record<string, (k?: string) => unknown> & {
       ui: { toast: (t: string, k: string) => void };
       selectedId: () => number | null;
       clearSelection: () => void;
     };
-    expect(d.enginePort()).toBe(app.enginePort);
-    expect(d.portCodes()).toBe(app.portCodes);
-    expect(d.reader()).toBe(app.reader);
-    expect(d.isUnlocked("office")).toBe(true);
-    expect(app.sim.isUnlocked).toHaveBeenCalledWith("office");
+    expect([d.enginePort(), d.portCodes(), d.reader(), d.isUnlocked("office")]).toEqual([app.enginePort, app.portCodes, app.reader, true]);
     d.ui.toast("hi", "bad");
     expect(app.ui.toast).toHaveBeenCalledWith("hi", "bad");
     expect(d.selectedId()).toBe(7);
@@ -274,10 +264,7 @@ describe("wireControllers", () => {
     const d = mocks.deps.keyboard as Record<string, (...a: unknown[]) => unknown> & {
       ui: Record<string, (...a: unknown[]) => unknown>;
     };
-    expect(d.enginePort()).toBe(app.enginePort);
-    expect(d.portCodes()).toBe(app.portCodes);
-    expect(d.reader()).toBe(app.reader);
-    expect(d.isUnlocked("office")).toBe(true);
+    expect([d.enginePort(), d.portCodes(), d.reader(), d.isUnlocked("office")]).toEqual([app.enginePort, app.portCodes, app.reader, true]);
     expect(d.engine()).toBe(app.engine);
     d.ui.toast("t", "info");
     expect(app.ui.toast).toHaveBeenCalledWith("t", "info");

@@ -1,4 +1,4 @@
-import { catalogBuildKind, catalogFacility } from "../engine/catalogTypes";
+import { catalogBuildKind, catalogFacility, type Catalog } from "../engine/catalogTypes";
 import type { FacilityKind } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
@@ -8,7 +8,7 @@ import { outcome, type PortCodes } from "../simport/portCodes";
 import type { BrushKind } from "../simport/commands";
 import type { ViewReader } from "../simport/viewReader";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
-import { catalogOf, quoteShaft } from "./portAccess";
+import { quoteShaft } from "./portAccess";
 
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
@@ -31,6 +31,8 @@ export interface BuildActionsDeps {
   portCodes(): PortCodes;
   /** The shared reader: the tower reads, current as of its last `update()`. */
   reader(): ViewReader;
+  /** The live tower's catalog for the reader's mode (`portAccess.catalogOf`). */
+  catalog(): Catalog;
   /** The one read the port cannot answer (`portAccess.isUnlocked`). */
   isUnlocked(kind: FacilityKind): boolean;
   ui: Pick<UI, "toast">;
@@ -85,7 +87,7 @@ export class BuildActions {
   /** Human-readable reason an elevator/stairs span can't be placed. */
   transportReason(kind: FacilityKind, x: number, bottom: number, top: number): string {
     if (!this.deps.isUnlocked(kind)) {
-      const f = catalogFacility(catalogOf(this.deps.reader()), kind);
+      const f = catalogFacility(this.deps.catalog(), kind);
       return `${f.name} unlocks at ${f.minStar}★.`;
     }
     const v = quoteShaft(this.deps.enginePort(), this.deps.portCodes(), kind, x, bottom, top);
@@ -112,7 +114,7 @@ export class BuildActions {
     // price; this is the belt-and-braces spoken confirmation. Keyed off the
     // catalog's ground-floor rule (catalogBuildKind), the same rule the preview
     // and the tool card use.
-    const catalog = catalogOf(this.deps.reader());
+    const catalog = this.deps.catalog();
     const laid = catalogBuildKind(catalog, kind, floor);
     if (placed > 0 && laid !== kind) {
       const f = catalogFacility(catalog, laid);
@@ -161,7 +163,7 @@ export class BuildActions {
     // the right edge left-shifts to fit instead of silently failing off-lot.
     // Loud, like the desktop press it mirrors: a tap deserves the build sfx
     // and the refusal toast. Drag steps stay quiet in paintFloorRun.
-    const seedX = snapX(catalogOf(this.deps.reader()), kind, tile);
+    const seedX = snapX(this.deps.catalog(), kind, tile);
     this.paint = { tile: seedX, floor };
     this.tryBuild(kind, floor, seedX);
   }
@@ -181,13 +183,13 @@ export class BuildActions {
       // For width-1 floor/lobby this is identical to clampTile.
       // Record the SNAPPED anchor (what was actually placed), so a later drag-run
       // extends from the placed unit, not an off-lot raw tile near the edge.
-      const seedX = snapX(catalogOf(this.deps.reader()), kind, tile);
+      const seedX = snapX(this.deps.catalog(), kind, tile);
       this.tryBuild(kind, floor, seedX, true);
       this.paint = { tile: seedX, floor };
       return;
     }
     // Quiet drag steps, run in order.
-    const catalog = catalogOf(this.deps.reader());
+    const catalog = this.deps.catalog();
     for (const x of dragRunTiles(this.paint.tile, tile)) {
       // snapX each column so a WIDE unit near the right edge still lands on-lot
       // (its footprint would otherwise run off; width-1 floor/lobby is unchanged).

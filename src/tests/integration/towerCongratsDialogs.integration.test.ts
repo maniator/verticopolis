@@ -49,6 +49,7 @@ function savedTower(withChoice: boolean): Simulation {
 }
 
 function makeApp(sim: Simulation, ui: UI) {
+  const { engine } = portDeps(sim);
   const app = {
     shownChoice: false,
     shownUpdate: false,
@@ -57,7 +58,7 @@ function makeApp(sim: Simulation, ui: UI) {
     prefs: { steadyClock: true },
     sim,
     port: createTsSim(() => sim),
-    reader: portDeps(sim).reader,
+    enginePort: engine,
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn() },
     engine: { focus: vi.fn(() => ({})) },

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { catalogFor } from "../engine/catalog";
 import { Simulation } from "../engine/Simulation";
-import { FACILITIES } from "../engine/facilities";
+import { FACILITIES, GRID } from "../engine/facilities";
+import { useTowerCatalogSource } from "../engine/towerCatalog";
 import { snapX, brushTiles } from "../ui/placement";
 import type { GameMode } from "../engine/types";
 import type { GameApp } from "../main";
@@ -170,6 +171,21 @@ describe("isTransportTool / isPaintTool", () => {
 });
 
 describe("updateBuildPreview", () => {
+  it("snaps to the host's catalog when the host installed one on the tower", () => {
+    const { sim } = fixture();
+    const { app, raw } = makeApp(sim, buildTool("office"));
+    const tile = GRID.width - 1;
+    updateBuildPreview(app, tile, 2);
+    const own = (raw.engine.preview as { x: number }).x;
+    expect(own).toBe(snapX(CAT, "office", tile));
+    useTowerCatalogSource(sim, (mode) => {
+      const base = catalogFor(mode);
+      return { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, width: f.width + 2 } : f)) };
+    });
+    updateBuildPreview(app, tile, 2);
+    expect((raw.engine.preview as { x: number }).x).toBe(own - 2);
+  });
+
   it("clears both previews and any refusal when the tool is not a build tool", () => {
     const { sim } = fixture();
     const { app, raw, showInspector } = makeApp(sim, { type: "inspect" } as unknown as GameApp["tool"], {

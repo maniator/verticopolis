@@ -61,7 +61,7 @@ export function pickedAt(app: GameApp, floor: number, tile: number): Picked | nu
  *  drag-sized shafts (that anchor gesture belongs to the caller), and
  *  otherwise the engine's outcome. */
 export function placeSimpleBuild(app: GameApp, kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null {
-  const catalog = catalogOf(app.reader);
+  const catalog = catalogOf(app);
   if (kind === "floor" || kind === "lobby") {
     const r = app.build.paintBrush(kind, tile, floor);
     return { what: "paint", ok: r.placed > 0, reason: r.reason };
@@ -75,7 +75,7 @@ export function placeSimpleBuild(app: GameApp, kind: FacilityKind, tile: number,
 }
 
 export function isTransportTool(app: GameApp): boolean {
-  return app.tool.type === "build" && catalogFacility(catalogOf(app.reader), app.tool.kind).transport;
+  return app.tool.type === "build" && catalogFacility(catalogOf(app), app.tool.kind).transport;
 }
 
 /** Whether the active tool drag-paints a run (floor/lobby/parking), see
@@ -92,7 +92,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     return;
   }
   const kind = app.tool.kind;
-  const catalog = catalogOf(app.reader);
+  const catalog = catalogOf(app);
   if (isTransportTool(app)) {
     const x = snapX(catalog, kind, tile);
     if (catalogFacility(catalog, kind).fixedSpan) {
