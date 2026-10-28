@@ -50,6 +50,12 @@ TypeScript adapter over the Rust engine:
   the dirty rows per frame; a golden-array test pins it, and a guard fails on
   an `await` of a port call.
 
+- **The suites move to Rust before 3.0** (owner, 2026-10-28). After PR 5,
+  the integration suites boot the Rust `Engine` through the port by default,
+  with `TsEngine` as the parity leg. The TypeScript-only ratchet goes to
+  zero, and any test that cannot move keeps a one-line reason. This is
+  the contract's PR 7, and Copilot issues carry the mechanical moves.
+
 R2's NO-GO notes on #1372 at `3a8e4008` carry where the code survives: the
 room-count guard rows, AC 2's import-walk guard (now over the port's
 modules), and no per-frame `Set` in the person decode.

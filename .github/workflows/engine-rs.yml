@@ -436,7 +436,7 @@ jobs:
           test -f engine-rs/pkg/verticopolis_engine.d.ts || { echo "the engine package has no engine-rs/pkg/verticopolis_engine.d.ts"; exit 1; }
           cmp engine-rs/pkg/verticopolis_engine.d.ts src/dualrun/engine.d.ts || { echo "src/dualrun/engine.d.ts is stale: run npm run wasm:build and commit it"; exit 1; }
           npm run gen:events
-          test -z "$(git status --porcelain -- src/dualrun/engine.d.ts src/engine/gameplayEvents.d.ts src/engine/gameplayEventRules.ts)" || { echo "src/dualrun/engine.d.ts, src/engine/gameplayEvents.d.ts or src/engine/gameplayEventRules.ts is stale or untracked: run npm run wasm:build (or npm run gen:events for the two event files) and commit them"; exit 1; }
+          test -z "$(git status --porcelain -- src/dualrun/engine.d.ts src/engine/gameplayEvents.d.ts src/engine/gameplayEventRules.ts src/engine/viewLayout.json)" || { echo "src/dualrun/engine.d.ts, src/engine/gameplayEvents.d.ts, src/engine/gameplayEventRules.ts or src/engine/viewLayout.json is stale or untracked: run npm run wasm:build (or npm run gen:events for the two event files) and commit them"; exit 1; }
 
       # The step limit and the start log keep a stall from running to the job's
       # limit with no test name (#1152); see the same step in test.yml.

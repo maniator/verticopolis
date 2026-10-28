@@ -186,12 +186,17 @@ commands are. Each reads the typed core its JSON getter wraps.
 
 ## 3. Input rules (both engines, one contract)
 
-The same rules on `Engine` and `TsEngine`, pinned by one contract fixture
-that runs on both (`src/simport/enginePortContract.fixture.ts`, the `unit`
-project for `TsEngine`, `unitWasm` for `Engine`):
+The same rules on `Engine` and `TsEngine`, pinned by one test that runs
+both engines side by side on one tower and compares every answer and
+refusal text (`src/tests/integration/tsEngine.golden.integration.test.ts`,
+PR 3):
 
 - Every numeric argument has one of three classes, and anything outside
-  its class is refused with `INVALID_REQUEST`, never coerced:
+  its class is refused, never coerced. A command or a quote refuses with its
+  refusal record and `INVALID_REQUEST` in `lastReason()`. A query refuses
+  with its empty or absent answer and leaves `lastReason()` alone, so an
+  unknown heat mode answers no cells (the TypeScript `floorHeatmap` throws
+  on one, so `TsEngine` checks the code first). The classes:
   - **safe integer**: a whole JS number within `Number.isSafeInteger`
     (`crate::charges::whole` and its TypeScript twin). Ids, floors,
     columns, tiles, counts, seeds, codes, revisions and sequence numbers.
@@ -310,15 +315,34 @@ they resume.
    (`wasm_port_life.rs`); 1c the panel queries `heatCells`, `crewCoverage`,
    `unitCard` and `shaftCard` (`wasm_port_panels.rs`); 1d `statsReport`
    and `diagnosticFacts`.
-2. `EnginePort`, the shared reader, the contract fixture on `Engine`, the
-   compile-time check; R2's notes from `3a8e4008` (room-count guard rows,
-   the import-walk guard over the port's modules, no per-frame `Set`).
-3. `TsEngine` and the contract fixture and golden arrays on it.
+2. `EnginePort` and the compile-time check on `Engine`; the layout as
+   `src/engine/viewLayout.json`, written by `npm run wasm:build` from the
+   package and held to it by a test; one tier rule for the port's members.
+3. `TsEngine`, the golden test against `Engine` (section 3), and the shared
+   reader with R2's notes from `3a8e4008` (room-count guard rows, the
+   import-walk guard over the port's modules, no per-frame `Set`), since the
+   reader's test needs both engines.
 4. Callers onto the port; `SimPort` and `TsSim` deleted.
 5. Boot behind `?engine=wasm-facade` (tooling builds), the e2e run, then the
    one-tower PC check through the coordinator.
 6. Restore points and the sidecar, the cadence exclusions, the fault
    fallback (story ACs 16 to 21 and slice 8), unchanged in substance.
+7. The integration suites on the Rust engine (owner, 2026-10-28: before
+   3.0, almost every integration test runs on Rust). It lands right after
+   PR 5, beside PR 6. Before PR 5 the suites' WASM leg runs on the mirror
+   host, where the TypeScript engine stays the authority, so a moved test
+   would not yet prove Rust. Three parts:
+   - The suites boot `Engine` through the port by default, and the
+     TypeScript engine (`TsEngine`) runs as the parity leg.
+   - The TypeScript-only ratchet (`itTypeScriptOnly`, 42 tests in 16 files
+     at `a7e6ead`) goes to zero. A test that drove the `Simulation`
+     directly (a clock jump, a write to a live counter, a subsystem call)
+     moves to port commands or to a tooling-only test member on `Engine`.
+   - A test that truly cannot move keeps its marker with a one-line reason,
+     and the story's test-mapping table lists it.
+   The file excludes in `vite.config.ts` stay. Those suites already run each
+   engine themselves. The mechanical moves go to Copilot as issues, one per
+   file group, after the port callers settle.
 
 ## Migration (story ACs to this contract)
 
