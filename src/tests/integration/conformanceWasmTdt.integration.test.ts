@@ -64,12 +64,10 @@
  *     it says so and skips its checks.
  *   - `VC_TDT_DIFF_KNOWN=1` adds the inputs the two sides are known to answer
  *     differently today, so a fix can be checked against them. They stay out
- *     of the default run until both sides agree: the edge saves in
- *     {@link KNOWN_DIVERGENT_EDGES}; in the NaN sweep, a unit's floor (skipped
- *     by default) and the live pairing, where the TypeScript exporter gets
- *     the in-memory object (by default both sides get the JSON form); in the
- *     forged sweep, a unit's floor, x and width (skipped by default, #884),
- *     and the sweep widens to all 22 values on two bases as under a raised N.
+ *     of the default run until both sides agree: a unit's floor in the NaN
+ *     sweep, and a unit's floor, x and width in the forged sweep (skipped by
+ *     default, #884); the forged sweep also widens to all 22 values on two
+ *     bases as under a raised N.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -133,15 +131,6 @@ const TOWERS_TIMEOUT = Math.max(600_000, TOWERS * 2 * TOWER_BUDGET * 2);
  *  at 50 or more a run where none parses means the harness is broken. */
 const MUTATIONS_GUARDED = 50;
 
-/**
- * Edge saves the two exporters answer differently today. A save with no
- * `towerName` loads on both engines, and then the TypeScript exporter throws
- * a TypeError (`legacyFilename` upper-cases undefined) where the Rust one
- * writes the file; a save whose `units` or `transports` is not an array is a
- * TypeError in TypeScript and a refusal in Rust.
- */
-const KNOWN_DIVERGENT_EDGES = new Set(["no-name", "no-units", "no-transports", "units-null"]);
-
 /** A stream of its own for each named consumer: FNV-1a over the root seed
  *  and the name, so no consumer's draws depend on which others ran first. */
 function rngFor(name: string): RNG {
@@ -196,7 +185,7 @@ const edgeCases = memo((): Case[] => {
   const out: Case[] = [];
   for (const [id, save] of edgeSaves(sampleBase())) {
     const filename = rng.pick(FILENAMES);
-    if (KNOWN || !KNOWN_DIVERGENT_EDGES.has(id)) out.push({ id: `edge-${id}`, save, filename });
+    out.push({ id: `edge-${id}`, save, filename });
   }
   return out;
 });
@@ -312,14 +301,12 @@ describe.skipIf(!hasWasmPackage())("TDT import and export, TypeScript against th
     "exports the same when the in-memory save holds NaN, Infinity or a huge clock",
     (rng) => {
       // The live host hands the TypeScript exporter the object and the Rust
-      // exporter JSON text, where NaN and Infinity become null. The two answer
-      // differently for a non-finite unit x, width, floor or rent and for
-      // non-finite minutes: the TypeScript exporter reads NaN differently from
-      // null. With VC_TDT_DIFF_KNOWN=1 that live pairing runs; by default both
-      // sides get the JSON form, which they answer the same for every field but
-      // a unit's floor (null floor: TypeScript paves a type-0 tenant under the
-      // room and leaves the floor edges at 0, Rust writes the room alone with
-      // its own edges), so unit floors are left out of the default sweep.
+      // exporter JSON text, where NaN and Infinity become null. The TypeScript
+      // exporter reads its input through JSON first (#887), so the two answer
+      // the same for every field but a unit's floor (null floor: TypeScript
+      // paves a type-0 tenant under the room and leaves the floor edges at 0,
+      // Rust writes the room alone with its own edges; #884). Unit floors run
+      // only under VC_TDT_DIFF_KNOWN=1.
       const bases: [string, SerializedGame][] = [["sample", viaJson(sampleBase())], ...classicTowers(2)];
       for (const [baseId, base] of bases) {
         for (const path of numericPaths(base, rng, NAN_UNITS)) {
@@ -327,8 +314,7 @@ describe.skipIf(!hasWasmPackage())("TDT import and export, TypeScript against th
           for (const bad of [NaN, Infinity, -Infinity]) {
             const save = structuredClone(base);
             setPath(save, path, bad);
-            if (KNOWN) diffExport(`nan-${baseId}-${path.join(".")}=${bad}`, save, JSON.stringify(save), viaJson(save));
-            else diffExport(`nan-${baseId}-${path.join(".")}=${bad}`, viaJson(save), JSON.stringify(save));
+            diffExport(`nan-${baseId}-${path.join(".")}=${bad}`, save, JSON.stringify(save), viaJson(save));
           }
         }
         for (const m of [2 ** 31 * 1440, 2 ** 31 * 1440 + 1, 2 ** 31 * 1440 + 1440 * 5 + 61, 2 ** 32 * 1440 + 7, 2 ** 53 - 1, 1e300, -(2 ** 31) * 1440 - 1]) {

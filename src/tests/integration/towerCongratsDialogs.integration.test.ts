@@ -3,11 +3,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { GameApp } from "../../main";
 import { Simulation } from "../../engine/Simulation";
 import { runFrame } from "../../game/frameLoop";
-import { portDeps } from "../../game/portDeps.fixture";
 import { hasBlockingModal } from "../../game/interactionState";
 import type { UI } from "../../ui/UI";
 import { mountAppDom, makeUI } from "../uiFixture";
 import { createTsSim } from "../../simport/tsSim";
+import { TsEngine } from "../../engine/port/tsEngine";
+import { PortCodes } from "../../simport/portCodes";
+import { ViewReader } from "../../simport/viewReader";
 
 /**
  * The TOWER congratulations and the dialogs that freeze time (#1120).
@@ -49,7 +51,7 @@ function savedTower(withChoice: boolean): Simulation {
 }
 
 function makeApp(sim: Simulation, ui: UI) {
-  const { engine } = portDeps(sim);
+  const enginePort = new TsEngine(sim);
   const app = {
     shownChoice: false,
     shownUpdate: false,
@@ -58,7 +60,9 @@ function makeApp(sim: Simulation, ui: UI) {
     prefs: { steadyClock: true },
     sim,
     port: createTsSim(() => sim),
-    enginePort: engine,
+    enginePort,
+    reader: new ViewReader(enginePort),
+    portCodes: new PortCodes(enginePort),
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn() },
     engine: { focus: vi.fn(() => ({})) },

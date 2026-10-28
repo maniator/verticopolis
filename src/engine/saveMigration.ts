@@ -81,12 +81,14 @@ export function migrateSave(data: SerializedGame): SerializedGame {
       ...migrated,
       // A missing `state` reads as "empty" (the deserialize fallback a sparse v3
       // save relies on), so an omitted state can never be mistaken for a sold shell.
+      // So does a non-string one, which only a hand edit writes, as in the Rust
+      // loader (#858).
       units: migrated.units.map((u) =>
         u &&
         u.kind === "condo" &&
         u.everOccupied === true &&
         u.rent === undefined &&
-        (u.state ?? "empty") !== "empty" &&
+        (typeof u.state === "string" ? u.state : "empty") !== "empty" &&
         u.state !== "gutted" &&
         u.state !== "construction"
           ? { ...u, rent: LEGACY_CONDO_DEFAULT_PRICE }

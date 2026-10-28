@@ -1,4 +1,5 @@
 import type { FacilityKind, LogEntry, SerializedUnit, SerializedView, Transport, Unit, UnitState } from "../types";
+import type { RNG } from "../rng";
 import { cloneSchedule, scheduleIsEmpty } from "../elevatorSchedule";
 
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../types";
@@ -121,6 +122,79 @@ export function coerceExterminationDueDay(hasRecovery: boolean, clockDay: number
   // hand-edited save can't strand the tower in a permanent "exterminator en
   // route" state (which would block new bookings and never resolve).
   return Math.min(clockDay + 1, Math.max(clockDay, Math.floor(raw)));
+}
+
+/** Put `rng` at a saved live state exactly, 0 included (#856): `new RNG` maps 0
+ *  to 1, which keeps a new game off state 0, but a running stream passes
+ *  through 0 once every 2^32 draws. A missing or non-number state leaves the
+ *  constructor's. */
+export function restoreSavedState(rng: RNG, saved: unknown): void {
+  if (typeof saved === "number" && Number.isFinite(saved)) rng.restore(saved);
+}
+
+/** Saved minutes: a non-negative finite number, else 0 (a forged NaN or
+ *  negative would poison every `clock.minutes` reader), not floored so a
+ *  sub-minute save round-trips, and capped at 2^53 - 1 as the Rust loader caps
+ *  it: past about 1.3e22 minutes the Rust clock's `i64` day saturates while
+ *  this one keeps counting, and under the cap both days agree (#858). */
+export function coerceMinutes(v: unknown): number {
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, typeof v === "number" && Number.isFinite(v) ? v : 0));
+}
+
+/**
+ * A saved whole number (#858): truncated toward zero and clamped into
+ * `[lo, hi]`, by default the integers a double holds exactly. That is the
+ * number the Rust loader keeps in its integer field. The game writes only
+ * whole numbers in these fields; a hand-edited fraction used to stay a
+ * fraction here, and past `i64` the Rust cast saturates to 2^63 - 1, which a
+ * double cannot hold exactly, so both engines clamp first. `-0` (from a
+ * fraction just below 0) reads as 0, as an integer has no `-0`. Callers pass a
+ * finite number; NaN would read as 0, as the Rust cast reads it.
+ */
+export function savedInt(v: number, lo = -Number.MAX_SAFE_INTEGER, hi = Number.MAX_SAFE_INTEGER): number {
+  return Math.trunc(Math.max(lo, Math.min(hi, v))) || 0;
+}
+
+/**
+ * A saved flag the game writes as a boolean (`evaluatedTower`,
+ * `builtWeddingHall`). Absent stays absent, so the next save leaves the key
+ * out again, and anything but `true` reads as false, as in the Rust loader
+ * (#858); a hand-edited `1` used to read as truthy here.
+ */
+export function savedFlag(v: unknown): boolean {
+  return (v === undefined ? undefined : v === true) as boolean;
+}
+
+/** The saved tower name: absent stays absent and a non-string reads as "", as
+ *  in the Rust loader (#858). The game writes only strings. */
+export function savedName(v: unknown): string {
+  return (v === undefined || typeof v === "string" ? v : "") as string;
+}
+
+/** The unfavorable-VIP nag day: a whole day no later than the save's own (so a
+ *  forged future value can't mute the VIP for years), the fresh-tower -100 when
+ *  missing, and clamped like {@link savedInt} where the Rust loader's `i64`
+ *  would saturate (#858). */
+export function coerceLastVipNagDay(clockDay: number, raw: unknown): number {
+  return Math.min(clockDay, typeof raw === "number" && Number.isFinite(raw) ? savedInt(Math.floor(raw)) : -100);
+}
+
+/** One entry per field of `Transport`, so adding or removing a field without
+ *  listing it here fails to compile. Fields were only ever added to the type
+ *  (`skipFloors`, `carLoad`, `schedule`), never removed or renamed, and the
+ *  writer spreads the typed object, so these are every key a game-written save
+ *  holds. */
+const TRANSPORT_FIELDS: Record<keyof Transport, true> = {
+  id: true, kind: true, x: true, width: true, bottom: true, top: true, cars: true,
+  carPositions: true, carDir: true, carLoad: true, load: true, skipFloors: true, schedule: true,
+};
+const TRANSPORT_KEYS: ReadonlySet<string> = new Set(Object.keys(TRANSPORT_FIELDS));
+
+/** A saved transport without any key outside {@link TRANSPORT_KEYS}, in its own
+ *  key order. The Rust loader drops such a key, and only a hand edit adds one;
+ *  the object spread used to carry it into the next save (#858). */
+export function knownTransportKeys<T extends object>(t: T): T {
+  return Object.fromEntries(Object.entries(t).filter(([k]) => TRANSPORT_KEYS.has(k))) as T;
 }
 
 /**

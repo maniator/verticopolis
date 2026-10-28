@@ -59,6 +59,10 @@ labels:
     color: "d4c5f9"
     description: Awaiting a reproduction
 
+  - name: post-3.0
+    color: "bfd4f2"
+    description: "Waits for 3.0: re-scope it against the Rust-only engine first"
+
   # --- priority ---
   - name: P1
     color: "e60000"
@@ -134,6 +138,7 @@ labels:
 #   gh label create modern        -c 1d76db -d "Affects Modern (opt-in) towers" --force
 #   gh label create needs-triage  -c fbca04 -d "Not yet reviewed by a maintainer" --force
 #   gh label create needs-repro   -c d4c5f9 -d "Awaiting a reproduction" --force
+#   gh label create post-3.0      -c bfd4f2 -d "Waits for 3.0: re-scope it against the Rust-only engine first" --force
 #   gh label create P1            -c e60000 -d "Priority 1: work next" --force
 #   gh label create P2            -c ff8c00 -d "Priority 2: do when you next touch the area" --force
 #   gh label create P3            -c b8e600 -d "Priority 3: low, gated, watch-only or awaiting a spec" --force

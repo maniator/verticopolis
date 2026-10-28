@@ -63,12 +63,14 @@ export class EventSystem {
     if (!state) return;
     const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
     this.lastSantaYear = num(state.lastSantaYear, -1);
-    this.extra = new RNG(num(state.rngState, 1) >>> 0 || 1);
+    const rngState = num(state.rngState, 1);
+    this.extra = new RNG(rngState);
+    this.extra.restore(rngState); // the saved live state exactly, 0 included (#856)
     // Restore an unresolved choice (a bomb threat survives save/reload).
     const p = state.pending;
     this.pending =
       p && (p.kind === "fireRescue" || p.kind === "bombThreat") && Number.isFinite(p.cost)
-        ? { kind: p.kind, cost: p.cost, message: String(p.message ?? "") }
+        ? { kind: p.kind, cost: p.cost, message: typeof p.message === "string" ? p.message : "" }
         : null;
   }
 
