@@ -4,6 +4,7 @@ import { MILESTONES } from "../engine/milestones";
 import { cumulativeStarGates } from "../engine/sim/star";
 import { MID, lay, mustBuild, newSeededGame, placeUnit } from "../tests/fixtures/towerFixtures";
 import { ONBOARD_STEPS } from "../ui/Onboarding";
+import { onboarding } from "../engine/port/queries";
 import {
   tsFloorHeatmap,
   tsHousekeepingCoverage,
@@ -303,7 +304,7 @@ describe("tsPanels answers", () => {
     const sim = Simulation.newGame(5, "classic");
     const agree = () => {
       const facts = tsOnboardingFacts(sim);
-      for (const step of ONBOARD_STEPS) expect(facts[step.id as keyof typeof facts], step.id).toBe(step.done(sim));
+      for (const step of ONBOARD_STEPS) expect(facts[step.id as keyof typeof facts], step.id).toBe(step.done(onboarding(sim)));
     };
     agree();
     for (let x = MID - 10; x < MID + 10; x++) sim.tower.place("lobby", 1, x);
@@ -325,7 +326,7 @@ describe("tsPanels answers", () => {
     const sim = Simulation.newGame(6, "classic");
     const agree = (what: string) => {
       const facts = tsOnboardingFacts(sim);
-      for (const step of ONBOARD_STEPS) expect(facts[step.id as keyof typeof facts], `${what}: ${step.id}`).toBe(step.done(sim));
+      for (const step of ONBOARD_STEPS) expect(facts[step.id as keyof typeof facts], `${what}: ${step.id}`).toBe(step.done(onboarding(sim)));
     };
     for (let x = MID - 10; x < MID + 10; x++) sim.tower.place("lobby", 1, x);
     // A basement story is a floor tile below the lobby: no "floor" step yet.

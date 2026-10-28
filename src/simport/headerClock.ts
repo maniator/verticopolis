@@ -14,7 +14,7 @@ import type { HeaderView } from "./view";
 /** The clock's readings a panel shows. */
 export type ClockView = Pick<
   Clock,
-  "minutes" | "minuteOfDay" | "hour" | "minute" | "day" | "dayOfWeek" | "isWeekend" | "quarter" | "dayName" | "year" | "format" | "formatRetroDate"
+  "minutes" | "minuteOfDay" | "isMorning" | "isEvening" | "isNight" | "hour" | "minute" | "day" | "dayOfWeek" | "isWeekend" | "quarter" | "dayName" | "year" | "format" | "formatRetroDate"
 >;
 
 /** The clock at the header's minute, on the tower's calendar. */

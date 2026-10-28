@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { pump, rebaseLog } from "../../ui/hud.fixture";
 import { towerCatalog, useTowerCatalogSource } from "../../engine/towerCatalog";
 import { catalogFor } from "../../engine/catalog";
 import { html, type TemplateResult } from "lit-html";
@@ -1362,13 +1363,13 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
   it("keeps toasting and appending the bulletin past the log cap — never freezes", () => {
     const { ui } = makeUI();
     const sim = Simulation.newGame(1);
-    ui.update(sim); // sync the UI cursor past any founding log entry
+    pump(ui, sim); // sync the UI cursor past any founding log entry
     const startSeq = sim.logSeq;
     const toastSpy = vi.spyOn(ui, "toast").mockImplementation(() => {});
     // Fire 320 good events (past the 300 buffer cap), pumping the UI each time.
     for (let i = 1; i <= 320; i++) {
       sim.emit(`event ${i}`, "good");
-      ui.update(sim);
+      pump(ui, sim);
     }
     // Engine: the buffer is capped, but the cursor stays monotonic.
     expect(sim.log.length).toBe(300);
@@ -1390,9 +1391,9 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
     const sim = Simulation.newGame(1);
     for (let i = 1; i <= 1000; i++) {
       sim.emit(`event ${i}`, i % 2 ? "good" : "info");
-      if (i % 7 === 0) ui.update(sim); // realistic: UI is throttled, not every emit
+      if (i % 7 === 0) pump(ui, sim); // realistic: UI is throttled, not every emit
     }
-    ui.update(sim);
+    pump(ui, sim);
     const logEl = document.getElementById("log")!;
     // 1000 events later the DOM is still bounded to the cap — never unbounded growth.
     expect(logEl.childElementCount).toBeLessThanOrEqual(LOG_DOM_CAP);
@@ -1403,11 +1404,11 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
   it("caps toasts per frame on a catch-up burst but records every line in the bulletin", () => {
     const { ui } = makeUI();
     const sim = Simulation.newGame(1);
-    ui.update(sim); // sync the cursor past the founding entry
+    pump(ui, sim); // sync the cursor past the founding entry
     const toastSpy = vi.spyOn(ui, "toast").mockImplementation(() => {});
     // Backgrounded-tab / fast-forward: 50 good events flush between two frames.
     for (let i = 1; i <= 50; i++) sim.emit(`burst ${i}`, "good");
-    ui.update(sim);
+    pump(ui, sim);
     // Only the newest few pop as toasts (TOAST_MAX=5) — not 50 transient nodes/timers…
     expect(toastSpy).toHaveBeenCalledTimes(5);
     expect(toastSpy).toHaveBeenLastCalledWith("burst 50", "good");
@@ -1423,14 +1424,14 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
   it("keeps the bulletin line even when toast() throws (line is the durable record)", () => {
     const { ui } = makeUI();
     const sim = Simulation.newGame(1);
-    ui.update(sim);
+    pump(ui, sim);
     vi.spyOn(ui, "toast").mockImplementation(() => {
       throw new Error("toast boom");
     });
     // A throwing toast must not drop the line or abort the pump.
     expect(() => {
       sim.emit("resilient line", "bad");
-      ui.update(sim);
+      pump(ui, sim);
     }).not.toThrow();
     expect(document.getElementById("log")!.textContent).toContain("resilient line");
   });
@@ -1440,14 +1441,14 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
     const a = Simulation.newGame(1);
     for (let i = 0; i < 3; i++) {
       a.emit(`a${i}`, "good");
-      ui.update(a);
+      pump(ui, a);
     }
     const toastSpy = vi.spyOn(ui, "toast").mockImplementation(() => {});
     // Swap to a fresh tower (what adoptSim does) and rebase the cursor.
     const b = Simulation.newGame(2);
-    ui.resetLog(b);
+    rebaseLog(ui, b);
     b.emit("swapped tower event", "bad");
-    ui.update(b);
+    pump(ui, b);
     // Only b's new entry toasts — a's three don't replay, and b's isn't skipped.
     expect(toastSpy).toHaveBeenCalledTimes(1);
     expect(toastSpy).toHaveBeenCalledWith("swapped tower event", "bad");
@@ -1469,7 +1470,7 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
     const sim = Simulation.newGame(1);
 
     sim.star = 1;
-    ui.update(sim);
+    pump(ui, sim);
     // 1★-unlocked kinds are shown; higher-tier kinds carry .locked (-> display:none).
     expect(item("office").classList.contains("locked")).toBe(false);
     expect(item("elevatorStandard").classList.contains("locked")).toBe(false);
@@ -1485,7 +1486,7 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
     expect(section("Special").hidden).toBe(true);
 
     sim.star = 3;
-    ui.update(sim);
+    pump(ui, sim);
     // 2★/3★ kinds now reveal; their group sections appear.
     expect(item("hotelSingle").classList.contains("locked")).toBe(false);
     expect(item("restaurant").classList.contains("locked")).toBe(false);
@@ -1508,21 +1509,21 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
     // affordability comparison well away from a boundary.
     sim.money = 2_000_000;
     const scans = vi.spyOn(document.getElementById("palette-scroll")!, "querySelectorAll");
-    ui.update(sim); // first pump after construction: always scans (2 walks)
+    pump(ui, sim); // first pump after construction: always scans (2 walks)
     const afterFirst = scans.mock.calls.length;
     expect(afterFirst).toBeGreaterThan(0);
-    ui.update(sim); // identical snapshot: skipped
+    pump(ui, sim); // identical snapshot: skipped
     sim.money -= 1; // moves, but crosses no kind's cost boundary
-    ui.update(sim);
+    pump(ui, sim);
     expect(scans.mock.calls.length).toBe(afterFirst);
     sim.money = 100; // crosses (nearly) every affordability boundary
-    ui.update(sim);
+    pump(ui, sim);
     const afterCrossing = scans.mock.calls.length;
     expect(afterCrossing).toBeGreaterThan(afterFirst);
     // The DOM caught up with the crossing: offices are now unaffordable.
     expect(item("office").classList.contains("unaffordable")).toBe(true);
     sim.star = 3; // a star crossing rescans too
-    ui.update(sim);
+    pump(ui, sim);
     expect(scans.mock.calls.length).toBeGreaterThan(afterCrossing);
     expect(item("restaurant").classList.contains("locked")).toBe(false);
     scans.mockRestore();
@@ -1558,13 +1559,13 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
     const sim = Simulation.newGame(1);
 
     sim.star = 4;
-    ui.update(sim);
+    pump(ui, sim);
     ui.selectTool({ type: "build", kind: "metro" });
     expect(ui.tool).toEqual({ type: "build", kind: "metro" });
 
     // Swap in a lower-star tower (load / new tower / undo) — Metro is now locked.
     sim.star = 1;
-    ui.update(sim);
+    pump(ui, sim);
     expect(ui.tool).toEqual({ type: "inspect" });
     // The engine callback was notified of the reselection, not left stale.
     expect(cb.onSelectTool).toHaveBeenLastCalledWith({ type: "inspect" });
@@ -1575,7 +1576,7 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
     const sim = Simulation.newGame(1);
     sim.star = 1;
     sim.money = 0; // can't afford anything
-    ui.update(sim);
+    pump(ui, sim);
     // Office is unlocked at 1★: not locked (still visible), just flagged unaffordable.
     expect(item("office").classList.contains("locked")).toBe(false);
     expect(item("office").classList.contains("unaffordable")).toBe(true);
@@ -3364,7 +3365,7 @@ describe("the palette and tool card follow the tower's catalog (#921)", () => {
   it("redraws names and prices when the tower's catalog source changes, and back", () => {
     const sim = Simulation.newGame(51, "classic");
     const { ui } = makeUI({ getCatalog: () => towerCatalog(sim) });
-    ui.update(sim);
+    pump(ui, sim);
     const office = () => document.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
     const toolInfo = () => document.getElementById("tool-info")!.textContent ?? "";
     expect(office().querySelector(".pal-name")?.textContent).toBe("Office");
@@ -3374,7 +3375,7 @@ describe("the palette and tool card follow the tower's catalog (#921)", () => {
     const base = catalogFor("classic");
     const marked = { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, name: "Corner Suite", cost: 77_000 } : f)) };
     useTowerCatalogSource(sim, () => marked);
-    ui.update(sim);
+    pump(ui, sim);
     expect(office().querySelector(".pal-name")?.textContent).toBe("Corner Suite");
     expect(office().querySelector(".pal-cost")?.textContent).toBe("$77k");
     expect(office().getAttribute("aria-label")).toBe("Corner Suite, $77k");
@@ -3382,7 +3383,7 @@ describe("the palette and tool card follow the tower's catalog (#921)", () => {
     expect(toolInfo()).toContain("Cost: $77,000");
     // Let go: back to the tables on the next pump.
     useTowerCatalogSource(sim, null);
-    ui.update(sim);
+    pump(ui, sim);
     expect(office().querySelector(".pal-name")?.textContent).toBe("Office");
     expect(toolInfo()).not.toContain("Corner Suite");
   });
