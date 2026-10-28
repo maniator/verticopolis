@@ -18,9 +18,10 @@
  * - Every `.vctower` fixture, loaded the way an import loads it (`fromVctower`
  *   against `SaveGame.import`).
  * - Every loader-table case (`conformance/loader-cases.json`: forged and
- *   hand-edited saves), `fromSave` against `Simulation.deserialize`. The
- *   `knownDivergence` cases (#858) are pinned as still different, so a fix
- *   flips them here and the entry has to be removed on purpose.
+ *   hand-edited saves), `fromSave` against `Simulation.deserialize`. A case
+ *   marked `knownDivergence` is pinned as still different, so a fix flips it
+ *   here and the marker has to be removed on purpose. None carries one since
+ *   #858 was fixed.
  * - Text that is not plain ASCII (astral characters, combining marks, a lone
  *   surrogate) in the tower name, read the way the web reads save text
  *   (`parseSaveJson`), and a save of exactly 32 MiB and one byte more,

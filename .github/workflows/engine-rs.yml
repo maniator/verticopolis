@@ -17,6 +17,7 @@ on:
       - "src/tests/conformance/**"
       - "src/tests/integration/conformance.integration.test.ts"
       - "src/tests/integration/conformanceWasm.integration.test.ts"
+      - "src/tests/integration/conformanceWasmLoadFidelity.integration.test.ts"
       - "src/tests/integration/conformanceWasmTdt.integration.test.ts"
       - "src/tests/integration/conformanceWasmCanBuild.integration.test.ts"
       - "src/tests/integration/conformanceWasmVctower.integration.test.ts"
@@ -120,6 +121,7 @@ jobs:
             case "$f" in src/tests/conformance/*) engine=true ;; esac
             case "$f" in src/tests/integration/conformance.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/conformanceWasm.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/conformanceWasmLoadFidelity.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/conformanceWasmTdt.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/conformanceWasmCanBuild.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/conformanceWasmVctower.integration.test.ts) engine=true ;; esac

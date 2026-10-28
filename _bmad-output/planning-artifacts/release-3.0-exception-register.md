@@ -55,7 +55,7 @@ approves an exception.
     the same length as the TypeScript writer's.
   - **Key order inside a transport (files and text).** TypeScript writes a
     transport's keys where its object history put them. `carLoad` comes
-    before `load` when a save carries it (`src/engine/sim/serialization.ts:409`)
+    before `load` when a save carries it (the `carLoad` line of `deserialize` in `src/engine/sim/serialization.ts`)
     and after it when dispatch appends it on the first tick
     (`ElevatorDispatch.ts:130`); the stairs in the `split-tower-4` fixture
     come out with their keys sorted. The Rust serializer has one fixed order.
@@ -85,3 +85,38 @@ approves an exception.
   `.0`; the written file equals the TypeScript writer's text once each
   transport's keys are sorted), so a fix of either fails the test and this
   entry has to be removed or rewritten.
+
+## EX-3: a number literal past the double range refuses the save in the engine
+
+- **Source:** the loader fidelity fixes for #858
+  (`spec-gh-858-856-loader-fidelity.md`, D3).
+- **Status:** proposed (2026-10-21). Awaiting the owner's decision at the
+  #945 sign-off.
+- **What is lost:** a save whose JSON holds a number literal too large for a
+  double (`1e400`, say) opens in the TypeScript engine, where `JSON.parse`
+  reads it as Infinity and the loader treats it as it treats any non-finite
+  value, and is refused whole by the Rust engine, whose JSON parser rejects
+  the literal. The file itself is untouched. Today's web host never meets
+  the refusal: TypeScript reads the file and hands the engine its own
+  serialization, which cannot hold such a literal. It is reached where the
+  engine reads a file's text itself (`fromSave` and `fromVctower` in the
+  binding, and the Rust-first load the facade brings).
+- **Size:** only a hand-edited or forged save. No writer the game has
+  shipped can produce the literal: `JSON.stringify` writes `null` for
+  Infinity, and every finite double prints in range. The fixtures and the
+  loader table have none. The refusal is an error, with no crash and no
+  partial load.
+- **After the TypeScript engine retires:** the file then opens in neither
+  engine. That is still a refusal with an error and nothing written, for a
+  file no writer makes; whoever retires the TypeScript engine rechecks this
+  entry.
+- **Why accepted:** loading it as TypeScript does would mean carrying
+  Infinity, field by field, through the engine's JSON tree, which cannot
+  hold it, for a value no writer makes. Reading the literal as `null` first
+  would not match either, since TypeScript treats Infinity and null
+  differently in some fields.
+- **Check:** `engine-rs/src/load_fidelity_tests.rs`
+  (`a_number_past_the_double_range_is_refused_ex3`) and
+  `conformanceWasmLoadFidelity.integration.test.ts` pin both sides, so a
+  change in either direction fails a test and this entry has to be removed
+  or rewritten.

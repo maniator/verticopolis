@@ -7,6 +7,20 @@
 import { FACILITIES, GRID, facilityFloors, isFacilityKind } from "../facilities";
 import type { FacilityKind, SerializedGame, SerializedUnit } from "../types";
 
+/** No room in a game save has a floor, column or width this far from 0 or
+ *  further; every whole step up to it is exact in a double, and in the Rust
+ *  loader's `i64`. Such a room is left out of the checks (floor) and the reflow
+ *  (all three), so no loop over its stories or columns runs where `f++` stops
+ *  moving, and both engines treat it alike (#858). */
+const FAR_COORD = 2 ** 52;
+
+/** A structure tile's geometry, read as the Rust loader reads it (#858): numbers,
+ *  a width that is not a number counts as 1, and no wider than the lot, so a
+ *  loop over a hand-edited tile runs at most the lot's width of columns. */
+function tileSpan(u: SerializedUnit): { f: number; x: number; w: number } {
+  return { f: Number(u.floor), x: Number(u.x), w: Math.min(typeof u.width === "number" ? u.width : 1, GRID.width) };
+}
+
 /**
  * Facility height AS OF a given save-schema version. The party hall only became
  * two stories at v6; a v1..v5 save still holds a one-story hall (the v5 -> v6
@@ -61,11 +75,19 @@ export function migrationLooksValid(data: SerializedGame): boolean {
   for (const r of rooms) {
     // A sparse save never omits a ROOM's width (see serializeUnit), but read it
     // through the same catalog fallback deserialize uses so the check can't crash.
-    const width = r.width ?? FACILITIES[r.kind].width;
-    if (r.x < 0 || r.x + width > GRID.width) return false; // off-lot
-    for (let f = r.floor; f < r.floor + storiesAtVersion(r.kind, data.version); f++) {
+    // Geometry reads as numbers, as the Rust loader's check reads it: a
+    // hand-edited string `x` or `floor` would concatenate here, and a width
+    // that is not a number takes the catalog's (#858).
+    const width = typeof r.width === "number" ? r.width : FACILITIES[r.kind].width;
+    const x = Number(r.x);
+    const floor = Number(r.floor);
+    if (x < 0 || x + width > GRID.width) return false; // off-lot
+    // A room at no column overlaps nothing, and a NaN in the sort below could
+    // hide an overlap between two others (#858).
+    if (Number.isNaN(x) || !(Math.abs(floor) < FAR_COORD)) continue;
+    for (let f = floor; f < floor + storiesAtVersion(r.kind, data.version); f++) {
       const arr = byFloor.get(f) ?? [];
-      arr.push({ x: r.x, w: width });
+      arr.push({ x, w: width });
       byFloor.set(f, arr);
     }
   }
@@ -90,13 +112,16 @@ export function floatingStructureCount(data: SerializedGame): number {
   // A sparse (v3) floor/lobby tile omits its width-1 field; default it like the loader.
   for (const u of units) {
     if (!u || (u.kind !== "floor" && u.kind !== "lobby")) continue;
-    for (let i = 0; i < (u.width ?? 1); i++) struct.add(`${u.floor}:${u.x + i}`);
+    const { f, x, w } = tileSpan(u);
+    for (let i = 0; i < w; i++) struct.add(`${f}:${x + i}`);
   }
   let floating = 0;
   for (const u of units) {
-    if (!u || (u.kind !== "floor" && u.kind !== "lobby") || u.floor === 1) continue;
-    const below = u.floor >= 2 ? u.floor - 1 : u.floor + 1;
-    for (let i = 0; i < (u.width ?? 1); i++) if (!struct.has(`${below}:${u.x + i}`)) floating++;
+    if (!u || (u.kind !== "floor" && u.kind !== "lobby")) continue;
+    const { f, x, w } = tileSpan(u);
+    if (f === 1) continue;
+    const below = f >= 2 ? f - 1 : f + 1;
+    for (let i = 0; i < w; i++) if (!struct.has(`${below}:${x + i}`)) floating++;
   }
   return floating;
 }
@@ -166,7 +191,7 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
     // tile still contributes its column to the support envelope.
     const w0 = Math.round(Number(u.width ?? 1));
     if (!Number.isFinite(f) || !Number.isFinite(x0) || !Number.isFinite(w0)) continue;
-    for (let i = 0; i < w0; i++) origStruct.add(`${f}:${x0 + i}`);
+    for (let i = 0; i < Math.min(w0, LOT); i++) origStruct.add(`${f}:${x0 + i}`);
   }
   const restsOn = (floor: number, x: number): boolean => {
     if (floor === 1) return true; // the ground floor rests on the earth
@@ -187,7 +212,7 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
     const floor = Math.round(Number(u.floor));
     const x0 = Math.round(Number(u.x));
     const w0 = Math.round(Number(u.width));
-    if (!Number.isFinite(floor) || !Number.isFinite(x0) || !Number.isFinite(w0) || w0 < 1) {
+    if (!Number.isFinite(floor) || !Number.isFinite(x0) || !Number.isFinite(w0) || w0 < 1 || !(Math.abs(floor) < FAR_COORD) || !(Math.abs(x0) < FAR_COORD) || !(w0 < FAR_COORD)) {
       others.push(u);
       continue;
     }
@@ -323,10 +348,14 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
   // at their new x/width, plus a `floor` tile under any new footprint tile that
   // wasn't already paved (so a grown/shifted room never floats over bare space).
   const paved = new Set<string>();
-  for (const u of others) if (isStruct(u.kind)) for (let i = 0; i < (u.width ?? 1); i++) paved.add(`${u.floor}:${u.x + i}`);
+  for (const u of others) {
+    if (!isStruct(u.kind)) continue;
+    const { f, x, w } = tileSpan(u);
+    for (let i = 0; i < w; i++) paved.add(`${f}:${x + i}`);
+  }
   // Fresh floor tiles get ids past the highest existing id, a missing/garbled
   // `nextId` must never collide with an existing unit id.
-  let nextId = Number.isFinite(data.nextId) ? data.nextId : 1;
+  let nextId = Number.isFinite(data.nextId) ? Math.floor(data.nextId as number) : 1;
   for (const u of src) if (u && Number.isFinite(u.id)) nextId = Math.max(nextId, Math.floor(u.id) + 1);
   // `others` aliases the input unit objects; that's safe because deserialize re-maps
   // (deep-copies) every unit right after migration, and the migration never mutates.
@@ -336,7 +365,9 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
     const w = nw.get(r.u) ?? r.w0;
     outUnits.push({ ...r.u, x, width: w });
     for (let f = r.floor; f < r.floor + r.fl; f++) {
-      for (let tx = x; tx < x + w; tx++) {
+      // Only columns on the lot: a room that keeps a saved footprint past it
+      // fails the check after the reflow anyway (#858).
+      for (let tx = Math.max(x, 0); tx < Math.min(x + w, LOT); tx++) {
         const key = `${f}:${tx}`;
         if (!paved.has(key)) {
           paved.add(key);
