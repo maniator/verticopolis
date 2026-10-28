@@ -417,6 +417,7 @@ export class TsEngine implements PortState {
   statsStrip = () => ask.statsStrip(this.current);
   hotspot = () => ask.hotspot(this.current);
   onboarding = () => ask.onboarding(this.current);
+  evaluatedTower = () => this.current.evaluatedTower === true;
   heatCells = (modeCode: number) => ask.heatCells(this.current, modeCode);
   crewCoverage = () => ask.crewCoverage(this.current);
   unitCard = (id: number) => ask.unitCard(this.current, id);

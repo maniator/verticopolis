@@ -183,6 +183,7 @@ export const BINDING_EXPORT_TIERS = {
   statsStrip: T2,
   hotspot: T2,
   onboarding: T2,
+  evaluatedTower: T2,
   // Tier 2, the port's lifecycle, events, log and text getters (facade
   // slice 7, PR 1b): a swap per load, undo or new game, a drain per step,
   // and text read only for what changed.

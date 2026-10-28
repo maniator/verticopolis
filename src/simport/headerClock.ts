@@ -1,5 +1,5 @@
 import { Clock } from "../engine/Clock";
-import { resolveCalendar } from "../engine/calendar";
+import { resolveCalendar, type Calendar } from "../engine/calendar";
 import { makeRules, type GameRules } from "../engine/gameRules";
 import type { HeaderView } from "./view";
 
@@ -24,6 +24,11 @@ export function clockOf(h: Pick<HeaderView, "minutes" | "mode" | "modernCalendar
   // header's minute is exact, so set it again.
   clock.minutes = h.minutes;
   return clock;
+}
+
+/** The tower's calendar (a static table), without building a clock. */
+export function calendarOf(h: Pick<HeaderView, "mode" | "modernCalendar">): Calendar {
+  return resolveCalendar(h.mode, h.modernCalendar);
 }
 
 /** The tower's rule set (a static singleton per mode). */

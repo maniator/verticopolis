@@ -1145,6 +1145,10 @@ impl Engine {
     pub fn onboarding(&self) -> f64 {
         self.port_onboarding()
     }
+    #[wasm_bindgen(js_name = evaluatedTower)]
+    pub fn evaluated_tower(&self) -> bool {
+        self.port_evaluated_tower()
+    }
     // The panel queries (`wasm_port_panels.rs`): the overlay's cells, the
     // crew coverage and the unit and shaft cards, each a record the layout
     // names.

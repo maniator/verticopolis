@@ -52,7 +52,7 @@ export const INSTANCE_METHODS = [
   // quotes and HUD queries.
   "chooseAutoBridge", "answerChoice", "viewLayout", "lastReason", "buildAt", "paintTiles",
   "buildShaft", "demolish", "changeCars", "extendShaft", "bookExterminator", "setCamera",
-  "setFilm", "quoteBuild", "quoteShaft", "statsStrip", "hotspot", "onboarding", "markStop",
+  "setFilm", "quoteBuild", "quoteShaft", "statsStrip", "hotspot", "onboarding", "evaluatedTower", "markStop",
   "expressStops", "dropStops", "stepRent", "noRate", "setRent", "rentBatch", "rerollUnit",
   "flipAutoBridge", "startExtend", "stopExtend", "labelUnit", "nameTower",
   // PR 1b's lifecycle, events, log and text getters.
