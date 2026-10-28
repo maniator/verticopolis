@@ -66,6 +66,7 @@ pub mod schedule;
 pub mod services;
 pub mod sim;
 pub mod sim_loop;
+mod sim_save;
 pub mod snapshot;
 pub mod star;
 #[cfg(any(test, feature = "conformance"))]
