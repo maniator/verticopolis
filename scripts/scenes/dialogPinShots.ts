@@ -80,6 +80,15 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
         // Keep the Settings Game engine row intact in the capture while still
         // leaving enough content below the fold to prove the sticky footer rule.
         box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight - strip.offsetHeight * 3);
+        // The build line sits just above the pinned row, so that scroll can leave
+        // it half behind the strip, which the visibility check below rejects.
+        // Back off until the whole line is below the fold, where the pin's
+        // cover (not the line) is what the shot shows under Close.
+        const version = box.querySelector(".set-version") as HTMLElement | null;
+        if (!version) throw new Error("Settings lost its build line");
+        const lineTop = version.getBoundingClientRect().top;
+        const boxBottom = box.getBoundingClientRect().bottom;
+        if (lineTop < boxBottom + 1) box.scrollTop -= Math.ceil(boxBottom + 1 - lineTop);
         const left = box.scrollHeight - box.clientHeight - box.scrollTop;
         if (left <= strip.offsetHeight) throw new Error("Settings did not overflow enough for the pin to be doing anything");
         if (strip.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1) throw new Error("the Settings footer is not pinned; this shot would prove nothing");
