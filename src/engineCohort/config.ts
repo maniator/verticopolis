@@ -40,7 +40,8 @@ export const REFUSAL_HOLDS_PAGE_LIFE = false;
  *  owner approves the exact additions; nothing new reaches production
  *  telemetry while it is false. The sticky safety path (the suppression and
  *  the crash marker) switches on with it, so no boot moves to TypeScript
- *  where the reliability data could not say why. */
+ *  where the reliability data could not say why. A Settings choice of the
+ *  Rust engine runs it regardless (`playerChoseRust`, owner 2026-10-28). */
 export const COHORT_TELEMETRY = false;
 
 /** True while only a player's choice boots the Rust engine: a `?engine=wasm`

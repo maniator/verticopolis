@@ -3,7 +3,7 @@ import { COHORT_STAGE, COHORT_TELEMETRY, RUST_ONLY_BY_CHOICE, STAGE_SHARE, type 
 import { exitCleanly, stepAside } from "./crashMarker";
 import { heldAfterCrashes, tabStore } from "./crashReload";
 import { setCurrentSelection, currentSelection } from "./current";
-import { latchSafety, selectEngine, suppressionApplies, type SafetyStage, type Selection } from "./policy";
+import { latchSafety, playerChoseRust, selectEngine, suppressionApplies, type SafetyStage, type Selection } from "./policy";
 import { browserStore, readSafety, type KeyValueStore } from "./records";
 import { watchSurvival } from "./survival";
 
@@ -114,7 +114,8 @@ function leftRust(sel: Selection): void {
 }
 
 /** Rust failed on this device: a load failure (build scope) or a latched
- *  fault (until the player retries). Only where the cohort's draw ran and
+ *  fault (until the player retries). Only where the safety path runs (the
+ *  cohort's fields, a test stage, or a Settings choice of Rust), the draw ran and
  *  the boot was an ordinary one, so tooling keeps a known engine on every
  *  load and a `?engine=` test visit leaves the player's own records alone (as
  *  the crash marker does). A clean refusal is never passed here, since it
@@ -123,7 +124,7 @@ function leftRust(sel: Selection): void {
 export function noteRustFailed(stage: SafetyStage, reason: string, engine?: string): void {
   try {
     const sel = currentSelection();
-    if (!sel || !safetyOn || sel.assignedArm === "none" || sel.selectedBy === "url") return;
+    if (!sel || !(safetyOn || playerChoseRust(sel)) || sel.assignedArm === "none" || sel.selectedBy === "url") return;
     // The page runs TypeScript now, so a pending "now runs on Rust" notice is untrue.
     setCurrentSelection({ ...sel, notice: "none" });
     latchSafety(store, { reason, stage, sha: __APP_SHA__, now: Date.now(), ...(engine ? { engine } : {}) });

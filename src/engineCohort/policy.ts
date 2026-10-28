@@ -184,6 +184,14 @@ export function armOf(bucket: number, share: number): Arm {
   return bucket < share ? "wasm" : "ts";
 }
 
+/** The player picked the Rust engine itself in Settings. That choice runs
+ *  the crash marker and the sticky suppression even before the cohort's
+ *  fields ship (owner, 2026-10-28), so a Rust tab that dies hard on load
+ *  stops booting Rust, and Settings says why and offers the retry. */
+export function playerChoseRust(s: Pick<Selection, "selectedBy" | "requested">): boolean {
+  return s.selectedBy === "setting" && s.requested === "wasm";
+}
+
 /** Choose the engine for this boot. Reads and writes the cohort's records;
  *  never throws. */
 export function selectEngine(env: SelectionEnv): Selection {
@@ -227,9 +235,9 @@ export function selectEngine(env: SelectionEnv): Selection {
     return { ...common, boot: "ts", requested, selectedBy, notice: quiet ? "none" : notice };
   }
   // Held on TypeScript, so the engine did not change and no notice is due.
-  const playerChoseRust = selectedBy === "setting" && requested === "wasm";
-  if (env.rustOnlyByChoice && !playerChoseRust) return { ...common, boot: "ts", requested, selectedBy, heldForChoice: true };
-  if (!env.safetyOn) return { ...common, boot: requested, requested, selectedBy, notice };
+  const ownChoice = playerChoseRust({ selectedBy, requested });
+  if (env.rustOnlyByChoice && !ownChoice) return { ...common, boot: "ts", requested, selectedBy, heldForChoice: true };
+  if (!env.safetyOn && !ownChoice) return { ...common, boot: requested, requested, selectedBy, notice };
   const suppression = activeSuppression(env.store, env.sha, env.now);
   if (suppression) return { ...common, boot: "ts", requested, selectedBy: "safety", suppression };
   const marker = crashLoopFound(env.store, { id: env.pageId, sha: env.sha }, env.now);

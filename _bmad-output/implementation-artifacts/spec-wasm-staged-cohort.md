@@ -150,7 +150,10 @@ The size gate is not in this table: it acts at a tower load (below).
   boots Rust as it does on main, so no boot moves to TypeScript where the
   reliability data could not say why (independent review of #1266, item 4;
   route (a), pending the owner's answer). Tests turn it on through the
-  tooling seam.
+  tooling seam. One exception (owner, 2026-10-28): a player who picks the
+  Rust engine in Settings gets the marker and the suppression at once, so a
+  Rust tab that dies hard on load stops booting Rust, and Settings says why
+  and offers the retry.
 - **What latches.** A latched runtime fallback (`onFallback(_, true)`: a
   trap in a command, tick, frame sync, drain, undo, or while a tower
   attaches), any failure while the engine package loads, any failure while
