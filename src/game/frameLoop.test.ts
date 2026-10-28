@@ -367,9 +367,10 @@ describe("runFrame auto-surfaced emergency choice", () => {
     const [msg, cost, cb] = raw.ui.showEventChoice.mock.calls[0];
     expect(msg).toBe(pc.message);
     expect(cost).toBe("$5,000");
-    // Answered through the port, which answers at once: the latch clears after the call.
+    // Answered through the port at once: the latch clears, then the header is read again.
     (cb as (opt: unknown) => void)("accept");
     expect(sim.resolveChoice).toHaveBeenCalledWith("accept");
+    expect(Math.max(...vi.mocked(app.reader.update).mock.invocationCallOrder)).toBeGreaterThan(vi.mocked(sim.resolveChoice).mock.invocationCallOrder[0]);
     expect(raw.shownChoice).toBe(false);
   });
 

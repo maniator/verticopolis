@@ -58,9 +58,9 @@ export interface HeaderView {
   readonly money: number;
   /** 1 to 5 stars, 6 for TOWER. */
   readonly star: number;
-  /** The TypeScript engine walks every room to answer this (O(R), about
-   *  330 µs on the large tower), so a reader takes it at most once per step
-   *  or per HUD tick, or keeps one header for that span, and never per frame. */
+  /** The tower's head count. Both engines answer it from a running count
+   *  (TypeScript from `roomCounts`, Rust from its reader's sum), so a read is
+   *  cheap and needs no room walk. */
   readonly population: number;
   readonly weather: WeatherKind;
   /** The bulletin log's monotonic cursor. */

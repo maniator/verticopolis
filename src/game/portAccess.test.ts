@@ -4,6 +4,7 @@ import { Simulation } from "../engine/Simulation";
 import { useTowerCatalogSource } from "../engine/towerCatalog";
 import { catalogOf, isUnlocked, quoteBuild, quoteShaft } from "./portAccess";
 import { portDeps } from "./portDeps.fixture";
+import { KINDS } from "../engine/port/layout";
 
 function tower() {
   const sim = new Simulation(7, "classic");
@@ -70,9 +71,25 @@ describe("catalogOf", () => {
 });
 
 describe("isUnlocked", () => {
-  it("reads the simulation, the one gap the port leaves", () => {
+  it("answers what the simulation answers for every kind, from the reader's header", () => {
+    for (const mode of ["classic", "modern"] as const) {
+      const sim = new Simulation(7, mode);
+      const { reader } = portDeps(sim);
+      for (const star of [1, 3, 5, 6]) {
+        sim.star = star;
+        reader.update();
+        for (const kind of KINDS) expect(isUnlocked({ reader }, kind), `${mode} ${star} ${kind}`).toBe(sim.isUnlocked(kind));
+      }
+    }
+  });
+
+  it("answers as of the reader's last update", () => {
     const sim = tower();
-    expect(isUnlocked({ sim }, "office")).toBe(sim.isUnlocked("office"));
-    expect(isUnlocked({ sim }, "elevatorExpress")).toBe(false);
+    const { reader } = portDeps(sim);
+    expect(isUnlocked({ reader }, "elevatorExpress")).toBe(false);
+    sim.star = 5;
+    expect(isUnlocked({ reader }, "elevatorExpress")).toBe(false);
+    reader.update();
+    expect(isUnlocked({ reader }, "elevatorExpress")).toBe(sim.isUnlocked("elevatorExpress"));
   });
 });

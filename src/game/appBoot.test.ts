@@ -105,10 +105,10 @@ describe("wireControllers", () => {
   /** A fake app whose every collaborator is a spy, so each wiring closure can be
    *  invoked and asserted to route to the matching app member. */
   function makeWiringApp() {
-    const sim = { id: "sim", star: 3, population: 800, isUnlocked: vi.fn(() => true) };
+    const sim = { id: "sim", star: 3, population: 800 };
     const engine = { viewState: vi.fn(() => ({ view: 1 })), onContextRestored: null as unknown };
     const app = {
-      sim, enginePort: { id: "engine port" }, portCodes: { id: "codes" }, reader: { id: "reader" }, engine,
+      sim, enginePort: { id: "engine port" }, portCodes: { id: "codes" }, reader: { id: "reader", unlocked: vi.fn(() => true) }, engine,
       audio: { sfx: vi.fn(), setProgram: vi.fn() },
       speed: 2,
       frameErrors: [],
