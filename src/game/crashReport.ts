@@ -114,7 +114,7 @@ export async function buildCrashReportZip(
     "crash-report.json": strToU8(JSON.stringify(details, null, 2)),
   };
   try {
-    files["tower.vctower"] = strToU8(await SaveGame.export(sim));
+    files["tower.vctower"] = strToU8(await SaveGame.export(JSON.stringify(sim.serialize())));
   } catch {
     files["tower.json"] = strToU8(JSON.stringify(sim.serialize()));
   }

@@ -65,7 +65,7 @@ export function resetExportFlowForTests(): void {
  * line reads as the end of the export the watchdog called stuck rather than
  * contradicting that warning.
  */
-export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simulation) => void): Promise<void> {
+export async function runExportFlow(deps: ExportFlowDeps, save: () => { readonly text: string; readonly towerName: string | undefined }): Promise<void> {
   if (latchOwner !== 0) return;
   const run = ++nextRun;
   latchOwner = run;
@@ -90,11 +90,12 @@ export async function runExportFlow(deps: ExportFlowDeps, stampView: (sim: Simul
       await settleEngine(sim);
       [settling, sim] = [sim, deps.getSim()];
     }
-    stampView(sim);
-    const file = await SaveGame.export(sim);
+    // The engine port saves the tower it holds now, with the camera stamped.
+    const { text, towerName } = save();
+    const file = await SaveGame.export(text);
     // A download that failed has already said so (GH #997); the success line
     // would contradict it.
-    if (!deps.ui.downloadFile(SaveGame.exportFilename(sim), file)) return;
+    if (!deps.ui.downloadFile(SaveGame.exportFilename(towerName), file)) return;
     // The container is pure ASCII, so string length == bytes on disk.
     const size = `${(file.length / 1024).toFixed(1)} KB`;
     deps.ui.toast(

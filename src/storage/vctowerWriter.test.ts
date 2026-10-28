@@ -3,6 +3,7 @@ import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "./SaveGame";
 import { STORE_MAGIC } from "./saveCompression";
 import { ENGINE_WRITER_MAX_BYTES, packVctower, setEngineWriter } from "./vctowerWriter";
+import { saveOf } from "../tests/fixtures/saveText";
 
 const NOW = 1_760_000_000_123;
 
@@ -21,8 +22,8 @@ describe("the .vctower writer", () => {
       calls.push([json, appVersion, savedAt]);
       return "VCTOWER1\nZW5naW5l\n";
     });
-    expect(await SaveGame.export(sim)).toBe("VCTOWER1\nZW5naW5l\n");
-    expect(SaveGame.packSync(sim)).toBe(STORE_MAGIC + "ZW5naW5l");
+    expect(await SaveGame.export(saveOf(sim))).toBe("VCTOWER1\nZW5naW5l\n");
+    expect(SaveGame.packSync(saveOf(sim))).toBe(STORE_MAGIC + "ZW5naW5l");
     expect(calls).toHaveLength(2);
     const [json, appVersion, savedAt] = calls[0] ?? ["", "", 0];
     expect(savedAt).toBe(NOW);
@@ -33,14 +34,14 @@ describe("the .vctower writer", () => {
   it("falls back to the TypeScript writer, and stays there, once the engine throws", async () => {
     vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
     const sim = new Simulation(1);
-    const own = await SaveGame.export(sim);
-    const ownPacked = SaveGame.packSync(sim);
+    const own = await SaveGame.export(saveOf(sim));
+    const ownPacked = SaveGame.packSync(saveOf(sim));
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     setEngineWriter(() => {
       throw new Error("trapped");
     });
-    expect(await SaveGame.export(sim)).toBe(own);
-    expect(SaveGame.packSync(sim)).toBe(ownPacked);
+    expect(await SaveGame.export(saveOf(sim))).toBe(own);
+    expect(SaveGame.packSync(saveOf(sim))).toBe(ownPacked);
     // Logged once: the first failure turns the engine writer off.
     expect(error).toHaveBeenCalledTimes(1);
     expect(ownPacked).toBe(STORE_MAGIC + own.split("\n")[1]);
@@ -51,12 +52,12 @@ describe("the .vctower writer", () => {
     async (bad) => {
       vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
       const sim = new Simulation(1);
-      const ownPacked = SaveGame.packSync(sim);
+      const ownPacked = SaveGame.packSync(saveOf(sim));
       vi.spyOn(console, "error").mockImplementation(() => {});
       const writer = vi.fn(() => bad);
       setEngineWriter(writer);
-      expect(SaveGame.packSync(sim)).toBe(ownPacked);
-      expect(SaveGame.packSync(sim)).toBe(ownPacked);
+      expect(SaveGame.packSync(saveOf(sim))).toBe(ownPacked);
+      expect(SaveGame.packSync(saveOf(sim))).toBe(ownPacked);
       expect(writer).toHaveBeenCalledTimes(1);
     },
   );
@@ -65,19 +66,19 @@ describe("the .vctower writer", () => {
     vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
     vi.spyOn(console, "error").mockImplementation(() => {});
     const sim = new Simulation(1);
-    const ownPacked = SaveGame.packSync(sim);
+    const ownPacked = SaveGame.packSync(saveOf(sim));
     const onLatch = vi.fn(() => {
       throw new Error("analytics is down");
     });
     setEngineWriter(() => "not a tower file", onLatch);
-    expect(SaveGame.packSync(sim)).toBe(ownPacked);
-    expect(SaveGame.packSync(sim)).toBe(ownPacked);
+    expect(SaveGame.packSync(saveOf(sim))).toBe(ownPacked);
+    expect(SaveGame.packSync(saveOf(sim))).toBe(ownPacked);
     expect(onLatch).toHaveBeenCalledTimes(1);
     // A writer set again starts with no listener unless it brings one.
     const quiet = vi.fn();
     setEngineWriter(() => "still not one", null);
     setEngineWriter(null, quiet);
-    expect(SaveGame.packSync(sim)).toBe(ownPacked);
+    expect(SaveGame.packSync(saveOf(sim))).toBe(ownPacked);
     expect(quiet).not.toHaveBeenCalled();
   });
 

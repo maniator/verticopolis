@@ -40,6 +40,7 @@ import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
 import { hudSource } from "./game/hudSource";
 import { catalogOf } from "./game/portAccess";
+import { loadStored } from "./game/portLifecycle";
 import type { Catalog } from "./engine/catalogTypes";
 
 /**
@@ -200,14 +201,20 @@ class GameApp implements GameAppPorts {
     // would offer "Continue", then silently start fresh and let the autosave
     // clobber it). We fall back to a new tower either way, but remember the
     // corruption so the splash stays honest and the player is told (below).
-    const boot = SaveGame.loadResult();
+    // The engine starts on a fresh tower and loads the autosave over it. The
+    // fresh tower's events never reach the loaded one (`setBackdrop`).
+    this.enginePort = new TsEngine(Simulation.newGame(Date.parse("2024-01-01")));
+    this.enginePort.setBackdrop(true);
+    const boot = SaveGame.loadResult(loadStored(this.enginePort));
+    this.enginePort.setBackdrop(false);
     this.saveWasCorrupt = boot.corrupt;
-    this.hadReadableSave = boot.sim !== null;
+    this.hadReadableSave = boot.loaded;
     // Stash the unreadable bytes off the autosave slot before the 30s timer can
     // overwrite them: a save from a *newer* build is only unreadable here, and a
     // future version may recover it. Best-effort, never blocks boot.
     if (boot.corrupt) SaveGame.preserveUnreadable();
-    this.enginePort = new TsEngine(boot.sim ?? Simulation.newGame(Date.parse("2024-01-01")));
+    // A swap through the port reaches the app as a swap the game made (PR 5's bridge, see `TsEngine.handOff`).
+    this.enginePort.handOff = (sim, keep) => this.adoptSim(sim, keep);
     this.reader = new ViewReader(this.enginePort);
     this.portCodes = new PortCodes(this.enginePort);
     // Seed the promotion latch to the boot tower's rating (adoptSim does the same

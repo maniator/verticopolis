@@ -47,6 +47,14 @@ const CALENDARS = VIEW_LAYOUT.calendars as readonly CalendarKind[];
  */
 export class TsEngine implements PortState {
   reason: string | undefined;
+  /**
+   * PR 5's bridge while the WASM mirror host still follows `GameApp.adoptSim`:
+   * when set, a done swap hands the new tower to the app (`adoptSim`, which
+   * calls `take`), so the app and the host follow it as they follow a swap
+   * the game made itself. The hand-off runs inside the swap member, before it
+   * answers. Goes with the mirror host in 5e.
+   */
+  handOff: ((next: Simulation, keepHistory: boolean) => void) | undefined;
   private current: Simulation;
   private gen = 0;
   private backdrop = false;
@@ -183,11 +191,15 @@ export class TsEngine implements PortState {
       next.autoBridge = this.current.autoBridge;
       next.view = this.current.view;
     }
-    this.adopt(next);
+    this.adopt(next, keepLive);
     return this.swapRecord(true);
   }
 
-  private adopt(next: Simulation): void {
+  private adopt(next: Simulation, keepHistory = false): void {
+    if (this.handOff) {
+      this.handOff(next, keepHistory);
+      return;
+    }
     const prev = this.current.gameplayEvents;
     prev.discardOnHandOff = this.backdrop;
     next.gameplayEvents.inherit(prev);

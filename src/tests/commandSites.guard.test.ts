@@ -73,16 +73,13 @@ const SETTINGS: ReadonlySet<string> = new Set(["towerName", "autoBridge", "view"
 /** Slice 5's lifecycle writes, as `file member` (a write as `member=`):
  *  - appBoot: the bulletin at boot when a save could not be read;
  *  - legacyImportAdopt: the bulletin an imported 1994 tower opens with;
- *  - saveLoad: the bulletin after a graphics reset is recovered, and the
- *    camera stamped onto the tower before an autosave or export;
- *  - appModals: the camera stamped before a manual slot save;
- *  - main.ts: the bridging preference an undo or redo restore keeps. */
+ *  - saveLoad: the camera stamped onto the tower before a legacy export.
+ *  The graphics-reset bulletin, the slot save's camera and the autosave's
+ *  and export's camera now go through the port (`logLine`, `setCamera`). */
 const LIFECYCLE: ReadonlyMap<string, number> = new Map([
   ["src/game/appBoot.ts emit", 1],
   ["src/game/legacyImportAdopt.ts emit", 1],
-  ["src/game/saveLoad.ts emit", 1],
   ["src/game/saveLoad.ts view=", 1],
-  ["src/game/appModals.ts view=", 1],
 ]);
 
 const RECEIVER = /^(?:[A-Za-z_$]*[Ss]im[A-Za-z_$0-9]*|tower)$/;

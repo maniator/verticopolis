@@ -23,6 +23,7 @@ import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
 import { portDeps } from "../../game/portDeps.fixture";
 import { INVALID_COMMAND, MAX_TEXT } from "../../simport/request";
+import { saveOf, loadAuto, loadSlotSim, withPorts } from "../fixtures/saveText";
 
 /** Coverage companion to gameControllers.integration.test.ts: the same harness idioms
  *  (recording fakes, fixture placements asserted with .ok, real Simulation)
@@ -926,17 +927,19 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     crashScreens = [];
     armed = 0;
     recoveries = [];
-    saveLoad = new SaveLoad({
+    saveLoad = new SaveLoad(withPorts({
       getSim: () => sim,
       getView: () => null,
       adoptSim: (s) => {
+        // The app follows the adopted tower, as GameApp.adoptSim does.
         adopted.push(s);
+        sim = s;
       },
       ui: f.ui,
       showCrashScreen: (info) => crashScreens.push(info),
       attemptGraphicsRecovery: (done) => recoveries.push(done),
       armOnboarding: () => armed++,
-    });
+    }));
   });
 
   afterEach(() => {
@@ -974,7 +977,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     let releaseFirst!: () => void;
     const savedMoney: number[] = [];
     const spy = vi.spyOn(SaveGame, "saveAsync").mockImplementation(async (s) => {
-      savedMoney.push(s.money);
+      savedMoney.push((JSON.parse(s) as { money: number }).money);
       if (savedMoney.length === 1) await new Promise<void>((resolve) => (releaseFirst = resolve));
     });
     try {
@@ -1001,7 +1004,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(adopted).toHaveLength(0);
     expect(f.toasts).toEqual([{ text: "No saved tower found.", kind: "bad" }]);
     sim.money = 123_456;
-    SaveGame.save(sim);
+    SaveGame.save(saveOf(sim));
     saveLoad.load();
     expect(adopted).toHaveLength(1);
     expect(adopted[0]).toBeInstanceOf(Simulation);
@@ -1035,7 +1038,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
       expect(f.downloads[0].filename).toBe("vertic-opolis.vctower");
       // The controller's contract is "download exactly what SaveGame.export
       // produces"; the container format itself is pinned by storage.test.ts.
-      expect(f.downloads[0].contents).toBe(await SaveGame.export(sim));
+      expect(f.downloads[0].contents).toBe(await SaveGame.export(saveOf(sim)));
     } finally {
       vi.useRealTimers();
     }
@@ -1058,7 +1061,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
 
   it("importGame adopts a Simulation from a SaveGame.export round-trip", async () => {
     sim.money = 777_777;
-    await saveLoad.importGame(await SaveGame.export(sim));
+    await saveLoad.importGame(await SaveGame.export(saveOf(sim)));
     expect(adopted).toHaveLength(1);
     expect(adopted[0]).toBeInstanceOf(Simulation);
     expect(adopted[0].money).toBe(777_777);
@@ -1121,8 +1124,8 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(adopted).toHaveLength(1);
     expect(adopted[0]).toBeInstanceOf(Simulation);
     expect(adopted[0].money).toBe(1_234_500);
-    expect(SaveGame.load()!.money).toBe(777); // current tower kept safe
-    expect(SaveGame.loadSlot(1)!.money).toBe(1_234_500); // fresh-slot copy
+    expect(loadAuto()!.money).toBe(777); // current tower kept safe
+    expect(loadSlotSim(1)!.money).toBe(1_234_500); // fresh-slot copy
     expect(last(f.toasts)).toEqual({ text: "Tower imported and saved to slot 1.", kind: "good" });
   });
 
@@ -1133,12 +1136,12 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "CAREFUL.TDT");
     f.importReports[0].open();
     expect(localStorage.getItem("simtower-clone-slot-1")).toBe("VCZ1:not-really-deflate");
-    expect(SaveGame.loadSlot(2)).not.toBeNull(); // landed on the next raw-free slot
+    expect(loadSlotSim(2)).not.toBeNull(); // landed on the next raw-free slot
     expect(last(f.toasts).text).toBe("Tower imported and saved to slot 2.");
   });
 
   it("importLegacy: with every slot full, nothing is overwritten and the toast says so", () => {
-    for (let n = 1; n <= 3; n++) SaveGame.saveSlot(n, sim);
+    for (let n = 1; n <= 3; n++) SaveGame.saveSlot(n, saveOf(sim));
     const before = [1, 2, 3].map((n) => localStorage.getItem(`simtower-clone-slot-${n}`));
     saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "FULL.TDT");
     f.importReports[0].open();
@@ -1298,7 +1301,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     const reload = stubReload();
     // A prior autosave exists (the tower was flushed before the crash).
     sim.money = 555_000;
-    SaveGame.save(sim);
+    SaveGame.save(saveOf(sim));
     // Now the GPU dies AND storage is full: the pre-crash flush throws. Left
     // unhandled this would escape the onContextLost handler and skip the crash
     // screen. Instead the screen must show, and the prior tower must survive.
@@ -1318,7 +1321,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(crashScreens[0].save).toEqual({ flushed: false, behindSplash: false, storageBlame: true, hadPriorSave: true });
     expect(crashScreens[0].crash.saveFlushed).toBe(false);
     // A failed setItem never clobbers — the prior tower is still loadable.
-    expect(SaveGame.load()?.money).toBe(555_000);
+    expect(loadAuto()?.money).toBe(555_000);
     spy.mockRestore();
   });
 
@@ -1364,7 +1367,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
 
   it("a non-storage save error (e.g. a serialize/compression bug) is not blamed on storage", () => {
     sim.money = 111_000;
-    SaveGame.save(sim); // a prior autosave exists
+    SaveGame.save(saveOf(sim)); // a prior autosave exists
     // A non-storage failure (not a quota/security DOMException) must not be
     // misdiagnosed as "storage full" and send the player to free up space.
     const spy = vi.spyOn(SaveGame, "save").mockImplementationOnce(() => {

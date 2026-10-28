@@ -7,7 +7,6 @@ import { GRID } from "../../engine/facilities";
 import type { SerializedGame, SerializedView } from "../../engine/types";
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
 import { SKY_HEADROOM_FLOORS } from "../../render/cameraBounds";
-import { SaveGame } from "../../storage/SaveGame";
 import { SaveLoad } from "../../game/saveLoad";
 import {
   TDT_DEFAULT_VIEW_X,
@@ -18,6 +17,7 @@ import {
 import { buildTDT } from "../../storage/tdtExport";
 import { parseTDT } from "../../storage/tdtImport";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
+import { loadAuto, loadSlotSim, withPorts } from "../fixtures/saveText";
 
 /**
  * View-state save parity: the camera (tile/floor/zoom) rides inside every
@@ -109,11 +109,13 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
     sim = new Simulation();
     adopted = [];
     importReports = [];
-    saveLoad = new SaveLoad({
+    saveLoad = new SaveLoad(withPorts({
       getSim: () => sim,
       getView: () => ({ ...camera }),
       adoptSim: (s) => {
+        // The app follows the adopted tower, as GameApp.adoptSim does.
         adopted.push(s);
+        sim = s;
       },
       ui: {
         toast: () => {},
@@ -125,17 +127,17 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
       showCrashScreen: () => {},
       attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
-    });
+    }));
   });
 
   it("save() stamps the view; the reloaded autosave carries it", () => {
     saveLoad.save(true);
-    expect(SaveGame.load()!.view).toEqual(camera);
+    expect(loadAuto()!.view).toEqual(camera);
   });
 
   it("a null camera (headless) stamps nothing and never erases a view the sim already carries", () => {
     sim.view = { tile: 7, floor: 8 }; // e.g. brought over by a TDT import
-    saveLoad = new SaveLoad({
+    saveLoad = new SaveLoad(withPorts({
       getSim: () => sim,
       getView: () => null,
       adoptSim: () => {},
@@ -143,20 +145,20 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
       showCrashScreen: () => {},
       attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
-    });
+    }));
     saveLoad.save(true);
     expect(sim.view).toEqual({ tile: 7, floor: 8 });
-    expect(SaveGame.load()!.view).toEqual({ tile: 7, floor: 8 });
+    expect(loadAuto()!.view).toEqual({ tile: 7, floor: 8 });
   });
 
   it("autosave() stamps the view on the async path too", async () => {
     await saveLoad.autosave();
-    expect(SaveGame.load()!.view).toEqual(camera);
+    expect(loadAuto()!.view).toEqual(camera);
   });
 
   it("exportGame() stamps the view into the .vctower payload", async () => {
     let file = "";
-    saveLoad = new SaveLoad({
+    saveLoad = new SaveLoad(withPorts({
       getSim: () => sim,
       getView: () => ({ ...camera }),
       adoptSim: () => {},
@@ -173,7 +175,7 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
       showCrashScreen: () => {},
       attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
-    });
+    }));
     await saveLoad.exportGame();
     expect(decodeVctower(file).view).toEqual(camera);
   });
@@ -189,10 +191,10 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
     expect(adopted[0].view!.zoom).toBeUndefined();
     expect(adopted[0].view!.tile).toBeCloseTo(200, 1);
     expect(adopted[0].view!.floor).toBeCloseTo(20, 1);
-    expect(SaveGame.loadSlot(1)!.view!.tile).toBeCloseTo(200, 1);
-    expect(SaveGame.loadSlot(1)!.view!.floor).toBeCloseTo(20, 1);
+    expect(loadSlotSim(1)!.view!.tile).toBeCloseTo(200, 1);
+    expect(loadSlotSim(1)!.view!.floor).toBeCloseTo(20, 1);
     // The previous tower's autosave flush carries the live camera.
-    expect(SaveGame.load()!.view).toEqual(camera);
+    expect(loadAuto()!.view).toEqual(camera);
   });
 });
 

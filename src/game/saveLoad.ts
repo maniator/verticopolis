@@ -9,6 +9,10 @@ import type { ImportReport } from "../storage/tdtImport";
 import { runExportFlow, runLegacyDownload } from "./exportFlow";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
 import { shouldArm } from "../ui/Onboarding";
+import type { EnginePort } from "../simport/enginePort";
+import type { PortCodes } from "../simport/portCodes";
+import type { ViewReader } from "../simport/viewReader";
+import { loadStored, saveText, swapDone } from "./portLifecycle";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import type { UI } from "../ui/UI";
 
@@ -21,8 +25,20 @@ import type { UI } from "../ui/UI";
  * stays in GameApp and arrives here as an injected callback.
  */
 export interface SaveLoadDeps {
-  /** The live simulation (never cached — adoptSim swaps the instance). */
+  /** The live simulation (never cached — adoptSim swaps the instance), for
+   *  the file flows and the background hosts' settle that have not moved to
+   *  the engine port yet. */
   getSim(): Simulation;
+  /** The engine port the saves, loads and new towers go through; a done swap
+   *  reaches the app's adoptSim inside the call. */
+  enginePort(): EnginePort;
+  /** The layout's code tables, for the port's mode, calendar and log codes. */
+  portCodes(): PortCodes;
+  /** The shared reader, current as of the last swap. */
+  reader(): Pick<ViewReader, "rooms" | "structure">;
+  /** A tower arrived through the port (load or found): break the report
+   *  dialogs' leash, as `adoptSim` does for the file imports. */
+  towerSwapped(): void;
   /** The live camera as save cargo (GameApp reads TowerEngine.viewState).
    *  Stamped onto the sim right before every save/export of the CURRENT
    *  tower so the view travels with it; an imported sim keeps the view its
@@ -110,16 +126,19 @@ export class SaveLoad {
     if (view) sim.view = view;
   }
 
+  /** The live tower's save text through the port, the camera stamped first. */
+  private saveText(): string {
+    return saveText(this.deps.enginePort(), this.deps.getView());
+  }
+
   save(silent = false): void {
-    const sim = this.deps.getSim();
     try {
       // Stamp inside the try: a disposed or context-lost engine can throw
       // from viewState() too, and the manual path's no-escaped-throw contract
       // must cover it (saveToSlot makes the same call the same way). Silent
       // callers see no change: they caught a stampView throw before this
       // reorder too, via the rethrow below.
-      this.stampView(sim);
-      SaveGame.save(sim);
+      SaveGame.save(this.saveText());
     } catch (err) {
       // Silent callers rely on the THROW: saveBeforeUpdate's caller must not
       // reload on a failed write, recoverFromContextLoss words the failure on
@@ -156,22 +175,21 @@ export class SaveLoad {
     try {
       do {
         this.autosaveQueued = false;
-        const sim = this.deps.getSim();
+        const tower = this.deps.enginePort().generation();
         // Re-stamp per iteration: the camera may have moved while the
         // previous async compression was in flight.
         // The experimental worker host answers `serialize` from the engine
         // only once its read model has caught up; wait for that here, where
         // waiting costs nothing (no-op on every other engine). The camera is
         // stamped after the wait, so the save carries where it is now.
-        await settleEngine(sim);
+        await settleEngine(this.deps.getSim());
         // A tower adopted during the wait is not the one to write: go round
         // again with the tower the app holds now.
-        if (this.deps.getSim() !== sim) {
+        if (this.deps.enginePort().generation() !== tower) {
           this.autosaveQueued = true;
           continue;
         }
-        this.stampView(sim);
-        await SaveGame.saveAsync(sim);
+        await SaveGame.saveAsync(this.saveText());
       } while (this.autosaveQueued);
     } catch {
       /* periodic autosave is best effort and has no UI surface; manual and pre-reload saves still report errors */
@@ -304,7 +322,7 @@ export class SaveLoad {
     // Captured so a tower swap during the wait (Load/New stay reachable) is
     // detectable at completion: the "your tower was saved" trace belongs to
     // THIS tower, and must not land in a different one's bulletin log.
-    const simAtLoss = this.deps.getSim();
+    const towerAtLoss = this.deps.enginePort().generation();
     this.deps.ui.toast("The device reset the game's graphics. Recovering...", "info");
     this.deps.attemptGraphicsRecovery((recovered) => {
       // Re-anchor the repeat window at the attempt's END too: a background
@@ -319,12 +337,13 @@ export class SaveLoad {
       // GPU); the screen owns the session then, so stay quiet rather than
       // contradict it with a success toast.
       if (isCrashed()) return;
-      if (this.deps.getSim() === simAtLoss) {
+      const port = this.deps.enginePort();
+      if (port.generation() === towerAtLoss) {
         // Leave a durable trace in the bulletin log (the old silent reload
         // erased all evidence; recovering must not repeat that mistake).
-        simAtLoss.emit(
+        port.logLine(
           "The device reset the game's graphics; the game recovered on the spot. Your tower was saved first.",
-          "info",
+          this.deps.portCodes().code("logKinds", "info"),
         );
         this.deps.ui.toast("Graphics recovered. Your tower was saved.", "good");
       } else {
@@ -336,9 +355,8 @@ export class SaveLoad {
   }
 
   load(): void {
-    const loaded = SaveGame.load();
-    if (loaded) {
-      this.deps.adoptSim(loaded);
+    if (SaveGame.load(loadStored(this.deps.enginePort()))) {
+      this.deps.towerSwapped();
       this.deps.ui.toast("Tower loaded.", "good");
     } else {
       this.deps.ui.toast("No saved tower found.", "bad");
@@ -353,7 +371,7 @@ export class SaveLoad {
    *  guard; delegating keeps the latch on the one choke point every export
    *  entry converges on. */
   exportGame(): Promise<void> {
-    return runExportFlow(this.deps, (sim) => this.stampView(sim));
+    return runExportFlow(this.deps, () => ({ text: this.saveText(), towerName: this.deps.enginePort().towerName() }));
   }
 
   /**
@@ -440,14 +458,17 @@ export class SaveLoad {
    *  runs the canon calendar and auto structure, so `modernCalendar` and
    *  `startUnbridged` is only consulted for Modern. */
   newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", startUnbridged = false): void {
-    this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode, modernCalendar, startUnbridged));
+    const port = this.deps.enginePort();
+    const codes = this.deps.portCodes();
+    swapDone(port, port.foundTower(Date.now() & 0x7fffffff, codes.code("modes", mode), codes.code("calendars", modernCalendar), startUnbridged));
+    this.deps.towerSwapped();
     // Both rule-sets found an empty lot now, so the toast is the actionable
     // first-lobby cue (the engine's welcome log entry is rebased past by the UI
     // cursor, so the toast is the one visible signal). Keyed on tower state,
     // never on the mode string, so it stays correct if founding ever seeds again.
-    const founded = this.deps.getSim();
+    const founded = this.deps.reader();
     this.deps.ui.toast(
-      founded.tower.units.length === 0
+      founded.rooms.length === 0 && founded.structure.length === 0
         ? "New tower founded. Lay a lobby on the ground line to open it."
         : "New tower founded. Good luck!",
       "good",

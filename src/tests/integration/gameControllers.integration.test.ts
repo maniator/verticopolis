@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import { withPorts } from "../fixtures/saveText";
 import { catalogFor } from "../../engine/catalog";
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, GRID, isFixedSpanTransport } from "../../engine/facilities";
@@ -340,7 +341,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
     sim = new Simulation();
     f = fakes();
     adopted = [];
-    saveLoad = new SaveLoad({
+    saveLoad = new SaveLoad(withPorts({
       getSim: () => sim,
       getView: () => null,
       adoptSim: (s) => {
@@ -350,7 +351,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
       showCrashScreen: () => {},
       attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
-    });
+    }));
   });
 
   it("newGame adopts a fresh sim (the dep's shape forbids preserving the undo trail)", () => {
@@ -409,7 +410,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
     // engine; the manual path's no-escaped-throw contract covers the stamp
     // too, while the silent path still propagates it to its own callers.
     const f2 = fakes();
-    const throwing = new SaveLoad({
+    const throwing = new SaveLoad(withPorts({
       getSim: () => sim,
       getView: () => {
         throw new Error("context lost");
@@ -419,7 +420,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
       showCrashScreen: () => {},
       attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
-    });
+    }));
     expect(() => throwing.save()).not.toThrow();
     expect(f2.toasts).toEqual([{ text: "Save failed: context lost", kind: "bad" }]);
     expect(() => throwing.save(true)).toThrow(/context lost/);

@@ -7,6 +7,7 @@ import { toBase64, deflate } from "../../storage/saveCompression";
 import { FACILITIES, GRID } from "../../engine/facilities";
 import { UNIT_CAP } from "../../engine/sim/deserializeGuards";
 import { itTypeScriptOnly } from "../parity/typescriptOnly";
+import { saveOf, loadAuto, loadResultSim, loadSlotSim } from "../fixtures/saveText";
 
 describe("SaveGame", () => {
   beforeEach(() => localStorage.clear());
@@ -404,7 +405,7 @@ describe("SaveGame", () => {
       return realSetItem(key, value);
     });
     try {
-      expect(() => SaveGame.saveSlot(2, sim)).toThrow(/quota/i);
+      expect(() => SaveGame.saveSlot(2, saveOf(sim))).toThrow(/quota/i);
     } finally {
       setSpy.mockRestore();
     }
@@ -412,9 +413,9 @@ describe("SaveGame", () => {
 
   it("round-trips through localStorage", () => {
     const sim = sampleGame();
-    SaveGame.save(sim);
+    SaveGame.save(saveOf(sim));
     expect(SaveGame.hasSave()).toBe(true);
-    const loaded = SaveGame.load()!;
+    const loaded = loadAuto()!;
     expect(loaded).not.toBeNull();
     expect(loaded.money).toBe(sim.money);
     expect(loaded.clock.minutes).toBe(sim.clock.minutes);
@@ -424,8 +425,8 @@ describe("SaveGame", () => {
 
   it("preserves occupancy lookups after load", () => {
     const sim = sampleGame();
-    SaveGame.save(sim);
-    const loaded = SaveGame.load()!;
+    SaveGame.save(saveOf(sim));
+    const loaded = loadAuto()!;
     const x0 = Math.floor(GRID.width / 2) - 20;
     expect(loaded.tower.unitAt(2, x0)).toBeDefined();
   });
@@ -436,23 +437,23 @@ describe("SaveGame", () => {
 
   it("stores autosaves COMPRESSED (tagged, and smaller than the raw JSON), not as a giant blob", () => {
     const sim = sampleGame();
-    SaveGame.save(sim);
+    SaveGame.save(saveOf(sim));
     const raw = localStorage.getItem(AUTO_KEY)!;
     // The stored value is the compression marker + payload, never raw JSON.
     expect(raw.startsWith("VCZ1:")).toBe(true);
     expect(raw.startsWith("{")).toBe(false);
     expect(raw.length).toBeLessThan(JSON.stringify(sim.serialize()).length);
     // …and it still round-trips back to the same tower.
-    expect(SaveGame.load()!.money).toBe(sim.money);
+    expect(loadAuto()!.money).toBe(sim.money);
   });
 
   it("async autosave writes the same compressed localStorage format", async () => {
     const sim = sampleGame();
     sim.money = 765_432;
-    await SaveGame.saveAsync(sim);
+    await SaveGame.saveAsync(saveOf(sim));
     const raw = localStorage.getItem(AUTO_KEY)!;
     expect(raw.startsWith("VCZ1:")).toBe(true);
-    expect(SaveGame.load()!.money).toBe(765_432);
+    expect(loadAuto()!.money).toBe(765_432);
   });
 
   it("async autosave falls back to the synchronous writer when native compression is unavailable", async () => {
@@ -466,9 +467,9 @@ describe("SaveGame", () => {
     );
     const sim = sampleGame();
     sim.money = 246_810;
-    await SaveGame.saveAsync(sim);
+    await SaveGame.saveAsync(saveOf(sim));
     expect(localStorage.getItem(AUTO_KEY)!.startsWith("VCZ1:")).toBe(true);
-    expect(SaveGame.load()!.money).toBe(246_810);
+    expect(loadAuto()!.money).toBe(246_810);
   });
 
   it("async autosave only requires native compression, not native decompression", async () => {
@@ -482,8 +483,8 @@ describe("SaveGame", () => {
     );
     const sim = sampleGame();
     sim.money = 135_790;
-    await SaveGame.saveAsync(sim);
-    expect(SaveGame.load()!.money).toBe(135_790);
+    await SaveGame.saveAsync(saveOf(sim));
+    expect(loadAuto()!.money).toBe(135_790);
   });
 
   it("does not let an older async autosave overwrite a newer synchronous save", async () => {
@@ -513,16 +514,16 @@ describe("SaveGame", () => {
 
     const stale = sampleGame();
     stale.money = 100;
-    const pending = SaveGame.saveAsync(stale);
+    const pending = SaveGame.saveAsync(saveOf(stale));
     await vi.waitFor(() => expect(captured).toBeDefined());
 
     const fresh = sampleGame();
     fresh.money = 200;
-    SaveGame.save(fresh);
+    SaveGame.save(saveOf(fresh));
     release();
     await pending;
 
-    expect(SaveGame.load()!.money).toBe(200);
+    expect(loadAuto()!.money).toBe(200);
   });
 
   it("a manual SLOT save does not cancel an in-flight async autosave commit", async () => {
@@ -552,24 +553,24 @@ describe("SaveGame", () => {
 
     const auto = sampleGame();
     auto.money = 111;
-    const pending = SaveGame.saveAsync(auto);
+    const pending = SaveGame.saveAsync(saveOf(auto));
     await vi.waitFor(() => expect(captured).toBeDefined());
 
     // Writes a DIFFERENT key, so the pending autosave must still commit.
     const manual = sampleGame();
     manual.money = 222;
-    SaveGame.saveSlot(1, manual);
+    SaveGame.saveSlot(1, saveOf(manual));
     release();
     await pending;
 
-    expect(SaveGame.load()!.money).toBe(111); // autosave landed, not cancelled
-    expect(SaveGame.loadSlot(1)!.money).toBe(222); // slot save intact
+    expect(loadAuto()!.money).toBe(111); // autosave landed, not cancelled
+    expect(loadSlotSim(1)!.money).toBe(222); // slot save intact
   });
 
   it("propagates direct async save failures to callers", async () => {
     const saveToAsync = vi.spyOn(SaveGame, "saveToAsync").mockRejectedValueOnce(new Error("write failed"));
     try {
-      await expect(SaveGame.saveAsync(sampleGame())).rejects.toThrow(/write failed/);
+      await expect(SaveGame.saveAsync(saveOf(sampleGame()))).rejects.toThrow(/write failed/);
     } finally {
       saveToAsync.mockRestore();
     }
@@ -592,7 +593,7 @@ describe("SaveGame", () => {
     const data = { ...sim.serialize(), savedAt: 1, filler: "x".repeat(33 * 1024 * 1024) }; // > 32MB inflated
     const packed = deflateSync(new TextEncoder().encode(JSON.stringify(data)));
     localStorage.setItem(AUTO_KEY, "VCZ1:" + b64(packed));
-    expect(SaveGame.load()).toBeNull(); // the cap fired (the payload alone is valid + loadable)
+    expect(loadAuto()).toBeNull(); // the cap fired (the payload alone is valid + loadable)
   });
 
   it("degrades a truncated / garbage compressed save to null — no crash, no partial tower", () => {
@@ -600,31 +601,31 @@ describe("SaveGame", () => {
     // rejects; either way readSlot catches it and returns null, so the player
     // never loads a half-decoded tower.
     const sim = sampleGame();
-    SaveGame.save(sim);
+    SaveGame.save(saveOf(sim));
     const body = localStorage.getItem(AUTO_KEY)!.slice("VCZ1:".length);
     localStorage.setItem(AUTO_KEY, "VCZ1:" + body.slice(0, Math.floor(body.length / 2))); // truncated payload
-    expect(SaveGame.load()).toBeNull();
+    expect(loadAuto()).toBeNull();
     localStorage.setItem(AUTO_KEY, "VCZ1:" + btoa("not a deflate stream at all")); // outright garbage
-    expect(SaveGame.load()).toBeNull();
+    expect(loadAuto()).toBeNull();
   });
 
   it("loadResult distinguishes an absent save from a present-but-unreadable one (for an honest boot)", () => {
     // Absent → not corrupt, no sim, no write time.
-    expect(SaveGame.loadResult()).toEqual({ sim: null, corrupt: false, savedAt: undefined });
+    expect(loadResultSim()).toEqual({ sim: null, corrupt: false, savedAt: undefined });
 
     // A real save → readable, not corrupt, and its write time comes back for the
     // boot recency bucket (no second decode of the slot).
     const sim = sampleGame();
     const before = Date.now();
-    SaveGame.save(sim);
-    const ok = SaveGame.loadResult();
+    SaveGame.save(saveOf(sim));
+    const ok = loadResultSim();
     expect(ok.corrupt).toBe(false);
     expect(ok.sim?.money).toBe(sim.money);
     expect(ok.savedAt).toBeGreaterThanOrEqual(before);
 
     // Present but undecodable → corrupt (so boot warns instead of a silent fresh start).
     localStorage.setItem(AUTO_KEY, "VCZ1:" + btoa("not a deflate stream at all"));
-    expect(SaveGame.loadResult()).toEqual({ sim: null, corrupt: true, savedAt: undefined });
+    expect(loadResultSim()).toEqual({ sim: null, corrupt: true, savedAt: undefined });
     expect(SaveGame.hasSave()).toBe(true); // …yet the key IS present — the exact trap this guards
   });
 
@@ -647,7 +648,7 @@ describe("SaveGame", () => {
     sim.money = 555_555;
     localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
     localStorage.setItem(AUTO_KEY, "VCZ1:not-actually-deflate");
-    const boot = SaveGame.loadResult();
+    const boot = loadResultSim();
     expect(boot.sim).not.toBeNull(); // the legacy tower is rescued...
     expect(boot.sim!.money).toBe(555_555);
     expect(boot.corrupt).toBe(true); // ...while boot still preserves + warns
@@ -659,9 +660,9 @@ describe("SaveGame", () => {
   it("does not consult the legacy key (or flag corruption) when the Verticopolis autosave reads fine", () => {
     const sim = sampleGame();
     sim.money = 777_777;
-    SaveGame.save(sim);
+    SaveGame.save(saveOf(sim));
     localStorage.setItem(LEGACY_AUTO_KEY, "VCZ1:garbage-stale-legacy");
-    const boot = SaveGame.loadResult();
+    const boot = loadResultSim();
     expect(boot.sim!.money).toBe(777_777);
     expect(boot.corrupt).toBe(false);
   });
@@ -671,7 +672,7 @@ describe("SaveGame", () => {
     // legacy key is dropped: the write must fail WITHOUT destroying the legacy
     // value, which an unreadable primary falls back to at load.
     const sim = sampleGame();
-    SaveGame.save(sim);
+    SaveGame.save(saveOf(sim));
     const legacyValue = JSON.stringify({ ...sim.serialize(), savedAt: 123 });
     localStorage.setItem(LEGACY_AUTO_KEY, legacyValue);
     const realSetItem = localStorage.setItem.bind(localStorage);
@@ -680,7 +681,7 @@ describe("SaveGame", () => {
       return realSetItem(key, value);
     });
     try {
-      expect(() => SaveGame.save(sim)).toThrow(/quota/i);
+      expect(() => SaveGame.save(saveOf(sim))).toThrow(/quota/i);
       expect(localStorage.getItem(LEGACY_AUTO_KEY)).toBe(legacyValue); // restored, not lost
     } finally {
       setSpy.mockRestore();
@@ -691,13 +692,13 @@ describe("SaveGame", () => {
     const sim = sampleGame();
     localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
     expect(SaveGame.hasSave()).toBe(true);
-    expect(SaveGame.load()!.money).toBe(sim.money);
+    expect(loadAuto()!.money).toBe(sim.money);
 
-    const loaded = SaveGame.load()!;
+    const loaded = loadAuto()!;
     loaded.money = 333_333;
-    SaveGame.save(loaded);
+    SaveGame.save(saveOf(loaded));
     expect(localStorage.getItem(AUTO_KEY)).not.toBeNull();
-    expect(SaveGame.load()!.money).toBe(333_333);
+    expect(loadAuto()!.money).toBe(333_333);
   });
 
   it("removes the legacy autosave key before migrating so quota can be reclaimed", () => {
@@ -711,7 +712,7 @@ describe("SaveGame", () => {
       return realSetItem(key, value);
     });
     try {
-      expect(() => SaveGame.save(sim)).not.toThrow();
+      expect(() => SaveGame.save(saveOf(sim))).not.toThrow();
       expect(localStorage.getItem(LEGACY_AUTO_KEY)).toBeNull();
       expect(localStorage.getItem(AUTO_KEY)).not.toBeNull();
     } finally {
@@ -724,7 +725,7 @@ describe("SaveGame", () => {
     // legacy key after migration). A quota-tight write must reclaim the stale
     // legacy duplicate and retry rather than fail the autosave.
     const sim = sampleGame();
-    SaveGame.save(sim); // AUTO_KEY now populated
+    SaveGame.save(saveOf(sim)); // AUTO_KEY now populated
     localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
     const realSetItem = localStorage.setItem.bind(localStorage);
     const setSpy = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
@@ -735,9 +736,9 @@ describe("SaveGame", () => {
     });
     try {
       sim.money = 424_242;
-      expect(() => SaveGame.save(sim)).not.toThrow();
+      expect(() => SaveGame.save(saveOf(sim))).not.toThrow();
       expect(localStorage.getItem(LEGACY_AUTO_KEY)).toBeNull();
-      expect(SaveGame.load()!.money).toBe(424_242);
+      expect(loadAuto()!.money).toBe(424_242);
     } finally {
       setSpy.mockRestore();
     }
@@ -748,17 +749,17 @@ describe("SaveGame", () => {
     localStorage.setItem(AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
     expect(localStorage.getItem(AUTO_KEY)!.startsWith("{")).toBe(true); // legacy: raw JSON, no marker
 
-    const loaded = SaveGame.load()!;
+    const loaded = loadAuto()!;
     expect(loaded.money).toBe(sim.money); // old save still readable
 
-    SaveGame.save(loaded); // re-saving migrates it forward
+    SaveGame.save(saveOf(loaded)); // re-saving migrates it forward
     expect(localStorage.getItem(AUTO_KEY)!.startsWith("VCZ1:")).toBe(true);
   });
 
   it("listSlots reads compressed slots — name / star / savedAt survive the round-trip", () => {
     const sim = sampleGame();
     sim.tower.towerName = "Compressed Tower";
-    SaveGame.saveSlot(1, sim);
+    SaveGame.saveSlot(1, saveOf(sim));
     const info = SaveGame.listSlots().find((s) => s.slot === 1)!;
     expect(info.exists).toBe(true);
     expect(info.towerName).toBe("Compressed Tower");
@@ -773,7 +774,7 @@ describe("SaveGame", () => {
     // picker keys its rows on that difference: hiding an unreadable slot would
     // claim the tower is gone while the bytes are still on disk, which is the
     // very thing preserveUnreadable exists to prevent.
-    SaveGame.saveSlot(1, sampleGame());
+    SaveGame.saveSlot(1, saveOf(sampleGame()));
     localStorage.setItem("simtower-clone-slot-2", "VCZ1:not-actually-base64-deflate");
     const slots = SaveGame.listSlots();
     const at = (n: number | "auto") => slots.find((s) => s.slot === n)!;
@@ -792,11 +793,11 @@ describe("SaveGame", () => {
     // tower fine.
     const sim = sampleGame();
     sim.tower.towerName = "Legacy Rescue";
-    SaveGame.save(sim); // writes the current key
+    SaveGame.save(saveOf(sim)); // writes the current key
     localStorage.setItem("simtower-clone-save", localStorage.getItem("verticopolis-save")!);
     localStorage.setItem("verticopolis-save", "VCZ1:not-actually-base64-deflate");
 
-    expect(SaveGame.load()!.tower.towerName).toBe("Legacy Rescue"); // the fallback works
+    expect(loadAuto()!.tower.towerName).toBe("Legacy Rescue"); // the fallback works
     const auto = SaveGame.listSlots().find((s) => s.slot === "auto")!;
     expect(auto).toMatchObject({ exists: true, present: true, towerName: "Legacy Rescue" });
   });
@@ -810,7 +811,7 @@ describe("SaveGame", () => {
 
   it("exports a .vctower container (magic line + packed payload, not raw JSON) and imports it back", async () => {
     const sim = sampleGame();
-    const file = await SaveGame.export(sim);
+    const file = await SaveGame.export(saveOf(sim));
     // The made-up format: first line is the magic, and the body is NOT
     // copy-paste JSON anymore.
     expect(file.startsWith("VCTOWER1\n")).toBe(true);
@@ -822,7 +823,7 @@ describe("SaveGame", () => {
 
   it("exports files smaller than the old pretty-printed JSON format", async () => {
     const sim = sampleGame();
-    const file = await SaveGame.export(sim);
+    const file = await SaveGame.export(saveOf(sim));
     const oldFormat = JSON.stringify(sim.serialize(), null, 2);
     // The whole point of the compressed container: a fraction of the JSON it
     // replaced, not just marginally under it.
@@ -832,9 +833,9 @@ describe("SaveGame", () => {
   it("names the export file after the tower", () => {
     const sim = sampleGame();
     sim.tower.towerName = "Naftali's Tower #1";
-    expect(SaveGame.exportFilename(sim)).toBe("naftali-s-tower-1.vctower");
+    expect(SaveGame.exportFilename(sim.tower.towerName)).toBe("naftali-s-tower-1.vctower");
     sim.tower.towerName = "✨✨"; // slugs to nothing → fallback
-    expect(SaveGame.exportFilename(sim)).toBe("tower.vctower");
+    expect(SaveGame.exportFilename(sim.tower.towerName)).toBe("tower.vctower");
   });
 
   it("rejects a raw-JSON tower export — only .vctower containers import now", async () => {
@@ -855,7 +856,7 @@ describe("SaveGame", () => {
     // Valid base64 over bytes that are not a deflate stream.
     await expect(SaveGame.import("VCTOWER1\n" + btoa('{"minutes":'))).rejects.toThrow(/damaged/);
     // A truncated real export: recognized container, broken payload.
-    const file = await SaveGame.export(sampleGame());
+    const file = await SaveGame.export(saveOf(sampleGame()));
     await expect(SaveGame.import(file.slice(0, Math.floor(file.length / 2)))).rejects.toThrow(/damaged/);
   });
 
@@ -905,30 +906,30 @@ describe("SaveGame", () => {
     it("export works without the compression API", async () => {
       breakEncode();
       breakDecode();
-      const file = await SaveGame.export(sampleGame());
+      const file = await SaveGame.export(saveOf(sampleGame()));
       vi.unstubAllGlobals();
       expect((await SaveGame.import(file)).money).toBe(sampleGame().money);
     });
 
     it("importing a compressed file reports the browser is too old, not 'damaged'", async () => {
       // A real, healthy container built while compression WAS available.
-      const file = await SaveGame.export(sampleGame());
+      const file = await SaveGame.export(saveOf(sampleGame()));
       breakDecode();
       await expect(SaveGame.import(file)).rejects.toThrow(/too old to open/);
     });
 
     it("a decoder-only browser can still import, and an encoder-only browser can still export", async () => {
-      const file = await SaveGame.export(sampleGame());
+      const file = await SaveGame.export(saveOf(sampleGame()));
       breakEncode(); // decoder-only browser
       expect((await SaveGame.import(file)).money).toBe(sampleGame().money);
       vi.unstubAllGlobals();
       breakDecode(); // encoder-only browser
-      await expect(SaveGame.export(sampleGame())).resolves.toMatch(/^VCTOWER1\n/);
+      await expect(SaveGame.export(saveOf(sampleGame()))).resolves.toMatch(/^VCTOWER1\n/);
     });
   });
 
   it("returns null when no save exists", () => {
-    expect(SaveGame.load()).toBeNull();
+    expect(loadAuto()).toBeNull();
     expect(SaveGame.hasSave()).toBe(false);
   });
 

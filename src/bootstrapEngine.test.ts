@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bootGame } from "./bootstrap";
+import { saveOf } from "./tests/fixtures/saveText";
 
 // The telemetry SDKs are gated on the host and best-effort; stub them so the
 // gate and its catch can be asserted without touching the real endpoints.
@@ -191,7 +192,7 @@ describe("bootGame engine", () => {
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
       expect(startWasmHost).toHaveBeenCalled();
       expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "wasm", failure: null });
-      expect(await SaveGame.export(new Simulation(1))).toBe("VCTOWER1\nZW5naW5l\n");
+      expect(await SaveGame.export(saveOf(new Simulation(1)))).toBe("VCTOWER1\nZW5naW5l\n");
       expect(encodeVctower).toHaveBeenCalledTimes(1);
     } finally {
       setEngineWriter(null);
@@ -211,7 +212,7 @@ describe("bootGame engine", () => {
       expect(error).toHaveBeenCalledWith(expect.stringContaining("[wasm]"), expect.any(Error));
       // The fallback is recorded with its reason (#874) as well as logged.
       expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", reason: "boot-error", message: "no host" } });
-      expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
+      expect(await SaveGame.export(saveOf(new Simulation(1)))).toMatch(/^VCTOWER1\n/);
       expect(encodeVctower).not.toHaveBeenCalled();
     } finally {
       setEngineWriter(null);
@@ -229,7 +230,7 @@ describe("bootGame engine", () => {
       await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
       expect((globalThis as { __vcEngineBoot?: unknown }).__vcEngineBoot).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", reason: "attach-refused", message: "not hosting this tower: it has a crowd" } });
       // The host follows every later adopt, so saves keep the engine's writer.
-      expect(await SaveGame.export(new Simulation(1))).toBe("VCTOWER1\nZW5naW5l\n");
+      expect(await SaveGame.export(saveOf(new Simulation(1)))).toBe("VCTOWER1\nZW5naW5l\n");
       expect(encodeVctower).toHaveBeenCalledTimes(1);
     } finally {
       setEngineWriter(null);
@@ -326,7 +327,7 @@ describe("bootGame engine_status", () => {
     await boot();
     expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", engine: "wasm", writer_latched: false })]);
     expect(bootState()).toEqual({ build: "switchable", engine: "wasm", failure: null });
-    await SaveGame.export(new Simulation(1));
+    await SaveGame.export(saveOf(new Simulation(1)));
     expect(lastRow(engineRows())).toMatchObject({ trigger: "writer-latch", engine: "wasm", writer_latched: true });
     expect(bootState()).toEqual({ build: "switchable", engine: "wasm", failure: null, writerLatched: true });
   });
@@ -342,7 +343,7 @@ describe("bootGame engine_status", () => {
     const setSpeed = vi.fn();
     await boot({ setSpeed });
     expect(opts?.strict).toBeUndefined();
-    expect(await SaveGame.export(new Simulation(1))).toBe("VCTOWER1\nZW5naW5l\n");
+    expect(await SaveGame.export(saveOf(new Simulation(1)))).toBe("VCTOWER1\nZW5naW5l\n");
     expect(encodeVctower).toHaveBeenCalledTimes(1);
     // The engine traps in a tick; the host has frozen it and moves the game
     // to TypeScript.
@@ -353,7 +354,7 @@ describe("bootGame engine_status", () => {
     expect(document.getElementById("engine-failure")).toBeNull();
     expect(setSpeed).not.toHaveBeenCalled();
     // Saves go back to the TypeScript writer: the trapped module is not asked.
-    expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
+    expect(await SaveGame.export(saveOf(new Simulation(1)))).toMatch(/^VCTOWER1\n/);
     expect(encodeVctower).toHaveBeenCalledTimes(1);
     expect(lastRow(engineRows())).toMatchObject({ trigger: "fallback", engine: "ts-fallback", fallback_reason: "trap-tick", fallbacks: 1 });
     expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret/);
@@ -368,12 +369,12 @@ describe("bootGame engine_status", () => {
       return { status, current: () => null, stop: () => {} } as never;
     });
     await boot();
-    expect(await SaveGame.export(new Simulation(1))).toBe("VCTOWER1\nZW5naW5l\n");
+    expect(await SaveGame.export(saveOf(new Simulation(1)))).toBe("VCTOWER1\nZW5naW5l\n");
     // A load traps as it attaches; the host sets its status, then reports.
     Object.assign(status, { hosted: false, latched: true, lastError: `not hosting this tower or any later one, since the Rust engine trapped: ${secret}` });
     opts?.onFallback?.({ reason: "attach-refused", stage: "adopt" }, true);
     expect(bootState()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "host", reason: "attach-refused", message: status.lastError } });
-    expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
+    expect(await SaveGame.export(saveOf(new Simulation(1)))).toMatch(/^VCTOWER1\n/);
     expect(encodeVctower).toHaveBeenCalledTimes(1);
     expect(lastRow(engineRows())).toMatchObject({ trigger: "fallback", fallback_reason: "attach-refused", fallback_stage: "adopt" });
     expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret/);
@@ -389,7 +390,7 @@ describe("bootGame engine_status", () => {
     await boot();
     // Recorded once the host returns, with its message, as a refusal is.
     expect(bootState()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", reason: "attach-refused", message: lastError } });
-    expect(await SaveGame.export(new Simulation(1))).toMatch(/^VCTOWER1\n/);
+    expect(await SaveGame.export(saveOf(new Simulation(1)))).toMatch(/^VCTOWER1\n/);
     expect(encodeVctower).not.toHaveBeenCalled();
     expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", engine: "ts-fallback", fallback_reason: "attach-refused", fallback_stage: "start" })]);
   });

@@ -5,6 +5,7 @@ import { SaveGame } from "./SaveGame";
 import { deflateSync } from "fflate";
 import { fromBase64, inflateCapped, STORE_MAGIC, toBase64, TOWER_FILE_MAGIC } from "./saveCompression";
 import { fromTowerFile, toTowerFile } from "./towerFileCodec";
+import { saveOf } from "../tests/fixtures/saveText";
 
 /** A tower as an OLD build wrote it: no appVersion, plus the two fields
  *  `SaveGame.import` insists on. */
@@ -119,7 +120,7 @@ describe("Founder survives the reverse trip", () => {
 describe("a CompressionStream-written tower reads back through fflate", () => {
   it("survives export, reverse conversion, and an fflate decode", async () => {
     const sim = Simulation.newGame(9182);
-    const exported = await SaveGame.export(sim);
+    const exported = await SaveGame.export(saveOf(sim));
     expect(exported.startsWith(TOWER_FILE_MAGIC + "\n")).toBe(true);
 
     const back = fromTowerFile(exported);
@@ -136,7 +137,7 @@ describe("a CompressionStream-written tower reads back through fflate", () => {
     // End to end on the codec: export with the stream API, convert back, then
     // load through `SaveGame.import`, which is the production reader.
     const sim = Simulation.newGame(4242);
-    const exported = await SaveGame.export(sim);
+    const exported = await SaveGame.export(saveOf(sim));
     const back = fromTowerFile(exported);
     expect(back.ok).toBe(true);
     if (!back.ok) return;

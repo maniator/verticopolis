@@ -73,6 +73,14 @@ let latestAsyncSave: object | null = null;
  */
 export const TOWER_FILE_EXT = ".vctower";
 
+/** A save as the engine writes it (`EnginePort.serialize()`): the JSON text
+ *  of a `SerializedGame`, with no write stamp yet. */
+export type SaveText = string;
+
+/** Hand a stored save to the engine (`loadSave`); true when it loaded the
+ *  tower. */
+export type TryLoad = (text: SaveText) => boolean;
+
 function readSlot(key: string): SerializedGame | null {
   const raw = localStorage.getItem(key);
   if (!raw) return null;
@@ -184,26 +192,28 @@ const MAX_SLOT_DAY = 360_000;
 
 export const SaveGame = {
   // ---- Auto-save slot (used on startup) --------------------------------
-  save(sim: Simulation): void {
-    this.saveTo(AUTO_KEY, sim);
+  save(text: SaveText): void {
+    this.saveTo(AUTO_KEY, text);
   },
-  async saveAsync(sim: Simulation): Promise<void> {
-    await this.saveToAsync(AUTO_KEY, sim);
+  async saveAsync(text: SaveText): Promise<void> {
+    await this.saveToAsync(AUTO_KEY, text);
   },
   hasSave(): boolean {
     return localStorage.getItem(AUTO_KEY) !== null || localStorage.getItem(LEGACY_AUTO_KEY) !== null;
   },
-  load(): Simulation | null {
-    return this.loadResult().sim;
+  /** Load the autosave through `tryLoad`; true when a save loaded. */
+  load(tryLoad: TryLoad): boolean {
+    return this.loadResult(tryLoad).loaded;
   },
   /**
    * Load the autosave, distinguishing a genuinely ABSENT save from one that's
    * present but UNREADABLE (corrupt, or from an incompatible/newer format). Boot
    * needs the difference: on `corrupt` it must warn and not silently offer
    * "Continue" (which would drop the player into a fresh tower behind a title
-   * that promised their old one) — see main.ts.
+   * that promised their old one) — see main.ts. `tryLoad` hands each decoded
+   * save to the engine, which says whether it loaded it.
    */
-  loadResult(): { sim: Simulation | null; corrupt: boolean; savedAt: number | undefined } {
+  loadResult(tryLoad: TryLoad): { loaded: boolean; corrupt: boolean; savedAt: number | undefined } {
     // Try the Verticopolis key first, then the legacy key: a partial migration
     // or multi-tab divergence can leave an unreadable value on one key beside a
     // healthy save on the other, and the healthy one must still load. `corrupt`
@@ -214,22 +224,17 @@ export const SaveGame = {
     for (const key of [AUTO_KEY, LEGACY_AUTO_KEY]) {
       if (localStorage.getItem(key) === null) continue; // absent, not corrupt
       const data = readSlot(key); // null ⇒ present but undecodable
-      if (data) {
-        try {
-          const sim = Simulation.deserialize(data);
-          markFounderFromLoadedFile(sim, data); // an unstamped stored tower predates the appVersion stamp (pre-2.0)
-          // Surface the loaded tower's write time from the SAME decoded data and
-          // the SAME key that actually loaded (legacy fallback included), so the
-          // boot return-recency bucket needs no second decode of the slot. A
-          // forged or out-of-range stamp reads as absent (parseSavedAt).
-          return { sim, corrupt, savedAt: parseSavedAt(data.savedAt) };
-        } catch {
-          /* decoded, but the schema won't load; treated as unreadable below */
-        }
-      }
+      // The engine applies the founder rule: an unstamped stored tower
+      // predates the appVersion stamp (pre-2.0). Surface the loaded tower's
+      // write time from the SAME decoded data and the SAME key that actually
+      // loaded (legacy fallback included), so the boot return-recency bucket
+      // needs no second decode of the slot. A forged or out-of-range stamp
+      // reads as absent (parseSavedAt). A save the engine refuses is
+      // unreadable, as below.
+      if (data && tryLoad(JSON.stringify(data))) return { loaded: true, corrupt, savedAt: parseSavedAt(data.savedAt) };
       corrupt = true;
     }
-    return { sim: null, corrupt, savedAt: undefined };
+    return { loaded: false, corrupt, savedAt: undefined };
   },
   clear(): void {
     localStorage.removeItem(AUTO_KEY);
@@ -252,8 +257,8 @@ export const SaveGame = {
   },
 
   // ---- Named manual slots ----------------------------------------------
-  saveSlot(n: number, sim: Simulation): void {
-    this.saveTo(SLOT_KEY(n), sim);
+  saveSlot(n: number, text: SaveText): void {
+    this.saveTo(SLOT_KEY(n), text);
   },
   /** Raw presence check for a manual slot, parse-free and cheap, so a
    *  corrupt-but-present slot still reads as occupied. Anything that picks a
@@ -262,16 +267,11 @@ export const SaveGame = {
   hasSlot(n: number): boolean {
     return localStorage.getItem(SLOT_KEY(n)) !== null;
   },
-  loadSlot(n: number): Simulation | null {
+  /** Load a manual slot through `tryLoad` (the engine applies the founder
+   *  rule); false for an empty, undecodable or refused slot. */
+  loadSlot(n: number, tryLoad: TryLoad): boolean {
     const data = readSlot(SLOT_KEY(n));
-    if (!data) return null;
-    try {
-      const sim = Simulation.deserialize(data);
-      markFounderFromLoadedFile(sim, data); // an unstamped slot save predates the appVersion stamp (pre-2.0)
-      return sim;
-    } catch {
-      return null;
-    }
+    return data !== null && tryLoad(JSON.stringify(data));
   },
   deleteSlot(n: number): void {
     localStorage.removeItem(SLOT_KEY(n));
@@ -292,14 +292,14 @@ export const SaveGame = {
    * reason this codec is synchronous at all. Identical stamping and packing to
    * {@link SaveGame.saveTo}, which now delegates here.
    */
-  packSync(sim: Simulation): string {
-    const data = stamp(sim.serialize());
+  packSync(text: SaveText): string {
+    const data = stamp(JSON.parse(text) as SerializedGame);
     const json = JSON.stringify(data);
     return STORE_MAGIC + payloadLine(packVctower(json, encodeSaveJson(json), data));
   },
 
   // ---- Shared writer + export/import -----------------------------------
-  saveTo(key: string, sim: Simulation): void {
+  saveTo(key: string, text: SaveText): void {
     // Only an AUTOSAVE-slot write invalidates an in-flight async autosave (the
     // token exists so older compressed state can't commit over this newer
     // flush of the SAME slot). A manual slot save targets a different key, so
@@ -311,17 +311,17 @@ export const SaveGame = {
     // third of the cost, keeping the pre-reload flush short). Synchronous by
     // design: this runs just before a reload in the crash-recovery path, where
     // an async write could be lost.
-    writeSlot(key, this.packSync(sim));
+    writeSlot(key, this.packSync(text));
   },
-  async saveToAsync(key: string, sim: Simulation): Promise<void> {
+  async saveToAsync(key: string, text: SaveText): Promise<void> {
     if (!compressionEncodeSupported()) {
-      this.saveTo(key, sim);
+      this.saveTo(key, text);
       return;
     }
     // Encode (and refuse an oversized save) before claiming the token: a
     // refused save leaves no token behind, so an older save of the same slot
     // still in flight commits instead of the slot keeping neither.
-    const bytes = encodeSaveJson(JSON.stringify(stamp(sim.serialize())));
+    const bytes = encodeSaveJson(JSON.stringify(stamp(JSON.parse(text) as SerializedGame)));
     const token = {};
     latestAsyncSave = token;
     const packed = await deflate(bytes);
@@ -331,18 +331,18 @@ export const SaveGame = {
   },
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
-  async export(sim: Simulation): Promise<string> {
+  async export(text: SaveText): Promise<string> {
     // Exports carry the same write-time provenance as local saves: a moved
     // file says when and by which build it was written. packVctower writes the
     // same bits in every browser, through the engine when it runs.
-    const data = stamp(sim.serialize());
+    const data = stamp(JSON.parse(text) as SerializedGame);
     const json = JSON.stringify(data);
     return packVctower(json, encodeSaveJson(json), data);
   },
 
   /** Download name for an export: the tower's name slugged, e.g. "tower-one.vctower". */
-  exportFilename(sim: Simulation): string {
-    const slug = (sim.tower.towerName || "")
+  exportFilename(towerName: string | undefined): string {
+    const slug = (towerName || "")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");

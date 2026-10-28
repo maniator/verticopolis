@@ -4,7 +4,7 @@ import { UndoHistory, towerStateSig } from "../../engine/UndoHistory";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { createAppHistory } from "../../game/appHistory";
-import { createTsSim } from "../../simport/tsSim";
+import { TsEngine } from "../../engine/port/tsEngine";
 
 // A tiny in-memory "world" so the stack logic can be exercised with no
 // simulation at all — the snapshot is just the JSON of a single number.
@@ -381,19 +381,19 @@ describe("UndoHistory + Simulation — round-trip", () => {
   });
 
   it("undo of a build preserves a bridging toggle changed afterward (a setting, not a build step)", async () => {
-    // The app's history through the port: a `history` load carries the live
+    // The app's history through the port: `restore` carries the live
     // autoBridge across, so undoing a BUILD never silently flips a Settings
     // toggle the player changed after that build (Codex P2).
-    let sim = Simulation.newGame(3, "modern", "realWorld");
-    const port = createTsSim(() => sim, { adopt: (next) => void (sim = next) });
-    const hist = createAppHistory({ port, ui: { toast: () => {} } });
+    const enginePort = new TsEngine(Simulation.newGame(3, "modern", "realWorld"));
+    const hist = createAppHistory({ enginePort, ui: { toast: () => {} } });
     const cx = Math.floor(GRID.width / 2);
     hist.capture("Build"); // snapshot taken while bridging is on
-    expect(sim.tower.place("lobby", 1, cx).ok).toBe(true); // ground lobby: the first valid placement
+    expect(enginePort.sim.tower.place("lobby", 1, cx).ok).toBe(true); // ground lobby: the first valid placement
     hist.commit();
-    sim.autoBridge = false; // player turns bridging off AFTER the build
+    enginePort.sim.autoBridge = false; // player turns bridging off AFTER the build
     await hist.undo();
-    expect(sim.tower.unitAt(1, cx)).toBeUndefined(); // the build is undone
-    expect(sim.autoBridge).toBe(false); // preserved, not reverted to the snapshot's on
+    expect(enginePort.sim.tower.unitAt(1, cx)).toBeUndefined(); // the build is undone
+    expect(enginePort.sim.autoBridge).toBe(false); // preserved, not reverted to the snapshot's on
   });
+
 });

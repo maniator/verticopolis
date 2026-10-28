@@ -13,7 +13,7 @@ import type { SaveLoadDeps } from "./saveLoad";
  * `SaveLoad` where its tests live.
  */
 export function adoptConfirmedLegacyImport(
-  deps: Pick<SaveLoadDeps, "adoptSim" | "getSim" | "ui">,
+  deps: Pick<SaveLoadDeps, "adoptSim" | "getSim" | "enginePort" | "ui">,
   sim: Simulation,
   flushCurrent: () => void,
 ): void {
@@ -39,7 +39,9 @@ export function adoptConfirmedLegacyImport(
   try {
     for (let n = 1; n <= SLOT_COUNT; n++) {
       if (!SaveGame.hasSlot(n)) {
-        SaveGame.saveSlot(n, sim);
+        // The engine holds the imported tower now; its save keeps the view
+        // the file carried.
+        SaveGame.saveSlot(n, deps.enginePort().serialize());
         savedTo = n;
         break;
       }

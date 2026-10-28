@@ -4,6 +4,7 @@ import towerFile from "../../../conformance/fixtures/towerone_6.vctower?raw";
 import { LOG_SAVE_CAP, Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../engine/types";
 import { SaveGame } from "../../storage/SaveGame";
+import { saveOf, loadResultSim, loadSlotSim } from "../fixtures/saveText";
 
 /**
  * Save metadata stamps (savedAt + appVersion on every write, including
@@ -32,7 +33,7 @@ describe("write-time provenance stamps (savedAt + appVersion)", () => {
   it("a localStorage save stamps both, and listSlots reads savedAt back", () => {
     const sim = new Simulation();
     const before = Date.now();
-    SaveGame.saveSlot(1, sim);
+    SaveGame.saveSlot(1, saveOf(sim));
     const raw = decodeSlot("simtower-clone-slot-1");
     expect(raw.savedAt).toBeGreaterThanOrEqual(before);
     expect(raw.appVersion).toMatch(/^\d+\.\d+\.\d+$/); // the Vite-injected build version
@@ -43,7 +44,7 @@ describe("write-time provenance stamps (savedAt + appVersion)", () => {
   it("a .vctower export stamps both (a moved file says when and by which build it was written)", async () => {
     const sim = new Simulation();
     const before = Date.now();
-    const file = await SaveGame.export(sim);
+    const file = await SaveGame.export(saveOf(sim));
     const data = decodeVctower(file);
     expect(data.savedAt).toBeGreaterThanOrEqual(before);
     expect(data.appVersion).toMatch(/^\d+\.\d+\.\d+$/);
@@ -51,7 +52,7 @@ describe("write-time provenance stamps (savedAt + appVersion)", () => {
 
   it("treats a forged savedAt as absent so the Saves dialog never shows Invalid Date", () => {
     const sim = new Simulation();
-    SaveGame.saveSlot(1, sim);
+    SaveGame.saveSlot(1, saveOf(sim));
     // Re-pack the slot with a hostile savedAt (a string) in place.
     const data = decodeSlot("simtower-clone-slot-1") as Omit<SerializedGame, "savedAt"> & { savedAt: unknown };
     data.savedAt = "yesterday";
@@ -67,8 +68,8 @@ describe("write-time provenance stamps (savedAt + appVersion)", () => {
   });
 
   it("listSlots reports the founded mode and in-game day for the Saves dialog", () => {
-    SaveGame.saveSlot(1, new Simulation()); // classic by default
-    SaveGame.saveSlot(2, Simulation.newGame(7, "modern"));
+    SaveGame.saveSlot(1, saveOf(new Simulation())); // classic by default
+    SaveGame.saveSlot(2, saveOf(Simulation.newGame(7, "modern")));
     const slots = SaveGame.listSlots();
     const slot1 = slots.find((s) => s.slot === 1)!;
     const slot2 = slots.find((s) => s.slot === 2)!;
@@ -82,7 +83,7 @@ describe("write-time provenance stamps (savedAt + appVersion)", () => {
     // Pin the division, the +1, and the 1440 minutes-per-day invariant
     // (calendar.ts: a day is 1440 minutes in EVERY calendar) against a save
     // 813 full days in, mid-afternoon.
-    SaveGame.saveSlot(1, new Simulation());
+    SaveGame.saveSlot(1, saveOf(new Simulation()));
     const data = decodeSlot("simtower-clone-slot-1");
     data.minutes = 813 * 1440 + 500;
     localStorage.setItem("simtower-clone-slot-1", repackSlot(data));
@@ -90,7 +91,7 @@ describe("write-time provenance stamps (savedAt + appVersion)", () => {
   });
 
   it("a forged mode or minutes cannot reach the Saves dialog raw", () => {
-    SaveGame.saveSlot(1, new Simulation());
+    SaveGame.saveSlot(1, saveOf(new Simulation()));
     const data = decodeSlot("simtower-clone-slot-1") as Omit<SerializedGame, "mode" | "minutes"> & {
       mode: unknown;
       minutes: unknown;
@@ -113,22 +114,22 @@ describe("write-time provenance stamps (savedAt + appVersion)", () => {
 
   it("loadResult surfaces the autosave's write time for the boot return-recency bucket", () => {
     const before = Date.now();
-    SaveGame.save(new Simulation()); // writes the autosave slot
-    const stamp = SaveGame.loadResult().savedAt;
+    SaveGame.save(saveOf(new Simulation())); // writes the autosave slot
+    const stamp = loadResultSim().savedAt;
     expect(stamp).toBeGreaterThanOrEqual(before);
     // It agrees with the raw stamp the writer laid down.
     expect(stamp).toBe(decodeSlot("verticopolis-save").savedAt);
   });
 
   it("loadResult reads a forged autosave stamp as absent (same trust posture as the Saves dialog)", () => {
-    SaveGame.save(new Simulation());
+    SaveGame.save(saveOf(new Simulation()));
     const data = decodeSlot("verticopolis-save") as Omit<SerializedGame, "savedAt"> & { savedAt: unknown };
     data.savedAt = "yesterday";
     localStorage.setItem("verticopolis-save", repackSlot(data as unknown as SerializedGame));
-    expect(SaveGame.loadResult().savedAt).toBeUndefined();
+    expect(loadResultSim().savedAt).toBeUndefined();
     data.savedAt = 1e20; // finite but beyond Date's range
     localStorage.setItem("verticopolis-save", repackSlot(data as unknown as SerializedGame));
-    expect(SaveGame.loadResult().savedAt).toBeUndefined();
+    expect(loadResultSim().savedAt).toBeUndefined();
   });
 
   it("the stamps are file provenance, not live state: deserialize does not carry them", () => {
@@ -175,12 +176,12 @@ describe("bulletin-log persistence", () => {
     const sim = new Simulation();
     sim.emit("Metro line opened.", "good");
     sim.emit("Recycling is overdue.", "bad");
-    SaveGame.saveSlot(2, sim);
-    expect(SaveGame.loadSlot(2)!.log.map((e) => e.text)).toEqual([
+    SaveGame.saveSlot(2, saveOf(sim));
+    expect(loadSlotSim(2)!.log.map((e) => e.text)).toEqual([
       "Metro line opened.",
       "Recycling is overdue.",
     ]);
-    const file = await SaveGame.export(sim);
+    const file = await SaveGame.export(saveOf(sim));
     const imported = await SaveGame.import(file);
     expect(imported.log.map((e) => `${e.kind}:${e.text}`)).toEqual([
       "good:Metro line opened.",
