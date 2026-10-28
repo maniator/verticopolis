@@ -123,13 +123,90 @@ function buildCases(): Case[] {
     ["unit-width-string", mutate(modern, (s) => { const u = units(s).find((x) => x.kind === "office")!; u.width = "4"; })],
     ["legacy-v1-width-string", mutate(modern, (s) => { delete s.version; const u = units(s).find((x) => x.kind === "office")!; u.width = "4"; })],
     ["schedule-nonfinite-tunables", mutate(modern, (s) => { transports(s)[0].schedule = { waitingCarResponse: -4, standardFloorDeparture: 1e9, activeCars: { weekday: Array(24).fill(1) } }; })],
+    // A save taken at random state 0 reloads at 0 (#856): the constructor's
+    // 0-to-1 mapping is for a new game only.
+    ["seed-zero", mutate(modern, (s) => { s.seed = 0; })],
+    ["seed-two-pow-32", mutate(modern, (s) => { s.seed = 4294967296; })],
+    ["events-rngstate-zero", mutate(modern, (s) => { s.events = { ...(s.events as Any), rngState: 0 }; })],
+    // Hand-edited values the game never writes (#858). Each field narrows to
+    // the type the game writes it as, the way the Rust loader reads it.
+    ["unit-occupants-fractional", mutate(modern, (s) => { const u = units(s).find((x) => x.kind === "office")!; u.occupants = 2.5; })],
+    ["unit-occupants-huge", mutate(modern, (s) => { const u = units(s).find((x) => x.kind === "office")!; u.occupants = 1e300; })],
+    ["transport-cardir-fractional", mutate(modern, (s) => { transports(s)[0].carDir = (transports(s)[0].carDir as number[]).map(() => 0.5); })],
+    ["transport-cardir-huge", mutate(modern, (s) => { transports(s)[0].carDir = (transports(s)[0].carDir as number[]).map(() => -1e300); })],
+    ["transport-cardir-above-one", mutate(modern, (s) => { transports(s)[0].carDir = (transports(s)[0].carDir as number[]).map(() => 2.5); })],
+    ["transport-load-fractional", mutate(modern, (s) => { transports(s)[0].load = 2.5; })],
+    ["transport-load-string", mutate(modern, (s) => { transports(s)[0].load = "x"; })],
+    ["transport-load-absent", mutate(modern, (s) => { delete transports(s)[0].load; })],
+    ["transport-load-huge", mutate(modern, (s) => { transports(s)[0].load = 1e300; })],
+    ["transport-unknown-key", mutate(modern, (s) => { transports(s)[0].foo = 1; })],
+    ["wedding-hall-number", mutate(modern, (s) => { s.builtWeddingHall = 1; })],
+    ["wedding-hall-null", mutate(modern, (s) => { s.builtWeddingHall = null; })],
+    ["tower-name-number", mutate(modern, (s) => { s.towerName = 5; })],
+    ["tower-name-null", mutate(modern, (s) => { s.towerName = null; })],
+    ["vip-favorable-number", mutate(modern, (s) => { s.vipFavorable = 1; })],
+    ["evaluated-tower-number", mutate(modern, (s) => { s.evaluatedTower = 1; })],
+    ["evaluated-tower-null", mutate(modern, (s) => { s.evaluatedTower = null; })],
+    ["vip-visit-day-string", mutate(modern, (s) => { s.vipVisitDay = "3"; })],
+    ["vip-visit-day-boolean", mutate(modern, (s) => { s.vipVisitDay = true; })],
+    ["last-vip-nag-day-huge", mutate(modern, (s) => { s.lastVipNagDay = -1e300; })],
+    ["last-vip-nag-day-negative-fraction", mutate(modern, (s) => { s.lastVipNagDay = -3.5; })],
+    ["minutes-huge-extermination", mutate(modern, (s) => { s.minutes = 1e23; s.exterminationDueDay = 2; })],
+    ["legacy-condo-state-number", mutate(modern, (s) => { delete s.mode; const u = units(s).find((x) => x.kind === "condo")!; Object.assign(u, { everOccupied: true, state: 5 }); delete u.rent; })],
+    ["legacy-v1-geometry-string", mutate(modern, (s) => { delete s.version; const u = units(s).find((x) => x.kind === "office")!; u.floor = "2"; u.x = String(u.x); })],
+    // The v1 checks' edges (#858): structure geometry as strings, a room at a
+    // NaN column sorted between an overlapping pair, a two-story room at 2^53
+    // floors (past FAR_COORD, 2^52; at 2^53 `f++` stops moving), and a
+    // structure tile far wider than the lot.
+    ["legacy-v1-structure-geometry-string", mutate(modern, (s) => { delete s.version; const u = units(s).find((x) => x.kind === "floor" && x.floor === 2)!; u.floor = "2"; u.x = String(u.x); })],
+    // A non-number room width, which the check reads as the catalog's (#858),
+    // and structure tiles under a room's footprint with a string column, which
+    // the reflow's paving reads as a number, or a string width, read as 1 (#858).
+    ["legacy-v1-room-width-nonnum-left", mutate(modern, (s) => { delete s.version; const [a, b] = units(s).filter((x) => x.kind === "office"); b.width = "abc"; b.x = (a.x as number) - 3; })],
+    ["legacy-v1-structure-x-string-paved", mutate(modern, (s) => { delete s.version; units(s).find((x) => x.kind === "floor" && x.floor === 2 && x.x === 175)!.x = "175"; })],
+    ["legacy-v1-structure-width-string-paved", mutate(modern, (s) => { delete s.version; const us = units(s); const at = us.findIndex((x) => x.kind === "floor" && x.floor === 2 && x.x === 175); if (at < 0) throw new Error("no floor tile at 2:175"); us.splice(at, 1); us.find((x) => x.kind === "floor" && x.floor === 2 && x.x === 174)!.width = "2"; })],
+    ["legacy-v1-x-nan", mutate(modern, (s) => { delete s.version; const [a, b] = units(s).filter((x) => x.kind === "office"); b.x = (a.x as number) + 1; units(s).splice(units(s).indexOf(a) + 1, 0, { ...a, id: 9003, x: "abc" }); })],
+    ["legacy-v1-floor-far", mutate(modern, (s) => { delete s.version; const u = units(s).find((x) => x.kind === "office")!; u.kind = "cinema"; u.floor = 2 ** 53; })],
+    // The narrow office tells the reflow (canon width 9) from the fallback (8).
+    ["legacy-v1-tile-width-huge", mutate(modern, (s) => { delete s.version; units(s).find((x) => x.kind === "lobby")!.width = 1e8; units(s).find((x) => x.kind === "office")!.width = 8; })],
+    // The reflow's edges (#858): a room column past FAR_COORD on either side
+    // and a room width past it (left out of the reflow), rooms that keep a
+    // saved footprint far off the lot on the right or the left (only lot
+    // columns are paved), and a fractional nextId well above every id with a
+    // room the reflow paves under (the second office moved up to the bare
+    // fourth floor): the pads take ids from the floored nextId, where a
+    // fractional id used to be renumbered from the highest id at load.
+    ["legacy-v1-x-far", mutate(modern, (s) => { delete s.version; units(s).find((x) => x.kind === "office")!.x = 2 ** 53; })],
+    ["legacy-v1-room-off-lot-wide", mutate(modern, (s) => { delete s.version; Object.assign(units(s).find((x) => x.kind === "office")!, { x: 400, width: 1e9 }); })],
+    ["legacy-v1-room-off-lot-left", mutate(modern, (s) => { delete s.version; const [a, b] = units(s).filter((x) => x.kind === "office"); Object.assign(a, { x: -(2 ** 51), width: 2 ** 51 + 9 }); b.x = 400; })],
+    ["legacy-v1-x-far-negative", mutate(modern, (s) => { delete s.version; units(s).find((x) => x.kind === "office")!.x = -(2 ** 53); })],
+    ["legacy-v1-width-far", mutate(modern, (s) => { delete s.version; units(s).find((x) => x.kind === "office")!.width = 2 ** 53; })],
+    ["legacy-v1-next-id-fractional", mutate(modern, (s) => { delete s.version; s.nextId = (s.nextId as number) + 100.5; units(s).filter((x) => x.kind === "office")[1].floor = 4; })],
+    // Two more reflow rules (#858), each of which would discard the reflow
+    // without it: a room at 2^52 floors is left out of the reflow's checks,
+    // and the support envelope counts a lobby far wider than the lot as the
+    // lot's 375 columns, as the floating count does (counted wider, the two
+    // disagree about the floor-2 tiles at columns 300 to 302, past the
+    // lobby's capped end). The kept reflow shows in the loaded nextId (901
+    // and 913).
+    ["legacy-v1-room-floor-far-reflowed", mutate(modern, (s) => { delete s.version; units(s).push({ id: 900, kind: "office", floor: 2 ** 52, x: 172, width: 3, state: "vacant" }); })],
+    ["legacy-v1-lobby-wider-than-lot-reflowed", mutate(modern, (s) => {
+      delete s.version;
+      units(s).push({ id: 908, kind: "lobby", floor: 1, x: -100, width: 1000 });
+      for (let i = 0; i < 3; i++) units(s).push({ id: 910 + i, kind: "floor", floor: 2, x: 300 + i, width: 1 });
+      units(s).push({ id: 909, kind: "office", floor: 2, x: 300, width: 3, state: "vacant" });
+    })],
+    // A pending message that is not a string reads as none (#858). The state
+    // view leaves the message out as prose, so the native Rust replay passes
+    // whatever these two read as; the WASM test's canonical saves
+    // (`conformanceWasmSaves`) and the unit tests in both engines pin them.
+    ["pending-message-array", mutate(modern, (s) => { s.events = { ...(s.events as Any), pending: { kind: "bombThreat", cost: 300000, message: [1, 2] } }; })],
+    ["pending-message-huge-number", mutate(modern, (s) => { s.events = { ...(s.events as Any), pending: { kind: "fireRescue", cost: 300000, message: 1e21 } }; })],
   ];
-  // The divergences #858 records, carried with a marker so the Rust test
-  // expects the mismatch and flags the day a case stops diverging.
-  const known: [string, Any, string][] = [
-    ["known-858-fractional-occupants", mutate(modern, (s) => { const u = units(s).find((x) => x.kind === "office")!; u.occupants = 2.5; }), "#858: a fractional occupants count stays a double in TypeScript and narrows to an integer in Rust"],
-    ["known-858-evaluated-tower-number", mutate(modern, (s) => { s.evaluatedTower = 1; }), "#858: a non-boolean evaluatedTower is kept verbatim in TypeScript and narrows to false in Rust"],
-  ];
+  // A divergence the engines have not settled yet, carried with a marker so
+  // the Rust test expects the mismatch and flags the day a case stops
+  // diverging. None is open: #858 settled the last two.
+  const known: [string, Any, string][] = [];
   const hashOf = (input: unknown): string => {
     try {
       return digest(stateView(Simulation.deserialize(input as unknown as SerializedGame)));

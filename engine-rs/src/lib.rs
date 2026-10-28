@@ -34,6 +34,8 @@ pub mod identity;
 pub mod jsmath;
 pub mod ledger;
 pub mod load;
+#[cfg(test)]
+mod load_fidelity_tests;
 // The binding's save reader (#1225): `wasm.rs` loads through it, and the
 // crate's tests check it against `load::deserialize`.
 #[cfg(any(test, feature = "wasm"))]

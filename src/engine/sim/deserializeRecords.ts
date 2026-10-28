@@ -9,7 +9,7 @@ import { isStructural } from "../tower/towerTopology";
 import { isUnitState, isVacateReason } from "../types";
 import { coerceSchedule } from "../elevatorSchedule";
 import { SOLD_CONDO_MIN_PRICE, SOLD_CONDO_MAX_PRICE } from "./constants";
-import { coerceDirtyDays } from "./coerce";
+import { coerceDirtyDays, knownTransportKeys, savedInt } from "./coerce";
 
 /** One unit and one transport record of a save, hardened the way
  *  `deserialize` reads them. Apart from it so the worker host can read the
@@ -101,7 +101,7 @@ export function coerceUnitRecord(sim: Simulation, u: SerializedGame["units"][num
     // lobby) hold nobody either, so a legacy count on one restores to 0:
     // the per-step scans skip them, and must agree with the hourly ones.
     occupants:
-      FACILITIES[u.kind].attendance !== undefined || isStructural(u.kind) ? 0 : Math.max(0, num(u.occupants, 0)),
+      FACILITIES[u.kind].attendance !== undefined || isStructural(u.kind) ? 0 : savedInt(num(u.occupants, 0), 0),
     // Household size, only kept for a CURRENTLY-sold condo, and sanitized by
     // the rule-set (Classic strips it so its condos read the flat 3; Modern
     // clamps into the 2..5 generator band). A not-sold condo (legacy dead
@@ -209,7 +209,7 @@ export function coerceTransportRecord(t: SerializedGame["transports"][number]): 
       Array.isArray(arr) ? num(arr[i], fill) : fill,
     );
   return {
-    ...t,
+    ...knownTransportKeys(t),
     // Same geometry hardening as units: keep the shaft's whole width on
     // the lot. `width` is already bounded by the catalog above, so
     // clamping by it keeps a kept-legacy 3-wide shaft at the right lot
@@ -221,8 +221,9 @@ export function coerceTransportRecord(t: SerializedGame["transports"][number]): 
     top,
     cars,
     carPositions: fixLen(t.carPositions, bottom),
-    carDir: fixLen(t.carDir, 0),
+    carDir: fixLen(t.carDir, 0).map((d) => savedInt(d, -1, 1)),
     carLoad: t.carLoad ? fixLen(t.carLoad, 0) : undefined,
+    load: savedInt(num(t.load, 0)),
     skipFloors: Array.isArray(t.skipFloors)
       ? t.skipFloors.filter((n) => typeof n === "number" && Number.isFinite(n))
       : undefined,

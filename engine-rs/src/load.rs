@@ -27,6 +27,10 @@ const SOLD_CONDO_MAX_PRICE: f64 = 240_000.0;
 const VIP_VISITS_CAP: f64 = 1_000_000.0;
 const LOG_TEXT_CAP: usize = 400;
 const LEGACY_CONDO_DEFAULT_PRICE: f64 = 120_000.0;
+/// `Number.MAX_SAFE_INTEGER`: saved whole numbers clamp to it in both loaders,
+/// so a value past `i64` reads the same in both. Without the clamp `as i64`
+/// saturates here to 2^63 - 1, which a double cannot hold exactly (#858).
+const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
 pub(crate) const OLDEST_SAVE_VERSION: i64 = 1;
 /// `MAX_SAVE_INFLATED_BYTES` (saveCompression.ts).
 const MAX_SAVE_INFLATED_BYTES: u64 = 32 * 1024 * 1024;
@@ -482,6 +486,26 @@ fn to_uint32(x: f64) -> u32 {
     m as u32
 }
 
+/// `FAR_COORD` (v1tov2.ts): a room floor, column or width at least this far
+/// from 0 is left out of the checks (floor) and the reflow (all three), so no
+/// loop over its stories or columns runs where adding 1 stops moving, no
+/// `as i64` saturates, and both engines treat it alike (#858).
+const FAR_COORD: f64 = 4_503_599_627_370_496.0;
+
+/// `!(Math.abs(v) < FAR_COORD)` in v1tov2.ts: NaN counts as far.
+fn is_far(v: f64) -> bool {
+    v.is_nan() || v.abs() >= FAR_COORD
+}
+
+/// A structure tile's width as `tileSpan` reads it: 1 when not a number, and no
+/// wider than the lot (#858).
+fn tile_width(u: &Value) -> f64 {
+    u.get("width")
+        .and_then(Value::as_f64)
+        .unwrap_or(1.0)
+        .min(LOT as f64)
+}
+
 fn tile_key(f: f64, x: f64) -> String {
     format!("{}:{}", number_to_string(f), number_to_string(x))
 }
@@ -539,6 +563,11 @@ pub fn migration_looks_valid(data: &Value) -> bool {
         if x < 0.0 || x + width > LOT as f64 {
             return false;
         }
+        // A room at no column overlaps nothing, and a NaN in the sort below
+        // could hide an overlap between two others (#858).
+        if x.is_nan() || is_far(floor) {
+            continue;
+        }
         let stories = stories_at_version(kind, version) as f64;
         let mut f = floor;
         while f < floor + stories {
@@ -569,7 +598,7 @@ pub fn floating_structure_count(data: &Value) -> i64 {
         if !struct_of(u) {
             continue;
         }
-        let w = u.get("width").and_then(Value::as_f64).unwrap_or(1.0);
+        let w = tile_width(u);
         let f = js_number(u.get("floor"));
         let x = js_number(u.get("x"));
         let mut i = 0.0;
@@ -588,7 +617,7 @@ pub fn floating_structure_count(data: &Value) -> i64 {
             continue;
         }
         let below = if f >= 2.0 { f - 1.0 } else { f + 1.0 };
-        let w = u.get("width").and_then(Value::as_f64).unwrap_or(1.0);
+        let w = tile_width(u);
         let x = js_number(u.get("x"));
         let mut i = 0.0;
         while i < w {
@@ -632,7 +661,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
             continue;
         }
         let mut i = 0.0;
-        while i < w0 {
+        while i < w0.min(LOT as f64) {
             orig_struct.insert(tile_key(f, x0 + i));
             i += 1.0;
         }
@@ -662,7 +691,14 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
         let floor = round(js_number(u.get("floor")));
         let x0 = round(js_number(u.get("x")));
         let w0 = round(js_number(u.get("width")));
-        if !floor.is_finite() || !x0.is_finite() || !w0.is_finite() || w0 < 1.0 {
+        if !floor.is_finite()
+            || !x0.is_finite()
+            || !w0.is_finite()
+            || w0 < 1.0
+            || is_far(floor)
+            || is_far(x0)
+            || is_far(w0)
+        {
             others.push(u.clone());
             continue;
         }
@@ -827,7 +863,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
     let mut paved: HashSet<String> = HashSet::new();
     for u in &others {
         if matches!(kind_of(u), Some(Kind::Floor) | Some(Kind::Lobby)) {
-            let w = u.get("width").and_then(Value::as_f64).unwrap_or(1.0);
+            let w = tile_width(u);
             let f = js_number(u.get("floor"));
             let x = js_number(u.get("x"));
             let mut i = 0.0;
@@ -837,7 +873,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
             }
         }
     }
-    let mut next_id = finite_num(data.get("nextId")).unwrap_or(1.0);
+    let mut next_id = finite_num(data.get("nextId")).map_or(1.0, f64::floor);
     for u in &src {
         if let Some(id) = finite_num(u.get("id")) {
             next_id = next_id.max(id.floor() + 1.0);
@@ -849,7 +885,9 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
         let w = nw.get(&ri).copied().unwrap_or(r.w0);
         out_units.push(with(&r.u, vec![("x", json!(x)), ("width", json!(w))]));
         for f in r.floor..r.floor.saturating_add(r.fl) {
-            for tx in x..x.saturating_add(w) {
+            // Only columns on the lot: a room that keeps a saved footprint
+            // past it fails the check after the reflow anyway (#858).
+            for tx in x.max(0)..x.saturating_add(w).min(LOT) {
                 let key = tile_key(f as f64, tx as f64);
                 if !paved.contains(&key) {
                     paved.insert(key);
@@ -1476,6 +1514,11 @@ pub fn mark_founder_from_loaded_file(sim: &mut Simulation, raw: &Value) {
 
 /// `Simulation.deserialize(raw)`.
 pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
+    // `migrateSave(null)` throws reading `version`; any other top-level value
+    // loads as the TypeScript loads it (#858).
+    if raw.is_null() {
+        return Err("not a tower save (the save is null)".into());
+    }
     let data = migrate_save(raw);
     let modern = data.get("mode").and_then(Value::as_str) == Some("modern");
     let listed = data
@@ -1616,7 +1659,7 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         occupants: if kind.attendance_cap().is_some() || kind.is_structural() {
             0
         } else {
-            num(u.get("occupants"), 0.0).max(0.0) as i64
+            num(u.get("occupants"), 0.0).clamp(0.0, MAX_SAFE_INTEGER) as i64
         },
         customers_in: None,
         hotel_customers_in: None,
@@ -1675,6 +1718,11 @@ pub(crate) fn assemble(
         Some(v) => to_uint32(js_number(Some(v))),
     };
     let mut sim = Simulation::new(seed, mode, calendar, false);
+    // The saved live state exactly, 0 included (#856): `new` maps 0 to 1 for
+    // a new game. A missing or non-number seed keeps the constructor's.
+    if let Some(s) = finite_num(data.get("seed")) {
+        sim.rng.restore(to_uint32(s));
+    }
     let modern = mode == GameMode::Modern;
     sim.auto_bridge = if mode.bridging_toggleable() {
         data.get("autoBridge") != Some(&Value::Bool(false))
@@ -1687,7 +1735,12 @@ pub(crate) fn assemble(
     }
     sim.money = num(data.get("money"), sim.money);
     sim.star = (num(data.get("star"), 1.0).floor() as i64).clamp(1, 6);
-    sim.clock = Clock::new(num(data.get("minutes"), 0.0).max(0.0), sim.clock.calendar);
+    // Capped at 2^53 - 1 minutes (#858): the day is an `i64`, which saturates
+    // past about 1.3e22 minutes where the TypeScript day keeps counting.
+    sim.clock = Clock::new(
+        num(data.get("minutes"), 0.0).clamp(0.0, MAX_SAFE_INTEGER),
+        sim.clock.calendar,
+    );
     sim.evaluated_tower = data
         .get("evaluatedTower")
         .map(|v| v.as_bool().unwrap_or(false));
@@ -1709,7 +1762,7 @@ pub(crate) fn assemble(
         sim.vip_visits = if evaluated { 2 } else { 1 };
     }
     sim.last_vip_nag_day = (match finite_num(data.get("lastVipNagDay")) {
-        Some(d) => d.floor() as i64,
+        Some(d) => d.floor().clamp(-MAX_SAFE_INTEGER, MAX_SAFE_INTEGER) as i64,
         None => -100,
     })
     .min(sim.clock.day());
@@ -1868,10 +1921,14 @@ pub(crate) fn assemble(
                 car_positions: fix_len(t.get("carPositions"), bottom as f64),
                 car_dir: fix_len(t.get("carDir"), 0.0)
                     .into_iter()
-                    .map(|d| d as i64)
+                    .map(|d| (d as i64).clamp(-1, 1))
                     .collect(),
                 car_load,
-                load: t.get("load").and_then(Value::as_f64).unwrap_or(0.0) as i64,
+                load: t
+                    .get("load")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0)
+                    .clamp(-MAX_SAFE_INTEGER, MAX_SAFE_INTEGER) as i64,
                 skip_floors,
                 schedule: Schedule::coerce(t.get("schedule"), cars, bottom, top),
             };
@@ -1971,7 +2028,9 @@ pub(crate) fn assemble(
     if let Some(ev) = events {
         sim.events.last_santa_year = num(ev.get("lastSantaYear"), -1.0);
         let st = to_uint32(num(ev.get("rngState"), 1.0));
-        sim.events.extra = Rng::new(if st == 0 { 1 } else { st });
+        // The saved live state exactly, 0 included (#856).
+        sim.events.extra = Rng::new(st);
+        sim.events.extra.restore(st);
         sim.events.pending = ev.get("pending").and_then(Value::as_object).and_then(|p| {
             let kind: &'static str = match p.get("kind").and_then(Value::as_str) {
                 Some("fireRescue") => "fireRescue",
@@ -1982,10 +2041,11 @@ pub(crate) fn assemble(
                 .get("cost")
                 .and_then(Value::as_f64)
                 .filter(|c| c.is_finite())?;
+            // A message the game writes is a string; anything else reads as
+            // none, as in TypeScript (#858).
             let message = match p.get("message") {
-                None | Some(Value::Null) => String::new(),
                 Some(Value::String(s)) => s.clone(),
-                Some(v) => v.to_string(),
+                _ => String::new(),
             };
             Some(PendingChoice {
                 kind,
@@ -2484,8 +2544,8 @@ mod loader_cases {
                 Err(_) => ("panics".to_string(), None),
             };
             if let Some(why) = known {
-                // A recorded #858 divergence: the mismatch is expected, and a
-                // match means the case can lose its marker.
+                // A recorded divergence: the mismatch is expected, and a match
+                // means the case can lose its marker.
                 if got == expected {
                     misses.push(format!(
                         "{id}: no longer diverges ({why}); drop its knownDivergence marker"

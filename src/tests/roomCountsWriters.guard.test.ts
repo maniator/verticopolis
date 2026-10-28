@@ -102,7 +102,7 @@ const RAW_WRITES: Record<string, Record<string, number>> = {
 const NAMED_WRITES: Record<string, Record<string, number>> = {
   "src/engine/crowd/motion.ts": { state: 9 },
   "src/engine/crowd/visits.ts": { state: 1 },
-  "src/engine/rng.ts": { state: 3 },
+  "src/engine/rng.ts": { state: 4 },
   "src/wasmhost/frameApply.ts": { state: 1 },
   "src/wasmhost/frameSync.ts": { state: 1 },
 };
