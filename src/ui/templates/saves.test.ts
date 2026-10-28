@@ -15,6 +15,13 @@ import { renderToFragment } from "../testing/litTestUtils";
 const AT = 1_700_000_000_000;
 
 describe("savesTemplate row gating and actions", () => {
+  it("offers the kept unreadable autosave as a download only when one is kept", () => {
+    const slots: SlotInfo[] = [{ slot: "auto", exists: false, present: true }];
+    expect(renderToFragment(savesTemplate(slots)).querySelector('[data-act="unreadable"]')).toBeNull();
+    const kept = renderToFragment(savesTemplate(slots, true)).querySelector('[data-act="unreadable"]');
+    expect(kept?.textContent).toContain("Download unreadable save");
+  });
+
   it("gives the auto-save row Load only (no Save, no Delete)", () => {
     const slots: SlotInfo[] = [{ slot: "auto", exists: true, present: true, towerName: "Auto Twr", star: 2, population: 300, funds: 50000, savedAt: AT }];
     const row = renderToFragment(savesTemplate(slots)).querySelector(".slot")!;

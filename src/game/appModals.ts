@@ -114,7 +114,7 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
 
 export function showSaves(app: GameApp): void {
   trackAppAction("saves_open"); // saves manager modal opening
-  app.ui.showSaves(SaveGame.listSlots());
+  app.ui.showSaves(SaveGame.listSlots(), SaveGame.unreadableBackup());
 }
 
 /** Save the live tower into a manual slot, stamping the live camera view. */

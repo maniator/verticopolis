@@ -19,6 +19,7 @@ vi.mock("../storage/SaveGame", async (importActual) => {
     ...actual,
     SaveGame: {
       listSlots: vi.fn(() => [{ slot: "auto", exists: false }]),
+      unreadableBackup: vi.fn(() => "VCTOWER1\nkept"),
       saveSlot: vi.fn(),
       load: vi.fn(),
       loadSlot: vi.fn(),
@@ -36,12 +37,12 @@ beforeEach(() => {
 });
 
 describe("showSaves", () => {
-  it("passes the SaveGame slot listing to the UI", () => {
+  it("passes the SaveGame slot listing and the kept unreadable autosave to the UI", () => {
     const sim = makeSim();
     const { app, ui } = makeApp(sim);
     showSaves(app);
     expect(SaveGame.listSlots).toHaveBeenCalledTimes(1);
-    expect(ui.showSaves).toHaveBeenCalledExactlyOnceWith([{ slot: "auto", exists: false }]);
+    expect(ui.showSaves).toHaveBeenCalledExactlyOnceWith([{ slot: "auto", exists: false }], "VCTOWER1\nkept");
   });
 });
 

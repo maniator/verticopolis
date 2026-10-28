@@ -20,7 +20,7 @@ body:
     id: engine
     attributes:
       label: Engine
-      description: Which simulation engine was running? Rust/WASM is the Rust engine, which the game calls the "Rust engine" on the version line on the splash screen, in Settings and in Help (versions before 2.47.0 called it the "WASM engine"). Choose Fallback if the game said the Rust engine stopped and it runs on the TypeScript engine now.
+      description: Which simulation engine was running? Rust/WASM is the Rust engine, which the game calls the "Rust engine" on the version line on the splash screen, in Settings and in Help (versions before 2.47.0 called it the "WASM engine"). Choose Fallback if the game said the Rust engine stopped and it runs on the TypeScript engine now, for example after the Rust engine stopped twice and the game reloaded on TypeScript.
       options:
         - Not sure
         - Rust/WASM
@@ -48,7 +48,10 @@ body:
     id: repro
     attributes:
       label: Steps to reproduce
-      description: How can we reproduce it? Include a saved tower export (`.vctower`) if relevant.
+      description: >-
+        How can we reproduce it? A saved tower helps. GitHub does not accept `.vctower` files, so
+        drag in the crash-report `.zip` if the game gave you one (it already holds your tower), or
+        put the `.vctower` export in a `.zip`, or rename it to end in `.txt`, before attaching it.
       value: |
         1.
         2.
