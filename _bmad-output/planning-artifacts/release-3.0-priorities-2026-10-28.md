@@ -1,6 +1,6 @@
-# Release 3.0 priorities: what is left for 3.0 and what moves to 3.x (revision 3.1; decisions 5 and 6 await the owner)
+# Release 3.0 priorities: what is left for 3.0 and what moves to 3.x (revision 3.1, approved)
 
-> **Snapshot, Oct 28, 2026 about 20:55 UTC (4:55 PM EDT), against main 093da570 (app 2.50.0, engine crate 0.20.0). It does not refresh. Naftali approved it at 20:45 UTC (4:45 PM EDT): decisions 1 to 4 and 7 to 13, with the 20:45 clarifications that belong to them (the recovery copy kept apart from export). Decisions 5 (the gameplay sequence) and 6 (M5a and M5b) come from the review's clarification text and are proposed, awaiting his own OK. Also separate and unapproved: the analytics packet, the size-gate measure and cutoffs, the population minimums and each #920 exception. Approving this plan approves no value he has not reviewed. #1348 and its held TypeScript-retirement decisions are untouched, and no rollout starts without his explicit GO.** Live state: GitHub issues and PRs, and `src/engineCohort/config.ts` for the cohort. The three reviews this revision answers (20:06, 20:21 and 20:45 UTC) were written by ChatGPT, as Naftali clarified each time. They are input, so every point in them appears below as a proposal with my verdict, and the "approvals" in the second and third reviews are listed as decisions still waiting for his own confirmation. Sources checked for this revision: current main (storage, the TypeScript engine's port, the perf scripts, e2e), the release plan's section 5.3 (M1 to M8 and the δ and ε rule), #1104's rows, #1350, #1422, #1221, and the Oct 28 PC suite summary.
+> **Snapshot, Oct 28, 2026 about 21:45 UTC (5:45 PM EDT), against main 69b2c25b (app 2.50.0, engine crate 0.20.0). It does not refresh. Naftali approved it at 20:45 UTC (4:45 PM EDT): decisions 1 to 4 and 7 to 13, with the 20:45 clarifications that belong to them (the recovery copy kept apart from export). He approved decisions 5 (adding the gameplay sequence; its numeric bars stay proposals until he confirms them) and 6 (M5a and M5b, M5b as an explicit expansion of the gate) at 21:34 UTC, and the release plan's section 5.3 records them as M5a, M5b and M9. Also separate and unapproved: the analytics packet, the size-gate measure and cutoffs, the population minimums and each #920 exception. Approving this plan approves no value he has not reviewed. #1348 and its held TypeScript-retirement decisions are untouched, and no rollout starts without his explicit GO.** Live state: GitHub issues and PRs, and `src/engineCohort/config.ts` for the cohort. The three reviews this revision answers (20:06, 20:21 and 20:45 UTC) were written by ChatGPT, as Naftali clarified each time. They are input, so every point in them appears below as a proposal with my verdict, and the "approvals" in the second and third reviews are listed as decisions still waiting for his own confirmation. Sources checked for this revision: current main (storage, the TypeScript engine's port, the perf scripts, e2e), the release plan's section 5.3 (M1 to M8 and the δ and ε rule), #1104's rows, #1350, #1422, #1221, and the Oct 28 PC suite summary.
 
 ## What changed from revision 2
 
@@ -16,25 +16,25 @@
 
 8. **The emergency raw-save download is now separate from ordinary `.vctower` export.** Without the engine package, export says "unavailable" and offers the recovery copy. It no longer falls back to a TypeScript writer.
 9. **The memory-growth bar reports growth in MiB, sampled peaks and the ratio,** with a floor so a near-zero TypeScript growth can't produce a meaningless ratio. M6 is unchanged.
-10. **Cold start becomes M5a (fresh start) and M5b (saved-tower start),** each with its own calibrated ε at 1x and 4x. Proposed (from the review), awaiting Naftali's own OK. M5b would be an explicit expansion of the gate, their ε values come from calibration, and any exception is his.
+10. **Cold start becomes M5a (fresh start) and M5b (saved-tower start),** each with its own calibrated ε at 1x and 4x. Approved at 21:34 UTC, M5b as an explicit expansion of the gate. Their ε values come from calibration, and any exception is Naftali's.
 11. **#1433 (6a) merged** at 20:42 UTC (093da570, app 2.50.0).
 
 ## Remaining actual blockers
 
 Everything here is open today and something approved stands on it. Items that are only work in flight are in the workstream table.
 
-**Open decisions that block work** (lettered, so they don't mix with the numbered decisions further down):
+**Open decisions that block work** (lettered A to H, so they don't mix with the numbered decisions further down):
 
 | Letter | Open decision | Blocks |
 | --- | --- | --- |
 | A | The analytics packet (cohort fields, `engine` on every event, `crash-reload`, browser family, the tap event, #1090's fields) | 6b's analytics value, the fields PR, gate 1 |
 | B | The size gate's measure and cutoffs (plan 1.3.9 item 2) | Building the size gate, gate 1 |
-| C | Decision 5: adding the gameplay sequence, and its numeric bars (the floor, the growth ratio, 200 ms per task, the unit-count check) | Whether #1259 and #1338 stay deferred, gate 2 |
-| D | Decision 6: M5a and M5b, including M5b's explicit expansion of the gate; then any exception. Their ε values come from A/A calibration under section 5.3, and a calibration that misses the cap goes to Naftali | #1254's verdict, gate 2 |
-| E | The PC slot for the validated run (approved for before stage 1, when practical) | Gate 1 |
-| F | Coverage minimums for the 300 report (already planned as his dated thresholds file in #1350) | Gate 3 |
-| G | #920's exceptions, one at a time | Gate 3 |
-| H | His stage-1 GO, then each stage, the flip and 3.0.0 | Every gate |
+| C | Any exception to M5a or M5b. Their ε values come from A/A calibration under section 5.3, and a calibration that misses the cap goes to Naftali | #1254's verdict, gate 2 |
+| D | The PC slot for the validated run (approved for before stage 1, when practical) | Gate 1 |
+| E | Coverage minimums for the 300 report (already planned as his dated thresholds file in #1350) | Gate 3 |
+| F | #920's exceptions, one at a time | Gate 3 |
+| G | His stage-1 GO, then each stage, the flip and 3.0.0 | Every gate |
+| H | M9's numeric bars (the 8 MiB floor, the 1.25x growth ratio, 200 ms per task, the unit-count check) | Whether #1259 and #1338 stay deferred, gate 2 |
 
 **Work not started or not finished that a gate needs:**
 
@@ -62,15 +62,15 @@ The TypeScript `.vctower` and `.TDT` parsers (`TsEngine.loadVctower`, `loadTdt` 
 
 The plan's section 5.3 already fixes most of this; what is new is marked.
 
-- **Measures stay separate,** as your Oct 21 directive says: bare engine (M1), hosted time (M2), frames (M3), main-thread blocking (M4), cold start (M5), memory (M6), CI tripwire (M7), edits (M8). Ten repetitions, distributions and paired 95% intervals, at 1x and 4x.
+- **Measures stay separate,** as your Oct 21 directive says: bare engine (M1), hosted time (M2), frames (M3), main-thread blocking (M4), fresh and saved-tower cold start (M5a, M5b), memory (M6), CI tripwire (M7), edits (M8), gameplay sequence (M9). Ten repetitions, distributions and paired 95% intervals, at 1x and 4x.
 - **Memory (M6, approved):** peak JS heap plus WASM linear memory on the large tower, at most 1.25x TypeScript on the paired ratio's upper bound. Report JS heap and WASM separately as well as combined (the suite already does). WASM linear memory never shrinks, so its peak and its after-test value are the same number; the peak-versus-after split only matters for the JS heap, which needs sampled peaks. Medium (1.79x) and large (1.16x) from today's suite are reported, and only large is gated, as M6 is written.
-- **The gameplay sequence (new, for #1259 and #1338; adding it is proposed, its bars are proposals):** load the large and the many-unit towers, build one room, advance 720 steps, save, export `.vctower` and `.TDT`. `scripts/perf-load-memory.ts` already walks load, build, save, play, serialize and reload for WASM memory, so it is the starting point. Proposed bars, all new and yours to set:
-  - growth during the sequence (memory after it minus memory after load) at most 1.25x TypeScript's growth, read as `Rust growth / max(TypeScript growth, floor)`. The proposed floor is 8 MiB, or the A/A noise of TypeScript's growth across reps if that is larger, fixed before the run. Below the floor the bar becomes an allowance in MiB (1.25x the floor), so a near-zero TypeScript growth can't make the ratio meaningless or unstable. The report always shows growth in MiB, the sampled JS heap peak (sampled at a fixed interval during the sequence; WASM's peak is its final size), and the ratio;
+- **The gameplay sequence (for #1259 and #1338; approved at 21:34 UTC as section 5.3's M9, with its bars still proposals):** load the large and the many-unit towers, build one room, advance 720 steps, save, export `.vctower` and `.TDT`. `scripts/perf-load-memory.ts` already walks load, build, save, play, serialize and reload for WASM memory, so it is the starting point. Its proposed bars, awaiting Naftali (open decision H):
+  - growth during the sequence (memory after it minus memory after load) at most 1.25x TypeScript's growth, read as `Rust growth / max(TypeScript growth, floor)`. The floor is 8 MiB, or the A/A noise of TypeScript's growth across reps if that is larger, fixed before the run. Below the floor the bar becomes an allowance in MiB (1.25x the floor), so a near-zero TypeScript growth can't make the ratio meaningless or unstable. The report always shows growth in MiB, the sampled JS heap peak (sampled at a fixed interval during the sequence; WASM's peak is its final size), and the ratio;
   - no single main-thread task over 200 ms from build, save or export at 1x. An operation's total duration is reported separately, since a slow export split into small tasks blocks nothing;
   - the unit count after the first build equals the count before it plus what was built.
 
   If it passes, #1259 and #1338 stay deferred to 3.x. If not, they are fixed before gate 2.
-- **Cold start (M5a fresh start, M5b saved-tower start, #1254):** the plan's row reads "cold start to ready" at 1x and 4x and does not say whether a tower is loaded. Proposed (from the review), awaiting Naftali's own OK: M5a (a fresh start with an empty cache) and M5b (a start that resumes a saved tower) are reported and gated separately, each with its own calibrated ε at each throttle. M5b would be an explicit expansion of the gate. Their ε values come from calibration, and any exception to either is Naftali's. Today's suite measured only the saved-tower start, at 1x: Rust is 47 to 78 ms slower on every tower (for example medium 249 against 299 ms, large 296 against 372 ms), while 5% of TypeScript's start is 11 to 15 ms. The pass rule, from section 5.3: ε is calibrated from A/A passes and capped at 5% of TypeScript's median cold start at that throttle, and M5 passes when the upper bound of the paired 95% interval of Rust minus TypeScript, in ms, is at most ε at both throttles. Unless RUN-1 shows something different, M5b fails and #1254 is a real fix, not a deferral. M5a has not been measured on the current harness.
+- **Cold start (M5a fresh start, M5b saved-tower start, #1254):** the plan's row reads "cold start to ready" at 1x and 4x and does not say whether a tower is loaded. Approved at 21:34 UTC (section 5.3's M5a and M5b): M5a (a fresh start with an empty cache) and M5b (a start that resumes a saved tower) are reported and gated separately, each with its own calibrated ε at each throttle. M5b is an explicit expansion of the gate. Their ε values come from calibration, and any exception to either is Naftali's. Today's suite measured only the saved-tower start, at 1x: Rust is 47 to 78 ms slower on every tower (for example medium 249 against 299 ms, large 296 against 372 ms), while 5% of TypeScript's start is 11 to 15 ms. The pass rule, from section 5.3: ε is calibrated from A/A passes and capped at 5% of TypeScript's median cold start at that throttle, and M5 passes when the upper bound of the paired 95% interval of Rust minus TypeScript, in ms, is at most ε at both throttles. Unless RUN-1 shows something different, M5b fails and #1254 is a real fix, not a deferral. M5a has not been measured on the current harness.
 - **#900 (M7):** the plan's M7 row already says it: a baseline per engine, tolerances calibrated from A/A CI runs under the same cap as δ. It stays in 3.0.0.
 
 ## Coverage and the reliability count
@@ -86,7 +86,7 @@ The plan's section 5.3 already fixes most of this; what is new is marked.
 | A. Crash and save integrity | 6b with the recovery copy (6a merged as #1433), save-integrity and no-package tests, #1066's unstamped boots, #1236 | 6b's analytics value waits on open decision A | Gate 1 |
 | B. Analytics and counting | The fields PR, #1350's pins, #1268, the per-population report | Open decision A | Gate 1, then the 300 |
 | C. Cohort controls | The size gate, #1258 recheck, ST1 | Open decision B | Gate 1 |
-| D. Performance and memory | The validated PC run with the gameplay-sequence row, #1349 (#1242) resumed, #1259 and #1338 measured, #1254 fix, #1162, #1111, #1237, RUN-1 | PC slots (other threads pause during a run), open decisions C, D and E | Gates 1 and 2 |
+| D. Performance and memory | The validated PC run with the gameplay-sequence row, #1349 (#1242) resumed, #1259 and #1338 measured, #1254 fix, #1162, #1111, #1237, RUN-1 | PC slots (other threads pause during a run), open decisions C, D and H | Gates 1 and 2 |
 | E. Tests on Rust | #1430, PR 7 (#1421, #878) with the inventory, the cue-timing test, #900 | none (#1429 merged) | Gates 2 and 3 |
 | F. Formats in Rust | Layer 3 for the TypeScript engine, #885, #886, #920 triage, #932, A7's real saves, #740 check | None (decision 3 approved) | Gate 3 |
 | G. Release docs and ops | #985, #1345, #1085, #1221's rehearsal, X1, #945 (the reconciliation edits are done) | None | Gate 3 |
@@ -140,16 +140,16 @@ Status key: **3.0** (with its gate), **conditional** (criteria above), **3.x**, 
 
 ## Decisions
 
-Each proposal names where it came from. Status as of 20:45 UTC: Naftali's "Sure" approved decisions 1 to 4 and 7 to 13, with the clarifications that belong to them. Decisions 5 and 6 came from the review's clarification text (written by ChatGPT) and are proposed, awaiting his own OK.
+Each proposal names where it came from. Naftali's "Sure" at 20:45 UTC approved decisions 1 to 4 and 7 to 13, with the clarifications that belong to them. His "Yes" at 21:34 UTC approved decisions 5 and 6.
 
-| # | Proposal | From | My verdict | Status (20:45 UTC) |
+| # | Proposal | From | My verdict | Status |
 | --- | --- | --- | --- | --- |
 | 1 | Three gates (stage 1, stage 3, 3.0.0) with the streams above, plus the cue-timing test and the size gate's removal at gate 2 and the soak and tail at gate 3 | GPT 20:06, revision 2 | Agree. The additions are already approved conditions. | Approved |
 | 2 | One validated PC run before stage 1, not now. It adds the gameplay-sequence row. Your "final release evidence" run with the memory-over-time leg stays before 3.0.0 | GPT 20:21, your 19:38 | Agree. It fits your 19:38 position. | Approved |
 | 3 | The three-layer format boundary and the no-package test | GPT 20:21, revised here | Agree. It corrects revision 2. It also changes #1104's A9 row (your Oct 22 direction), which keeps the TypeScript codec as a runtime safe fallback. Under your 20:00 direction that fallback leaves the runtime, and A9's aim (a codec failure never strands a save) is carried by layers 1 and 2 instead. Approved with the A9 change. | Approved |
 | 4 | The recovery copy, riding on 6b, kept separate from ordinary export | New (GPT assumed it existed); GPT 20:45 asked for the separation | Agree. Small, and the recovery path needs it. A player-facing change, so a minor version. | Approved |
-| 5 | Add the gameplay sequence; its bars (growth 1.25x over the floor, 200 ms per task, unit count) | Revision 2, GPT 20:21 and 20:45 | Agree. The 8 MiB floor is my proposal and the number is yours. | Proposed (from the review), awaiting owner OK (C) |
-| 6 | M5a (fresh) and M5b (saved tower), each gated at 1x and 4x with its own calibrated ε; M5b as an explicit gate expansion | GPT 20:45 (GPT 20:21 had said fresh only) | Agree. The saved-tower start is what returning players see. Expanding a gate needs his own words. | Proposed (from the review), awaiting owner OK (D) |
+| 5 | Add the gameplay sequence; its bars (growth 1.25x over the floor, 200 ms per task, unit count) | Revision 2, GPT 20:21 and 20:45 | Agree. | Sequence approved 21:34 UTC (section 5.3's M9); bars proposed (H) |
+| 6 | M5a (fresh) and M5b (saved tower), each gated at 1x and 4x with its own calibrated ε; M5b as an explicit gate expansion | GPT 20:45 (GPT 20:21 had said fresh only) | Agree. The saved-tower start is what returning players see. Expanding a gate needs his own words. | Approved 21:34 UTC (section 5.3's M5a and M5b) |
 | 7 | Slow-hardware coverage from targeted testers and throttled runs, no new field; a large-tower line at stage 3; insufficient cells flagged | GPT 20:21 | Agree. | Approved |
 | 8 | #900 in 3.0.0 with a per-engine baseline and regression budget | GPT 20:21, revision 2 | Agree. It is M7 as written. | Approved |
 | 9 | The 300's "facade host" read as the port host; S6 mapped onto cutover PRs 1 to 7; RUN-1 replacing slice 9; your slice-9-before-10 rule marked overtaken | GPT 20:21 (as an approval), revision 2 | Agree. | Approved |
