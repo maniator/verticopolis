@@ -10,6 +10,7 @@ import { maybeSurfaceUpdatePrompt } from "./updateFlow";
 import { gameplaySession } from "../analytics";
 import { drainEngineEvents } from "../analyticsEngineBridge";
 import { stepGate } from "../wasmhost/stepGate";
+import { hudSource } from "./hudSource";
 
 /**
  * The per-frame simulation + throttled UI/audio refresh, split out of the
@@ -152,7 +153,8 @@ export function runFrame(app: GameApp, dtMs: number): void {
   if (now - app.lastUiUpdate > 160) {
     app.lastUiUpdate = now;
     app.audio.update(app.engine.focus());
-    app.ui.update(app.sim);
+    app.reader.update();
+    app.ui.update(hudSource(app));
     updateTraffic(app);
     app.onboarding.tick(); // advance the first-run checklist on real progress (no-op when inactive)
     gameplaySession.notePlaying(); // this session played: it reports session_emergencies

@@ -26,6 +26,7 @@ function standIn(tier: TrafficTier) {
     onboarding: { adoptSim: vi.fn() },
     engine: { setSim: vi.fn() },
     enginePort: { take: vi.fn() },
+    reader: { update: vi.fn() },
     ui: { resetLog: vi.fn(), update: vi.fn() },
     history: { clear: vi.fn() },
   };
