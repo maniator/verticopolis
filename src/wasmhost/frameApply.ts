@@ -1,6 +1,7 @@
 import { LOG_RING_CAP } from "../engine/sim/constants";
 import type { Simulation } from "../engine/Simulation";
-import type { LogEntry } from "../engine/types";
+import { markRoom } from "../engine/tower/rooms";
+import type { LogEntry, Unit } from "../engine/types";
 import type { Person } from "../engine/crowd/person";
 import { FRAME_HEADER, PERSON_FIXED, PERSON_STATES, ROUTINES, UNIT_STATES, enumAt, type FrameHeader } from "./frameView";
 import { PERSON_OPTIONALS, clearOptional } from "./personFields";
@@ -65,7 +66,9 @@ export function checkRecords(v: ArrayLike<number>, h: FrameHeader): void {
   if (i !== v.length) throw new Error(`frame view: ${v.length - i} numbers left after the last record`);
 }
 
-const counter = (n: number) => (n < 0 ? undefined : n);
+// The engine sends -1 for no count. A NaN, which no engine sends, reads as
+// none as well, so the HUD's kept counts never take one in.
+const counter = (n: number) => (n >= 0 ? n : undefined);
 
 /** Make `target` hold `v[from..from+n)`, in place, writing only when it
  *  differs (a holder of the array sees the new legs either way). */
@@ -146,13 +149,22 @@ function applyPeople(sim: Simulation, v: ArrayLike<number>, count: number, start
 
 function applyUnits(sim: Simulation, v: ArrayLike<number>, count: number, start: number): number {
   let i = start;
-  const byId = sim.tower.byId;
+  const { units, byId } = sim.tower;
   for (let k = 0; k < count; k++, i += 6) {
-    const u = byId.get(v[i]);
+    // Between merges the mirror holds the units in the engine's order, the
+    // frame's order, so a record's unit is the one at its position; the id
+    // index is the fallback for a record out of place.
+    const id = v[i];
+    let u: Unit | undefined = units[k];
+    if (u?.id !== id) u = byId.get(id);
     if (!u) continue;
-    u.state = UNIT_STATES[v[i + 1]];
+    const state = UNIT_STATES[v[i + 1]];
+    const customersIn = counter(v[i + 3]);
+    // The HUD's room counts recount a room only when a field they read moved.
+    if (u.state !== state || u.customersIn !== customersIn) markRoom(sim.tower, u);
+    u.state = state;
     u.occupants = v[i + 2];
-    u.customersIn = counter(v[i + 3]);
+    u.customersIn = customersIn;
     u.hotelCustomersIn = counter(v[i + 4]);
     u.outForMeal = counter(v[i + 5]);
   }

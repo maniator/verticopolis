@@ -42,7 +42,11 @@ reason. The owner set this order on 2026-10-09.
    (`pr-drift-check`, `update-visual-baselines.yml`) is the pixel parity
    check: a pixel difference between the engines is a parity finding. At
    the flip the committed gallery and the minted baselines come from the
-   WASM engine.
+   WASM engine. **Moved earlier by the owner (2026-10-27): the committed
+   gallery, the drift gate and the baselines come from the WASM engine
+   before 3.0, with the TypeScript engine as the report-only parity leg
+   while it stays selectable (#1353, backlog row
+   `screenshots-on-rust-engine`, release plan 9.2 step B8).**
 4. **AC4 The test-mapping table.** This file carries a table naming every
    test file that stays TypeScript-only, its bucket and its reason, and the
    count of tests that pass on the engine.
@@ -278,6 +282,7 @@ run records below.
 | `personCensus.integration.test.ts` | 0/24 | fixed | reads `originUnitId`, which the frame carries now |
 | `personRoundTrip.integration.test.ts` | 0/19 (2 marked) | d | two stamp `customersIn` on the instance (one mid-run, which the frame sync restores every tick; one before the first tick, which the save does not carry); the other four read the routing fields |
 | `phase2.integration.test.ts` | 0/14 (2 marked) | c | `simModel = "v1"`; the tower-wide coverage test sets v1 but never ticks (unmarked in review round 2) |
+| `roomCounts.integration.test.ts` (added after the run records below, PR #1340) | 0/1 (1 marked) | d | vacates offices through `sim.vacate` mid-run, which no command relays; the hosts' merge and frame apply have their own cases in `merge.test.ts` and `frameApply.test.ts`, which run on `unitWasm` |
 | `segmentRoutingReachable.integration.test.ts` | 0/11 (3 marked) | d | reads `returning` and the route, which the frame carries now; the three meal-rush tests pin lunch by swapping `sim.clock` and re-force the condo and venue occupancy every tick after the crowd exists, which only the fingerprint check (round 1) sees |
 | `simulation.integration.test.ts` | 0/107 (1 marked) | d | clears the render-only `patronageToday`/`profitToday` accumulators on units every hour mid-run |
 | `storage.integration.test.ts` | 0/66 (5 marked) | c | the TypeScript serializer's own round-trip and hardening tests: four write instance fields after the ticks and read `serialize()`, which is the engine's while hosted, and one compares the engine save's unit JSON bytes with the TypeScript serializer's key order |

@@ -10,7 +10,7 @@ import { ledgerCatFor, type LedgerCat } from "./Ledger";
 import { subtypeListFor } from "./retailSubtypes";
 import { Housekeeping } from "./economy/housekeeping";
 import { computeDemandMap, unitReachable } from "./sim/demand";
-import { roomUnits } from "./tower/rooms";
+import { roomUnits, setRoomState } from "./tower/rooms";
 
 /** The lease kinds `collectRent` collects quarterly, and the money-log line each
  *  emits (its ledger category comes from `ledgerCatFor`). A kind absent here pays
@@ -196,7 +196,7 @@ export class EconomySystem {
         }
         continue;
       }
-      u.state = "occupied";
+      setRoomState(this.sim.tower, u, "occupied");
       // Stamp the ambient crowd at the flip too: updatePresence ran earlier in
       // this same onHour and saw a newly built or newly reachable venue still
       // `empty`, so without this the first open hour has dark windows, a cold
@@ -352,7 +352,7 @@ export class EconomySystem {
         revenue += rentOf(u);
         // Guest leaves; the room is now DIRTY and cannot be re-let until
         // housekeeping services it.
-        u.state = "dirty";
+        setRoomState(this.sim.tower, u, "dirty");
         u.occupants = 0;
       }
     }
@@ -381,7 +381,7 @@ export class EconomySystem {
       if (!isHotelKind(u.kind)) continue;
       if (u.state === "asleep") {
         revenue += rentOf(u);
-        u.state = "dirty";
+        setRoomState(this.sim.tower, u, "dirty");
         u.occupants = 0;
       }
     }

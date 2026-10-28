@@ -9,7 +9,7 @@ import { Simulation } from "../../engine/Simulation";
 import { serializeUnit } from "../../engine/sim/coerce";
 import { FRAME_UNIT_FIELDS, churn, composition, measureReadModel, spread, summarizeMerges, type MergePass } from "./readModel";
 import { buildSmallTower } from "../perfCompare/scenarios";
-import { modeOrder, summarizeFrames, summarizeHosted } from "./runner";
+import { modeOrder, summarizeFrames, summarizeHosted, type ModeRun } from "./runner";
 import type { ModeName } from "./pageWorker";
 
 import { config, run, runs } from "./analysisFixture";
@@ -40,6 +40,33 @@ describe("perf:worker analysis", () => {
     expect(traffic.length).toBeGreaterThan(0);
     expect(traffic.every((m) => m.mode === "wasm-worker")).toBe(true);
     expect(traffic.find((m) => m.metric.startsWith("frame view bytes per reply") && m.throttle === "1")!.summary!.median).toBe(10);
+    // The hourly delta rows (#1045): the count, bytes per delta, and time.
+    const row = (prefix: string) => traffic.find((m) => m.metric.startsWith(prefix) && m.throttle === "1")!;
+    expect(row("hourly deltas, ").summary!.median).toBe(18);
+    expect(row("bytes per hourly delta").summary!.median).toBe(20);
+    expect(row("main-thread delta time").values.length).toBeGreaterThan(0);
+    expect(row("worker save time").summary!.median).toBe(3);
+    expect(row("deltas refused, ").summary!.median).toBe(1);
+    // The frames window counts its own saves, so a full save in it is seen.
+    expect(row("full-save merges (frames)").summary!.median).toBe(2);
+    expect(row("hourly deltas (frames)").summary!.median).toBe(7);
+    expect(row("deltas refused (frames)").summary!.median).toBe(1);
+    expect(row("approximate saves (frames)").summary!.median).toBe(3);
+    // A run recorded before the deltas has no sample in their rows. The
+    // harness reads a missing counter as NaN (undefined minus undefined), and a
+    // JSON round trip turns that into null, so all three spellings are checked.
+    const counters = ["deltas", "deltaBytes", "deltaMs", "deltasRefused", "approximateSaves"] as const;
+    const without = (value: undefined | null | number) => runs().map((r) => {
+      if (r.mode !== "wasm-worker") return r;
+      const hosted = r.scenarios.small.hosted[1]!;
+      const worker = { ...hosted.worker! } as Record<string, unknown>;
+      for (const k of counters) worker[k] = value;
+      return { ...r, scenarios: { small: { ...r.scenarios.small, hosted: { ...r.scenarios.small.hosted, 1: { ...hosted, worker } } } } } as unknown as ModeRun;
+    });
+    const hostedRows = (ms: ReturnType<typeof aggregate>) => ms.filter((m) => m.throttle === "1" && m.metric.includes("(hosted)") && /^(hourly deltas, |bytes per hourly delta|deltas refused, |main-thread delta time)/.test(m.metric));
+    expect(hostedRows(traffic).every((m) => m.values.length > 0)).toBe(true);
+    expect(hostedRows(traffic)).toHaveLength(4);
+    for (const v of [undefined, null, Number.NaN]) expect(hostedRows(aggregate(config, without(v))).filter((m) => m.values.length > 0)).toEqual([]);
     // A worker run whose worker heap could not be read has no combined sample.
     const missing = runs().map((r) => (r.mode === "wasm-worker" ? { ...r, scenarios: { small: { ...r.scenarios.small, memory: { ...r.scenarios.small.memory, workerHeapUsedBytes: null } } } } : r));
     expect(aggregate(config, missing).find((m) => m.metric.startsWith("JS heaps + WASM") && m.mode === "wasm-worker")!.values).toEqual([]);

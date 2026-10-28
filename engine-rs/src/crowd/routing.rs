@@ -4,13 +4,20 @@ use std::collections::HashMap;
 
 use super::banks::balance_shafts;
 use super::fasthash::{FastMap, FastSet};
-use super::{AdjGraph, Crowd, Edge, ElevatorCalls, PState, Route};
+use super::{AdjGraph, Crowd, Edge, ElevatorCalls, PState, Route, StaffParts};
 use crate::facilities::{LOT_WIDTH, MIN_FLOOR};
 use crate::tower::{Tower, Transport};
 use crate::tower_query::{floor_of_seg, NO_SEGMENT};
 
-fn build_adjacency<'a>(tower: &Tower, transports: impl Iterator<Item = &'a Transport>) -> AdjGraph {
+/// The graph over the transports' landing segments, and those segments in
+/// the order they were first listed, for a walk that must not follow the
+/// map's order.
+fn build_adjacency<'a>(
+    tower: &Tower,
+    transports: impl Iterator<Item = &'a Transport>,
+) -> (AdjGraph, Vec<i64>) {
     let mut adj: AdjGraph = HashMap::new();
+    let mut listed: Vec<i64> = Vec::new();
     for t in transports {
         let stops = tower.stops_of(t);
         let walk_kind = if t.kind.is_walkway() {
@@ -21,7 +28,10 @@ fn build_adjacency<'a>(tower: &Tower, transports: impl Iterator<Item = &'a Trans
         let seg_lists: Vec<Vec<i64>> = stops.iter().map(|&fl| tower.landing_segs(t, fl)).collect();
         for ai in 0..stops.len() {
             for &a_seg in &seg_lists[ai] {
-                let list = adj.entry(a_seg).or_default();
+                let list = adj.entry(a_seg).or_insert_with(|| {
+                    listed.push(a_seg);
+                    Vec::new()
+                });
                 for bi in 0..stops.len() {
                     if bi == ai {
                         continue;
@@ -37,13 +47,13 @@ fn build_adjacency<'a>(tower: &Tower, transports: impl Iterator<Item = &'a Trans
             }
         }
     }
-    adj
+    (adj, listed)
 }
 
 pub fn adjacency<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a AdjGraph {
     let fresh = !matches!(&crowd.adj, Some((rev, _)) if *rev == tower.revision);
     if fresh {
-        let adj = build_adjacency(
+        let (adj, _) = build_adjacency(
             tower,
             tower
                 .transports
@@ -55,20 +65,65 @@ pub fn adjacency<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a AdjGraph {
     &crowd.adj.as_ref().unwrap().1
 }
 
-pub fn staff_adjacency<'a>(crowd: &'a mut Crowd, tower: &Tower) -> &'a AdjGraph {
-    let fresh = !matches!(&crowd.staff_adj, Some((rev, _)) if *rev == tower.revision);
+/// The staff graph, and for each segment on it the part of the graph it lies
+/// in (see `graph_parts`).
+pub fn staff_adjacency<'a>(crowd: &'a mut Crowd, tower: &Tower) -> (&'a AdjGraph, &'a StaffParts) {
+    let fresh = !matches!(&crowd.staff_adj, Some((rev, _, _)) if *rev == tower.revision);
     if fresh {
         let mut service_first: Vec<&Transport> = tower.transports.iter().collect();
         service_first.sort_by_key(|t| !t.kind.is_staff_only_transport());
-        let adj = build_adjacency(
+        let (adj, listed) = build_adjacency(
             tower,
             service_first
                 .into_iter()
                 .filter(|t| t.kind.is_staff_transport()),
         );
-        crowd.staff_adj = Some((tower.revision, adj));
+        let parts = graph_parts(&adj, &listed);
+        crowd.staff_adj = Some((tower.revision, adj, parts));
     }
-    &crowd.staff_adj.as_ref().unwrap().1
+    let (_, adj, parts) = crowd.staff_adj.as_ref().unwrap();
+    (adj, parts)
+}
+
+/// Maps each segment that has an edge to a label for its part of the graph:
+/// the segments joined by edges taken in either direction, so a part holds
+/// every segment a search from any of its members could reach. A part is
+/// labeled with its first segment in `listed` order, the order the graph was
+/// built in, so the labels never follow a map's order; only their equality
+/// is read. `listed` holds every key of `adj`, as `build_adjacency` returns it.
+fn graph_parts(adj: &AdjGraph, listed: &[i64]) -> StaffParts {
+    let mut near: FastMap<i64, Vec<i64>> = FastMap::default();
+    for &a in listed {
+        for e in &adj[&a] {
+            near.get_or_insert_with(a, Vec::new).push(e.f);
+            near.get_or_insert_with(e.f, Vec::new).push(a);
+        }
+    }
+    let mut part: StaffParts = FastMap::default();
+    for &seg in listed {
+        if part.get(&seg).is_some() || near.get(&seg).is_none() {
+            continue;
+        }
+        part.insert(seg, seg);
+        let mut stack = vec![seg];
+        while let Some(at) = stack.pop() {
+            for &next in &near[&at] {
+                if part.get(&next).is_none() {
+                    part.insert(next, seg);
+                    stack.push(next);
+                }
+            }
+        }
+    }
+    part
+}
+
+/// Whether `a` and `b` differ and lie in different parts of the staff graph
+/// (or either lies in none). When it holds no route joins them, and on the
+/// tower's graphs, whose edges come in pairs, it holds whenever none does.
+fn parts_split(parts: &StaffParts, a: i64, b: i64) -> bool {
+    let pa = parts.get(&a);
+    a != b && (pa.is_none() || pa != parts.get(&b))
 }
 
 /// `passengerPath`: the per-mode router on segment ids.
@@ -172,7 +227,15 @@ pub fn staff_route(
     if let Some(decided) = off_run_pair(a, b, from_floor, from_x, to_floor, to_x) {
         return decided.map(|r| balance_shafts(crowd, tower, r));
     }
-    let mut r = bfs_route(staff_adjacency(crowd, tower), a, b)?;
+    let (adj, parts) = staff_adjacency(crowd, tower);
+    // A search between two parts of the staff graph visits all of the
+    // first one before it gives up, and dispatch keeps asking for such
+    // routes: a floor-level staff link can leave a room's segment off the
+    // crew's network (#1143 item 6). The parts answer that without a search.
+    if parts_split(parts, a, b) {
+        return None;
+    }
+    let mut r = bfs_route(adj, a, b)?;
     to_real_floors(&mut r);
     Some(balance_shafts(crowd, tower, r))
 }
@@ -326,6 +389,10 @@ pub fn elevator_calls(crowd: &Crowd, tower: &Tower) -> ElevatorCalls {
     }
     calls
 }
+
+#[cfg(test)]
+#[path = "staff_parts_tests.rs"]
+mod staff_parts_tests;
 
 #[cfg(test)]
 mod tests {
