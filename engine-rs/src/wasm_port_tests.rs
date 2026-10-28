@@ -89,7 +89,13 @@ fn onboarding_packs_the_facts_in_order() {
     // No fact is +0, the number TypeScript's bits give, never -0.
     assert!(e.port_onboarding() == 0.0 && e.port_onboarding().is_sign_positive());
     assert_eq!(e.port_build(code(Kind::Lobby), 1.0, 100.0)[STATUS], 1.0);
-    assert_eq!(e.port_onboarding(), 1.0);
+    assert_eq!(e.port_onboarding(), f64::from(ONBOARDING_LOBBY));
+}
+
+#[test]
+fn the_onboarding_flags_are_one_per_fact_in_layout_order() {
+    assert_eq!(ONBOARDING_FLAGS, [1, 2, 4, 8, 16]);
+    assert_eq!(ONBOARDING_FLAGS.len(), ONBOARDING.len());
 }
 
 #[test]
@@ -154,7 +160,7 @@ fn office(e: &Engine) -> f64 {
 
 /// The exported layout's hash; raise `VIEW_LAYOUT_VERSION` (and append its
 /// pin in `view/layout_tests.rs`) in the same commit as any change here.
-const EXPORTED_LAYOUT_PIN: &str = "59aebd31288ac82c";
+const EXPORTED_LAYOUT_PIN: &str = "0123a060c5cddd4f";
 
 #[test]
 fn the_exported_layout_is_pinned() {

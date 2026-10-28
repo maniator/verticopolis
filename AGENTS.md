@@ -20,6 +20,34 @@ human, and grammatically correct.
 The Rust engine in `engine-rs/` follows these rules with no grandfathered
 comments, plus the 500-line file ceiling (see CONTRIBUTING "Conventions").
 
+## Intent-revealing gameplay and UI conditions
+
+Agent-authored code must make **what a condition means** clear where it is
+used. Do not replace a readable gameplay rule with an opaque positional
+helper or magic number. For example, `done: bit(0)`, `if (flags & 4)`, or
+`check(2)` is not acceptable in gameplay, UI, or feature-policy code when
+the number secretly means "lobby built", "office connected", or another
+domain fact. Prefer `done: (facts) => facts.lobbyBuilt` or
+`done: (bits) => hasOnboardingFact(bits, "lobbyBuilt")`. The name must
+express the intent without opening the helper's implementation. Comments
+about positional ordering do not replace readable call sites.
+
+Numeric bit positions, protocol codes, raw record offsets, and bitset
+arithmetic are allowed **inside** serialization, engine transport, format
+decoders, dispatch algorithms, and tests where the representation matters.
+Keep those positions in named constants or a canonical layout, with tests
+that pin the mapping. Decode into semantic names or predicates before
+the value reaches gameplay and UI decisions. Avoid unexplained ordinal
+literals in fixtures, too, unless the literal itself is the subject of
+the test.
+
+**Refactor and review check:** compare the old and new call sites for
+readability. If a change makes the meaning harder to understand, restore
+the explicit predicate or introduce a clearly named helper, even if the
+shorter version is technically correct. Favor maintainability over saving
+lines or hiding logic in a clever shorthand. Reviewers should flag such
+changes before merge. Do not bulk-rewrite unrelated existing code.
+
 ## Use BMAD-METHOD for non-trivial work
 
 This repo has **BMAD-METHOD** (BMM core + CIS + BMGD) installed. Default to its

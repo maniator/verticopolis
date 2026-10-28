@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -379,6 +379,10 @@
     "drainEvents": [
       "dropped",
       "count"
+    ],
+    "advance": [
+      "steps",
+      "owed"
     ],
     "unitMetaChanged": [
       "revision",

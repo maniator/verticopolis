@@ -71,6 +71,7 @@ src/engine/request.ts
 
 # The host-side step driver (AD-2, #867)
 src/engine/sim/fixedStep.ts
+src/engine/sim/frameStep.ts
 src/engine/timePacing.ts
 
 # The crowd model
