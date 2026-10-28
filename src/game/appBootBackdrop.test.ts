@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
+import type { GameplayEvent } from "../engine/gameplayEvents";
 import { Simulation } from "../engine/Simulation";
+import { TsEngine } from "../engine/port/tsEngine";
+import { PortCodes } from "../simport/portCodes";
+import { PortEvents } from "../simport/portEvents";
 import { runBootFlow } from "./appBoot";
 
 // Same module stubs runBootFlow needs as appBoot.test.ts.
@@ -19,28 +23,40 @@ vi.mock("../ui/Onboarding", () => ({
  * which sits at the file-size ceiling. With no readable save the boot tower
  * is only the title screen's backdrop and the player founds their own from
  * New Tower, so whatever the backdrop emitted stays behind when that tower
- * takes over (`GameApp.adoptSim` inherits the replaced tower's buffer). A
+ * takes over (the engine's swap drops a backdrop's buffer, `TsEngine.adopt`). A
  * real tower behind Continue hands its events on as usual.
  */
 
-function makeApp(hadReadableSave: boolean): GameApp {
-  return {
+function makeApp(hadReadableSave: boolean, handOff = false): GameApp {
+  const enginePort = new TsEngine(Simulation.newGame(Date.parse("2024-01-01")));
+  const app = {
     mobileMq: { matches: false },
     audio: { sfx: vi.fn(), setProgram: vi.fn() },
     setSpeed: vi.fn(),
     ui: { toast: vi.fn(), newTowerModal: vi.fn(), showHelp: vi.fn() },
-    sim: Simulation.newGame(Date.parse("2024-01-01")),
+    sim: enginePort.sim,
+    enginePort,
+    events: new PortEvents(enginePort),
     saveLoad: { autosave: vi.fn(), newGame: vi.fn() },
     hadReadableSave,
     saveWasCorrupt: false,
   } as unknown as GameApp;
+  // The app's own swap, as `GameApp.adoptSim` makes it while the mirror host
+  // follows it: the new tower inherits the replaced one's buffer.
+  if (handOff)
+    enginePort.handOff = (next) => {
+      next.gameplayEvents.inherit(app.sim.gameplayEvents);
+      (app as { sim: Simulation }).sim = next;
+      enginePort.take(next);
+    };
+  return app;
 }
 
-/** What New Tower's swap does with the boot tower's buffer. */
-function foundNewTower(app: GameApp): Simulation {
-  const next = Simulation.newGame(7, "modern");
-  next.gameplayEvents.inherit(app.sim.gameplayEvents);
-  return next;
+/** New Tower's swap through the port, then the bridge's next drain. */
+function foundNewTower(app: GameApp): GameplayEvent[] {
+  const codes = new PortCodes(app.enginePort);
+  app.enginePort.foundTower(7, codes.code("modes", "modern"), codes.code("calendars", "realWorld"), false);
+  return app.events.drainGameplayEvents();
 }
 
 describe("runBootFlow: the boot backdrop's events", () => {
@@ -59,13 +75,20 @@ describe("runBootFlow: the boot backdrop's events", () => {
     const app = makeApp(false);
     runBootFlow(app);
     app.sim.gameplayEvents.push("fire_started", {}); // the backdrop, still running behind the title
-    const events = foundNewTower(app).drainGameplayEvents();
+    const events = foundNewTower(app);
     expect(events).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
+  });
+
+  it("stay behind when the swap hands the new tower to the app", () => {
+    const app = makeApp(false, true);
+    runBootFlow(app);
+    app.sim.gameplayEvents.push("fire_started", {});
+    expect(foundNewTower(app)).toEqual([{ name: "tower_founded", payload: { mode: "modern" } }]);
   });
 
   it("go on with a saved tower", () => {
     const app = makeApp(true);
     runBootFlow(app);
-    expect(foundNewTower(app).drainGameplayEvents().filter((e) => e.name === "tower_founded")).toHaveLength(2);
+    expect(foundNewTower(app).filter((e) => e.name === "tower_founded")).toHaveLength(2);
   });
 });

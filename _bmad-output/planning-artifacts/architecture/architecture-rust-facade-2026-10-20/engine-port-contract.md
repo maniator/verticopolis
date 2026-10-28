@@ -365,10 +365,12 @@ they resume.
    tower through the swap members (`SaveGame` takes save text and hands
    loads to the engine; until 5e, `TsEngine.handOff` hands a done swap to
    `GameApp.adoptSim` so the mirror host still follows it), then the file
-   import and export; 5e the boot, the mirror host's removal with
-   `SimPort`, `TsSim` and `handOff`, with the frame loop's
-   time call on `advance`, its clock reads, its event drain on `drainEvents`
-   and the reader brought up to date every rendered frame.
+   import and export; 5e in parts: first the frame loop's time call on
+   `advance`, its clock reads, its event drain on `drainEvents`
+   (`PortEvents`), the reader brought up to date every frame and the
+   renderer on `PortRenderSim`; then the cards' and the analytics' last
+   reads of the simulation; then the boot of either engine through the port
+   and the mirror host's removal with `SimPort`, `TsSim` and `handOff`.
 6. Restore points and the sidecar, the cadence exclusions, the fault
    fallback (story ACs 16 to 21 and slice 8), unchanged in substance.
 7. The integration suites on the Rust engine (owner, 2026-10-28: before

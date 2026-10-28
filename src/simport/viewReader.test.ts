@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { facilityFloors } from "../engine/facilities";
 import { Simulation } from "../engine/Simulation";
 import { KIND_CODES, codeOf } from "../engine/port/layout";
 import { TsEngine } from "../engine/port/tsEngine";
-import { roomUnits } from "../engine/tower/rooms";
+import { forgetUnitLists, roomUnits } from "../engine/tower/rooms";
+import { readFileSync } from "node:fs";
+import { decodeVctower } from "../storage/vctowerContainer";
+import type { SerializedGame } from "../engine/types";
 import { ViewReader } from "./viewReader";
 
 /**
@@ -31,7 +35,7 @@ const plain = (v: unknown): unknown => JSON.parse(JSON.stringify(v));
 describe("ViewReader over TsEngine", () => {
   it("decodes the rooms, the structure and the header the simulation holds", () => {
     const e = engine();
-    const r = new ViewReader(e);
+    const r = new ViewReader(e, facilityFloors);
     const rooms = roomUnits(e.sim.tower);
     expect(r.rooms.map((u) => [u.id, u.kind, u.floor, u.x, u.width, u.label])).toEqual(rooms.map((u) => [u.id, u.kind, u.floor, u.x, u.width, u.label]));
     expect(r.structure.map((s) => [s.kind, s.floor, s.x, s.count])).toEqual([
@@ -52,7 +56,7 @@ describe("ViewReader over TsEngine", () => {
 
   it("answers the point lookups and the expanded units", () => {
     const e = engine();
-    const r = new ViewReader(e);
+    const r = new ViewReader(e, facilityFloors);
     const office = r.rooms.find((u) => u.kind === "office")!;
     expect(r.tower.getUnit(office.id)).toBe(office);
     expect(r.tower.unitAt(2, office.x + 1)).toBe(office);
@@ -67,9 +71,29 @@ describe("ViewReader over TsEngine", () => {
     expect([r.tower.highestFloor, r.tower.lowestFloor, r.tower.revision]).toEqual([e.sim.tower.highestFloor, e.sim.tower.lowestFloor, e.sim.tower.revision]);
   });
 
+  it("answers every story of a taller room as the tower's own index does", () => {
+    // split-tower-4 holds cinemas and party halls (2 floors) and a metro (3).
+    const sim = Simulation.deserialize(decodeVctower(readFileSync("conformance/fixtures/split-tower-4.vctower", "utf8")) as SerializedGame);
+    const r = new ViewReader(new TsEngine(sim), facilityFloors);
+    let tall = 0;
+    for (const u of sim.tower.units) {
+      const floors = facilityFloors(u.kind);
+      if (floors < 2) continue;
+      tall++;
+      for (let floor = u.floor - 1; floor <= u.floor + floors; floor++) {
+        for (const x of [u.x - 1, u.x, u.x + u.width - 1, u.x + u.width]) {
+          const want = sim.tower.roomAt(floor, x);
+          const got = r.tower.unitAt(floor, x);
+          expect(want ? got?.id : Number.isNaN(got?.id ?? NaN), `${u.kind} ${floor} ${x}`).toBe(want ? want.id : true);
+        }
+      }
+    }
+    expect(tall).toBeGreaterThan(5);
+  });
+
   it("keeps rooms across a rebuild and reads the meta log's edits", () => {
     const e = engine();
-    const r = new ViewReader(e);
+    const r = new ViewReader(e, facilityFloors);
     const kept = r.rooms;
     const office = kept.find((u) => u.kind === "office")!;
     e.labelUnit(office.id, "Corner");
@@ -89,7 +113,7 @@ describe("ViewReader over TsEngine", () => {
     const e = engine();
     e.setCamera(200, 2, 1.5);
     const save = e.serialize();
-    const r = new ViewReader(e);
+    const r = new ViewReader(e, facilityFloors);
     const person = () => r.crowd.people[0];
     e.tick(480);
     r.update();
@@ -106,12 +130,30 @@ describe("ViewReader over TsEngine", () => {
 
   it("takes a full frame after another caller took one", () => {
     const e = engine();
-    const r = new ViewReader(e);
+    const r = new ViewReader(e, facilityFloors);
     for (let i = 0; i < 4; i++) {
       e.tick(45);
       e.viewFrame(false);
       r.update();
       expect(plain(r.rooms.map((u) => [u.state, u.occupants]))).toEqual(plain(roomUnits(e.sim.tower).map((u) => [u.state, u.occupants])));
     }
+  });
+
+  it("follows a room list rebuilt without a revision or a count move", () => {
+    // The WASM mirror host's merge: the held units are rewritten and reordered
+    // in place, the room list dropped, and the revision kept as the engine's.
+    const e = engine();
+    const r = new ViewReader(e, facilityFloors);
+    const tower = e.sim.tower;
+    const revision = tower.revision;
+    tower.units.reverse();
+    roomUnits(tower).find((u) => u.kind === "office")!.occupants = 6;
+    forgetUnitLists(tower);
+    expect(tower.revision).toBe(revision);
+    r.update();
+    const rooms = roomUnits(tower);
+    expect(r.rooms.map((u) => u.id)).toEqual(rooms.map((u) => u.id));
+    expect(plain(r.rooms.map((u) => [u.state, u.occupants]))).toEqual(plain(rooms.map((u) => [u.state, u.occupants])));
+    expect(r.rooms.find((u) => u.kind === "office")!.occupants).toBe(6);
   });
 });

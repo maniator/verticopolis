@@ -148,7 +148,8 @@ export class ViewReader implements SimView {
   private shafts: Shaft[] = [];
   private shaftById = new Map<number, Shaft>();
   private runs: Run[] = [];
-  /** Rooms and runs by floor, sorted by x, for the point lookups. */
+  /** Rooms under every floor they cover, and runs by floor, sorted by x, for
+   *  the point lookups. */
   private roomsByFloor = new Map<number, Room[]>();
   private runsByFloor = new Map<number, Run[]>();
   private floors = { high: 0, low: 0 };
@@ -167,7 +168,15 @@ export class ViewReader implements SimView {
   readonly crowd: CrowdView = { people: this.people };
   readonly tower: TowerView;
 
-  constructor(private readonly port: EnginePort) {
+  /**
+   * @param floorsOf a facility's height in floors (the catalog's `floors`).
+   *   The frame carries no heights, and `tower.unitAt` answers every story a
+   *   room covers, as the tower's own index does.
+   */
+  constructor(
+    private readonly port: EnginePort,
+    private readonly floorsOf: (kind: FacilityKind) => number,
+  ) {
     this.l = JSON.parse(port.viewLayout()) as Layout;
     this.kindCodes = new Map(this.l.kinds.map((k, i) => [k, i]));
     const lookups = {
@@ -187,6 +196,11 @@ export class ViewReader implements SimView {
       lowestFloor: { get: () => this.floors.low },
     }) as unknown as TowerView;
     this.update();
+  }
+
+  /** The engine generation the view was last read in. */
+  get generation(): number {
+    return this.gen;
   }
 
   /** Read the next frame. */
@@ -210,7 +224,10 @@ export class ViewReader implements SimView {
     this.seq = f[h.frameSeq];
     // A rebuild reads the text of every room new to it, so after one that
     // found no room it knew (a new tower) the frame's meta revision is read.
-    if (f[h.towerRevision] !== this.revision || f[h.rooms] !== this.rooms.length) {
+    // A full frame rebuilds too: an engine sends one when its room list
+    // moved, which can happen without the revision or the count moving, and
+    // its slots then follow the new list.
+    if (f[h.full] === 1 || f[h.towerRevision] !== this.revision || f[h.rooms] !== this.rooms.length) {
       if (this.rebuild() && this.metaRevision === 0) this.metaRevision = f[h.metaRevision];
     }
     this.readFrame(f);
@@ -254,7 +271,9 @@ export class ViewReader implements SimView {
       }
       this.rooms.push(r);
       this.byId.set(id, r);
-      this.listAt(this.roomsByFloor, floor).push(r);
+      // Filed under every story it covers, so a pick on a cinema's or a
+      // metro's upper story finds it.
+      for (let story = 0; story < this.floorsOf(kind); story++) this.listAt(this.roomsByFloor, floor + story).push(r);
     }
     for (const list of this.roomsByFloor.values()) list.sort((a, b) => a.x - b.x);
     this.runs = [];

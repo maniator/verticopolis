@@ -148,10 +148,11 @@ function scannedSources(): string[] {
 }
 
 const allowed = (file: string) => ALLOWED_DIRS.some((dir) => file.startsWith(dir));
-/** The shared view reader takes the frames through `EnginePort` (contract
- *  section 5), so it is the one caller outside the host scope that may read
- *  `viewFrame`; it imports no binding. */
-const FRAME_READERS = ["src/simport/viewReader.ts"];
+/** The port's own loop callers outside the host scope: the shared view
+ *  reader takes the frames through `EnginePort` (contract section 5,
+ *  `viewFrame`), and the frame loop steps the engine through it (`advance`).
+ *  Neither imports the binding. */
+const FRAME_READERS = ["src/simport/viewReader.ts", "src/game/frameLoop.ts"];
 
 /** The source with its comments blanked, so prose naming an op
  *  (`// without this, evaluateStar ...`) is not read as a call: block

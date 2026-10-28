@@ -185,7 +185,20 @@ function unitsMoved(live: readonly Unit[], fresh: readonly Unit[], changed: Unit
     const a = live[i];
     const b = fresh[i];
     if (a.id !== b.id || a.kind !== b.kind || a.floor !== b.floor || a.x !== b.x || a.width !== b.width) return true;
-    if (a.state !== b.state || a.noRate !== b.noRate || a.everOccupied !== b.everOccupied || a.residents !== b.residents || a.customersIn !== b.customersIn) {
+    // The HUD's counted fields, and the rest of what the engine's view reads
+    // of a room (its frame fields and its text), so the frame resends it.
+    if (
+      a.state !== b.state ||
+      a.noRate !== b.noRate ||
+      a.everOccupied !== b.everOccupied ||
+      a.residents !== b.residents ||
+      a.customersIn !== b.customersIn ||
+      a.occupants !== b.occupants ||
+      a.hotelCustomersIn !== b.hotelCustomersIn ||
+      a.outForMeal !== b.outForMeal ||
+      a.label !== b.label ||
+      a.subtype !== b.subtype
+    ) {
       changed.push(a);
     }
   }

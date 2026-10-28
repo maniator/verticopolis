@@ -3,6 +3,9 @@ import { Simulation } from "../engine/Simulation";
 import { markRoom, rampUnits, roomCounts, roomUnits, structureRuns } from "../engine/tower/rooms";
 import { MID, lay, mustBuild, placeUnit } from "../tests/fixtures/towerFixtures";
 import { mergeSimulation, mergeSimulationDelta } from "./merge";
+import { TsEngine } from "../engine/port/tsEngine";
+import { ViewReader } from "../simport/viewReader";
+import { facilityFloors } from "../engine/facilities";
 import { walkedStats } from "../tests/fixtures/walkedStats";
 
 /** A tower with a lobby row, two offices and a shaft, ticked a little. */
@@ -169,6 +172,24 @@ describe("mergeSimulation", () => {
     const hud = target.stats();
     expect(hud).toEqual(Simulation.deserialize(fresh.serialize()).stats());
     expect(hud.occupiedOffices).toBe(before.occupiedOffices + 2);
+  });
+
+  it("marks a room whose occupancy alone a merge rewrites, so the view the app reads follows it", () => {
+    // The mirror host merges the engine's tower over the one the app's
+    // engine watches; a merge that changes only what the view frame reads
+    // must still reach the reader, which reads changed rooms by their marks.
+    const target = tower(5);
+    const office = target.tower.units.find((u) => u.kind === "office")!;
+    office.state = "occupied";
+    office.occupants = 0;
+    const reader = new ViewReader(new TsEngine(target), facilityFloors);
+    expect(reader.tower.getUnit(office.id)!.occupants).toBe(0);
+    const fresh = Simulation.deserialize(target.serialize());
+    fresh.tower.getUnit(office.id)!.occupants = 6;
+    mergeSimulation(target, Simulation.deserialize(fresh.serialize()), { revision: target.tower.revision, mealOverlayRevision: 0 });
+    expect(office.occupants).toBe(6);
+    reader.update();
+    expect(reader.tower.getUnit(office.id)!.occupants).toBe(6);
   });
 
   it("marks the rooms whose counted fields a merge rewrites, one field at a time, and keeps the HUD's counts when the room list stays", () => {

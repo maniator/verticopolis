@@ -292,7 +292,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
 
   // The analytics bridge folds the live tower's gameplay events once per frame;
   // binding it lets the session fold the last ones before a page-hide report.
-  bindEngineBridge(() => app.sim);
+  bindEngineBridge(() => app.events);
 
   // One analytics snapshot per boot: the origin (update / recovery / corrupt /
   // continue / fresh) plus the loaded tower's standing state and the build
@@ -348,7 +348,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     // With no save the boot tower is only the title screen's backdrop, and the
     // player's own tower comes from New Tower: the backdrop's events (its
     // founding first) are left behind when that tower takes over.
-    if (!hasSave) app.sim.gameplayEvents.discardOnHandOff = true;
+    if (!hasSave) app.events.setBackdrop(true);
     app.onboarding.showSplash({
       hasSave,
       // The splash mute is a second view of the ONE persisted master mute

@@ -140,9 +140,10 @@ export class TowerEngine {
   /** Static floor/lobby tiles live in ONE TileMap entity, not per-tile
    *  actors: paying per-actor overhead for a ~9,000-tile slab dominated the
    *  frame on phones. Cells keep the same shared baked canvases the old
-   *  actors used, so pixels don't change. Keyed by unit id. */
+   *  actors used, so pixels don't change. The set holds the cells that carry a
+   *  graphic. Cells, not unit ids, because the view gives tiles no ids. */
   structTileMap!: ex.TileMap;
-  structTiles = new Map<number, ex.Tile>();
+  structTiles = new Set<ex.Tile>();
   // Settled rooms compose into region canvases (towerRegions, spec CAP-2).
   regions = new Map<number, RegionRec>();
   regionUnits = new Map<number, number[]>(); // unit id -> its region keys

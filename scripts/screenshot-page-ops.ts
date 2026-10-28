@@ -325,6 +325,10 @@ export function pgSetClock(hour: number): void {
   const hosted = Boolean(vc?.status?.hosted) && Object.prototype.hasOwnProperty.call(g.sim, "serialize");
   if (!hosted) {
     c.advance(delta);
+    // The renderer reads the clock through the app's view, which follows the
+    // engine once per frame after the step. Bring it up now, as the app does
+    // after its own edits, so the first settle frame already shows this hour.
+    g.reader?.update?.();
     return;
   }
   if (delta === 0) return;
@@ -335,6 +339,7 @@ export function pgSetClock(hour: number): void {
   // leg keeps it.
   host.engine.advanceClock(delta);
   c.advance(delta);
+  g.reader?.update?.();
 }
 
 /** Drive the real Map-overlay dropdown so the shot exercises the shipped path. */

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { facilityFloors } from "../engine/facilities";
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { roomUnits } from "../engine/tower/rooms";
@@ -85,7 +86,7 @@ describe("applyRecords", () => {
     for (const apply of [true, false]) {
       const r = rng(apply ? 3 : 4);
       const sim = tower();
-      const reader = new ViewReader(new TsEngine(sim));
+      const reader = new ViewReader(new TsEngine(sim), facilityFloors);
       const rooms = roomUnits(sim.tower).map((u) => u.id);
       for (let f = 0; f < 20; f++) {
         const v = Float64Array.from(randomFrame(r, sim, [1, 2, 3], rooms));

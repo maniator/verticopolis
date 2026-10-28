@@ -1,4 +1,5 @@
 import type { Simulation } from "../engine/Simulation";
+import { facilityFloors } from "../engine/facilities";
 import { catalogOf } from "./portAccess";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
@@ -10,7 +11,7 @@ import { ViewReader } from "../simport/viewReader";
  *  calls `reader.update()` before the controller reads it. */
 export function portDeps(sim: Simulation) {
   const engine = new TsEngine(sim);
-  const reader = new ViewReader(engine);
+  const reader = new ViewReader(engine, facilityFloors);
   const codes = new PortCodes(engine);
   return {
     engine,

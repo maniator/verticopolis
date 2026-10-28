@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { facilityFloors } from "../engine/facilities";
 import { Simulation } from "../engine/Simulation";
 import { towerCatalog } from "../engine/towerCatalog";
 import { TsEngine } from "../engine/port/tsEngine";
@@ -128,7 +129,7 @@ describe("update", () => {
     for (const f of catalog.facilities) scanKey += sim.money >= f.cost ? "1" : "0";
     const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: scanKey, lastLogSeq: sim.logSeq, tool: { type: "inspect" }, setTowerName: () => {} } as unknown as UI;
     const port = new TsEngine(sim);
-    const src: HudSource = { reader: new ViewReader(port), port, codes: new PortCodes(port) };
+    const src: HudSource = { reader: new ViewReader(port, facilityFloors), port, codes: new PortCodes(port) };
     const reads = vi.spyOn(sim, "stats");
     const population = vi.spyOn(sim, "population", "get");
     const census = vi.spyOn(sim.tower, "totalPopulation");

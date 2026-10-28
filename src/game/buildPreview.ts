@@ -1,8 +1,7 @@
 import type { GameApp } from "../main";
 import type { FacilityKind } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
-import { catalogBuildKind, catalogFacility, type Catalog } from "../engine/catalogTypes";
-import type { UnitView } from "../simport/view";
+import { catalogBuildKind, catalogFacility } from "../engine/catalogTypes";
 import { brushTiles, snapX, type PlaceOutcome } from "../ui/placement";
 import { buildRefusalTemplate } from "../ui/templates/inspector";
 import { isPaintKind } from "./gesture";
@@ -44,37 +43,10 @@ export function touchBuildLiftFloors(app: GameApp): number {
  * headlessly, keep that mirror in sync when editing these.
  */
 
-/** The tallest facility in the catalog, in floors, kept per catalog. */
-const tallestOf = new WeakMap<Catalog, number>();
-
-function tallest(catalog: Catalog): number {
-  let floors = tallestOf.get(catalog);
-  if (floors === undefined) {
-    floors = Math.max(...catalog.facilities.map((f) => f.floors));
-    tallestOf.set(catalog, floors);
-  }
-  return floors;
-}
-
-/** The unit covering a cell, as `Tower.unitAt` answers it. The reader files a
- *  room under its base floor only, so a cell on a taller room's upper story
- *  (a cinema's second floor) is found from the floors below it. */
-function unitCovering(app: GameApp, floor: number, tile: number): UnitView | undefined {
-  const tower = app.reader.tower;
-  const here = tower.unitAt(floor, tile);
-  // A room answers with its id; a structure tile has none (NaN).
-  if (here && !Number.isNaN(here.id)) return here;
-  const catalog = catalogOf(app);
-  for (let below = 1; below < tallest(catalog); below++) {
-    const u = tower.unitAt(floor - below, tile);
-    if (u && !Number.isNaN(u.id) && catalogFacility(catalog, u.kind).floors > below) return u;
-  }
-  return here;
-}
-
 /** The inspectable/bulldozable entity at a cell (room or transport), if any. */
 export function pickedAt(app: GameApp, floor: number, tile: number): Picked | null {
-  const u = unitCovering(app, floor, tile);
+  // The reader answers every story a room covers, as the tower does.
+  const u = app.reader.tower.unitAt(floor, tile);
   if (u && u.kind !== "floor" && u.kind !== "lobby") return { type: "unit", id: u.id, kind: u.kind };
   const t = app.reader.tower.transports.find(
     // Use the shaft's OWN stored width (matches render + overlap checks), not

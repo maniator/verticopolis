@@ -1,6 +1,4 @@
 import type { GameApp } from "../main";
-import type { StepDebt } from "../engine/sim/fixedStep";
-import { advanceOwedMinutes } from "../engine/sim/frameStep";
 import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
 import { tickInstallAffordance } from "./installAffordance";
@@ -27,16 +25,12 @@ export { MAX_CATCHUP_MINUTES, advanceOwedMinutes } from "../engine/sim/frameStep
 /** Game speeds → in-game minutes advanced per real second. */
 export const SPEEDS = [0, 10, 30, 120];
 
-/** Each app's step debt record, which carries the speed and pacing mode its
- *  minutes were owed under so the engine can drop them on a change. The
- *  minutes themselves live in `app.accMinutes` (reset by `adoptSim`, and on a
- *  speed or steady-clock change by `applySpeed` and `toggleSteadyClock`). */
-const stepDebts = new WeakMap<GameApp, StepDebt>();
-
 /** Apply the player's speed choice. A change drops the step carry here, at the
  *  seam, so a change undone before the next frame (fastest, pause, fastest)
- *  still never replays minutes owed under the earlier choice: the frame loop's
- *  own mode check only sees the speed each frame runs at. */
+ *  still never replays minutes owed under the earlier choice: the engine's
+ *  own mode check only sees the speed each frame runs at. The carry lives in
+ *  `app.accMinutes` (reset by `adoptSim`, and on a steady-clock change by
+ *  `toggleSteadyClock`). */
 export function applySpeed(app: GameApp, s: number): void {
   if (s !== app.speed) app.accMinutes = 0;
   app.speed = s;
@@ -48,7 +42,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // a stopped game samples no frames for the session either. Events the
   // engine emitted before it stopped still reach analytics.
   if (isEngineStopped()) {
-    drainEngineEvents(app.sim);
+    drainEngineEvents(app.events);
     app.accMinutes = 0;
     return;
   }
@@ -64,7 +58,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // stars, emergencies and their answers, pricing and capacity. Drained every
   // frame and ahead of the modal freeze below, so an emergency answered in a
   // modal reports on the next frame rather than when the freeze lifts.
-  drainEngineEvents(app.sim);
+  drainEngineEvents(app.events);
   // While a blocking modal is open, freeze time so nothing changes under it:
   // an emergency choice (canon: the modal pauses the game) must not auto-resolve
   // out from under the player, and the update prompt must not let a distracted
@@ -80,17 +74,27 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // and paceFactor is normalized so a full day costs the same real time, so
   // the speed buttons keep their meaning.
   const steadyClock = app.prefs.steadyClock === true;
-  const debt = stepDebts.get(app) ?? { minutes: 0 };
-  stepDebts.set(app, debt);
-  const minutesBeforeTicks = app.sim.clock.minutes;
+  // The clock as the last frame left it. A swap since then (a load, an undo)
+  // is a different clock, and no meal rush is judged across it.
+  const minutesBeforeTicks = app.reader.generation === app.enginePort.generation() ? app.reader.header.minutes : NaN;
   // An experimental engine host that syncs once per frame registers a gate:
   // it may hold the steps back while its last batch is in flight, and it
   // brings the read model up to date (or sends the batch) once the steps
   // ran. Without one (the TypeScript engine, the default WASM host) this is
   // the same frame as before.
   const gate = stepGate(app.sim);
-  advanceOwedMinutes(app, debt, dtMs, minutesPerSecond, steadyClock, gate ? gate.canStep() : true);
+  try {
+    app.accMinutes = app.enginePort.advance(app.accMinutes, dtMs, minutesPerSecond, steadyClock, gate ? gate.canStep() : true)[1];
+  } catch (err) {
+    // A step threw (the frame-error guard catches it). The carry is dropped,
+    // so the steps that already ran are never owed again.
+    app.accMinutes = 0;
+    throw err;
+  }
   gate?.flush();
+  // The view follows every frame, so the header, the HUD and the painters
+  // read this frame's tower.
+  app.reader.update();
   emitMealRushes(app, minutesBeforeTicks);
 
   // Throttle the comparatively expensive DOM/audio updates (~6Hz) so a busy
@@ -99,7 +103,6 @@ export function runFrame(app: GameApp, dtMs: number): void {
   if (now - app.lastUiUpdate > 160) {
     app.lastUiUpdate = now;
     app.audio.update(app.engine.focus());
-    app.reader.update();
     app.ui.update(hudSource(app));
     updateTraffic(app);
     app.onboarding.tick(); // advance the first-run checklist on real progress (no-op when inactive)
@@ -114,7 +117,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
     }
     // A jingle on every star promotion (2★–5★), not just the TOWER win. The
     // analytics side is the engine's star_reached, through the bridge. The
-    // header is this pass's: the reader was brought up to date above.
+    // header is this frame's.
     const header = app.reader.header;
     if (header.star > app.lastStar) {
       app.lastStar = header.star;
@@ -189,7 +192,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
  *  fires. Transient, like the log. */
 export function emitMealRushes(app: GameApp, minutesBeforeTicks: number): void {
   if (app.prefs.steadyClock) return;
-  const after = app.sim.clock.minutes;
+  const after = app.reader.header.minutes;
   // A tampered save can seed the clock with non-finite minutes (deserialize
   // passes data.minutes to Clock un-hardened); without this, dayOfKind is NaN,
   // the once-per-day latch never sticks (NaN !== NaN), and the bulletin spams
@@ -216,13 +219,9 @@ export function emitMealRushes(app: GameApp, minutesBeforeTicks: number): void {
     // Tenant-count floor: silence bulletins in a very small tower (1-star lot
     // with a handful of rooms), so the log does not chatter through the early
     // game. 30 occupied tenants is a modest bar; a mid-star tower clears it.
-    // Counted only when a rush is due, so a frame without one walks no units:
-    // the reader is brought up to date for it, and its header's population is
-    // the census `totalPopulation()` counts.
-    if (tenants === undefined) {
-      app.reader.update();
-      tenants = app.reader.header.population;
-    }
+    // The header's population is the census `totalPopulation()` counts, as
+    // of this frame's update.
+    if (tenants === undefined) tenants = app.reader.header.population;
     if (tenants < 30) return;
     app.lastMealRushDay[kind] = dayOfKind;
     app.enginePort.logLine(text, app.portCodes.code("logKinds", "info"));

@@ -86,26 +86,27 @@ export function syncScene(engine: TowerEngine): void {
   // the daily flip reads badly on a real hotel tower.
   // Set here rather than in the per-frame tick because the scan walks every unit.
   engine.d.staffed = tower.units.some((u) => isPresent(u));
-  const seenS = new Set<number>();
+  const seenS = new Set<ex.Tile>();
   const seenR = new Set<number>();
   // Rebuilt fresh each sync from the one flood-fill read above; the region
   // draw closures read it live at raster time (dead spaces get the red X).
   const deadNow = new Set<number>();
   for (const u of tower.units) {
     if (u.kind === "floor" || u.kind === "lobby") {
-      seenS.add(u.id);
-      const cell = engine.structTiles.get(u.id);
-      if (!cell) addStruct(engine, u);
-      else if (u.kind === "lobby") {
-        // Lobby tiles swap their shared graphic when the evening lights come
-        // on (chandeliers/sconces glow). Guarded: clearing and re-adding a
-        // cell graphic dirties the TileMap's cached geometry, so skip when
-        // the cell already shows the right canvas.
-        const gfx = lobbyTileGfx(engine, u);
-        if (cell.getGraphics()[0] !== gfx) {
-          cell.clearGraphics();
-          cell.addGraphic(gfx);
-        }
+      // Floor/lobby units are one tile wide, so a unit maps to one cell.
+      const cell = engine.structTileMap.getTile(u.x, viewWorld().maxFloor - u.floor);
+      if (!cell) continue; // outside the grid; the engine never places there
+      seenS.add(cell);
+      engine.structTiles.add(cell);
+      // Lobby tiles swap their shared graphic when the evening lights come
+      // on (chandeliers/sconces glow), and a lobby built over bare floor
+      // takes the cell over. Guarded: clearing and re-adding a cell graphic
+      // dirties the TileMap's cached geometry, so skip when the cell already
+      // shows the right canvas.
+      const gfx = u.kind === "lobby" ? lobbyTileGfx(engine, u) : engine.floorGfx;
+      if (cell.getGraphics()[0] !== gfx) {
+        cell.clearGraphics();
+        cell.addGraphic(gfx);
       }
     } else {
       seenR.add(u.id);
@@ -144,16 +145,11 @@ export function syncScene(engine: TowerEngine): void {
     }
   }
   engine.deadParking = deadNow;
-  reap(engine.structTiles, seenS, (cell) => {
-    // A dead unit's cell may have been re-claimed IN THIS SAME PASS by its
-    // replacement (building a lobby over bare floor removes the floor unit
-    // and adds the lobby at the same coordinates in one revision). The add
-    // ran above, so blindly clearing here would wipe the replacement's
-    // just-set graphic; only clear when no live floor/lobby unit owns the
-    // cell anymore. Cell coords map back to the grid: row 0 is the top floor.
-    const live = tower.unitAt(viewWorld().maxFloor - cell.y, cell.x);
-    if (!live || (live.kind !== "floor" && live.kind !== "lobby")) cell.clearGraphics();
-  });
+  for (const cell of engine.structTiles) {
+    if (seenS.has(cell)) continue;
+    cell.clearGraphics();
+    engine.structTiles.delete(cell);
+  }
   reap(engine.animatedRooms, seenR, (a, id) => {
     a.kill();
     engine.roomSig.delete(id);
@@ -298,17 +294,6 @@ function addBoxActor(engine: TowerEngine, pos: ex.Vector, w: number, h: number, 
   a.collider.set(ex.Shape.Box(w, h, ex.vec(0, 0)));
   engine.engine.add(a);
   return a;
-}
-
-function addStruct(engine: TowerEngine, u: UnitView): void {
-  // Floor/lobby units are one tile wide in the sim (and the old per-unit
-  // actor drew exactly one tile regardless), so a unit maps to one cell.
-  const cell = engine.structTileMap.getTile(u.x, viewWorld().maxFloor - u.floor);
-  if (!cell) return; // outside the grid; the sim never places there
-  const gfx = u.kind === "lobby" ? lobbyTileGfx(engine, u) : engine.floorGfx;
-  cell.clearGraphics();
-  cell.addGraphic(gfx);
-  engine.structTiles.set(u.id, cell);
 }
 
 /** The shared lobby tile graphic for this unit's lighting, style and slot.
