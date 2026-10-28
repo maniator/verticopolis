@@ -283,13 +283,12 @@ A plain host `npm run screenshots` is still preview-only because host Chromium
 and font rasterization may differ from the pinned image. See
 [`docs/screenshots.md`](./docs/screenshots.md) for the workflow details.
 
-The Playwright visual baselines are the Rust engine's (#1353): the suite runs
-on the `chromium-wasm` project, which mints and compares them in `npm run e2e`
-and in `update-visual-baselines`. There is one set of images. The committed
-gallery is still the TypeScript engine's; `pr-drift-check` compares it with a
-render on the WASM engine (`VC_SHOT_ENGINE=wasm`, the `engine-parity` check),
-and any pixel difference fails that leg as an engine parity finding to report.
-It never commits.
+The gallery and the Playwright visual baselines are both the Rust engine's
+(#1353), one set of images each. The gallery generator hosts the tower on the
+WASM engine unless `VC_SHOT_ENGINE=ts` says otherwise (a by-hand flag that CI
+never sets), and it needs the engine package (`npm run wasm:build`). The
+baselines are minted and compared on the `chromium-wasm` project, in `npm run
+e2e` and in `update-visual-baselines`.
 
 ### Coverage floors
 
