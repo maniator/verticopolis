@@ -261,6 +261,10 @@ export const SaveGame = {
       /* best effort — a full quota just means we can't back it up */
     }
   },
+  /** The autosave text {@link preserveUnreadable} kept, or null when none is kept. */
+  unreadableBackup(): string | null {
+    return localStorage.getItem(UNREADABLE_KEY);
+  },
 
   // ---- Named manual slots ----------------------------------------------
   saveSlot(n: number, text: SaveText): void {

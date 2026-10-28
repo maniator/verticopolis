@@ -15,18 +15,26 @@ import type { SlotInfo } from "../../storage/SaveGame";
  * by the controller (`showSaves`) after mount, unchanged by this migration, so the
  * re-render-on-save flow keeps routing exactly as before.
  */
-export function savesTemplate(slots: SlotInfo[]): TemplateResult {
+export function savesTemplate(slots: SlotInfo[], keptUnreadable = false): TemplateResult {
   return html`
       <h2>Saved Towers</h2>
       <div class="slots well" role="list" aria-label="Saved towers">
         ${slots.map(slotRow)}
       </div>
+      ${keptUnreadable ? keptUnreadableNote : nothing}
       <div class="modal-actions">
         <button class="btn" data-act="export">Export to file…</button>
         <button class="btn" data-act="import">Import from file…</button>
         <button class="btn primary" data-act="close">Close</button>
       </div>`;
 }
+
+/** An autosave this version couldn't read is kept aside (SaveGame.preserveUnreadable).
+ *  The player can download its text as it is stored, for a later version or a bug report. */
+const keptUnreadableNote = html`<p class="slot-detail slot-unreadable">
+    An autosave this version couldn't read is kept.
+    <button class="btn" data-act="unreadable">Download unreadable save</button>
+  </p>`;
 
 const fmtWhen = (ms?: number): string =>
   ms ? new Date(ms).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : "";

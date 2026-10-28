@@ -408,8 +408,8 @@ export class UI {
     dialogs.showStats(this, body, handlers);
   }
 
-  showSaves(slots: SlotInfo[]): void {
-    dialogs.showSaves(this, slots);
+  showSaves(slots: SlotInfo[], unreadable: string | null = null): void {
+    dialogs.showSaves(this, slots, unreadable);
   }
 
   showTowerPicker(ctx: dialogs.TowerPickerCtx): void {
