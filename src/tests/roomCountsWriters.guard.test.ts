@@ -20,16 +20,16 @@ import { COUNTED_FIELDS, VIEW_FIELDS } from "../engine/tower/rooms";
  * where each file marks, and the behavior is checked by the seeded run
  * (`src/tests/integration/roomCounts.integration.test.ts`) and the cases in
  * `src/engine/tower/roomCounts.test.ts`, against the walk over every unit.
- * Comment lines are left out of the scan, so prose cannot stand in for a
- * write.
+ * Comments are left out of the scan, so prose cannot stand in for a write.
  *
  * Writes through `p`, `person` or `this` are people's and a class's own
  * fields; they are pinned per file in their own table, so a room bound to one
  * of those names still shows up as a change there. Writes the field patterns
  * cannot see are pinned per file in a third table: anywhere in `src/`,
  * `Object.assign`, `Object.defineProperty` and `defineProperties`,
- * `Reflect.set` and `deleteProperty`, a `delete` through a cast or a computed
- * key, and an assignment through a cast and a computed key; in the host code
+ * `Reflect.set`, `deleteProperty` and `defineProperty`, a `delete` through a
+ * cast or a computed key, and an assignment through a cast and a computed key
+ * (one level of nested index or cast in the key); in the host code
  * that copies the engine's records (`src/wasmhost/`, `src/dualrun/`,
  * `src/simport/`), any assignment through a computed key. The engine writes
  * rooms by field name, so its plain computed-key writes (array and map
@@ -50,17 +50,22 @@ const MEMBER = String.raw`(?:\.(${FIELD})\b|\[\s*(["'\`])(${FIELD})\3\s*\])`;
 const OPERATOR = String.raw`(?:\*\*=|<<=|>>>?=|\?\?=|\|\|=|&&=|[-+*/%&|^]?=(?![=>])|\+\+|--)`;
 /** `x.f op` and `x["f"] op`, for every assignment operator and a postfix step. */
 const ASSIGNED = new RegExp(String.raw`(?:\b([A-Za-z_$][\w$]*)|[\])!])\s*${MEMBER}\s*${OPERATOR}`, "g");
-/** A prefix step or a `delete` on a chain ending in a counted field. The
- *  chain is one character class, so a long name cannot make it backtrack;
- *  the quote is group 3 here as in `ASSIGNED`. */
-const PREFIXED = new RegExp(String.raw`(?:\+\+|--|\bdelete\b)\s*([\w$.[\]()!?]*?)${MEMBER}`, "g");
+/** A prefix step or a `delete` operator (never a `.delete(` method) on a
+ *  chain ending in a counted field. The chain is bounded tokens (a name
+ *  character, a short index, a short parenthesized cast), so a long name
+ *  cannot make it backtrack; the quote is group 3 here as in `ASSIGNED`. */
+const PREFIXED = new RegExp(String.raw`(?:\+\+|--|(?<![.\w$])delete\b)\s*((?:[\w$.!?]|\[[^\]\n]{0,40}\]|\([^()\n]{0,60}\)){0,80}?)${MEMBER}`, "g");
 const NOT_A_ROOM: ReadonlySet<string> = new Set(["p", "person", "this"]);
 
-/** `text` without its comment lines (`//`, `/*` and the ` *` lines of a block). */
+/** `text` without its comments: a `/* ... *\/` span closed on its own line is
+ *  cut out, so the code after it stays, and then a line that opens with `//`,
+ *  an unclosed `/*` or a block's ` * ` is left out (a generator's `*name` is
+ *  code). */
 function code(text: string): string {
   return text
     .split("\n")
-    .filter((line) => !/^\s*(?:\/\/|\/\*|\*)/.test(line))
+    .map((line) => line.replace(/\/\*.*?\*\//g, " "))
+    .filter((line) => !/^\s*(?:\/\/|\/\*|\*(?:\s|\/|$))/.test(line))
     .join("\n");
 }
 
@@ -142,20 +147,23 @@ const NAMED_WRITES: Record<string, Record<string, number>> = {
   "src/wasmhost/frameSync.ts": { state: 1 },
 };
 
+/** A computed key: anything but a plain string or a number, with one level
+ *  of nested index (`[keys[i]]`) and casts (`[k as K]`) allowed. */
+const KEY = String.raw`\[(?!\s*(?:"[^"\n]*"|'[^'\n]*'|\`[^\`$\n]*\`|\d+)\s*\])(?:[^\[\]\n]|\[[^\[\]\n]*\])+\]`;
 /** Writes the field patterns cannot see, anywhere in `src/`. */
 const BULK = new RegExp(
   [
     String.raw`\bObject\.(?:assign|defineProperty|defineProperties)\(`,
-    String.raw`\bReflect\.(?:set|deleteProperty)\(`,
+    String.raw`\bReflect\.(?:set|deleteProperty|defineProperty)\(`,
     String.raw`(?<![.\w$])delete\s*\(`,
-    String.raw`(?<![.\w$])delete\s+[\w$.!]+\[`,
-    String.raw`\)\[\s*[A-Za-z_$][\w$.]*\s*\]\s*${OPERATOR}`,
+    String.raw`(?<![.\w$])delete\s+[\w$.!?]+\[`,
+    String.raw`\)${KEY}\s*${OPERATOR}`,
   ].join("|"),
   "g",
 );
 /** An assignment through a computed key (not a quoted or numeric one), pinned
  *  in {@link HOST_CODE} only. */
-const KEYED = new RegExp(String.raw`[\w$\])!]\[\s*(?!["'\`\d])[^\]\n]+\]\s*${OPERATOR}`, "g");
+const KEYED = new RegExp(String.raw`[\w$\])!]${KEY}\s*${OPERATOR}`, "g");
 /** The host code that copies the engine's records into the read model. */
 const HOST_CODE = ["src/wasmhost/", "src/dualrun/", "src/simport/"];
 
@@ -216,6 +224,25 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   "src/simport/scheduleSlots.ts": { keyed: 2 },
 };
 
+/** A write of a unit's kind. The kept counts move a kind's count only when
+ *  the rooms list is rebuilt, so the engine never rewrites a kind in place;
+ *  the hosts' merges, which rewrite units wholesale, drop the list when a
+ *  kind moves. A type's indexed access (`LogEntry["kind"] = "info"`, a
+ *  default parameter) is not a write. */
+const KIND_WRITE = new RegExp(String.raw`(?:\.kind\b|(?<!\b[A-Z][\w$]*)\[\s*(["'\`])kind\1\s*\])\s*${OPERATOR}`, "g");
+
+/** Files under `src/engine/` that write `.kind`, with their counts. */
+function engineKindWrites(): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const abs of sourceFiles("src/engine", [".ts", ".tsx"])) {
+    const rel = repoRel(abs);
+    if (rel.endsWith(".test.ts") || rel.endsWith(".d.ts")) continue;
+    const n = code(readFileSync(abs, "utf8")).match(KIND_WRITE)?.length ?? 0;
+    if (n > 0) out[rel] = n;
+  }
+  return out;
+}
+
 function scan(): { raw: Record<string, Record<string, number>>; named: Record<string, Record<string, number>>; opaque: Record<string, OpaqueWrites> } {
   const raw: Record<string, Record<string, number>> = {};
   const named: Record<string, Record<string, number>> = {};
@@ -259,6 +286,11 @@ describe("writes of the fields the HUD's room counts read", () => {
     ).toEqual(OPAQUE_WRITES);
   });
 
+  it("leave a unit's kind alone in the engine, so the kind counts move only with the rooms list", () => {
+    expect(engineKindWrites(), "A unit's kind changes only by removing it and placing a new unit (or a merge that drops the rooms list).").toEqual({});
+    expect(`u.kind = 'condo'; u['kind'] ??= k; if (u.kind === k) {} f(kind: LogEntry["kind"] = "info")`.match(KIND_WRITE)?.length).toBe(2);
+  });
+
   it("are found in every write form, and reads and comments are passed over", () => {
     const hits = (text: string) => writesIn(text).map((w) => (w.named ? `named ${w.field}` : w.field));
     const writes = [
@@ -281,6 +313,7 @@ describe("writes of the fields the HUD's room counts read", () => {
     // A long name after a step or a delete: a pattern that backtracks over
     // how to split the name would not finish this inside the test's timeout.
     expect(hits(`delete this.${"a".repeat(60)}; ++${"b".repeat(60)}.count;`)).toEqual([]);
+    expect(hits("++units[i + 1].customersIn; ++(venue as Unit).customersIn; delete (u as Unit).noRate;")).toEqual(["customersIn", "customersIn", "noRate"]);
     const reads = [
       "if (u.state === 'empty') {}",
       "if (u.state !== s) {}",
@@ -290,9 +323,12 @@ describe("writes of the fields the HUD's room counts read", () => {
       "u.stateLabel = 1;",
       "u.customersIn > 0 ? a : b;",
       "f(u.state, u.noRate);",
+      "seen.delete(u.state);",
+      "byState.delete(u.noRate);",
     ];
     expect(hits(reads.join(" "))).toEqual([]);
     expect(hits(code("// u.state = 'empty';\n/* u.noRate = true; */\n * u.residents = 2;\nu.customersIn = 0;"))).toEqual(["customersIn"]);
+    expect(hits(code("/** staged */ u.state = 'empty';\n*[Symbol.iterator]() { u.noRate = true; }\n/* a */ x; /* b */"))).toEqual(["state", "noRate"]);
     const finds = (re: RegExp, line: string) => (line.match(re)?.length ?? 0) > 0;
     const bulk = [
       "Object.assign(held, record);",
@@ -300,13 +336,17 @@ describe("writes of the fields the HUD's room counts read", () => {
       "Object.defineProperties(u, ds);",
       "Reflect.set(u, k, v);",
       "Reflect.deleteProperty(u, k);",
+      "Reflect.defineProperty(u, 'state', d);",
       "delete held[key];",
       "delete (u as Unit).noRate;",
       "(u as Record<string, unknown>)[key] = v;",
       "(u as Unit)[k] ??= v;",
+      "(u as Unit)[keys[i]] = v;",
+      "(u as Unit)[k as K] = v;",
+      "delete u?.[k];",
     ];
     for (const line of bulk) expect(finds(BULK, line), line).toBe(true);
-    for (const line of ["held[key] = record[key];", "out[i + 1] = x;", "slots[h] ||= 1;"]) expect(finds(KEYED, line), line).toBe(true);
-    for (const line of ["const [a, b] = pair;", "xs[0] = 1;", "m['k'] = 1;", "if (xs[i] === y) {}", "xs[i] >= y;", "xs[i] <= y;"]) expect(finds(KEYED, line), line).toBe(false);
+    for (const line of ["held[key] = record[key];", "out[i + 1] = x;", "slots[h] ||= 1;", "held[keys[i]] = record[keys[i]];", "held[`x${k}`] = v;"]) expect(finds(KEYED, line), line).toBe(true);
+    for (const line of ["const [a, b] = pair;", "xs[0] = 1;", "m['k'] = 1;", 'm["k"] = 1;', "m[`k`] = 1;", "if (xs[i] === y) {}", "xs[i] >= y;", "xs[i] <= y;"]) expect(finds(KEYED, line), line).toBe(false);
   });
 });

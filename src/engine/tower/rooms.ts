@@ -128,9 +128,11 @@ export const VIEW_FIELDS = ["occupants", "hotelCustomersIn", "outForMeal", "labe
  * ({@link COUNTED_FIELDS}) marks its room through {@link setRoomState} or
  * {@link markRoom}, and a read recounts only the marked rooms: it takes each
  * one's last share out and puts its share as the fields stand now back in.
- * A room's kind never changes in place (`roomUnits` relies on the same; the
- * hosts' full merge and hourly delta, the writers that could, drop the rooms
- * list when a kind moves), so the kind counts move only with the list. The
+ * A room's kind never changes in place: no engine code writes a unit's kind
+ * (`roomCountsWriters.guard.test.ts` pins that), and the hosts' merges, which
+ * rewrite units wholesale, drop the rooms list when a kind moves. So the kind
+ * counts move only with the list (`roomUnits` needs less: it only leaves out
+ * the structure tiles). The
  * returned object is the ledger's own: the next read after a write updates it
  * in place, and a rebuild replaces it, so a caller that keeps the counts
  * copies them.

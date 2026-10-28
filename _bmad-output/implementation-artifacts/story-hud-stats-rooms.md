@@ -1,6 +1,6 @@
 ---
 story: hud-stats-rooms
-status: review
+status: done
 issue: 905
 ---
 
@@ -32,12 +32,13 @@ quoted in Review). So the HUD now reads counts kept as the rooms change.
 ## Acceptance criteria
 
 1. **AC1 Same numbers.** `stats()` returns the same object as before for any
-   tower at any moment: every count, the population, money, star, the floor
+   tower, whenever every write of a counted field has marked its room (the
+   guard and the tests hold the engine and the hosts to that): every count, the population, money, star, the floor
    and transport figures and the fire count. The HUD shows the same
    population.
 2. **AC2 A flat HUD read.** `stats()` reads counts kept as the rooms change
    (`roomCounts` in `src/engine/tower/rooms.ts`). A read recounts only the
-   rooms written since the last read, and counts every room once after the
+   rooms marked since the last read, and counts every room once after the
    rooms list is rebuilt (a build command, a load, a host merge that moved
    the units). The HUD refresh (`uiStatus.update`) reads `stats()` once for
    the population label and the stats grid, where it read `sim.population`
@@ -187,7 +188,8 @@ The read after a step is not flat in the tail. On the large tower the
 Hot-Path Auditor's 2,160 two-minute steps read at a p95 of 0.020 ms, and the
 read after the daily pass that changes about 1,440 rooms costs 0.7 to 1.0 ms
 once (single timed reads). With every room marked a read costs about
-0.76 ms, a little more than a full recount (0.64 ms on the auditor's run),
+0.76 ms, a little more than a full recount (0.64 ms on the auditor's run;
+round 5's auditor measured 0.49 and 0.54 ms on two runs),
 since each marked room costs a map lookup and two tallies. The marks dedupe
 per room, so a read never does more than that.
 
@@ -283,8 +285,9 @@ Tests:
   to the offices or the condos, which alternates No Rate and the default
   rate for each kind. Every 113th sells a room and builds it again. It
   checks that the population and every condition count moved between reads,
-  leaving out the reads after a sale or a build, which rebuild the list, and
-  that a sale and a build went through. Each failure names its save. It
+  leaving out the reads that found a new rooms list (whatever rebuilt it),
+  and that a sale and a build went through. Each read's failure names its
+  save; the closing checks cover the three saves together. It
   takes about 22 s here against its 120 s timeout, and it is TypeScript-only
   on the parity projects, since no command relays `sim.vacate`.
 - `roomCounts.test.ts` drives single writes and holds `stats()` to the
@@ -423,7 +426,8 @@ stress run (2,500 steps with commands, twelve seeded runs) found no read that
 differed from the walk over every unit. The Hot-Path Auditor confirmed the
 flat read between passes, measured a mark at 26 to 53 ns, found that marks
 matched the rooms really changed over three game days, and found two costs
-on the hosts. Its record is on the PR.
+on the hosts. Its record is in `hud-stats-rooms-hot-path-records/round-3.md`
+beside this story, with round 4's and round 5's.
 
 - [x] [Review][Patch] The frame apply's change check added two reads and compares per unit record inside the per-step and per-frame walk, +7% to +50% of the apply (Hot-Path Auditor F1) [frameApply.ts, frameSync.ts]: each record's unit comes by position when its id matches and from the id index otherwise, which leaves the apply cheaper than `main`'s (Result); the test sends records in the mirror's order, out of it, and in it but for one swapped pair of rooms, and checks each lands on its own unit.
 - [x] [Review][Patch] Every host merge dropped the counts, so the next HUD read counted every room again, with an allocation per room, once per engine hour pass and command (Hot-Path Auditor F2; Blind Hunter B15) [merge.ts]: the merge's moved check also compares the five counted fields and marks the rooms that differ, and drops nothing while the list stays; a new test checks the ledger is the same object after the merge and follows each counted field.
@@ -462,7 +466,7 @@ Hot-Path Auditor found one cache bypass, which section 7 always patches.
 - [x] [Review][Patch] The bulk-writer table checked file names only, and the merge had to call `markRoom` once for its two unit writers (Blind Hunter B4; Acceptance Auditor A2) [guard]: each file's wholesale and computed-key writes are counted, the merge's two `markRoom` calls are pinned, and its note names both writers.
 - [x] [Review][Patch] Nothing tied the five counted fields to what the counts' predicates read; round 3 dismissed this on a reading (Blind Hunter B5) [rooms.ts, roomCounts.test.ts, guard]: `COUNTED_FIELDS` is exported, the guard builds its pattern from it, and a test reads the counts through a proxy for every kind and state in both modes and fails on any other field; a mutant that reads `occupants` fails it.
 - [x] [Review][Patch] The hourly delta could change a unit's kind in place under a kept rooms list, which the `roomCounts` comment said only the full merge could do (Blind Hunter B6) [merge.ts, rooms.ts, merge.test.ts]: the delta compares each record's kind and place with the held unit's and drops the room lists when one moved; a test sends a record whose kind changed, and fails without the drop.
-- [x] [Review][Patch] Tooling that stages a counted field after the HUD has read leaves the HUD behind (Blind Hunter B8) [guard, features.ts]: the one scene that does so bumps the revision, and the guard's comment gives the rule for tooling; the screenshot drift check runs on this head.
+- [x] [Review][Patch] Tooling that stages a counted field after the HUD has read leaves the HUD behind (Blind Hunter B8) [guard, features.ts]: the one scene that does so bumps the revision, and the guard's comment gives the rule for tooling; the screenshot drift check passed on 04d157a and on the merged head 2d3268d with no differing shot.
 - [x] [Review][Patch] A NaN customer count in a frame record would stay in the kept population for good (Edge Case Hunter 1) [frameApply.ts, frameView.ts, frameApply.test.ts]: both counters read a NaN as no count, which no engine sends (its counts are 64-bit integers); a test fails on the old counter.
 - [x] [Review][Patch] The seeded run's labels did not name the save, and a refused sale or build went unnoticed (Blind Hunter B10; Acceptance Auditor A7) [roomCounts.integration.test.ts]: each label names its fixture, and the run requires a sale and a build to go through; it takes about 22 s of its 120 s timeout here.
 - [x] [Review][Patch] The guard counted matches in comments (Blind Hunter B14) [guard]: comment lines are left out of the scan, and the self-test shows a commented write is ignored.
@@ -471,4 +475,25 @@ Hot-Path Auditor found one cache bypass, which section 7 always patches.
 - [x] [Review][Defer] Three hourly costs inside functions this diff touched, whose Rust twins are tracked (Hot-Path Auditor P5) [churn.ts, gripe.ts]: the move-in probes, the nightclub walks in `vacateCause`, and the context rebuilds per buy-back in `vacate`, deferred onto #1170 beside A14, A13 and #1257 item 3.
 - [x] [Review][Defer] The rest of the stats report's walks (Hot-Path Auditor P7) [tsPanels.ts]: on #1262, whose row now notes the report's population reads can take the ledger's.
 - By reference, older than this change and tracked: the hosts' per-frame walk over every unit record (P1: #1158 A22, #1049), the full merge per hour pass and command (P2: A23, A34, #1045, #1050, #1342, #868), the engine passes that walk every unit where the rooms list answers (P3: #1170, #1173 F1, A35, A16), `removeUnit`'s scan under `build` (P6: #1170, A17), the meal-rush check's walk per frame (P8: #1334), the step's population walks (P9: #1170, A10; the parity-safe fold is #1298's, since the engine reading the ledger would make gameplay depend on every mark), and the traffic chip (P10: #338).
-- Dismissed (4): the rebuild's cost, about five times the first version's plain pass (Blind Hunter B9), since it is paid once per build command at the next HUD read (1.2 ms on the large tower), where `main` paid 1.9 ms at every read; the live ledger object (B12), since its type is read-only, its comment says a caller that keeps the counts copies them, `stats()` copies them, and the tests pin its identity on purpose; a marked room with no share (B13), which only a writer swapping a room's object under a standing list could cause, and none does (the merges keep each object), as its comment now says; and rewording #905's gate (Acceptance Auditor A6's last point), since the gate is the row's requirement, and the row's update already says where it is to be measured now.
+- Dismissed (4): the rebuild's cost, about five times the first version's plain pass (Blind Hunter B9), since it is paid once per build command at the next HUD read (1.024 ms on the large tower in Result, 1.2 ms on round 4's re-measure), where `main` paid 1.980 ms at every read (Result) and the read after a build command also rebuilt the rooms list; the live ledger object (B12), since its type is read-only, its comment says a caller that keeps the counts copies them, `stats()` copies them, and the tests pin its identity on purpose; a marked room with no share (B13), which only a writer swapping a room's object under a standing list could cause, and none does (the merges keep each object), as its comment now says; and rewording #905's gate (Acceptance Auditor A6's last point), since the gate is the row's requirement, and the row's update already says where it is to be measured now.
+
+### Round 5
+
+`/gds-code-review` round 5 (a confirming pass) on 04d157a against `main`
+9ebf538: Blind Hunter, Edge Case Hunter, Acceptance Auditor and Hot-Path
+Auditor. Copilot had come back and recommended approval with no comments.
+The owner stopped the round partway (2026-10-27 20:57 UTC) so the stack could
+go to the PC run, and #1340 merged with the stack at 2d3268d. No layer found a
+wrong count on a path the code takes. The fixes below landed in a follow-up
+PR from `main` c1ebcf1, after the port cutover deleted the mirror and worker
+hosts, so the findings that only touched those hosts were dropped there.
+
+- [x] [Review][Patch] The guard missed some write forms (Edge Case Hunter 2 to 5, Blind Hunter B3, B7, B8, Acceptance A4) [guard]: a prefix step or `delete` now reads bounded tokens (`++units[i + 1].x`, `++(venue as Unit).x`) and no longer reads a `.delete(` method call; a closed `/* ... */` is cut out of its line in place of dropping the line, and a generator's `*name` is code; a computed key may hold one nested index or a cast, a template key counts, and `delete u?.[k]` and `Reflect.defineProperty` are pinned. The tables did not move on `main`.
+- [x] [Review][Patch] The kind counts rely on no engine write of a kind, which nothing pinned (Blind Hunter B4) [guard, rooms.ts]: the guard now expects no write of `.kind` under `src/engine/`, and the ledger's comment says so.
+- [x] [Review][Patch] A frame count of infinity or a fraction got into the kept population (Edge Case Hunter 1, Blind Hunter B6) [frameApply.ts, frameView.ts]: only a whole count reads as a count.
+- [x] [Review][Patch] The proxy test ran correlated fields and trapped only `get` (Blind Hunter B5) [roomCounts.test.ts]: every combination of the four flag fields and two occupant values, with `has`, `ownKeys` and `getOwnPropertyDescriptor` trapped.
+- [x] [Review][Patch] The seeded run left out only the rebuilds its caller named (Blind Hunter B9) [integration test]: it now compares the rooms list's identity at each read.
+- [x] [Review][Patch] Prose that said more than the code (Blind Hunter B10, B12, B13, B14; Acceptance A1, A5, A7) [story, stats.ts, star.ts, HP-8 row]: AC1 and AC2 say marked, `star.ts` names the two definitions, the HP-8 row gives the full merge's whole drop condition, the figures above name their runs, and the hot-path records for rounds 3 to 5 are in `hud-stats-rooms-hot-path-records/` beside this story, with round 5's table on #1340.
+- [x] [Review][Defer] The first-run checklist's walks (Hot-Path Auditor P11): the port cutover moved the checklist onto the port's onboarding facts, so the round 5 figures no longer describe it; not re-measured. The recycling card's two population and two center walks per render (P12) are filed on #1170.
+- Dropped, since the port cutover removed the code's production use: the hosted seeded run (Blind Hunter B1), the merge's change check built from `COUNTED_FIELDS` (B2), the delta's comment and marks (B11, Hot-Path Auditor F1) and the delta in the `roomUnits` and `structureRuns` rows (Acceptance A6). The WASM host and its merges now run only under the WASM parity tests, and no host calls the hourly delta.
+

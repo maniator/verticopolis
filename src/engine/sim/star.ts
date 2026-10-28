@@ -107,9 +107,10 @@ export function population(sim: Simulation): number {
   // customers: a worker out to lunch still counts via their origin room's
   // baseline occupancy and, while eating, again at the venue (customersIn),
   // so the HUD number deliberately swells during meal windows and settles
-  // between them. Delegate to Tower.totalPopulation(), the rule's one
+  // between them. Delegate to Tower.totalPopulation(), the walk's
   // definition. The HUD's `stats()` keeps the same sum as the rooms change
-  // (`roomCounts`), and its tests pin the two equal.
+  // (`populationOf` in `roomCounts` repeats the rule per room), and its tests
+  // pin the two equal.
   return sim.tower.totalPopulation();
 }
 
