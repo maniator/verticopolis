@@ -1,6 +1,5 @@
-import type { Simulation } from "../engine/Simulation";
 import { downloadFile } from "./downloadFile";
-import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../game/crashReport";
+import { buildCrashDetails, buildCrashReportZip, bugReportUrl, type CrashTower } from "../game/crashReport";
 import type { CrashDescription, FrameErrorEntry } from "../game/crashReport";
 import { escapeHtml } from "./escape";
 
@@ -26,8 +25,8 @@ export interface CrashScreenOptions {
   save: { flushed: boolean; behindSplash: boolean; storageBlame: boolean; hadPriorSave: boolean };
   version: string;
   speed: number;
-  /** Read live at click time; the sim outlives its renderer. */
-  getSim: () => Simulation;
+  /** Read live at click time; the engine outlives its renderer. */
+  tower: () => CrashTower;
   frameErrors: readonly FrameErrorEntry[];
   /** Stamps the recovery session flags, then reloads (owned by SaveLoad). */
   onReload: () => void;
@@ -98,15 +97,15 @@ export function showCrashScreen(opts: CrashScreenOptions): void {
     downloadBtn.disabled = true;
     status.textContent = "Packing crash report…";
     void (async () => {
-      // One sim capture per click: the JSON summary and the packed save must
-      // describe the same state even if the app swaps the instance meanwhile.
-      const sim = opts.getSim();
-      const details = buildCrashDetails(sim, opts.crash, {
+      // One capture per click: the JSON summary and the packed save must
+      // describe the same tower even if the app swaps it meanwhile.
+      const tower = opts.tower();
+      const details = buildCrashDetails(tower, opts.crash, {
         version: opts.version,
         speed: opts.speed,
         frameErrors: opts.frameErrors,
       });
-      const { filename, bytes } = await buildCrashReportZip(sim, details);
+      const { filename, bytes } = await buildCrashReportZip(tower, details);
       downloadFile(filename, bytes, "application/zip");
       // Like the export flow, this points at the downloads folder rather than
       // asserting success: the browser owns the download from here.

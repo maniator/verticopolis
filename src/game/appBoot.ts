@@ -17,6 +17,7 @@ import { RESUME_AFTER_UPDATE_KEY, RESUME_RELOAD_MAX_AGE_MS } from "./updateFlow"
 import { gameplaySession, setCommonProps } from "../analytics";
 import { reportCrashException } from "../analyticsErrors";
 import { bindEngineBridge } from "../analyticsEngineBridge";
+import { clockOf } from "../simport/headerClock";
 import { bootCommonProps, distributionChannelLabel, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
@@ -133,7 +134,7 @@ export function wireControllers(app: GameApp): void {
         ...info,
         version: APP_VERSION,
         speed: app.speed,
-        getSim: () => app.sim,
+        tower: () => ({ view: app.reader, port: app.enginePort }),
         frameErrors: app.frameErrors,
       });
       // Then report the crash the moment its screen is shown (not just via the
@@ -144,8 +145,8 @@ export function wireControllers(app: GameApp): void {
       gameplaySession.noteCrash({
         ...info.crash,
         version: APP_VERSION,
-        star: app.sim?.star ?? 0,
-        population: app.sim?.population ?? 0,
+        star: app.reader?.header.star ?? 0,
+        population: app.reader?.header.population ?? 0,
       });
       // Additionally surface the crash in PostHog Error Tracking as a synthetic
       // $exception (the crash event above is analytics; this is the Error
@@ -280,7 +281,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
         distributionChannel: distributionChannelLabel(platform),
         version: APP_VERSION,
         onboarded: isOnboarded(),
-        tenureDay: app.sim?.clock?.day,
+        tenureDay: app.reader ? clockOf(app.reader.header).day : undefined,
         savedAt: savedAtBoot,
         standalone: isStandalone(),
         now: Date.now(),
@@ -308,10 +309,10 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     }),
     version: APP_VERSION,
     // Defensive reads: a telemetry payload must never throw and abort boot.
-    mode: app.sim?.mode ?? "unknown",
-    star: app.sim?.star ?? 0,
-    floors: app.sim?.tower?.highestFloor ?? 0,
-    population: app.sim?.population ?? 0,
+    mode: app.reader?.header.mode ?? "unknown",
+    star: app.reader?.header.star ?? 0,
+    floors: app.reader?.tower.highestFloor ?? 0,
+    population: app.reader?.header.population ?? 0,
   });
 
   // The 2.0 "Ground floor" recognition (party 2026-07-23): the STATUS lives on
@@ -408,11 +409,11 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     // The corrupt flag can coexist with a loaded tower: an unreadable
     // Verticopolis autosave with a healthy legacy save behind it loads the
     // legacy tower, and the message must not claim a fresh start.
-    app.sim.emit(
+    app.enginePort.logLine(
       app.hadReadableSave
         ? "⚠️ Your latest autosave couldn't be read, so an older saved tower was loaded instead."
         : "⚠️ Your saved tower couldn't be read. It may be corrupted or from a newer version. Starting a new tower.",
-      "bad",
+      app.portCodes.code("logKinds", "bad"),
     );
   }
 

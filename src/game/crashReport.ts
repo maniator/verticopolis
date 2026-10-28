@@ -1,5 +1,6 @@
 import { strToU8, zipSync } from "fflate";
-import type { Simulation } from "../engine/Simulation";
+import type { EnginePort } from "../simport/enginePort";
+import type { SimView } from "../simport/view";
 import { SaveGame } from "../storage/SaveGame";
 
 /**
@@ -63,8 +64,15 @@ export interface CrashDetails {
   recentFrameErrors: FrameErrorEntry[];
 }
 
+/** The tower as a crash report captures it, through the port: the reader's
+ *  view as of its last frame, and the engine's save. */
+export interface CrashTower {
+  readonly view: Pick<SimView, "header" | "tower">;
+  readonly port: Pick<EnginePort, "serialize">;
+}
+
 export function buildCrashDetails(
-  sim: Simulation,
+  { view }: CrashTower,
   crash: CrashDescription,
   opts: { version: string; speed: number; frameErrors: readonly FrameErrorEntry[] },
 ): CrashDetails {
@@ -79,13 +87,13 @@ export function buildCrashDetails(
         ? { width: window.innerWidth, height: window.innerHeight, dpr: window.devicePixelRatio || 1 }
         : { width: 0, height: 0, dpr: 1 },
     tower: {
-      name: sim.tower.towerName,
-      star: sim.star,
-      population: sim.population,
-      money: sim.money,
-      minutes: sim.clock.minutes,
-      units: sim.tower.units.length,
-      transports: sim.tower.transports.length,
+      name: view.tower.towerName,
+      star: view.header.star,
+      population: view.header.population,
+      money: view.header.money,
+      minutes: view.header.minutes,
+      units: view.tower.units.length,
+      transports: view.tower.transports.length,
       speed: opts.speed,
     },
     recentFrameErrors: [...opts.frameErrors],
@@ -107,16 +115,17 @@ export function buildCrashDetails(
  * goes in instead, which the devs can still load.
  */
 export async function buildCrashReportZip(
-  sim: Simulation,
+  { port }: CrashTower,
   details: CrashDetails,
 ): Promise<{ filename: string; bytes: Uint8Array }> {
   const files: Record<string, Uint8Array> = {
     "crash-report.json": strToU8(JSON.stringify(details, null, 2)),
   };
+  const save = port.serialize();
   try {
-    files["tower.vctower"] = strToU8(await SaveGame.export(JSON.stringify(sim.serialize())));
+    files["tower.vctower"] = strToU8(await SaveGame.export(save));
   } catch {
-    files["tower.json"] = strToU8(JSON.stringify(sim.serialize()));
+    files["tower.json"] = strToU8(save);
   }
   // Timestamp in the name so repeated crashes don't overwrite each other in
   // the downloads folder. Colons are not filename-safe; keep digits and dashes.
