@@ -46,7 +46,10 @@ describe("GameApp hands the replaced tower's gameplay events on", () => {
     // constructor builds the engine once, and adoptSim alone hands it a tower.
     expect(main.match(/this\.sim\s*(\?\?|\|\||&&)?=(?!=)/g) ?? []).toEqual([]);
     expect(main.match(/this\.enginePort\s*=(?!=)/g) ?? []).toHaveLength(1);
-    expect(main.match(/\.take\(/g) ?? []).toHaveLength(1);
+    // adoptSim, and the setter the tooling scenes use (scripts/), as they
+    // assigned the field before.
+    expect(main.match(/\.take\(/g) ?? []).toHaveLength(2);
+    expect(main).toMatch(/^ {2}set sim\(sim: Simulation\) \{ this\.enginePort\.take\(sim\); \}/m);
     // No other module swaps the app's tower behind adoptSim's back.
     const elsewhere = shellFiles(src)
       .filter((file) => file !== resolve(src, "main.ts"))
