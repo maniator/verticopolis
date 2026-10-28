@@ -8,6 +8,7 @@ import { notesForVersion } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 import { parseEngineBuild, type EngineBuild } from "./src/build/engineBundle";
 import { engineIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
+import { tsEngineSourceHash } from "./src/build/tsEngineSources";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
@@ -339,6 +340,10 @@ export default defineConfig(({ command }) => ({
     // all (VC_ALLOW_NO_ENGINE=1); a production build with a broken record
     // stops here.
     __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(publicDir(), command === "build" ? "build" : "other")),
+    // The TypeScript engine's source hash (#1422), shown with its pinned
+    // version (src/wasmhost/tsEngineIdentity.ts) on the version line and in
+    // the diagnostics, as the Rust binary's source hash is.
+    __TS_ENGINE_SOURCES__: JSON.stringify(tsEngineSourceHash(resolve(__dirname, "src/engine"))),
   },
   plugins: [
     captureOutDir((dir) => {

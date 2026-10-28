@@ -52,7 +52,10 @@
  *   plan 4.1 rules, and so does `other`: the worker host sends it for a boot
  *   step outside the engine (so it overstates that host), and the
  *   main-thread host for a save that failed on a running engine or for the
- *   engine reads that fail while a tower is let go (#874).
+ *   engine reads that fail while a tower is let go (#874). A `crash-reload`
+ *   row (a running engine's trap just before the page reloads, #1422) raises
+ *   `fallbacks` with its `trap-*` reason, so it counts as a fault the same
+ *   way; the reload is a new page life with its own settle row.
  * - A page life whose settle row already fell back on `package-mismatch` or
  *   `unverifiable`, and that sent no other reason, never ran the engine: it is
  *   neither a pass nor a fault. One whose first tower ran on the engine and
