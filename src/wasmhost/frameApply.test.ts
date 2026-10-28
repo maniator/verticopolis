@@ -203,19 +203,19 @@ describe("the HUD's room counts over frames", () => {
     for (const [k, n] of Object.entries(moved)) expect(n, k).toBeGreaterThan(0);
   });
 
-  it("read a NaN customer count as none, so the next frame's count lands", () => {
+  it("read a customer count that is not a whole count (NaN, an infinity, a fraction) as none, so the next frame's count lands", () => {
     const a = rooms();
     const b = rooms();
     const venue = a.tower.units.find((u) => u.kind === "fastFood")!;
     a.stats();
     b.stats();
-    for (const customers of [Number.NaN, 4]) {
+    for (const customers of [Number.NaN, 4, Number.POSITIVE_INFINITY, 2.5, 3]) {
       const v = Float64Array.from(randomFrame(rng(1), a, [], [venue.id]));
       v.set([venue.id, UNIT_STATES.indexOf("occupied"), 0, customers], FRAME_HEADER);
       syncUnits(a, decodeFrame(v));
       applyRecords(b, v, decodeHeader(v));
       for (const sim of [a, b]) expect(sim.stats(), `customers ${customers}`).toMatchObject(walkedStats(sim));
     }
-    expect(a.stats().population).toBe(4);
+    for (const sim of [a, b]) expect(sim.stats().population).toBe(3);
   });
 });
