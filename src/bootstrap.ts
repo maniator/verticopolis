@@ -6,6 +6,8 @@ import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
 import { noteRustCrashed, noteRustFailed, selectBootEngine, stageNotice } from "./engineCohort/boot";
+import { offerRustCrashReport, type RustCrashApp } from "./ui/rustCrashDialog";
+import { parseEngineIdentity } from "./wasmhost/engineIdentity";
 import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, reloadSoon, tabStore } from "./engineCohort/crashReload";
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rustEngine";
 import { tsBootTower, type BootTower } from "./game/bootTower";
@@ -32,9 +34,17 @@ import { runEngineRepair } from "./engineRepairControl";
  *  the PWA update prompt. Structural, so `bootstrap.ts` need not import `GameApp`. */
 interface BootApp {
   onUpdateAvailable(activate: () => Promise<void>, info?: UpdateInfo): void;
-  ui?: { toast?(text: string): void };
+  ui?: { toast?(text: string): void } & Partial<RustCrashApp["ui"]>;
   setSpeed?(speed: number): void;
+  /** What the Rust crash report reads (`rustCrashDialog.ts`). */
+  reader?: RustCrashApp["reader"];
+  enginePort?: RustCrashApp["enginePort"];
+  speed?: number;
 }
+
+/** The app can show the Rust crash report: a game app, not a test double. */
+const canReportCrash = (app: BootApp): app is BootApp & RustCrashApp =>
+  !!(app.ui?.openModalTemplate && app.ui.closeModal && app.ui.wireActions && app.reader && app.enginePort);
 
 /** The renderer needs WebGL; some in-app file viewers don't provide it. */
 export function hasWebGL(): boolean {
@@ -351,15 +361,21 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
           // Nothing runs the tower now, on either build.
           bootState = { ...failBoot(bootState, "host", "trap-tick", message), engine: "none" };
           setEngineWriter(null);
-          const outcome = crashOutcome(countRustCrash(tabStore(), __APP_SHA__), __WASM_ONLY__);
+          // Both builds count the trap in the reliability rows, as the stage
+          // its tower was hosted at. The tab keeps the fault and the engine
+          // that crashed for the crash report the TypeScript boot offers.
+          const fault = { reason: "trap-tick", stage: runningTowerStage() } as const;
+          const rustEngine = {
+            version: parseEngineIdentity(bootState.identity)?.crate.version ?? null,
+            sourceHash: bootState.binary?.state === "ok" ? bootState.binary.sourceHash : null,
+          };
+          const outcome = crashOutcome(countRustCrash(tabStore(), __APP_SHA__, { ...fault, rust: rustEngine }), __WASM_ONLY__);
           if (outcome === "reload") noteRustCrashed();
           else if (outcome === "reload-on-ts") rustFailed("crash-loop", "trap-loop");
           else rustFailed("host", "trap-tick");
           publishBootState(bootState);
-          // Both builds count the trap in the reliability rows, as the stage
-          // its tower was hosted at. A reload's row names the engine that
-          // crashed, and goes out by beacon, so it survives the reload.
-          const fault = { reason: "trap-tick", stage: runningTowerStage() } as const;
+          // A reload's row names the engine that crashed, and goes out by
+          // beacon, so it survives the reload.
           if (outcome === "stop") noteEngineFallback(fault);
           else noteEngineCrashReload(fault);
           app.setSpeed?.(0);
@@ -374,8 +390,12 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // steps below, so a throw in one of them cannot lose the row.
       settle();
       // A stage change that moved this browser's engine says so once (#1197).
+      // The first TypeScript boot after this tab's Rust crashes spent its
+      // reloads offers the crash report instead (#1422), which says more.
+      // A wasm-only build stopped at that crash and runs no TypeScript.
       try {
-        const notice = stageNotice();
+        const offered = !__WASM_ONLY__ && !onRust && canReportCrash(app) && offerRustCrashReport(app, __APP_SHA__);
+        const notice = offered ? null : stageNotice();
         if (notice) app.ui?.toast?.(notice);
       } catch (e) {
         console.error("[engine] could not show the engine test notice:", e);
