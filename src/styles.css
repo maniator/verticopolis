@@ -713,9 +713,10 @@ html.reduce-motion *::after {
    rows that are not a dialog footer at all: Tower Statistics renders one
    mid-body for the exterminator, and pinning that would park a button on an
    opaque band over the sections the player is scrolling through. The
-   `:nth-last-child(2)` arm is for Settings, which renders its version line
-   AFTER the actions, so a bare `:last-child` would skip the one dialog most
-   likely to scroll on a phone.
+   `:nth-last-child(2)` arm is for a dialog that renders one trailing line
+   after the actions. Settings used to be that dialog; it now keeps its
+   version line above the Close row, because the band under an upward-only
+   strip shows scrolled content on a phone. Prefer `:last-child`.
 
    DELIBERATELY MINIMAL. Only `position`, `bottom`, `z-index` and paint, all of
    which are inert on a box that is not overflowing. Three earlier cuts added

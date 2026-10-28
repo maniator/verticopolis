@@ -44,11 +44,14 @@ export function engineSectionTemplate(view: EngineSettingsView): TemplateResult 
  * showModal). There is a real Close button here (the `data-act="close"` action the
  * controller wires), not a title-bar-only dismissal.
  *
- * The muted version line at the foot is a read-only echo of the splash and Help's
+ * The muted version line at the foot of the body is a read-only echo of the splash and Help's
  * About block: some players look in Settings first for "what build am I on." It is
  * the interpolated app `version` (auto-escaped by lit), a read-only label rather
  * than a control, sourced from the same `__APP_VERSION__` the About line uses;
- * never make it look editable or read it from anywhere else.
+ * never make it look editable or read it from anywhere else. It sits ABOVE the
+ * Close row, not after it: the pinned action strip must be the dialog's last
+ * child, or scrolled content (the engine status line) shows in the band under
+ * the strip, outside the dialog's footer, on a phone.
  *
  * The Building section is Modern-only: `showBuilding` is true only for a Modern
  * tower, so a Classic tower never renders the "Bridge floors between rooms"
@@ -84,7 +87,7 @@ export function settingsTemplate(version: string, showBuilding = false, engine =
       </div>
       ${building}
       ${engineView ? engineSectionTemplate(engineView) : nothing}
-      <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Close</button></div>
       <p class="set-version">Verticopolis <span class="app-version">v${version}</span>${engine}</p>
+      <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Close</button></div>
     `;
 }

@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.54.1
+
+- On a phone, Settings no longer shows a stray line of text under the Close button as you scroll.
+
 ## 2.48.0
 
 - Exporting to SimTower (1994) now works for a tower loaded from a save that has no tower name. The file is named TOWER1.TDT.
