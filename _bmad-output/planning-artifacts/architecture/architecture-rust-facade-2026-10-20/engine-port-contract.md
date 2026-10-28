@@ -359,9 +359,14 @@ they resume.
    `recyclingFill`, `positionReachable`) and `PortRenderSim`, the
    renderer's `RenderSim` over the reader and the port; 5c the frame loop's
    reads (the star, the emergency and the meal-rush calendar and head count
-   from the reader's header, the win from `evaluatedTower`); 5d the
-   lifecycle callers and the stats modal, then `SimPort` and `TsSim`
-   deleted; 5e the boot and the mirror host's removal, with the frame loop's
+   from the reader's header, the win from `evaluatedTower`); 5d in parts:
+   the stats modal on `statsSheet`, the remaining reads (unlocks, the build
+   preview, the catalog, `autoBridge`), the saves, slots, undo and new
+   tower through the swap members (`SaveGame` takes save text and hands
+   loads to the engine; until 5e, `TsEngine.handOff` hands a done swap to
+   `GameApp.adoptSim` so the mirror host still follows it), then the file
+   import and export; 5e the boot, the mirror host's removal with
+   `SimPort`, `TsSim` and `handOff`, with the frame loop's
    time call on `advance`, its clock reads, its event drain on `drainEvents`
    and the reader brought up to date every rendered frame.
 6. Restore points and the sidecar, the cadence exclusions, the fault

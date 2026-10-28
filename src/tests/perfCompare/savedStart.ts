@@ -3,6 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../engine/serializedGame";
 import { SaveGame } from "../../storage/SaveGame";
 import type { Scenario } from "./scenarios";
+import { saveOf, loadResultSim } from "../fixtures/saveText";
 
 /**
  * The cold start with a saved tower (#1254): a scenario's save placed in the
@@ -32,7 +33,7 @@ const seeds = new Map<string, AutosaveSeed>();
 export function autosaveSeed(sc: Pick<Scenario, "save">): AutosaveSeed {
   let seed = seeds.get(sc.save);
   if (seed === undefined) {
-    const value = SaveGame.packSync(Simulation.deserialize(JSON.parse(sc.save) as SerializedGame));
+    const value = SaveGame.packSync(saveOf(Simulation.deserialize(JSON.parse(sc.save) as SerializedGame)));
     seed = { value, sha256: createHash("sha256").update(value).digest("hex") };
     seeds.set(sc.save, seed);
   }
@@ -47,7 +48,7 @@ export function checkAutosaveSeeds(scenarios: readonly Pick<Scenario, "name" | "
     // An empty tower would pass the runner's population check without the
     // save ever loading.
     if (!(sc.population > 0)) throw new Error(`${sc.name}: the saved-tower start needs a tower with people in it; this save has population ${sc.population}`);
-    const loaded = withAutosave(autosaveSeed(sc).value, () => SaveGame.loadResult());
+    const loaded = withAutosave(autosaveSeed(sc).value, () => loadResultSim());
     if (!loaded.sim || loaded.corrupt || loaded.sim.population !== sc.population) throw new Error(`${sc.name}: the autosave seed does not load back (${loaded.sim ? `population ${loaded.sim.population}, the save ${sc.population}` : "no tower"}${loaded.corrupt ? ", read as corrupt" : ""})`);
   }
 }

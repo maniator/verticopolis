@@ -75,6 +75,30 @@ export interface ImportFacts {
   tdt: TdtTower;
 }
 
+/** The numbers an import report reads. `parseTDT` derives them from the save
+ *  it built ({@link buildReport}); the engine port answers them as the
+ *  `loadTdt` record, with the notes from `tdtNote`. */
+export interface ImportReportFacts {
+  towerName: string;
+  counts: ImportCounts;
+  decoded: boolean;
+  decodeStats: { droppedShafts: number; adjustedShafts: number; droppedFlights: number };
+  /** The save's connected-stall and roster counts, null when it had none. */
+  parkingConnected: number | null;
+  peopleCount: number | null;
+  /** The highest floor built and the basement levels. */
+  floors: number;
+  basements: number;
+  minutes: number;
+  /** Elevator shafts, and stairway and escalator flights. */
+  shafts: number;
+  flights: number;
+  star: number;
+  money: number;
+  /** The header's notes, then the walk's warnings, said as they are. */
+  notes: readonly string[];
+}
+
 export function buildReport(
   save: SerializedGame,
   counts: ImportCounts,
@@ -89,18 +113,39 @@ export function buildReport(
     if (u.floor > floors) floors = u.floor;
     if (u.floor < 1) basements = Math.max(basements, 1 - u.floor);
   }
-  const day = Math.floor(save.minutes / 1440) + 1; // 1-indexed, as shown to the player
   let shafts = 0;
   let flights = 0;
   for (const t of save.transports) {
     if (t.kind === "stairs" || t.kind === "escalator") flights++;
     else shafts++;
   }
+  return importReport({
+    towerName: save.towerName,
+    counts,
+    decoded,
+    decodeStats,
+    parkingConnected: tdt.parkingConnected,
+    peopleCount: tdt.peopleCount,
+    floors,
+    basements,
+    minutes: save.minutes,
+    shafts,
+    flights,
+    star: save.star,
+    money: save.money,
+    notes: [...headerNotes, ...tdt.warnings],
+  });
+}
+
+/** The fidelity report from its numbers. */
+export function importReport(facts: ImportReportFacts): ImportReport {
+  const { counts, decoded, decodeStats, floors, basements, shafts, flights } = facts;
+  const day = Math.floor(facts.minutes / 1440) + 1; // 1-indexed, as shown to the player
 
   const broughtOver: string[] = [];
-  const rating = save.star >= 6 ? "the TOWER rating" : `your ${save.star}-star rating`;
+  const rating = facts.star >= 6 ? "the TOWER rating" : `your ${facts.star}-star rating`;
   // Minus before the dollar sign, matching the stats panel's money formatting.
-  const funds = `${save.money < 0 ? "-" : ""}$${Math.abs(save.money).toLocaleString()}`;
+  const funds = `${facts.money < 0 ? "-" : ""}$${Math.abs(facts.money).toLocaleString()}`;
   broughtOver.push(`${funds} in funds and ${rating}.`);
   broughtOver.push(
     `${floors} floor${floors === 1 ? "" : "s"} of structure` +
@@ -136,17 +181,17 @@ export function buildReport(
   if (counts.rentsApplied > 0) {
     broughtOver.push(`Rent levels for ${counts.rentsApplied} unit${counts.rentsApplied === 1 ? "" : "s"}, from the save's rent classes.`);
   }
-  if (counts.parkingStalls > 0 && tdt.parkingConnected !== null && tdt.parkingConnected <= 512) {
+  if (counts.parkingStalls > 0 && facts.parkingConnected !== null && facts.parkingConnected <= 512) {
     // 512 is the format's own stall-table size; a bigger count is corrupt and
     // must not be echoed at the player.
     broughtOver.push(
-      `${counts.parkingStalls} parking stall${counts.parkingStalls === 1 ? "" : "s"} (the save counted ${tdt.parkingConnected} connected to a ramp).`,
+      `${counts.parkingStalls} parking stall${counts.parkingStalls === 1 ? "" : "s"} (the save counted ${facts.parkingConnected} connected to a ramp).`,
     );
   }
   if (counts.construction > 0) {
     broughtOver.push(`${counts.construction} room${counts.construction === 1 ? "" : "s"} still under construction; work resumes now.`);
   }
-  broughtOver.push(`The clock: day ${day}, ${formatClock(save.minutes)}.`);
+  broughtOver.push(`The clock: day ${day}, ${formatClock(facts.minutes)}.`);
 
   const couldNotBring: string[] = [];
   if (!decoded) {
@@ -228,19 +273,18 @@ export function buildReport(
   if (counts.occupiedOffices + counts.soldCondos > 0) {
     couldNotBring.push("Occupancy is approximate: any office or condo with people recorded imports as occupied.");
   }
-  if (tdt.peopleCount !== null && tdt.peopleCount > 0) {
+  if (facts.peopleCount !== null && facts.peopleCount > 0) {
     couldNotBring.push(
-      `The ${tdt.peopleCount.toLocaleString()} people on the save's roster aren't carried over one by one; your tower re-populates as it runs.`,
+      `The ${facts.peopleCount.toLocaleString()} people on the save's roster aren't carried over one by one; your tower re-populates as it runs.`,
     );
   }
   couldNotBring.push("Tenant names and finance history aren't imported yet.");
-  couldNotBring.push(...headerNotes);
-  couldNotBring.push(...tdt.warnings);
+  couldNotBring.push(...facts.notes);
 
   return {
-    towerName: save.towerName,
-    star: save.star,
-    money: save.money,
+    towerName: facts.towerName,
+    star: facts.star,
+    money: facts.money,
     day,
     floors,
     basements,

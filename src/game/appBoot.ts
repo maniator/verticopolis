@@ -105,6 +105,10 @@ export function wireControllers(app: GameApp): void {
   app.saveLoad = new SaveLoad({
     getSim: () => app.sim,
     getView: () => app.engine.viewState(),
+    enginePort: () => app.enginePort,
+    portCodes: () => app.portCodes,
+    reader: () => app.reader,
+    towerSwapped: () => app.ui.precedence.towerSwapped(),
     // A report parsed against the OLD tower is stale the moment one is adopted,
     // and dialog lifecycle cannot see it: New Tower closes perfectly normally
     // and swaps afterwards. Breaking the leash here covers every swap SaveLoad

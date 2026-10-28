@@ -14,6 +14,7 @@ import {
 import { toTowerFile } from "./towerFileCodec";
 import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "./SaveGame";
+import { saveOf } from "../tests/fixtures/saveText";
 
 /**
  * The cap on a decompressed save can only be enforced BETWEEN pushes to the
@@ -152,8 +153,8 @@ describe("the save writers refuse a save past the cap", () => {
   };
 
   it("packSync and export throw SaveTooLargeError", async () => {
-    expect(() => SaveGame.packSync(oversized())).toThrow(SaveTooLargeError);
-    await expect(SaveGame.export(oversized())).rejects.toThrow(SaveTooLargeError);
+    expect(() => SaveGame.packSync(saveOf(oversized()))).toThrow(SaveTooLargeError);
+    await expect(SaveGame.export(saveOf(oversized()))).rejects.toThrow(SaveTooLargeError);
   });
 });
 

@@ -5,7 +5,7 @@ import type { UndoHistory } from "../../engine/UndoHistory";
 import { towerStateSig } from "../../engine/UndoHistory";
 import type { WasmEngine } from "../../dualrun/binding";
 import { createAppHistory } from "../../game/appHistory";
-import { createTsSim } from "../../simport/tsSim";
+import { TsEngine } from "../../engine/port/tsEngine";
 import { startWasmHost, type WasmHostHandle } from "../../wasmhost/startWasmHost";
 import { wasm } from "../conformance/wasmEngine";
 import { FrameDriver } from "../dualrun/dualRunHarness";
@@ -25,16 +25,20 @@ export const CLEARED = "The Rust engine stopped, so the undo history was cleared
 export const SWAP_FAILED = "The Rust engine stopped, and the tower could not switch to the TypeScript engine, so it is frozen and changes to it are not saved. Load a save or start a new tower to keep playing.";
 
 /** GameApp as far as the host and the undo trail see it: its adopt, its
- *  port, its history (the real one, through the port) and its toasts. */
+ *  engine port, its history (the real one, through the port) and its toasts. */
 export function gameApp(sim: Simulation) {
+  const engine = new TsEngine(sim);
   const a = {
-    sim,
+    get sim(): Simulation {
+      return engine.sim;
+    },
+    enginePort: engine,
     toasts: [] as string[],
     ui: { toast: (message: string) => void a.toasts.push(message) },
     history: null as unknown as UndoHistory,
     adoptSim(next: Simulation, preserveHistory = false) {
       next.gameplayEvents.inherit(a.sim.gameplayEvents);
-      a.sim = next;
+      engine.take(next);
       if (!preserveHistory) a.history.clear();
     },
     captureUndo: (label: string) => a.history.capture(label),
@@ -44,9 +48,9 @@ export function gameApp(sim: Simulation) {
     dropEmptyUndo: (sigOf: (snap: string) => string) => a.history.dropUnchanged(sigOf),
     holdClearedRedo: (on: boolean) => void (a.history.holdClearedRedo = on),
     clearUndo: () => a.history.clear(),
-    // Read at call time, so the host's adopt wrapper sees every swap.
-    port: createTsSim((): Simulation => a.sim, { adopt: (next, keep): void => a.adoptSim(next, keep) }),
   };
+  // Read at call time, so the host's adopt wrapper sees every swap.
+  engine.handOff = (next, keep) => a.adoptSim(next, keep);
   a.history = createAppHistory(a);
   return a;
 }

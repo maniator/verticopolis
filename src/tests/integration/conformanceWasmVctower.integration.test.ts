@@ -32,6 +32,7 @@ import { setEngineWriter } from "../../storage/vctowerWriter";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { tsEngine } from "../conformance/scenario";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { saveOf } from "../fixtures/saveText";
 
 const FIXTURES = resolve(__dirname, "../../../conformance/fixtures");
 const fixtures = readdirSync(FIXTURES)
@@ -89,11 +90,11 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     const sim = await SaveGame.import(original);
     vi.useFakeTimers({ now: SAVED_AT, toFake: ["Date"] });
     try {
-      const webFile = await SaveGame.export(sim);
+      const webFile = await SaveGame.export(saveOf(sim));
       expect(rust().encodeVctower(JSON.stringify(sim.serialize()), __APP_VERSION__, SAVED_AT)).toBe(webFile);
       // packSync, the localStorage writer the desktop store re-headers, packs
       // the same bits.
-      expect(SaveGame.packSync(sim)).toBe(STORE_MAGIC + (webFile.split("\n")[1] ?? ""));
+      expect(SaveGame.packSync(saveOf(sim))).toBe(STORE_MAGIC + (webFile.split("\n")[1] ?? ""));
     } finally {
       vi.useRealTimers();
     }
@@ -106,9 +107,9 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     vi.useFakeTimers({ now: SAVED_AT, toFake: ["Date"] });
     const error = vi.spyOn(console, "error");
     try {
-      const own = [await SaveGame.export(sim), SaveGame.packSync(sim)];
+      const own = [await SaveGame.export(saveOf(sim)), SaveGame.packSync(saveOf(sim))];
       setEngineWriter(rust().encodeVctower);
-      expect([await SaveGame.export(sim), SaveGame.packSync(sim)]).toEqual(own);
+      expect([await SaveGame.export(saveOf(sim)), SaveGame.packSync(saveOf(sim))]).toEqual(own);
       expect(error).not.toHaveBeenCalled();
     } finally {
       error.mockRestore();
@@ -170,7 +171,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
       expect(payloadText(text)).toBe(JSON.stringify({ ...JSON.parse(json), savedAt: SAVED_AT, appVersion: VERSION }));
       expect(tsEngine(sim).stateDigest()).toBe(engine.stateDigest());
       // The engine's stamp adds exactly the fields SaveGame.export's does.
-      const webKeys = Object.keys(decodeVctower(await SaveGame.export(sim)) as object).sort();
+      const webKeys = Object.keys(decodeVctower(await SaveGame.export(saveOf(sim))) as object).sort();
       const engineKeys = Object.keys(decodeVctower(text) as object).sort();
       expect(engineKeys).toEqual(webKeys);
     } finally {
@@ -231,7 +232,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     if (first === undefined) return;
     const sim = await SaveGame.import(readFileSync(resolve(FIXTURES, first), "utf8"));
     sim.tower.towerName = "Sky \ud83c";
-    const webFile = await SaveGame.export(sim);
+    const webFile = await SaveGame.export(saveOf(sim));
     const json = JSON.stringify(sim.serialize());
     expect(json).toContain("\\ud83c");
     // The file the web writer made carries the escape itself.

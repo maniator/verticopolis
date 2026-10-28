@@ -3,7 +3,7 @@ import { UndoHistory } from "../../engine/UndoHistory";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { createAppHistory } from "../../game/appHistory";
-import { createTsSim } from "../../simport/tsSim";
+import { TsEngine } from "../../engine/port/tsEngine";
 
 // How an undo or a redo behaves when its restore settles late or fails
 // (slice 5, #1212): the steps pop in order before anything settles, a step
@@ -195,26 +195,26 @@ describe("UndoHistory: restores that settle late or fail (slice 5)", () => {
   });
 
   it("keeps the way back through the app's history when the adopt throws after the swap", async () => {
-    let sim = Simulation.newGame(3, "modern", "realWorld");
+    const enginePort = new TsEngine(Simulation.newGame(3, "modern", "realWorld"));
     let throwing = false;
-    const port = createTsSim(() => sim, {
-      adopt: (next) => {
-        sim = next;
-        if (throwing) throw new Error("no attach");
-      },
-    });
+    // The app's adopt, which the engine hands each swap to: it takes the
+    // tower, then fails.
+    enginePort.handOff = (next) => {
+      enginePort.take(next);
+      if (throwing) throw new Error("no attach");
+    };
     const notes: string[] = [];
-    const hist = createAppHistory({ port, ui: { toast: (m) => void notes.push(m) } });
+    const hist = createAppHistory({ enginePort, ui: { toast: (m) => void notes.push(m) } });
     const cx = Math.floor(GRID.width / 2);
     hist.capture("Build");
-    expect(sim.tower.place("lobby", 1, cx).ok).toBe(true);
+    expect(enginePort.sim.tower.place("lobby", 1, cx).ok).toBe(true);
     hist.commit();
     throwing = true;
     await expect(hist.undo()).rejects.toThrow("no attach");
-    expect(sim.tower.unitAt(1, cx)).toBeUndefined();
+    expect(enginePort.sim.tower.unitAt(1, cx)).toBeUndefined();
     throwing = false;
     await hist.redo();
-    expect(sim.tower.unitAt(1, cx)).toBeDefined();
+    expect(enginePort.sim.tower.unitAt(1, cx)).toBeDefined();
     expect(notes).toEqual(["Redid: Build"]);
   });
 });

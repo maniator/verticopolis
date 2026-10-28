@@ -23,6 +23,8 @@ import {
   TowerTooLargeError,
 } from "./saveCompression";
 import { packVctower, payloadLine } from "./vctowerWriter";
+import { stampText } from "./saveStamp";
+import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
 
 /**
  * Persistence. Games are stored in localStorage: one auto-save slot plus a
@@ -73,7 +75,18 @@ let latestAsyncSave: object | null = null;
  */
 export const TOWER_FILE_EXT = ".vctower";
 
-function readSlot(key: string): SerializedGame | null {
+/** A save as the engine writes it (`EnginePort.serialize()`): the JSON text
+ *  of a `SerializedGame`, with no write stamp yet. */
+export type SaveText = string;
+
+/** Hand a stored save to the engine (`loadSave`); true when it loaded the
+ *  tower. */
+export type TryLoad = (text: SaveText) => boolean;
+
+/** A slot's save as the text an engine loads it from (`engineSaveText`), or
+ *  null for an absent or undecodable slot. Nothing parses the tower here: the
+ *  engine does, once. */
+function readSlotText(key: string): SaveText | null {
   const raw = localStorage.getItem(key);
   if (!raw) return null;
   try {
@@ -85,7 +98,7 @@ function readSlot(key: string): SerializedGame | null {
     const json = raw.startsWith(STORE_MAGIC)
       ? new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(fromBase64(raw.slice(STORE_MAGIC.length))))
       : raw;
-    return parseSaveJson(json) as SerializedGame;
+    return engineSaveText(json);
   } catch {
     return null;
   }
@@ -128,17 +141,18 @@ function parseSavedAt(value: unknown): number | undefined {
  * null payload); it keeps the guarantee free if that ever changes.
  */
 function infoFrom(slot: number | "auto", ...keys: string[]): SlotInfo {
-  // From the RAW keys, before any parse: readSlot returns null for an absent
-  // key and an undecodable one alike (see SlotInfo.present).
+  // From the RAW keys, before any parse: readSlotText returns null for an
+  // absent key and an undecodable one alike (see SlotInfo.present).
   const present = keys.some((k) => localStorage.getItem(k) !== null);
   for (const key of keys) {
-    const data = readSlot(key);
-    if (!data) continue;
-    let population: number;
+    const text = readSlotText(key);
+    if (text === null) continue;
+    let data: SerializedGame, population: number;
     try {
+      data = parseSaveJson(text) as SerializedGame;
       population = Simulation.deserialize(data).population;
     } catch {
-      continue; // decoded, but the schema will not load: try the next key
+      continue; // undecodable, or the schema will not load: try the next key
     }
     return {
       slot,
@@ -184,26 +198,28 @@ const MAX_SLOT_DAY = 360_000;
 
 export const SaveGame = {
   // ---- Auto-save slot (used on startup) --------------------------------
-  save(sim: Simulation): void {
-    this.saveTo(AUTO_KEY, sim);
+  save(text: SaveText): void {
+    this.saveTo(AUTO_KEY, text);
   },
-  async saveAsync(sim: Simulation): Promise<void> {
-    await this.saveToAsync(AUTO_KEY, sim);
+  async saveAsync(text: SaveText): Promise<void> {
+    await this.saveToAsync(AUTO_KEY, text);
   },
   hasSave(): boolean {
     return localStorage.getItem(AUTO_KEY) !== null || localStorage.getItem(LEGACY_AUTO_KEY) !== null;
   },
-  load(): Simulation | null {
-    return this.loadResult().sim;
+  /** Load the autosave through `tryLoad`; true when a save loaded. */
+  load(tryLoad: TryLoad): boolean {
+    return this.loadResult(tryLoad).loaded;
   },
   /**
    * Load the autosave, distinguishing a genuinely ABSENT save from one that's
    * present but UNREADABLE (corrupt, or from an incompatible/newer format). Boot
    * needs the difference: on `corrupt` it must warn and not silently offer
    * "Continue" (which would drop the player into a fresh tower behind a title
-   * that promised their old one) — see main.ts.
+   * that promised their old one) — see main.ts. `tryLoad` hands each decoded
+   * save to the engine, which says whether it loaded it.
    */
-  loadResult(): { sim: Simulation | null; corrupt: boolean; savedAt: number | undefined } {
+  loadResult(tryLoad: TryLoad): { loaded: boolean; corrupt: boolean; savedAt: number | undefined } {
     // Try the Verticopolis key first, then the legacy key: a partial migration
     // or multi-tab divergence can leave an unreadable value on one key beside a
     // healthy save on the other, and the healthy one must still load. `corrupt`
@@ -213,23 +229,18 @@ export const SaveGame = {
     let corrupt = false;
     for (const key of [AUTO_KEY, LEGACY_AUTO_KEY]) {
       if (localStorage.getItem(key) === null) continue; // absent, not corrupt
-      const data = readSlot(key); // null ⇒ present but undecodable
-      if (data) {
-        try {
-          const sim = Simulation.deserialize(data);
-          markFounderFromLoadedFile(sim, data); // an unstamped stored tower predates the appVersion stamp (pre-2.0)
-          // Surface the loaded tower's write time from the SAME decoded data and
-          // the SAME key that actually loaded (legacy fallback included), so the
-          // boot return-recency bucket needs no second decode of the slot. A
-          // forged or out-of-range stamp reads as absent (parseSavedAt).
-          return { sim, corrupt, savedAt: parseSavedAt(data.savedAt) };
-        } catch {
-          /* decoded, but the schema won't load; treated as unreadable below */
-        }
-      }
+      const text = readSlotText(key); // null ⇒ present but undecodable
+      // The engine applies the founder rule: an unstamped stored tower
+      // predates the appVersion stamp (pre-2.0). Surface the loaded tower's
+      // write time from the SAME decoded data and the SAME key that actually
+      // loaded (legacy fallback included), so the boot return-recency bucket
+      // needs no second decode of the slot. A forged or out-of-range stamp
+      // reads as absent (parseSavedAt). A save the engine refuses is
+      // unreadable, as below.
+      if (text !== null && tryLoad(text)) return { loaded: true, corrupt, savedAt: parseSavedAt(readSavedAt(text)) };
       corrupt = true;
     }
-    return { sim: null, corrupt, savedAt: undefined };
+    return { loaded: false, corrupt, savedAt: undefined };
   },
   clear(): void {
     localStorage.removeItem(AUTO_KEY);
@@ -252,8 +263,8 @@ export const SaveGame = {
   },
 
   // ---- Named manual slots ----------------------------------------------
-  saveSlot(n: number, sim: Simulation): void {
-    this.saveTo(SLOT_KEY(n), sim);
+  saveSlot(n: number, text: SaveText): void {
+    this.saveTo(SLOT_KEY(n), text);
   },
   /** Raw presence check for a manual slot, parse-free and cheap, so a
    *  corrupt-but-present slot still reads as occupied. Anything that picks a
@@ -262,16 +273,11 @@ export const SaveGame = {
   hasSlot(n: number): boolean {
     return localStorage.getItem(SLOT_KEY(n)) !== null;
   },
-  loadSlot(n: number): Simulation | null {
-    const data = readSlot(SLOT_KEY(n));
-    if (!data) return null;
-    try {
-      const sim = Simulation.deserialize(data);
-      markFounderFromLoadedFile(sim, data); // an unstamped slot save predates the appVersion stamp (pre-2.0)
-      return sim;
-    } catch {
-      return null;
-    }
+  /** Load a manual slot through `tryLoad` (the engine applies the founder
+   *  rule); false for an empty, undecodable or refused slot. */
+  loadSlot(n: number, tryLoad: TryLoad): boolean {
+    const text = readSlotText(SLOT_KEY(n));
+    return text !== null && tryLoad(text);
   },
   deleteSlot(n: number): void {
     localStorage.removeItem(SLOT_KEY(n));
@@ -292,14 +298,13 @@ export const SaveGame = {
    * reason this codec is synchronous at all. Identical stamping and packing to
    * {@link SaveGame.saveTo}, which now delegates here.
    */
-  packSync(sim: Simulation): string {
-    const data = stamp(sim.serialize());
-    const json = JSON.stringify(data);
-    return STORE_MAGIC + payloadLine(packVctower(json, encodeSaveJson(json), data));
+  packSync(text: SaveText): string {
+    const { json, stamp } = stampText(text);
+    return STORE_MAGIC + payloadLine(packVctower(json, encodeSaveJson(json), stamp));
   },
 
   // ---- Shared writer + export/import -----------------------------------
-  saveTo(key: string, sim: Simulation): void {
+  saveTo(key: string, text: SaveText): void {
     // Only an AUTOSAVE-slot write invalidates an in-flight async autosave (the
     // token exists so older compressed state can't commit over this newer
     // flush of the SAME slot). A manual slot save targets a different key, so
@@ -311,17 +316,17 @@ export const SaveGame = {
     // third of the cost, keeping the pre-reload flush short). Synchronous by
     // design: this runs just before a reload in the crash-recovery path, where
     // an async write could be lost.
-    writeSlot(key, this.packSync(sim));
+    writeSlot(key, this.packSync(text));
   },
-  async saveToAsync(key: string, sim: Simulation): Promise<void> {
+  async saveToAsync(key: string, text: SaveText): Promise<void> {
     if (!compressionEncodeSupported()) {
-      this.saveTo(key, sim);
+      this.saveTo(key, text);
       return;
     }
     // Encode (and refuse an oversized save) before claiming the token: a
     // refused save leaves no token behind, so an older save of the same slot
     // still in flight commits instead of the slot keeping neither.
-    const bytes = encodeSaveJson(JSON.stringify(stamp(sim.serialize())));
+    const bytes = encodeSaveJson(stampText(text).json);
     const token = {};
     latestAsyncSave = token;
     const packed = await deflate(bytes);
@@ -331,26 +336,35 @@ export const SaveGame = {
   },
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
-  async export(sim: Simulation): Promise<string> {
+  async export(text: SaveText): Promise<string> {
     // Exports carry the same write-time provenance as local saves: a moved
     // file says when and by which build it was written. packVctower writes the
     // same bits in every browser, through the engine when it runs.
-    const data = stamp(sim.serialize());
-    const json = JSON.stringify(data);
-    return packVctower(json, encodeSaveJson(json), data);
+    const { json, stamp } = stampText(text);
+    return packVctower(json, encodeSaveJson(json), stamp);
   },
 
   /** Download name for an export: the tower's name slugged, e.g. "tower-one.vctower". */
-  exportFilename(sim: Simulation): string {
-    const slug = (sim.tower.towerName || "")
+  exportFilename(towerName: string | undefined): string {
+    const slug = (towerName || "")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
     return (slug || "tower") + TOWER_FILE_EXT;
   },
 
-  /** Parse a `.vctower` tower file. */
+  /** Parse a `.vctower` tower file into a tower (tests and tools). */
   async import(text: string): Promise<Simulation> {
+    const data = JSON.parse(await this.importText(text)) as SerializedGame;
+    const sim = Simulation.deserialize(data);
+    markFounderFromLoadedFile(sim, data); // an unstamped imported tower predates the appVersion stamp (pre-2.0)
+    return sim;
+  },
+
+  /** Read a `.vctower` file into save text for the engine's `loadSave`. The
+   *  checks and refusal copy stay here, in front of the engine, whose own
+   *  `.vctower` reader is more lenient (#1410 N4). */
+  async importText(text: string): Promise<SaveText> {
     const trimmed = text.trim();
     // Match the whole VCTOWER family, not just this version's magic, so a file
     // from a newer build gets an honest "update the game" rather than a generic
@@ -368,13 +382,13 @@ export const SaveGame = {
     if (!compressionDecodeSupported()) {
       throw new Error("This browser is too old to open compressed tower files. Try a current browser.");
     }
-    let data: SerializedGame;
+    let json: SaveText;
     try {
       // Whitespace-tolerant: survives files re-wrapped by editors or mailers.
       const packed = fromBase64(trimmed.slice(magic[0].length).replace(/\s+/g, ""));
       // fatal decoder: a flipped byte must fail the import loudly, never
       // silently half-load a tower with U+FFFD-mangled strings.
-      data = parseSaveJson(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed))) as SerializedGame;
+      json = engineSaveText(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed)));
     } catch (err) {
       // A crafted tiny file can inflate to gigabytes (a decompression bomb);
       // inflate() caps the output and throws this, distinct from "damaged".
@@ -385,13 +399,17 @@ export const SaveGame = {
       // the container was recognized, so the file is OURS but broken. Say so.
       throw new Error("This tower file is damaged and can't be read.");
     }
-    if (typeof data.minutes !== "number" || !Array.isArray(data.units)) {
-      throw new Error("Not a valid tower save file.");
-    }
-    const sim = Simulation.deserialize(data);
-    markFounderFromLoadedFile(sim, data); // an unstamped imported tower predates the appVersion stamp (pre-2.0)
-    return sim;
+    // The engine parses the save; a text the scan is unsure of is checked
+    // here first, and a save the engine refuses is told apart by the caller
+    // (`importObjection`), with the same copy.
+    const objection = looksLikeTowerSave(json) ? undefined : importObjection(json);
+    if (objection) throw new Error(objection);
+    return json;
   },
+
+  /** What the import's checks hold against a save the engine refused, in the
+   *  player's words (`importObjection`), or undefined to give the engine's. */
+  importObjection,
 };
 
 /** True when a failed save write is STORAGE's fault (quota full, private
@@ -475,18 +493,3 @@ function writeAutosaveValue(value: string): void {
   localStorage.setItem(AUTO_KEY, value);
 }
 
-function nowMs(): number {
-  // Date is unavailable in the deterministic engine, but the storage layer is
-  // UI-side, so a wall-clock stamp here is fine.
-  return typeof Date !== "undefined" ? Date.now() : 0;
-}
-
-/** Write-time provenance: when the save was written and by which build. The
- *  engine never emits these (serialize() is stamp-free); every write path
- *  (localStorage and .vctower alike) re-stamps here, so the values always
- *  describe THIS file, never a previous device's. */
-function stamp(data: SerializedGame): SerializedGame {
-  data.savedAt = nowMs();
-  data.appVersion = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
-  return data;
-}

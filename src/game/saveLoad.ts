@@ -3,12 +3,16 @@ import { Simulation } from "../engine/Simulation";
 import type { GameMode, SerializedView } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
 import { SaveGame, isStorageWriteError, saveFailureMessage } from "../storage/SaveGame";
-import { LegacyExportError, buildTDT, type BuiltLegacyTower } from "../storage/tdtExport";
-import { LegacyImportError, parseTDT } from "../storage/tdtImport";
-import type { ImportReport } from "../storage/tdtImport";
+import { exportReport, type ExportReport } from "../storage/tdtExportReport";
+import { importReport } from "../storage/tdtImportReport";
 import { runExportFlow, runLegacyDownload } from "./exportFlow";
 import { adoptConfirmedLegacyImport } from "./legacyImportAdopt";
 import { shouldArm } from "../ui/Onboarding";
+import type { EnginePort } from "../simport/enginePort";
+import type { PortCodes } from "../simport/portCodes";
+import type { ViewReader } from "../simport/viewReader";
+import { SWAP_REFUSED, loadStored, saveText, stampCamera, swapDone } from "./portLifecycle";
+import { exportFacts, importFacts } from "../simport/tdtRecords";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import type { UI } from "../ui/UI";
 
@@ -21,8 +25,20 @@ import type { UI } from "../ui/UI";
  * stays in GameApp and arrives here as an injected callback.
  */
 export interface SaveLoadDeps {
-  /** The live simulation (never cached — adoptSim swaps the instance). */
+  /** The live simulation (never cached — adoptSim swaps the instance), for
+   *  the file flows and the background hosts' settle that have not moved to
+   *  the engine port yet. */
   getSim(): Simulation;
+  /** The engine port the saves, loads and new towers go through; a done swap
+   *  reaches the app's adoptSim inside the call. */
+  enginePort(): EnginePort;
+  /** The layout's code tables, for the port's mode, calendar and log codes. */
+  portCodes(): PortCodes;
+  /** The shared reader, current as of the last swap. */
+  reader(): Pick<ViewReader, "rooms" | "structure">;
+  /** A tower arrived through the port (load or found): break the report
+   *  dialogs' leash, as `adoptSim` does for the file imports. */
+  towerSwapped(): void;
   /** The live camera as save cargo (GameApp reads TowerEngine.viewState).
    *  Stamped onto the sim right before every save/export of the CURRENT
    *  tower so the view travels with it; an imported sim keeps the view its
@@ -101,25 +117,19 @@ export class SaveLoad {
     }
   }
 
-  /** Stamp the live camera onto the sim before a save/export. A null camera
-   *  (headless context) stamps nothing rather than null, so it can never
-   *  erase a view the sim already carries (e.g. one a TDT import brought
-   *  over before any camera existed). */
-  private stampView(sim: Simulation): void {
-    const view = this.deps.getView();
-    if (view) sim.view = view;
+  /** The live tower's save text through the port, the camera stamped first. */
+  private saveText(): string {
+    return saveText(this.deps.enginePort(), this.deps.getView());
   }
 
   save(silent = false): void {
-    const sim = this.deps.getSim();
     try {
       // Stamp inside the try: a disposed or context-lost engine can throw
       // from viewState() too, and the manual path's no-escaped-throw contract
       // must cover it (saveToSlot makes the same call the same way). Silent
       // callers see no change: they caught a stampView throw before this
       // reorder too, via the rethrow below.
-      this.stampView(sim);
-      SaveGame.save(sim);
+      SaveGame.save(this.saveText());
     } catch (err) {
       // Silent callers rely on the THROW: saveBeforeUpdate's caller must not
       // reload on a failed write, recoverFromContextLoss words the failure on
@@ -156,22 +166,21 @@ export class SaveLoad {
     try {
       do {
         this.autosaveQueued = false;
-        const sim = this.deps.getSim();
+        const tower = this.deps.enginePort().generation();
         // Re-stamp per iteration: the camera may have moved while the
         // previous async compression was in flight.
         // The experimental worker host answers `serialize` from the engine
         // only once its read model has caught up; wait for that here, where
         // waiting costs nothing (no-op on every other engine). The camera is
         // stamped after the wait, so the save carries where it is now.
-        await settleEngine(sim);
+        await settleEngine(this.deps.getSim());
         // A tower adopted during the wait is not the one to write: go round
         // again with the tower the app holds now.
-        if (this.deps.getSim() !== sim) {
+        if (this.deps.enginePort().generation() !== tower) {
           this.autosaveQueued = true;
           continue;
         }
-        this.stampView(sim);
-        await SaveGame.saveAsync(sim);
+        await SaveGame.saveAsync(this.saveText());
       } while (this.autosaveQueued);
     } catch {
       /* periodic autosave is best effort and has no UI surface; manual and pre-reload saves still report errors */
@@ -304,7 +313,7 @@ export class SaveLoad {
     // Captured so a tower swap during the wait (Load/New stay reachable) is
     // detectable at completion: the "your tower was saved" trace belongs to
     // THIS tower, and must not land in a different one's bulletin log.
-    const simAtLoss = this.deps.getSim();
+    const towerAtLoss = this.deps.enginePort().generation();
     this.deps.ui.toast("The device reset the game's graphics. Recovering...", "info");
     this.deps.attemptGraphicsRecovery((recovered) => {
       // Re-anchor the repeat window at the attempt's END too: a background
@@ -319,12 +328,13 @@ export class SaveLoad {
       // GPU); the screen owns the session then, so stay quiet rather than
       // contradict it with a success toast.
       if (isCrashed()) return;
-      if (this.deps.getSim() === simAtLoss) {
+      const port = this.deps.enginePort();
+      if (port.generation() === towerAtLoss) {
         // Leave a durable trace in the bulletin log (the old silent reload
         // erased all evidence; recovering must not repeat that mistake).
-        simAtLoss.emit(
+        port.logLine(
           "The device reset the game's graphics; the game recovered on the spot. Your tower was saved first.",
-          "info",
+          this.deps.portCodes().code("logKinds", "info"),
         );
         this.deps.ui.toast("Graphics recovered. Your tower was saved.", "good");
       } else {
@@ -336,9 +346,8 @@ export class SaveLoad {
   }
 
   load(): void {
-    const loaded = SaveGame.load();
-    if (loaded) {
-      this.deps.adoptSim(loaded);
+    if (SaveGame.load(loadStored(this.deps.enginePort()))) {
+      this.deps.towerSwapped();
       this.deps.ui.toast("Tower loaded.", "good");
     } else {
       this.deps.ui.toast("No saved tower found.", "bad");
@@ -353,7 +362,7 @@ export class SaveLoad {
    *  guard; delegating keeps the latch on the one choke point every export
    *  entry converges on. */
   exportGame(): Promise<void> {
-    return runExportFlow(this.deps, (sim) => this.stampView(sim));
+    return runExportFlow(this.deps, () => ({ text: this.saveText(), towerName: this.deps.enginePort().towerName() }));
   }
 
   /**
@@ -364,33 +373,47 @@ export class SaveLoad {
    * refused outright (the 1994 rule set cannot represent them).
    */
   exportLegacy(): void {
-    let built: BuiltLegacyTower;
+    const port = this.deps.enginePort();
+    let bytes: Uint8Array | undefined;
+    let report: ExportReport;
     try {
-      const sim = this.deps.getSim();
-      this.stampView(sim);
-      built = buildTDT(sim.serialize());
+      // A null camera (headless) stamps nothing, so it never erases the view
+      // a TDT import brought over before any camera existed.
+      stampCamera(port, this.deps.getView());
+      const rec = port.tdtExport();
+      bytes = rec[0] === 1 ? port.tdtFile() : undefined;
+      if (!bytes) {
+        // The engine's refusal is the player's sentence (a Modern tower, a
+        // tower too deep for 1994).
+        this.deps.ui.sayVisibly(port.lastReason() ?? "Export failed."); // not a toast: a dialog may be up (GH #658)
+        return;
+      }
+      report = exportReport(exportFacts(rec, this.deps.portCodes(), port.towerName()));
     } catch (err) {
-      const msg =
-        err instanceof LegacyExportError
-          ? err.message
-          : "Export failed: " + (err instanceof Error ? err.message : String(err));
-      this.deps.ui.sayVisibly(msg); // not a toast: a dialog may be up (GH #658)
+      this.deps.ui.sayVisibly("Export failed: " + (err instanceof Error ? err.message : String(err)));
       return;
     }
-    this.deps.ui.showExportReport(built.report, {
+    const file = bytes;
+    this.deps.ui.showExportReport(report, {
       // Through the shared export latch (GH #760 follow-on), so a .TDT download
       // and a .vctower export can never run at once.
       onDownload: () =>
         void runLegacyDownload(this.deps.ui, () => {
-          this.deps.ui.downloadFile(built.report.filename, built.bytes);
+          this.deps.ui.downloadFile(report.filename, file);
         }),
     });
   }
 
   async importGame(data: string): Promise<void> {
     try {
-      const sim = await SaveGame.import(data);
-      this.deps.adoptSim(sim);
+      // SaveGame holds the file to its checks and copy; the engine loads it
+      // (the `stored` source, with the founder rule) and the app follows.
+      const text = await SaveGame.importText(data);
+      const port = this.deps.enginePort();
+      const loaded = port.loadSave(text);
+      // A refused file is told apart in the import's own words when they have any.
+      if (loaded[0] !== 1) throw new Error(SaveGame.importObjection(text) ?? port.lastReason() ?? SWAP_REFUSED);
+      this.deps.towerSwapped();
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
       this.deps.ui.sayVisibly("Import failed: " + (err as Error).message);
@@ -398,39 +421,32 @@ export class SaveLoad {
   }
 
   /**
-   * Import an original 1994 SimTower save (`.TDT`). Parse and validate FIRST
-   * (through both the binary walker's hardening and `Simulation.deserialize`'s
-   * trust-boundary coercion), then show the fidelity report; nothing is
-   * adopted or persisted until the player confirms with "Open tower". A
-   * garbage file never reaches the sim, the same contract as importGame.
+   * Import an original 1994 SimTower save (`.TDT`). The engine reads and
+   * checks it first (the binary walker's hardening, then the trust boundary
+   * every save goes through) and stages it; the fidelity report comes from
+   * its record. Nothing is adopted or persisted until the player confirms
+   * with "Open tower". A garbage file never reaches the tower, the same
+   * contract as importGame.
    */
   importLegacy(buffer: ArrayBuffer, filename: string): void {
-    let sim: Simulation;
-    let report: ImportReport;
-    try {
-      const parsed = parseTDT(buffer, filename);
-      // Deliberate second hardening layer: the importer's output goes through
-      // the exact trust boundary every other save does.
-      sim = Simulation.deserialize(parsed.save);
-      report = parsed.report;
-    } catch (err) {
-      // LegacyImportError messages are already player-readable; anything else
-      // (a deserialize trust-boundary refusal, an importer bug) keeps the
-      // plain lead but carries the underlying detail, matching importGame's
-      // "Import failed: <message>" diagnosability.
-      const detail = err instanceof Error && err.message ? ` (${err.message})` : "";
-      const msg =
-        err instanceof LegacyImportError
-          ? err.message
-          : `This SimTower save couldn't be read.${detail}`;
-      this.deps.ui.toast(msg, "bad");
+    const port = this.deps.enginePort();
+    const bytes = new Uint8Array(buffer);
+    const rec = port.loadTdt(bytes, filename);
+    if (rec[0] !== 1) {
+      // The refusal is already player-readable: the importer's own sentence,
+      // or "This SimTower save couldn't be read." with the detail.
+      this.deps.ui.toast(port.lastReason() ?? "This SimTower save couldn't be read.", "bad");
       return;
     }
+    const report = importReport(importFacts(rec, this.deps.portCodes(), port));
     this.deps.ui.showImportReport(report, {
       // The confirmed-adoption flow (flush, adopt, fresh-slot copy, honest
       // toasts) lives in ./legacyImportAdopt, split out at the 500-line guard.
       // The flush stays a bound thunk so its throw contract is owned here.
-      onOpen: () => adoptConfirmedLegacyImport(this.deps, sim, () => this.saveBeforeUpdate()),
+      // The engine stages one file at a time, so the confirmation stages its
+      // own file again: a second read finished meanwhile cannot swap in.
+      onOpen: () =>
+        adoptConfirmedLegacyImport(this.deps, report.towerName, () => this.saveBeforeUpdate(), () => port.loadTdt(bytes, filename)),
     });
   }
 
@@ -440,14 +456,17 @@ export class SaveLoad {
    *  runs the canon calendar and auto structure, so `modernCalendar` and
    *  `startUnbridged` is only consulted for Modern. */
   newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", startUnbridged = false): void {
-    this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode, modernCalendar, startUnbridged));
+    const port = this.deps.enginePort();
+    const codes = this.deps.portCodes();
+    swapDone(port, port.foundTower(Date.now() & 0x7fffffff, codes.code("modes", mode), codes.code("calendars", modernCalendar), startUnbridged));
+    this.deps.towerSwapped();
     // Both rule-sets found an empty lot now, so the toast is the actionable
     // first-lobby cue (the engine's welcome log entry is rebased past by the UI
     // cursor, so the toast is the one visible signal). Keyed on tower state,
     // never on the mode string, so it stays correct if founding ever seeds again.
-    const founded = this.deps.getSim();
+    const founded = this.deps.reader();
     this.deps.ui.toast(
-      founded.tower.units.length === 0
+      founded.rooms.length === 0 && founded.structure.length === 0
         ? "New tower founded. Lay a lobby on the ground line to open it."
         : "New tower founded. Good luck!",
       "good",

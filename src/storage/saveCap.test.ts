@@ -14,6 +14,7 @@ import {
   toBase64,
 } from "./saveCompression";
 import { toTowerFile } from "./towerFileCodec";
+import { saveOf, loadResultSim } from "../tests/fixtures/saveText";
 
 /**
  * The one 32 MiB cap at its edge, on a real tower: a save whose JSON is
@@ -36,7 +37,7 @@ function jsonOf(packed: string): string {
 /** The fixture tower, renamed so its stamped save is exactly `bytes` long. */
 async function towerOf(bytes: number): Promise<Simulation> {
   const sim = await SaveGame.import(readFileSync(FIXTURE, "utf8"));
-  const base = new TextEncoder().encode(jsonOf(SaveGame.packSync(sim))).length;
+  const base = new TextEncoder().encode(jsonOf(SaveGame.packSync(saveOf(sim)))).length;
   sim.tower.towerName = sim.tower.towerName + "x".repeat(bytes - base);
   return sim;
 }
@@ -44,7 +45,7 @@ async function towerOf(bytes: number): Promise<Simulation> {
 /** The save text of a tower one byte past the cap, written by hand (every
  *  web writer refuses it). */
 async function oversizedJson(): Promise<string> {
-  const json = jsonOf(SaveGame.packSync(await towerOf(CAP)));
+  const json = jsonOf(SaveGame.packSync(saveOf(await towerOf(CAP))));
   const grown = json.replace('"towerName":"', '"towerName":"x');
   expect(new TextEncoder().encode(grown).length).toBe(CAP + 1);
   return grown;
@@ -70,22 +71,22 @@ describe("a save of exactly 32 MiB", () => {
     const sim = await towerOf(CAP);
     const name = sim.tower.towerName;
 
-    const packed = SaveGame.packSync(sim);
+    const packed = SaveGame.packSync(saveOf(sim));
     const json = jsonOf(packed);
     expect(new TextEncoder().encode(json).length).toBe(CAP);
 
-    SaveGame.saveTo(AUTO_KEY, sim);
-    const sync = SaveGame.loadResult();
+    SaveGame.saveTo(AUTO_KEY, saveOf(sim));
+    const sync = loadResultSim();
     expect(sync.corrupt).toBe(false);
     expect(sync.sim?.tower.towerName).toBe(name);
 
     localStorage.clear();
-    await SaveGame.saveToAsync(AUTO_KEY, sim);
-    const async = SaveGame.loadResult();
+    await SaveGame.saveToAsync(AUTO_KEY, saveOf(sim));
+    const async = loadResultSim();
     expect(async.corrupt).toBe(false);
     expect(async.sim?.tower.towerName).toBe(name);
 
-    const file = await SaveGame.export(sim);
+    const file = await SaveGame.export(saveOf(sim));
     expect(new TextEncoder().encode(jsonOf(file)).length).toBe(CAP);
     expect((await SaveGame.import(file)).tower.towerName).toBe(name);
 
@@ -98,11 +99,11 @@ describe("a save of exactly 32 MiB", () => {
 describe("a save one byte past 32 MiB", () => {
   it("is refused by every writer, which leave the slot as it was", async () => {
     const sim = await towerOf(CAP + 1);
-    expect(() => SaveGame.packSync(sim)).toThrow(SaveTooLargeError);
-    expect(() => SaveGame.saveTo(AUTO_KEY, sim)).toThrow(SaveTooLargeError);
-    await expect(SaveGame.saveToAsync(AUTO_KEY, sim)).rejects.toThrow(SaveTooLargeError);
+    expect(() => SaveGame.packSync(saveOf(sim))).toThrow(SaveTooLargeError);
+    expect(() => SaveGame.saveTo(AUTO_KEY, saveOf(sim))).toThrow(SaveTooLargeError);
+    await expect(SaveGame.saveToAsync(AUTO_KEY, saveOf(sim))).rejects.toThrow(SaveTooLargeError);
     expect(localStorage.getItem(AUTO_KEY)).toBeNull();
-    await expect(SaveGame.export(sim)).rejects.toThrow(SaveTooLargeError);
+    await expect(SaveGame.export(saveOf(sim))).rejects.toThrow(SaveTooLargeError);
   }, 60_000);
 
   it("is refused by every reader", async () => {
@@ -110,7 +111,7 @@ describe("a save one byte past 32 MiB", () => {
     const b64 = toBase64(deflateSync(new TextEncoder().encode(json), { level: 1 }));
 
     localStorage.setItem(AUTO_KEY, STORE_MAGIC + b64);
-    const stored = SaveGame.loadResult();
+    const stored = loadResultSim();
     expect(stored.sim).toBeNull();
     expect(stored.corrupt).toBe(true);
 

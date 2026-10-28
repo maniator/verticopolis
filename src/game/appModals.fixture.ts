@@ -12,7 +12,7 @@ import type { CatalogEconomy } from "../engine/catalogTypes";
  * exterminator and save-slot commands against: a fake sim whose exterminator
  * pieces a test dials, and a fake `EnginePort` that answers the layout's
  * records (the stats sheet, the coverage, the booking and the log line) from
- * the app's tower at the time of each ask (`app.sim`, so a test that swaps it
+ * the app's tower at the time of each ask, and saves and loads stand-in text (`app.sim`, so a test that swaps it
  * gets answers about the new one and a moved generation).
  */
 
@@ -67,7 +67,7 @@ export function makeApp(sim: SimShape) {
     showTowerPicker: vi.fn(),
     toast: vi.fn(),
   };
-  const engine = { viewState: vi.fn(() => ({ camera: "VIEW" })) };
+  const engine = { viewState: vi.fn(() => ({ tile: 40, floor: 3, zoom: 2 })) };
   const current = (): SimShape => app.sim;
   const coverage = () => (current().housekeepingCoverage as () => { infested: number })();
   let reason: string | undefined;
@@ -98,6 +98,18 @@ export function makeApp(sim: SimShape) {
       return Float64Array.of(1, 0);
     }),
     lastReason: () => reason,
+    setCamera: vi.fn((tile: number, floor: number, zoom: number) => {
+      current().view = { tile, floor, zoom };
+    }),
+    serialize: vi.fn(() => "SAVE TEXT"),
+    /** Loads any text but "BAD": the swap moves the generation and hands the
+     *  text to `adoptSim`, as the engine hands the app its new tower. */
+    loadSave: vi.fn((text: string) => {
+      if (text === "BAD") return Float64Array.of(0, generation);
+      generation++;
+      (app.adoptSim as (next: string) => void)(text);
+      return Float64Array.of(1, generation);
+    }),
   };
   const reader = {
     update: vi.fn(),

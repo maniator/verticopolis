@@ -1,11 +1,11 @@
 import type { GameApp } from "../main";
-import type { Simulation } from "../engine/Simulation";
 import { SaveGame, saveFailureMessage } from "../storage/SaveGame";
 import { canCallExterminator, statsScreen, statsTemplate } from "../ui/templates/stats";
 import { trackAppAction } from "../analytics";
 import { outcome } from "../simport/portCodes";
 import { statsReport } from "../simport/statsSheet";
 import { catalogOf } from "./portAccess";
+import { loadStored, saveText } from "./portLifecycle";
 
 /**
  * The tower-statistics modal, its exterminator action, and the manual save-slot
@@ -124,8 +124,7 @@ export function saveToSlot(app: GameApp, slot: number): void {
     // SaveLoad does for the autosave and exports. Inside the try on purpose:
     // a disposed or context-lost engine can throw from viewState() too, and
     // that failure must reach the same honest toast, not the click handler.
-    app.sim.view = app.engine.viewState();
-    SaveGame.saveSlot(slot, app.sim);
+    SaveGame.saveSlot(slot, saveText(app.enginePort, app.engine.viewState()));
   } catch (err) {
     // Same contract as Quick Save: a manual save must never fail silently or
     // toast success on a failed write (the throw would otherwise escape the
@@ -139,9 +138,9 @@ export function saveToSlot(app: GameApp, slot: number): void {
 
 /** Load a manual slot (or the autosave) and adopt it as the live tower. */
 export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
-  const loaded = slot === "auto" ? SaveGame.load() : SaveGame.loadSlot(slot);
-  if (loaded) {
-    app.adoptSim(loaded);
+  // The engine loads the save and the app follows the swap inside the call.
+  const load = loadStored(app.enginePort);
+  if (slot === "auto" ? SaveGame.load(load) : SaveGame.loadSlot(slot, load)) {
     trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
     app.ui.toast("Tower loaded.", "good");
   } else {
@@ -200,18 +199,23 @@ export function showTowerPicker(app: GameApp, onAdopted?: () => void): void {
  * blocked. A throw here must read as "could not load", not escape the click
  * handler and leave the picker looking frozen.
  *
- * On success nothing here tears the splash down or re-pauses. `adoptSim` owns
- * both, so every arrival route behaves identically.
+ * On success nothing here tears the splash down or re-pauses. `adoptSim`, which
+ * the engine hands the loaded tower to, owns both, so every arrival route
+ * behaves identically.
  */
 export function loadFromSplash(app: GameApp, slot: number | "auto"): boolean {
-  let loaded: Simulation | null = null;
+  const load = loadStored(app.enginePort);
+  const before = app.enginePort.generation();
+  let loaded: boolean;
   try {
-    loaded = slot === "auto" ? SaveGame.load() : SaveGame.loadSlot(slot);
-  } catch {
+    loaded = slot === "auto" ? SaveGame.load(load) : SaveGame.loadSlot(slot, load);
+  } catch (e) {
+    // A throw from the app's adoption, after the tower swapped, is not a
+    // failed read: it reaches the caller as before.
+    if (app.enginePort.generation() !== before) throw e;
     return false;
   }
   if (!loaded) return false;
-  app.adoptSim(loaded);
   trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
   return true;
 }

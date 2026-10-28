@@ -50,6 +50,11 @@ function flowDeps(ui: ReturnType<typeof fakeUi>["ui"], sim = Simulation.newGame(
   return { getSim: () => sim, ui };
 }
 
+/** The flow's save callback: the engine port's save of `sim` and its name. */
+function saved(sim = Simulation.newGame(7)) {
+  return () => ({ text: JSON.stringify(sim.serialize()), towerName: sim.tower.towerName });
+}
+
 const HUNG_TOAST = { text: "The export is not responding. You can try exporting again.", kind: "bad" };
 // The size line for the 13-byte payload these tests mock into SaveGame.export
 // ("VCTOWER1\nfake" rounds to 0.0 KB).
@@ -70,9 +75,9 @@ describe("export single-flight latch (GH #760)", () => {
   it("hands the player a real .vctower download and says how big it is", async () => {
     const { ui, toasts, downloads } = fakeUi();
     const sim = Simulation.newGame(7);
-    await runExportFlow(flowDeps(ui, sim), () => {});
+    await runExportFlow(flowDeps(ui, sim), saved(sim));
     expect(downloads).toHaveLength(1);
-    expect(downloads[0]!.filename).toBe(SaveGame.exportFilename(sim));
+    expect(downloads[0]!.filename).toBe(SaveGame.exportFilename(sim.tower.towerName));
     const text = downloads[0]!.contents as string;
     expect(typeof text).toBe("string");
     // The file reads back as the same tower.
@@ -86,12 +91,12 @@ describe("export single-flight latch (GH #760)", () => {
   it("REGRESSION (GH #997): a download that failed gets no success toast, and the latch frees", async () => {
     vi.spyOn(SaveGame, "export").mockResolvedValue("VCTOWER1\nfake");
     const { ui, toasts, downloads } = fakeUi([false]);
-    await runExportFlow(flowDeps(ui), () => {});
+    await runExportFlow(flowDeps(ui), saved());
     expect(downloads).toHaveLength(1);
     // UI.downloadFile already toasted the failure; the flow adds nothing.
     expect(toasts).toEqual([]);
     // The next export runs and succeeds normally.
-    await runExportFlow(flowDeps(ui), () => {});
+    await runExportFlow(flowDeps(ui), saved());
     expect(downloads).toHaveLength(2);
     expect(toasts).toEqual([LIVE_TOAST]);
   });
@@ -100,8 +105,8 @@ describe("export single-flight latch (GH #760)", () => {
     const gate = deferred<string>();
     const spy = vi.spyOn(SaveGame, "export").mockReturnValue(gate.promise);
     const { ui, toasts, downloads } = fakeUi();
-    const first = runExportFlow(flowDeps(ui), () => {});
-    await runExportFlow(flowDeps(ui), () => {});
+    const first = runExportFlow(flowDeps(ui), saved());
+    await runExportFlow(flowDeps(ui), saved());
     expect(spy).toHaveBeenCalledTimes(1);
     gate.resolve("VCTOWER1\nfake");
     await first;
@@ -112,11 +117,11 @@ describe("export single-flight latch (GH #760)", () => {
   it("the latch releases on success and on failure, so the next export runs", async () => {
     const spy = vi.spyOn(SaveGame, "export").mockRejectedValueOnce(new Error("boom"));
     const { ui, toasts, downloads } = fakeUi();
-    await runExportFlow(flowDeps(ui), () => {});
+    await runExportFlow(flowDeps(ui), saved());
     expect(toasts).toEqual([{ text: "Export failed: boom", kind: "bad" }]);
     spy.mockResolvedValue("VCTOWER1\nfake");
-    await runExportFlow(flowDeps(ui), () => {});
-    await runExportFlow(flowDeps(ui), () => {});
+    await runExportFlow(flowDeps(ui), saved());
+    await runExportFlow(flowDeps(ui), saved());
     expect(downloads).toHaveLength(2);
   });
 
@@ -127,7 +132,7 @@ describe("export single-flight latch (GH #760)", () => {
     });
     expect(toasts).toEqual([{ text: "Export failed: context lost", kind: "bad" }]);
     vi.spyOn(SaveGame, "export").mockResolvedValue("VCTOWER1\nfake");
-    await runExportFlow(flowDeps(ui), () => {});
+    await runExportFlow(flowDeps(ui), saved());
     expect(toasts[toasts.length - 1]).toEqual(LIVE_TOAST);
   });
 
@@ -138,7 +143,10 @@ describe("export single-flight latch (GH #760)", () => {
       return Promise.resolve("VCTOWER1\nfake");
     });
     const { ui } = fakeUi();
-    await runExportFlow(flowDeps(ui), () => order.push("stamp"));
+    await runExportFlow(flowDeps(ui), () => {
+      order.push("stamp");
+      return saved()();
+    });
     expect(order).toEqual(["stamp", "export"]);
   });
 
@@ -146,7 +154,7 @@ describe("export single-flight latch (GH #760)", () => {
     vi.useFakeTimers();
     vi.spyOn(SaveGame, "export").mockReturnValueOnce(new Promise<string>(() => {}));
     const { ui, toasts } = fakeUi();
-    void runExportFlow(flowDeps(ui), () => {});
+    void runExportFlow(flowDeps(ui), saved());
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS - 1);
     expect(toasts).toEqual([]);
     await vi.advanceTimersByTimeAsync(1);
@@ -159,14 +167,14 @@ describe("export single-flight latch (GH #760)", () => {
     const retry = deferred<string>();
     vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise).mockReturnValueOnce(retry.promise);
     const { ui, toasts, downloads } = fakeUi();
-    const first = runExportFlow(flowDeps(ui), () => {});
+    const first = runExportFlow(flowDeps(ui), saved());
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
-    const second = runExportFlow(flowDeps(ui), () => {});
+    const second = runExportFlow(flowDeps(ui), saved());
     // The first export lands late: its download still arrives, but the
     // retry still holds the latch, so a third attempt stays a no-op.
     slow.resolve("VCTOWER1\nfake");
     await first;
-    await runExportFlow(flowDeps(ui), () => {});
+    await runExportFlow(flowDeps(ui), saved());
     expect(downloads).toHaveLength(1);
     retry.resolve("VCTOWER1\nfake");
     await second;
@@ -179,7 +187,7 @@ describe("export single-flight latch (GH #760)", () => {
     const slow = deferred<string>();
     vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise);
     const { ui, toasts, downloads } = fakeUi();
-    const run = runExportFlow(flowDeps(ui), () => {});
+    const run = runExportFlow(flowDeps(ui), saved());
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
     slow.resolve("VCTOWER1\nfake");
     await run;
@@ -192,7 +200,7 @@ describe("export single-flight latch (GH #760)", () => {
     const slow = deferred<string>();
     vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise);
     const { ui, toasts, downloads } = fakeUi([false]);
-    const run = runExportFlow(flowDeps(ui), () => {});
+    const run = runExportFlow(flowDeps(ui), saved());
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
     slow.resolve("VCTOWER1\nfake");
     await run;
@@ -232,7 +240,7 @@ describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", (
     const slow = deferred<string>();
     vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise);
     const { ui, toasts, said, downloads } = fakeUi();
-    const vctower = runExportFlow(flowDeps(ui), () => {});
+    const vctower = runExportFlow(flowDeps(ui), saved());
     let legacy = 0;
     const ran = await runLegacyDownload(ui, () => {
       legacy++;
@@ -258,7 +266,7 @@ describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", (
     });
     // A .vctower export fired while the legacy download holds the latch bails
     // before it serializes or opens anything.
-    await runExportFlow(flowDeps(ui), () => {});
+    await runExportFlow(flowDeps(ui), saved());
     expect(legacy).toBe(1);
     expect(downloads).toEqual([]);
     // ...and quietly: the #1012 message is only for a .TDT click.
@@ -300,7 +308,10 @@ describe("runExportFlow with an engine host that settles", () => {
     setStepGate(first, { canStep: () => true, flush: () => {}, settle: async () => { settled.push(first); held = second; } });
     setStepGate(second, { canStep: () => true, flush: () => {}, settle: async () => { settled.push(second); } });
     const stamped: Simulation[] = [];
-    await runExportFlow({ getSim: () => held, ui }, (sim) => stamped.push(sim));
+    await runExportFlow({ getSim: () => held, ui }, () => {
+      stamped.push(held);
+      return saved(held)();
+    });
     expect(settled).toEqual([first, second]);
     expect(stamped).toEqual([second]);
     expect(downloads).toHaveLength(1);

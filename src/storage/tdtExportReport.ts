@@ -2,7 +2,7 @@ import { GRID } from "../engine/facilities";
 import type { SerializedGame } from "../engine/types";
 import { TDT_ELEVATOR_SLOTS } from "./tdtConstants";
 import { legacyFilename } from "./tdtExportTables";
-import type { GatheredTower } from "./tdtExportGather";
+import type { ExportCounts, GatheredTower } from "./tdtExportGather";
 import type { EncodeStats } from "./tdtEncoder";
 
 /**
@@ -29,13 +29,22 @@ export interface ExportReport {
   staysBehind: string[];
 }
 
-export function buildExportReport(save: SerializedGame, gathered: GatheredTower, stats: EncodeStats): ExportReport {
-  const { extents, counts } = gathered;
-  const { balance, money, star } = stats;
+/** The numbers an export report reads. `buildTDT` derives them from the
+ *  gather tally and the encode stats ({@link buildExportReport}); the engine
+ *  port answers them as the `tdtExport` record, with the tower's name. */
+export interface ExportReportFacts {
+  towerName: string;
+  counts: ExportCounts;
+  stats: EncodeStats;
+  /** The highest floor and the basement levels the file can contain. */
+  topFloor: number;
+  basements: number;
+}
 
+export function buildExportReport(save: SerializedGame, gathered: GatheredTower, stats: EncodeStats): ExportReport {
   let topFloor = 0;
   let basements = 0;
-  for (const [floor] of extents) {
+  for (const [floor] of gathered.extents) {
     // Count only floors the encoded file can contain (TDT rows 0-109): a
     // skipped out-of-range room widened extents the reserved rows never
     // echo, and the modal facts must match the bytes.
@@ -43,6 +52,18 @@ export function buildExportReport(save: SerializedGame, gathered: GatheredTower,
     if (floor > topFloor) topFloor = floor;
     if (floor < 1) basements = Math.max(basements, 1 - floor);
   }
+  // A save without a string name still exports (the bytes carry no name), so
+  // the report reads it as an empty name and the file falls back to TOWER1
+  // rather than throwing (#887).
+  const towerName = typeof save.towerName === "string" ? save.towerName : "";
+  return exportReport({ towerName, counts: gathered.counts, stats, topFloor, basements });
+}
+
+/** The reverse fidelity report from its numbers. */
+export function exportReport(facts: ExportReportFacts): ExportReport {
+  const { counts, stats, topFloor, basements, towerName } = facts;
+  const { balance, money, star } = stats;
+
   // Shafts that will actually be THERE in 1994. Every express after the first
   // is lost to the game-side desync (see the staysBehind line below), so
   // counting encoded records here would have the modal promise a shaft in one
@@ -123,10 +144,6 @@ export function buildExportReport(save: SerializedGame, gathered: GatheredTower,
   staysBehind.push("People in transit are not carried; the crowd re-simulates on load.");
   staysBehind.push("Satisfaction detail resets; tenants re-judge the tower as it runs.");
 
-  // A save without a string name still exports (the bytes carry no name), so
-  // the report reads it as an empty name and the file falls back to TOWER1
-  // rather than throwing (#887).
-  const towerName = typeof save.towerName === "string" ? save.towerName : "";
   return {
     towerName,
     filename: legacyFilename(towerName),
