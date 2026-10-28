@@ -20,10 +20,10 @@ name: PR screenshot drift-check
 #
 #   3. ENGINE PARITY: `capture-wasm` renders the same scenes with the WASM engine
 #      hosting the tower, and `engine-parity` fails when that render differs from
-#      this run's TypeScript render, naming the first differing shot;
-#      `engine-parity-visual` runs the visual specs on the engine against the
-#      committed baselines. Both are separate checks from `drift-gate` (which
-#      stays on the TypeScript engine's gallery) and never commit anything.
+#      this run's TypeScript render, naming the first differing shot. It is a
+#      separate check from `drift-gate` (which stays on the TypeScript engine's
+#      gallery) and never commits anything. The visual baselines are not
+#      checked here: the `e2e` job in test.yml compares them on the Rust engine.
 #
 # PREREQUISITE: the `screenshot-approval` Environment must exist with a required
 # reviewer (repo Settings -> Environments). Without a required reviewer the gate
@@ -70,8 +70,7 @@ jobs:
   #   colocated *.test.ts files), but re-include the test fixtures
   #   (src/tests/fixtures/**) and the saved towers (conformance/fixtures/**). No
   #   scene loads a saved tower today; the rule keeps a future one covered.
-  #   Plus the generator, this workflow, the reusable capture, and the visual
-  #   specs' harness (engine-parity-visual's inputs). The app version
+  #   Plus the generator, this workflow and the reusable capture. The app version
   #   is deliberately NOT matched: the generator masks it to a fixed placeholder at
   #   capture time (pgMaskVersion), so a package.json/vite.config.ts version bump no
   #   longer changes committed pixels; matching them would fire the capture on every
@@ -120,7 +119,7 @@ jobs:
             case "$f" in .github/workflows/pr-drift-check.yml) sign=+ ;; esac
             case "$f" in .github/workflows/screenshot-capture.yml) sign=+ ;; esac
             # The Rust engine and the build of its WASM package: the engine legs
-            # (capture-wasm, engine-parity, engine-parity-visual) render on it.
+            # (capture-wasm, engine-parity) render on it.
             # The package is build output, so an engine change no longer shows
             # up as a src/public/engine/ change; its inputs count instead.
             # The engine's inputs that can reach the package: the crate but its
@@ -131,12 +130,6 @@ jobs:
             case "$f" in engine-rs/*|conformance/events/*) sign=+ ;; esac
             case "$f" in engine-rs/*.md|conformance/events/*.md) sign=- ;; esac
             case "$f" in scripts/wasm-build.ts|scripts/build-engine-wasm.sh|.github/actions/engine-wasm/*|.github/actions/engine-wasm-download/*) sign=+ ;; esac
-            # The visual specs and their harness: engine-parity-visual is the only
-            # job that runs visual.spec.ts on chromium-wasm (PW_WASM_VISUAL=1), so a
-            # change to the spec, its helpers, its baselines or the Playwright
-            # config must reach it.
-            case "$f" in e2e/visual.spec.ts|e2e/helpers.ts|playwright.config.ts) sign=+ ;; esac
-            case "$f" in e2e/visual.spec.ts-snapshots/*) sign=+ ;; esac
             # The pinned Playwright/browser + font versions come from the lockfile, and
             # a bump there can shift antialiasing across the WHOLE committed gallery.
             # This filter used to exclude the lockfile to avoid a capture on every
@@ -281,81 +274,6 @@ jobs:
           echo "$changed"
           exit 1
 
-  # The visual baselines on the engine, on every render-affecting PR: the
-  # visual specs run on chromium-wasm (PW_WASM_VISUAL=1) in the pinned image
-  # against the committed baselines, and any pixel difference fails this job.
-  # It never mints. The image tag comes from the WASM capture's resolve step;
-  # without one the job fails to start rather than skipping.
-  engine-parity-visual:
-    needs: [changes, capture-wasm]
-    if: ${{ !cancelled() && needs.changes.outputs.render == 'true' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    container:
-      image: ${{ needs.capture-wasm.outputs.image }}
-    env:
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-
-      - name: Use Node.js (from .nvmrc)
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: ".nvmrc"
-
-      - name: Install dependencies
-        run: npm ci
-
-      # The engine's WASM package is build output, not checked in; the WASM
-      # capture's resolve job restored or built it for this same head.
-      - uses: ./.github/actions/engine-wasm-download
-        with:
-          artifact-name: engine-wasm-package
-
-      - name: Build
-        run: npm run build
-        env:
-          VC_TOOLING: "1"
-
-      # PW_WASM_VISUAL makes playwright.config.ts compare pixels (on CI or off)
-      # and turns snapshot writing off.
-      - name: Compare the WASM engine's render with the committed baselines
-        run: npx playwright test e2e/visual.spec.ts --project=chromium-wasm
-        env:
-          PW_WASM_VISUAL: "1"
-
-      - name: Name the first differing shot
-        if: failure()
-        run: |
-          # Pixel failures leave a *-diff.png in their result folder, and a spec
-          # with no committed baseline leaves only an *-actual.png; anything else
-          # (a hosting guard, a timeout) failed before it compared.
-          diff="$(find test-results -name '*-diff.png' 2>/dev/null | sort | head -1)"
-          actual="$(find test-results -name '*-actual.png' 2>/dev/null | sort | head -1)"
-          if [ -n "$diff" ]; then
-            echo "::error::engine parity: the first shot that differs on the WASM engine is $(basename "$diff" -diff.png) ($(basename "$(dirname "$diff")")); if this PR changes rendering, mint the baselines first, then re-run"
-          elif [ -n "$actual" ]; then
-            echo "::error::no committed baseline for $(basename "$actual" -actual.png); the TypeScript baselines must be minted first"
-          else
-            echo "::error::a visual spec failed on the WASM engine without a pixel diff (setup, hosting, or a timeout): $(ls test-results 2>/dev/null | head -1)"
-          fi
-          exit 0
-
-      - name: Upload the engine's visual diffs
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: playwright-visual-engine-diffs
-          path: test-results/
-          if-no-files-found: ignore
-
-  # Signal 2's detector: assemble the verified run over the PR's committed gallery
-  # and record whether anything changed (has_drift), WITHOUT committing. Posts a
-  # best-effort advisory comment. Never fails on drift.
   verify-drift:
     needs: capture
     runs-on: ubuntu-latest

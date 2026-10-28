@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { hasWebGL, showBootMessage, bootGame, hideBootCover, showEngineFailure } from "./bootstrap";
+import { hasWebGL, showBootMessage, bootGame, hideBootCover, showCrashReload, showEngineFailure } from "./bootstrap";
+import { isEngineStopped } from "./game/interactionState";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import { inject as injectWebAnalytics } from "@vercel/analytics";
 
@@ -290,6 +291,21 @@ describe("showEngineFailure", () => {
     document.body.appendChild(late);
     await Promise.resolve();
     expect(late.inert).toBe(true);
+  });
+
+  it("stops the game behind a crash's reload line as behind the failure message (#1422)", () => {
+    document.body.innerHTML = `<div id="stage"><button id="quick-save">Quick Save</button></div><dialog id="modal"></dialog>`;
+    const dialog = document.getElementById("modal") as HTMLDialogElement;
+    dialog.showModal();
+    const button = document.getElementById("quick-save") as HTMLButtonElement;
+    button.focus();
+    showCrashReload("Reloading your tower from its last autosave.");
+    expect(dialog.open).toBe(false);
+    expect((document.getElementById("stage") as HTMLElement).inert).toBe(true);
+    expect(document.activeElement).not.toBe(button);
+    // No key, autosave or dialog reaches the trapped engine while the line shows.
+    expect(isEngineStopped()).toBe(true);
+    expect(document.getElementById("engine-failure")?.textContent).toContain("Reloading your tower");
   });
 
   it("closes an open modal dialog, which would otherwise cover the Reload button", () => {

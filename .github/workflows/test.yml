@@ -204,14 +204,26 @@ jobs:
       - name: Run end-to-end tests
         run: npm run e2e
 
+      # The suite runs on the Rust engine (#1353). Players can still be on the
+      # TypeScript engine (the Automatic cohort, a Settings choice), so the
+      # @ts-smoke test also runs on it. PW_ENGINE=ts is the same project, seeded
+      # TypeScript; `npm run e2e:ts` runs the whole suite that way by hand.
+      - name: End-to-end smoke on the TypeScript engine
+        run: npm run e2e:ts -- --grep @ts-smoke
+
       # The E5-S0 perf gate: run the ui.update micro-benchmark, the throttled
       # end-to-end speed probe, and the node-identity check against the committed
       # baseline (e2e/perf/baseline.json). Runs in the SAME pinned container the
       # baseline was minted in, so the numbers are comparable. When no baseline is
       # committed yet, the spec captures one and skips the assertions (bootstrap),
       # so this is inert until update-perf-baseline.yml mints the reference set.
+      #
+      # The committed baseline was measured on the TypeScript engine, so the gate
+      # runs on it (PW_ENGINE=ts) until a Rust baseline is minted.
       - name: Perf gate (E5-S0)
         run: npm run perf
+        env:
+          PW_ENGINE: "ts"
 
       # Per-run visual proof of the ★-progression. milestones.spec.ts writes to
       # the untracked e2e/output/ dir (never the committed, human-blessed

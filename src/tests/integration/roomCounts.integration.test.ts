@@ -34,9 +34,9 @@ function pick(sim: Simulation, n: number, keep: (u: Unit) => boolean): Unit | un
  * counted field that does not mark its room leaves the kept counts behind the
  * walk, so this catches any write site the run reaches. Fires, departures,
  * rate changes, reprices, sales and builds are issued along the way. How
- * often each count moved between reads, leaving out the reads after a sale
- * or a build (which rebuild the rooms list and count every room), shows that
- * marked writes moved them. The rarer writes have their own cases in
+ * often each count moved between reads, leaving out the reads that found a
+ * new rooms list (which count every room, whatever rebuilt the list), shows
+ * that marked writes moved them. The rarer writes have their own cases in
  * `src/engine/tower/roomCounts.test.ts`.
  */
 function run(name: string, save: string): { moved: Record<keyof Counts, number>; rebuilds: number } {
@@ -45,11 +45,16 @@ function run(name: string, save: string): { moved: Record<keyof Counts, number>;
   const moved = Object.fromEntries(FIELDS.map((f) => [f, 0])) as Record<keyof Counts, number>;
   let rebuilds = 0;
   let last = sim.stats();
-  const check = (label: string, rebuilt = false) => {
+  let lastRooms = roomUnits(sim.tower);
+  const check = (label: string) => {
     const now = sim.stats();
     expect(now, `${name}, ${label}`).toMatchObject(walkedStats(sim));
-    if (!rebuilt) for (const f of FIELDS) if (now[f] !== last[f]) moved[f]++;
+    // The kept counts are keyed on the rooms list: a new list means every
+    // room was counted again, so its changes say nothing about the marks.
+    const rooms = roomUnits(sim.tower);
+    if (rooms === lastRooms) for (const f of FIELDS) if (now[f] !== last[f]) moved[f]++;
     last = now;
+    lastRooms = rooms;
   };
   for (let step = 1; step <= STEPS; step++) {
     sim.tick(2);
@@ -79,9 +84,9 @@ function run(name: string, save: string): { moved: Record<keyof Counts, number>;
       if (room) {
         const { kind, floor, x } = room;
         const sold = sim.sellAt(floor, x);
-        check(`sale at ${step}`, true);
+        check(`sale at ${step}`);
         if (sold && sim.build(kind, floor, x).ok) rebuilds++;
-        check(`build at ${step}`, true);
+        check(`build at ${step}`);
       }
     }
   }
@@ -97,8 +102,9 @@ describe("the HUD's kept room counts follow a running simulation", () => {
       for (const f of FIELDS) totals[f] += result.moved[f];
       rebuilds += result.rebuilds;
     }
-    // What the runs reached: every condition count and the population moved
-    // under marked writes, and a sale and a build went through.
+    // What the three runs reached together: every condition count and the
+    // population moved under marked writes, and a sale and a build went
+    // through.
     for (const f of ["population", "occupiedOffices", "vacant", "vacantNoRate", "soldCondos", "occupiedHotel", "dirty"] as const) {
       expect(totals[f], f).toBeGreaterThan(0);
     }

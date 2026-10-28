@@ -92,21 +92,41 @@ describe("single room writes reach the HUD's kept counts", () => {
 });
 
 describe("the HUD's kept counts read", () => {
-  it("a room's kind and the counted fields only, for every kind and state in both modes", () => {
+  it("a room's kind and the counted fields only, for every kind, state and field combination in both modes", () => {
     const states: UnitState[] = ["construction", "empty", "occupied", "moving_in", "vacating", "asleep", "dirty", "infested", "fire", "gutted"];
     const read = new Set<string>();
     for (const mode of ["classic", "modern"] as const) {
       const sim = Simulation.newGame(3, mode);
       let id = 1;
+      // Each of the four flag fields set or not, independently, and the
+      // occupants at none or one, so a field read on one branch only (a sold
+      // condo with no household, a let office off the market) is reached.
+      const yesNo = [false, true];
+      const combos = yesNo.flatMap((noRate) =>
+        yesNo.flatMap((everOccupied) =>
+          yesNo.flatMap((hasResidents) =>
+            yesNo.flatMap((hasCustomers) =>
+              yesNo.map((hasOccupants) => ({
+                noRate,
+                everOccupied,
+                residents: hasResidents ? 3 : undefined,
+                customersIn: hasCustomers ? 2 : undefined,
+                occupants: hasOccupants ? 1 : 0,
+              })),
+            ),
+          ),
+        ),
+      );
       const units = ALL_KINDS.flatMap((kind) =>
         states.flatMap((state) =>
-          [false, true].map((flag) => {
-            const fields = { id: id++, kind, floor: 2, x: 0, width: 1, state, noRate: flag, everOccupied: flag, residents: flag ? 3 : undefined, customersIn: flag ? 2 : undefined, occupants: 1 };
+          combos.map((combo) => {
+            const fields = { id: id++, kind, floor: 2, x: 0, width: 1, state, ...combo };
+            const note = (key: string | symbol) => read.add(String(key));
             return new Proxy(fields as unknown as Unit, {
-              get: (target, key, receiver) => {
-                read.add(String(key));
-                return Reflect.get(target, key, receiver);
-              },
+              get: (target, key, receiver) => (note(key), Reflect.get(target, key, receiver)),
+              has: (target, key) => (note(key), Reflect.has(target, key)),
+              getOwnPropertyDescriptor: (target, key) => (note(key), Reflect.getOwnPropertyDescriptor(target, key)),
+              ownKeys: (target) => (note("(ownKeys)"), Reflect.ownKeys(target)),
             });
           }),
         ),

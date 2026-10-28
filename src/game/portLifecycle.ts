@@ -1,5 +1,6 @@
 import type { SerializedView } from "../engine/types";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
+import { engineTrapped } from "./engineFault";
 
 /**
  * The lifecycle members' records as the game's callers read them (contract
@@ -18,10 +19,17 @@ export function swapDone(port: Pick<EnginePort, "lastReason">, rec: PortRecord):
   if (rec[0] !== 1) throw new Error(port.lastReason() ?? SWAP_REFUSED);
 }
 
+/** Why no save is written once the running engine trapped. */
+export const TRAPPED_SAVE_REFUSED = "The engine stopped after an error, so the last save is kept.";
+
 /** The live tower's save text, with the live camera stamped first so the view
  *  travels with it. A null camera (no renderer, as in headless tests) stamps
- *  nothing, so it never erases the view the tower already carries. */
+ *  nothing, so it never erases the view the tower already carries.
+ *  Once the running engine trapped (#874) its state may be half-written, so
+ *  this throws before asking it: every save, autosave, slot and export goes
+ *  through here, and the last good save stays for the reload (#1422). */
 export function saveText(port: Pick<EnginePort, "setCamera" | "serialize">, view: SerializedView | null): string {
+  if (engineTrapped()) throw new Error(TRAPPED_SAVE_REFUSED);
   stampCamera(port, view);
   return port.serialize();
 }

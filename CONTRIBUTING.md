@@ -178,6 +178,11 @@ Verticopolis has **two test tiers**:
   a wasm-only tooling build (`VC_ENGINE=wasm VC_TOOLING=1 npm run build`),
   with `e2e/wasmOnly.spec.ts` covering its boot, failures and offline start;
   CI runs it as the `e2e-wasm-only` job.
+  The suite runs on the Rust engine only (`chromium-wasm`). While players can
+  still be on the TypeScript engine, `PW_ENGINE=ts` runs the same specs on it
+  as the `chromium-ts` project: CI runs the `@ts-smoke` test that way (and the
+  perf gate, whose baseline is TypeScript's), and `npm run e2e:ts` runs the
+  whole suite on it by hand. Visual specs never run on it.
   Specs cover boot/integration, milestones, a full win, and visual baselines.
   See [`playwright.config.ts`](./playwright.config.ts) for how visual baselines
   are minted by CI (local runs smoke the flows but skip pixel comparison unless
@@ -278,15 +283,13 @@ A plain host `npm run screenshots` is still preview-only because host Chromium
 and font rasterization may differ from the pinned image. See
 [`docs/screenshots.md`](./docs/screenshots.md) for the workflow details.
 
-Both checks run on two engines. The committed gallery and baselines are the
-TypeScript engine's, and engine legs render the same scenes with the WASM engine
-hosting the tower (`VC_SHOT_ENGINE=wasm` for `scripts/screenshots.ts`,
-`PW_WASM_VISUAL=1 npx playwright test e2e/visual.spec.ts --project=chromium-wasm`
-for the baselines): `pr-drift-check` compares the engine's gallery with the same
-run's TypeScript render (`engine-parity`) and the engine's visual specs with the
-committed baselines (`engine-parity-visual`), and `update-visual-baselines`
-repeats the visual comparison after a mint. Any pixel difference fails the leg
-as an engine parity finding to report; the engine legs never commit or mint.
+The Playwright visual baselines are the Rust engine's (#1353): the suite runs
+on the `chromium-wasm` project, which mints and compares them in `npm run e2e`
+and in `update-visual-baselines`. There is one set of images. The committed
+gallery is still the TypeScript engine's; `pr-drift-check` compares it with a
+render on the WASM engine (`VC_SHOT_ENGINE=wasm`, the `engine-parity` check),
+and any pixel difference fails that leg as an engine parity finding to report.
+It never commits.
 
 ### Coverage floors
 
