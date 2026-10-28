@@ -150,5 +150,6 @@ src/engine/port/layout.ts
 src/engine/port/metaLog.ts
 src/engine/port/queries.ts
 src/engine/port/record.ts
+src/engine/port/render.ts
 src/engine/port/tsEngine.ts
 src/engine/port/viewEncode.ts

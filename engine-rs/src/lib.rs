@@ -43,6 +43,7 @@ mod load_stream;
 mod noise;
 pub mod panels;
 pub mod presence;
+pub mod render_reads;
 pub mod rent;
 pub mod rng;
 pub mod rules;

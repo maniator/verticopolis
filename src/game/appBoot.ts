@@ -5,6 +5,7 @@ import { SaveLoad, RESUME_AFTER_RECOVERY_KEY } from "./saveLoad";
 import { InspectorController } from "./inspector";
 import { createCardKit } from "./cardKit";
 import { KeyboardPlay } from "./keyboardPlay";
+import { catalogOf, isUnlocked } from "./portAccess";
 import { attemptContextRecovery } from "./contextRecovery";
 import { isEngineStopped, isSplashUp } from "./interactionState";
 import { showCrashScreen } from "../ui/crashScreen";
@@ -65,8 +66,11 @@ export function bootReason(flags: {
  *  re-asks `app.sim` per call, so an adoptSim() swap is picked up automatically. */
 export function wireControllers(app: GameApp): void {
   app.build = new BuildActions({
-    getSim: () => app.sim,
-    port: app.port,
+    enginePort: () => app.enginePort,
+    portCodes: () => app.portCodes,
+    reader: () => app.reader,
+    catalog: () => catalogOf(app),
+    isUnlocked: (kind) => isUnlocked(app, kind),
     ui: { toast: (text, kind) => app.ui.toast(text, kind) },
     audio: app.audio,
     selectedId: () => app.selected?.id ?? null,
@@ -167,8 +171,11 @@ export function wireControllers(app: GameApp): void {
     },
   });
   app.keyboard = new KeyboardPlay({
-    getSim: () => app.sim,
-    port: app.port,
+    enginePort: () => app.enginePort,
+    portCodes: () => app.portCodes,
+    reader: () => app.reader,
+    catalog: () => catalogOf(app),
+    isUnlocked: (kind) => isUnlocked(app, kind),
     engine: () => app.engine,
     audio: app.audio,
     ui: { toast: (text, kind) => app.ui.toast(text, kind) },

@@ -51,6 +51,9 @@ impl Simulation {
         let rush = self.rush_factor();
         self.elevators.accumulate(&self.tower, dt_minutes, rush);
         self.crowd.begin_step();
+        // The renderer's queue projection, built once a step at its start
+        // (`Crowd::queue_view`), as the TypeScript loop primes it.
+        self.crowd.queue_view(&self.tower);
         // A fractional id (a forged save) matches no cinema, so only whole
         // ids reach the crowd's set.
         self.crowd.blockbusters = self

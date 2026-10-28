@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..");
 
-const ROOTS = ["src/simport/enginePort.ts", "src/simport/viewReader.ts", "src/simport/portCodes.ts", "src/simport/cards.ts", "src/simport/scheduleSlots.ts"];
+const ROOTS = ["src/simport/enginePort.ts", "src/simport/viewReader.ts", "src/simport/portCodes.ts", "src/simport/portRenderSim.ts", "src/simport/cards.ts", "src/simport/scheduleSlots.ts"];
 
 /** The modules the TypeScript engine runs on. */
 const SIMULATION = [/^src\/engine\/sim\//, /^src\/engine\/Simulation\.ts$/, /^src\/engine\/Tower\.ts$/, /^src\/engine\/crowd\//];

@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -563,6 +563,24 @@
       "minutesLeft",
       "noticeSatisfaction",
       "keepAt"
+    ],
+    "queueView": [
+      "landings",
+      "cars"
+    ],
+    "queueLanding": [
+      "shaft",
+      "floor",
+      "count",
+      "tier"
+    ],
+    "queueCar": [
+      "shaft",
+      "car",
+      "riders"
+    ],
+    "parkingSet": [
+      "count"
     ],
     "loadTdt": [
       "status",

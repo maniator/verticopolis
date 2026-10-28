@@ -168,8 +168,19 @@ export function setRoomState(tower: Tower, u: Unit, state: UnitState): void {
 export function markRoom(tower: Tower, u: Unit): void {
   const m = marks.get(tower);
   if (!m) return;
+  m.seq++;
   m.ledger?.changed.add(u);
   m.watch?.add(u);
+}
+
+/** How many rooms `tower` has had marked since the first call that counted,
+ *  watched or asked this of it: equal answers mean no field {@link markRoom}
+ *  covers has been written between them, so a memo of what only those fields
+ *  and the revision feed may key on it. The first call starts the count. */
+export function roomMarkCount(tower: Tower): number {
+  let m = marks.get(tower);
+  if (!m) marks.set(tower, (m = { seq: 0 }));
+  return m.seq;
 }
 
 /**
@@ -181,7 +192,7 @@ export function markRoom(tower: Tower, u: Unit): void {
  */
 export function watchRooms(tower: Tower): Set<Unit> {
   let m = marks.get(tower);
-  if (!m) marks.set(tower, (m = {}));
+  if (!m) marks.set(tower, (m = { seq: 0 }));
   return (m.watch ??= new Set());
 }
 
@@ -268,9 +279,10 @@ interface RoomLedger {
   changed: Set<Unit>;
 }
 
-/** A tower's mark sinks: the counts' ledger and the view's watch set. One
- *  map, so a mark costs one lookup. */
-const marks = new WeakMap<Tower, { ledger?: RoomLedger; watch?: Set<Unit> }>();
+/** A tower's mark sinks: the counts' ledger, the view's watch set and the
+ *  number of marks taken since the entry was made. One map, so a mark costs
+ *  one lookup. */
+const marks = new WeakMap<Tower, { ledger?: RoomLedger; watch?: Set<Unit>; seq: number }>();
 
 const OCCUPIED_OFFICE = 1;
 const VACANT = 2;
@@ -330,6 +342,6 @@ function countRooms(tower: Tower, rooms: readonly Unit[]): RoomCounts {
   const ledger = { rooms, counts, shares, changed: new Set<Unit>() };
   const m = marks.get(tower);
   if (m) m.ledger = ledger;
-  else marks.set(tower, { ledger });
+  else marks.set(tower, { ledger, seq: 0 });
   return counts;
 }

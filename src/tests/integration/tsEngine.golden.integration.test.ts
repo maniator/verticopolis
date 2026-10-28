@@ -89,6 +89,14 @@ function sameReads(p: [EnginePort, EnginePort]): void {
   same(p, (e) => e.onboarding(), "onboarding");
   same(p, (e) => e.crewCoverage(), "crewCoverage");
   for (let m = 0; m < VIEW_LAYOUT.heatModes.length; m++) same(p, (e) => e.heatCells(m), `heat ${m}`);
+  same(p, (e) => e.congestion(), "congestion");
+  same(p, (e) => e.queueView(), "queueView");
+  same(p, (e) => e.parkingSet(), "parkingSet");
+  for (const spots of [0, 3, 40, -1, NaN]) same(p, (e) => e.parkingUsage(spots), `parkingUsage ${spots}`);
+  same(p, (e) => e.recyclingFill(), "recyclingFill");
+  for (const [floor, x] of [[1, 170], [2, 170], [3, 200], [5, 0], [2.5, 170]]) {
+    same(p, (e) => e.positionReachable(floor, x), `reachable ${floor} ${x}`);
+  }
   for (const id of units(p[0])) {
     same(p, (e) => e.unitCard(id), `unit ${id}`);
     same(p, (e) => e.unitLabel(id), `label ${id}`);
@@ -119,6 +127,21 @@ describe("TsEngine against the Rust Engine", () => {
       }
       sameReads(p);
     }
+  });
+
+  it.skipIf(!hasWasmPackage())("draws the same queues and congestion after every short step of a rush", () => {
+    // The frame reads both once per frame: each engine builds its queue
+    // projection at the start of a step and keeps both answers until the
+    // next, so a read after any step matches.
+    const p = pair();
+    let queued = 0;
+    for (let i = 0; i < 360; i++) {
+      p.forEach((e) => e.tick(2));
+      const q = same(p, (e) => e.queueView(), `queueView ${i}`, false);
+      if (q[0] > 0) queued++;
+      same(p, (e) => e.congestion(), `congestion ${i}`, false);
+    }
+    expect(queued).toBeGreaterThan(0);
   });
 
   it.skipIf(!hasWasmPackage())("answers every command with the same record", () => {

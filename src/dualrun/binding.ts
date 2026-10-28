@@ -64,8 +64,8 @@ export const INSTANCE_METHODS = [
   // PR 1d's report queries and file members.
   "statsSheet", "unitFacts", "loadVctower", "exportVctower", "loadTdt", "tdtNote", "tdtTowerName",
   "adoptTdt", "tdtExport", "tdtFile",
-  // PR 5's frame step.
-  "advance",
+  // PR 5's frame step and render queries.
+  "advance", "congestion", "queueView", "parkingSet", "parkingUsage", "recyclingFill", "positionReachable",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 
