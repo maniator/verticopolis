@@ -1,4 +1,5 @@
 import { SLOT_COUNT, SaveGame } from "../storage/SaveGame";
+import type { PortRecord } from "../simport/enginePort";
 import { swapDone } from "./portLifecycle";
 import type { SaveLoadDeps } from "./saveLoad";
 
@@ -9,6 +10,9 @@ import type { SaveLoadDeps } from "./saveLoad";
  * is only what happens after the player clicks the primary: the engine swaps
  * the staged tower in (`adoptTdt`) and the app follows.
  *
+ * `stage` reads the confirmed report's own file into the engine again, since
+ * another file read after it would have replaced the one staged tower.
+ *
  * `flushCurrent` is the caller's `saveBeforeUpdate` bound, kept as a thunk so
  * the flush contract (throws on failure, caller decides) stays owned by
  * `SaveLoad` where its tests live.
@@ -17,6 +21,7 @@ export function adoptConfirmedLegacyImport(
   deps: Pick<SaveLoadDeps, "enginePort" | "portCodes" | "towerSwapped" | "ui">,
   towerName: string,
   flushCurrent: () => void,
+  stage: () => PortRecord,
 ): void {
   // Flush the CURRENT tower to the autosave slot first (same splash guard as
   // every other flush), so adopting the import can't cost the player their
@@ -31,9 +36,10 @@ export function adoptConfirmedLegacyImport(
   }
   const port = deps.enginePort();
   try {
+    swapDone(port, stage());
     swapDone(port, port.adoptTdt());
   } catch (err) {
-    // The staged file is gone (another file was read since): nothing swapped.
+    // The file no longer reads or adopts: nothing swapped.
     deps.ui.toast(`The tower could not be opened: ${(err as Error).message}`, "bad");
     return;
   }

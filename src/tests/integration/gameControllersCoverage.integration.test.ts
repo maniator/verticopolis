@@ -1129,6 +1129,16 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(last(f.toasts)).toEqual({ text: "Tower imported and saved to slot 1.", kind: "good" });
   });
 
+  it("importLegacy: each report opens its own file, whatever was read after it", () => {
+    saveLoad.importLegacy(buildTdt({ balance: 111 }).buffer as ArrayBuffer, "FIRST.TDT");
+    saveLoad.importLegacy(buildTdt({ balance: 222 }).buffer as ArrayBuffer, "SECOND.TDT");
+    saveLoad.importLegacy(new ArrayBuffer(4), "tiny.TDT");
+    f.importReports[0].open();
+    expect(adopted.map((s) => s.money)).toEqual([11_100]);
+    f.importReports[1].open();
+    expect(adopted.map((s) => s.money)).toEqual([11_100, 22_200]);
+  });
+
   it("importLegacy: a corrupt-but-present slot is NOT treated as free (raw presence wins)", () => {
     // A slot whose payload no longer parses may still be recoverable by a
     // later build; the import's fresh-slot copy must skip it, not reuse it.

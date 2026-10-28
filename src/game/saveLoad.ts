@@ -428,7 +428,8 @@ export class SaveLoad {
    */
   importLegacy(buffer: ArrayBuffer, filename: string): void {
     const port = this.deps.enginePort();
-    const rec = port.loadTdt(new Uint8Array(buffer), filename);
+    const bytes = new Uint8Array(buffer);
+    const rec = port.loadTdt(bytes, filename);
     if (rec[0] !== 1) {
       // The refusal is already player-readable: the importer's own sentence,
       // or "This SimTower save couldn't be read." with the detail.
@@ -440,7 +441,10 @@ export class SaveLoad {
       // The confirmed-adoption flow (flush, adopt, fresh-slot copy, honest
       // toasts) lives in ./legacyImportAdopt, split out at the 500-line guard.
       // The flush stays a bound thunk so its throw contract is owned here.
-      onOpen: () => adoptConfirmedLegacyImport(this.deps, report.towerName, () => this.saveBeforeUpdate()),
+      // The engine stages one file at a time, so the confirmation stages its
+      // own file again: a second read finished meanwhile cannot swap in.
+      onOpen: () =>
+        adoptConfirmedLegacyImport(this.deps, report.towerName, () => this.saveBeforeUpdate(), () => port.loadTdt(bytes, filename)),
     });
   }
 
