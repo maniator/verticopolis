@@ -219,9 +219,22 @@ The size gate is not in this table: it acts at a tower load (below).
   - A third limit: a device that sleeps or a clock that jumps forward with
     the game visible can make a live window's entry look stale until its
     next heartbeat, so a window that boots in that gap counts it once.
+- **A trap while the tower runs (#1422, owner 2026-10-28).** The page does
+  not hand the tower to TypeScript mid-game, since the module may be corrupt.
+  It stops the engine, sends a `crash-reload` row by beacon, shows a short
+  cover line and reloads onto the last autosave, still on Rust. The tab
+  counts its crashes per build in `vc.rustCrashes` (sessionStorage), and the
+  second one latches a fault with the reason `trap-loop` (stage
+  `crash-loop`) before the reload, so that boot runs TypeScript. That boot
+  offers the crash report once: a dialog with a zip the player downloads
+  (the save, both engines' identity, the fault's codes, the browser string)
+  and a prefilled bug report. The game never sends the zip. A wasm-only build has no
+  TypeScript to reload onto, so its second crash stops on the engine-failure
+  screen.
 - **Retry.** Settings shows the suppression and a "Try the Rust engine
   again" button, which clears the safety record and the marker. It takes
-  effect at the next start; the game never reloads itself.
+  effect at the next start; apart from the trap reload above, the game never
+  reloads itself.
 - **Analysis.** The suppression never changes the bucket or the assigned
   arm. A suppressed page life reports `safety_suppressed: true` and stays in
   the WASM arm's all-attempts safety analysis.
@@ -352,6 +365,12 @@ New values on existing fields:
   counts).
 - `trigger`: `size-gate`, a row when the gate moves a later tower in a page
   life.
+- `trigger`: `crash-reload`, the row a trap sends before the page reloads
+  (#1422), with `engine: "wasm"`, since the tower did not move to TypeScript.
+  A crash loop shows as two `crash-reload` rows (`trap-tick`) from one tab
+  on one build. Its `trap-loop` reason lives in the safety record and in
+  Settings, not in a row; a row value for it would be a new value and needs
+  the owner's OK.
 - `engine_requested` keeps its meaning (what the policy asked for). With a
   suppression, `engine_requested` is the selection before safety and
   `engine` is `ts`.
