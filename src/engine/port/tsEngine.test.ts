@@ -3,6 +3,7 @@ import { Simulation } from "../Simulation";
 import { INVALID_REQUEST, UNKNOWN_FACILITY } from "../request";
 import { KIND_CODES, VIEW_LAYOUT, VIEW_LAYOUT_TEXT, codeOf } from "./layout";
 import { MetaLog } from "./metaLog";
+import { ONBOARDING_FLAG } from "./queries";
 import { TsEngine } from "./tsEngine";
 
 /**
@@ -116,7 +117,7 @@ describe("TsEngine", () => {
     expect(e.quoteShaft(code("stairs"), 275, 1, 2)[0]).toBe(1);
     expect(e.statsStrip()).toHaveLength(VIEW_LAYOUT.records.statsStrip.length);
     expect(e.hotspot()).toHaveLength(2);
-    expect(e.onboarding() & 1).toBe(1);
+    expect(e.onboarding() & ONBOARDING_FLAG.lobby).toBe(ONBOARDING_FLAG.lobby);
     for (let m = 0; m < 4; m++) expect(e.heatCells(m).length % 5).toBe(0);
     expect(e.crewCoverage()).toHaveLength(7);
     expect(e.unitCard(idOf(e, "cinema"))).toHaveLength(20);

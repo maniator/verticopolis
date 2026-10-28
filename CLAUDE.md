@@ -59,6 +59,14 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
+- **Named flags, not bit math.** A set of named on/off facts (an `onboarding()`
+  answer, a status word, a mask a reader tests with `&`) gets one named constant
+  per flag (`ONBOARDING_FLAG.lobby`, `ONBOARDING_LOBBY`), on the writing side
+  and the reading side. Never `1 << i`, `2 ** i` over an index, or a bare
+  `bits & 4`, and never a bare number standing for a state or kind. A bitset
+  keyed by a real index (a kind code, a stop, a floor) or a byte codec is fine
+  and goes on the allowlist in `src/tests/namedFlags.guard.test.ts` with its
+  reason. This is the pattern the owner rejected in PR #1403.
 - **Rust follows the same source rules.** The engine port in `engine-rs/` is held to
   the same conventions as the TypeScript, with no grandfathered comments:
   American English, no em-dashes (`src/tests/rustProse.guard.test.ts` keeps the
