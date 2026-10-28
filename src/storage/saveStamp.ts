@@ -30,5 +30,8 @@ export function stampText(text: SaveText): { json: string; stamp: SaveStamp } {
   const spliceable =
     body.startsWith("{") && body.endsWith("}") && !/^\{\s*\}$/.test(body) && !body.includes('"savedAt"') && !body.includes('"appVersion"');
   if (spliceable) return { json: `${body.slice(0, -1)},${keys}}`, stamp };
-  return { json: JSON.stringify(Object.assign(JSON.parse(text) as object, stamp)), stamp };
+  const data = JSON.parse(text) as Partial<SaveStamp>;
+  data.savedAt = stamp.savedAt;
+  data.appVersion = stamp.appVersion;
+  return { json: JSON.stringify(data), stamp };
 }
