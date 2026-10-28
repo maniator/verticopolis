@@ -142,6 +142,6 @@ describe("engineSuffix", () => {
   it("names the worker placement", () => {
     expect(engineSuffix({ __vcEngine: { status: { hosted: true, placement: "worker" } } })).toBe(" · Rust engine (worker)");
     expect(engineSuffix({ __vcEngine: { status: { hosted: true } } })).toBe(" · Rust engine");
-    expect(engineSuffix({ __vcEngine: { status: { hosted: false, placement: "worker" } } })).toBe("");
+    expect(engineSuffix({ __vcEngine: { status: { hosted: false, placement: "worker" } } })).toContain(" · TypeScript engine ");
   });
 });
