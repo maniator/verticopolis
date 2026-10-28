@@ -305,6 +305,8 @@ describe("TsEngine's reports and files", () => {
     expect(founder()).not.toBe(true);
     e.loadSave(JSON.stringify(save));
     expect(founder()).toBe(true);
+    expect(e.loadSave("null")[0]).toBe(0);
+    expect(e.lastReason()).toBe("not a tower save (the save is null)");
   });
 
   it("writes, stages and adopts .TDT files", () => {

@@ -9,7 +9,7 @@ import type { SerializedGame } from "../types";
 import type { CalendarKind } from "../calendar";
 import type { GameMode } from "../types";
 import * as cmd from "./commands";
-import { message, readVctower, stageTdt, writeTdt, writeVctower, type StagedTdt } from "./files";
+import { deserializeSave, message, readVctower, stageTdt, writeTdt, writeVctower, type StagedTdt } from "./files";
 import { VIEW_LAYOUT, VIEW_LAYOUT_TEXT } from "./layout";
 import { MetaLog } from "./metaLog";
 import * as ask from "./queries";
@@ -162,7 +162,7 @@ export class TsEngine implements PortState {
     let next: Simulation;
     try {
       const raw = JSON.parse(text) as SerializedGame;
-      next = Simulation.deserialize(raw);
+      next = deserializeSave(raw);
       if (!keepLive) markFounderFromLoadedFile(next, raw);
     } catch (e) {
       this.reason = message(e);

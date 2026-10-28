@@ -23,6 +23,13 @@ import { buildTDT } from "../../storage/tdtExport";
 
 export const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
+/** `Simulation.deserialize` with the Rust reader's refusal of a JSON
+ *  `null` save (`load::deserialize`), so both engines give one reason. */
+export function deserializeSave(raw: SerializedGame | null): Simulation {
+  if (raw === null) throw new Error("not a tower save (the save is null)");
+  return Simulation.deserialize(raw);
+}
+
 /** A `.vctower` file read into a tower, with the founder rule a stored file
  *  takes: a save with no `appVersion` predates the stamp (before 2.0). */
 export function readVctower(text: string): Simulation {
@@ -31,7 +38,7 @@ export function readVctower(text: string): Simulation {
   const packed = lenientBase64(trimmed.slice(TOWER_FILE_MAGIC.length));
   const raw = parseSaveJson(new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(packed))) as SerializedGame;
   // Best effort past the parse, as `loadSave` and the Rust reader are.
-  const sim = Simulation.deserialize(raw);
+  const sim = deserializeSave(raw);
   markFounderFromLoadedFile(sim, raw);
   return sim;
 }

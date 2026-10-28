@@ -288,6 +288,8 @@ describe("TsEngine against the Rust Engine", () => {
     same(p, (e) => e.view(), "restore keeps the live camera");
     same(p, (e) => e.loadSave(save), "loadSave");
     same(p, (e) => e.view(), "a load takes the saved camera");
+    const nul = `${TOWER_FILE_MAGIC}\n${toBase64(deflateSync(new TextEncoder().encode("null"), { level: 1 }))}\n`;
+    same(p, (e) => e.loadVctower(nul), "a null payload");
     // The parse error's text is each engine's own.
     same(p, (e) => e.loadSave("{"), "a refused load", false);
     expect(p[1].lastReason()).toBeTruthy();
@@ -314,6 +316,8 @@ describe("TsEngine against the Rust Engine", () => {
     same(p, founder, "an unstamped save is a founder's");
     expect(founder(p[1])).toBe(true);
     same(p, (e) => JSON.parse(e.serialize()) as unknown, "the saves after the loads");
+    same(p, (e) => e.loadSave("null"), "a null save");
+    same(p, (e) => e.restore("null"), "a null snapshot");
     same(p, (e) => e.restore(stamped), "restore keeps no rule");
     same(p, founder, "a restored snapshot carries what it says");
   });
@@ -345,6 +349,8 @@ describe("TsEngine against the Rust Engine", () => {
     expect((JSON.parse(p[1].serialize()) as { founder?: boolean }).founder).toBe(true);
     same(p, (e) => JSON.parse(e.serialize()) as unknown, "the saves after the loads");
     sameReads(p);
+    const nul = `${TOWER_FILE_MAGIC}\n${toBase64(deflateSync(new TextEncoder().encode("null"), { level: 1 }))}\n`;
+    same(p, (e) => e.loadVctower(nul), "a null payload");
     // The parse error's text is each engine's own.
     same(p, (e) => e.loadVctower("VCTOWER1\n!!!"), "a damaged file", false);
     same(p, (e) => e.generation(), "generation", false);
