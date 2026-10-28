@@ -14,7 +14,7 @@ import {
   type BatchRungHandlers,
 } from "./templates/batchPricing";
 import { syncRungSelects } from "./templates/rungPicker";
-import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
+import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/sim/constants";
 import type { PriceOptions, PriceRung } from "../engine/gameRules";
 import type { FacilityKind } from "../engine/types";
 

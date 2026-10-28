@@ -69,7 +69,7 @@ function makeApp(over: Record<string, unknown> = {}) {
     portCodes,
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn() },
-    engine: { focus: vi.fn(() => ({})) },
+    engine: { focus: vi.fn(() => ({})) }, reader: { update: vi.fn(), rooms: [], structure: [] },
     ui: {
       update: vi.fn(),
       isEditorOpen: vi.fn(() => false),

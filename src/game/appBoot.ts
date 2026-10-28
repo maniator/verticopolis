@@ -164,7 +164,7 @@ export function wireControllers(app: GameApp): void {
         done,
       ),
     armOnboarding: () => {
-      app.onboarding.arm(app.sim);
+      app.onboarding.arm(app.enginePort);
     },
   });
   app.keyboard = new KeyboardPlay({

@@ -106,7 +106,7 @@ describe("wireControllers", () => {
     const sim = { id: "sim", star: 3, population: 800, isUnlocked: vi.fn(() => true) };
     const engine = { viewState: vi.fn(() => ({ view: 1 })), onContextRestored: null as unknown };
     const app = {
-      sim,
+      sim, enginePort: { id: "port" },
       engine,
       enginePort: { id: "engine port" }, portCodes: { id: "codes" }, reader: { id: "reader" },
       audio: { sfx: vi.fn(), setProgram: vi.fn() },
@@ -255,7 +255,7 @@ describe("wireControllers", () => {
     expect(rebuildEngine).toHaveBeenCalledWith(app);
     expect(done).toHaveBeenCalled();
     d.armOnboarding();
-    expect(app.onboarding.arm).toHaveBeenCalledWith(app.sim);
+    expect(app.onboarding.arm).toHaveBeenCalledWith(app.enginePort);
   });
 
   it("hands KeyboardPlay closures that reach the live app", () => {

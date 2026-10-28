@@ -1,5 +1,5 @@
 import { html, nothing, render as litRender } from "lit-html";
-import type { Simulation } from "../engine/Simulation";
+import type { EnginePort } from "../simport/enginePort";
 import { splashTemplate, type SplashHandlers } from "./splashTemplate";
 import { isDialogOpen, isEngineStopped } from "../game/interactionState";
 import { iconElement } from "./icons";
@@ -48,14 +48,17 @@ export interface OnboardStep {
   hintMobile: string;
   /** CSS selector(s) for the control(s) to pulse while this step is active. */
   pulse: string;
-  /** True once the player has genuinely done this — read from live sim state. */
-  done: (sim: Simulation) => boolean;
+  /** True once the player has done this, from the engine's `onboarding()` bits (this list's order). */
+  done: (bits: number) => boolean;
 }
 
+export type OnboardingPort = Pick<EnginePort, "onboarding">;
+/** The flag of each step in the engine's `onboarding()` answer (the layout's `onboarding` order). */
+export const ONBOARDING_FLAG = { lobby: 1, floor: 2, office: 4, connect: 8, play: 16 } as const;
+
 /** The five steps: empty lot → first office earning rent. Both rule-sets found
- *  the 1994 empty lot now, so step one always teaches the first lobby lay (its
- *  `done` predicate reads live state and fires once any lobby exists, whatever
- *  the mode). Advance on real game state, not scripted clicks. */
+ *  the 1994 empty lot now, so step one always teaches the first lobby lay,
+ *  whatever the mode. Advance on real game state, not scripted clicks. */
 export const ONBOARD_STEPS: OnboardStep[] = [
   {
     id: "lobby",
@@ -64,7 +67,7 @@ export const ONBOARD_STEPS: OnboardStep[] = [
     hintDesktop: "Pick Lobby in the palette, then click or drag along the ground line (the row above the dirt).",
     hintMobile: "Tap Lobby, then tap or drag along the ground line.",
     pulse: '.pal-item[data-kind="lobby"]',
-    done: (sim) => sim.tower.units.some((u) => u.kind === "lobby"),
+    done: (bits) => (bits & ONBOARDING_FLAG.lobby) !== 0,
   },
   {
     id: "floor",
@@ -73,7 +76,7 @@ export const ONBOARD_STEPS: OnboardStep[] = [
     hintDesktop: "Pick Floor in the palette, then drag across the row above your lobby. (To pan, hold Shift or Space and drag.)",
     hintMobile: "Tap Floor, then tap the row just above your lobby to lay floor tiles.",
     pulse: '.pal-item[data-kind="floor"]',
-    done: (sim) => sim.tower.units.some((u) => u.kind === "floor" && u.floor >= 2),
+    done: (bits) => (bits & ONBOARDING_FLAG.floor) !== 0,
   },
   {
     id: "office",
@@ -82,7 +85,7 @@ export const ONBOARD_STEPS: OnboardStep[] = [
     hintDesktop: "Pick Office, then click your new floor to place it.",
     hintMobile: "Tap Office, then tap your new floor to place it.",
     pulse: '.pal-item[data-kind="office"]',
-    done: (sim) => sim.tower.units.some((u) => u.kind === "office"),
+    done: (bits) => (bits & ONBOARDING_FLAG.office) !== 0,
   },
   {
     id: "connect",
@@ -93,7 +96,7 @@ export const ONBOARD_STEPS: OnboardStep[] = [
     hintMobile:
       "Tap Elevator, then touch-and-drag vertically to size the shaft, or tap Stairway once on the lobby (a flight always links two floors).",
     pulse: '.pal-item[data-kind="elevatorStandard"], .pal-item[data-kind="stairs"]',
-    done: (sim) => sim.tower.units.some((u) => u.kind === "office" && sim.tower.isFloorServed(u.floor)),
+    done: (bits) => (bits & ONBOARDING_FLAG.connect) !== 0,
   },
   {
     id: "play",
@@ -102,13 +105,14 @@ export const ONBOARD_STEPS: OnboardStep[] = [
     hintDesktop: "Press Play in the top bar and let time run.",
     hintMobile: "Tap Play in the top bar and let time run.",
     pulse: '#speed button[data-speed="1"]',
-    done: (sim) => sim.tower.units.some((u) => u.kind === "office" && u.state === "occupied"),
+    done: (bits) => (bits & ONBOARDING_FLAG.play) !== 0,
   },
 ];
 
 /** Index of the first not-yet-satisfied step; === ONBOARD_STEPS.length when all done. */
-export function firstIncompleteStep(sim: Simulation): number {
-  for (let i = 0; i < ONBOARD_STEPS.length; i++) if (!ONBOARD_STEPS[i].done(sim)) return i;
+export function firstIncompleteStep(port: OnboardingPort): number {
+  const bits = port.onboarding();
+  for (let i = 0; i < ONBOARD_STEPS.length; i++) if (!ONBOARD_STEPS[i].done(bits)) return i;
   return ONBOARD_STEPS.length;
 }
 
@@ -145,7 +149,7 @@ export class OnboardingController {
   static markOnboarded = markOnboarded;
   static clearOnboarded = clearOnboarded;
 
-  private sim: Simulation | null = null;
+  private port: OnboardingPort | null = null;
   private active = false;
   private step = 0;
   private splashEl: HTMLElement | null = null;
@@ -353,14 +357,14 @@ export class OnboardingController {
 
   // ---- Checklist / onboarding --------------------------------------------
 
-  /** Begin (or resume) onboarding on `sim`. Idempotent — tears down any live
+  /** Begin (or resume) onboarding on `port`. Idempotent — tears down any live
    *  session first so a re-arm (e.g. Replay) can't stack panels. No-ops (returns
    *  false) if already onboarded or if there's nothing left to teach. */
-  arm(sim: Simulation): boolean {
+  arm(port: OnboardingPort): boolean {
     if (isOnboarded()) return false;
     this.clearSession(); // re-entrancy guard: never leave a second panel behind
-    this.sim = sim;
-    this.step = firstIncompleteStep(sim);
+    this.port = port;
+    this.step = firstIncompleteStep(port);
     if (this.step >= ONBOARD_STEPS.length) {
       // Nothing left to teach (e.g. replay on an already-built tower).
       markOnboarded();
@@ -382,14 +386,14 @@ export class OnboardingController {
    *  `keepSplash`: an undo restore, or the WASM engine's fallback (#874),
    *  swaps the tower without the player choosing one, so a title screen
    *  still up stays up. */
-  adoptSim(sim: Simulation, keepSplash = false): void {
+  adoptSim(port: OnboardingPort, keepSplash = false): void {
     // Runs BEFORE the `active` guard: a returning player has no live onboarding
     // session, but their title screen is still up and this tower is what takes
     // it down.
     if (!keepSplash && this.dismissSplash()) this.opts.onEnterTower?.();
     if (!this.active) return;
-    this.sim = sim;
-    this.step = firstIncompleteStep(sim);
+    this.port = port;
+    this.step = firstIncompleteStep(port);
     if (this.step >= ONBOARD_STEPS.length) {
       this.finish();
       return;
@@ -400,8 +404,8 @@ export class OnboardingController {
 
   /** Called from the host's throttled update loop (~6 Hz). Advances on real progress. */
   tick(): void {
-    if (!this.active || !this.sim) return;
-    const s = firstIncompleteStep(this.sim);
+    if (!this.active || !this.port) return;
+    const s = firstIncompleteStep(this.port);
     if (s === this.step) return;
     this.step = s;
     this.opts.chime();

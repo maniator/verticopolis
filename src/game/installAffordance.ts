@@ -65,7 +65,8 @@ export function splashInstallOffered(): boolean {
  *  tower (a placed lobby / any build). A brand-new empty lot is not yet "playing". */
 function hasReallyPlayed(app: GameApp): boolean {
   if (isSplashUp()) return false;
-  return (app.sim?.tower?.units?.length ?? 0) > 0;
+  // Any room, or any floor or lobby run, means the lot is no longer empty.
+  return (app.reader?.rooms.length ?? 0) > 0 || (app.reader?.structure.length ?? 0) > 0;
 }
 
 /** Toggle the permanent passive menu entry to match live offerability. Cheap;
