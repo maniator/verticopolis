@@ -2,7 +2,8 @@ import { trackAppAction } from "../analytics";
 import { wellFormed } from "../engine/wellFormed";
 import type { UICallbacks, Tool } from "../ui/UI";
 import type { Simulation } from "../engine/Simulation";
-import type { SimPort } from "../simport/port";
+import type { EnginePort } from "../simport/enginePort";
+import type { PortCodes } from "../simport/portCodes";
 import type { AudioEngine } from "../audio/Audio";
 import type { SaveLoad } from "./saveLoad";
 import type { EditorActions } from "./editorActions";
@@ -25,9 +26,11 @@ import { towerCatalog } from "../engine/towerCatalog";
 export interface GameAppPorts {
   /** The live simulation, re-read per call so an adoptSim() swap is seen. */
   getSim(): Simulation;
-  /** The port every command goes through (AD-9). One per app, created once;
-   *  it follows an adoptSim() swap itself, so it is safe to hold. */
-  readonly port: SimPort;
+  /** The engine port every command goes through (AD-9), read per call: an
+   *  `adoptSim()` swap hands the new tower to the same engine. */
+  readonly enginePort: EnginePort;
+  /** The layout's code tables and record slots, for speaking to the port. */
+  readonly portCodes: PortCodes;
   /** The audio facade. Read per call (never destructured), so it stays correct
    *  whatever its lifecycle: that per-call read is the guarantee, not any
    *  assumption that the facade is never replaced. */
@@ -120,7 +123,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     isSteadyClock: () => app.isSteadyClock(),
     // The preference the engine holds after the toggle (a Classic tower
     // always bridges, so there it stays on).
-    onToggleAutoBridge: async () => (await app.port.command({ op: "toggleAutoBridge" })).value,
+    onToggleAutoBridge: async () => app.portCodes.slot(app.enginePort.flipAutoBridge(), "flipAutoBridge", "value") === 1,
     isAutoBridge: () => app.getSim().autoBridge,
     onReplayOnboarding: () => {
       trackAppAction("replay_onboarding");
