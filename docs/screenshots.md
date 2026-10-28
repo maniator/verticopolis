@@ -113,8 +113,7 @@ shows what a loaded tower shows. A new shot setup that edits the tower in place
 (a unit's state, a placed room) rather than through a game command belongs in
 `SETTLE_AFTER_SETUP`; otherwise the render fails it by name when the edit
 touches a field its hosted check compares (the clock, the star, a unit's place,
-state, occupancy, rent or label, a transport), and any other in-place edit shows
-up as a pixel difference between the legs. A builder that
+state, occupancy, rent or label, a transport). A builder that
 ticks calls `window.__vcShotHandoff()` before its ticks, as `buildStatsTower`
 does.
 
