@@ -34,7 +34,6 @@ import { onUpdateAvailable } from "./game/updateFlow";
 import { bootGame } from "./bootstrap";
 import { gameplaySession } from "./analytics";
 import { createTsSim } from "./simport/tsSim";
-import type { SimPort } from "./simport/port";
 import { TsEngine } from "./engine/port/tsEngine";
 import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
@@ -67,8 +66,9 @@ class GameApp implements GameAppPorts {
   reader!: ViewReader;
   portCodes!: PortCodes;
   get sim(): Simulation { return this.enginePort.sim; }
+  set sim(sim: Simulation) { this.enginePort.take(sim); } // the tooling scenes (scripts/) set the tower directly
   /** The simulation as the game drives it (AD-9); follows every adoptSim swap. */
-  readonly port: SimPort = createTsSim(() => this.sim, { adopt: (sim, keep) => this.adoptSim(sim, keep) });
+  readonly port = createTsSim(() => this.sim, { adopt: (sim, keep) => this.adoptSim(sim, keep) });
   engine: TowerEngine;
   audio = new AudioEngine();
   ui: UI;
