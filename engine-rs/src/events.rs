@@ -52,6 +52,9 @@ impl EventSystem {
     }
 
     /// `saveState()`: `pending` is a literal null when there is no choice.
+    /// `sim_save.rs` writes this object itself too (#1242), with the pending
+    /// choice's message from the borrow; its tests hold the two to the same
+    /// text.
     pub fn save_state(&self) -> Value {
         let pending = match &self.pending {
             Some(p) => json!({ "kind": p.kind, "cost": p.cost, "message": p.message }),
