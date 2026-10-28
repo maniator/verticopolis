@@ -55,10 +55,13 @@ export function rollHousehold(rng: RNG): number {
   return CLASSIC_HOUSEHOLD; // unreachable; the classic 3 as a safety net
 }
 
-/** The stats screen's household mix: every occupied condo and apartment,
- *  with `mix` as [household size, homes] pairs, smallest size first. The
- *  stats panel and the port's `statsSheet` both read it, mirroring the Rust
- *  engine's `household_mix()`. */
+/** The Modern "Households" readout: homes in residence (a condo or a rental
+ *  Apartment holding its household, sized through the census's own
+ *  `residentCount`), their people, and the size mix as [household size,
+ *  homes] pairs, smallest size first. A Studio is one occupant with no
+ *  household, so it is not counted. Walks the rooms only, as the Rust
+ *  engine's `household_mix()` does. The stats panel and the port's
+ *  `statsSheet` both read it. */
 export function householdMix(tower: Tower): { households: number; residents: number; mix: [number, number][] } {
   const counts = new Map<number, number>();
   let households = 0;

@@ -77,11 +77,6 @@ function nextStar(sim: Simulation): NextStarView | null {
   };
 }
 
-/** The Modern "Households" readout: homes in residence (a condo or a rental
- *  Apartment holding its household, sized through the census's own
- *  `residentCount`), their people, and the size mix, smallest size first. A
- *  Studio is one occupant with no household, so it is not counted. Walks the
- *  rooms only, as the Rust getter does. */
 export function tsHousekeepingCoverage(sim: Simulation): HousekeepingCoverageView {
   const c = sim.housekeepingCoverage();
   return {
