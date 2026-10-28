@@ -47,9 +47,9 @@ describe("GameApp hands the replaced tower's gameplay events on", () => {
     expect(main.match(/this\.sim\s*(\?\?|\|\||&&)?=(?!=)/g) ?? []).toEqual([]);
     expect(main.match(/this\.enginePort\s*=(?!=)/g) ?? []).toHaveLength(1);
     // adoptSim, and the setter the tooling scenes use (scripts/), as they
-    // assigned the field before.
+    // assigned the field before. A production build refuses the setter.
     expect(main.match(/\.take\(/g) ?? []).toHaveLength(2);
-    expect(main).toMatch(/^ {2}set sim\(sim: Simulation\) \{ this\.enginePort\.take\(sim\); \}/m);
+    expect(main).toMatch(/^ {2}set sim\(sim: Simulation\) \{ if \(!\(import\.meta\.env\.DEV \|\| __TOOLING_BUILD__\)\) throw new Error\([^)]*\); this\.enginePort\.take\(sim\); \}/m);
     // No other module swaps the app's tower behind adoptSim's back.
     const elsewhere = shellFiles(src)
       .filter((file) => file !== resolve(src, "main.ts"))

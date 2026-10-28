@@ -63,8 +63,11 @@ export function syncUnits(sim: Simulation, frame: FrameView): void {
     let u: Unit | undefined = units[k];
     if (u?.id !== r.id) u = byId.get(r.id);
     if (!u) continue;
-    // The HUD's room counts recount a room only when a field they read moved.
-    if (u.state !== r.state || u.customersIn !== r.customersIn) markRoom(sim.tower, u);
+    // The HUD's room counts and the engine's view frame recount a room only
+    // when a field they read moved, so any of the five marks it.
+    if (u.state !== r.state || u.occupants !== r.occupants || u.customersIn !== r.customersIn || u.hotelCustomersIn !== r.hotelCustomersIn || u.outForMeal !== r.outForMeal) {
+      markRoom(sim.tower, u);
+    }
     u.state = r.state;
     u.occupants = r.occupants;
     u.customersIn = r.customersIn;
