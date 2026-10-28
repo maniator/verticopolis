@@ -61,7 +61,7 @@ import type { SimPort } from "./simport/port";
 class GameApp implements GameAppPorts {
   sim: Simulation;
   /** The simulation as the game drives it (AD-9); follows every adoptSim swap. */
-  readonly port: SimPort = createTsSim(() => this.sim);
+  readonly port: SimPort = createTsSim(() => this.sim, { adopt: (sim, keep) => this.adoptSim(sim, keep) });
   engine: TowerEngine;
   audio = new AudioEngine();
   ui: UI;
@@ -177,9 +177,8 @@ class GameApp implements GameAppPorts {
   inspector!: InspectorController;
   /** @internal */ keyboard!: KeyboardPlay;
 
-  /** Undo/redo: snapshot-based history (see {@link UndoHistory}). Built in the
-   *  constructor once `sim`/`ui` exist; its ports close over `this` so they
-   *  always see the live sim across an adoptSim() swap. */
+  /** Undo/redo through the port (see {@link UndoHistory}), built in the
+   *  constructor once `ui` exists. */
   private history!: UndoHistory;
 
   constructor() {
@@ -231,7 +230,7 @@ class GameApp implements GameAppPorts {
     // fires onSelectTool synchronously (which needs this.keyboard/this.build).
     this.ui = new UI(createUICallbacks(this));
 
-    this.history = createAppHistory(this); // its ports read the live sim across adoptSim swaps
+    this.history = createAppHistory(this);
 
     wireEngine(this);
     bindKeys(this);
@@ -436,8 +435,6 @@ class GameApp implements GameAppPorts {
   /** Swap in a freshly loaded/created simulation and point the engine at it.
    *  @internal */
   adoptSim(sim: Simulation, preserveHistory = false): void {
-    // Undo/redo restore (the only preserveHistory path) keeps the live bridging toggle: it's a SETTING, not a build step, so undoing a BUILD must not flip it.
-    if (preserveHistory) sim.autoBridge = this.sim.autoBridge;
     sim.gameplayEvents.inherit(this.sim.gameplayEvents); // what the replaced tower still owed, and its drop count
     this.sim = sim;
     this.clearSelection();
@@ -478,11 +475,11 @@ class GameApp implements GameAppPorts {
   /** @internal */ captureUndo(label: string): void { this.history.capture(label); }
   /** @internal */ commitUndo(): void { this.history.commit(); }
   /** @internal */ discardUndo(): void { this.history.discard(); }
-  /** @internal Temporary, with the WASM engine's fallback (#874). */ dropEmptyUndo(): number { return this.history.dropUnchanged(); }
+  /** @internal Temporary, with the WASM engine's fallback (#874). */ dropEmptyUndo(sigOf: (snap: string) => string): number { return this.history.dropUnchanged(sigOf); }
   /** @internal Temporary, with the WASM engine's fallback (#874). */ holdClearedRedo(on: boolean): void { this.history.holdClearedRedo = on; }
   /** @internal Temporary, with the WASM engine's fallback (#1126). */ clearUndo(): void { this.history.clear(); }
-  undo(): void { this.history.undo(); }
-  redo(): void { this.history.redo(); }
+  undo(): Promise<void> { return this.history.undo(); }
+  redo(): Promise<void> { return this.history.redo(); }
 }
 
 export { GameApp };

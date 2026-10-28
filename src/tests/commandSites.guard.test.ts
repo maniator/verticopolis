@@ -83,7 +83,6 @@ const LIFECYCLE: ReadonlyMap<string, number> = new Map([
   ["src/game/saveLoad.ts emit", 1],
   ["src/game/saveLoad.ts view=", 1],
   ["src/game/appModals.ts view=", 1],
-  ["src/main.ts autoBridge=", 1],
 ]);
 
 const RECEIVER = /^(?:[A-Za-z_$]*[Ss]im[A-Za-z_$0-9]*|tower)$/;

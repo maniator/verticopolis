@@ -1,0 +1,514 @@
+{
+  "version": 4,
+  "header": {
+    "minutes": 0,
+    "towerRevision": 1,
+    "metaRevision": 2,
+    "mealOverlayRevision": 3,
+    "logSeq": 4,
+    "money": 5,
+    "star": 6,
+    "unlocked": 7,
+    "population": 8,
+    "weather": 9,
+    "santaFxSeq": 10,
+    "explosionFxSeq": 11,
+    "explosionFxFloor": 12,
+    "explosionFxX": 13,
+    "thiefFxSeq": 14,
+    "thiefFxCaught": 15,
+    "thiefFxFloor": 16,
+    "treasureFxSeq": 17,
+    "treasureFxFloor": 18,
+    "treasureFxX": 19,
+    "vipFxSeq": 20,
+    "firesStarted": 21,
+    "firesGutRooms": 22,
+    "bombsDetonated": 23,
+    "pendingChoice": 24,
+    "onHourRuns": 25,
+    "rooms": 26,
+    "full": 27,
+    "frameSeq": 28,
+    "people": 29,
+    "units": 30,
+    "transports": 31
+  },
+  "headerWidth": 32,
+  "person": {
+    "id": 0,
+    "seed": 1,
+    "staff": 2,
+    "state": 3,
+    "floor": 4,
+    "x": 5,
+    "fy": 6,
+    "wait": 7
+  },
+  "personWidth": 8,
+  "unit": {
+    "slot": 0,
+    "state": 1,
+    "occupants": 2,
+    "customersIn": 3,
+    "hotelCustomersIn": 4,
+    "outForMeal": 5
+  },
+  "unitWidth": 6,
+  "transport": {
+    "id": 0,
+    "cars": 1
+  },
+  "transportFixed": 2,
+  "car": {
+    "position": 0,
+    "load": 1,
+    "direction": 2
+  },
+  "carWidth": 3,
+  "structure": {
+    "revision": 0,
+    "rooms": 1,
+    "runs": 2,
+    "shafts": 3,
+    "highestFloor": 4,
+    "lowestFloor": 5,
+    "mode": 6,
+    "calendar": 7,
+    "sceneSeed": 8
+  },
+  "structureWidth": 9,
+  "room": {
+    "id": 0,
+    "kind": 1,
+    "floor": 2,
+    "x": 3,
+    "width": 4
+  },
+  "roomWidth": 5,
+  "run": {
+    "kind": 0,
+    "floor": 1,
+    "x": 2,
+    "width": 3,
+    "count": 4,
+    "state": 5,
+    "occupants": 6,
+    "customersIn": 7,
+    "hotelCustomersIn": 8,
+    "outForMeal": 9
+  },
+  "runWidth": 10,
+  "shaft": {
+    "id": 0,
+    "kind": 1,
+    "x": 2,
+    "width": 3,
+    "bottom": 4,
+    "top": 5,
+    "cars": 6,
+    "skips": 7
+  },
+  "shaftFixed": 8,
+  "kinds": [
+    "lobby",
+    "floor",
+    "office",
+    "condo",
+    "hotelSingle",
+    "hotelDouble",
+    "hotelSuite",
+    "fastFood",
+    "restaurant",
+    "foodHall",
+    "shop",
+    "cinema",
+    "partyHall",
+    "amusements",
+    "boutiqueBay",
+    "fitnessClub",
+    "clinic",
+    "nightclub",
+    "spa",
+    "skyBar",
+    "aquaticCenter",
+    "daycare",
+    "stairs",
+    "escalator",
+    "elevatorStandard",
+    "elevatorService",
+    "elevatorExpress",
+    "parkingRamp",
+    "parking",
+    "security",
+    "medical",
+    "housekeeping",
+    "recycling",
+    "metro",
+    "weddingHall",
+    "rentalStudio",
+    "rentalApartment"
+  ],
+  "names": [
+    "Lobby",
+    "Floor",
+    "Office",
+    "Condominium",
+    "Single Room",
+    "Double Room",
+    "Suite",
+    "Fast Food",
+    "Restaurant",
+    "Food Hall",
+    "Retail Shop",
+    "Cinema",
+    "Party Hall",
+    "Amusements",
+    "Boutique Bay",
+    "Fitness Club",
+    "Clinic",
+    "Nightclub",
+    "Spa",
+    "Sky Bar",
+    "Aquatic Center",
+    "Daycare",
+    "Stairway",
+    "Escalator",
+    "Standard Elevator",
+    "Service Elevator",
+    "Express Elevator",
+    "Parking Ramp",
+    "Parking Space",
+    "Security",
+    "Medical Center",
+    "Housekeeping",
+    "Recycling Center",
+    "Metro Station",
+    "Wedding Hall",
+    "Studio",
+    "Apartment"
+  ],
+  "unitStates": [
+    "construction",
+    "empty",
+    "occupied",
+    "moving_in",
+    "vacating",
+    "asleep",
+    "dirty",
+    "infested",
+    "fire",
+    "gutted"
+  ],
+  "personStates": [
+    "toShaft",
+    "waiting",
+    "riding",
+    "climbing",
+    "toDest",
+    "dwelling",
+    "done"
+  ],
+  "weather": [
+    "clear",
+    "cloudy",
+    "rain"
+  ],
+  "modes": [
+    "classic",
+    "modern"
+  ],
+  "calendars": [
+    "canon",
+    "realWorld"
+  ],
+  "metaRecord": [
+    "id",
+    "label",
+    "subtype"
+  ],
+  "records": {
+    "buildAt": [
+      "status",
+      "delta"
+    ],
+    "paintTiles": [
+      "status",
+      "delta",
+      "placed"
+    ],
+    "buildShaft": [
+      "status",
+      "delta"
+    ],
+    "demolish": [
+      "status",
+      "delta"
+    ],
+    "changeCars": [
+      "status",
+      "delta",
+      "cars"
+    ],
+    "extendShaft": [
+      "status",
+      "delta",
+      "bottom",
+      "top",
+      "added"
+    ],
+    "bookExterminator": [
+      "status",
+      "delta",
+      "cost",
+      "rooms"
+    ],
+    "setCamera": [
+      "status",
+      "delta"
+    ],
+    "setFilm": [
+      "status",
+      "delta",
+      "policyCode"
+    ],
+    "markStop": [
+      "status",
+      "delta"
+    ],
+    "expressStops": [
+      "status",
+      "delta"
+    ],
+    "dropStops": [
+      "status",
+      "delta"
+    ],
+    "stepRent": [
+      "status",
+      "delta",
+      "rent"
+    ],
+    "noRate": [
+      "status",
+      "delta"
+    ],
+    "setRent": [
+      "status",
+      "delta",
+      "rent"
+    ],
+    "rentBatch": [
+      "status",
+      "delta",
+      "matched",
+      "eligible",
+      "changed",
+      "skippedSold",
+      "skippedCustom",
+      "customOverwritten",
+      "clampedLow",
+      "clampedHigh"
+    ],
+    "rerollUnit": [
+      "status",
+      "delta",
+      "subtypeCode"
+    ],
+    "answerChoice": [
+      "status",
+      "delta"
+    ],
+    "chooseAutoBridge": [
+      "status",
+      "delta",
+      "value"
+    ],
+    "flipAutoBridge": [
+      "status",
+      "delta",
+      "value"
+    ],
+    "startExtend": [
+      "status",
+      "delta"
+    ],
+    "stopExtend": [
+      "status",
+      "delta"
+    ],
+    "labelUnit": [
+      "status",
+      "delta"
+    ],
+    "nameTower": [
+      "status",
+      "delta"
+    ],
+    "logLine": [
+      "status",
+      "delta"
+    ],
+    "scheduleShaft": [
+      "status",
+      "delta"
+    ],
+    "quoteBuild": [
+      "ok",
+      "cost"
+    ],
+    "quoteShaft": [
+      "ok"
+    ],
+    "hotspot": [
+      "ratio",
+      "floor"
+    ],
+    "loadSave": [
+      "status",
+      "generation"
+    ],
+    "restore": [
+      "status",
+      "generation"
+    ],
+    "foundTower": [
+      "status",
+      "generation"
+    ],
+    "drainEvents": [
+      "dropped",
+      "count"
+    ],
+    "unitMetaChanged": [
+      "revision",
+      "full"
+    ],
+    "logAfter": [
+      "seq",
+      "kindCode",
+      "minute"
+    ],
+    "statsStrip": [
+      "population",
+      "parkingSpaces",
+      "money",
+      "star",
+      "offices",
+      "occupiedOffices",
+      "condos",
+      "soldCondos",
+      "hotelRooms",
+      "occupiedHotel",
+      "dirty",
+      "shops",
+      "restaurants",
+      "vacant",
+      "vacantNoRate",
+      "floors",
+      "basements",
+      "elevators",
+      "transports",
+      "fires"
+    ],
+    "heatCell": [
+      "floor",
+      "minX",
+      "maxX",
+      "severity",
+      "tint"
+    ],
+    "crewCoverage": [
+      "rooms",
+      "crews",
+      "maids",
+      "dailyCapacity",
+      "outOfReach",
+      "dirty",
+      "infested"
+    ],
+    "unitCard": [
+      "id",
+      "kindCode",
+      "floor",
+      "x",
+      "width",
+      "stateCode",
+      "satisfaction",
+      "occupants",
+      "customersIn",
+      "residents",
+      "everOccupied",
+      "noRate",
+      "rent",
+      "price",
+      "vacateReason",
+      "filmPolicy",
+      "served",
+      "reachable",
+      "floorHasLobby",
+      "blockbuster"
+    ],
+    "shaftCard": [
+      "id",
+      "kindCode",
+      "x",
+      "width",
+      "bottom",
+      "top",
+      "cars",
+      "capacity",
+      "utilization",
+      "hourly",
+      "stops",
+      "origins"
+    ],
+    "stopRow": [
+      "floor",
+      "served",
+      "lobby",
+      "endpoint"
+    ]
+  },
+  "onboarding": [
+    "lobby",
+    "floor",
+    "office",
+    "connect",
+    "play"
+  ],
+  "filmPolicies": [
+    "auto",
+    "feature",
+    "blockbuster"
+  ],
+  "logKinds": [
+    "info",
+    "good",
+    "bad",
+    "money"
+  ],
+  "scheduleSlots": 61,
+  "heatModes": [
+    "congestion",
+    "occupancy",
+    "satisfaction",
+    "cleanliness"
+  ],
+  "heatTints": [
+    "none",
+    "na",
+    "infested"
+  ],
+  "vacateReasons": [
+    "access",
+    "noTransport",
+    "congestion",
+    "rent",
+    "noise",
+    "transportFar",
+    "lobbyFar",
+    "unmetDemand",
+    "relocation"
+  ]
+}

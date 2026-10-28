@@ -15,6 +15,19 @@ impl Simulation {
     /// rooms once for the three office steps, asking the served-floor memo in
     /// place (#1237).
     pub fn onboarding_facts(&self) -> Value {
+        let [lobby, floor, office, connect, play] = self.onboarding_flags();
+        json!({
+            "lobby": lobby,
+            "floor": floor,
+            "office": office,
+            "connect": connect,
+            "play": play,
+        })
+    }
+
+    /// The five facts in `onboarding_facts` order: lobby, floor, office,
+    /// connect, play.
+    pub fn onboarding_flags(&self) -> [bool; 5] {
         let lobby = self.tower.lobby_tiles.values().any(|&n| n > 0);
         let floor = self
             .tower
@@ -33,12 +46,6 @@ impl Simulation {
                 break;
             }
         }
-        json!({
-            "lobby": lobby,
-            "floor": floor,
-            "office": office,
-            "connect": connect,
-            "play": play,
-        })
+        [lobby, floor, office, connect, play]
     }
 }

@@ -50,11 +50,11 @@ describe.skipIf(!hasWasmPackage())("an edit whose engine command traps is undone
       // Each event once, the completed office's included, the lost one's not.
       expect(tally(delivered)).toEqual({ ...SET_UP, "facility_placed office": 2 });
       // The lost edit left no undo step; the completed one is next.
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Undid: first office"]);
       expect(offices(a)).toEqual([170]);
       // The TypeScript engine runs on and emits none of it again.
-      a.redo();
+      await a.redo();
       expect(a.toasts).toEqual(["Undid: first office", "Redid: first office"]);
       const resumed = a.sim;
       const minutes = resumed.clock.minutes;
@@ -83,7 +83,7 @@ describe.skipIf(!hasWasmPackage())("an edit whose engine command traps is undone
       await settle();
       const fresh = expectRolledBack(a, sim, good);
       expect(fresh.tower.units.find((u) => u.kind === "office")).toMatchObject({ floor: 2, x: 170 });
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Nothing to undo."]);
       deliver();
       expect(tally(delivered)).toEqual(SET_UP); // no removal reached the game
@@ -110,7 +110,7 @@ describe.skipIf(!hasWasmPackage())("an edit whose engine command traps is undone
       await settle();
       const fresh = expectRolledBack(a, sim, good);
       expect(fresh.tower.transportAt(1, 200)!.cars).toBe(cars);
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Nothing to undo."]);
       deliver();
       expect(tally(delivered)).toEqual(SET_UP); // no capacity change reached the game
@@ -135,7 +135,7 @@ describe.skipIf(!hasWasmPackage())("an edit whose engine command traps is undone
       await settle();
       const fresh = expectRolledBack(a, sim, good);
       expect(fresh.tower.getUnit(office.id)?.rent).toBe(rent);
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Nothing to undo."]);
       deliver();
       expect(tally(delivered)).toEqual(SET_UP); // no price change reached the game
@@ -161,7 +161,7 @@ describe.skipIf(!hasWasmPackage())("an edit whose engine command traps is undone
       await settle();
       const fresh = expectRolledBack(a, sim, good);
       expect(fresh.tower.transportAt(1, 200)).toMatchObject({ bottom: 1, top: 2 });
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Nothing to undo."]);
       deliver();
       expect(tally(delivered)).toEqual({ ...SET_UP, "facility_placed floor": 120 }); // no capacity change
@@ -191,7 +191,7 @@ describe.skipIf(!hasWasmPackage())("an edit whose engine command traps is undone
       // The drag goes on, on TypeScript, and ends as one step.
       expect(fresh.build("floor", 3, 162).ok).toBe(true);
       a.commitUndo();
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Undid: Build Floor"]);
       expect(tiles()).toEqual([]);
       deliver();
@@ -226,7 +226,7 @@ describe.skipIf(!hasWasmPackage())("an edit whose engine command traps is undone
       a.commitUndo();
       deliver();
       expect(tally(delivered)).toEqual({ ...SET_UP, "facility_placed floor": 71 });
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Undid: Build Floor"]);
       expect(tiles()).toEqual([]);
     } finally {

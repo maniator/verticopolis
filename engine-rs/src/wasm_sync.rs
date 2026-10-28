@@ -11,6 +11,10 @@ impl Engine {
         Engine {
             sim,
             mirror: SaveMirror::default(),
+            reason: None,
+            generation: 0,
+            backdrop: false,
+            drained: Vec::new(),
         }
     }
 }

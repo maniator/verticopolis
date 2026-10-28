@@ -79,7 +79,14 @@ function play(sim: Simulation, engine: Engine, minutes: number): void {
   engine.tick(minutes);
 }
 
-const layout = (): Layout => JSON.parse(wasm().viewLayout!()) as Layout;
+const layout = (): Layout => {
+  const probe = wasm().Engine.newGame(1, "modern");
+  try {
+    return JSON.parse(probe.viewLayout()) as Layout;
+  } finally {
+    probe.free();
+  }
+};
 
 const FIELD_NAMES = ["state", "occupants", "customersIn", "hotelCustomersIn", "outForMeal"];
 
@@ -186,7 +193,7 @@ function expectStructure(sim: Simulation, engine: Engine): Float64Array {
 describe.skipIf(!hasWasmPackage())("the engine view through the binding (#1213)", () => {
   it("hands over its layout by name, every slot named once", () => {
     const l = layout();
-    expect(l.version).toBe(1);
+    expect(l.version).toBe(4);
     const tables: [Slots, number][] = [
       [l.header, l.headerWidth], [l.person, l.personWidth], [l.unit, l.unitWidth],
       [l.transport, l.transportFixed], [l.car, l.carWidth], [l.structure, l.structureWidth],

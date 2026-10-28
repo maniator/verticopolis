@@ -50,6 +50,15 @@ impl Rng {
     pub fn seed(&self) -> u32 {
         self.state
     }
+
+    /// `restore(state)`: put the stream at exactly `state`, the live state a
+    /// save carries. `new` maps a seed of 0 to 1 (a new game never starts at
+    /// 0), but Mulberry32 passes through state 0 once every 2^32 draws, so a
+    /// save can hold it, and loading it as 1 would draw a different stream
+    /// (#856). `initial_seed` is left as it is.
+    pub fn restore(&mut self, state: u32) {
+        self.state = state;
+    }
 }
 
 #[cfg(test)]
@@ -112,6 +121,22 @@ mod tests {
                 3051556669
             )
         );
+    }
+
+    /// #856: `new` keeps a new game off state 0; `restore` keeps a saved 0.
+    #[test]
+    fn restore_keeps_state_zero_and_the_uninterrupted_stream() {
+        assert_eq!(Rng::new(0).seed(), 1);
+        let mut live = Rng::new(0u32.wrapping_sub(0x6d2b_79f5));
+        live.next();
+        assert_eq!(live.seed(), 0);
+        let mut restored = Rng::new(5);
+        restored.restore(0);
+        assert_eq!(restored.seed(), 0);
+        assert_eq!(restored.initial_seed, 5);
+        for _ in 0..4 {
+            assert_eq!(restored.next(), live.next());
+        }
     }
 
     #[test]

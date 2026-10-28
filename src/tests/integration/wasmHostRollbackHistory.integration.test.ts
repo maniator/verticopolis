@@ -35,7 +35,7 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       a.commitUndo();
       await settle();
       expectRolledBack(a, sim, good);
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Nothing to undo."]);
       deliver();
       expect(tally(delivered)).toEqual(SET_UP);
@@ -62,7 +62,7 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       // Both offices go, the line says so, and neither step is left.
       expectRolledBack(a, sim, good);
       expect(offices(a)).toEqual([170]);
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Nothing to undo."]);
       deliver();
       expect(tally(delivered)).toEqual(SET_UP); // neither office reached the game
@@ -84,7 +84,7 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       await settle(); // the recovery runs before the release
       expectRolledBack(a, sim, good);
       a.commitUndo(); // the release, with nothing done on the restored tower
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Nothing to undo."]);
       expect(offices(a)).toEqual([170]);
       deliver();
@@ -100,7 +100,7 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       a.captureUndo("zero");
       expect(a.sim.build("office", 2, 180).ok).toBe(true);
       a.commitUndo();
-      a.undo(); // a redo trail, on a new engine
+      await a.undo(); // a redo trail, on a new engine
       const sim = a.sim;
       a.captureUndo("first office");
       expect(sim.build("office", 2, 190).ok).toBe(true);
@@ -110,7 +110,7 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       await settle();
       expect(offices(a)).toEqual([170]);
       a.commitUndo();
-      a.redo();
+      await a.redo();
       expect(offices(a)).toEqual([170, 180]);
       expect(a.toasts).toEqual(["Undid: zero", "Redid: zero"]);
     } finally {
@@ -130,9 +130,9 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       expect(a.sim.build("office", 2, 190).ok).toBe(true); // the drag goes on, on TypeScript
       a.commitUndo();
       expect(offices(a)).toEqual([170, 190]);
-      a.undo();
+      await a.undo();
       expect(offices(a)).toEqual([170]);
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Undid: second office", "Nothing to undo."]);
     } finally {
       h.stop();
@@ -153,7 +153,7 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       // say the engine lost them.
       expect(a.sim.log[a.sim.log.length - 1]).toEqual(expect.objectContaining({ text: REPLACED, kind: "bad" }));
       expect(a.sim.log.filter((e) => e.text.startsWith("The Rust engine stopped"))).toHaveLength(1);
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Nothing to undo."]);
     } finally {
       h.stop();
@@ -168,14 +168,14 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       expect(sim.build("office", 2, 180).ok).toBe(true);
       a.commitUndo(); // paused: no point covers it
       trapAfter(engine(), "serialize", false);
-      a.undo(); // its redo snapshot traps: the newest point, the state before the office
+      await a.undo(); // its redo snapshot traps: the newest point, the state before the office
       expect(h.status.lastFallback).toEqual({ reason: "trap-undo", stage: "start" });
       expect(offices(a)).toEqual([170]);
       await settle();
       // The undo itself is the player's, but its redo step is gone, so the
       // line says changes were lost.
       expect(a.sim.log[a.sim.log.length - 1]).toEqual(expect.objectContaining({ text: LOST, kind: "bad" }));
-      a.redo();
+      await a.redo();
       expect(a.toasts).toEqual(["Undid: office", "Nothing to redo."]);
       expect(offices(a)).toEqual([170]);
       deliver();
@@ -197,11 +197,11 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       new FrameDriver(sim, 3).frame(); // the merge covers the office
       deliver();
       trapAfter(engine(), "serialize", false);
-      a.undo();
+      await a.undo();
       expect(h.status.lastFallback).toEqual({ reason: "trap-undo", stage: "start" });
       await settle();
       expect(a.sim.log[a.sim.log.length - 1]).toEqual(expect.objectContaining({ text: REPLACED, kind: "bad" }));
-      a.redo();
+      await a.redo();
       expect(a.toasts).toEqual(["Undid: office", "Redid: office"]);
       expect(offices(a)).toEqual([170, 180]);
       deliver();
@@ -221,14 +221,14 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       new FrameDriver(sim, 3).frame(); // the merge covers the office
       sim.tower.towerName = "Sky Plaza"; // a rename: no undo capture, and no point after it
       trapAfter(engine(), "serialize", false);
-      a.undo();
+      await a.undo();
       expect(h.status.lastFallback).toEqual({ reason: "trap-undo", stage: "start" });
       await settle();
       expect(a.sim.log[a.sim.log.length - 1]).toEqual(expect.objectContaining({ text: LOST, kind: "bad" }));
       expect(a.sim.tower.towerName).toBe("Tower One");
       expect(offices(a)).toEqual([170]);
       // The redo step is the merge's point: the office, under the old name.
-      a.redo();
+      await a.redo();
       expect(a.toasts).toEqual(["Undid: office", "Redid: office"]);
       expect(offices(a)).toEqual([170, 180]);
       expect(a.sim.tower.towerName).toBe("Tower One");
@@ -244,15 +244,15 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       a.captureUndo("office");
       expect(sim.build("office", 2, 180).ok).toBe(true);
       a.commitUndo();
-      a.undo(); // healthy: the undo hosts the restored tower on a new engine
+      await a.undo(); // healthy: the undo hosts the restored tower on a new engine
       expect(h.status.starts).toBe(2);
       trapAfter(engine(), "serialize", false);
-      a.redo();
+      await a.redo();
       expect(h.status.lastFallback).toEqual({ reason: "trap-undo", stage: "undo" });
       expect(offices(a)).toEqual([170, 180]);
       await settle();
       expect(a.sim.log[a.sim.log.length - 1].text).toBe(REPLACED);
-      a.undo();
+      await a.undo();
       expect(offices(a)).toEqual([170]);
       expect(a.toasts).toEqual(["Undid: office", "Redid: office", "Undid: office"]);
       deliver();
@@ -269,7 +269,7 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       a.captureUndo("first office");
       expect(a.sim.build("office", 2, 180).ok).toBe(true);
       a.commitUndo();
-      a.undo(); // a redo trail, on a new engine
+      await a.undo(); // a redo trail, on a new engine
       const sim = a.sim;
       a.captureUndo("second office");
       const good = lastGood(sim);
@@ -279,10 +279,10 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       await settle();
       expectRolledBack(a, sim, good, UNDONE);
       expect(offices(a)).toEqual([170]);
-      a.redo();
+      await a.redo();
       expect(offices(a)).toEqual([170, 180]);
-      a.undo();
-      a.undo();
+      await a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Undid: first office", "Redid: first office", "Undid: first office", "Nothing to undo."]);
     } finally {
       h.stop();
@@ -310,7 +310,7 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       expect(a.sim.log[a.sim.log.length - 1].text).toBe(OLDER);
       expect(offices(a)).toEqual([170, 190]);
       // The trail is gone, the step older than the tower with it.
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Nothing to undo."]);
       expect(offices(a)).toEqual([170, 190]);
     } finally {
@@ -334,14 +334,14 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       load.mockImplementationOnce(() => {
         throw new Error("the newest point does not load");
       });
-      a.undo(); // the snapshot for its redo step goes back to the merge
+      await a.undo(); // the snapshot for its redo step goes back to the merge
       await settle();
       expect(h.status.restorePoint).toEqual({ point: "merge", skipped: 1 });
       // The tower is the undo's target, as the player asked; only the trail goes.
       expect(a.sim.log[a.sim.log.length - 1].text).toBe(CLEARED);
       expect(offices(a)).toEqual([170]);
       // Kept, that redo step would bring back the merge's tower, without the rename.
-      a.redo();
+      await a.redo();
       expect(a.toasts).toEqual(["Undid: Build office", "Nothing to redo."]);
       expect(offices(a)).toEqual([170]);
     } finally {
@@ -371,7 +371,7 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       expect(a.sim.log[a.sim.log.length - 1].text).toBe(OLDER);
       expect(a.sim.tower.towerName).toBe("Tower One");
       expect(offices(a)).toEqual([170]);
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Nothing to undo."]);
     } finally {
       load.mockRestore();
@@ -386,7 +386,7 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       a.captureUndo("Build office");
       expect(a.sim.build("office", 2, 190).ok).toBe(true);
       a.commitUndo();
-      a.undo(); // healthy: a redo trail, on a new engine
+      await a.undo(); // healthy: a redo trail, on a new engine
       const sim = a.sim;
       h.current()!.syncStructure(); // a merge: the older point
       sim.tower.towerName = "Sky Plaza";
@@ -395,13 +395,13 @@ describe.skipIf(!hasWasmPackage())("a trap in an undo, a redo or an undo capture
       load.mockImplementationOnce(() => {
         throw new Error("the newest point does not load");
       });
-      a.redo(); // the snapshot for its undo step goes back to the merge
+      await a.redo(); // the snapshot for its undo step goes back to the merge
       await settle();
       expect(h.status.restorePoint).toEqual({ point: "merge", skipped: 1 });
       expect(a.sim.log[a.sim.log.length - 1].text).toBe(CLEARED);
       expect(offices(a)).toEqual([170, 190]);
       // Kept, that undo step would bring back the merge's tower, without the rename.
-      a.undo();
+      await a.undo();
       expect(a.toasts).toEqual(["Undid: Build office", "Redid: Build office", "Nothing to undo."]);
       expect(offices(a)).toEqual([170, 190]);
     } finally {

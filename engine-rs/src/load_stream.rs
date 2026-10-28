@@ -49,7 +49,7 @@ pub fn load_save_text(text: &[u8]) -> Result<Simulation, String> {
 }
 
 /// `load_save_text`, and whether the streamed reader took the text.
-fn read_save(text: &[u8]) -> Result<(Simulation, bool), String> {
+pub(crate) fn read_save(text: &[u8]) -> Result<(Simulation, bool), String> {
     if let Some((sim, _)) = streamed(text, None) {
         return Ok((sim, true));
     }

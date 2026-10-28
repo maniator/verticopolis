@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { attachWasmHost } from "./wasmHost";
+import { saveText } from "./stepGate";
 import { fakeModule, type FakeEngine } from "./fakeEngine.fixture";
 
 /**
@@ -225,5 +226,28 @@ describe("restore points on the main-thread host (#874)", () => {
     expect(host.restore().sim.money).toBe(100);
     expect((sim.serialize() as { money: number }).money).toBe(100);
     host.detach();
+  });
+
+  it("hands over the engine's own text for a copy kept in memory, read as a point like any save (slice 5, #1158 A31)", () => {
+    const { sim, host, engine, extra } = hosted();
+    const text = saveText(sim);
+    expect(text).toBeDefined();
+    sim.money = 100;
+    const own = text!();
+    expect(extra()).toBe(1);
+    expect(JSON.parse(own)).toEqual(sim.serialize());
+    expect(extra()).toBe(2);
+    // A faulted host answers with its newest point, the text just read.
+    engine.failOn = "tick";
+    sim.tick(1);
+    expect(host.fault?.reason).toBe("trap-tick");
+    expect(text!()).toBe(own);
+    // A faulted tower keeps answering with that point after it is let go;
+    // a healthy one takes its own saves back.
+    host.detach();
+    expect(saveText(sim)).toBe(text);
+    const healthy = hosted();
+    healthy.host.detach();
+    expect(saveText(healthy.sim)).toBeUndefined();
   });
 });

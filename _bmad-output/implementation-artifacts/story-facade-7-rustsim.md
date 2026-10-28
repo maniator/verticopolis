@@ -1,7 +1,12 @@
-# Story facade.7: `RustSim` behind a flag, with restore points on the existing saves
+# Story facade.7: the engine is the port, behind a flag, with restore points on the existing saves
 
-Status: ready-for-dev (PR by PR, each when its inputs are on `main`; see
-"Order and inputs")
+Status: ready-for-dev on the redesign (2026-10-28). **The authoritative
+contract is
+`_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/engine-port-contract.md`**:
+every member, its signature, result records, input rules, the JSON and
+string exceptions, the view reader, workers, the PR order and the migration
+of the ACs below. Where this story and the contract differ, the contract
+wins.
 
 Issue #1217, under the facade tracker #1207 (spine AD-9). Plan:
 `_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/`
@@ -10,6 +15,50 @@ F8, R1, R5 and R6). Forward requirements from earlier slices are in #1217's
 comments and are gathered below as acceptance criteria. Written 2026-10-27
 from `main` at `c0787c1f` and the open heads of slices 2 (#1290 at
 `0ff4efc4`), 5 (#1294 at `4124c97d`) and 6a (#1284 at `43ed0bd2`).
+
+## Redesign (owner, 2026-10-28): the engine is the port
+
+A summary; the contract page above is the full text.
+Naftali on PR #1372: "I don't see why we need a rust sim ts layer, ts should
+hit either the wasm engine or the ts engine with the same abstract methods",
+and no JSON on the paths that run per frame or per command. So there is no
+TypeScript adapter over the Rust engine:
+
+- **One interface, two engines.** `EnginePort` (`src/simport/enginePort.ts`)
+  is implemented by the binding's `Engine` class itself, in Rust, and by the
+  TypeScript engine. The UI holds one of the two and nothing sits between.
+  Anything adapter-like (refusals, the shape check, the money delta) lives
+  inside each engine: in Rust for the WASM engine, in `TsEngine` and its
+  `Simulation` for the TypeScript one.
+- **Numeric.** The view is the engine's `Float64Array`s
+  (`viewStructure` per revision, `viewFrame` per frame) decoded by the slots
+  and code tables of `viewLayout`. Commands take numbers (facility kinds as
+  layout codes) and answer a result record: status, the signed money delta
+  the engine measured, then the op's own slots; a refusal's text is
+  `lastReason()`, valid until the next status call. Queries answer a
+  `Float64Array` record whose slots the layout names; text fields (a label,
+  a name) come from their own getters.
+- **JSON only where it is rare,** each listed here as it lands: `viewLayout`
+  (once per boot), the save and load (the save format is JSON), and the
+  tooling-only exports (digests, telemetry, the dual-run views).
+- **Settled 2026-10-28** (a four-voice party at the owner's request, no
+  split): the port is synchronous, and a worker host, if one ships, wraps it
+  on its own side. The renderer's records come from one shared numeric view
+  reader, and both engines encode into the same arrays, so the painters and
+  the screenshots are unchanged and the parity tests compare one path. The
+  reader rebuilds structure only when the revision moves and patches only
+  the dirty rows per frame; a golden-array test pins it, and a guard fails on
+  an `await` of a port call.
+
+- **The suites move to Rust before 3.0** (owner, 2026-10-28). After PR 5,
+  the integration suites boot the Rust `Engine` through the port by default,
+  with `TsEngine` as the parity leg. The TypeScript-only ratchet goes to
+  zero, and any test that cannot move keeps a one-line reason. This is
+  the contract's PR 7, and Copilot issues carry the mechanical moves.
+
+R2's NO-GO notes on #1372 at `3a8e4008` carry where the code survives: the
+room-count guard rows, AC 2's import-walk guard (now over the port's
+modules), and no per-frame `Set` in the person decode.
 
 ## Story
 
@@ -32,7 +81,14 @@ engine, a cohort, a gate or a production analytics field.
 
 ## Acceptance Criteria
 
-### The adapter (PRs 7a to 7c)
+> **Superseded in part (2026-10-28).** ACs 1 to 12 below describe the
+> dropped `RustSim` adapter and the async `SimPort`. They are kept for the
+> history and the tests they name; the contract page's "Migration" table
+> maps each one to where it now lives. ACs 13 to 21 (boot, trap, e2e,
+> restore points, sidecar, cadence) carry over in substance. Nothing here
+> drops a recovery or test gate.
+
+### The adapter (PRs 7a to 7c, superseded)
 
 1. **One adapter, every contract.** `createRustSim(engine, opts)` in
    `src/simport/rustSim.ts` returns a `SimPort`. Every port contract suite
@@ -224,6 +280,10 @@ engine, a cohort, a gate or a production analytics field.
     11, never silently.
 
 ## Order and inputs
+
+> **Superseded (2026-10-28):** the PR order is the contract page's section
+> 8. The table below is the old 7a to 7f plan, kept for its inputs (#1237,
+> #1239 and the slice dependencies still hold).
 
 | PR | Content | Waits for |
 | --- | --- | --- |

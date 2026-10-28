@@ -25,16 +25,18 @@ companions:
 
 Hexagonal. `engine-rs/` is the core. It exposes a **command port** (player
 actions with results), a **read-model port** (frame view, getters, catalog,
-log, events) and a **persistence port** (the `.vctower` codec). The web host
-implements one `SimPort` per host (main thread, worker, fallback) over the
-WASM binding (`engine-rs/src/wasm.rs`); `src/ui`, `src/game` and
-`src/render` see only the port (AD-9). The TypeScript `src/engine/` is a
+log, events) and a **persistence port** (the `.vctower` codec). On the main
+thread the binding's `Engine` class is itself the port (`EnginePort`,
+synchronous and numeric), and the TypeScript engine implements the same
+interface; `src/ui`, `src/game` and `src/render` see only the port and one
+shared view reader (AD-9, redesigned 2026-10-28). A worker host, if one
+ships, puts an async gateway in front of an in-worker port. The TypeScript `src/engine/` is a
 second core kept as the reference and as the fallback after a fault, until
 retirement.
 
 ```mermaid
 flowchart LR
-  UI[src/ui, src/game, src/render] --> Port[SimPort: RustSim, RustWorkerSim, TsSim]
+  UI[src/ui, src/game, src/render] --> Port[EnginePort: the WASM Engine, or TsEngine]
   Port --> Bind[engine-rs/src/wasm.rs binding]
   Bind --> Core[engine-rs core: sim, clock, charges, catalog, load]
   Port -. fallback after a fault .-> TS[src/engine reference]
@@ -216,6 +218,14 @@ host; nothing in `src/ui` calls the binding directly.
   and slice plan are
   `architecture-rust-facade-2026-10-20/` (ARCHITECTURE-REVIEW.md,
   slice-plan.md).
+- **Redesign (owner, 2026-10-28):** no TypeScript adapter over the Rust
+  engine. The port is `EnginePort`, synchronous and numeric, implemented
+  directly by the binding's `Engine` class and by the TypeScript engine; the
+  view is the engine's arrays through one shared reader that decodes and
+  never decides; JSON stays only on rare paths. Where the rule above says
+  "returns promises" and "`SimPort`", read `EnginePort` and a synchronous
+  answer; a worker host keeps the promises in its own gateway. The contract
+  is `architecture-rust-facade-2026-10-20/engine-port-contract.md`.
 
 ## Consistency Conventions
 

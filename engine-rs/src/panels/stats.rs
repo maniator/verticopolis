@@ -16,9 +16,52 @@ use crate::facilities::Kind;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
+/// The HUD strip's counters, in the order [`Simulation::tower_stats_record`]
+/// gives them; the view layout names them for the port's readers.
+pub const TOWER_STATS: [&str; 20] = [
+    "population",
+    "parkingSpaces",
+    "money",
+    "star",
+    "offices",
+    "occupiedOffices",
+    "condos",
+    "soldCondos",
+    "hotelRooms",
+    "occupiedHotel",
+    "dirty",
+    "shops",
+    "restaurants",
+    "vacant",
+    "vacantNoRate",
+    "floors",
+    "basements",
+    "elevators",
+    "transports",
+    "fires",
+];
+
 impl Simulation {
     /// `stats()`: the cheap counters the HUD strip and the stats screen share.
     pub fn tower_stats(&self) -> Value {
+        let record = self.tower_stats_record();
+        let mut m = Map::new();
+        for (name, v) in TOWER_STATS.iter().zip(record) {
+            // Every counter but the balance is a whole number in TypeScript's
+            // answer, and the lock compares the JSON text.
+            let v = if *name == "money" {
+                json!(v)
+            } else {
+                json!(v as i64)
+            };
+            m.insert((*name).to_owned(), v);
+        }
+        Value::Object(m)
+    }
+
+    /// The same counters as numbers in [`TOWER_STATS`] order: the record the
+    /// engine's port hands the HUD strip every UI tick, with no JSON.
+    pub fn tower_stats_record(&self) -> [f64; TOWER_STATS.len()] {
         let (mut offices, mut occupied_offices, mut condos, mut sold_condos) = (0, 0, 0, 0);
         let (mut hotel_rooms, mut occupied_hotel, mut dirty) = (0, 0, 0);
         let (mut shops, mut restaurants, mut vacant, mut vacant_no_rate) = (0, 0, 0, 0);
@@ -58,28 +101,34 @@ impl Simulation {
                 _ => {}
             }
         }
-        json!({
-            "population": self.population(),
-            "parkingSpaces": parking_spaces,
-            "money": self.money,
-            "star": self.star,
-            "offices": offices,
-            "occupiedOffices": occupied_offices,
-            "condos": condos,
-            "soldCondos": sold_condos,
-            "hotelRooms": hotel_rooms,
-            "occupiedHotel": occupied_hotel,
-            "dirty": dirty,
-            "shops": shops,
-            "restaurants": restaurants,
-            "vacant": vacant,
-            "vacantNoRate": vacant_no_rate,
-            "floors": self.highest_floor(),
-            "basements": (1 - self.lowest_floor()).max(0),
-            "elevators": self.tower.transports.iter().filter(|t| t.kind.is_elevator()).count(),
-            "transports": self.tower.transports.len(),
-            "fires": self.events.count(),
-        })
+        let elevators = self
+            .tower
+            .transports
+            .iter()
+            .filter(|t| t.kind.is_elevator())
+            .count();
+        [
+            self.population() as f64,
+            f64::from(parking_spaces),
+            self.money,
+            self.star as f64,
+            f64::from(offices),
+            f64::from(occupied_offices),
+            f64::from(condos),
+            f64::from(sold_condos),
+            f64::from(hotel_rooms),
+            f64::from(occupied_hotel),
+            f64::from(dirty),
+            f64::from(shops),
+            f64::from(restaurants),
+            f64::from(vacant),
+            f64::from(vacant_no_rate),
+            self.highest_floor() as f64,
+            (1 - self.lowest_floor()).max(0) as f64,
+            elevators as f64,
+            self.tower.transports.len() as f64,
+            self.events.count() as f64,
+        ]
     }
 
     /// The Modern "Households" readout: the homes in residence, the people in

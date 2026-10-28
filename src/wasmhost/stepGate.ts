@@ -31,6 +31,21 @@ export function stepGate(sim: object): StepGate | undefined {
   return gates.get(sim);
 }
 
+const texts = new WeakMap<object, () => string>();
+
+/** The host's own save text for `sim`, for a save that stays in memory (an
+ *  undo or a redo step), so the port hands it over without parsing it and
+ *  printing it again (#1158 A31). The default WASM host offers one; null
+ *  takes it back. */
+export function setSaveText(sim: object, text: (() => string) | null): void {
+  if (text) texts.set(sim, text);
+  else texts.delete(sim);
+}
+
+export function saveText(sim: object): (() => string) | undefined {
+  return texts.get(sim);
+}
+
 /** The longest a save waits for a host to catch up; past it the save is
  *  the read model's (a hung worker must not hold an autosave forever). */
 export const SETTLE_TIMEOUT_MS = 2000;

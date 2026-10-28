@@ -44,8 +44,8 @@ export interface GameAppPorts {
   setSpeed(speed: number): void;
   /** The live game-speed index, so a dialog can restore it after pausing. */
   getSpeed(): number;
-  undo(): void;
-  redo(): void;
+  undo(): Promise<void>;
+  redo(): Promise<void>;
   setOverlay(mode: string): void;
   toggleMute(): boolean;
   setVolume(kind: "music" | "ambience" | "sfx", value: number): void;
@@ -112,8 +112,8 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
       ambience: app.audio.ambienceVolume,
       sfx: app.audio.sfxVolume,
     }),
-    onUndo: () => app.undo(),
-    onRedo: () => app.redo(),
+    onUndo: () => void app.undo(),
+    onRedo: () => void app.redo(),
     onEditAction: (action, root) => app.editor.handleEditAction(action, root),
     onToggleReducedMotion: () => app.toggleReducedMotion(),
     onToggleSteadyClock: () => app.toggleSteadyClock(),

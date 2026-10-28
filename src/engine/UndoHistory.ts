@@ -49,14 +49,16 @@ export function towerStateSig(tower: Tower, money: number): string {
 export interface UndoPorts {
   /** Serialize the current state to an opaque string (e.g. the saved game). */
   snapshot(): string;
-  /** Restore a snapshot previously returned by {@link snapshot}. */
-  restore(snap: string): void;
+  /** Restore a snapshot previously returned by {@link snapshot}. The tower
+   *  changes before this returns; the promise settles once the restore is
+   *  done, and rejects when it failed. */
+  restore(snap: string): Promise<void>;
   /** Fingerprint the current player-mutable state (see {@link towerStateSig}). */
   signature(): string;
-  /** Fingerprint a snapshot's state the same way, when the host can (used
-   *  only by {@link UndoHistory.dropUnchanged}; temporary, with the WASM
-   *  engine's fallback, #874). */
-  signatureOf?(snap: string): string;
+  /** Which tower is live (`SimPort.generation`), read around a restore to
+   *  tell whether it swapped the tower before it failed. Without it a failed
+   *  restore is taken to have left the tower as it was. */
+  generation?(): number;
   /** Surface a short user-facing message ("Undid: Bulldoze", "Nothing to undo."). */
   notify(message: string): void;
 }
@@ -147,22 +149,66 @@ export class UndoHistory {
     if (this.undoStack.length > UNDO_CAP) this.undoStack.shift();
   }
 
-  undo(): void {
+  /** Undo the newest step. The commit, the pop, the redo step's snapshot
+   *  and the restore's start all happen before this returns, so two undos in
+   *  one task pop two steps in order. The "Undid:" notice follows the
+   *  settled restore; a failure gives none and rejects (see {@link step}). */
+  undo(): Promise<void> {
     this.commit(); // finalize any in-flight gesture first
     const entry = this.undoStack.pop();
-    if (!entry) return this.ports.notify("Nothing to undo.");
-    this.redoStack.push({ snap: this.ports.snapshot(), label: entry.label });
-    this.ports.restore(entry.snap);
-    this.ports.notify(`Undid: ${entry.label}`);
+    if (!entry) return this.say("Nothing to undo.");
+    return this.step(entry, "undo");
   }
 
-  redo(): void {
+  /** Redo the newest undone step, in the same order as {@link undo}. */
+  redo(): Promise<void> {
     this.commit(); // finalize any in-flight gesture first (matches undo)
     const entry = this.redoStack.pop();
-    if (!entry) return this.ports.notify("Nothing to redo.");
-    this.undoStack.push({ snap: this.ports.snapshot(), label: entry.label });
-    this.ports.restore(entry.snap);
-    this.ports.notify(`Redid: ${entry.label}`);
+    if (!entry) return this.say("Nothing to redo.");
+    return this.step(entry, "redo");
+  }
+
+  /** Restore `entry`, just popped by an undo or a redo, keeping today's
+   *  state as the opposite step. When the snapshot fails, `entry` goes back
+   *  where it was. When the restore fails, `entry` stays dropped: its save
+   *  would fail again and, kept on top, would block every older step. The
+   *  opposite step stays only when the restore swapped the tower before it
+   *  failed (it is then the way back); otherwise it holds the tower as it
+   *  still is and would change nothing, so it comes off wherever it now
+   *  sits. That trail is read again then, as the WASM fallback's tidy may
+   *  have replaced it. */
+  private step(entry: Entry, kind: "undo" | "redo"): Promise<void> {
+    const opposite = () => (kind === "undo" ? this.redoStack : this.undoStack);
+    let back: Entry;
+    try {
+      back = { snap: this.ports.snapshot(), label: entry.label };
+    } catch (e) {
+      (kind === "undo" ? this.undoStack : this.redoStack).push(entry);
+      return Promise.reject(e);
+    }
+    opposite().push(back);
+    const before = this.ports.generation?.();
+    let restored: Promise<void>;
+    try {
+      restored = this.ports.restore(entry.snap);
+    } catch (e) {
+      restored = Promise.reject(e);
+    }
+    const swapped = this.ports.generation?.() !== before;
+    return restored.then(
+      () => this.ports.notify(`${kind === "undo" ? "Undid" : "Redid"}: ${entry.label}`),
+      (e: unknown) => {
+        const trail = opposite();
+        const at = trail.lastIndexOf(back);
+        if (!swapped && at >= 0) trail.splice(at, 1);
+        throw e;
+      },
+    );
+  }
+
+  private say(message: string): Promise<void> {
+    this.ports.notify(message);
+    return Promise.resolve();
   }
 
   /** Drop the newest undo and redo steps that would change nothing now, and
@@ -174,11 +220,10 @@ export class UndoHistory {
    *  Both go. A gesture under way keeps its capture, fingerprinted again from
    *  its own snapshot: a capture whose save trapped took the newest restore
    *  point, which is where the fallback went, so a release with nothing done
-   *  since leaves no step. A no-op without `signatureOf`. Temporary, with
-   *  the fallback. */
-  dropUnchanged(): number {
-    const sigOf = this.ports.signatureOf;
-    if (!sigOf) return 0;
+   *  since leaves no step. `sigOf` fingerprints a snapshot the way
+   *  {@link UndoPorts.signature} reads the live state; the host that falls
+   *  back passes it. Temporary, with the fallback. */
+  dropUnchanged(sigOf: (snap: string) => string): number {
     const now = this.ports.signature();
     let dropped = 0;
     while (this.undoStack.length > 0 && sigOf(this.undoStack[this.undoStack.length - 1].snap) === now) {
