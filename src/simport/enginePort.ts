@@ -63,6 +63,9 @@ export interface EnginePortView {
   logText(seq: number): string | undefined;
   /** The saved camera as JSON, read once per tower. */
   view(): string | undefined;
+  /** The emergency waiting on the player as JSON `{ kind, cost, message }`,
+   *  read when the frame's `pendingChoice` flag rises. */
+  pendingChoice(): string | undefined;
 }
 
 /** The commands; each answers a result record (contract section 2). */

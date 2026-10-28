@@ -86,7 +86,8 @@ fn the_strip_record_matches_the_json_readout() {
 #[test]
 fn onboarding_packs_the_facts_in_order() {
     let mut e = engine();
-    assert_eq!(e.port_onboarding(), 0.0);
+    // No fact is +0, the number TypeScript's bits give, never -0.
+    assert!(e.port_onboarding() == 0.0 && e.port_onboarding().is_sign_positive());
     assert_eq!(e.port_build(code(Kind::Lobby), 1.0, 100.0)[STATUS], 1.0);
     assert_eq!(e.port_onboarding(), 1.0);
 }

@@ -94,6 +94,9 @@ const RAW_WRITES: Record<string, Record<string, number>> = {
   // The hosts' unit records: markRoom when either field moves.
   "src/wasmhost/frameApply.ts": { state: 1, customersIn: 1 },
   "src/wasmhost/frameSync.ts": { state: 1, customersIn: 1 },
+  // The shared reader's own decoded rooms, never an engine unit: it keeps
+  // no counts.
+  "src/simport/viewReader.ts": { state: 2, customersIn: 1 },
 };
 
 /** Writes through a person's or a class's own name, per file: the crowd's
@@ -173,6 +176,9 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   // Array slots: the section builder's output and the telemetry's tables.
   "src/wasmhost/buildSection.ts": { keyed: 1 },
   "src/wasmhost/telemetry.ts": { keyed: 2 },
+  // The shared reader's tower handle (its getters) and its decoded rooms,
+  // people and cars, written into its own objects: no engine unit.
+  "src/simport/viewReader.ts": { bulk: 2, keyed: 5 },
 };
 
 function scan(): { raw: Record<string, Record<string, number>>; named: Record<string, Record<string, number>>; opaque: Record<string, OpaqueWrites> } {

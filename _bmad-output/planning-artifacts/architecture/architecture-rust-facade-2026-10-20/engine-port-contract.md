@@ -254,6 +254,7 @@ stays the one that survives (3.x).
 | `eventText(i)` | JSON string | an analytics event's `{ name, payload }` | per gameplay event, rare (a drain's `count` is 0 on almost every step) |
 | `scheduleShaft` (inside the engine) | a small JSON value built from the slots | the slots cross as numbers; the engine builds the input `Schedule::coerce` reads, so the schedule's coercion rules stay in one place for this setter and the legacy one | per schedule edit (one value of two 24-hour rows and a few fields, under 1 KB) |
 | text getters (`lastReason`, `unitLabel`, `logText`, `towerName`) | string | free text | on demand |
+| `pendingChoice()` / `view()` | JSON string | an emergency's `{ kind, cost, message }`, the saved camera | when the frame's `pendingChoice` flag rises; once per tower |
 | digests, telemetry, dual-run views | JSON | tooling only, never in a player build's loop | tooling |
 
 Nothing else crosses as JSON. A new exception needs a row here and a
@@ -348,7 +349,7 @@ they resume.
 
 | Story AC | Now |
 | --- | --- |
-| 1 one adapter, every contract | The contract fixture runs on `Engine` and `TsEngine` (section 3); the old suites' cases move into it, none dropped. |
+| 1 one adapter, every contract | The golden test (`tsEngine.golden.integration.test.ts`, section 3) runs one script on `Engine` and `TsEngine` and holds every answer equal; the old suites' cases move into it, none dropped, each keeping its own expected answer. |
 | 2 no TypeScript `Simulation` | Kept: the import-walk guard covers `enginePort.ts`, `viewReader.ts` and the boot path. |
 | 3 commands at issue, one queue | Kept and simpler: synchronous calls run in issue order by construction. |
 | 4 the shape check first | Moves into each engine (section 3). |

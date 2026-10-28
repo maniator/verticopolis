@@ -253,6 +253,11 @@ function wasmParityProjects() {
     "**/panelGettersWasm.integration.test.ts",
     "**/panelGettersCost.integration.test.ts",
     "**/engineView.integration.test.ts",
+    // The engine port's side-by-side tests (facade slice 7) run both
+    // engines themselves.
+    "**/tsEngine.golden.integration.test.ts",
+    "**/viewReader.integration.test.ts",
+    "**/viewLayoutJson.integration.test.ts",
     // The engine comparison's own checks run each engine themselves (#972).
     "**/perfCompare/*.integration.test.ts",
     // Pure render: it paints in a software raster and never touches the engine,
@@ -284,8 +289,11 @@ function wasmParityProjects() {
         name: "unitWasm",
         include: ["src/**/*.test.ts"],
         // The mirror's and the dual run's own unit tests attach a relay
-        // themselves.
-        exclude: [...configDefaults.exclude, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/dualrun/dualRun.test.ts"],
+        // themselves. `TsEngine`'s own tests and the shared reader's over
+        // it cover the TypeScript engine behind the port, which the parity
+        // setup would host on the Rust engine; the golden and reader
+        // integration tests hold the two engines together.
+        exclude: [...configDefaults.exclude, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/dualrun/dualRun.test.ts", "**/engine/port/tsEngine.test.ts", "**/simport/viewReader.test.ts"],
         setupFiles,
         testTimeout,
         hookTimeout: testTimeout,

@@ -148,6 +148,10 @@ function scannedSources(): string[] {
 }
 
 const allowed = (file: string) => ALLOWED_DIRS.some((dir) => file.startsWith(dir));
+/** The shared view reader takes the frames through `EnginePort` (contract
+ *  section 5), so it is the one caller outside the host scope that may read
+ *  `viewFrame`; it imports no binding. */
+const FRAME_READERS = ["src/simport/viewReader.ts"];
 
 /** The source with its comments blanked, so prose naming an op
  *  (`// without this, evaluateStar ...`) is not read as a call: block
@@ -306,7 +310,7 @@ describe("WASM binding export tiers", () => {
     });
 
     it("no scanned source calls a host-loop op the binding alone has", () => {
-      const offenders = files.filter((file) => !allowed(file)).flatMap((file) => {
+      const offenders = files.filter((file) => !allowed(file) && !FRAME_READERS.includes(file)).flatMap((file) => {
         const text = read(file);
         const hit = offense(text, CALLS_HOST_LOOP) ?? offense(text, REACHES_ENGINE_LOOP);
         return hit ? [`${file}: ${hit}`] : [];
