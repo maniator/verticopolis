@@ -203,7 +203,7 @@ export class BuildActions {
   }
 
   /**
-   * Shared player-removal path: the engine's `demolish` refuses a
+   * Shared player-removal path: the engine's demolish member refuses a
    * burning unit or load-bearing structure (with an error toast unless
    * `quiet`; drag steps stay silent, like build drags) and pays the refund.
    * Returns true on success.
@@ -223,7 +223,7 @@ export class BuildActions {
     return true;
   }
 
-  /** Tear out a shaft through the engine's `demolish`, which pays its
+  /** Tear out a shaft through the engine's demolish member, which pays its
    *  resale: the ONE refund path shared by the editor's Sell and the
    *  bulldozer. `verb` is the sell-vs-bulldoze telemetry detail (the
    *  caller's gesture), which the engine reports as the removal's method.
