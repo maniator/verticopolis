@@ -47,7 +47,7 @@ function boot(e: SelectionEnv) {
 
 let pages = 0;
 function env(store: KeyValueStore | null, over: Partial<SelectionEnv> = {}): SelectionEnv {
-  return { store, url: null, drawOn: true, safetyOn: true, stage: 1, share: 10, sha: "aaa1111", pageId: `p${++pages}`, now: 1_000, random: () => 0.5, ...over };
+  return { store, url: null, drawOn: true, safetyOn: true, stage: 1, share: 10, sha: "aaa1111", pageId: `p${++pages}`, now: 1_000, random: () => 0.5, rustOnlyByUrl: false, ...over };
 }
 
 const withBucket = (bucket: number, extra: Record<string, unknown> = {}) => {
@@ -55,6 +55,28 @@ const withBucket = (bucket: number, extra: Record<string, unknown> = {}) => {
   s.setItem(COHORT_KEY, JSON.stringify({ v: 1, bucket, ...extra }));
   return s;
 };
+
+describe("selectEngine while only the URL boots Rust", () => {
+  it("runs TypeScript for the Settings choice and the cohort's draw, and Rust for the URL", () => {
+    const chose = new MemoryStore();
+    setPreference(chose, "wasm");
+    for (const drawOn of [true, false]) {
+      const held = selectEngine(env(chose, { drawOn, rustOnlyByUrl: true }));
+      expect(held).toMatchObject({ boot: "ts", requested: "wasm", heldForUrl: true, markerId: null, notice: "none" });
+      expect(selectEngine(env(chose, { drawOn, rustOnlyByUrl: true, url: "wasm" }))).toMatchObject({ boot: "wasm" });
+      // The old measurement hosts' links are held too (owner, 2026-10-28).
+      for (const url of ["wasm-frame", "wasm-worker"]) {
+        expect(selectEngine(env(chose, { drawOn, rustOnlyByUrl: true, url }))).toMatchObject({ boot: "ts", requested: url, heldForUrl: true });
+        expect(selectEngine(env(chose, { drawOn, rustOnlyByUrl: false, url }))).toMatchObject({ boot: url });
+      }
+    }
+    // Bucket 0 draws the WASM arm at a 10% share.
+    expect(selectEngine(env(withBucket(0), { rustOnlyByUrl: true }))).toMatchObject({ boot: "ts", requested: "wasm", selectedBy: "cohort", heldForUrl: true });
+    // A TypeScript choice is no hold.
+    setPreference(chose, "ts");
+    expect(selectEngine(env(chose, { rustOnlyByUrl: true })).heldForUrl).toBeUndefined();
+  });
+});
 
 describe("selectEngine: the draw", () => {
   it("draws a bucket once and keeps it on every later boot", () => {

@@ -14,6 +14,16 @@ function input(over: Partial<EngineSettingsInput> = {}): EngineSettingsInput {
   return { selection: sel(), running: "ts", preference: "auto", suppression: null, pageFallback: null, storable: true, ...over };
 }
 
+describe("engineSettingsView while only the URL boots Rust", () => {
+  it("says why a Rust choice runs TypeScript and offers no restart", () => {
+    const v = engineSettingsView(input({ preference: "wasm", rustOnlyByUrl: true, selection: sel({ selectedBy: "setting", requested: "wasm", heldForUrl: true }) }));
+    expect(v.note).toBe("For now the Rust engine runs only from a test link, so the game uses the TypeScript engine.");
+    expect(v.restart).toBe(false);
+    // A test link's Rust page says nothing.
+    expect(engineSettingsView(input({ preference: "wasm", rustOnlyByUrl: true, running: "wasm", selection: sel({ selectedBy: "url", boot: "wasm" }) })).note).toBeNull();
+  });
+});
+
 describe("engineSettingsView", () => {
   it("shows Automatic on the TypeScript arm with nothing to explain", () => {
     expect(engineSettingsView(input())).toEqual({ choice: "auto", testHost: false, running: "TypeScript engine", note: null, retry: false, restart: false, storable: true });

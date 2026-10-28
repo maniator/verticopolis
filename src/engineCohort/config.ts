@@ -43,6 +43,15 @@ export const REFUSAL_HOLDS_PAGE_LIFE = false;
  *  where the reliability data could not say why. */
 export const COHORT_TELEMETRY = false;
 
+/** True while only a `?engine=wasm` link boots the Rust engine: a trap
+ *  stops the game until the fallback to TypeScript returns (#1422), so the
+ *  Settings choice, the cohort's draw and the old measurement hosts' links
+ *  (`wasm-frame`, `wasm-worker`) run TypeScript (owner's decisions,
+ *  2026-10-28). PR 6 turns it off. A tooling build (VC_TOOLING=1, never
+ *  shipped to players) keeps the stored choice, which the end-to-end lanes and
+ *  the screenshot harness set to run every page they open on the Rust engine. */
+export const RUST_ONLY_BY_URL = !__TOOLING_BUILD__;
+
 /** True when a build would put browsers on Rust through the cohort before
  *  everything stage 1 needs is in it: the cohort's fields, #1258's page-life
  *  hold and, at a stage that runs the size gate, the gate with its threshold.

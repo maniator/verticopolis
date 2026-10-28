@@ -1,6 +1,7 @@
 import { html, render } from "lit-html";
 import { activeEngine } from "../wasmhost/engineLabel";
 import type { EngineBootState } from "../wasmhost/engineBoot";
+import { RUST_ONLY_BY_URL } from "./config";
 import { currentSelection } from "./current";
 import { clearSafety, readPreference, setPreference, suppressionApplies, type Preference, type Selection } from "./policy";
 import { browserStore, readSafety, remove, writeChecked, type KeyValueStore, type SafetyRecord } from "./records";
@@ -63,6 +64,7 @@ export function liveEngineSettings(src: LiveSources = browserSources()): EngineS
     pageFallback: boot?.failure && boot.build === "switchable" ? boot.failure.reason : null,
     retried: retriedThisPage,
     storable: storable(src.store),
+    rustOnlyByUrl: RUST_ONLY_BY_URL,
   });
 }
 
