@@ -5,9 +5,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames";
 import { engineBuildRecord } from "../wasmhost/enginePackageRecord";
-import { INTEGRITY_FILES, engineDistProblems, engineIntegrityTransform, integrityOf, manifestIntegrity, readExpectedPackage, shellProblems } from "./enginePackageBuild";
+import { ENGINE_REVISION_SUFFIX, INTEGRITY_FILES, engineDistProblems, engineRevision, engineIntegrityTransform, integrityOf, manifestIntegrity, manifestRevisions, readExpectedPackage, revisionsOf, shellProblems, shellRevisionProblems } from "./enginePackageBuild";
 
 const sha = (d: Uint8Array | string) => createHash("sha256").update(d).digest("hex");
+const md5 = (d: Uint8Array | string) => createHash("md5").update(d).digest("hex");
 const glue = new TextEncoder().encode("export default async function init() {}\n");
 const wasm = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 2, 3]);
 const record = engineBuildRecord(glue, wasm, "a".repeat(64), sha);
@@ -31,7 +32,7 @@ function pkg(over: { record?: string | null; glue?: Uint8Array; wasm?: Uint8Arra
 
 describe("readExpectedPackage", () => {
   it("reads the package id and the file digests of a good record", () => {
-    expect(readExpectedPackage(pkg(), "build")).toEqual({ package: record.package, files: record.files, sources: record.sources });
+    expect(readExpectedPackage(pkg(), "build")).toEqual({ package: record.package, files: record.files, sources: record.sources, revisions: revisionsOf(join(dir, ENGINE_DIR)) });
   });
 
   it("is null when there is no package folder, in a build or not", () => {
@@ -59,7 +60,8 @@ describe("readExpectedPackage", () => {
     made.push(dir);
     mkdirSync(join(dir, ENGINE_DIR));
     expect(readExpectedPackage(dir, "build")).toBeNull();
-    expect(readExpectedPackage(pkg({ record: `\uFEFF${JSON.stringify(record)}` }), "build")).toEqual({ package: record.package, files: record.files, sources: record.sources });
+    const withBom = `\uFEFF${JSON.stringify(record)}`;
+    expect(readExpectedPackage(pkg({ record: withBom }), "build")).toEqual({ package: record.package, files: record.files, sources: record.sources, revisions: revisionsOf(join(dir, ENGINE_DIR)) });
   });
 
   it("gives a dev serve or a test null even for a good record", () => {
@@ -86,10 +88,23 @@ describe("engineIntegrityTransform", () => {
     expect(manifest[3]).toEqual({ url: "index.html", revision: "r4", size: 10 });
   });
 
+  it("gives each engine entry a revision no worker before the integrity attribute used, and leaves the rest alone", () => {
+    const d = pkg();
+    const { manifest } = engineIntegrityTransform(d)(entries());
+    expect(manifest.slice(0, 3).map((e) => e.revision)).toEqual([engineRevision(glue), engineRevision(wasm), engineRevision(new TextEncoder().encode(JSON.stringify(record)))]);
+    for (const e of manifest.slice(0, 3)) {
+      expect(e.revision, "not the plain MD5 an earlier worker keyed the file by").toMatch(new RegExp(`^[0-9a-f]{32}${ENGINE_REVISION_SUFFIX}$`));
+      expect(e.revision).not.toMatch(/^[0-9a-f]{32}$/);
+    }
+    expect(engineRevision(glue)).toBe(`${md5(glue)}${ENGINE_REVISION_SUFFIX}`);
+    expect(manifest[3].revision).toBe("r4");
+  });
+
   it("matches an entry whatever its prefix or query string", () => {
     const d = pkg();
     const { manifest } = engineIntegrityTransform(d)([{ url: `./${ENGINE_DIR}${ENGINE_GLUE}?v=1`, revision: null, size: 1 }]);
     expect(manifest[0].integrity).toBe(integrityOf(glue));
+    expect(manifest[0].revision, "an entry that arrived with no revision gets the rotated one").toBe(engineRevision(glue));
   });
 
   it("asks for the output folder when it is given a function, so a changed outDir is followed", () => {
@@ -130,11 +145,12 @@ describe("manifestIntegrity", () => {
 
 describe("engineDistProblems", () => {
   /** A manifest with the three engine entries carrying the right integrity. */
-  function manifestFor(_d: string, over: Record<string, string | null> = {}): string {
+  function manifestFor(_d: string, over: Record<string, string | null> = {}, revisionOver: Record<string, string> = {}): string {
     const entry = (name: string, bytes: Uint8Array) => {
       const url = ENGINE_DIR + name;
       const integrity = url in over ? over[url] : integrityOf(bytes);
-      return `{url:"${url}",revision:"r"${integrity === null ? "" : `,integrity:"${integrity}"`}}`;
+      const revision = url in revisionOver ? revisionOver[url] : engineRevision(bytes);
+      return `{url:"${url}",revision:"${revision}"${integrity === null ? "" : `,integrity:"${integrity}"`}}`;
     };
     return `[${entry(ENGINE_GLUE, glue)},${entry(ENGINE_WASM, wasm)},${entry(ENGINE_BUILD_RECORD, new TextEncoder().encode(JSON.stringify(record)))}]`;
   }
@@ -173,6 +189,13 @@ describe("engineDistProblems", () => {
     const only = manifestFor(d).replace(/\{url:"engine\/BUILD\.json"[^}]*\}/, "");
     expect(engineDistProblems(d, only).join("\n")).toContain(`precache entry ${ENGINE_DIR}${ENGINE_BUILD_RECORD} is missing from the manifest`);
     expect(engineDistProblems(d, "[]")).toHaveLength(3);
+  });
+
+  it("reports an engine entry whose revision is not the one of its file, which would send Repair to another cache key", () => {
+    const d = pkg();
+    const bad = manifestFor(d, {}, { [`${ENGINE_DIR}${ENGINE_WASM}`]: "0".repeat(32) });
+    expect(engineDistProblems(d, bad).join("\n")).toContain(`precache entry ${ENGINE_DIR}${ENGINE_WASM} has revision ${"0".repeat(32)}; the file in dist/ has ${engineRevision(wasm)}`);
+    expect(manifestRevisions(manifestFor(d)).get(`${ENGINE_DIR}${ENGINE_GLUE}`)).toBe(engineRevision(glue));
   });
 
   it("reports a binary that is missing from dist", () => {
@@ -274,5 +297,27 @@ describe("the other readers of BUILD.json", () => {
 
   it("a schema 2 record still carries the sources hash they read", () => {
     expect(record.sources).toBe("a".repeat(64));
+  });
+});
+
+describe("shellRevisionProblems", () => {
+  it("passes when a script carries the revision of each engine file, and names the one that is missing", () => {
+    const d = pkg();
+    mkdirSync(join(d, "assets"), { recursive: true });
+    const all = JSON.stringify(revisionsOf(join(d, ENGINE_DIR)));
+    writeFileSync(join(d, "assets/index-1.js"), `x={revisions:${all}}`);
+    expect(shellRevisionProblems(d)).toEqual([]);
+    writeFileSync(join(d, "assets/index-1.js"), `x={revisions:${all.replace(engineRevision(wasm), "0".repeat(32))}}`);
+    expect(shellRevisionProblems(d).join("\n")).toContain(`precache revision of ${ENGINE_DIR}${ENGINE_WASM}`);
+  });
+
+  it("does not count the worker's own manifest as the shell carrying the revisions", () => {
+    const d = pkg();
+    mkdirSync(join(d, "assets"), { recursive: true });
+    const manifest = Object.values(revisionsOf(join(d, ENGINE_DIR))).map((revision) => `{url:"x",revision:"${revision}"}`);
+    writeFileSync(join(d, "sw.js"), `precacheAndRoute([${manifest.join(",")}])`);
+    writeFileSync(join(d, "workbox-abc123.js"), manifest.join(","));
+    writeFileSync(join(d, "assets/index-1.js"), "x={}");
+    expect(shellRevisionProblems(d)).toHaveLength(3);
   });
 });

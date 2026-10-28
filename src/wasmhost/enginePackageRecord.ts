@@ -49,6 +49,11 @@ export interface ExpectedEnginePackage {
   files: EngineFiles;
   /** The crate this shell was built to run, a label for About and diagnostics (#963); the check never reads it. */
   crate?: EngineCrateRecord;
+  /** The Workbox precache revision (the file's MD5 plus the rotation suffix) of each of the three
+   *  engine files this build ships, by file name, so Repair can name the cache
+   *  keys of the running build and no other (#985, design 5.4). Optional: a
+   *  label for Repair; the package check never reads it. */
+  revisions?: Record<string, string>;
   /** The hash of the Rust sources of the package this shell was built with
    *  (`BUILD.json`'s `sources`), for About to compare with the hash stamped in
    *  the binary (#963). A label: the package check never reads it. */

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { FUZZ_ENTRIES, PART_NAMES, fuzzKey, fuzzKeyFiles, fuzzKeyParts, importClosure, type PartName } from "./fuzzKey";
 import { repoRoot } from "../guardFiles";
+import { linkFolder } from "../fixtures/links";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -26,6 +27,8 @@ function tree(): string {
   put("src/engine/a.test.ts", "export const t = 1;\n");
   put("scripts/fuzz-compare.ts", 'import { helper } from "../src/tests/helper";\nexport const c = helper;\n');
   put("scripts/fuzz-key.ts", "export {};\n");
+  put("scripts/fuzz-shrink.ts", "export {};\n");
+  put("scripts/fuzz-corpus.ts", "export {};\n");
   put("src/tests/helper.ts", "export const helper = 1;\n");
   put("scripts/wasm-build.ts", "export {};\n");
   put("scripts/build-engine-wasm.sh", "#!/bin/sh\n");
@@ -100,7 +103,7 @@ describe("the differential's window key", () => {
     writeFileSync(join(b, "src/engine/a.ts"), "export const a = 1;\r\n");
     expect(keyOf(b)).toBe(keyOf(a));
     writeFileSync(join(b, "conformance/fixtures/.DS_Store"), "junk");
-    symlinkSync(join(b, "conformance/fixtures"), join(b, "conformance/fixtures/loop"));
+    linkFolder(join(b, "conformance/fixtures"), join(b, "conformance/fixtures/loop"));
     expect(keyOf(b)).toBe(keyOf(a));
     unlinkSync(join(b, "conformance/fixtures/loop"));
   });

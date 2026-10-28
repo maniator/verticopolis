@@ -98,6 +98,16 @@ export class Engine {
      */
     crowdView(): string;
     /**
+     * The facts behind the inspector's diagnostics for one unit, as JSON
+     * text (`diagnostics::DiagnosticFacts`); TypeScript keeps the wording.
+     * Undefined for an id that names no unit (a transport's, zero or a
+     * negative one) and for a malformed one (fractional, not finite, past
+     * the safe integers), read raw so it cannot wrap onto a real unit.
+     * The read may fill the engine's caches, which sit outside the save; it
+     * changes nothing in the game.
+     */
+    diagnosticFacts(id: number): string | undefined;
+    /**
      * The gameplay events emitted since the last drain, oldest first, as
      * JSON `[{ name, payload }]` (`conformance/events/catalog.json`); the
      * buffer is empty afterwards.
@@ -131,6 +141,11 @@ export class Engine {
      * The number of units on fire.
      */
     fires(): number;
+    /**
+     * `floorHeatmap(mode)`'s cells as JSON; a mode that is not one of the
+     * four overlays is an error.
+     */
+    floorHeatmap(mode: string): string;
     /**
      * The per-frame read model as one flat number array (see
      * `frame_view` for the layout): what the host reads every frame while
@@ -169,6 +184,10 @@ export class Engine {
      */
     gameplayEventsPending(): number;
     /**
+     * `housekeepingCoverage()`, as JSON.
+     */
+    housekeepingCoverage(): string;
+    /**
      * `economy.housekeepingReport()`: yesterday's shift result as JSON
      * `{ cleaned, leftover }`, or nothing (`undefined`) before the first
      * morning checkout.
@@ -195,6 +214,21 @@ export class Engine {
      * as the TypeScript defaults do.
      */
     static newGame(seed: number, mode: string, modern_calendar?: string | null, start_unbridged?: boolean | null): Engine;
+    /**
+     * The five onboarding facts as JSON.
+     */
+    onboardingFacts(): string;
+    /**
+     * `paintBrush(kind, floor, tiles)` with the tiles as JSON text: JSON
+     * `{ placed, reason? }`, the floor and lobby brush (`brush.rs`) in one
+     * call. Every argument is read raw, so a malformed brush is refused
+     * with "That request is not valid." as TypeScript refuses it.
+     */
+    paintBrush(kind: string, floor: number, tiles: string): string;
+    /**
+     * `peakCongestionHotspot()`: `{ ratio, floor }` as JSON.
+     */
+    peakCongestionHotspot(): string;
     /**
      * The pending player choice as JSON `{ kind, cost, message }`, or null.
      */
@@ -253,6 +287,13 @@ export class Engine {
      */
     resolveChoice(accept: boolean): void;
     /**
+     * What moved in the save since the last sync: `{ units, rest }` as JSON
+     * text (the changed unit records, and every other top-level key).
+     * `undefined` when units were added, removed or reordered, or no full
+     * save was taken yet: the host then takes a full one.
+     */
+    saveDelta(): string | undefined;
+    /**
      * Replace the elevator telemetry with an `elevatorTelemetry` document.
      * Tooling only (the gallery's engine leg); no game command reaches it.
      */
@@ -270,6 +311,11 @@ export class Engine {
      * is refused with `false`, never coerced.
      */
     sellAt(floor: number, x: number): boolean;
+    /**
+     * `serialize()`, byte for byte, which also becomes the base the next
+     * `saveDelta` is taken against (#1045, `crate::save_delta`).
+     */
+    serializeForSync(): string;
     /**
      * `serialize()` as JSON text.
      */
@@ -334,6 +380,10 @@ export class Engine {
      * The hashed state view: the saved game minus prose, as canonical JSON.
      */
     stateView(): string;
+    /**
+     * Everything the stats screen reads beyond `stats()`, as JSON.
+     */
+    statsReport(): string;
     tick(dt_minutes: number): void;
     /**
      * `toggleAutoBridge()`: the preference after the flip.
@@ -354,14 +404,28 @@ export class Engine {
      * (#996), as `setCars`.
      */
     towerSetCars(id: number, cars: number): boolean;
+    towerSignature(): bigint;
+    /**
+     * `stats()`: the HUD strip's counters, as JSON.
+     */
+    towerStats(): string;
     /**
      * The shaft covering a tile, serialized as the save would, or null.
      */
     transportAt(floor: number, x: number): string | undefined;
     /**
+     * The transport inspector and editor card for shaft `id`, as JSON, or null.
+     */
+    transportDetail(id: number): string | undefined;
+    /**
      * The unit covering a tile, serialized as the save would, or null.
      */
     unitAt(floor: number, x: number): string | undefined;
+    /**
+     * The unit inspector and editor card for unit `id`, as JSON, or null.
+     */
+    unitDetail(id: number): string | undefined;
+    unitMetaSince(since: number): string;
     /**
      * `tower.validateTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`,
      * nothing written. An unknown kind is refused with "Unknown facility."; a
@@ -369,6 +433,8 @@ export class Engine {
      * is refused with `INVALID_REQUEST`, never coerced (#923).
      */
     validateTransport(kind: string, x: number, bottom: number, top: number): string;
+    viewFrame(full: boolean): Float64Array;
+    viewStructure(): Float64Array;
 }
 
 /**
@@ -417,3 +483,5 @@ export function exportTdt(save_json: string): Uint8Array;
  * the player-readable message.
  */
 export function importTdt(bytes: Uint8Array, filename: string): string;
+
+export function viewLayout(): string;

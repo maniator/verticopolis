@@ -33,6 +33,7 @@ use verticopolis_engine::rent::BatchTarget;
 use verticopolis_engine::scenario::{run_scenario, Checkpoint, Scenario};
 use verticopolis_engine::sim::Simulation;
 use verticopolis_engine::snapshot::state_view;
+use verticopolis_engine::view::{layout, meta_since, structure_view, ViewReader};
 use verticopolis_engine::{export_tdt, import_tdt};
 
 /// The seed every run here starts from. Any seed works; a fixed one makes
@@ -231,9 +232,12 @@ pub fn edit(sim: &mut Simulation) -> Result<(), String> {
     let r = sim.remove_car(elevator);
     check(!r.ok && r.delta == 0.0, "the last car stays")?;
 
-    for x in ELEVATOR_X..ELEVATOR_X + 6 {
-        check(sim.build(Kind::Floor, 4, x).ok, "floor tiles on floor 4")?;
-    }
+    let tiles: Vec<i64> = (ELEVATOR_X..ELEVATOR_X + 6).collect();
+    let r = sim.paint_brush(Kind::Floor, 4, &tiles);
+    check(
+        r.placed == 6 && r.reason.is_none(),
+        "the brush lays floor tiles on floor 4",
+    )?;
     let r = sim.extend_transport(elevator, ExtendEnd::Up, 4);
     check(
         r.charge.ok && r.top == 4 && r.added == 1,
@@ -442,6 +446,57 @@ pub fn read_frame(sim: &Simulation) -> Result<usize, String> {
     Ok(people)
 }
 
+/// Read the renderer-facing view the way a host that keeps no copy of the
+/// simulation would (`view`, layouts in `src/view/layout.rs`): the
+/// structure's rooms and runs account for every unit, a first frame sends
+/// every room with the population the simulation counts, a second frame
+/// with nothing changed sends none, and the metadata listing parses.
+pub fn read_view(sim: &Simulation) -> Result<(), String> {
+    let s = structure_view(sim);
+    use layout::structure;
+    let (rooms, runs) = (s[structure::ROOMS] as usize, s[structure::RUNS] as usize);
+    let run_at = layout::STRUCTURE_HEADER + rooms * layout::ROOM_RECORD;
+    let tiles: f64 = (0..runs)
+        .map(|k| s[run_at + k * layout::RUN_RECORD + layout::run::COUNT])
+        .sum();
+    if rooms + tiles as usize != sim.tower.units.len() {
+        return Err(format!(
+            "the structure holds {rooms} rooms and {tiles} tiles, the tower {} units",
+            sim.tower.units.len()
+        ));
+    }
+    let mut reader = ViewReader::new();
+    let first = reader.frame(sim, false);
+    use layout::header;
+    let got = [
+        first[header::FULL],
+        first[header::ROOMS],
+        first[header::UNITS],
+    ];
+    if got != [1.0, rooms as f64, rooms as f64] {
+        return Err(format!("a first frame reads full, rooms, units {got:?}"));
+    }
+    if first[header::POPULATION] != sim.population() as f64 {
+        let got = first[header::POPULATION];
+        return Err(format!(
+            "the frame counts {got} people, the simulation {}",
+            sim.population()
+        ));
+    }
+    let again = reader.frame(sim, false);
+    if again[header::UNITS] != 0.0 {
+        return Err(format!(
+            "an unchanged frame resent {} rooms",
+            again[header::UNITS]
+        ));
+    }
+    let meta = meta_since(&sim.tower, None);
+    if meta["full"] != true || !meta["units"].is_array() {
+        return Err(format!("the metadata listing reads {meta}"));
+    }
+    Ok(())
+}
+
 /// Load a `.vctower` file the way the web game does: decode, deserialize,
 /// then mark a file with no build stamp as a founder's tower (an unstamped
 /// save predates the stamp, so it is a founder's).
@@ -510,6 +565,7 @@ pub fn smoke(seed: u32) -> Result<Report, String> {
         ));
     }
     read_frame(&sim)?;
+    read_view(&sim)?;
     // People come and go; at the hour the run ends the tower may be empty,
     // but two working days must have spawned some.
     let crowd = sim.crowd.view();

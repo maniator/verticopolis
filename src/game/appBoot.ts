@@ -65,6 +65,7 @@ export function bootReason(flags: {
 export function wireControllers(app: GameApp): void {
   app.build = new BuildActions({
     getSim: () => app.sim,
+    port: app.port,
     ui: { toast: (text, kind) => app.ui.toast(text, kind) },
     audio: app.audio,
     selectedId: () => app.selected?.id ?? null,
@@ -77,6 +78,7 @@ export function wireControllers(app: GameApp): void {
   });
   app.editor = new EditorActions({
     getSim: () => app.sim,
+    port: app.port,
     ui: {
       toast: (text, kind) => app.ui.toast(text, kind),
       showBatchPricingDialog: (ctx, cb) => app.ui.showBatchPricingDialog(ctx, cb),
@@ -163,6 +165,7 @@ export function wireControllers(app: GameApp): void {
   });
   app.keyboard = new KeyboardPlay({
     getSim: () => app.sim,
+    port: app.port,
     engine: () => app.engine,
     audio: app.audio,
     ui: { toast: (text, kind) => app.ui.toast(text, kind) },

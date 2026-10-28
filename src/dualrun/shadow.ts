@@ -55,6 +55,7 @@ export class ShadowEngine {
       }
       case "tick": this.live().tick(cmd.dt); return null;
       case "build": this.live().build(cmd.kind, cmd.floor, cmd.x); return null;
+      case "paintBrush": this.live().paintBrush(cmd.kind, cmd.floor, JSON.stringify(cmd.tiles)); return null;
       case "buildTransport": this.live().buildTransport(cmd.kind, cmd.x, cmd.bottom, cmd.top); return null;
       case "sellAt": this.live().sellAt(cmd.floor, cmd.x); return null;
       case "removeUnit": this.live().removeUnit(cmd.id); return null;

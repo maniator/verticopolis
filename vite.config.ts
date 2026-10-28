@@ -244,9 +244,14 @@ function wasmParityProjects() {
     "**/conformanceWasmCanBuild.integration.test.ts",
     "**/conformanceWasmVctower.integration.test.ts",
     "**/conformanceWasmSaves.integration.test.ts",
+    "**/conformanceWasmDiagnostics*.integration.test.ts",
     "**/dualRunDay.integration.test.ts",
     "**/dualRunEdits.integration.test.ts",
     "**/loaderCases.integration.test.ts",
+    // They run each engine themselves, like the conformance suites above.
+    "**/panelGettersWasm.integration.test.ts",
+    "**/panelGettersCost.integration.test.ts",
+    "**/engineView.integration.test.ts",
     // The engine comparison's own checks run each engine themselves (#972).
     "**/perfCompare/*.integration.test.ts",
     // Pure render: it paints in a software raster and never touches the engine,
@@ -259,6 +264,7 @@ function wasmParityProjects() {
     // These start their own host (in process, or the worker's).
     "**/wasmHostAnalyticsBridge.integration.test.ts",
     "**/wasmHostAttachTrap.integration.test.ts",
+    "**/wasmWorkerDelta.integration.test.ts",
     "**/wasmHostExtermination.integration.test.ts",
     "**/wasmHostFallback.integration.test.ts",
     "**/wasmHostRollback*.integration.test.ts",
@@ -423,9 +429,12 @@ export default defineConfig(({ command }) => ({
         // build's own bytes cannot be newly cached: an install that overlaps
         // a deploy fails whole and the old, consistent set stays. Workbox
         // applies it only to an entry it has to fetch; an entry already in
-        // the cache under the same revision key is served as it is, which is
-        // why the page's own byte check (#985 slice 2) is the defense for
-        // caches filled before this change.
+        // the cache under the expected key is served as it is. The engine
+        // entries therefore carry a revision no earlier worker used (the
+        // MD5 plus ENGINE_REVISION_SUFFIX, enginePackageBuild.ts), so a set
+        // stored before this change is never found under their keys and the
+        // update fetches all three files with integrity. The page's own byte
+        // check (#985 slice 2) covers the window before the update lands.
         // scripts/verify-precache.ts fails the build when a run-time engine
         // or audio file is missing from the manifest, when a build-only
         // engine file is in it, and when the package holds a file the list

@@ -43,6 +43,8 @@ export interface WorkerHostStatus extends HostErrors {
   hosted: boolean;
   /** Workers started (a failure starts the next tower on a fresh one). */
   workers: number;
+  /** The package refusal that stopped worker restarts, null while restarts are allowed (#985). */
+  refusal: PackageFailure | null;
 }
 
 export interface WorkerHostHandle {
@@ -123,7 +125,7 @@ export function makeBrowserWorker(): EngineWorkerLike {
 }
 
 export function startWorkerHost(app: WasmHostApp, first: SpawnedWorker, respawn: () => Promise<SpawnedWorker>, log: Pick<Console, "info" | "error"> = console): WorkerHostHandle {
-  const status: WorkerHostStatus = { engine: "wasm", placement: "worker", starts: 0, hosted: false, workers: 1, errors: [], lastError: null, droppedErrors: 0 };
+  const status: WorkerHostStatus = { engine: "wasm", placement: "worker", starts: 0, hosted: false, workers: 1, refusal: null, errors: [], lastError: null, droppedErrors: 0 };
   let worker: EngineWorkerLike | null = null;
   let catalogs = first.catalogs;
   let host: WorkerHost | null = null;
@@ -174,7 +176,9 @@ export function startWorkerHost(app: WasmHostApp, first: SpawnedWorker, respawn:
       // The last worker failed: start a fresh one and host whichever tower
       // the app holds once it is ready (a tower that ticked on TypeScript
       // meanwhile and has a crowd stays there).
-      if (stopped || respawning) return;
+      // A refused package stays refused for this page life, so a later tower
+      // does not download and hash it again just to be refused again.
+      if (stopped || respawning || status.refusal) return;
       respawning = Promise.resolve().then(respawn).then(
         (next) => {
           respawning = null;
@@ -189,7 +193,13 @@ export function startWorkerHost(app: WasmHostApp, first: SpawnedWorker, respawn:
         },
         (e: unknown) => {
           respawning = null;
-          noteError(`could not restart the engine worker: ${e instanceof Error ? e.message : String(e)}`);
+          const pkg = e instanceof EngineBootError ? e.package : undefined;
+          // Files that did not match, or a browser that cannot hash them, will
+          // not change by asking again; files that did not arrive might.
+          const latch = pkg && (pkg.kind === "mismatch" || pkg.kind === "unverifiable") ? pkg : null;
+          if (latch) status.refusal = latch;
+          const detail = latch ? ` (package ${latch.kind}${latch.file ? `, ${latch.file}` : ""}; not trying again)` : "";
+          noteError(`could not restart the engine worker: ${e instanceof Error ? e.message : String(e)}${detail}`);
         },
       );
       return;

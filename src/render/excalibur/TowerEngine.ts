@@ -1,7 +1,8 @@
 import * as ex from "excalibur";
-import type { Simulation, HeatmapMode, HeatCell } from "../../engine/Simulation";
+import type { HeatmapMode, HeatCell } from "../../engine/sim/constants";
 import type { FacilityKind, SerializedView } from "../../engine/types";
 import type { UnitView, TransportView } from "../../simport/view";
+import type { RenderSim } from "../renderSim";
 import { PinchTracker } from "../pinchTracker";
 import type { DrawCtx } from "../sprites";
 // World-scale constants live in ../scale (pure); re-exported for consumers.
@@ -13,7 +14,8 @@ import * as crowd from "./towerCrowd";
 import * as camera from "./towerInputCamera";
 import { clearLongPress } from "./longPress";
 import * as overlayFx from "./towerOverlay";
-import { displayLit, drainSceneSync, runSceneSync } from "./towerSyncSchedule";
+import { displayLit, runSceneSync } from "./towerSyncSchedule";
+import { beginFrame } from "./towerFrame";
 import { drainRegions, type RegionRec } from "./towerRegions";
 import type { Walker } from "./towerCrowd";
 import type { ViewFocus, Picked, ScreenRect } from "./towerInputCamera";
@@ -42,7 +44,7 @@ export type { ViewFocus, Picked } from "./towerInputCamera";
  */
 export class TowerEngine {
   engine: ex.Engine;
-  sim: Simulation;
+  sim: RenderSim;
   /** @internal friend-module access (shared draw context). */
   d: DrawCtx;
 
@@ -274,7 +276,7 @@ export class TowerEngine {
   sky!: ex.ScreenElement;
   skyCanvas!: ex.Canvas;
 
-  constructor(canvas: HTMLCanvasElement, sim: Simulation) {
+  constructor(canvas: HTMLCanvasElement, sim: RenderSim) {
     this.sim = sim;
     scene.bindSceneWorld(sim);
     this.engine = new ex.Engine({
@@ -328,46 +330,7 @@ export class TowerEngine {
   }
 
   private tick(elapsedMs: number): void {
-    const c = this.sim.clock;
-    // Advance the decorative animation clock by the frame's elapsed time, but
-    // only while the game is running: paused (speed 0) freezes the walkers,
-    // train and street just like the simulated crowd and elevators. `elapsedMs`
-    // comes from the engine clock, not wall time, so a manually stepped clock
-    // (the screenshot generator swaps in Excalibur's TestClock) advances the
-    // decorations deterministically; under the standard clock it is the real
-    // per-frame delta, so live play is effectively unchanged. The one visible
-    // difference from the old performance.now() delta: Excalibur clamps a frame
-    // longer than 200ms (a tab switch or stall) to 1ms, so the decorations
-    // resume from where they froze instead of jumping ahead. That is a slight
-    // improvement, and it never affects a screenshot (the clock is stepped).
-    // Freeze the decorative clock when paused OR reduced-motion is on; functional
-    // motion (cars, routed crowd) advances from sim state, not this clock.
-    const animating = !this.paused && !this.reducedMotion;
-    if (animating) this.animClock += elapsedMs / 1000;
-    this.d.anim = this.animClock;
-    this.syncEventFx(animating);
-    this.d.hour = c.hour;
-    this.d.lit = displayLit(c);
-    // Deferred-reconcile drain: before the crane check and the sim advance
-    // in onUpdate (re-stack rationale: drainSceneSync's doc).
-    drainSceneSync(this);
-    // Garage/waste display fractions (this.d.parkingUse / recycleFill) are
-    // refreshed inside syncScene — the same moment the sprites that read them
-    // re-bake — so they're never staler than the sprite, and the flood-fill /
-    // scans stay off this per-frame path.
-    // The crane repaints while the decorative clock moves (trolley, hook,
-    // beacon); the lighting flip (cab window) rides the scene sync instead,
-    // so it lands once, aligned with the room repaint (towerSyncSchedule).
-    if (this.craneGfx && animating) this.craneGfx.flagDirty();
-    this.d.stress = Math.max(0, Math.min(1, this.sim.congestion() - 1));
-    // Read-only queue + car-fill projection for the transport render path.
-    // Memoized on the (step, revision) key in the engine, so this per-frame read
-    // returns the cached snapshot without re-scanning the crowd, except on the
-    // first call after the sim steps or the tower structure changes (for example
-    // a paused structural edit), which rebuilds once. The queue render that draws
-    // from it is a follow-up story.
-    this.d.elevatorQueue = this.sim.crowd.queueView(this.sim.tower);
-    this.engine.backgroundColor = ex.Color.fromHex(scene.skyColor(c.hour));
+    beginFrame(this, elapsedMs);
     if (this.onUpdate) this.onUpdate(elapsedMs);
 
     // Scene reconcile scheduling lives in towerSyncSchedule (spec CAP-3):
@@ -380,7 +343,7 @@ export class TowerEngine {
 
   // ---- Delegations to friend-modules --------------------------------------
 
-  setSim(sim: Simulation, opts?: { keepCamera?: boolean }): void {
+  setSim(sim: RenderSim, opts?: { keepCamera?: boolean }): void {
     scene.setSim(this, sim, opts);
   }
 
@@ -388,7 +351,6 @@ export class TowerEngine {
   // scene syncs route through towerSyncSchedule's module functions, observed
   // with module mocks (towerEngineMealOverlay.test.ts). start() uses the
   // sync delegations below.
-  private syncEventFx(animating: boolean): void { overlayFx.syncEventFx(this, animating); }
   private syncScene(): void { reconcile.syncScene(this); }
   private syncFacade(): void { reconcile.syncFacade(this); }
   private syncMotion(): void { crowd.syncMotion(this); }

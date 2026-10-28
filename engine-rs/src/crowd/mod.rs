@@ -14,7 +14,7 @@ pub mod spawn_floors;
 pub mod visits;
 pub mod walk;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use serde_json::{json, Map, Value};
 
@@ -180,11 +180,16 @@ pub struct Edge {
 
 pub type AdjGraph = HashMap<i64, Vec<Edge>>;
 
+/// The part of the staff graph each segment lies in (`graph_parts` in
+/// `routing.rs`), only looked up.
+pub type StaffParts = fasthash::FastMap<i64, i64>;
+
 /// `ElevatorCalls`: hall (shaft -> floor -> count) and cab (shaft -> car -> floors).
+/// A car's cab floors are an ordered set, so dispatch reads them in floor order.
 #[derive(Default)]
 pub struct ElevatorCalls {
     pub hall: HashMap<i64, HashMap<i64, f64>>,
-    pub cab: HashMap<i64, HashMap<i64, HashSet<i64>>>,
+    pub cab: HashMap<i64, HashMap<i64, BTreeSet<i64>>>,
 }
 
 pub struct StaffResult {
@@ -203,7 +208,10 @@ pub struct Crowd {
     pub commute_wait_by_floor: HashMap<i64, f64>,
     pub commute_revision: u32,
     pub adj: Option<(i64, AdjGraph)>,
-    pub staff_adj: Option<(i64, AdjGraph)>,
+    /// The staff graph and the part of it each segment lies in, built
+    /// together and keyed on the tower revision (`staff_adjacency`). Never
+    /// saved: a load builds a fresh crowd.
+    pub staff_adj: Option<(i64, AdjGraph, StaffParts)>,
     pub shaft_banks: Option<(i64, HashMap<(Kind, Vec<i64>, Vec<i64>), Vec<i64>>)>,
     pub seg_served: Option<(i64, HashSet<i64>)>,
     /// The segments the Classic walk-budget search reaches from a lobby

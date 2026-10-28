@@ -6,7 +6,9 @@ import { UNKNOWN_FACILITY, whole } from "../request";
 import { storeRent } from "./constants";
 
 import { FACILITIES, buildMinutes, facilityFloors, isElevatorKind, isFacilityKind } from "../facilities";
+import { setRoomState } from "../tower/rooms";
 import { groundFloorStructureKind } from "../tower/towerTopology";
+import { removeUnits } from "../tower/removal";
 import type { FacilityKind, WeatherKind } from "../types";
 
 /** Build / place / sell for the Simulation, as friend functions taking the
@@ -125,7 +127,7 @@ export function build(sim: Simulation, kind: FacilityKind, floor: number, x: num
   const laidBridge = sim.autoBridge ? sim.tower.fillBridge(kind, floor, x, f.width, hgt) : [];
   const res = sim.tower.place(kind, floor, x);
   if (!res.ok) {
-    for (const id of laidBridge) sim.tower.removeUnit(id);
+    removeUnits(sim.tower, laidBridge);
     return { ok: false, reason: res.reason };
   }
   // Charge only for tiles actually laid: the plan is exact so this equals
@@ -160,7 +162,7 @@ export function build(sim: Simulation, kind: FacilityKind, floor: number, x: num
   if (dur > 0 && res.unitId !== undefined) {
     const u = sim.tower.getUnit(res.unitId);
     if (u) {
-      u.state = "construction";
+      setRoomState(sim.tower, u, "construction");
       u.completeAt = sim.clock.minutes + dur;
       sim.constructing.add(u.id);
     }

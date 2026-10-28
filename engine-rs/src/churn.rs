@@ -4,6 +4,7 @@ use crate::demand::fold_origin_demand;
 use crate::econ::{classic_ladder, rent_config, rent_of};
 use crate::facilities::Kind;
 use crate::jsmath;
+use crate::presence::CongestionAttribution;
 use crate::rent::snap_to_ladder;
 use crate::satisfaction::{vacate_reason_text, SatisfactionContext, VACATE_NOTICE_MINUTES};
 use crate::services::with_thousands;
@@ -80,7 +81,21 @@ impl Simulation {
     /// attribution entry, or with every class at 0, falls back to the
     /// serving-kinds classification.
     pub fn binding_transport_class_at(&self, floor: i64) -> CongestionBindingClass {
-        if let Some(att) = self.spatial_congestion_attribution_by_floor().get(&floor) {
+        self.binding_class_from(
+            self.spatial_congestion_attribution_by_floor().get(&floor),
+            floor,
+        )
+    }
+
+    /// `bindingTransportClassAt` on an attribution entry the caller already
+    /// built (`None` for a floor without one), so a reader holding the
+    /// congestion maps does not build them again.
+    pub(crate) fn binding_class_from(
+        &self,
+        att: Option<&CongestionAttribution>,
+        floor: i64,
+    ) -> CongestionBindingClass {
+        if let Some(att) = att {
             let walk_max = att.stairs.max(att.escalator);
             if walk_max > att.elevator + BINDING_TIE_EPS {
                 let stairs_bind = att.stairs > att.elevator + BINDING_TIE_EPS;
@@ -154,7 +169,7 @@ impl Simulation {
             }
         };
         let next = list[idx];
-        self.tower.get_unit_mut(id)?.subtype = Some(next);
+        self.tower.set_unit_subtype(id, Some(next));
         self.tower.bump_meal_overlay_revision();
         Some(next)
     }
@@ -191,13 +206,13 @@ impl Simulation {
             self.record_money("condos", -buyback);
         }
         let modern = self.mode.is_modern();
-        let u = &mut self.tower.units[i];
-        u.state = UnitState::Empty;
-        u.occupants = 0;
+        let (u, at) = self.tower.marked(i);
+        u.set_state(at, UnitState::Empty);
+        u.set_occupants(at, 0);
         if !kind.is_hotel() {
             u.ever_occupied = false;
         }
-        u.residents = None;
+        u.set_residents(at, None);
         if kind == Kind::Condo {
             if let Some(r) = u.rent {
                 u.rent = Some(if modern {
@@ -208,9 +223,10 @@ impl Simulation {
                 });
             }
         }
-        u.label = kind.facility().name.to_string();
         u.vacate_reason = None;
         u.vacate_at = None;
+        self.tower
+            .set_unit_label_at(i, kind.facility().name.to_string());
         let name = kind.facility().name;
         // The trailing note asks the move-in gate directly, on the emptied
         // unit: a No Rate unit stays off the market, a unit the gate still
@@ -336,8 +352,8 @@ impl Simulation {
                 }
                 k if k.is_hotel() => {
                     if evening && self.rng.chance(0.5 * demand) {
-                        let w = &mut self.tower.units[i];
-                        w.state = UnitState::Asleep;
+                        let (w, at) = self.tower.marked(i);
+                        w.set_state(at, UnitState::Asleep);
                         w.ever_occupied = true;
                         self.move_ins_today.rooms += 1;
                         if let Some(ctx) = sat_ctx.as_mut() {
@@ -366,8 +382,8 @@ impl Simulation {
     pub fn move_in(&mut self, i: usize) {
         let kind = self.tower.units[i].kind;
         {
-            let u = &mut self.tower.units[i];
-            u.state = UnitState::Occupied;
+            let (u, at) = self.tower.marked(i);
+            u.set_state(at, UnitState::Occupied);
             u.satisfaction = 1.0;
             u.vacate_reason = None;
             u.vacate_at = None;
@@ -384,10 +400,10 @@ impl Simulation {
                 (asking, None)
             };
             let floor = self.tower.units[i].floor;
-            let u = &mut self.tower.units[i];
+            let (u, at) = self.tower.marked(i);
             u.ever_occupied = true;
             if residents.is_some() {
-                u.residents = residents;
+                u.set_residents(at, residents);
             }
             u.rent = Some(asking);
             self.money += price;
@@ -408,23 +424,20 @@ impl Simulation {
         match kind {
             Kind::Office => {
                 let name = self.company_name();
-                let u = &mut self.tower.units[i];
-                u.ever_occupied = true;
-                u.label = name;
+                self.tower.units[i].ever_occupied = true;
+                self.tower.set_unit_label_at(i, name);
                 self.move_ins_today.offices += 1;
             }
             Kind::FitnessClub => {
                 let name = self.gym_name();
-                let u = &mut self.tower.units[i];
-                u.ever_occupied = true;
-                u.label = name;
+                self.tower.units[i].ever_occupied = true;
+                self.tower.set_unit_label_at(i, name);
                 self.move_ins_today.fitness += 1;
             }
             Kind::Clinic => {
                 let name = self.clinic_name();
-                let u = &mut self.tower.units[i];
-                u.ever_occupied = true;
-                u.label = name;
+                self.tower.units[i].ever_occupied = true;
+                self.tower.set_unit_label_at(i, name);
                 self.move_ins_today.clinic += 1;
             }
             Kind::RentalStudio | Kind::RentalApartment => {
@@ -433,10 +446,10 @@ impl Simulation {
                 } else {
                     None
                 };
-                let u = &mut self.tower.units[i];
+                let (u, at) = self.tower.marked(i);
                 u.ever_occupied = true;
                 if residents.is_some() {
-                    u.residents = residents;
+                    u.set_residents(at, residents);
                 }
                 self.move_ins_today.rentals += 1;
             }
@@ -532,8 +545,8 @@ impl Simulation {
             if chance <= 0.0 || !self.rng.chance(chance) {
                 continue;
             }
-            let u = &mut self.tower.units[i];
-            u.state = UnitState::Vacating;
+            let (u, at) = self.tower.marked(i);
+            u.set_state(at, UnitState::Vacating);
             u.vacate_reason = Some("relocation");
             u.vacate_at = Some(self.clock.minutes + VACATE_NOTICE_MINUTES);
             let msg = format!(

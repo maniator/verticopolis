@@ -1,6 +1,6 @@
 # Story facade.3: The renderer and HUD read the view (3a types, 3b frame data)
 
-Status: in progress (3a-1 is PR #1291; 3a-2 next; 3b waits for gates)
+Status: in progress (3a-1 #1291, 3a-2a #1317, clock helper #1322, fx and camera #1324 and sceneSeed #1328 merged; population cadence is the open PR; the loop binding waits for #1325; 3b waits for gates)
 
 Slice 3 of the Rust-backed facade
 (`_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/slice-plan.md`),
@@ -201,3 +201,122 @@ Slice 3 adds the `view.ts` lines, the `TsSim` fills and assertions in its own fi
   missed file (`towerReconcile.ts`), a mangled section banner in
   `sprites/transport.ts`, a stale doc comment and the mapping-table gaps
   above. All are fixed in this PR.
+
+## 3a-2a notes (RenderSim)
+
+- `src/render/renderSim.ts` lists every read the renderer makes of the
+  simulation, grouped by call frequency. `TowerEngine.sim`, `setSim`,
+  `bindSceneWorld` and the scenery record are typed by it; the live
+  `Simulation` satisfies it (`renderSim.types.test.ts`), so `main.ts` is
+  unchanged. `renderSim.guard.test.ts` keeps `Simulation` out of every
+  production source under `src/render`.
+- Typing the sim as `RenderSim` made the compiler report one read the views
+  lacked: `towerInputCamera` filters people by their discrete `floor`.
+  `PersonView` gains `floor` (the live `Person` already has it). The Rust
+  frame must carry the discrete floor beside `fy`; this goes to the facade
+  lane for the 6a frame.
+- `TowerEngine.ts` was at the 500-line ceiling, so the frame prelude
+  (decorative clock, event visuals, lighting, sky) moved to `towerFrame.ts`
+  with the same step order.
+- The `RenderSim` members for effects, usage, reachability and the frame
+  slices are the live engine's own today. Each moves behind a view member as
+  the facade lane adds it.
+- `RenderSim` does not extend `SimView`: it keeps the live engine's flat
+  member names (`weather`, `population`, `clock`) so `main.ts` is unchanged,
+  and its comments name the `SimView` member each one stands for. The
+  stand-ins are `mode` (with the catalog handle, per the lane decision that
+  there is no `view.catalog`), `rng.initialSeed` (until `HeaderView.sceneSeed`
+  exists), `view` (the saved `SerializedView` until `view.camera` exists) and
+  the effect counters (until `view.fx` exists). Each is replaced by its view
+  member when the facade lane adds it.
+- The type test assigns the live `Simulation`. A test over `TsSim` comes with
+  the first step that reads through the view instead of the instance.
+
+## 3a-2b notes (clock helper)
+
+- `src/simport/clockView.ts` adds `ClockReads`, the renderer's clock reads
+  (`hour`, `minute`, `minuteOfDay`, `isMorning`, `isEvening`, `isNight`)
+  derived from `header.minutes`. `clockView.test.ts` pins every minute from
+  two days before the start to four days after against `Clock`, so the windows
+  cannot drift, and checks the class is a `RenderClock`.
+- It is a reusable object (`set(header)`, then read) so a frame reads the clock
+  with no allocation. `headerClock.ts` (slice 4) builds a full `Clock` for the
+  panels, which suits a once-per-tick read; the renderer reads per frame, so it
+  gets the cheaper form.
+- Nothing reads it yet. The loop binding swaps `RenderSim.clock` for it when
+  `main.ts` hands the renderer a view.
+
+## 3a-2b notes (fx and camera)
+
+- `HeaderView` gains `fx` (`FxView`: `santaSeq`, `vipSeq`, `explosion`, `thief`,
+  `treasure`) and `camera` (`CameraView | null`: `tile`, `floor`, optional
+  `zoom`, the shape of the save's `SerializedView`). `CameraView` is the saved
+  camera read on construction and on a tower swap; `setView` stays the command
+  that stores it, and the live camera belongs to the renderer.
+- `TsSim` fills `fx` with copies taken when the header is read, so a header
+  kept across a step shows one moment's counters. That costs four small
+  objects per header read; the renderer's per-frame read is the seq numbers,
+  and the loop binding decides whether it takes the header each frame or only
+  on a step. The Rust header supplies the same counters from the frame (6a's
+  dynamic frame, per the facade lane's decision).
+- `view.types.test.ts` keeps the live `Simulation` fields assignable to the
+  view types; `tsSim.test.ts` pins the copy and the null camera.
+- `RenderSim` keeps its flat stand-ins (`santaFxSeq` and the other counters,
+  `view`) until the loop binding swaps them for these members.
+- The clock pin gained fractional minutes (`m + 0.5`, `m + 59.999 / 60`),
+  the independent reviewer's note on 3a-2b.
+
+## 3a-2b notes (sceneSeed)
+
+- `HeaderView.sceneSeed` is the founding seed (`RNG.initialSeed`) the scenery
+  derives from, beside `mode` and `modernCalendar` as the facade lane decided.
+  It is fixed for a tower's life, so the scenery compares it to the seed it
+  built from to notice a tower swap (`towerScenery.ts` does this with
+  `rng.initialSeed` today). `TsSim` fills it from the instance; the Rust
+  header supplies the same constant from the loaded save.
+- Still open for the view: `usage` (garage and recycling fill, valid per sim
+  hour) and reachability (a per-revision list of unreachable room ids). Each
+  needs its Rust source from the facade lane before the member is added here.
+- From the independent reviews of 3a-2b: the loop binding takes the header
+  once per frame, because each read allocates; and slice 7 needs a source for
+  `camera` (the frame has none), from the loaded save or a small getter, on
+  construction and on a tower swap, so the null branch is not the default by
+  accident.
+
+## Header cadence notes (#1234)
+
+- `towerCrowd.ts` read `sim.population` every frame for the walkers' busyness
+  gate; on the TypeScript engine that walks every room (about 330 µs on the
+  large tower, cloud estimate). `towerPopulation.ts` (`crowdPopulation`) keeps
+  the count and reads it again when `tower.revision` moves (an edit made while
+  paused shows at once), when the sim is a different object (a tower swap), or
+  when the sim has stepped (the clock minute moved) and at least
+  `POPULATION_REFRESH_FRAMES` (30) frames have passed since the last read.
+- The frame count is what bounds the top speeds. With the minute alone as the
+  key, a step in every frame (speed 3 at 60 Hz, the night sprint) would miss
+  every frame; with the window the walk runs about twice a second whatever the
+  speed (Codex review P1 on 2a39d0cd, #1335). The cost is a count that trails
+  the sim by up to about half a second, which the gate hides: it scales a
+  cosmetic crowd and saturates at 350.
+- `RenderClock` gains `minutes` (the live `Clock` and `ClockReads` both have
+  it) for the key.
+- Tests: `towerPopulation.test.ts` pins one read for any number of frames in a
+  step, the 30-frame window after a step, the top-speed rate (a few reads in 120
+  frames of a step each), an immediate read after a paused edit or a host
+  merge's revision change, a real change followed within the window, the
+  documented non-key lag, and a replaced tower. `towerCrowdMotion.test.ts`
+  pins that `updateMotion` itself goes through the memo.
+- Deviation from criterion 3 as first written ("from the step's header or a
+  value the adapter memoizes per step"): the memo lives on the render side over
+  the live instance, because `main.ts` still passes the `Simulation`. It goes
+  away when the loop binding hands the renderer a header that is built once per
+  step (not per frame: `readHeader` walks the rooms once per header object, so
+  a header built every frame would bring #1234 back).
+- Lag paths the key cannot see, bounded the same way: the worker host moves the
+  minute on the main thread before the step's reply lands, and a paused
+  emergency answer that guts rooms (a declined bomb threat) changes states with
+  no step.
+- Deferred with a row: `emitMealRushes` in `frameLoop.ts` walks the rooms every
+  frame (`meal-rush-population-per-frame`, #1334). The top-speed row (#1335) stays
+  open: the refresh window bounds the walk to about two a second, and an
+  engine census or the port header makes it O(1).

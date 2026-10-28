@@ -55,3 +55,7 @@ engine-rs/pkg/
 # The served engine package (wasm:build writes it; Vercel and CI build it,
 # see scripts/build-engine-wasm.sh and .github/actions/engine-wasm).
 src/public/engine/
+
+# Records `fuzz --replay` writes next to a corpus scenario
+conformance/fuzz-corpus/*.rs.json
+conformance/fuzz-corpus/*.rs.detail.json

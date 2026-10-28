@@ -5,95 +5,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::facilities::*;
-use crate::tower::{Tower, Transport, Unit, UnitState};
-
-#[derive(Default)]
-pub struct Memo {
-    pub served: Option<(i64, HashSet<i64>)>,
-    pub stops: HashMap<i64, (i64, Vec<i64>)>,
-    pub segs: Option<(i64, HashMap<i64, Vec<(i64, i64)>>)>,
-    pub staff: Option<(i64, HashMap<i64, i64>)>,
-    pub cols: Option<(i64, HashMap<i64, Vec<(i64, i64)>>)>,
-    pub tiles: Option<(crate::tower_index::IndexKey, crate::tower_index::FloorTiles)>,
-    pub bounds: Option<(crate::tower_index::IndexKey, (i64, i64))>,
-    pub rooms: Option<(crate::tower_index::IndexKey, std::sync::Arc<[usize]>)>,
-    pub census: Option<(
-        crate::tower_index::IndexKey,
-        std::sync::Arc<crate::tower_index::Census>,
-    )>,
-    pub floor_rooms: Option<(
-        crate::tower_index::IndexKey,
-        std::sync::Arc<crate::tower_index::FloorRooms>,
-    )>,
-}
-
-// ---- unit state predicates (types.ts) --------------------------------------
-
-impl Unit {
-    pub fn is_operational(&self) -> bool {
-        !matches!(
-            self.state,
-            UnitState::Construction | UnitState::Fire | UnitState::Gutted
-        )
-    }
-
-    pub fn is_present(&self) -> bool {
-        matches!(
-            self.state,
-            UnitState::Occupied | UnitState::Asleep | UnitState::MovingIn | UnitState::Vacating
-        )
-    }
-
-    pub fn is_tenanted(&self) -> bool {
-        matches!(self.state, UnitState::Occupied | UnitState::Vacating)
-    }
-
-    pub fn is_dormant(&self) -> bool {
-        matches!(
-            self.state,
-            UnitState::Empty
-                | UnitState::Construction
-                | UnitState::Fire
-                | UnitState::Gutted
-                | UnitState::Infested
-        )
-    }
-
-    /// `residentCount`.
-    pub fn resident_count(&self) -> i64 {
-        if self.kind.has_household() {
-            if let Some(r) = self.residents {
-                return r;
-            }
-        }
-        self.kind.facility().population
-    }
-
-    /// `censusCount`.
-    pub fn census_count(&self) -> i64 {
-        if self.kind.is_commercial() && self.kind.facility().population > 0 {
-            return self.customers_in.unwrap_or(0);
-        }
-        self.resident_count()
-    }
-
-    /// `syncAttendanceOccupants`.
-    pub fn sync_attendance_occupants(&mut self) {
-        if self.kind.attendance_cap().is_none() {
-            return;
-        }
-        self.occupants = if self.is_operational() {
-            self.customers_in.unwrap_or(0)
-        } else {
-            0
-        };
-    }
-
-    /// `visibleOccupants`.
-    pub fn visible_occupants(&self) -> i64 {
-        (self.occupants - self.out_for_meal.unwrap_or(0)).max(0)
-    }
-}
+use crate::tower::{Tower, Transport, Unit};
 
 /// `segId`.
 pub fn seg_id(floor: i64, start_x: i64) -> i64 {
@@ -205,13 +117,17 @@ impl Tower {
 
     /// `staffComponents`: floor -> component id over service elevators and stairs.
     pub fn staff_components(&self) -> HashMap<i64, i64> {
-        {
-            let memo = self.memo.borrow();
-            if let Some((rev, s)) = &memo.staff {
-                if *rev == self.revision {
-                    return s.clone();
-                }
-            }
+        self.fill_staff();
+        let memo = self.memo.borrow();
+        memo.staff.as_ref().expect("fill_staff built it").1.clone()
+    }
+
+    /// Builds the staff-component memo when this revision has none, so
+    /// `staff_component`, which dispatch asks for every crew and floor, reads
+    /// it in place instead of copying the map on each call (#1143 item 6).
+    fn fill_staff(&self) {
+        if matches!(&self.memo.borrow().staff, Some((rev, _)) if *rev == self.revision) {
+            return;
         }
         let mut comp: HashMap<i64, i64> = HashMap::new();
         let mut next = 0;
@@ -246,19 +162,24 @@ impl Tower {
                 comp.insert(*f, id);
             }
         }
-        self.memo.borrow_mut().staff = Some((self.revision, comp.clone()));
-        comp
+        self.memo.borrow_mut().staff = Some((self.revision, comp));
+    }
+
+    /// The staff component `floor` lies in, read in place; `None` for a
+    /// floor no staff transport serves.
+    pub(crate) fn staff_component(&self, floor: i64) -> Option<i64> {
+        self.fill_staff();
+        let memo = self.memo.borrow();
+        let (_, comp) = memo.staff.as_ref().expect("fill_staff built it");
+        comp.get(&floor).copied()
     }
 
     pub fn staff_connected(&self, a: i64, b: i64) -> bool {
         if a == b {
             return true;
         }
-        let comp = self.staff_components();
-        match comp.get(&a) {
-            Some(ca) => comp.get(&b) == Some(ca),
-            None => false,
-        }
+        let ca = self.staff_component(a);
+        ca.is_some() && ca == self.staff_component(b)
     }
 
     /// `functionalParkingSet`: parking-space ids chained to a ramp.

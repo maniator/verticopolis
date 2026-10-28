@@ -24,6 +24,9 @@ on:
       - "src/tests/integration/dualRunDay.integration.test.ts"
       - "src/tests/integration/dualRunEdits.integration.test.ts"
       - "src/tests/integration/chargeBindingRaw.integration.test.ts"
+      - "src/tests/integration/panelGettersWasm.integration.test.ts"
+      - "src/tests/integration/panelGettersCost.integration.test.ts"
+      - "src/tests/integration/engineView.integration.test.ts"
       - "src/tests/dualrun/**"
       - "src/dualrun/**"
       - "src/wasmhost/**"
@@ -45,10 +48,17 @@ on:
       - "scripts/license-files.ts"
       - "src/build/thirdPartyNotices.ts"
       - "src/build/rustNotices.ts"
+      - "src/build/engineCompat.ts"
       - "package.json"
       - "package-lock.json"
       - ".nvmrc"
       - "vite.config.ts"
+      - "scripts/fuzz-compare.ts"
+      - "scripts/fuzz-corpus.ts"
+      - "scripts/fuzz-key.ts"
+      - "scripts/fuzz-shrink.ts"
+      - "tsconfig.json"
+      - ".github/workflows/engine-fuzz.yml"
       - ".github/workflows/engine-rs.yml"
   # Every PR runs this workflow, because engine-rs is a required check: a
   # path filter here would leave a PR that touches none of these files
@@ -117,6 +127,9 @@ jobs:
             case "$f" in src/tests/integration/dualRunDay.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/dualRunEdits.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/chargeBindingRaw.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/panelGettersWasm.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/panelGettersCost.integration.test.ts) engine=true ;; esac
+            case "$f" in src/tests/integration/engineView.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/dualrun/*) engine=true ;; esac
             case "$f" in src/dualrun/*) engine=true ;; esac
             case "$f" in src/wasmhost/*) engine=true ;; esac
@@ -138,10 +151,17 @@ jobs:
             case "$f" in scripts/license-files.ts) engine=true ;; esac
             case "$f" in src/build/thirdPartyNotices.ts) engine=true ;; esac
             case "$f" in src/build/rustNotices.ts) engine=true ;; esac
+            case "$f" in src/build/engineCompat.ts) engine=true ;; esac
             case "$f" in package.json) engine=true ;; esac
             case "$f" in package-lock.json) engine=true ;; esac
             case "$f" in .nvmrc) engine=true ;; esac
             case "$f" in vite.config.ts) engine=true ;; esac
+            case "$f" in scripts/fuzz-compare.ts) engine=true ;; esac
+            case "$f" in scripts/fuzz-corpus.ts) engine=true ;; esac
+            case "$f" in scripts/fuzz-key.ts) engine=true ;; esac
+            case "$f" in scripts/fuzz-shrink.ts) engine=true ;; esac
+            case "$f" in tsconfig.json) engine=true ;; esac
+            case "$f" in .github/workflows/engine-fuzz.yml) engine=true ;; esac
             case "$f" in .github/workflows/engine-rs.yml) engine=true ;; esac
           done < "$list"
           echo "engine=$engine" >> "$GITHUB_OUTPUT"
@@ -371,8 +391,9 @@ jobs:
   # TypeScript runner replays every scenario on the module wasm-bindgen
   # generates (story-engine-wasm-binding), and the dual run's day gate
   # (story-engine-dual-run) compares both engines every hour for a day on
-  # every fixture at each game speed. This is the one job here that needs
-  # Node.js, so the Rust jobs above carry no Node.js setup at all. The
+  # every fixture at each game speed. This job and the fuzz corpus below are
+  # the two here that need Node.js, so the Rust jobs above carry no Node.js
+  # setup at all. The
   # package comes from .github/actions/engine-wasm: restored from the cache
   # the other workflows share when the Rust sources are unchanged, and built
   # on a miss with the prebuilt wasm-bindgen CLI at the version Cargo.toml
@@ -431,14 +452,67 @@ jobs:
         if: ${{ cancelled() }}
         run: exit 1
 
+  # The seeded differential's corpus (conformance/fuzz-corpus/): scenarios the
+  # nightly once diverged on, shrunk by scripts/fuzz-shrink.ts, plus smoke
+  # entries so the job never runs on nothing. Each is replayed on the Rust
+  # engine (the fuzzer's --replay mode) and on the TypeScript engine, and the
+  # two must agree at every checkpoint. The nightly keeps growing new seeds;
+  # this job only holds what it already found. The whole job is held to ten
+  # minutes, and the script stops at its own 240 s budget and fails rather
+  # than skip an entry.
+  fuzz-corpus:
+    needs: changes
+    # Fail closed, as the rust job above.
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: npm ci
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal
+          rustup default 1.97.0
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: v1-rust
+          workspaces: engine-rs -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build the fuzzer
+        run: cargo build --locked --release --features conformance --bin fuzz
+        working-directory: engine-rs
+
+      - name: Replay the corpus on both engines
+        run: npx tsx scripts/fuzz-corpus.ts --budget 240
+
+      - name: Fail a cancelled run
+        if: ${{ cancelled() }}
+        run: exit 1
+
   # The check branch protection requires on main. It always runs and
   # passes in two cases only: the changes filter succeeded and found no
-  # engine file (the three engine jobs above skipped on purpose), or all
-  # three passed. Anything else (a failure, a cancellation, a skip the
+  # engine file (the four engine jobs above skipped on purpose), or all
+  # four passed. Anything else (a failure, a cancellation, a skip the
   # filter did not ask for) fails it, so the binding's checks and the
   # Node-free consumer gate a merge alongside the Rust job.
   engine-rs:
-    needs: [changes, consumer, rust, wasm-binding]
+    needs: [changes, consumer, rust, wasm-binding, fuzz-corpus]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -450,12 +524,13 @@ jobs:
           CONSUMER: ${{ needs.consumer.result }}
           RUST: ${{ needs.rust.result }}
           BINDING: ${{ needs.wasm-binding.result }}
+          CORPUS: ${{ needs.fuzz-corpus.result }}
         run: |
-          echo "changes: $FILTER (engine=$ENGINE), consumer: $CONSUMER, rust: $RUST, wasm-binding: $BINDING"
-          if [ "$FILTER" = success ] && [ "$ENGINE" = false ] && [ "$CONSUMER" = skipped ] && [ "$RUST" = skipped ] && [ "$BINDING" = skipped ]; then
+          echo "changes: $FILTER (engine=$ENGINE), consumer: $CONSUMER, rust: $RUST, wasm-binding: $BINDING, fuzz-corpus: $CORPUS"
+          if [ "$FILTER" = success ] && [ "$ENGINE" = false ] && [ "$CONSUMER" = skipped ] && [ "$RUST" = skipped ] && [ "$BINDING" = skipped ] && [ "$CORPUS" = skipped ]; then
             exit 0
           fi
-          test "$CONSUMER" = success && test "$RUST" = success && test "$BINDING" = success
+          test "$CONSUMER" = success && test "$RUST" = success && test "$BINDING" = success && test "$CORPUS" = success
 
       - name: Fail a cancelled run
         if: ${{ cancelled() }}

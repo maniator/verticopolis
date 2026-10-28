@@ -4,6 +4,7 @@ import { rentOf, rentConfig } from "../econConfig";
 import { isFacilityKind } from "../facilitiesData";
 import { ladderRungFor, priceNeutral, snapToLadder } from "../gameRules";
 import { whole } from "../request";
+import { markRoom } from "../tower/rooms";
 
 import type { FacilityKind, Unit } from "../types";
 
@@ -45,6 +46,7 @@ export function priceUnit(sim: Simulation, u: Unit, target: number): number | nu
   // Any explicit reprice puts the unit back on the market, so an imported
   // No-Rate unit is never a permanent $0 trap.
   u.noRate = undefined;
+  markRoom(sim.tower, u);
   // A write that leaves the price where it was (a nudge at the end of the
   // ladder, the same price again) is not a change.
   if (rentOf(u) !== before) sim.gameplayEvents.push("pricing_changed", { kind: u.kind });
@@ -68,6 +70,7 @@ export function setNoRate(sim: Simulation, id: number): boolean {
   if (u.kind === "condo" && u.everOccupied) return false; // sold: price-locked
   const wasOff = u.noRate === true;
   u.noRate = true;
+  markRoom(sim.tower, u);
   if (!wasOff) sim.gameplayEvents.push("pricing_changed", { kind: u.kind });
   return true;
 }
@@ -164,7 +167,10 @@ export function computeBatch(sim: Simulation,
       // in place but nothing reads it while off-market (rentOf charges $0, and
       // a later reprice applies its caller's explicit target, not this value).
       if (!u.noRate) r.changed++;
-      if (mutate) u.noRate = true;
+      if (mutate) {
+        u.noRate = true;
+        markRoom(sim.tower, u);
+      }
       continue;
     }
     // With the protect toggle off, a custom-priced unit here is about to be
@@ -188,6 +194,7 @@ export function computeBatch(sim: Simulation,
     if (mutate) {
       storeRent(u, cfg, value);
       u.noRate = undefined; // an explicit reprice returns a No-Rate unit to the market
+      markRoom(sim.tower, u);
     }
   }
   return r;
