@@ -381,6 +381,7 @@ export function finish(crowd: Crowd, p: Person, tower: Tower): void {
   const origin = originUnit(tower, p);
   if (origin && (origin.outForMeal ?? 0) > 0) {
     origin.outForMeal = (origin.outForMeal ?? 0) - 1;
+    markRoom(tower, origin);
     tower.bumpMealOverlayRevision();
   }
   // Venue customer: decrement the destination's live customer count on any

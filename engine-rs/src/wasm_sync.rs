@@ -15,6 +15,8 @@ impl Engine {
             generation: 0,
             backdrop: false,
             drained: Vec::new(),
+            staged_tdt: None,
+            tdt_file: None,
         }
     }
 }
