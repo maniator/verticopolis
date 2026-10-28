@@ -61,12 +61,12 @@ import { PortCodes } from "./simport/portCodes";
  * traffic chip); renaming any needs every consumer updated (TypeScript won't catch it).
  */
 class GameApp implements GameAppPorts {
-  /** The port's engine (slice 7, PR 4), its view (updated with the UI) and code tables; `sim` is its tower. */
+  /** The port's engine (slice 7, PR 4), its view and code tables; `sim` is its tower, set directly only by the tooling scenes. */
   enginePort!: TsEngine;
   reader!: ViewReader;
   portCodes!: PortCodes;
   get sim(): Simulation { return this.enginePort.sim; }
-  set sim(sim: Simulation) { this.enginePort.take(sim); } // the tooling scenes (scripts/) set the tower directly
+  set sim(sim: Simulation) { if (!(import.meta.env.DEV || __TOOLING_BUILD__)) throw new Error("app.sim is set only in tooling builds"); this.enginePort.take(sim); }
   /** The simulation as the game drives it (AD-9); follows every adoptSim swap. */
   readonly port = createTsSim(() => this.sim, { adopt: (sim, keep) => this.adoptSim(sim, keep) });
   engine: TowerEngine;
