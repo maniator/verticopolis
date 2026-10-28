@@ -137,6 +137,45 @@ export const BINDING_EXPORT_TIERS = {
   towerSignature: T2,
   // Tier 2, the inspector's diagnostics facts (facade slice 6c).
   diagnosticFacts: T2,
+  // Tier 2, the camera and the tower name a host with no TypeScript tower
+  // reads once per engine (facade slice 7a).
+  view: T2,
+  towerName: T2,
+  // Tier 1, the engine's own port (facade slice 7, the 2026-10-28 redesign):
+  // numeric commands answering a result record, the refusal text, and the
+  // numeric queries the HUD and the build preview ask per UI tick or pointer
+  // move. The editing commands are named apart from the legacy exports the
+  // conformance suites still call.
+  chooseAutoBridge: T1,
+  answerChoice: T1,
+  lastReason: T1,
+  buildAt: T1,
+  paintTiles: T1,
+  buildShaft: T1,
+  demolish: T1,
+  changeCars: T1,
+  extendShaft: T1,
+  bookExterminator: T1,
+  setCamera: T1,
+  setFilm: T1,
+  quoteBuild: T1,
+  quoteShaft: T1,
+  statsStrip: T1,
+  hotspot: T1,
+  onboarding: T1,
+  markStop: T1,
+  expressStops: T1,
+  dropStops: T1,
+  stepRent: T1,
+  noRate: T1,
+  setRent: T1,
+  rentBatch: T1,
+  rerollUnit: T1,
+  flipAutoBridge: T1,
+  startExtend: T1,
+  stopExtend: T1,
+  labelUnit: T1,
+  nameTower: T1,
   // Tier 2, the host loop and the engine's lifetime.
   tick: LOOP,
   frameView: LOOP,

@@ -187,6 +187,7 @@ mod tests {
         let mut e = Engine {
             sim: Simulation::new_game(7, GameMode::Modern),
             mirror: crate::save_delta::SaveMirror::default(),
+            reason: None,
         };
         e.sim.money = 1e9;
         for x in 150..200 {

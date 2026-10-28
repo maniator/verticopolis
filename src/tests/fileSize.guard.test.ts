@@ -60,6 +60,11 @@ function lineCount(absPath: string): number {
   return n;
 }
 
+/** Files a tool writes, which no one splits by hand: the binding's
+ *  declaration is wasm-bindgen's output (`npm run wasm:build` refreshes it)
+ *  and grows with every export the engine adds. */
+const GENERATED: ReadonlySet<string> = new Set(["src/dualrun/engine.d.ts"]);
+
 function scanFiles(): { rel: string; lines: number }[] {
   return SCANNED_DIRS.flatMap(({ dir, exts }) => sourceFiles(dir, exts))
     .map((p) => ({ rel: repoRel(p), lines: lineCount(p) }))
@@ -77,7 +82,7 @@ describe("file-size guard", () => {
 
   it("no un-exempted code file exceeds the line ceiling", () => {
     const offenders = files
-      .filter((f) => f.lines > MAX_LINES && !LEGACY_OVERSIZED.has(f.rel))
+      .filter((f) => f.lines > MAX_LINES && !LEGACY_OVERSIZED.has(f.rel) && !GENERATED.has(f.rel))
       .map((f) => `${f.rel} (${f.lines} lines)`);
     expect(offenders, `Files over ${MAX_LINES} lines must be split or added to the ratchet:\n${offenders.join("\n")}`).toEqual([]);
   });

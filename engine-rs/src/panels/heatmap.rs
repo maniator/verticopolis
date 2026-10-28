@@ -140,6 +140,13 @@ impl Simulation {
     /// is (`null` when nothing is congested). A tie names the lowest floor,
     /// the one closest to where riders board.
     pub fn peak_congestion_hotspot(&self) -> Value {
+        let (ratio, floor) = self.peak_congestion();
+        json!({ "ratio": ratio, "floor": floor })
+    }
+
+    /// The busiest served floor's congestion ratio and the floor (the lowest
+    /// on a tie), or no floor when none is congested.
+    pub fn peak_congestion(&self) -> (f64, Option<i64>) {
         let mut ratio = 0.0;
         let mut floor: Option<i64> = None;
         for (f, c) in self.spatial_congestion_by_floor() {
@@ -150,7 +157,7 @@ impl Simulation {
                 floor = Some(f);
             }
         }
-        json!({ "ratio": ratio, "floor": floor })
+        (ratio, floor)
     }
 
     /// `floorHeatmap(mode)`, as typed cells.
