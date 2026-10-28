@@ -181,6 +181,11 @@ async function memoryPass(page: Page, cdp: CDPSession, opts: RunnerOptions, engi
     await page.evaluate(stashSave, { name: sc.name, save: sc.save });
     const adopt = await page.evaluate(adoptScenario, sc.name);
     if (adopt.engineActive !== engine) throw new Error(`${sc.name}: after loading the save, ${adopt.engineActive} runs the tower, not ${engine}`);
+    // The hosted load's stamped copy leaves the heap before it is read, so
+    // the page holds one save string as it did before the copy existed.
+    await page.evaluate(() => {
+      (window as unknown as { __perfStoredSaves?: unknown }).__perfStoredSaves = {};
+    });
     await page.evaluate(prepareLiveApp);
     await within(
       `${sc.name} memory ticks`,

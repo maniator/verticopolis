@@ -359,7 +359,7 @@ export async function runMode(opts: RunnerOptions, rep: number, slot: ModeName, 
       // Memory after a few steps on a fresh page.
       await ev(page, `${sc.name} memory steps`, hostedRun, { name: sc.name, steps: config.memorySteps, warmSteps: 0, dt: config.dt, batch: config.batch, stash: false });
       // The harness's stashed saves leave the heap before it is read.
-      await ev(page, "drop stash", () => { (window as unknown as { __perfStash?: unknown }).__perfStash = {}; }, undefined);
+      await ev(page, "drop stash", () => { Object.assign(window, { __perfStash: {}, __perfStoredSaves: {} }); }, undefined);
       await cdp.send("HeapProfiler.collectGarbage");
       const heap = (await cdp.send("Runtime.getHeapUsage")) as { usedSize: number };
       const wasm = await ev(page, "engine memory", engineMemory, undefined);
@@ -371,6 +371,8 @@ export async function runMode(opts: RunnerOptions, rep: number, slot: ModeName, 
         processPssBytes: processTreePss(process.pid, /chrom|headless_shell/i)?.bytes ?? null,
       };
       await expectMode(page, mode, `${sc.name} memory`);
+      // The hosted runs below load the stamped copy again.
+      await ev(page, "stash", stashSave, { name: sc.name, save: sc.save });
       run.scenarios[sc.name] = { memory, raw: {}, hosted: {}, frames: {} };
       const result = run.scenarios[sc.name];
       for (const rate of config.throttles) {
