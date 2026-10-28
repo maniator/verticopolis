@@ -86,6 +86,15 @@ impl FrameMarks {
         log.base + log.entries.len() as u64
     }
 
+    /// Where the log stands: its id and the position after the newest mark.
+    /// Two reads at one position see the same marked fields, so a memo of
+    /// what only those fields (and the revision) feed may key on it. The
+    /// port's render memo is its one reader.
+    #[cfg(feature = "wasm")]
+    pub(crate) fn position(&self) -> (u64, u64) {
+        (self.id, self.end())
+    }
+
     /// How many marks a reader at position `from` has not read, or `None`
     /// when the log has dropped some of them or `from` is past its end (a
     /// position this log never gave).

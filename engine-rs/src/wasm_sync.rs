@@ -18,7 +18,7 @@ impl Engine {
             staged_tdt: None,
             tdt_file: None,
             stepper: Default::default(),
-            queue_memo: None,
+            render_memo: Default::default(),
         }
     }
 }

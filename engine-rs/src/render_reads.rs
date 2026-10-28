@@ -6,10 +6,10 @@
 
 use indexmap::IndexMap;
 
-use crate::crowd::{PState, STRESS_WAIT};
+use crate::crowd::{Crowd, PState, STRESS_WAIT};
 use crate::facilities::Kind;
 use crate::sim::Simulation;
-use crate::tower::UnitState;
+use crate::tower::{Tower, UnitState};
 
 /// `GARBAGE_COLLECT_HOUR` (census.ts): the hour the recycling bins empty.
 const GARBAGE_COLLECT_HOUR: f64 = 5.0;
@@ -77,17 +77,38 @@ impl Simulation {
         ((office_cars + suite_cars) / spots).min(1.0)
     }
 
+    /// The crowd's queue projection, as the step left it.
+    pub fn elevator_queue_view(&mut self) -> &QueueView {
+        self.crowd.queue_view(&self.tower)
+    }
+}
+
+impl Crowd {
+    /// `Crowd.queueView`: the queue projection, kept per step and tower
+    /// revision. The step loop builds it right after `begin_step`, before
+    /// the step spawns or moves anyone, as the TypeScript loop does, so a
+    /// frame between steps reads the step's start. An edit while paused
+    /// moves the revision, and the next read builds it again.
+    pub fn queue_view(&mut self, tower: &Tower) -> &QueueView {
+        let key = (self.step, tower.revision);
+        if self.queue_cache.as_ref().is_none_or(|(k, _)| *k != key) {
+            let view = self.build_queue_view(tower);
+            self.queue_cache = Some((key, view));
+        }
+        &self.queue_cache.as_ref().expect("built above").1
+    }
+
     /// `elevatorQueueView`: one walk of the crowd for the landings and one of
     /// the transports for the cars. A landing counts only an elevator's
     /// waiters on a floor it stops at, and on a staff-only shaft only staff.
-    pub fn elevator_queue_view(&self) -> QueueView {
+    fn build_queue_view(&self, tower: &Tower) -> QueueView {
         let mut landings: IndexMap<i64, IndexMap<i64, QueueLanding>> = IndexMap::new();
-        for p in &self.crowd.people {
+        for p in &self.people {
             let Some(shaft_id) = p.shaft_id else { continue };
             if p.state != PState::Waiting {
                 continue;
             }
-            let Some(shaft) = self.tower.get_transport(shaft_id) else {
+            let Some(shaft) = tower.get_transport(shaft_id) else {
                 continue;
             };
             if !shaft.kind.is_elevator()
@@ -104,14 +125,13 @@ impl Simulation {
             landing.count += 1;
             landing.tier = landing.tier.max(wait_tier(p.wait));
         }
-        let boarded = self
-            .tower
+        let boarded = tower
             .transports
             .iter()
             .filter(|t| t.kind.is_elevator())
             .map(|t| {
                 let cars = (0..t.cars)
-                    .map(|i| self.crowd.car_riders.get(&(t.id, i)).copied().unwrap_or(0))
+                    .map(|i| self.car_riders.get(&(t.id, i)).copied().unwrap_or(0))
                     .collect();
                 (t.id, cars)
             })

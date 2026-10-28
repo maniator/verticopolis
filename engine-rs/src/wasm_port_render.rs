@@ -30,14 +30,44 @@ pub(crate) fn add_render_records(layout: &mut serde_json::Value) {
     records["parkingSet"] = serde_json::json!(PARKING_SET);
 }
 
-/// What `queueView` was last built for: the tower, the crowd step and the
-/// tower revision, the key the TypeScript crowd memoizes its view on.
-pub(crate) type QueueKey = (u64, i64, i64);
+/// What `queueView` was last encoded for: the tower, the crowd step and the
+/// tower revision, the key the crowd keeps its projection on.
+type QueueKey = (u64, i64, i64);
+
+/// What `congestion` was last computed for: the tower, the crowd step, the
+/// tower revision, the clock's minutes (the rush factor) and the mark log's
+/// position (the rooms' state and census counts).
+type CongestionKey = (u64, i64, i64, u64, (u64, u64));
+
+/// The frame's kept answers: the frame asks each once per frame, and both
+/// change only with a step or an edit.
+#[derive(Default)]
+pub(crate) struct RenderMemo {
+    queue: Option<(QueueKey, Vec<f64>)>,
+    congestion: Option<(CongestionKey, f64)>,
+}
 
 impl Engine {
-    /// The mean congestion over populated floors, the lobby left out.
-    pub(crate) fn port_congestion(&self) -> f64 {
-        self.sim.congestion()
+    /// The mean congestion over populated floors, the lobby left out. The
+    /// frame asks once per frame, so the answer is kept until a step, an
+    /// edit or a room's change moves its key: a frame between them reads it
+    /// without walking the rooms.
+    pub(crate) fn port_congestion(&mut self) -> f64 {
+        let key = (
+            self.generation,
+            self.sim.crowd.step,
+            self.sim.tower.revision,
+            self.sim.clock.minutes.to_bits(),
+            self.sim.tower.view.marks.position(),
+        );
+        if let Some((k, c)) = self.render_memo.congestion {
+            if k == key {
+                return c;
+            }
+        }
+        let c = self.sim.congestion();
+        self.render_memo.congestion = Some((key, c));
+        c
     }
 
     /// The queue projection as one record. The frame asks once per frame, so
@@ -49,7 +79,7 @@ impl Engine {
             self.sim.crowd.step,
             self.sim.tower.revision,
         );
-        if let Some((k, r)) = &self.queue_memo {
+        if let Some((k, r)) = &self.render_memo.queue {
             if *k == key {
                 return r.clone();
             }
@@ -69,7 +99,7 @@ impl Engine {
                 r.extend_from_slice(&[*shaft as f64, i as f64, *n as f64]);
             }
         }
-        self.queue_memo = Some((key, r.clone()));
+        self.render_memo.queue = Some((key, r.clone()));
         r
     }
 

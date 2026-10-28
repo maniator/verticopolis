@@ -294,8 +294,8 @@ pub struct Engine {
     /// The step mode `advance` last stepped under; it outlives a swap, as
     /// the web host's step debt outlives an adopted tower.
     stepper: crate::fixed_step::FrameStepper,
-    /// The last `queueView` record and what it was built for.
-    queue_memo: Option<(port_render::QueueKey, Vec<f64>)>,
+    /// The last `queueView` and `congestion` answers and their keys.
+    render_memo: port_render::RenderMemo,
 }
 
 #[wasm_bindgen]
@@ -1173,7 +1173,7 @@ impl Engine {
         self.port_unit_facts(id)
     }
     // The render queries (`wasm_port_render.rs`).
-    pub fn congestion(&self) -> f64 {
+    pub fn congestion(&mut self) -> f64 {
         self.port_congestion()
     }
     #[wasm_bindgen(js_name = queueView)]

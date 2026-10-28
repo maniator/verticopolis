@@ -222,6 +222,9 @@ pub struct Crowd {
     pub staff_done: Vec<StaffResult>,
     pub staff_count: i64,
     pub step: i64,
+    /// The queue projection and the (step, tower revision) it was built
+    /// for (`queue_view`, `render_reads.rs`). Never saved.
+    pub queue_cache: Option<((i64, i64), crate::render_reads::QueueView)>,
 }
 
 impl Crowd {
@@ -244,6 +247,7 @@ impl Crowd {
             staff_done: Vec::new(),
             staff_count: 0,
             step: 0,
+            queue_cache: None,
         }
     }
 

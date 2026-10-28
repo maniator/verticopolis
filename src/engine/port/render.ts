@@ -1,5 +1,7 @@
 import type { ElevatorQueueView } from "../crowd/person";
 import type { Simulation } from "../Simulation";
+import type { Tower } from "../Tower";
+import { roomMarkCount } from "../tower/rooms";
 import { whole } from "./record";
 
 /**
@@ -7,6 +9,36 @@ import { whole } from "./record";
  * beyond the view frame, slot for slot what the Rust engine answers
  * (`engine-rs/src/wasm_port_render.rs`). None answers a status.
  */
+
+/** The last congestion per tower and what it was read at: the simulation,
+ *  the crowd step, the revision, the clock's minutes (the rush factor) and
+ *  the room mark count (the rooms' state and census counts). */
+const congested = new WeakMap<
+  Tower,
+  { sim: Simulation; step: number; revision: number; minutes: number; marks: number; value: number }
+>();
+
+/** The mean congestion over populated floors, the lobby left out. The frame
+ *  asks once per frame, so the answer is kept until a step, an edit or a
+ *  room's change moves its key: a frame between them walks no rooms. */
+export function congestion(sim: Simulation): number {
+  const tower = sim.tower;
+  const marks = roomMarkCount(tower);
+  const c = congested.get(tower);
+  if (
+    c &&
+    c.sim === sim &&
+    c.step === sim.crowd.step &&
+    c.revision === tower.revision &&
+    c.minutes === sim.clock.minutes &&
+    c.marks === marks
+  ) {
+    return c.value;
+  }
+  const value = sim.congestion();
+  congested.set(tower, { sim, step: sim.crowd.step, revision: tower.revision, minutes: sim.clock.minutes, marks, value });
+  return value;
+}
 
 /** The encoded queue per projection: the crowd keeps one projection per step
  *  and revision, so a frame between steps copies the record out. */

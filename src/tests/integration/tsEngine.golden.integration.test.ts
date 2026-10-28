@@ -129,6 +129,21 @@ describe("TsEngine against the Rust Engine", () => {
     }
   });
 
+  it.skipIf(!hasWasmPackage())("draws the same queues and congestion after every short step of a rush", () => {
+    // The frame reads both once per frame: each engine builds its queue
+    // projection at the start of a step and keeps both answers until the
+    // next, so a read after any step matches.
+    const p = pair();
+    let queued = 0;
+    for (let i = 0; i < 360; i++) {
+      p.forEach((e) => e.tick(2));
+      const q = same(p, (e) => e.queueView(), `queueView ${i}`, false);
+      if (q[0] > 0) queued++;
+      same(p, (e) => e.congestion(), `congestion ${i}`, false);
+    }
+    expect(queued).toBeGreaterThan(0);
+  });
+
   it.skipIf(!hasWasmPackage())("answers every command with the same record", () => {
     const p = pair();
     const ids = (e: EnginePort) => units(e);

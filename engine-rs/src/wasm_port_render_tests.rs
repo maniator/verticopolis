@@ -3,6 +3,7 @@ use crate::clock::GameMode;
 use crate::crowd::{PState, Person, STRESS_WAIT};
 use crate::facilities::{Kind, FACILITIES};
 use crate::sim::Simulation;
+use crate::tower::UnitState;
 
 fn code(kind: Kind) -> f64 {
     FACILITIES.iter().position(|f| f.kind == kind).unwrap() as f64
@@ -127,6 +128,50 @@ fn the_queue_view_is_kept_until_the_crowd_steps() {
     assert_eq!(e.port_queue_view(), first);
     e.sim.crowd.step += 1;
     assert_eq!(e.port_queue_view()[0], 0.0);
+}
+
+#[test]
+fn the_queue_view_is_built_at_the_start_of_each_step() {
+    let mut e = built();
+    let lift = shaft(&e, Kind::ElevatorStandard);
+    e.sim.crowd.people = vec![waiter(1, lift, 2, 0.0, false)];
+    // The step builds the projection before it moves anyone, so the read
+    // after it answers the line as the step found it, as TypeScript does.
+    let want = e.sim.elevator_queue_view().clone();
+    e.sim.advance_step(1.0);
+    assert_eq!(e.sim.crowd.queue_cache.as_ref().unwrap().0 .0, 1);
+    assert_eq!(e.sim.crowd.queue_cache.as_ref().unwrap().1, want);
+    assert_eq!(e.port_queue_view()[0], 1.0);
+}
+
+#[test]
+fn congestion_is_kept_until_a_room_the_tower_or_the_clock_moves() {
+    let mut e = built();
+    let office = e
+        .sim
+        .tower
+        .units
+        .iter()
+        .find(|u| u.kind == Kind::Office)
+        .unwrap()
+        .id;
+    assert_eq!(e.port_congestion(), 0.0);
+    // A write that skips the mark log is not seen: the kept answer stands,
+    // so a frame between changes walks no rooms.
+    e.sim.tower.get_unit_mut(office).unwrap().state = UnitState::Occupied;
+    assert_eq!(e.port_congestion(), 0.0);
+    // A marked write moves the key.
+    let (u, at) = e.sim.tower.marked_by_id(office).unwrap();
+    u.set_state(at, UnitState::Vacating);
+    let busy = e.sim.congestion();
+    assert!(busy > 0.0);
+    assert_eq!(e.port_congestion().to_bits(), busy.to_bits());
+    // So do the clock (the rush factor) and the revision.
+    e.sim.clock.minutes += 8.0 * 60.0;
+    assert_eq!(e.port_congestion().to_bits(), e.sim.congestion().to_bits());
+    assert_ne!(e.port_congestion().to_bits(), busy.to_bits());
+    assert!(e.sim.tower.place(Kind::Office, 3, 170).ok);
+    assert_eq!(e.port_congestion().to_bits(), e.sim.congestion().to_bits());
 }
 
 #[test]
