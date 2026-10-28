@@ -1,7 +1,7 @@
 import * as ex from "excalibur";
 import type { HeatmapMode, HeatCell } from "../../engine/sim/constants";
 import type { FacilityKind, SerializedView } from "../../engine/types";
-import type { UnitView, TransportView } from "../../simport/view";
+import type { SimView, UnitView, TransportView } from "../../simport/view";
 import type { RenderSim } from "../renderSim";
 import { PinchTracker } from "../pinchTracker";
 import type { DrawCtx } from "../sprites";
@@ -15,6 +15,7 @@ import * as camera from "./towerInputCamera";
 import { clearLongPress } from "./longPress";
 import * as overlayFx from "./towerOverlay";
 import { displayLit, runSceneSync } from "./towerSyncSchedule";
+import { clockOf } from "../../simport/headerClock";
 import { beginFrame } from "./towerFrame";
 import { drainRegions, type RegionRec } from "./towerRegions";
 import type { Walker } from "./towerCrowd";
@@ -276,7 +277,10 @@ export class TowerEngine {
   sky!: ex.ScreenElement;
   skyCanvas!: ex.Canvas;
 
-  constructor(canvas: HTMLCanvasElement, sim: RenderSim) {
+  /** `reader`: the shared view reader. `start()` takes the saved camera, the
+   *  hour and the revisions from it when given (slice 7, PR 4); the frame
+   *  reads stay on `sim` until the frame slices move behind the view. */
+  constructor(canvas: HTMLCanvasElement, sim: RenderSim, private readonly reader?: SimView) {
     this.sim = sim;
     scene.bindSceneWorld(sim);
     this.engine = new ex.Engine({
@@ -313,19 +317,21 @@ export class TowerEngine {
     scene.makeSky(this);
     scene.makeOverlay(this);
     // A boot-loaded autosave restores its saved view; a fresh tower centers.
-    this.adoptCamera(this.sim.view);
+    this.adoptCamera(this.reader ? this.reader.header.camera : this.sim.view);
     // Bake the boot scene against the real clock instead of the d defaults:
     // the hour-driven resync now defers a frame (towerSyncSchedule), so a
     // stale boot bake would actually display instead of being fixed pre-draw.
-    this.d.hour = this.sim.clock.hour;
-    this.d.lit = displayLit(this.sim.clock);
+    const clock = this.reader ? clockOf(this.reader.header) : this.sim.clock;
+    this.d.hour = clock.hour;
+    this.d.lit = displayLit(clock);
     this.litState = this.d.lit;
     this.lastSyncHour = this.d.hour;
     this.syncScene();
     this.syncMotion();
     this.syncFacade();
-    this.builtRev = this.sim.tower.revision;
-    this.mealOverlayRev = this.sim.tower.mealOverlayRevision;
+    const tower = this.reader ? this.reader.tower : this.sim.tower;
+    this.builtRev = tower.revision;
+    this.mealOverlayRev = tower.mealOverlayRevision;
     camera.bindInput(this);
   }
 

@@ -53,7 +53,7 @@ function makeInstallable(): void {
 function makeApp(opts: { units?: number; splash?: boolean } = {}): GameApp {
   if (opts.splash) document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>');
   return {
-    sim: { tower: { units: Array.from({ length: opts.units ?? 0 }, () => ({})) } },
+    reader: { rooms: Array.from({ length: opts.units ?? 0 }, () => ({})), structure: [] },
     ui: { openModalTemplate: vi.fn(), closeModal: vi.fn() },
   } as unknown as GameApp;
 }
