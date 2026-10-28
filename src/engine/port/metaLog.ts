@@ -1,7 +1,7 @@
 import { FACILITIES } from "../facilities";
 import type { Tower } from "../Tower";
 import type { Unit } from "../types";
-import { roomUnits } from "../tower/rooms";
+import { roomSlots, roomUnits } from "../tower/rooms";
 
 /** The most ids the log holds before it drops its older half, as the Rust
  *  engine's (`view/meta.rs`). A reader further behind gets a full listing. */
@@ -14,14 +14,14 @@ const FIRST = 1;
  * Unit labels and subtypes for `unitMetaChanged`, the TypeScript side of the
  * Rust engine's meta log (`engine-rs/src/view/meta.rs`). The TypeScript
  * engine writes labels and subtypes in place (a new tenant's name, a reroll),
- * with no setter to log them, so a pass finds the changes by comparing each
- * room's label and subtype with what it last saw. The frame encoder's own
- * walk over the rooms runs that pass (`begin` and `visit`), so a frame walks
- * the rooms once; a listing runs one itself (`sync`). A change bumps the
- * revision and logs the id, as the Rust setters do. A new room logs nothing,
- * as in Rust. The port's own label and reroll commands log their edit at
- * once (`edited`), which also covers the floor and lobby tiles the scan
- * skips.
+ * with no setter to log them, but every such write marks its room
+ * (`markRoom`, `watchRooms` in `src/engine/tower/rooms.ts`). A pass (`sync`)
+ * takes the marked rooms and compares each one's label and subtype with what
+ * it last saw, in slot order, so it costs the rooms written since the last
+ * pass, not every room (#1389). A change bumps the revision and logs the id,
+ * as the Rust setters do. A new room logs nothing, as in Rust. The port's own
+ * label and reroll commands log their edit at once (`edited`), which also
+ * covers the floor and lobby tiles a pass skips.
  */
 export class MetaLog {
   revision = FIRST;
@@ -34,12 +34,13 @@ export class MetaLog {
   private labels: string[] = [];
   private subtypes: (string | undefined)[] = [];
 
-  /** Start a pass over `tower`'s rooms and answer them, for `visit` by slot.
-   *  A new tower starts the log again, as a load does in the Rust engine; a
-   *  new room list (a revision move) carries what was seen by id, and a new
-   *  room logs nothing, as a new unit's construction logs nothing in Rust (a
-   *  reader takes a new room's text itself). */
-  begin(tower: Tower): readonly Unit[] {
+  /** Start a pass over `tower`'s rooms, for `visit` by slot. A new tower
+   *  starts the log again, as a load does in the Rust engine; a new room list
+   *  (a revision move) carries what was seen by id, and a new room logs
+   *  nothing, as a new unit's construction logs nothing in Rust (a reader
+   *  takes a new room's text itself). A new list costs one pass over the
+   *  rooms, as the list's own rebuild does. */
+  private begin(tower: Tower): void {
     const rooms = roomUnits(tower);
     if (tower !== this.tower) {
       this.tower = tower;
@@ -62,23 +63,32 @@ export class MetaLog {
       this.labels = labels;
       this.subtypes = subtypes;
     }
-    return rooms;
   }
 
   /** Compare the room in `slot` of the last `begin` with what was seen, and
-   *  log it when its label or subtype moved: two string compares, no
-   *  allocation, so the frame's own walk over the rooms carries it. */
-  visit(slot: number, u: Unit): void {
+   *  log it when its label or subtype moved. */
+  private visit(slot: number, u: Unit): void {
     if (u.label === this.labels[slot] && u.subtype === this.subtypes[slot]) return;
     this.labels[slot] = u.label;
     this.subtypes[slot] = u.subtype;
     this.note(u.id);
   }
 
-  /** A whole pass: bring the log up to `tower`'s labels and subtypes. */
-  sync(tower: Tower): void {
-    const rooms = this.begin(tower);
-    for (let i = 0; i < rooms.length; i++) this.visit(i, rooms[i]);
+  /** A pass: bring the log up to `tower`'s labels and subtypes, given the
+   *  units marked since the last pass (`marked`; none for a new tower, whose
+   *  baseline is its text as it stands). The changes log in slot order, as a
+   *  walk over every room would log them; a marked unit that is not a room
+   *  (a tile, or a unit since removed) is skipped. */
+  sync(tower: Tower, marked: Iterable<Unit> = []): void {
+    this.begin(tower);
+    const at = roomSlots(tower);
+    const slots: number[] = [];
+    for (const u of marked) {
+      const slot = at.get(u);
+      if (slot !== undefined) slots.push(slot);
+    }
+    if (slots.length > 1) slots.sort((a, b) => a - b);
+    for (const slot of slots) this.visit(slot, this.rooms[slot]);
   }
 
   /** Log a port command's edit of `u` at once, so it is seen before the next
@@ -88,8 +98,10 @@ export class MetaLog {
   edited(u: Unit, label: string, subtype: string | undefined): void {
     if (u.label === label && u.subtype === subtype) return;
     this.note(u.id);
-    const slot = this.rooms.indexOf(u);
-    if (slot >= 0) {
+    if (!this.tower) return;
+    this.begin(this.tower);
+    const slot = roomSlots(this.tower).get(u);
+    if (slot !== undefined) {
       this.labels[slot] = u.label;
       this.subtypes[slot] = u.subtype;
     }

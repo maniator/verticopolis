@@ -5,6 +5,7 @@ import type { SpawnFloors } from "./person";
 import { hasHousehold } from "../residentialRentals";
 import { visibleOccupants } from "./person";
 import { add } from "./trips";
+import { markRoom } from "../tower/rooms";
 import {
   SCHOOL_RUN_DEPART_START,
   SCHOOL_RUN_DEPART_END,
@@ -109,6 +110,7 @@ export function spawnSchoolDeparture(crowd: Crowd, tower: Tower, floors: SpawnFl
   spawned.originUnitId = origin.id;
   spawned.returning = true;
   origin.outForMeal = (origin.outForMeal ?? 0) + 1;
+  markRoom(tower, origin);
   tower.bumpMealOverlayRevision();
 }
 
@@ -149,5 +151,6 @@ export function spawnSalesCall(crowd: Crowd, tower: Tower, floors: SpawnFloors):
   spawned.routine = "salesCall";
   spawned.originUnitId = origin.id;
   origin.outForMeal = (origin.outForMeal ?? 0) + 1;
+  markRoom(tower, origin);
   tower.bumpMealOverlayRevision();
 }

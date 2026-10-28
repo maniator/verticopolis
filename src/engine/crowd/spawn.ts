@@ -24,7 +24,7 @@ import { add, makePerson, venueHasRoom } from "./trips";
 import { pushVenueVisitOptions } from "./visits";
 import { pushRoutineOptions } from "./routines";
 import { metroArrival, metroDeparture } from "./venueTrips";
-import { roomUnits } from "../tower/rooms";
+import { markRoom, roomUnits } from "../tower/rooms";
 
 // Re-exported so existing importers (motion.ts, tests) keep their historical entry point; the
 // primitives now live in the `trips.ts` leaf.
@@ -385,6 +385,7 @@ export function spawnMealOutbound(
   spawned.mealVenueId = venue.id;
   spawned.originUnitId = origin.id;
   origin.outForMeal = (origin.outForMeal ?? 0) + 1;
+  markRoom(tower, origin);
   tower.bumpMealOverlayRevision();
 }
 
