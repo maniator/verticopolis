@@ -1,6 +1,7 @@
 import type { SimContext } from "../SimContext";
 import { isOperational, type Unit } from "../types";
 import { isHotelKind } from "../facilities";
+import { setRoomState } from "../tower/rooms";
 import type { HousekeepingShift } from "../gameRules";
 
 /** Maids a single Housekeeping unit fields (canon: the 1994 unit staffs 6, each
@@ -146,7 +147,7 @@ export class Housekeeping {
       if (u.state !== "dirty" || !isHotelKind(u.kind)) continue;
       const days = (u.dirtyDays ?? 0) + 1;
       if (days >= INFEST_DAYS) {
-        u.state = "infested";
+        setRoomState(this.sim.tower, u, "infested");
         u.occupants = 0;
         u.dirtyDays = undefined; // the clock's job is done; the room is now terminal-dirty
         floors.push(u.floor);
@@ -361,7 +362,7 @@ export class Housekeeping {
     this.releaseAssignment(roomId);
     const room = this.sim.tower.getUnit(roomId);
     if (ok && room?.state === "dirty") {
-      room.state = "empty";
+      setRoomState(this.sim.tower, room, "empty");
       room.satisfaction = 1;
       room.dirtyDays = undefined; // clock reset: a re-dirtied room starts fresh
       this.hkCleanedToday++;
@@ -392,7 +393,7 @@ export class Housekeeping {
         this.sim.tower.roomAt(u.floor, u.x - 1),
       ]) {
         if (neighbor && isHotelKind(neighbor.kind) && (neighbor.state === "asleep" || neighbor.state === "empty")) {
-          neighbor.state = "dirty";
+          setRoomState(this.sim.tower, neighbor, "dirty");
           neighbor.occupants = 0;
           floors.push(neighbor.floor);
         }

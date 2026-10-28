@@ -17,6 +17,9 @@ export type ShadowCommand =
   | { op: "load"; gen: number; save: string; markers: BoundaryMarkers }
   | { op: "tick"; dt: number }
   | { op: "build"; kind: FacilityKind; floor: number; x: number }
+  /** `tiles` is null when the live call passed something other than an
+   *  array the brush can carry; both engines refuse it. */
+  | { op: "paintBrush"; kind: string; floor: number; tiles: number[] | null }
   | { op: "buildTransport"; kind: FacilityKind; x: number; bottom: number; top: number }
   | { op: "sellAt"; floor: number; x: number }
   | { op: "removeUnit"; id: number }

@@ -6,6 +6,7 @@ import { runFrame } from "../../game/frameLoop";
 import { hasBlockingModal } from "../../game/interactionState";
 import type { UI } from "../../ui/UI";
 import { mountAppDom, makeUI } from "../uiFixture";
+import { createTsSim } from "../../simport/tsSim";
 
 /**
  * The TOWER congratulations and the dialogs that freeze time (#1120).
@@ -54,6 +55,7 @@ function makeApp(sim: Simulation, ui: UI) {
     speed: 1,
     prefs: { steadyClock: true },
     sim,
+    port: createTsSim(() => sim),
     accMinutes: 0,
     audio: { update: vi.fn(), sfx: vi.fn() },
     engine: { focus: vi.fn(() => ({})) },
@@ -89,7 +91,7 @@ afterEach(() => {
 });
 
 describe("a TOWER save with an open emergency", () => {
-  it("shows the choice first, keeps its buttons, and brings the congratulations after the answer", () => {
+  it("shows the choice first, keeps its buttons, and brings the congratulations after the answer", async () => {
     const { ui } = makeUI();
     vi.spyOn(ui, "update").mockImplementation(() => {});
     const sim = savedTower(true);
@@ -109,8 +111,10 @@ describe("a TOWER save with an open emergency", () => {
     for (let i = 0; i < 5; i++) pass(app, raw);
     expect(sim.clock.minutes).toBe(minutes);
     expect(has('[data-act="accept"]')).toBe(true);
-    // The player answers: the latch clears and the game moves again.
+    // The player answers: the latch clears once the engine has answered, and
+    // the game moves again.
     click('[data-act="decline"]');
+    await new Promise((r) => setTimeout(r, 0));
     expect(raw.shownChoice).toBe(false);
     expect(sim.pendingChoice).toBeNull();
     expect(hasBlockingModal(app)).toBe(false);
@@ -127,7 +131,7 @@ describe("a TOWER save with an open emergency", () => {
     expect(raw.shownChoice).toBe(false);
   });
 
-  it("dismissing the choice with Esc declines it and still ends in the congratulations", () => {
+  it("dismissing the choice with Esc declines it and still ends in the congratulations", async () => {
     const { ui } = makeUI();
     vi.spyOn(ui, "update").mockImplementation(() => {});
     const sim = savedTower(true);
@@ -137,6 +141,7 @@ describe("a TOWER save with an open emergency", () => {
     expect(has('[data-act="accept"]')).toBe(true);
     expect(has('[data-act="decline"]')).toBe(true);
     dialog().dispatchEvent(new Event("cancel", { cancelable: true }));
+    await new Promise((r) => setTimeout(r, 0));
     expect(raw.shownChoice).toBe(false);
     expect(sim.pendingChoice).toBeNull();
     pass(app, raw);

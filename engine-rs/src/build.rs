@@ -188,9 +188,7 @@ impl Simulation {
         };
         let res = self.tower.place(kind, floor, x);
         if !res.ok {
-            for id in laid_bridge {
-                self.tower.remove_unit(id);
-            }
+            self.tower.remove_units(&laid_bridge);
             return BuildResult {
                 ok: false,
                 reason: res.reason,
@@ -200,7 +198,7 @@ impl Simulation {
         if let Some(id) = res.unit_id {
             if let Some(list) = kind.subtype_list() {
                 let name = *self.rng.pick(list);
-                self.tower.get_unit_mut(id).unwrap().subtype = Some(name);
+                self.tower.set_unit_subtype(id, Some(name));
             }
             if self.mode == GameMode::Classic {
                 if let Some(ladder) = crate::econ::classic_ladder(kind) {
@@ -212,8 +210,8 @@ impl Simulation {
             }
             let dur = kind.build_minutes();
             if dur > 0.0 {
-                let u = self.tower.get_unit_mut(id).unwrap();
-                u.state = UnitState::Construction;
+                let (u, at) = self.tower.marked_by_id(id).unwrap();
+                u.set_state(at, UnitState::Construction);
                 u.complete_at = Some(self.clock.minutes + dur);
                 self.constructing.insert(id);
             }

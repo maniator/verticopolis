@@ -117,13 +117,17 @@ impl Tower {
 
     /// `staffComponents`: floor -> component id over service elevators and stairs.
     pub fn staff_components(&self) -> HashMap<i64, i64> {
-        {
-            let memo = self.memo.borrow();
-            if let Some((rev, s)) = &memo.staff {
-                if *rev == self.revision {
-                    return s.clone();
-                }
-            }
+        self.fill_staff();
+        let memo = self.memo.borrow();
+        memo.staff.as_ref().expect("fill_staff built it").1.clone()
+    }
+
+    /// Builds the staff-component memo when this revision has none, so
+    /// `staff_component`, which dispatch asks for every crew and floor, reads
+    /// it in place instead of copying the map on each call (#1143 item 6).
+    fn fill_staff(&self) {
+        if matches!(&self.memo.borrow().staff, Some((rev, _)) if *rev == self.revision) {
+            return;
         }
         let mut comp: HashMap<i64, i64> = HashMap::new();
         let mut next = 0;
@@ -158,19 +162,24 @@ impl Tower {
                 comp.insert(*f, id);
             }
         }
-        self.memo.borrow_mut().staff = Some((self.revision, comp.clone()));
-        comp
+        self.memo.borrow_mut().staff = Some((self.revision, comp));
+    }
+
+    /// The staff component `floor` lies in, read in place; `None` for a
+    /// floor no staff transport serves.
+    pub(crate) fn staff_component(&self, floor: i64) -> Option<i64> {
+        self.fill_staff();
+        let memo = self.memo.borrow();
+        let (_, comp) = memo.staff.as_ref().expect("fill_staff built it");
+        comp.get(&floor).copied()
     }
 
     pub fn staff_connected(&self, a: i64, b: i64) -> bool {
         if a == b {
             return true;
         }
-        let comp = self.staff_components();
-        match comp.get(&a) {
-            Some(ca) => comp.get(&b) == Some(ca),
-            None => false,
-        }
+        let ca = self.staff_component(a);
+        ca.is_some() && ca == self.staff_component(b)
     }
 
     /// `functionalParkingSet`: parking-space ids chained to a ramp.
