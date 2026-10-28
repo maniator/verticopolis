@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { SaveGame } from "../storage/SaveGame";
-import { SWAP_REFUSED, loadStored, saveText, swapDone } from "./portLifecycle";
+import { SWAP_REFUSED, TRAPPED_SAVE_REFUSED, loadStored, saveText, swapDone } from "./portLifecycle";
+import { noteEngineThrow, watchEngineTraps } from "./engineFault";
 
 const textOf = (sim: Simulation): string => JSON.stringify(sim.serialize());
 
@@ -20,6 +21,21 @@ describe("swapDone", () => {
 });
 
 describe("saveText", () => {
+  it("asks a trapped engine for nothing, so no save, slot or export replaces the last good one (#1422)", () => {
+    const engine = new TsEngine(Simulation.newGame(1));
+    const serialize = vi.spyOn(engine, "serialize");
+    watchEngineTraps(() => {});
+    try {
+      expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
+      expect(() => saveText(engine, null)).toThrow(TRAPPED_SAVE_REFUSED);
+      expect(serialize).not.toHaveBeenCalled();
+    } finally {
+      watchEngineTraps(null);
+    }
+    // A new engine's watch starts clean.
+    expect(() => saveText(engine, null)).not.toThrow();
+  });
+
   it("stamps the live camera before the save, so the view travels with it", () => {
     const sim = Simulation.newGame(1);
     const engine = new TsEngine(sim);
