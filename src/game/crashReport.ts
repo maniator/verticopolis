@@ -40,13 +40,33 @@ export interface CrashDescription {
   behindSplash: boolean;
 }
 
+/** The Rust engine crashed often enough in this tab that the game reloaded
+ *  onto the TypeScript engine (#1422). The report is offered on that
+ *  TypeScript boot, so the tower in it is the TypeScript engine's. */
+export interface RustCrashDescription {
+  kind: "rust-engine-trap";
+  /** This tab's Rust crashes on this build. */
+  crashes: number;
+  /** The fault's reason and stage codes, as the reliability row sends them. */
+  reason: string;
+  stage: string;
+}
+
+/** Both engines, named as the version line names them (#1434). */
+export interface CrashEngines {
+  rust: { version: string | null; sourceHash: string | null };
+  typescript: { version: string; sources: string };
+}
+
 /** The crash-details JSON written into the zip. Field names are part of the
  *  report format; renaming them breaks tooling that reads old reports. */
 export interface CrashDetails {
   report: "verticopolis-crash";
   version: string;
   createdAt: string;
-  crash: CrashDescription;
+  crash: CrashDescription | RustCrashDescription;
+  /** The engines, on a report about an engine. */
+  engines?: CrashEngines;
   userAgent: string;
   viewport: { width: number; height: number; dpr: number };
   /** Chrome-only heap numbers when present; absent elsewhere. */
@@ -78,14 +98,15 @@ export interface CrashTower {
 
 export function buildCrashDetails(
   { view }: CrashTower,
-  crash: CrashDescription,
-  opts: { version: string; speed: number; frameErrors: readonly FrameErrorEntry[] },
+  crash: CrashDetails["crash"],
+  opts: { version: string; speed: number; frameErrors: readonly FrameErrorEntry[]; engines?: CrashEngines },
 ): CrashDetails {
   const details: CrashDetails = {
     report: "verticopolis-crash",
     version: opts.version,
     createdAt: new Date().toISOString(),
     crash,
+    ...(opts.engines ? { engines: opts.engines } : {}),
     userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
     viewport:
       typeof window !== "undefined"
@@ -156,26 +177,44 @@ export async function buildCrashReportZip(
   };
 }
 
+/** The issue title and the first lines of its description, per crash. */
+function crashSummary(details: Pick<CrashDetails, "crash" | "engines">): { title: string; lines: string[] } {
+  const { crash } = details;
+  if (crash.kind === "webgl-context-lost") {
+    return {
+      title: "Game crashed (graphics context lost)",
+      lines: ["The game crashed: the graphics context was lost while playing.", crash.repeat ? "It crashed twice in a row." : ""],
+    };
+  }
+  const rust = details.engines?.rust;
+  const named = [rust?.version ?? "version unknown", rust?.sourceHash ? `source ${rust.sourceHash.slice(0, 12)}` : ""].filter(Boolean).join(", ");
+  return {
+    title: "Rust engine crashed",
+    lines: [
+      `The Rust engine crashed ${crash.crashes} times, so the game switched to the TypeScript engine.`,
+      `Rust engine: ${named}. Fault: ${crash.reason} at ${crash.stage}.`,
+    ],
+  };
+}
+
 /**
  * A prefilled GitHub bug-report URL for this crash. Issue forms accept field
  * ids as query parameters, so the version input and the description arrive
  * filled in; attachments can't travel by URL, which is why the description
  * tells the reporter to attach the downloaded zip.
  */
-export function bugReportUrl(details: Pick<CrashDetails, "version" | "crash">): string {
+export function bugReportUrl(details: Pick<CrashDetails, "version" | "crash" | "engines">): string {
+  const { title, lines } = crashSummary(details);
   const params = new URLSearchParams({
     template: "bug_report.yml",
-    title: "Game crashed (graphics context lost)",
+    title,
     version: details.version,
     "what-happened": [
-      "The game crashed: the graphics context was lost while playing.",
-      details.crash.repeat ? "It crashed twice in a row." : "",
+      ...lines.filter((line) => line !== ""),
       "",
       "A crash-report zip (crash details plus my tower save) was downloaded from the crash screen.",
       "I am attaching it to this issue by dragging the zip file into this text box.",
-    ]
-      .filter((line, i) => line !== "" || i === 2) // keep the single blank separator
-      .join("\n"),
+    ].join("\n"),
   });
   return `https://github.com/maniator/verticopolis/issues/new?${params.toString()}`;
 }

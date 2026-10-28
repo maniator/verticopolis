@@ -15,37 +15,93 @@ import { remove, writeChecked, type KeyValueStore } from "./records";
 /** This tab's Rust crashes on one build. */
 export const RUST_CRASHES_KEY = "vc.rustCrashes";
 
+/** What a crash report needs from the crash that spent the tab's reloads:
+ *  the fault's codes and the Rust engine that crashed, as the boot read it
+ *  (null where the package did not say). The page that shows the report runs
+ *  TypeScript, so it cannot ask the Rust engine. */
+export interface RustCrashFacts {
+  reason: string;
+  stage: string;
+  rust: { version: string | null; sourceHash: string | null };
+}
+
 interface CrashCount {
   v: 1;
   sha: string;
   count: number;
+  /** The latest crash on this build. */
+  last?: RustCrashFacts;
+  /** The crash report was offered once on this build in this tab. */
+  reportShown?: true;
 }
 
-function countOf(store: KeyValueStore | null, sha: string): number {
+const text = (v: unknown): v is string => typeof v === "string";
+const textOrNull = (v: unknown): v is string | null => v === null || text(v);
+
+function factsOf(v: unknown): RustCrashFacts | undefined {
+  const f = v as Partial<RustCrashFacts> | null | undefined;
+  if (!f || !text(f.reason) || !text(f.stage) || !f.rust) return undefined;
+  const { version, sourceHash } = f.rust;
+  if (!textOrNull(version) || !textOrNull(sourceHash)) return undefined;
+  return { reason: f.reason, stage: f.stage, rust: { version, sourceHash } };
+}
+
+function recordOf(store: KeyValueStore | null, sha: string): CrashCount | null {
   try {
     const raw = store?.getItem(RUST_CRASHES_KEY);
-    if (!raw) return 0;
+    if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<CrashCount>;
-    return parsed.v === 1 &&
-      parsed.sha === sha &&
-      Number.isInteger(parsed.count)
-      ? parsed.count!
-      : 0;
+    if (parsed.v !== 1 || parsed.sha !== sha || !Number.isInteger(parsed.count)) return null;
+    const last = factsOf(parsed.last);
+    return {
+      v: 1,
+      sha,
+      count: parsed.count!,
+      ...(last ? { last } : {}),
+      ...(parsed.reportShown === true ? { reportShown: true } : {}),
+    };
   } catch {
-    return 0;
+    return null;
   }
 }
 
+const countOf = (store: KeyValueStore | null, sha: string): number =>
+  recordOf(store, sha)?.count ?? 0;
+
 /** Count one crash on this build and return the tab's count, or null when
  *  storage did not keep it: that reload could not be counted, so the caller
- *  must not reload. */
+ *  must not reload. `last` is kept for the crash report. */
 export function countRustCrash(
   store: KeyValueStore | null,
   sha: string,
+  last?: RustCrashFacts,
 ): number | null {
   const count = countOf(store, sha) + 1;
-  const record: CrashCount = { v: 1, sha, count };
+  const record: CrashCount = { v: 1, sha, count, ...(last ? { last } : {}) };
   return writeChecked(store, RUST_CRASHES_KEY, record) ? count : null;
+}
+
+/** The crash report this tab still owes the player: its crashes on this build
+ *  are spent and the report was not offered yet. Null otherwise, and where
+ *  the crash's facts were not kept. */
+export function crashReportDue(
+  store: KeyValueStore | null,
+  sha: string,
+): { count: number; last: RustCrashFacts } | null {
+  const record = recordOf(store, sha);
+  if (!record?.last || record.reportShown || !crashReloadsSpent(record.count)) return null;
+  return { count: record.count, last: record.last };
+}
+
+/** The crash report was offered: later boots in this tab say why in a line.
+ *  Returns false when storage did not keep the mark. */
+export function markCrashReportShown(
+  store: KeyValueStore | null,
+  sha: string,
+): boolean {
+  const record = recordOf(store, sha);
+  if (!record) return false;
+  return writeChecked(store, RUST_CRASHES_KEY, { ...record, reportShown: true });
 }
 
 /** Whether this tab crashed often enough on this build that Rust stays off. */
