@@ -10,7 +10,7 @@ function appOn(port: EnginePort) {
   const update = vi.fn<() => void>();
   const reader = Object.assign({ header: { logSeq: 0 }, tower: {} } as unknown as HudSource["reader"], { update });
   const portCodes = { kind: () => 4, code: () => 0, slot: () => 0 };
-  return { enginePort: port, reader, portCodes, ui: { lastLogSeq: 0, resetLog: vi.fn() }, followSwap: vi.fn(), followEdit: vi.fn() };
+  return { enginePort: port, reader, portCodes, ui: { lastLogSeq: 0, resetLog: vi.fn(), update: vi.fn() }, followSwap: vi.fn(), followEdit: vi.fn() };
 }
 
 /** A stand-in for the Rust engine: it holds a save, restores one, and is not
@@ -53,8 +53,24 @@ describe("the tooling harnesses' tower", () => {
     expect((saved() as unknown as { vipFavorable: boolean }).vipFavorable).toBe(true);
     expect(port.restore).toHaveBeenCalledTimes(1);
     expect(app.followEdit).toHaveBeenCalledOnce();
+    expect(app.ui.update).toHaveBeenCalledOnce(); // before the load, so no line is lost to it
     expect(app.followSwap).not.toHaveBeenCalled();
     expect(toolingSim(app)).toBe(sim);
+  });
+
+  it("hands the lines the copy logged on to the bulletin with the edit, and only those", () => {
+    const { app } = rustLike();
+    const sim = toolingSim(app)!;
+    sim.vipFavorable = true;
+    expect(app.followEdit).toHaveBeenLastCalledWith(undefined);
+    sim.emit("Congratulations! Your tower reached 2 stars.", "good");
+    expect(app.followEdit).toHaveBeenCalledTimes(2);
+    const shown = app.followEdit.mock.lastCall![0] as Simulation;
+    expect(shown.log[shown.log.length - 1]?.text).toBe("Congratulations! Your tower reached 2 stars.");
+    // The bulletin reads the whole log from nothing: the saved tail and the new line.
+    expect(new TsEngine(shown).logAfter(0)).toHaveLength(2 * 3);
+    sim.vipFavorable = false;
+    expect(app.followEdit).toHaveBeenLastCalledWith(undefined);
   });
 
   it("sends a build and a money write to the engine as its own commands, beside the copy's", () => {
