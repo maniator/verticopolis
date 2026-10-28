@@ -20,7 +20,7 @@ import { VACATE_NOTICE_MINUTES } from "./constants";
 import { buildSatisfactionContext, wouldEvictFreshTenant, type SatisfactionContext } from "./satisfactionStep";
 import { foldOriginDemand } from "./demand";
 import { bindingTransportClassAt, type CongestionBindingClass } from "./gripe";
-import { roomUnits, setRoomState } from "../tower/rooms";
+import { markRoom, roomUnits, setRoomState } from "../tower/rooms";
 
 /** Vacate, move-in, subtype churn for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -360,6 +360,7 @@ export function rerollSubtype(sim: Simulation, id: number): string | undefined {
   }
   const next = list[idx];
   u.subtype = next;
+  markRoom(sim.tower, u);
   // Retail varieties draw differently, and the renderer only re-compares
   // room signatures on a sync trigger (hour flip, lighting flip, structural
   // or meal-overlay change). Bump the meal-overlay channel, the cheap

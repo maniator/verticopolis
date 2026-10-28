@@ -208,6 +208,20 @@ export const BINDING_EXPORT_TIERS = {
   crewCoverage: T2,
   unitCard: T2,
   shaftCard: T2,
+  // Tier 2, the port's report queries and file members (facade slice 7, PR
+  // 1d): the stats screen and diagnostics records in place of the JSON
+  // getters, the .vctower and .TDT files in and out, and the staged .TDT
+  // tower the import report shows before the player opens it.
+  statsSheet: T2,
+  unitFacts: T2,
+  loadVctower: T2,
+  exportVctower: T2,
+  loadTdt: T2,
+  tdtNote: T2,
+  tdtTowerName: T2,
+  adoptTdt: T2,
+  tdtExport: T2,
+  tdtFile: T2,
   // Tier 2, the host loop and the engine's lifetime.
   tick: LOOP,
   frameView: LOOP,

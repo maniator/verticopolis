@@ -11,6 +11,7 @@ import { subtypeListFor } from "./retailSubtypes";
 import { Housekeeping } from "./economy/housekeeping";
 import { computeDemandMap, unitReachable } from "./sim/demand";
 import { roomUnits, setRoomState } from "./tower/rooms";
+import { emptyVenue } from "./sim/presence";
 
 /** The lease kinds `collectRent` collects quarterly, and the money-log line each
  *  emits (its ledger category comes from `ledgerCatFor`). A kind absent here pays
@@ -182,18 +183,12 @@ export class EconomySystem {
         // Unreachable (stranded up a long climb, on a stranded run, or not
         // connected at all) → no patrons. Clear any lingering occupancy so a
         // newly-stranded venue reads empty instead of frozen at its last busy state.
-        if (u.state === "occupied") {
-          if (attends) syncAttendanceOccupants(u);
-          else u.occupants = 0;
-        }
+        if (u.state === "occupied") emptyVenue(this.sim.tower, u);
         continue;
       }
       if (!isOpenAt(u.kind, this.sim.clock.hour)) {
         // Closed for the night: no patrons.
-        if (u.state === "occupied") {
-          if (attends) syncAttendanceOccupants(u);
-          else u.occupants = 0;
-        }
+        if (u.state === "occupied") emptyVenue(this.sim.tower, u);
         continue;
       }
       setRoomState(this.sim.tower, u, "occupied");

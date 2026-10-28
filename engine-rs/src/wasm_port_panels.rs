@@ -109,6 +109,7 @@ pub(crate) fn add_panel_records(layout: &mut serde_json::Value) {
     layout["heatModes"] = serde_json::json!(HEAT_MODES);
     layout["heatTints"] = serde_json::json!(HEAT_TINTS);
     layout["vacateReasons"] = serde_json::json!(VACATE_REASONS);
+    super::port_reports::add_report_records(layout);
 }
 
 fn heat_mode(code: f64) -> Option<HeatmapMode> {
@@ -121,12 +122,12 @@ fn heat_mode(code: f64) -> Option<HeatmapMode> {
     })
 }
 
-fn flag(b: bool) -> f64 {
+pub(crate) fn flag(b: bool) -> f64 {
     f64::from(u8::from(b))
 }
 
 /// The index of `name` in `table`, or NaN for none.
-fn code_of(table: &[&str], name: Option<&str>) -> f64 {
+pub(crate) fn code_of(table: &[&str], name: Option<&str>) -> f64 {
     name.and_then(|n| table.iter().position(|t| *t == n))
         .map_or(f64::NAN, |i| i as f64)
 }

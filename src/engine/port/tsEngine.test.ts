@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../Simulation";
 import { INVALID_REQUEST, UNKNOWN_FACILITY } from "../request";
-import { KIND_CODES, VIEW_LAYOUT, VIEW_LAYOUT_TEXT, codeOf } from "./layout";
+import { KIND_CODES, UNIT_STATE_CODES, VIEW_LAYOUT, VIEW_LAYOUT_TEXT, codeOf } from "./layout";
+import { roomUnits, watchRooms } from "../tower/rooms";
 import { MetaLog } from "./metaLog";
 import { TsEngine } from "./tsEngine";
 
@@ -188,24 +189,80 @@ describe("MetaLog", () => {
     const tower = e.sim.tower;
     const office = idOf(e, "office");
     const log = new MetaLog();
+    const marked = watchRooms(tower);
+    const pass = () => {
+      log.sync(tower, marked);
+      marked.clear();
+    };
     log.sync(tower);
     expect(Array.from(log.changed(tower, 0)).slice(1, 2)).toEqual([1]);
     tower.setLabel(office, "Renamed");
-    log.sync(tower);
+    pass();
     expect(Array.from(log.changed(tower, 1))).toEqual([2, 0, office]);
     // A room built after the first sync logs nothing.
     e.buildAt(code("office"), 3, 200);
-    log.sync(tower);
+    pass();
+    expect(log.revision).toBe(2);
+    // A mark with no change logs nothing.
+    marked.add(tower.getUnit(office)!);
+    pass();
     expect(log.revision).toBe(2);
     // Past the cap the older half goes, and a reader that far back gets a
     // full listing.
     for (let i = 0; i < 4100; i++) {
       tower.setLabel(office, `n${i}`);
-      log.sync(tower);
+      pass();
     }
     expect(log.changed(tower, 2)[1]).toBe(1);
     expect(log.changed(tower, log.revision - 1)[1]).toBe(0);
     log.sync(Simulation.newGame(1, "classic").tower);
     expect(log.revision).toBe(1);
+  });
+});
+
+describe("TsEngine's frames and meta log from the room marks", () => {
+  it("send every change a walk over every room would find (#1389)", () => {
+    const e = engine();
+    // Homes and a hotel room send people out for meals (outForMeal).
+    for (const [kind, x] of [["condo", 196], ["condo", 260], ["hotelSingle", 170], ["hotelSingle", 180]] as const) expect(e.buildAt(code(kind), 3, x)[0], `${kind} at ${x}: ${e.lastReason()}`).toBe(1);
+    const L = VIEW_LAYOUT;
+    const h = L.header;
+    const fields = (slot: number): number[] => {
+      const u = roomUnits(e.sim.tower)[slot];
+      return [codeOf(UNIT_STATE_CODES, u.state), u.occupants, u.customersIn ?? -1, u.hotelCustomersIn ?? -1, u.outForMeal ?? -1];
+    };
+    // What a reader holds: each slot's fields as sent, and each id's text as
+    // the meta log last named it.
+    let held: number[][] = [];
+    const text = new Map<number, string>();
+    const said = (u: { label: string; subtype?: string }) => `${u.label}|${u.subtype ?? ""}`;
+    let since = 0;
+    let rooms = -1;
+    let partial = 0;
+    for (let i = 0; i < 400; i++) {
+      if (i === 150) expect(e.labelUnit(idOf(e, "office"), "Midway")[0]).toBe(1);
+      if (i === 250) e.buildAt(code("office"), 3, 230);
+      e.tick(30);
+      const f = e.viewFrame(false);
+      if (f[h.full] === 1) held = [];
+      else partial++;
+      const rows = L.headerWidth + f[h.people] * L.personWidth;
+      for (let k = 0; k < f[h.units]; k++) {
+        const at = rows + k * L.unitWidth;
+        held[f[at]] = Array.from(f.subarray(at + 1, at + L.unitWidth));
+      }
+      expect(held.length).toBe(f[h.rooms]);
+      for (let slot = 0; slot < f[h.rooms]; slot++) expect(held[slot], `slot ${slot} at frame ${i}`).toEqual(fields(slot));
+      const meta = e.unitMetaChanged(since);
+      const units = e.sim.tower.units;
+      // A new room's text is read directly, as the shared reader does.
+      if (meta[1] === 1 || units.length !== rooms) for (const u of units) text.set(u.id, said(u));
+      for (const id of meta.subarray(2)) text.set(id, said(e.sim.tower.getUnit(id)!));
+      for (const u of units) expect(text.get(u.id), `unit ${u.id} at frame ${i}`).toBe(said(u));
+      since = meta[0];
+      rooms = units.length;
+    }
+    expect(partial).toBeGreaterThan(300);
+    expect(since).toBeGreaterThan(1);
   });
 });
