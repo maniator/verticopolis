@@ -2,7 +2,7 @@
 
 Status: in-progress (story review: GO on ad20180c, both conditions met; 5a
 written on the F2 amendment's recommended option and reviewed with
-`/gds-code-review`; it merges only once the owner answers F2)
+`/gds-code-review`; the owner answered F2 on 2026-10-28, quoted in D2)
 
 Slice 5 of the Rust-backed facade
 (`_bmad-output/planning-artifacts/architecture/architecture-rust-facade-2026-10-20/slice-plan.md`),
@@ -269,7 +269,7 @@ its undo half).
         #1290 merges
   - [ ] the coverage case on slice 2's command contract script, when this
         branch takes main after #1290 merges (AC 3)
-  - [ ] the owner's F2 answer quoted in D2 before merge
+  - [x] the owner's F2 answer quoted in D2 before merge
 - [ ] PR 5b: saves
   - [ ] the stamp splice (`src/storage/saveStamp.ts`) and its byte-equality
         tests (D8)
@@ -451,8 +451,16 @@ candidates that did not load (D11).
   costs above. Whether two synchronous members amend F2's
   "one interface, no pretend-sync" rule is the facade lead's call, and the
   owner's if it does. The facade lead judged that it does (2026-10-21), so
-  the amendment is the owner's, pending; 5a is written on its recommended
-  option (main-thread only, with these guardrails).
+  the amendment is the owner's; 5a is written on its recommended option
+  (main-thread only, with these guardrails).
+
+  **The owner's answer (Naftali, 2026-10-28 00:06 UTC, project thread):**
+  "Whatever makes things for the rust host make sense the most". Read as
+  the amendment as drafted: the Rust host runs on the main thread and
+  answers in the same task, so `saveNow` and `undoSignature` stay
+  synchronous on the main-thread adapters, and the worker adapter (#1224)
+  owes the in-order primitives above. Recorded on PR #1294 (comment
+  6456875130).
 - **D3. `undoSignature`, a string.** Slice 6a's round 1 review replaced the
   change counter with `towerSignature()`, a pure fingerprint of
   `towerStateSig`'s tower half, with money compared beside it. A string
@@ -768,6 +776,6 @@ Copilot's two commits (a2c854ef, 429027a9) kept and their code replaced:
   `wasmHostFallback.integration.test.ts`
 - `src/tests/simulationReach.ratchet.txt`,
   `frontendEngineImports.ratchet.txt`
-- the slice plan's row 5 (pending the owner's F2 answer)
+- the slice plan's row 5 (the owner answered F2 on 2026-10-28)
 - `_bmad-output/implementation-artifacts/story-engine-retire-typescript.md`
   (the fallback's lists), `backlog.md` (the review's deferrals, #1158 A34)
