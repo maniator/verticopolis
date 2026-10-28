@@ -194,6 +194,13 @@ export const BINDING_EXPORT_TIERS = {
   logText: T2,
   logLine: T1,
   scheduleShaft: T1,
+  // Tier 2, the port's panel queries (facade slice 7, PR 1c): read-only
+  // records for the heat overlay, the crew coverage and the unit and shaft
+  // cards, in place of the slice 6b JSON getters.
+  heatCells: T2,
+  crewCoverage: T2,
+  unitCard: T2,
+  shaftCard: T2,
   // Tier 2, the host loop and the engine's lifetime.
   tick: LOOP,
   frameView: LOOP,

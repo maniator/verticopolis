@@ -38,20 +38,44 @@ pub(crate) fn unit_price(mode: GameMode, u: &Unit) -> f64 {
         .unwrap_or(0.0)
 }
 
+/// The card's derived flags for one unit, which the JSON card and the port's
+/// `unitCard` record both read.
+pub(crate) struct CardFlags {
+    pub served: bool,
+    pub reachable: bool,
+    pub has_lobby: bool,
+    /// Only for a cinema.
+    pub blockbuster: Option<bool>,
+}
+
 impl Simulation {
-    /// The detail card for unit `id`, or `None` for an id that is not a unit.
-    /// `served` is the tower's lobby connection for the floor, `reachable`
-    /// whether the walk to it is within what anyone will make (`floorReachable`),
-    /// and `blockbuster` whether a cinema is booked for the blockbuster.
-    /// Takes `&mut self` for the reachability memo, as `floor_reachable` does.
-    pub fn unit_detail(&mut self, id: i64) -> Option<Value> {
-        let floor = self.tower.get_unit(id)?.floor;
-        let served = self.tower.is_floor_served(floor);
-        let reachable = self.floor_reachable(floor);
-        let has_lobby = self.tower.floor_has_lobby(floor);
+    /// The derived flags of unit `id`'s card, or `None` for an id that is not
+    /// a unit. `served` is the tower's lobby connection for the floor,
+    /// `reachable` whether the walk to it is within what anyone will make
+    /// (`floorReachable`), and `blockbuster` whether a cinema is booked for
+    /// the blockbuster. Takes `&mut self` for the reachability memo, as
+    /// `floor_reachable` does.
+    pub(crate) fn card_flags(&mut self, id: i64) -> Option<CardFlags> {
         let u = self.tower.get_unit(id)?;
-        let blockbuster =
-            (u.kind == Kind::Cinema).then(|| self.blockbusters.contains(&(id as f64)));
+        let (floor, cinema) = (u.floor, u.kind == Kind::Cinema);
+        Some(CardFlags {
+            served: self.tower.is_floor_served(floor),
+            reachable: self.floor_reachable(floor),
+            has_lobby: self.tower.floor_has_lobby(floor),
+            blockbuster: cinema.then(|| self.blockbusters.contains(&(id as f64))),
+        })
+    }
+
+    /// The detail card for unit `id`, or `None` for an id that is not a unit,
+    /// with the flags `card_flags` derives.
+    pub fn unit_detail(&mut self, id: i64) -> Option<Value> {
+        let CardFlags {
+            served,
+            reachable,
+            has_lobby,
+            blockbuster,
+        } = self.card_flags(id)?;
+        let u = self.tower.get_unit(id)?;
         Some(json!({
             "id": u.id,
             "kind": u.kind.as_str(),

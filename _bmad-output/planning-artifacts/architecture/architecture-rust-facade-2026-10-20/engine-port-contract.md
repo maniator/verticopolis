@@ -168,16 +168,21 @@ records under their own names.
 | `statsStrip` | none | record, `TOWER_STATS` order | UI tick |
 | `hotspot` | none | record: ratio, floor (NaN = none) | UI tick |
 | `onboarding` | none | number, bits in `ONBOARDING` order | UI tick |
-| `floorHeatmap` | modeCode | record: cells of floor, minX, maxX, severity, tint code | overlay refresh |
-| `unitDetail` | id | record (NaN for absent fields); `unitLabel(id)`, `unitSubtype(id)` text | selection, revision or hour change |
-| `transportDetail` | id | record with the stop rows and hourly slots; origins as counted pairs | selection, revision or hour change |
-| `statsReport` | none | record with counted sections | stats screen open |
-| `housekeepingCoverage` | none | record | exterminator gate |
-| `diagnosticFacts` | id | record | diagnostics readout |
+| `heatCells` | modeCode (layout `heatModes`) | record: per cell, the layout's `heatCell` slots (floor, minX, maxX, severity, tint code from `heatTints`); an unknown mode answers no cells | overlay refresh |
+| `unitCard` | id | record, the layout's `unitCard` slots (NaN for absent fields, flags 0 or 1, codes from `kinds`, `unitStates`, `vacateReasons`, `filmPolicies`); empty for no such unit; `unitLabel(id)`, `unitSubtype(id)` text | selection, revision or hour change |
+| `shaftCard` | id | record: the layout's `shaftCard` header, then the 48 hourly demand slots when `hourly` is 1, the `stops` stop rows (`stopRow`), and the origin rings when `origins` is 1 (per hour, a pair count and that many floor, count pairs); empty for no such shaft | selection, revision or hour change |
+| `statsReport` | none | record with counted sections (PR 1d) | stats screen open |
+| `crewCoverage` | none | record, the layout's `crewCoverage` slots | exterminator gate |
+| `diagnosticFacts` | id | record (PR 1d; the port name is chosen there, apart from the legacy JSON export) | diagnostics readout |
 | `logAfter` | seq | record of (seq, kindCode, minute) triples; `logText(seq)` | per new log line |
 
 `towerName()`, `unitLabel(id)`, `logText(seq)` and the other text getters
 return a plain string, never JSON.
+
+The panel queries are named apart from the legacy JSON getters
+(`floorHeatmap`, `unitDetail`, `transportDetail`, `housekeepingCoverage`),
+which stay for the conformance suites until PR 4, the same way the editing
+commands are. Each reads the typed core its JSON getter wraps.
 
 ## 3. Input rules (both engines, one contract)
 
@@ -224,7 +229,7 @@ project for `TsEngine`, `unitWasm` for `Engine`):
 - A code outside its table is refused (`UNKNOWN_FACILITY` for a kind,
   `INVALID_REQUEST` otherwise).
 - A refusal changes nothing and its delta is `0`.
-- The contract is versioned with the layout (`VIEW_LAYOUT_VERSION`, 2 from PR 1a; a native test pins the whole exported layout, records included): a
+- The contract is versioned with the layout (`VIEW_LAYOUT_VERSION`: 2 from PR 1a, 3 from 1b, 4 from 1c; a native test pins the whole exported layout, records included): a
   record's slots and the code tables are part of it, and a reader built
   against another version refuses to start.
 
@@ -302,7 +307,9 @@ they resume.
    quotes and the HUD queries (`wasm_port.rs`, `wasm_port_edit.rs`); 1b the
    lifecycle members, `drainEvents` and `eventText`, `setBackdrop`, the log,
    `unitMetaChanged` and the text getters, and `scheduleShaft`
-   (`wasm_port_life.rs`); 1c the panel queries.
+   (`wasm_port_life.rs`); 1c the panel queries `heatCells`, `crewCoverage`,
+   `unitCard` and `shaftCard` (`wasm_port_panels.rs`); 1d `statsReport`
+   and `diagnosticFacts`.
 2. `EnginePort`, the shared reader, the contract fixture on `Engine`, the
    compile-time check; R2's notes from `3a8e4008` (room-count guard rows,
    the import-walk guard over the port's modules, no per-frame `Set`).
