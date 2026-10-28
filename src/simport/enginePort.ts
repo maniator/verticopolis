@@ -120,5 +120,22 @@ export interface EnginePortQueries {
   shaftCard(id: number): PortRecord;
 }
 
+/** The renderer's reads beyond the view frame (contract section 2, PR 5b).
+ *  The overlay's peak congestion is `hotspot`'s ratio. */
+export interface EnginePortRender {
+  /** The mean congestion over populated floors; read per frame. */
+  congestion(): number;
+  /** The elevator queue projection as `queueView`, `queueLanding` and
+   *  `queueCar` slots; kept per step and revision, so read per frame. */
+  queueView(): PortRecord;
+  /** `[count, ids...]`: the working garage spaces, ascending. */
+  parkingSet(): PortRecord;
+  /** The garage fill, 0 to 1, for `spots` working spaces. */
+  parkingUsage(spots: number): number;
+  /** The recycling bins' fill, 0 to 1. */
+  recyclingFill(): number;
+  positionReachable(floor: number, x: number): boolean;
+}
+
 /** The whole port: what the game holds, whichever engine runs. */
-export interface EnginePort extends EnginePortLifecycle, EnginePortView, EnginePortCommands, EnginePortQueries {}
+export interface EnginePort extends EnginePortLifecycle, EnginePortView, EnginePortCommands, EnginePortQueries, EnginePortRender {}

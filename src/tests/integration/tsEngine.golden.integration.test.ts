@@ -89,6 +89,14 @@ function sameReads(p: [EnginePort, EnginePort]): void {
   same(p, (e) => e.onboarding(), "onboarding");
   same(p, (e) => e.crewCoverage(), "crewCoverage");
   for (let m = 0; m < VIEW_LAYOUT.heatModes.length; m++) same(p, (e) => e.heatCells(m), `heat ${m}`);
+  same(p, (e) => e.congestion(), "congestion");
+  same(p, (e) => e.queueView(), "queueView");
+  same(p, (e) => e.parkingSet(), "parkingSet");
+  for (const spots of [0, 3, 40, -1, NaN]) same(p, (e) => e.parkingUsage(spots), `parkingUsage ${spots}`);
+  same(p, (e) => e.recyclingFill(), "recyclingFill");
+  for (const [floor, x] of [[1, 170], [2, 170], [3, 200], [5, 0], [2.5, 170]]) {
+    same(p, (e) => e.positionReachable(floor, x), `reachable ${floor} ${x}`);
+  }
   for (const id of units(p[0])) {
     same(p, (e) => e.unitCard(id), `unit ${id}`);
     same(p, (e) => e.unitLabel(id), `label ${id}`);

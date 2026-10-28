@@ -10,6 +10,7 @@ import * as cmd from "./commands";
 import { VIEW_LAYOUT, VIEW_LAYOUT_TEXT } from "./layout";
 import { MetaLog } from "./metaLog";
 import * as ask from "./queries";
+import * as draw from "./render";
 import { flag, whole, type PortState } from "./record";
 import { FrameEncoder, encodeStructure } from "./viewEncode";
 
@@ -293,4 +294,10 @@ export class TsEngine implements PortState {
   crewCoverage = () => ask.crewCoverage(this.current);
   unitCard = (id: number) => ask.unitCard(this.current, id);
   shaftCard = (id: number) => ask.shaftCard(this.current, id);
+  congestion = () => this.current.congestion();
+  queueView = () => draw.queueView(this.current);
+  parkingSet = () => draw.parkingSet(this.current);
+  parkingUsage = (spots: number) => draw.parkingUsage(this.current, spots);
+  recyclingFill = () => this.current.recyclingFill();
+  positionReachable = (floor: number, x: number) => draw.positionReachable(this.current, floor, x);
 }
