@@ -1,6 +1,6 @@
 import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN, type Simulation } from "../Simulation";
 import { SERVED_RECOVERY } from "../sim/constants";
-import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind, residentCount } from "../facilities";
+import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../facilities";
 import { isRentalKind } from "../residentialRentals";
 import { catalogFacility } from "../catalogTypes";
 import { towerCatalog } from "../towerCatalog";
@@ -13,7 +13,7 @@ import {
   unmetCoverage,
 } from "../sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../sim/satisfactionStep";
-import { roomUnits } from "../tower/rooms";
+import { householdMix } from "../households";
 import { isPresent, type Unit, type VacateReason } from "../types";
 import { KIND_CODES, VIEW_LAYOUT, codeOf } from "./layout";
 import { price } from "./queries";
@@ -51,18 +51,7 @@ export function statsSheet(sim: Simulation): Float64Array {
   const rows = sim.elevatorStats();
   const { averages, hasData } = sim.incomeBreakdown();
   const shift = sim.economy.housekeepingReport();
-  const counts = new Map<number, number>();
-  let homes = 0;
-  let residents = 0;
-  for (const u of roomUnits(sim.tower)) {
-    if ((u.kind === "condo" || u.kind === "rentalApartment") && isPresent(u)) {
-      const size = residentCount(u);
-      counts.set(size, (counts.get(size) ?? 0) + 1);
-      homes++;
-      residents += size;
-    }
-  }
-  const mix = [...counts.keys()].sort((a, b) => a - b);
+  const homes = householdMix(sim.tower);
   const achieved = MILESTONES.map((id) => sim.achievedMilestones.has(id));
   const r: number[] = [
     sim.ratingPopulation(),
@@ -81,15 +70,15 @@ export function statsSheet(sim: Simulation): Float64Array {
     flag(sim.vipFavorable),
     nan(sim.exterminationDueDay),
     flag(hasData),
-    homes,
-    residents,
+    homes.households,
+    homes.residents,
     achieved.filter(Boolean).length,
     flag(next !== null),
     next?.gates.length ?? 0,
     stranded.length,
     achieved.length,
     rows.length,
-    mix.length,
+    homes.mix.length,
   ];
   const s = sim.stats();
   r.push(...STATS.map((name) => s[name]));
@@ -102,7 +91,7 @@ export function statsSheet(sim: Simulation): Float64Array {
   }
   r.push(...stranded, ...achieved.map(flag));
   for (const e of rows) r.push(e.id, codeOf(KIND_CODES, e.kind), e.bottom, e.top, e.cars, e.capacity, e.utilization);
-  for (const size of mix) r.push(size, counts.get(size)!);
+  for (const [size, count] of homes.mix) r.push(size, count);
   return Float64Array.from(r);
 }
 

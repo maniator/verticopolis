@@ -1,5 +1,9 @@
 import { FACILITIES } from "./facilities";
 import type { RNG } from "./rng";
+import { residentCount } from "./census";
+import type { Tower } from "./Tower";
+import { roomUnits } from "./tower/rooms";
+import { isPresent } from "./types";
 
 /**
  * The condo HOUSEHOLD layer of the rule-set seam: family sizes, the weighted
@@ -49,4 +53,24 @@ export function rollHousehold(rng: RNG): number {
     if (roll <= 0) return HOUSEHOLD_SIZES[i];
   }
   return CLASSIC_HOUSEHOLD; // unreachable; the classic 3 as a safety net
+}
+
+/** The stats screen's household mix: every occupied condo and apartment,
+ *  with `mix` as [household size, homes] pairs, smallest size first. The
+ *  stats panel and the port's `statsSheet` both read it, mirroring the Rust
+ *  engine's `household_mix()`. */
+export function householdMix(tower: Tower): { households: number; residents: number; mix: [number, number][] } {
+  const counts = new Map<number, number>();
+  let households = 0;
+  let residents = 0;
+  for (const u of roomUnits(tower)) {
+    if ((u.kind === "condo" || u.kind === "rentalApartment") && isPresent(u)) {
+      const size = residentCount(u);
+      counts.set(size, (counts.get(size) ?? 0) + 1);
+      households++;
+      residents += size;
+    }
+  }
+  const mix = [...counts.keys()].sort((a, b) => a - b).map((size): [number, number] => [size, counts.get(size)!]);
+  return { households, residents, mix };
 }
