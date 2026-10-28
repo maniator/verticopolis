@@ -27,6 +27,19 @@ pub const MILESTONE_IDS: [&str; 11] = [
     "full-house",
 ];
 
+/// One rung's progress (`NextStarView`): the population bar and the
+/// facility gates by id, in ladder order.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NextStar {
+    pub star: i64,
+    pub is_tower: bool,
+    pub pop_have: i64,
+    pub pop_need: i64,
+    pub pop_met: bool,
+    pub gates: Vec<(&'static str, bool)>,
+    pub all_met: bool,
+}
+
 impl Simulation {
     /// `nextStarThreshold`: the population the next rung needs, `None` from
     /// 5 stars up.
@@ -56,12 +69,12 @@ impl Simulation {
         gates
     }
 
-    /// `nextStarRequirements`: the checklist toward the next rung, or `null`
-    /// once the tower is a TOWER. The TOWER rung asks for the Wedding Hall and
-    /// the metro instead of the cumulative ladder.
-    pub fn next_star_requirements(&self) -> Value {
+    /// `nextStarRequirements` as typed fields, or `None` once the tower is a
+    /// TOWER. The TOWER rung asks for the Wedding Hall and the metro instead
+    /// of the cumulative ladder.
+    pub fn next_star(&self) -> Option<NextStar> {
         if self.star >= 6 {
-            return Value::Null;
+            return None;
         }
         let star = self.star + 1;
         let is_tower = star == 6;
@@ -85,14 +98,31 @@ impl Simulation {
             self.cumulative_star_gates(star)
         };
         let all_met = pop_met && gates.iter().all(|(_, met)| *met);
+        Some(NextStar {
+            star,
+            is_tower,
+            pop_have,
+            pop_need,
+            pop_met,
+            gates,
+            all_met,
+        })
+    }
+
+    /// `nextStarRequirements`: the checklist toward the next rung, or `null`
+    /// once the tower is a TOWER.
+    pub fn next_star_requirements(&self) -> Value {
+        let Some(n) = self.next_star() else {
+            return Value::Null;
+        };
         json!({
-            "star": star,
-            "isTower": is_tower,
-            "popHave": pop_have,
-            "popNeed": pop_need,
-            "popMet": pop_met,
-            "gates": gates.iter().map(|(id, met)| json!({ "id": id, "met": met })).collect::<Vec<_>>(),
-            "allMet": all_met,
+            "star": n.star,
+            "isTower": n.is_tower,
+            "popHave": n.pop_have,
+            "popNeed": n.pop_need,
+            "popMet": n.pop_met,
+            "gates": n.gates.iter().map(|(id, met)| json!({ "id": id, "met": met })).collect::<Vec<_>>(),
+            "allMet": n.all_met,
         })
     }
 

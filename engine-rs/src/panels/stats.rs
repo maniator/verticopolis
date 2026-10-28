@@ -134,6 +134,14 @@ impl Simulation {
     /// The Modern "Households" readout: the homes in residence, the people in
     /// them, and a histogram of household sizes.
     pub fn households_report(&self) -> Value {
+        let (households, residents, mix) = self.household_mix();
+        let mix: Vec<Value> = mix.iter().map(|(s, n)| json!([s, n])).collect();
+        json!({ "households": households, "residents": residents, "mix": mix })
+    }
+
+    /// The households readout as numbers: homes, residents, and the count of
+    /// homes per household size, smallest first.
+    pub fn household_mix(&self) -> (i64, i64, BTreeMap<i64, i64>) {
         let mut mix: BTreeMap<i64, i64> = BTreeMap::new();
         let (mut households, mut residents) = (0, 0);
         for u in self.tower.room_units() {
@@ -144,8 +152,7 @@ impl Simulation {
                 residents += size;
             }
         }
-        let mix: Vec<Value> = mix.iter().map(|(s, n)| json!([s, n])).collect();
-        json!({ "households": households, "residents": residents, "mix": mix })
+        (households, residents, mix)
     }
 
     /// Everything the stats screen reads beyond `stats()`, in one answer.
