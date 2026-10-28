@@ -36,6 +36,7 @@ import { onUpdateAvailable } from "./game/updateFlow";
 import { bootGame } from "./bootstrap";
 import { gameplaySession } from "./analytics";
 import { adoptToolingSim, followToolingEdit, syncToolingSim, toolingSim } from "./game/toolingSim";
+import { noteTowerSwap } from "./game/engineFault";
 import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
 import { PortEvents } from "./simport/portEvents";
@@ -440,8 +441,9 @@ class GameApp implements GameAppPorts {
     // Facility ids restart in a fresh tower. A stale ✕-latch (or anchor) from the old tower
     // would silently mute the inspector on whichever new facility happens to reuse the id.
     this.inspector.clear();
-    // A live Getting Started session must follow the swap to the new tower.
+    // Getting Started and the engine's trap report follow the swap too.
     this.onboarding.adoptSim(this.enginePort, keepHistory);
+    noteTowerSwap(keepHistory);
     this.shownWin = false;
     this.accMinutes = 0;
     this.lastMealRushDay = { breakfast: -1, lunch: -1, dinner: -1 };

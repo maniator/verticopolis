@@ -8,7 +8,7 @@ import { runFrame, SPEEDS } from "./frameLoop";
 import { applyReducedMotion } from "./audioPrefs";
 import { catalogOf, isUnlocked, quoteShaft } from "./portAccess";
 import { noteFrameError } from "./frameErrors";
-import { noteEngineThrow } from "./engineFault";
+import { engineTrapped, noteEngineThrow } from "./engineFault";
 
 /**
  * Engine wiring and post-context-loss engine rebuild, split out of the `GameApp`
@@ -246,21 +246,30 @@ export function wireEngine(app: GameApp): void {
   // Suppress the browser context menu so right-click is ours to use.
   app.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // Per-frame: advance the sim and (throttled) refresh DOM/audio.
+  // A thrown frame must NEVER escape to Excalibur: its game loop calls
+  // stop() on any uncaught exception, which freezes the whole game dead
+  // (seen at high speed, where far more sim work runs per frame). Contain it
+  // so a transient error skips one frame instead of halting play.
+  const onFrameThrow = (err: unknown): void => {
+    // A trap in the Rust engine stops the game, which logs it
+    // (engineFault.ts), and the scene stops reading the engine: a trap in a
+    // command or a save surfaces here as the next frame's first read. Any
+    // other throw is logged at most once per two seconds per source, to the
+    // console and the crash report's ring buffer, so a per-frame throw can't
+    // spam either (game/frameErrors.ts has the window's rules).
+    if (noteEngineThrow(err) || engineTrapped()) app.engine.halted = true;
+    else noteFrameError(app, err);
+  };
+  // A renderer rebuilt after a trap never reads the engine either.
+  app.engine.halted = engineTrapped();
+  app.engine.onFrameError = onFrameThrow;
+  // Per-frame: advance the sim and (throttled) refresh DOM/audio. Caught here
+  // too, so a throw in the step still lets the scene sync run.
   app.engine.onUpdate = (ms) => {
-    // A thrown frame must NEVER escape to Excalibur: its game loop calls
-    // stop() on any uncaught exception, which freezes the whole game dead
-    // (seen at high speed, where far more sim work runs per frame). Contain it
-    // here so a transient error skips one frame instead of halting play.
     try {
       runFrame(app, ms);
     } catch (err) {
-      // A trap in the Rust engine stops the game, which logs it
-      // (engineFault.ts). Any other throw is logged at most once per two
-      // seconds per source, to the console and the crash report's ring
-      // buffer, so a per-frame throw can't spam either (game/frameErrors.ts
-      // has the window's rules).
-      if (!noteEngineThrow(err)) noteFrameError(app, err);
+      onFrameThrow(err);
     }
   };
 

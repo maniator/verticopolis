@@ -11,38 +11,43 @@ vi.mock("./towerCrowd", () => ({ syncMotion: vi.fn() }));
 // The frame prelude (towerFrame) calls the overlay's event-visual sync directly.
 vi.mock("./towerOverlay", async (orig) => ({ ...(await orig<typeof import("./towerOverlay")>()), syncEventFx: vi.fn() }));
 
+/** A whitebox stand-in for the scene the frame pump runs on. */
+function fakeEngine(updateMotion: () => void, reconcileCrowd: () => void): any {
+  return {
+    sim: {
+      clock: { hour: 12, isNight: () => false, isEvening: () => false },
+      tower: { revision: 7, mealOverlayRevision: 1 },
+      congestion: () => 1,
+      // The tick threads the read-only queue projection onto d.elevatorQueue;
+      // stub the memoized view so this whitebox tick harness has one to read.
+      crowd: { queueView: () => ({ landings: new Map(), boarded: new Map() }) },
+    },
+    d: { lit: false, anim: 0, hour: 12, stress: 0 },
+    craneGfx: null,
+    paused: true,
+    reducedMotion: false,
+    lastAnimWall: 0,
+    animClock: 0,
+    builtRev: 7,
+    mealOverlayRev: 0,
+    litState: false,
+    lastSyncHour: 12,
+    hourSyncPending: false,
+    regionDirty: new Set(),
+    engine: { backgroundColor: null },
+    onUpdate: null,
+    updateMotion,
+    reconcileCrowd,
+  };
+}
+
 describe("TowerEngine meal-overlay repaint trigger", () => {
   it("re-runs syncScene when the transient meal overlay changes mid-hour", () => {
     const updateMotion = vi.fn();
     const reconcileCrowd = vi.fn();
-    const fake: any = {
-      sim: {
-        clock: { hour: 12, isNight: () => false, isEvening: () => false },
-        tower: { revision: 7, mealOverlayRevision: 1 },
-        congestion: () => 1,
-        // The tick threads the read-only queue projection onto d.elevatorQueue;
-        // stub the memoized view so this whitebox tick harness has one to read.
-        crowd: { queueView: () => ({ landings: new Map(), boarded: new Map() }) },
-      },
-      d: { lit: false, anim: 0, hour: 12, stress: 0 },
-      craneGfx: null,
-      paused: true,
-      reducedMotion: false,
-      lastAnimWall: 0,
-      animClock: 0,
-      builtRev: 7,
-      mealOverlayRev: 0,
-      litState: false,
-      lastSyncHour: 12,
-      hourSyncPending: false,
-      regionDirty: new Set(),
-      engine: { backgroundColor: null },
-      onUpdate: null,
-      updateMotion,
-      reconcileCrowd,
-    };
+    const fake = fakeEngine(updateMotion, reconcileCrowd);
 
-    (TowerEngine.prototype as any).tick.call(fake, 16);
+    (TowerEngine.prototype as any).runTick.call(fake, 16);
 
     // Mid-hour overlay bump: same-frame scene sync (never deferred, the sim
     // just moved someone out for a meal), no structural motion/facade rebuild.
@@ -56,5 +61,19 @@ describe("TowerEngine meal-overlay repaint trigger", () => {
     expect(reconcileCrowd).toHaveBeenCalledTimes(1);
     expect(fake.mealOverlayRev).toBe(1);
     expect(fake.hourSyncPending).toBe(false);
+  });
+
+  it("stops the frame at once when the step heard an engine trap", () => {
+    const updateMotion = vi.fn();
+    const reconcileCrowd = vi.fn();
+    const fake = fakeEngine(updateMotion, reconcileCrowd);
+    fake.onUpdate = () => {
+      fake.halted = true;
+    };
+    vi.mocked(syncScene).mockClear();
+    (TowerEngine.prototype as any).runTick.call(fake, 16);
+    expect(syncScene).not.toHaveBeenCalled();
+    expect(updateMotion).not.toHaveBeenCalled();
+    expect(reconcileCrowd).not.toHaveBeenCalled();
   });
 });

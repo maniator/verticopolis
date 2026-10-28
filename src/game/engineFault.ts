@@ -12,12 +12,27 @@ import { isEngineTrap } from "../wasmhost/hostFault";
 
 let onTrap: ((error: unknown) => void) | null = null;
 let trapped = false;
+/** How the running tower reached the engine: the first tower, a later one (a
+ *  load, a new tower, an import) or an undo or redo restore. A trap's
+ *  reliability row names it as its stage. */
+let towerStage: "start" | "adopt" | "undo" = "start";
+
+/** The engine swapped in another tower (`GameApp.followSwap`). */
+export function noteTowerSwap(undo: boolean): void {
+  towerStage = undo ? "undo" : "adopt";
+}
+
+/** How the running tower reached the engine (see `towerStage`). */
+export function runningTowerStage(): "start" | "adopt" | "undo" {
+  return towerStage;
+}
 
 /** Hear the running engine's first trap (boot installs it on the Rust
  *  engine; null stops listening). */
 export function watchEngineTraps(handler: ((error: unknown) => void) | null): void {
   onTrap = handler;
   trapped = false;
+  towerStage = "start";
 }
 
 /** The running engine trapped, so nothing may call it again. */

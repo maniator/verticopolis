@@ -114,6 +114,20 @@ describe("bootGame engine", () => {
     expect(bootState()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "load", reason: "boot-error", message: "404 engine/verticopolis_engine.js" } });
   });
 
+  it("says why the game did not start when the stored tower cannot be read", async () => {
+    document.body.innerHTML = '<div id="stage"></div>';
+    stubWebGL();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const blocked = new DOMException("The operation is insecure.", "SecurityError");
+    vi.mocked(tsBootTower).mockImplementationOnce(() => {
+      throw blocked;
+    });
+    const create = vi.fn((_tower: unknown) => ({ onUpdateAvailable: vi.fn() }));
+    await expect(bootGame(create)).rejects.toBe(blocked);
+    expect(create).not.toHaveBeenCalled();
+    expect(document.getElementById("boot-fallback-host")!.textContent).toContain("Something went wrong starting the game: The operation is insecure.");
+  });
+
   it("hands the app the Rust engine's tower and publishes the engine before the app exists", async () => {
     requestWasm();
     let seen: unknown;
@@ -313,6 +327,29 @@ describe("bootGame engine_status", () => {
     wasmStub.startError = new EngineBootError("package-mismatch", secret);
     expect(await settled()).toMatchObject({ engine: "ts-fallback", fallback_reason: "package-mismatch", fallback_stage: "start" });
     expect(JSON.stringify(vi.mocked(sendToRelay).mock.calls)).not.toMatch(/Secret|player|vctower/);
+  });
+
+  it("counts a running engine's trap at its tower's stage, and then takes an update at once", async () => {
+    stubWebGL();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    wasmStub.requested = "wasm";
+    wasmStub.module = { Engine: class {} };
+    let onUpdate: ((activate: () => Promise<void>, info?: unknown) => void) | undefined;
+    vi.spyOn(pwa, "registerPWA").mockImplementation((opts) => {
+      onUpdate = opts.onUpdateAvailable as typeof onUpdate;
+    });
+    const prompt = vi.fn();
+    document.body.innerHTML = '<div id="stage"></div>';
+    await boot({ onUpdateAvailable: prompt, setSpeed: vi.fn() });
+    const activate = vi.fn(() => Promise.resolve());
+    onUpdate!(activate);
+    expect(prompt).toHaveBeenCalledOnce();
+    expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
+    // A switchable build's row reads ts-fallback until PR 6 makes it so (#1422).
+    expect(lastRow(engineRows())).toMatchObject({ trigger: "fallback", engine: "ts-fallback", fallback_reason: "trap-tick", fallback_stage: "start", fallbacks: 1 });
+    onUpdate!(activate);
+    expect(activate).toHaveBeenCalledOnce();
+    expect(prompt).toHaveBeenCalledOnce();
   });
 
   it("keeps the row when a boot step after the engine throws, and sends none when the game never existed", async () => {

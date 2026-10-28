@@ -20,11 +20,14 @@ class FakeWorker {
   reply(r: WorkerReply): void { this.onmessage?.({ data: r } as MessageEvent<WorkerReply>); }
 }
 
-function app(): DualRunApp & { adopted: Simulation[] } {
+/** The app as the run sees it: a harness's `adoptSim` and the engine's own
+ *  swaps (a load, an undo) both end in `followSwap`, as on `GameApp`. */
+function app(): DualRunApp & { adopted: Simulation[]; adoptSim(sim: Simulation): void } {
   const a = {
     sim: Simulation.newGame(1, "classic"),
     adopted: [] as Simulation[],
-    adoptSim(sim: Simulation) { this.sim = sim; this.adopted.push(sim); },
+    followSwap() { this.adopted.push(this.sim); },
+    adoptSim(sim: Simulation) { this.sim = sim; this.followSwap(); },
   };
   return a;
 }
@@ -89,6 +92,20 @@ describe("startDualRun", () => {
     run.stop();
   });
 
+  it("follows a tower the engine swapped in itself, such as a load or an undo", () => {
+    const a = app();
+    const w = new FakeWorker();
+    const run = startDualRun(a, () => w as unknown as Worker, quiet);
+    const loaded = Simulation.newGame(3, "classic");
+    a.sim = loaded;
+    a.followSwap(true);
+    expect(a.adopted).toEqual([loaded]);
+    expect(w.sent[w.sent.length - 1]).toMatchObject({ op: "load", gen: 2 });
+    loaded.money = 5;
+    expect(w.sent[w.sent.length - 1]).toEqual({ op: "setMoney", amount: 5 });
+    run.stop();
+  });
+
   it("reports a tower it cannot shadow and leaves the app's adopt intact", () => {
     const a = app();
     const w = new FakeWorker();
@@ -104,9 +121,9 @@ describe("startDualRun", () => {
     run.stop();
   });
 
-  it("collects worker errors and, on stop, detaches, restores adoptSim and terminates", () => {
+  it("collects worker errors and, on stop, detaches, restores followSwap and terminates", () => {
     const a = app();
-    const ownAdopt = Object.getOwnPropertyDescriptor(a, "adoptSim");
+    const ownFollow = Object.getOwnPropertyDescriptor(a, "followSwap");
     const w = new FakeWorker();
     const run = startDualRun(a, () => w as unknown as Worker, quiet);
     w.reply({ type: "error", message: "could not load" });
@@ -118,7 +135,7 @@ describe("startDualRun", () => {
     expect((globalThis as { __vcDualRun?: unknown }).__vcDualRun).toBe(run);
     run.stop();
     expect(w.terminated).toBe(true);
-    expect(Object.getOwnPropertyDescriptor(a, "adoptSim")).toEqual(ownAdopt);
+    expect(Object.getOwnPropertyDescriptor(a, "followSwap")).toEqual(ownFollow);
     expect((globalThis as { __vcDualRun?: unknown }).__vcDualRun).toBeUndefined();
     const sent = w.sent.length;
     a.sim.money = 9;

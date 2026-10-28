@@ -20,7 +20,7 @@ import { enginePackageUrl } from "../wasmhost/rustEngine";
 export interface DualRunStatus {
   /** Hours compared so far on the current tower. */
   hours: number;
-  /** Towers the run has followed (every adoptSim restarts the shadow). */
+  /** Towers the run has followed (every swap the app follows restarts the shadow). */
   starts: number;
   /** The first divergence seen on the current tower, if any. */
   divergence: { label: string; view: string; path: string; live: string; shadow: string } | null;
@@ -31,7 +31,9 @@ export interface DualRunStatus {
 
 export interface DualRunApp {
   sim: Simulation;
-  adoptSim(sim: Simulation, preserveHistory?: boolean): void;
+  /** The app following a tower the engine swapped in: a load, a new tower,
+   *  an import, an undo or redo, or a harness's own tower. */
+  followSwap(keepHistory?: boolean): void;
 }
 
 export function dualRunRequested(location: { search: string } = window.location, storage: { getItem(k: string): string | null } | null = safeStorage()): boolean {
@@ -57,7 +59,8 @@ export interface DualRunHandle {
 }
 
 /** Start the dual run on an app: shadow the current tower, follow every
- *  later `adoptSim`, and report through the console and the status. */
+ *  later swap the app follows (`followSwap`), and report through the console
+ *  and the status. */
 export function startDualRun(app: DualRunApp, makeWorker: () => Worker = defaultWorker, log: Pick<Console, "info" | "error" | "warn"> = console): DualRunHandle {
   const status: DualRunStatus = { hours: 0, starts: 0, divergence: null, errors: [], lastLabel: null };
   const worker = makeWorker();
@@ -114,13 +117,13 @@ export function startDualRun(app: DualRunApp, makeWorker: () => Worker = default
   };
   tryFollow(app.sim);
 
-  const adopt = app.adoptSim;
-  const ownAdopt = Object.getOwnPropertyDescriptor(app, "adoptSim");
-  const wrappedAdopt = function (this: DualRunApp, sim: Simulation, preserveHistory?: boolean): void {
-    adopt.call(this, sim, preserveHistory);
-    tryFollow(sim);
+  const followSwap = app.followSwap;
+  const ownFollow = Object.getOwnPropertyDescriptor(app, "followSwap");
+  const wrappedFollow = function (this: DualRunApp, keepHistory?: boolean): void {
+    followSwap.call(this, keepHistory);
+    tryFollow(this.sim);
   };
-  Object.defineProperty(app, "adoptSim", { value: wrappedAdopt, configurable: true, writable: true });
+  Object.defineProperty(app, "followSwap", { value: wrappedFollow, configurable: true, writable: true });
 
   const handle: DualRunHandle = {
     status,
@@ -128,8 +131,8 @@ export function startDualRun(app: DualRunApp, makeWorker: () => Worker = default
       detach?.();
       detach = null;
       // Put back what was there: the app's own property, or the prototype's.
-      if (ownAdopt) Object.defineProperty(app, "adoptSim", ownAdopt);
-      else delete (app as Partial<DualRunApp>).adoptSim;
+      if (ownFollow) Object.defineProperty(app, "followSwap", ownFollow);
+      else delete (app as Partial<DualRunApp>).followSwap;
       worker.terminate();
       const g = globalThis as unknown as { __vcDualRun?: DualRunHandle };
       if (g.__vcDualRun === handle) delete g.__vcDualRun;

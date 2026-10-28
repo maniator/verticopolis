@@ -10,8 +10,8 @@ import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rus
 import { tsBootTower, type BootTower } from "./game/bootTower";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "./analyticsEngineStatus";
-import { watchEngineTraps } from "./game/engineFault";
-import { ENGINE_FAILURE_ID } from "./game/interactionState";
+import { runningTowerStage, watchEngineTraps } from "./game/engineFault";
+import { ENGINE_FAILURE_ID, isEngineStopped } from "./game/interactionState";
 import { showEngineLoading } from "./engineLoading";
 import { bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState } from "./wasmhost/engineBoot";
 import { copyEngineDiagnostics } from "./engineDiagnosticsCopy";
@@ -289,20 +289,22 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       }
       publishBootState(bootState);
     }
-    // A wasm-only build has no TypeScript engine to fall back to.
-    if (!tower) tower = __WASM_ONLY__ ? stopEngineless() : tsBootTower();
-    const onRust = !!wasmModule && bootState.engine === "wasm";
-    const rust = onRust ? publishRustEngine(tower.port) : null;
-    // Start the gameplay session clock (foreground time + funnel state) only
-    // once the game can run: a no-WebGL visitor bails above, and so does a
-    // wasm-only build with no engine. Host-gated inside, like the page-view
-    // inject above.
-    startGameplaySession();
     // Whether the game exists: a boot that throws before it does sends no
     // row, even when its engine had already failed to load (the error itself
     // reaches `$exception`, and the reliability report names the gap).
     let created = false;
     try {
+      // Inside the boot's error boundary: reading the stored tower can throw
+      // (blocked storage), and the player then sees why the game did not start.
+      // A wasm-only build has no TypeScript engine to fall back to.
+      if (!tower) tower = __WASM_ONLY__ ? stopEngineless() : tsBootTower();
+      const onRust = !!wasmModule && bootState.engine === "wasm";
+      const rust = onRust ? publishRustEngine(tower.port) : null;
+      // Start the gameplay session clock (foreground time + funnel state) only
+      // once the game can run: a no-WebGL visitor bails above, and so does a
+      // wasm-only build with no engine. Host-gated inside, like the page-view
+      // inject above.
+      startGameplaySession();
       const app = create(tower);
       created = true;
       // Saves are written through the engine too (same bytes, #935).
@@ -327,9 +329,10 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
           setEngineWriter(null);
           rustFailed("host", "trap-tick");
           publishBootState(bootState);
-          // A wasm-only build reports the stop as its engine going to none; a
-          // switchable one sends no fallback row, since it runs no fallback.
-          if (__WASM_ONLY__) noteEngineFallback({ reason: "trap-tick", stage: "start" });
+          // Both builds count the trap in the reliability rows, as the stage
+          // its tower was hosted at. A switchable build's row reads
+          // ts-fallback until PR 6 makes that so again (owner, 2026-10-28).
+          noteEngineFallback({ reason: "trap-tick", stage: runningTowerStage() });
           showEngineFailure(bootState);
           app.setSpeed?.(0);
         });
@@ -367,7 +370,10 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // Register the service worker so the game is installable and offline-ready.
       // On a new build: prompt the player (never force a reload), see
       // GameApp.onUpdateAvailable.
-      registerPWA({ onUpdateAvailable: (activate, info) => app.onUpdateAvailable(activate, info) });
+      // A game stopped on its engine takes an update at once instead: the
+      // prompt would sit under the engine-failure message, and a fixed deploy
+      // is the way out.
+      registerPWA({ onUpdateAvailable: (activate, info) => (isEngineStopped() ? void activate() : app.onUpdateAvailable(activate, info)) });
     } catch (err) {
       // A non-Error throw (a string, say) has no `.message`, so derive the text
       // defensively rather than render "undefined"; the original error is still

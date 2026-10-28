@@ -5,6 +5,7 @@ import { wireEngine } from "./engineWiring";
 import { portDeps } from "./portDeps.fixture";
 import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors } from "./buildPreview";
 import { runFrame } from "./frameLoop";
+import { noteEngineThrow, watchEngineTraps } from "./engineFault";
 
 /**
  * Headless unit tests for wireEngine. The sibling helpers it delegates to
@@ -49,6 +50,8 @@ interface FakeEngine {
   onExtendTo?: (end: unknown, target: unknown) => void;
   onExtendEnd?: () => void;
   onUpdate?: (ms: number) => void;
+  onFrameError?: (err: unknown) => void;
+  halted?: boolean;
   onContextLost?: () => void;
   preview?: unknown;
   transportPreview?: unknown;
@@ -127,6 +130,7 @@ describe("wireEngine installs all engine callbacks", () => {
       "onExtendTo",
       "onExtendEnd",
       "onUpdate",
+      "onFrameError",
       "onContextLost",
     ] as const) {
       expect(typeof app.engine[hook]).toBe("function");
@@ -328,6 +332,48 @@ describe("onUpdate", () => {
     expect(app.frameErrors).toHaveLength(1);
     expect(app.frameErrors[0].message).toContain("boom");
     consoleSpy.mockRestore();
+  });
+});
+
+describe("a throw from the scene's own reads", () => {
+  afterEach(() => watchEngineTraps(null));
+
+  it("is recorded as a frame error and the scene keeps running", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const app = makeApp();
+    wireEngine(app);
+    app.engine.onFrameError!(new Error("a bad read"));
+    expect(app.frameErrors).toHaveLength(1);
+    expect(app.engine.halted).toBe(false);
+    consoleSpy.mockRestore();
+  });
+
+  it("stops the scene reading an engine that trapped, wherever the trap began", () => {
+    const onTrap = vi.fn();
+    watchEngineTraps(onTrap);
+    const app = makeApp();
+    wireEngine(app);
+    // A command trapped outside the frame; the scene's next read is the first to hear it.
+    app.engine.onFrameError!(new WebAssembly.RuntimeError("unreachable"));
+    expect(onTrap).toHaveBeenCalledOnce();
+    expect(app.engine.halted).toBe(true);
+    // A renderer rebuilt after it starts halted too.
+    const rebuilt = makeApp();
+    wireEngine(rebuilt);
+    expect(rebuilt.engine.halted).toBe(true);
+    expect(rebuilt.frameErrors).toHaveLength(0);
+  });
+
+  it("halts the scene on a trap the step hears first", () => {
+    watchEngineTraps(vi.fn());
+    mockRunFrame.mockImplementation(() => {
+      throw new WebAssembly.RuntimeError("unreachable");
+    });
+    const app = makeApp();
+    wireEngine(app);
+    app.engine.onUpdate!(16);
+    expect(app.engine.halted).toBe(true);
+    expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(false);
   });
 });
 
