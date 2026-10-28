@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { drawRuns, noteRustFailed, safetyRuns, selectBootEngine, stageNotice, TOOLING_STAGE_KEY } from "./boot";
+import { CRASH_HOLD_NOTICE, drawRuns, noteRustCrashed, noteRustFailed, safetyRuns, selectBootEngine, stageNotice, TOOLING_STAGE_KEY } from "./boot";
+import { countRustCrash } from "./crashReload";
 import { setCurrentSelection } from "./current";
 import { BOOT_MARKER_KEY, COHORT_KEY, readSafety, SAFETY_KEY } from "./records";
 import { ENGINE_STORAGE_KEY } from "../wasmhost/engineChoice";
 
 // The suites below test the Rust paths the Settings choice and the cohort
-// reach once PR 6 brings back the fallback (#1422); the hold that keeps them on
-// TypeScript until then is tested on its own.
+// reach once the test link no longer holds them (#1422); the hold that keeps
+// them on TypeScript until then is tested on its own.
 const flags = vi.hoisted(() => ({ rustOnlyByUrl: false }));
 vi.mock("./config", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./config")>()),
@@ -15,7 +16,10 @@ vi.mock("./config", async (importOriginal) => ({
   },
 }));
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
+});
 
 describe("the boot while only the URL boots Rust", () => {
   afterEach(() => {
@@ -142,5 +146,36 @@ describe("the stage-change notice", () => {
     localStorage.setItem(TOOLING_STAGE_KEY, JSON.stringify({ stage: 1 }));
     selectBootEngine("");
     expect(stageNotice()).toContain("TypeScript engine again");
+  });
+});
+
+describe("a crash reload (#1422)", () => {
+  it("leaves Rust without a latch, so the reload boots Rust again", () => {
+    atStage(1, 3);
+    expect(selectBootEngine("")).toBe("wasm");
+    countRustCrash(sessionStorage, __APP_SHA__);
+    noteRustCrashed();
+    expect(localStorage.getItem(BOOT_MARKER_KEY)).toBeNull();
+    expect(localStorage.getItem(SAFETY_KEY)).toBeNull();
+    expect(selectBootEngine("")).toBe("wasm");
+    expect(stageNotice()).toBeNull();
+  });
+
+  it("holds the tab on TypeScript after its second crash, a test link included, and says why", () => {
+    atStage(1, 3);
+    countRustCrash(sessionStorage, __APP_SHA__);
+    countRustCrash(sessionStorage, __APP_SHA__);
+    expect(selectBootEngine("")).toBe("ts");
+    // The held boot added no marker entry that could go stale.
+    expect(localStorage.getItem(BOOT_MARKER_KEY)).toBeNull();
+    expect(stageNotice()).toBe(CRASH_HOLD_NOTICE);
+    expect(selectBootEngine("?engine=wasm")).toBe("ts");
+  });
+
+  it("latches the second crash as a trap loop on an ordinary boot", () => {
+    atStage(1, 3);
+    selectBootEngine("");
+    noteRustFailed("crash-loop", "trap-loop");
+    expect(readSafety(localStorage)).toMatchObject({ ok: true, value: { scope: "fault", stage: "crash-loop", reason: "trap-loop" } });
   });
 });

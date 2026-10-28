@@ -5,7 +5,8 @@ import { startGameplaySession, trackAppActionOnce } from "./analytics";
 import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
-import { noteRustFailed, selectBootEngine, stageNotice } from "./engineCohort/boot";
+import { noteRustCrashed, noteRustFailed, selectBootEngine, stageNotice } from "./engineCohort/boot";
+import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, reloadSoon, tabStore } from "./engineCohort/crashReload";
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rustEngine";
 import { tsBootTower, type BootTower } from "./game/bootTower";
 import { setEngineWriter } from "./storage/vctowerWriter";
@@ -119,12 +120,9 @@ let inertWatch: MutationObserver | null = null;
  *  every other boot-fallback message. */
 export function showEngineFailure(state: EngineBootState, online = typeof navigator === "undefined" || navigator.onLine !== false): void {
   if (!state.failure) return;
-  // An open modal dialog sits in the top layer above any z-index and makes
-  // the rest of the page inert, the Reload button included, so close it.
-  for (const dialog of Array.from(document.querySelectorAll("dialog[open]"))) (dialog as HTMLDialogElement).close();
   const offerRepair = repairOffered(state.failure, pageControlled());
   const copy = engineFailureCopy(state.failure, online, { secure: typeof window === "undefined" || window.isSecureContext !== false, repair: offerRepair });
-  showBootMessage(
+  stopGame(
     html`<div id=${ENGINE_FAILURE_ID} data-stage=${state.failure.stage} role="alert" aria-live="assertive">
       <p><b>${copy.headline}</b></p>
       <p style="opacity:.8">Reason: ${copy.reason}</p>
@@ -142,6 +140,27 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
     </div>`,
     true,
   );
+}
+
+/** The running Rust engine crashed and the page reloads in a moment (#1422):
+ *  the game stops behind the line as it does behind the failure message, so
+ *  nothing calls the trapped engine while the line is read. */
+export function showCrashReload(line: string): void {
+  stopGame(
+    html`<div id=${ENGINE_FAILURE_ID} data-stage="reload" role="alert" aria-live="assertive">
+      <p><b>${line}</b></p>
+    </div>`,
+    false,
+  );
+}
+
+/** Stop the game behind `message` (it carries `ENGINE_FAILURE_ID`, which
+ *  `isEngineStopped` reads, so no key, autosave or dialog reaches the engine). */
+function stopGame(message: TemplateResult, withReload: boolean): void {
+  // An open modal dialog sits in the top layer above any z-index and makes
+  // the rest of the page inert, the Reload button included, so close it.
+  for (const dialog of Array.from(document.querySelectorAll("dialog[open]"))) (dialog as HTMLDialogElement).close();
+  showBootMessage(message, withReload);
   // Everything behind the message goes inert, so a button that kept focus
   // cannot be pressed with Enter or Space and the title screen's keys do
   // nothing: the message and its Reload button are all that is left.
@@ -318,9 +337,11 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
           noteEngineWriterLatched();
         });
       }
-      // A trap in the running engine (#874) stops the game on both builds
-      // until PR 6 brings back the fallback to TypeScript: the module may be
-      // corrupt, so nothing calls it again, and the saves stay as last written.
+      // A trap in the running engine (#874) never hands the tower to the
+      // TypeScript engine mid-game (#1422): the module may be corrupt, so
+      // nothing calls it again, the saves stay as last written, and the page
+      // reloads onto the last autosave. This tab's second crash on a build
+      // reloads onto TypeScript, and a wasm-only build stops there instead.
       if (rust) {
         watchEngineTraps((e) => {
           const message = `the Rust engine failed during a tick: ${e instanceof Error ? e.message : String(e)}`;
@@ -330,14 +351,21 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
           // Nothing runs the tower now, on either build.
           bootState = { ...failBoot(bootState, "host", "trap-tick", message), engine: "none" };
           setEngineWriter(null);
-          rustFailed("host", "trap-tick");
+          const outcome = crashOutcome(countRustCrash(tabStore(), __APP_SHA__), __WASM_ONLY__);
+          if (outcome === "reload") noteRustCrashed();
+          else if (outcome === "reload-on-ts") rustFailed("crash-loop", "trap-loop");
+          else rustFailed("host", "trap-tick");
           publishBootState(bootState);
           // Both builds count the trap in the reliability rows, as the stage
-          // its tower was hosted at. A switchable build's row reads
-          // ts-fallback until PR 6 makes that so again (owner, 2026-10-28).
+          // its tower was hosted at. The row goes out by beacon, so it
+          // survives the reload.
           noteEngineFallback({ reason: "trap-tick", stage: runningTowerStage() });
-          showEngineFailure(bootState);
           app.setSpeed?.(0);
+          if (outcome === "stop") showEngineFailure(bootState);
+          else {
+            showCrashReload(CRASH_RELOAD_LINE[outcome]);
+            reloadSoon();
+          }
         });
       }
       // The engine is settled. Sent before the tooling and service-worker
