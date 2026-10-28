@@ -296,6 +296,7 @@ export class Engine {
     quoteRentBatch(kind: number, target: number, only_default: boolean): Float64Array;
     quoteShaft(kind: number, x: number, bottom: number, top: number): Float64Array;
     recyclingFill(): number;
+    recyclingCapacity(): number;
     /**
      * `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
      * The id is read raw, as for `addCar` (#923).

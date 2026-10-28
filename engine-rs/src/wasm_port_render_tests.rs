@@ -179,6 +179,26 @@ fn the_fills_and_the_parking_set_read_the_simulation() {
     let mut e = built();
     assert_eq!(e.port_congestion().to_bits(), e.sim.congestion().to_bits());
     assert_eq!(e.port_recycling_fill(), e.sim.recycling_fill());
+    assert_eq!(e.port_recycling_capacity(), 0.0);
+    for floor in [0, -1] {
+        for x in 150..230 {
+            assert!(e.sim.tower.place(Kind::Floor, floor, x).ok);
+        }
+    }
+    let center = e.sim.tower.place(Kind::Recycling, -1, 160);
+    assert!(center.ok);
+    assert_eq!(e.port_recycling_capacity(), 2500.0);
+    assert_eq!(e.port_recycling_capacity(), e.sim.recycling_capacity());
+    e.sim
+        .tower
+        .get_unit_mut(center.unit_id.unwrap())
+        .unwrap()
+        .state = UnitState::Fire;
+    assert_eq!(
+        e.port_recycling_capacity(),
+        0.0,
+        "a burning center processes nothing"
+    );
     assert_eq!(e.port_parking_set(), vec![0.0]);
     for spots in [0.0, -1.0, f64::NAN, f64::INFINITY] {
         assert_eq!(e.port_parking_usage(spots), 0.0, "{spots}");

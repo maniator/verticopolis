@@ -3,7 +3,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { Catalog } from "../engine/catalogTypes";
 import type { ElevatorSchedule } from "../engine/elevatorSchedule";
 import type { BatchRentOptions, BatchRentResult, BatchTarget } from "../engine/sim/constants";
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind, UnitState } from "../engine/types";
 import { catalogOf } from "./portAccess";
 import { Cards } from "../simport/cards";
 import { PortCodes } from "../simport/portCodes";
@@ -11,14 +11,16 @@ import { scheduleFromSlots } from "../simport/scheduleSlots";
 import type { EnginePort } from "../simport/enginePort";
 import type { ViewReader } from "../simport/viewReader";
 import { facilityDiagnostics, transportDiagnostics } from "./facilityDiagnostics";
+import { recyclingLinesOf } from "./recyclingDiagnostics";
 
 /**
  * What the facility editor and the inspector cards read: the decoded cards,
  * a shaft's schedule (`shaftSchedule`) and the batch dialog's dry run
  * (`quoteRentBatch`) through the port, the catalog of the engine the game
  * holds (`catalogOf`), and the cards' gripe lines (`facilityDiagnostics`),
- * which read the TypeScript engine's tower and so are empty on the Rust
- * engine until the port carries them (#1420).
+ * which read the TypeScript engine's tower. The Rust engine's cards carry the
+ * recycling lines off the port; the other lines are empty there until the port
+ * carries them (#1420).
  */
 export interface CardKit {
   readonly cards: Cards;
@@ -51,22 +53,36 @@ export const BATCH_COUNTERS = [
   "clampedHigh",
 ] as const satisfies readonly (keyof BatchRentResult)[];
 
+/** The states a room does no work in: `isOperational`'s complement (a runtime
+ *  import of the engine is off limits to this file; a test pins the two). */
+export const INERT_STATES: ReadonlySet<UnitState> = new Set<UnitState>(["construction", "fire", "gutted"]);
+
 export function createCardKit(app: { readonly enginePort: EnginePort; readonly reader: ViewReader }): CardKit {
   const port = app.enginePort;
   const codes = new PortCodes(port);
   // The gripe lines read the TypeScript engine's own tower, never the
   // tooling's copy of the Rust engine's (`game.sim`), which a read would
-  // rebuild from a save; the Rust engine shows none until the port carries
-  // them (#1420).
+  // rebuild from a save; the Rust engine shows only the lines the port carries
+  // (#1420).
   const tsTower = (): Simulation | undefined => (app.enginePort as { readonly sim?: Simulation }).sim;
+  const cards = new Cards(app.enginePort, app.reader);
+  /** A recycling center's lines from the port: the card's kind and state, the
+   *  population from the header, the capacity and the bin fill. Read when the
+   *  card opens, not per frame. */
+  const portUnitLines = (id: number): TemplateResult[] => {
+    const u = cards.unit(id);
+    if (u?.kind !== "recycling" || INERT_STATES.has(u.state)) return [];
+    return recyclingLinesOf(app.reader.header.population, port.recyclingCapacity(), port.recyclingFill());
+  };
   return {
-    cards: new Cards(app.enginePort, app.reader),
+    cards,
     catalog: () => catalogOf(app),
     diagnostics: {
       unit: (id) => {
         const sim = tsTower();
-        const u = sim?.tower.getUnit(id);
-        return sim && u ? facilityDiagnostics(sim, u) : [];
+        if (!sim) return portUnitLines(id);
+        const u = sim.tower.getUnit(id);
+        return u ? facilityDiagnostics(sim, u) : [];
       },
       transport: (id) => {
         const sim = tsTower();
