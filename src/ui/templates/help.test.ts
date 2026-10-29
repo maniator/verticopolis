@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { helpTemplate } from "./help";
-import { helpPrivacyBody } from "./helpContent";
+import { HELP_SECTIONS, helpPrivacyBody } from "./helpContent";
 import { renderToFragment, click } from "../testing/litTestUtils";
 import { MODERN_RULES } from "../../engine/ruleSets";
 import type { GameRules } from "../../engine/gameRules";
@@ -85,6 +85,12 @@ describe("helpTemplate structure and a11y", () => {
     const text = (renderToFragment(helpPrivacyBody()).textContent ?? "").replace(/\s+/g, " ");
     expect(text).toContain("It never sends the test group's number, and none of it identifies you.");
     expect(text).toContain("whether you started playing, and a short code if the engine stopped.");
+  });
+
+  it("says Automatic follows the engine test and an engine change waits for a restart", () => {
+    const text = HELP_SECTIONS.map((s) => renderToFragment(s.body()).textContent ?? "").join(" ").replace(/\s+/g, " ");
+    expect(text).toContain("leave it on Automatic, which follows any engine test you are part of.");
+    expect(text).toContain("A change takes effect the next time the game starts.");
   });
 
   // Drift guard. Every member of the GameRules seam is mapped either to a DISTINCT
