@@ -280,18 +280,21 @@ floors, and per-floor destination counts). So one built shaft's record stride is
 - **standard and service** (`type` 1 and 2): one entry per SPANNED floor,
   `topFloor - bottomFloor + 1`, **every floor the shaft passes, stop or not**
   (see the 2026-07-13 correction below).
-- **express** (`type` 0): one entry per **SERVICED** floor, the count of set
-  bytes in the header's 120-byte stop bitmap **within the shaft's own span**, in
-  files the 1994 game wrote (see the 2026-08-04 measurement below). The in-span
-  qualifier is the SAFE reading of a measured hazard: game re-saves carry stray
-  set bits OUTSIDE a shaft's span (a standard shaft at floors 54..69 carried 2,
-  seen 2026-08-04), and counting a stray would size an express record a full
-  entry long, so a reader clamps the count to the span. Whether the game itself
-  counts strays is unmeasured (the only express measured so far has none). Our
-  own exporter still spans this kind, which the game accepts on load (it loses
-  only what FOLLOWS the oversized record, which is why the exporter orders
-  express last); the importer tells our files from the game's by the trailer
-  (§12a).
+- **express** (`type` 0): one entry per **ELIGIBLE** floor, measured on the
+  nine 1997 saves in `conformance/fixtures/tdt-reddit/` (2026-10-29, #1497).
+  With `f` the floor in our numbering (the file's index minus 9), a shaft has an
+  entry for each `f` from its bottom to its top where `f <= 1` or `f` is a
+  multiple of 15 (the ground, the basements, the first floor and the sky
+  lobbies). All 21 express shafts in those files, from 4 to 16 entries, size
+  exactly this way, and reading a file with this rule walks the whole table
+  straight through where the SERVICED-stops rule below needed a search for the
+  later headers on three of them. The serviced bitmap does not size the record.
+  Earlier notes in this section found that an express record is not sized by
+  its span and that a count of serviced floors fits the one tower measured;
+  that count is the same number only when the stops are exactly the eligible
+  floors. Our exporter writes this size from generation 2 of the trailer (§12a);
+  generation 1 sized express by span, which the game reads as the wrong length
+  and loses what follows (the second express among them).
 
 The distinction is invisible on standard and service shafts, which stop at every
 floor they pass, and that is why it went unnoticed: an express is the one kind
@@ -600,8 +603,9 @@ Everything above describes the original's format. This section describes bytes
 
 A `.TDT` Verticopolis writes ends with a small trailer: the ASCII magic
 `VCTDT`, then a **u16 generation** (little-endian, like every other word here).
-Generation `1` is the spanned-floor elevator payload (§8), which our writer uses
-for every kind, express included. An UNSTAMPED file gets no such statement and
+Generation `1` is the spanned-floor elevator payload (§8), which our writer used
+for every kind, express included. Generation `2` is the current one: express
+shafts are sized by their eligible floors, as the game does. An UNSTAMPED file gets no such statement and
 is decided by the structural reasoning described under "Reading it" below: it
 may be a save the 1994 game wrote, or one of ours from before the trailer
 existed, and those two want different rules.

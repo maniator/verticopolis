@@ -8,18 +8,18 @@ use std::path::PathBuf;
 
 use verticopolis_engine::tdt::import_tdt;
 
-/// (file, elevator shafts, walkway flights, whether the shafts were found by
-/// shape because the elevator table is sized by a rule no layout has).
-const SAVES: [(&str, usize, usize, bool); 9] = [
-    ("TOWER1.TDT", 15, 1, false),
-    ("TOWER2.TDT", 24, 31, true),
-    ("TOWER3.TDT", 11, 29, false),
-    ("TOWER4.TDT", 18, 29, false),
-    ("TOWER5.TDT", 7, 7, false),
-    ("TOWER6.TDT", 23, 64, true),
-    ("TOWER7.TDT", 24, 64, false),
-    ("TOWER8.TDT", 0, 0, false),
-    ("MYTOWER.TDT", 24, 37, true),
+/// (file, elevator shafts, walkway flights). Every file reads straight
+/// through its elevator table, express shafts included.
+const SAVES: [(&str, usize, usize); 9] = [
+    ("TOWER1.TDT", 15, 1),
+    ("TOWER2.TDT", 24, 31),
+    ("TOWER3.TDT", 11, 29),
+    ("TOWER4.TDT", 18, 29),
+    ("TOWER5.TDT", 7, 7),
+    ("TOWER6.TDT", 23, 64),
+    ("TOWER7.TDT", 24, 64),
+    ("TOWER8.TDT", 0, 0),
+    ("MYTOWER.TDT", 24, 37),
 ];
 
 #[test]
@@ -29,7 +29,7 @@ fn the_real_1997_saves_bring_over_their_own_elevators_and_stairways() {
         .join("conformance")
         .join("fixtures")
         .join("tdt-reddit");
-    for (name, shafts, flights, searched) in SAVES {
+    for (name, shafts, flights) in SAVES {
         let bytes = std::fs::read(dir.join(name)).expect("fixture");
         let (json, warnings) = import_tdt(&bytes, name).expect("imports");
         let save: serde_json::Value = serde_json::from_str(&json).expect("save json");
@@ -40,10 +40,12 @@ fn the_real_1997_saves_bring_over_their_own_elevators_and_stairways() {
             .count();
         assert_eq!(transports.len() - walkways, shafts, "{name} shafts");
         assert_eq!(walkways, flights, "{name} flights");
-        let searched_note = warnings
-            .iter()
-            .any(|w| w.contains("found by searching the file"));
-        assert_eq!(searched_note, searched, "{name} warnings: {warnings:?}");
+        assert!(
+            warnings
+                .iter()
+                .all(|w| !w.contains("found by searching the file")),
+            "{name} warnings: {warnings:?}"
+        );
         assert!(
             warnings
                 .iter()

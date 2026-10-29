@@ -59,7 +59,11 @@ pub const TDT_STAIR_RECORD_SIZE: usize = 10;
 pub const TDT_ROUTING_TAIL_SIZE: usize = 0x6400;
 /// Our trailer: the ASCII magic then a u16 generation, at the very end.
 pub const TDT_STAMP_MAGIC: &str = "VCTDT";
-pub const TDT_STAMP_GENERATION: i64 = 1;
+pub const TDT_STAMP_GENERATION: i64 = 2;
+
+/// The first generation of our trailer. Its express payloads were sized by
+/// the floors the shaft spans, which SimTower reads as the wrong length.
+pub const TDT_STAMP_SPANNED_GENERATION: i64 = 1;
 pub const TDT_STAMP_SIZE: usize = TDT_STAMP_MAGIC.len() + 2;
 /// Sanity bounds for recognizing a stair record while scanning for the table.
 pub const TDT_MAX_TILE: i64 = 800;
@@ -106,6 +110,26 @@ pub fn built_shaft_payload_size_for(
         return Ok(spanned);
     }
     built_shaft_payload_size(1, serviced_count.max(1))
+}
+
+/// The floors an express shaft carries a payload entry for: the ones from
+/// `bottom_floor` to `top_floor` (file numbering) that are at or below the
+/// first floor, or a multiple of 15 (the sky lobbies). All eight express
+/// shafts in the nine original saves size to this count.
+pub fn express_eligible_floors(bottom_floor: i64, top_floor: i64) -> i64 {
+    (bottom_floor..=top_floor)
+        .filter(|raw| {
+            let floor = raw - TDT_FLOOR_OFFSET;
+            floor <= 1 || floor % 15 == 0
+        })
+        .count() as i64
+}
+
+/// One express shaft's payload size: an entry for each eligible floor,
+/// and at least one.
+pub fn express_payload_size(bottom_floor: i64, top_floor: i64) -> Result<i64, String> {
+    built_shaft_payload_size(bottom_floor, top_floor)?;
+    built_shaft_payload_size(1, express_eligible_floors(bottom_floor, top_floor).max(1))
 }
 
 /// Stories a stair-table record spans, from its type ordinal.
@@ -258,6 +282,26 @@ pub fn parse_tdt_binary(bytes: &[u8]) -> Result<TdtTower, LegacyImportError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_express_shaft_has_an_entry_for_each_floor_at_or_below_the_first_and_each_sky_lobby() {
+        // Floors 0 to 60: the ground, the first and the lobbies at 15, 30, 45, 60.
+        let raw = |floor: i64| floor + TDT_FLOOR_OFFSET;
+        assert_eq!(express_eligible_floors(raw(0), raw(60)), 6);
+        // Floors -9 to 60 add the nine basements and the ground below the first.
+        assert_eq!(express_eligible_floors(raw(-9), raw(60)), 15);
+        assert_eq!(express_eligible_floors(raw(2), raw(14)), 0);
+        assert_eq!(
+            express_payload_size(raw(2), raw(14)),
+            Ok(3140 + 324 + 348),
+            "an entry is kept for a shaft with no eligible floor"
+        );
+        assert_eq!(
+            express_payload_size(raw(0), raw(60)),
+            Ok(3140 + 6 * 324 + 348)
+        );
+        assert!(express_payload_size(raw(20), raw(15)).is_err());
+    }
 
     #[test]
     fn payload_size_is_car_independent_and_refuses_inverted_spans() {

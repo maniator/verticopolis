@@ -7,7 +7,7 @@ import type { FacilityKind, SerializedGame } from "../../engine/types";
 import {
   TDT_HEADER_SIZE,
   TDT_MAX_FILE_BYTES,
-  TDT_STAMP_GENERATION,
+  TDT_STAMP_SPANNED_GENERATION,
   TDT_STAMP_MAGIC,
   TDT_STAMP_SIZE,
 } from "../fixtures/tdtLayout";
@@ -299,10 +299,10 @@ describe("parseTDT: golden mappings", () => {
       expect(u?.subtype).toBe(RESTAURANT_SUBTYPES[4]);
     });
 
-    it("an out-of-range variant byte drops to undefined (whitelist coerce)", () => {
+    it("an out-of-range variant byte takes the kind's first style, so a shop is never unstyled", () => {
       const u = importOne(10, 200);
       expect(u?.kind).toBe("shop");
-      expect(u?.subtype).toBeUndefined();
+      expect(u?.subtype).toBe(SHOP_SUBTYPES[0]);
     });
 
     it("reads the variant from byte 6, NOT byte 17 (guards the real-game read bug)", () => {
@@ -1021,7 +1021,7 @@ describe("transport decode: the save's own shafts and flights", () => {
     };
     const bare = buildTdt(spec);
     for (const [label, bytes] of [
-      ["stamped", withStamp(bare, TDT_STAMP_GENERATION)],
+      ["stamped", withStamp(bare, TDT_STAMP_SPANNED_GENERATION)],
       ["unstamped", bare],
     ] as const) {
       const walked = parseTdtBinary(bytes);
@@ -1121,7 +1121,7 @@ describe("transport decode: the save's own shafts and flights", () => {
       legacyServicedPayload: true,
     };
     const base = buildTdt(legacy);
-    for (const generation of [2, 3, 7, 0, 0xffff]) {
+    for (const generation of [3, 7, 0, 0xffff]) {
       const walked = parseTdtBinary(withStamp(base, generation));
       expect(walked.elevators, `generation ${generation}`).toHaveLength(2);
       expect(walked.elevators!.map((e) => e.x), `generation ${generation}`).toEqual([100, 140]);

@@ -321,10 +321,15 @@ pub fn encode_tower(
                 clamp(home, e.bottom, e.top) + TDT_FLOOR_OFFSET as f64,
             ));
         }
-        let size = built_shaft_payload_size(
+        let (bottom_raw, top_raw) = (
             e.bottom as i64 + TDT_FLOOR_OFFSET,
             e.top as i64 + TDT_FLOOR_OFFSET,
-        )
+        );
+        let size = if e.kind == Kind::ElevatorExpress {
+            express_payload_size(bottom_raw, top_raw)
+        } else {
+            built_shaft_payload_size(bottom_raw, top_raw)
+        }
         .map_err(LegacyExportError)?;
         w.pad(size as usize);
     }

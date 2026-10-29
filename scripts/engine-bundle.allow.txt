@@ -151,5 +151,8 @@ src/engine/port/queries.ts
 src/engine/port/record.ts
 src/engine/port/render.ts
 src/engine/port/reports.ts
+# The TypeScript engine's .TDT codec (files.ts calls it); it borrows a Rust
+# engine from the package and leaves with the TypeScript engine in 3.x
+src/engine/port/tdtCodec.ts
 src/engine/port/tsEngine.ts
 src/engine/port/viewEncode.ts

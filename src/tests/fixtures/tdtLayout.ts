@@ -29,7 +29,9 @@ export const TDT_STAIR_SLOTS = 64;
 export const TDT_STAIR_RECORD_SIZE = 10;
 /** The trailer our writer stamps: magic plus a u16 generation. */
 export const TDT_STAMP_MAGIC = "VCTDT";
-export const TDT_STAMP_GENERATION = 1;
+export const TDT_STAMP_GENERATION = 2;
+/** The first generation: every shaft sized by its span, express included. */
+export const TDT_STAMP_SPANNED_GENERATION = 1;
 export const TDT_STAMP_SIZE = TDT_STAMP_MAGIC.length + 2;
 
 const BUILT_FIXED = 3140;
@@ -46,8 +48,28 @@ export function builtShaftPayloadSize(bottomFloor: number, topFloor: number): nu
   return BUILT_FIXED + PER_FLOOR * (topFloor - bottomFloor + 1) + CAR_BLOCK;
 }
 
-/** The same, sized the way the 1994 game sizes an express shaft: by the floors
- *  it stops at (at least one) rather than the floors it spans. */
+/** The floors an express shaft has an entry for: from its bottom to its top,
+ *  the ones at or below the first floor and every multiple of 15 (the sky
+ *  lobbies). The 1994 game sizes an express record by this count. */
+export function expressEligibleFloors(bottomFloor: number, topFloor: number): number {
+  let count = 0;
+  for (let raw = bottomFloor; raw <= topFloor; raw++) {
+    const floor = raw - TDT_FLOOR_OFFSET;
+    if (floor <= 1 || floor % 15 === 0) count++;
+  }
+  return count;
+}
+
+/** An express shaft's payload as the game sizes it, an entry per eligible floor
+ *  (at least one); the span is validated like any other shaft's. */
+export function expressPayloadSize(bottomFloor: number, topFloor: number): number {
+  builtShaftPayloadSize(bottomFloor, topFloor);
+  return builtShaftPayloadSize(1, Math.max(1, expressEligibleFloors(bottomFloor, topFloor)));
+}
+
+/** The same, sized the way an older 1994-game reading had it: an express shaft
+ *  by the floors it stops at (at least one) rather than the floors it spans.
+ *  Kept to build the older files the reader still has to read. */
 export function builtShaftPayloadSizeFor(type: number, bottomFloor: number, topFloor: number, servicedCount: number): number {
   const spanned = builtShaftPayloadSize(bottomFloor, topFloor);
   return type === EXPRESS ? builtShaftPayloadSize(1, Math.max(1, servicedCount)) : spanned;
@@ -86,8 +108,8 @@ const u32 = (b: Uint8Array, o: number): number => (b[o] | (b[o + 1] << 8) | (b[o
 
 /**
  * A file the exporter wrote, read straight off the wire by fixed offsets: every
- * floor's tenant records, and the built elevator slots (the writer sizes every
- * shaft by its spanned floors). It is a ground truth that does not go through
+ * floor's tenant records, and the built elevator slots (the writer sizes a standard or
+ * service shaft by its spanned floors, an express by its eligible floors). It is a ground truth that does not go through
  * the importer.
  */
 export function wireModel(bytes: Uint8Array): { floors: { tenants: WireTenant[] }[]; elevators: WireElevator[] } {
@@ -119,7 +141,8 @@ export function wireModel(bytes: Uint8Array): { floors: { tenants: WireTenant[] 
     const top = bytes[o + 64];
     const bottom = bytes[o + 65];
     if (used !== 0) elevators.push({ type: bytes[o + 1], cars: bytes[o + 3], x: u16(bytes, o + 62), topFloor: top, bottomFloor: bottom });
-    o += TDT_ELEVATOR_HEADER_SIZE + (used !== 0 ? builtShaftPayloadSize(bottom, top) : 0);
+    const payload = bytes[o + 1] === EXPRESS ? expressPayloadSize(bottom, top) : builtShaftPayloadSize(bottom, top);
+    o += TDT_ELEVATOR_HEADER_SIZE + (used !== 0 ? payload : 0);
   }
   return { floors, elevators };
 }

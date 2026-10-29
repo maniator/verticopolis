@@ -148,6 +148,9 @@ fn table_end_anchored(bytes: &[u8], end: usize) -> bool {
 /// How a built elevator slot's payload is sized; see `tdtTail.ts`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum PayloadLayout {
+    /// Express shafts carry an entry per eligible floor, the rest per spanned
+    /// floor: what SimTower writes.
+    ExpressEligible,
     ExpressServiced,
     Spanned,
     Serviced,
@@ -179,6 +182,10 @@ fn payload_size(
     // The table walk checks the span before sizing, so the helpers cannot
     // refuse here; a refusal would be a walker bug.
     let size = match layout {
+        PayloadLayout::ExpressEligible if type_id == TDT_ELEVATOR_TYPE_EXPRESS => {
+            express_payload_size(bottom_floor, top_floor)
+        }
+        PayloadLayout::ExpressEligible => built_shaft_payload_size(bottom_floor, top_floor),
         PayloadLayout::ExpressServiced => built_shaft_payload_size_for(
             type_id,
             bottom_floor,
@@ -312,40 +319,62 @@ fn read_elevator_table(r: &mut ByteReader, layout: PayloadLayout, resync: bool) 
 /// Which payload layout does this file use? Decided once for the whole file;
 /// see `chooseLayout` in `tdtTail.ts` for the reasoning behind each step.
 fn choose_layout(bytes: &[u8], table_start: usize) -> PayloadLayout {
-    if stamped_generation(bytes) == Some(TDT_STAMP_GENERATION) {
-        return PayloadLayout::Spanned;
+    match stamped_generation(bytes) {
+        Some(TDT_STAMP_SPANNED_GENERATION) => return PayloadLayout::Spanned,
+        Some(TDT_STAMP_GENERATION) => return PayloadLayout::ExpressEligible,
+        _ => {}
     }
     let walk = |layout: PayloadLayout| -> TableWalk {
         let mut r = ByteReader::new(bytes);
         r.skip(table_start).expect("table start inside the file");
         read_elevator_table(&mut r, layout, false)
     };
-    let current = walk(PayloadLayout::ExpressServiced);
-    let ambiguous = current.elevators.as_ref().is_some_and(|es| {
-        es.iter().any(|e| {
-            stop_count(&e.serviced, e.bottom_floor, e.top_floor) != e.top_floor - e.bottom_floor + 1
-        })
-    });
-    if current.elevators.is_some() && !ambiguous {
-        return PayloadLayout::ExpressServiced;
-    }
     let anchored = |end: usize| table_end_anchored(bytes, end);
-    let spanned = walk(PayloadLayout::Spanned);
-    let serviced = walk(PayloadLayout::Serviced);
-    for (layout, w) in [
-        (PayloadLayout::ExpressServiced, &current),
-        (PayloadLayout::Spanned, &spanned),
-        (PayloadLayout::Serviced, &serviced),
-    ] {
-        if w.elevators.is_some() && anchored(w.end) {
-            return layout;
-        }
+    // A layout that sizes a payload wrong lands later headers on payload bytes,
+    // which read as empty slots, so the walk that finds the most shafts has
+    // the right layout. Ties go to the order below.
+    let layouts = [
+        PayloadLayout::ExpressEligible,
+        PayloadLayout::ExpressServiced,
+        PayloadLayout::Spanned,
+        PayloadLayout::Serviced,
+    ];
+    let walks = layouts.map(&walk);
+    // The legacy serviced-stops layout is read only when its table ends where
+    // the rest of the file says it should; it fits too many broken files.
+    let shafts = |layout: PayloadLayout, w: &TableWalk| {
+        let believable = layout != PayloadLayout::Serviced || anchored(w.end);
+        w.elevators.as_ref().filter(|_| believable).map(Vec::len)
+    };
+    let Some(most) = layouts
+        .iter()
+        .zip(walks.iter())
+        .filter_map(|(layout, w)| shafts(*layout, w))
+        .max()
+    else {
+        return PayloadLayout::ExpressServiced;
+    };
+    let ties: Vec<(PayloadLayout, &TableWalk)> = layouts
+        .into_iter()
+        .zip(walks.iter())
+        .filter(|(layout, w)| shafts(*layout, w) == Some(most))
+        .collect();
+    if let Some((layout, _)) = ties.iter().find(|(_, w)| anchored(w.end)) {
+        return *layout;
     }
-    if spanned.elevators.is_some() {
-        PayloadLayout::Spanned
-    } else {
-        PayloadLayout::ExpressServiced
-    }
+    let ambiguous = |w: &TableWalk| {
+        w.elevators.as_ref().is_some_and(|es| {
+            es.iter().any(|e| {
+                stop_count(&e.serviced, e.bottom_floor, e.top_floor)
+                    != e.top_floor - e.bottom_floor + 1
+            })
+        })
+    };
+    ties.iter()
+        .find(|(layout, w)| *layout != PayloadLayout::ExpressServiced || !ambiguous(w))
+        .or(ties.first())
+        .map(|(layout, _)| *layout)
+        .expect("a walk found the most shafts")
 }
 
 /// `walkTolerantTail`: the blocks after the floor map, in file order.

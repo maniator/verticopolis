@@ -74,6 +74,29 @@ fn every_real_save_survives_export_and_import_unchanged() {
 }
 
 #[test]
+fn an_export_reads_straight_through_with_every_express_shaft_kept() {
+    for name in SAVES {
+        let first = save_of(&fixture(name), name);
+        let exported = export_tdt(&first.to_string()).expect("exports");
+        let (json, warnings) = import_tdt(&exported, name).expect("imports");
+        let second: Value = serde_json::from_str(&json).expect("save json");
+        assert!(
+            warnings.iter().all(|w| !w.contains("searching")),
+            "{name}: {warnings:?}"
+        );
+        let express = |save: &Value| {
+            save["transports"]
+                .as_array()
+                .expect("transports")
+                .iter()
+                .filter(|t| t["kind"] == "elevatorExpress")
+                .count()
+        };
+        assert_eq!(express(&second), express(&first), "{name} express shafts");
+    }
+}
+
+#[test]
 fn a_second_export_is_the_first_byte_for_byte() {
     for name in SAVES {
         let first = save_of(&fixture(name), name);
