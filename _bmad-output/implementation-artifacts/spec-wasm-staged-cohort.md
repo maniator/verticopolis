@@ -246,6 +246,13 @@ The size gate is not in this table: it acts at a tower load (below).
 
 ### 4. Tower loads and the size gate
 
+**Owner decision, 2026-10-29 00:46 UTC: no size gate at stage 1.** Asked
+whether to gate stage 1 or run the bracket first, Naftali answered "Yes no
+gate". Stage 1 runs with no size gate, so towers of every size get the Rust
+engine there. Stage 2 keeps the gate described below until he decides
+otherwise: `SIZE_GATED_STAGES` in `src/engineCohort/config.ts` is `[2]`, and
+`shipsBlind` requires the gate and its threshold before stage 2 ships.
+
 - Boot picks the page life's engine. A load, a new tower or an undo never
   picks a new engine on its own. There is one exception, and it moves only
   toward TypeScript: a load (Load or an import) that the size gate declines
@@ -254,7 +261,7 @@ The size gate is not in this table: it acts at a tower load (below).
   never during an action. The incoming tower starts on TypeScript from its
   own save, so nothing has to be recovered, and the notice below tells the
   player. The page life never moves back to Rust.
-- **The gate (stages 1 and 2 only).** When a WASM page life adopts a tower
+- **The gate (stage 2 only).** When a WASM page life adopts a tower
   through the first tower, Load or an import, and its size is above the
   threshold, the host declines it and the tower runs on TypeScript with
   `size_gated: true`, never coded as a fallback. The page life then stays

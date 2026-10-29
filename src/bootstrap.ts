@@ -12,7 +12,8 @@ import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, reloadSoon, tabStore }
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rustEngine";
 import { tsBootTower, type BootTower } from "./game/bootTower";
 import { setEngineWriter } from "./storage/vctowerWriter";
-import { noteEngineCrashReload, noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "./analyticsEngineStatus";
+import { noteEngineAttempt, noteEngineCrashReload, noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "./analyticsEngineStatus";
+import { startEngagementWatch } from "./game/engagementWatch";
 import { runningTowerStage, watchEngineTraps } from "./game/engineFault";
 import { ENGINE_FAILURE_ID, isEngineStopped } from "./game/interactionState";
 import { showEngineLoading } from "./engineLoading";
@@ -264,6 +265,8 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     // A switchable build asks the staged cohort's policy (#1197): the URL, a
     // safety suppression, the Settings choice, then the cohort arm.
     const choice = __WASM_ONLY__ ? "wasm" : selectBootEngine();
+    // Counted before the package loads, so a load the tab never finishes is too (#1090).
+    noteEngineAttempt({ build: __WASM_ONLY__ ? "wasm-only" : "switchable", requested: choice });
     const wantsRust = choice !== "ts";
     // The cover says so after a short wait, when the package takes a while (#1132).
     const stopLoadingLine = wantsRust ? showEngineLoading() : () => {};
@@ -339,6 +342,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       startGameplaySession();
       const app = create(tower);
       created = true;
+      startEngagementWatch(tower.port, () => app.reader?.header.minutes ?? 0);
       // Saves are written through the engine too (same bytes, #935).
       if (onRust && wasmModule?.encodeVctower) {
         setEngineWriter(wasmModule.encodeVctower, () => {

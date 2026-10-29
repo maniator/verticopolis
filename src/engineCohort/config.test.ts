@@ -18,6 +18,13 @@ describe("the cohort config", () => {
     expect(shipsBlind({ ...ready, gated: false, gateBuilt: false, threshold: null })).toBe(false);
   });
 
+  it("runs no size gate at stage 1 and keeps it at stage 2, as the owner decided on 2026-10-29", () => {
+    expect(SIZE_GATED_STAGES).toEqual([2]);
+    const built = { telemetry: true, refusalHolds: true, gateBuilt: SIZE_GATE_BUILT, threshold: SIZE_GATE_THRESHOLD };
+    expect(shipsBlind({ ...built, share: STAGE_SHARE[1], gated: SIZE_GATED_STAGES.includes(1) })).toBe(false);
+    expect(shipsBlind({ ...built, share: STAGE_SHARE[2], gated: SIZE_GATED_STAGES.includes(2) })).toBe(true);
+  });
+
   it("lets stage 0 through with nothing built", () => {
     expect(shipsBlind({ share: 0, telemetry: false, refusalHolds: false, gated: false, gateBuilt: false, threshold: null })).toBe(false);
   });
