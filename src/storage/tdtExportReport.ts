@@ -91,7 +91,7 @@ export function exportReport(facts: ExportReportFacts): ExportReport {
   }
   if (counts.vacancyHistoryLost > 0) {
     staysBehind.push(
-      `${counts.vacancyHistoryLost} vacant room${counts.vacancyHistoryLost === 1 ? "" : "s"} lose their rental history (1994 only records a sitting tenant).`,
+      `${counts.vacancyHistoryLost} vacant room${counts.vacancyHistoryLost === 1 ? " loses its" : "s lose their"} rental history (1994 only records a sitting tenant).`,
     );
   }
   if (counts.outOfRange > 0) {
@@ -130,11 +130,19 @@ export function exportReport(facts: ExportReportFacts): ExportReport {
     );
   }
   if (money !== balance * 100) {
-    staysBehind.push("Funds round to the nearest $100 (the format stores hundreds).");
+    staysBehind.push(
+      "Funds round to the nearest $100 (the format stores hundreds).",
+    );
   }
-  staysBehind.push("The income ledger and finance history start fresh in 1994.");
-  staysBehind.push("People in transit are not carried; the crowd re-simulates on load.");
-  staysBehind.push("Satisfaction detail resets; tenants re-judge the tower as it runs.");
+  staysBehind.push(
+    "The income ledger and finance history start fresh in 1994.",
+  );
+  staysBehind.push(
+    "People in transit are not carried; the crowd re-simulates on load.",
+  );
+  staysBehind.push(
+    "Satisfaction detail resets; tenants re-judge the tower as it runs.",
+  );
 
   return {
     towerName,
