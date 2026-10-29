@@ -199,7 +199,11 @@ fn a_large_load_peaks_near_what_it_keeps() {
         "{} units",
         sim.tower.units.len()
     );
-    assert_eq!(sim.tower.units.capacity(), sim.tower.units.len());
+    // Room for the first placements and no more (#1259).
+    assert_eq!(
+        sim.tower.units.capacity(),
+        sim.tower.units.len() + crate::tower::unit_list_headroom(sim.tower.units.len())
+    );
     // The count saw the game (its units alone pass 10 MiB), so the bound
     // below measures something.
     assert!(kept > 10 << 20, "only {kept} bytes counted");
@@ -425,4 +429,36 @@ fn a_version_one_save_peaks_below_what_it_did() {
         peak <= kept * 16,
         "the load peaked at {peak} bytes for {kept} kept"
     );
+}
+
+/// The first placements after a load move nothing: the list kept room for
+/// them, where one floor tile moved the 14 MiB list to a block twice its
+/// size and took the engine's WASM memory from 24.6 to 52.4 MiB (#1259).
+/// Once the room is used, the list grows by a quarter, not a doubling.
+#[test]
+fn placing_after_a_large_load_copies_nothing() {
+    let text = large_save();
+    let mut sim = load_save_text(text.as_bytes()).unwrap();
+    let len = sim.tower.units.len();
+    let spare = crate::tower::unit_list_headroom(len);
+    let next_id = 1_000_000;
+    let (_, peak, _) = measure(|| {
+        for i in 0..spare {
+            let mut unit = sim.tower.units[0].clone();
+            unit.id = next_id + i as i64;
+            sim.tower.add_unit(unit, None);
+        }
+    });
+    assert!(
+        peak < 1 << 20,
+        "{spare} placements held {peak} bytes more at once"
+    );
+    assert_eq!(sim.tower.units.len(), len + spare);
+    assert_eq!(sim.tower.units.capacity(), len + spare);
+    // One more fills the list: it grows by a quarter.
+    let mut unit = sim.tower.units[0].clone();
+    unit.id = next_id + spare as i64;
+    sim.tower.add_unit(unit, None);
+    let full = len + spare;
+    assert_eq!(sim.tower.units.capacity(), full + full / 4);
 }
