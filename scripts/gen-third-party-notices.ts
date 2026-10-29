@@ -111,11 +111,13 @@ if (!existsSync(DIST)) fail(`${DIST} does not exist; run the build first`);
 const maps = filesUnder(DIST, (n) => /\.([mc]?js|css)\.map$/.test(n));
 if (maps.length === 0) fail("no sourcemaps in dist; they are needed to list the bundled packages");
 
-// Shipped JavaScript with no sourcemap would carry unlisted code. The only one
-// is the WASM engine's wasm-bindgen glue, which is attributed instead by the
-// record its build writes beside it (read below, #955).
+// Shipped JavaScript with no sourcemap would carry unlisted code. Two files
+// are allowed. The WASM engine's wasm-bindgen glue is attributed instead by
+// the record its build writes beside it (read below, #955). The service
+// worker's navigation fallback (#1345) is the project's own plain script from
+// src/public/ (listed in src/build/publicFiles.ts) and bundles no package.
 const ENGINE_GLUE_PATH = ENGINE_DIR + ENGINE_GLUE;
-const MAPLESS_JS_ALLOWED = new Set([ENGINE_GLUE_PATH]);
+const MAPLESS_JS_ALLOWED = new Set([ENGINE_GLUE_PATH, "sw-navigation-fallback.js"]);
 const mapless = filesUnder(DIST, (n) => /\.[mc]?js$/.test(n))
   .filter((f) => !existsSync(`${f}.map`))
   .map((f) => relative(DIST, f).replace(/\\/g, "/"))

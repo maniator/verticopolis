@@ -63,6 +63,22 @@ async function installedFirst(page: Page): Promise<void> {
 const bootFailure = (page: Page) =>
   page.evaluate(() => (window as any).__vcEngineBoot?.failure as { stage: string; reason: string; package?: { kind: string; controlled: boolean } } | null | undefined);
 
+/** Where each stored precache entry lives, as paths. */
+const storedPaths = (page: Page): Promise<string[]> =>
+  page.evaluate(async () => {
+    const paths: string[] = [];
+    for (const name of await caches.keys()) {
+      for (const request of await (await caches.open(name)).keys()) paths.push(new URL(request.url).pathname);
+    }
+    return paths;
+  });
+
+/** Drop every cache, as a browser short of space can. */
+const dropAllCaches = (page: Page): Promise<void> =>
+  page.evaluate(async () => {
+    for (const name of await caches.keys()) await caches.delete(name);
+  });
+
 test.afterEach(() => {
   deployments?.serve("A");
   deployments?.engineFrom(null);
@@ -169,6 +185,46 @@ test("with the whole precache gone and no network the page does not load, and an
     await hostedGame(revisit);
     expect(await bootFailure(revisit)).toBeNull();
     await expectEngineIs(deployments, revisit, "A");
+
+    // The online visit stored the shell as well as the engine (#1345), so the
+    // next cold start works with no network at all.
+    const stored = await storedPaths(revisit);
+    expect(stored, "the shell page was stored again").toContain("/index.html");
+    expect(stored.some((p) => /^\/assets\/main-.*\.js$/.test(p)), "the game's entry chunk was stored again").toBe(true);
+    deployments.failNetwork("all");
+    await revisit.close();
+    const offline = await context.newPage();
+    await offline.goto("/");
+    await hostedGame(offline);
+    expect(await bootFailure(offline), "the offline cold start runs the engine").toBeNull();
+    await expectEngineIs(deployments, offline, "A");
+  } finally {
+    await context.close();
+  }
+});
+
+test("a navigation that fails its integrity after the cache was lost still loads online, and stores nothing from the other build", async ({ browser }) => {
+  const context = await newContext(browser, deployments);
+  try {
+    const page = await context.newPage();
+    await installedFirst(page);
+    const firstShell = await (await context.request.get("/")).text();
+    await dropAllCaches(page);
+    // The deploy has reached the server but not this page's worker: the worker
+    // asks for its own build's index.html and the server answers with the next.
+    deployments.serve("B");
+    const before = deployments.requests.length;
+    const response = await page.goto("/");
+    expect(response?.status(), "the navigation is answered").toBe(200);
+    expect(await response!.text(), "with the server's own page").not.toBe(firstShell);
+    expect(deployments.requests.slice(before).some((r) => (r.path === "/" || r.path === "/index.html") && r.from === "B")).toBe(true);
+    expect(await storedPaths(page), "the other build's page was not stored").not.toContain("/index.html");
+
+    // Back on the first build, the miss stores its page.
+    deployments.serve("A");
+    await page.goto("/");
+    await hostedGame(page);
+    expect(await storedPaths(page), "the matching page is stored").toContain("/index.html");
   } finally {
     await context.close();
   }

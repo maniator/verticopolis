@@ -16,7 +16,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets.ts";
-import { engineDistProblems, shellProblems, shellRevisionProblems } from "../src/build/enginePackageBuild.ts";
+import { engineDistProblems, manifestIntegrityProblems, shellProblems, shellRevisionProblems } from "../src/build/enginePackageBuild.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
 import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, ENGINE_WASM, glueLoads } from "../src/wasmhost/engineAssets.ts";
 
@@ -145,6 +145,17 @@ if (builtEngine) {
   const unsound = engineDistProblems(DIST, manifest);
   if (unsound.length > 0) fail(`the engine package in dist/ is not one consistent set: ${unsound.join("; ")}`);
 }
+// Every entry carries the integrity of its file (#1345), engine or not: a miss
+// is stored only for an entry with one, so the shell refills after the
+// browser drops the precache. An entry listed twice is already refused above.
+const integrity = manifestIntegrityProblems(DIST, manifest);
+if (integrity.length > 0) fail(`the precache manifest's integrity is not sound: ${integrity.join("; ")}`);
+// The navigation fallback (#1345) loads through importScripts and is updated
+// with the worker, so the worker must import it and the precache must not
+// list it.
+if (!/importScripts\(\s*["']sw-navigation-fallback\.js["']/.test(sw)) fail("dist/sw.js does not import sw-navigation-fallback.js, so a navigation that fails its integrity would show a blank page");
+if (!existsSync(resolve(DIST, "sw-navigation-fallback.js"))) fail("dist/sw-navigation-fallback.js is missing, so the worker would not install");
+if (seen.has("sw-navigation-fallback.js")) fail("sw-navigation-fallback.js is in the precache manifest; the worker imports it, so it must stay out of it");
 // The page checks the engine against the id compiled into its chunks, and a
 // production bundle must not carry the development serve's skip (#985).
 const shell = shellProblems(DIST, builtEngine);

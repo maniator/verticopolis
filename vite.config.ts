@@ -7,7 +7,7 @@ import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 import { parseEngineBuild, type EngineBuild } from "./src/build/engineBundle";
-import { engineIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
+import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 import { tsEngineSourceHash } from "./src/build/tsEngineSources";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
@@ -394,6 +394,15 @@ export default defineConfig(({ command }) => ({
           },
         ],
       },
+      integration: {
+        // Workbox appends `additionalManifestEntries` (the plugin adds the web
+        // manifest) after the manifest transforms, so give them their
+        // integrity here, just before the worker is generated (#1345).
+        beforeBuildServiceWorker(options) {
+          const extra = options.workbox.additionalManifestEntries;
+          if (extra) options.workbox.additionalManifestEntries = extra.map((e) => (typeof e === "string" ? e : entryWithIntegrity(e, builtDistDir)));
+        },
+      },
       workbox: {
         // Precache the game shell only. The dev/tooling entry points and their
         // chunks are excluded so an install ships just the game.
@@ -429,17 +438,25 @@ export default defineConfig(({ command }) => ({
         // at run time (audio data for #968, say), mark it in engineAssets.ts
         // or audioAssets.ts and add that one file to this list by its own path.
         //
-        // The three engine entries (glue, binary, BUILD.json) carry a Workbox
-        // `integrity` (manifestTransforms below), so a body that is not the
-        // build's own bytes cannot be newly cached: an install that overlaps
-        // a deploy fails whole and the old, consistent set stays. Workbox
-        // applies it only to an entry it has to fetch; an entry already in
-        // the cache under the expected key is served as it is. The engine
-        // entries therefore carry a revision no earlier worker used (the
-        // MD5 plus ENGINE_REVISION_SUFFIX, enginePackageBuild.ts), so a set
-        // stored before this change is never found under their keys and the
-        // update fetches all three files with integrity. The page's own byte
-        // check (#985 slice 2) covers the window before the update lands.
+        // Every entry carries a Workbox `integrity` (manifestTransforms
+        // below), so a body that is not the build's own bytes cannot be newly
+        // cached: an install that overlaps a deploy fails whole and the old,
+        // consistent set stays. Workbox also stores a precache miss only for
+        // an entry that has one, so after the browser drops the precache an
+        // online visit refills the shell and the engine and the next offline
+        // cold start finds them (#1345); a miss for a file the page has not
+        // requested yet (a sound not yet played) stays empty until it is.
+        // Workbox applies it only to an entry it has to fetch; an entry already
+        // in the cache under the expected key is served as it is. The three
+        // engine entries (glue, binary, BUILD.json) therefore carry a revision
+        // no earlier worker used (the MD5 plus ENGINE_REVISION_SUFFIX,
+        // enginePackageBuild.ts), so a set stored before this change is never
+        // found under their keys and the update fetches all three files with
+        // integrity. The page's own byte check (#985 slice 2) covers the
+        // window before the update lands. A navigation that fails its
+        // integrity (a deploy newer than this worker, after the cache was
+        // lost) falls back to the network without storing it:
+        // src/public/sw-navigation-fallback.js, imported below.
         // scripts/verify-precache.ts fails the build when a run-time engine
         // or audio file is missing from the manifest, when a build-only
         // engine file is in it, and when the package holds a file the list
@@ -460,7 +477,10 @@ export default defineConfig(({ command }) => ({
         // the game shell: the PWA needs nothing that large, so it stays out
         // of every web player's offline precache (a review catch on the PR
         // that added it).
-        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png"],
+        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**", "**/icon-1024x1024.png", "**/sw-navigation-fallback.js"],
+        // The worker's own helper, loaded by importScripts and updated with it,
+        // so it stays out of the precache.
+        importScripts: ["sw-navigation-fallback.js"],
         navigateFallback: "index.html",
         // Keep the non-game pages and the real static files out of the app-shell
         // fallback, letting them fall through to the network rather than the game
@@ -515,7 +535,7 @@ export default defineConfig(({ command }) => ({
           // host's own 404 rather than the game shell, same as the file below it.
           /\.well-known/,
         ],
-        manifestTransforms: [engineIntegrityTransform(() => builtDistDir)],
+        manifestTransforms: [precacheIntegrityTransform(() => builtDistDir)],
         cleanupOutdatedCaches: true,
         // Excalibur's bundle is comfortably large; lift the precache ceiling.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,

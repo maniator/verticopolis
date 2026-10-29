@@ -42,6 +42,7 @@ export const PUBLIC_FILES: readonly PublicFile[] = [
   { path: "pwa-maskable-512x512.png", license: "CC-BY-4.0", source: ICONS },
   { path: "robots.txt", license: "MIT", source: "written for the project" },
   { path: "sitemap.xml", license: "MIT", source: "written for the project" },
+  { path: "sw-navigation-fallback.js", license: "MIT", source: "written for the project (service worker helper, #1345)" },
 ];
 
 /**
