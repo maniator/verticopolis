@@ -42,7 +42,16 @@ export const PUBLIC_FILES: readonly PublicFile[] = [
   { path: "pwa-maskable-512x512.png", license: "CC-BY-4.0", source: ICONS },
   { path: "robots.txt", license: "MIT", source: "written for the project" },
   { path: "sitemap.xml", license: "MIT", source: "written for the project" },
+  { path: "sw-navigation-fallback.js", license: "MIT", source: "written for the project (service worker helper, #1345)" },
 ];
+
+/**
+ * Scripts that ship from `src/public/` as written, with no sourcemap: the
+ * project's own plain scripts that bundle no package. The checks that read
+ * every emitted script's sourcemap (`gen-third-party-notices.ts`,
+ * `verify-engine-bundle.ts`) skip these, and nothing else.
+ */
+export const MAPLESS_PUBLIC_SCRIPTS: readonly string[] = ["sw-navigation-fallback.js"];
 
 /**
  * Files an operating system writes into any folder it shows (Finder,

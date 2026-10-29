@@ -1,12 +1,14 @@
 /**
  * Build-time halves of the engine package check (#985 criterion 5), kept out
  * of vite.config.ts so unit tests can pin them: the expected package the
- * shell is compiled with, and the Workbox `integrity` the three engine
- * precache entries carry. Node only; never imported by the app.
+ * shell is compiled with, and the Workbox `integrity` every precache entry
+ * carries (the three engine entries also get their own revision). Node only;
+ * never imported by the app.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
+import { precacheFile } from "../precacheEntry.ts";
 import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames.ts";
 import { canonicalFilesJson, expectedOf, parseEngineRecord, type ExpectedEnginePackage } from "../wasmhost/enginePackageRecord.ts";
 
@@ -96,26 +98,31 @@ interface ManifestEntry {
   integrity?: string;
 }
 
+/** One manifest entry with the `integrity` of its file under `distDir`, and
+ *  for the three engine files the revision of {@link engineRevision}. An entry
+ *  whose file is not there stops the build rather than ship without a check. */
+export function entryWithIntegrity<E extends { url: string; revision?: string | null }>(entry: E, distDir: string): E & { integrity: string } {
+  const url = entry.url.split(/[?#]/)[0].replace(/^\.?\//, "");
+  const file = precacheFile(distDir, url);
+  if (!existsSync(file)) throw new Error(`precache entry ${url} has no file under ${distDir}, so it cannot carry integrity`);
+  const bytes = readFileSync(file);
+  return INTEGRITY_FILES.includes(url) ? { ...entry, revision: engineRevision(bytes), integrity: integrityOf(bytes) } : { ...entry, integrity: integrityOf(bytes) };
+}
+
 /**
- * A Workbox `manifestTransform`: adds `integrity` to the three engine entries,
- * computed from the files in the build output, and gives them the revision of
- * {@link engineRevision}. The browser then rejects a
- * body that differs from the build's own bytes, during install and on a
- * precache-miss fetch, so a mixed set cannot enter the precache. Every other
- * entry is unchanged. An engine entry whose file is not under `distDir` stops
- * the build rather than ship without a check.
+ * A Workbox `manifestTransform`: adds `integrity` to every entry, computed
+ * from the file in the build output. The browser then rejects a body that
+ * differs from the build's own bytes, during install and on a precache-miss
+ * fetch, and Workbox stores a miss only when the entry has an `integrity`
+ * (#1345), so after the browser drops the precache an online visit refills the
+ * shell as well as the engine and the next offline cold start finds it. The
+ * three engine entries also get the revision of {@link engineRevision}.
+ * Workbox runs the transforms before it appends `additionalManifestEntries`
+ * (the web manifest), so those go through {@link entryWithIntegrity} directly.
  */
-export function engineIntegrityTransform(distDir: string | (() => string)) {
+export function precacheIntegrityTransform(distDir: string | (() => string)) {
   return (entries: ManifestEntry[]): { manifest: ManifestEntry[]; warnings: string[] } => ({
-    manifest: entries.map((e) => {
-      const url = e.url.split(/[?#]/)[0].replace(/^\.?\//, "");
-      if (!INTEGRITY_FILES.includes(url)) return e;
-      const dir = typeof distDir === "function" ? distDir() : distDir;
-      const file = resolve(dir, url);
-      if (!existsSync(file)) throw new Error(`precache entry ${url} has no file under ${dir}, so it cannot carry integrity`);
-      const bytes = readFileSync(file);
-      return { ...e, revision: engineRevision(bytes), integrity: integrityOf(bytes) };
-    }),
+    manifest: entries.map((e) => entryWithIntegrity(e, typeof distDir === "function" ? distDir() : distDir)),
     warnings: [],
   });
 }
@@ -182,6 +189,25 @@ export function engineDistProblems(distDir: string, manifest: string): string[] 
   for (const url of INTEGRITY_FILES) {
     const want = wanted[url.slice(ENGINE_DIR.length)];
     if (revisions.has(url) && revisions.get(url) !== want) problems.push(`precache entry ${url} has revision ${revisions.get(url) ?? "none"}; the file in dist/ has ${want}, so Repair would name another cache key`);
+  }
+  return problems;
+}
+
+/**
+ * What is wrong with the `integrity` of the precache manifest's entries, as
+ * sentences (an empty list means every entry is sound): each entry must carry
+ * the digest of its file in `dist/`. Workbox stores a precache miss only for an
+ * entry with an `integrity`, so one without it would never be refilled after
+ * the browser drops the cache (#1345), and one with the wrong digest would
+ * fail every fetch. This covers a file changed after the worker was generated.
+ */
+export function manifestIntegrityProblems(distDir: string, manifest: string): string[] {
+  const problems: string[] = [];
+  for (const [url, have] of manifestIntegrity(manifest)) {
+    const file = precacheFile(distDir, url);
+    if (!existsSync(file)) problems.push(`precache entry ${url} has no file in dist/`);
+    else if (!have) problems.push(`precache entry ${url} carries no integrity, so a miss would not refill the precache after the browser drops it`);
+    else if (have !== integrityOf(readFileSync(file))) problems.push(`precache entry ${url} carries an integrity that is not the digest of the file in dist/`);
   }
   return problems;
 }

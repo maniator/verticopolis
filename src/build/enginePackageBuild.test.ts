@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEV_SKIP_MARKER, ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../wasmhost/enginePackageNames";
 import { engineBuildRecord } from "../wasmhost/enginePackageRecord";
-import { ENGINE_REVISION_SUFFIX, INTEGRITY_FILES, engineDistProblems, engineRevision, engineIntegrityTransform, integrityOf, manifestIntegrity, manifestRevisions, readExpectedPackage, revisionsOf, shellProblems, shellRevisionProblems } from "./enginePackageBuild";
+import { ENGINE_REVISION_SUFFIX, INTEGRITY_FILES, engineDistProblems, engineRevision, entryWithIntegrity, precacheIntegrityTransform, integrityOf, manifestIntegrity, manifestIntegrityProblems, manifestRevisions, readExpectedPackage, revisionsOf, shellProblems, shellRevisionProblems } from "./enginePackageBuild";
 
 const sha = (d: Uint8Array | string) => createHash("sha256").update(d).digest("hex");
 const md5 = (d: Uint8Array | string) => createHash("md5").update(d).digest("hex");
@@ -70,27 +70,47 @@ describe("readExpectedPackage", () => {
   });
 });
 
-describe("engineIntegrityTransform", () => {
+describe("precacheIntegrityTransform", () => {
+  const html = new TextEncoder().encode("<!doctype html><title>game</title>\n");
   const entries = () => [
     { url: `${ENGINE_DIR}${ENGINE_GLUE}`, revision: "r1", size: glue.length },
     { url: `${ENGINE_DIR}${ENGINE_WASM}`, revision: "r2", size: wasm.length },
     { url: `${ENGINE_DIR}${ENGINE_BUILD_RECORD}`, revision: "r3", size: 400 },
-    { url: "index.html", revision: "r4", size: 10 },
+    { url: "index.html", revision: "r4", size: html.length },
   ];
-
-  it("adds the integrity of each of the three engine files and leaves the rest alone", () => {
+  /** The package folder with the shell's index.html beside it. */
+  const withShell = () => {
     const d = pkg();
-    const { manifest, warnings } = engineIntegrityTransform(d)(entries());
+    writeFileSync(join(d, "index.html"), html);
+    return d;
+  };
+
+  it("adds the integrity of each of the three engine files", () => {
+    const d = withShell();
+    const { manifest, warnings } = precacheIntegrityTransform(d)(entries());
     expect(warnings).toEqual([]);
     expect(manifest[0].integrity).toBe(`sha256-${createHash("sha256").update(glue).digest("base64")}`);
     expect(manifest[1].integrity).toBe(integrityOf(wasm));
     expect(manifest[2].integrity).toBeDefined();
-    expect(manifest[3]).toEqual({ url: "index.html", revision: "r4", size: 10 });
+  });
+
+  it("gives a shell entry the integrity of its file and keeps its revision, so a miss on it refills the precache (#1345)", () => {
+    const d = withShell();
+    const { manifest } = precacheIntegrityTransform(d)(entries());
+    expect(manifest[3]).toEqual({ url: "index.html", revision: "r4", size: html.length, integrity: integrityOf(html) });
+  });
+
+  it("covers an entry with no revision, a hashed asset, the same way", () => {
+    const d = withShell();
+    mkdirSync(join(d, "assets"));
+    writeFileSync(join(d, "assets", "main-abc123.js"), "export {};\n");
+    const { manifest } = precacheIntegrityTransform(d)([{ url: "assets/main-abc123.js", revision: null, size: 11 }]);
+    expect(manifest[0]).toEqual({ url: "assets/main-abc123.js", revision: null, size: 11, integrity: integrityOf(new TextEncoder().encode("export {};\n")) });
   });
 
   it("gives each engine entry a revision no worker before the integrity attribute used, and leaves the rest alone", () => {
-    const d = pkg();
-    const { manifest } = engineIntegrityTransform(d)(entries());
+    const d = withShell();
+    const { manifest } = precacheIntegrityTransform(d)(entries());
     expect(manifest.slice(0, 3).map((e) => e.revision)).toEqual([engineRevision(glue), engineRevision(wasm), engineRevision(new TextEncoder().encode(JSON.stringify(record)))]);
     for (const e of manifest.slice(0, 3)) {
       expect(e.revision, "not the plain MD5 an earlier worker keyed the file by").toMatch(new RegExp(`^[0-9a-f]{32}${ENGINE_REVISION_SUFFIX}$`));
@@ -102,27 +122,73 @@ describe("engineIntegrityTransform", () => {
 
   it("matches an entry whatever its prefix or query string", () => {
     const d = pkg();
-    const { manifest } = engineIntegrityTransform(d)([{ url: `./${ENGINE_DIR}${ENGINE_GLUE}?v=1`, revision: null, size: 1 }]);
+    const { manifest } = precacheIntegrityTransform(d)([{ url: `./${ENGINE_DIR}${ENGINE_GLUE}?v=1`, revision: null, size: 1 }]);
     expect(manifest[0].integrity).toBe(integrityOf(glue));
     expect(manifest[0].revision, "an entry that arrived with no revision gets the rotated one").toBe(engineRevision(glue));
   });
 
   it("asks for the output folder when it is given a function, so a changed outDir is followed", () => {
-    const d = pkg();
+    const d = withShell();
     let asked = 0;
-    const { manifest } = engineIntegrityTransform(() => (asked++, d))(entries());
-    expect(asked).toBe(3);
+    const { manifest } = precacheIntegrityTransform(() => (asked++, d))(entries());
+    expect(asked).toBe(4);
     expect(manifest[0].integrity).toBe(integrityOf(glue));
   });
 
-  it("stops the build when an engine entry has no file to hash", () => {
-    const d = pkg();
+  it("stops the build when an entry has no file to hash, engine or shell", () => {
+    const d = withShell();
     rmSync(join(d, ENGINE_DIR, ENGINE_WASM));
-    expect(() => engineIntegrityTransform(d)(entries())).toThrow(/cannot carry integrity/);
+    expect(() => precacheIntegrityTransform(d)(entries())).toThrow(/cannot carry integrity/);
+    const e = withShell();
+    rmSync(join(e, "index.html"));
+    expect(() => precacheIntegrityTransform(e)(entries())).toThrow(/precache entry index\.html has no file/);
   });
 
-  it("covers exactly the glue, the binary and BUILD.json", () => {
+  it("refuses an entry that climbs out of the output folder", () => {
+    expect(() => precacheIntegrityTransform(withShell())([{ url: "../secret.txt", revision: null, size: 1 }])).toThrow(/climbs out of dist/);
+  });
+
+  it("covers exactly the glue, the binary and BUILD.json with a rotated revision", () => {
     expect([...INTEGRITY_FILES].sort()).toEqual([ENGINE_BUILD_RECORD, ENGINE_GLUE, ENGINE_WASM].map((f) => ENGINE_DIR + f).sort());
+  });
+});
+
+describe("entryWithIntegrity", () => {
+  it("adds integrity to an entry the transforms never see, as the plugin's web manifest is", () => {
+    const d = pkg();
+    const text = '{"name":"Verticopolis"}\n';
+    writeFileSync(join(d, "manifest.webmanifest"), text);
+    expect(entryWithIntegrity({ url: "manifest.webmanifest", revision: "m1" }, d)).toEqual({ url: "manifest.webmanifest", revision: "m1", integrity: integrityOf(new TextEncoder().encode(text)) });
+  });
+});
+
+describe("manifestIntegrityProblems", () => {
+  const files = { "index.html": "<html></html>\n", "assets/main-1.js": "export {};\n" } as const;
+  function dist(): string {
+    const d = pkg();
+    mkdirSync(join(d, "assets"));
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(d, name), text);
+    return d;
+  }
+  const entry = (url: keyof typeof files, integrity: string | null = integrityOf(new TextEncoder().encode(files[url]))) =>
+    `{url:"${url}",revision:null${integrity === null ? "" : `,integrity:"${integrity}"`}}`;
+
+  it("is empty when every entry carries the digest of its file", () => {
+    expect(manifestIntegrityProblems(dist(), `[${entry("index.html")},${entry("assets/main-1.js")}]`)).toEqual([]);
+  });
+
+  it("names an entry with no integrity, so a miss would not refill the precache", () => {
+    expect(manifestIntegrityProblems(dist(), `[${entry("index.html", null)}]`).join("\n")).toMatch(/index\.html carries no integrity/);
+  });
+
+  it("names an entry whose integrity is not its file's digest, such as a file changed after the worker was built", () => {
+    expect(manifestIntegrityProblems(dist(), `[${entry("assets/main-1.js", integrityOf(new TextEncoder().encode("other")))}]`).join("\n")).toMatch(/main-1\.js carries an integrity that is not the digest/);
+  });
+
+  it("names an entry whose file is gone", () => {
+    const d = dist();
+    rmSync(join(d, "index.html"));
+    expect(manifestIntegrityProblems(d, `[${entry("index.html")}]`).join("\n")).toMatch(/index\.html has no file in dist/);
   });
 });
 
