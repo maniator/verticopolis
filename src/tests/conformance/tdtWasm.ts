@@ -4,7 +4,8 @@ import { exportFacts, importFacts } from "../../simport/tdtRecords";
 import { exportReport, type ExportReport } from "../../storage/tdtExportReport";
 import { importReport, type ImportReport } from "../../storage/tdtImportReport";
 import { codecFromModule, useTdtCodec } from "../../engine/port/tdtCodec";
-import { wasm } from "./wasmEngine";
+import { describe, it } from "vitest";
+import { hasWasmPackage, wasm } from "./wasmEngine";
 
 /**
  * The `.TDT` codec as the tests meet it: the Rust importer and exporter through
@@ -12,6 +13,12 @@ import { wasm } from "./wasmEngine";
  * game builds them. A refusal throws the player-readable sentence as an `Error`
  * of one of the two classes below.
  */
+
+/** Suites that need the codec skip themselves where the engine package is not
+ *  built; the WASM lanes set `VC_REQUIRE_WASM=1`, and `engineLoad.test.ts` fails
+ *  those runs when the package is missing, so a skip cannot hide there. */
+export const describeWithCodec = describe.skipIf(!hasWasmPackage());
+export const itWithCodec = it.skipIf(!hasWasmPackage());
 
 export class LegacyImportError extends Error {}
 export class LegacyExportError extends Error {}

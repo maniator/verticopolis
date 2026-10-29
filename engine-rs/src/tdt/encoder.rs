@@ -340,6 +340,8 @@ pub fn encode_tower(
     w.u16(stalls);
     w.pad(TDT_PARKING_SIZE - 2);
 
+    w.pad(TDT_STAIRS_GAP);
+
     let mut stair_records: Vec<StairRecord> = vec![];
     let mut sorted: Vec<&OutWalkway> = walkways.iter().collect();
     sorted.sort_by(|a, b| {

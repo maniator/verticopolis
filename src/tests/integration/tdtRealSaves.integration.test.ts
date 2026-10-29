@@ -7,8 +7,8 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
-import { parseTDT } from "../conformance/tdtWasm";
+import { expect, it } from "vitest";
+import { describeWithCodec, parseTDT } from "../conformance/tdtWasm";
 
 const DIR = resolve(__dirname, "../../../conformance/fixtures/tdt-reddit");
 const load = (name: string) => {
@@ -30,7 +30,7 @@ const SAVES = [
   { name: "MYTOWER.TDT", shafts: 24, flights: 37 },
 ] as const;
 
-describe("real 1997 saves (u/invokes)", () => {
+describeWithCodec("real 1997 saves (u/invokes)", () => {
   for (const { name, shafts, flights } of SAVES) {
     it(`${name} brings over its own elevators and stairways`, () => {
       const { save, report } = load(name);

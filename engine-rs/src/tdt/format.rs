@@ -53,6 +53,10 @@ pub const TDT_ELEVATOR_CAR_BLOCK_SIZE: i64 = 348;
 pub const TDT_ELEVATOR_TYPE_EXPRESS: i64 = 0;
 pub const TDT_FINANCE_SIZE: usize = 132;
 pub const TDT_PARKING_SIZE: usize = 2 + 512 * 2;
+/// Zero bytes between the parking block and the stairs table in every save
+/// SimTower wrote (measured on the nine 1997 saves and the game's own
+/// re-saves of them). A table written without the gap reads four bytes early.
+pub const TDT_STAIRS_GAP: usize = 4;
 pub const TDT_STAIR_SLOTS: usize = 64;
 pub const TDT_STAIR_RECORD_SIZE: usize = 10;
 /// The trailing routing/reachability region the exporter emits, 0xFF-filled.

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, facilityFloors } from "../../engine/facilities";
 import { SAVE_VERSION } from "../../engine/saveMigration";
-import { buildTDT, parseTDT } from "../conformance/tdtWasm";
+import { buildTDT, itWithCodec, parseTDT } from "../conformance/tdtWasm";
 import type { SerializedGame, Unit } from "../../engine/types";
 
 /**
@@ -65,7 +65,7 @@ describe("Party Hall two-story load and round trip", () => {
     expect(sim.tower.roomAt(hall.floor + 1, hall.x)?.id).toBe(hall.id);
   });
 
-  it("exports and re-imports a built hall as a single two-story room", () => {
+  itWithCodec("exports and re-imports a built hall as a single two-story room", () => {
     // A minimal exportable tower: ground lobby, two paved stories, and a hall.
     const save = v5Save(
       [

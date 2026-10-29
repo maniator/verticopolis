@@ -590,6 +590,15 @@ Lobbies observed at in-game floors 1, 15, 30, 45, 60, 75, 90: the canon
 > over-emitting the fixed constant remains the safe side of every measured case.
 > See the backlog's `tdt-export-routing-tail`.
 
+> **Measured 2026-10-29 (#1497): a 4-byte gap, then a fixed 17,402-byte tail.**
+> In all nine 1997 saves and the game's own re-saves, the stairs table starts
+> **4 zero bytes** after the parking block, not directly after it, and exactly
+> **17,402 bytes** follow the table (the whole elevator table is walked with the
+> express rule in section 8, so these offsets are exact). Our exporter used to
+> write the table with no gap, so SimTower read it 4 bytes early and found no
+> flights. The exporter now writes the gap. It still over-emits the 0xFF tail
+> (see above); matching the 17,402 bytes needs a 5-star-and-up load check first.
+
 ## 12. Named tenants / people
 
 16-byte fields holding null-terminated names, **max 15 characters** [OS]; the

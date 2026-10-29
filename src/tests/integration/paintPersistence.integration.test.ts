@@ -4,7 +4,7 @@ import { Simulation } from "../../engine/Simulation";
 import { GRID, attendanceCap } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { drawRoom, type RoomCtx } from "../../render/pixelSprites";
-import { buildTDT, parseTDT } from "../conformance/tdtWasm";
+import { buildTDT, describeWithCodec, parseTDT } from "../conformance/tdtWasm";
 import type { FacilityKind, Unit } from "../../engine/types";
 
 /**
@@ -127,7 +127,7 @@ describe("save round-trip paints identical pixels (.vctower serialize/deserializ
   });
 });
 
-describe("TDT round-trip preserves the retail varieties' paint (geometry + subtype survive)", () => {
+describeWithCodec("TDT round-trip preserves the retail varieties' paint (geometry + subtype survive)", () => {
   it("each canon variety paints byte-identical after export -> import at its own spot", () => {
     // Classic tower (TDT refuses modern) with one venue per variety. The TDT
     // format preserves kind, floor, x, and the variant byte; unit ids are

@@ -11,7 +11,7 @@ import {
   TDT_STAMP_MAGIC,
   TDT_STAMP_SIZE,
 } from "../fixtures/tdtLayout";
-import { LegacyImportError, parseTDT, parseTdtBinary } from "../conformance/tdtWasm";
+import { LegacyImportError, describeWithCodec, parseTDT, parseTdtBinary } from "../conformance/tdtWasm";
 import { looksLikeLegacyTower } from "../../storage/tdtImportHelpers";
 import type { TdtSpec } from "../fixtures/tdtBuilder";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
@@ -61,7 +61,7 @@ function withStamp(bytes: Uint8Array, generation: number): Uint8Array {
   return out;
 }
 
-describe("tdtFormat: hostile-file hardening (typed errors, never hangs)", () => {
+describeWithCodec("tdtFormat: hostile-file hardening (typed errors, never hangs)", () => {
   it("rejects a wrong magic word as not-a-SimTower-save", () => {
     expect(() => parse({ magic: 0x1234 })).toThrow(LegacyImportError);
     expect(() => parse({ magic: 0x1234 })).toThrow(/doesn't look like a SimTower save/);
@@ -163,7 +163,7 @@ function findElevatorTableOffset(bytes: Uint8Array): number {
   return pos;
 }
 
-describe("parseTDT: golden mappings", () => {
+describeWithCodec("parseTDT: golden mappings", () => {
   it("money is stored ×1/100: balance 20000 → $2,000,000 (negative survives)", () => {
     expect(parse({ balance: 20000 }).save.money).toBe(2_000_000);
     expect(parse({ balance: -500 }).save.money).toBe(-50_000);
@@ -816,7 +816,7 @@ describe("looksLikeLegacyTower", () => {
   });
 });
 
-describe("transport decode: the save's own shafts and flights", () => {
+describeWithCodec("transport decode: the save's own shafts and flights", () => {
   it("a standard shaft decodes with position, extent, cars, and car homes", () => {
     const { save, report } = parse({
       floors: [{ index: 10, leftEdge: 100, rightEdge: 200 }],
@@ -1490,7 +1490,7 @@ describe("transport decode: the save's own shafts and flights", () => {
   });
 });
 
-describe("end-to-end: import → deserialize → live simulation", () => {
+describeWithCodec("end-to-end: import → deserialize → live simulation", () => {
   it("the sample tower deserializes and ticks several game-hours without throwing", () => {
     const { save } = parse(sampleTowerSpec(), "ROUNDTRIP.TDT");
     const sim = Simulation.deserialize(save);

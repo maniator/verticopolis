@@ -5,6 +5,10 @@
 use std::path::PathBuf;
 
 use serde_json::Value;
+use verticopolis_engine::tdt::format::{
+    TDT_ROUTING_TAIL_SIZE, TDT_STAIRS_GAP, TDT_STAIR_RECORD_SIZE, TDT_STAIR_SLOTS, TDT_STAMP_SIZE,
+};
+use verticopolis_engine::tdt::tail::stairs_table_starts_at;
 use verticopolis_engine::tdt::{export_tdt, import_tdt};
 
 const SAVES: [&str; 9] = [
@@ -93,6 +97,32 @@ fn an_export_reads_straight_through_with_every_express_shaft_kept() {
                 .count()
         };
         assert_eq!(express(&second), express(&first), "{name} express shafts");
+    }
+}
+
+#[test]
+fn an_export_leaves_the_gap_the_game_leaves_before_its_stairs_table() {
+    for name in SAVES {
+        let first = save_of(&fixture(name), name);
+        let exported = export_tdt(&first.to_string()).expect("exports");
+        let table = TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE;
+        let stairs = exported.len() - TDT_STAMP_SIZE - TDT_ROUTING_TAIL_SIZE - table;
+        let walkways = first["transports"]
+            .as_array()
+            .expect("transports")
+            .iter()
+            .any(|t| matches!(t["kind"].as_str(), Some("stairs" | "escalator")));
+        assert_eq!(
+            stairs_table_starts_at(&exported, stairs),
+            walkways,
+            "{name}"
+        );
+        assert!(
+            exported[stairs - TDT_STAIRS_GAP..stairs]
+                .iter()
+                .all(|&b| b == 0),
+            "{name}: the gap is zeros"
+        );
     }
 }
 

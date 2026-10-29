@@ -138,11 +138,13 @@ pub fn stairs_table_starts_at(bytes: &[u8], at: usize) -> bool {
 /// routing region one stairs table further on?
 fn table_end_anchored(bytes: &[u8], end: usize) -> bool {
     let after_parking = end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE;
-    stairs_table_starts_at(bytes, after_parking)
-        || routing_tail_starts_at(
-            bytes,
-            after_parking + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE,
-        )
+    // The game's own files leave a gap before the stairs table; our exports
+    // from before it was measured did not.
+    [TDT_STAIRS_GAP, 0].into_iter().any(|gap| {
+        let stairs = after_parking + gap;
+        stairs_table_starts_at(bytes, stairs)
+            || routing_tail_starts_at(bytes, stairs + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE)
+    })
 }
 
 /// How a built elevator slot's payload is sized; see `tdtTail.ts`.

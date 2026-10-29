@@ -19,7 +19,7 @@ import {
   TDT_STAMP_SIZE,
   wireModel,
 } from "../fixtures/tdtLayout";
-import { LegacyExportError, buildTDT, parseTDT, parseTdtBinary } from "../conformance/tdtWasm";
+import { LegacyExportError, buildTDT, describeWithCodec, parseTDT, parseTdtBinary } from "../conformance/tdtWasm";
 import { legacyFilename } from "../../storage/tdtFilename";
 import { FACILITIES, GRID } from "../../engine/facilities";
 import { rentConfig } from "../../engine/econConfig";
@@ -129,7 +129,7 @@ function transportFacts(save: SerializedGame) {
     .sort((a, b) => a.kind.localeCompare(b.kind) || a.x - b.x || a.bottom - b.bottom);
 }
 
-describe("buildTDT: export → import round trip", () => {
+describeWithCodec("buildTDT: export → import round trip", () => {
   it("rooms, states, and transports survive the trip through our own parser", () => {
     const save = sampleSave();
     const { bytes } = buildTDT(save);
@@ -270,7 +270,9 @@ describe("buildTDT: export → import round trip", () => {
     };
     const built = buildTDT(save);
     expect(built.report.comesAlong[0]).toMatch(/^0 rooms/); // no census: see above
-    expect(built.bytes.length).toBe(71_291);
+    // 4 bytes more than before the 4-byte gap that SimTower leaves between the
+    // parking block and the stairs table (measured on the nine 1997 saves, #1497).
+    expect(built.bytes.length).toBe(71_295);
   });
 
   // `builtShaftPayloadSize`'s own arithmetic contract is pinned at the UNIT
@@ -678,7 +680,7 @@ describe("buildTDT: export → import round trip", () => {
   });
 });
 
-describe("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
+describeWithCodec("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
   /** Little-endian i32 read at a header byte offset. */
   const i32 = (b: Uint8Array, off: number) =>
     (b[off] | (b[off + 1] << 8) | (b[off + 2] << 16) | (b[off + 3] << 24)) | 0;
@@ -792,7 +794,7 @@ describe("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
   });
 });
 
-describe("buildTDT: review hardening (states, collisions, caps, hostile input)", () => {
+describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile input)", () => {
   it("vacating and moving-in tenants export as sitting tenants, never as vacancies", () => {
     const save = sampleSave();
     const office = save.units.find((u) => u.kind === "office" && u.state === "occupied")!;
@@ -1135,7 +1137,7 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
 // floor 1 and every sky lobby, and elevators cannot connect. These pin that the
 // exporter now emits those records: one coalesced span per contiguous run, only
 // where a tile is not under a room, matching a real save's bytes.
-describe("buildTDT: lobby (type 24) and empty-floor (type 0) paving records", () => {
+describeWithCodec("buildTDT: lobby (type 24) and empty-floor (type 0) paving records", () => {
   const u16 = (b: Uint8Array, off: number) => b[off] | (b[off + 1] << 8);
   const i8 = (b: number) => (b << 24) >> 24;
 
@@ -1444,7 +1446,7 @@ describe("legacyFilename", () => {
 // a populated tower needs a nonzero people count; the file must carry the
 // trailing routing region; built shafts need a real schedule block or their cars
 // never run; and the saved view opens on the ground, not the sky.
-describe("buildTDT: real-game loadability (people, routing tail, schedule, camera)", () => {
+describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedule, camera)", () => {
   const u16 = (b: Uint8Array, o: number) => b[o] | (b[o + 1] << 8);
   const u32 = (b: Uint8Array, o: number) =>
     (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
