@@ -379,3 +379,50 @@ fn the_count_is_a_written_saves_units() {
         assert!(shortest.is_some_and(|n| n + 1 >= 40), "{shortest:?}");
     }
 }
+
+/// The text of a committed player tower written by an older version.
+fn old_tower(name: &str) -> Vec<u8> {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../conformance/fixtures");
+    let file = std::fs::read_to_string(format!("{dir}/{name}")).unwrap();
+    inflate_vctower(&file).unwrap()
+}
+
+/// A save from an older version takes today's path, which migrates it step
+/// by step. It held the whole save once per step, so the medium perf tower
+/// (version 4) peaked at eleven times what it keeps, and a WASM memory keeps
+/// its peak for the session. Migrated in place, it peaks at about four
+/// times; the bound leaves room for the parsed save it must still hold.
+#[test]
+fn an_old_save_peaks_near_what_it_keeps() {
+    drop(load_save_text(
+        br#"{"version":7,"mode":"classic","units":[]}"#,
+    ));
+    let text = old_tower("sixseven_2.vctower");
+    let (sim, peak, kept) = measure(|| load_save_text(&text).unwrap());
+    assert!(
+        !read_save(&text).unwrap().1,
+        "a version 4 save took the streamed path"
+    );
+    assert!(sim.tower.units.len() > 12_000);
+    assert!(kept > 5 << 20, "only {kept} bytes counted");
+    assert!(
+        peak * 5 <= kept * 24,
+        "the load peaked at {peak} bytes for {kept} kept"
+    );
+}
+
+/// A version 1 save is also re-laid at canon widths, which builds its own
+/// copies of the units; that step is not yet streamed, so the bound only
+/// keeps it from growing back to the 24 times it peaked at before.
+#[test]
+fn a_version_one_save_peaks_below_what_it_did() {
+    drop(load_save_text(
+        br#"{"version":7,"mode":"classic","units":[]}"#,
+    ));
+    let text = old_tower("towerone_6.vctower");
+    let (_, peak, kept) = measure(|| load_save_text(&text).unwrap());
+    assert!(
+        peak <= kept * 16,
+        "the load peaked at {peak} bytes for {kept} kept"
+    );
+}

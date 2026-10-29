@@ -524,19 +524,45 @@ fn floor_unit(id: i64, floor: i64, x: i64) -> Value {
     })
 }
 
-fn units_of(data: &Value) -> Vec<Value> {
+fn units_of(data: &Value) -> &[Value] {
     data.get("units")
         .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default()
+        .map_or(&[][..], Vec::as_slice)
 }
 
 fn version_of(data: &Value) -> Option<f64> {
     data.get("version").and_then(Value::as_f64)
 }
 
+/// `{...data, ...patches}`: the keys a patch replaces are not cloned first
+/// (a patched `units` is the whole tower), and every key keeps the position
+/// the object gave it.
 fn with(data: &Value, patches: Vec<(&str, Value)>) -> Value {
-    let mut m = data.as_object().cloned().unwrap_or_default();
+    let mut patches: Vec<Option<(&str, Value)>> = patches.into_iter().map(Some).collect();
+    let mut m = Map::new();
+    for (k, v) in data.as_object().into_iter().flatten() {
+        let patch = patches
+            .iter_mut()
+            .rev()
+            .find(|p| p.as_ref().is_some_and(|(pk, _)| pk == k))
+            .and_then(Option::take);
+        match patch {
+            Some((_, pv)) => m.insert(k.clone(), pv),
+            None => m.insert(k.clone(), v.clone()),
+        };
+    }
+    for (k, v) in patches.into_iter().flatten() {
+        m.insert(k.to_string(), v);
+    }
+    Value::Object(m)
+}
+
+/// `with` on a save this call owns: the patches go in place, nothing is cloned.
+fn with_owned(data: Value, patches: Vec<(&str, Value)>) -> Value {
+    let mut m = match data {
+        Value::Object(m) => m,
+        _ => Map::new(),
+    };
     for (k, v) in patches {
         m.insert(k.to_string(), v);
     }
@@ -550,7 +576,7 @@ pub fn migration_looks_valid(data: &Value) -> bool {
     let version = version_of(data);
     let mut by_floor: IndexMap<String, Vec<(f64, f64)>> = IndexMap::new();
     for u in units_of(data) {
-        let Some(kind) = kind_of(&u) else { continue };
+        let Some(kind) = kind_of(u) else { continue };
         if kind.is_structural() {
             continue;
         }
@@ -594,7 +620,7 @@ pub fn floating_structure_count(data: &Value) -> i64 {
     let units = units_of(data);
     let mut structure: HashSet<String> = HashSet::new();
     let struct_of = |u: &Value| matches!(kind_of(u), Some(Kind::Floor) | Some(Kind::Lobby));
-    for u in &units {
+    for u in units {
         if !struct_of(u) {
             continue;
         }
@@ -608,7 +634,7 @@ pub fn floating_structure_count(data: &Value) -> i64 {
         }
     }
     let mut floating = 0;
-    for u in &units {
+    for u in units {
         if !struct_of(u) {
             continue;
         }
@@ -647,7 +673,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
     let mut rooms: Vec<Room> = Vec::new();
     let mut others: Vec<Value> = Vec::new();
     let mut orig_struct: HashSet<String> = HashSet::new();
-    for u in &src {
+    for u in src {
         if !matches!(kind_of(u), Some(Kind::Floor) | Some(Kind::Lobby)) {
             continue;
         }
@@ -676,7 +702,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
     let safe_col = |floor: i64, x: i64| -> bool {
         orig_struct.contains(&tile_key(floor as f64, x as f64)) || rests_on(floor, x)
     };
-    for u in &src {
+    for u in src {
         let kind = kind_of(u);
         let Some(kind) = kind else {
             if !u.is_null() {
@@ -874,7 +900,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
         }
     }
     let mut next_id = finite_num(data.get("nextId")).map_or(1.0, f64::floor);
-    for u in &src {
+    for u in src {
         if let Some(id) = finite_num(u.get("id")) {
             next_id = next_id.max(id.floor() + 1.0);
         }
@@ -935,6 +961,17 @@ pub fn widen_legacy_elevator_shafts(data: &Value) -> Value {
     match transports.and_then(|t| widen_shafts(t)) {
         Some(out) => with(data, vec![("transports", Value::Array(out))]),
         None => data.clone(),
+    }
+}
+
+/// `widen_legacy_elevator_shafts` on a save this call owns.
+fn widen_shafts_in_place(data: &mut Value) {
+    let widened = data
+        .get("transports")
+        .and_then(Value::as_array)
+        .and_then(|t| widen_shafts(t));
+    if let (Some(out), Some(m)) = (widened, data.as_object_mut()) {
+        m.insert("transports".to_string(), Value::Array(out));
     }
 }
 
@@ -1015,7 +1052,7 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
     let mut struct_cols: HashMap<i64, HashSet<i64>> = HashMap::new();
     let mut room_occ: HashMap<i64, HashSet<i64>> = HashMap::new();
     let mut lobby_cols: HashMap<i64, HashSet<i64>> = HashMap::new();
-    for u in &src {
+    for u in src {
         let Some(kind) = kind_of(u) else { continue };
         let stories = kind.floors();
         let f =
@@ -1046,14 +1083,13 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
     let paved = |sc: &HashMap<i64, HashSet<i64>>, f: i64, x: i64| {
         sc.get(&f).is_some_and(|s| s.contains(&x))
     };
-    let halls: Vec<Value> = src
+    let halls: Vec<&Value> = src
         .iter()
         .filter(|u| kind_of(u) == Some(Kind::PartyHall))
-        .cloned()
         .collect();
     let mut kept: Vec<Value> = Vec::new();
     let mut dropped = 0;
-    for u in &halls {
+    for u in halls.iter().copied() {
         let w = (round(num(u.get("width"), Kind::PartyHall.facility().width as f64)) as i64)
             .min(LOT)
             .max(1);
@@ -1146,17 +1182,16 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
         Some(n) => n.floor(),
         None => 1.0,
     };
-    for u in &src {
+    for u in src {
         if let Some(id) = finite_num(u.get("id")) {
             next_id = next_id.max(id.floor() + 1.0);
         }
     }
-    let others: Vec<Value> = src
+    let others: Vec<&Value> = src
         .iter()
         .filter(|u| !u.is_null() && kind_of(u) != Some(Kind::PartyHall))
-        .cloned()
         .collect();
-    let mut out: Vec<Value> = others.clone();
+    let mut out: Vec<Value> = others.iter().map(|u| (*u).clone()).collect();
     out.extend(kept.iter().cloned());
     let mut struct_cols2 = struct_cols.clone();
     for h in &kept {
@@ -1210,7 +1245,7 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
     if (input_valid && !migration_looks_valid(&result))
         || floating_structure_count(&result) > floating_structure_count(data)
     {
-        return with_log(others, halls.len());
+        return with_log(others.into_iter().cloned().collect(), halls.len());
     }
     result
 }
@@ -1223,6 +1258,13 @@ fn is_game_mode(v: Option<&Value>) -> bool {
 
 /// `migrateSave(data)`.
 pub fn migrate_save(data: &Value) -> Value {
+    migrate_save_owned(data.clone())
+}
+
+/// `migrate_save` on a save this call owns. The steps that only set a key
+/// set it in place, so an old save is held once, not once per step: a
+/// version 4 tower of 12,000 units peaked at eleven times what it keeps.
+pub fn migrate_save_owned(data: Value) -> Value {
     let raw_version = data.get("version").and_then(Value::as_f64);
     let valid = raw_version
         .is_some_and(|v| v.is_finite() && v.fract() == 0.0 && v >= OLDEST_SAVE_VERSION as f64);
@@ -1232,30 +1274,24 @@ pub fn migrate_save(data: &Value) -> Value {
         OLDEST_SAVE_VERSION as f64
     };
     let mut migrated = if raw_version == Some(version) {
-        data.clone()
+        data
     } else {
-        with(data, vec![("version", json!(version))])
+        with_owned(data, vec![("version", json!(version))])
     };
     if !is_game_mode(migrated.get("mode")) {
-        if let Some(units) = migrated.get("units").and_then(Value::as_array) {
-            let units: Vec<Value> = units
-                .iter()
-                .map(|u| {
-                    let sold_shell = u.is_object()
-                        && kind_of(u) == Some(Kind::Condo)
-                        && u.get("everOccupied") == Some(&Value::Bool(true))
-                        && u.get("rent").is_none()
-                        && u.get("state").and_then(Value::as_str).unwrap_or("empty") != "empty"
-                        && u.get("state").and_then(Value::as_str) != Some("gutted")
-                        && u.get("state").and_then(Value::as_str) != Some("construction");
-                    if sold_shell {
-                        with(u, vec![("rent", json!(LEGACY_CONDO_DEFAULT_PRICE))])
-                    } else {
-                        u.clone()
-                    }
-                })
-                .collect();
-            migrated = with(&migrated, vec![("units", Value::Array(units))]);
+        if let Some(Value::Array(units)) = migrated.get_mut("units") {
+            for u in units.iter_mut() {
+                let sold_shell = u.is_object()
+                    && kind_of(u) == Some(Kind::Condo)
+                    && u.get("everOccupied") == Some(&Value::Bool(true))
+                    && u.get("rent").is_none()
+                    && u.get("state").and_then(Value::as_str).unwrap_or("empty") != "empty"
+                    && u.get("state").and_then(Value::as_str) != Some("gutted")
+                    && u.get("state").and_then(Value::as_str) != Some("construction");
+                if let (true, Some(unit)) = (sold_shell, u.as_object_mut()) {
+                    unit.insert("rent".to_string(), json!(LEGACY_CONDO_DEFAULT_PRICE));
+                }
+            }
         }
     }
     let v = |m: &Value| version_of(m);
@@ -1263,24 +1299,25 @@ pub fn migrate_save(data: &Value) -> Value {
         migrated = upgrade_v1_to_v2(&migrated);
     }
     if v(&migrated) == Some(2.0) {
-        migrated = with(&migrated, vec![("version", json!(3))]);
+        migrated = with_owned(migrated, vec![("version", json!(3))]);
     }
     if v(&migrated) == Some(3.0) {
-        migrated = with(&migrated, vec![("version", json!(4))]);
+        migrated = with_owned(migrated, vec![("version", json!(4))]);
     }
     if v(&migrated) == Some(4.0) {
-        migrated = widen_legacy_elevator_shafts(&with(&migrated, vec![("version", json!(5))]));
+        migrated = with_owned(migrated, vec![("version", json!(5))]);
+        widen_shafts_in_place(&mut migrated);
     }
     if v(&migrated) == Some(5.0) {
         migrated = expand_legacy_party_halls(&migrated);
     }
     if v(&migrated) == Some(6.0) {
-        migrated = with(&migrated, vec![("version", json!(7))]);
+        migrated = with_owned(migrated, vec![("version", json!(7))]);
     }
     // `load_stream.rs` applies this step to a current save on its own, so a
     // step added here for version 7 goes there too.
     if v(&migrated) == Some(7.0) {
-        migrated = widen_legacy_elevator_shafts(&migrated);
+        widen_shafts_in_place(&mut migrated);
     }
     migrated
 }
@@ -1514,17 +1551,27 @@ pub fn mark_founder_from_loaded_file(sim: &mut Simulation, raw: &Value) {
 
 /// `Simulation.deserialize(raw)`.
 pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
+    deserialize_owned(raw.clone())
+}
+
+/// `deserialize` on a save this call owns: the save is migrated in place and
+/// each unit entry is freed as it is converted, so the load holds the save
+/// and the game it builds, not the save several times over (#1225).
+pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
     // `migrateSave(null)` throws reading `version`; any other top-level value
     // loads as the TypeScript loads it (#858).
     if raw.is_null() {
         return Err("not a tower save (the save is null)".into());
     }
-    let data = migrate_save(raw);
+    // The founder test reads the save as written, and `assemble` reads
+    // nothing else from it, so two keys stand in for it.
+    let written = founder_keys(&raw);
+    let mut data = migrate_save_owned(raw);
     let modern = data.get("mode").and_then(Value::as_str) == Some("modern");
-    let listed = data
-        .get("units")
-        .and_then(Value::as_array)
-        .map_or(&[][..], Vec::as_slice);
+    let listed = match data.get_mut("units") {
+        Some(Value::Array(units)) => std::mem::take(units),
+        _ => Vec::new(),
+    };
     // The entries `unit_from_value` keeps, counted before any unit is built,
     // so a save past the cap is refused first and the rest fill vectors of
     // their exact size.
@@ -1539,12 +1586,25 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
         ));
     }
     let (mut units, mut ids) = (Vec::with_capacity(kept), Vec::with_capacity(kept));
-    for (unit, id) in listed.iter().filter_map(|u| unit_from_value(u, modern)) {
-        units.push(unit);
-        ids.push(id);
+    for entry in listed {
+        if let Some((unit, id)) = unit_from_value(&entry, modern) {
+            units.push(unit);
+            ids.push(id);
+        }
     }
     debug_assert_eq!(units.len(), kept, "unit_from_value skipped a counted entry");
-    Ok(assemble(&data, units, ids, raw))
+    Ok(assemble(&data, units, ids, &written))
+}
+
+/// The keys `detect_founder` reads off a save.
+pub(crate) fn founder_keys(raw: &Value) -> Value {
+    let mut keys = Map::new();
+    for key in ["founder", "appVersion"] {
+        if let Some(v) = raw.get(key) {
+            keys.insert(key.to_string(), v.clone());
+        }
+    }
+    Value::Object(keys)
 }
 
 /// One entry of a save's `units` array as `deserialize` reads it, with its
