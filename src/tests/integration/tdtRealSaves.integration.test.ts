@@ -8,12 +8,12 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseTDT } from "../../storage/tdtImport";
+import { parseTDT } from "../conformance/tdtWasm";
 
 const DIR = resolve(__dirname, "../../../conformance/fixtures/tdt-reddit");
 const load = (name: string) => {
   const bytes = readFileSync(resolve(DIR, name));
-  return parseTDT(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, name);
+  return parseTDT(bytes, name);
 };
 
 /** Shafts and walkway flights each save carries, and whether the import had to

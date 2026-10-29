@@ -22,9 +22,8 @@ import { describe, it, expect } from "vitest";
 // --- 1. Compile-time surface: every exported TYPE. ---
 import type { BatchRentOptions, BatchRentResult, BatchTarget, HeatCell, HeatmapMode, LogEntry } from "../engine/Simulation";
 import type { ElevatorCalls, MealWindow, Person, PersonState, StaffKind } from "../engine/Crowd";
-import type { TdtElevator, TdtFloor, TdtHeader, TdtStair, TdtTenant, TdtTower } from "../storage/tdtFormat";
-import type { DecodedTransports, ImportReport, ParsedLegacyTower } from "../storage/tdtImport";
-import type { BuiltLegacyTower, ExportReport } from "../storage/tdtExport";
+import type { ExportReport } from "../storage/tdtExportReport";
+import type { ImportReport } from "../storage/tdtImportReport";
 import type { SlotInfo } from "../storage/SaveGame";
 import type { FastFoodLook, RestaurantLook, RoomCtx, ShopLook } from "../render/pixelSprites";
 import type { EntranceKind } from "../render/sprites/structure";
@@ -35,9 +34,7 @@ import type { SfxName } from "../audio/ToneAudioEngine";
 export type _TypeSurfacePins = [
   BatchRentOptions, BatchRentResult, BatchTarget, HeatCell, HeatmapMode, LogEntry,
   ElevatorCalls, MealWindow, Person, PersonState, StaffKind,
-  TdtElevator, TdtFloor, TdtHeader, TdtStair, TdtTenant, TdtTower,
-  DecodedTransports, ImportReport, ParsedLegacyTower,
-  BuiltLegacyTower, ExportReport,
+  ImportReport, ExportReport,
   SlotInfo,
   FastFoodLook, RestaurantLook, RoomCtx, ShopLook,
   EntranceKind,
@@ -51,9 +48,8 @@ import * as tower from "../engine/Tower";
 import * as crowd from "../engine/Crowd";
 import * as economy from "../engine/EconomySystem";
 import * as migration from "../engine/saveMigration";
-import * as tdtFormat from "../storage/tdtFormat";
-import * as tdtImport from "../storage/tdtImport";
-import * as tdtExport from "../storage/tdtExport";
+import * as tdtImportHelpers from "../storage/tdtImportHelpers";
+import * as tdtFilename from "../storage/tdtFilename";
 import * as saveGame from "../storage/SaveGame";
 import * as pixelSprites from "../render/pixelSprites";
 import * as structure from "../render/sprites/structure";
@@ -88,33 +84,8 @@ const RUNTIME_EXPORTS: Record<string, string[]> = {
     "SAVE_VERSION", "floatingStructureCount", "migrateSave", "migrationLooksValid", "reflowV1toV2",
     "upgradeV1toV2", "upgradeV2toV3", "upgradeV3toV4", "upgradeV4toV5", "widenLegacyElevatorShafts",
   ],
-  tdtFormat: [
-    // The full value surface: every TDT_* constant + the reader, error, view
-    // mapping, and parse/locate functions. Exhaustive on purpose (a review
-    // finding: a curated subset let a dropped constant like TDT_WORLD_W slip
-    // past this net), so any silent removal from the barrel trips the test.
-    "ByteReader", "LegacyImportError", "locateStairs", "parseTdtBinary",
-    "viewFromViewWords", "viewWordsFromView",
-    "TDT_MAGIC", "TDT_HEADER_SIZE", "TDT_FLOOR_COUNT", "TDT_TENANT_RECORD_SIZE",
-    "TDT_FLOOR_INDEX_ENTRIES", "TDT_MAX_TENANTS_PER_FLOOR", "TDT_MAX_FILE_BYTES", "TDT_MAX_PEOPLE",
-    "TDT_PERSON_RECORD_SIZE", "TDT_MAX_CENSUS", "TDT_DEFAULT_VIEW_X", "TDT_DEFAULT_VIEW_Y",
-    "TDT_FLOOR_OFFSET", "TDT_TILE_PX", "TDT_FLOOR_PX", "TDT_WORLD_W", "TDT_WORLD_H",
-    "TDT_VIEW_W", "TDT_VIEW_H", "TDT_RETAIL_SLOTS", "TDT_RETAIL_RECORD_SIZE", "TDT_ELEVATOR_SLOTS",
-    "TDT_ELEVATOR_HEADER_SIZE", "TDT_ELEVATOR_BUILT_FIXED", "TDT_ELEVATOR_PER_FLOOR_SIZE",
-    "TDT_ELEVATOR_CAR_BLOCK_SIZE", "TDT_ELEVATOR_SCHEDULE_DEFAULT", "builtShaftPayloadSize",
-    "builtShaftPayloadSizeFor", "TDT_ELEVATOR_TYPE_EXPRESS",
-    "TDT_FINANCE_SIZE", "TDT_PARKING_SIZE",
-    "TDT_STAIR_SLOTS", "TDT_STAIR_RECORD_SIZE", "TDT_ROUTING_TAIL_SIZE",
-    "TDT_STAMP_GENERATION", "TDT_STAMP_MAGIC", "TDT_STAMP_SIZE", "TDT_MAX_TILE",
-    "TDT_MAX_STAIR_CROWD", "TDT_STAIR_SCAN_WINDOW",
-  ],
-  tdtImport: [
-    "ELEVATOR_KINDS", "FAMILY_STORIES", "HOTEL_ASLEEP_FLAG", "HOTEL_DIRTY_FLAG", "HOTEL_OCCUPANT_MASK",
-    "PART_FAMILY", "TDT_BURNED", "TDT_FLOOR_OFFSET", "TENANT_KIND", "LegacyImportError", "isLobbyFloor",
-    "looksLikeLegacyTower", "parseTDT", "rentFromClass", "synthesizeTransports", "towerNameFromFilename",
-    "transportsFromDecoded",
-  ],
-  tdtExport: ["LegacyExportError", "buildTDT", "classFromRent", "legacyFilename"],
+  tdtImportHelpers: ["looksLikeLegacyTower"],
+  tdtFilename: ["legacyFilename"],
   saveGame: ["SLOT_COUNT", "SaveGame", "TOWER_FILE_EXT"],
   pixelSprites: [
     "FASTFOOD_LOOKS", "PAL", "RESTAURANT_LOOKS", "SHIRTS", "SHOP_LOOKS", "SKIN", "drawRoom", "person",
@@ -139,7 +110,7 @@ const RUNTIME_EXPORTS: Record<string, string[]> = {
 };
 
 const MODULES: Record<string, Record<string, unknown>> = {
-  facilities, simulation, tower, crowd, economy, migration, tdtFormat, tdtImport, tdtExport,
+  facilities, simulation, tower, crowd, economy, migration, tdtImportHelpers, tdtFilename,
   saveGame, pixelSprites, structure, spriteFacilities, audio, toneScenes, toneVoices,
 };
 

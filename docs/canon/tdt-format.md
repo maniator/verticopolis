@@ -31,7 +31,7 @@ commentary) are fair inspiration.
 **Why this exists.** The `.TDT` save is a window into the 1994 original's
 internals: it confirms (or corrects) numbers our engine treats as canon, and it
 is the specification for the importer of original saves
-(`src/storage/tdtFormat.ts` + `src/storage/tdtImport.ts`; see PARITY.md).
+(`engine-rs/src/tdt/`, the one `.TDT` codec; the TypeScript engine reaches it through the WASM package, `src/engine/port/tdtCodec.ts`).
 `src/tests/integration/canon.integration.test.ts` asserts our engine constants against this page so
 drift gets caught in CI.
 
@@ -246,8 +246,8 @@ notes implied. Confirmed against game-written saves via `tools/simtower`:
 `my_tower`'s five fast-food units read byte 6 = `3,1,2,4,0`
 (Ice Cream / Chinese Cafe / Hamburger Stand / Coffee Shop / Japanese Soba), which
 matches the readable "BURGER" stand in the Wine render, while byte 17 is `0` in
-every real save. The importer reads byte 6 (`tdtParse.ts`) and the exporter
-writes it there (`tdtEncoder.ts`). The §7 table's own status/variant bytes do
+every real save. The importer reads byte 6 (`engine-rs/src/tdt/parse.rs`) and the exporter
+writes it there (`engine-rs/src/tdt/encoder.rs`). The §7 table's own status/variant bytes do
 NOT line up with byte 6 (`my_tower`'s §7 variant column read `0,1,0,1,0`), so the
 §7 record's internal layout past its floor byte is still unresolved; it is not
 the variant source and is a separate follow-up.
@@ -470,7 +470,7 @@ that skips most of what it spans.
 > first such shaft: **only one elevator rendered, and the parking/basement block
 > that follows the table mis-read too.** Forcing the payload to the fixed size
 > (car count kept in the header) made all shafts render in the real game.
-> Fixed in `tdtExport.ts` + `tdtFormat.ts` (and the `tdtBuilder` test fixture).
+> Fixed in `engine-rs/src/tdt/export.rs` + `format.rs` (and the `tdtBuilder` test fixture).
 
 > **Corrected (Verticopolis RE, 2026-07-31, Wine harness vs the real 1994
 > game):** the 324-byte per-floor entries run over the shaft's **whole span**
@@ -485,7 +485,7 @@ that skips most of what it spans.
 > shaft skips five floors: sized by serviced floors the game rendered **2 of 4**
 > shafts (and the tower sat dark and unpopulated); sized by spanned floors it
 > rendered **4 of 4**, with the skipping shaft correctly showing no stops on its
-> skipped floors. Fixed in `tdtEncoder.ts`, `tdtTail.ts`, and the `tdtBuilder`
+> skipped floors. Fixed in `engine-rs/src/tdt/encoder.rs`, `tail.rs`, and the `tdtBuilder`
 > fixture; guarded by a payload-length test in `tdtExport.integration.test.ts`.
 
 > **Measured (Verticopolis RE, tools/simtower round-trip vs the real 1994 game):**
@@ -493,7 +493,7 @@ that skips most of what it spans.
 > doc previously estimated. Walking the three shafts in a real save (my_tower.TDT)
 > with the 720 figure desynced the table after the first shaft and forced the
 > importer to synthesize fake elevators; the 3,140 figure reproduces every
-> shaft's exact file offset (`src/storage/tdtFormat.ts` `TDT_ELEVATOR_BUILT_FIXED`).
+> shaft's exact file offset (`engine-rs/src/tdt/format.rs` `TDT_ELEVATOR_BUILT_FIXED`).
 > **The `type` byte @1 is the authoritative kind signal, NOT the capacity byte
 > @2:** in that save a service shaft (type = 2) carried a capacity byte of 21
 > (the standard value, not service's 10), so the capacity byte is unreliable for
@@ -529,7 +529,7 @@ at the first empty one.
 > parking/lobby region §10+) are not yet pinned down across saves. In a real save
 > the stairs table sat **436 bytes before** the offset we got by summing
 > finance (132) + parking (1,026), so the old arithmetic read zeros and lost
-> every flight. `src/storage/tdtFormat.ts` `locateStairs` now finds the table by
+> every flight. `engine-rs/src/tdt/tail.rs` `locate_stairs` now finds the table by
 > scanning from the end of the elevator table for the 64-record window (empty or
 > in-range built) that holds the most flights. Finance is still read at its known
 > size (its last i32 carries the tower population total), but the stairs no

@@ -11,8 +11,7 @@ import {
   parseSaveJson,
   toBase64,
 } from "../../storage/saveCompression";
-import { parseTDT } from "../../storage/tdtParse";
-import { buildTDT } from "../../storage/tdtExport";
+import { tdtCodec } from "./tdtCodec";
 
 /**
  * `TsEngine`'s file members, as the Rust engine answers them
@@ -95,52 +94,20 @@ export interface StagedTdt {
   record: Float64Array;
 }
 
-/** Read and check a `.TDT` file: the importer's output goes through the
- *  trust boundary every save does, and is never marked a founder's tower. */
+/** Read and check a `.TDT` file: the codec reads it, and the tower goes through
+ *  the trust boundary every save does, never marked a founder's. */
 export function stageTdt(bytes: Uint8Array, filename: string): StagedTdt {
-  const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-  const { save, facts } = parseTDT(buffer, filename);
+  const read = tdtCodec().read(bytes, filename);
   let sim: Simulation;
   try {
-    sim = Simulation.deserialize(save);
+    sim = Simulation.deserialize(JSON.parse(read.saveJson) as SerializedGame);
   } catch (e) {
     throw new Error(`This SimTower save couldn't be read. (${message(e)})`);
   }
-  const { counts: c, decodeStats: d, tdt } = facts;
-  let floors = 0;
-  let basements = 0;
-  for (const u of save.units) {
-    floors = Math.max(floors, u.floor);
-    if (u.floor < 1) basements = Math.max(basements, 1 - u.floor);
-  }
-  const flights = save.transports.filter((t) => t.kind === "stairs" || t.kind === "escalator").length;
-  // prettier-ignore
-  const record = Float64Array.of(
-    1,
-    c.rooms, c.offices, c.occupiedOffices, c.condos, c.soldCondos, c.hotelRooms, c.hotelAsleep,
-    c.hotelDirty, c.hotelBooked, c.asleepConverted, c.infested, c.venues, c.services, c.parkingStalls,
-    c.construction, c.rentsApplied, c.twinRooms, c.secom, c.cathedral, c.burned, c.unknown,
-    c.droppedFloors, c.offLot, c.overlapping, c.misplaced, c.clamped, c.widthMismatch,
-    facts.decoded ? 1 : 0, d.droppedShafts, d.adjustedShafts, d.droppedFlights,
-    tdt.parkingConnected ?? NaN, tdt.peopleCount ?? NaN,
-    floors, basements, save.minutes, save.transports.length - flights, flights, save.star, save.money,
-    facts.headerNotes.length, tdt.warnings.length,
-  );
-  return { sim, notes: [...facts.headerNotes, ...tdt.warnings], name: sim.tower.towerName ?? undefined, record };
+  return { sim, notes: read.notes, name: sim.tower.towerName ?? undefined, record: read.record };
 }
 
 /** The tower as `.TDT` bytes and the `tdtExport` record. */
 export function writeTdt(sim: Simulation): { record: Float64Array; bytes: Uint8Array } {
-  const built = buildTDT(sim.serialize());
-  const { counts: c, stats: s, report } = built;
-  // prettier-ignore
-  const record = Float64Array.of(
-    1,
-    c.rooms, c.rentsSnapped, c.namesDropped, c.hotelStates, c.occupied, c.construction,
-    c.parkingStalls, c.burnedOut, c.vacancyHistoryLost, c.outOfRange,
-    s.balance, s.money, s.star, s.shaftsDropped, s.shaftsColliding, s.flightsDropped,
-    s.transportsDropped, s.elevatorsLen, s.walkwaysLen, s.expressLen,
-    report.floors, report.basements,
-  );
-  return { record, bytes: built.bytes };
+  return tdtCodec().write(JSON.stringify(sim.serialize()));
 }

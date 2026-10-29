@@ -14,8 +14,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { deflateSync } from "fflate";
-import { parseTDT } from "../../src/storage/tdtImport";
-import { buildTDT } from "../../src/storage/tdtExport";
+import { buildTDT, parseTDT } from "../../src/tests/conformance/tdtWasm";
 import { SAVE_VERSION } from "../../src/engine/saveMigration";
 import type { SerializedGame } from "../../src/engine/types";
 

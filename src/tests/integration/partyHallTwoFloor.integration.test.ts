@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, facilityFloors } from "../../engine/facilities";
 import { SAVE_VERSION } from "../../engine/saveMigration";
-import { buildTDT } from "../../storage/tdtExport";
-import { parseTDT } from "../../storage/tdtImport";
+import { buildTDT, parseTDT } from "../conformance/tdtWasm";
 import type { SerializedGame, Unit } from "../../engine/types";
 
 /**

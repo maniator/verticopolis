@@ -1,15 +1,47 @@
-import { GRID } from "../engine/facilities";
-import type { SerializedGame } from "../engine/types";
-import { TDT_ELEVATOR_SLOTS } from "./tdtConstants";
-import { legacyFilename } from "./tdtExportTables";
-import type { ExportCounts, GatheredTower } from "./tdtExportGather";
-import type { EncodeStats } from "./tdtEncoder";
+import { legacyFilename } from "./tdtFilename";
+
+/** The elevator slots a `.TDT` file holds. */
+const TDT_ELEVATOR_SLOTS = 24;
 
 /**
  * The reverse fidelity report for a `.TDT` export: an honest account of what
- * the 1994 format can and cannot carry. Extracted from `tdtExport.ts`; reads
- * the gather tally and the encode stats, invents nothing.
+ * the 1994 format can and cannot carry. Reads the export tally and the encode
+ * stats the Rust codec counts (the `tdtExport` record), invents nothing.
  */
+
+/** Loss/quirk tally of an export. */
+export interface ExportCounts {
+  rooms: number;
+  rentsSnapped: number;
+  namesDropped: number;
+  hotelStates: number;
+  occupied: number;
+  construction: number;
+  parkingStalls: number;
+  burnedOut: number;
+  vacancyHistoryLost: number;
+  outOfRange: number;
+}
+
+/** Numbers the report reads from the encode pass (header money/star + the
+ *  transport drops counted while writing the tables). */
+export interface EncodeStats {
+  balance: number;
+  money: number;
+  star: number;
+  shaftsDropped: number;
+  shaftsColliding: number;
+  flightsDropped: number;
+  transportsDropped: number;
+  /** Elevator/walkway counts BEFORE the table caps, for the report's tallies. */
+  elevatorsLen: number;
+  walkwaysLen: number;
+  /** Express shafts written. The retail game loses every shaft after the FIRST
+   *  express slot in files WE write (our express records are span-sized, doc
+   *  §8), so anything past one costs the player real transport in 1994 and
+   *  the report has to say so. See `tdt-express-desync`. */
+  expressLen: number;
+}
 
 /** What the reverse fidelity modal shows before the player downloads. */
 export interface ExportReport {
@@ -29,9 +61,8 @@ export interface ExportReport {
   staysBehind: string[];
 }
 
-/** The numbers an export report reads. `buildTDT` derives them from the
- *  gather tally and the encode stats ({@link buildExportReport}); the engine
- *  port answers them as the `tdtExport` record, with the tower's name. */
+/** The numbers an export report reads: the engine port answers them as the
+ *  `tdtExport` record, with the tower's name. */
 export interface ExportReportFacts {
   towerName: string;
   counts: ExportCounts;
@@ -39,24 +70,6 @@ export interface ExportReportFacts {
   /** The highest floor and the basement levels the file can contain. */
   topFloor: number;
   basements: number;
-}
-
-export function buildExportReport(save: SerializedGame, gathered: GatheredTower, stats: EncodeStats): ExportReport {
-  let topFloor = 0;
-  let basements = 0;
-  for (const [floor] of gathered.extents) {
-    // Count only floors the encoded file can contain (TDT rows 0-109): a
-    // skipped out-of-range room widened extents the reserved rows never
-    // echo, and the modal facts must match the bytes.
-    if (floor < GRID.minFloor || floor > GRID.maxFloor) continue;
-    if (floor > topFloor) topFloor = floor;
-    if (floor < 1) basements = Math.max(basements, 1 - floor);
-  }
-  // A save without a string name still exports (the bytes carry no name), so
-  // the report reads it as an empty name and the file falls back to TOWER1
-  // rather than throwing (#887).
-  const towerName = typeof save.towerName === "string" ? save.towerName : "";
-  return exportReport({ towerName, counts: gathered.counts, stats, topFloor, basements });
 }
 
 /** The reverse fidelity report from its numbers. */

@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.60.0
+
+- Exporting a tower to SimTower's .TDT format now keeps the game clock to the minute, so a tower you export and import again reads the same time.
+- Shops, restaurants and fast food places from a SimTower save now arrive with a style instead of an unset one.
+
 ## 2.59.0
 
 - Towers saved by the original 1997 SimTower now bring over their elevators and stairs when you import a .TDT file, including towers with express elevators.

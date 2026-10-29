@@ -4,8 +4,7 @@ import { Simulation } from "../../engine/Simulation";
 import { GRID, attendanceCap } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { drawRoom, type RoomCtx } from "../../render/pixelSprites";
-import { buildTDT } from "../../storage/tdtExport";
-import { parseTDT } from "../../storage/tdtImport";
+import { buildTDT, parseTDT } from "../conformance/tdtWasm";
 import type { FacilityKind, Unit } from "../../engine/types";
 
 /**

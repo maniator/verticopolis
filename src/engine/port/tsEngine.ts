@@ -9,6 +9,7 @@ import type { SerializedGame } from "../types";
 import type { CalendarKind } from "../calendar";
 import type { GameMode } from "../types";
 import * as cmd from "./commands";
+import { prepareTdtCodec } from "./tdtCodec";
 import { deserializeSave, message, readVctower, stageTdt, writeTdt, writeVctower, type StagedTdt } from "./files";
 import { VIEW_LAYOUT, VIEW_LAYOUT_TEXT } from "./layout";
 import { MetaLog } from "./metaLog";
@@ -229,6 +230,12 @@ export class TsEngine implements PortState {
       this.reason = message(e);
       return undefined;
     }
+  }
+
+  /** Load the Rust engine package the `.TDT` codec runs on; `loadTdt` and
+   *  `tdtExport` refuse until it has loaded. */
+  prepareTdt(): Promise<void> {
+    return prepareTdtCodec();
   }
 
   /** Read and stage a `.TDT` file; the live tower waits for `adoptTdt`. */

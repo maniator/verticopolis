@@ -14,7 +14,7 @@ import {
   TDT_RETAIL_SLOTS,
   TDT_STAIR_RECORD_SIZE,
   TDT_STAIR_SLOTS,
-} from "../../storage/tdtFormat";
+} from "./tdtLayout";
 
 /**
  * Declarative synthetic `.TDT` byte-buffer builder for the importer tests.

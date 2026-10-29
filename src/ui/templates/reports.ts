@@ -1,7 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { TOWER_FILE_EXT } from "../../storage/SaveGame";
-import type { ImportReport } from "../../storage/tdtImport";
-import type { ExportReport } from "../../storage/tdtExport";
+import type { ImportReport } from "../../storage/tdtImportReport";
+import type { ExportReport } from "../../storage/tdtExportReport";
 
 /**
  * The TDT import/export report dialogs plus the export-choice modal. Authored to

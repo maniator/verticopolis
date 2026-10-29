@@ -109,14 +109,15 @@ npx tsx tools/simtower/vctower-to-tdt.ts path/to/tower.vctower [...]
 # -> tools/simtower/saves/TOWER<n>.TDT   (load these in the game)
 ```
 
-Decodes the `.vctower` container and runs the engine's own `buildTDT`, imported
-directly under `tsx`, so it can't drift from what ships.
+Decodes the `.vctower` container and runs the Rust engine's `.TDT` exporter
+through its WASM package (`src/tests/conformance/tdtWasm.ts`), so it is the codec
+the game ships. Build the package first with `npm run wasm:build`.
 
 ### Import a real `.TDT` into our engine (`tdt -> vctower`)
 
 ```bash
 npx tsx tools/simtower/tdt-to-vctower.ts saves/TSTSAVE.TDT [--diff-empty]
-# runs the engine's parseTDT, prints a summary + fidelity notes, writes a
+# runs the Rust engine's .TDT importer (WASM package), prints a summary + fidelity notes, writes a
 # .imported.vctower. --diff-empty also byte-diffs our empty-tower export against
 # the input (a real empty save), which is how the undersized-trailing export bug
 # was found.

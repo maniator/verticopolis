@@ -4,8 +4,7 @@ import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, CLINIC_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { AMUSEMENTS_LOOKS, BOUTIQUE_LOOKS, CLINIC_LOOKS, FASTFOOD_LOOKS, FITNESS_LOOKS, FOODHALL_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../../render/pixelSprites";
-import { buildTDT } from "../../storage/tdtExport";
-import { parseTDT } from "../../storage/tdtImport";
+import { buildTDT, parseTDT } from "../conformance/tdtWasm";
 import type { FacilityKind } from "../../engine/types";
 
 /**

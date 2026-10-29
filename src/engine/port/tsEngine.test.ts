@@ -8,6 +8,9 @@ import { roomUnits, setRoomState, watchRooms } from "../tower/rooms";
 import { MetaLog } from "./metaLog";
 import { ONBOARDING_FLAG } from "./queries";
 import { TsEngine } from "./tsEngine";
+import { TDT_UNAVAILABLE, useTdtCodec } from "./tdtCodec";
+import { hasWasmPackage } from "../../tests/conformance/wasmEngine";
+import { installTdtCodec } from "../../tests/conformance/tdtWasm";
 import type { SerializedGame } from "../types";
 
 /**
@@ -359,7 +362,17 @@ describe("TsEngine's reports and files", () => {
     expect(e.lastReason()).toBe("not a tower save (the save is null)");
   });
 
-  it("writes, stages and adopts .TDT files", () => {
+  it("says the Rust package is needed when no .TDT codec is installed", () => {
+    useTdtCodec(undefined);
+    const e = engine();
+    expect(e.tdtExport()[0]).toBe(0);
+    expect(e.lastReason()).toContain(TDT_UNAVAILABLE);
+    expect(e.loadTdt(Uint8Array.of(0, 36), "X.TDT")[0]).toBe(0);
+    expect(e.lastReason()).toContain(TDT_UNAVAILABLE);
+  });
+
+  it.skipIf(!hasWasmPackage())("writes, stages and adopts .TDT files", () => {
+    installTdtCodec();
     expect(engine().tdtExport()[0]).toBe(0);
     const sim = Simulation.newGame(3, "classic");
     sim.money = 1e8;
