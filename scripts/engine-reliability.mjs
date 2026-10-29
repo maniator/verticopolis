@@ -71,7 +71,8 @@
  *   life it happened in, and a session that ran several counts once under
  *   each.
  * - Size-gated page lives are outside the rate; their count obeys every other
- *   filter.
+ *   filter. So are `marker-blocked` ones: the boot could not write its crash
+ *   marker, so it kept the request on TypeScript and never ran the engine.
  * - The bound is the exact one-sided 95% binomial upper bound (Clopper-Pearson)
  *   on faults over N: about 3/N with none, about 4.74/N with one.
  * - The size of a loop is kept: the report gives the fallbacks the counted
@@ -124,7 +125,7 @@ export const HOSTS = ["wasm", "wasm-frame", "wasm-worker"];
 export const BUILDS = ["switchable", "wasm-only"];
 /** Every `engine` value the game sends (`src/analyticsEngineStatus.ts`). */
 export const ENGINE_KINDS_SENT = ["ts", "wasm", "wasm-frame", "wasm-worker", "ts-fallback", "none"];
-export const REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other", "unclean-exit"];
+export const REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other", "unclean-exit", "marker-blocked"];
 
 /** A build's commit (`git rev-parse --short`, or `unknown` outside a checkout)
  *  and version, as the game sends them. */
@@ -337,7 +338,7 @@ export function summarizeReliability(pageLives, opts = {}) {
   const byArm = new Map();
   const byStage = new Map();
   const reasons = new Map();
-  const totals = { unsettledPageLives: 0, safetySuppressedPageLives: 0, crashLoopPageLives: 0, pageLives: 0, faultPageLives: 0, mismatchPageLives: 0, mismatchNeverRan: 0, unverifiablePageLives: 0, unverifiableNeverRan: 0, latchedPageLives: 0, sizeGatedPageLives: 0, unrecognizedPageLives: 0, totalFallbacks: 0, maxFallbacks: 0 };
+  const totals = { unsettledPageLives: 0, safetySuppressedPageLives: 0, crashLoopPageLives: 0, pageLives: 0, faultPageLives: 0, mismatchPageLives: 0, mismatchNeverRan: 0, unverifiablePageLives: 0, unverifiableNeverRan: 0, latchedPageLives: 0, sizeGatedPageLives: 0, markerBlockedPageLives: 0, unrecognizedPageLives: 0, totalFallbacks: 0, maxFallbacks: 0 };
   const bucket = (map, key) => {
     if (!map.has(key)) map.set(key, { sessions: new Set(), faults: new Set(), pageLives: 0, faultPageLives: 0 });
     return map.get(key);
@@ -360,6 +361,10 @@ export function summarizeReliability(pageLives, opts = {}) {
     }
     if (pl.sizeGated) {
       totals.sizeGatedPageLives++;
+      continue;
+    }
+    if (pl.reasons.includes("marker-blocked")) {
+      totals.markerBlockedPageLives++;
       continue;
     }
     const fellBack = pl.fallbacks > 0;
@@ -477,6 +482,7 @@ export function renderReliabilityMarkdown(summary, meta) {
     `| Cannot verify the engine files (outside the rate) | ${summary.unverifiableSessions} sessions, ${summary.unverifiablePageLives} page lives, ${summary.unverifiableNeverRan} of them never ran the engine |`,
     `| Engine writer latch-offs | ${summary.latchedSessions} sessions, ${summary.latchedPageLives} page lives |`,
     `| Size-gated page lives (outside the rate) | ${summary.sizeGatedPageLives} |`,
+    `| Kept on TypeScript because the crash marker could not be written (outside the rate) | ${summary.markerBlockedPageLives} |`,
     `| Page lives that made an attempt and never settled (outside the rate) | ${summary.unsettledPageLives} |`,
     `| Safety-suppressed page lives naming a counted host (on TypeScript; outside the rate) | ${summary.safetySuppressedPageLives} (${summary.crashLoopPageLives} reporting a crash loop, an engine fault the cohort section counts) |`,
     `| Unrecognized page lives (values the game never sends; left out) | ${summary.unrecognizedPageLives} |`,
