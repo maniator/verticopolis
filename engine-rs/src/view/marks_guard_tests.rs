@@ -273,8 +273,8 @@ fn branches(value: &str) -> Option<Vec<&str>> {
 /// The setters in `view/marks.rs` are the only engine writes of a room's
 /// frame fields and residents, a new unit's struct literal aside: a write
 /// anywhere else would leave the room unmarked, and a frame reader would
-/// keep showing its old value. The loaders (`load.rs`, `tdt/`) are scanned
-/// like any other file, with one exemption: `load.rs` fills a new tower's
+/// keep showing its old value. The loaders (`load/`, `tdt/`) are scanned like
+/// any other file, with one exemption: `load/assemble.rs` fills a new tower's
 /// list (`the_loader_fills_only_a_new_tower`). `save_delta.rs` lends the
 /// list out and puts it straight back, which is no write (`lent`), and the
 /// lobby brush lays a new unit in a slot a removal emptied
@@ -312,10 +312,10 @@ fn only_the_setters_write_the_frame_fields() {
         "let mut probe = &mut self.units[i]; probe.residents = None;"
     ));
     assert!(
-        !room("load.rs", "sim.tower.units = units;"),
+        !room("load/assemble.rs", "sim.tower.units = units;"),
         "the new tower"
     );
-    assert!(room("load.rs", "self.tower.units = rebuilt;"));
+    assert!(room("load/assemble.rs", "self.tower.units = rebuilt;"));
     assert!(room("x.rs", "sim.tower.units = units;"));
     assert!(
         writers.iter().all(|w| w.starts_with("view/marks.rs:")),
@@ -324,14 +324,15 @@ fn only_the_setters_write_the_frame_fields() {
     assert_eq!(writers.len(), 6, "{writers:?}");
 }
 
-/// `load.rs`'s one fill of a unit list, one of the list half's three
-/// exemptions, is of the tower `assemble` (the rest of `deserialize` and of
-/// the streamed reader) has just made with `Simulation::new`, whose mark log
-/// is new. The other, a list lent out and put back, is pinned by its cases.
+/// `load/assemble.rs`'s one fill of a unit list, one of the list half's three
+/// exemptions, is of the tower `assemble` (the rest of `deserialize` and of the
+/// streamed reader) has just made with `Simulation::new`, whose mark log is
+/// new. The other, a list lent out and put back, is pinned by its cases.
 #[test]
 fn the_loader_fills_only_a_new_tower() {
+    const LOAD_FILL: &str = "load/assemble.rs";
     let sources = engine_sources();
-    let load = sources.iter().find(|s| s.rel == "load.rs").unwrap();
+    let load = sources.iter().find(|s| s.rel == LOAD_FILL).unwrap();
     let fills: Vec<usize> = load
         .code
         .match_indices("sim.tower.units=units;")
@@ -347,9 +348,9 @@ fn the_loader_fills_only_a_new_tower() {
         let code = squeeze(rel.into(), line).code;
         !new_list_aside(rel, &code, unit_writes(&code, &[])).is_empty()
     };
-    assert!(!flagged("load.rs", "sim.tower.units = units;"));
-    assert!(flagged("load.rs", "self.tower.units = units;"));
-    assert!(flagged("load.rs", "sim.tower.units = rebuilt;"));
+    assert!(!flagged("load/assemble.rs", "sim.tower.units = units;"));
+    assert!(flagged("load/assemble.rs", "self.tower.units = units;"));
+    assert!(flagged("load/assemble.rs", "sim.tower.units = rebuilt;"));
     assert!(flagged("x.rs", "sim.tower.units = units;"));
     // A list lent out and put straight back (`save_delta.rs`), in any file:
     // the take, what comes between, the return, and whether it is flagged.

@@ -171,3 +171,93 @@ fn ids_are_repaired_units_first() {
     assert_eq!(repair_entity_ids(&mut both, &mut [], None), next);
     assert_eq!(both, [units, transports].concat());
 }
+
+/// Saved sets restore in first-seen order and in linear time (#1252): a hand-
+/// edited save with a hundred thousand distinct entries must not freeze
+/// the tab, and +0 and -0 stay one value as in a TypeScript `Set`.
+#[test]
+fn saved_sets_restore_in_first_seen_order_without_quadratic_scans() {
+    let n = 100_000_u32;
+    let mut ids: Vec<Value> = (0..n).map(|i| json!(f64::from(i) + 0.5)).collect();
+    ids.extend([json!(0.0), json!(-0.0), json!(1.5), json!(null), json!("x")]);
+    let words: Vec<Value> = (0..n).map(|i| json!(format!("w{i}"))).collect();
+    let mut dup_words = words.clone();
+    dup_words.extend(words.iter().take(10).cloned());
+    let data = json!({ "blockbusters": ids, "milestones": dup_words, "excavated": words });
+    let start = std::time::Instant::now();
+    let sim = assemble(&data, Vec::new(), Vec::new(), &json!({}));
+    assert!(
+        start.elapsed().as_secs() < 5,
+        "restoring the sets took {:?}",
+        start.elapsed()
+    );
+    assert_eq!(sim.blockbusters.len(), n as usize + 1);
+    assert_eq!(sim.blockbusters[0], 0.5);
+    assert_eq!(
+        sim.blockbusters[n as usize], 0.0,
+        "-0 joins the +0 already kept"
+    );
+    assert_eq!(sim.milestones.len(), n as usize);
+    assert_eq!(sim.milestones[9], "w9");
+    assert_eq!(sim.excavated.len(), n as usize);
+}
+
+/// A version 1 save with parking on many distinct floors re-lays in linear
+/// time (#1282): each floor's parking is grouped once, not found by a scan of
+/// every room per floor. Four times the floors may take about four times as
+/// long; the scan per floor took sixteen.
+#[test]
+fn legacy_parking_on_many_floors_reflows_without_a_scan_per_floor() {
+    let reflow = |n: i64| {
+        let units: Vec<Value> = (0..n)
+            .map(|i| json!({ "kind": "parking", "floor": i + 100, "x": 7, "width": 3 }))
+            .collect();
+        let start = std::time::Instant::now();
+        let out = crate::load::reflow_v1_to_v2(&json!({ "version": 1, "units": units }));
+        let took = start.elapsed();
+        let floors: Vec<i64> = out["units"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|u| u["kind"] == "parking")
+            .map(|u| u["floor"].as_i64().unwrap())
+            .collect();
+        assert_eq!(
+            floors,
+            (100..100 + n).collect::<Vec<_>>(),
+            "floor order kept"
+        );
+        took
+    };
+    let small = reflow(10_000);
+    let large = reflow(40_000);
+    assert!(
+        large < small * 8,
+        "10,000 floors took {small:?}, 40,000 took {large:?}"
+    );
+}
+
+/// A version 5 save with thousands of party halls and nowhere to put them
+/// drops each without its own search of every floor and column (#1282): the
+/// same width fails the same way until a placement changes the floor plan.
+/// The search per hall took about a second for every thousand halls.
+#[test]
+fn legacy_party_halls_with_no_room_fail_without_a_search_each() {
+    let n = 10_000_i64;
+    let units: Vec<Value> = (0..n)
+        .map(|i| json!({ "kind": "partyHall", "floor": 10 + i % 50, "x": 5, "width": 8 }))
+        .collect();
+    let start = std::time::Instant::now();
+    let out = crate::load::expand_legacy_party_halls(&json!({ "version": 5, "units": units }));
+    assert!(
+        start.elapsed().as_secs() < 2,
+        "dropping the halls took {:?}",
+        start.elapsed()
+    );
+    assert!(
+        out["units"].as_array().unwrap().is_empty(),
+        "no hall had room"
+    );
+    let text = out["log"][0]["text"].as_str().unwrap();
+    assert!(text.starts_with(&format!("{n} party halls")), "{text}");
+}

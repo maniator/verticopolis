@@ -31,7 +31,7 @@ not replace it.
    measures this with `cargo llvm-cov`; the line floor in
    `.github/workflows/engine-rs.yml` only moves up.
 4. **Loader coercion has a table case.** A change to how a save field is
-   read (`src/engine/sim/serialization.ts`, `engine-rs/src/load.rs`, the
+   read (`src/engine/sim/serialization.ts`, `engine-rs/src/load.rs` and `load/`, the
    migrations) needs a row in `conformance/loader-cases.json`, written by
    `src/tests/integration/loaderCases.integration.test.ts` and replayed by
    the Rust `loader_cases` test. A `knownDivergence` marker is a recorded gap

@@ -197,7 +197,7 @@ fn place_before(code: &str, end: usize) -> &str {
 
 /// `writes` without the three list writes no reader can miss: the loader's
 /// one assignment of a new tower's unit list, `sim.tower.units = units;` in
-/// `load.rs`, where `sim` is the `Simulation::new` that `assemble` has just
+/// `load/assemble.rs`, where `sim` is the `Simulation::new` that `assemble` has just
 /// made, with its own mark log (`the_loader_fills_only_a_new_tower` pins
 /// that); a list lent out of a tower and put straight back (`lent`); and the
 /// lobby brush's one slot fill, `self.units[idx] = unit;` in
@@ -206,7 +206,7 @@ fn place_before(code: &str, end: usize) -> &str {
 /// (`the_brush_fills_only_an_emptied_slot` pins that).
 pub(super) fn new_list_aside(rel: &str, code: &str, writes: Vec<usize>) -> Vec<usize> {
     let filled = |at: usize| {
-        rel == "load.rs"
+        rel == "load/assemble.rs"
             && code[..at].ends_with("sim.tower.")
             && code[at..].starts_with("units=units;")
     };

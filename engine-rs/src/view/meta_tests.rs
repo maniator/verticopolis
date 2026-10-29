@@ -313,7 +313,7 @@ const META_READS: [&str; 18] = [
 /// `&mut` borrows, `ref mut` bindings, writes through a binding of that
 /// name) and its whole-unit writes. A new unit gets its metadata in a struct literal
 /// (`Tower::place`, the loaders), which the scan does not count, and the
-/// loader fills a new tower's list (`load.rs`, a new log and revision); the
+/// loader fills a new tower's list (`load/assemble.rs`, a new log and revision); the
 /// session oracle's metadata comparison covers both.
 fn metadata_writes(rel: &str, code: &str) -> Vec<usize> {
     let reads = Calls::Reading(&META_READS);
