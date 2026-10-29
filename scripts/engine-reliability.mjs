@@ -108,6 +108,7 @@ import { appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { lit, parseWindow, rowsToObjects, runQuery } from "./posthog-report.mjs";
 import { OVERRIDE_SELECTIONS, cohortCaveats, isSuppressed, renderCohortsMarkdown, suppressedFault, summarizeCohorts } from "./engine-reliability-cohorts.mjs";
+import { renderFloorsMarkdown, summarizeFloors } from "./engine-reliability-floors.mjs";
 
 /** The event the game sends. */
 export const EVENT = "engine_status";
@@ -459,7 +460,7 @@ export function renderReliabilityMarkdown(summary, meta) {
   const lines = [
     "# Engine reliability",
     "",
-    `> **Snapshot** of the ${meta.windowLabel} to ${meta.until} (UTC), production only: the page lives that settled (or made an attempt) in that window. It does not refresh: the live figure is this script run again (\`node scripts/engine-reliability.mjs\`), whose rules \`src/engine-reliability.test.ts\`, \`src/engine-reliability-cohorts.test.ts\` and \`src/engine-reliability-cohorts-report.test.ts\` pin.`,
+    `> **Snapshot** of the ${meta.windowLabel} to ${meta.until} (UTC), production only: the page lives that settled (or made an attempt) in that window. It does not refresh: the live figure is this script run again (\`node scripts/engine-reliability.mjs\`), whose rules \`src/engine-reliability.test.ts\`, \`src/engine-reliability-cohorts.test.ts\`, \`src/engine-reliability-cohorts-report.test.ts\` and \`src/engine-reliability-floors.test.ts\` pin.`,
     `> Counted: hosts ${meta.hosts.map(code).join(", ")}; builds ${meta.builds}; arms ${meta.arms}.`,
     "> **This overall rate is early telemetry** (plan 4.1, OD-2): it is never release evidence, so triage each failure, and do not publish it as a reliability figure. The 1,000-session gate counts the engaged eligible cohort under *Release evidence and safety* (#1090; the owner's direction of 2026-10-21), read beside the all-attempts safety denominator.",
     ...(meta.cohorts ? cohortCaveats(meta.cohorts, { eligibleShas: meta.eligibleShas ?? [] }) : []),
@@ -497,6 +498,7 @@ export function renderReliabilityMarkdown(summary, meta) {
     ...summary.byReason.map((r) => `| ${code(r.reason)} | ${r.pageLives} |`),
   );
   if (meta.cohorts) lines.push(...renderCohortsMarkdown(meta.cohorts, { eligibleShas: meta.eligibleShas ?? [], tailShas: meta.tailShas ?? [] }));
+  if (meta.floors) lines.push(...renderFloorsMarkdown(meta.floors));
   return lines.join("\n") + "\n";
 }
 
@@ -617,6 +619,7 @@ async function main() {
     truncated,
     crashesTruncated: crashes.truncated,
     cohorts,
+    floors: summarizeFloors(lives),
     eligibleShas,
     tailShas,
   });

@@ -100,6 +100,7 @@ export interface ReportMeta {
   truncated: boolean;
   crashesTruncated?: boolean;
   cohorts?: import("./engine-reliability-cohorts.mjs").CohortsSummary;
+  floors?: import("./engine-reliability-floors.mjs").StageFloor[];
   eligibleShas?: string[];
   tailShas?: string[];
 }

@@ -157,15 +157,15 @@ export const suppressedFault = (pl) => isSuppressed(pl) && faultReason(pl);
  *  loop a suppressed boot detected. Every table reads this one rule. */
 export const engineFault = (pl) => isFault(pl) || faultReason(pl);
 
-/** Whether a page life is eligible evidence (before engagement), or, with
- *  `settledOrNot`, would be had it reached its first tower. A settled page
- *  life that never ran the engine is neither; an `engaged` row stands in for
- *  a lost settle row. */
-export function isEligible(pl, eligibleShas, settledOrNot = false) {
+/** Whether a page life is in the cohort at `stage` on any commit: the
+ *  production host, drawn into the WASM arm by the cohort, not moved off it,
+ *  and running the engine (or, with `settledOrNot`, would be had it reached
+ *  its first tower). A settled page life that never ran the engine is
+ *  neither; an `engaged` row stands in for a lost settle row. */
+export function inStageCohort(pl, stage, settledOrNot = false) {
   return (
     pl.requested === ELIGIBLE_HOST &&
-    shaMatches(pl.sha, eligibleShas) &&
-    pl.stage === ELIGIBLE_STAGE &&
+    pl.stage === stage &&
     pl.assignedArm === "wasm" &&
     pl.selectedBy === "cohort" &&
     !isSuppressed(pl) &&
@@ -175,18 +175,26 @@ export function isEligible(pl, eligibleShas, settledOrNot = false) {
   );
 }
 
+/** Whether a page life is eligible evidence: the stage-3 cohort on a commit
+ *  the gate review names. */
+export const isEligible = (pl, eligibleShas, settledOrNot = false) => shaMatches(pl.sha, eligibleShas) && inStageCohort(pl, ELIGIBLE_STAGE, settledOrNot);
+
 /** Whether the page life engaged with the engine running. */
 export const engagedOnEngine = (pl) => pl.engaged && ENGINE_RUNNING.includes(pl.engagedEngine);
 
-/** A page life's time, for ordering: unparseable or missing sorts last. */
-const when = (pl) => {
-  const t = Date.parse(String(pl.firstSeen).replace(" ", "T"));
+/** A page life's time, for ordering: unparseable or missing sorts last.
+ *  A time without an offset is read as UTC: ordering needs one fixed zone,
+ *  never the machine's, where a daylight-saving gap can reorder two page
+ *  lives and flip a session's arm (#1249). */
+export const when = (pl) => {
+  const iso = String(pl.firstSeen).replace(" ", "T");
+  const t = Date.parse(iso.includes("T") && !/(Z|[+-]\d\d:?\d\d)$/i.test(iso) ? `${iso}Z` : iso);
   return Number.isFinite(t) ? t : Number.POSITIVE_INFINITY;
 };
 
 /** Group page lives by session, oldest first (ties by page life id), and give
  *  each session the arm of its first page life that carries one. */
-function bySession(pageLives) {
+export function bySession(pageLives) {
   const sessions = new Map();
   for (const pl of pageLives) {
     if (!sessions.has(pl.session)) sessions.set(pl.session, []);
@@ -211,7 +219,7 @@ const buildKey = (pl) => `${pl.version} (${pl.sha}, ${pl.build})`;
  *  reload keeps the session), which are charged to it as faults. A session
  *  with an override page life never qualifies; `overridden` counts those,
  *  and `overriddenFaults` the ones a fault the cohort would hold. */
-function cohort(sessions, pick, pickLoading, pickLoop, engagedOnly = true) {
+export function cohort(sessions, pick, pickLoading, pickLoop, engagedOnly = true) {
   const out = { n: 0, faults: 0, faultsOrLeft: 0, latched: 0, leftBeforeTower: 0, overridden: 0, overriddenFaults: 0, byEngagement: { command: 0, play: 0, unknown: 0, none: 0 } };
   const byBuild = new Map();
   for (const s of sessions) {
