@@ -12,7 +12,8 @@ import { offerRustCrashReport, type RustCrashApp } from "./ui/rustCrashDialog";
 import { parseEngineIdentity } from "./wasmhost/engineIdentity";
 import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, reloadSoon, tabStore } from "./engineCohort/crashReload";
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rustEngine";
-import { tsBootTower, type BootTower } from "./game/bootTower";
+import { storedSaveChars, tsBootTower, type BootTower } from "./game/bootTower";
+import { SIZE_GATE_ON, SIZE_GATE_THRESHOLD, sizeGateHolds } from "./engineCohort/config";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { noteEngineAttempt, noteEngineCrashReload, noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "./analyticsEngineStatus";
 import { startEngagementWatch } from "./game/engagementWatch";
@@ -268,10 +269,15 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     // A switchable build asks the staged cohort's policy (#1197): the URL, a
     // safety suppression, the Settings choice, then the cohort arm.
     const choice = __WASM_ONLY__ ? "wasm" : selectBootEngine();
+    // The size gate (#1197, stage 2, behind `SIZE_GATE_ON`): a cohort tower
+    // above the threshold boots on TypeScript before the package loads, never
+    // coded as a fallback. Measured the same way in both arms.
+    const sel = currentSelection();
+    const sizeGated = !__WASM_ONLY__ && SIZE_GATE_ON && sizeGateHolds({ on: SIZE_GATE_ON, stage: sel?.stage ?? 0, selectedBy: sel?.selectedBy, saveChars: storedSaveChars(), threshold: SIZE_GATE_THRESHOLD });
     // Counted before the package loads, so a load the tab never finishes is too (#1090).
-    const facts = selectionFacts(choice, currentSelection());
+    const facts = { ...selectionFacts(choice, sel), ...(sizeGated ? { boot: "ts" as const, sizeGated } : {}) };
     noteEngineAttempt({ build: __WASM_ONLY__ ? "wasm-only" : "switchable", ...facts });
-    const wantsRust = choice !== "ts";
+    const wantsRust = facts.boot !== "ts";
     // The cover says so after a short wait, when the package takes a while (#1132).
     const stopLoadingLine = wantsRust ? showEngineLoading() : () => {};
     const booted = wantsRust ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: (signal, onBuild) => loadWasmEngine(undefined, signal, { onBuild }) }) : typescriptBoot();
@@ -403,7 +409,9 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // A wasm-only build stopped at that crash and runs no TypeScript.
       try {
         const offered = !__WASM_ONLY__ && !onRust && canReportCrash(app) && offerRustCrashReport(app, __APP_SHA__);
-        const notice = offered ? null : stageNotice();
+        // The size gate's notice, for a tower it moved off the Rust engine (#1197).
+        const gatedOff = sizeGated && choice !== "ts" ? "This tower is larger than the Rust engine test covers yet, so it runs on the TypeScript engine." : null;
+        const notice = offered ? null : (gatedOff ?? stageNotice());
         if (notice) app.ui?.toast?.(notice);
       } catch (e) {
         console.error("[engine] could not show the engine test notice:", e);

@@ -79,6 +79,7 @@ export const ENGINE_STATUS_FIELDS = [
   "assigned_arm",
   "selected_by",
   "engaged_by",
+  "size_gated",
 ] as const satisfies readonly (keyof GameplayEvents["engine_status"])[];
 type MissingField = Exclude<keyof GameplayEvents["engine_status"], (typeof ENGINE_STATUS_FIELDS)[number]>;
 const everyField: [MissingField] extends [never] ? true : MissingField = true;
@@ -112,6 +113,8 @@ export interface EngineSettle {
   crashLoop?: boolean;
   /** The boot could not write its crash marker and runs TypeScript (`marker-blocked`). */
   markerBlocked?: boolean;
+  /** The size gate held this page life's tower on TypeScript (#1197). */
+  sizeGated?: boolean;
 }
 
 /** The boot stage of a failure, as analytics names it. A failure the settle
@@ -134,6 +137,7 @@ interface Status {
   stage: FallbackStage;
   fallbacks: number;
   cohort?: CohortFields;
+  sizeGated?: true;
 }
 
 let status: Status | null = null;
@@ -169,6 +173,7 @@ function send(s: Status, trigger: EngineStatusTrigger, engagedBy?: EngagedBy): v
   trackEvent("engine_status", {
     ...(cohortRows.on ? (s.cohort ?? cohortFields(null)) : {}),
     ...(engagedBy ? { engaged_by: engagedBy } : {}),
+    ...(s.sizeGated ? { size_gated: true } : {}),
     trigger,
     engine_requested: s.requested,
     engine: s.engine,
@@ -240,6 +245,7 @@ export function noteEngineSettled(settle: EngineSettle): void {
     stage: settle.failure ? STAGE_OF_BOOT[settle.failure.stage] : "none",
     fallbacks: failed ? 1 : 0,
     cohort: settle.cohort,
+    ...(settle.sizeGated ? { sizeGated: true as const } : {}),
   };
   reasonsSent.add(status.reason);
   send(status, "settle");

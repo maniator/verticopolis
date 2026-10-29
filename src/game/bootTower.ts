@@ -37,3 +37,14 @@ export function bootTower(port: EnginePort): BootTower {
 export function tsBootTower(): BootTower {
   return bootTower(new TsEngine(Simulation.newGame(BOOT_SEED)));
 }
+
+/** The stored save's length in characters, decoded, before any engine reads
+ *  it (0 with none): the size gate's measure (#1197). Reads only. */
+export function storedSaveChars(): number {
+  let chars = 0;
+  SaveGame.loadResult((text) => {
+    chars = text.length;
+    return true;
+  });
+  return chars;
+}

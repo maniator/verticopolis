@@ -235,6 +235,8 @@ export interface GameplayEvents {
     selected_by?: CohortFields["selected_by"];
     /** Only on `engaged` rows (#1090). */
     engaged_by?: EngagedBy;
+    /** Only on a page life the size gate held on TypeScript (#1197). */
+    size_gated?: true;
   };
 }
 
