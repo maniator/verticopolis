@@ -26,6 +26,7 @@ macro_rules! fac {
 mod rest;
 
 const fn join<const N: usize>(head: &[Facility], tail: &[Facility]) -> [Facility; N] {
+    assert!(head.len() + tail.len() == N);
     let mut out = [head[0]; N];
     let mut i = 0;
     while i < head.len() {

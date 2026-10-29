@@ -49,7 +49,7 @@ impl Simulation {
     pub fn advance_step(&mut self, dt_minutes: f64) {
         self.clock.advance(dt_minutes);
         let rush = self.rush_factor();
-        self.elevators.accumulate(&self.tower, dt_minutes, rush);
+        let population = self.elevators.accumulate(&self.tower, dt_minutes, rush);
         self.crowd.begin_step();
         // The renderer's queue projection, built once a step at its start
         // (`Crowd::queue_view`), as the TypeScript loop primes it.
@@ -68,6 +68,7 @@ impl Simulation {
             &mut self.tower,
             &self.clock,
             Some(self.weather),
+            population,
         );
         let move_minutes = dt_minutes.min(CROWD_MAX_STEP / CROWD_SECONDS_PER_MINUTE);
         let mut left = move_minutes;
