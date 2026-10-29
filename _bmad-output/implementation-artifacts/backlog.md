@@ -59,9 +59,13 @@ How items flow:
    TypeScript fallback also carries the `closes with TS removal` label.
    Every issue, open or closed, has a milestone: `3.0.0` (open work carries a
    `gate-1`, `gate-2` or `gate-3` label from the 3.0 priorities plan), `3.x`,
-   `Triage` (new or undecided), `Backlog` (deliberately parked enhancements
-   only), or `1.x` and `2.x` for closed work by release line. A bug is never in
-   `Backlog`, and a closed issue never stays there.
+   `Triage` (new or undecided, each gets a decision), `4.x` (Visual Renaissance:
+   renderer, art, UI polish and audio on the same simulation), `5.x` (deeper
+   simulation: economy, transport, tenants and 1994 parity), `Backlog`
+   (deliberately parked enhancements with no target version), or `1.x` and
+   `2.x` for closed work by release line. A bug is never in `Backlog`, and a
+   closed issue never stays there. Bugs that the renderer choice decides ride
+   with `4.x`; every other bug goes to `3.0.0`, `3.x` or `Triage`.
    When a row finishes, close the issue (completed or not planned) and set the
    `GH` cell to `—`; when an issue is closed on GitHub first, true up the row
    the same way in the next session that touches this file.
