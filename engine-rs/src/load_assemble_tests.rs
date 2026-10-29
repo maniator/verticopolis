@@ -236,3 +236,28 @@ fn legacy_parking_on_many_floors_reflows_without_a_scan_per_floor() {
         "10,000 floors took {small:?}, 40,000 took {large:?}"
     );
 }
+
+/// A version 5 save with thousands of party halls and nowhere to put them
+/// drops each without its own search of every floor and column (#1282): the
+/// same width fails the same way until a placement changes the floor plan.
+/// The search per hall took about a second for every thousand halls.
+#[test]
+fn legacy_party_halls_with_no_room_fail_without_a_search_each() {
+    let n = 10_000_i64;
+    let units: Vec<Value> = (0..n)
+        .map(|i| json!({ "kind": "partyHall", "floor": 10 + i % 50, "x": 5, "width": 8 }))
+        .collect();
+    let start = std::time::Instant::now();
+    let out = crate::load::expand_legacy_party_halls(&json!({ "version": 5, "units": units }));
+    assert!(
+        start.elapsed().as_secs() < 2,
+        "dropping the halls took {:?}",
+        start.elapsed()
+    );
+    assert!(
+        out["units"].as_array().unwrap().is_empty(),
+        "no hall had room"
+    );
+    let text = out["log"][0]["text"].as_str().unwrap();
+    assert!(text.starts_with(&format!("{n} party halls")), "{text}");
+}

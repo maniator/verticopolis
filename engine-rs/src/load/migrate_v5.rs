@@ -45,10 +45,19 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
         .collect();
     let mut kept: Vec<Value> = Vec::new();
     let mut dropped = 0;
+    // Widths whose search found no room since the last placement. Only a
+    // placement changes what a search sees, so the same width fails again
+    // without the floor-by-floor scan (a forged save with thousands of halls
+    // and nowhere to put them, #1282).
+    let mut no_room_for: HashSet<i64> = HashSet::new();
     for u in halls.iter().copied() {
         let w = (round(num(u.get("width"), Kind::PartyHall.facility().width as f64)) as i64)
             .min(LOT)
             .max(1);
+        if no_room_for.contains(&w) {
+            dropped += 1;
+            continue;
+        }
         let home_floor = (round(num(u.get("floor"), 1.0)) as i64).clamp(MIN_FLOOR, MAX_FLOOR - 1);
         let home_x = (round(num(u.get("x"), 0.0)) as i64).clamp(0, LOT - w);
         let span_clear = |hall_occ: &HashMap<i64, HashSet<i64>>, f_: i64, x: i64, w: i64| -> bool {
@@ -121,9 +130,11 @@ pub fn expand_legacy_party_halls(data: &Value) -> Value {
             }
         }
         let Some((pf, px)) = placed else {
+            no_room_for.insert(w);
             dropped += 1;
             continue;
         };
+        no_room_for.clear();
         for f in [pf, pf + 1] {
             for i in 0..w {
                 hall_occ.entry(f).or_default().insert(px + i);
