@@ -8,6 +8,7 @@ import type { PerfServer, ServedRequest } from "./server";
 import { launchOptions, type BrowserLaunch } from "./renderer";
 import { autosaveSeed, autosaveState, bootedTower } from "./savedStart";
 import { eachScenarioFresh } from "./scenarioPages";
+import { idleLoad } from "./idleLoad";
 import type { Scenario } from "./scenarios";
 import { frameStats, quantile } from "./stats";
 import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun, SavedStart, StartupSample, StepSummary } from "./types";
@@ -401,6 +402,8 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     run.coldSaved = await savedStarts(browser, opts, url, engine, run.page?.webgl?.renderer ?? null, listen, sink);
     for (const [name, r] of Object.entries(run.coldSaved)) log(`  rep ${rep} ${slot} ${name} saved tower: ${r.sample ? `cold ready ${r.sample.gameReadyMs?.toFixed(0)} ms` : `no sample (${r.error})`}`);
   }
+  // The package's load in a blank page (#1005), after everything else.
+  if (run.ok && browser && engine === "ts") run.wasmIdle = await idleLoad(server, () => newContext(browser, config, "block", noteLoss), within);
   await browser?.close().catch(() => {});
   return run;
 }
