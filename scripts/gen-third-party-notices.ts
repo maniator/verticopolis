@@ -48,6 +48,7 @@ import {
   type NoticePackage,
 } from "../src/build/thirdPartyNotices.ts";
 import { installedLinkProblems } from "../src/build/installedLinks.ts";
+import { MAPLESS_PUBLIC_SCRIPTS } from "../src/build/publicFiles.ts";
 import { ENGINE_THIRD_PARTY, engineRecordPackages } from "../src/build/rustNotices.ts";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR, ENGINE_GLUE, ENGINE_WASM } from "../src/wasmhost/enginePackageNames.ts";
 import { readLicenseFiles } from "./license-files.ts";
@@ -111,11 +112,14 @@ if (!existsSync(DIST)) fail(`${DIST} does not exist; run the build first`);
 const maps = filesUnder(DIST, (n) => /\.([mc]?js|css)\.map$/.test(n));
 if (maps.length === 0) fail("no sourcemaps in dist; they are needed to list the bundled packages");
 
-// Shipped JavaScript with no sourcemap would carry unlisted code. The only one
-// is the WASM engine's wasm-bindgen glue, which is attributed instead by the
-// record its build writes beside it (read below, #955).
+// Shipped JavaScript with no sourcemap would carry unlisted code. Two files
+// are allowed. The WASM engine's wasm-bindgen glue is attributed instead by
+// the record its build writes beside it (read below, #955). The project's own
+// plain scripts from src/public/ (MAPLESS_PUBLIC_SCRIPTS in
+// src/build/publicFiles.ts: the service worker's navigation fallback, #1345)
+// bundle no package.
 const ENGINE_GLUE_PATH = ENGINE_DIR + ENGINE_GLUE;
-const MAPLESS_JS_ALLOWED = new Set([ENGINE_GLUE_PATH]);
+const MAPLESS_JS_ALLOWED = new Set([ENGINE_GLUE_PATH, ...MAPLESS_PUBLIC_SCRIPTS]);
 const mapless = filesUnder(DIST, (n) => /\.[mc]?js$/.test(n))
   .filter((f) => !existsSync(`${f}.map`))
   .map((f) => relative(DIST, f).replace(/\\/g, "/"))

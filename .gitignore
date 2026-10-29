@@ -22,6 +22,8 @@ coverage/
 *.js
 !dist/*.js
 !eslint.config.js
+# The service worker's navigation fallback, a hand-written script shipped from src/public (#1345).
+!src/public/sw-navigation-fallback.js
 !vite.config.ts
 !vite-env.d.ts
 __pycache__/
