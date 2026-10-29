@@ -275,6 +275,28 @@ export function importInputs(): [string, Uint8Array, string?][] {
     parkingConnected: 302,
     routingTailBytes: 20_000,
   });
+  // An express whose payload no layout predicts (16 entries for 8 stops), with
+  // shafts after it: the walk loses sync, then finds each header by its shape.
+  const oddExpress: TdtSpec = {
+    elevators: [
+      { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [10, 25, 40, 55, 70, 85, 99, 100], payloadFloors: 16 },
+      { type: 1, cars: 6, x: 145, bottomFloor: 10, topFloor: 24 },
+      { type: 0, cars: 8, x: 321, bottomFloor: 10, topFloor: 100, serviced: [10, 40, 70, 100], payloadFloors: 16 },
+      { type: 2, cars: 3, x: 209, bottomFloor: 39, topFloor: 54 },
+    ],
+    stairs: [{ type: 1, x: 120, floor: 10 }],
+    parkingConnected: 302,
+    routingTailBytes: 20_000,
+    ffPayload: true,
+  };
+  add("layout-odd-express-resync", oddExpress);
+  // A deleted shaft leaves an empty slot after the odd express: the walk counts
+  // it from the distance, so the table still ends where the parking block starts.
+  const [odd, std, oddB, service] = oddExpress.elevators!;
+  add("layout-odd-express-hole", { ...oddExpress, elevators: [odd, null, std, null, oddB, service] });
+  // The same express with nothing recoverable behind it: the retry finds no
+  // header, so the table is refused with the old warning, never guessed.
+  add("layout-odd-express-alone", { ...oddExpress, elevators: oddExpress.elevators!.slice(0, 1) });
   const spanned: TdtSpec = {
     elevators: [
       { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [10, 55, 100] },

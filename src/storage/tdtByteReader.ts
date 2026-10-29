@@ -28,6 +28,16 @@ export class ByteReader {
     return this.pos;
   }
 
+  /** Move to an absolute offset inside the buffer, forward or back. */
+  seek(to: number): void {
+    if (to < 0 || to > this.bytes_.byteLength) {
+      throw new LegacyImportError(
+        `This SimTower save is cut short. The file ends in the middle of its ${this.block}.`,
+      );
+    }
+    this.pos = to;
+  }
+
   /** The underlying buffer, for tail structures we locate by scanning for a
    *  record signature rather than by a byte offset we can't pin down. */
   raw(): Uint8Array {

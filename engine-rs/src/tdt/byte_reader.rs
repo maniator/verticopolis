@@ -32,6 +32,18 @@ impl<'a> ByteReader<'a> {
         self.pos
     }
 
+    /// Move to an absolute offset inside the buffer, forward or back.
+    pub fn seek(&mut self, to: usize) -> Result<(), LegacyImportError> {
+        if to > self.bytes.len() {
+            return Err(LegacyImportError(format!(
+                "This SimTower save is cut short. The file ends in the middle of its {}.",
+                self.block
+            )));
+        }
+        self.pos = to;
+        Ok(())
+    }
+
     /// The underlying buffer, for tail structures located by signature scan.
     pub fn raw(&self) -> &'a [u8] {
         self.bytes

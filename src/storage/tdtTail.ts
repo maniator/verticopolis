@@ -13,147 +13,20 @@ import {
   TDT_FINANCE_SIZE,
   TDT_FLOOR_COUNT,
   TDT_MAX_PEOPLE,
-  TDT_MAX_STAIR_CROWD,
-  TDT_MAX_TILE,
   TDT_PARKING_SIZE,
   TDT_PERSON_RECORD_SIZE,
   TDT_RETAIL_RECORD_SIZE,
   TDT_RETAIL_SLOTS,
   TDT_STAIR_RECORD_SIZE,
-  TDT_STAIR_SCAN_WINDOW,
   TDT_STAMP_GENERATION,
   TDT_STAIR_SLOTS,
 } from "./tdtConstants";
-import type { TdtElevator, TdtStair, TdtTail } from "./tdtTypes";
+import type { TdtElevator, TdtTail } from "./tdtTypes";
+import { emptySlotsInGap, findNextHeader, MAX_BUILT_PAYLOAD, MIN_BUILT_PAYLOAD } from "./tdtElevatorResync";
+import { locateStairs, routingTailStartsAt, stairsTableStartsAt } from "./tdtStairs";
 import { stampedGeneration } from "./tdtStamp";
 
-/**
- * Locate and decode the 64 × 10-byte stairs/escalator table (doc §8) by
- * scanning for its record signature, starting at `from` (the end of the
- * elevator table). We scan rather than sum block sizes because the finance and
- * parking/lobby blocks between the elevator table and the stairs table are not
- * yet pinned down across saves; a real save put the stairs 436 bytes before our
- * summed offset, so the old arithmetic read zeros and lost every flight.
- *
- * A record is *empty* (built byte 0), *built* (built byte 1 with an in-range
- * type/tile/floor/crowd), or *bad* (anything else). We take the 64-record
- * window that is entirely empty-or-built and holds the MOST flights: the
- * surrounding finance/parking bytes contain out-of-range "built" bytes, so a
- * window overlapping them fails; and because the real table packs its flights
- * into the high slots, an earlier same-alignment window would clip the trailing
- * ones, so "first window with a flight" isn't enough. The earliest window that
- * ties for the maximum count is the true table origin. Returns the built
- * flights, or an empty array when the tower has no stairs (there is nothing to
- * anchor on, which is indistinguishable from an all-empty table and is the
- * common case, not an error).
- */
-/** Read one stairs record: 0 = empty slot, 1 = built flight, -1 = not a stair
- *  record at all. Shared by the scan and by {@link stairsTableStartsAt}. */
-function classifyStairRecord(bytes: Uint8Array, o: number): number {
-  const REC = TDT_STAIR_RECORD_SIZE;
-  const rd16 = (at: number): number => bytes[at] | (bytes[at + 1] << 8);
-  if (o + REC > bytes.length) return -1;
-  const built = bytes[o];
-  if (built === 0) return 0;
-  if (built !== 1) return -1;
-  const type = bytes[o + 1];
-  const x = rd16(o + 2);
-  const floor = rd16(o + 4);
-  if (type > 5) return -1;
-  // x >= 1: tile 0 is the lot's extreme left edge, never a real flight column, and
-  // rejecting it stops a lone "01 00 .." byte from posing as a stair at 0,0 (which
-  // would out-count a small real table). floor 0 (= B10) IS a valid TDT floor.
-  if (x < 1 || x > TDT_MAX_TILE) return -1;
-  if (floor >= TDT_FLOOR_COUNT) return -1; // floor is a TDT index 0..119; 0 = B10 is valid
-  if (rd16(o + 6) > TDT_MAX_STAIR_CROWD || rd16(o + 8) > TDT_MAX_STAIR_CROWD) return -1;
-  return 1;
-}
-
-export function locateStairs(bytes: Uint8Array, from: number): TdtStair[] {
-  const REC = TDT_STAIR_RECORD_SIZE;
-  const rd16 = (o: number): number => bytes[o] | (bytes[o + 1] << 8);
-  const classify = (o: number): number => classifyStairRecord(bytes, o);
-  // Bound the scan: the table sits just past the finance + parking/lobby blocks,
-  // well within a few KB of the elevator table even in tall towers. A window may
-  // run up against EOF (when the stairs table is the file's last structure, as in
-  // synthetic fixtures): the remaining slots are simply absent, not a mismatch.
-  const last = Math.min(bytes.length - REC, from + TDT_STAIR_SCAN_WINDOW);
-  let bestBase = -1;
-  let bestBuilt = 0;
-  for (let base = Math.max(0, from); base <= last; base++) {
-    let built = 0;
-    let ok = true;
-    for (let s = 0; s < TDT_STAIR_SLOTS; s++) {
-      const o = base + s * REC;
-      if (o + REC > bytes.length) break; // table ends at EOF; later slots absent
-      const c = classify(o);
-      if (c < 0) {
-        ok = false;
-        break;
-      }
-      built += c;
-    }
-    if (ok && built > bestBuilt) {
-      bestBuilt = built; // strictly-greater keeps the earliest window at the max
-      bestBase = base;
-    }
-  }
-  if (bestBase < 0) return []; // no built flights found: the tower has no stairs
-  const stairs: TdtStair[] = [];
-  for (let s = 0; s < TDT_STAIR_SLOTS; s++) {
-    const o = bestBase + s * REC;
-    if (o + REC > bytes.length) break;
-    if (bytes[o] === 1) stairs.push({ type: bytes[o + 1], x: rd16(o + 2), floor: rd16(o + 4) });
-  }
-  return stairs;
-}
-
-/**
- * Does the trailing routing region BEGIN exactly at `at`? Our writer emits that
- * region `0xFF`-filled (doc §11), so its first byte is `0xFF` and the byte
- * before it, the last of the stairs table, is not.
- *
- * That boundary is what makes this usable as an alignment marker. The region is
- * 25,600 bytes long, so "a run of 0xFF starts here" is true at 25,600 offsets;
- * only "the run STARTS here" is true at one. It is the marker of last resort for
- * the payload-layout choice, and the only one left for a tower with no
- * stairways, where the stairs table is 64 empty records and says nothing.
- */
-function routingTailStartsAt(bytes: Uint8Array, at: number): boolean {
-  const RUN = 64; // enough 0xFF to not be a coincidence, short enough to survive truncation
-  if (at <= 0 || at + RUN > bytes.length) return false;
-  if (bytes[at - 1] === 0xff) return false; // already inside the region, not at its start
-  for (let i = 0; i < RUN; i++) if (bytes[at + i] !== 0xff) return false;
-  return true;
-}
-
-/**
- * Could a COMPLETE stairs table start exactly at `at`? All 64 records must be
- * present and read as stair records, and at least one must be built.
- *
- * Completeness is the load-bearing part. This is only ever used as an alignment
- * marker, and accepting a table that runs into EOF lets a single residual
- * 10-byte stair-shaped record at the end of a TRUNCATED file corroborate a
- * layout that file does not have. `locateStairs` is the tolerant one, because
- * reading whatever flights survive is a different job from proving an offset.
- *
- * Note this is deliberately not "where did locateStairs find the table": that
- * scan takes the EARLIEST window holding the most built flights, and since an
- * all-zero record is a valid empty slot, a sparse table's window can begin up to
- * 63 records before its true start. Fine for reading the flights, useless as an
- * alignment marker, which is what the payload-layout choice needs.
- */
-export function stairsTableStartsAt(bytes: Uint8Array, at: number): boolean {
-  const REC = TDT_STAIR_RECORD_SIZE;
-  if (at < 0 || at + TDT_STAIR_SLOTS * REC > bytes.length) return false; // must be whole
-  let built = 0;
-  for (let s = 0; s < TDT_STAIR_SLOTS; s++) {
-    const c = classifyStairRecord(bytes, at + s * REC);
-    if (c < 0) return false;
-    built += c;
-  }
-  return built > 0;
-}
+export { locateStairs };
 
 /**
  * How a built elevator slot's payload is sized. Three writers have to be read:
@@ -217,15 +90,26 @@ interface TableWalk {
 
 const CUT_SHORT =
   "The elevator table is cut short, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.";
+const RESYNCED =
+  "Some of the save's elevators are stored in a layout we don't fully understand, so their shafts were found by searching the file. Check that your elevators look right.";
 const NOT_DOCUMENTED =
   "The elevator table doesn't match the documented layout, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.";
 
-/** Walk the 24-slot elevator table, sizing built payloads per `layout`. */
-function readElevatorTable(r: ByteReader, layout: PayloadLayout): TableWalk {
+/**
+ * Walk the 24-slot elevator table, sizing built payloads per `layout`. With
+ * `resync`, a header that does not parse after a built slot is not the end of
+ * the walk: the previous shaft's payload was sized wrong, so the next plausible
+ * header is searched for past that shaft's smallest possible payload and the
+ * walk goes on from there.
+ */
+function readElevatorTable(r: ByteReader, layout: PayloadLayout, resync = false): TableWalk {
   r.enterBlock("elevator table");
   const elevators: TdtElevator[] = [];
-  for (let slot = 0; slot < TDT_ELEVATOR_SLOTS; slot++) {
+  let prevHeader = -1;
+  let slotAfterPrev = 0;
+  for (let slot = 0; slot < TDT_ELEVATOR_SLOTS; ) {
     if (r.remaining() < TDT_ELEVATOR_HEADER_SIZE) return { elevators: null, warning: CUT_SHORT, end: r.offset() };
+    const headerAt = r.offset();
     const used = r.u8();
     const type = r.u8();
     const capacity = r.u8(); // byte 2; NOT a reliable kind signal (a real service shaft read 21). Kind comes from `type`; see TdtElevator.capacity.
@@ -238,7 +122,10 @@ function readElevatorTable(r: ByteReader, layout: PayloadLayout): TableWalk {
     const serviced = r.bytes(TDT_FLOOR_COUNT);
     const carHomes: number[] = [];
     for (let c = 0; c < 8; c++) carHomes.push(r.u8());
-    if (used === 0) continue; // empty slot: header only, no payload
+    if (used === 0) {
+      slot++; // empty slot: header only, no payload
+      continue;
+    }
     // `topFloor`/`bottomFloor` join the checked fields because the payload size
     // is derived from the span: an INVERTED or out-of-range pair would size the
     // skip below from garbage. A zero-height shaft is NOT rejected here (its
@@ -249,6 +136,25 @@ function readElevatorTable(r: ByteReader, layout: PayloadLayout): TableWalk {
       // guess, and every later slot would misalign. Bail to synthesis: the same
       // posture this reader takes for a bad type or car count, and safer than
       // skipping a guessed distance into the middle of a record.
+      if (resync && prevHeader >= 0) {
+        // The next shaft starts after this one's smallest possible payload and no
+        // later than its largest (a whole-tower span).
+        const afterHeader = prevHeader + TDT_ELEVATOR_HEADER_SIZE;
+        // The stretch up to a header is the previous shaft's payload (whole floors)
+        // and any empty slots between the two. Only one count of empty slots makes
+        // that add up, so a header that leaves none is not the next slot.
+        const found = findNextHeader(
+          r.raw(),
+          afterHeader + MIN_BUILT_PAYLOAD,
+          afterHeader + MAX_BUILT_PAYLOAD,
+          (o) => emptySlotsInGap(o - prevHeader, slotAfterPrev) >= 0,
+        );
+        if (found >= 0) {
+          slot = slotAfterPrev + emptySlotsInGap(found - prevHeader, slotAfterPrev);
+          r.seek(found); // read this slot again from the shaft's real header
+          continue;
+        }
+      }
       return { elevators: null, warning: NOT_DOCUMENTED, end: r.offset() };
     }
     // Built shafts append live passenger/queue state we deliberately skip: our
@@ -256,6 +162,9 @@ function readElevatorTable(r: ByteReader, layout: PayloadLayout): TableWalk {
     const payload = payloadSize(layout, type, bottomFloor, topFloor, serviced);
     if (r.remaining() < payload) return { elevators: null, warning: CUT_SHORT, end: r.offset() };
     r.skip(payload);
+    prevHeader = headerAt;
+    slot++;
+    slotAfterPrev = slot;
     elevators.push({ type, capacity, cars, x, topFloor, bottomFloor, serviced, carHomes });
   }
   return { elevators, end: r.offset() };
@@ -443,14 +352,30 @@ export function walkTolerantTail(r: ByteReader): TdtTail {
   // how they are told apart.
   // The layout is chosen for the whole file, and `chooseLayout` only answers
   // "serviced" when the file corroborates it, so there is no second-chance
-  // retry here. A retry that accepted the shorter walk merely because the
-  // documented one failed would take a TRUNCATED current-layout file for a
-  // legacy one: the short walk reads the zero fill as the remaining empty
+  // retry of a SHORTER layout. A retry that accepted the shorter walk merely
+  // because the documented one failed would take a TRUNCATED current-layout file
+  // for a legacy one: the short walk reads the zero fill as the remaining empty
   // headers and finishes where the honest walk correctly gave up, turning a
   // clean bail into a silent, wrong table with no parking and no stairs.
+  // The one retry below is a different kind: it keeps the chosen layout and
+  // runs only when a header after a built shaft fails to parse, then accepts
+  // a header only where its whole shape fits (see `tdtElevatorResync.ts`), so a
+  // truncated file, which fails on size and not on a header, never reaches it.
   const tableStart = r.offset();
   const reader = r;
-  const table = readElevatorTable(reader, chooseLayout(r.raw(), tableStart));
+  const layout = chooseLayout(r.raw(), tableStart);
+  let table = readElevatorTable(reader, layout);
+  if (table.elevators === null && table.warning === NOT_DOCUMENTED) {
+    // Some real saves size a shaft's payload by a rule none of the three layouts
+    // has (a 100-floor tower's express shafts, measured on a 1997 save). Walk
+    // again, finding each header by its shape.
+    reader.seek(tableStart);
+    const retry = readElevatorTable(reader, layout, true);
+    if (retry.elevators !== null) {
+      warnings.push(RESYNCED);
+      table = retry;
+    }
+  }
   if (table.elevators === null) {
     warnings.push(table.warning!);
     return tail;

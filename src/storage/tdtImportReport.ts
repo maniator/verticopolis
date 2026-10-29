@@ -172,6 +172,14 @@ export function importReport(facts: ImportReportFacts): ImportReport {
       `${counts.hotelRooms} hotel room${counts.hotelRooms === 1 ? "" : "s"}${states.length ? ` (${states.join(", ")})` : ", ready for guests"}.`,
     );
   }
+  if (counts.twinRooms > 0) {
+    // The original's twin room is our Double Room: same width, same two guests. A rename, not a loss.
+    broughtOver.push(
+      counts.twinRooms === 1
+        ? "Of those, 1 is a twin room, which is a Double Room here."
+        : `Of those, ${counts.twinRooms} are twin rooms, which are Double Rooms here.`,
+    );
+  }
   if (counts.venues > 0) {
     broughtOver.push(`${counts.venues} food, retail, and entertainment venue${counts.venues === 1 ? "" : "s"}.`);
   }
@@ -198,9 +206,6 @@ export function importReport(facts: ImportReportFacts): ImportReport {
     couldNotBring.push(
       `The save's elevator data couldn't be read, so a working layout was rebuilt from your floors (${shafts} shaft${shafts === 1 ? "" : "s"}).`,
     );
-  }
-  if (counts.twinRooms > 0) {
-    couldNotBring.push(`${counts.twinRooms} twin room${counts.twinRooms === 1 ? "" : "s"} imported as Double Rooms (the closest match).`);
   }
   if (counts.secom > 0) {
     couldNotBring.push(`${counts.secom} SECOM office${counts.secom === 1 ? "" : "s"} imported as Security (SECOM never shipped in the original).`);

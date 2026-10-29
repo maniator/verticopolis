@@ -174,7 +174,7 @@ etc.); an importer must merge parts into one unit, never place each part.
 | --- | --- | --- |
 | 0 | Empty floor | `floor` (structural pave) |
 | 3 | Hotel single | `hotelSingle` |
-| 4 | Hotel twin | `hotelDouble` (lossy name) |
+| 4 | Hotel twin | `hotelDouble` (our Double Room; same width and guests) |
 | 5 | Hotel suite | `hotelSuite` |
 | 6 | Restaurant | `restaurant` |
 | 7 | Office | `office` |
@@ -447,6 +447,18 @@ that skips most of what it spans.
 > floor it spans, so spanned and serviced predict the same size for them. The
 > spanned rule for standard and service still rests on the 2026-07-13
 > measurement below.
+
+> **Measured (u/invokes' 1997 saves, 2026-10-29, issue #1491).** Four real saves
+> from the 1997 game (`conformance/fixtures/tdt-reddit/`) read cleanly under the
+> stop rule for every express in the three towers of 30 to 61 floors (express
+> stops 4 to 14, spans up to 69 floors). The fourth, a 100-floor tower, writes both of its express shafts
+> (span 1 to 99, 11 and 12 stops) with **16** per-floor entries, a size no
+> layout above predicts; every standard and service shaft in it, including the one
+> that skips floors, matches the spanned rule. The importer finds the next shaft
+> header by shape when the table walk fails on a header (a built slot with
+> `used = 1`, type 0 to 2, 1 to 8 cars, a tile position and a stop at both ends of
+> its span), and says so in the import report. Why 16 is open (backlog
+> `tdt-express-desync`).
 
 > **Corrected (Verticopolis RE, 2026-07-13, Wine harness vs the real 1994
 > game):** the appended 348-byte block appears **ONCE per built shaft, not once

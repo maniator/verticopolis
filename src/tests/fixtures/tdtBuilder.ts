@@ -71,6 +71,10 @@ export interface ElevatorSpec {
   serviced?: number[];
   /** Home floor (TDT index) per car; defaults to bottomFloor. */
   carHomes?: number[];
+  /** Per-floor entries to write in this shaft's payload, whatever its span
+   *  or stops say. Reproduces the express shafts of a real 1997 100-floor save,
+   *  whose payload no documented layout predicts. */
+  payloadFloors?: number;
 }
 
 export interface StairSpec {
@@ -102,7 +106,7 @@ export interface TdtSpec {
    *  false truncates the tail after the retail table; the importer then
    *  falls back to synthesizing a transport layout. */
   includeTransports?: boolean;
-  elevators?: ElevatorSpec[];
+  elevators?: (ElevatorSpec | null)[];
   /** Size each built shaft's payload the way Verticopolis 2.9.0 and earlier did,
    *  one entry per SERVICED floor rather than per spanned floor. Only for
    *  testing the reader's fallback for those files; never for anything else. */
@@ -113,6 +117,11 @@ export interface TdtSpec {
    *  encodes a superseded layout so the reader's fallback can be tested. */
   spannedExpressPayload?: boolean;
   stairs?: StairSpec[];
+  /** Fill every built shaft's payload with `0xFF`, as the unused queue slots of
+   *  a real save's payload are, instead of zeros. A misaligned walk then fails
+   *  loudly on a `0xFF` header byte; over zero fill it reads empty slot headers
+   *  and loses the table without a sound. */
+  ffPayload?: boolean;
   /** The parking block's connected-stall count (default 0). */
   parkingConnected?: number;
   /** Zero bytes appended after the stairs table. Real saves carry a trailing
@@ -197,6 +206,9 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
   if (spec.includeTransports === false) return finish(chunks, spec);
 
   // ---- Elevator table: 24 entries -------------------------------------------
+  const payloadPad = (n: number) => {
+    for (let i = 0; i < n; i++) chunks.push(spec.ffPayload ? 0xff : 0);
+  };
   const elevators = (spec.elevators ?? []).slice(0, TDT_ELEVATOR_SLOTS);
   for (let slot = 0; slot < TDT_ELEVATOR_SLOTS; slot++) {
     const e = elevators[slot];
@@ -235,10 +247,12 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     // an inverted or fractional span and emit a fixture whose header and payload
     // disagree, which is exactly the loud early failure this call exists to give.
     const spannedSize = builtShaftPayloadSize(e.bottomFloor, e.topFloor);
-    if (spec.legacyServicedPayload) {
-      pad(builtShaftPayloadSize(1, Math.max(1, serviced.size)));
+    if (e.payloadFloors !== undefined) {
+      payloadPad(builtShaftPayloadSize(1, e.payloadFloors));
+    } else if (spec.legacyServicedPayload) {
+      payloadPad(builtShaftPayloadSize(1, Math.max(1, serviced.size)));
     } else if (spec.spannedExpressPayload) {
-      pad(spannedSize); // generation 1: every kind by span, express included
+      payloadPad(spannedSize); // generation 1: every kind by span, express included
     } else {
       // Count the stops the bitmap LOOP writes, not the spec's raw set: a spec
       // entry outside 0..119 (or outside the span) never reaches the file, so
@@ -246,7 +260,7 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
       // the suite a fixture that disagrees with every reader.
       let written = 0;
       for (const f of serviced) if (f >= 0 && f < TDT_FLOOR_COUNT && f >= e.bottomFloor && f <= e.topFloor) written++;
-      pad(builtShaftPayloadSizeFor(e.type, e.bottomFloor, e.topFloor, written));
+      payloadPad(builtShaftPayloadSizeFor(e.type, e.bottomFloor, e.topFloor, written));
     }
   }
 

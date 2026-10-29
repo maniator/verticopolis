@@ -5,6 +5,7 @@
 
 use super::byte_reader::ByteReader;
 use super::format::*;
+use super::resync::{empty_slots_in_gap, find_next_header, MAX_BUILT_PAYLOAD, MIN_BUILT_PAYLOAD};
 use super::stamp::stamped_generation;
 use super::types::{TdtElevator, TdtStair, TdtTail};
 
@@ -125,6 +126,18 @@ pub fn stairs_table_starts_at(bytes: &[u8], at: usize) -> bool {
     built > 0
 }
 
+/// Does a structure whose position we know sit where a table ending at `end`
+/// puts it: the stairs table after the finance and parking blocks, or the
+/// routing region one stairs table further on?
+fn table_end_anchored(bytes: &[u8], end: usize) -> bool {
+    let after_parking = end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE;
+    stairs_table_starts_at(bytes, after_parking)
+        || routing_tail_starts_at(
+            bytes,
+            after_parking + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE,
+        )
+}
+
 /// How a built elevator slot's payload is sized; see `tdtTail.ts`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum PayloadLayout {
@@ -180,15 +193,23 @@ struct TableWalk {
 }
 
 const CUT_SHORT: &str = "The elevator table is cut short, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.";
+const RESYNCED: &str = "Some of the save's elevators are stored in a layout we don't fully understand, so their shafts were found by searching the file. Check that your elevators look right.";
 const NOT_DOCUMENTED: &str = "The elevator table doesn't match the documented layout, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.";
 
-/// Walk the 24-slot elevator table, sizing built payloads per `layout`.
-fn read_elevator_table(r: &mut ByteReader, layout: PayloadLayout) -> TableWalk {
+/// Walk the 24-slot elevator table, sizing built payloads per `layout`. With
+/// `resync`, a header that does not parse after a built slot is not the end of
+/// the walk: the previous shaft's payload was sized wrong, so the next
+/// plausible header is searched for past that shaft's smallest possible
+/// payload and the walk goes on from there.
+fn read_elevator_table(r: &mut ByteReader, layout: PayloadLayout, resync: bool) -> TableWalk {
     r.enter_block("elevator table");
     let mut elevators = vec![];
+    let mut prev_header: Option<usize> = None;
+    let mut slot_after_prev = 0;
+    let mut slot = 0;
     // Every read below is guarded by the size check first, so the reader
     // cannot run short mid-slot; `expect` marks that invariant.
-    for _slot in 0..TDT_ELEVATOR_SLOTS {
+    while slot < TDT_ELEVATOR_SLOTS {
         if r.remaining() < TDT_ELEVATOR_HEADER_SIZE {
             return TableWalk {
                 elevators: None,
@@ -196,6 +217,7 @@ fn read_elevator_table(r: &mut ByteReader, layout: PayloadLayout) -> TableWalk {
                 end: r.offset(),
             };
         }
+        let header_at = r.offset();
         let used = r.u8().expect("header sized");
         let type_id = r.u8().expect("header sized");
         let capacity = r.u8().expect("header sized");
@@ -211,6 +233,7 @@ fn read_elevator_table(r: &mut ByteReader, layout: PayloadLayout) -> TableWalk {
             car_homes.push(r.u8().expect("header sized"));
         }
         if used == 0 {
+            slot += 1;
             continue;
         }
         if used != 1
@@ -219,6 +242,30 @@ fn read_elevator_table(r: &mut ByteReader, layout: PayloadLayout) -> TableWalk {
             || top_floor < bottom_floor
             || top_floor >= TDT_FLOOR_COUNT
         {
+            if let Some(prev) = prev_header.filter(|_| resync) {
+                // The next shaft starts after this one's smallest possible
+                // payload and no later than its largest (a whole-tower span).
+                let past_smallest_payload = prev + TDT_ELEVATOR_HEADER_SIZE + MIN_BUILT_PAYLOAD;
+                let within_largest_payload = prev + TDT_ELEVATOR_HEADER_SIZE + MAX_BUILT_PAYLOAD;
+                // The stretch up to a header is the previous shaft's payload
+                // (whole floors) and any empty slots between the two. Only one
+                // count of empty slots makes that add up, so a header that
+                // leaves none is not the next slot.
+                let gap_fits =
+                    |found: usize| empty_slots_in_gap(found - prev, slot_after_prev).is_some();
+                if let Some(found) = find_next_header(
+                    r.raw(),
+                    past_smallest_payload,
+                    within_largest_payload,
+                    gap_fits,
+                ) {
+                    let empty_slots =
+                        empty_slots_in_gap(found - prev, slot_after_prev).expect("accepted above");
+                    slot = slot_after_prev + empty_slots;
+                    r.seek(found).expect("found inside the file");
+                    continue;
+                }
+            }
             return TableWalk {
                 elevators: None,
                 warning: Some(NOT_DOCUMENTED),
@@ -234,6 +281,9 @@ fn read_elevator_table(r: &mut ByteReader, layout: PayloadLayout) -> TableWalk {
             };
         }
         r.skip(payload).expect("payload sized");
+        prev_header = Some(header_at);
+        slot += 1;
+        slot_after_prev = slot;
         elevators.push(TdtElevator {
             type_id,
             capacity,
@@ -261,7 +311,7 @@ fn choose_layout(bytes: &[u8], table_start: usize) -> PayloadLayout {
     let walk = |layout: PayloadLayout| -> TableWalk {
         let mut r = ByteReader::new(bytes);
         r.skip(table_start).expect("table start inside the file");
-        read_elevator_table(&mut r, layout)
+        read_elevator_table(&mut r, layout, false)
     };
     let current = walk(PayloadLayout::ExpressServiced);
     let ambiguous = current.elevators.as_ref().is_some_and(|es| {
@@ -272,14 +322,7 @@ fn choose_layout(bytes: &[u8], table_start: usize) -> PayloadLayout {
     if current.elevators.is_some() && !ambiguous {
         return PayloadLayout::ExpressServiced;
     }
-    let anchored = |end: usize| {
-        let after_parking = end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE;
-        stairs_table_starts_at(bytes, after_parking)
-            || routing_tail_starts_at(
-                bytes,
-                after_parking + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE,
-            )
-    };
+    let anchored = |end: usize| table_end_anchored(bytes, end);
     let spanned = walk(PayloadLayout::Spanned);
     let serviced = walk(PayloadLayout::Serviced);
     for (layout, w) in [
@@ -351,7 +394,17 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
 
     let table_start = r.offset();
     let layout = choose_layout(r.raw(), table_start);
-    let table = read_elevator_table(r, layout);
+    let mut table = read_elevator_table(r, layout, false);
+    if table.elevators.is_none() && table.warning == Some(NOT_DOCUMENTED) {
+        // Some real saves size a shaft's payload by a rule none of the three
+        // layouts has. Walk again, finding each header by its shape.
+        r.seek(table_start).expect("table start inside the file");
+        let retry = read_elevator_table(r, layout, true);
+        if retry.elevators.is_some() {
+            tail.warnings.push(RESYNCED.to_string());
+            table = retry;
+        }
+    }
     let Some(elevators) = table.elevators else {
         tail.warnings
             .push(table.warning.unwrap_or(CUT_SHORT).to_string());
