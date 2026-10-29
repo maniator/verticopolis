@@ -98,6 +98,13 @@ describe("when the cohort's paths run", () => {
 });
 
 describe("noteRustFailed", () => {
+  it("latches for a Settings choice of Rust while the cohort's fields are off", () => {
+    selectBootEngine("");
+    setCurrentSelection({ stage: 0, preference: "wasm", suppression: null, crashLoop: false, transition: "none", notice: "none", markerId: null, boot: "wasm", requested: "wasm", selectedBy: "setting", assignedArm: "ts" });
+    noteRustFailed("crash-loop", "trap-loop");
+    expect(readSafety(localStorage)).toMatchObject({ ok: true, value: { reason: "trap-loop", scope: "fault" } });
+  });
+
   it("leaves the records alone on a URL visit", () => {
     atStage(1, 3);
     expect(selectBootEngine("?engine=wasm")).toBe("wasm");

@@ -411,20 +411,20 @@ describe("selectEngine: crash loops", () => {
 });
 
 describe("selectEngine: with the safety path off", () => {
-  it("runs a stored Rust choice with no suppression and no crash marker, as main does", () => {
-    const s = withBucket(80);
-    setPreference(s, "wasm");
+  // A Settings choice of Rust runs the safety path whatever this says (the
+  // suite above), so these use the cohort's WASM arm.
+  it("runs the cohort's Rust arm with no suppression and no crash marker", () => {
+    const s = withBucket(3);
     latchSafety(s, { reason: "trap-tick", stage: "host", sha: "aaa1111", now: 5 });
     for (let i = 0; i < 4; i++) {
       const sel = selectEngine(env(s, { safetyOn: false, now: 1_000 + i * (STALE_MS + 1) }));
-      expect(sel).toMatchObject({ boot: "wasm", requested: "wasm", selectedBy: "setting", suppression: null, crashLoop: false, markerId: null });
+      expect(sel).toMatchObject({ boot: "wasm", requested: "wasm", selectedBy: "cohort", suppression: null, crashLoop: false, markerId: null });
     }
     expect(s.getItem(BOOT_MARKER_KEY)).toBeNull();
   });
 
   it("still runs Rust where the marker could not be written", () => {
     const s = withBucket(3);
-    setPreference(s, "wasm");
     const noMarker: KeyValueStore = { getItem: (k) => s.getItem(k), setItem: (k, v) => (k === BOOT_MARKER_KEY ? throwQuota() : s.setItem(k, v)), removeItem: (k) => s.removeItem(k) };
     expect(selectEngine(env(noMarker, { safetyOn: false }))).toMatchObject({ boot: "wasm", markerId: null });
   });
