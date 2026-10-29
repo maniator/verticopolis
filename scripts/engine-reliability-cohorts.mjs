@@ -157,15 +157,15 @@ export const suppressedFault = (pl) => isSuppressed(pl) && faultReason(pl);
  *  loop a suppressed boot detected. Every table reads this one rule. */
 export const engineFault = (pl) => isFault(pl) || faultReason(pl);
 
-/** Whether a page life is eligible evidence (before engagement), or, with
- *  `settledOrNot`, would be had it reached its first tower. A settled page
- *  life that never ran the engine is neither; an `engaged` row stands in for
- *  a lost settle row. */
-export function isEligible(pl, eligibleShas, settledOrNot = false) {
+/** Whether a page life is in the cohort at `stage` on any commit: the
+ *  production host, drawn into the WASM arm by the cohort, not moved off it,
+ *  and running the engine (or, with `settledOrNot`, would be had it reached
+ *  its first tower). A settled page life that never ran the engine is
+ *  neither; an `engaged` row stands in for a lost settle row. */
+export function inStageCohort(pl, stage, settledOrNot = false) {
   return (
     pl.requested === ELIGIBLE_HOST &&
-    shaMatches(pl.sha, eligibleShas) &&
-    pl.stage === ELIGIBLE_STAGE &&
+    pl.stage === stage &&
     pl.assignedArm === "wasm" &&
     pl.selectedBy === "cohort" &&
     !isSuppressed(pl) &&
@@ -175,18 +175,26 @@ export function isEligible(pl, eligibleShas, settledOrNot = false) {
   );
 }
 
+/** Whether a page life is eligible evidence: the stage-3 cohort on a commit
+ *  the gate review names. */
+export const isEligible = (pl, eligibleShas, settledOrNot = false) => shaMatches(pl.sha, eligibleShas) && inStageCohort(pl, ELIGIBLE_STAGE, settledOrNot);
+
 /** Whether the page life engaged with the engine running. */
 export const engagedOnEngine = (pl) => pl.engaged && ENGINE_RUNNING.includes(pl.engagedEngine);
 
-/** A page life's time, for ordering: unparseable or missing sorts last. */
-const when = (pl) => {
-  const t = Date.parse(String(pl.firstSeen).replace(" ", "T"));
+/** A page life's time, for ordering: unparseable or missing sorts last.
+ *  A time without an offset is read as UTC: ordering needs one fixed zone,
+ *  never the machine's, where a daylight-saving gap can reorder two page
+ *  lives and flip a session's arm (#1249). */
+export const when = (pl) => {
+  const iso = String(pl.firstSeen).replace(" ", "T");
+  const t = Date.parse(iso.includes("T") && !/(Z|[+-]\d\d:?\d\d)$/i.test(iso) ? `${iso}Z` : iso);
   return Number.isFinite(t) ? t : Number.POSITIVE_INFINITY;
 };
 
 /** Group page lives by session, oldest first (ties by page life id), and give
  *  each session the arm of its first page life that carries one. */
-function bySession(pageLives) {
+export function bySession(pageLives) {
   const sessions = new Map();
   for (const pl of pageLives) {
     if (!sessions.has(pl.session)) sessions.set(pl.session, []);
@@ -211,7 +219,7 @@ const buildKey = (pl) => `${pl.version} (${pl.sha}, ${pl.build})`;
  *  reload keeps the session), which are charged to it as faults. A session
  *  with an override page life never qualifies; `overridden` counts those,
  *  and `overriddenFaults` the ones a fault the cohort would hold. */
-function cohort(sessions, pick, pickLoading, pickLoop, engagedOnly = true) {
+export function cohort(sessions, pick, pickLoading, pickLoop, engagedOnly = true) {
   const out = { n: 0, faults: 0, faultsOrLeft: 0, latched: 0, leftBeforeTower: 0, overridden: 0, overriddenFaults: 0, byEngagement: { command: 0, play: 0, unknown: 0, none: 0 } };
   const byBuild = new Map();
   for (const s of sessions) {
@@ -451,6 +459,7 @@ export function cohortCaveats(c, meta) {
   if (!meta.eligibleShas.length) lines.push("> **No eligible commits named** (`--eligible-shas`), so nothing in this report is release evidence: every session is early telemetry.");
   if (partial(c.cohortFields)) lines.push(`> **The cohort fields are missing:** ${of(c.cohortFields)} that asked for the engine carry \`stage\` and \`assigned_arm\` (A4, #1197); the rest can never be eligible.`);
   if (partial(c.engagedRows)) lines.push(`> **Engagement is not fully measured:** ${of(c.engagedRows)} that settled on a counted host (on a named eligible commit, once commits are named) are on a build that sends an \`engaged\` row (the row waits for the owner's analytics approval), so the engaged cohort is empty or short because the row is missing, which says nothing about the engine.`);
+  if (c.unrecognizedSessions) lines.push(`> **Values the game never sends:** ${c.unrecognizedSessions} session${c.unrecognizedSessions === 1 ? " has a page life" : "s have page lives"} carrying one; each such page life is in no count below (#1248).`);
   if (partial(c.attemptRows)) lines.push(`> **Early exits are partly invisible:** ${of(c.attemptRows)} on a counted host are on a build that sends an \`attempt\` row; a tab closed or crashed while the engine loaded on a build without it is in no count.`);
   return lines;
 }

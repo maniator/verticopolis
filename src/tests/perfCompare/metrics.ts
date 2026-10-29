@@ -141,6 +141,14 @@ function picks(scenarios: readonly string[], throttles: readonly string[]): Pick
   for (const [metric, key] of [["fetch", "fetchMs"], ["compile", "compileMs"], ["instantiate", "instantiateMs"], ["first Engine", "firstEngineMs"]] as const) {
     out.push({ group: "wasm-load", scenario: "-", throttle: "1", metric: `cold ${metric}`, unit: "ms", better: "lower", value: (r) => r.wasmCold?.[key], engines: ["ts"] });
   }
+  // The load steps again in a blank page of a context of its own (#1005):
+  // no event loop of the app in the timings, and each way compiles on its own.
+  const idle = (metric: string, value: Pick["value"]) => out.push({ group: "wasm-load", scenario: "-", throttle: "1", metric, unit: "ms", better: "lower", value, engines: ["ts"] });
+  idle("idle fetch (headers)", (r) => r.wasmIdle?.buffered?.responseMs);
+  idle("idle fetch (body)", (r) => r.wasmIdle?.buffered?.bodyMs);
+  idle("idle compile (after the whole download)", (r) => r.wasmIdle?.buffered?.compileMs);
+  idle("idle streamed (headers)", (r) => r.wasmIdle?.streamed?.responseMs);
+  idle("idle streamed (request to module)", (r) => r.wasmIdle?.streamed?.totalMs);
   for (const s of scenarios) {
     out.push({ group: "memory", scenario: s, throttle: "1", metric: "adopt (load the save)", unit: "ms", better: "lower", value: (r) => r.scenarios[s]?.adoptMs });
     out.push({ group: "memory", scenario: s, throttle: "1", metric: "JS heap used", unit: "bytes", better: "lower", value: (r) => r.scenarios[s]?.memory.jsHeapUsedBytes });

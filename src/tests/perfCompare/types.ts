@@ -104,6 +104,23 @@ export interface StartupSample {
   servedAfterReady: ServedRequest[];
 }
 
+/** The package's load in a blank page (#1005), the two ways a page can take
+ *  it. Each way runs in a context of its own, because V8 keeps a compiled
+ *  module by its bytes and a second compile in the same process would answer
+ *  from that cache. A way that failed leaves its record `null` and says why
+ *  in `error`. */
+export interface IdleLoad {
+  /** The whole download, then `WebAssembly.compile` (what the old
+   *  `wasmCold` row timed, without the app's event loop in the way):
+   *  `responseMs` to the headers, `bodyMs` to read the bytes, `compileMs`. */
+  buffered: { responseMs: number; bodyMs: number; compileMs: number; bytes: number } | null;
+  /** `WebAssembly.compileStreaming` over the response, which compiles while
+   *  the bytes arrive: `responseMs` to the headers, `totalMs` from the request
+   *  to the module. */
+  streamed: { responseMs: number; totalMs: number } | null;
+  error: string | null;
+}
+
 /** One cold start with a scenario's save in the autosave slot (#1254), in a
  *  fresh context of the repetition's browser process. `sample` is set only
  *  when every check passed (the requested engine ran, the boot loaded the
@@ -175,6 +192,13 @@ export interface ProcessRun {
   cpuProbe: { unthrottledMs: number; throttledMs: number | null; rate: number; timed: Record<string, number> } | null;
   scenarios: Record<string, ScenarioRun>;
   wasmCold: { fetchMs: number; bytes: number; compileMs: number; instantiateMs: number; firstEngineMs: number } | null;
+  /** The package's download and compile in a blank same-origin page of a
+   *  context of its own, so no event loop of the app waits in the timings and
+   *  no earlier compile in the process answers from V8's module cache (#1005).
+   *  Auxiliary like the first visit: it runs on the TypeScript process only,
+   *  after every other measurement, and cannot fail the repetition. Absent in
+   *  results written before it and in repetitions that did not run it. */
+  wasmIdle?: IdleLoad;
   /** The audio start of the audio-on frame pass: the last scenario's page, since each scenario starts audio in its own. */
   audio: { started: boolean; muted: boolean; contexts: string[] } | null;
   /** A first visit with the service worker allowed, then an offline

@@ -35,6 +35,21 @@ describe("aggregate", () => {
     expect(aggregate(runs(), ["small"], [1], null).some((r) => r.group === "wasm-load")).toBe(true);
   });
 
+  it("reports the idle-page load steps on the TypeScript process, and nothing for a result that predates them (#1005)", () => {
+    const rows = aggregate(runs(), ["small"], [1], null).filter((r) => r.metric.startsWith("idle "));
+    expect(rows.map((r) => r.metric)).toEqual([
+      "idle fetch (headers)",
+      "idle fetch (body)",
+      "idle compile (after the whole download)",
+      "idle streamed (headers)",
+      "idle streamed (request to module)",
+    ]);
+    expect(rows.every((r) => r.group === "wasm-load" && r.engine === "ts" && r.values.length > 0)).toBe(true);
+    expect(rows.find((r) => r.metric === "idle streamed (request to module)")!.summary!.median).toBe(45);
+    const old = aggregate([processRun(0, "ts", { wasmIdle: undefined })], ["small"], [1], null);
+    expect(old.filter((r) => r.metric.startsWith("idle ")).every((r) => r.values.length === 0)).toBe(true);
+  });
+
   it("gives an A/A comparison no verdict word, compares the boot-order rows, and names slots in skip reasons", () => {
     const rows = aggregate(aaRuns("ts"), ["small"], [1], "ts");
     const skipped: string[] = [];
