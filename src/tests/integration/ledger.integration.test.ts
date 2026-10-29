@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Ledger, WINDOW, ledgerCatFor } from "../../engine/Ledger";
 import { Simulation } from "../../engine/Simulation";
+import type { SerializedGame } from "../../engine/types";
 import { GRID } from "../../engine/facilities";
+import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 const W = GRID.width;
 const C = Math.floor(W / 2);
@@ -83,49 +85,44 @@ describe("Ledger (rolling income/expense record)", () => {
   });
 });
 
-describe("Income breakdown integration", () => {
-  it("records shop traffic income into the retail line as the tower runs", () => {
-    const sim = Simulation.newGame(77);
-    sim.money = 1e9;
-    sim.star = 3;
-    lay(sim, "lobby", 1);
-    lay(sim, "floor", 2);
-    sim.buildTransport("elevatorStandard", C, 1, 2);
-    const shop = sim.tower.place("shop", 2, 0);
-    sim.tower.units.find((u) => u.id === shop.unitId)!.state = "occupied";
-    // Occupied offices give the shop a demand pool to serve (income is
-    // demand-driven), so the retail line takes real dollars.
+/** A lit shop and three occupied offices on floor 2, served by an elevator.
+ *  Occupied offices give the shop a demand pool to serve (income is
+ *  demand-driven), so the retail line takes real dollars. */
+function shopTower(leg: Leg, seed: number): PortSim {
+  const draft = Simulation.newGame(seed);
+  draft.money = 1e9;
+  draft.star = 3;
+  lay(draft, "lobby", 1);
+  lay(draft, "floor", 2);
+  const sim = new PortSim(leg, draft);
+  sim.buildTransport("elevatorStandard", C, 1, 2);
+  sim.setup((d) => {
+    const shop = d.tower.place("shop", 2, 0);
+    d.tower.units.find((u) => u.id === shop.unitId)!.state = "occupied";
     for (const x of [20, 32, 44]) {
-      const o = sim.tower.place("office", 2, x);
+      const o = d.tower.place("office", 2, x);
       expect(o.ok, o.reason).toBe(true);
-      sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
+      d.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
     }
+  });
+  return sim;
+}
+
+describeEngines("Income breakdown integration", (leg) => {
+  it("records shop traffic income into the retail line as the tower runs", () => {
+    const sim = shopTower(leg, 77);
     // Run a few days so the shop earns during its open hours and days roll over.
     for (let d = 0; d < 3; d++) sim.tick(60 * 24);
-    const { averages, hasData } = sim.incomeBreakdown();
+    const { averages, hasData } = sim.state.incomeBreakdown();
     expect(hasData).toBe(true);
     expect(averages.retail).toBeGreaterThan(0); // the shop is on the retail line
   });
 
   it("survives save/load with its accrued figures intact", () => {
-    const sim = Simulation.newGame(78);
-    sim.money = 1e9;
-    sim.star = 3;
-    lay(sim, "lobby", 1);
-    lay(sim, "floor", 2);
-    sim.buildTransport("elevatorStandard", C, 1, 2);
-    const shop = sim.tower.place("shop", 2, 0);
-    sim.tower.units.find((u) => u.id === shop.unitId)!.state = "occupied";
-    // Occupied offices give the shop a demand pool to serve (income is
-    // demand-driven), so the retail line takes real dollars.
-    for (const x of [20, 32, 44]) {
-      const o = sim.tower.place("office", 2, x);
-      expect(o.ok, o.reason).toBe(true);
-      sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
-    }
+    const sim = shopTower(leg, 78);
     for (let d = 0; d < 3; d++) sim.tick(60 * 24);
-    const before = sim.incomeBreakdown().averages.retail;
-    const reloaded = Simulation.deserialize(sim.serialize());
-    expect(reloaded.incomeBreakdown().averages.retail).toBeCloseTo(before, 5);
+    const before = sim.state.incomeBreakdown().averages.retail;
+    const reloaded = new PortSim(leg, Simulation.deserialize(JSON.parse(sim.save()) as SerializedGame));
+    expect(reloaded.state.incomeBreakdown().averages.retail).toBeCloseTo(before, 5);
   });
 });
