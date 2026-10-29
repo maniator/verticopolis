@@ -315,7 +315,16 @@ Two startup rows in `report.md` need care:
   reliable: `initSync` takes 0.598 ms and the first `Engine.fromSave`
   29.65 ms.
 
-The load-step probe is tracked as `perf-compare-startup-rows` (#1005).
+Later runs of the harness separate the two causes (#1005). The `idle` rows of
+the same table are timed in a blank same-origin page, in a browser context of
+its own for each way, because V8 keeps a compiled module by its bytes and a
+second compile in one process would answer from that cache. `idle fetch`
+(headers and body) and `idle compile` are the buffered way, the whole
+download and then `WebAssembly.compile`; `idle streamed` is
+`WebAssembly.compileStreaming` over the response, request to module. The
+`cold` rows above stay as they were, timed on the live page, so a run lists
+both and the gap between them is the app event loop. The idle rows come
+from the TypeScript process only and are reported with no verdict.
 
 Later runs of the harness also split each start where boot first publishes its
 engine state, which both engines do just before the app is created. `engine

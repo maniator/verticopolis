@@ -91,6 +91,7 @@ export function processRun(rep: number, engine: EngineName, over: Partial<Proces
     },
     audio: { started: true, muted: false, contexts: ["running"] },
     wasmCold: engine === "ts" ? { fetchMs: 10, bytes: 1000, compileMs: 300, instantiateMs: 1, firstEngineMs: 20 } : null,
+    wasmIdle: engine === "ts" ? { buffered: { responseMs: 5, bodyMs: 12, compileMs: 40, bytes: 1000 }, streamed: { responseMs: 5, totalMs: 45 }, error: null } : undefined,
     firstVisitWithServiceWorker: { served: [{ path: "/", status: 200, bytes: 2000, encoding: "br" }], swActive: true, onlineEngineActive: engine, offlineEngineActive: "ts", onlinePageErrors: [], offlinePageErrors: [], error: null },
     ...over,
   };

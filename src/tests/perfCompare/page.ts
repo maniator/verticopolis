@@ -8,6 +8,8 @@
  * game, and return plain JSON.
  */
 
+import type { IdleLoad } from "./types";
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /** Init script for perf:compare, added after {@link installProbes} so its
@@ -340,6 +342,35 @@ export async function wasmColdLoad(arg: { wasmUrl: string; jsUrl: string; scenar
   glue.Engine.fromSave(save).free();
   const firstEngineMs = performance.now() - t;
   return { fetchMs, bytes: bytes.byteLength, compileMs, instantiateMs, firstEngineMs };
+}
+
+/**
+ * The package's download and compile, buffered (#1005): the headers, the
+ * body, then `WebAssembly.compile`. Run in a blank same-origin page that
+ * has compiled nothing, so the timings are the network and the compiler and
+ * not the app's event loop (`wasmColdLoad` awaits on the live page).
+ */
+export async function wasmIdleBuffered(arg: { wasmUrl: string }): Promise<NonNullable<IdleLoad["buffered"]>> {
+  let t = performance.now();
+  const response = await fetch(arg.wasmUrl, { cache: "no-store" });
+  const responseMs = performance.now() - t;
+  t = performance.now();
+  const bytes = await response.arrayBuffer();
+  const bodyMs = performance.now() - t;
+  t = performance.now();
+  await WebAssembly.compile(bytes);
+  return { responseMs, bodyMs, compileMs: performance.now() - t, bytes: bytes.byteLength };
+}
+
+/** The same package taken with `WebAssembly.compileStreaming`, as a page can
+ *  when nothing needs the bytes first. Run in its own fresh context (see
+ *  {@link IdleLoad}). */
+export async function wasmIdleStreamed(arg: { wasmUrl: string }): Promise<NonNullable<IdleLoad["streamed"]>> {
+  const t = performance.now();
+  const response = await fetch(arg.wasmUrl, { cache: "no-store" });
+  const responseMs = performance.now() - t;
+  await WebAssembly.compileStreaming(response);
+  return { responseMs, totalMs: performance.now() - t };
 }
 
 /** A fixed CPU-bound loop, timed: run once unthrottled and once under the
