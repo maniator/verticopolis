@@ -37,7 +37,7 @@ use crate::load::{
     parse_save_json, repair_lone_surrogates, unit_from_value, widen_shafts, UNIT_CAP,
 };
 use crate::sim::Simulation;
-use crate::tower::Unit;
+use crate::tower::{unit_list_headroom, Unit};
 
 /// The save version this reader takes. Its migration step is the one
 /// `streamed` applies, so a new save version means a new review of this file
@@ -263,7 +263,7 @@ impl<'de> Visitor<'de> for Units {
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-        let mut units = Vec::with_capacity(self.hint);
+        let mut units = Vec::with_capacity(self.hint + unit_list_headroom(self.hint));
         let mut ids = Vec::with_capacity(self.hint);
         while let Some(entry) = seq.next_element::<Value>()? {
             let Some((unit, id)) = unit_from_value(&entry, self.modern) else {

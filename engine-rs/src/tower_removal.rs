@@ -177,6 +177,12 @@ impl Tower {
                 idx
             }
             None => {
+                // A full list grows by a quarter, not a doubling, so the old
+                // block and the new one held together are 2.25 times the
+                // list, not 3 (#1259).
+                if self.units.len() == self.units.capacity() {
+                    self.units.reserve_exact((self.units.len() / 4).max(64));
+                }
                 self.units.push(unit);
                 self.units.len() - 1
             }
