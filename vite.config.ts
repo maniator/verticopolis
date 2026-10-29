@@ -9,6 +9,7 @@ import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices
 import { parseEngineBuild, type EngineBuild } from "./src/build/engineBundle";
 import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 import { tsEngineSourceHash } from "./src/build/tsEngineSources";
+import { convertedSuites } from "./src/tests/portKit/convertedList";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
@@ -270,6 +271,10 @@ function wasmParityProjects() {
     "**/wasmHostLogText.integration.test.ts",
     "**/wasmHostTelemetry.integration.test.ts",
   ];
+  // The suites converted to the engine port start both engines themselves
+  // (src/tests/portKit/converted.txt), so hosting their simulations here would
+  // run them on the mirror a second time.
+  const portSuites = convertedSuites();
   const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts", "src/tests/ci/testStartLogSetup.ts"];
   // Every hosted tick also syncs the engine's frame (and in tick mode merges
   // its save), so a fixture-driven test runs several times slower here.
@@ -286,7 +291,7 @@ function wasmParityProjects() {
         // engine behind the port, which the parity setup would host on the
         // Rust engine; the golden, reader and port contract integration
         // tests hold the two engines together.
-        exclude: [...configDefaults.exclude, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/dualrun/dualRun.test.ts", "**/engine/port/tsEngine.test.ts", "**/simport/viewReader.test.ts", "**/simport/engineContract.test.ts"],
+        exclude: [...configDefaults.exclude, ...portSuites, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/dualrun/dualRun.test.ts", "**/engine/port/tsEngine.test.ts", "**/simport/viewReader.test.ts", "**/simport/engineContract.test.ts"],
         setupFiles,
         testTimeout,
         hookTimeout: testTimeout,
@@ -297,7 +302,7 @@ function wasmParityProjects() {
       test: {
         name: "integrationWasm",
         include: ["src/**/*.integration.test.ts"],
-        exclude: [...configDefaults.exclude, ...typescriptSide],
+        exclude: [...configDefaults.exclude, ...typescriptSide, ...portSuites],
         setupFiles,
         testTimeout,
         hookTimeout: testTimeout,

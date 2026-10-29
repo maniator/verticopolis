@@ -142,6 +142,21 @@ Verticopolis has **two test tiers**:
     pinned as a named scenario in the fix PR. A run summary names its seed
     range and the `seed_block` and `seed_offset` that replay it.
 
+    **Suites on the engine port.** A converted suite does not build a
+    `Simulation` and poke it. It names its engines with `describeEngines`
+    (`src/tests/portKit/portSim.ts`) and drives one `PortSim` per test: port
+    commands (`build`, `buildTransport`, `tick`), the tooling-only members
+    (`startFire`, `bombThreat`, `setMoney`), and reads from `sim.state`, a
+    read-only copy of the engine's own save. A fixture's raw tower edits go
+    through `sim.setup(draft => ...)`, which opens the save as a draft, edits
+    it and loads it back, and works only before the first tick since a load.
+    The same body runs on the Rust engine and on `TsEngine`, so the Rust
+    engine is the authority and the TypeScript fallback keeps its coverage.
+    List a converted file in `src/tests/portKit/converted.txt` (a guard checks
+    the list): the WASM parity projects then leave it out, and
+    `npm run test:port` (part of `npm run test:wasm`) runs it with the Rust
+    leg required. Without the engine package the Rust leg skips.
+
     **The vitest tiers on the WASM engine.** `npm run test:wasm:parity` runs
     the `integrationWasm` and `unitWasm` projects, whose setup file hosts
     every `Simulation` a test ticks on the engine

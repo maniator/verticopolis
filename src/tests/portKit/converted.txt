@@ -1,0 +1,8 @@
+# The suites converted to the engine port (#878, #1421): each runs on the Rust
+# engine and on TsEngine through src/tests/portKit/portSim.ts, one path per
+# line. The WASM parity projects leave them out (they host nothing, since the
+# suite starts both engines itself), and `npm run test:port` runs them with the
+# Rust leg required. src/tests/portKit/converted.guard.test.ts keeps this list
+# and the files that use the kit in step.
+src/tests/integration/fire.integration.test.ts
+src/tests/integration/ledger.integration.test.ts
