@@ -6,7 +6,8 @@ use std::path::PathBuf;
 
 use serde_json::Value;
 use verticopolis_engine::tdt::format::{
-    TDT_ROUTING_TAIL_SIZE, TDT_STAIRS_GAP, TDT_STAIR_RECORD_SIZE, TDT_STAIR_SLOTS, TDT_STAMP_SIZE,
+    TDT_ROUTING_TAIL_SIZE, TDT_STAIRS_GAP, TDT_STAIR_FIRST_SLOT, TDT_STAIR_RECORD_SIZE,
+    TDT_STAIR_SLOTS, TDT_STAMP_SIZE,
 };
 use verticopolis_engine::tdt::tail::stairs_table_starts_at;
 use verticopolis_engine::tdt::{export_tdt, import_tdt};
@@ -97,6 +98,35 @@ fn an_export_reads_straight_through_with_every_express_shaft_kept() {
                 .count()
         };
         assert_eq!(express(&second), express(&first), "{name} express shafts");
+    }
+}
+
+/// Every flight is a single-story record, and the flights fill the table from
+/// slot 16, the way the game's own saves do.
+#[test]
+fn an_export_writes_one_single_story_record_per_flight_from_slot_16() {
+    for name in SAVES {
+        let first = save_of(&fixture(name), name);
+        let exported = export_tdt(&first.to_string()).expect("exports");
+        let table = TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE;
+        let stairs = exported.len() - TDT_STAMP_SIZE - TDT_ROUTING_TAIL_SIZE - table;
+        let flights = first["transports"]
+            .as_array()
+            .expect("transports")
+            .iter()
+            .filter(|t| matches!(t["kind"].as_str(), Some("stairs" | "escalator")))
+            .count();
+        let built: Vec<usize> = (0..TDT_STAIR_SLOTS)
+            .filter(|&s| exported[stairs + s * TDT_STAIR_RECORD_SIZE] == 1)
+            .collect();
+        assert_eq!(built.len(), flights, "{name}");
+        for &slot in &built {
+            let kind = exported[stairs + slot * TDT_STAIR_RECORD_SIZE + 1];
+            assert!(kind <= 1, "{name}: slot {slot} has multi-story type {kind}");
+        }
+        if flights > 0 && flights <= TDT_STAIR_SLOTS - TDT_STAIR_FIRST_SLOT {
+            assert_eq!(built[0], TDT_STAIR_FIRST_SLOT, "{name}");
+        }
     }
 }
 

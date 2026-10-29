@@ -195,6 +195,16 @@ pub fn gather_units<U: Borrow<Value>>(
                 if status != 0 {
                     counts.hotel_states += 1;
                     add_residents(&mut people_pop, &mut class_pop, u);
+                    // The finance block counts the guests in the rooms, so a
+                    // dirty or booked room, which the census counts for the
+                    // people block, holds none there.
+                    if let Some(class) = population_class(u.kind) {
+                        class_pop[class] -= resident_count(u);
+                        if u.state == "asleep" {
+                            class_pop[class] +=
+                                js_min(js_max(u.occupants, 1.0), HOTEL_OCCUPANT_MASK as f64);
+                        }
+                    }
                 }
             }
             if (u.kind == Kind::Office || u.kind == Kind::Condo) && !tenanted && u.ever_occupied {

@@ -94,6 +94,11 @@ pub fn population_class(kind: crate::facilities::Kind) -> Option<usize> {
 /// re-saves of them). A table written without the gap reads four bytes early.
 pub const TDT_STAIRS_GAP: usize = 4;
 pub const TDT_STAIR_SLOTS: usize = 64;
+/// The first slot the game fills: every save it wrote that has fewer than 64
+/// flights starts at slot 16, and a full table (64 flights) uses slots 0 to 15
+/// last. SimTower dropped the first 16 records of a file that filled the table
+/// from slot 0.
+pub const TDT_STAIR_FIRST_SLOT: usize = 16;
 pub const TDT_STAIR_RECORD_SIZE: usize = 10;
 /// The trailing routing/reachability region the exporter emits, 0xFF-filled.
 pub const TDT_ROUTING_TAIL_SIZE: usize = 0x6400;

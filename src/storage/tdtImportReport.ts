@@ -54,6 +54,8 @@ export interface ImportCounts {
   misplaced: number;
   clamped: number;
   widthMismatch: number;
+  /** People placed in offices, condos and hotel rooms from the file's own counts. */
+  residentsSeeded: number;
 }
 
 /** The numbers an import report reads: the engine port answers them as the
@@ -217,7 +219,11 @@ export function importReport(facts: ImportReportFacts): ImportReport {
       `${counts.widthMismatch} room${counts.widthMismatch === 1 ? " keeps" : "s keep"} the original's size, which differs from what new construction here would use.`,
     );
   }
-  if (counts.occupiedOffices + counts.soldCondos > 0) {
+  if (counts.residentsSeeded > 0) {
+    couldNotBring.push(
+      `${counts.residentsSeeded.toLocaleString()} residents and guests are here now, matching the save's counts; shoppers and diners return as the tower runs.`,
+    );
+  } else if (counts.occupiedOffices + counts.soldCondos > 0) {
     couldNotBring.push("Occupancy is approximate: any office or condo with people recorded imports as occupied.");
   }
   if (facts.peopleCount !== null && facts.peopleCount > 0) {

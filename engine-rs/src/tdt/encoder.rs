@@ -432,7 +432,11 @@ pub fn encode_tower(
         }
     }
     for slot in 0..TDT_STAIR_SLOTS {
-        let Some(s) = stair_records.get(slot) else {
+        // Flights fill the table from slot 16 and wrap to slot 0 only once the
+        // upper slots are full, the way the game allocates them.
+        let Some(s) =
+            stair_records.get((slot + TDT_STAIR_SLOTS - TDT_STAIR_FIRST_SLOT) % TDT_STAIR_SLOTS)
+        else {
             w.pad(TDT_STAIR_RECORD_SIZE);
             continue;
         };

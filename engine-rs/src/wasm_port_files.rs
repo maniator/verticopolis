@@ -19,7 +19,7 @@ use super::Engine;
 /// reads, and the number of `notes` (the header's) and `warnings` (the
 /// walk's) that `tdtNote(i)` reads, notes first. NaN marks a count the file
 /// does not carry. A refused file answers `[0]`.
-pub(crate) const LOAD_TDT: [&str; 43] = [
+pub(crate) const LOAD_TDT: [&str; 44] = [
     "status",
     "rooms",
     "offices",
@@ -48,6 +48,7 @@ pub(crate) const LOAD_TDT: [&str; 43] = [
     "misplaced",
     "clamped",
     "widthMismatch",
+    "residentsSeeded",
     "decoded",
     "droppedShafts",
     "adjustedShafts",
@@ -110,7 +111,7 @@ pub(crate) struct StagedTdt {
     name: Option<String>,
 }
 
-fn counts(c: &ImportCounts) -> [f64; 27] {
+fn counts(c: &ImportCounts) -> [f64; 28] {
     [
         c.rooms,
         c.offices,
@@ -139,6 +140,7 @@ fn counts(c: &ImportCounts) -> [f64; 27] {
         c.misplaced,
         c.clamped,
         c.width_mismatch,
+        c.residents_seeded,
     ]
     .map(|n| n as f64)
 }

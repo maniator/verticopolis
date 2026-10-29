@@ -626,6 +626,7 @@
       "misplaced",
       "clamped",
       "widthMismatch",
+      "residentsSeeded",
       "decoded",
       "droppedShafts",
       "adjustedShafts",

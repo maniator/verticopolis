@@ -56,11 +56,13 @@ fn the_real_1997_saves_bring_over_their_own_elevators_and_stairways() {
 }
 
 /// (file, people SimTower counts in offices, people it counts in condos), from
-/// the PC's per-class table for the nine saves (TOWER4's block holds no total).
-const RESIDENTS: [(&str, i64, i64); 7] = [
+/// the PC's per-class table for the nine saves (TOWER4's block is the same shape
+/// as the rest and totals 4,515; only the PC's lookup script missed it).
+const RESIDENTS: [(&str, i64, i64); 8] = [
     ("TOWER1.TDT", 528, 423),
     ("TOWER2.TDT", 1284, 915),
     ("TOWER3.TDT", 1620, 0),
+    ("TOWER4.TDT", 1620, 1131),
     ("TOWER5.TDT", 648, 0),
     ("TOWER6.TDT", 1272, 162),
     ("TOWER7.TDT", 1428, 462),

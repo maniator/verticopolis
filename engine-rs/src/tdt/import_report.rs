@@ -33,6 +33,8 @@ pub struct ImportCounts {
     pub misplaced: i64,
     pub clamped: i64,
     pub width_mismatch: i64,
+    /// People placed in offices, condos and hotel rooms from the file's counts.
+    pub residents_seeded: i64,
 }
 
 /// The transport decode's loss accounting, as the report reads it.

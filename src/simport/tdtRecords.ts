@@ -40,6 +40,7 @@ const IMPORT_COUNTS = [
   "misplaced",
   "clamped",
   "widthMismatch",
+  "residentsSeeded",
 ] as const satisfies readonly (keyof ImportCounts)[];
 
 const EXPORT_COUNTS = [
