@@ -233,7 +233,7 @@ describe("engine crate version rule", () => {
         unbumpedPins(record, {
           ...record,
           lockDigest: "0".repeat(16),
-          catalogVersion: 2,
+          catalogVersion: record.catalogVersion + 1,
         }),
       ).toEqual(["lockDigest", "catalogVersion"]);
     });
