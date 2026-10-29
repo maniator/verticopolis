@@ -1,7 +1,13 @@
-import type { Unit } from "./types";
+import type { FacilityKind, Unit } from "./types";
 import { isOperational } from "./types";
 import { FACILITIES } from "./facilitiesData";
 import { isCommercialKind } from "./facilityPredicates";
+
+/** The kinds whose units may carry their own household size: a condo and a
+ *  rental apartment. */
+export function hasOwnHousehold(kind: FacilityKind): boolean {
+  return kind === "condo" || kind === "rentalApartment";
+}
 
 /**
  * The number of people a unit contributes to the population census, the SINGLE
@@ -19,7 +25,7 @@ export function residentCount(u: Pick<Unit, "kind"> & { residents?: number }): n
   // that stamps it on an office can't inflate that office's head count.
   // Everything else, and any such unit without a household set, reads the flat
   // catalog population.
-  if ((u.kind === "condo" || u.kind === "rentalApartment") && u.residents !== undefined) return u.residents;
+  if (hasOwnHousehold(u.kind) && u.residents !== undefined) return u.residents;
   return FACILITIES[u.kind].population;
 }
 

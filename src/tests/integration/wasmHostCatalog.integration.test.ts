@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { catalogFor } from "../../engine/catalog";
+import { CATALOG_VERSION } from "../../engine/catalogTypes";
 import type { WasmModule } from "../../dualrun/binding";
 import { attachMirror } from "../../dualrun/mirror";
 import { attachWasmHost } from "../../wasmhost/wasmHost";
@@ -65,7 +66,7 @@ describe.skipIf(!hasWasmPackage())("a hosted tower reads the engine's catalog (#
 
   it("refuses a binding whose catalog this build cannot read, before building an engine", () => {
     const sim = Simulation.newGame(42, "classic");
-    const { mod, built } = countingModule((text) => text.replace('"version":1', '"version":99'));
+    const { mod, built } = countingModule((text) => text.replace(`"version":${CATALOG_VERSION},`, '"version":99,'));
     expect(() => attachWasmHost(sim, mod)).toThrow(/catalog is version 99/);
     expect(built()).toBe(0);
     expect(towerCatalog(sim)).toEqual(catalogFor("classic"));
@@ -140,7 +141,7 @@ describe.skipIf(!hasWasmPackage())("a hosted tower reads the engine's catalog (#
     // A Classic tower reads the Modern catalog too (its patronage yardstick),
     // so both modes are checked at attach.
     const sim = Simulation.newGame(44, "classic");
-    const { mod, built } = countingModule((text) => (text.includes('"mode":"modern"') ? text.replace('"version":1', '"version":99') : text));
+    const { mod, built } = countingModule((text) => (text.includes('"mode":"modern"') ? text.replace(`"version":${CATALOG_VERSION},`, '"version":99,') : text));
     expect(() => attachWasmHost(sim, mod)).toThrow(/catalog is version 99/);
     expect(built()).toBe(0);
     expect(towerCatalog(sim, "modern")).toEqual(catalogFor("modern"));

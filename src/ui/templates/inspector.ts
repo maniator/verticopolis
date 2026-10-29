@@ -1,7 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { isTenanted } from "../../engine/types";
-import { isCommercialKind, isElevatorKind, isOpenAt, residentCount } from "../../engine/facilities";
-import { catalogFacility, type Catalog } from "../../engine/catalogTypes";
+import { isCommercialKind, isElevatorKind } from "../../engine/facilities";
+import { catalogFacility, catalogOpenAt, catalogResidents, type Catalog } from "../../engine/catalogTypes";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
 import { floorTag } from "../format";
 
@@ -61,11 +61,11 @@ export function unitInspectorTemplate(u: UnitDetail, catalog: Catalog, hour: num
   // Attendance venues (cinema / party hall / wedding hall, catalog population
   // 0) show the same live line from their routed attendance tally: a mid-show
   // house must never inspect as empty while the audience is visibly seated.
-  const closed = isTenanted(u) && !isOpenAt(u.kind, hour);
+  const closed = isTenanted(u) && !catalogOpenAt(f, hour);
   let peopleLine: TemplateResult | typeof nothing = nothing;
   if ((isCommercialKind(u.kind) && f.population > 0) || f.attendance !== null)
     peopleLine = html`<div>Customers: ${u.customersIn ?? 0}${closed ? " (closed)" : ""}</div>`;
-  else if (f.population) peopleLine = html`<div>Occupants: ${u.occupants}/${residentCount({ kind: u.kind, residents: u.residents ?? undefined })}</div>`;
+  else if (f.population) peopleLine = html`<div>Occupants: ${u.occupants}/${catalogResidents(f, u.residents)}</div>`;
   return html`<h4 class="win-title">${title}</h4><div>${labelIsExtra ? html`${u.label}<br />` : nothing}${
     u.floor >= 1 ? `Floor ${u.floor}` : `B${1 - u.floor}`
   }</div><div>Status: ${statusText}</div>${peopleLine}${diagnostics}<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`;

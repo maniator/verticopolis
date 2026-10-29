@@ -10,7 +10,7 @@ import type { FacilityCategory, FacilityKind, GameMode } from "./types";
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 1;
+export const CATALOG_VERSION = 2;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -208,6 +208,13 @@ export interface CatalogFacility {
   readonly spendPerCustomer: number | null;
   /** A service facility's monthly maintenance, or null. */
   readonly upkeepMonthly: number | null;
+  /** Whether it is open in each hour of the day, 0 to 23, for a kind that
+   *  keeps business hours, else null (always open). */
+  readonly openHours: readonly boolean[] | null;
+  /** Whether a unit may carry its own household size (`residents`), which
+   *  then stands in for `population`; a condo's price scales with it against
+   *  the condo's `population`. */
+  readonly ownHousehold: boolean;
 }
 
 const facilityIndex = new WeakMap<Catalog, ReadonlyMap<FacilityKind, CatalogFacility>>();
@@ -236,4 +243,43 @@ export function catalogFacility(catalog: Catalog, kind: FacilityKind): CatalogFa
  *  ground floor, and every other build lays its own kind. */
 export function catalogBuildKind(catalog: Catalog, kind: FacilityKind, floor: number): FacilityKind {
   return kind === "floor" && floor === catalog.world.groundFloor ? catalog.world.groundFloorStructure : kind;
+}
+
+/** Whether a facility is open in `hour` (the game hour; fractions and 24 read
+ *  as the engines read them, since every opening and closing is on the hour):
+ *  always, for a kind that keeps no business hours. */
+export function catalogOpenAt(f: CatalogFacility, hour: number): boolean {
+  return f.openHours === null || f.openHours[((Math.floor(hour) % 24) + 24) % 24] === true;
+}
+
+/** The people a unit holds: its own household where the kind carries one and
+ *  the unit has it, else the catalog's `population`. */
+export function catalogResidents(f: CatalogFacility, residents: number | null | undefined): number {
+  return f.ownHousehold && residents != null ? residents : f.population;
+}
+
+/** A condo's price for its household: the asking `base` scaled by household
+ *  size against the classic household, the condo's catalog `population`. No
+ *  household (Classic, or an unsold unit) is exactly the base. */
+export function catalogHouseholdPrice(catalog: Catalog, base: number, residents: number | null | undefined): number {
+  if (residents == null) return base;
+  return Math.round((base * residents) / catalogFacility(catalog, "condo").population);
+}
+
+/** The rung of a ladder a value sits on: the nearest, ties rounding up to the
+ *  higher rung, and Average (the third rung) for a non-finite value. The
+ *  engine's own snap (`snapToLadder`) is this rule. */
+export function rungFor<R extends { readonly value: number }>(rungs: readonly R[], value: number): R {
+  if (!Number.isFinite(value)) return rungs[2];
+  let best = rungs[0];
+  let bestDist = Infinity;
+  for (const r of rungs) {
+    const d = Math.abs(value - r.value);
+    // `<=` so an exact tie prefers the later (higher) rung.
+    if (d <= bestDist) {
+      bestDist = d;
+      best = r;
+    }
+  }
+  return best;
 }

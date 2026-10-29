@@ -279,3 +279,36 @@ fn json_takes_the_typescript_keys_and_number_forms() {
         canonical_json(&serde_json::from_str(&catalog_json(GameMode::Modern)).unwrap())
     );
 }
+
+/// Opening hours per hour of the day, and the kinds that carry a household.
+#[test]
+fn hours_and_households_follow_the_engine_rules() {
+    let c = catalog(GameMode::Modern);
+    let club = entry(&c, "nightclub").open_hours.clone().unwrap();
+    let open: Vec<usize> = (0..24).filter(|&h| club[h]).collect();
+    assert_eq!(open, vec![0, 1, 20, 21, 22, 23]);
+    assert_eq!(entry(&c, "office").open_hours, None);
+    for e in &c.facilities {
+        let kind = Kind::parse(e.key).unwrap();
+        assert_eq!(
+            e.open_hours.is_some(),
+            kind.has_business_hours(),
+            "{}",
+            e.key
+        );
+        if let Some(hours) = &e.open_hours {
+            for (h, &is_open) in hours.iter().enumerate() {
+                assert_eq!(is_open, kind.is_open_at(h as i64), "{} at {h}", e.key);
+            }
+        }
+        assert_eq!(
+            e.own_household,
+            matches!(e.key, "condo" | "rentalApartment"),
+            "{}",
+            e.key
+        );
+    }
+    let v = serde_json::to_value(&c).unwrap();
+    assert_eq!(json_entry(&v, "office")["openHours"], Value::Null);
+    assert_eq!(json_entry(&v, "condo")["ownHousehold"], Value::Bool(true));
+}

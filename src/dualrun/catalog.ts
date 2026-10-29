@@ -129,6 +129,8 @@ const FACILITY: Shape = {
   dailyIncome: orNull(amount),
   spendPerCustomer: orNull(amount),
   upkeepMonthly: orNull(amount),
+  openHours: (v) => v === null || (Array.isArray(v) && v.length === 24 && v.every(bool)),
+  ownHousehold: bool,
 };
 const LADDER: Shape = { cadence, default: amount, rungs: Array.isArray, noRate: oneOf(true) };
 const RUNG: Shape = { level: count, label: text, value: amount };
