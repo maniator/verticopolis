@@ -14,7 +14,7 @@
 //! `lastReason()`. Only the members that answer a status (the commands and
 //! the quotes) clear it at their start, so view and text reads between a
 //! refusal and its display never lose it. A query answers a record of
-//! numbers whose slots the layout names. `wasm.rs` holds the bindings; the logic is here so native tests
+//! numbers whose slots the layout names. `wasm.rs` and `wasm/` hold the bindings; the logic is here so native tests
 //! reach it.
 use crate::brush::{BrushResult, BRUSH_TILE_LIMIT};
 use crate::charges::{whole, ExtendEnd, INVALID_REQUEST};

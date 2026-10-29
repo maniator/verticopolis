@@ -1,7 +1,7 @@
 //! The per-frame read model a host reads between structural syncs: the
 //! flat frame (`frame_view`) and the log entries since a sequence number
 //! (`log_since`). Both are plain reads of a `Simulation`, so a native host
-//! calls them directly; the JavaScript binding (`wasm.rs`) re-exports them
+//! calls them directly; the JavaScript binding (`wasm.rs`, `wasm/`) re-exports them
 //! and passes the frame across as one typed array.
 use serde_json::Value;
 

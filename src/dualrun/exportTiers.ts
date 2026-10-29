@@ -2,11 +2,11 @@ import type * as Binding from "./engine";
 import type { WasmEngine } from "./binding";
 
 /**
- * Every export of the WASM binding (`engine-rs/src/wasm.rs`), sorted into a
+ * Every export of the WASM binding (`engine-rs/src/wasm.rs` and `engine-rs/src/wasm/`), sorted into a
  * tier (#946, cutover plan story S10, spine AD-3). One table, so a new export
  * has to pick a tier before it can ship: the typecheck fails on an export of
  * the declared package (`engine.d.ts`) missing here, and
- * `bindingExportTiers.guard.test.ts` parses `wasm.rs` and fails on an export
+ * `bindingExportTiers.guard.test.ts` parses `wasm.rs` and `wasm/` and fails on an export
  * missing here or listed but gone.
  *
  * - **Tier 1, player commands.** What a player can do, with the engine's own
@@ -267,7 +267,7 @@ export const BINDING_EXPORT_TIERS = {
   seedElevatorTelemetry: T3,
 } as const satisfies Record<BindingExport, TierEntry>;
 
-/** The exports wasm-bindgen writes itself, which `wasm.rs` never names. */
+/** The exports wasm-bindgen writes itself, which the Rust sources never name. */
 export const GENERATED_EXPORTS: readonly BindingExport[] = ["free"];
 
 /** The names in one tier, in table order. */

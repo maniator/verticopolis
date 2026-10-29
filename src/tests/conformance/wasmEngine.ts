@@ -8,7 +8,7 @@ import { checkBinding, type WasmEngine, type WasmModule } from "../../dualrun/bi
 
 /**
  * The Rust engine behind the scenario surface, through its WASM binding
- * (`engine-rs/src/wasm.rs`, built by `npm run wasm:build` into
+ * (`engine-rs/src/wasm.rs` and `wasm/`, built by `npm run wasm:build` into
  * `engine-rs/pkg/`). Structured values cross the binding as JSON text; this
  * adapter parses them and nothing more, so a scenario drives the port exactly
  * as it drives the TypeScript engine.

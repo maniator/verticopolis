@@ -44,7 +44,7 @@ verticopolis-engine = { git = "https://github.com/maniator/verticopolis", rev = 
 ```
 
 The crate has no default features. The `wasm` feature is the JavaScript
-binding (`src/wasm.rs`) and a native host leaves it off. The `conformance`
+binding (`src/wasm.rs` and `src/wasm/`) and a native host leaves it off. The `conformance`
 feature is the harness that replays the lock (tier 2 below); a host turns
 it on only to prove conformance, as `consumer/` does:
 
