@@ -122,6 +122,18 @@ describe("crash screen wording and wiring", () => {
     expect(btn.disabled).toBe(false);
   });
 
+  it("Download recovery copy hands over the stored text unchanged, or says none is stored", () => {
+    const { card } = show({ recoveryText: () => "VCZ1:stored" });
+    card.querySelector<HTMLButtonElement>('[data-act="recovery"]')!.click();
+    expect(downloadFile).toHaveBeenCalledWith("verticopolis-recovery-copy.txt", "VCZ1:stored", "application/octet-stream");
+    expect(card.querySelector(".crash-status")!.textContent).toContain("Recovery copy ready.");
+    card.remove();
+    const empty = show({ recoveryText: () => null }).card;
+    empty.querySelector<HTMLButtonElement>('[data-act="recovery"]')!.click();
+    expect(downloadFile).toHaveBeenCalledTimes(1);
+    expect(empty.querySelector(".crash-status")!.textContent).toBe("There is no stored save on this device to copy.");
+  });
+
   it("a second call never stacks a second card", () => {
     show();
     show();

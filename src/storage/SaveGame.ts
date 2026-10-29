@@ -56,7 +56,7 @@ export const SLOT_COUNT = 3;
  * *here* — stashing the raw bytes keeps them off the autosave slot's chopping
  * block so a later version can still recover them.
  */
-const UNREADABLE_KEY = "simtower-clone-unreadable";
+export const UNREADABLE_KEY = "simtower-clone-unreadable";
 
 // Latest-start write token for same-tab async saves. A synchronous save clears
 // the token before it writes, so an older async compression can never commit
@@ -104,7 +104,7 @@ function readSlotText(key: string): SaveText | null {
   }
 }
 
-function autosaveKey(): string {
+export function autosaveKey(): string {
   return localStorage.getItem(AUTO_KEY) !== null || localStorage.getItem(LEGACY_AUTO_KEY) === null
     ? AUTO_KEY
     : LEGACY_AUTO_KEY;

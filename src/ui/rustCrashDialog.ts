@@ -4,6 +4,8 @@ import { crashReportDue, markCrashReportShown, tabStore, type RustCrashFacts } f
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl, timesText, type CrashEngines, type CrashTower, type RustCrashDescription } from "../game/crashReport";
 import { TS_ENGINE_SOURCES, TS_ENGINE_VERSION } from "../wasmhost/tsEngineIdentity";
 import { downloadFile } from "./downloadFile";
+import { readRecoveryText } from "../storage/recoveryCopy";
+import { downloadRecoveryCopy, RECOVERY_COPY_STATUS } from "./recoveryCopy";
 import type { UI } from "./UI";
 
 /**
@@ -23,6 +25,8 @@ export interface RustCrashApp {
   reader: CrashTower["view"];
   enginePort: CrashTower["port"];
   speed?: number;
+  /** The stored save's raw text for the recovery copy, read at click time. */
+  recoveryText?: () => string | null;
 }
 
 export function rustCrashTemplate(crash: RustCrashDescription, reportHref: string): TemplateResult {
@@ -33,6 +37,7 @@ export function rustCrashTemplate(crash: RustCrashDescription, reportHref: strin
     <p class="crash-status" aria-live="polite"></p>
     <div class="modal-actions">
       <button class="btn" data-act="download">Download crash report</button>
+      <button class="btn" data-act="recovery">Download recovery copy</button>
       <a class="btn" data-act="report" target="_blank" rel="noopener noreferrer" href=${reportHref}>Report a bug<span class="visually-hidden"> (opens GitHub in a new tab)</span></a>
       <button class="btn primary" data-act="close" autofocus>Keep playing</button>
     </div>`;
@@ -51,6 +56,9 @@ export function showRustCrashReport(app: RustCrashApp, crash: RustCrashDescripti
   const status = box.querySelector<HTMLElement>(".crash-status")!;
   const download = box.querySelector<HTMLButtonElement>('[data-act="download"]')!;
   ui.wireActions(box, {
+    recovery: () => {
+      status.textContent = RECOVERY_COPY_STATUS[downloadRecoveryCopy(app.recoveryText ?? readRecoveryText)];
+    },
     download: () => {
       // Disabled while packing, so a double tap cannot race two zips.
       download.disabled = true;

@@ -2,6 +2,8 @@ import { downloadFile } from "./downloadFile";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl, type CrashTower } from "../game/crashReport";
 import type { CrashDescription, FrameErrorEntry } from "../game/crashReport";
 import { escapeHtml } from "./escape";
+import { readRecoveryText } from "../storage/recoveryCopy";
+import { downloadRecoveryCopy, RECOVERY_COPY_STATUS } from "./recoveryCopy";
 
 /**
  * The full-screen crash card. Shown when the game can no longer draw (the GPU
@@ -30,6 +32,8 @@ export interface CrashScreenOptions {
   frameErrors: readonly FrameErrorEntry[];
   /** Stamps the recovery session flags, then reloads (owned by SaveLoad). */
   onReload: () => void;
+  /** The stored save's raw text for the recovery copy, read at click time. */
+  recoveryText?: () => string | null;
 }
 
 /** Idempotence guard: context loss can only fire once per engine, but a
@@ -74,6 +78,7 @@ export function showCrashScreen(opts: CrashScreenOptions): void {
       <p class="crash-status" aria-live="polite"></p>
       <div class="modal-actions">
         <button class="btn" data-act="download">Download crash report</button>
+        <button class="btn" data-act="recovery">Download recovery copy</button>
         <a class="btn" data-act="report" target="_blank" rel="noopener noreferrer" href="${escapeHtml(bugReportUrl({ version: opts.version, crash: opts.crash }))}">Report a bug<span class="visually-hidden"> (opens GitHub in a new tab)</span></a>
         <button class="btn primary" data-act="reload" autofocus>Reload game</button>
       </div>`;
@@ -119,6 +124,11 @@ export function showCrashScreen(opts: CrashScreenOptions): void {
       status.textContent = "The crash report couldn't be saved. You can still reload; your tower's save state is described above.";
       downloadBtn.disabled = false;
     });
+  });
+  // The stored save as it is, with no engine and no zip, so it works when
+  // packing the report does not.
+  dialog.querySelector<HTMLButtonElement>('[data-act="recovery"]')!.addEventListener("click", () => {
+    status.textContent = RECOVERY_COPY_STATUS[downloadRecoveryCopy(opts.recoveryText ?? readRecoveryText)];
   });
   dialog.querySelector<HTMLButtonElement>('[data-act="reload"]')!.addEventListener("click", () => opts.onReload());
   // showModal honors the autofocus above; the explicit call covers the
