@@ -52,9 +52,11 @@ How items flow:
    priority, edit the row. An issue no row cites (a community report) arrives
    with `needs-triage` from its template, and triage swaps that for a P label.
    An issue the Rust-only engine changes majorly (a TypeScript-engine rule, the
-   TypeScript codecs, the crate survey, the 4.0 roadmap) also carries the
-   `post-3.0` label, and its row Notes lead with **Post-3.0** and the reason;
-   the P label still orders it among the post-3.0 work.
+   TypeScript codecs, the crate survey, the 4.0 roadmap) belongs to the `3.x`
+   milestone, and its row Notes lead with **Post-3.0** and the reason (the
+   `post-3.0` label was retired on 2026-10-29 in favor of milestones); the P
+   label still orders it among the 3.x work. A bug that only affects the
+   TypeScript fallback also carries the `closes with TS removal` label.
    When a row finishes, close the issue (completed or not planned) and set the
    `GH` cell to `—`; when an issue is closed on GitHub first, true up the row
    the same way in the next session that touches this file.
