@@ -15,8 +15,9 @@ export type CohortStage = 0 | 1 | 2 | 3;
 /** The proposed `stage` field's closed list: the stage the build carries. */
 export const STAGES = ["0", "1", "2", "3"] as const;
 
-/** The stage this build carries. 0 until the owner approves stage 1. */
-export const COHORT_STAGE: CohortStage = 0;
+/** The stage this build carries. Stage 1 on the owner's GO ("Go go go",
+ *  2026-10-29 00:39 UTC), once every gate 1 item passed. */
+export const COHORT_STAGE: CohortStage = 1;
 
 /** The WASM arm's share of buckets (0 to 99) at each stage, in percent. */
 export const STAGE_SHARE: Readonly<Record<CohortStage, number>> = { 0: 0, 1: 10, 2: 25, 3: 50 };
@@ -51,11 +52,12 @@ export const REFUSAL_HOLDS_PAGE_LIFE = true;
  *  Rust engine runs it regardless (`playerChoseRust`, owner 2026-10-28). */
 export const COHORT_TELEMETRY = true;
 
-/** True while only a player's choice boots the Rust engine: a `?engine=wasm`
- *  link or the Settings choice of the Rust engine. The cohort's draw and the
- *  old measurement hosts (`wasm-frame`, `wasm-worker`) run TypeScript (owner's
- *  decisions, 2026-10-28). The Settings choice joined the link once a trap
- *  reloads the game rather than stopping it (#1422). A tooling build (VC_TOOLING=1, never
+/** True while only a player's choice or the cohort's draw boots the Rust
+ *  engine: a `?engine=wasm` link, the Settings choice of the Rust engine, or
+ *  the WASM arm of the stage this build carries. The old measurement hosts
+ *  (`wasm-frame`, `wasm-worker`) run TypeScript (owner's decisions,
+ *  2026-10-28). The Settings choice joined the link once a trap reloads the
+ *  game rather than stopping it (#1422), and the draw joined with stage 1. A tooling build (VC_TOOLING=1, never
  *  shipped to players) keeps the stored choice, which the end-to-end lanes and
  *  the screenshot harness set to run every page they open on the Rust engine. */
 export const RUST_ONLY_BY_CHOICE = !__TOOLING_BUILD__;

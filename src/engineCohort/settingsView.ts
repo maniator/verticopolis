@@ -37,8 +37,8 @@ export interface EngineSettingsInput {
   /** The player pressed "Try the Rust engine again" in this page life. */
   retried?: boolean;
   storable: boolean;
-  /** Only a player's choice boots Rust for now (`RUST_ONLY_BY_CHOICE`): the
-   *  Rust engine itself, never a test host or the cohort's draw. */
+  /** Only a player's choice or the cohort's draw boots Rust
+   *  (`RUST_ONLY_BY_CHOICE`): never an old measurement host. */
   rustOnlyByChoice?: boolean;
 }
 
@@ -89,10 +89,9 @@ function nextEngine(i: EngineSettingsInput): "ts" | "wasm" {
   return i.suppression || i.selection?.markerBlocked || i.selection?.heldAfterCrashes || heldOffRust(i) ? "ts" : wantedEngine(i);
 }
 
-/** The hold keeps this choice on TypeScript: anything but the plain Rust
- *  engine, which the player picks themselves. */
+/** The hold keeps this choice on TypeScript: an old measurement host. */
 function heldOffRust(i: EngineSettingsInput): boolean {
-  return i.rustOnlyByChoice === true && i.preference !== "wasm";
+  return i.rustOnlyByChoice === true && optionOf(i.preference).testHost;
 }
 
 /** The engine this page life's boot started (any Rust host counts as Rust). */

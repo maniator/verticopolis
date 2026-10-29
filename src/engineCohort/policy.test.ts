@@ -57,7 +57,7 @@ const withBucket = (bucket: number, extra: Record<string, unknown> = {}) => {
 };
 
 describe("selectEngine while only a choice boots Rust", () => {
-  it("runs Rust for the Settings choice and the URL, and TypeScript for the cohort's draw and the old hosts", () => {
+  it("runs Rust for the Settings choice, the URL and the cohort's draw, and TypeScript for the old hosts", () => {
     const chose = new MemoryStore();
     setPreference(chose, "wasm");
     for (const drawOn of [true, false]) {
@@ -72,8 +72,10 @@ describe("selectEngine while only a choice boots Rust", () => {
         expect(selectEngine(env(chose, { drawOn, rustOnlyByChoice: false, url }))).toMatchObject({ boot: url });
       }
     }
-    // Bucket 0 draws the WASM arm at a 10% share.
-    expect(selectEngine(env(withBucket(0), { rustOnlyByChoice: true }))).toMatchObject({ boot: "ts", requested: "wasm", selectedBy: "cohort", heldForChoice: true });
+    // Bucket 0 draws the WASM arm at a 10% share, and the draw runs Rust (stage 1).
+    const drawn = selectEngine(env(withBucket(0), { rustOnlyByChoice: true }));
+    expect(drawn).toMatchObject({ boot: "wasm", requested: "wasm", selectedBy: "cohort" });
+    expect(drawn.heldForChoice).toBeUndefined();
     // A TypeScript choice is no hold.
     setPreference(chose, "ts");
     expect(selectEngine(env(chose, { rustOnlyByChoice: true })).heldForChoice).toBeUndefined();

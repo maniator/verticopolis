@@ -102,9 +102,9 @@ export interface Selection {
   /** Rust was wanted, but storage would not keep this page life's crash
    *  marker, so the boot runs TypeScript (a crash could not be counted). */
   markerBlocked?: true;
-  /** Rust was wanted without the player asking for the main-thread engine
-   *  (the cohort's draw, or an old measurement host), while only a choice
-   *  boots it (`rustOnlyByChoice`), so the boot runs TypeScript. */
+  /** An old measurement host was asked for, while only a choice or the
+   *  cohort's draw boots Rust (`rustOnlyByChoice`), so the boot runs
+   *  TypeScript. */
   heldForChoice?: true;
   /** Rust was chosen, but this tab's Rust engine crashed `CRASH_LOOP_PAGES`
    *  times on this build (`crashReload.ts`), so the boot runs TypeScript. */
@@ -195,11 +195,11 @@ export function playerChoseRust(s: Pick<Selection, "selectedBy" | "requested">):
 /** Choose the engine for this boot. Reads and writes the cohort's records;
  *  never throws. */
 export function selectEngine(env: SelectionEnv): Selection {
-  // While only a choice boots Rust (`rustOnlyByChoice`): `?engine=wasm` and
-  // the Settings choice of the Rust engine run it (owner, 2026-10-28, once the
-  // crash reload shipped), and every other way to ask for it runs
-  // TypeScript: the cohort's draw and the old measurement hosts (`wasm-frame`,
-  // `wasm-worker`).
+  // While only a choice or the draw boots Rust (`rustOnlyByChoice`):
+  // `?engine=wasm` and the Settings choice of the Rust engine run it (owner,
+  // 2026-10-28, once the crash reload shipped), the cohort's WASM arm runs it
+  // from stage 1, and the old measurement hosts (`wasm-frame`, `wasm-worker`)
+  // run TypeScript.
   const url = isChoice(env.url) ? env.url : null;
   const preference = readPreference(env.store);
   const base = { stage: env.stage, preference, suppression: null, crashLoop: false, transition: "none" as Transition, notice: "none" as Transition, markerId: null };
@@ -236,7 +236,8 @@ export function selectEngine(env: SelectionEnv): Selection {
   }
   // Held on TypeScript, so the engine did not change and no notice is due.
   const ownChoice = playerChoseRust({ selectedBy, requested });
-  if (env.rustOnlyByChoice && !ownChoice) return { ...common, boot: "ts", requested, selectedBy, heldForChoice: true };
+  const drawnRust = selectedBy === "cohort";
+  if (env.rustOnlyByChoice && !ownChoice && !drawnRust) return { ...common, boot: "ts", requested, selectedBy, heldForChoice: true };
   if (!env.safetyOn && !ownChoice) return { ...common, boot: requested, requested, selectedBy, notice };
   const suppression = activeSuppression(env.store, env.sha, env.now);
   if (suppression) return { ...common, boot: "ts", requested, selectedBy: "safety", suppression };
