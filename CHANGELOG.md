@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.59.0
+
+- Towers saved by the original 1997 SimTower now bring over their elevators and stairs when you import a .TDT file, including towers with express elevators.
+- The import report now counts twin rooms as Double Rooms. Thanks to Reddit user u/invokes for sending in their saves to test with.
+
 ## 2.58.0
 
 - Some players on the Automatic engine setting now run the new Rust engine as part of a test. You can change this in Settings.
