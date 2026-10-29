@@ -1,6 +1,6 @@
 {
   "name": "verticopolis",
-  "version": "2.54.4",
+  "version": "2.54.5",
   "description": "Verticopolis: a browser-native SimTower clone in TypeScript",
   "license": "MIT",
   "type": "module",
