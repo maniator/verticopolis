@@ -1,7 +1,7 @@
 /**
  * `npm run perf:load-memory`: the engine's WASM memory around a load (#1225,
  * slice 13 of the facade plan). For each perf scenario
- * (`src/tests/perfCompare/scenarios.ts`) each repetition runs two fresh Node
+ * (`src/tests/perfCompare/scenarios.ts`) each repetition runs four fresh Node
  * processes, since a WASM memory never shrinks. The first loads the save with
  * `Engine.fromSave` and records the linear memory before the load, after it,
  * after an hour of play (30 steps of two minutes) and after one `serialize`
@@ -21,7 +21,10 @@
  * searches, builds the tile at once (the unit list leaves the load at its
  * exact size, so the first build may move it) and saves, recording the
  * memory after each step and the build's and the save's times, apart from
- * the hour and the other saves.
+ * the hour and the other saves. Two more processes each play the hour and then
+ * write one file, the `.vctower` (`exportVctower`) in the first and the `.TDT`
+ * (`tdtExport`) in the second, recording the memory and the time of that
+ * write, since each export has its own peak (#1338, #1431).
  *
  * It measures the Node package `npm run wasm:build` writes to `engine-rs/pkg/`
  * and names it by the source hash the same build stamps into the package's
@@ -109,6 +112,13 @@ interface Sample {
   /** After the third engine's build and `serialize`. */
   afterThird: number;
   heapDelta: number;
+  /** In its own process, after the hour and a `.vctower` export, and that export's wall time. */
+  afterVctower: number;
+  vctowerMs: number;
+  /** In its own process, after the hour and a `.TDT` export, that export's wall time and status. */
+  afterTdt: number;
+  tdtMs: number;
+  tdtStatus: number;
 }
 
 interface Engine {
@@ -117,6 +127,9 @@ interface Engine {
   money(): number;
   tick(dtMinutes: number): void;
   serialize(): string;
+  /** The port's file members, which a build from before #1390 lacks. */
+  exportVctower?(appVersion: string, savedAtMs: number): string | undefined;
+  tdtExport?(): number[];
   free(): void;
 }
 
@@ -160,8 +173,9 @@ function buildAt(engine: Engine, { floor, x, cost }: ReturnType<typeof loneTile>
   return ms;
 }
 
-/** What one child measures: the play and save steps, or one build. */
-type Step = "play" | "build";
+/** What one child measures: the play and save steps, one build, or one export. */
+type Step = "play" | "build" | "vctower" | "tdt";
+const STEPS: readonly string[] = ["play", "build", "vctower", "tdt"];
 
 /** One load in this process, then `step`: the child half of the script. */
 function child(pkgPath: string, savePath: string, step: Step): void {
@@ -204,6 +218,20 @@ function child(pkgPath: string, savePath: string, step: Step): void {
     engine.serialize();
     const buildSaveMs = performance.now() - saveStart;
     sample = { afterLoad, afterSearch, afterBuild, buildMs, buildSaveMs, afterBuildThenSave: memory.buffer.byteLength, built: `${tile.floor}, ${tile.x}` };
+  } else if (step === "vctower" || step === "tdt") {
+    for (let i = 0; i < 30; i++) engine.tick(2);
+    const afterPlay = memory.buffer.byteLength;
+    const exportStart = performance.now();
+    if (step === "vctower") {
+      if (!engine.exportVctower) throw new Error(`${pkgPath} has no exportVctower`);
+      const file = engine.exportVctower("3.0.0", 1.7e12);
+      if (!file?.startsWith("VCTOWER1")) throw new Error("the .vctower export wrote no file");
+      sample = { afterLoad, afterPlay, afterVctower: memory.buffer.byteLength, vctowerMs: performance.now() - exportStart };
+    } else {
+      if (!engine.tdtExport) throw new Error(`${pkgPath} has no tdtExport`);
+      const record = engine.tdtExport();
+      sample = { afterLoad, afterPlay, afterTdt: memory.buffer.byteLength, tdtMs: performance.now() - exportStart, tdtStatus: record[0] };
+    }
   } else {
     for (let i = 0; i < 30; i++) engine.tick(2);
     const afterPlay = memory.buffer.byteLength;
@@ -293,8 +321,8 @@ function runChild(name: string, pkgPath: string, path: string, step: Step): Part
 
 async function main(args: string[]): Promise<void> {
   if (args[0] === "--child") {
-    if (args[3] !== "play" && args[3] !== "build") throw new Error(`unknown child step ${args[3]}`);
-    return child(args[1], args[2], args[3]);
+    if (!STEPS.includes(args[3])) throw new Error(`unknown child step ${args[3]}`);
+    return child(args[1], args[2], args[3] as Step);
   }
   for (let i = 0; i < args.length; i += 2) {
     if (!OPTIONS.includes(args[i])) throw new Error(`unknown option ${args[i]}; the options are ${OPTIONS.join(", ")}`);
@@ -324,9 +352,26 @@ async function main(args: string[]): Promise<void> {
       for (let r = 0; r < reps; r++) {
         const played = runChild(s.name, pkgPath, path, "play");
         const built = runChild(s.name, pkgPath, path, "build");
+        const vctower = runChild(s.name, pkgPath, path, "vctower");
+        const tdt = runChild(s.name, pkgPath, path, "tdt");
         // The two processes load the same build and save, so they must agree.
-        if (built.afterLoad !== played.afterLoad) throw new Error(`${s.name}: the two loads left ${played.afterLoad} and ${built.afterLoad} bytes`);
-        samples.push({ ...played, afterSearch: built.afterSearch, afterBuild: built.afterBuild, buildMs: built.buildMs, buildSaveMs: built.buildSaveMs, afterBuildThenSave: built.afterBuildThenSave, built: built.built } as Sample);
+        for (const other of [built, vctower, tdt]) {
+          if (other.afterLoad !== played.afterLoad) throw new Error(`${s.name}: the two loads left ${played.afterLoad} and ${other.afterLoad} bytes`);
+        }
+        samples.push({
+          ...played,
+          afterSearch: built.afterSearch,
+          afterBuild: built.afterBuild,
+          buildMs: built.buildMs,
+          buildSaveMs: built.buildSaveMs,
+          afterBuildThenSave: built.afterBuildThenSave,
+          built: built.built,
+          afterVctower: vctower.afterVctower,
+          vctowerMs: vctower.vctowerMs,
+          afterTdt: tdt.afterTdt,
+          tdtMs: tdt.tdtMs,
+          tdtStatus: tdt.tdtStatus,
+        } as Sample);
       }
       results[s.name] = { sha256: s.sha256, units: s.units, saveBytes: Buffer.byteLength(s.save), samples };
     }
@@ -367,6 +412,17 @@ async function main(args: string[]): Promise<void> {
   for (const [name, r] of Object.entries(results)) {
     const memory = (["afterLoad", "afterSearch", "afterBuild", "afterBuildThenSave"] as const).map((k) => steady(each(r, k)));
     lines.push(`| ${name} | ${memory.join(" | ")} | ${spread(each(r, "buildMs"))} | ${spread(each(r, "buildSaveMs"))} | ${[...new Set(r.samples.map((x) => x.built))].join("; ")} |`);
+  }
+  lines.push(
+    "",
+    "A file written after the load and the hour, each in its own process (WASM memory in MiB; times in ms, median (min to max); a `.TDT` status of 0 is a refused tower, which writes nothing):",
+    "",
+    "| Scenario | After load | After an hour | After a `.vctower` | The `.vctower` ms | After a `.TDT` | The `.TDT` ms | `.TDT` status |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+  );
+  for (const [name, r] of Object.entries(results)) {
+    const memory = (["afterLoad", "afterPlay", "afterVctower"] as const).map((k) => steady(each(r, k)));
+    lines.push(`| ${name} | ${memory.join(" | ")} | ${spread(each(r, "vctowerMs"))} | ${steady(each(r, "afterTdt"))} | ${spread(each(r, "tdtMs"))} | ${[...new Set(each(r, "tdtStatus"))].join("; ")} |`);
   }
   process.stdout.write(`${lines.join("\n")}\n`);
   if (jsonOut) {
