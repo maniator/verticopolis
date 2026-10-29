@@ -3,6 +3,9 @@ import { legacyFilename } from "./tdtFilename";
 /** The elevator slots a `.TDT` file holds. */
 const TDT_ELEVATOR_SLOTS = 24;
 
+/** Flights SimTower kept from our exports of towers that have more (#1501). */
+const STAIR_FLIGHTS_SIMTOWER_KEEPS = 48;
+
 /**
  * The reverse fidelity report for a `.TDT` export: an honest account of what
  * the 1994 format can and cannot carry. Reads the export tally and the encode
@@ -112,6 +115,11 @@ export function exportReport(facts: ExportReportFacts): ExportReport {
   if (stats.flightsDropped > 0) {
     staysBehind.push(
       `${stats.flightsDropped} stairway/escalator flight${stats.flightsDropped === 1 ? "" : "s"} past 1994's 64-slot table stayed behind.`,
+    );
+  }
+  if (flights > STAIR_FLIGHTS_SIMTOWER_KEEPS) {
+    staysBehind.push(
+      `With more than ${STAIR_FLIGHTS_SIMTOWER_KEEPS} stairway/escalator flights, SimTower dropped 16 of them when it loaded our test files (a file SimTower saved itself keeps all 64). Check your stairs after loading.`,
     );
   }
   if (stats.transportsDropped > 0) {
