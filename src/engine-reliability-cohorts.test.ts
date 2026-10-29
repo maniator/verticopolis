@@ -283,6 +283,12 @@ describe("the all-attempts safety denominator", () => {
     expect(summarizeReliability([life({ session: "b", selectedBy: "safety-device", engaged: false })])).toMatchObject({ n: 0, safetySuppressedPageLives: 1 });
   });
 
+  it("moves a marker-blocked page life off the engine: never ran, no fault, not eligible", () => {
+    const blocked = life({ engaged: false, reasons: ["marker-blocked"] });
+    expect(isEligible(blocked, [SHA])).toBe(false);
+    expect(run([blocked]).attempts).toMatchObject({ sessions: 0, faults: 0, movedOff: 1 });
+  });
+
   it("keeps a size-gated page life's engine fault in the safety denominator", () => {
     expect(run([life({ sizeGated: true, engaged: false, ...fault })]).attempts).toMatchObject({ sessions: 1, faults: 1 });
     expect(run([life({ sizeGated: true, engaged: false })]).attempts.sessions).toBe(0);

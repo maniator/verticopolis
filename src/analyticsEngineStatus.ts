@@ -91,9 +91,11 @@ void everyField;
  *  count survives the cap through the `summary` row. */
 export const MAX_ENGINE_STATUS_ROWS = 10;
 
-/** `fallback_reason`'s codes: the fallbacks', and `unclean-exit`, which only
- *  the crash-loop check raises, on the settle row of the boot that found it. */
-export const ENGINE_STATUS_REASONS = [...FALLBACK_REASONS, "unclean-exit"] as const;
+/** `fallback_reason`'s codes: the fallbacks', `unclean-exit`, which only the
+ *  crash-loop check raises, on the settle row of the boot that found it, and
+ *  `marker-blocked`, on the settle row of a boot that kept a Rust request on
+ *  TypeScript because it could not write its crash marker. */
+export const ENGINE_STATUS_REASONS = [...FALLBACK_REASONS, "unclean-exit", "marker-blocked"] as const;
 export type EngineStatusReason = (typeof ENGINE_STATUS_REASONS)[number];
 
 /** What boot settled on, from its published state (`window.__vcEngineBoot`). */
@@ -108,6 +110,8 @@ export interface EngineSettle {
   cohort?: CohortFields;
   /** The boot found a crash loop and runs TypeScript (`unclean-exit`). */
   crashLoop?: boolean;
+  /** The boot could not write its crash marker and runs TypeScript (`marker-blocked`). */
+  markerBlocked?: boolean;
 }
 
 /** The boot stage of a failure, as analytics names it. A failure the settle
@@ -217,6 +221,12 @@ export function noteEngineEngaged(by: EngagedBy): void {
   send(status, "engaged", by);
 }
 
+/** Why a boot without a failure did not start what it asked for, if it did not. */
+function settleReason(settle: EngineSettle): EngineStatusReason {
+  if (settle.crashLoop) return "unclean-exit";
+  return settle.markerBlocked ? "marker-blocked" : "none";
+}
+
 /** Boot has picked its engine: send the page life's `settle` row. Once per
  *  page life; a second call is ignored. */
 export function noteEngineSettled(settle: EngineSettle): void {
@@ -226,7 +236,7 @@ export function noteEngineSettled(settle: EngineSettle): void {
     build: settle.build,
     requested: settle.requested,
     engine: engineKind(settle.build, settle.boot ?? settle.requested, failed),
-    reason: settle.failure?.reason ?? (settle.crashLoop ? "unclean-exit" : "none"),
+    reason: settle.failure?.reason ?? settleReason(settle),
     stage: settle.failure ? STAGE_OF_BOOT[settle.failure.stage] : "none",
     fallbacks: failed ? 1 : 0,
     cohort: settle.cohort,

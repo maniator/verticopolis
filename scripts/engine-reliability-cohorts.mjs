@@ -15,8 +15,9 @@
  *   asked for a counted WASM host, overrides included; a settled page life
  *   must have run the engine, and a size-gated one counts only when it
  *   faulted or engaged on the engine. Every `wasm`-arm session with a page
- *   life that an opt-out (a setting or the URL choosing TypeScript) or a
- *   safety suppression moved to TypeScript is counted in the WASM arm's row;
+ *   life that an opt-out (a setting or the URL choosing TypeScript), a
+ *   safety suppression or a crash marker it could not write (`marker-blocked`)
+ *   moved to TypeScript is counted in the WASM arm's row;
  *   one that never ran the engine is outside the rate's N, since it cannot
  *   fault and would make the rate look cleaner than the engine is. #1197
  *   words it the other way, so the report also prints the rate with them in
@@ -110,8 +111,17 @@ export const COMPARED_ARMS = ["wasm", "ts"];
 /** Whether the player or the URL chose this page life's engine. */
 export const isOverride = (pl) => OVERRIDE_SELECTIONS.includes(pl.selectedBy);
 
-/** Whether a reason speaks to the engine (`package-mismatch`, #1046, and `unverifiable`, #985, do not). */
-const engineReason = (r) => r !== "package-mismatch" && r !== "unverifiable";
+/** The reasons that say nothing about the engine: `package-mismatch` (#1046),
+ *  `unverifiable` (#985), and `marker-blocked`, a boot that could not write its
+ *  crash marker and so kept a Rust request on TypeScript. */
+const NON_ENGINE_REASONS = ["package-mismatch", "unverifiable", "marker-blocked"];
+
+/** Whether a reason speaks to the engine. */
+const engineReason = (r) => !NON_ENGINE_REASONS.includes(r);
+
+/** Whether the boot kept a Rust request on TypeScript because it could not
+ *  write its crash marker: it never ran the engine. */
+export const markerBlocked = (pl) => pl.reasons.includes("marker-blocked");
 
 /** Whether the page life fell back for an engine fault: an engine reason, or
  *  no reason at all with its rows lost. */
@@ -123,8 +133,9 @@ export const isFault = (pl) => pl.fallbacks > 0 && (pl.reasons.some(engineReason
 const pastSettle = (pl) => pl.settled || pl.engaged || pl.fallbacks > pl.settleFallbacks || pl.writerLatched;
 
 /** Whether a page life ran the engine: one whose settle row already fell
- *  back on non-engine reasons alone never did. */
-export const ranEngine = (pl) => pastSettle(pl) && !(pl.settleFallbacks > 0 && !isFault(pl) && pl.reasons.some((r) => !engineReason(r)));
+ *  back on non-engine reasons alone never did, and neither did one whose
+ *  boot could not write its crash marker. */
+export const ranEngine = (pl) => pastSettle(pl) && !markerBlocked(pl) && !(pl.settleFallbacks > 0 && !isFault(pl) && pl.reasons.some((r) => !engineReason(r)));
 
 const leftBeforeTower = (pl) => pl.attempted && !pastSettle(pl);
 
@@ -313,7 +324,7 @@ export function summarizeCohorts(allLives, opts = {}) {
   const loopHost = (pl) => hosts.includes(pl.requested) || (pl.requested === "ts" && pl.assignedArm === "wasm" && hosts.includes(ELIGIBLE_HOST));
   const asked = (pl) =>
     (hosts.includes(pl.requested) && !isSuppressed(pl) && (pl.settled ? ranEngine(pl) : pl.attempted) && (!pl.sizeGated || engineFault(pl) || engagedOnEngine(pl))) || (suppressedFault(pl) && loopHost(pl));
-  const movedOff = (pl) => hosts.includes(ELIGIBLE_HOST) && pl.assignedArm === "wasm" && !pl.sizeGated && !engineFault(pl) && (isSuppressed(pl) || (isOverride(pl) && pl.requested === "ts"));
+  const movedOff = (pl) => hosts.includes(ELIGIBLE_HOST) && pl.assignedArm === "wasm" && !pl.sizeGated && !engineFault(pl) && (isSuppressed(pl) || markerBlocked(pl) || (isOverride(pl) && pl.requested === "ts"));
   const uncountedWasm = (pl) => pl.requested.startsWith("wasm") && !hosts.includes(pl.requested);
   let uncountedHostSessions = 0;
   let uncountedHostFaults = 0;
@@ -462,7 +473,7 @@ export function renderCohortsMarkdown(c, meta) {
     "",
     "## Release evidence and safety",
     "",
-    "> The all-attempts denominator is the safety count: every engine fault in a page life that asked for a counted host is in it, before engagement too, and so is a crash loop a suppressed boot detected. `wasm`-arm sessions that never ran the engine (opted out to TypeScript or suppressed) are outside its N; the next row puts them in N as #1197 words it. The first reading departs from #1197's wording; which one the gate uses is pending the owner. A page life that left before a tower sits in N without a fault (some may be crashes during the load); the last column shows how many, and the pessimistic bound counts each as a fault, so the two bounds bracket the engine. A session with an override page life (a setting or the URL chose either engine, an opt-out included) is in no eligible row, since overridden sessions never qualify; its faults stay in all attempts. The engaged rows hold only sessions that engaged, so a fault that stopped a player engaging is outside them and inside the attempts rows: read the rows together. \`--shas\`, \`--versions\`, \`--builds\` and \`--arms\` apply only to the overall rate above; \`--hosts\` applies to both. Each session's arm is that of its first page life in the window that carries one. A page life still loading when this ran counts as having left before a tower, and one that left may have crashed while the engine loaded. Sessions are not independent, so each bound is optimistic.",
+    "> The all-attempts denominator is the safety count: every engine fault in a page life that asked for a counted host is in it, before engagement too, and so is a crash loop a suppressed boot detected. `wasm`-arm sessions that never ran the engine (opted out to TypeScript, suppressed, or kept there because the crash marker could not be written) are outside its N; the next row puts them in N as #1197 words it. The first reading departs from #1197's wording; which one the gate uses is pending the owner. A page life that left before a tower sits in N without a fault (some may be crashes during the load); the last column shows how many, and the pessimistic bound counts each as a fault, so the two bounds bracket the engine. A session with an override page life (a setting or the URL chose either engine, an opt-out included) is in no eligible row, since overridden sessions never qualify; its faults stay in all attempts. The engaged rows hold only sessions that engaged, so a fault that stopped a player engaging is outside them and inside the attempts rows: read the rows together. \`--shas\`, \`--versions\`, \`--builds\` and \`--arms\` apply only to the overall rate above; \`--hosts\` applies to both. Each session's arm is that of its first page life in the window that carries one. A page life still loading when this ran counts as having left before a tower, and one that left may have crashed while the engine loaded. Sessions are not independent, so each bound is optimistic.",
     "",
     "| Population | Sessions | Faults | Fault rate | 95% upper bound | 95% upper bound, early exits as faults | Latch-offs | Left before a tower |",
     "| --- | --- | --- | --- | --- | --- | --- | --- |",

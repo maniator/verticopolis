@@ -24,6 +24,7 @@ describe("the cohort's fields (A4)", () => {
 
   it("keep the policy's request apart from the engine boot started", () => {
     expect(selectionFacts("ts", sel({ selectedBy: "safety", suppression: record("fault"), crashLoop: true }))).toMatchObject({ requested: "wasm", boot: "ts", crashLoop: true });
-    expect(selectionFacts("wasm", null)).toMatchObject({ requested: "wasm", boot: "wasm", crashLoop: false });
+    expect(selectionFacts("wasm", null)).toMatchObject({ requested: "wasm", boot: "wasm", crashLoop: false, markerBlocked: false });
+    expect(selectionFacts("ts", sel({ markerBlocked: true }))).toMatchObject({ requested: "wasm", boot: "ts", crashLoop: false, markerBlocked: true });
   });
 });

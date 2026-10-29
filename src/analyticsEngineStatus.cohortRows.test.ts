@@ -84,6 +84,12 @@ describe("the attempt and engaged rows", () => {
     expect(s).toMatchObject({ engine: "ts", fallback_reason: "unclean-exit", fallbacks: 0 });
   });
 
+  it("name marker-blocked when a boot kept a Rust request on TypeScript for want of a crash marker", () => {
+    const cohort = { stage: "1", assigned_arm: "wasm", selected_by: "cohort" } as const;
+    noteEngineSettled({ ...settle, boot: "ts", cohort, markerBlocked: true });
+    expect(rows()[0]).toMatchObject({ engine_requested: "wasm", engine: "ts", fallback_reason: "marker-blocked", fallbacks: 0, ...cohort });
+  });
+
   it("send the no-draw fields when boot gave none", () => {
     noteEngineSettled(settle);
     expect(rows()[0]).toMatchObject({ stage: expect.any(String), assigned_arm: "none", selected_by: "default", fallback_reason: "none" });

@@ -323,6 +323,11 @@ describe("summarizeReliability", () => {
     expect(summarizeReliability(lives, { arms: ["override"] })).toMatchObject({ n: 1, faults: 1 });
   });
 
+  it("leaves a marker-blocked page life outside the rate on its own line", () => {
+    const lives = [life({ session: "a", reasons: ["marker-blocked"] }), life({ session: "b" })];
+    expect(summarizeReliability(lives)).toMatchObject({ n: 1, faults: 0, markerBlockedPageLives: 1, unrecognizedPageLives: 0 });
+  });
+
   it("leaves a size-gated page life outside the rate and counts it under the same filters", () => {
     const lives = [life({ session: "a", sizeGated: true, fallbacks: 1, reasons: ["boot-timeout"] }), life({ session: "b" }), life({ session: "c", sizeGated: true, sha: "0dd0000" })];
     expect(summarizeReliability(lives)).toMatchObject({ n: 1, faults: 0, sizeGatedPageLives: 2 });
