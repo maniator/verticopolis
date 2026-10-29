@@ -57,6 +57,11 @@ How items flow:
    `post-3.0` label was retired on 2026-10-29 in favor of milestones); the P
    label still orders it among the 3.x work. A bug that only affects the
    TypeScript fallback also carries the `closes with TS removal` label.
+   Every issue, open or closed, has a milestone: `3.0.0` (open work carries a
+   `gate-1`, `gate-2` or `gate-3` label from the 3.0 priorities plan), `3.x`,
+   `Triage` (new or undecided), `Backlog` (deliberately parked enhancements
+   only), or `1.x` and `2.x` for closed work by release line. A bug is never in
+   `Backlog`, and a closed issue never stays there.
    When a row finishes, close the issue (completed or not planned) and set the
    `GH` cell to `—`; when an issue is closed on GitHub first, true up the row
    the same way in the next session that touches this file.
