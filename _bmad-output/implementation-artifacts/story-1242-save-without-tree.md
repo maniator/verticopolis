@@ -319,10 +319,12 @@ columns compare.
   of 64 KiB; the table's rounded figures give 4.07) to the load's 24.56,
   and a build then a save ends where the build did (52.38 MiB). Natively
   the save peaks at 2.3 times its text, and builds about 5 KiB beside a
-  reserved buffer. The desktop run is owed.
+  reserved buffer. The owner's desktop run of 2026-10-28 met it too
+  (readout on #1242).
 - **AC4 met on the cloud run.** Every `Engine.serialize` on large is at or
   under both other columns: the first after a load 11.6 ms under the figure
-  before #1225 and 44.3 under `main`'s. The desktop run is owed.
+  before #1225 and 44.3 under `main`'s. The owner's desktop run of
+  2026-10-28 met it too (readout on #1242).
 - **Slice 9's save budget** is no save task over 50 ms on the large PC tower
   at 1x and 4x. `Engine.serialize` alone takes 36.2 to 40.7 ms here, but a
   save task also stamps and stores the text, and Quick Save also runs
