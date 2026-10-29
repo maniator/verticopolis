@@ -9,10 +9,11 @@ export declare const STAGE_FLOORS: Array<{ stage: string; floor: number }>;
 export interface StageFloor {
   stage: string;
   floor: number;
+  commitsNamed: boolean;
   engaged: CohortCount;
   attempts: CohortCount;
   reached: boolean;
 }
 
-export function summarizeFloors(pageLives: PageLife[]): StageFloor[];
+export function summarizeFloors(pageLives: PageLife[], floorShas?: string[]): StageFloor[];
 export function renderFloorsMarkdown(floors: StageFloor[]): string[];

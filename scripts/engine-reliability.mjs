@@ -100,7 +100,7 @@
  * Run: `POSTHOG_PERSONAL_API_KEY=phx_... node scripts/engine-reliability.mjs
  * --window 30 [--hosts wasm] [--shas abc1234,def5678] [--versions 2.36.0]
  * [--builds switchable] [--arms wasm] [--eligible-shas abc1234]
- * [--tail-shas abc1234]`. Any other flag is an error. The key
+ * [--tail-shas abc1234] [--floor-shas abc1234]`. Any other flag is an error. The key
  * and host are the ones `posthog-report.mjs` reads.
  */
 
@@ -503,7 +503,7 @@ export function renderReliabilityMarkdown(summary, meta) {
 }
 
 /** The flags the script takes; any other is an error. */
-const FLAGS = ["window", "hosts", "shas", "versions", "builds", "arms", "eligible-shas", "tail-shas"];
+const FLAGS = ["window", "hosts", "shas", "versions", "builds", "arms", "eligible-shas", "tail-shas", "floor-shas"];
 
 /** What each list flag may hold: a closed list, or the shape of the value. */
 const FLAG_VALUES = {
@@ -512,6 +512,7 @@ const FLAG_VALUES = {
   shas: (v) => SHA.test(v),
   "eligible-shas": (v) => SHA.test(v),
   "tail-shas": (v) => SHA.test(v),
+  "floor-shas": (v) => SHA.test(v),
   versions: (v) => VERSION.test(v),
   arms: (v) => SAFE_VALUE.test(v),
 };
@@ -521,6 +522,7 @@ const FLAG_HELP = {
   shas: "commits of 7 to 40 lowercase hex digits",
   "eligible-shas": "commits of 7 to 40 lowercase hex digits, each one the gate review names: it carries S4 (#874), S9 (#954) and the slice-10 facade, and the old mirror host cannot run under `wasm` on it",
   "tail-shas": "commits of 7 to 40 lowercase hex digits",
+  "floor-shas": "commits of 7 to 40 lowercase hex digits, each a build at stage 1 or 2 that carries every fix its stage needed (plan 4.1)",
   versions: "versions like 2.36.0",
   arms: "arm names",
 };
@@ -568,6 +570,7 @@ export function parseArgs(argv) {
     opts: { hosts, shas: list("shas"), versions: list("versions"), builds: list("builds"), arms: list("arms") },
     eligibleShas,
     tailShas,
+    floorShas: list("floor-shas") ?? [],
   };
 }
 
@@ -593,7 +596,7 @@ async function main() {
     console.error("POSTHOG_PERSONAL_API_KEY is not set (a phx_... personal key with query:read; see scripts/posthog-report.mjs).");
     process.exit(1);
   }
-  const { window: span, opts, eligibleShas, tailShas } = args;
+  const { window: span, opts, eligibleShas, tailShas, floorShas } = args;
   const [res, crashRes] = await Promise.all([runQuery(buildPageLivesQuery(span.hours)), runQuery(buildCrashSessionsQuery(span.hours))]);
   for (const r of [res, crashRes]) {
     if (!r.ok) {
@@ -619,7 +622,7 @@ async function main() {
     truncated,
     crashesTruncated: crashes.truncated,
     cohorts,
-    floors: summarizeFloors(lives),
+    floors: summarizeFloors(lives, floorShas),
     eligibleShas,
     tailShas,
   });

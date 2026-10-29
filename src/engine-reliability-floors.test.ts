@@ -11,6 +11,7 @@ import {
   summarizeReliability,
 } from "../scripts/engine-reliability.mjs";
 import { when } from "../scripts/engine-reliability-cohorts.mjs";
+import { parseArgs } from "../scripts/engine-reliability.mjs";
 import { fault, life, run } from "./engine-reliability-cohorts.fixtures";
 
 const stage1 = (over: Parameters<typeof life>[0] = {}) =>
@@ -108,6 +109,19 @@ describe("the stage floors", () => {
     expect(f.engaged.faults).toBe(2);
     expect(f.attempts.n).toBe(3);
     expect(f.attempts.faults).toBe(3);
+  });
+
+  it("counts only the named builds once floor commits are named (plan 4.1), and says which reading it is", () => {
+    const lives = [stage1({ session: "old", sha: "1a10db3" }), stage1({ session: "fixed", sha: "ffff111" })];
+    expect(floorAt(lives, "1").engaged.n).toBe(2);
+    const named = summarizeFloors(lives, ["ffff111"]);
+    expect(named[0]!.engaged.n).toBe(1);
+    expect(named[0]!.attempts.n).toBe(1);
+    expect(renderFloorsMarkdown(named).join("\n")).toContain("Counted on the commits `--floor-shas` names");
+    expect(renderFloorsMarkdown(summarizeFloors(lives)).join("\n")).toContain("**No floor commits named**");
+    expect(parseArgs(["--floor-shas", "ffff111,1a10db3"]).floorShas).toEqual(["ffff111", "1a10db3"]);
+    expect(parseArgs([]).floorShas).toEqual([]);
+    expect(() => parseArgs(["--floor-shas", "nope"])).toThrow(/--floor-shas cannot hold/);
   });
 
   it("reaches the floor at exactly its count", () => {

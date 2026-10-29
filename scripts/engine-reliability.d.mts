@@ -118,5 +118,6 @@ export function parseArgs(argv: string[]): {
   opts: { hosts: string[]; shas: string[] | null; versions: string[] | null; builds: string[] | null; arms: string[] | null };
   eligibleShas: string[];
   tailShas: string[];
+  floorShas: string[];
 };
 export function responseRows(json: unknown): { rows: Array<Record<string, unknown>>; truncated: boolean };
