@@ -204,9 +204,7 @@ impl Engine {
         saved_at_ms: f64,
     ) -> Option<String> {
         self.reason = None;
-        let mut save = self.sim.serialize();
-        let text = crate::load::stamp_save(&mut save, app_version, saved_at_ms)
-            .and_then(|()| crate::load::encode_vctower(&save))
+        let text = crate::load::encode_simulation_vctower(&self.sim, app_version, saved_at_ms)
             .map(|bytes| String::from_utf8(bytes).map_err(|e| e.to_string()));
         match text {
             Ok(Ok(text)) => Some(text),
@@ -292,7 +290,8 @@ impl Engine {
     pub(crate) fn port_tdt_export(&mut self) -> Vec<f64> {
         self.reason = None;
         self.tdt_file = None;
-        let built = match crate::tdt::export::build_tdt(&self.sim.serialize()) {
+        let (rest, units) = self.sim.save_without_units();
+        let built = match crate::tdt::export::build_tdt_streamed(&rest, units) {
             Ok(b) => b,
             Err(e) => {
                 self.reason = Some(e.0);

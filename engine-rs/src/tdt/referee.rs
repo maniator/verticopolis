@@ -112,11 +112,11 @@ fn fixture_save(suite: &Path, fixture: &str) -> Result<Value, String> {
     Ok(sim.serialize())
 }
 
-/// Replay one export case; `suite` is the conformance directory its fixture
-/// is read from (see [`crate::suite::fixture_path`]).
-pub fn replay_export(case: &ExportCase, lock: &Lock, suite: &Path) -> Verdict {
-    let save = if let Some(fixture) = &case.fixture {
-        fixture_save(suite, fixture)?
+/// The save one export case builds from: its fixture, its base with the
+/// patch applied, or the one it embeds.
+fn export_case_save(case: &ExportCase, lock: &Lock, suite: &Path) -> Result<Value, String> {
+    if let Some(fixture) = &case.fixture {
+        fixture_save(suite, fixture)
     } else if let Some(base) = &case.base {
         let base_case = lock
             .export
@@ -132,12 +132,18 @@ pub fn replay_export(case: &ExportCase, lock: &Lock, suite: &Path) -> Verdict {
                 obj.insert(k.clone(), v.clone());
             }
         }
-        save
+        Ok(save)
     } else {
         case.save
             .clone()
-            .ok_or_else(|| "case embeds no save".to_string())?
-    };
+            .ok_or_else(|| "case embeds no save".to_string())
+    }
+}
+
+/// Replay one export case; `suite` is the conformance directory its fixture
+/// is read from (see [`crate::suite::fixture_path`]).
+pub fn replay_export(case: &ExportCase, lock: &Lock, suite: &Path) -> Verdict {
+    let save = export_case_save(case, lock, suite)?;
     match (build_tdt(&save), &case.expected, &case.throws) {
         (Ok(built), Some(want), _) => {
             let got = sha256_hex(&built.bytes);
@@ -194,6 +200,7 @@ pub fn read_lock(path: &Path) -> Result<Lock, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tdt::export::build_tdt_streamed;
     use std::path::PathBuf;
 
     /// Every case in the lock replays; the list of failures is the assertion
@@ -213,6 +220,40 @@ mod tests {
             .filter_map(|(id, v)| v.err().map(|e| format!("{id}: {e}")))
             .collect();
         assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    /// The streamed build (`build_tdt_streamed`, #1431) writes the lock's
+    /// bytes, or its refusal, for every export case whose save lists its
+    /// units: the save split into the tree without `units` and the entries.
+    #[test]
+    fn the_streamed_build_matches_the_whole_save_build_on_every_case() {
+        let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("conformance");
+        let lock = read_lock(&suite.join("tdt-cases.json")).expect("lock");
+        let mut compared = 0;
+        for case in &lock.export {
+            let save = export_case_save(case, &lock, &suite).expect("the case's save");
+            let Some(units) = save.get("units").and_then(Value::as_array) else {
+                continue;
+            };
+            let mut rest = save.clone();
+            rest.as_object_mut().expect("an object").remove("units");
+            let whole = build_tdt(&save);
+            let streamed = build_tdt_streamed(&rest, units.iter());
+            match (whole, streamed) {
+                (Ok(a), Ok(b)) => {
+                    assert_eq!(a.bytes, b.bytes, "{}: the bytes", case.id);
+                    assert_eq!(a.stats, b.stats, "{}: the stats", case.id);
+                    assert_eq!(a.counts, b.counts, "{}: the counts", case.id);
+                    assert_eq!((a.top_floor, a.basements), (b.top_floor, b.basements));
+                }
+                (Err(a), Err(b)) => assert_eq!(a.0, b.0, "{}: the refusal", case.id),
+                (a, b) => panic!("{}: {:?} vs {:?}", case.id, a.err(), b.err()),
+            }
+            compared += 1;
+        }
+        assert!(compared > 10, "only {compared} cases compared");
     }
 
     /// Six of `forged-transport-entries`' seven entries have no kind, and the

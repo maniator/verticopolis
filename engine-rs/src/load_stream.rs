@@ -387,4 +387,4 @@ mod vctower;
 
 #[cfg(test)]
 #[path = "load_memory_tests.rs"]
-mod memory;
+pub(crate) mod memory;

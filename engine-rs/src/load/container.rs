@@ -153,7 +153,13 @@ pub const TOWER_FILE_MAGIC: &str = "VCTOWER1";
 ///
 /// [`js_json`]: crate::canonical::js_json
 pub fn encode_vctower(save: &Value) -> Result<Vec<u8>, String> {
-    let json = crate::canonical::js_json(save);
+    pack_json(&crate::canonical::js_json(save))
+}
+
+/// The container around a save's JSON text: the size check, the deflate and
+/// the base64 framing of [`encode_vctower`], shared with the streamed writer
+/// (`export_stream`) so the two cannot frame differently.
+pub(crate) fn pack_json(json: &str) -> Result<Vec<u8>, String> {
     if json.len() as u64 > MAX_SAVE_INFLATED_BYTES {
         return Err(format!(
             "this save is {} bytes of JSON, more than the {MAX_SAVE_INFLATED_BYTES} a .vctower reader will hold",
@@ -197,14 +203,7 @@ pub fn stamp_save(save: &mut Value, app_version: &str, saved_at_ms: f64) -> Resu
     {
         return Err("not a tower save (no numeric minutes or no units list)".into());
     }
-    if !(saved_at_ms.is_finite() && saved_at_ms.abs() <= 8.64e15) {
-        return Err(format!("savedAt {saved_at_ms} is not a time"));
-    }
-    if parse_int(app_version).is_some_and(|v| v < 2.0) {
-        return Err(format!(
-            "appVersion {app_version:?} reads as a build before 2.0, which marks the tower as a founder's"
-        ));
-    }
+    check_stamp(app_version, saved_at_ms)?;
     if carries_founder {
         m.insert("founder".into(), json!(true));
     }
@@ -213,17 +212,32 @@ pub fn stamp_save(save: &mut Value, app_version: &str, saved_at_ms: f64) -> Resu
     Ok(())
 }
 
+/// The two checks on a stamp's own values, which [`stamp_save`] runs after
+/// the tower's: the time and the build name.
+pub(crate) fn check_stamp(app_version: &str, saved_at_ms: f64) -> Result<(), String> {
+    if !(saved_at_ms.is_finite() && saved_at_ms.abs() <= 8.64e15) {
+        return Err(format!("savedAt {saved_at_ms} is not a time"));
+    }
+    if parse_int(app_version).is_some_and(|v| v < 2.0) {
+        return Err(format!(
+            "appVersion {app_version:?} reads as a build before 2.0, which marks the tower as a founder's"
+        ));
+    }
+    Ok(())
+}
+
 /// `SaveGame.export(sim)`: serialize the game, stamp it ([`stamp_save`]) and
 /// encode it ([`encode_vctower`]). The engine has no clock and no build
-/// identity of its own, so the host passes both.
+/// identity of its own, so the host passes both. The game is written as
+/// text and the file built from that text, one top-level key at a time
+/// (`export_stream`), so the save is never held whole as a `Value` tree
+/// (#1338); the bytes are the tree path's.
 pub fn encode_simulation_vctower(
     sim: &Simulation,
     app_version: &str,
     saved_at_ms: f64,
 ) -> Result<Vec<u8>, String> {
-    let mut save = sim.serialize();
-    stamp_save(&mut save, app_version, saved_at_ms)?;
-    encode_vctower(&save)
+    crate::export_stream::encode_vctower_string(sim.save_text(), app_version, saved_at_ms)
 }
 
 /// `Buffer.from(b64, "base64")`: decoding stops at the first `=`, every

@@ -104,3 +104,17 @@ fn tdt_export_writes_the_bytes_the_referee_checks() {
     assert_eq!(e.port_tdt_export()[0], 1.0);
     assert_eq!(e.port_tdt_file().unwrap(), legacy);
 }
+
+#[test]
+fn vctower_export_writes_the_bytes_of_the_tree_path() {
+    // The file the port writes is the one stamping and encoding the whole
+    // save as a tree writes (#1338).
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let mut e = built(mode);
+        let mut save = e.sim.serialize();
+        crate::load::stamp_save(&mut save, "3.0.0", 1.7e12).unwrap();
+        let want = crate::load::encode_vctower(&save).unwrap();
+        let got = e.port_export_vctower("3.0.0", 1.7e12).unwrap();
+        assert_eq!(got.as_bytes(), want.as_slice());
+    }
+}
