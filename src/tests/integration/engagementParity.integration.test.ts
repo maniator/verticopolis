@@ -48,7 +48,7 @@ describe.each(engines)("engagement on the %s engine", (_name, make) => {
     s.port.nameTower("Parity");
     expect(noteEngineEngaged).not.toHaveBeenCalled();
     expect(s.port.buildAt(kind("office"), 2, lobbyCenter(s) - 4)[0]).toBe(1);
-    s.port.buildAt(kind("office"), 2, lobbyCenter(s) + 4);
+    expect(s.port.buildAt(kind("office"), 2, lobbyCenter(s) + 6)[0]).toBe(1);
     expect(vi.mocked(noteEngineEngaged).mock.calls).toEqual([["command"]]);
   });
 
