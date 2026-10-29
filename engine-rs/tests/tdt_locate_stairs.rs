@@ -62,3 +62,26 @@ fn the_real_table_beats_a_smaller_coincidental_cluster() {
 fn a_tower_without_stairs_gives_an_empty_list() {
     assert!(locate_stairs(&vec![0u8; 2000], 0).is_empty());
 }
+
+#[test]
+fn signed_runtime_crowd_words_do_not_hide_the_table() {
+    // SimTower's own re-saves hold values like 0xfffb (-5) and 0xffff (-1).
+    let mut bytes = vec![0u8; 100];
+    let mut flights = table(&[(16, 1, 195, 9), (17, 0, 168, 11)]);
+    flights[16 * RECORD + 6..16 * RECORD + 8].copy_from_slice(&0xfffb_u16.to_le_bytes());
+    flights[17 * RECORD + 8..17 * RECORD + 10].copy_from_slice(&0xffff_u16.to_le_bytes());
+    bytes.extend(flights);
+    assert_eq!(
+        locate_stairs(&bytes, 0),
+        vec![stair(1, 195, 9), stair(0, 168, 11)]
+    );
+}
+
+#[test]
+fn a_crowd_word_far_outside_any_real_count_is_still_not_a_table() {
+    let mut bytes = vec![0u8; 100];
+    let mut flights = table(&[(16, 1, 195, 9)]);
+    flights[16 * RECORD + 6..16 * RECORD + 8].copy_from_slice(&0x7000_u16.to_le_bytes());
+    bytes.extend(flights);
+    assert!(locate_stairs(&bytes, 0).is_empty());
+}
