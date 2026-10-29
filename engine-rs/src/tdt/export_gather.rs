@@ -32,6 +32,8 @@
 //! `Map` by its raw value and is coerced here by `js_num_raw_site`, so those
 //! saves write different bytes (#884).
 
+use std::borrow::Borrow;
+
 use indexmap::IndexMap;
 use serde_json::Value;
 
@@ -56,6 +58,15 @@ pub fn gather_tower(save: &Value) -> Result<GatheredTower, LegacyExportError> {
     let Some(raw_units) = save.get("units").and_then(Value::as_array) else {
         return Err(LegacyExportError("save.units is not an array".into()));
     };
+    gather_units(raw_units)
+}
+
+/// [`gather_tower`] over the save's unit entries as they come, each read on
+/// its own and dropped before the next, so the caller need not hold the
+/// `units` array whole (#1431).
+pub fn gather_units<U: Borrow<Value>>(
+    raw_units: impl IntoIterator<Item = U>,
+) -> Result<GatheredTower, LegacyExportError> {
     let mut tenants_by_tdt: IndexMap<FloorKey, Vec<OutTenant>> = IndexMap::new();
     let mut extents: IndexMap<FloorKey, (f64, f64)> = IndexMap::new();
     let mut covered_tiles: IndexMap<FloorKey, Vec<bool>> = IndexMap::new();
@@ -93,7 +104,7 @@ pub fn gather_tower(save: &Value) -> Result<GatheredTower, LegacyExportError> {
 
     let mut rooms: Vec<GatheredRoom> = vec![];
     for raw in raw_units {
-        let mut u = norm(raw)?;
+        let mut u = norm(raw.borrow())?;
         if u.kind == Kind::Floor || u.kind == Kind::Lobby {
             if u.kind == Kind::Lobby && u.floor == 1.0 && u.state != "fire" && u.state != "gutted" {
                 has_ground_lobby = true;

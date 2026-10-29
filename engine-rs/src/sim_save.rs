@@ -199,18 +199,35 @@ impl Simulation {
 
     /// `serialize()`: the saved game as a JSON tree, for the readers that
     /// edit, hash or walk it: the state view and its digest (the dual run's
-    /// shadow and the tooling digest), the native host's save
-    /// (`load::encode_simulation_vctower`, tier 1 in `API.md`, which the web
-    /// game does not call), the scenario runner, the TDT referee and the
-    /// `.TDT` export (`Engine::port_tdt_export`, #1431). The port's
-    /// `exportVctower` and the sync paths `serializeForSync` and `saveDelta`
-    /// (`save_delta.rs`) read it too.
+    /// shadow and the tooling digest), the scenario runner and the TDT
+    /// referee. The sync paths `serializeForSync` and `saveDelta`
+    /// (`save_delta.rs`) read it too. The `.vctower` and `.TDT` exports do
+    /// not: they read the text and the units one at a time (#1338, #1431).
     pub fn serialize(&self) -> Value {
         let mut m = Map::new();
         for (k, f) in self.save_fields() {
             m.insert(k.into(), f.into_value());
         }
         Value::Object(m)
+    }
+
+    /// The save as a tree without its `units`, and the units as `Value`s one
+    /// at a time: the `.TDT` export reads the units as they come and the
+    /// rest from the tree (`build_tdt_streamed`, #1431), so a save of
+    /// thousands of units is never a tree beside the game. Each unit is the
+    /// `Value` `serialize()` holds for it.
+    #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+    pub(crate) fn save_without_units(&self) -> (Value, impl Iterator<Item = Value> + '_) {
+        let mut m = Map::new();
+        for (k, f) in self.save_fields() {
+            if k != "units" {
+                m.insert(k.into(), f.into_value());
+            }
+        }
+        (
+            Value::Object(m),
+            self.tower.units.iter().map(Unit::serialize),
+        )
     }
 
     /// The saved game as `serde_json`'s compact text: the same bytes as
