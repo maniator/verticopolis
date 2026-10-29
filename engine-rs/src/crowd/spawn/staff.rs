@@ -52,21 +52,25 @@ pub fn max_staff_for(tower: &Tower) -> i64 {
     tower.housekeeping_units() * HK_MAIDS_PER_UNIT
 }
 
-/// `spawnStep`.
+/// `spawnStep`. `population` is the tower's `totalPopulation` as the step's
+/// dispatch pass summed it; nothing between that pass and this call changes
+/// who is present.
 pub fn spawn_step(
     crowd: &mut Crowd,
     dt_sec: f64,
     tower: &mut Tower,
     clock: &Clock,
     weather: Option<Weather>,
+    population: i64,
 ) {
+    debug_assert_eq!(population, tower.total_population());
     let mut time_rate = 2.2;
     if clock.is_night() {
         time_rate = 0.3;
     } else if clock.is_weekend() {
         time_rate = 1.2;
     }
-    let pop_factor = (0.4 + tower.total_population() as f64 / 2000.0).min(3.0);
+    let pop_factor = (0.4 + population as f64 / 2000.0).min(3.0);
     let sky = weather.unwrap_or_else(|| weather_for(clock.day()));
     let weather_factor = if sky == Weather::Rain {
         tower.mode.rain_crowd_factor()
