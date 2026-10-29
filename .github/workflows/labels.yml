@@ -44,7 +44,7 @@ jobs:
           sync needs-triage       fbca04 "Not yet reviewed by a maintainer"
           sync needs-repro        d4c5f9 "Awaiting a reproduction"
           sync gate-1             0e8a16 "Needed before stage 1 of the engine cohort (3.0 priorities plan)"
-          sync gate-2             fbca04 "Needed before stage 2 (3.0 priorities plan)"
+          sync gate-2             bfdadc "Needed before stage 3 (3.0 priorities plan)"
           sync gate-3             d93f0b "Needed before the 3.0.0 flip (3.0 priorities plan)"
           sync "closes with TS removal" cfd3d7 "Only affects the TypeScript engine fallback; closes when the TypeScript engine is removed in 3.x"
           sync P1                 e60000 "Priority 1: work next"

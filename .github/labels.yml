@@ -63,8 +63,8 @@ labels:
     color: "0e8a16"
     description: Needed before stage 1 of the engine cohort (3.0 priorities plan)
   - name: gate-2
-    color: "fbca04"
-    description: Needed before stage 2 (3.0 priorities plan)
+    color: "bfdadc"
+    description: Needed before stage 3 (3.0 priorities plan)
   - name: gate-3
     color: "d93f0b"
     description: Needed before the 3.0.0 flip (3.0 priorities plan)
@@ -148,7 +148,7 @@ labels:
 #   gh label create needs-triage  -c fbca04 -d "Not yet reviewed by a maintainer" --force
 #   gh label create needs-repro   -c d4c5f9 -d "Awaiting a reproduction" --force
 #   gh label create gate-1        -c 0e8a16 -d "Needed before stage 1 of the engine cohort (3.0 priorities plan)" --force
-#   gh label create gate-2        -c fbca04 -d "Needed before stage 2 (3.0 priorities plan)" --force
+#   gh label create gate-2        -c bfdadc -d "Needed before stage 3 (3.0 priorities plan)" --force
 #   gh label create gate-3        -c d93f0b -d "Needed before the 3.0.0 flip (3.0 priorities plan)" --force
 #   gh label create "closes with TS removal" -c cfd3d7 -d "Only affects the TypeScript engine fallback; closes when the TypeScript engine is removed in 3.x" --force
 #   gh label create P1            -c e60000 -d "Priority 1: work next" --force
