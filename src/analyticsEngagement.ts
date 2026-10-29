@@ -99,7 +99,9 @@ const DONE = 1;
 export function watchGameplayCommands(port: EnginePortCommands, detector: Pick<EngagementDetector, "commandAnswered">): void {
   const members = port as unknown as Record<string, (...args: unknown[]) => PortRecord>;
   for (const name of GAMEPLAY_COMMANDS) {
-    const original = members[name]!.bind(port);
+    // A port without the member (a test double) has nothing to watch there.
+    if (typeof members[name] !== "function") continue;
+    const original = members[name].bind(port);
     members[name] = (...args) => {
       const rec = original(...args);
       // The analytics never cost the player a command.

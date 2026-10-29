@@ -96,6 +96,14 @@ describe("watchGameplayCommands", () => {
     expect(answered).not.toHaveBeenCalled();
   });
 
+  it("skips a member the port does not have", () => {
+    const answered = vi.fn();
+    const partial = { buildAt: () => done } as unknown as EnginePortCommands;
+    watchGameplayCommands(partial, { commandAnswered: answered });
+    partial.buildAt(0, 0, 0);
+    expect(answered).toHaveBeenCalledWith(true);
+  });
+
   it("never costs the player a command when the detector throws", () => {
     const { p } = port();
     vi.spyOn(console, "error").mockImplementation(() => {});
