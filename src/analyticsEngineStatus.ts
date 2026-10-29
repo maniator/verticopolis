@@ -210,11 +210,11 @@ export const cohortRows = { on: COHORT_TELEMETRY };
 /** Boot has chosen the engine and the package has not loaded yet: send the
  *  page life's `attempt` row (#1090), so a tab that closes or crashes during
  *  the load is still counted. Once per page life, outside the cap. */
-export function noteEngineAttempt(attempt: { build: EngineBuild; requested: EngineChoice; boot?: EngineChoice; cohort?: CohortFields }): void {
+export function noteEngineAttempt(attempt: { build: EngineBuild; requested: EngineChoice; boot?: EngineChoice; cohort?: CohortFields; sizeGated?: boolean }): void {
   if (!cohortRows.on || attemptSent) return;
   attemptSent = true;
   const { build, requested, cohort } = attempt;
-  send({ build, requested, engine: engineKind(build, attempt.boot ?? requested, false), reason: "none", stage: "none", fallbacks: 0, cohort }, "attempt");
+  send({ build, requested, engine: engineKind(build, attempt.boot ?? requested, false), reason: "none", stage: "none", fallbacks: 0, cohort, ...(attempt.sizeGated ? { sizeGated: true as const } : {}) }, "attempt");
 }
 
 /** The page life engaged (`analyticsEngagement.ts`): send its `engaged` row,

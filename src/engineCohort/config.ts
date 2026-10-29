@@ -22,17 +22,17 @@ export const COHORT_STAGE: CohortStage = 1;
 /** The WASM arm's share of buckets (0 to 99) at each stage, in percent. */
 export const STAGE_SHARE: Readonly<Record<CohortStage, number>> = { 0: 0, 1: 10, 2: 25, 3: 50 };
 
-/** The stages that run the size gate. Stage 2 only: the owner decided stage 1
- *  runs with no size gate, so towers of every size get the Rust engine there
- *  ("Yes no gate", 2026-10-29 00:46 UTC, replacing plan 4.1's gate from stage
- *  1). Stage 2 keeps the gate until he decides otherwise, and `shipsBlind`
- *  requires it, with its threshold, before stage 2 can ship. */
-export const SIZE_GATED_STAGES: readonly CohortStage[] = [2];
+/** The stages that run the size gate: none. The owner decided stage 1 runs
+ *  with no size gate ("Yes no gate", 2026-10-29 00:46 UTC, replacing plan
+ *  4.1's gate from stage 1), then stage 2 too ("No gate at stage 2", decision
+ *  card, 2026-10-29 16:07 UTC), so towers of every size get the Rust engine.
+ *  The gate stays built behind `SIZE_GATE_ON`; naming a stage here makes
+ *  `shipsBlind` require the flag and a threshold before that stage ships. */
+export const SIZE_GATED_STAGES: readonly CohortStage[] = [];
 
 /** The size above which a tower stays on TypeScript while the gate runs:
  *  the stored save's length in characters, decoded, read the same way in both
- *  arms (`storedSaveChars`). `null` until the owner picks stage 2's
- *  threshold. */
+ *  arms (`storedSaveChars`). `null`: no stage runs the gate. */
 export const SIZE_GATE_THRESHOLD: number | null = null;
 
 /** Whether this build has the size gate (#1197). */
@@ -44,11 +44,11 @@ export const SIZE_GATE_BUILT = true;
 export const SIZE_GATE_ON = false;
 
 /** Whether the size gate holds a tower of `saveChars` on TypeScript: the
- *  flag is on, the stage runs the gate, the cohort's draw chose the engine (a
+ *  flag is on, the stage is one of `gatedStages`, the cohort's draw chose the engine (a
  *  Settings choice or a link is never gated) and the save is above the
  *  threshold. Read the same way in both arms, so the arms stay comparable. */
-export function sizeGateHolds(c: { on: boolean; stage: CohortStage; selectedBy: string | undefined; saveChars: number; threshold: number | null }): boolean {
-  return c.on && c.threshold !== null && SIZE_GATED_STAGES.includes(c.stage) && c.selectedBy === "cohort" && c.saveChars > c.threshold;
+export function sizeGateHolds(c: { on: boolean; gatedStages: readonly CohortStage[]; stage: CohortStage; selectedBy: string | undefined; saveChars: number; threshold: number | null }): boolean {
+  return c.on && c.threshold !== null && c.gatedStages.includes(c.stage) && c.selectedBy === "cohort" && c.saveChars > c.threshold;
 }
 
 /** Whether a clean attach refusal keeps the rest of the page life on

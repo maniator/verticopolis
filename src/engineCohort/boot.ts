@@ -1,10 +1,11 @@
 import type { EngineChoice } from "../wasmhost/engineChoice";
-import { COHORT_STAGE, COHORT_TELEMETRY, RUST_ONLY_BY_CHOICE, STAGE_SHARE, type CohortStage } from "./config";
+import { COHORT_STAGE, COHORT_TELEMETRY, RUST_ONLY_BY_CHOICE, SIZE_GATED_STAGES, SIZE_GATE_ON, SIZE_GATE_THRESHOLD, STAGE_SHARE, sizeGateHolds, type CohortStage } from "./config";
 import { exitCleanly, stepAside } from "./crashMarker";
 import { heldAfterCrashes, tabStore } from "./crashReload";
 import { setCurrentSelection, currentSelection } from "./current";
 import { latchSafety, playerChoseRust, selectEngine, suppressionApplies, type SafetyStage, type Selection } from "./policy";
 import { browserStore, readSafety, type KeyValueStore } from "./records";
+import { storedSaveChars } from "./sizeGate";
 import { watchSurvival } from "./survival";
 
 /**
@@ -99,6 +100,14 @@ function chooseAndWatch(search: string): EngineChoice {
     // run TypeScript and say why, a `?engine=wasm` visit included.
     if (selection.markerId) stepAside(store, { id: selection.markerId, sha: __APP_SHA__ });
     selection = { ...selection, boot: "ts", markerId: null, notice: "none", heldAfterCrashes: true };
+  }
+  // The size gate (#1197, stage 2, behind `SIZE_GATE_ON`): a cohort tower
+  // above the threshold boots on TypeScript before the package loads, never
+  // coded as a fallback. Its crash marker steps aside, so neither a hard exit
+  // nor a clean one of this TypeScript page life counts for the Rust engine.
+  if (SIZE_GATE_ON && sizeGateHolds({ on: SIZE_GATE_ON, gatedStages: SIZE_GATED_STAGES, stage: selection.stage, selectedBy: selection.selectedBy, saveChars: storedSaveChars(), threshold: SIZE_GATE_THRESHOLD })) {
+    if (selection.markerId) stepAside(store, { id: selection.markerId, sha: __APP_SHA__ });
+    selection = { ...selection, boot: "ts", markerId: null, sizeGated: true, ...(selection.boot === "ts" ? {} : { notice: "none" as const }) };
   }
   setCurrentSelection(selection);
   if (selection.markerId) stopWatch = watchSurvival(store, { id: selection.markerId, sha: __APP_SHA__ });

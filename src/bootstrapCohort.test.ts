@@ -34,6 +34,7 @@ vi.mock("./game/bootTower", async (importOriginal) => {
   return { ...real, tsBootTower: vi.fn(() => ({ port: {}, corrupt: false, loaded: true, savedAt: undefined })) };
 });
 import { noteRustFailed } from "./engineCohort/boot";
+import { setCurrentSelection } from "./engineCohort/current";
 
 function stubWebGL(): void {
   const real = document.createElement.bind(document);
@@ -50,6 +51,7 @@ beforeEach(() => {
   stub.startError = null;
   stub.rustCorrupt = false;
   stub.notice = null;
+  setCurrentSelection(null);
   document.body.innerHTML = "";
   stubWebGL();
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -81,6 +83,14 @@ describe("bootGame and the stage-change notice", () => {
     const toast = vi.fn();
     await bootGame(() => ({ onUpdateAvailable: vi.fn(), ui: { toast } }));
     expect(toast).toHaveBeenCalledExactlyOnceWith(stub.notice);
+  });
+
+  it("names the size gate instead, once, when it moved the tower off the Rust engine (#1197)", async () => {
+    stub.notice = "This game now runs on the new Rust engine as part of a test.";
+    setCurrentSelection({ stage: 2, preference: "auto", suppression: null, crashLoop: false, transition: "none", notice: "none", markerId: null, boot: "ts", requested: "wasm", selectedBy: "cohort", assignedArm: "wasm", sizeGated: true });
+    const toast = vi.fn();
+    await bootGame(() => ({ onUpdateAvailable: vi.fn(), ui: { toast } }));
+    expect(toast).toHaveBeenCalledExactlyOnceWith("This tower is larger than the Rust engine test covers yet, so it runs on the TypeScript engine.");
   });
 
   it("shows nothing without a notice", async () => {

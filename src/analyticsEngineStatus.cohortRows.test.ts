@@ -40,6 +40,11 @@ describe("the attempt and engaged rows", () => {
     expect(rows().map((r) => r.trigger)).toEqual(["settle"]);
   });
 
+  it("say size_gated on the attempt row of a page life the size gate held (#1197)", () => {
+    noteEngineAttempt({ ...attempt, boot: "ts", sizeGated: true });
+    expect(rows()[0]).toMatchObject({ trigger: "attempt", engine: "ts", size_gated: true });
+  });
+
   it("send one attempt row before settle, carrying the settle row's fields as they stand", () => {
     noteEngineAttempt(attempt);
     noteEngineAttempt(attempt);
