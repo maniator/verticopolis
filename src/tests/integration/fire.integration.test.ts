@@ -12,8 +12,8 @@ function firePrep(leg: Leg, seed: number, n = 1) {
   const x0 = Math.floor(GRID.width / 2) - 20;
   for (let i = 0; i < 40; i++) draft.tower.place("floor", 2, x0 + i);
   const sim = new PortSim(leg, draft);
-  sim.buildTransport("elevatorStandard", x0, 1, 2);
-  for (let i = 0; i < n; i++) sim.build("office", 2, x0 + i * 2);
+  sim.mustBuildTransport("elevatorStandard", x0, 1, 2);
+  for (let i = 0; i < n; i++) sim.mustBuild("office", 2, x0 + i * 9);
   const ids = sim.setup((d) => {
     const offices = d.tower.units.filter((u) => u.kind === "office");
     for (const u of offices) {
@@ -22,6 +22,8 @@ function firePrep(leg: Leg, seed: number, n = 1) {
     }
     return offices.map((u) => u.id);
   });
+  expect(ids).toHaveLength(n);
+  expect(sim.state.tower.transports.some((t) => t.kind === "elevatorStandard" && t.bottom <= 1 && t.top >= 2)).toBe(true);
   /** The office `i`, as the engine holds it now. */
   const office = (i: number) => sim.state.tower.units.find((u) => u.id === ids[i])!;
   return { sim, office, x0 };
@@ -116,7 +118,7 @@ describeEngines("Fire aftermath — gutted shells (canon), not auto-repair", (le
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 40; i++) draft.tower.place("floor", 2, x0 + i);
     const sim = new PortSim(leg, draft);
-    sim.buildTransport("elevatorStandard", x0, 1, 2); // served floor
+    sim.mustBuildTransport("elevatorStandard", x0, 1, 2); // served floor
     const shopId = sim.setup((d) => {
       d.tower.place("shop", 2, 0 + x0); // the only flammable room (earns traffic income)
       const shop = d.tower.units.find((u) => u.kind === "shop")!;

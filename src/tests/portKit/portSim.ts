@@ -83,6 +83,11 @@ function makeLeaf(leg: Leg, save: string): Leaf {
 
 const live = new Set<PortSim>();
 
+function must(result: CommandResult, what: string): CommandResult {
+  if (!result.ok) throw new Error(`${what} was refused: ${result.reason ?? "no reason"}`);
+  return result;
+}
+
 /** What a command answered: `ok`, the refusal text, the engine's measured
  *  money change. */
 export interface CommandResult {
@@ -177,6 +182,17 @@ export class PortSim {
 
   buildTransport(kind: FacilityKind, x: number, bottom: number, top: number): CommandResult {
     return this.result(this.leaf.port.buildShaft(codeOf(KIND_CODES, kind), x, bottom, top));
+  }
+
+  /** {@link build}, which throws when the engine refuses: a fixture asserts its
+   *  own construction. */
+  mustBuild(kind: FacilityKind, floor: number, x: number): CommandResult {
+    return must(this.build(kind, floor, x), `build ${kind} at ${floor},${x}`);
+  }
+
+  /** {@link buildTransport}, which throws when the engine refuses. */
+  mustBuildTransport(kind: FacilityKind, x: number, bottom: number, top: number): CommandResult {
+    return must(this.buildTransport(kind, x, bottom, top), `buildTransport ${kind} at ${x} (${bottom}-${top})`);
   }
 
   /** Sell what stands at a cell (a floor or lobby tile included). */

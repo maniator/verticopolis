@@ -95,9 +95,10 @@ function shopTower(leg: Leg, seed: number): PortSim {
   lay(draft, "lobby", 1);
   lay(draft, "floor", 2);
   const sim = new PortSim(leg, draft);
-  sim.buildTransport("elevatorStandard", C, 1, 2);
+  sim.mustBuildTransport("elevatorStandard", C, 1, 2);
   sim.setup((d) => {
     const shop = d.tower.place("shop", 2, 0);
+    expect(shop.ok, shop.reason).toBe(true);
     d.tower.units.find((u) => u.id === shop.unitId)!.state = "occupied";
     for (const x of [20, 32, 44]) {
       const o = d.tower.place("office", 2, x);
@@ -105,6 +106,8 @@ function shopTower(leg: Leg, seed: number): PortSim {
       d.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
     }
   });
+  expect(sim.state.tower.transports.some((t) => t.kind === "elevatorStandard" && t.bottom <= 1 && t.top >= 2)).toBe(true);
+  expect(sim.state.tower.units.filter((u) => u.kind === "shop" || u.kind === "office")).toHaveLength(4);
   return sim;
 }
 
