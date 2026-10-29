@@ -36,13 +36,14 @@ export const SIZE_GATE_BUILT = false;
  *  TypeScript under the cohort (#1258). The PR that fixes it flips this. */
 export const REFUSAL_HOLDS_PAGE_LIFE = false;
 
-/** Whether `engine_status` rows carry the cohort's fields. Off until the
- *  owner approves the exact additions; nothing new reaches production
- *  telemetry while it is false. The sticky safety path (the suppression and
+/** Whether `engine_status` rows carry the cohort's fields and #1090's
+ *  `attempt` and `engaged` rows. On since the owner approved the analytics
+ *  packet (rev 5, "A yes", 2026-10-29 00:46 UTC); any other new field still
+ *  needs his approval. The sticky safety path (the suppression and
  *  the crash marker) switches on with it, so no boot moves to TypeScript
  *  where the reliability data could not say why. A Settings choice of the
  *  Rust engine runs it regardless (`playerChoseRust`, owner 2026-10-28). */
-export const COHORT_TELEMETRY = false;
+export const COHORT_TELEMETRY = true;
 
 /** True while only a player's choice boots the Rust engine: a `?engine=wasm`
  *  link or the Settings choice of the Rust engine. The cohort's draw and the

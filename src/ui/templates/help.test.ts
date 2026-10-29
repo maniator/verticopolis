@@ -81,6 +81,12 @@ describe("helpTemplate structure and a11y", () => {
     expect(norm(privacy!.textContent ?? "")).toContain(shared);
   });
 
+  it("says what the engine test reports, as the approved analytics packet words it", () => {
+    const text = (renderToFragment(helpPrivacyBody()).textContent ?? "").replace(/\s+/g, " ");
+    expect(text).toContain("It never sends the test group's number, and none of it identifies you.");
+    expect(text).toContain("whether you started playing, and a short code if the engine stopped.");
+  });
+
   // Drift guard. Every member of the GameRules seam is mapped either to a DISTINCT
   // phrase the "Classic vs Modern" Help copy must contain, or to null when it
   // carries no dedicated player-facing copy (a load-only sanitizer, an internal

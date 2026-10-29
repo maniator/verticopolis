@@ -25,7 +25,7 @@ import {
   type PageLife,
 } from "../scripts/engine-reliability.mjs";
 import { ENGINE_BUILDS, ENGINE_KINDS, ENGINE_STATUS_FIELDS } from "./analyticsEngineStatus";
-import { FALLBACK_REASONS } from "./wasmhost/engineBoot";
+import { ENGINE_STATUS_REASONS } from "./analyticsEngineStatus";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const collapse = (s: string) => s.replace(/\s+/g, " ");
@@ -125,7 +125,7 @@ describe("the page-lives query", () => {
     // relay's environment stamp, one the A4 cohort work adds (#1197), or the
     // `engaged_by` field proposed for #1090 (a missing one reads as the
     // default).
-    const planned = ["stage", "assigned_arm", "selected_by", "safety_suppressed", "size_gated", "engaged_by", "environment"];
+    const planned = ["safety_suppressed", "size_gated", "environment"];
     const read = [...q.matchAll(/properties\.([a-z_]+)/g)].map((m) => m[1]);
     for (const field of read) expect([...ENGINE_STATUS_FIELDS, ...planned]).toContain(field);
   });
@@ -282,7 +282,7 @@ describe("summarizeReliability", () => {
     expect(REQUESTS).toEqual(ENGINE_KINDS.filter((k) => k !== "ts-fallback" && k !== "none"));
     expect(HOSTS).toEqual(REQUESTS.filter((r) => r !== "ts"));
     expect(BUILDS).toEqual([...ENGINE_BUILDS]);
-    expect(REASONS).toEqual([...FALLBACK_REASONS]);
+    expect(REASONS).toEqual([...ENGINE_STATUS_REASONS]);
   });
 
   it("keeps a loop's size: the fallbacks sent in all and the most in one page life", () => {
