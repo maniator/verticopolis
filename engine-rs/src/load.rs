@@ -20,7 +20,7 @@ use crate::rng::Rng;
 use crate::schedule::Schedule;
 use crate::sim::{LogEntry, LogKind, Simulation, LOG_RING_CAP};
 use crate::sim_loop::weather_for;
-use crate::tower::{Transport, Unit, UnitState};
+use crate::tower::{unit_list_headroom, Transport, Unit, UnitState};
 
 const SOLD_CONDO_MIN_PRICE: f64 = 60_000.0;
 const SOLD_CONDO_MAX_PRICE: f64 = 240_000.0;
@@ -1585,7 +1585,8 @@ pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
             "This save lists more than {UNIT_CAP} units, more than the whole lot can hold, so it cannot be a real tower."
         ));
     }
-    let (mut units, mut ids) = (Vec::with_capacity(kept), Vec::with_capacity(kept));
+    let mut units = Vec::with_capacity(kept + unit_list_headroom(kept));
+    let mut ids = Vec::with_capacity(kept);
     for entry in listed {
         if let Some((unit, id)) = unit_from_value(&entry, modern) {
             units.push(unit);
@@ -1895,9 +1896,9 @@ pub(crate) fn assemble(
     sim.log = coerce_log(data.get("log"));
 
     drop_overlapping_units(&mut units, &mut unit_ids);
-    // Exact sizes: a vector grown past its units would keep the spare room
-    // for the whole session.
-    units.shrink_to_fit();
+    // A vector grown past its units would keep the spare room for the whole
+    // session, so it keeps only the room the first placements need (#1259).
+    units.shrink_to(units.len() + unit_list_headroom(units.len()));
     // Snap-on-load for ladder-priced kinds (Classic).
     let mut rents_snapped = 0;
     let mut has_condo = false;

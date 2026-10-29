@@ -300,6 +300,16 @@ pub struct Tower {
     pub(crate) lobby_upgrades: Option<crate::tower_removal::LobbyUpgrades>,
 }
 
+/// The room a loaded game's unit list keeps past its units. A list with no
+/// spare room moves to a new block on the first placement while it still holds
+/// the old one, which on the large perf tower took the engine's WASM memory
+/// from 24.6 to 52.4 MiB for one floor tile (#1259), and a WASM memory keeps
+/// its peak for the session. An eighth, at least 64, holds the placements most
+/// sessions make; past it `Tower::add_unit` grows the list by a quarter.
+pub(crate) fn unit_list_headroom(units: usize) -> usize {
+    (units / 8).max(64)
+}
+
 impl Tower {
     pub fn new() -> Tower {
         Tower {
