@@ -3,7 +3,7 @@
 use super::*;
 
 /// JS `Number.parseInt(s, 10)` as an option.
-pub(super) fn parse_int(s: &str) -> Option<f64> {
+pub(crate) fn parse_int(s: &str) -> Option<f64> {
     // `parseInt` skips the JavaScript whitespace set, the byte order mark included.
     let t = js_trim(s);
     let (neg, rest) = match t.strip_prefix('-') {

@@ -273,3 +273,28 @@ fn fixture_towers_write_the_trees_text() {
         same(&sim, &p.display().to_string());
     }
 }
+
+/// The `.TDT` export's split (#1431) holds every field of `serialize()`: the
+/// tree without `units`, and the units as the tree has them.
+#[test]
+fn the_save_without_units_and_its_units_are_the_trees_save() {
+    for sim in [
+        Simulation::new(1, GameMode::Classic, CalendarKind::RealWorld, true),
+        played(GameMode::Classic),
+        played(GameMode::Modern),
+    ] {
+        let whole = sim.serialize();
+        let (mut rest, units) = sim.save_without_units();
+        let units: Vec<Value> = units.collect();
+        assert_eq!(Value::Array(units), whole["units"]);
+        rest.as_object_mut()
+            .unwrap()
+            .insert("units".into(), whole["units"].clone());
+        // The keys come back in the tree's order once `units` is put in its place.
+        assert_eq!(
+            rest.as_object().unwrap().keys().len(),
+            whole.as_object().unwrap().keys().len()
+        );
+        assert_eq!(rest, whole);
+    }
+}

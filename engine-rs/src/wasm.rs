@@ -330,11 +330,13 @@ pub fn encode_vctower(
     app_version: &str,
     saved_at_ms: f64,
 ) -> Result<String, JsError> {
-    let mut save = crate::load::parse_save_json(save_json.as_bytes())
-        .map_err(|e| err(format!("save: {e}")))?;
-    crate::load::stamp_save(&mut save, app_version, saved_at_ms).map_err(err)?;
+    // The text is read key by key, so the save is not held whole as a tree
+    // (#1338); the bytes and the messages are the tree path's.
+    let bytes =
+        crate::export_stream::encode_vctower_text(save_json.as_bytes(), app_version, saved_at_ms)
+            .map_err(err)?;
     // The container is ASCII by construction (magic, base64, newlines).
-    String::from_utf8(crate::load::encode_vctower(&save).map_err(err)?).map_err(err)
+    String::from_utf8(bytes).map_err(err)
 }
 
 #[path = "wasm_facade_commands.rs"]

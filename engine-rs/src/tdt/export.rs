@@ -2,10 +2,12 @@
 //! mirror. `build_tdt` is the orchestrator over the gather pass, the encoder
 //! and (next phase) the reverse fidelity report.
 
+use std::borrow::Borrow;
+
 use serde_json::Value;
 
 use super::encoder::{encode_tower, EncodeStats};
-use super::export_gather::{gather_tower, ExportCounts};
+use super::export_gather::{gather_tower, gather_units, ExportCounts, GatheredTower};
 use super::LegacyExportError;
 use crate::facilities::{MAX_FLOOR, MIN_FLOOR};
 
@@ -23,12 +25,32 @@ pub struct BuiltLegacyTower {
 /// `buildTDT`: the `.TDT` bytes for a serialized tower, or the refusal for a
 /// tower the format cannot hold.
 pub fn build_tdt(save: &Value) -> Result<BuiltLegacyTower, LegacyExportError> {
+    refuse_modern(save)?;
+    finish(save, gather_tower(save)?)
+}
+
+/// `build_tdt` for a game that hands over its unit entries one at a time and
+/// the rest of the save as a tree without `units` (the encoder reads nothing
+/// else off it), so the whole save is never held as one tree (#1431). The
+/// same bytes, or the same refusal, as `build_tdt` of the whole save.
+pub fn build_tdt_streamed<U: Borrow<Value>>(
+    rest: &Value,
+    units: impl IntoIterator<Item = U>,
+) -> Result<BuiltLegacyTower, LegacyExportError> {
+    refuse_modern(rest)?;
+    finish(rest, gather_units(units)?)
+}
+
+fn refuse_modern(save: &Value) -> Result<(), LegacyExportError> {
     if save.get("mode").and_then(Value::as_str) == Some("modern") {
         return Err(LegacyExportError(
             "This tower uses Modern rules. SimTower (1994) can only load Classic towers.".into(),
         ));
     }
-    let gathered = gather_tower(save)?;
+    Ok(())
+}
+
+fn finish(save: &Value, gathered: GatheredTower) -> Result<BuiltLegacyTower, LegacyExportError> {
     let encoded = encode_tower(save, &gathered)?;
     let (mut top_floor, mut basements) = (0.0_f64, 0.0_f64);
     for key in gathered.extents.keys() {

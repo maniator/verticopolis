@@ -59,7 +59,7 @@ static COUNTING: Counting = Counting;
 
 /// The peak above the starting point while `f` runs, and what is still held
 /// when it returns, in bytes.
-fn measure<T>(f: impl FnOnce() -> T) -> (T, isize, isize) {
+pub(crate) fn measure<T>(f: impl FnOnce() -> T) -> (T, isize, isize) {
     let base = LIVE.with(Cell::get);
     PEAK.with(|p| p.set(base));
     let out = f();
@@ -98,7 +98,7 @@ fn pool_of(kind: Kind) -> &'static Pool {
 /// office (room ids are capped at `UNIT_CAP`, far above that), `MANY`
 /// blockbuster cinemas and milestones, and a tower name and a pending
 /// choice's message `LONG` bytes each.
-fn large_save() -> String {
+pub(crate) fn large_save() -> String {
     let mut units = Vec::new();
     let mut offices = Vec::new();
     let mut id = 0;

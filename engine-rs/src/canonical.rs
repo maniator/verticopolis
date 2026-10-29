@@ -44,6 +44,13 @@ fn array_index(k: &str) -> Option<u32> {
     k.parse::<u32>().ok().filter(|&n| n != u32::MAX)
 }
 
+/// Where a key sorts among an object's keys in JavaScript: an array index at
+/// its number, every other key after all of them (the sort is stable, so
+/// those keep insertion order).
+pub(crate) fn js_key_rank(k: &str) -> u64 {
+    array_index(k).map_or(1u64 << 32, u64::from)
+}
+
 /// How `write_value` orders an object's keys.
 #[derive(Clone, Copy)]
 enum KeyOrder {
@@ -79,7 +86,7 @@ fn write_value(out: &mut String, v: &Value, order: KeyOrder) {
             match order {
                 KeyOrder::Sorted => keys.sort_by(|a, b| utf16_cmp(a, b)),
                 // Stable, so the other keys keep insertion order.
-                KeyOrder::Js => keys.sort_by_key(|k| array_index(k).map_or(1u64 << 32, u64::from)),
+                KeyOrder::Js => keys.sort_by_key(|k| js_key_rank(k)),
             }
             out.push('{');
             for (i, k) in keys.iter().enumerate() {
@@ -93,6 +100,17 @@ fn write_value(out: &mut String, v: &Value, order: KeyOrder) {
             out.push('}');
         }
     }
+}
+
+/// [`js_json`] of `v`, appended to `out`. The streamed `.vctower` writer
+/// builds its text from several values this way (#1338).
+pub(crate) fn write_js_json(out: &mut String, v: &Value) {
+    write_value(out, v, KeyOrder::Js);
+}
+
+/// A string written as `JSON.stringify` writes it, appended to `out`.
+pub(crate) fn write_js_string(out: &mut String, s: &str) {
+    write_string(out, s);
 }
 
 /// The canonical text of a value. A JSON value never holds `undefined`, so
