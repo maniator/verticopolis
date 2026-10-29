@@ -31,8 +31,12 @@ function fillOffices(sim: Simulation, floor: number, rightClear = 0, occupy = tr
   return n;
 }
 
-const done = (sim: PortSim, label: string): boolean =>
-  sim.state.milestoneProgress().list.find((m) => m.label === label)?.done ?? false;
+/** The milestone ids the engine recorded in its own save. `sim.state` is a
+ *  TypeScript load that adopts every satisfied milestone, so it cannot tell
+ *  whether the engine awarded one. */
+const awarded = (sim: PortSim): string[] => (JSON.parse(sim.save()) as { milestones?: string[] }).milestones ?? [];
+
+const done = (sim: PortSim, label: string): boolean => awarded(sim).includes(MILESTONES.find((m) => m.label === label)!.id);
 
 /** A founded tower with three office floors and a standard elevator on the
  *  right edge, enough to clear the 500-population milestone. The last
@@ -64,9 +68,9 @@ describeEngines("Milestones (optional goals)", (leg: Leg) => {
     expect(done(sim, "Getting Started")).toBe(true);
 
     // Fires exactly once: the achieved set doesn't grow on a further day.
-    const achieved = sim.state.milestoneProgress().achieved;
+    const achieved = awarded(sim).length;
     sim.tick(DAY);
-    expect(sim.state.milestoneProgress().achieved).toBe(achieved);
+    expect(awarded(sim).length).toBe(achieved);
   });
 
   it("achievements survive save/reload (no re-announce)", () => {
@@ -76,9 +80,9 @@ describeEngines("Milestones (optional goals)", (leg: Leg) => {
 
     const reloaded = new PortSim(leg, sim.save());
     expect(done(reloaded, "Getting Started")).toBe(true); // restored, still achieved
-    const achieved = reloaded.state.milestoneProgress().achieved;
+    const achieved = awarded(reloaded).length;
     reloaded.tick(DAY); // already achieved → must not re-announce
-    expect(reloaded.state.milestoneProgress().achieved).toBe(achieved);
+    expect(awarded(reloaded).length).toBe(achieved);
   });
 
   it("well-served fires for a large, fully-reachable tower", () => {
@@ -99,6 +103,7 @@ describeEngines("Milestones (optional goals)", (leg: Leg) => {
     expect(done(sim, "Smooth Operator")).toBe(false); // floor 25 is not served yet
     // One standard elevator serving floors 1..25 makes every occupied floor reachable.
     expect(sim.extendShaft(sim.state.tower.transports[0].id, true, 25).ok).toBe(true);
+    expect(done(sim, "Smooth Operator")).toBe(false); // not evaluated until a day passes
     sim.tick(DAY);
     expect(done(sim, "Smooth Operator")).toBe(true);
   });
