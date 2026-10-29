@@ -354,7 +354,7 @@ async function main(args: string[]): Promise<void> {
         const built = runChild(s.name, pkgPath, path, "build");
         const vctower = runChild(s.name, pkgPath, path, "vctower");
         const tdt = runChild(s.name, pkgPath, path, "tdt");
-        // The two processes load the same build and save, so they must agree.
+        // The processes load the same build and save, so they must agree.
         for (const other of [built, vctower, tdt]) {
           if (other.afterLoad !== played.afterLoad) throw new Error(`${s.name}: the two loads left ${played.afterLoad} and ${other.afterLoad} bytes`);
         }
@@ -379,7 +379,7 @@ async function main(args: string[]): Promise<void> {
     rmSync(dir, { recursive: true, force: true });
   }
   const lines = [
-    `Engine sources ${sources.slice(0, 16)} (${engineRoot}), Node ${process.version}, ${reps} repetitions per scenario, each in two fresh processes. WASM memory in MiB.`,
+    `Engine sources ${sources.slice(0, 16)} (${engineRoot}), Node ${process.version}, ${reps} repetitions per scenario, each in fresh processes. WASM memory in MiB.`,
     "",
     "The load, the hour, the saves, a second engine and a build on it, then a third engine, in one process (WASM memory, MiB):",
     "",

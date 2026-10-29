@@ -16,6 +16,7 @@
 //! included, goes to today's path, so its result and its message are exactly
 //! what they were.
 
+use std::collections::HashSet;
 use std::fmt;
 use std::ops::Range;
 
@@ -103,11 +104,13 @@ impl<'de> Visitor<'de> for TopVisitor {
             buf: String::with_capacity(self.0),
             ..Top::default()
         };
+        // The keys read so far, so that a repeated one is found in constant
+        // time however many keys a crafted text lists.
+        let mut seen = HashSet::new();
         while let Some(key) = map.next_key::<String>()? {
             // `load_stream` declines these spellings too: a `Value` reads them
             // as something else under serde_json's raw-value features.
-            if key.starts_with("$serde_json::private::") || top.parts.iter().any(|(k, _)| *k == key)
-            {
+            if key.starts_with("$serde_json::private::") || !seen.insert(key.clone()) {
                 return Err(decline());
             }
             let start = top.buf.len();
