@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID, FACILITIES, STAR_THRESHOLDS, TOWER_POPULATION } from "../../engine/facilities";
+import { PortSim, describeEngines } from "../portKit/portSim";
 
 // Mirrors the harness in milestones.integration.test.ts: fill floors edge to
 // edge and stamp occupied offices directly, so population is deterministic
@@ -35,10 +36,10 @@ function fillOffices(sim: Simulation, floor: number, rightClear = 0): number {
   return n;
 }
 
-describe("nextStarRequirements (what blocks the next star)", () => {
+describeEngines("nextStarRequirements (what blocks the next star)", (leg) => {
   it("reports the 2★ population bar on a fresh tower, with no facility gates", () => {
-    const sim = Simulation.newGame(1);
-    const req = sim.nextStarRequirements()!;
+    const sim = new PortSim(leg, Simulation.newGame(1));
+    const req = sim.state.nextStarRequirements()!;
     expect(req.star).toBe(2);
     expect(req.isTower).toBe(false);
     expect(req.popNeed).toBe(STAR_THRESHOLDS[2]);
@@ -48,42 +49,46 @@ describe("nextStarRequirements (what blocks the next star)", () => {
   });
 
   it("returns null once the tower is a TOWER", () => {
-    const sim = Simulation.newGame(1);
-    sim.star = 6;
-    expect(sim.nextStarRequirements()).toBeNull();
+    const draft = Simulation.newGame(1);
+    draft.star = 6;
+    const sim = new PortSim(leg, draft);
+    expect(sim.state.nextStarRequirements()).toBeNull();
   });
 
   it("the Security gate at 3★ agrees with evaluateStar (blocked, then promoted)", () => {
-    const sim = Simulation.newGame(2);
-    sim.money = 1_000_000_000;
-    sim.star = 2;
-    layFull(sim, "lobby", 1);
+    const draft = Simulation.newGame(2);
+    draft.money = 1_000_000_000;
+    draft.star = 2;
+    layFull(draft, "lobby", 1);
     // Enough occupied offices to clear the 3★ population bar; leave the right
     // edge free for the Security office.
     for (let f = 2; f <= 12; f++) {
-      layFull(sim, "floor", f);
-      fillOffices(sim, f, FACILITIES.security.width);
+      layFull(draft, "floor", f);
+      fillOffices(draft, f, FACILITIES.security.width);
     }
-    expect(sim.tower.totalPopulation()).toBeGreaterThanOrEqual(STAR_THRESHOLDS[3]);
+    const sim = new PortSim(leg, draft);
+    expect(sim.state.tower.totalPopulation()).toBeGreaterThanOrEqual(STAR_THRESHOLDS[3]);
 
     // Population is met but Security is missing: not ready, and evaluateStar holds at 2.
-    let req = sim.nextStarRequirements()!;
+    let req = sim.state.nextStarRequirements()!;
     expect(req.star).toBe(3);
     expect(req.popMet).toBe(true);
     expect(req.gates.find((g) => g.label === "Security office")!.met).toBe(false);
     expect(req.allMet).toBe(false);
     sim.evaluateStar();
-    expect(sim.star).toBe(2); // promotion refused, matching allMet === false
+    expect(sim.state.star).toBe(2); // promotion refused, matching allMet === false
 
     // Add an operational Security office: now ready, and evaluateStar promotes.
-    const sec = sim.tower.place("security", 2, W - FACILITIES.security.width);
-    expect(sec.ok).toBe(true);
-    sim.tower.units.find((u) => u.id === sec.unitId)!.state = "occupied";
-    req = sim.nextStarRequirements()!;
+    sim.setup((d) => {
+      const sec = d.tower.place("security", 2, W - FACILITIES.security.width);
+      expect(sec.ok).toBe(true);
+      d.tower.units.find((u) => u.id === sec.unitId)!.state = "occupied";
+    });
+    req = sim.state.nextStarRequirements()!;
     expect(req.gates.find((g) => g.label === "Security office")!.met).toBe(true);
     expect(req.allMet).toBe(true);
     sim.evaluateStar();
-    expect(sim.star).toBe(3); // promotion granted, matching allMet === true
+    expect(sim.state.star).toBe(3); // promotion granted, matching allMet === true
   });
 
   it("lists lower-rung gates cumulatively (evaluateStar re-checks them each hour)", () => {
@@ -92,9 +97,10 @@ describe("nextStarRequirements (what blocks the next star)", () => {
     // full ladder for the 5★ rung, not just metro. A regression here would let
     // the section read "ready" while promotion is refused (e.g. recycling that
     // outgrew its capacity, or a sold-off security office).
-    const sim = Simulation.newGame(1);
-    sim.star = 4; // climbing to 5★
-    const req = sim.nextStarRequirements()!;
+    const draft = Simulation.newGame(1);
+    draft.star = 4; // climbing to 5★
+    const sim = new PortSim(leg, draft);
+    const req = sim.state.nextStarRequirements()!;
     expect(req.gates.map((g) => g.label)).toEqual([
       "Security office",
       "Medical center",
@@ -109,9 +115,10 @@ describe("nextStarRequirements (what blocks the next star)", () => {
   });
 
   it("lists the TOWER inspection gates and the 15,000 bar at 5★", () => {
-    const sim = Simulation.newGame(3);
-    sim.star = 5;
-    const req = sim.nextStarRequirements()!;
+    const draft = Simulation.newGame(3);
+    draft.star = 5;
+    const sim = new PortSim(leg, draft);
+    const req = sim.state.nextStarRequirements()!;
     expect(req.star).toBe(6);
     expect(req.isTower).toBe(true);
     expect(req.popNeed).toBe(TOWER_POPULATION);

@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Ledger, WINDOW, ledgerCatFor } from "../../engine/Ledger";
 import { Simulation } from "../../engine/Simulation";
-import type { SerializedGame } from "../../engine/types";
 import { GRID } from "../../engine/facilities";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
@@ -125,7 +124,7 @@ describeEngines("Income breakdown integration", (leg) => {
     const sim = shopTower(leg, 78);
     for (let d = 0; d < 3; d++) sim.tick(60 * 24);
     const before = sim.state.incomeBreakdown().averages.retail;
-    const reloaded = new PortSim(leg, Simulation.deserialize(JSON.parse(sim.save()) as SerializedGame));
+    const reloaded = new PortSim(leg, sim.save());
     expect(reloaded.state.incomeBreakdown().averages.retail).toBeCloseTo(before, 5);
   });
 });
