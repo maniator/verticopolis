@@ -5,7 +5,7 @@
  * exempt it.
  *
  * Every value here is the owner's to change: a stage promotion, a drop-back,
- * the size gate's threshold and sending the cohort's new analytics fields
+ * the size gate's stages and threshold, and sending the cohort's new analytics fields
  * each ship only on his explicit approval. Stage 0 runs no cohort: the bucket
  * is drawn and kept, but every Automatic browser stays on TypeScript.
  */
@@ -21,11 +21,15 @@ export const COHORT_STAGE: CohortStage = 0;
 /** The WASM arm's share of buckets (0 to 99) at each stage, in percent. */
 export const STAGE_SHARE: Readonly<Record<CohortStage, number>> = { 0: 0, 1: 10, 2: 25, 3: 50 };
 
-/** The stages that run the size gate (plan 4.1: through stage 2, off at 3). */
-export const SIZE_GATED_STAGES: readonly CohortStage[] = [1, 2];
+/** The stages that run the size gate. Stage 2 only: the owner decided stage 1
+ *  runs with no size gate, so towers of every size get the Rust engine there
+ *  ("Yes no gate", 2026-10-29 00:46 UTC, replacing plan 4.1's gate from stage
+ *  1). Stage 2 keeps the gate until he decides otherwise, and `shipsBlind`
+ *  requires it, with its threshold, before stage 2 can ship. */
+export const SIZE_GATED_STAGES: readonly CohortStage[] = [2];
 
 /** The size above which a tower stays on TypeScript while the gate runs.
- *  `null` until the owner picks the gate's rule, unit and threshold. No gate
+ *  `null` until the owner picks stage 2's gate rule and threshold. No gate
  *  runs in this build: `SIZE_GATE_BUILT` says when one does. */
 export const SIZE_GATE_THRESHOLD: number | null = null;
 
@@ -36,13 +40,14 @@ export const SIZE_GATE_BUILT = false;
  *  TypeScript under the cohort (#1258). The PR that fixes it flips this. */
 export const REFUSAL_HOLDS_PAGE_LIFE = false;
 
-/** Whether `engine_status` rows carry the cohort's fields. Off until the
- *  owner approves the exact additions; nothing new reaches production
- *  telemetry while it is false. The sticky safety path (the suppression and
+/** Whether `engine_status` rows carry the cohort's fields and #1090's
+ *  `attempt` and `engaged` rows. On since the owner approved the analytics
+ *  packet (rev 5, "A yes", 2026-10-29 00:46 UTC); any other new field still
+ *  needs his approval. The sticky safety path (the suppression and
  *  the crash marker) switches on with it, so no boot moves to TypeScript
  *  where the reliability data could not say why. A Settings choice of the
  *  Rust engine runs it regardless (`playerChoseRust`, owner 2026-10-28). */
-export const COHORT_TELEMETRY = false;
+export const COHORT_TELEMETRY = true;
 
 /** True while only a player's choice boots the Rust engine: a `?engine=wasm`
  *  link or the Settings choice of the Rust engine. The cohort's draw and the
@@ -55,7 +60,8 @@ export const RUST_ONLY_BY_CHOICE = !__TOOLING_BUILD__;
 
 /** True when a build would put browsers on Rust through the cohort before
  *  everything stage 1 needs is in it: the cohort's fields, #1258's page-life
- *  hold and, at a stage that runs the size gate, the gate with its threshold.
+ *  hold and, at a stage that runs the size gate (stage 2 only), the gate with
+ *  its threshold.
  *  `config.test.ts` fails CI where this holds, so a one-line promotion cannot
  *  ship ahead of them. */
 export function shipsBlind(c: { share: number; telemetry: boolean; refusalHolds: boolean; gated: boolean; gateBuilt: boolean; threshold: number | null }): boolean {

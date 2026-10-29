@@ -317,13 +317,14 @@ describe("analytics engine bridge", () => {
     // A shell call next to the bridge's fold would send every removal twice.
     // Every source file but the bridge itself; tests and the type that names
     // the action are left out by the pattern, which looks for the value as code.
-    // The binding's method list names the engine port's `demolish` command,
-    // which sends nothing, so it is left out too.
+    // The binding's method list and the engagement detector's command list
+    // name the engine port's `demolish` command, which sends nothing, so both
+    // are left out too.
     const src = dirname(fileURLToPath(import.meta.url));
     const files = readdirSync(src, { recursive: true, encoding: "utf8" })
       .map((f) => f.replace(/\\/g, "/")) // Windows joins with backslashes
       .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.endsWith(".d.ts"))
-      .filter((f) => f !== "analyticsEngineBridge.ts" && f !== "dualrun/binding.ts");
+      .filter((f) => f !== "analyticsEngineBridge.ts" && f !== "dualrun/binding.ts" && f !== "analyticsEngagement.ts");
     expect(files).toContain("game/buildActions.ts");
     const senders = files.filter((f) => /["'`]demolish["'`]\s*[,)};]/.test(readFileSync(resolve(src, f), "utf8")));
     expect(senders).toEqual([]);

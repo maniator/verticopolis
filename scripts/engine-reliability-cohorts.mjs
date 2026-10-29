@@ -88,6 +88,10 @@ import { recognized, shaMatches, upperBound } from "./engine-reliability.mjs";
  *  chose either engine (Settings) or the URL did; an opt-out is one too. */
 export const OVERRIDE_SELECTIONS = ["setting", "url"];
 
+/** The selections a safety suppression makes (A4, packet rev 5 item 2): a
+ *  build-scoped one and a fault kept on the device. */
+export const SAFETY_SELECTIONS = ["safety-build", "safety-device"];
+
 /** The only stage whose page lives can be eligible, as `stage` reads. */
 export const ELIGIBLE_STAGE = "3";
 
@@ -130,8 +134,8 @@ const leftBeforeTower = (pl) => pl.attempted && !pastSettle(pl);
 const faultReason = (pl) => isFault(pl) || pl.reasons.some(engineReason);
 
 /** Whether a safety suppression moved the page life to TypeScript: the flag,
- *  or the selection (A4 may fold one into the other). */
-export const isSuppressed = (pl) => pl.safetySuppressed || pl.selectedBy === "safety";
+ *  or a safety selection (A4 folds the flag into `selected_by`). */
+export const isSuppressed = (pl) => pl.safetySuppressed || SAFETY_SELECTIONS.includes(pl.selectedBy);
 
 /** Whether a suppressed page life carries an engine-fault reason: the boot
  *  that detects a crash loop reports it (A4's `unclean-exit`) on a page life

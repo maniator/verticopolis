@@ -77,7 +77,8 @@ describe("engine_status rows", () => {
     noteEngineSettled(wasmSettle);
     // The reset cleared the common props (the platform buckets), so the row
     // holds the event's own fields and nothing else.
-    expect(Object.keys(rows()[0]).sort()).toEqual([...ENGINE_STATUS_FIELDS].sort());
+    // `engaged_by` rides on `engaged` rows only.
+    expect(Object.keys(rows()[0]).sort()).toEqual(ENGINE_STATUS_FIELDS.filter((f) => f !== "engaged_by").sort());
   });
 
   it("reads a boot failure from the settle snapshot, as one fallback", () => {
