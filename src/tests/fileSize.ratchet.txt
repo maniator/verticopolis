@@ -24,17 +24,9 @@ src/engine/Tower.test.ts
 src/tests/integration/calendar.integration.test.ts
 # engine-rs (Rust, guarded from 2026-10-14; inline test modules count)
 engine-rs/consumer/src/lib.rs
-engine-rs/src/catalog.rs
-engine-rs/src/churn.rs
 engine-rs/src/crowd/spawn.rs
-engine-rs/src/economy.rs
-engine-rs/src/facilities.rs
-engine-rs/src/fflate.rs
-engine-rs/src/gameplay.rs
 engine-rs/src/load.rs
-engine-rs/src/satisfaction.rs
 engine-rs/src/scenario.rs
-engine-rs/src/services.rs
 engine-rs/src/tdt/export_gather.rs
 engine-rs/src/tdt/parse.rs
 engine-rs/src/tower.rs
