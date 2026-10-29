@@ -169,6 +169,7 @@ export function isEligible(pl, eligibleShas, settledOrNot = false) {
     pl.assignedArm === "wasm" &&
     pl.selectedBy === "cohort" &&
     !isSuppressed(pl) &&
+    !markerBlocked(pl) &&
     !pl.sizeGated &&
     (settledOrNot && !pastSettle(pl) ? pl.attempted : ranEngine(pl))
   );
@@ -323,7 +324,7 @@ export function summarizeCohorts(allLives, opts = {}) {
   // one that names `ts` in the `wasm` arm belongs to the production host.
   const loopHost = (pl) => hosts.includes(pl.requested) || (pl.requested === "ts" && pl.assignedArm === "wasm" && hosts.includes(ELIGIBLE_HOST));
   const asked = (pl) =>
-    (hosts.includes(pl.requested) && !isSuppressed(pl) && (pl.settled ? ranEngine(pl) : pl.attempted) && (!pl.sizeGated || engineFault(pl) || engagedOnEngine(pl))) || (suppressedFault(pl) && loopHost(pl));
+    (hosts.includes(pl.requested) && !isSuppressed(pl) && !markerBlocked(pl) && (pl.settled ? ranEngine(pl) : pl.attempted) && (!pl.sizeGated || engineFault(pl) || engagedOnEngine(pl))) || (suppressedFault(pl) && loopHost(pl));
   const movedOff = (pl) => hosts.includes(ELIGIBLE_HOST) && pl.assignedArm === "wasm" && !pl.sizeGated && !engineFault(pl) && (isSuppressed(pl) || markerBlocked(pl) || (isOverride(pl) && pl.requested === "ts"));
   const uncountedWasm = (pl) => pl.requested.startsWith("wasm") && !hosts.includes(pl.requested);
   let uncountedHostSessions = 0;

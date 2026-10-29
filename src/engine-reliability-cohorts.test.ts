@@ -287,6 +287,10 @@ describe("the all-attempts safety denominator", () => {
     const blocked = life({ engaged: false, reasons: ["marker-blocked"] });
     expect(isEligible(blocked, [SHA])).toBe(false);
     expect(run([blocked]).attempts).toMatchObject({ sessions: 0, faults: 0, movedOff: 1 });
+    // Its settle row lost: the engaged row still names the reason.
+    const unsettled = life({ settled: false, engagedEngine: "ts", reasons: ["marker-blocked"] });
+    expect(isEligible(unsettled, [SHA], true)).toBe(false);
+    expect(run([unsettled]).attempts).toMatchObject({ sessions: 0, faults: 0, movedOff: 1 });
   });
 
   it("keeps a size-gated page life's engine fault in the safety denominator", () => {
