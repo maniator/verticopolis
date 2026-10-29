@@ -379,6 +379,23 @@ fn choose_layout(bytes: &[u8], table_start: usize) -> PayloadLayout {
         .expect("a walk found the most shafts")
 }
 
+/// The per-class people in the finance block, trusted only when they add up to
+/// the total beside them and the total is not zero: a file from before the
+/// block was filled holds zeros, which say nothing.
+fn finance_population(finance: &[u8]) -> Option<[i64; TDT_POPULATION_CLASSES]> {
+    let word = |at: usize| {
+        i64::from(u32::from_le_bytes(
+            finance[at..at + 4].try_into().expect("four bytes"),
+        ))
+    };
+    let mut pops = [0; TDT_POPULATION_CLASSES];
+    for (class, pop) in pops.iter_mut().enumerate() {
+        *pop = word(TDT_FINANCE_POPULATION_AT + class * 4);
+    }
+    let total = word(TDT_FINANCE_TOTAL_AT);
+    (total > 0 && pops.iter().sum::<i64>() == total).then_some(pops)
+}
+
 /// `walkTolerantTail`: the blocks after the floor map, in file order.
 pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
     let mut tail = TdtTail::default();
@@ -453,7 +470,8 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
 
     r.enter_block("finance block");
     if r.remaining() >= TDT_FINANCE_SIZE {
-        r.skip(TDT_FINANCE_SIZE).expect("finance block sized");
+        let finance = r.bytes(TDT_FINANCE_SIZE).expect("finance block sized");
+        tail.finance_population = finance_population(&finance);
         r.enter_block("parking block");
         if r.remaining() >= TDT_PARKING_SIZE {
             tail.parking_connected = Some(r.u16().expect("parking block sized"));

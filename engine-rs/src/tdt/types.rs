@@ -2,6 +2,8 @@
 //! of the bytes with no game semantics applied. The mapping to the serialized
 //! game lives in `parse.rs`.
 
+use super::format::TDT_POPULATION_CLASSES;
+
 /// One tenant record, mirrored raw from the file (`TdtTenant`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TdtTenant {
@@ -76,6 +78,9 @@ pub struct TdtTail {
     pub elevators: Option<Vec<TdtElevator>>,
     pub stairs: Option<Vec<TdtStair>>,
     pub parking_connected: Option<i64>,
+    /// The people of each class the finance block counts (`POP_*` order), when
+    /// the block holds a count that adds up to its total.
+    pub finance_population: Option<[i64; TDT_POPULATION_CLASSES]>,
     pub warnings: Vec<String>,
 }
 

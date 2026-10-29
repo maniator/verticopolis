@@ -38,7 +38,9 @@ use indexmap::IndexMap;
 use serde_json::Value;
 
 use super::export_tables::{class_from_rent, kind_tenant, part_stack, OutTenant};
-use super::format::TDT_FLOOR_OFFSET;
+use super::format::{
+    population_class, TDT_FLOOR_OFFSET, TDT_POPULATION_CLASSES as POPULATION_CLASSES,
+};
 use super::tables::{
     is_priced, rent_from_class, HOTEL_ASLEEP_FLAG, HOTEL_DIRTY_FLAG, HOTEL_OCCUPANT_MASK,
 };
@@ -95,12 +97,17 @@ pub fn gather_units<U: Borrow<Value>>(
     let mut header = ExportHeaderCounts::default();
     let mut has_ground_lobby = false;
     let mut people_pop = 0.0;
-    let add_residents = |people_pop: &mut f64, u: &GatheredRoom| {
-        let r = resident_count(u);
-        if r.is_finite() {
-            *people_pop += r;
-        }
-    };
+    let mut class_pop = [0.0; POPULATION_CLASSES];
+    let add_residents =
+        |people_pop: &mut f64, class_pop: &mut [f64; POPULATION_CLASSES], u: &GatheredRoom| {
+            let r = resident_count(u);
+            if r.is_finite() {
+                *people_pop += r;
+                if let Some(class) = population_class(u.kind) {
+                    class_pop[class] += r;
+                }
+            }
+        };
 
     let mut rooms: Vec<GatheredRoom> = vec![];
     for raw in raw_units {
@@ -171,10 +178,10 @@ pub fn gather_units<U: Borrow<Value>>(
             if (u.kind == Kind::Office || u.kind == Kind::Condo) && tenanted {
                 status = 1;
                 counts.occupied += 1;
-                add_residents(&mut people_pop, u);
+                add_residents(&mut people_pop, &mut class_pop, u);
             } else if u.kind.is_commercial() && u.kind.facility().population > 0 {
                 if is_present(&u.state) {
-                    add_residents(&mut people_pop, u);
+                    add_residents(&mut people_pop, &mut class_pop, u);
                 }
             } else if u.kind.is_hotel() {
                 if u.state == "dirty" {
@@ -187,7 +194,7 @@ pub fn gather_units<U: Borrow<Value>>(
                 }
                 if status != 0 {
                     counts.hotel_states += 1;
-                    add_residents(&mut people_pop, u);
+                    add_residents(&mut people_pop, &mut class_pop, u);
                 }
             }
             if (u.kind == Kind::Office || u.kind == Kind::Condo) && !tenanted && u.ever_occupied {
@@ -398,6 +405,7 @@ pub fn gather_units<U: Borrow<Value>>(
         header,
         has_ground_lobby,
         people_pop,
+        class_pop,
         rooms,
     })
 }

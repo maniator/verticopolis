@@ -54,3 +54,40 @@ fn the_real_1997_saves_bring_over_their_own_elevators_and_stairways() {
         );
     }
 }
+
+/// (file, people SimTower counts in offices, people it counts in condos), from
+/// the PC's per-class table for the nine saves (TOWER4's block holds no total).
+const RESIDENTS: [(&str, i64, i64); 7] = [
+    ("TOWER1.TDT", 528, 423),
+    ("TOWER2.TDT", 1284, 915),
+    ("TOWER3.TDT", 1620, 0),
+    ("TOWER5.TDT", 648, 0),
+    ("TOWER6.TDT", 1272, 162),
+    ("TOWER7.TDT", 1428, 462),
+    ("MYTOWER.TDT", 1842, 624),
+];
+
+#[test]
+fn offices_and_condos_arrive_with_the_people_the_file_counts() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("conformance")
+        .join("fixtures")
+        .join("tdt-reddit");
+    for (name, offices, condos) in RESIDENTS {
+        let bytes = std::fs::read(dir.join(name)).expect("fixture");
+        let (json, _) = import_tdt(&bytes, name).expect("imports");
+        let save: serde_json::Value = serde_json::from_str(&json).expect("save json");
+        let people = |kind: &str| -> i64 {
+            save["units"]
+                .as_array()
+                .expect("units")
+                .iter()
+                .filter(|u| u["kind"] == kind && u["state"] == "occupied")
+                .map(|u| u["occupants"].as_i64().expect("occupants"))
+                .sum()
+        };
+        assert_eq!(people("office"), offices, "{name} offices");
+        assert_eq!(people("condo"), condos, "{name} condos");
+    }
+}

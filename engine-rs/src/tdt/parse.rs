@@ -5,7 +5,9 @@ use std::collections::{BTreeMap, HashMap};
 
 use serde_json::{json, Map, Value};
 
-use super::format::{parse_tdt_binary, view_from_view_words, TDT_FLOOR_OFFSET};
+use super::format::{
+    parse_tdt_binary, view_from_view_words, POP_CONDO, POP_OFFICE, TDT_FLOOR_OFFSET,
+};
 use super::import::{hash_seed, tower_name_from_filename};
 use super::import_report::{DecodeStats, ImportCounts};
 use super::pacing::minute_of_day_for_frame;
@@ -46,6 +48,56 @@ pub fn jnum(x: f64) -> Value {
 }
 
 /// `parseTDT`: an original SimTower `.TDT` buffer into our save schema.
+/// Set how many rooms of `kind` are occupied from the people the file counts
+/// for the class, since a room's status byte is an activity state and reads
+/// some occupied rooms as empty and the reverse. Rooms the status byte already
+/// reads as occupied stay occupied first. Returns the rooms and the count.
+fn seed_residents(
+    units: Vec<OutUnit>,
+    kind: Kind,
+    people: i64,
+    read_occupied: i64,
+) -> (Vec<OutUnit>, i64) {
+    let per_room = kind.facility().population.max(1);
+    let mut ranked: Vec<usize> = (0..units.len())
+        .filter(|&i| units[i].kind == kind && units[i].state != "construction")
+        .collect();
+    // Occupied rooms first, so the surplus or the shortfall falls on the rest.
+    ranked.sort_by_key(|&i| units[i].state != "occupied");
+    let target = (people / per_room).min(ranked.len() as i64);
+    let occupied_now = ranked
+        .iter()
+        .filter(|&&i| units[i].state == "occupied")
+        .count() as i64;
+    if target == occupied_now && target == read_occupied {
+        return (units, target);
+    }
+    let rank_of: HashMap<usize, usize> = ranked.iter().enumerate().map(|(r, &i)| (i, r)).collect();
+    let seeded = units
+        .into_iter()
+        .enumerate()
+        .map(|(i, unit)| match rank_of.get(&i) {
+            Some(&rank) if (rank as i64) < target => OutUnit {
+                state: "occupied",
+                occupants: per_room,
+                ever_occupied: true,
+                ..unit
+            },
+            // A room the file's status marked occupied but whose people the
+            // finance block does not count goes back to never having been lived in,
+            // which is all an exported vacant room can say.
+            Some(_) => OutUnit {
+                state: "empty",
+                occupants: 0,
+                ever_occupied: unit.ever_occupied && unit.state != "occupied",
+                ..unit
+            },
+            None => unit,
+        })
+        .collect();
+    (seeded, target)
+}
+
 pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, LegacyImportError> {
     let tdt = parse_tdt_binary(bytes)?;
 
@@ -315,6 +367,17 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
                 counts.secom += 1;
             }
         }
+    }
+
+    if let Some(pops) = tdt.tail.finance_population {
+        (units, counts.occupied_offices) = seed_residents(
+            units,
+            Kind::Office,
+            pops[POP_OFFICE],
+            counts.occupied_offices,
+        );
+        (units, counts.sold_condos) =
+            seed_residents(units, Kind::Condo, pops[POP_CONDO], counts.sold_condos);
     }
 
     for m in merge_parts(&part_records) {

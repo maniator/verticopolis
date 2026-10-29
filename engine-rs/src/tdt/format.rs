@@ -53,6 +53,42 @@ pub const TDT_ELEVATOR_CAR_BLOCK_SIZE: i64 = 348;
 pub const TDT_ELEVATOR_TYPE_EXPRESS: i64 = 0;
 pub const TDT_FINANCE_SIZE: usize = 132;
 pub const TDT_PARKING_SIZE: usize = 2 + 512 * 2;
+/// The finance block (`TDT_FINANCE_SIZE` bytes) holds, as little-endian u32s,
+/// the people of each class SimTower counts, then their total. Measured on the
+/// nine 1997 saves: the ten classes sit at byte 88 in the order below, the
+/// total at byte 128 is their sum, and the game shows it as the population.
+pub const TDT_FINANCE_POPULATION_AT: usize = 88;
+pub const TDT_FINANCE_TOTAL_AT: usize = 128;
+pub const TDT_POPULATION_CLASSES: usize = 10;
+pub const POP_OFFICE: usize = 0;
+pub const POP_HOTEL_SINGLE: usize = 1;
+pub const POP_HOTEL_TWIN: usize = 2;
+pub const POP_HOTEL_SUITE: usize = 3;
+pub const POP_SHOP: usize = 4;
+pub const POP_FAST_FOOD: usize = 5;
+pub const POP_RESTAURANT: usize = 6;
+pub const POP_PARTY_HALL: usize = 7;
+pub const POP_THEATRE: usize = 8;
+pub const POP_CONDO: usize = 9;
+
+/// Which of the ten population classes a room's people count under.
+pub fn population_class(kind: crate::facilities::Kind) -> Option<usize> {
+    use crate::facilities::Kind;
+    Some(match kind {
+        Kind::Office => POP_OFFICE,
+        Kind::HotelSingle => POP_HOTEL_SINGLE,
+        Kind::HotelDouble => POP_HOTEL_TWIN,
+        Kind::HotelSuite => POP_HOTEL_SUITE,
+        Kind::Shop => POP_SHOP,
+        Kind::FastFood => POP_FAST_FOOD,
+        Kind::Restaurant => POP_RESTAURANT,
+        Kind::PartyHall => POP_PARTY_HALL,
+        Kind::Cinema => POP_THEATRE,
+        Kind::Condo | Kind::RentalApartment => POP_CONDO,
+        _ => return None,
+    })
+}
+
 /// Zero bytes between the parking block and the stairs table in every save
 /// SimTower wrote (measured on the nine 1997 saves and the game's own
 /// re-saves of them). A table written without the gap reads four bytes early.

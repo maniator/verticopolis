@@ -93,6 +93,7 @@ pub fn encode_tower(
         header,
         has_ground_lobby,
         people_pop,
+        class_pop,
         counts,
         retail_rows,
         rooms,
@@ -334,7 +335,21 @@ pub fn encode_tower(
         w.pad(size as usize);
     }
 
-    w.pad(TDT_FINANCE_SIZE);
+    // The people of each class and their total, the way the game's own finance
+    // block carries them; every other field stays zero.
+    let mut finance = [0u8; TDT_FINANCE_SIZE];
+    let mut total = 0i64;
+    for (class, pop) in class_pop.iter().enumerate() {
+        let people = to_int32(round(*pop)).clamp(0, TDT_MAX_CENSUS as i64);
+        total += people;
+        let at = TDT_FINANCE_POPULATION_AT + class * 4;
+        finance[at..at + 4].copy_from_slice(&(people as u32).to_le_bytes());
+    }
+    finance[TDT_FINANCE_TOTAL_AT..TDT_FINANCE_TOTAL_AT + 4]
+        .copy_from_slice(&(total as u32).to_le_bytes());
+    for byte in finance {
+        w.u8(byte as i64);
+    }
 
     let stalls = connected_stall_count(rooms).min(((TDT_PARKING_SIZE - 2) / 2) as i64);
     w.u16(stalls);

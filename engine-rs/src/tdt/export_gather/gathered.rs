@@ -6,6 +6,7 @@ use serde_json::Value;
 use super::FloorKey;
 use crate::facilities::Kind;
 use crate::tdt::export_tables::OutTenant;
+use crate::tdt::format::TDT_POPULATION_CLASSES as POPULATION_CLASSES;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SkipReason {
@@ -81,5 +82,7 @@ pub struct GatheredTower {
     pub header: ExportHeaderCounts,
     pub has_ground_lobby: bool,
     pub people_pop: f64,
+    /// The people of each class the finance block counts, in its order.
+    pub class_pop: [f64; POPULATION_CLASSES],
     pub rooms: Vec<GatheredRoom>,
 }
