@@ -123,7 +123,7 @@ error does; see above.)
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `trigger` | `settle`, `fallback`, `crash-reload`, `writer-latch`, `summary` | Why this row was sent. `crash-reload` is a running Rust engine that trapped, sent just before the page reloads from its last autosave (#1422); it keeps the `engine` that crashed and counts as that page life's fallback |
+| `trigger` | `attempt`, `settle`, `fallback`, `crash-reload`, `writer-latch`, `summary`, `engaged` | Why this row was sent. `attempt` (#1090) goes once per page life when boot has chosen the engine, before the package loads, so a tab that closes or crashes during the load is still counted; it carries the settle row's fields as they stand then. `engaged` (#1090) goes once per page life at the first engagement (the running engine accepts a player's gameplay command, or 30 s of foreground play pass with the splash and dialogs closed and the game clock moving in every counted second) and names the engine running then. Neither counts toward the cap, and neither is sent until the cohort's fields ship (`COHORT_TELEMETRY`; the owner approved both on 2026-10-29). `crash-reload` is a running Rust engine that trapped, sent just before the page reloads from its last autosave (#1422); it keeps the `engine` that crashed and counts as that page life's fallback |
 | `engine_requested` | `ts`, `wasm`, `wasm-frame`, `wasm-worker` | The engine the page life asked for (`?engine=` or `vc.engine`; `ts` when neither is set). A wasm-only build always sends `wasm`, whatever the URL says. |
 | `engine` | `ts`, `wasm`, `wasm-frame`, `wasm-worker`, `ts-fallback`, `none` | What runs when the row is sent. `ts-fallback` is a switchable build back on TypeScript; `none` is a wasm-only build that stopped. After a fallback it stays `ts-fallback` for the rest of the page life. After a running engine's fault (#874) that is exact, since no later tower is hosted; after a refused tower the host can take a later one again, and no row reports that. |
 | `build` | `switchable`, `wasm-only` | The bundle kind (`src/build/engineBundle.ts`) |
@@ -134,6 +134,7 @@ error does; see above.)
 | `page_life` | random id | Minted in memory at the page life's first row and never stored, so a reload gets a new one. It only groups rows from one page life; it cannot link a page life to anything else. |
 | `version` | the build's version | Which release sent the row |
 | `sha` | the build's short commit (`__APP_SHA__`) | Which exact build, so two deploys of one version stay apart |
+| `engaged_by` | `command`, `play` | Only on `engaged` rows: which branch engaged the page life. Absent reads as `none` |
 
 **Planned, not collected yet.** The A4 cohort work (#1197) adds `stage`,
 `assigned_arm` (the randomized arm, never rewritten by a setting, a URL, a
@@ -141,13 +142,8 @@ safety suppression or the size gate), `selected_by` (which policy rule chose
 the engine; `setting` and `url` are manual overrides), `safety_suppressed` and
 `size_gated`, and #954 adds `divergence_reports`, a count of commands the
 engine refused after the TypeScript instance accepted them (the report moved
-there from #874). #1090 proposes two rows, waiting for the owner's analytics
-approval: `trigger: attempt`, once per page life when boot has chosen the
-engine and before the package loads, so a tab closed or crashed during the
-load is counted; and `trigger: engaged` with `engaged_by` (`command` or
-`play`), once per page life, the first time the running engine accepts a
-player's gameplay command or 30 s of foreground play pass with the game clock
-advancing. The governed definition already reads all of them, and an absent
+there from #874). #1090's `attempt` and `engaged` rows are in the table above and go out with
+the cohort's fields. The governed definition already reads all of them, and an absent
 value reads as `none`, `default`, false, no attempt row or not engaged. Each
 lands in this table, with its reason, in the change that sends it.
 

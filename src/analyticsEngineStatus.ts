@@ -1,5 +1,7 @@
 import { trackEvent, type GameplayEvents } from "./analyticsCore";
 import { APP_VERSION } from "./appVersion";
+import type { EngagedBy } from "./analyticsEngagement";
+import { COHORT_TELEMETRY } from "./engineCohort/config";
 import type { BootStage, FallbackReason, FallbackStage } from "./wasmhost/engineBoot";
 import type { EngineChoice } from "./wasmhost/engineChoice";
 
@@ -50,7 +52,7 @@ export const ENGINE_KINDS = ["ts", "wasm", "wasm-frame", "wasm-worker", "ts-fall
 export type EngineKind = (typeof ENGINE_KINDS)[number];
 
 /** Why a row was sent; see the module comment. */
-export const ENGINE_STATUS_TRIGGERS = ["settle", "fallback", "crash-reload", "writer-latch", "summary"] as const;
+export const ENGINE_STATUS_TRIGGERS = ["attempt", "settle", "fallback", "crash-reload", "writer-latch", "summary", "engaged"] as const;
 export type EngineStatusTrigger = (typeof ENGINE_STATUS_TRIGGERS)[number];
 
 /** The bundle kind (see `src/build/engineBundle.ts`). */
@@ -72,6 +74,7 @@ export const ENGINE_STATUS_FIELDS = [
   "page_life",
   "version",
   "sha",
+  "engaged_by",
 ] as const satisfies readonly (keyof GameplayEvents["engine_status"])[];
 type MissingField = Exclude<keyof GameplayEvents["engine_status"], (typeof ENGINE_STATUS_FIELDS)[number]>;
 const everyField: [MissingField] extends [never] ? true : MissingField = true;
@@ -121,6 +124,8 @@ const reasonsSent = new Set<FallbackReason>();
 /** A row the cap dropped since the last row went out. */
 let dropped = false;
 let pageLife: string | undefined;
+let attemptSent = false;
+let engagedSent = false;
 
 /** The page-life id: minted at the page life's first row, held in memory
  *  only, so a reload starts a new one while the relay's session id carries
@@ -139,8 +144,9 @@ function fallbackId(): string {
   return `p-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 }
 
-function send(s: Status, trigger: EngineStatusTrigger): void {
+function send(s: Status, trigger: EngineStatusTrigger, engagedBy?: EngagedBy): void {
   trackEvent("engine_status", {
+    ...(engagedBy ? { engaged_by: engagedBy } : {}),
     trigger,
     engine_requested: s.requested,
     engine: s.engine,
@@ -167,6 +173,30 @@ function sendCapped(s: Status, trigger: EngineStatusTrigger, novel: boolean): vo
   dropped = false;
   reasonsSent.add(s.reason);
   send(s, trigger);
+}
+
+/** Whether the cohort's rows (`attempt`, `engaged`) go out: with the
+ *  cohort's fields, which the owner approved on 2026-10-29 and the fields PR
+ *  switches on. Exported for the tests. */
+export const cohortRows = { on: COHORT_TELEMETRY };
+
+/** Boot has chosen the engine and the package has not loaded yet: send the
+ *  page life's `attempt` row (#1090), so a tab that closes or crashes during
+ *  the load is still counted. Once per page life, outside the cap. */
+export function noteEngineAttempt(attempt: { build: EngineBuild; requested: EngineChoice }): void {
+  if (!cohortRows.on || attemptSent) return;
+  attemptSent = true;
+  const { build, requested } = attempt;
+  send({ build, requested, engine: engineKind(build, requested, false), reason: "none", stage: "none", fallbacks: 0 }, "attempt");
+}
+
+/** The page life engaged (`analyticsEngagement.ts`): send its `engaged` row,
+ *  with the engine running at that moment. Once per page life, outside the
+ *  cap; before `settle` there is no engine to name, so it is ignored. */
+export function noteEngineEngaged(by: EngagedBy): void {
+  if (!cohortRows.on || !status || engagedSent) return;
+  engagedSent = true;
+  send(status, "engaged", by);
 }
 
 /** Boot has picked its engine: send the page life's `settle` row. Once per
@@ -234,4 +264,6 @@ export function resetEngineStatus(): void {
   reasonsSent.clear();
   dropped = false;
   pageLife = undefined;
+  attemptSent = false;
+  engagedSent = false;
 }
