@@ -423,8 +423,8 @@ fn the_brush_fills_only_an_emptied_slot() {
         .filter(|s| s.code.contains(".add_unit("))
         .map(|s| s.rel.as_str())
         .collect();
-    assert_eq!(callers, ["tower.rs"]);
-    let place = body(code("tower.rs"), "place");
+    assert_eq!(callers, ["tower/placement.rs"]);
+    let place = body(code("tower/placement.rs"), "place");
     assert_eq!(place.matches(".add_unit(").count(), 1);
     assert!(place.contains("self.add_unit(unit,slot)"));
     assert_eq!(place.matches("slot=").count(), 2, "{place}");
