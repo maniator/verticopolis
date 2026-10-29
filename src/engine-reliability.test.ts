@@ -381,7 +381,7 @@ describe("summarizeReliability", () => {
 
 describe("the command line", () => {
   it("reads the window and the lists", () => {
-    expect(parseArgs([])).toEqual({ window: { hours: 720, label: "30 days" }, opts: { hosts: ["wasm"], shas: null, versions: null, builds: null, arms: null }, eligibleShas: [], tailShas: [] });
+    expect(parseArgs([])).toEqual({ window: { hours: 720, label: "30 days" }, opts: { hosts: ["wasm"], shas: null, versions: null, builds: null, arms: null }, eligibleShas: [], tailShas: [], floorShas: [] });
     expect(parseArgs(["--window=7", "--shas", "abc1234, def5678a", "--arms", "wasm", "--hosts", "wasm,wasm-frame", "--builds", "wasm-only", "--versions", "2.36.0"]).opts).toEqual({
       hosts: ["wasm", "wasm-frame"],
       shas: ["abc1234", "def5678a"],

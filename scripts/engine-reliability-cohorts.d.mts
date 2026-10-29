@@ -86,7 +86,18 @@ export function isSuppressed(pl: PageLife): boolean;
 export function suppressedFault(pl: PageLife): boolean;
 export function engineFault(pl: PageLife): boolean;
 export function ranEngine(pl: PageLife): boolean;
+export function inStageCohort(pl: PageLife, stage: string, settledOrNot?: boolean): boolean;
 export function isEligible(pl: PageLife, eligibleShas: string[], settledOrNot?: boolean): boolean;
+export function when(pl: PageLife): number;
+export interface Session {
+  id: string;
+  lives: PageLife[];
+  arm: string;
+  stage: string;
+  changed: boolean;
+}
+export function bySession(pageLives: PageLife[]): Session[];
+export function cohort(sessions: Session[], pick: (pl: PageLife) => boolean, pickLoading: (pl: PageLife) => boolean, pickLoop: (pl: PageLife) => boolean, engagedOnly?: boolean): CohortCount;
 export function engagedOnEngine(pl: PageLife): boolean;
 export function differenceInterval(k1: number, n1: number, k2: number, n2: number): [number, number] | null;
 export function summarizeCohorts(pageLives: PageLife[], opts?: CohortOptions): CohortsSummary;
