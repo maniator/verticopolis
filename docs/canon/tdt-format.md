@@ -304,12 +304,9 @@ the tail.
 
 - Records sit in any slot, not packed (TOWER2 uses slots 14 to 46). Read all 64.
 - Saves with up to 48 flights start at slot 16 (TOWER1, TOWER5, TOWER2 and MYTOWER do; TOWER6 and TOWER7 hold 64 and so also use slots 0 to 15). SimTower dropped the first 16 records of a file that filled the table from slot 0, so the exporter fills from slot 16 and wraps to slot 0 after slot 63 (confidence: Medium, from the allocation pattern).
-- Open problem (tracked in #1501): from an export with 64 flights, SimTower
-  keeps slots 16 to 63 and drops slots 0 to 15, although a file SimTower wrote
-  itself with all 64 slots built keeps all of them. Swapping the original's
-  bytes before the table into our export did not change this; swapping in the
-  original's tail makes SimTower refuse the file. The cause is not found, and
-  the export report warns when a tower has more than 48 flights.
+- Open question (#1501): from an export with 64 flights SimTower keeps slots 16
+  to 63 and drops slots 0 to 15, although a file SimTower wrote itself with all
+  64 slots built keeps all of them. The export report warns above 48 flights.
 - A stacked column of flights is one single-story record per floor. The exporter
   writes the same.
 - Pool: 64 links shared by stairs and escalators.
