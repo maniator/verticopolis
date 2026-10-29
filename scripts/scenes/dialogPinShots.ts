@@ -10,9 +10,9 @@
  * it applies to every dialog in the app:
  *
  *   - Help is the long one a player is most likely to be scrolling.
- *   - Settings is the one the rule is easiest to get wrong: it renders its
- *     build-id line AFTER the action row, so the footer is not the box's last
- *     child and a `:last-child`-only selector skips it in silence.
+ *   - Settings is the one the rule is easiest to get wrong: its build-id line
+ *     must stay ABOVE the action row. Rendered after it, the footer is not the
+ *     box's last child and scrolled text shows in the band under Close.
  *
  * Both are shot on a deliberately SHORT viewport. `.modal-box` caps at 82vh, so
  * a small window (or a phone held sideways) is exactly where the footer used to
@@ -73,12 +73,22 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
         const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
         const strip = document.querySelector("#modal .modal-box > .modal-actions") as HTMLElement | null;
         if (!box || !strip) throw new Error("the Settings dialog did not mount");
-        // The premise of the selector's second arm: something really does
-        // follow the action row here.
-        if (strip.nextElementSibling === null) throw new Error("Settings no longer renders anything after its action row; the shot has lost its subject");
+        // The premise of this shot: the action row is the box's last child
+        // (the build line sits above it), so the full downward cover applies
+        // and scrolled text cannot show in the band under Close on a phone.
+        if (strip.nextElementSibling !== null) throw new Error("Settings renders something after its action row again; scrolled text can show under the Close button");
         // Keep the Settings Game engine row intact in the capture while still
         // leaving enough content below the fold to prove the sticky footer rule.
         box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight - strip.offsetHeight * 3);
+        // The build line sits just above the pinned row, so that scroll can leave
+        // it half behind the strip, which the visibility check below rejects.
+        // Back off until the whole line is below the fold, where the pin's
+        // cover (not the line) is what the shot shows under Close.
+        const version = box.querySelector(".set-version") as HTMLElement | null;
+        if (!version) throw new Error("Settings lost its build line");
+        const lineTop = version.getBoundingClientRect().top;
+        const boxBottom = box.getBoundingClientRect().bottom;
+        if (lineTop < boxBottom + 1) box.scrollTop -= Math.ceil(boxBottom + 1 - lineTop);
         const left = box.scrollHeight - box.clientHeight - box.scrollTop;
         if (left <= strip.offsetHeight) throw new Error("Settings did not overflow enough for the pin to be doing anything");
         if (strip.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom + 1) throw new Error("the Settings footer is not pinned; this shot would prove nothing");
