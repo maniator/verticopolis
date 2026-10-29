@@ -5,12 +5,17 @@ import type { CohortStage } from "./config";
 import { clearMarker, crashLoopFound } from "./crashMarker";
 import {
   COHORT_KEY,
+  RECORD_VERSION,
   SAFETY_KEY,
+  fromNewerBuild,
   readCohort,
   readSafety,
   remove,
+  versionAfter,
   writeChecked,
   type Arm,
+  type CohortRecord,
+  type Enrollment,
   type KeyValueStore,
   type SafetyRecord,
   type SafetyScope,
@@ -63,6 +68,9 @@ export interface SelectionEnv {
   share: number;
   /** This build's commit (`__APP_SHA__`). */
   sha: string;
+  /** This build's app version (`__APP_VERSION__`), so an older build left
+   *  open during a deploy never rewrites a newer build's enrollment. */
+  version?: string;
   /** A random key for this page life (its crash-marker entry). */
   pageId: string;
   now: number;
@@ -147,7 +155,7 @@ export function readPreference(store: KeyValueStore | null): Preference {
 function activeSuppression(store: KeyValueStore | null, sha: string, now: number): SafetyRecord | null {
   const r = readSafety(store);
   if (r.ok) {
-    if (suppressionApplies(r.value, sha)) return r.value;
+    if (fromNewerBuild(r.value) || suppressionApplies(r.value, sha)) return r.value;
     remove(store, SAFETY_KEY);
     return null;
   }
@@ -160,21 +168,25 @@ function activeSuppression(store: KeyValueStore | null, sha: string, now: number
 }
 
 /** The bucket, drawn and stored on first use, or null when storage cannot keep it. */
-function bucketOf(env: SelectionEnv): { bucket: number; applied?: { stage: number; arm: Arm; sha: string } } | null {
+function bucketOf(env: SelectionEnv): CohortRecord | null {
   const r = readCohort(env.store);
   if (r.ok) return r.value;
   if (r.why === "unavailable") return null;
-  const bucket = Math.min(99, Math.floor(env.random() * 100));
-  return writeChecked(env.store, COHORT_KEY, { v: 1, bucket }) ? { bucket } : null;
+  const record: CohortRecord = { v: RECORD_VERSION, bucket: Math.min(99, Math.floor(env.random() * 100)), ...(r.why === "corrupt" ? { redrawn: env.now } : {}) };
+  return writeChecked(env.store, COHORT_KEY, record) ? record : null;
 }
 
 /** Record this build's enrollment and report a change from the last one. A
  *  change storage did not keep is not reported, so the notice cannot repeat
- *  on every boot. */
-function applyEnrollment(env: SelectionEnv, bucket: number, applied: { stage: number; arm: Arm; sha: string } | undefined, arm: Arm): Transition {
-  const now = { stage: env.stage, arm, sha: env.sha };
+ *  on every boot. A newer build's record, or an enrollment a later app
+ *  version applied, is left alone: an older build still open during a deploy
+ *  would otherwise flip it back and repeat the notice (#1289 item 3). */
+function applyEnrollment(env: SelectionEnv, record: CohortRecord, arm: Arm): Transition {
+  const { applied } = record;
+  const now: Enrollment = { stage: env.stage, arm, sha: env.sha, ...(env.version ? { version: env.version } : {}) };
   if (applied && applied.stage === now.stage && applied.arm === now.arm && applied.sha === now.sha) return "none";
-  const kept = writeChecked(env.store, COHORT_KEY, { v: 1, bucket, applied: now });
+  if (fromNewerBuild(record) || (applied?.version && env.version && versionAfter(applied.version, env.version))) return "none";
+  const kept = writeChecked(env.store, COHORT_KEY, { v: RECORD_VERSION, bucket: record.bucket, applied: now, ...(record.redrawn !== undefined ? { redrawn: record.redrawn } : {}) });
   if (!kept || !applied || applied.arm === arm) return "none";
   return arm === "wasm" ? "enrolled" : "withdrawn";
 }
@@ -219,7 +231,7 @@ export function selectEngine(env: SelectionEnv): Selection {
     if (url !== "ts" && url !== "wasm" && env.rustOnlyByChoice) return { ...base, assignedArm, boot: "ts", requested: url, selectedBy: "url", heldForChoice: true };
     return { ...base, assignedArm, boot: url, requested: url, selectedBy: "url" };
   }
-  const transition = drawn && arm ? applyEnrollment(env, drawn.bucket, drawn.applied, arm) : "none";
+  const transition = drawn && arm ? applyEnrollment(env, drawn, arm) : "none";
   const common = { ...base, assignedArm, transition };
 
   const requested: EngineChoice = stored ?? (arm === "wasm" ? "wasm" : "ts");

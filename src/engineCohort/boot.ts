@@ -88,6 +88,7 @@ function chooseAndWatch(search: string): EngineChoice {
     stage,
     share: STAGE_SHARE[stage],
     sha: __APP_SHA__,
+    version: __APP_VERSION__,
     pageId: pageKey(),
     now: Date.now(),
     random: randomUnit,

@@ -13,7 +13,28 @@
  *
  * The player's own choice stays in `vc.engine` (`engineChoice.ts`), which only
  * the Settings choice writes (`setPreference`).
+ *
+ * A record from a newer build (a `v` above `RECORD_VERSION`) is read for the
+ * fields this build knows and never rewritten or removed by this build
+ * (#1289 item 2): the cohort keeps its bucket, and a safety record keeps the
+ * device on TypeScript as a fault until the player retries.
  */
+
+/** The version this build writes. */
+export const RECORD_VERSION = 1;
+
+/** Whether a record was written by a newer build. */
+export const fromNewerBuild = (r: { v: number }): boolean => r.v > RECORD_VERSION;
+
+/** Whether `a` is a later app version than `b` (`major.minor.patch`); false
+ *  when either does not parse. */
+export function versionAfter(a: string, b: string): boolean {
+  const parse = (v: string) => (/^\d+\.\d+\.\d+$/.test(v) ? v.split(".").map(Number) : null);
+  const [x, y] = [parse(a), parse(b)];
+  if (!x || !y) return false;
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i]! > y[i]!;
+  return false;
+}
 
 export const COHORT_KEY = "vc.engineCohort";
 export const SAFETY_KEY = "vc.engineSafety";
@@ -27,11 +48,23 @@ export interface KeyValueStore {
 
 export type Arm = "wasm" | "ts";
 
+/** The enrollment a boot applied; `version` is the app version that applied
+ *  it, absent on records from before this field. */
+export interface Enrollment {
+  stage: number;
+  arm: Arm;
+  sha: string;
+  version?: string;
+}
+
 export interface CohortRecord {
-  v: 1;
+  v: number;
   bucket: number;
   /** The enrollment the last boot applied, absent before the first. */
-  applied?: { stage: number; arm: Arm; sha: string };
+  applied?: Enrollment;
+  /** When the bucket was drawn again because the stored record did not parse
+   *  (packet note A): kept locally, never sent. */
+  redrawn?: number;
 }
 
 /** `fault`: Rust itself failed, kept until the player retries. `build`: the
@@ -40,7 +73,7 @@ export interface CohortRecord {
 export type SafetyScope = "fault" | "build";
 
 export interface SafetyRecord {
-  v: 1;
+  v: number;
   scope: SafetyScope;
   /** The fallback code that latched it (`FALLBACK_REASONS`, or `unclean-exit`). */
   reason: string;
@@ -116,16 +149,19 @@ export function isBucket(v: unknown): v is number {
   return typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 99;
 }
 
+/** A version this build can read: its own or a newer build's. */
+const readableVersion = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= RECORD_VERSION;
+
 function isCohort(v: unknown): v is CohortRecord {
-  return isObject(v) && v.v === 1 && isBucket(v.bucket);
+  return isObject(v) && readableVersion(v.v) && isBucket(v.bucket);
 }
 
-const isApplied = (a: unknown): a is CohortRecord["applied"] => isObject(a) && typeof a.stage === "number" && isArm(a.arm) && typeof a.sha === "string";
+const isApplied = (a: unknown): a is Enrollment => isObject(a) && typeof a.stage === "number" && isArm(a.arm) && typeof a.sha === "string" && (a.version === undefined || typeof a.version === "string");
 
 function isSafety(v: unknown): v is SafetyRecord {
   return (
     isObject(v) &&
-    v.v === 1 &&
+    v.v === RECORD_VERSION &&
     (v.scope === "fault" || v.scope === "build") &&
     typeof v.reason === "string" &&
     typeof v.stage === "string" &&
@@ -146,9 +182,17 @@ function isMarker(v: unknown): v is BootMarker {
 export function readCohort(store: KeyValueStore | null): Read<CohortRecord> {
   const r = readJson(store, COHORT_KEY, isCohort);
   if (!r.ok || r.value.applied === undefined || isApplied(r.value.applied)) return r;
-  return { ok: true, value: { v: 1, bucket: r.value.bucket } };
+  return { ok: true, value: { v: r.value.v, bucket: r.value.bucket } };
 }
-export const readSafety = (store: KeyValueStore | null): Read<SafetyRecord> => readJson(store, SAFETY_KEY, isSafety);
+/** The safety record. A newer build's record is read as a fault with the
+ *  fields this build knows, whatever else it holds. */
+export function readSafety(store: KeyValueStore | null): Read<SafetyRecord> {
+  const newer = readJson(store, SAFETY_KEY, (v): v is Record<string, unknown> & { v: number } => isObject(v) && readableVersion(v.v) && v.v > RECORD_VERSION);
+  if (!newer.ok) return readJson(store, SAFETY_KEY, isSafety);
+  const r = newer.value;
+  const text = (x: unknown, or: string) => (typeof x === "string" ? x : or);
+  return { ok: true, value: { v: r.v, scope: "fault", reason: text(r.reason, "corrupt"), stage: text(r.stage, "none"), sha: text(r.sha, ""), at: typeof r.at === "number" ? r.at : 0 } };
+}
 export const readMarker = (store: KeyValueStore | null): Read<BootMarker> => readJson(store, BOOT_MARKER_KEY, isMarker);
 
 /** The browser's `localStorage`, or null where reading the property throws. */
