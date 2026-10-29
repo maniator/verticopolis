@@ -1,4 +1,4 @@
-//! Four real SimTower saves from 1997, contributed by Reddit user u/invokes
+//! Nine real SimTower saves from 1997, contributed by Reddit user u/invokes
 //! with their consent (r/SimTower thread, 2026-10-29); see
 //! `conformance/fixtures/tdt-reddit/README.md` and issue #1491. The TypeScript
 //! importer reads the same files in
@@ -10,11 +10,16 @@ use verticopolis_engine::tdt::import_tdt;
 
 /// (file, elevator shafts, walkway flights, whether the shafts were found by
 /// shape because the elevator table is sized by a rule no layout has).
-const SAVES: [(&str, usize, usize, bool); 4] = [
+const SAVES: [(&str, usize, usize, bool); 9] = [
     ("TOWER1.TDT", 15, 1, false),
     ("TOWER2.TDT", 24, 31, true),
     ("TOWER3.TDT", 11, 29, false),
     ("TOWER4.TDT", 18, 29, false),
+    ("TOWER5.TDT", 7, 7, false),
+    ("TOWER6.TDT", 23, 64, true),
+    ("TOWER7.TDT", 24, 64, false),
+    ("TOWER8.TDT", 0, 0, false),
+    ("MYTOWER.TDT", 24, 37, true),
 ];
 
 #[test]

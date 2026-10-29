@@ -1,5 +1,5 @@
 /**
- * Four real SimTower saves from 1997, contributed by Reddit user u/invokes with
+ * Nine real SimTower saves from 1997, contributed by Reddit user u/invokes with
  * their consent (r/SimTower thread, 2026-10-29). They are the first real saves
  * of that vintage the importer has met; see
  * `conformance/fixtures/tdt-reddit/README.md` and issue #1491. The Rust importer
@@ -17,13 +17,18 @@ const load = (name: string) => {
 };
 
 /** Shafts and walkway flights each save carries, and whether the import had to
- *  find its shafts by shape (the elevator table of TOWER2 is sized by a rule no
- *  documented layout has, #1491). */
+ *  find its shafts by shape (the elevator tables of TOWER2, TOWER6 and MYTOWER
+ *  are sized by a rule no documented layout has, #1491). */
 const SAVES = [
   { name: "TOWER1.TDT", shafts: 15, flights: 1, searched: false },
   { name: "TOWER2.TDT", shafts: 24, flights: 31, searched: true },
   { name: "TOWER3.TDT", shafts: 11, flights: 29, searched: false },
   { name: "TOWER4.TDT", shafts: 18, flights: 29, searched: false },
+  { name: "TOWER5.TDT", shafts: 7, flights: 7, searched: false },
+  { name: "TOWER6.TDT", shafts: 23, flights: 64, searched: true },
+  { name: "TOWER7.TDT", shafts: 24, flights: 64, searched: false },
+  { name: "TOWER8.TDT", shafts: 0, flights: 0, searched: false },
+  { name: "MYTOWER.TDT", shafts: 24, flights: 37, searched: true },
 ] as const;
 
 describe("real 1997 saves (u/invokes)", () => {

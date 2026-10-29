@@ -44,8 +44,9 @@ export function emptySlotsInGap(distance: number, slot: number): number {
 
 /**
  * Does a built elevator slot header start at `o`? Every field the walk checks,
- * plus what a real shaft always has: a position on the lot and a stop at both
- * ends of its span. Strict on purpose: {@link findNextHeader} uses it to find a
+ * plus what a real shaft always has: a position on the lot and a stop somewhere
+ * in its span (an express shaft may skip its own bottom floor, as one measured
+ * 1997 save does). Strict on purpose: {@link findNextHeader} uses it to find a
  * header inside payload bytes of unknown length.
  */
 function plausibleHeader(bytes: Uint8Array, o: number): boolean {
@@ -65,8 +66,7 @@ function plausibleHeader(bytes: Uint8Array, o: number): boolean {
     x <= TDT_MAX_TILE &&
     bottomFloor <= topFloor &&
     topFloor < TDT_FLOOR_COUNT &&
-    bytes[o + 66 + bottomFloor] !== 0 &&
-    bytes[o + 66 + topFloor] !== 0
+    bytes.subarray(o + 66 + bottomFloor, o + 66 + topFloor + 1).some((stop) => stop !== 0)
   );
 }
 

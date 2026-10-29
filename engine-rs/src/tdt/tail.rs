@@ -187,7 +187,8 @@ fn payload_size(
 
 /// Does a built elevator slot header start at `o`? Every field the walk
 /// checks, plus what a real shaft always has: a position on the lot, and a
-/// stop at both ends of its span. Strict on purpose: `find_next_header` uses
+/// stop somewhere in its span (an express shaft may skip its own bottom
+/// floor, as one measured 1997 save does). Strict on purpose: `find_next_header` uses
 /// it to find a header inside payload bytes of unknown length.
 fn plausible_header(bytes: &[u8], o: usize) -> bool {
     if o + TDT_ELEVATOR_HEADER_SIZE > bytes.len() {
@@ -203,8 +204,7 @@ fn plausible_header(bytes: &[u8], o: usize) -> bool {
         && (1..=TDT_MAX_TILE).contains(&x)
         && bottom <= top
         && top < TDT_FLOOR_COUNT as usize
-        && serviced[bottom] != 0
-        && serviced[top] != 0
+        && serviced[bottom..=top].iter().any(|&stop| stop != 0)
 }
 
 /// Empty slots that fit between a built shaft's header and the next built
