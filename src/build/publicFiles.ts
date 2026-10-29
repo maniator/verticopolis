@@ -46,6 +46,14 @@ export const PUBLIC_FILES: readonly PublicFile[] = [
 ];
 
 /**
+ * Scripts that ship from `src/public/` as written, with no sourcemap: the
+ * project's own plain scripts that bundle no package. The checks that read
+ * every emitted script's sourcemap (`gen-third-party-notices.ts`,
+ * `verify-engine-bundle.ts`) skip these, and nothing else.
+ */
+export const MAPLESS_PUBLIC_SCRIPTS: readonly string[] = ["sw-navigation-fallback.js"];
+
+/**
  * Files an operating system writes into any folder it shows (Finder,
  * Explorer). Vite would ship one with the rest of the folder, and a
  * `.DS_Store` names local files, so the check asks for it to be deleted.
