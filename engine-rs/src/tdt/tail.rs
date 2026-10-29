@@ -5,6 +5,7 @@
 
 use super::byte_reader::ByteReader;
 use super::format::*;
+use super::resync::{empty_slots_in_gap, find_next_header, MAX_BUILT_PAYLOAD, MIN_BUILT_PAYLOAD};
 use super::stamp::stamped_generation;
 use super::types::{TdtElevator, TdtStair, TdtTail};
 
@@ -185,59 +186,6 @@ fn payload_size(
     size.expect("elevator span checked before sizing")
 }
 
-/// Does a built elevator slot header start at `o`? Every field the walk
-/// checks, plus what a real shaft always has: a position on the lot, and a
-/// stop somewhere in its span (an express shaft may skip its own bottom
-/// floor, as one measured 1997 save does). Strict on purpose: `find_next_header` uses
-/// it to find a header inside payload bytes of unknown length.
-fn plausible_header(bytes: &[u8], o: usize) -> bool {
-    if o + TDT_ELEVATOR_HEADER_SIZE > bytes.len() {
-        return false;
-    }
-    let (used, type_id, cars) = (bytes[o], bytes[o + 1], bytes[o + 3]);
-    let x = rd16(bytes, o + 62);
-    let (top, bottom) = (bytes[o + 64] as usize, bytes[o + 65] as usize);
-    let serviced = &bytes[o + 66..o + 66 + TDT_FLOOR_COUNT as usize];
-    used == 1
-        && type_id <= 2
-        && (1..=8).contains(&cars)
-        && (1..=TDT_MAX_TILE).contains(&x)
-        && bottom <= top
-        && top < TDT_FLOOR_COUNT as usize
-        && serviced[bottom..=top].iter().any(|&stop| stop != 0)
-}
-
-/// Empty slots that fit between a built shaft's header and the next built
-/// header, `distance` bytes on, given that the shaft's payload is the fixed
-/// block, the car block and a whole number of 324-byte floor entries (at least
-/// one) and each empty slot is a 194-byte header. The two sizes share no factor
-/// the slot count could hide in (194 x k is a multiple of 324 only when k is a
-/// multiple of 162), so there is at most one answer, and `None` means the
-/// distance fits no shaft followed by empty slots that still fit in the table
-/// (`slot` is the index of the slot after the shaft).
-fn empty_slots_in_gap(distance: usize, slot: usize) -> Option<usize> {
-    let after_fixed = distance.checked_sub(TDT_ELEVATOR_HEADER_SIZE + FIXED_PAYLOAD)?;
-    (0..TDT_ELEVATOR_SLOTS - slot).find(|&empty| {
-        after_fixed
-            .checked_sub(empty * TDT_ELEVATOR_HEADER_SIZE)
-            .is_some_and(|floors| {
-                floors >= TDT_ELEVATOR_PER_FLOOR_SIZE as usize
-                    && floors % TDT_ELEVATOR_PER_FLOOR_SIZE as usize == 0
-            })
-    })
-}
-
-/// The first plausible built-slot header from `from` up to `to` that
-/// `accepts` (the walk's own check on the distance to it).
-fn find_next_header(
-    bytes: &[u8],
-    from: usize,
-    to: usize,
-    accepts: impl Fn(usize) -> bool,
-) -> Option<usize> {
-    (from..bytes.len().min(to + 1)).find(|&o| plausible_header(bytes, o) && accepts(o))
-}
-
 struct TableWalk {
     elevators: Option<Vec<TdtElevator>>,
     warning: Option<&'static str>,
@@ -246,17 +194,6 @@ struct TableWalk {
 
 const CUT_SHORT: &str = "The elevator table is cut short, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.";
 const RESYNCED: &str = "Some of the save's elevators are stored in a layout we don't fully understand, so their shafts were found by searching the file. Check that your elevators look right.";
-/// What a built shaft appends besides its per-floor entries.
-const FIXED_PAYLOAD: usize = (TDT_ELEVATOR_BUILT_FIXED + TDT_ELEVATOR_CAR_BLOCK_SIZE) as usize;
-/// The least a built shaft can append after its header: the fixed block, one
-/// per-floor entry and the car block.
-const MIN_BUILT_PAYLOAD: usize =
-    (TDT_ELEVATOR_BUILT_FIXED + TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_CAR_BLOCK_SIZE) as usize;
-/// The most a built shaft can append: the fixed block, an entry for every
-/// floor of the tower and the car block.
-const MAX_BUILT_PAYLOAD: usize = (TDT_ELEVATOR_BUILT_FIXED
-    + TDT_FLOOR_COUNT * TDT_ELEVATOR_PER_FLOOR_SIZE
-    + TDT_ELEVATOR_CAR_BLOCK_SIZE) as usize;
 const NOT_DOCUMENTED: &str = "The elevator table doesn't match the documented layout, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.";
 
 /// Walk the 24-slot elevator table, sizing built payloads per `layout`. With
