@@ -468,9 +468,13 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
     tail.elevators = Some(elevators);
     let after_elevators = r.offset();
 
+    // The stairs table comes after the finance block, whose people counts can
+    // read as a flight, so the search starts past it when the block is there.
+    let mut stairs_search_from = after_elevators;
     r.enter_block("finance block");
     if r.remaining() >= TDT_FINANCE_SIZE {
         let finance = r.bytes(TDT_FINANCE_SIZE).expect("finance block sized");
+        stairs_search_from = r.offset();
         tail.finance_population = finance_population(&finance);
         r.enter_block("parking block");
         if r.remaining() >= TDT_PARKING_SIZE {
@@ -490,6 +494,6 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
     }
 
     r.enter_block("stairs table");
-    tail.stairs = Some(locate_stairs(r.raw(), after_elevators));
+    tail.stairs = Some(locate_stairs(r.raw(), stairs_search_from));
     tail
 }

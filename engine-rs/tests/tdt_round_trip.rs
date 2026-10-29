@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use serde_json::Value;
 use verticopolis_engine::tdt::format::{
-    TDT_ROUTING_TAIL_SIZE, TDT_STAIRS_GAP, TDT_STAIR_FIRST_SLOT, TDT_STAIR_RECORD_SIZE,
-    TDT_STAIR_SLOTS, TDT_STAMP_SIZE,
+    POP_HOTEL_SINGLE, POP_HOTEL_TWIN, TDT_FINANCE_SIZE, TDT_PARKING_SIZE, TDT_ROUTING_TAIL_SIZE,
+    TDT_STAIRS_GAP, TDT_STAIR_FIRST_SLOT, TDT_STAIR_RECORD_SIZE, TDT_STAIR_SLOTS, TDT_STAMP_SIZE,
 };
 use verticopolis_engine::tdt::tail::stairs_table_starts_at;
 use verticopolis_engine::tdt::{export_tdt, import_tdt};
@@ -154,6 +154,34 @@ fn an_export_leaves_the_gap_the_game_leaves_before_its_stairs_table() {
             "{name}: the gap is zeros"
         );
     }
+}
+
+/// Where the finance block starts in one of our exports.
+fn finance_start(exported: &[u8]) -> usize {
+    let table = TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE;
+    let stairs = exported.len() - TDT_STAMP_SIZE - TDT_ROUTING_TAIL_SIZE - table;
+    stairs - TDT_STAIRS_GAP - TDT_PARKING_SIZE - TDT_FINANCE_SIZE
+}
+
+#[test]
+fn people_counts_in_the_finance_block_are_not_read_as_a_flight() {
+    // 256 single-room guests followed by one twin-room guest put the bytes of a
+    // built escalator record (x 256, floor 0) inside the finance block.
+    let empty = save_of(&fixture("TOWER8.TDT"), "TOWER8.TDT");
+    let mut exported = export_tdt(&empty.to_string()).expect("exports");
+    let finance = finance_start(&exported);
+    let word = |class: usize| finance + 88 + 4 * class;
+    exported[word(POP_HOTEL_SINGLE)..word(POP_HOTEL_SINGLE) + 4]
+        .copy_from_slice(&256_i32.to_le_bytes());
+    exported[word(POP_HOTEL_TWIN)..word(POP_HOTEL_TWIN) + 4].copy_from_slice(&1_i32.to_le_bytes());
+    let back = save_of(&exported, "TOWER8.TDT");
+    let walkways = back["transports"]
+        .as_array()
+        .expect("transports")
+        .iter()
+        .filter(|t| matches!(t["kind"].as_str(), Some("stairs" | "escalator")))
+        .count();
+    assert_eq!(walkways, 0, "no phantom escalator from the finance block");
 }
 
 #[test]
