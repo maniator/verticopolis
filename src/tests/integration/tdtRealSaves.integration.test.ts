@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, it } from "vitest";
 import { describeWithCodec, parseTDT } from "../conformance/tdtWasm";
+import { deserializeSave, readVctower, writeVctower } from "../../engine/port/files";
 
 const DIR = resolve(__dirname, "../../../conformance/fixtures/tdt-reddit");
 const load = (name: string) => {
@@ -41,6 +42,27 @@ describeWithCodec("real 1997 saves (u/invokes)", () => {
       expect(said).not.toMatch(/rebuilt from your floors/);
       expect(said).not.toMatch(/stairways couldn't be read/);
       expect(report.couldNotBring.some((l) => l.includes("found by searching the file"))).toBe(false);
+    });
+  }
+});
+
+describeWithCodec("real 1997 saves keep their shop, restaurant and fast-food styles through a .vctower", () => {
+  const STYLED = new Set(["shop", "restaurant", "fastFood"]);
+  const styles = (units: { kind: string; floor: number; x: number; subtype?: string }[]) =>
+    units
+      .filter((u) => STYLED.has(u.kind))
+      .map((u) => `${u.kind}@${u.floor},${u.x}=${u.subtype}`)
+      .sort();
+
+  for (const { name } of SAVES) {
+    it(`${name}: import .TDT, save .vctower, reload`, () => {
+      const imported = load(name).save;
+      const before = styles(imported.units);
+      const sim = deserializeSave(imported);
+      const reloaded = readVctower(writeVctower(sim, "3.0.0", 0)).serialize();
+      expect(styles(reloaded.units)).toEqual(before);
+      // Every styled room has a style, so the comparison above is not empty names.
+      expect(before.every((line) => !line.endsWith("=undefined"))).toBe(true);
     });
   }
 });

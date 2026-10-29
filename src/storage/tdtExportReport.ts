@@ -36,10 +36,9 @@ export interface EncodeStats {
   /** Elevator/walkway counts BEFORE the table caps, for the report's tallies. */
   elevatorsLen: number;
   walkwaysLen: number;
-  /** Express shafts written. The retail game loses every shaft after the FIRST
-   *  express slot in files WE write (our express records are span-sized, doc
-   *  §8), so anything past one costs the player real transport in 1994 and
-   *  the report has to say so. See `tdt-express-desync`. */
+  /** Express shafts written. Every one is sized the way the game sizes it
+   *  (doc §8), so none is lost; the count stays in the record for the report
+   *  facts. */
   expressLen: number;
 }
 
@@ -77,11 +76,7 @@ export function exportReport(facts: ExportReportFacts): ExportReport {
   const { counts, stats, topFloor, basements, towerName } = facts;
   const { balance, money, star } = stats;
 
-  // Shafts that will actually be THERE in 1994. Every express after the first
-  // is lost to the game-side desync (see the staysBehind line below), so
-  // counting encoded records here would have the modal promise a shaft in one
-  // breath and take it away in the next.
-  const shafts = Math.min(stats.elevatorsLen, TDT_ELEVATOR_SLOTS) - Math.max(0, stats.expressLen - 1);
+  const shafts = Math.min(stats.elevatorsLen, TDT_ELEVATOR_SLOTS);
   const flights = stats.walkwaysLen - stats.flightsDropped;
   const comesAlong: string[] = [
     `${counts.rooms.toLocaleString()} room${counts.rooms === 1 ? "" : "s"} with their occupancy and hotel states.`,
@@ -89,22 +84,6 @@ export function exportReport(facts: ExportReportFacts): ExportReport {
     `Your funds (${fmtMoney(balance * 100)}), star rating, and the clock.`,
   ];
   const staysBehind: string[] = [];
-  // The 1994 game stops reading the elevator table at an express slot, so we
-  // write express shafts LAST and exactly one of them survives; the extras, and
-  // anything that followed them, do not. Measured by reordering the game's own
-  // save: an express at the first slot costs it 6 of 8 shafts, at the sixth it
-  // costs nothing. Doc §8 and the backlog's `tdt-express-desync`.
-  //
-  // The copy says what the player loses, not how the format fails. "The
-  // original loses any shaft built after the first express" was accurate and
-  // read as a threat to every elevator they own; with express written last the
-  // only casualties are the surplus expresses themselves.
-  if (stats.expressLen > 1) {
-    const lost = stats.expressLen - 1;
-    staysBehind.push(
-      `${lost} of your express elevators won't appear in 1994: the original keeps only one. Rebuild ${lost === 1 ? "it" : "them"} there.`,
-    );
-  }
   if (counts.burnedOut > 0) {
     staysBehind.push(
       `${counts.burnedOut} burned or burning room${counts.burnedOut === 1 ? " arrives" : "s arrive"} cleared (bare floor, or lobby on a lobby row); rebuild ${counts.burnedOut === 1 ? "it" : "them"} in 1994.`,
