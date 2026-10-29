@@ -9,7 +9,8 @@ import { WASM_PROJECT } from "./helpers";
  * package cannot be fetched, so the boot that asked for Rust runs the
  * TypeScript engine, and that engine must keep every save path working on
  * its own. It loads the autosave, plays, saves and reloads; it loads a save
- * from an older version; a failed import leaves the tower alone; an
+ * from an older version; a failed import leaves the tower and every stored
+ * save alone; an
  * unreadable autosave is kept, not overwritten, and downloads as it was
  * stored; and the tower still downloads as a file.
  */
@@ -21,6 +22,7 @@ test.use({ storageState: { cookies: [], origins: [] }, serviceWorkers: "block" }
 const AUTO_KEY = "verticopolis-save";
 const LEGACY_AUTO_KEY = "simtower-clone-save";
 const UNREADABLE_KEY = "simtower-clone-unreadable";
+const SLOT_1_KEY = "simtower-clone-slot-1";
 /** A save from save format version 1, in the file container. */
 const OLD_FILE = readFileSync(new URL("../conformance/fixtures/towerone-star1.vctower", import.meta.url), "utf8");
 const OLD_SAVE = inflateRawSync(Buffer.from(OLD_FILE.split("\n")[1]!, "base64")).toString();
@@ -56,6 +58,17 @@ async function playAndSave(page: Page, after: number): Promise<number> {
   });
 }
 
+/** Every save the game keeps in browser storage, by key. */
+const storedSaves = (page: Page) =>
+  page.evaluate(() => {
+    const saves: Record<string, string> = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)!;
+      if (/^(verticopolis|simtower-clone)-/.test(key)) saves[key] = localStorage.getItem(key)!;
+    }
+    return saves;
+  });
+
 const clockReads = (page: Page, minutes: number) =>
   page.waitForFunction((m) => (window as any).game.reader.header.minutes === m, minutes, { timeout: 10_000 });
 
@@ -81,20 +94,25 @@ test("an older version's autosave loads, a failed import changes nothing, and an
   const old = JSON.parse(OLD_SAVE) as { version: number; money: number };
   expect(old.version).toBe(1);
   await page.addInitScript(
-    ([key, save]) => {
+    ([key, save, slot]) => {
       if (sessionStorage.getItem("seeded")) return;
       sessionStorage.setItem("seeded", "1");
       localStorage.setItem(key, save);
+      // A manual slot too, so the import check below covers more than the autosave.
+      localStorage.setItem(slot, save);
     },
-    [LEGACY_AUTO_KEY, OLD_SAVE],
+    [LEGACY_AUTO_KEY, OLD_SAVE, SLOT_1_KEY],
   );
   expect(await boot(page, "/?engine=wasm")).toEqual({ engine: "ts", failedAt: "load" });
   await page.waitForFunction((money) => (window as any).game.reader.header.money === money, old.money, { timeout: 10_000 });
   await page.evaluate(() => (window as any).game.onboarding.dismissSplash());
   const before = await page.evaluate(() => (window as any).game.reader.header.minutes as number);
+  const storedBefore = await storedSaves(page);
   await page.evaluate(() => (window as any).game.saveLoad.importGame("not a tower"));
   await expect(page.getByText(/Import failed/)).toBeVisible();
   expect(await page.evaluate(() => (window as any).game.reader.header.minutes)).toBe(before);
+  // Every stored save is byte for byte what it was.
+  expect(await storedSaves(page)).toEqual(storedBefore);
   // The same older tower as a file imports through the TypeScript engine.
   await page.evaluate((text) => (window as any).game.saveLoad.importGame(text), OLD_FILE);
   await expect(page.getByText("Tower imported.")).toBeVisible();
