@@ -8,7 +8,8 @@ import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
 /**
  * The WASM binding's export tiers (#946, cutover plan story S10).
  *
- * 1. Every export `engine-rs/src/wasm.rs` declares is in the tier table
+ * 1. Every export `engine-rs/src/wasm.rs` and its `engine-rs/src/wasm/` children
+ *    declare is in the tier table
  *    (`src/dualrun/exportTiers.ts`), and every table entry is still exported.
  *    The parse reads the module functions under `#[wasm_bindgen]` and every
  *    `pub fn` of a `#[wasm_bindgen] impl` block, by its `js_name` when it has
@@ -48,6 +49,9 @@ import { repoRoot, repoRel, sourceFiles } from "./guardFiles";
  */
 
 const WASM_RS = "engine-rs/src/wasm.rs";
+/** The binding's exported members sit in child modules of `wasm.rs`. */
+const WASM_DIR = "engine-rs/src/wasm";
+const bindingFiles = (): string[] => [WASM_RS, ...sourceFiles(WASM_DIR, [".rs"]).map(repoRel).sort()];
 const ALLOWED_DIRS = ["src/engine/", "src/dualrun/", "src/wasmhost/", "src/public/engine/", "src/tests/"];
 const SCANNED_TREES = ["src", "api", "tools"];
 const SOURCE = /\.(m|c)?[jt]sx?$/;
@@ -212,7 +216,7 @@ function offense(text: string, pattern: RegExp): string | null {
 }
 
 describe("WASM binding export tiers", () => {
-  const rust = readFileSync(resolve(repoRoot, WASM_RS), "utf8");
+  const rust = bindingFiles().map((file) => readFileSync(resolve(repoRoot, file), "utf8")).join("\n");
   const parsed = parseBindingExports(rust);
   const exported = parsed.names;
   const table = Object.keys(BINDING_EXPORT_TIERS) as BindingExport[];
@@ -230,11 +234,11 @@ describe("WASM binding export tiers", () => {
     expect(parsed.unsupported, "teach parseBindingExports this shape, then tier the export").toEqual([]);
   });
 
-  it("only wasm.rs declares binding exports", () => {
+  it("only wasm.rs and wasm/ declare binding exports", () => {
     const others = sourceFiles("engine-rs/src", [".rs"])
       .map(repoRel)
-      .filter((file) => file !== WASM_RS && /#\[wasm_bindgen/.test(readFileSync(resolve(repoRoot, file), "utf8")));
-    expect(others, "a #[wasm_bindgen] outside wasm.rs is not parsed: move it there or teach the parser").toEqual([]);
+      .filter((file) => !bindingFiles().includes(file) && /#\[wasm_bindgen/.test(readFileSync(resolve(repoRoot, file), "utf8")));
+    expect(others, "a #[wasm_bindgen] outside wasm.rs and wasm/ is not parsed: move it there or teach the parser").toEqual([]);
   });
 
   it("the parser reads js_name methods, bare methods and module functions (no false pass)", () => {

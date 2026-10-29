@@ -630,7 +630,7 @@ alone.
   --check` and `cargo clippy -D warnings` (`engine-rs.yml`), and the engine
   boundary rules to `engine-rs/tests/independence.rs`, which keeps the simulation
   free of host access (files, network, console, clock; a few named referee
-  functions may read fixtures) and the JavaScript binding inside `src/wasm.rs`.
+  functions may read fixtures) and the JavaScript binding inside `src/wasm.rs` and `src/wasm/`.
 - **Keep `src/engine/` free of DOM/rendering** so the simulation stays
   deterministic and unit-testable.
 - **Show visual/gameplay changes with real screenshots** in the PR's

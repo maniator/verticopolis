@@ -35,6 +35,7 @@ export const SURFACES: Record<string, string[]> = {
   "TypeScript engine": ["src/engine/"],
   "WASM binding": [
     "engine-rs/src/wasm.rs",
+    "engine-rs/src/wasm/",
     "engine-rs/src/frame.rs",
     "src/dualrun/",
   ],
