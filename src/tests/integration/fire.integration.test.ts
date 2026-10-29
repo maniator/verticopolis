@@ -1,8 +1,7 @@
 import { it, expect } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { GRID } from "../../engine/facilities";
-import { Simulation } from "../../engine/Simulation";
-import { isOperational, type SerializedGame } from "../../engine/types";
+import { isOperational } from "../../engine/types";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 /** A floor-2 tower served by an elevator, with `n` occupied offices — the only
@@ -103,7 +102,7 @@ describeEngines("Fire aftermath — gutted shells (canon), not auto-repair", (le
   it("survives save/load as gutted and never re-ignites or re-lets", () => {
     const { sim, x0 } = firePrep(leg, 11, 1);
     burnDown(sim, x0);
-    const reloaded = new PortSim(leg, Simulation.deserialize(JSON.parse(sim.save()) as SerializedGame));
+    const reloaded = new PortSim(leg, sim.save());
     const officeOf = () => reloaded.state.tower.units.find((u) => u.kind === "office")!;
     expect(officeOf().state).toBe("gutted");
     expect(reloaded.state.fires).toBe(0);

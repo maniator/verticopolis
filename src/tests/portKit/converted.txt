@@ -5,4 +5,7 @@
 # Rust leg required. src/tests/portKit/converted.guard.test.ts keeps this list
 # and the files that use the kit in step.
 src/tests/integration/fire.integration.test.ts
+src/tests/integration/batchPricing.integration.test.ts
 src/tests/integration/ledger.integration.test.ts
+src/tests/integration/milestones.integration.test.ts
+src/tests/integration/nextStarRequirements.integration.test.ts

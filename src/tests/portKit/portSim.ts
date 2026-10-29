@@ -1,5 +1,5 @@
 import { afterEach, describe } from "vitest";
-import { KIND_CODES, codeOf } from "../../engine/port/layout";
+import { KIND_CODES, VIEW_LAYOUT, codeOf } from "../../engine/port/layout";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { Simulation } from "../../engine/Simulation";
 import type { Tower } from "../../engine/Tower";
@@ -54,6 +54,7 @@ interface Leaf {
   /** The tooling-only members (binding tier 3), the same on both engines. */
   startFire(): void;
   bombThreat(): void;
+  evaluateStar(): void;
   setMoney(amount: number): void;
   free(): void;
 }
@@ -65,6 +66,7 @@ function makeLeaf(leg: Leg, save: string): Leaf {
       port: engine,
       startFire: () => engine.sim.startFire(),
       bombThreat: () => engine.sim.bombThreat(),
+      evaluateStar: () => engine.sim.evaluateStar(),
       setMoney: (amount) => {
         engine.sim.money = amount;
       },
@@ -76,6 +78,7 @@ function makeLeaf(leg: Leg, save: string): Leaf {
     port: engine as unknown as EnginePort,
     startFire: () => engine.startFire(),
     bombThreat: () => engine.bombThreat(),
+    evaluateStar: () => engine.evaluateStar(),
     setMoney: (amount) => engine.setMoney(amount),
     free: () => engine.free(),
   };
@@ -96,18 +99,48 @@ export interface CommandResult {
   readonly delta: number;
 }
 
+/** A batch price target: a price, the unit's default, or No Rate. */
+export type BatchTarget = number | "default" | "noRate";
+
+/** A batch's counts, by the layout's slot names. */
+export interface BatchResult {
+  readonly matched: number;
+  readonly eligible: number;
+  readonly changed: number;
+  readonly skippedSold: number;
+  readonly skippedCustom: number;
+  readonly customOverwritten: number;
+  readonly clampedLow: number;
+  readonly clampedHigh: number;
+}
+
+/** The port's number for a batch target: NaN is the default, -1 No Rate. */
+function batchCode(target: BatchTarget): number {
+  if (target === "default") return NaN;
+  return target === "noRate" ? -1 : target;
+}
+
+function batchResult(slots: readonly string[], rec: Float64Array): BatchResult {
+  const out: Record<string, number> = {};
+  slots.forEach((name, i) => {
+    if (name !== "status" && name !== "ok" && name !== "delta") out[name] = rec[i];
+  });
+  return out as unknown as BatchResult;
+}
+
 export class PortSim {
   private leaf: Leaf;
   private cached: Snapshot | undefined;
   private ticked = false;
 
-  /** A simulation on `leg` that starts from `draft`'s save. The draft is a
-   *  fixture's authoring copy; nothing reads it afterwards. */
+  /** A simulation on `leg` that starts from `source`: a draft `Simulation`
+   *  (a fixture's authoring copy; nothing reads it afterwards) or save text
+   *  the engine loads itself, such as an edited or forged save. */
   constructor(
     readonly leg: Leg,
-    draft: Simulation,
+    source: Simulation | string,
   ) {
-    this.leaf = makeLeaf(leg, JSON.stringify(draft.serialize()));
+    this.leaf = makeLeaf(leg, typeof source === "string" ? source : JSON.stringify(source.serialize()));
     live.add(this);
   }
 
@@ -122,6 +155,12 @@ export class PortSim {
   get state(): Snapshot {
     this.cached ??= Simulation.deserialize(JSON.parse(this.leaf.port.serialize()) as SerializedGame) as unknown as Snapshot;
     return this.cached;
+  }
+
+  /** The read-only copy as a `Simulation`, for a rule that takes one and only
+   *  reads (a milestone's test, say). */
+  get readOnlySimulation(): Simulation {
+    return this.state as unknown as Simulation;
   }
 
   /** A slot of the frame header by its layout name, read from the engine now
@@ -193,6 +232,55 @@ export class PortSim {
   /** {@link buildTransport}, which throws when the engine refuses. */
   mustBuildTransport(kind: FacilityKind, x: number, bottom: number, top: number): CommandResult {
     return must(this.buildTransport(kind, x, bottom, top), `buildTransport ${kind} at ${x} (${bottom}-${top})`);
+  }
+
+  /** Extend shaft `id` up or down to `targetFloor`. */
+  extendShaft(id: number, up: boolean, targetFloor: number): CommandResult {
+    return this.result(this.leaf.port.extendShaft(id, up, targetFloor));
+  }
+
+  /** Demolish unit `id` through the port; whether it was done. */
+  demolish(id: number, bulldoze = false): boolean {
+    return this.result(this.leaf.port.demolish(id, bulldoze)).ok;
+  }
+
+  /** Price one unit one rung up (1) or down (-1); the rent after, or null
+   *  when the engine refused. */
+  stepRent(id: number, dir: number): number | null {
+    const rec = this.leaf.port.stepRent(id, dir);
+    this.changed();
+    return rec[0] === 1 ? rec[2] : null;
+  }
+
+  /** Price one unit at `target`; the rent after, or null when refused. */
+  setRent(id: number, target: number): number | null {
+    const rec = this.leaf.port.setRent(id, target);
+    this.changed();
+    return rec[0] === 1 ? rec[2] : null;
+  }
+
+  /** Take a unit off the market (Classic's No Rate); whether it was done. */
+  noRate(id: number): boolean {
+    return this.result(this.leaf.port.noRate(id)).ok;
+  }
+
+  /** Apply a price target to every unit of `kind`; null when the engine
+   *  refused (an unpriced kind, or No Rate in Modern). */
+  rentBatch(kind: FacilityKind, target: BatchTarget, options: { onlyDefaultPriced?: boolean } = {}): BatchResult | null {
+    const rec = this.leaf.port.rentBatch(codeOf(KIND_CODES, kind), batchCode(target), options.onlyDefaultPriced === true);
+    this.changed();
+    return rec[0] === 1 ? batchResult(VIEW_LAYOUT.records.rentBatch, rec) : null;
+  }
+
+  /** What {@link rentBatch} would do, with nothing written; null when refused. */
+  quoteRentBatch(kind: FacilityKind, target: BatchTarget, options: { onlyDefaultPriced?: boolean } = {}): BatchResult | null {
+    const rec = this.leaf.port.quoteRentBatch(codeOf(KIND_CODES, kind), batchCode(target), options.onlyDefaultPriced === true);
+    return rec[0] === 1 ? batchResult(VIEW_LAYOUT.records.quoteRentBatch, rec) : null;
+  }
+
+  evaluateStar(): void {
+    this.leaf.evaluateStar();
+    this.changed();
   }
 
   /** Sell what stands at a cell (a floor or lobby tile included). */
