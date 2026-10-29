@@ -260,10 +260,16 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
             }
             let no_rate = t.rent_rate == 4 && is_priced(kind);
             let subtype = match kind {
-                Kind::Shop | Kind::FastFood | Kind::Restaurant => kind
-                    .subtype_list()
-                    .and_then(|list| usize::try_from(t.variant).ok().and_then(|i| list.get(i)))
-                    .copied(),
+                // A byte past the style list (real 1997 saves keep a venue
+                // counter there) takes the first style, which is what the
+                // exporter writes for a venue with none, so a file imports
+                // the same before and after one trip through export.
+                Kind::Shop | Kind::FastFood | Kind::Restaurant => {
+                    kind.subtype_list().and_then(|list| {
+                        let styled = usize::try_from(t.variant).ok().and_then(|i| list.get(i));
+                        styled.or_else(|| list.first()).copied()
+                    })
+                }
                 _ => None,
             };
             let unit = OutUnit {

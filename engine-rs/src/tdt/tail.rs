@@ -54,6 +54,13 @@ pub fn locate_stairs(bytes: &[u8], from: usize) -> Vec<TdtStair> {
         return vec![];
     }
     let last = (bytes.len() - REC).min(from + TDT_STAIR_SCAN_WINDOW);
+    // Windows start one byte apart and are 64 records long, so each offset is
+    // read by up to 640 of them. Read every record once, and a window then
+    // only adds up what is already known.
+    let reach = (last + TDT_STAIR_SLOTS * REC).min(bytes.len());
+    let classes: Vec<i8> = (from..reach)
+        .map(|o| classify_stair_record(bytes, o) as i8)
+        .collect();
     let mut best_base: Option<usize> = None;
     let mut best_built = 0;
     let mut base = from;
@@ -65,12 +72,12 @@ pub fn locate_stairs(bytes: &[u8], from: usize) -> Vec<TdtStair> {
             if o + REC > bytes.len() {
                 break;
             }
-            let c = classify_stair_record(bytes, o);
+            let c = classes[o - from];
             if c < 0 {
                 ok = false;
                 break;
             }
-            built += c;
+            built += i64::from(c);
         }
         if ok && built > best_built {
             best_built = built;
