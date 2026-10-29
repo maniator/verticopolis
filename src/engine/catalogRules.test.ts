@@ -6,7 +6,7 @@ import { catalogFacility, catalogHouseholdPrice, catalogOpenAt, catalogResidents
 import { residentCount } from "./census";
 import { ALL_KINDS, hasBusinessHours, isOpenAt } from "./facilities";
 import { householdPrice } from "./households";
-import { ladderRungFor, snapToLadder } from "./pricing";
+import { ladderRungFor, snapToLadder, type PriceRung } from "./pricing";
 
 describe("the catalog's rules match the engine's", () => {
   for (const mode of ["classic", "modern"] as const) {
@@ -31,7 +31,12 @@ describe("the catalog's rules match the engine's", () => {
   }
 
   it("names the rung the engine snaps to: nearest, ties up, Average when not finite", () => {
-    const rungs = [10, 20, 30, 40, 50].map((value, level) => ({ level, label: `r${level}`, value }));
+    const rungs: readonly PriceRung[] = [
+      { level: 0, label: "Very Low", value: 10 },
+      { level: 1, label: "Low", value: 20 },
+      { level: 2, label: "Average", value: 30 },
+      { level: 3, label: "High", value: 40 },
+    ];
     for (const v of [-5, 10, 14.9, 15, 25, 31, 45, 99, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(rungFor(rungs, v), String(v)).toBe(ladderRungFor(rungs, v));
       expect(rungFor(rungs, v).value).toBe(snapToLadder(rungs, v));
