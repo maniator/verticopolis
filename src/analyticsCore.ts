@@ -364,6 +364,21 @@ function deliver(name: string, props: EventProps): void {
  * The gate saying no means nothing is sent.
  */
 export function trackEvent<K extends keyof GameplayEvents>(name: K, props: GameplayEvents[K]): void {
+  if (__TOOLING_BUILD__) captureForTooling(name, { ...commonProps, ...props });
   if (!telemetryHostAllowed()) return;
   deliver(name, { ...commonProps, ...props });
+}
+
+/** The rows a tooling build hands a page that asked for them: an e2e test sets
+ *  `window.__vcEvents` to an array before the page loads, and every event is
+ *  pushed there as the adapter would receive it, whatever the host gate says
+ *  (the preview server is on localhost, where nothing is sent). A production
+ *  build compiles the call away with the `__TOOLING_BUILD__` define. */
+function captureForTooling(name: string, props: EventProps): void {
+  try {
+    const sink = (globalThis as { __vcEvents?: unknown }).__vcEvents;
+    if (Array.isArray(sink)) sink.push({ name, props });
+  } catch {
+    /* tooling only; never block gameplay on it */
+  }
 }
