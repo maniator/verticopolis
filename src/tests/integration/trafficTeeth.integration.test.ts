@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
+import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 const C = Math.floor(GRID.width / 2);
 const DAY = 60 * 24;
@@ -21,7 +22,7 @@ function layStrip(sim: Simulation, kind: "floor" | "lobby", floor: number): void
  * is uncapped now (#503), so a too-long stair climb is what strands it. A shop
  * sits on floor 40. Narrow, tick-cheap footprint.
  */
-function strandedShopTower(seed: number): Simulation {
+function strandedShopTower(seed: number): { draft: Simulation; shopId: number } {
   const sim = Simulation.newGame(seed);
   sim.money = 1e12;
   layStrip(sim, "lobby", 1);
@@ -40,47 +41,50 @@ function strandedShopTower(seed: number): Simulation {
   const r = sim.tower.place("shop", 40, C + 30); // up the long stair climb
   expect(r.ok, r.reason).toBe(true);
   sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
-  return sim;
+  return { draft: sim, shopId: r.unitId! };
 }
 
-describe("Reachability teeth — stranded commercial earns no visitor income", () => {
+describeEngines("Reachability teeth: stranded commercial earns no visitor income", (leg: Leg) => {
+  const retailAverage = (sim: PortSim): number => sim.statsReport().income.averages.retail;
+
   it("a stranded (stair-climb) shop records no positive visitor income; reachability turns it on", () => {
-    const sim = strandedShopTower(21);
+    const { draft, shopId } = strandedShopTower(21);
+    const sim = new PortSim(leg, draft);
     // Precondition: floor 40 is connected but not reachably-close (10-flight climb).
-    expect(sim.tower.isFloorServed(40)).toBe(true);
-    expect(sim.floorReachable(40)).toBe(false);
+    expect(sim.unitCard(shopId).served).toBe(1);
+    expect(sim.unitCard(shopId).reachable).toBe(0);
 
     // A few days of open hours: no visitors reach the shop, so its retail line
-    // never takes a positive cent — it only ever carries the shop's own overhead
+    // never takes a positive cent: it only ever carries the shop's own overhead
     // (≤ 0). Under the old isFloorServed gate this shop would have earned full
     // traffic income while the game told the player none would come.
     for (let d = 0; d < 4; d++) sim.tick(DAY);
-    const strandedRetail = sim.incomeBreakdown().averages.retail;
+    const strandedRetail = retailAverage(sim);
     expect(strandedRetail).toBeLessThanOrEqual(0);
 
     // An elevator 30→45 shortcuts the stair climb (1→30 by A, 30→40 by the new
     // shaft): now reachably-close, so the same shop starts drawing patrons and the
     // retail line rises above its stranded (overhead-only) level.
-    expect(sim.tower.placeTransport("elevatorStandard", C - 10, 30, 45).ok).toBe(true);
-    expect(sim.floorReachable(40)).toBe(true);
+    sim.mustBuildTransport("elevatorStandard", C - 10, 30, 45);
+    expect(sim.unitCard(shopId).reachable).toBe(1);
     for (let d = 0; d < 4; d++) sim.tick(DAY);
-    expect(sim.incomeBreakdown().averages.retail).toBeGreaterThan(strandedRetail);
+    expect(retailAverage(sim)).toBeGreaterThan(strandedRetail);
   }, 60000);
 
   it("a stranded shop earns strictly less than the identical shop made reachable", () => {
     // Same seed ⇒ same everything except reachability, isolating the teeth.
-    const stranded = strandedShopTower(22);
-    const reachable = strandedShopTower(22);
-    reachable.tower.placeTransport("elevatorStandard", C - 10, 30, 45); // via elevator 30→45
-    expect(stranded.floorReachable(40)).toBe(false);
-    expect(reachable.floorReachable(40)).toBe(true);
+    const a = strandedShopTower(22);
+    const b = strandedShopTower(22);
+    const stranded = new PortSim(leg, a.draft);
+    const reachable = new PortSim(leg, b.draft);
+    reachable.mustBuildTransport("elevatorStandard", C - 10, 30, 45); // via elevator 30→45
+    expect(stranded.unitCard(a.shopId).reachable).toBe(0);
+    expect(reachable.unitCard(b.shopId).reachable).toBe(1);
 
     for (let d = 0; d < 5; d++) {
       stranded.tick(DAY);
       reachable.tick(DAY);
     }
-    expect(reachable.incomeBreakdown().averages.retail).toBeGreaterThan(
-      stranded.incomeBreakdown().averages.retail,
-    );
+    expect(retailAverage(reachable)).toBeGreaterThan(retailAverage(stranded));
   }, 60000);
 });
