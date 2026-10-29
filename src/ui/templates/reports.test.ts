@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { ImportReport } from "../../storage/tdtImport";
-import type { ExportReport } from "../../storage/tdtExport";
+import type { ImportReport } from "../../storage/tdtImportReport";
+import type { ExportReport } from "../../storage/tdtExportReport";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./reports";
 import { renderToFragment } from "../testing/litTestUtils";
 

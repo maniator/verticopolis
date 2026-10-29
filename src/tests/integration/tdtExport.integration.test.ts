@@ -17,13 +17,13 @@ import {
   TDT_STAMP_GENERATION,
   TDT_STAMP_MAGIC,
   TDT_STAMP_SIZE,
-  parseTdtBinary,
-} from "../../storage/tdtFormat";
-import { LegacyExportError, buildTDT, classFromRent, legacyFilename } from "../../storage/tdtExport";
+  wireModel,
+} from "../fixtures/tdtLayout";
+import { LegacyExportError, buildTDT, describeWithCodec, parseTDT, parseTdtBinary } from "../conformance/tdtWasm";
+import { legacyFilename } from "../../storage/tdtFilename";
 import { FACILITIES, GRID } from "../../engine/facilities";
+import { rentConfig } from "../../engine/econConfig";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
-import { FAMILY_STORIES, PART_FAMILY, parseTDT } from "../../storage/tdtImport";
-import { stampedGeneration } from "../../storage/tdtStamp";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 
 /** A bare room unit for hand-built saves. */
@@ -129,7 +129,7 @@ function transportFacts(save: SerializedGame) {
     .sort((a, b) => a.kind.localeCompare(b.kind) || a.x - b.x || a.bottom - b.bottom);
 }
 
-describe("buildTDT: export → import round trip", () => {
+describeWithCodec("buildTDT: export → import round trip", () => {
   it("rooms, states, and transports survive the trip through our own parser", () => {
     const save = sampleSave();
     const { bytes } = buildTDT(save);
@@ -270,7 +270,9 @@ describe("buildTDT: export → import round trip", () => {
     };
     const built = buildTDT(save);
     expect(built.report.comesAlong[0]).toMatch(/^0 rooms/); // no census: see above
-    expect(built.bytes.length).toBe(71_291);
+    // 4 bytes more than before the 4-byte gap that SimTower leaves between the
+    // parking block and the stairs table (measured on the nine 1997 saves, #1497).
+    expect(built.bytes.length).toBe(71_295);
   });
 
   // `builtShaftPayloadSize`'s own arithmetic contract is pinned at the UNIT
@@ -319,7 +321,7 @@ describe("buildTDT: export → import round trip", () => {
     // slot than the plain one: with it last, a wrong skip lands in trailing
     // padding, every later slot reads as empty, and nothing fails. Pin the order
     // in the file so a future change that sorts shafts cannot quietly neuter it.
-    const decoded = parseTdtBinary(bytes).elevators!;
+    const decoded = wireModel(bytes).elevators!;
     const skipperSlot = decoded.findIndex((e) => e.x === 100);
     const trailingSlot = decoded.findIndex((e) => e.x === 120);
     expect(skipperSlot).toBeGreaterThanOrEqual(0);
@@ -371,7 +373,7 @@ describe("buildTDT: export → import round trip", () => {
     // must land on unit-record byte 6, where the real 1994 game reads it, and
     // byte 17 must stay 0. parseTdtBinary reads those fixed offsets literally
     // (.variant = byte 6, .subtype = byte 17), so this pins the wire bytes.
-    const raw = parseTdtBinary(bytes);
+    const raw = wireModel(bytes);
     const allTenants = raw.floors.flatMap((fl) => fl.tenants);
     const tenantOf = (type: number) => allTenants.find((t) => t.type === type);
     expect(tenantOf(10)?.variant).toBe(3); // shop Book Store at byte 6
@@ -433,31 +435,6 @@ describe("buildTDT: export → import round trip", () => {
       towerName: "Counts",
       builtWeddingHall: false,
       evaluatedTower: false,
-    });
-
-    it("derives all six counts from the emitted rooms, excluding burned + out-of-range", () => {
-      const { bytes } = buildTDT(
-        tower([
-          unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }), // ground lobby -> lobbyHeight 1
-          unit({ id: 2, kind: "recycling", floor: 2, x: 0, width: 20 }), // counts
-          unit({ id: 3, kind: "recycling", floor: 5, x: 40, width: 20, state: "gutted" }), // burned -> excluded
-          unit({ id: 4, kind: "shop", floor: 8, x: 0, width: 12 }), // commercial
-          unit({ id: 5, kind: "restaurant", floor: 9, x: 0, width: 24 }), // commercial
-          unit({ id: 6, kind: "fastFood", floor: 10, x: 0, width: 16 }), // commercial
-          unit({ id: 7, kind: "shop", floor: 105, x: 0, width: 12 }), // out-of-range -> excluded
-          unit({ id: 8, kind: "security", floor: 11, x: 0, width: 8 }),
-          unit({ id: 9, kind: "partyHall", floor: 12, x: 0, width: 24 }), // hall+cinema
-          unit({ id: 10, kind: "cinema", floor: 13, x: 0, width: 31 }), // hall+cinema
-          unit({ id: 11, kind: "parking", floor: -1, x: 0, width: 4 }),
-          unit({ id: 12, kind: "parking", floor: -2, x: 0, width: 4 }),
-        ]),
-      );
-      expect(u16(bytes, 0x1c)).toBe(1); // lobbyHeight
-      expect(u16(bytes, 0x2a)).toBe(1); // recyclingCount (burned one excluded)
-      expect(u16(bytes, 0x2e)).toBe(3); // commercialCount (out-of-range shop excluded)
-      expect(u16(bytes, 0x30)).toBe(1); // securityCount
-      expect(u16(bytes, 0x32)).toBe(2); // parkingStallCount
-      expect(u16(bytes, 0x36)).toBe(2); // hallCinemaCount (partyHall + cinema)
     });
 
     it("clamps securityCount to the canon max of 10", () => {
@@ -662,60 +639,7 @@ describe("buildTDT: export → import round trip", () => {
     expect(nonSkyRecs.every((r) => r.type === 0)).toBe(true);
   });
 
-  it("warns when a kept-legacy narrow shaft would collide at 1994's fixed elevator width", () => {
-    // A boxed-in 3-wide standard the v5 migration preserved sits flush against
-    // a 4-wide service shaft: legal in-engine, but the 1994 format has no
-    // width field, so both export at the fixed footprint and overlap. The
-    // report must say so instead of claiming every shaft made the trip.
-    const save = sampleSave();
-    const shaft = (kind: "elevatorStandard" | "elevatorService", x: number, width: number) => ({
-      id: x,
-      kind: kind as FacilityKind,
-      x,
-      width,
-      bottom: 1,
-      top: 10,
-      cars: 1,
-      carPositions: [1],
-      carDir: [0],
-      load: 0,
-    });
-    save.transports.push(shaft("elevatorStandard", 100, 3), shaft("elevatorService", 103, 4));
-    const { report } = buildTDT(save);
-    expect(report.staysBehind.join(" ")).toMatch(/overlaps a neighbor at 1994's fixed footprint widths/);
-
-    // Control: the same pair with a clear tile between full-width footprints
-    // raises no warning.
-    const clear = sampleSave();
-    clear.transports.push(shaft("elevatorStandard", 100, 3), shaft("elevatorService", 105, 4));
-    expect(buildTDT(clear).report.staysBehind.join(" ")).not.toMatch(/at 1994's fixed footprint widths/);
-  });
-
-  it("the overlap warning inspects the emitted (collapsed) stair records, not the raw flight list", () => {
-    // 66 stacked one-floor flights in one column collapse into 22 three-story
-    // records, all comfortably inside the 64-slot table; a colliding escalator
-    // beside the run would be sliced out of a raw-flight scan capped at 64
-    // entries, silently hiding the warning for bytes that ARE exported.
-    const save = sampleSave();
-    const flight = (kind: "stairs" | "escalator", x: number, bottom: number, id: number) => ({
-      id,
-      kind: kind as FacilityKind,
-      x,
-      width: 8,
-      bottom,
-      top: bottom + 1,
-      cars: 0,
-      carPositions: [],
-      carDir: [],
-      load: 0,
-    });
-    for (let i = 0; i < 66; i++) save.transports.push(flight("stairs", 300, 1 + i, 9_000 + i));
-    save.transports.push(flight("escalator", 304, 1, 9_999)); // overlaps the run at full width
-    const { report } = buildTDT(save);
-    expect(report.staysBehind.join(" ")).toMatch(/at 1994's fixed footprint widths/);
-  });
-
-  it("stacked walkway flights collapse into multi-story records and come back apart", () => {
+  it("stacked walkway flights are written one record per floor, as the game writes them", () => {
     const save = sampleSave();
     // Three stacked stairs flights at one x: floors 1-2, 2-3, 3-4.
     for (let i = 0; i < 3; i++) {
@@ -756,7 +680,7 @@ describe("buildTDT: export → import round trip", () => {
   });
 });
 
-describe("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
+describeWithCodec("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
   /** Little-endian i32 read at a header byte offset. */
   const i32 = (b: Uint8Array, off: number) =>
     (b[off] | (b[off + 1] << 8) | (b[off + 2] << 16) | (b[off + 3] << 24)) | 0;
@@ -782,7 +706,7 @@ describe("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
     const { bytes } = buildTDT(
       tower([unit({ id: 1, kind: "office", floor: 5, x: 100, width: 9, noRate: true })]),
     );
-    const tdt = parseTdtBinary(bytes);
+    const tdt = wireModel(bytes);
     const tenant = tdt.floors.flatMap((f) => f.tenants).find((t) => Math.abs(t.type) === 7);
     expect(tenant?.rentRate).toBe(4);
   });
@@ -793,7 +717,7 @@ describe("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
     const { bytes } = buildTDT(
       tower([unit({ id: 1, kind: "fastFood", floor: 5, x: 100, width: 16 })]),
     );
-    const tdt = parseTdtBinary(bytes);
+    const tdt = wireModel(bytes);
     const tenant = tdt.floors.flatMap((f) => f.tenants).find((t) => Math.abs(t.type) === 12);
     expect(tenant?.rentRate).toBe(4);
   });
@@ -804,7 +728,7 @@ describe("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
     const reimported = parseTDT(first.buffer as ArrayBuffer, "N.TDT").save;
     const office = reimported.units.find((u) => u.kind === "office")!;
     expect(office.noRate).toBe(true); // flag came back on import
-    const again = parseTdtBinary(buildTDT(reimported).bytes);
+    const again = wireModel(buildTDT(reimported).bytes);
     const tenant = again.floors.flatMap((f) => f.tenants).find((t) => Math.abs(t.type) === 7);
     expect(tenant?.rentRate).toBe(4); // and re-export still emits class 4
   });
@@ -832,7 +756,7 @@ describe("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
     // Byte level: each unit's rent class is exactly its rung level (0-3), and
     // the No Rate office carries class 4 (doc §4 tenant type IDs).
     const TYPE: Record<string, number> = { office: 7, condo: 9, hotelSingle: 3, hotelDouble: 4, hotelSuite: 5 };
-    const tdt = parseTdtBinary(first.bytes);
+    const tdt = wireModel(first.bytes);
     const tenants = tdt.floors.flatMap((f) => f.tenants);
     for (const [kind] of ladders) {
       const rates = tenants
@@ -849,7 +773,7 @@ describe("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
       const rents = back.units
         .filter((u) => u.kind === kind && !u.noRate)
         .sort((a, b) => a.x - b.x)
-        .map((u) => u.rent);
+        .map((u) => u.rent ?? rentConfig(kind)?.default);
       expect(rents, kind).toEqual(values);
     }
     expect(back.units.some((u) => u.kind === "office" && u.noRate === true)).toBe(true);
@@ -870,7 +794,7 @@ describe("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
   });
 });
 
-describe("buildTDT: review hardening (states, collisions, caps, hostile input)", () => {
+describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile input)", () => {
   it("vacating and moving-in tenants export as sitting tenants, never as vacancies", () => {
     const save = sampleSave();
     const office = save.units.find((u) => u.kind === "office" && u.state === "occupied")!;
@@ -1023,32 +947,20 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
     expect(parseTdtBinary(bytes).warnings).toEqual([]);
   });
 
-  it("the export report says only the SURPLUS express elevators stay behind", () => {
-    // The modal is the only place a player learns this, and the old wording
-    // ("the original loses any shaft built after the first express") read as a
-    // threat to every elevator they own. With express written last the only
-    // casualties are the extra expresses, so the copy must say that and must
-    // not appear at all for a tower with one.
+  it("the export report counts every express elevator and warns about none", () => {
+    // Express records are sized the way the game sizes them (doc §8), so no
+    // express stays behind and the modal says nothing about them.
     const mk = (x: number): Transport => ({
       id: 800 + x, kind: "elevatorExpress" as FacilityKind, x, width: 8, bottom: 1, top: 30,
       cars: 2, carPositions: [1, 1], carDir: [0, 0], load: 0,
     });
-    const one = sampleSave();
-    one.transports.push(mk(60));
-    expect(buildTDT(one).report.staysBehind.join(" ")).not.toMatch(/express/i);
-
+    const base = buildTDT(sampleSave()).report;
     const three = sampleSave();
     for (const x of [60, 80, 100]) three.transports.push(mk(x));
-    const line = buildTDT(three).report.staysBehind.find((s) => /express/i.test(s))!;
-    expect(line).toBe(
-      "2 of your express elevators won't appear in 1994: the original keeps only one. Rebuild them there.",
-    );
-    // Singular reads correctly too.
-    const two = sampleSave();
-    for (const x of [60, 80]) two.transports.push(mk(x));
-    expect(buildTDT(two).report.staysBehind.find((s) => /express/i.test(s))).toBe(
-      "1 of your express elevators won't appear in 1994: the original keeps only one. Rebuild it there.",
-    );
+    const report = buildTDT(three).report;
+    expect(report.staysBehind.join(" ")).not.toMatch(/express/i);
+    const shafts = (r: typeof report) => Number(/^(\d+) elevator shaft/.exec(r.comesAlong[1])![1]);
+    expect(shafts(report)).toBe(shafts(base) + 3);
   });
 
   it("express shafts are written to LATER slots than the rest (the desync workaround)", () => {
@@ -1063,7 +975,7 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
     save.transports.push(mk("elevatorExpress", 60, 1, 30));
     save.transports.push(mk("elevatorStandard", 80, 1, 12));
     save.transports.push(mk("elevatorService", 90, 1, 12));
-    const decoded = parseTdtBinary(buildTDT(save).bytes).elevators!;
+    const decoded = wireModel(buildTDT(save).bytes).elevators!;
     const expressSlot = decoded.findIndex((e) => e.x === 60);
     expect(expressSlot).toBeGreaterThanOrEqual(0);
     for (const other of [80, 90]) {
@@ -1089,7 +1001,7 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
         cars: 1, carPositions: [1], carDir: [0], load: 0,
       });
     }
-    const decoded = parseTdtBinary(buildTDT(save).bytes).elevators!;
+    const decoded = wireModel(buildTDT(save).bytes).elevators!;
     expect(decoded.length).toBe(24);
     expect(decoded.some((e) => e.x === 40)).toBe(true); // the express survived the cap
     expect(decoded[decoded.length - 1].x).toBe(40); // and still sits last
@@ -1112,13 +1024,6 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
       for (let x = 100; x < 131; x++) expect(paved.has(x)).toBe(true);
     }
     expect(parseTdtBinary(bytes).warnings).toEqual([]);
-  });
-
-  it("a vacant-but-once-rented office loses its history, and the report says so", () => {
-    const save = sampleSave();
-    save.units.push(unit({ id: 9_100, kind: "office", floor: 3, x: 10, width: 9, everOccupied: true }));
-    const { report } = buildTDT(save);
-    expect(report.staysBehind.join(" ")).toMatch(/rental history/);
   });
 
   it("the cathedral stack stops above a multi-story room's UPPER story (no overlapping tenants)", () => {
@@ -1145,18 +1050,6 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
       save.units.push(unit({ id: 10_000 + i, kind: "office", floor: 40, x: i, width: 1 }));
     }
     expect(() => buildTDT(save)).toThrow(LegacyExportError);
-  });
-
-  it("rooms outside the 1994 floor range are skipped and counted, reserved rows stay empty", () => {
-    const save = sampleSave();
-    save.units.push(unit({ id: 9_300, kind: "cinema", floor: 100, x: 10, width: 31 })); // story at 101
-    const { bytes, report } = buildTDT(save);
-    expect(report.staysBehind.join(" ")).toMatch(/outside the floors/);
-    // The modal facts match the bytes: the skipped room's extent at 101 must
-    // not leak into the reported floor count.
-    expect(report.floors).toBeLessThanOrEqual(100);
-    const back = parseTDT(bytes.buffer as ArrayBuffer, "S.TDT");
-    expect(back.report.couldNotBring.join(" ")).not.toMatch(/reserved floor row/);
   });
 
   it("shafts past the 24-slot table are dropped and REPORTED, never silently", () => {
@@ -1208,35 +1101,6 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
     expect(back.report.broughtOver.join(" ")).toMatch(/counted 1 connected to a ramp/);
   });
 
-  it("non-finite money exports as $0 and reports $0, never $NaN", () => {
-    const save = { ...sampleSave(), money: NaN };
-    const { report, bytes } = buildTDT(save);
-    expect(report.money).toBe(0);
-    expect(parseTDT(bytes.buffer as ArrayBuffer, "S.TDT").save.money).toBe(0);
-  });
-
-  it("forged transports are sanitized like the importer's: unknown kinds drop with a report line, coordinates clamp", () => {
-    const save = sampleSave();
-    save.transports.push(
-      // Unknown kind: no 1994 equivalent.
-      { id: 21_000, kind: "office", x: 10, width: 4, bottom: 1, top: 5, cars: 1, carPositions: [1], carDir: [0], load: 0 },
-      // Wild extents: clamps into the grid instead of wrapping the byte masks.
-      { id: 21_001, kind: "elevatorStandard", x: 9_999, width: 4, bottom: -50, top: 500, cars: NaN, carPositions: [NaN], carDir: [], load: 0 },
-      // Degenerate: dropped.
-      { id: 21_002, kind: "elevatorService", x: 20, width: 4, bottom: 8, top: 8, cars: 2, carPositions: [8, 8], carDir: [0, 0], load: 0 },
-    );
-    const { bytes, report } = buildTDT(save);
-    expect(parseTdtBinary(bytes).warnings).toEqual([]);
-    expect(report.staysBehind.join(" ")).toMatch(/2 transports couldn't be represented/);
-    // The sample's 1 shaft + the clamped forgery = 2 shafts, honestly counted.
-    expect(report.comesAlong.join(" ")).toMatch(/2 elevator shafts/);
-    const back = parseTDT(bytes.buffer as ArrayBuffer, "S.TDT").save;
-    const clamped = back.transports.filter((t) => t.kind === "elevatorStandard" && t.x !== 150);
-    expect(clamped).toHaveLength(1);
-    expect(clamped[0].bottom).toBeGreaterThanOrEqual(-9);
-    expect(clamped[0].top - clamped[0].bottom).toBeLessThanOrEqual(30);
-  });
-
   it("a forged star feeds ONE sanitized value into both the header and the report", () => {
     const forged = buildTDT({ ...sampleSave(), star: NaN });
     expect(forged.report.star).toBe(1);
@@ -1261,7 +1125,7 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
 // floor 1 and every sky lobby, and elevators cannot connect. These pin that the
 // exporter now emits those records: one coalesced span per contiguous run, only
 // where a tile is not under a room, matching a real save's bytes.
-describe("buildTDT: lobby (type 24) and empty-floor (type 0) paving records", () => {
+describeWithCodec("buildTDT: lobby (type 24) and empty-floor (type 0) paving records", () => {
   const u16 = (b: Uint8Array, off: number) => b[off] | (b[off + 1] << 8);
   const i8 = (b: number) => (b << 24) >> 24;
 
@@ -1554,34 +1418,7 @@ describe("buildTDT: lobby (type 24) and empty-floor (type 0) paving records", ()
   });
 });
 
-describe("shared-table tripwires: the writer's inversions match the importer", () => {
-  it("every PART_STACKS id maps back to its kind, with the family's full story count", () => {
-    // PART_STACKS is module-private; assert through behavior: each multi-story
-    // kind round-trips as itself at its family height via the mapping tests
-    // above, and the inverse tables agree id-by-id.
-    const stacks: Record<string, number[]> = {
-      cinema: [19, 18],
-      recycling: [21, 20],
-      partyHall: [30, 29],
-      metro: [33, 32, 31],
-      weddingHall: [36, 37, 38, 39, 40],
-    };
-    for (const [kind, ids] of Object.entries(stacks)) {
-      expect(ids).toHaveLength(FAMILY_STORIES[kind as keyof typeof FAMILY_STORIES]!);
-      for (const id of ids) expect(PART_FAMILY[id]).toBe(kind);
-    }
-  });
-});
-
-describe("classFromRent / legacyFilename", () => {
-  it("maps band anchors to the four 1994 classes; unset stays Average", () => {
-    expect(classFromRent("office", 2_000)).toBe(0); // band.min
-    expect(classFromRent("office", 10_000)).toBe(2); // band.default
-    expect(classFromRent("office", 20_000)).toBe(3); // band.max
-    expect(classFromRent("office", undefined)).toBe(2);
-    expect(classFromRent("security", 123)).toBe(4); // unpriced kind = No Rate (class 4), per real saves
-  });
-
+describe("legacyFilename", () => {
   it("filenames are DOS-safe: A-Z0-9, upper, max 8 chars, never empty or a device name", () => {
     expect(legacyFilename("My Tower!")).toBe("MYTOWER.TDT");
     expect(legacyFilename("verticopolis prime")).toBe("VERTICOP.TDT");
@@ -1597,7 +1434,7 @@ describe("classFromRent / legacyFilename", () => {
 // a populated tower needs a nonzero people count; the file must carry the
 // trailing routing region; built shafts need a real schedule block or their cars
 // never run; and the saved view opens on the ground, not the sky.
-describe("buildTDT: real-game loadability (people, routing tail, schedule, camera)", () => {
+describeWithCodec("buildTDT: real-game loadability (people, routing tail, schedule, camera)", () => {
   const u16 = (b: Uint8Array, o: number) => b[o] | (b[o + 1] << 8);
   const u32 = (b: Uint8Array, o: number) =>
     (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
@@ -1713,9 +1550,6 @@ describe("buildTDT: real-game loadability (people, routing tail, schedule, camer
     const at = bytes.length - TDT_STAMP_SIZE;
     expect(new TextDecoder().decode(bytes.subarray(at, at + TDT_STAMP_MAGIC.length))).toBe(TDT_STAMP_MAGIC);
     expect(u16(bytes, at + TDT_STAMP_MAGIC.length)).toBe(TDT_STAMP_GENERATION);
-    expect(stampedGeneration(bytes)).toBe(TDT_STAMP_GENERATION);
-    // A file without one reads as unstamped rather than as generation 0.
-    expect(stampedGeneration(bytes.subarray(0, bytes.length - 1))).toBeNull();
   });
 
   it("writes the New Tower view-scroll default so a load opens on the ground lobby", () => {

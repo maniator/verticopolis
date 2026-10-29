@@ -1,11 +1,7 @@
-import type { SerializedGame } from "../engine/types";
-import type { TdtTower } from "./tdtFormat";
-
 /**
- * The fidelity-report builder for a `.TDT` import. Extracted from
- * `tdtImport.ts`. The `parseTDT` walk fills an {@link ImportCounts} tally while
- * it decodes; {@link buildReport} turns that tally into the honest
- * player-facing {@link ImportReport} shown before the tower is adopted.
+ * The fidelity report for a `.TDT` import: the player-facing
+ * {@link ImportReport} shown before the tower is adopted, built from the
+ * numbers the Rust codec counts while it decodes (the `loadTdt` record).
  */
 
 /** What the fidelity-report modal shows before the player adopts the tower. */
@@ -29,12 +25,7 @@ export interface ImportReport {
   couldNotBring: string[];
 }
 
-/**
- * The running tally `parseTDT` fills while decoding the floor map. Promoted to
- * a shared interface (it used to be an inline object literal in `parseTDT` plus
- * a duplicate parameter shape on `buildReport`) so the producer and consumer
- * cannot drift.
- */
+/** The running tally the Rust codec fills while decoding the floor map. */
 export interface ImportCounts {
   rooms: number;
   offices: number;
@@ -63,20 +54,11 @@ export interface ImportCounts {
   misplaced: number;
   clamped: number;
   widthMismatch: number;
+  /** People placed in offices, condos and hotel rooms from the file's own counts. */
+  residentsSeeded: number;
 }
 
-/** What `parseTDT` builds the report from, which the engine port answers as
- *  numbers (`TsEngine.loadTdt`, the Rust `loadTdt`'s record). */
-export interface ImportFacts {
-  counts: ImportCounts;
-  decoded: boolean;
-  decodeStats: { droppedShafts: number; adjustedShafts: number; droppedFlights: number };
-  headerNotes: string[];
-  tdt: TdtTower;
-}
-
-/** The numbers an import report reads. `parseTDT` derives them from the save
- *  it built ({@link buildReport}); the engine port answers them as the
+/** The numbers an import report reads: the engine port answers them as the
  *  `loadTdt` record, with the notes from `tdtNote`. */
 export interface ImportReportFacts {
   towerName: string;
@@ -97,44 +79,6 @@ export interface ImportReportFacts {
   money: number;
   /** The header's notes, then the walk's warnings, said as they are. */
   notes: readonly string[];
-}
-
-export function buildReport(
-  save: SerializedGame,
-  counts: ImportCounts,
-  tdt: TdtTower,
-  decoded: boolean,
-  decodeStats: { droppedShafts: number; adjustedShafts: number; droppedFlights: number },
-  headerNotes: string[],
-): ImportReport {
-  let floors = 0;
-  let basements = 0;
-  for (const u of save.units) {
-    if (u.floor > floors) floors = u.floor;
-    if (u.floor < 1) basements = Math.max(basements, 1 - u.floor);
-  }
-  let shafts = 0;
-  let flights = 0;
-  for (const t of save.transports) {
-    if (t.kind === "stairs" || t.kind === "escalator") flights++;
-    else shafts++;
-  }
-  return importReport({
-    towerName: save.towerName,
-    counts,
-    decoded,
-    decodeStats,
-    parkingConnected: tdt.parkingConnected,
-    peopleCount: tdt.peopleCount,
-    floors,
-    basements,
-    minutes: save.minutes,
-    shafts,
-    flights,
-    star: save.star,
-    money: save.money,
-    notes: [...headerNotes, ...tdt.warnings],
-  });
 }
 
 /** The fidelity report from its numbers. */
@@ -275,7 +219,11 @@ export function importReport(facts: ImportReportFacts): ImportReport {
       `${counts.widthMismatch} room${counts.widthMismatch === 1 ? " keeps" : "s keep"} the original's size, which differs from what new construction here would use.`,
     );
   }
-  if (counts.occupiedOffices + counts.soldCondos > 0) {
+  if (counts.residentsSeeded > 0) {
+    couldNotBring.push(
+      `${counts.residentsSeeded.toLocaleString()} office workers and condo residents are here now, matching the save's counts; shoppers, diners and moviegoers return as the tower runs.`,
+    );
+  } else if (counts.occupiedOffices + counts.soldCondos > 0) {
     couldNotBring.push("Occupancy is approximate: any office or condo with people recorded imports as occupied.");
   }
   if (facts.peopleCount !== null && facts.peopleCount > 0) {

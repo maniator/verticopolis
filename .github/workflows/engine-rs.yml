@@ -18,7 +18,6 @@ on:
       - "src/tests/integration/conformance.integration.test.ts"
       - "src/tests/integration/conformanceWasm.integration.test.ts"
       - "src/tests/integration/conformanceWasmLoadFidelity.integration.test.ts"
-      - "src/tests/integration/conformanceWasmTdt.integration.test.ts"
       - "src/tests/integration/conformanceWasmCanBuild.integration.test.ts"
       - "src/tests/integration/conformanceWasmVctower.integration.test.ts"
       - "src/tests/integration/conformanceWasmSaves.integration.test.ts"
@@ -40,10 +39,8 @@ on:
       - "e2e/wasmEngine.spec.ts"
       - "src/game/frameLoop.ts"
       - "src/tests/integration/loaderCases.integration.test.ts"
-      - "src/tests/integration/tdtCases.integration.test.ts"
       - "src/tests/fixtures/tdtBuilder.ts"
-      - "src/tests/fixtures/tdtImportCases.ts"
-      - "src/tests/fixtures/tdtExportCases.ts"
+      - "src/tests/fixtures/tdtLayout.ts"
       - "scripts/wasm-build.ts"
       - "scripts/build-engine-wasm.sh"
       - "scripts/gen-gameplay-events.ts"
@@ -125,7 +122,6 @@ jobs:
             case "$f" in src/tests/integration/conformance.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/conformanceWasm.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/conformanceWasmLoadFidelity.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/conformanceWasmTdt.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/conformanceWasmCanBuild.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/conformanceWasmVctower.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/integration/conformanceWasmSaves.integration.test.ts) engine=true ;; esac
@@ -147,10 +143,8 @@ jobs:
             case "$f" in e2e/wasmEngine.spec.ts) engine=true ;; esac
             case "$f" in src/game/frameLoop.ts) engine=true ;; esac
             case "$f" in src/tests/integration/loaderCases.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/tdtCases.integration.test.ts) engine=true ;; esac
             case "$f" in src/tests/fixtures/tdtBuilder.ts) engine=true ;; esac
-            case "$f" in src/tests/fixtures/tdtImportCases.ts) engine=true ;; esac
-            case "$f" in src/tests/fixtures/tdtExportCases.ts) engine=true ;; esac
+            case "$f" in src/tests/fixtures/tdtLayout.ts) engine=true ;; esac
             case "$f" in scripts/wasm-build.ts) engine=true ;; esac
             case "$f" in scripts/build-engine-wasm.sh) engine=true ;; esac
             case "$f" in scripts/gen-gameplay-events.ts) engine=true ;; esac

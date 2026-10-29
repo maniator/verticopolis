@@ -1,27 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import { FACILITIES, GRID, maxCarsFor, maxSpanFor } from "../../engine/facilities";
+import { FACILITIES, GRID, maxSpanFor } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { SAVE_VERSION } from "../../engine/saveMigration";
-import type { FacilityKind, SerializedGame, Transport } from "../../engine/types";
+import type { FacilityKind, SerializedGame } from "../../engine/types";
 import {
   TDT_HEADER_SIZE,
   TDT_MAX_FILE_BYTES,
-  TDT_STAIR_RECORD_SIZE,
-  TDT_STAMP_GENERATION,
+  TDT_STAMP_SPANNED_GENERATION,
   TDT_STAMP_MAGIC,
   TDT_STAMP_SIZE,
-  locateStairs,
-  parseTdtBinary,
-} from "../../storage/tdtFormat";
-import {
-  LegacyImportError,
-  looksLikeLegacyTower,
-  parseTDT,
-  rentFromClass,
-  synthesizeTransports,
-  towerNameFromFilename,
-} from "../../storage/tdtImport";
+} from "../fixtures/tdtLayout";
+import { LegacyImportError, describeWithCodec, parseTDT, parseTdtBinary } from "../conformance/tdtWasm";
+import { looksLikeLegacyTower } from "../../storage/tdtImportHelpers";
 import type { TdtSpec } from "../fixtures/tdtBuilder";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 
@@ -70,7 +61,7 @@ function withStamp(bytes: Uint8Array, generation: number): Uint8Array {
   return out;
 }
 
-describe("tdtFormat: hostile-file hardening (typed errors, never hangs)", () => {
+describeWithCodec("tdtFormat: hostile-file hardening (typed errors, never hangs)", () => {
   it("rejects a wrong magic word as not-a-SimTower-save", () => {
     expect(() => parse({ magic: 0x1234 })).toThrow(LegacyImportError);
     expect(() => parse({ magic: 0x1234 })).toThrow(/doesn't look like a SimTower save/);
@@ -105,7 +96,6 @@ describe("tdtFormat: hostile-file hardening (typed errors, never hangs)", () => 
 
   it("a missing retail table is a warning, not a failure; and transports go unread", () => {
     const tdt = parseTdtBinary(buildTdt({ includeRetail: false }));
-    expect(tdt.retailRows).toBeNull();
     expect(tdt.elevators).toBeNull();
     expect(tdt.stairs).toBeNull();
     expect(tdt.warnings.length).toBeGreaterThan(0);
@@ -113,7 +103,6 @@ describe("tdtFormat: hostile-file hardening (typed errors, never hangs)", () => 
 
   it("reads the retail table's occupied rows when present", () => {
     const tdt = parseTdtBinary(buildTdt({ retailRows: 7 }));
-    expect(tdt.retailRows).toBe(7);
     expect(tdt.warnings).toEqual([]);
   });
 
@@ -174,7 +163,7 @@ function findElevatorTableOffset(bytes: Uint8Array): number {
   return pos;
 }
 
-describe("parseTDT: golden mappings", () => {
+describeWithCodec("parseTDT: golden mappings", () => {
   it("money is stored ×1/100: balance 20000 → $2,000,000 (negative survives)", () => {
     expect(parse({ balance: 20000 }).save.money).toBe(2_000_000);
     expect(parse({ balance: -500 }).save.money).toBe(-50_000);
@@ -310,10 +299,10 @@ describe("parseTDT: golden mappings", () => {
       expect(u?.subtype).toBe(RESTAURANT_SUBTYPES[4]);
     });
 
-    it("an out-of-range variant byte drops to undefined (whitelist coerce)", () => {
+    it("an out-of-range variant byte takes the kind's first style, so a shop is never unstyled", () => {
       const u = importOne(10, 200);
       expect(u?.kind).toBe("shop");
-      expect(u?.subtype).toBeUndefined();
+      expect(u?.subtype).toBe(SHOP_SUBTYPES[0]);
     });
 
     it("reads the variant from byte 6, NOT byte 17 (guards the real-game read bug)", () => {
@@ -690,20 +679,7 @@ describe("parseTDT: golden mappings", () => {
 
   it("rent classes map onto the Classic canon rungs (very low / low / average / high / no-rate)", () => {
     // TDT towers are Classic, so classes 0-3 are exactly the canon ladder
-    // dollars (pricing split, FR8): office 2k/5k/10k/15k quarterly.
-    expect(rentFromClass("office", 0)).toBe(2_000);
-    expect(rentFromClass("office", 1)).toBe(5_000);
-    expect(rentFromClass("office", 2)).toBe(10_000); // Average, the default rung
-    expect(rentFromClass("office", 3)).toBe(15_000);
-    expect(rentFromClass("office", 4)).toBeUndefined(); // No Rate carries no dollar value
-    expect(rentFromClass("office", 99)).toBeUndefined(); // garbage
-    expect(rentFromClass("shop", 3)).toBeUndefined(); // unpriced kind
-    // Condo and hotel ladders map the same way (spot-check the ends).
-    expect(rentFromClass("condo", 0)).toBe(50_000);
-    expect(rentFromClass("condo", 3)).toBe(200_000);
-    expect(rentFromClass("hotelSingle", 0)).toBe(500);
-    expect(rentFromClass("hotelSuite", 3)).toBe(9_000);
-
+    // dollars (pricing split, FR8); the ladders themselves are pinned in Rust.
     const highOffice = rooms({
       floors: [{ index: 20, tenants: [{ left: 100, right: 109, type: 7, rentRate: 3 }] }],
     })[0];
@@ -828,14 +804,7 @@ describe("parseTDT: golden mappings", () => {
   });
 });
 
-describe("towerNameFromFilename / looksLikeLegacyTower", () => {
-  it("slugs the basename: separators to spaces, extension dropped, path stripped, capped", () => {
-    expect(towerNameFromFilename("MY_TOWER.TDT")).toBe("MY TOWER");
-    expect(towerNameFromFilename("C:\\GAMES\\SIM\\towers\\alpha-one.tdt")).toBe("alpha one");
-    expect(towerNameFromFilename("§§§.tdt")).toBe("SimTower Import");
-    expect(towerNameFromFilename("a-very-long-tower-name-that-keeps-going.tdt").length).toBeLessThanOrEqual(24);
-  });
-
+describe("looksLikeLegacyTower", () => {
   it("recognizes .tdt by extension and the 0x2400 magic by sniff; nothing else", () => {
     expect(looksLikeLegacyTower("TOWER.TDT")).toBe(true);
     expect(looksLikeLegacyTower("tower.vctower")).toBe(false);
@@ -847,7 +816,7 @@ describe("towerNameFromFilename / looksLikeLegacyTower", () => {
   });
 });
 
-describe("transport decode: the save's own shafts and flights", () => {
+describeWithCodec("transport decode: the save's own shafts and flights", () => {
   it("a standard shaft decodes with position, extent, cars, and car homes", () => {
     const { save, report } = parse({
       floors: [{ index: 10, leftEdge: 100, rightEdge: 200 }],
@@ -946,7 +915,7 @@ describe("transport decode: the save's own shafts and flights", () => {
     expect(walked.elevators!.map((e) => e.x)).toEqual([175, 145, 251, 209]);
     expect(walked.stairs).toHaveLength(1);
     expect(walked.parkingConnected).toBe(302); // the tail a missized express shifts off
-    expect(walked.elevators![0].serviced.filter((s) => s !== 0).length).toBe(stops.length);
+    expect(walked.elevators![0].stops).toBe(stops.length);
   });
 
   it("shafts after an express sized by a rule no layout has are found by shape, with a warning", () => {
@@ -1052,7 +1021,7 @@ describe("transport decode: the save's own shafts and flights", () => {
     };
     const bare = buildTdt(spec);
     for (const [label, bytes] of [
-      ["stamped", withStamp(bare, TDT_STAMP_GENERATION)],
+      ["stamped", withStamp(bare, TDT_STAMP_SPANNED_GENERATION)],
       ["unstamped", bare],
     ] as const) {
       const walked = parseTdtBinary(bytes);
@@ -1152,7 +1121,7 @@ describe("transport decode: the save's own shafts and flights", () => {
       legacyServicedPayload: true,
     };
     const base = buildTdt(legacy);
-    for (const generation of [2, 3, 7, 0, 0xffff]) {
+    for (const generation of [3, 7, 0, 0xffff]) {
       const walked = parseTdtBinary(withStamp(base, generation));
       expect(walked.elevators, `generation ${generation}`).toHaveLength(2);
       expect(walked.elevators!.map((e) => e.x), `generation ${generation}`).toEqual([100, 140]);
@@ -1521,103 +1490,7 @@ describe("transport decode: the save's own shafts and flights", () => {
   });
 });
 
-describe("transport synthesis: the fallback when the save's blocks are unreadable", () => {
-  /** A spec whose tail stops after retail: transports must be synthesized. */
-  function fallback(spec: TdtSpec): TdtSpec {
-    return { ...spec, includeTransports: false };
-  }
-
-  it("an unreadable transport block falls back to synthesis; and the report says so", () => {
-    const { save, report } = parse(fallback(sampleTowerSpec()));
-    expect(save.transports.length).toBeGreaterThan(0);
-    expect(report.couldNotBring.join(" ")).toMatch(/rebuilt from your floors/);
-    expect(report.broughtOver.join(" ")).not.toMatch(/straight from the save/);
-  });
-
-  it("the same floor map always yields byte-identical shafts (no RNG)", () => {
-    const a = parse(fallback(sampleTowerSpec())).save.transports;
-    const b = parse(fallback(sampleTowerSpec())).save.transports;
-    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
-    expect(a.length).toBeGreaterThan(0);
-  });
-
-  it("a service elevator is synthesized iff the tower has hotels", () => {
-    const withHotels = parse(fallback(sampleTowerSpec())).save.transports;
-    expect(withHotels.some((t) => t.kind === "elevatorService")).toBe(true);
-    const noHotels = parse(fallback(oneTenant(7))).save.transports;
-    expect(noHotels.some((t) => t.kind === "elevatorService")).toBe(false);
-  });
-
-  it("an express shaft appears once the tower tops ~30 floors, stopping lobby-to-lobby", () => {
-    const short = parse(fallback(oneTenant(7))).save.transports;
-    expect(short.some((t) => t.kind === "elevatorExpress")).toBe(false);
-    // Floors up to TDT 59 = our floor 50.
-    const tallSpec: TdtSpec = fallback({
-      floors: Array.from({ length: 50 }, (_, i) => ({ index: 10 + i, leftEdge: 100, rightEdge: 150 })),
-    });
-    const tall = parse(tallSpec).save.transports;
-    const express = tall.find((t) => t.kind === "elevatorExpress")!;
-    expect(express).toBeDefined();
-    expect(express.bottom).toBe(1);
-    expect(express.top).toBe(50);
-    // Skips every non-lobby floor strictly inside the span.
-    expect(express.skipFloors).toContain(2);
-    expect(express.skipFloors).not.toContain(15);
-    expect(express.skipFloors).not.toContain(30);
-  });
-
-  it("every synthesized shaft respects the canon pools, car caps, spans, and the lot", () => {
-    const tallSpec: TdtSpec = fallback({
-      level: 3,
-      floors: [
-        // A full-height tower with hotels near the top and a deep basement.
-        ...Array.from({ length: 110 }, (_, i) => ({ index: i, leftEdge: 50, rightEdge: 350 })),
-      ],
-    });
-    tallSpec.floors![95].tenants = [{ left: 100, right: 104, type: 3 }];
-    tallSpec.floors![12].tenants = [{ left: 100, right: 108, type: 15 }];
-    const ts: Transport[] = parse(tallSpec).save.transports;
-    expect(ts.length).toBeLessThanOrEqual(24); // the shared elevator pool
-    for (const t of ts) {
-      expect(t.cars).toBeLessThanOrEqual(maxCarsFor(t.kind));
-      expect(t.top - t.bottom).toBeLessThanOrEqual(maxSpanFor(t.kind));
-      expect(t.top).toBeGreaterThan(t.bottom);
-      expect(t.x).toBeGreaterThanOrEqual(0);
-      expect(t.x + t.width).toBeLessThanOrEqual(GRID.width);
-      expect(t.width).toBe(FACILITIES[t.kind].width);
-      expect(t.carPositions).toHaveLength(t.cars);
-    }
-    // Shafts never overlap each other spatially.
-    for (let i = 0; i < ts.length; i++) {
-      for (let j = i + 1; j < ts.length; j++) {
-        const a = ts[i];
-        const b = ts[j];
-        const xOverlap = a.x < b.x + b.width && b.x < a.x + a.width;
-        expect(xOverlap).toBe(false);
-      }
-    }
-  });
-
-  it("synthesizeTransports of an empty floor map is empty", () => {
-    expect(synthesizeTransports(new Map(), [], [], 1)).toEqual([]);
-  });
-
-  it("shafts never hang below a floating tower's lowest built floor", () => {
-    // Nothing built below our floor 40 (TDT 49): every band must clamp its
-    // bottom into the built range instead of anchoring at 15/30 in thin air.
-    const floating: TdtSpec = fallback({
-      floors: Array.from({ length: 41 }, (_, i) => ({ index: 49 + i, leftEdge: 100, rightEdge: 200 })),
-    });
-    const ts = parse(floating).save.transports;
-    expect(ts.length).toBeGreaterThan(0);
-    for (const t of ts) expect(t.bottom).toBeGreaterThanOrEqual(40);
-    // A single built floor has nothing to connect; no zero-height shafts.
-    const single: TdtSpec = fallback({ floors: [{ index: 50, leftEdge: 100, rightEdge: 200 }] });
-    expect(parse(single).save.transports).toEqual([]);
-  });
-});
-
-describe("end-to-end: import → deserialize → live simulation", () => {
+describeWithCodec("end-to-end: import → deserialize → live simulation", () => {
   it("the sample tower deserializes and ticks several game-hours without throwing", () => {
     const { save } = parse(sampleTowerSpec(), "ROUNDTRIP.TDT");
     const sim = Simulation.deserialize(save);
@@ -1648,78 +1521,5 @@ describe("end-to-end: import → deserialize → live simulation", () => {
     expect(office().state).toBe("construction");
     for (let i = 0; i < 12 * 60 && office().state === "construction"; i += 30) sim.tick(30);
     expect(office().state).not.toBe("construction");
-  });
-});
-
-describe("locateStairs: finds the stairs table by signature, not a fixed offset", () => {
-  // Build a raw 64-slot stairs table (10 bytes/record) with flights at their slots.
-  const stairTable = (
-    flights: { slot: number; type: number; x: number; floor: number; up?: number; down?: number }[],
-  ): Uint8Array => {
-    const buf = new Uint8Array(64 * TDT_STAIR_RECORD_SIZE);
-    const w16 = (o: number, v: number) => {
-      buf[o] = v & 0xff;
-      buf[o + 1] = (v >> 8) & 0xff;
-    };
-    for (const f of flights) {
-      const o = f.slot * TDT_STAIR_RECORD_SIZE;
-      buf[o] = 1;
-      buf[o + 1] = f.type;
-      w16(o + 2, f.x);
-      w16(o + 4, f.floor);
-      w16(o + 6, f.up ?? 0);
-      w16(o + 8, f.down ?? 0);
-    }
-    return buf;
-  };
-  const concat = (...parts: Uint8Array[]): Uint8Array => {
-    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
-    let off = 0;
-    for (const p of parts) {
-      out.set(p, off);
-      off += p.length;
-    }
-    return out;
-  };
-
-  it("recovers flights packed into the HIGH slots (real saves pack the top slots)", () => {
-    const table = stairTable([
-      { slot: 58, type: 1, x: 195, floor: 9 },
-      { slot: 60, type: 0, x: 168, floor: 11 },
-      { slot: 63, type: 1, x: 221, floor: 14 },
-    ]);
-    // Zero "finance/parking" filler (multiple of 10) before the table.
-    const bytes = concat(new Uint8Array(200), table);
-    expect(locateStairs(bytes, 0)).toEqual([
-      { type: 1, x: 195, floor: 9 },
-      { type: 0, x: 168, floor: 11 },
-      { type: 1, x: 221, floor: 14 },
-    ]);
-  });
-
-  it("accepts a flight anchored at TDT floor 0 (B10 is a valid floor)", () => {
-    const bytes = concat(new Uint8Array(60), stairTable([{ slot: 5, type: 1, x: 100, floor: 0 }]));
-    expect(locateStairs(bytes, 0)).toEqual([{ type: 1, x: 100, floor: 0 }]);
-  });
-
-  it("picks the real table over a smaller coincidental cluster (most flights wins)", () => {
-    const decoy = stairTable([
-      { slot: 2, type: 1, x: 10, floor: 3 },
-      { slot: 4, type: 1, x: 20, floor: 4 },
-    ]);
-    const real = stairTable([
-      { slot: 40, type: 1, x: 150, floor: 8 },
-      { slot: 42, type: 1, x: 160, floor: 9 },
-      { slot: 44, type: 1, x: 170, floor: 10 },
-      { slot: 46, type: 0, x: 180, floor: 11 },
-    ]);
-    const bytes = concat(decoy, new Uint8Array(300), real);
-    const stairs = locateStairs(bytes, 0);
-    expect(stairs).toHaveLength(4);
-    expect(stairs.map((s) => s.x)).toEqual([150, 160, 170, 180]);
-  });
-
-  it("returns [] (no error) when the tower has no stairs", () => {
-    expect(locateStairs(new Uint8Array(2000), 0)).toEqual([]);
   });
 });

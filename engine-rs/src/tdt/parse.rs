@@ -20,8 +20,10 @@ use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH, MAX_FLOOR};
 use crate::sim::SAVE_VERSION;
 
 mod out_unit;
+mod seed;
 
 use out_unit::OutUnit;
+use seed::seed_from_finance;
 
 /// Result of a successful parse: the save, the binary walk's warnings and the
 /// tally the report is built from.
@@ -260,10 +262,16 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
             }
             let no_rate = t.rent_rate == 4 && is_priced(kind);
             let subtype = match kind {
-                Kind::Shop | Kind::FastFood | Kind::Restaurant => kind
-                    .subtype_list()
-                    .and_then(|list| usize::try_from(t.variant).ok().and_then(|i| list.get(i)))
-                    .copied(),
+                // A byte past the style list (real 1997 saves keep a venue
+                // counter there) takes the first style, which is what the
+                // exporter writes for a venue with none, so a file imports
+                // the same before and after one trip through export.
+                Kind::Shop | Kind::FastFood | Kind::Restaurant => {
+                    kind.subtype_list().and_then(|list| {
+                        let styled = usize::try_from(t.variant).ok().and_then(|i| list.get(i));
+                        styled.or_else(|| list.first()).copied()
+                    })
+                }
                 _ => None,
             };
             let unit = OutUnit {
@@ -309,6 +317,10 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
                 counts.secom += 1;
             }
         }
+    }
+
+    if let Some(pops) = tdt.tail.finance_population {
+        units = seed_from_finance(units, &pops, &mut counts);
     }
 
     for m in merge_parts(&part_records) {

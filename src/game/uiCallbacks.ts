@@ -101,11 +101,11 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     },
     onImportLegacy: (buffer, filename) => {
       trackAppAction("import_tdt");
-      app.saveLoad.importLegacy(buffer, filename);
+      void app.saveLoad.importLegacy(buffer, filename);
     },
     onExportLegacy: () => {
       trackAppAction("export_tdt");
-      app.saveLoad.exportLegacy();
+      void app.saveLoad.exportLegacy();
     },
     getMode: () => app.reader.header.mode,
     onNew: (mode, modernCalendar, startUnbridged) => app.saveLoad.newGame(mode, modernCalendar, startUnbridged),

@@ -93,6 +93,7 @@ pub fn encode_tower(
         header,
         has_ground_lobby,
         people_pop,
+        class_pop,
         counts,
         retail_rows,
         rooms,
@@ -321,19 +322,40 @@ pub fn encode_tower(
                 clamp(home, e.bottom, e.top) + TDT_FLOOR_OFFSET as f64,
             ));
         }
-        let size = built_shaft_payload_size(
+        let (bottom_raw, top_raw) = (
             e.bottom as i64 + TDT_FLOOR_OFFSET,
             e.top as i64 + TDT_FLOOR_OFFSET,
-        )
+        );
+        let size = if e.kind == Kind::ElevatorExpress {
+            express_payload_size(bottom_raw, top_raw)
+        } else {
+            built_shaft_payload_size(bottom_raw, top_raw)
+        }
         .map_err(LegacyExportError)?;
         w.pad(size as usize);
     }
 
-    w.pad(TDT_FINANCE_SIZE);
+    // The people of each class and their total, the way the game's own finance
+    // block carries them; every other field stays zero.
+    let mut finance = [0u8; TDT_FINANCE_SIZE];
+    let mut total = 0i64;
+    for (class, pop) in class_pop.iter().enumerate() {
+        let people = to_int32(round(*pop)).clamp(0, TDT_MAX_CENSUS as i64);
+        total += people;
+        let at = TDT_FINANCE_POPULATION_AT + class * 4;
+        finance[at..at + 4].copy_from_slice(&(people as u32).to_le_bytes());
+    }
+    finance[TDT_FINANCE_TOTAL_AT..TDT_FINANCE_TOTAL_AT + 4]
+        .copy_from_slice(&(total as u32).to_le_bytes());
+    for byte in finance {
+        w.u8(byte as i64);
+    }
 
     let stalls = connected_stall_count(rooms).min(((TDT_PARKING_SIZE - 2) / 2) as i64);
     w.u16(stalls);
     w.pad(TDT_PARKING_SIZE - 2);
+
+    w.pad(TDT_STAIRS_GAP);
 
     let mut stair_records: Vec<StairRecord> = vec![];
     let mut sorted: Vec<&OutWalkway> = walkways.iter().collect();
@@ -348,32 +370,15 @@ pub fn encode_tower(
                     .unwrap_or(std::cmp::Ordering::Equal),
             )
     });
-    let mut i = 0;
-    while i < sorted.len() {
-        let first = sorted[i];
-        let mut run = 1;
-        while i + run < sorted.len()
-            && sorted[i + run].kind == first.kind
-            && sorted[i + run].x == first.x
-            && sorted[i + run].bottom == first.bottom + run as f64
-        {
-            run += 1;
-        }
-        let is_stairs = first.kind == Kind::Stairs;
-        let mut base = first.bottom;
-        let mut left = run as i64;
-        while left > 0 {
-            let stories = left.min(3);
-            let type_id = (stories - 1) * 2 + if is_stairs { 1 } else { 0 };
-            stair_records.push(StairRecord {
-                type_id,
-                x: first.x,
-                floor: base + TDT_FLOOR_OFFSET as f64,
-            });
-            base += stories as f64;
-            left -= stories;
-        }
-        i += run;
+    // One record per flight, as the game writes them: it never stacks flights
+    // into the multi-story types, and a stacked column is one record per floor.
+    for flight in &sorted {
+        let is_stairs = flight.kind == Kind::Stairs;
+        stair_records.push(StairRecord {
+            type_id: if is_stairs { 1 } else { 0 },
+            x: flight.x,
+            floor: flight.bottom + TDT_FLOOR_OFFSET as f64,
+        });
     }
     let mut flights_dropped = 0;
     for s in stair_records.iter().skip(TDT_STAIR_SLOTS) {
@@ -427,7 +432,11 @@ pub fn encode_tower(
         }
     }
     for slot in 0..TDT_STAIR_SLOTS {
-        let Some(s) = stair_records.get(slot) else {
+        // Flights fill the table from slot 16 and wrap to slot 0 only once the
+        // upper slots are full, the way the game allocates them.
+        let Some(s) =
+            stair_records.get((slot + TDT_STAIR_SLOTS - TDT_STAIR_FIRST_SLOT) % TDT_STAIR_SLOTS)
+        else {
             w.pad(TDT_STAIR_RECORD_SIZE);
             continue;
         };

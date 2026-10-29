@@ -53,13 +53,62 @@ pub const TDT_ELEVATOR_CAR_BLOCK_SIZE: i64 = 348;
 pub const TDT_ELEVATOR_TYPE_EXPRESS: i64 = 0;
 pub const TDT_FINANCE_SIZE: usize = 132;
 pub const TDT_PARKING_SIZE: usize = 2 + 512 * 2;
+/// The finance block (`TDT_FINANCE_SIZE` bytes) holds, as little-endian u32s,
+/// the people of each class SimTower counts, then their total. Measured on the
+/// nine 1997 saves: the ten classes sit at byte 88 in the order below, the
+/// total at byte 128 is their sum, and the game shows it as the population.
+pub const TDT_FINANCE_POPULATION_AT: usize = 88;
+pub const TDT_FINANCE_TOTAL_AT: usize = 128;
+pub const TDT_POPULATION_CLASSES: usize = 10;
+pub const POP_OFFICE: usize = 0;
+pub const POP_HOTEL_SINGLE: usize = 1;
+pub const POP_HOTEL_TWIN: usize = 2;
+pub const POP_HOTEL_SUITE: usize = 3;
+pub const POP_SHOP: usize = 4;
+pub const POP_FAST_FOOD: usize = 5;
+pub const POP_RESTAURANT: usize = 6;
+pub const POP_PARTY_HALL: usize = 7;
+pub const POP_THEATRE: usize = 8;
+pub const POP_CONDO: usize = 9;
+
+/// Which of the ten population classes a room's people count under.
+pub fn population_class(kind: crate::facilities::Kind) -> Option<usize> {
+    use crate::facilities::Kind;
+    Some(match kind {
+        Kind::Office => POP_OFFICE,
+        Kind::HotelSingle => POP_HOTEL_SINGLE,
+        Kind::HotelDouble => POP_HOTEL_TWIN,
+        Kind::HotelSuite => POP_HOTEL_SUITE,
+        Kind::Shop => POP_SHOP,
+        Kind::FastFood => POP_FAST_FOOD,
+        Kind::Restaurant => POP_RESTAURANT,
+        Kind::PartyHall => POP_PARTY_HALL,
+        Kind::Cinema => POP_THEATRE,
+        Kind::Condo | Kind::RentalApartment => POP_CONDO,
+        _ => return None,
+    })
+}
+
+/// Zero bytes between the parking block and the stairs table in every save
+/// SimTower wrote (measured on the nine 1997 saves and the game's own
+/// re-saves of them). A table written without the gap reads four bytes early.
+pub const TDT_STAIRS_GAP: usize = 4;
 pub const TDT_STAIR_SLOTS: usize = 64;
+/// The first slot the game fills: every save it wrote that has fewer than 64
+/// flights starts at slot 16, and a full table (64 flights) uses slots 0 to 15
+/// last. SimTower dropped the first 16 records of a file that filled the table
+/// from slot 0.
+pub const TDT_STAIR_FIRST_SLOT: usize = 16;
 pub const TDT_STAIR_RECORD_SIZE: usize = 10;
 /// The trailing routing/reachability region the exporter emits, 0xFF-filled.
 pub const TDT_ROUTING_TAIL_SIZE: usize = 0x6400;
 /// Our trailer: the ASCII magic then a u16 generation, at the very end.
 pub const TDT_STAMP_MAGIC: &str = "VCTDT";
-pub const TDT_STAMP_GENERATION: i64 = 1;
+pub const TDT_STAMP_GENERATION: i64 = 2;
+
+/// The first generation of our trailer. Its express payloads were sized by
+/// the floors the shaft spans, which SimTower reads as the wrong length.
+pub const TDT_STAMP_SPANNED_GENERATION: i64 = 1;
 pub const TDT_STAMP_SIZE: usize = TDT_STAMP_MAGIC.len() + 2;
 /// Sanity bounds for recognizing a stair record while scanning for the table.
 pub const TDT_MAX_TILE: i64 = 800;
@@ -106,6 +155,26 @@ pub fn built_shaft_payload_size_for(
         return Ok(spanned);
     }
     built_shaft_payload_size(1, serviced_count.max(1))
+}
+
+/// The floors an express shaft carries a payload entry for: the ones from
+/// `bottom_floor` to `top_floor` (file numbering) that are at or below the
+/// first floor, or a multiple of 15 (the sky lobbies). All eight express
+/// shafts in the nine original saves size to this count.
+pub fn express_eligible_floors(bottom_floor: i64, top_floor: i64) -> i64 {
+    (bottom_floor..=top_floor)
+        .filter(|raw| {
+            let floor = raw - TDT_FLOOR_OFFSET;
+            floor <= 1 || floor % 15 == 0
+        })
+        .count() as i64
+}
+
+/// One express shaft's payload size: an entry for each eligible floor,
+/// and at least one.
+pub fn express_payload_size(bottom_floor: i64, top_floor: i64) -> Result<i64, String> {
+    built_shaft_payload_size(bottom_floor, top_floor)?;
+    built_shaft_payload_size(1, express_eligible_floors(bottom_floor, top_floor).max(1))
 }
 
 /// Stories a stair-table record spans, from its type ordinal.
@@ -258,6 +327,26 @@ pub fn parse_tdt_binary(bytes: &[u8]) -> Result<TdtTower, LegacyImportError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_express_shaft_has_an_entry_for_each_floor_at_or_below_the_first_and_each_sky_lobby() {
+        // Floors 0 to 60: the ground, the first and the lobbies at 15, 30, 45, 60.
+        let raw = |floor: i64| floor + TDT_FLOOR_OFFSET;
+        assert_eq!(express_eligible_floors(raw(0), raw(60)), 6);
+        // Floors -9 to 60 add the nine basements and the ground below the first.
+        assert_eq!(express_eligible_floors(raw(-9), raw(60)), 15);
+        assert_eq!(express_eligible_floors(raw(2), raw(14)), 0);
+        assert_eq!(
+            express_payload_size(raw(2), raw(14)),
+            Ok(3140 + 324 + 348),
+            "an entry is kept for a shaft with no eligible floor"
+        );
+        assert_eq!(
+            express_payload_size(raw(0), raw(60)),
+            Ok(3140 + 6 * 324 + 348)
+        );
+        assert!(express_payload_size(raw(20), raw(15)).is_err());
+    }
 
     #[test]
     fn payload_size_is_car_independent_and_refuses_inverted_spans() {

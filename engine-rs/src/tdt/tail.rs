@@ -54,6 +54,13 @@ pub fn locate_stairs(bytes: &[u8], from: usize) -> Vec<TdtStair> {
         return vec![];
     }
     let last = (bytes.len() - REC).min(from + TDT_STAIR_SCAN_WINDOW);
+    // Windows start one byte apart and are 64 records long, so each offset is
+    // read by up to 640 of them. Read every record once, and a window then
+    // only adds up what is already known.
+    let reach = (last + TDT_STAIR_SLOTS * REC).min(bytes.len());
+    let classes: Vec<i8> = (from..reach)
+        .map(|o| classify_stair_record(bytes, o) as i8)
+        .collect();
     let mut best_base: Option<usize> = None;
     let mut best_built = 0;
     let mut base = from;
@@ -65,12 +72,12 @@ pub fn locate_stairs(bytes: &[u8], from: usize) -> Vec<TdtStair> {
             if o + REC > bytes.len() {
                 break;
             }
-            let c = classify_stair_record(bytes, o);
+            let c = classes[o - from];
             if c < 0 {
                 ok = false;
                 break;
             }
-            built += c;
+            built += i64::from(c);
         }
         if ok && built > best_built {
             best_built = built;
@@ -131,16 +138,21 @@ pub fn stairs_table_starts_at(bytes: &[u8], at: usize) -> bool {
 /// routing region one stairs table further on?
 fn table_end_anchored(bytes: &[u8], end: usize) -> bool {
     let after_parking = end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE;
-    stairs_table_starts_at(bytes, after_parking)
-        || routing_tail_starts_at(
-            bytes,
-            after_parking + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE,
-        )
+    // The game's own files leave a gap before the stairs table; our exports
+    // from before it was measured did not.
+    [TDT_STAIRS_GAP, 0].into_iter().any(|gap| {
+        let stairs = after_parking + gap;
+        stairs_table_starts_at(bytes, stairs)
+            || routing_tail_starts_at(bytes, stairs + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE)
+    })
 }
 
 /// How a built elevator slot's payload is sized; see `tdtTail.ts`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum PayloadLayout {
+    /// Express shafts carry an entry per eligible floor, the rest per spanned
+    /// floor: what SimTower writes.
+    ExpressEligible,
     ExpressServiced,
     Spanned,
     Serviced,
@@ -172,6 +184,10 @@ fn payload_size(
     // The table walk checks the span before sizing, so the helpers cannot
     // refuse here; a refusal would be a walker bug.
     let size = match layout {
+        PayloadLayout::ExpressEligible if type_id == TDT_ELEVATOR_TYPE_EXPRESS => {
+            express_payload_size(bottom_floor, top_floor)
+        }
+        PayloadLayout::ExpressEligible => built_shaft_payload_size(bottom_floor, top_floor),
         PayloadLayout::ExpressServiced => built_shaft_payload_size_for(
             type_id,
             bottom_floor,
@@ -305,40 +321,79 @@ fn read_elevator_table(r: &mut ByteReader, layout: PayloadLayout, resync: bool) 
 /// Which payload layout does this file use? Decided once for the whole file;
 /// see `chooseLayout` in `tdtTail.ts` for the reasoning behind each step.
 fn choose_layout(bytes: &[u8], table_start: usize) -> PayloadLayout {
-    if stamped_generation(bytes) == Some(TDT_STAMP_GENERATION) {
-        return PayloadLayout::Spanned;
+    match stamped_generation(bytes) {
+        Some(TDT_STAMP_SPANNED_GENERATION) => return PayloadLayout::Spanned,
+        Some(TDT_STAMP_GENERATION) => return PayloadLayout::ExpressEligible,
+        _ => {}
     }
     let walk = |layout: PayloadLayout| -> TableWalk {
         let mut r = ByteReader::new(bytes);
         r.skip(table_start).expect("table start inside the file");
         read_elevator_table(&mut r, layout, false)
     };
-    let current = walk(PayloadLayout::ExpressServiced);
-    let ambiguous = current.elevators.as_ref().is_some_and(|es| {
-        es.iter().any(|e| {
-            stop_count(&e.serviced, e.bottom_floor, e.top_floor) != e.top_floor - e.bottom_floor + 1
-        })
-    });
-    if current.elevators.is_some() && !ambiguous {
-        return PayloadLayout::ExpressServiced;
-    }
     let anchored = |end: usize| table_end_anchored(bytes, end);
-    let spanned = walk(PayloadLayout::Spanned);
-    let serviced = walk(PayloadLayout::Serviced);
-    for (layout, w) in [
-        (PayloadLayout::ExpressServiced, &current),
-        (PayloadLayout::Spanned, &spanned),
-        (PayloadLayout::Serviced, &serviced),
-    ] {
-        if w.elevators.is_some() && anchored(w.end) {
-            return layout;
-        }
+    // A layout that sizes a payload wrong lands later headers on payload bytes,
+    // which read as empty slots, so the walk that finds the most shafts has
+    // the right layout. Ties go to the order below.
+    let layouts = [
+        PayloadLayout::ExpressEligible,
+        PayloadLayout::ExpressServiced,
+        PayloadLayout::Spanned,
+        PayloadLayout::Serviced,
+    ];
+    let walks = layouts.map(&walk);
+    // The legacy serviced-stops layout is read only when its table ends where
+    // the rest of the file says it should; it fits too many broken files.
+    let shafts = |layout: PayloadLayout, w: &TableWalk| {
+        let believable = layout != PayloadLayout::Serviced || anchored(w.end);
+        w.elevators.as_ref().filter(|_| believable).map(Vec::len)
+    };
+    let Some(most) = layouts
+        .iter()
+        .zip(walks.iter())
+        .filter_map(|(layout, w)| shafts(*layout, w))
+        .max()
+    else {
+        return PayloadLayout::ExpressServiced;
+    };
+    let ties: Vec<(PayloadLayout, &TableWalk)> = layouts
+        .into_iter()
+        .zip(walks.iter())
+        .filter(|(layout, w)| shafts(*layout, w) == Some(most))
+        .collect();
+    if let Some((layout, _)) = ties.iter().find(|(_, w)| anchored(w.end)) {
+        return *layout;
     }
-    if spanned.elevators.is_some() {
-        PayloadLayout::Spanned
-    } else {
-        PayloadLayout::ExpressServiced
+    let ambiguous = |w: &TableWalk| {
+        w.elevators.as_ref().is_some_and(|es| {
+            es.iter().any(|e| {
+                stop_count(&e.serviced, e.bottom_floor, e.top_floor)
+                    != e.top_floor - e.bottom_floor + 1
+            })
+        })
+    };
+    ties.iter()
+        .find(|(layout, w)| *layout != PayloadLayout::ExpressServiced || !ambiguous(w))
+        .or(ties.first())
+        .map(|(layout, _)| *layout)
+        .expect("a walk found the most shafts")
+}
+
+/// The per-class people in the finance block, trusted only when they add up to
+/// the total beside them and the total is not zero: a file from before the
+/// block was filled holds zeros, which say nothing.
+fn finance_population(finance: &[u8]) -> Option<[i64; TDT_POPULATION_CLASSES]> {
+    let word = |at: usize| {
+        i64::from(u32::from_le_bytes(
+            finance[at..at + 4].try_into().expect("four bytes"),
+        ))
+    };
+    let mut pops = [0; TDT_POPULATION_CLASSES];
+    for (class, pop) in pops.iter_mut().enumerate() {
+        *pop = word(TDT_FINANCE_POPULATION_AT + class * 4);
     }
+    let total = word(TDT_FINANCE_TOTAL_AT);
+    (total > 0 && pops.iter().sum::<i64>() == total).then_some(pops)
 }
 
 /// `walkTolerantTail`: the blocks after the floor map, in file order.
@@ -413,9 +468,14 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
     tail.elevators = Some(elevators);
     let after_elevators = r.offset();
 
+    // The stairs table comes after the finance block, whose people counts can
+    // read as a flight, so the search starts past it when the block is there.
+    let mut stairs_search_from = after_elevators;
     r.enter_block("finance block");
     if r.remaining() >= TDT_FINANCE_SIZE {
-        r.skip(TDT_FINANCE_SIZE).expect("finance block sized");
+        let finance = r.bytes(TDT_FINANCE_SIZE).expect("finance block sized");
+        stairs_search_from = r.offset();
+        tail.finance_population = finance_population(&finance);
         r.enter_block("parking block");
         if r.remaining() >= TDT_PARKING_SIZE {
             tail.parking_connected = Some(r.u16().expect("parking block sized"));
@@ -434,6 +494,6 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
     }
 
     r.enter_block("stairs table");
-    tail.stairs = Some(locate_stairs(r.raw(), after_elevators));
+    tail.stairs = Some(locate_stairs(r.raw(), stairs_search_from));
     tail
 }

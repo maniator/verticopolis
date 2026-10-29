@@ -1,8 +1,8 @@
 import type { Catalog } from "../engine/catalogTypes";
 import type { LogEntry } from "../engine/types";
 import type { SlotInfo } from "../storage/SaveGame";
-import type { ExportReport } from "../storage/tdtExport";
-import type { ImportReport } from "../storage/tdtImport";
+import type { ExportReport } from "../storage/tdtExportReport";
+import type { ImportReport } from "../storage/tdtImportReport";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { ElevatorSchedule } from "../engine/elevatorSchedule";
 import type { CalendarKind } from "../engine/calendar";

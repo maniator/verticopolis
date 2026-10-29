@@ -3,6 +3,7 @@ import {
   TDT_ELEVATOR_SLOTS,
   builtShaftPayloadSize,
   builtShaftPayloadSizeFor,
+  expressPayloadSize,
   TDT_FINANCE_SIZE,
   TDT_FLOOR_COUNT,
   TDT_FLOOR_INDEX_ENTRIES,
@@ -14,7 +15,7 @@ import {
   TDT_RETAIL_SLOTS,
   TDT_STAIR_RECORD_SIZE,
   TDT_STAIR_SLOTS,
-} from "../../storage/tdtFormat";
+} from "./tdtLayout";
 
 /**
  * Declarative synthetic `.TDT` byte-buffer builder for the importer tests.
@@ -24,6 +25,9 @@ import {
  * the doc does. Every buffer is synthesized from scratch: NEVER commit bytes
  * from a real (copyrighted) SimTower save.
  */
+
+/** The elevator header's `type` byte for an express shaft. */
+const EXPRESS_TYPE = 0;
 
 export interface TenantSpec {
   /** Extents in tiles (half-open), exactly as stored. */
@@ -113,9 +117,13 @@ export interface TdtSpec {
   legacyServicedPayload?: boolean;
   /** Size EVERY shaft by its spanned floors, express included: the generation-1
    *  layout Verticopolis 2.12.x wrote, before an express was measured to be
-   *  sized by its stops (#740). Like `legacyServicedPayload`, this deliberately
-   *  encodes a superseded layout so the reader's fallback can be tested. */
+   *  sized by its eligible floors (#740, #1497). Like `legacyServicedPayload`,
+   *  this deliberately encodes a superseded layout so the reader's fallback can
+   *  be tested. */
   spannedExpressPayload?: boolean;
+  /** Size an express shaft by the floors it stops at, the reading of the game's
+   *  layout before the eligible-floor rule. Only for the reader's fallback. */
+  stoppedExpressPayload?: boolean;
   stairs?: StairSpec[];
   /** Fill every built shaft's payload with `0xFF`, as the unused queue slots of
    *  a real save's payload are, instead of zeros. A misaligned walk then fails
@@ -253,6 +261,8 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
       payloadPad(builtShaftPayloadSize(1, Math.max(1, serviced.size)));
     } else if (spec.spannedExpressPayload) {
       payloadPad(spannedSize); // generation 1: every kind by span, express included
+    } else if (e.type === EXPRESS_TYPE && !spec.stoppedExpressPayload) {
+      payloadPad(expressPayloadSize(e.bottomFloor, e.topFloor)); // what the game writes
     } else {
       // Count the stops the bitmap LOOP writes, not the spec's raw set: a spec
       // entry outside 0..119 (or outside the span) never reaches the file, so

@@ -8,14 +8,8 @@ import type { SerializedGame, SerializedView } from "../../engine/types";
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
 import { SKY_HEADROOM_FLOORS } from "../../render/cameraBounds";
 import { SaveLoad } from "../../game/saveLoad";
-import {
-  TDT_DEFAULT_VIEW_X,
-  TDT_DEFAULT_VIEW_Y,
-  viewFromViewWords,
-  viewWordsFromView,
-} from "../../storage/tdtFormat";
-import { buildTDT } from "../../storage/tdtExport";
-import { parseTDT } from "../../storage/tdtImport";
+import { buildTDT, installTdtCodec, parseTDT } from "../conformance/tdtWasm";
+import { hasWasmPackage } from "../conformance/wasmEngine";
 import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 import { loadAuto, loadSlotSim, withPorts } from "../fixtures/saveText";
 
@@ -32,6 +26,14 @@ function decodeVctower(text: string): SerializedGame {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   return JSON.parse(new TextDecoder().decode(inflateSync(bytes))) as SerializedGame;
 }
+
+/** The New Tower default view words (header 0x26/0x28). */
+const TDT_DEFAULT_VIEW_X = 1105;
+const TDT_DEFAULT_VIEW_Y = 3491;
+/** The words for a view centered on tile 200, floor 20 (the engine maps tile x
+ *  8 px less half the 640 px window, and the floor's 36 px row less half the
+ *  469 px window). */
+const WORDS_200_20 = { x: 1280, y: 3024 };
 
 const readHdrU16 = (bytes: Uint8Array, off: number): number => bytes[off] | (bytes[off + 1] << 8);
 
@@ -180,11 +182,11 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
     expect(decodeVctower(file).view).toEqual(camera);
   });
 
-  it("importLegacy: the imported sim keeps the TDT file's view, never the live camera's; the pre-adopt flush keeps the live one", () => {
-    // Words for a view centered on tile 200, floor 20 (see the mapping tests).
-    const words = viewWordsFromView({ tile: 200, floor: 20 });
+  it.skipIf(!hasWasmPackage())("importLegacy: the imported sim keeps the TDT file's view, never the live camera's; the pre-adopt flush keeps the live one", async () => {
+    installTdtCodec();
+    const words = WORDS_200_20;
     const buf = buildTdt({ ...sampleTowerSpec(), viewX: words.x, viewY: words.y });
-    saveLoad.importLegacy(buf.buffer as ArrayBuffer, "MOVED.TDT");
+    await saveLoad.importLegacy(buf.buffer as ArrayBuffer, "MOVED.TDT");
     importReports[0].open();
     // The adopted tower and its fresh-slot copy carry the FILE's view
     // (zoomless, fractional: the words quantize to 8px/36px).
@@ -195,59 +197,6 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
     expect(loadSlotSim(1)!.view!.floor).toBeCloseTo(20, 1);
     // The previous tower's autosave flush carries the live camera.
     expect(loadAuto()!.view).toEqual(camera);
-  });
-});
-
-describe("TDT view-word mapping (header 0x26/0x28)", () => {
-  it("anchors on the New Tower default: 1105/3491 lands the view on the ground-lobby area", () => {
-    const view = viewFromViewWords(TDT_DEFAULT_VIEW_X, TDT_DEFAULT_VIEW_Y)!;
-    expect(view.tile).toBeCloseTo(178.125, 3);
-    expect(view.floor).toBeGreaterThanOrEqual(1);
-    expect(view.floor).toBeLessThanOrEqual(13);
-    // The default words are a FIXED POINT of the mapping: re-exporting the
-    // imported default view writes the exact same words back (this is what
-    // keeps the exporter's export/import/export idempotence intact).
-    expect(viewWordsFromView(view)).toEqual({ x: TDT_DEFAULT_VIEW_X, y: TDT_DEFAULT_VIEW_Y });
-  });
-
-  it("treats the (0, 0) pair as no saved view (the 1994 top-left-sky failure mode)", () => {
-    expect(viewFromViewWords(0, 0)).toBeNull();
-    expect(viewFromViewWords(0, 1)).not.toBeNull();
-    expect(viewFromViewWords(1, 0)).not.toBeNull();
-  });
-
-  it("round-trips any unclamped view within one tile and one floor", () => {
-    for (let floor = -2; floor <= 100; floor += 6) {
-      for (let tile = 40; tile <= 300; tile += 20) {
-        const w = viewWordsFromView({ tile, floor });
-        const back = viewFromViewWords(w.x, w.y)!;
-        expect(Math.abs(back.tile - tile)).toBeLessThanOrEqual(1);
-        expect(Math.abs(back.floor - floor)).toBeLessThanOrEqual(1);
-      }
-    }
-  });
-
-  it("clamps extremes to what the 1994 window can scroll to (ground/basement pinned at the window edge)", () => {
-    // A B10-centered view: the 1994 window bottoms out with the basement at
-    // its bottom edge, which reads back as a center ~6.5 floors higher.
-    const deep = viewWordsFromView({ tile: 170, floor: -9 });
-    expect(viewFromViewWords(deep.x, deep.y)!.floor).toBeCloseTo(-3, 1);
-    // The far right edge of our wider-than-representable camera range.
-    const right = viewWordsFromView({ tile: 340, floor: 10 });
-    expect(viewFromViewWords(right.x, right.y)!.tile).toBe(335);
-  });
-
-  it("falls back to the default words for non-finite members", () => {
-    expect(viewWordsFromView({ tile: NaN, floor: 5 })).toEqual({ x: TDT_DEFAULT_VIEW_X, y: TDT_DEFAULT_VIEW_Y });
-    expect(viewWordsFromView({ tile: 5, floor: Infinity })).toEqual({ x: TDT_DEFAULT_VIEW_X, y: TDT_DEFAULT_VIEW_Y });
-  });
-
-  it("never manufactures the (0, 0) sentinel for a real view (top-left extreme survives re-import)", () => {
-    // An unclamped view (never through coerceView) that clamps to the exact
-    // top-left corner must not export as the "no saved view" pair.
-    const words = viewWordsFromView({ tile: 20, floor: 150 });
-    expect(words).toEqual({ x: 0, y: 1 });
-    expect(viewFromViewWords(words.x, words.y)).not.toBeNull();
   });
 });
 
@@ -365,7 +314,7 @@ describe("TowerEngine gesture zoom floor (prototype on a fake: no canvas)", () =
   });
 });
 
-describe("TDT export/import carry the view words", () => {
+describe.skipIf(!hasWasmPackage())("TDT export/import carry the view words", () => {
   /** A realistic serialized tower (the sample fixture through the importer). */
   function sampleSave(): SerializedGame {
     const buf = buildTdt(sampleTowerSpec());
@@ -380,14 +329,14 @@ describe("TDT export/import carry the view words", () => {
     expect(readHdrU16(plain, 0x28)).toBe(TDT_DEFAULT_VIEW_Y);
 
     save.view = { tile: 200, floor: 20, zoom: 2 }; // zoom is dropped: 1994 has none
-    const words = viewWordsFromView(save.view);
+    const words = WORDS_200_20;
     const stamped = buildTDT(save).bytes;
     expect(readHdrU16(stamped, 0x26)).toBe(words.x);
     expect(readHdrU16(stamped, 0x28)).toBe(words.y);
   });
 
   it("parseTDT brings the words back as a zoomless view; absent words stay absent", () => {
-    const words = viewWordsFromView({ tile: 200, floor: 20 });
+    const words = WORDS_200_20;
     const withView = parseTDT(
       buildTdt({ ...sampleTowerSpec(), viewX: words.x, viewY: words.y }).buffer as ArrayBuffer,
       "VIEW.TDT",

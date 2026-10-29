@@ -1,6 +1,4 @@
-import type { EncodeStats } from "../storage/tdtEncoder";
-import type { ExportReportFacts } from "../storage/tdtExportReport";
-import type { ExportCounts } from "../storage/tdtExportGather";
+import type { EncodeStats, ExportCounts, ExportReportFacts } from "../storage/tdtExportReport";
 import type { ImportCounts, ImportReportFacts } from "../storage/tdtImportReport";
 import type { EnginePort, PortRecord } from "./enginePort";
 import type { PortCodes } from "./portCodes";
@@ -42,6 +40,7 @@ const IMPORT_COUNTS = [
   "misplaced",
   "clamped",
   "widthMismatch",
+  "residentsSeeded",
 ] as const satisfies readonly (keyof ImportCounts)[];
 
 const EXPORT_COUNTS = [

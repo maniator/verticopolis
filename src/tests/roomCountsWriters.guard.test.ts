@@ -208,7 +208,6 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   "src/simport/engineLifecycle.fixture.ts": { bulk: 4 },
   // `buildTDT`'s reviver deletes a `toString` key from the export's own
   // `JSON.parse` copy of the save: parsed data that reaches no room.
-  "src/storage/tdtExport.ts": { bulk: 1 },
   // A harness's field write on the tooling copy of the Rust engine's tower,
   // which reaches the engine as a load (the engine counts its own rooms): the
   // copy's own fields and the parts of it a harness holds (liveOf), no live unit.

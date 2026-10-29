@@ -1,6 +1,6 @@
 import type { UI } from "./UI";
 import { TOWER_FILE_EXT } from "../storage/SaveGame";
-import { looksLikeLegacyTower } from "../storage/tdtImport";
+import { looksLikeLegacyTower } from "../storage/tdtImportHelpers";
 
 /**
  * The file-picker entry point, in its own module so both the in-game Saved

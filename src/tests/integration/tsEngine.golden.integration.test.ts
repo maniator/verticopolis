@@ -10,6 +10,7 @@ import { TsEngine } from "../../engine/port/tsEngine";
 import type { EnginePort } from "../../simport/enginePort";
 import { MAX_SAVE_INFLATED_BYTES, TOWER_FILE_MAGIC, toBase64 } from "../../storage/saveCompression";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { installTdtCodec } from "../conformance/tdtWasm";
 
 /**
  * The golden arrays (facade slice 7, PR 3): the Rust `Engine` and `TsEngine`
@@ -393,6 +394,7 @@ describe("TsEngine against the Rust Engine", () => {
   });
 
   it.skipIf(!hasWasmPackage())("writes and reads .TDT files the same way", () => {
+    installTdtCodec();
     same(pair(), (e) => e.tdtExport(), "a Modern tower is refused");
     const p = pair("classic");
     same(p, (e) => e.adoptTdt(), "nothing staged");

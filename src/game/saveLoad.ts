@@ -349,8 +349,9 @@ export class SaveLoad {
    * downloaded until the player clicks the primary. Modern-mode towers are
    * refused outright (the 1994 rule set cannot represent them).
    */
-  exportLegacy(): void {
+  async exportLegacy(): Promise<void> {
     const port = this.deps.enginePort();
+    await port.prepareTdt?.();
     let bytes: Uint8Array | undefined;
     let report: ExportReport;
     try {
@@ -405,8 +406,9 @@ export class SaveLoad {
    * with "Open tower". A garbage file never reaches the tower, the same
    * contract as importGame.
    */
-  importLegacy(buffer: ArrayBuffer, filename: string): void {
+  async importLegacy(buffer: ArrayBuffer, filename: string): Promise<void> {
     const port = this.deps.enginePort();
+    await port.prepareTdt?.();
     const bytes = new Uint8Array(buffer);
     const rec = port.loadTdt(bytes, filename);
     if (rec[0] !== 1) {

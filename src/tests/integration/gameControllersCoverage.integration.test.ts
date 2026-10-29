@@ -12,8 +12,8 @@ import type { Tool } from "../../ui/UI";
 import { unitEditor, transportEditor, editorPortDeps, inspectorPortDeps } from "../../game/cardKit.fixture";
 import { render, type TemplateResult } from "lit-html";
 import { SaveGame } from "../../storage/SaveGame";
-import type { ExportReport } from "../../storage/tdtExport";
-import type { ImportReport } from "../../storage/tdtImport";
+import type { ExportReport } from "../../storage/tdtExportReport";
+import type { ImportReport } from "../../storage/tdtImportReport";
 import { buildTdt } from "../fixtures/tdtBuilder";
 import { BuildActions } from "../../game/buildActions";
 import { brushTiles } from "../../ui/placement";
@@ -23,6 +23,16 @@ import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
 import { portDeps } from "../../game/portDeps.fixture";
 import { INVALID_COMMAND, MAX_TEXT } from "../../simport/request";
+import { hasWasmPackage } from "../conformance/wasmEngine";
+import { installTdtCodec } from "../conformance/tdtWasm";
+
+/** The `.TDT` tests read and write files through the Rust package, so they run
+ *  where it is built (CI builds it for every project). */
+const itTdt = (name: string, body: () => Promise<void>) =>
+  it.skipIf(!hasWasmPackage())(name, async () => {
+    installTdtCodec();
+    await body();
+  });
 import { saveOf, loadAuto, loadSlotSim, withPorts } from "../fixtures/saveText";
 
 /** Coverage companion to gameControllers.integration.test.ts: the same harness idioms
@@ -1079,9 +1089,9 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(f.toasts).toEqual([{ text: "Tower imported.", kind: "good" }]);
   });
 
-  it("exportLegacy: the reverse fidelity report shows first; nothing downloads until the primary", () => {
+  itTdt("exportLegacy: the reverse fidelity report shows first; nothing downloads until the primary", async () => {
     sim.money = 1_234_567;
-    saveLoad.exportLegacy();
+    await saveLoad.exportLegacy();
     expect(f.downloads).toHaveLength(0); // two-step contract
     expect(f.exportReports).toHaveLength(1);
     const { report, download } = f.exportReports[0];
@@ -1096,11 +1106,11 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(bytes[1]).toBe(0x24);
   });
 
-  it("exportLegacy: a Modern tower is refused with the rules message, nothing shown or downloaded", () => {
+  itTdt("exportLegacy: a Modern tower is refused with the rules message, nothing shown or downloaded", async () => {
     saveLoad.newGame("modern");
     sim = adopted[0];
     f.toasts.length = 0;
-    saveLoad.exportLegacy();
+    await saveLoad.exportLegacy();
     expect(f.exportReports).toHaveLength(0);
     expect(f.downloads).toHaveLength(0);
     // Through `sayVisibly`, so the refusal reaches the player even if a dialog
@@ -1110,16 +1120,16 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     );
   });
 
-  it("importLegacy: a garbage buffer toasts a typed message and never reaches the sim", () => {
-    saveLoad.importLegacy(new ArrayBuffer(4), "tiny.TDT");
+  itTdt("importLegacy: a garbage buffer toasts a typed message and never reaches the sim", async () => {
+    await saveLoad.importLegacy(new ArrayBuffer(4), "tiny.TDT");
     expect(adopted).toHaveLength(0);
     expect(f.importReports).toHaveLength(0);
     expect(f.toasts).toEqual([{ text: "This file is too small to be a SimTower save.", kind: "bad" }]);
   });
 
-  it("importLegacy: a valid .TDT shows the fidelity report first; nothing adopted until Open", () => {
+  itTdt("importLegacy: a valid .TDT shows the fidelity report first; nothing adopted until Open", async () => {
     const bytes = buildTdt({ balance: 12345, level: 3 });
-    saveLoad.importLegacy(bytes.buffer as ArrayBuffer, "LEGACY.TDT");
+    await saveLoad.importLegacy(bytes.buffer as ArrayBuffer, "LEGACY.TDT");
     expect(adopted).toHaveLength(0); // report up, tower not adopted yet
     expect(f.toasts).toEqual([]);
     expect(f.importReports).toHaveLength(1);
@@ -1140,31 +1150,31 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(last(f.toasts)).toEqual({ text: "Tower imported and saved to slot 1.", kind: "good" });
   });
 
-  it("importLegacy: each report opens its own file, whatever was read after it", () => {
-    saveLoad.importLegacy(buildTdt({ balance: 111 }).buffer as ArrayBuffer, "FIRST.TDT");
-    saveLoad.importLegacy(buildTdt({ balance: 222 }).buffer as ArrayBuffer, "SECOND.TDT");
-    saveLoad.importLegacy(new ArrayBuffer(4), "tiny.TDT");
+  itTdt("importLegacy: each report opens its own file, whatever was read after it", async () => {
+    await saveLoad.importLegacy(buildTdt({ balance: 111 }).buffer as ArrayBuffer, "FIRST.TDT");
+    await saveLoad.importLegacy(buildTdt({ balance: 222 }).buffer as ArrayBuffer, "SECOND.TDT");
+    await saveLoad.importLegacy(new ArrayBuffer(4), "tiny.TDT");
     f.importReports[0].open();
     expect(adopted.map((s) => s.money)).toEqual([11_100]);
     f.importReports[1].open();
     expect(adopted.map((s) => s.money)).toEqual([11_100, 22_200]);
   });
 
-  it("importLegacy: a corrupt-but-present slot is NOT treated as free (raw presence wins)", () => {
+  itTdt("importLegacy: a corrupt-but-present slot is NOT treated as free (raw presence wins)", async () => {
     // A slot whose payload no longer parses may still be recoverable by a
     // later build; the import's fresh-slot copy must skip it, not reuse it.
     localStorage.setItem("simtower-clone-slot-1", "VCZ1:not-really-deflate");
-    saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "CAREFUL.TDT");
+    await saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "CAREFUL.TDT");
     f.importReports[0].open();
     expect(localStorage.getItem("simtower-clone-slot-1")).toBe("VCZ1:not-really-deflate");
     expect(loadSlotSim(2)).not.toBeNull(); // landed on the next raw-free slot
     expect(last(f.toasts).text).toBe("Tower imported and saved to slot 2.");
   });
 
-  it("importLegacy: with every slot full, nothing is overwritten and the toast says so", () => {
+  itTdt("importLegacy: with every slot full, nothing is overwritten and the toast says so", async () => {
     for (let n = 1; n <= 3; n++) SaveGame.saveSlot(n, saveOf(sim));
     const before = [1, 2, 3].map((n) => localStorage.getItem(`simtower-clone-slot-${n}`));
-    saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "FULL.TDT");
+    await saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "FULL.TDT");
     f.importReports[0].open();
     expect(adopted).toHaveLength(1);
     expect([1, 2, 3].map((n) => localStorage.getItem(`simtower-clone-slot-${n}`))).toEqual(before);

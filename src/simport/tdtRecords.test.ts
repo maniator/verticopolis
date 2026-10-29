@@ -1,42 +1,127 @@
 import { describe, expect, it } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { TsEngine } from "../engine/port/tsEngine";
-import { buildTDT } from "../storage/tdtExport";
-import { exportReport } from "../storage/tdtExportReport";
-import { importReport } from "../storage/tdtImportReport";
-import { parseTDT } from "../storage/tdtParse";
-import { exportInputs } from "../tests/fixtures/tdtExportCases";
-import { importInputs } from "../tests/fixtures/tdtImportCases";
-import { PortCodes } from "./portCodes";
+import type { PortCodes } from "./portCodes";
 import { exportFacts, importFacts } from "./tdtRecords";
 
-const bufferOf = (bytes: Uint8Array): ArrayBuffer => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+const LOAD_FIELDS = [
+  "ok",
+  "decoded",
+  "notes",
+  "warnings",
+  "droppedShafts",
+  "adjustedShafts",
+  "droppedFlights",
+  "parkingConnected",
+  "peopleCount",
+  "floors",
+  "basements",
+  "minutes",
+  "shafts",
+  "flights",
+  "star",
+  "money",
+  "rooms",
+  "residentsSeeded",
+];
 
-describe("the .TDT reports from the port's records", () => {
-  it("reads every import case's record back as the report parseTDT builds", () => {
-    let read = 0;
-    for (const [id, bytes, filename = "TOWER.TDT"] of importInputs()) {
-      const engine = new TsEngine(Simulation.newGame(1));
-      const rec = engine.loadTdt(bytes, filename);
-      if (rec[0] !== 1) continue;
-      read++;
-      const want = parseTDT(bufferOf(bytes), filename).report;
-      expect(importReport(importFacts(rec, new PortCodes(engine), engine)), id).toEqual(want);
-    }
-    expect(read).toBeGreaterThan(10);
+const codes = (fields: readonly string[]): PortCodes =>
+  ({ fields: () => fields }) as unknown as PortCodes;
+
+describe("importFacts", () => {
+  const record = (over: Record<string, number>) =>
+    Float64Array.from(LOAD_FIELDS.map((name) => over[name] ?? 0));
+
+  it("reads the slots by name and gathers the notes", () => {
+    const rec = record({
+      decoded: 1,
+      notes: 1,
+      warnings: 2,
+      floors: 12,
+      basements: 1,
+      minutes: 99,
+      shafts: 3,
+      flights: 4,
+      star: 5,
+      money: 7,
+      rooms: 40,
+      residentsSeeded: 8,
+      parkingConnected: 6,
+      peopleCount: 9,
+      droppedFlights: 2,
+    });
+    const asked: number[] = [];
+    const port = {
+      tdtNote: (i: number) => (
+        asked.push(i),
+        i === 1 ? undefined : `note ${i}`
+      ),
+      tdtTowerName: () => "Name",
+    };
+    const facts = importFacts(rec, codes(LOAD_FIELDS), port);
+    expect(facts).toMatchObject({
+      towerName: "Name",
+      decoded: true,
+      floors: 12,
+      basements: 1,
+      minutes: 99,
+      shafts: 3,
+      flights: 4,
+      star: 5,
+      money: 7,
+      parkingConnected: 6,
+      peopleCount: 9,
+    });
+    expect(facts.counts.rooms).toBe(40);
+    expect(facts.counts.residentsSeeded).toBe(8);
+    expect(facts.decodeStats.droppedFlights).toBe(2);
+    expect(facts.notes).toEqual(["note 0", "", "note 2"]);
+    expect(asked).toEqual([0, 1, 2]);
   });
 
-  it("reads every export case's record back as the report buildTDT builds", () => {
-    let read = 0;
-    for (const [id, input] of exportInputs()) {
-      if (!("save" in input)) continue;
-      const engine = new TsEngine(Simulation.deserialize(input.save));
-      const rec = engine.tdtExport();
-      if (rec[0] !== 1) continue;
-      read++;
-      const want = buildTDT(engine.sim.serialize()).report;
-      expect(exportReport(exportFacts(rec, new PortCodes(engine), engine.towerName())), id).toEqual(want);
-    }
-    expect(read).toBeGreaterThan(5);
+  it("turns an absent count into null and a missing name into an empty one", () => {
+    const rec = record({ parkingConnected: NaN, peopleCount: NaN });
+    const facts = importFacts(rec, codes(LOAD_FIELDS), {
+      tdtNote: () => undefined,
+      tdtTowerName: () => undefined,
+    });
+    expect(facts.parkingConnected).toBeNull();
+    expect(facts.peopleCount).toBeNull();
+    expect(facts.towerName).toBe("");
+    expect(facts.decoded).toBe(false);
+    expect(facts.notes).toEqual([]);
+  });
+});
+
+describe("exportFacts", () => {
+  it("reads the counts, the encode stats and the extent by name", () => {
+    const fields = [
+      "ok",
+      "rooms",
+      "burnedOut",
+      "balance",
+      "money",
+      "star",
+      "expressLen",
+      "topFloor",
+      "basements",
+    ];
+    const facts = exportFacts(
+      Float64Array.from([1, 40, 2, 500, 50000, 4, 3, 30, 2]),
+      codes(fields),
+      "Tower",
+    );
+    expect(facts.towerName).toBe("Tower");
+    expect(facts.counts.rooms).toBe(40);
+    expect(facts.counts.burnedOut).toBe(2);
+    expect(facts.stats).toMatchObject({
+      balance: 500,
+      money: 50000,
+      star: 4,
+      expressLen: 3,
+    });
+    expect(facts.topFloor).toBe(30);
+    expect(facts.basements).toBe(2);
+    expect(
+      exportFacts(Float64Array.from([1]), codes(["ok"]), undefined).towerName,
+    ).toBe("");
   });
 });
