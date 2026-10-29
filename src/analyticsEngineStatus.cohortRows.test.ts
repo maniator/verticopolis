@@ -72,4 +72,20 @@ describe("the attempt and engaged rows", () => {
     expect(rows().filter((r) => r.trigger === "attempt")).toHaveLength(1);
     expect(rows().filter((r) => r.trigger === "engaged")).toHaveLength(1);
   });
+
+  it("carry the cohort's fields on every row, and name the engine boot started", () => {
+    const cohort = { stage: "1", assigned_arm: "wasm", selected_by: "safety-device" } as const;
+    noteEngineAttempt({ ...attempt, boot: "ts", cohort });
+    noteEngineSettled({ ...settle, boot: "ts", cohort, crashLoop: true });
+    noteEngineFallback({ reason: "attach-refused", stage: "adopt" });
+    const [a, s, f] = rows();
+    for (const row of [a, s, f]) expect(row).toMatchObject({ engine_requested: "wasm", ...cohort });
+    expect(a.engine).toBe("ts");
+    expect(s).toMatchObject({ engine: "ts", fallback_reason: "unclean-exit", fallbacks: 0 });
+  });
+
+  it("send the no-draw fields when boot gave none", () => {
+    noteEngineSettled(settle);
+    expect(rows()[0]).toMatchObject({ stage: expect.any(String), assigned_arm: "none", selected_by: "default", fallback_reason: "none" });
+  });
 });

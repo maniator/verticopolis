@@ -6,6 +6,8 @@ import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
 import { noteRustCrashed, noteRustFailed, selectBootEngine, stageNotice } from "./engineCohort/boot";
+import { currentSelection } from "./engineCohort/current";
+import { selectionFacts } from "./engineCohort/fields";
 import { offerRustCrashReport, type RustCrashApp } from "./ui/rustCrashDialog";
 import { parseEngineIdentity } from "./wasmhost/engineIdentity";
 import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, reloadSoon, tabStore } from "./engineCohort/crashReload";
@@ -266,7 +268,8 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     // safety suppression, the Settings choice, then the cohort arm.
     const choice = __WASM_ONLY__ ? "wasm" : selectBootEngine();
     // Counted before the package loads, so a load the tab never finishes is too (#1090).
-    noteEngineAttempt({ build: __WASM_ONLY__ ? "wasm-only" : "switchable", requested: choice });
+    const facts = selectionFacts(choice, currentSelection());
+    noteEngineAttempt({ build: __WASM_ONLY__ ? "wasm-only" : "switchable", ...facts });
     const wantsRust = choice !== "ts";
     // The cover says so after a short wait, when the package takes a while (#1132).
     const stopLoadingLine = wantsRust ? showEngineLoading() : () => {};
@@ -284,7 +287,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     // message stays behind; only the stage and the reason are handed over.
     const settle = () => {
       const f = bootState.failure;
-      noteEngineSettled({ build: bootState.build, requested: choice, failure: f && { stage: f.stage, reason: f.reason } });
+      noteEngineSettled({ build: bootState.build, ...facts, failure: f && { stage: f.stage, reason: f.reason } });
     };
     // A wasm-only build whose engine did not load or start has nothing to
     // run the game on.
