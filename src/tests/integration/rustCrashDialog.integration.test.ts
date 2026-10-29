@@ -78,4 +78,13 @@ describe("the Rust crash report", () => {
     expect(strFromU8(files["tower.vctower"])).toMatch(/^VCTOWER1\n/);
     expect(dialog().querySelector(".crash-status")?.textContent).toContain("Crash report ready.");
   });
+
+  it("offers the recovery copy: the stored text as it is, with no engine involved", () => {
+    countRustCrash(sessionStorage, SHA, FACTS);
+    countRustCrash(sessionStorage, SHA, FACTS);
+    offerRustCrashReport({ ...app(), recoveryText: () => "VCZ1:as-stored" }, SHA);
+    dialog().querySelector<HTMLElement>('[data-act="recovery"]')!.click();
+    expect(downloadFile).toHaveBeenCalledWith("verticopolis-recovery-copy.txt", "VCZ1:as-stored", "application/octet-stream");
+    expect(dialog().querySelector(".crash-status")?.textContent).toContain("Recovery copy ready.");
+  });
 });

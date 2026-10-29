@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.57.0
+
+- If the game crashes, its crash screen now has a Download recovery copy button that saves your tower's last autosave as a file.
+
 ## 2.56.0
 
 - Help's Privacy section now lists what the game reports when you are part of an engine test.
