@@ -370,32 +370,15 @@ pub fn encode_tower(
                     .unwrap_or(std::cmp::Ordering::Equal),
             )
     });
-    let mut i = 0;
-    while i < sorted.len() {
-        let first = sorted[i];
-        let mut run = 1;
-        while i + run < sorted.len()
-            && sorted[i + run].kind == first.kind
-            && sorted[i + run].x == first.x
-            && sorted[i + run].bottom == first.bottom + run as f64
-        {
-            run += 1;
-        }
-        let is_stairs = first.kind == Kind::Stairs;
-        let mut base = first.bottom;
-        let mut left = run as i64;
-        while left > 0 {
-            let stories = left.min(3);
-            let type_id = (stories - 1) * 2 + if is_stairs { 1 } else { 0 };
-            stair_records.push(StairRecord {
-                type_id,
-                x: first.x,
-                floor: base + TDT_FLOOR_OFFSET as f64,
-            });
-            base += stories as f64;
-            left -= stories;
-        }
-        i += run;
+    // One record per flight, as the game writes them: it never stacks flights
+    // into the multi-story types, and a stacked column is one record per floor.
+    for flight in &sorted {
+        let is_stairs = flight.kind == Kind::Stairs;
+        stair_records.push(StairRecord {
+            type_id: if is_stairs { 1 } else { 0 },
+            x: flight.x,
+            floor: flight.bottom + TDT_FLOOR_OFFSET as f64,
+        });
     }
     let mut flights_dropped = 0;
     for s in stair_records.iter().skip(TDT_STAIR_SLOTS) {

@@ -639,7 +639,7 @@ describeWithCodec("buildTDT: export → import round trip", () => {
     expect(nonSkyRecs.every((r) => r.type === 0)).toBe(true);
   });
 
-  it("stacked walkway flights collapse into multi-story records and come back apart", () => {
+  it("stacked walkway flights are written one record per floor, as the game writes them", () => {
     const save = sampleSave();
     // Three stacked stairs flights at one x: floors 1-2, 2-3, 3-4.
     for (let i = 0; i < 3; i++) {

@@ -59,9 +59,12 @@ pub fn frame_for_minute_of_day(minute_of_day: f64) -> f64 {
             // file writes back as the same minute. Where a frame spans more
             // than one minute (1880 to 2000) not every minute has a frame, and
             // the first frame at or past it is the answer.
-            let frame = frame_start
+            // The last minute of the day has no frame of its own, so the result
+            // stays on the day's last frame, inside the format's range.
+            let frame = (frame_start
                 + ((m - minute_start) * (frame_end - frame_start) / (minute_end - minute_start))
-                    .ceil();
+                    .ceil())
+            .min(frame_end - 1.0);
             let earlier = frame - 1.0;
             let reads_back =
                 |f: f64| minute_of_day_for_frame(f) == wrap(minute_of_day, 24.0 * 60.0).floor();
@@ -101,6 +104,13 @@ pub fn pace_factor(minute_of_day: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_last_minute_of_the_day_maps_to_the_last_frame() {
+        let last = frame_for_minute_of_day(419.0);
+        assert!(last <= 2599.0, "{last}");
+        assert!(last >= 0.0);
+    }
 
     #[test]
     fn canon_anchors() {
