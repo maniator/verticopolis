@@ -171,3 +171,33 @@ fn ids_are_repaired_units_first() {
     assert_eq!(repair_entity_ids(&mut both, &mut [], None), next);
     assert_eq!(both, [units, transports].concat());
 }
+
+/// Saved sets restore in first-seen order and in linear time (#1252): a hand-
+/// edited save with a hundred thousand distinct entries must not freeze
+/// the tab, and +0 and -0 stay one value as in a TypeScript `Set`.
+#[test]
+fn saved_sets_restore_in_first_seen_order_without_quadratic_scans() {
+    let n = 100_000_u32;
+    let mut ids: Vec<Value> = (0..n).map(|i| json!(f64::from(i) + 0.5)).collect();
+    ids.extend([json!(0.0), json!(-0.0), json!(1.5), json!(null), json!("x")]);
+    let words: Vec<Value> = (0..n).map(|i| json!(format!("w{i}"))).collect();
+    let mut dup_words = words.clone();
+    dup_words.extend(words.iter().take(10).cloned());
+    let data = json!({ "blockbusters": ids, "milestones": dup_words, "excavated": words });
+    let start = std::time::Instant::now();
+    let sim = assemble(&data, Vec::new(), Vec::new(), &json!({}));
+    assert!(
+        start.elapsed().as_secs() < 5,
+        "restoring the sets took {:?}",
+        start.elapsed()
+    );
+    assert_eq!(sim.blockbusters.len(), n as usize + 1);
+    assert_eq!(sim.blockbusters[0], 0.5);
+    assert_eq!(
+        sim.blockbusters[n as usize], 0.0,
+        "-0 joins the +0 already kept"
+    );
+    assert_eq!(sim.milestones.len(), n as usize);
+    assert_eq!(sim.milestones[9], "w9");
+    assert_eq!(sim.excavated.len(), n as usize);
+}

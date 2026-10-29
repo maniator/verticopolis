@@ -109,10 +109,13 @@ pub(crate) fn assemble(
             sim.extermination_room_ids = Some(ids);
         }
     }
+    // First-seen order with a membership set beside the list, so a hand-edited
+    // save with many distinct entries restores in linear time (#1252).
     if let Some(a) = data.get("excavated").and_then(Value::as_array) {
+        let mut seen: HashSet<String> = sim.excavated.iter().cloned().collect();
         for k in a {
             if let Some(s) = k.as_str() {
-                if !sim.excavated.iter().any(|e| e == s) {
+                if seen.insert(s.to_string()) {
                     sim.excavated.push(s.to_string());
                 }
             }
@@ -120,11 +123,14 @@ pub(crate) fn assemble(
     }
     if let Some(a) = data.get("blockbusters").and_then(Value::as_array) {
         // `new Set(ids.filter(finite))`: a fractional id is kept as it is (it
-        // never matches a unit, but it saves back out unchanged).
+        // never matches a unit, but it saves back out unchanged). A set
+        // reads +0 and -0 as one value, so both map to one key here.
         let mut ids: Vec<f64> = Vec::new();
+        let mut seen: HashSet<u64> = HashSet::new();
         for v in a {
             if let Some(n) = v.as_f64() {
-                if n.is_finite() && !ids.contains(&n) {
+                let key = if n == 0.0 { 0 } else { n.to_bits() };
+                if n.is_finite() && seen.insert(key) {
                     ids.push(n);
                 }
             }
@@ -132,9 +138,10 @@ pub(crate) fn assemble(
         sim.blockbusters = ids;
     }
     if let Some(a) = data.get("milestones").and_then(Value::as_array) {
+        let mut seen: HashSet<String> = sim.milestones.iter().cloned().collect();
         for v in a {
             if let Some(s) = v.as_str() {
-                if !sim.milestones.iter().any(|m| m == s) {
+                if seen.insert(s.to_string()) {
                     sim.milestones.push(s.to_string());
                 }
             }
