@@ -379,12 +379,13 @@ serviced-only.
 - Multi-story units arrive as per-floor parts and are merged.
 - Windows byte order only; the Mac version is unknown.
 - **Population on load.** Offices and condos are seeded from the finance
-  people lines: rooms are occupied until `people / 6` (office) or `people / 3`
-  (condo) rooms are full, capped by the rooms built, so the app matches the file
-  exactly on the real saves. Hotel guests come from each room's flags. Shops,
-  restaurants, fast food and theatres cannot be seeded: their customers are
-  runtime state in our engine and build up after load, so the app's count starts
-  below the file's total.
+  block's per-class people lines: rooms take people until `people / per-room`
+  rooms are full (office 6, condo 3), capped by the rooms built, so the app
+  matches the file exactly on the real saves. Hotel guests come from each
+  room's flags (section 5.1), not from the finance line. Shops, restaurants,
+  fast food and theatres cannot be seeded: their customers are runtime state in
+  our engine and build up after load, so the app's count starts below the
+  file's total. Tracked in #1500.
 - Retail units keep their variant through `.vctower` and `.TDT`.
 
 ## 18. Round trip (export then import)

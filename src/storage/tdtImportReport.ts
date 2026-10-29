@@ -221,7 +221,7 @@ export function importReport(facts: ImportReportFacts): ImportReport {
   }
   if (counts.residentsSeeded > 0) {
     couldNotBring.push(
-      `${counts.residentsSeeded.toLocaleString()} residents and guests are here now, matching the save's counts; shoppers and diners return as the tower runs.`,
+      `${counts.residentsSeeded.toLocaleString()} office workers and condo residents are here now, matching the save's counts; shoppers, diners and moviegoers return as the tower runs.`,
     );
   } else if (counts.occupiedOffices + counts.soldCondos > 0) {
     couldNotBring.push("Occupancy is approximate: any office or condo with people recorded imports as occupied.");

@@ -4,22 +4,18 @@ use std::collections::HashMap;
 
 use super::OutUnit;
 use crate::facilities::Kind;
-use crate::tdt::format::{
-    POP_CONDO, POP_HOTEL_SINGLE, POP_HOTEL_SUITE, POP_HOTEL_TWIN, POP_OFFICE,
-    TDT_POPULATION_CLASSES,
-};
+use crate::tdt::format::{POP_CONDO, POP_OFFICE, TDT_POPULATION_CLASSES};
 use crate::tdt::import_report::ImportCounts;
 
 /// The classes whose people the finance block counts and the load seeds: the
 /// kind, its slot in the block and the state a room with people in it takes.
-/// Shops, restaurants, fast food and theatres are left out: their customers are
-/// runtime state and arrive as the tower runs.
-const SEEDED_CLASSES: [(Kind, usize, &str); 5] = [
+/// Hotels keep the states their own flags decode to, since a guest count cannot
+/// say which double room holds one guest or two. Shops, restaurants, fast food
+/// and theatres are left out: their customers are runtime state and arrive as
+/// the tower runs.
+const SEEDED_CLASSES: [(Kind, usize, &str); 2] = [
     (Kind::Office, POP_OFFICE, "occupied"),
     (Kind::Condo, POP_CONDO, "occupied"),
-    (Kind::HotelSingle, POP_HOTEL_SINGLE, "asleep"),
-    (Kind::HotelDouble, POP_HOTEL_TWIN, "asleep"),
-    (Kind::HotelSuite, POP_HOTEL_SUITE, "asleep"),
 ];
 
 fn count_in_state(units: &[OutUnit], of_kind: fn(Kind) -> bool, state: &str) -> i64 {
