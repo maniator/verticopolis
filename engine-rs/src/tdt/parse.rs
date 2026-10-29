@@ -19,6 +19,10 @@ use super::LegacyImportError;
 use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH, MAX_FLOOR};
 use crate::sim::SAVE_VERSION;
 
+mod out_unit;
+
+use out_unit::OutUnit;
+
 /// Result of a successful parse: the save, the binary walk's warnings and the
 /// tally the report is built from.
 #[derive(Clone, Debug)]
@@ -38,52 +42,6 @@ pub fn jnum(x: f64) -> Value {
         json!(x as i64)
     } else {
         json!(x)
-    }
-}
-
-/// A unit as the importer writes it into the save.
-struct OutUnit {
-    id: i64,
-    kind: Kind,
-    floor: i64,
-    x: i64,
-    width: i64,
-    state: &'static str,
-    occupants: i64,
-    ever_occupied: bool,
-    rent: Option<f64>,
-    no_rate: bool,
-    subtype: Option<&'static str>,
-    complete_at: Option<i64>,
-}
-
-impl OutUnit {
-    fn to_json(&self) -> Value {
-        let mut m = Map::new();
-        m.insert("id".into(), json!(self.id));
-        m.insert("kind".into(), json!(self.kind.as_str()));
-        m.insert("floor".into(), json!(self.floor));
-        m.insert("x".into(), json!(self.x));
-        m.insert("width".into(), json!(self.width));
-        m.insert("state".into(), json!(self.state));
-        m.insert("satisfaction".into(), json!(1));
-        m.insert("occupants".into(), json!(self.occupants));
-        m.insert("everOccupied".into(), json!(self.ever_occupied));
-        m.insert("pendingIncome".into(), json!(0));
-        m.insert("label".into(), json!(self.kind.facility().name));
-        if let Some(r) = self.rent {
-            m.insert("rent".into(), jnum(r));
-        }
-        if self.no_rate {
-            m.insert("noRate".into(), json!(true));
-        }
-        if let Some(s) = self.subtype {
-            m.insert("subtype".into(), json!(s));
-        }
-        if let Some(c) = self.complete_at {
-            m.insert("completeAt".into(), json!(c));
-        }
-        Value::Object(m)
     }
 }
 

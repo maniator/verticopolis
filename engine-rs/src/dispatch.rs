@@ -62,13 +62,15 @@ impl ElevatorDispatch {
             .retain(|id, _| tower.transport_index(*id).is_some());
     }
 
-    /// `accumulate(tower, dt, rush)`: once per outer step.
-    pub fn accumulate(&mut self, tower: &Tower, dt: f64, rush: f64) {
+    /// `accumulate(tower, dt, rush)`: once per outer step. Returns the tower's
+    /// `totalPopulation`, which the pass over the rooms already sums, so the
+    /// crowd's spawn step reuses it instead of walking the rooms again.
+    pub fn accumulate(&mut self, tower: &Tower, dt: f64, rush: f64) -> i64 {
         self.prune_removed_shafts(tower);
-        self.accumulate_waiting(tower, dt, rush);
+        self.accumulate_waiting(tower, dt, rush)
     }
 
-    fn accumulate_waiting(&mut self, tower: &Tower, dt: f64, rush: f64) {
+    fn accumulate_waiting(&mut self, tower: &Tower, dt: f64, rush: f64) -> i64 {
         self.waiting.retain(|_, n| {
             let v = *n - dt * 0.03;
             if v <= 0.0 {
@@ -113,6 +115,7 @@ impl ElevatorDispatch {
                 *w = (*w + pop as f64 * rush * dt * 0.0015).min(25.0);
             }
         }
+        pop
     }
 
     /// `moveCars(tower, dt, crowdCalls, clock)`.

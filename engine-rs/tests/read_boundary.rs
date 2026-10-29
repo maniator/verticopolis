@@ -9,8 +9,9 @@ use scan::{crate_dir, parts, rel, rust_files, Part};
 /// Where a path literal climbs out of the crate, it is a `..` step on the way
 /// to the conformance suite and nowhere else: `"../conformance/..."`, or a
 /// bare `".."` joined straight onto `"conformance"`. Every Rust file under
-/// `src/`, `tests/` and `consumer/src/` counts (`tests/independence.rs` and
-/// this file aside, whose examples climb on purpose), so the crate's tests
+/// `src/`, `tests/` and `consumer/src/` counts (`tests/independence.rs`, the
+/// modules under `tests/independence/` and this file aside, whose examples
+/// climb on purpose), so the crate's tests
 /// and the referee read only `engine-rs/` and `conformance/`. A path that
 /// steps up another way (`Path::parent`, `ancestors`, `ParentDir`) is not
 /// read here; the sparse CI job, which runs everything from a checkout that
@@ -78,7 +79,9 @@ fn the_tests_and_the_referee_read_only_the_crate_and_the_suite() {
     for path in files {
         let name = rel(&path);
         // The two guard tests' own examples climb on purpose.
-        if ["tests/independence.rs", "tests/read_boundary.rs"].contains(&name.as_str()) {
+        if ["tests/independence.rs", "tests/read_boundary.rs"].contains(&name.as_str())
+            || name.starts_with("tests/independence/")
+        {
             continue;
         }
         let text = std::fs::read_to_string(&path)

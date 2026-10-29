@@ -1,22 +1,19 @@
 //! Port of `crowd/spawn.ts`, `crowd/trips.ts` and `crowd/venueTrips.ts`.
 
-use crate::housekeeping::HK_MAIDS_PER_UNIT;
-
-use super::meals::{
-    matches_meal_origin_kind, meal_window_for, outbound_weight, staff_on_shift, MealOrigin,
-};
+use super::meals::MealOrigin;
 use super::routines::push_routine_options;
 pub use super::spawn_floors::{spawn_floors, SpawnFloors};
 use super::visits::{push_venue_visit_options, spawn_venue_visit, VisitOrigin};
-use super::{
-    Crowd, PState, Person, Route, CROWD_SECONDS_PER_MINUTE, MAX_PEOPLE, METRO_DWELL_MAX,
-    METRO_DWELL_MIN,
-};
+use super::{Crowd, PState, Person, Route, MAX_PEOPLE, METRO_DWELL_MAX, METRO_DWELL_MIN};
 use crate::clock::Clock;
 use crate::facilities::Kind;
-use crate::jsmath;
-use crate::sim_loop::{weather_for, Weather};
 use crate::tower::{Tower, Unit};
+
+mod meal_trips;
+mod staff;
+
+use meal_trips::{push_meal_options, spawn_meal_outbound};
+pub use staff::{max_staff_for, spawn_staff, spawn_step, StaffSpawn};
 
 // ---- trips.ts -------------------------------------------------------------
 
@@ -394,222 +391,5 @@ pub fn spawn_trips(crowd: &mut Crowd, tower: &mut Tower, clock: &Clock, floors: 
     }
 }
 
-fn push_meal_options(
-    crowd: &mut Crowd,
-    tower: &Tower,
-    clock: &Clock,
-    floors: &SpawnFloors,
-    options: &mut Options,
-) {
-    let Some(window) = meal_window_for(clock.hour()) else {
-        return;
-    };
-    let (start, end) = window.bounds();
-    let hour_frac = clock.minute_of_day() / 60.0 - start as f64;
-    let t = (hour_frac / (end - start) as f64).clamp(0.0, 1.0);
-    let outbound = outbound_weight(t);
-    let venue_floors: Vec<i64> = window
-        .venues()
-        .iter()
-        .flat_map(|k| floors.venues_by_kind.get(k).cloned().unwrap_or_default())
-        .collect();
-    if venue_floors.is_empty() {
-        return;
-    }
-    let shift = tower.mode.housekeeping_shift();
-    let mut pools: Vec<MealPool> = Vec::new();
-    let mut push = |origin_kind: MealOrigin, list: Vec<i64>| {
-        if !list.is_empty() && origin_kind.weight() > 0.0 {
-            pools.push(MealPool {
-                origin_kind,
-                floors: list,
-            });
-        }
-    };
-    for &kind in window.origins() {
-        match kind {
-            MealOrigin::Office => push(MealOrigin::Office, floors.staffed_offices.clone()),
-            MealOrigin::Condo => push(MealOrigin::Condo, floors.condo_floors.clone()),
-            MealOrigin::Hotel => push(MealOrigin::Hotel, floors.hotel_floors.clone()),
-            MealOrigin::Staff => {
-                let on_shift: Vec<i64> = floors
-                    .staff_floors
-                    .iter()
-                    .filter(|(k, _)| staff_on_shift(*k, clock.hour(), shift))
-                    .map(|(_, f)| *f)
-                    .collect();
-                push(MealOrigin::Staff, on_shift);
-            }
-        }
-    }
-    if pools.is_empty() {
-        return;
-    }
-    let outbound_base = jsmath::round(outbound * 3.0).max(0.0) as i64;
-    for (pi, pool) in pools.iter().enumerate() {
-        for _ in 0..outbound_base {
-            let w = pool.origin_kind.weight();
-            if w >= 1.0 || crowd.rng.chance(w) {
-                options.opts.push(Opt::MealOutbound(pi));
-            }
-        }
-    }
-    options.pools = pools;
-    options.venue_floors = venue_floors;
-    options.venue_kinds = window.venues();
-}
-
-fn spawn_meal_outbound(
-    crowd: &mut Crowd,
-    tower: &mut Tower,
-    pool: &MealPool,
-    venue_floors: &[i64],
-    venue_kinds: &[Kind],
-    hour: i64,
-    floors: &SpawnFloors,
-) {
-    let origin_floor = *crowd.rng.pick(&pool.floors);
-    let shift = tower.mode.housekeeping_shift();
-    let candidates: Vec<i64> = floors
-        .units_on(origin_floor)
-        .iter()
-        .copied()
-        .filter(|&id| {
-            let u = tower.get_unit(id).unwrap();
-            matches_meal_origin_kind(u, pool.origin_kind)
-                && (pool.origin_kind != MealOrigin::Staff || staff_on_shift(u.kind, hour, shift))
-                && u.visible_occupants() > 0
-        })
-        .collect();
-    if candidates.is_empty() {
-        return;
-    }
-    let origin_id = *crowd.rng.pick(&candidates);
-    let venue_floor = *crowd.rng.pick(venue_floors);
-    let venue_candidates: Vec<i64> = floors
-        .units_on(venue_floor)
-        .iter()
-        .copied()
-        .filter(|&id| {
-            let u = tower.get_unit(id).unwrap();
-            venue_kinds.contains(&u.kind)
-                && u.is_tenanted()
-                && u.kind.is_open_at(hour)
-                && venue_has_room(u)
-        })
-        .collect();
-    if venue_candidates.is_empty() {
-        return;
-    }
-    let venue_id = *crowd.rng.pick(&venue_candidates);
-    let (ox, vx, vw) = {
-        let o = tower.get_unit(origin_id).unwrap();
-        let v = tower.get_unit(venue_id).unwrap();
-        (o.x, v.x, v.width)
-    };
-    let Some(i) = add(crowd, tower, origin_floor, venue_floor, Some(ox), Some(vx)) else {
-        return;
-    };
-    crowd.people[i].dest_x = crowd.rng.int(vx, vx + vw - 1) as f64;
-    crowd.people[i].meal_venue_id = Some(venue_id);
-    crowd.people[i].origin_unit_id = Some(origin_id);
-    let (origin, at) = tower.marked_by_id(origin_id).unwrap();
-    origin.set_out_for_meal(at, Some(origin.out_for_meal.unwrap_or(0) + 1));
-    tower.bump_meal_overlay_revision();
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum StaffSpawn {
-    Sent,
-    Full,
-    NoRoute,
-}
-
-pub fn spawn_staff(
-    crowd: &mut Crowd,
-    tower: &Tower,
-    from: i64,
-    to: i64,
-    dest_x: f64,
-    clean_unit_id: i64,
-    clean_minutes: f64,
-    from_x: Option<f64>,
-) -> StaffSpawn {
-    if crowd.staff_count >= max_staff_for(tower) {
-        return StaffSpawn::Full;
-    }
-    let Some(r) = crowd.staff_route(tower, from, to, from_x, Some(dest_x)) else {
-        return StaffSpawn::NoRoute;
-    };
-    let i = make_person(crowd, tower, r, dest_x, None);
-    let p = &mut crowd.people[i];
-    if let Some(fx) = from_x {
-        p.x = fx;
-    }
-    p.staff = true;
-    p.clean_unit_id = Some(clean_unit_id);
-    p.linger_for = Some(clean_minutes * CROWD_SECONDS_PER_MINUTE);
-    crowd.staff_count += 1;
-    StaffSpawn::Sent
-}
-
-/// `maxStaffFor`. It runs for every staff spawn attempt inside
-/// housekeeping's loop over rooms and crews, so the crews come from a
-/// memoized count (`Tower::housekeeping_units`, keyed on revision and unit
-/// count) where the TypeScript keeps `staffCeiling` per revision (#1143).
-pub fn max_staff_for(tower: &Tower) -> i64 {
-    tower.housekeeping_units() * HK_MAIDS_PER_UNIT
-}
-
-/// `spawnStep`.
-pub fn spawn_step(
-    crowd: &mut Crowd,
-    dt_sec: f64,
-    tower: &mut Tower,
-    clock: &Clock,
-    weather: Option<Weather>,
-) {
-    let mut time_rate = 2.2;
-    if clock.is_night() {
-        time_rate = 0.3;
-    } else if clock.is_weekend() {
-        time_rate = 1.2;
-    }
-    let pop_factor = (0.4 + tower.total_population() as f64 / 2000.0).min(3.0);
-    let sky = weather.unwrap_or_else(|| weather_for(clock.day()));
-    let weather_factor = if sky == Weather::Rain {
-        tower.mode.rain_crowd_factor()
-    } else {
-        1.0
-    };
-    crowd.spawn_acc += dt_sec * time_rate * pop_factor * weather_factor;
-    if crowd.spawn_acc < 1.0 {
-        return;
-    }
-    // `spawn_trips` only adds people and returns on `crowd_is_full` before
-    // any draw, so a crowd full here skips the lists and drains the
-    // accumulator the same (#1143 item 4).
-    let floors = (!crowd_is_full(crowd)).then(|| spawn_floors(tower, clock));
-    let mut guard = 0;
-    while crowd.spawn_acc >= 1.0 && guard < 8 {
-        guard += 1;
-        crowd.spawn_acc -= 1.0;
-        if let Some(floors) = &floors {
-            spawn_trips(crowd, tower, clock, floors);
-        }
-    }
-}
-
 #[cfg(test)]
-mod tests {
-    use super::seed_for;
-
-    #[test]
-    fn seed_matches_the_javascript_expression() {
-        // Node: (id * 2654435761) | 0 for each id.
-        assert_eq!(seed_for(1), -1640531535);
-        assert_eq!(seed_for(2), 1013904226);
-        assert_eq!(seed_for(3_400_000), -1911161536);
-        assert_eq!(seed_for(10_000_000), -568160640);
-    }
-}
+mod tests;
