@@ -5,6 +5,9 @@ import { Simulation } from "../../engine/Simulation";
 import type { Tower } from "../../engine/Tower";
 import type { FacilityKind, SerializedGame, Transport, Unit } from "../../engine/types";
 import type { EnginePort } from "../../simport/enginePort";
+import type { StatsReport } from "../../simport/panels";
+import { PortCodes } from "../../simport/portCodes";
+import { statsReport } from "../../simport/statsSheet";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
 
@@ -56,6 +59,8 @@ interface Leaf {
   bombThreat(): void;
   evaluateStar(): void;
   setMoney(amount: number): void;
+  /** The hourly utilization average the engine holds for a shaft, if any. */
+  elevatorUtilization(id: number): number | undefined;
   free(): void;
 }
 
@@ -70,6 +75,7 @@ function makeLeaf(leg: Leg, save: string): Leaf {
       setMoney: (amount) => {
         engine.sim.money = amount;
       },
+      elevatorUtilization: (id) => engine.sim.elevatorUtilization(id),
       free: () => undefined,
     };
   }
@@ -80,6 +86,7 @@ function makeLeaf(leg: Leg, save: string): Leaf {
     bombThreat: () => engine.bombThreat(),
     evaluateStar: () => engine.evaluateStar(),
     setMoney: (amount) => engine.setMoney(amount),
+    elevatorUtilization: (id) => (JSON.parse(engine.elevatorTelemetry()) as { util: [number, number][] }).util.find(([shaft]) => shaft === id)?.[1],
     free: () => engine.free(),
   };
 }
@@ -175,6 +182,27 @@ export class PortSim {
   /** The analytics-only emergency tallies (#611). */
   emergencyCounts(): { fires: number; firesGutRooms: number; bombs: number } {
     return { fires: this.frameSlot("firesStarted"), firesGutRooms: this.frameSlot("firesGutRooms"), bombs: this.frameSlot("bombsDetonated") };
+  }
+
+  /** The stats screen as the engine answers it (`statsSheet`): the HUD strip,
+   *  the ledger averages, the next star, the milestones, the elevator rows. */
+  statsReport(): StatsReport {
+    return statsReport(this.leaf.port.statsSheet(), new PortCodes(this.leaf.port));
+  }
+
+  /** A unit's card as the engine answers it (`unitCard`), by the layout's slot
+   *  names: `served`, `reachable`, `satisfaction`, `rent` and the rest. An empty
+   *  object for an id the engine does not know. */
+  unitCard(id: number): Readonly<Record<string, number>> {
+    const rec = this.leaf.port.unitCard(id);
+    const names = new PortCodes(this.leaf.port).fields("unitCard");
+    return Object.fromEntries(Array.from(rec, (v, i) => [names[i], v]));
+  }
+
+  /** The hourly utilization average the engine holds for a shaft, or
+   *  undefined when it holds none (a shaft it never sampled or has dropped). */
+  elevatorUtilization(id: number): number | undefined {
+    return this.leaf.elevatorUtilization(id);
   }
 
   /** The engine's save text. */

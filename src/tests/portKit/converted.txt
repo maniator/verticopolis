@@ -9,3 +9,5 @@ src/tests/integration/batchPricing.integration.test.ts
 src/tests/integration/ledger.integration.test.ts
 src/tests/integration/milestones.integration.test.ts
 src/tests/integration/nextStarRequirements.integration.test.ts
+src/tests/integration/elevatorStats.integration.test.ts
+src/tests/integration/trafficTeeth.integration.test.ts
