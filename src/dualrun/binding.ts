@@ -2,7 +2,7 @@ import type { Engine, catalog, encodeVctower, engineIdentity } from "./engine";
 
 /**
  * The WASM binding's surface, as wasm-bindgen declares it from
- * `engine-rs/src/wasm.rs`. `engine.d.ts` is the declaration the build writes
+ * `engine-rs/src/wasm.rs` and `engine-rs/src/wasm/`. `engine.d.ts` is the declaration the build writes
  * (`npm run wasm:build` refreshes it; CI fails when the checked-in copy is
  * stale), so a method added or renamed in Rust reaches TypeScript as a type
  * change and the lists below as a typecheck failure until they follow.
