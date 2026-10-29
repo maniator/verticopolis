@@ -201,3 +201,38 @@ fn saved_sets_restore_in_first_seen_order_without_quadratic_scans() {
     assert_eq!(sim.milestones[9], "w9");
     assert_eq!(sim.excavated.len(), n as usize);
 }
+
+/// A version 1 save with parking on many distinct floors re-lays in linear
+/// time (#1282): each floor's parking is grouped once, not found by a scan of
+/// every room per floor. Four times the floors may take about four times as
+/// long; the scan per floor took sixteen.
+#[test]
+fn legacy_parking_on_many_floors_reflows_without_a_scan_per_floor() {
+    let reflow = |n: i64| {
+        let units: Vec<Value> = (0..n)
+            .map(|i| json!({ "kind": "parking", "floor": i + 100, "x": 7, "width": 3 }))
+            .collect();
+        let start = std::time::Instant::now();
+        let out = crate::load::reflow_v1_to_v2(&json!({ "version": 1, "units": units }));
+        let took = start.elapsed();
+        let floors: Vec<i64> = out["units"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|u| u["kind"] == "parking")
+            .map(|u| u["floor"].as_i64().unwrap())
+            .collect();
+        assert_eq!(
+            floors,
+            (100..100 + n).collect::<Vec<_>>(),
+            "floor order kept"
+        );
+        took
+    };
+    let small = reflow(10_000);
+    let large = reflow(40_000);
+    assert!(
+        large < small * 8,
+        "10,000 floors took {small:?}, 40,000 took {large:?}"
+    );
+}

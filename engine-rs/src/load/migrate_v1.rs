@@ -182,16 +182,15 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
             }
         };
     // Parking runs.
-    let mut park_floors: IndexSet<i64> = IndexSet::new();
-    for r in &rooms {
+    // Grouped by floor in one pass, floors in first-seen order and rooms in
+    // save order within a floor (#1282).
+    let mut park_by_floor: IndexMap<i64, Vec<usize>> = IndexMap::new();
+    for (i, r) in rooms.iter().enumerate() {
         if is_park(r.kind) {
-            park_floors.insert(r.floor);
+            park_by_floor.entry(r.floor).or_default().push(i);
         }
     }
-    for &f_ in &park_floors {
-        let mut units: Vec<usize> = (0..rooms.len())
-            .filter(|&i| rooms[i].floor == f_ && is_park(rooms[i].kind))
-            .collect();
+    for mut units in park_by_floor.into_values() {
         units.sort_by_key(|&i| rooms[i].x0);
         struct Run {
             left: i64,

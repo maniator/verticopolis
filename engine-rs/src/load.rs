@@ -14,7 +14,7 @@
 use std::collections::{HashMap, HashSet};
 
 use base64::Engine;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use serde_json::{json, Map, Value};
 
 use crate::clock::{CalendarKind, Clock, GameMode};
