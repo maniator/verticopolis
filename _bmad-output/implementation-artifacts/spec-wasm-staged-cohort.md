@@ -184,8 +184,8 @@ The size gate is not in this table: it acts at a tower load (below).
 - **Not latched:** a clean attach refusal (`attach-refused` or
   `package-mismatch`). Under the cohort the page life should still stay on
   TypeScript after it (rule 4 below), and the next page life follows the
-  policy. The host does not hold the page life yet: deferred to #1258,
-  before any stage above 0.
+  policy. The refusal hands the app the TypeScript port, so the page life
+  holds (#1258).
 - **Within a page life:** after any fallback the page life stays on
   TypeScript; no later tower in it goes back to Rust.
 - **Crash-loop protection.** The marker (`vc.engineBoot`) is per page
@@ -457,9 +457,8 @@ using the opt-out count this story makes visible.
 5. Two stale crash-marker entries on one build latch `unclean-exit`; a
    second open window never counts as a crash.
 6. A page life never returns to Rust after a fallback or a size-gated
-   tower. (A clean attach refusal does not hold this yet: the host leaves
-   hosting on, so a later tower in that page life is offered to Rust again.
-   Deferred to #1258, before any stage above 0.)
+   tower. (A clean attach refusal holds it too: the app keeps the
+   TypeScript port it was handed, and every later tower loads through it, #1258.)
 7. A tower above the threshold, at the first tower, a Load or an import,
    runs on TypeScript with the notice and `size_gated`; one that grew past
    it switches at its next Load or import; an undo restore is never gated.

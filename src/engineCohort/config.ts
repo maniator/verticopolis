@@ -37,8 +37,10 @@ export const SIZE_GATE_THRESHOLD: number | null = null;
 export const SIZE_GATE_BUILT = false;
 
 /** Whether a clean attach refusal keeps the rest of the page life on
- *  TypeScript under the cohort (#1258). The PR that fixes it flips this. */
-export const REFUSAL_HOLDS_PAGE_LIFE = false;
+ *  TypeScript under the cohort (#1258). It does: the refusal hands the app the
+ *  TypeScript port, every later Load, import and New goes through that port,
+ *  and `rustPageLife.guard.test.ts` keeps the boot the only way into Rust. */
+export const REFUSAL_HOLDS_PAGE_LIFE = true;
 
 /** Whether `engine_status` rows carry the cohort's fields and #1090's
  *  `attempt` and `engaged` rows. On since the owner approved the analytics

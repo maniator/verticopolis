@@ -29,9 +29,9 @@ describe("the cohort config", () => {
     expect(shipsBlind({ share: 0, telemetry: false, refusalHolds: false, gated: false, gateBuilt: false, threshold: null })).toBe(false);
   });
 
-  it("flags every stage above 0 in today's build", () => {
-    for (const stage of [1, 2, 3] as const) {
-      expect(shipsBlind({ share: STAGE_SHARE[stage], telemetry: COHORT_TELEMETRY, refusalHolds: REFUSAL_HOLDS_PAGE_LIFE, gated: SIZE_GATED_STAGES.includes(stage), gateBuilt: SIZE_GATE_BUILT, threshold: SIZE_GATE_THRESHOLD })).toBe(true);
-    }
+  it("flags only the gated stage that lacks its size gate in today's build", () => {
+    const blind = ([1, 2, 3] as const).filter((stage) =>
+      shipsBlind({ share: STAGE_SHARE[stage], telemetry: COHORT_TELEMETRY, refusalHolds: REFUSAL_HOLDS_PAGE_LIFE, gated: SIZE_GATED_STAGES.includes(stage), gateBuilt: SIZE_GATE_BUILT, threshold: SIZE_GATE_THRESHOLD }));
+    expect(blind).toEqual([2]);
   });
 });

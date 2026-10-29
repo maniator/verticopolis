@@ -271,6 +271,10 @@ describe("bootGame engine", () => {
     expect(create.mock.calls[0][0]).toMatchObject({ port: { engine: "ts" }, corrupt: false });
     expect(published()).toBeUndefined();
     expect(bootState()).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", reason: "attach-refused", message: expect.stringContaining("not a tower") } });
+    // The page life holds the TypeScript port (#1258): the app loads, imports
+    // and starts every later tower on it, and the Rust boot ran once.
+    expect(rustBootTower).toHaveBeenCalledTimes(1);
+    expect(tsBootTower).toHaveBeenCalledTimes(1);
     expect(await SaveGame.export(saveOf(new Simulation(1)))).toMatch(/^VCTOWER1\n/);
     expect(encodeVctower).not.toHaveBeenCalled();
   });
