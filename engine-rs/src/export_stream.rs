@@ -88,8 +88,10 @@ struct Top {
     carries_founder: bool,
 }
 
-/// The text's length, which the buffer is reserved to: a save the game writes
-/// is already compact, and its values take no more room than its text.
+/// The text's length, which the buffer is reserved to. It is only a hint: the
+/// values of a compact save take about as much room as its text, a few
+/// numbers JavaScript spells longer (`1e21` is `1e+21`) can make the buffer
+/// regrow once, and nothing about the bytes depends on it.
 struct TopVisitor(usize);
 
 impl<'de> Visitor<'de> for TopVisitor {
