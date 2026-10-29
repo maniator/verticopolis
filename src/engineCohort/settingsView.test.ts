@@ -28,6 +28,11 @@ describe("engineSettingsView while only a choice boots Rust", () => {
     expect(v.note).toBeNull();
     expect(v.restart).toBe(true);
   });
+
+  it("lets the cohort's draw run Rust: Automatic on the WASM arm stays there with nothing to explain", () => {
+    const v = engineSettingsView(input({ rustOnlyByChoice: true, running: "wasm", selection: sel({ selectedBy: "cohort", assignedArm: "wasm", requested: "wasm", boot: "wasm" }) }));
+    expect(v).toMatchObject({ choice: "auto", running: "Rust engine", note: null, restart: false });
+  });
 });
 
 describe("engineSettingsView", () => {

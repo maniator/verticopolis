@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.58.0
+
+- Some players on the Automatic engine setting now run the new Rust engine as part of a test. You can change this in Settings.
+
 ## 2.57.1
 
 - The game now opens offline again after your browser clears its saved copy, once you have visited it online.
