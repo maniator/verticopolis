@@ -1,10 +1,10 @@
 //! The engine library stays a library any host can link: no file, network,
 //! process, environment, console or clock access in the simulation, nothing
-//! from the JavaScript binding outside `src/wasm.rs`, and nothing compiled in
-//! from the web game's tree. A native host, the WASM binding and the referee
-//! all link the same code, so a dependency on any of these would tie every
-//! frontend to one host. `engine-rs/API.md` states the rule; this test holds
-//! it.
+//! from the JavaScript binding outside `src/wasm.rs` and `src/wasm/`, and
+//! nothing compiled in from the web game's tree. A native host, the WASM
+//! binding and the referee all link the same code, so a dependency on any of
+//! these would tie every frontend to one host. `engine-rs/API.md` states the
+//! rule; this test holds it.
 //!
 //! Test code (`#[cfg(test)]` items and the files they pull in with `#[path]`)
 //! and the binaries under `src/bin/` may read files: they are the referee and
@@ -46,16 +46,21 @@ fn the_library_uses_no_host_service() {
     );
 }
 
+/// The binding is `src/wasm.rs` and its child modules in `src/wasm/`.
+fn is_binding_file(name: &str) -> bool {
+    name == "src/wasm.rs" || name.starts_with("src/wasm/")
+}
+
 #[test]
 fn the_javascript_binding_stays_in_wasm_rs() {
     let found: Vec<String> = library_sources()
         .into_iter()
-        .filter(|(name, lib)| name != "src/wasm.rs" && has(&squeeze(&lib.code), "wasm_bindgen"))
+        .filter(|(name, lib)| !is_binding_file(name) && has(&squeeze(&lib.code), "wasm_bindgen"))
         .map(|(name, _)| name)
         .collect();
     assert!(
         found.is_empty(),
-        "wasm_bindgen outside src/wasm.rs: {found:?}"
+        "wasm_bindgen outside src/wasm.rs and src/wasm/: {found:?}"
     );
     let text = std::fs::read_to_string(crate_dir().join("src/lib.rs"))
         .expect("lib.rs")

@@ -25,7 +25,7 @@ must reproduce every pinned checkpoint hash (`expected.json`) byte for byte.
 | `tdt/` (`byte_reader.rs`, `byte_writer.rs`, `format.rs`, `types.rs`, `tables.rs`, `parse.rs`, `part_merge.rs`, `transports.rs`, `tail.rs`, `stamp.rs`, `pacing.rs`, `import.rs`, `import_report.rs`, `export_tables.rs`, `export_gather.rs`, `export_parking.rs`, `encoder.rs`, `export.rs`, `export_report.rs`), `tdt/referee.rs`, `bin/tdt.rs` | `src/storage/tdt*.ts` (the 1994 `.TDT` importer and exporter; `timePacing.ts` for the frame clock), `src/tests/integration/tdtCases.integration.test.ts` |
 | `catalog.rs` | `catalog.ts`: the reference data a frontend reads (see The catalog) |
 | `frame.rs`, `snapshot.rs` | `src/wasmhost/frameView.ts` decodes the frame; `src/engine/conformanceView.ts` (`stateView`): the per-frame read model and the hashed snapshot a host reads, with or without the binding |
-| `wasm.rs` (feature `wasm`) | the JavaScript binding; `src/tests/conformance/wasmEngine.ts`, `src/dualrun/` and the `.TDT` differential test (`src/tests/conformance/tdtDifferential.ts`, inputs from `src/tests/fixtures/tdtDifferentialInputs.ts`) and the `.vctower` writer test (`src/tests/integration/conformanceWasmVctower.integration.test.ts`) drive it |
+| `wasm.rs` and `wasm/` (feature `wasm`) | the JavaScript binding; `src/tests/conformance/wasmEngine.ts`, `src/dualrun/` and the `.TDT` differential test (`src/tests/conformance/tdtDifferential.ts`, inputs from `src/tests/fixtures/tdtDifferentialInputs.ts`) and the `.vctower` writer test (`src/tests/integration/conformanceWasmVctower.integration.test.ts`) drive it |
 
 Functions keep the names and shape of their TypeScript originals so the two
 can be read side by side. Where JavaScript semantics matter for the hash

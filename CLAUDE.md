@@ -83,7 +83,7 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   --check` and `cargo clippy -D warnings` (`engine-rs.yml`), and the engine
   boundary rules to `engine-rs/tests/independence.rs`, which keeps the simulation
   free of host access (files, network, console, clock; a few named referee
-  functions may read fixtures) and the JavaScript binding inside `src/wasm.rs`.
+  functions may read fixtures) and the JavaScript binding inside `src/wasm.rs` and `src/wasm/`.
 - **Bump `package.json` `version` on any player-facing change**, keyed to "would a
   player notice anything different?": **major** for a save/compat break or a
   headline milestone, **minor** as the default for anything a player notices,

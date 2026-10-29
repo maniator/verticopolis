@@ -23,4 +23,3 @@ src/tests/integration/gameControllers.integration.test.ts
 src/engine/Tower.test.ts
 src/tests/integration/calendar.integration.test.ts
 # engine-rs (Rust, guarded from 2026-10-14; inline test modules count)
-engine-rs/src/wasm.rs
