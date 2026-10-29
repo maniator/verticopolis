@@ -53,7 +53,7 @@ fn the_record_holds_every_field() {
     assert_eq!(v["saveVersion"], 7);
     assert_eq!(v["oldestSaveVersion"], 1);
     assert_eq!(v["frameLayoutVersion"], 1);
-    assert_eq!(v["catalogVersion"], 1);
+    assert_eq!(v["catalogVersion"], CATALOG_VERSION);
     assert_eq!(
         v["catalogDigests"]["classic"],
         catalog_digest(GameMode::Classic)

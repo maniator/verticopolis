@@ -39,7 +39,7 @@ use crate::sim::STARTING_MONEY;
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 1;
+pub const CATALOG_VERSION: u32 = 2;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -233,6 +233,13 @@ pub struct FacilityEntry {
     pub spend_per_customer: Option<f64>,
     /// A service facility's monthly maintenance, or null.
     pub upkeep_monthly: Option<f64>,
+    /// Whether it is open in each hour of the day, 0 to 23, for a kind that
+    /// keeps business hours (`hasBusinessHours`), else null (always open).
+    pub open_hours: Option<Vec<bool>>,
+    /// Whether a unit may carry its own household size (`residents`), which
+    /// then stands in for `population`; a condo's price scales with it
+    /// against the condo's `population` (`householdPrice`).
+    pub own_household: bool,
 }
 
 /// How the player prices a kind: a ladder of fixed rungs (Classic) or a
@@ -396,6 +403,10 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
             .and(commercial_daily_income(mode, kind))
             .and_then(|_| retail_spend_per_customer(kind)),
         upkeep_monthly: service_maintenance_monthly(kind),
+        open_hours: kind
+            .has_business_hours()
+            .then(|| (0..24).map(|hour| kind.is_open_at(hour)).collect()),
+        own_household: kind.has_household(),
     }
 }
 

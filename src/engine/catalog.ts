@@ -22,7 +22,9 @@ import {
   POOLED_CAPS,
   buildMinutes,
   facilityFloors,
+  hasBusinessHours,
   isElevatorKind,
+  isOpenAt,
   isFixedSpanTransport,
   isHotelKind,
   maxCarsFor,
@@ -30,6 +32,7 @@ import {
   transportCarCapacity,
 } from "./facilities";
 import { REAL_WORLD, resolveCalendar, type CalendarKind } from "./calendar";
+import { hasOwnHousehold } from "./census";
 import { makeRules } from "./gameRules";
 import { priceNeutral } from "./pricing";
 import { isRentalKind } from "./residentialRentals";
@@ -118,6 +121,8 @@ function facilityEntry(mode: GameMode, rules: ReturnType<typeof makeRules>, kind
     spendPerCustomer:
       subtypes && rules.commercialDailyIncome(kind) !== undefined ? (ECON.retailSpendPerCustomer[kind] ?? null) : null,
     upkeepMonthly: ECON.serviceMaintenanceMonthly[kind] ?? null,
+    openHours: hasBusinessHours(kind) ? Array.from({ length: 24 }, (_, hour) => isOpenAt(kind, hour)) : null,
+    ownHousehold: hasOwnHousehold(kind),
   };
 }
 

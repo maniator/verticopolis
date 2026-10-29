@@ -1,5 +1,6 @@
 import { ECON, PRICED_KINDS } from "./econConfig";
 import { FACILITIES } from "./facilitiesData";
+import { rungFor } from "./catalogTypes";
 
 /**
  * The Classic/Modern pricing split's SHAPE layer (gdd-classic-modern-pricing-
@@ -143,23 +144,12 @@ export function priceNeutral(opts: PriceOptions): number {
  * or non-finite can survive a snap.
  */
 export function snapToLadder(rungs: readonly PriceRung[], value: number): number {
-  if (!Number.isFinite(value)) return rungs[2].value;
-  let best = rungs[0].value;
-  let bestDist = Infinity;
-  for (const r of rungs) {
-    const d = Math.abs(value - r.value);
-    // `<=` so an exact tie prefers the LATER (higher) rung: ties round up.
-    if (d <= bestDist) {
-      bestDist = d;
-      best = r.value;
-    }
-  }
-  return best;
+  return rungFor(rungs, value).value;
 }
 
 /** The rung a value sits on (nearest, ties up), for readouts that name the
- *  level (the picker's selection, the locked sold-condo rung, announce copy). */
+ *  level (the picker's selection, the locked sold-condo rung, announce copy).
+ *  A frontend reads the same rule off the catalog's rungs (`rungFor`). */
 export function ladderRungFor(rungs: readonly PriceRung[], value: number): PriceRung {
-  const snapped = snapToLadder(rungs, value);
-  return rungs.find((r) => r.value === snapped) ?? rungs[2];
+  return rungFor(rungs, value);
 }

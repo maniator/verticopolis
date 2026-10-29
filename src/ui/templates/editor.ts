@@ -1,14 +1,8 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { keyed } from "lit-html/directives/keyed.js";
 import { isOperational, isTenanted } from "../../engine/types";
-import {
-  isCommercialKind,
-  isHotelKind,
-  isOpenAt,
-  residentCount,
-} from "../../engine/facilities";
-import { householdPrice, ladderRungFor } from "../../engine/gameRules";
-import { catalogFacility, type Catalog } from "../../engine/catalogTypes";
+import { isCommercialKind, isHotelKind } from "../../engine/facilities";
+import { catalogFacility, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../engine/catalogTypes";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
 import { priceOptionsFor } from "../catalogPricing";
 import { isRentalKind } from "../../engine/residentialRentals";
@@ -82,10 +76,10 @@ export function unitEditorTemplate(
   // unit's real occupancy (a Modern condo's household, the flat catalog value
   // for the rest), never a bare `5/3` for a big family.
   if (isCommercialKind(u.kind) && f.population > 0) {
-    const closed = isTenanted(u) && !isOpenAt(u.kind, hour);
+    const closed = isTenanted(u) && !catalogOpenAt(f, hour);
     rows.push(kv("Customers", `${u.customersIn ?? 0}${closed ? " (closed)" : ""}`, "customers"));
   } else if (f.population) {
-    rows.push(kv("Occupants", `${u.occupants}/${residentCount({ kind: u.kind, residents: u.residents ?? undefined })}`, "occupants"));
+    rows.push(kv("Occupants", `${u.occupants}/${catalogResidents(f, u.residents)}`, "occupants"));
   }
   // On mobile the folded-in diagnostics carry the richer access reachability
   // line, so the plain Yes/No row would duplicate it: drop it there. But keep
@@ -128,7 +122,7 @@ export function unitEditorTemplate(
     // where the price normally shows for a unit taken off the market.
     const rent = u.noRate
       ? "No Rate"
-      : `$${(u.kind === "condo" ? householdPrice(u.price, u.residents ?? undefined) : u.price).toLocaleString()}${isHotelKind(u.kind) ? "/night" : ""}`;
+      : `$${(u.kind === "condo" ? catalogHouseholdPrice(catalog, u.price, u.residents) : u.price).toLocaleString()}${isHotelKind(u.kind) ? "/night" : ""}`;
     rows.push(kv(label, rent, "rent"));
   }
   if (u.kind === "cinema" && isOperational(u)) {
@@ -161,7 +155,7 @@ export function unitEditorTemplate(
   const priceShape = priceOptionsFor(catalog, u.kind);
   if (priceShape?.shape === "ladder") {
     const locked = u.kind === "condo" && u.everOccupied;
-    const current: RungChoice = u.noRate ? "noRate" : ladderRungFor(priceShape.rungs, u.price).level;
+    const current: RungChoice = u.noRate ? "noRate" : rungFor(priceShape.rungs, u.price).level;
     let ariaLabel = "Rent level";
     if (u.kind === "condo") ariaLabel = "Sale price level";
     else if (isHotelKind(u.kind)) ariaLabel = "Room rate level";
