@@ -31,7 +31,6 @@ engine-rs/src/economy.rs
 engine-rs/src/facilities.rs
 engine-rs/src/fflate.rs
 engine-rs/src/gameplay.rs
-engine-rs/src/load.rs
 engine-rs/src/satisfaction.rs
 engine-rs/src/scenario.rs
 engine-rs/src/services.rs

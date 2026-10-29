@@ -9,7 +9,7 @@
  * - A null save is refused by both engines, and every other top-level value
  *   loads alike. The loader cases #856 and #858 added run through WASM with
  *   the rest of the table in `conformanceWasmSaves.integration.test.ts`, and
- *   natively in `load.rs` (`loader_cases`).
+ *   natively in `load/loader_cases.rs`.
  * - EX-3 (proposed): a number literal past the double range, which
  *   `JSON.parse` reads as Infinity, is refused by the engine's JSON parser
  *   and loads in TypeScript. Both sides are pinned, so a change in either
