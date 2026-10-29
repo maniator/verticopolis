@@ -820,7 +820,8 @@ describe("parseTDT: golden mappings", () => {
     expect(report.couldNotBring.join(" ")).not.toMatch(/rebuilt from your floors/);
     expect(report.broughtOver.join(" ")).toMatch(/parking stall/);
     expect(report.broughtOver.join(" ")).toMatch(/Rent levels/);
-    expect(report.couldNotBring.join(" ")).toMatch(/twin room/i);
+    expect(report.broughtOver.join(" ")).toMatch(/Of those, \d+ (are twin rooms|is a twin room), which (are|is a) Double Rooms? here/);
+    expect(report.couldNotBring.join(" ")).not.toMatch(/twin room/i);
     // The sample writes a 12-person roster; the report owns up to not carrying it.
     expect(report.couldNotBring.join(" ")).toMatch(/12 people on the save's roster/);
     expect(report.couldNotBring.join(" ")).toMatch(/aren't imported yet/);
@@ -946,6 +947,88 @@ describe("transport decode: the save's own shafts and flights", () => {
     expect(walked.stairs).toHaveLength(1);
     expect(walked.parkingConnected).toBe(302); // the tail a missized express shifts off
     expect(walked.elevators![0].serviced.filter((s) => s !== 0).length).toBe(stops.length);
+  });
+
+  it("shafts after an express sized by a rule no layout has are found by shape, with a warning", () => {
+    // A real 1997 100-floor save: two express shafts whose payload held 16
+    // per-floor entries for 11 and 12 stops. No layout predicts that, the walk
+    // lands on a non-header, and the whole table (and the stairways behind it)
+    // used to be rebuilt from the floor map. The express is 16 entries here for 8 stops.
+    const spec: TdtSpec = {
+      elevators: [
+        { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [10, 25, 40, 55, 70, 85, 99, 100], payloadFloors: 16 },
+        { type: 1, cars: 6, x: 145, bottomFloor: 10, topFloor: 24 },
+        { type: 0, cars: 8, x: 321, bottomFloor: 10, topFloor: 100, serviced: [10, 40, 70, 100], payloadFloors: 16 },
+        { type: 2, cars: 3, x: 209, bottomFloor: 39, topFloor: 54 },
+      ],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      parkingConnected: 302,
+      routingTailBytes: 20_000,
+      ffPayload: true,
+    };
+    const walked = parseTdtBinary(buildTdt(spec));
+    expect(walked.warnings).toEqual([expect.stringContaining("found by searching the file")]);
+    expect(walked.elevators!.map((e) => e.x)).toEqual([175, 145, 321, 209]);
+    expect(walked.stairs).toHaveLength(1);
+    expect(walked.parkingConnected).toBe(302);
+  });
+
+  it("empty slots skipped over by the resync are counted, so the parking block is still found", () => {
+    const spec: TdtSpec = {
+      elevators: [
+        { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [10, 25, 40, 55, 70, 85, 99, 100], payloadFloors: 16 },
+        null,
+        { type: 1, cars: 6, x: 145, bottomFloor: 10, topFloor: 24 },
+        null,
+        { type: 2, cars: 3, x: 209, bottomFloor: 39, topFloor: 54 },
+      ],
+      parkingConnected: 302,
+      routingTailBytes: 20_000,
+      ffPayload: true,
+    };
+    const walked = parseTdtBinary(buildTdt(spec));
+    expect(walked.elevators!.map((e) => e.x)).toEqual([175, 145, 209]);
+    expect(walked.parkingConnected).toBe(302);
+  });
+
+  it("a header planted inside an odd express's payload is not taken for the next shaft", () => {
+    const bytes = buildTdt({
+      elevators: [
+        { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [10, 55, 100], payloadFloors: 16 },
+        { type: 1, cars: 6, x: 145, bottomFloor: 10, topFloor: 24 },
+      ],
+      parkingConnected: 302,
+      routingTailBytes: 20_000,
+      ffPayload: true,
+    });
+    const walked = parseTdtBinary(bytes);
+    expect(walked.elevators!.map((e) => e.x)).toEqual([175, 145]);
+    // Copy the standard shaft's header into the express's payload, 7 bytes past
+    // its smallest size, at x = 500: the distance to it fits no whole floors.
+    const first = 0x230 + 120 * (6 + 188) + 4 + 512 * 18; // empty floors, no people
+    const second = first + 194 + 3140 + 348 + 324 * 16;
+    const planted = first + 194 + 3812 + 7;
+    const forged = bytes.slice();
+    forged.set(bytes.slice(second, second + 194), planted);
+    forged[planted + 62] = 500 & 0xff;
+    forged[planted + 63] = 500 >> 8;
+    const forgedWalk = parseTdtBinary(forged);
+    expect(forgedWalk.elevators!.map((e) => e.x)).toEqual([175, 145]);
+    expect(forgedWalk.parkingConnected).toBe(302);
+  });
+
+  it("an odd express with no shaft header behind it is still refused, not guessed", () => {
+    const spec: TdtSpec = {
+      elevators: [
+        { type: 0, cars: 8, x: 175, bottomFloor: 10, topFloor: 100, serviced: [10, 25, 40, 55, 70, 85, 99, 100], payloadFloors: 16 },
+      ],
+      stairs: [{ type: 1, x: 120, floor: 10 }],
+      routingTailBytes: 20_000,
+      ffPayload: true,
+    };
+    const walked = parseTdtBinary(buildTdt(spec));
+    expect(walked.elevators).toBeNull();
+    expect(walked.warnings).toEqual([expect.stringContaining("doesn't match the documented layout")]);
   });
 
   it("OUR OWN span-sized express reads correctly, stamped or not", () => {

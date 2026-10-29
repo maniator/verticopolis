@@ -18,7 +18,7 @@ import type { FacilityKind } from "../engine/types";
  */
 export const TENANT_KIND: Readonly<Record<number, FacilityKind>> = {
   3: "hotelSingle",
-  4: "hotelDouble", // the original's "twin"; closest match, reported as lossy
+  4: "hotelDouble", // the original's "twin": our Double Room has the same width and guests
   5: "hotelSuite",
   6: "restaurant",
   7: "office",
