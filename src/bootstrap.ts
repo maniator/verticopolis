@@ -403,7 +403,9 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // A wasm-only build stopped at that crash and runs no TypeScript.
       try {
         const offered = !__WASM_ONLY__ && !onRust && canReportCrash(app) && offerRustCrashReport(app, __APP_SHA__);
-        const notice = offered ? null : stageNotice();
+        // The size gate's notice, for a tower it moved off the Rust engine (#1197).
+        const gatedOff = facts.sizeGated && facts.requested !== "ts" ? "This tower is larger than the Rust engine test covers yet, so it runs on the TypeScript engine." : null;
+        const notice = offered ? null : (gatedOff ?? stageNotice());
         if (notice) app.ui?.toast?.(notice);
       } catch (e) {
         console.error("[engine] could not show the engine test notice:", e);

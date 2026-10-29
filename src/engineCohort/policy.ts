@@ -117,6 +117,9 @@ export interface Selection {
   /** Rust was chosen, but this tab's Rust engine crashed `CRASH_LOOP_PAGES`
    *  times on this build (`crashReload.ts`), so the boot runs TypeScript. */
   heldAfterCrashes?: true;
+  /** The size gate held this boot's tower on TypeScript (#1197). Set in both
+   *  arms, so the arms stay comparable; only the WASM arm's engine moves. */
+  sizeGated?: true;
 }
 
 const CHOICES: readonly string[] = ["ts", "wasm", "wasm-frame", "wasm-worker"];

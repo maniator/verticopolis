@@ -138,10 +138,11 @@ error does; see above.)
 | `assigned_arm` | `wasm`, `ts`, `unassigned`, `none` | The cohort's arm at this build's stage: `wasm` when the stored random bucket is below the stage's share. A setting, a URL, a suppression or the size gate never changes it. `unassigned`: the draw runs but storage cannot keep the bucket. `none`: the draw is off (tooling, dev, a wasm-only build). The bucket's number is never sent |
 | `selected_by` | `default`, `cohort`, `setting`, `url`, `safety-build`, `safety-device` | Which policy rule chose `engine_requested`. `setting` and `url` are manual overrides (`setting` covers any stored choice). `safety-build`: a package that failed to load, timed out or did not match, cleared on the next build. `safety-device`: a fault (a trap, a host start failure, a crash loop), kept until the player retries in Settings |
 | `engaged_by` | `command`, `play` | Only on `engaged` rows: which branch engaged the page life. Absent reads as `none` |
+| `size_gated` | `true` | Only on the rows of a page life the size gate held on TypeScript (#1197): a cohort-drawn tower above the threshold at a gated stage, measured the same way in both arms. Sent only once the owner turns the gate on (`SIZE_GATE_ON`, off in this build). Absent reads as false |
 
-**Planned, not collected yet.** The size gate adds `size_gated` and
-`trigger: size-gate` once stage 2's gate is built (stage 1 runs without one,
-the owner's decision of 2026-10-29). A safety suppression is read from
+**Planned, not collected yet.** The size gate's `size_gated` is built behind
+its flag (above); `trigger: size-gate` comes with the gate on a later Load or
+import (stage 1 runs without a gate, the owner's decision of 2026-10-29). A safety suppression is read from
 `selected_by`, so no `safety_suppressed` field is sent. #954 adds `divergence_reports`, a count of commands the
 engine refused after the TypeScript instance accepted them (the report moved
 there from #874). #1090's `attempt` and `engaged` rows are in the table above and go out with

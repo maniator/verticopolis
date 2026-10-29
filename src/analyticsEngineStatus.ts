@@ -79,6 +79,7 @@ export const ENGINE_STATUS_FIELDS = [
   "assigned_arm",
   "selected_by",
   "engaged_by",
+  "size_gated",
 ] as const satisfies readonly (keyof GameplayEvents["engine_status"])[];
 type MissingField = Exclude<keyof GameplayEvents["engine_status"], (typeof ENGINE_STATUS_FIELDS)[number]>;
 const everyField: [MissingField] extends [never] ? true : MissingField = true;
@@ -112,6 +113,8 @@ export interface EngineSettle {
   crashLoop?: boolean;
   /** The boot could not write its crash marker and runs TypeScript (`marker-blocked`). */
   markerBlocked?: boolean;
+  /** The size gate held this page life's tower on TypeScript (#1197). */
+  sizeGated?: boolean;
 }
 
 /** The boot stage of a failure, as analytics names it. A failure the settle
@@ -134,6 +137,7 @@ interface Status {
   stage: FallbackStage;
   fallbacks: number;
   cohort?: CohortFields;
+  sizeGated?: true;
 }
 
 let status: Status | null = null;
@@ -169,6 +173,7 @@ function send(s: Status, trigger: EngineStatusTrigger, engagedBy?: EngagedBy): v
   trackEvent("engine_status", {
     ...(cohortRows.on ? (s.cohort ?? cohortFields(null)) : {}),
     ...(engagedBy ? { engaged_by: engagedBy } : {}),
+    ...(s.sizeGated ? { size_gated: true } : {}),
     trigger,
     engine_requested: s.requested,
     engine: s.engine,
@@ -205,11 +210,11 @@ export const cohortRows = { on: COHORT_TELEMETRY };
 /** Boot has chosen the engine and the package has not loaded yet: send the
  *  page life's `attempt` row (#1090), so a tab that closes or crashes during
  *  the load is still counted. Once per page life, outside the cap. */
-export function noteEngineAttempt(attempt: { build: EngineBuild; requested: EngineChoice; boot?: EngineChoice; cohort?: CohortFields }): void {
+export function noteEngineAttempt(attempt: { build: EngineBuild; requested: EngineChoice; boot?: EngineChoice; cohort?: CohortFields; sizeGated?: boolean }): void {
   if (!cohortRows.on || attemptSent) return;
   attemptSent = true;
   const { build, requested, cohort } = attempt;
-  send({ build, requested, engine: engineKind(build, attempt.boot ?? requested, false), reason: "none", stage: "none", fallbacks: 0, cohort }, "attempt");
+  send({ build, requested, engine: engineKind(build, attempt.boot ?? requested, false), reason: "none", stage: "none", fallbacks: 0, cohort, ...(attempt.sizeGated ? { sizeGated: true as const } : {}) }, "attempt");
 }
 
 /** The page life engaged (`analyticsEngagement.ts`): send its `engaged` row,
@@ -240,6 +245,7 @@ export function noteEngineSettled(settle: EngineSettle): void {
     stage: settle.failure ? STAGE_OF_BOOT[settle.failure.stage] : "none",
     fallbacks: failed ? 1 : 0,
     cohort: settle.cohort,
+    ...(settle.sizeGated ? { sizeGated: true as const } : {}),
   };
   reasonsSent.add(status.reason);
   send(status, "settle");

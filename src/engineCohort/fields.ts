@@ -40,5 +40,5 @@ function wireSelection(sel: Pick<Selection, "selectedBy" | "suppression">): Wire
  *  fields, whether the boot found a crash loop, and whether it could not write
  *  its crash marker. */
 export function selectionFacts(boot: EngineChoice, sel: Selection | null) {
-  return { requested: sel?.requested ?? boot, boot, cohort: cohortFields(sel), crashLoop: sel?.crashLoop === true, markerBlocked: sel?.markerBlocked === true };
+  return { requested: sel?.requested ?? boot, boot, cohort: cohortFields(sel), crashLoop: sel?.crashLoop === true, markerBlocked: sel?.markerBlocked === true, sizeGated: sel?.sizeGated === true };
 }

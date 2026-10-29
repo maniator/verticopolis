@@ -22,20 +22,34 @@ export const COHORT_STAGE: CohortStage = 1;
 /** The WASM arm's share of buckets (0 to 99) at each stage, in percent. */
 export const STAGE_SHARE: Readonly<Record<CohortStage, number>> = { 0: 0, 1: 10, 2: 25, 3: 50 };
 
-/** The stages that run the size gate. Stage 2 only: the owner decided stage 1
- *  runs with no size gate, so towers of every size get the Rust engine there
- *  ("Yes no gate", 2026-10-29 00:46 UTC, replacing plan 4.1's gate from stage
- *  1). Stage 2 keeps the gate until he decides otherwise, and `shipsBlind`
- *  requires it, with its threshold, before stage 2 can ship. */
-export const SIZE_GATED_STAGES: readonly CohortStage[] = [2];
+/** The stages that run the size gate: none. The owner decided stage 1 runs
+ *  with no size gate ("Yes no gate", 2026-10-29 00:46 UTC, replacing plan
+ *  4.1's gate from stage 1), then stage 2 too ("No gate at stage 2", decision
+ *  card, 2026-10-29 16:07 UTC), so towers of every size get the Rust engine.
+ *  The gate stays built behind `SIZE_GATE_ON`; naming a stage here makes
+ *  `shipsBlind` require the flag and a threshold before that stage ships. */
+export const SIZE_GATED_STAGES: readonly CohortStage[] = [];
 
-/** The size above which a tower stays on TypeScript while the gate runs.
- *  `null` until the owner picks stage 2's gate rule and threshold. No gate
- *  runs in this build: `SIZE_GATE_BUILT` says when one does. */
+/** The size above which a tower stays on TypeScript while the gate runs:
+ *  the stored save's length in characters, decoded, read the same way in both
+ *  arms (`storedSaveChars`). `null`: no stage runs the gate. */
 export const SIZE_GATE_THRESHOLD: number | null = null;
 
-/** Whether this build has the size gate (#1197). The PR that adds it flips this. */
-export const SIZE_GATE_BUILT = false;
+/** Whether this build has the size gate (#1197). */
+export const SIZE_GATE_BUILT = true;
+
+/** The size gate's feature flag (owner, 2026-10-29: "keep it behind a feature
+ *  flag"). Off: no tower is gated and no row says `size_gated`, at any stage.
+ *  Turning it on, with a threshold, is the owner's call. */
+export const SIZE_GATE_ON = false;
+
+/** Whether the size gate holds a tower of `saveChars` on TypeScript: the
+ *  flag is on, the stage is one of `gatedStages`, the cohort's draw chose the engine (a
+ *  Settings choice or a link is never gated) and the save is above the
+ *  threshold. Read the same way in both arms, so the arms stay comparable. */
+export function sizeGateHolds(c: { on: boolean; gatedStages: readonly CohortStage[]; stage: CohortStage; selectedBy: string | undefined; saveChars: number; threshold: number | null }): boolean {
+  return c.on && c.threshold !== null && c.gatedStages.includes(c.stage) && c.selectedBy === "cohort" && c.saveChars > c.threshold;
+}
 
 /** Whether a clean attach refusal keeps the rest of the page life on
  *  TypeScript under the cohort (#1258). It does: the refusal hands the app the
@@ -64,11 +78,11 @@ export const RUST_ONLY_BY_CHOICE = !__TOOLING_BUILD__;
 
 /** True when a build would put browsers on Rust through the cohort before
  *  everything stage 1 needs is in it: the cohort's fields, #1258's page-life
- *  hold and, at a stage that runs the size gate (stage 2 only), the gate with
- *  its threshold.
+ *  hold and, at a stage that runs the size gate (stage 2 only), the gate
+ *  switched on with its threshold.
  *  `config.test.ts` fails CI where this holds, so a one-line promotion cannot
  *  ship ahead of them. */
-export function shipsBlind(c: { share: number; telemetry: boolean; refusalHolds: boolean; gated: boolean; gateBuilt: boolean; threshold: number | null }): boolean {
+export function shipsBlind(c: { share: number; telemetry: boolean; refusalHolds: boolean; gated: boolean; gateBuilt: boolean; gateOn: boolean; threshold: number | null }): boolean {
   if (c.share <= 0) return false;
-  return !c.telemetry || !c.refusalHolds || (c.gated && (!c.gateBuilt || c.threshold === null));
+  return !c.telemetry || !c.refusalHolds || (c.gated && (!c.gateBuilt || !c.gateOn || c.threshold === null));
 }
