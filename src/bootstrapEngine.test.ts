@@ -289,11 +289,11 @@ describe("bootGame engine", () => {
 
 const lastRow = (xs: Record<string, unknown>[]): Record<string, unknown> | undefined => xs[xs.length - 1];
 
-/** Every `engine_status` row the relay saw, in order. */
-const engineRows = (): Record<string, unknown>[] =>
+/** Every `engine_status` row the relay saw, in order; `attempt` rows only with `all`. */
+const engineRows = (all = false): Record<string, unknown>[] =>
   vi
     .mocked(sendToRelay)
-    .mock.calls.filter(([name]) => name === "engine_status")
+    .mock.calls.filter(([name, props]) => name === "engine_status" && (all || (props as { trigger?: string }).trigger !== "attempt"))
     .map(([, props]) => props as Record<string, unknown>);
 
 /**
@@ -323,6 +323,7 @@ describe("bootGame engine_status", () => {
     stubWebGL();
     await boot();
     expect(engineRows()).toEqual([expect.objectContaining({ trigger: "settle", engine_requested: "ts", engine: "ts", build: "switchable", fallback_reason: "none", fallbacks: 0 })]);
+    expect(engineRows(true).map((r) => r.trigger)).toEqual(["attempt", "settle"]);
   });
 
   it("reports a package that failed to load by its code, with none of the message", async () => {

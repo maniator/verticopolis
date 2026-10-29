@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.56.0
+
+- Help's Privacy section now lists what the game reports when you are part of an engine test.
+
 ## 2.54.5
 
 - On a phone, Settings no longer shows a stray line of text under the Close button as you scroll.

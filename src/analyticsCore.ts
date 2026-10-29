@@ -2,8 +2,9 @@ import { analyticsAdapter, type EventProps } from "./analyticsAdapter";
 import { APP_VERSION } from "./appVersion";
 import { telemetryHostAllowed } from "./telemetry";
 import type { EngagedBy } from "./analyticsEngagement";
-import type { EngineBuild, EngineKind, EngineStatusTrigger } from "./analyticsEngineStatus";
-import type { FallbackReason, FallbackStage } from "./wasmhost/engineBoot";
+import type { EngineBuild, EngineKind, EngineStatusReason, EngineStatusTrigger } from "./analyticsEngineStatus";
+import type { CohortFields } from "./engineCohort/fields";
+import type { FallbackStage } from "./wasmhost/engineBoot";
 import type { EngineChoice } from "./wasmhost/engineChoice";
 
 /**
@@ -221,13 +222,17 @@ export interface GameplayEvents {
     engine_requested: EngineChoice;
     engine: EngineKind;
     build: EngineBuild;
-    fallback_reason: FallbackReason;
+    fallback_reason: EngineStatusReason;
     fallback_stage: FallbackStage;
     fallbacks: number;
     writer_latched: boolean;
     page_life: string;
     version: string;
     sha: string;
+    /** The cohort's fields (A4), on every row once they ship. */
+    stage?: CohortFields["stage"];
+    assigned_arm?: CohortFields["assigned_arm"];
+    selected_by?: CohortFields["selected_by"];
     /** Only on `engaged` rows (#1090). */
     engaged_by?: EngagedBy;
   };

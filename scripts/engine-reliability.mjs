@@ -124,7 +124,7 @@ export const HOSTS = ["wasm", "wasm-frame", "wasm-worker"];
 export const BUILDS = ["switchable", "wasm-only"];
 /** Every `engine` value the game sends (`src/analyticsEngineStatus.ts`). */
 export const ENGINE_KINDS_SENT = ["ts", "wasm", "wasm-frame", "wasm-worker", "ts-fallback", "none"];
-export const REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other"];
+export const REASONS = ["none", "boot-timeout", "boot-error", "package-mismatch", "unverifiable", "attach-refused", "trap-command", "trap-tick", "trap-undo", "other", "unclean-exit"];
 
 /** A build's commit (`git rev-parse --short`, or `unknown` outside a checkout)
  *  and version, as the game sends them. */
@@ -293,7 +293,7 @@ export const shaMatches = (sha, shas) => SHA.test(sha) && shas.some((s) => SHA.t
  *  sends them; the change that ships them binds these lists to the source. */
 export const STAGES = ["none", "0", "1", "2", "3"];
 export const ASSIGNED_ARMS = ["none", "wasm", "ts", "unassigned"];
-export const SELECTIONS = ["default", "cohort", "setting", "url", "safety"];
+export const SELECTIONS = ["default", "cohort", "setting", "url", "safety-build", "safety-device"];
 export const ENGAGED_BY = ["none", "command", "play"];
 
 /** Whether every value a page life carries is one the game can send. */

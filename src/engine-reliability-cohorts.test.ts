@@ -1,3 +1,6 @@
+import { STAGES as SOURCE_STAGES } from "./engineCohort/config";
+import { WIRE_SELECTIONS } from "./engineCohort/fields";
+import { ASSIGNED_ARMS as SOURCE_ARMS } from "./engineCohort/policy";
 import { describe, expect, it } from "vitest";
 // The cohorts of the governed reliability definition (#1090; the owner's
 // direction of 2026-10-20, section 5): the all-attempts safety denominator,
@@ -57,10 +60,10 @@ describe("the query's #1090 columns", () => {
 describe("the overall rate with the new fields", () => {
   it("counts an override by selected_by, under the override arm", () => {
     expect(OVERRIDE_SELECTIONS).toEqual(["setting", "url"]);
-    // The A4 spec's lists (#1197), until A4 binds them to the source.
-    expect(STAGES).toEqual(["none", "0", "1", "2", "3"]);
-    expect(ASSIGNED_ARMS).toEqual(["none", "wasm", "ts", "unassigned"]);
-    expect(SELECTIONS).toEqual(["default", "cohort", "setting", "url", "safety"]);
+    // Bound to the lists the game sends (A4), with `none` for a row without one.
+    expect(STAGES).toEqual(["none", ...SOURCE_STAGES]);
+    expect([...ASSIGNED_ARMS].sort()).toEqual([...SOURCE_ARMS].sort());
+    expect(SELECTIONS).toEqual([...WIRE_SELECTIONS]);
     expect(ENGAGED_BY).toEqual(["none", "command", "play"]);
     const lives = [life({ session: "a", selectedBy: "url" }), life({ session: "b", selectedBy: "setting" }), life({ session: "c" })];
     expect(summarizeReliability(lives)).toMatchObject({ n: 1 });
@@ -87,7 +90,7 @@ describe("eligibility", () => {
       { assignedArm: "unassigned" },
       { selectedBy: "setting" },
       { selectedBy: "url" },
-      { selectedBy: "safety" },
+      { selectedBy: "safety-device" },
       { selectedBy: "default" },
       { safetySuppressed: true },
       { sizeGated: true },
@@ -214,12 +217,12 @@ describe("the all-attempts safety denominator", () => {
 
   it("keeps opt-outs and safety suppressions in the WASM arm's row (#1197) but out of the rate's N, and not a TS-arm player's choice of TypeScript", () => {
     const c = run([
-      life({ session: "a", requested: "ts", selectedBy: "safety", safetySuppressed: true, engaged: false }),
+      life({ session: "a", requested: "ts", selectedBy: "safety-device", safetySuppressed: true, engaged: false }),
       life({ session: "b", requested: "ts", selectedBy: "setting", engaged: false }),
       life({ session: "e", requested: "ts", selectedBy: "url", engaged: false }),
       life({ session: "c", selectedBy: "setting" }),
       life({ session: "d", assignedArm: "ts", requested: "ts", selectedBy: "setting", engaged: false }),
-      life({ session: "f", requested: "ts", selectedBy: "safety", safetySuppressed: true, sizeGated: true, engaged: false }),
+      life({ session: "f", requested: "ts", selectedBy: "safety-device", safetySuppressed: true, sizeGated: true, engaged: false }),
     ]);
     // c asked for the engine (an override); a, b and e never ran it.
     expect(c.attempts).toMatchObject({ sessions: 1, movedOff: 3, overrides: 1 });
@@ -272,12 +275,12 @@ describe("the all-attempts safety denominator", () => {
 
   it("reads A4's suppressed row (the selection before safety, `selected_by: safety`) as a move off, flag or not", () => {
     const c = run([
-      life({ session: "a", selectedBy: "safety", safetySuppressed: true, engaged: false }),
-      life({ session: "b", selectedBy: "safety", engaged: false }),
+      life({ session: "a", selectedBy: "safety-device", safetySuppressed: true, engaged: false }),
+      life({ session: "b", selectedBy: "safety-device", engaged: false }),
     ]);
     expect(c.attempts).toMatchObject({ sessions: 0, movedOff: 2 });
     expect(c.attemptsWithMovedOff).toMatchObject({ n: 2, faults: 0 });
-    expect(summarizeReliability([life({ session: "b", selectedBy: "safety", engaged: false })])).toMatchObject({ n: 0, safetySuppressedPageLives: 1 });
+    expect(summarizeReliability([life({ session: "b", selectedBy: "safety-device", engaged: false })])).toMatchObject({ n: 0, safetySuppressedPageLives: 1 });
   });
 
   it("keeps a size-gated page life's engine fault in the safety denominator", () => {
@@ -296,18 +299,18 @@ describe("the all-attempts safety denominator", () => {
   });
 
   it("charges a crash loop detected after a same-tab reload to the session's cohorts, and counts one in a size-gated page life", () => {
-    const loop = { selectedBy: "safety", safetySuppressed: true, engaged: false, reasons: ["boot-error"], firstSeen: "2026-12-01 13:00:00" };
+    const loop = { selectedBy: "safety-device", safetySuppressed: true, engaged: false, reasons: ["boot-error"], firstSeen: "2026-12-01 13:00:00" };
     const c = run([life({ session: "a" }), life({ session: "a", ...loop })]);
     expect(c.eligible).toMatchObject({ n: 1, faults: 1 });
     expect(c.eligibleAttempts).toMatchObject({ n: 1, faults: 1 });
     expect(c.eligible.byBuild).toEqual([{ build: "2.50.0 (abc1234, switchable)", sessions: 1, faults: 1, upper95: upperBound(1, 1) }]);
     expect(run([life({ session: "b", engaged: false }), life({ session: "b", ...loop, sizeGated: true })]).attempts).toMatchObject({ sessions: 1, faults: 1 });
     // A suppressed fault whose reason rows were lost is still a fault.
-    expect(run([life({ session: "c", selectedBy: "safety", safetySuppressed: true, engaged: false, fallbacks: 1 })]).attempts).toMatchObject({ sessions: 1, faults: 1, movedOff: 0 });
+    expect(run([life({ session: "c", selectedBy: "safety-device", safetySuppressed: true, engaged: false, fallbacks: 1 })]).attempts).toMatchObject({ sessions: 1, faults: 1, movedOff: 0 });
   });
 
   it("keeps a crash loop on the host its row names", () => {
-    const loop = (requested: string) => life({ requested, selectedBy: "safety", safetySuppressed: true, engaged: false, reasons: ["boot-error"] });
+    const loop = (requested: string) => life({ requested, selectedBy: "safety-device", safetySuppressed: true, engaged: false, reasons: ["boot-error"] });
     const worker = run([loop("wasm-worker")]);
     expect(worker.attempts).toMatchObject({ sessions: 0, faults: 0, movedOff: 0 });
     expect(worker.uncountedHostSessions).toBe(1);
@@ -345,7 +348,7 @@ describe("the all-attempts safety denominator", () => {
 
   it("counts a crash loop a suppressed boot detected as a fault, never as a move off, and repeats it", () => {
     // `boot-error` stands in for A4's `unclean-exit` until A4 binds it.
-    const loop = (session: string) => life({ session, selectedBy: "safety", safetySuppressed: true, engaged: false, reasons: ["boot-error"] });
+    const loop = (session: string) => life({ session, selectedBy: "safety-device", safetySuppressed: true, engaged: false, reasons: ["boot-error"] });
     const c = run([life({ session: "a", engaged: false, firstSeen: "2026-12-01 11:00:00" }), loop("a"), loop("b")]);
     expect(c.attempts).toMatchObject({ sessions: 2, faults: 2, movedOff: 0 });
     expect(c.stopSignals).toEqual(["engine fault `boot-error on 2.50.0 (abc1234, switchable)` in 2 sessions"]);
@@ -381,7 +384,7 @@ describe("overridden sessions", () => {
     expect(after.eligible).toMatchObject({ n: 0, overridden: 1, overriddenFaults: 1 });
     expect(run([life({ session: "a" }), later]).eligible).toMatchObject({ overridden: 1, overriddenFaults: 0 });
     // A crash loop a suppressed boot detected is such a fault too.
-    const loop = life({ session: "b", selectedBy: "safety", safetySuppressed: true, engaged: false, reasons: ["boot-error"], firstSeen: "2026-12-01 12:30:00" });
+    const loop = life({ session: "b", selectedBy: "safety-device", safetySuppressed: true, engaged: false, reasons: ["boot-error"], firstSeen: "2026-12-01 12:30:00" });
     expect(run([life({ session: "b" }), loop, { ...later, session: "b" }]).eligible).toMatchObject({ overridden: 1, overriddenFaults: 1 });
   });
 });
@@ -433,7 +436,7 @@ describe("the pessimistic bound and the remaining columns", () => {
   });
 
   it("charges only crash loops on eligible commits to the cohort, and counts its latch-offs", () => {
-    const loop = { selectedBy: "safety", safetySuppressed: true, engaged: false, reasons: ["boot-error"], firstSeen: "2026-12-01 13:00:00" };
+    const loop = { selectedBy: "safety-device", safetySuppressed: true, engaged: false, reasons: ["boot-error"], firstSeen: "2026-12-01 13:00:00" };
     const c = run([life({ session: "a" }), life({ session: "a", sha: "def5678", ...loop })]);
     expect(c.eligible).toMatchObject({ n: 1, faults: 0 });
     expect(c.attempts.faults).toBe(1);
