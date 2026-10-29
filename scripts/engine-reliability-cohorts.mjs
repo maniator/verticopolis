@@ -459,6 +459,7 @@ export function cohortCaveats(c, meta) {
   if (!meta.eligibleShas.length) lines.push("> **No eligible commits named** (`--eligible-shas`), so nothing in this report is release evidence: every session is early telemetry.");
   if (partial(c.cohortFields)) lines.push(`> **The cohort fields are missing:** ${of(c.cohortFields)} that asked for the engine carry \`stage\` and \`assigned_arm\` (A4, #1197); the rest can never be eligible.`);
   if (partial(c.engagedRows)) lines.push(`> **Engagement is not fully measured:** ${of(c.engagedRows)} that settled on a counted host (on a named eligible commit, once commits are named) are on a build that sends an \`engaged\` row (the row waits for the owner's analytics approval), so the engaged cohort is empty or short because the row is missing, which says nothing about the engine.`);
+  if (c.unrecognizedSessions) lines.push(`> **Values the game never sends:** ${c.unrecognizedSessions} session${c.unrecognizedSessions === 1 ? " has a page life" : "s have page lives"} carrying one; each such page life is in no count below (#1248).`);
   if (partial(c.attemptRows)) lines.push(`> **Early exits are partly invisible:** ${of(c.attemptRows)} on a counted host are on a build that sends an \`attempt\` row; a tab closed or crashed while the engine loaded on a build without it is in no count.`);
   return lines;
 }

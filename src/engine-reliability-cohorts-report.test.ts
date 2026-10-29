@@ -106,6 +106,12 @@ describe("the report", () => {
     }
   });
 
+  it("names the sessions carrying a value the game never sends, above the figures (#1248)", () => {
+    const c = run([life({ session: "a" }), life({ session: "b", reasons: ["made-up"], fallbacks: 1 })]);
+    expect(c.unrecognizedSessions).toBe(1);
+    expect(cohortCaveats(c, { eligibleShas: [SHA] })).toEqual([expect.stringContaining("**Values the game never sends:** 1 session has a page life carrying one")]);
+  });
+
   it("keeps every row caveat when nothing asked for the engine", () => {
     expect(cohortCaveats(run([]), { eligibleShas: [SHA] })).toEqual([caveats[1], caveats[2], caveats[3]].map((lead) => expect.stringContaining(lead)));
   });
