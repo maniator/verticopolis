@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseUpdateInfo, isDifferentBuild, MAX_NOTE_LEN, MAX_NOTES } from "./pwaUpdateInfo";
+import { parseUpdateInfo, isDifferentBuild, classifyUpdate, withUpdateKind, MAX_NOTE_LEN, MAX_NOTES, type BuildFingerprint } from "./pwaUpdateInfo";
 
 /**
  * The pure sanitizer that bounds an incoming version.json payload before it
@@ -99,5 +99,69 @@ describe("isDifferentBuild — running vs deployed", () => {
     expect(isDifferentBuild({ version: "1.50.0", sha: "unknown", notes: [] }, "1.50.0", "unknown")).toBe(false);
     // "unknown" sha but a genuinely newer version still fires via the version fallback.
     expect(isDifferentBuild({ version: "1.51.0", sha: "unknown", notes: [] }, "1.50.0", "unknown")).toBe(true);
+  });
+});
+
+describe("classifyUpdate: game, engine or both", () => {
+  const fp = (over: Partial<BuildFingerprint["engine"]> & { shell?: string } = {}): BuildFingerprint => {
+    const { shell = "s1", ...engine } = over;
+    return { shell, engine: { crate: "0.24.0", rust: "r1", ts: "t1", ...engine } };
+  };
+
+  it("says nothing without both fingerprints, or when nothing differs", () => {
+    expect(classifyUpdate(undefined, fp())).toBeNull();
+    expect(classifyUpdate(fp(), undefined)).toBeNull();
+    expect(classifyUpdate(fp(), fp())).toBeNull();
+  });
+
+  it("calls a shell-only change a game update", () => {
+    expect(classifyUpdate(fp({ shell: "s2" }), fp())).toEqual({ kind: "game" });
+  });
+
+  it("calls a crate bump an engine update and names both versions", () => {
+    expect(classifyUpdate(fp({ crate: "0.25.0", rust: "r2" }), fp())).toEqual({
+      kind: "engine",
+      engineLine: "Rust engine 0.24.0 → 0.25.0",
+    });
+  });
+
+  it("calls a Rust rebuild without a crate bump an engine update", () => {
+    expect(classifyUpdate(fp({ rust: "r2" }), fp())).toEqual({ kind: "engine", engineLine: "Rust engine 0.24.0 (new build)" });
+  });
+
+  it("calls a TypeScript engine change an engine update", () => {
+    expect(classifyUpdate(fp({ ts: "t2" }), fp())).toEqual({ kind: "engine", engineLine: "TypeScript engine (new build)" });
+  });
+
+  it("calls a change to both the shell and an engine both", () => {
+    expect(classifyUpdate(fp({ shell: "s2", crate: "0.25.0", rust: "r2" }), fp())?.kind).toBe("both");
+  });
+
+  it("ignores an engine part either side did not report", () => {
+    expect(classifyUpdate(fp({ crate: undefined, rust: undefined }), fp())).toBeNull();
+  });
+});
+
+describe("withUpdateKind and the fingerprint in version.json", () => {
+  it("parses a bounded fingerprint and drops a malformed one", () => {
+    const ok = parseUpdateInfo({ shell: "abc", engine: { crate: "0.24.0", rust: "r", ts: "t", extra: 1 } });
+    expect(ok?.fingerprint).toEqual({ shell: "abc", engine: { crate: "0.24.0", rust: "r", ts: "t" } });
+    expect(parseUpdateInfo({ shell: "abc" })?.fingerprint).toBeUndefined();
+    expect(parseUpdateInfo({ shell: "x".repeat(65), engine: {} })?.fingerprint).toBeUndefined();
+    expect(parseUpdateInfo({ shell: "abc", engine: { crate: 5 } })?.fingerprint?.engine.crate).toBeUndefined();
+  });
+
+  it("never takes a kind or engine line from the payload", () => {
+    const info = parseUpdateInfo({ kind: "game", engineLine: "<b>hi</b>" });
+    expect(info?.kind).toBeUndefined();
+    expect(info?.engineLine).toBeUndefined();
+  });
+
+  it("fills the kind from the running build and leaves other info alone", () => {
+    const running: BuildFingerprint = { shell: "s1", engine: { ts: "t1" } };
+    const info = { version: "2.61.0", fingerprint: { shell: "s2", engine: { ts: "t1" } } };
+    expect(withUpdateKind(info, running)?.kind).toBe("game");
+    expect(withUpdateKind(info, undefined)).toBe(info);
+    expect(withUpdateKind(undefined, running)).toBeUndefined();
   });
 });

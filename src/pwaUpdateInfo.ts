@@ -8,6 +8,22 @@
  * payload.
  */
 
+/**
+ * What a build is made of, as two independent parts: the game shell (every
+ * source file outside the engines, hashed at build time) and the engines (the
+ * Rust crate version and package source hash, and the TypeScript engine's
+ * source hash). A running client compares its own fingerprint with the
+ * incoming build's to say whether an update touches the game, the engine or
+ * both. Any part may be absent (a dev build, or a package that did not report).
+ */
+export interface BuildFingerprint {
+  shell: string;
+  engine: { crate?: string; rust?: string; ts?: string };
+}
+
+/** Which part of the game an update changes. */
+export type UpdateKind = "game" | "engine" | "both";
+
 export interface UpdateInfo {
   /** The incoming build's `package.json` version, e.g. "1.1.1". */
   version?: string;
@@ -15,6 +31,60 @@ export interface UpdateInfo {
   sha?: string;
   /** Player-facing "what's new" lines (empty until the trailer harvest ships). */
   notes?: string[];
+  /** The incoming build's parts (see {@link BuildFingerprint}). */
+  fingerprint?: BuildFingerprint;
+  /** What this update changes, set by {@link withUpdateKind} from the two fingerprints. */
+  kind?: UpdateKind;
+  /** A one-line engine summary, such as "Rust engine 0.24.0 → 0.25.0", set with `kind` when an engine changed. */
+  engineLine?: string;
+}
+
+/** A fingerprint field is a short token (a version or a hex digest). */
+const MAX_FINGERPRINT_LEN = 64;
+const token = (v: unknown): string | undefined =>
+  typeof v === "string" && v.length > 0 && v.length <= MAX_FINGERPRINT_LEN ? v : undefined;
+
+function parseFingerprint(shell: unknown, engine: unknown): BuildFingerprint | undefined {
+  const s = token(shell);
+  if (!s || typeof engine !== "object" || engine === null) return undefined;
+  const e = engine as Record<string, unknown>;
+  return { shell: s, engine: { crate: token(e.crate), rust: token(e.rust), ts: token(e.ts) } };
+}
+
+const differs = (a: string | undefined, b: string | undefined): boolean => a !== undefined && b !== undefined && a !== b;
+
+/**
+ * Whether the incoming build changes the game shell, an engine, both or neither
+ * (`null`, also when either fingerprint is missing, so an older build shows the
+ * plain prompt). `engineLine` names the engine change for the player.
+ */
+export function classifyUpdate(
+  incoming: BuildFingerprint | undefined,
+  running: BuildFingerprint | undefined,
+): { kind: UpdateKind; engineLine?: string } | null {
+  if (!incoming || !running) return null;
+  const game = differs(incoming.shell, running.shell);
+  const a = running.engine;
+  const b = incoming.engine;
+  const crate = differs(a.crate, b.crate);
+  const rust = crate || differs(a.rust, b.rust);
+  const ts = differs(a.ts, b.ts);
+  if (!game && !rust && !ts) return null;
+  const lines: string[] = [];
+  if (crate) lines.push(`Rust engine ${a.crate} → ${b.crate}`);
+  else if (rust) lines.push(`Rust engine${b.crate ? ` ${b.crate}` : ""} (new build)`);
+  if (ts) lines.push("TypeScript engine (new build)");
+  const engine = rust || ts;
+  let kind: UpdateKind = "game";
+  if (engine) kind = game ? "both" : "engine";
+  return { kind, ...(lines.length > 0 ? { engineLine: lines.join(" · ") } : {}) };
+}
+
+/** `info` with its {@link UpdateKind} and engine line filled in from the running build's fingerprint. */
+export function withUpdateKind(info: UpdateInfo | undefined, running: BuildFingerprint | undefined): UpdateInfo | undefined {
+  if (!info) return info;
+  const c = classifyUpdate(info.fingerprint, running);
+  return c ? { ...info, ...c } : info;
 }
 
 /** Per-line cap: one giant unbroken token must not be able to wreck the modal
@@ -44,6 +114,7 @@ export function parseUpdateInfo(j: unknown): UpdateInfo | null {
     version: typeof o.version === "string" ? o.version : undefined,
     sha: typeof o.sha === "string" ? o.sha : undefined,
     notes,
+    fingerprint: parseFingerprint(o.shell, o.engine),
   };
 }
 

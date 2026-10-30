@@ -8,7 +8,9 @@ import { notesForVersion } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
 import { parseEngineBuild, type EngineBuild } from "./src/build/engineBundle";
 import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
+import type { BuildFingerprint } from "./src/pwaUpdateInfo";
 import { tsEngineSourceHash } from "./src/build/tsEngineSources";
+import { buildFingerprint } from "./src/build/buildFingerprint";
 import { convertedSuites } from "./src/tests/portKit/convertedList";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
@@ -131,7 +133,7 @@ function captureOutDir(set: (dir: string) => void): Plugin {
  * read from the CHANGELOG.md section matching this version (see `changelogNotes`
  * and CONTRIBUTING.md → "Player notes").
  */
-function emitVersionJson(): Plugin {
+function emitVersionJson(fingerprint: BuildFingerprint): Plugin {
   return {
     name: "emit-version-json",
     apply: "build",
@@ -139,7 +141,7 @@ function emitVersionJson(): Plugin {
       this.emitFile({
         type: "asset",
         fileName: "version.json",
-        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes(), engineBuild: ENGINE_BUILD }),
+        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes(), engineBuild: ENGINE_BUILD, shell: fingerprint.shell, engine: fingerprint.engine }),
       });
     },
   };
@@ -310,6 +312,9 @@ function wasmParityProjects() {
   ];
 }
 
+const expectedPackage = (command: "build" | "serve") => readExpectedPackage(publicDir(), command === "build" ? "build" : "other");
+const fingerprintOf = (command: "build" | "serve") => buildFingerprint(resolve(__dirname, "src"), expectedPackage(command));
+
 export default defineConfig(({ command }) => ({
   root: "src",
   publicDir: publicDir(),
@@ -344,7 +349,10 @@ export default defineConfig(({ command }) => ({
     // skip the check) and for a production build with no package folder at
     // all (VC_ALLOW_NO_ENGINE=1); a production build with a broken record
     // stops here.
-    __ENGINE_PACKAGE__: JSON.stringify(readExpectedPackage(publicDir(), command === "build" ? "build" : "other")),
+    __ENGINE_PACKAGE__: JSON.stringify(expectedPackage(command)),
+    // This build's game and engine parts, for the update prompt's label
+    // (src/pwaUpdateInfo.ts `classifyUpdate`); version.json carries the same.
+    __BUILD_FINGERPRINT__: JSON.stringify(fingerprintOf(command)),
     // The TypeScript engine's source hash (#1422), shown with its pinned
     // version (src/wasmhost/tsEngineIdentity.ts) on the version line and in
     // the diagnostics, as the Rust binary's source hash is.
@@ -354,7 +362,7 @@ export default defineConfig(({ command }) => ({
     captureOutDir((dir) => {
       builtDistDir = dir;
     }),
-    emitVersionJson(),
+    emitVersionJson(fingerprintOf(command)),
     noUnlistedPackageFiles(),
     sharedHead(),
     // Installable PWA via Workbox (vite-plugin-pwa) — no hand-rolled service

@@ -25,7 +25,8 @@ function resolveImport(from: string, spec: string): string {
   throw new Error(`${from} imports ${spec}, which the TypeScript engine's source hash cannot find; extend src/build/tsEngineSources.ts`);
 }
 
-export function tsEngineSourceHash(engineDir: string, srcDir = resolve(engineDir, "..")): string {
+/** The closure's files, as absolute paths in the order the hash reads them. */
+export function tsEngineSourceFiles(engineDir: string, srcDir = resolve(engineDir, "..")): string[] {
   const files = new Set<string>();
   const queue: string[] = [];
   const add = (p: string) => {
@@ -46,11 +47,16 @@ export function tsEngineSourceHash(engineDir: string, srcDir = resolve(engineDir
     if (!p.endsWith(".ts")) continue;
     for (const m of readFileSync(p, "utf8").matchAll(RELATIVE_IMPORT)) add(resolveImport(p, m[1]!));
   }
-  const hash = createHash("sha256");
   // Sort by the normalized path, so a Windows build hashes in the same order.
   const named = [...files].map((p) => ({ p, name: relative(srcDir, p).split("\\").join("/") }));
   named.sort((a, b) => Number(a.name > b.name) - Number(a.name < b.name));
-  for (const { p, name } of named) {
+  return named.map(({ p }) => p);
+}
+
+export function tsEngineSourceHash(engineDir: string, srcDir = resolve(engineDir, "..")): string {
+  const hash = createHash("sha256");
+  for (const p of tsEngineSourceFiles(engineDir, srcDir)) {
+    const name = relative(srcDir, p).split("\\").join("/");
     hash.update(name);
     hash.update("\0");
     hash.update(readFileSync(p));

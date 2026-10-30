@@ -18,4 +18,7 @@ declare const __WASM_ONLY__: boolean;
  *  digests of the glue and the binary, from src/public/engine/BUILD.json
  *  (see src/wasmhost/enginePackageRecord.ts). Null when the build carries no
  *  usable package. */
+/** This build's parts, for the update prompt's "game or engine" label (see
+ *  src/pwaUpdateInfo.ts and src/build/buildFingerprint.ts). */
+declare const __BUILD_FINGERPRINT__: import("./pwaUpdateInfo").BuildFingerprint;
 declare const __ENGINE_PACKAGE__: import("./wasmhost/enginePackageRecord").ExpectedEnginePackage | null;

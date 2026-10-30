@@ -1,13 +1,19 @@
 # Engine changelog
 
 Release notes for the engine crate (`engine-rs/Cargo.toml`), one `## <version>`
-section per crate version, newest first. Entries before 0.25.0 were written
-afterward from the history of the commits that raised the version, so they are
-documentation only.
+section per crate version, newest first, written for people who build on the
+engine. The player-facing notes live in [`CHANGELOG.md`](../CHANGELOG.md), one
+section per app version. A crate bump adds its section here in the same PR
+(`src/tests/engineChangelog.guard.test.ts` enforces it). Describe what changed
+in the engine's contract and behavior: saves, frame and view layouts, the
+catalog, identity, the binding, and rules. An engine change a player can feel
+also gets a line in the app changelog.
 
-Entries from 0.1.0 to 0.24.0 are short. 0.6.0 and 0.17.0 each lived on a
-branch commit that main's history does not carry as its own step, so 0.17.0 has
-no entry and 0.6.0 is listed from the commit that recorded it.
+Entries up to 0.24.0 were written afterward from the history of the commits that
+raised the version, so they are documentation only.
+
+There is no entry for 0.17.0, which only
+existed as a step inside a stacked branch.
 
 ## 0.24.0 (2026-10-29)
 

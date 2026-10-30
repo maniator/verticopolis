@@ -18,7 +18,7 @@
  * UI, or reloads on a timer.
  */
 import { registerSW } from "virtual:pwa-register";
-import { parseUpdateInfo, isDifferentBuild, type UpdateInfo } from "./pwaUpdateInfo";
+import { parseUpdateInfo, isDifferentBuild, withUpdateKind, type UpdateInfo } from "./pwaUpdateInfo";
 
 /**
  * High-level facts about the INCOMING build, read at prompt time from the
@@ -122,7 +122,7 @@ export function registerPWA(handlers: PwaHandlers): void {
     // don't replay them; show the build-id line only. A real version change keeps
     // its notes.
     const shown = info && info.version === __APP_VERSION__ ? { ...info, notes: [] } : info;
-    handlers.onUpdateAvailable(activate, shown);
+    handlers.onUpdateAvailable(activate, withUpdateKind(shown, typeof __BUILD_FINGERPRINT__ !== "undefined" ? __BUILD_FINGERPRINT__ : undefined));
   };
 
   const updateSW = registerSW({
