@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.75.0
+
+- Tower Statistics can now review elevators that run fewer cars than they have, with an undoable "Use all installed cars" for older towers.
+
 ## 2.74.3
 
 - A new elevator car joins the shaft's schedule: every hour that ran the whole fleet now runs the added car too, while hours you cut back stay as you set them.

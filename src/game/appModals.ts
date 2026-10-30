@@ -1,5 +1,7 @@
+import { html } from "lit-html";
 import type { GameApp } from "../main";
 import { SaveGame, saveFailureMessage } from "../storage/SaveGame";
+import { scheduleReviewEntry } from "../ui/templates/scheduleReview";
 import { canCallExterminator, statsScreen, statsTemplate } from "../ui/templates/stats";
 import { trackAppAction } from "../analytics";
 import { outcome } from "../simport/portCodes";
@@ -39,7 +41,12 @@ export async function showStats(app: GameApp): Promise<void> {
     const handlers: Record<string, () => void> = canCallExterminator(report, catalog)
       ? { exterminate: () => void confirmExterminate(app) }
       : {};
-    app.ui.showStats(statsTemplate(statsScreen(report, app.reader, catalog)), handlers);
+    // Older towers can hold elevators that run fewer cars than they have (#1548); the
+    // entry to the review exists only then, so a tower without any reads as before.
+    const idleCars = app.scheduleReview.findings().length;
+    if (idleCars > 0) handlers.reviewSchedules = () => app.scheduleReview.open();
+    const body = statsTemplate(statsScreen(report, app.reader, catalog));
+    app.ui.showStats(idleCars > 0 ? html`${body}${scheduleReviewEntry(idleCars)}` : body, handlers);
   } catch (e) {
     app.ui.toast("Tower Statistics could not be shown.", "bad");
     throw e;
