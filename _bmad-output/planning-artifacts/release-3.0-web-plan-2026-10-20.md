@@ -1,5 +1,7 @@
 # Verticopolis 3.0 web release plan (Phase 2)
 
+> **Superseded in part by Rust-only (2026-10-30).** The owner decided that the Rust engine is the only engine players run: since app 2.66.0 and engine crate 1.0.0 every deploy is the wasm-only build. This document is a dated snapshot and is not rewritten. Where it describes the switchable default build, the staged cohort (stages 0 to 3 and their 0/10/25/50% shares), the 300 and 1,000 session gates, the Settings engine choice or the TypeScript fallback, read those as replaced by [`release-3.0-rust-only-2026-10-30.md`](release-3.0-rust-only-2026-10-30.md). #945 stays open as the owner's release gate.
+
 > **Snapshot, written 2026-10-20 against `main` at `8f3a143` (app 2.35.0),
 > revised the same day after its adversarial review (section 14), after
 > the owner's decisions (section 12), and after the owner's evening direction
