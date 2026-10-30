@@ -11,11 +11,12 @@
  *   - `facilities/garage.ts`: the parking space and the parking ramp.
  *   - `facilities/vehicles.ts`: the garbage truck, street car, and metro
  *     train (the moving actors).
- *   - `facilities/venue.ts`: the party hall and wedding hall (the event
- *     venues).
+ *   - `facilities/venue.ts`: the party hall and aquatic center (the event
+ *     venues). `facilities/weddingHall.ts` is the wedding hall.
  */
 export { drawHousekeeping, drawMedical, drawMetro, drawMetroTunnel, drawSecurity, METRO_TUNNEL_TILE } from "./facilities/service";
 export { drawRecycling } from "./facilities/recycling";
 export { drawParking, drawParkingRamp } from "./facilities/garage";
 export { drawGarbageTruck, drawMetroTrain, drawStreetCar } from "./facilities/vehicles";
-export { drawAquaticCenter, drawPartyHall, drawWeddingHall } from "./facilities/venue";
+export { drawAquaticCenter, drawPartyHall } from "./facilities/venue";
+export { drawWeddingHall } from "./facilities/weddingHall";

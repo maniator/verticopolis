@@ -15,6 +15,11 @@ import {
 } from "./sprites";
 import { RESERVED_COLORS } from "./pixelSprites/common";
 import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "./sprites/events";
+import { FLOOR, TILE } from "./scale";
+
+/** The wedding hall rect: 28 tiles wide, five floors tall. */
+const WEDDING_HALL_W = 28 * TILE;
+const WEDDING_HALL_H = 5 * FLOOR;
 
 /**
  * Transport, crane, moving-vehicle, and event sprite coverage split out of
@@ -137,12 +142,12 @@ describe("transport, crane & event sprites paint", () => {
     expect(stair.log.some((l) => l.includes("#EDE6D2"))).toBe(true);
   });
 
-  it("the wedding hall paints its two-floor composition into the full rect", () => {
+  it("the wedding hall paints its five-floor wedding hall into the full rect", () => {
     // Floor 100's venue draws into whatever w x h rect the caller gives; drive
     // it at the two-floor (88px) height to prove the arch, aisle, and couple
     // scale into a taller rect without throwing.
     const s = spyCtx();
-    expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "weddingHall" }), 0, 0, 176, 88)).not.toThrow();
+    expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "weddingHall" }), 0, 0, WEDDING_HALL_W, WEDDING_HALL_H)).not.toThrow();
     expect(s.painted()).toBe(true);
     // The couple: a dark-suited seated figure at the altar.
     expect(s.log.some((l) => l.includes("#2A2E38"))).toBe(true);
