@@ -1,7 +1,7 @@
 import type { HeatmapMode, Simulation } from "./engine/Simulation";
 import type { UndoHistory } from "./engine/UndoHistory";
 import { createAppHistory } from "./game/appHistory";
-import { GRID, facilityFloors } from "./engine/facilities";
+import { GRID } from "./engine/facilities";
 import type { FacilityKind } from "./engine/types";
 import type { TransportView, UnitView } from "./simport/view";
 import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/TowerEngine";
@@ -42,7 +42,7 @@ import { PortCodes } from "./simport/portCodes";
 import { PortEvents } from "./simport/portEvents";
 import type { PortRenderSim } from "./simport/portRenderSim";
 import { hudSource } from "./game/hudSource";
-import { catalogOf, newRenderSim } from "./game/portAccess";
+import { catalogOf, newRenderSim, newViewReader } from "./game/portAccess";
 import type { BootTower } from "./game/bootTower";
 import type { EnginePort } from "./simport/enginePort";
 import type { Catalog } from "./engine/catalogTypes";
@@ -87,7 +87,6 @@ class GameApp implements GameAppPorts {
   readonly grid = GRID;
   speed = 1;
   tool: Tool = { type: "inspect" };
-
   /** @internal */ canvas: HTMLCanvasElement;
   /** @internal */ accMinutes = 0;
   /** Last day each meal-rush bulletin fired (transient, like the log). Kept
@@ -214,7 +213,7 @@ class GameApp implements GameAppPorts {
     // overwrite them: a save from a *newer* build is only unreadable here, and a
     // future version may recover it. Best-effort, never blocks boot.
     if (tower.corrupt) SaveGame.preserveUnreadable();
-    this.reader = new ViewReader(this.enginePort, facilityFloors);
+    this.reader = newViewReader(this.enginePort);
     this.portCodes = new PortCodes(this.enginePort);
     this.events = new PortEvents(this.enginePort);
     // Seed the promotion latch to the boot tower's rating (followSwap does it

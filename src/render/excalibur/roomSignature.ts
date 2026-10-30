@@ -1,4 +1,4 @@
-import { hasBusinessHours, isOpenAt } from "../../engine/facilities";
+import { hasBusinessHours, isOpenAt } from "../../presentation/viewKinds";
 import type { UnitView } from "../../simport/view";
 import { LATE_NIGHT_KINDS, isLateHour } from "../lateNight";
 

@@ -23,10 +23,13 @@ import {
   buildMinutes,
   facilityFloors,
   hasBusinessHours,
+  isCommercialKind,
   isElevatorKind,
   isOpenAt,
   isFixedSpanTransport,
   isHotelKind,
+  isLeaseAmenityKind,
+  isUnmetDemandKind,
   maxCarsFor,
   maxSpanFor,
   transportCarCapacity,
@@ -123,6 +126,10 @@ function facilityEntry(mode: GameMode, rules: ReturnType<typeof makeRules>, kind
     upkeepMonthly: ECON.serviceMaintenanceMonthly[kind] ?? null,
     openHours: hasBusinessHours(kind) ? Array.from({ length: 24 }, (_, hour) => isOpenAt(kind, hour)) : null,
     ownHousehold: hasOwnHousehold(kind),
+    commercial: isCommercialKind(kind),
+    hotel: isHotelKind(kind),
+    leaseAmenity: isLeaseAmenityKind(kind),
+    unmetDemand: isUnmetDemandKind(kind),
   };
 }
 

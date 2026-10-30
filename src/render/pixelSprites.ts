@@ -1,6 +1,6 @@
 import type { FacilityKind, UnitState } from "../engine/types";
 import type { UnitView } from "../simport/view";
-import { hasBusinessHours, isOpenAt } from "../engine/facilities";
+import { hasBusinessHours, isOpenAt } from "../presentation/viewKinds";
 import { facilityColor } from "../presentation/facilityPresentation";
 import { isLateHour } from "./lateNight";
 import { POPULATED, closedShutter, noticeBadge, type RoomCtx } from "./pixelSprites/common";

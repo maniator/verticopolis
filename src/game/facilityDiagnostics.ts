@@ -3,7 +3,7 @@ import type { Simulation } from "../engine/Simulation";
 import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN } from "../engine/Simulation";
 import { SERVED_RECOVERY } from "../engine/sim/constants";
 import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
-import { isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } from "../engine/facilities";
+import { isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } from "../presentation/viewKinds";
 import { catalogFacility, type Catalog } from "../engine/catalogTypes";
 import { isRentalKind } from "../engine/residentialRentals";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";

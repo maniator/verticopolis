@@ -8,6 +8,7 @@ import { pageShell } from "./ui/templates/pageShell";
 import { injectVercelTelemetry } from "./telemetry";
 import { trackAppAction } from "./analytics";
 import { bindViewWorld } from "./presentation/viewWorld";
+import { bindViewKinds } from "./presentation/viewKinds";
 import { readCatalog } from "./dualrun/catalog";
 import { loadWasmEngine } from "./wasmhost/rustEngine";
 
@@ -465,6 +466,7 @@ async function start(): Promise<void> {
     // A tooling page draws sprites without a tower, so it binds the catalog's
     // world for the view (the lot geometry the sprites hash on).
     bindViewWorld(catalog.world);
+    bindViewKinds(catalog);
     ITEMS = buildItems();
   } catch (e) {
     console.error("Sprite gallery: the Rust engine's catalog is unavailable.", e);

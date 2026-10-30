@@ -1,6 +1,6 @@
 {
   "name": "verticopolis",
-  "version": "2.74.3",
+  "version": "2.74.4",
   "description": "Verticopolis: a browser-native SimTower clone in TypeScript",
   "license": "MIT",
   "type": "module",
@@ -40,7 +40,7 @@
     "gen:events": "node scripts/gen-gameplay-events.ts",
     "wasm:build": "node scripts/wasm-build.ts",
     "engine:compat": "node scripts/engine-compat.ts",
-    "test:wasm": "cross-env VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost chargeBindingRaw panelGettersWasm panelGettersCost engineView perfCompare/scenarios.integration tsEngine.golden viewReader.integration viewLayoutJson engineContract.integration && npm run test:port",
+    "test:wasm": "cross-env VC_REQUIRE_WASM=1 vitest run --project integration conformanceWasm dualRun wasmHost chargeBindingRaw panelGettersWasm panelGettersCost engineView perfCompare/scenarios.integration tsEngine.golden viewReader.integration viewReaderHall.integration viewLayoutJson engineContract.integration && npm run test:port",
     "test:port": "node scripts/test-port.ts",
     "test:wasm:parity": "cross-env VC_REQUIRE_WASM=1 vitest run --project integrationWasm --project unitWasm"
   },
