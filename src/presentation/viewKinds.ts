@@ -4,8 +4,7 @@ import type { FacilityKind } from "../engine/types";
 /**
  * What the view knows about each kind, read from the engine's catalog: which
  * kinds are commercial, hotel rooms, lease amenities, demand tenants or
- * elevators, which keep business hours and when they are open, and how tall each
- * stands. The view asks these here instead of keeping kind lists of its own, so
+ * elevators, and which keep business hours and when they are open. The view asks these here instead of keeping kind lists of its own, so
  * a kind the engine adds lands on the right side of every check with no frontend
  * edit.
  *
@@ -65,11 +64,6 @@ export function hasBusinessHours(kind: FacilityKind): boolean {
  *  always open. */
 export function isOpenAt(kind: FacilityKind, hour: number): boolean {
   return entry(kind).openHours?.[hour] ?? true;
-}
-
-/** The kind's height in floors (1 for an ordinary room). */
-export function facilityFloors(kind: FacilityKind): number {
-  return entry(kind).floors;
 }
 
 /** Test hook: forget the bound facts. */
