@@ -30,6 +30,8 @@ pub const LAST_CAR: &str = "An elevator needs at least one car.";
 pub const FACILITY_GONE: &str = "That facility is gone.";
 pub const HOUSEKEEPING_PERMANENT: &str =
     "Housekeeping rooms are permanent. The 1994 game does not let you remove them.";
+/// Classic never lets the wedding hall be sold or bulldozed.
+pub const CLASSIC_WEDDING_HALL_KEPT: &str = "The wedding hall can't be removed.";
 pub const SECURITY_PERMANENT: &str =
     "Security offices are permanent. The 1994 game does not let you remove them.";
 pub const RECYCLING_PERMANENT: &str =
@@ -43,6 +45,7 @@ fn permanent_room_refusal(kind: Kind) -> &'static str {
         Kind::Security => SECURITY_PERMANENT,
         Kind::Recycling => RECYCLING_PERMANENT,
         Kind::Cinema => CINEMA_PERMANENT,
+        Kind::WeddingHall => CLASSIC_WEDDING_HALL_KEPT,
         _ => HOUSEKEEPING_PERMANENT,
     }
 }

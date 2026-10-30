@@ -5,6 +5,7 @@ import { CONFORMANCE_DIR, firstDivergence, loadScenario, runScenario, type Check
 import { hasWasmPackage, startWasmEngine, wasm, wasmRequired } from "../conformance/wasmEngine";
 import { CATALOG_VERSION, catalogFor } from "../../engine/catalog";
 import { readCatalog } from "../../dualrun/catalog";
+import { catalogLockView } from "../../engine/catalogLockView";
 import { canonicalJson, digest } from "../conformance/canonical";
 
 /**
@@ -33,16 +34,23 @@ describe.skipIf(!hasWasmPackage())("engine conformance through the WASM binding"
   }
 
   // The catalog the binding hands a frontend is the TypeScript engine's, field
-  // for field, and its text is the canonical form the lock hashes.
+  // for field, and its text is the canonical form the lock hashes. The one
+  // exception is the wedding hall's footprint (28 wide, five stories here, one
+  // story in the TypeScript engine), which the lock view leaves out.
   const catalogLock = JSON.parse(readFileSync(resolve(CONFORMANCE_DIR, "catalog-digests.json"), "utf8")) as { catalogs: Record<string, string> };
   for (const mode of ["classic", "modern"] as const) {
     it(`catalog(${mode}) matches the TypeScript catalog and the lock`, () => {
       const { catalog } = wasm();
       if (typeof catalog !== "function") throw new Error("the WASM package predates catalog(mode); run npm run wasm:build");
       const text = catalog(mode);
-      expect(readCatalog(wasm(), mode)).toEqual(catalogFor(mode));
-      expect(text).toBe(canonicalJson(catalogFor(mode)));
-      expect(digest(JSON.parse(text))).toBe(catalogLock.catalogs[mode]);
+      const got = readCatalog(wasm(), mode);
+      const want = catalogFor(mode);
+      expect(catalogLockView(got)).toEqual(catalogLockView(want));
+      expect(canonicalJson(catalogLockView(JSON.parse(text)))).toBe(canonicalJson(catalogLockView(want)));
+      expect(digest(catalogLockView(JSON.parse(text)))).toBe(catalogLock.catalogs[mode]);
+      // Outside the exempt footprint the engines agree; inside it the Rust hall is the cathedral.
+      const hall = got.facilities.find((f) => f.key === "weddingHall");
+      expect(hall).toMatchObject({ width: 28, floors: 5 });
     });
   }
 

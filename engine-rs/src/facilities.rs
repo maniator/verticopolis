@@ -5,6 +5,10 @@ pub const LOT_WIDTH: i64 = 375;
 pub const MAX_FLOOR: i64 = 100;
 pub const MIN_FLOOR: i64 = -9;
 pub const LOBBY_INTERVAL: i64 = 15;
+/// The wedding hall stands on floor `MAX_FLOOR` and rises four stories above it,
+/// the only facility that does. Grids that hold every story of every unit size
+/// to this.
+pub const WEDDING_HALL_TOP_FLOOR: i64 = MAX_FLOOR + 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Kind {
@@ -130,6 +134,21 @@ impl Kind {
     /// `facilityFloors`.
     pub fn floors(self) -> i64 {
         self.facility().floors.unwrap_or(1)
+    }
+
+    /// The highest story a unit of this kind may occupy: `MAX_FLOOR`, except the
+    /// wedding hall, which stands on floor `MAX_FLOOR` and rises above it.
+    pub fn highest_story(self) -> i64 {
+        if self == Kind::WeddingHall {
+            MAX_FLOOR + self.floors() - 1
+        } else {
+            MAX_FLOOR
+        }
+    }
+
+    /// The highest floor a unit of this kind may stand on (its bottom story).
+    pub fn highest_base_floor(self) -> i64 {
+        self.highest_story() - (self.floors() - 1)
     }
 
     /// `maxSpanFor`.

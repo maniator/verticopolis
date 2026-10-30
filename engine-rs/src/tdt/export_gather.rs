@@ -46,7 +46,7 @@ use super::tables::{
 };
 use super::LegacyExportError;
 use crate::econ::rent_config;
-use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH, MIN_FLOOR};
+use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH};
 
 mod gathered;
 mod normalize;
@@ -121,7 +121,7 @@ pub fn gather_units<U: Borrow<Value>>(
         }
         let burned = u.state == "fire" || u.state == "gutted";
         let stories = u.kind.floors() as f64;
-        let fits = fits_tdt_rows(u.floor, stories);
+        let fits = fits_tdt_rows(u.kind, u.floor, stories);
         let mappable = kind_tenant(u.kind).is_some() || part_stack(u.kind).is_some();
         u.skip_reason = if !fits {
             Some(SkipReason::OutOfRange)
@@ -252,26 +252,10 @@ pub fn gather_units<U: Borrow<Value>>(
 
         if let Some(stack) = part_stack(u.kind) {
             if u.kind == Kind::WeddingHall {
-                let mut parts: Vec<i64> = vec![];
-                for i in 0..stack.len() {
-                    let fl = u.floor - i as f64;
-                    let collides = fl < MIN_FLOOR as f64
-                        || (i > 0
-                            && rooms.iter().enumerate().any(|(j, o)| {
-                                j != idx
-                                    && o.emitted
-                                    && fl >= o.floor
-                                    && fl < o.floor + o.kind.floors() as f64
-                                    && o.x < u.x + u.width
-                                    && u.x < o.x + o.width
-                            }));
-                    if collides {
-                        break;
-                    }
-                    parts.push(stack[stack.len() - 1 - i]);
-                }
-                for (i, &part) in parts.iter().enumerate() {
-                    let fl = u.floor - i as f64;
+                // The cathedral stands on floor 100 with its bottom part and rises
+                // four floors above it, the top part last.
+                for (i, &part) in stack.iter().rev().enumerate() {
+                    let fl = u.floor + i as f64;
                     widen(&mut extents, fl, u.x, u.x + u.width);
                     push_tenant(
                         &mut tenants_by_tdt,
@@ -366,7 +350,7 @@ pub fn gather_units<U: Borrow<Value>>(
     let extent_list: Vec<(FloorKey, (f64, f64))> = extents.iter().map(|(k, v)| (*k, *v)).collect();
     for (key, ext) in extent_list {
         let floor = key.value();
-        if !fits_tdt_rows(floor, 1.0) {
+        if !fits_tdt_rows(Kind::Floor, floor, 1.0) {
             continue;
         }
         let lobby = floor.fract() == 0.0 && is_lobby_floor(floor as i64);

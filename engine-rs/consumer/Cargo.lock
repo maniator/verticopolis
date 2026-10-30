@@ -260,7 +260,7 @@ checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
 
 [[package]]
 name = "verticopolis-engine"
-version = "1.0.4"
+version = "1.1.0"
 dependencies = [
  "base64",
  "flate2",

@@ -79,7 +79,11 @@ function sweep(sim: Simulation, engine: WasmEngine): { checked: number; ok: numb
   let checked = 0;
   let ok = 0;
   for (const kind of KINDS) {
+    // Only the Rust engine builds the wedding hall as the 28 wide, five story
+    // cathedral, and only it reserves Classic's floor 100 for that hall.
+    if (kind === "weddingHall") continue;
     for (const floor of FLOORS) {
+      if (sim.mode === "classic" && floor + (FACILITIES[kind].floors ?? 1) > 100 && floor <= 100) continue;
       for (const x of XS) {
         const want = tsQuote(sim, kind, floor, x);
         const got = JSON.parse(engine.canBuild(kind, floor, x)) as Quote;

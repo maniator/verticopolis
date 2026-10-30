@@ -114,13 +114,13 @@ impl Tower {
         if x < 0 || x.saturating_add(f.width) > LOT_WIDTH {
             return Some("Off the edge of the lot.".into());
         }
-        if kind == Kind::WeddingHall && floor != 100 {
+        if kind == Kind::WeddingHall && floor != MAX_FLOOR {
             return Some("The wedding hall can only crown floor 100.".into());
         }
         if let Some(r) = self.cap_reason(kind) {
             return Some(r);
         }
-        if floor + hgt - 1 > MAX_FLOOR {
+        if floor + hgt - 1 > kind.highest_story() {
             return Some("Not enough floors above for this facility.".into());
         }
         if f.basement && floor + hgt > 1 {
@@ -137,6 +137,10 @@ impl Tower {
         for fl in floor..floor + hgt {
             if !self.room_span_free(fl, x, f.width) {
                 return Some("Something is already here.".into());
+            }
+            // The wedding hall's upper stories stand above the last floor slab.
+            if fl > MAX_FLOOR {
+                continue;
             }
             if require_floor && !self.span_has_floor(fl, x, f.width) {
                 return Some("Build floors on every story first.".into());
@@ -414,7 +418,7 @@ impl Tower {
         if x < 0
             || x.saturating_add(w) > LOT_WIDTH
             || floor < MIN_FLOOR
-            || floor.saturating_add(hgt - 1) > MAX_FLOOR
+            || floor.saturating_add(hgt - 1) > kind.highest_story()
         {
             return Vec::new();
         }
@@ -425,7 +429,7 @@ impl Tower {
         };
         let mut plan: Vec<(i64, i64)> = Vec::new();
         let mut planned: HashMap<i64, Vec<i64>> = HashMap::new();
-        for fl in floor..floor + hgt {
+        for fl in floor..(floor + hgt).min(MAX_FLOOR + 1) {
             let supportable = |tx: i64, planned: &HashMap<i64, Vec<i64>>| -> bool {
                 if fl < 2 {
                     return true;

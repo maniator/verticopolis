@@ -151,6 +151,7 @@ pub(crate) fn assemble(
     sim.view = coerce_view(data.get("view"));
     sim.log = coerce_log(data.get("log"));
 
+    widen_legacy_wedding_hall(&mut units);
     drop_overlapping_units(&mut units, &mut unit_ids);
     // A vector grown past its units would keep the spare room for the whole
     // session, so it keeps only the room the first placements need (#1259).

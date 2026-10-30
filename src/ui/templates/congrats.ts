@@ -10,7 +10,7 @@ import { iconTemplate } from "../icons";
 export function congratsTemplate(onClose: () => void): TemplateResult {
   return html`<h2>${iconTemplate("trophy", { size: 20 })}TOWER achieved!</h2>
     <p>
-      Your skyscraper has earned the legendary <b>TOWER</b> rating. Wedding bells ring out over the city from the
+      Your skyscraper has earned the legendary <b>TOWER</b> rating. Cheers ring out over the city from the wedding
       hall on the 100th floor. Congratulations, master builder!
     </p>
     <div class="modal-actions"><button class="btn primary" data-act="close" @click=${onClose}>Continue</button></div>`;

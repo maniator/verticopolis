@@ -220,7 +220,7 @@ impl Simulation {
         let mut ext: FloorSlots<(i64, i64)> = FloorSlots::new();
         for u in &self.tower.units {
             let right = u.x + u.width - 1;
-            for fl in u.floor..u.floor + u.kind.floors() {
+            for fl in u.floor..(u.floor + u.kind.floors()).min(MAX_FLOOR + 1) {
                 let e = ext.entry(fl, (u.x, right));
                 e.0 = e.0.min(u.x);
                 e.1 = e.1.max(right);

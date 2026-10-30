@@ -13,6 +13,8 @@
  *     stepping, chrome sweeps, palette/overlay/clock nudges, camera framing).
  *   - `screenshot-tower-builders.ts`: `buildCanonTower`, `buildBasement`,
  *     `buildModernPricingTower`, `pgGrowToStar`.
+ *   - `screenshot-crown-builder.ts`: `topOutTowerWithHall`, the TOWER capstone's
+ *     floor-100 crown.
  *   - `screenshot-compare-builders.ts`: the CAP-8 escalator-on-office pair
  *     (`buildEscalatorOfficeModern` / `buildEscalatorOfficeClassic`).
  *   - `screenshot-scene-builders.ts`: the engine/crowd/fire/condo/stats/hotspot/
@@ -24,5 +26,6 @@
 
 export * from "./screenshot-page-ops.ts";
 export * from "./screenshot-tower-builders.ts";
+export * from "./screenshot-crown-builder.ts";
 export * from "./screenshot-compare-builders.ts";
 export * from "./screenshot-scene-builders.ts";

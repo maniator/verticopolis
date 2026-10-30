@@ -40,9 +40,9 @@ import { noteTowerSwap } from "./game/engineFault";
 import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
 import { PortEvents } from "./simport/portEvents";
-import { PortRenderSim } from "./simport/portRenderSim";
+import type { PortRenderSim } from "./simport/portRenderSim";
 import { hudSource } from "./game/hudSource";
-import { catalogOf } from "./game/portAccess";
+import { catalogOf, newRenderSim } from "./game/portAccess";
 import type { BootTower } from "./game/bootTower";
 import type { EnginePort } from "./simport/enginePort";
 import type { Catalog } from "./engine/catalogTypes";
@@ -221,7 +221,7 @@ class GameApp implements GameAppPorts {
     // for later swaps), or a reloaded 2★-6★ tower would fire a phantom
     // promotion (jingle + star_reached) on frame one.
     this.lastStar = this.reader.header.star;
-    this.renderSim = new PortRenderSim(this.enginePort, this.reader);
+    this.renderSim = newRenderSim(this.enginePort, this.reader);
     this.engine = new TowerEngine(this.canvas, this.renderSim, this.reader);
 
     // Restore persisted audio prefs onto the facade BEFORE any UI wiring or
@@ -455,7 +455,7 @@ class GameApp implements GameAppPorts {
     // Renderer caches (scenery seed, walker reach) key on the sim it draws.
     // An undo/redo restore keeps the camera under the player; a real tower
     // swap restores the save's view.
-    this.renderSim = new PortRenderSim(this.enginePort, this.reader);
+    this.renderSim = newRenderSim(this.enginePort, this.reader);
     this.engine.setSim(this.renderSim, { keepCamera: keepHistory });
     // Rebase the UI log cursor so old entries don't replay as toasts, and
     // refresh the palette to the new star level so it never shows the prior

@@ -43,7 +43,7 @@ fn tower() -> Simulation {
 fn wedding_hall(sim: &mut Simulation) -> i64 {
     sim.star = 5;
     for floor in 32..100 {
-        for x in 150..166 {
+        for x in 150..178 {
             assert!(sim.tower.place(Kind::Floor, floor, x).ok, "{floor} {x}");
         }
     }

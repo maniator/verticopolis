@@ -5,6 +5,11 @@ import { dirname, resolve } from "node:path";
 import type { Unit } from "../engine/types";
 import { SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import { drawUnit, drawLobbyEntrance, type EntranceKind, type DrawCtx } from "./sprites";
+import { FLOOR, TILE } from "./scale";
+
+/** The wedding hall rect: 28 tiles wide, five floors tall. */
+const WEDDING_HALL_W = 28 * TILE;
+const WEDDING_HALL_H = 5 * FLOOR;
 
 /**
  * "An empty tower reads empty": the people-system canon that no figure paints
@@ -57,7 +62,7 @@ describe("venue figures are gated on real occupancy (#552)", () => {
   // two full rows of guests into every hall, tenanted or not.
   it("a wedding hall with no attendees draws its chairs but nobody in them", () => {
     const s = spyCtx();
-    drawUnit(draw({}, s.ctx), unit({ kind: "weddingHall", occupants: 0 }), 0, 0, 176, 88);
+    drawUnit(draw({}, s.ctx), unit({ kind: "weddingHall", occupants: 0 }), 0, 0, WEDDING_HALL_W, WEDDING_HALL_H);
     expect(s.log).not.toContain(FIGURE);
     // The room itself still paints: this is an empty hall, not a blank rect.
     expect(s.log.some((l) => l.startsWith("fillRect"))).toBe(true);
@@ -69,7 +74,7 @@ describe("venue figures are gated on real occupancy (#552)", () => {
     // could stop gating (or stop drawing) with the test still green.
     const seated = (occupants: number) => {
       const s = spyCtx();
-      drawUnit(draw({}, s.ctx), unit({ kind: "weddingHall", occupants }), 0, 0, 176, 88);
+      drawUnit(draw({}, s.ctx), unit({ kind: "weddingHall", occupants }), 0, 0, WEDDING_HALL_W, WEDDING_HALL_H);
       return s.log.filter((l) => l === FIGURE).length;
     };
     expect(seated(8)).toBeGreaterThan(seated(2));
@@ -83,7 +88,7 @@ describe("venue figures are gated on real occupancy (#552)", () => {
     // no seated guests. This pins the fill ORDER, which is what makes a small
     // wedding legible instead of looking like a lone stranger in an empty hall.
     const couple = spyCtx();
-    drawUnit(draw({}, couple.ctx), unit({ kind: "weddingHall", occupants: 2 }), 0, 0, 176, 88);
+    drawUnit(draw({}, couple.ctx), unit({ kind: "weddingHall", occupants: 2 }), 0, 0, WEDDING_HALL_W, WEDDING_HALL_H);
     const figures = couple.log.filter((l) => l === FIGURE).length;
     expect(figures).toBe(1); // the groom; the bride is drawn as a gown
     expect(couple.log).toContain("fillStyle=#F0F0F0"); // her veil: she was seated

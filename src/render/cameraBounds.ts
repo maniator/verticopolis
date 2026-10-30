@@ -5,6 +5,10 @@
 import { CRANE_H } from "./sprites/structure/rooftop";
 import { FLOOR } from "./scale";
 
+/** Stories the wedding hall rises above the top floor (it stands on floor 100 and is
+ *  five stories tall), so its spire needs the same sky the crane does. */
+export const WEDDING_HALL_RISE_FLOORS = 4;
+
 /** Sky floors above the top buildable floor the camera may reveal. Derived
  *  from the rooftop crane's height (plus a breath above the beacon) instead of
  *  a hardcoded count: the crane perches ON the top floor and rises CRANE_H
@@ -16,7 +20,7 @@ import { FLOOR } from "./scale";
  *  family, so "how many floors tall is the crane" transfers to any floorPx a
  *  caller passes to clampCameraY, which multiplies the count by that
  *  caller's own floor size. */
-export const SKY_HEADROOM_FLOORS = Math.ceil(CRANE_H / FLOOR) + 1;
+export const SKY_HEADROOM_FLOORS = Math.max(Math.ceil(CRANE_H / FLOOR), WEDDING_HALL_RISE_FLOORS) + 1;
 
 /**
  * Clamp the camera's vertical *center* so the visible window stays within the

@@ -57,6 +57,7 @@ src/render/pixelSprites/common.ts Crowd
 src/render/pixelSprites/food.ts Crowd
 src/render/pixelSprites/residential.ts Crowd
 src/render/sprites/facilities/venue.ts Crowd
+src/render/sprites/facilities/weddingHall.ts Crowd
 src/render/sprites/transport.ts facilities
 src/simport/headerClock.ts Clock calendar gameRules # what panels derive from the view's header instead of sim.clock and sim.rules (facade slice 4, #1211): date arithmetic, the calendar's day names and the static rule set
 src/simport/tsPanels.ts facilities households milestones # the TypeScript adapter's panel answers (facade slice 4, #1211), built from the TypeScript engine's own functions; they leave with it

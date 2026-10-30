@@ -68,12 +68,11 @@ pub(crate) fn founder_keys(raw: &Value) -> Value {
 /// the save's mode.
 pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i64>)> {
     let kind = kind_of(u)?;
-    let stories = kind.floors();
     let cat = kind.facility().width;
     // `drop_overlapping_units` indexes its tile grids by the floors and tiles
     // these clamps allow, so a loosened clamp would trap there.
     let floor =
-        (round(num(u.get("floor"), 1.0)) as i64).clamp(MIN_FLOOR, MAX_FLOOR - (stories - 1));
+        (round(num(u.get("floor"), 1.0)) as i64).clamp(MIN_FLOOR, kind.highest_base_floor());
     let x = (round(num(u.get("x"), 0.0)) as i64).clamp(0, LOT - 1);
     let cap = if kind.is_structural() { cat } else { LOT - x };
     let width = (round(num(u.get("width"), cat as f64)) as i64)

@@ -169,7 +169,7 @@ and covered by the Vitest suite and/or the captured screenshots.
 | Multi-floor cinema, party hall | ✅ |
 | Parking, security, medical, housekeeping, recycling | ✅ |
 | Whole-floor basement metro that brings visitors & eases the commute | ✅ |
-| Cathedral → **religion-agnostic Wedding Hall** on floor 100 | ✅ |
+| Cathedral → **religion-agnostic Wedding Hall**: 28 wide, five floors tall, standing on floor 100 (Rust engine) | ✅ |
 | Stairs, escalators, standard / service / express elevators | ✅ |
 | Adjustable elevator cars + per-floor (express) stop config | ✅ |
 | **Demand-driven elevator cars** (SCAN dispatch toward waiting floors) | ✅ |

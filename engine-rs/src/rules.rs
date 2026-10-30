@@ -106,13 +106,18 @@ impl GameMode {
     }
 
     /// Whether a placed room of `kind` stays for good: SimTower gives the
-    /// player no way to delete housekeeping, security, recycling or the movie
-    /// theater. Modern lets them be sold like other rooms.
+    /// player no way to delete housekeeping, security, recycling, the movie
+    /// theater or the cathedral (our wedding hall). Modern lets them be sold
+    /// like other rooms.
     pub fn room_is_permanent(self, kind: Kind) -> bool {
         self == GameMode::Classic
             && matches!(
                 kind,
-                Kind::Housekeeping | Kind::Security | Kind::Recycling | Kind::Cinema
+                Kind::Housekeeping
+                    | Kind::Security
+                    | Kind::Recycling
+                    | Kind::Cinema
+                    | Kind::WeddingHall
             )
     }
 

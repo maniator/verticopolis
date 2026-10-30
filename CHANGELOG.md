@@ -21,6 +21,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.72.0
+
+- The wedding hall is now a big five-floor garden building, 28 tiles wide, crowning the top of a 5-star tower on floors 100 to 104. Older towers widen their hall when they load.
+- In Classic, the wedding hall cannot be sold or bulldozed, and nothing else can be built on floor 100, as in SimTower.
+- Imported SimTower towers with a cathedral now bring it in as the wedding hall, and exported towers write it back.
+
 ## 2.71.0
 
 - Security, medical, housekeeping and recycling rooms build at the sizes SimTower uses, so a tower from the original game keeps its layout.
