@@ -21,6 +21,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.65.0
+
+- In Classic, the metro station only helps shops, restaurants and fast food once its platform floor has an elevator, stairs, or escalator connected, as in SimTower.
+- Housekeeping can no longer be built underground, as in SimTower. Housekeeping already in a basement stays.
+- In Classic, a housekeeping room can no longer be sold or bulldozed once it is placed, as in SimTower. A burned-out one can still be cleared.
+
 ## 2.64.1
 
 - An imported metro station no longer says it has no elevator access when an elevator reaches its platform.

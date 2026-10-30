@@ -15,6 +15,12 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 0.24.4 (2026-10-30)
+
+- Classic: the metro station's help to commercial demand and its rain relief now need the station's platform floor to be served by transport. Modern keeps the any-operational-station rule.
+- Housekeeping joins the kinds that cannot be placed underground (`no_basement` in the catalog), in both modes. Saves that already hold basement housekeeping still load.
+- Classic: a placed housekeeping room cannot be sold or bulldozed (`GameMode::housekeeping_is_permanent`), except a gutted shell. Modern still sells it. Lobby tiles were already refused in both modes.
+
 ## 0.24.3 (2026-10-30)
 
 - A metro station's unit card reads its elevator access at the platform floor, the floor above the row the station is saved on, the same floor the engine's own metro rule uses.

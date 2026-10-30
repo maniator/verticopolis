@@ -42,8 +42,9 @@ export function groundFloorStructureKind(kind: FacilityKind, floor: number): Fac
 
 /**
  * Rooms that need daylight and can't sit in a windowless basement. Commercial
- * (shop/fast food/restaurant), entertainment, and service facilities may go
- * underground; people don't live or work down there.
+ * (shop/fast food/restaurant), entertainment, and most service facilities may
+ * go underground; people don't live or work down there, and housekeeping stays
+ * with the hotel rooms it cleans.
  */
 export const NO_BASEMENT_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>([
   "office",
@@ -51,6 +52,7 @@ export const NO_BASEMENT_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind
   "hotelSingle",
   "hotelDouble",
   "hotelSuite",
+  "housekeeping",
 ]);
 
 /** True if a facility footprint (floor..floor+hgt-1) covers the ground concourse. */

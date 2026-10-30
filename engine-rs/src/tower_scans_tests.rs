@@ -268,3 +268,41 @@ fn the_served_floors_close_over_chains_listed_top_down() {
     tower.reindex();
     assert_served(&tower, &expected);
 }
+
+#[test]
+fn classic_metro_helps_business_only_with_its_platform_served() {
+    use crate::clock::GameMode;
+    let (mut sim, _metro) = full_lot();
+    // The platform floor has no transport: Classic gives no help, Modern keeps
+    // the any-operational-station rule.
+    sim.mode = GameMode::Classic;
+    assert!(!sim.metro_helps_business());
+    sim.mode = GameMode::Modern;
+    assert!(sim.metro_helps_business());
+    // A shaft through the basement serves the platform.
+    must(
+        sim.tower
+            .place_transport(Kind::ElevatorStandard, 200, -1, 4),
+    );
+    sim.mode = GameMode::Classic;
+    assert!(sim.metro_helps_business());
+}
+
+#[test]
+fn housekeeping_cannot_be_placed_underground() {
+    let mut tower = Tower::new();
+    let lobby = Kind::Lobby.facility().width;
+    for x in (0..40).step_by(lobby as usize) {
+        must(tower.place(Kind::Lobby, 1, x));
+    }
+    for x in 0..40 {
+        must(tower.place(Kind::Floor, 0, x));
+    }
+    let result = tower.place(Kind::Housekeeping, 0, 0);
+    assert!(!result.ok);
+    let reason = result.reason.expect("the refusal names its reason");
+    assert!(
+        reason.contains("can't be built in the basement"),
+        "{reason}"
+    );
+}

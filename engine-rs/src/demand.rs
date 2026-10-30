@@ -36,9 +36,20 @@ fn origin_weight(kind: Kind) -> Option<f64> {
     None
 }
 
+impl Simulation {
+    /// Whether an operating metro station is helping business: in Classic its
+    /// platform floor must also have transport, as in SimTower.
+    pub fn metro_helps_business(&self) -> bool {
+        let need_service = self.mode.metro_help_needs_service();
+        self.tower.units_of_kind(Kind::Metro).any(|u| {
+            u.is_operational() && (!need_service || self.tower.is_metro_platform_served(u))
+        })
+    }
+}
+
 /// `towerDemandBonus`.
 fn tower_demand_bonus(sim: &Simulation) -> f64 {
-    let metro = if sim.has_operational(Kind::Metro) {
+    let metro = if sim.metro_helps_business() {
         0.25
     } else {
         0.0

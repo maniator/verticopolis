@@ -20,7 +20,7 @@ impl Simulation {
         let demand_map = crate::demand::compute_demand_map(self);
         let mut reach_cache: HashMap<(i64, i64), bool> = HashMap::new();
         let rain = self.weather == Weather::Rain;
-        let rain_metro_relief = rain && self.has_operational(Kind::Metro);
+        let rain_metro_relief = rain && self.metro_helps_business();
         let is_weekend = self.clock.is_weekend();
         let hour = self.clock.hour();
         let mode = self.mode;
