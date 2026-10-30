@@ -18,7 +18,9 @@ export interface FloorEdge {
  *
  * Every story of a multi-floor room counts on each row it occupies, so a
  * two-story cinema at the edge still dresses its upper row. Basement rows are
- * excluded (edges clamp to floor ≥ 1), matching the above-ground facade.
+ * excluded (edges clamp to floor ≥ 1), matching the above-ground facade. The one
+ * exception is the wedding hall's garden: its upper stories stand in the open
+ * sky above the last floor, so they get no escape stairs and no crane perch.
  */
 export interface FacadeGeometry {
   /** Leftmost/rightmost built tile per above-ground floor row. */
@@ -27,6 +29,12 @@ export interface FacadeGeometry {
    *  when the top floor carries no above-ground structure (basement-only or
    *  empty lot), which is exactly when no crane should be shown. */
   topTiles: Set<number>;
+}
+
+/** Whether story `floor` of `u` is part of the wedding hall's garden crown (every
+ *  story above the hall's ground story), which is not a building row. */
+function isGardenCrownStory(u: UnitView, floor: number): boolean {
+  return u.kind === "weddingHall" && floor > u.floor;
 }
 
 /**
@@ -41,6 +49,7 @@ export function facadeGeometry(units: readonly UnitView[], highestFloor: number,
     const right = u.x + u.width;
     const top = u.floor + catalogFacility(catalog, u.kind).floors;
     for (let f = Math.max(1, u.floor); f < top; f++) {
+      if (isGardenCrownStory(u, f)) continue;
       const e = edges.get(f);
       if (!e) edges.set(f, { min: u.x, max: right });
       else {
