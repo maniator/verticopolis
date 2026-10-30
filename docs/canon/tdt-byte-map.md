@@ -1,9 +1,11 @@
 # Canon reference: the `.TDT` byte map
 
 Every byte of a SimTower `.TDT` save, in file order: what we know, what we only
-suspect and what nobody has decoded yet. [`tdt-format.md`](./tdt-format.md) is the
-narrative reference (how the codec uses the file); this page is the table of
-bytes. The two must agree. Where they differ, fix both in the same change.
+suspect and what nobody has decoded yet. This page owns the layout: every offset,
+size, field and grade. [`tdt-format.md`](./tdt-format.md) owns the meaning (unit
+types, the original's rules, what the codec does) and links here instead of
+restating a table. The two must agree. Where they differ, fix both in the same
+change, and keep a layout fact in one place only.
 
 **Snapshot.** Written 2026-10-30 from the nine game-written saves in
 `conformance/fixtures/tdt-reddit/`, the game's own re-saves of our exports
@@ -57,6 +59,11 @@ offset: walk the blocks in order.
 Every offset in blocks 6 to 12 is fixed relative to the end of block 5 (call it
 F): statistic words F+0, finance F+88, flags F+220, bytes F+232, parking F+274,
 clinic list F+1,300, stairs F+1,322, tail F+1,962.
+
+Measured example, TOWER2.TDT (470,530 bytes): people at 68,282 with N = 9,984;
+retail at 228,030; elevators at 237,246 (214,080 bytes for 24 slots); statistic
+words at 451,326; finance at 451,414; parking at 451,600; clinic list at 452,626;
+stairs at 452,648; tail at 453,288 (17,242 bytes).
 
 ---
 
@@ -144,6 +151,11 @@ and the game loads that fine; the game's own re-saves rebuild it.
 
 Multi-story units are one record per floor (parts); the importer merges them.
 
+Floor indexes run 0 to 119 (our floor is the index minus 9, see `tdt-format.md`
+section 5). Rows 110 to 119 hold nothing except the cathedral, which stands on
+rows 109 to 113 as five stacked parts (types 40 on floor 100 up to 36 on floor
+104).
+
 Rows that are not rooms. Type 0 is a paving piece (state 2) that fills floor
 tiles between rooms; type 45 is the metro tunnel, on floor index 0 only (our
 floor -9, B10), running along both sides of the station (TOWER7: tiles 0 to 208
@@ -152,7 +164,8 @@ floor indexes 2, 1 and 0, 30 tiles wide each (TOWER7: tiles 208 to 238). Widths
 seen in the saves: security 16, medical center 26, housekeeping 15, recycling
 center 25, parking stall 4, parkade ramp 16 (type 44).
 
-Parking rows hold stalls (type 11) and one ramp per segment. A row may carry
+Parking rows hold stalls (type 11) and one ramp per segment (what the rules around
+them mean is in `tdt-format.md` section 6.1). A row may carry
 short paving pieces between stalls (TOWER7 B5: tiles 138 to 141 and 149 to 150,
 state 2), drawn flat grey with cars only in stalls; the file still counts those
 stalls as connected. A paving piece 56 tiles wide (TOWER1) leaves the stalls
@@ -260,7 +273,8 @@ index 39 in TOWER4's express). Not decoded.
 
 `k` is every spanned floor for standard and service shafts, and only the
 eligible floors for express shafts (file index minus 9 is at most 1 or a
-multiple of 15). Layout from [TD], consistent with the nine saves:
+multiple of 15). The "at most 1" part covers every basement floor, so
+the express shafts in the saves carry an entry for each underground floor. Layout from [TD], consistent with the nine saves:
 
 | Off | Size | Field | Status |
 | --- | --- | --- | --- |
@@ -339,7 +353,10 @@ ten-wide groups suggest a per-security-office or per-clinic table.
 `u16` connected-stall count, then 512 x `u16` ascending stall ids (numbered from
 0, the rest zero). Header byte 50 counts all stalls. Known. All nine reddit
 saves match: the count equals the stall total except TOWER1 (55 of 63, the
-stalls a whole row of paving away from their ramp are not counted).
+stalls a whole row of paving away from their ramp are not counted). TOWER7 also holds two short paving
+pieces in one row, yet the file still counts every stall there as connected, which
+is why the importer closes such gaps (`tdt-format.md` section 6.1). Our own
+connectivity rule is in [classic-parking-audit.md](./classic-parking-audit.md).
 
 ### 7.6 Clinic list (F+1,300, 22 bytes)
 
