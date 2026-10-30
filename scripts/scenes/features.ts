@@ -253,7 +253,8 @@ export const FEATURE_SCENES: Scene[] = [
           await page.evaluate(pgStepNoDraw, 330);
           await page.evaluate(() => {
             const g = (window as any).game;
-            g.engine.setCamera(Math.floor(g.grid.width / 2), -3, 1.7);
+            const m = g.sim.tower.units.find((u: any) => u.kind === "metro");
+            g.engine.setCamera(m.x + m.width / 2, -3, 1.7);
             g.engine.animClock = 252; // cycle start: the train is still off-lot
           });
         },
@@ -271,7 +272,8 @@ export const FEATURE_SCENES: Scene[] = [
           await page.evaluate(pgStepNoDraw, 60);
           await page.evaluate(() => {
             const g = (window as any).game;
-            g.engine.setCamera(Math.floor(g.grid.width / 2), -3, 1.7);
+            const m = g.sim.tower.units.find((u: any) => u.kind === "metro");
+            g.engine.setCamera(m.x + m.width / 2, -3, 1.7);
             g.engine.animClock = 240; // parked window spans +3s to +9s from here
           });
         },

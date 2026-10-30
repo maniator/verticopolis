@@ -29,8 +29,13 @@ if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but 
 
 type Quote = { ok: boolean; reason?: string; cost: number };
 
-const KINDS = Object.keys(FACILITIES) as FacilityKind[];
-const FLOORS = [-10, -9, -4, -1, 0, 1, 2, 3, 4, 5, 6, 9, 11, 15, 16, 30, 31, 61, 100, 101];
+// The metro is not swept: the Rust engine refuses it on a row that holds a room
+// or above floors that exist below it (#1500), rules the TypeScript engine does
+// not have. the metro tests in engine-rs `tower_scans_tests.rs` cover them.
+const KINDS = (Object.keys(FACILITIES) as FacilityKind[]).filter((kind) => kind !== "metro");
+// Floor -9 is not swept: the Rust engine keeps the bottom basement row for the
+// metro tunnel (#1500), a rule the TypeScript engine does not have.
+const FLOORS = [-10, -4, -1, 0, 1, 2, 3, 4, 5, 6, 9, 11, 15, 16, 30, 31, 61, 100, 101];
 const XS = [-3, 0, 1, 37, 88, 120, 150, 151, 160, 175, 199, 240, 300, 371, 372, 380, 1000];
 
 /** `star` raises a loaded tower's rating before both engines read it, so the

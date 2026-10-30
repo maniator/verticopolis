@@ -213,7 +213,7 @@ describe("Cockroach persistence and legibility", () => {
     const sim = hotelTower(9);
     const dirtyRoom = placeHotel(sim, X0);
     placeHotel(sim, X0 + 20);
-    sim.tower.place("housekeeping", 2, X0 + 10);
+    sim.tower.place("housekeeping", 2, X0 + 4);
     dirtyRoom.state = "dirty";
     const cov = sim.housekeepingCoverage();
     expect(cov.rooms).toBe(2);

@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use super::reads_tests::{game, must, stacked, STATES};
-use crate::facilities::{Kind, FACILITIES};
+use crate::facilities::{Kind, FACILITIES, MIN_FLOOR};
 use crate::sim::Simulation;
 use crate::star::is_tenant_floor_unit;
 use crate::tower::{Tower, UnitState};
@@ -305,4 +305,65 @@ fn housekeeping_cannot_be_placed_underground() {
         reason.contains("can't be built in the basement"),
         "{reason}"
     );
+}
+
+/// A tower with a lobby on floor 1 and floor tiles on floors 0 to -3 under it.
+fn basement_tower() -> Tower {
+    let mut tower = Tower::new();
+    let lobby = Kind::Lobby.facility().width;
+    for x in (0..375 - lobby + 1).step_by(lobby as usize) {
+        must(tower.place(Kind::Lobby, 1, x));
+    }
+    for floor in [0, -1, -2, -3] {
+        for x in 0..375 {
+            must(tower.place(Kind::Floor, floor, x));
+        }
+    }
+    tower
+}
+
+#[test]
+fn a_metro_station_is_thirty_wide_and_leaves_the_rows_above_its_tunnel_open() {
+    let mut tower = basement_tower();
+    // Floor -3 is below a station placed at -2, so it has to be clear first.
+    assert!(!tower.can_place(Kind::Metro, -2, 100).ok);
+    assert_eq!(Kind::Metro.facility().width, 30);
+    let station = must(tower.place(Kind::Metro, -3, 100));
+    assert_eq!(tower.get_unit(station).unwrap().width, 30);
+    // Its bottom row is the tunnel, so a room cannot go there.
+    assert!(!tower.can_place(Kind::Office, -3, 20).ok);
+    // Rooms still go on the two rows above it, beside the station.
+    assert!(tower.can_place(Kind::Shop, -2, 20).ok);
+}
+
+#[test]
+fn nothing_goes_below_a_metro_station_and_a_station_needs_a_clear_bottom_row() {
+    let mut tower = basement_tower();
+    must(tower.place(Kind::Metro, -3, 100));
+    // A room on the station's own bottom row is refused, as is anything lower.
+    let tunnel = tower.can_place(Kind::Shop, -3, 20);
+    assert!(!tunnel.ok, "{:?}", tunnel.reason);
+    assert!(!tower.can_place(Kind::Floor, -4, 20).ok);
+    assert!(tower.can_place(Kind::Shop, -2, 20).ok);
+    // A room on the bottom row first keeps a station off that row.
+    let mut other = basement_tower();
+    must(other.place(Kind::Shop, -3, 20));
+    let blocked = other.can_place(Kind::Metro, -3, 100);
+    assert!(!blocked.ok, "{:?}", blocked.reason);
+}
+
+#[test]
+fn the_bottom_basement_row_takes_only_the_metro_and_its_tunnel() {
+    let mut tower = basement_tower();
+    for floor in (-8..=-4).rev() {
+        for x in 0..375 {
+            must(tower.place(Kind::Floor, floor, x));
+        }
+    }
+    // Floor -9 is SimTower's B10: tiles are laid there, rooms are not.
+    for x in 0..375 {
+        must(tower.place(Kind::Floor, MIN_FLOOR, x));
+    }
+    assert!(!tower.can_place(Kind::Shop, MIN_FLOOR, 20).ok);
+    must(tower.place(Kind::Metro, MIN_FLOOR, 100));
 }

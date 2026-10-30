@@ -15,8 +15,8 @@
     {
       "op": "build",
       "kind": "security",
-      "floor": -1,
-      "x": 108
+      "floor": -2,
+      "x": 180
     },
     {
       "op": "tick",

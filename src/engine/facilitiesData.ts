@@ -317,7 +317,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "security",
     category: "service",
     name: "Security",
-    width: 8,
+    width: 16,
     cost: 100000,
     // Buildable at 2★, it is the facility that GATES 3★, so it must be placeable
     // before the tower is 3★ or the rating deadlocks at 2★ forever.
@@ -328,7 +328,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "medical",
     category: "service",
     name: "Medical Center",
-    width: 16,
+    width: 26,
     cost: 500000,
     minStar: 3,
     population: 0,
@@ -337,7 +337,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "housekeeping",
     category: "service",
     name: "Housekeeping",
-    width: 8,
+    width: 15,
     cost: 50000,
     minStar: 2,
     population: 0,
@@ -346,7 +346,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "recycling",
     category: "service",
     name: "Recycling Center",
-    width: 20,
+    width: 25,
     floors: 2,
     cost: 500000,
     minStar: 3,
@@ -357,9 +357,9 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "metro",
     category: "special",
     name: "Metro Station",
-    // Spans the full lot width and THREE deep-basement floors (B8–B10 in the
-    // original), so it must be placed at the bottom of the basement.
-    width: LOT_WIDTH,
+    // 30 tiles wide and THREE deep-basement floors (B8–B10 in the original,
+    // as SimTower saves it). The tunnel is the rest of its bottom row.
+    width: 30,
     floors: 3,
     cost: 1000000,
     minStar: 4,

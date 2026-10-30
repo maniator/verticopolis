@@ -44,7 +44,7 @@ export function buildWinningTower(sim: Simulation, opts: WinTowerOpts = {}): voi
   // Above-ground standard floors 2..100.
   for (let f = 2; f <= GRID.maxFloor; f++) for (let x = LEFT; x < RIGHT; x++) t.place("floor", f, x);
   // Deep basement stories, built top-down (each hangs off the floor above), full
-  // width so the full-lot (375-wide) Metro fits at the bottom.
+  // width so the Metro fits at the bottom.
   for (let f = 0; f >= GRID.minFloor; f--) for (let x = 0; x < GRID.width; x++) t.place("floor", f, x);
 
   // Overlapping standard elevators (cap 30 floors each) that chain service
@@ -69,7 +69,7 @@ export function buildWinningTower(sim: Simulation, opts: WinTowerOpts = {}): voi
   // Rating gates (each skippable to test that it blocks the ladder). Rooms may
   // not sit on the lobby (floor 1) — amenities go on standard floor 2; the metro
   // is a basement facility.
-  if (!omit.has("metro")) t.place("metro", GRID.minFloor, 0); // full-lot, bottom of the basement
+  if (!omit.has("metro")) t.place("metro", GRID.minFloor, 0); // 30 wide, bottom of the basement
   if (!omit.has("security")) {
     t.place("security", 2, LEFT + 20);
     t.place("security", 3, LEFT + 20); // the 3★ gate wants more than one office
@@ -79,7 +79,8 @@ export function buildWinningTower(sim: Simulation, opts: WinTowerOpts = {}): voi
   // tower runs ~17–20k occupants, so build a row of nine centers (22.5k
   // capacity) in the basement, above the metro.
   if (!omit.has("recycling")) {
-    for (let i = 0; i < 9; i++) t.place("recycling", -1, LEFT + 60 + i * 20);
+    const recyclingW = FACILITIES.recycling.width;
+    for (let i = 0; i < 9; i++) t.place("recycling", -1, LEFT + 60 + i * recyclingW);
   }
   if (!omit.has("hotelSuite")) {
     t.place("hotelSuite", 2, LEFT + 80); // width 12

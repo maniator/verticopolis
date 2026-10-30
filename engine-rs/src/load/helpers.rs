@@ -214,6 +214,20 @@ pub(super) fn stories_at_version(kind: Kind, version: Option<f64>) -> i64 {
     kind.floors()
 }
 
+/// The width a kind had when the v1 to v2 migration was written, so it still
+/// re-lays an old save the way it always did. The catalog moved security,
+/// medical, housekeeping and recycling to their SimTower widths and the metro
+/// to 30 tiles (#1500); this keeps the old widths for that one migration.
+pub(super) fn v2_width(kind: Kind) -> i64 {
+    match kind {
+        Kind::Security | Kind::Housekeeping => 8,
+        Kind::Medical => 16,
+        Kind::Recycling => 20,
+        Kind::Metro => LOT,
+        _ => kind.facility().width,
+    }
+}
+
 pub(super) fn floor_unit(id: i64, floor: i64, x: i64) -> Value {
     json!({
         "id": id, "kind": "floor", "floor": floor, "x": x, "width": 1, "state": "empty",

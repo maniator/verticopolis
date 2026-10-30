@@ -365,7 +365,7 @@ export function buildCleanlinessTower(): void {
   s.star = 5;
   const W = g.grid.width;
   const cx = Math.floor(W / 2);
-  const left = cx - 30;
+  const left = cx - 35; // wide enough for the 15-wide housekeeping room and six hotel rooms a floor
   const right = cx + 30;
   // Ground lobby grows outward from the seeded center; floors 2..12.
   for (let x = cx; x <= right; x++) s.tower.place("lobby", 1, x);
@@ -380,7 +380,7 @@ export function buildCleanlinessTower(): void {
   if (hk.ok) s.tower.getUnit(hk.unitId).state = "occupied"; // in service now, skip construction
   // Fill every floor with hotel rooms, guests asleep.
   for (let f = 2; f <= 12; f++) {
-    for (let x = left + 22; x + 1 <= right; ) {
+    for (let x = left + 27; x + 1 <= right; ) {
       const r = s.tower.place("hotelDouble", f, x);
       if (r.ok) {
         const u = s.tower.getUnit(r.unitId);

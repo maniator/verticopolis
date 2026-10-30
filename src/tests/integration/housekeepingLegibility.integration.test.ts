@@ -105,7 +105,7 @@ describe("maids step out of their own station", () => {
   it("a dispatched maid spawns at the housekeeping unit's footprint, not a random tile", () => {
     const sim = baseTower(55);
     placeRoom(sim, 2, X0, "dirty");
-    const hk = sim.tower.place("housekeeping", 2, X0 + 20);
+    const hk = sim.tower.place("housekeeping", 2, X0 + 8);
     expect(hk.ok).toBe(true);
     const crew = sim.tower.units.find((u) => u.id === hk.unitId)!;
     sim.clock.minutes = 13 * 60;

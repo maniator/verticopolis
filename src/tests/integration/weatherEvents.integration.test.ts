@@ -28,8 +28,8 @@ function makeCtx(tower: Tower, star: number, money = 1_000_000) {
 /** A small tower with a built, occupiable floor 2 (for placing a service). */
 function withFloor2(): Tower {
   const tower = new Tower();
-  for (let x = 0; x < 12; x++) tower.place("lobby", 1, x);
-  for (let x = 0; x < 12; x++) tower.place("floor", 2, x);
+  for (let x = 0; x < 20; x++) tower.place("lobby", 1, x);
+  for (let x = 0; x < 20; x++) tower.place("floor", 2, x);
   return tower;
 }
 
@@ -121,14 +121,14 @@ describe("Fires", () => {
   /** A tower with a flammable room, optionally defended by security + medical. */
   function fireTower(defended: boolean): Tower {
     const tower = new Tower();
-    const W = 20;
+    const W = 44;
     for (let x = 0; x < W; x++) tower.place("lobby", 1, x);
     // Floor 2 carries only the (optional) stations, so no office ever sits next
     // to one — keeps ignitions isolated (no spread) for a clean frequency count.
     for (let x = 0; x < W; x++) tower.place("floor", 2, x);
     if (defended) {
       tower.place("security", 2, 0);
-      tower.place("medical", 2, 10);
+      tower.place("medical", 2, 16);
     }
     // A large pool of ISOLATED offices (one per floor, so a fire can't spread and
     // depletion stays slow). Fires now destroy rooms permanently (gutted), so the

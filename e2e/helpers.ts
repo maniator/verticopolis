@@ -168,24 +168,25 @@ export function buildToStar(target: number): number {
   // Gates, added at the rung they unlock.
   if (target >= 3) {
     t.place("security", 2, 24);
-    t.place("security", 2, 34); // the 3★ gate wants two offices
+    t.place("security", 2, 40); // the 3★ gate wants two offices (16 wide each)
   }
   if (target >= 4) {
-    t.place("medical", 2, 44);
+    t.place("medical", 2, 56); // 26 wide, clear of both offices
     // Recycling demand scales with population (~2,500/center): the full tower
     // runs ~19k occupants, so a row of nine centers (22.5k capacity) keeps
-    // demand met at every rung, same sizing as the Tier-1 fixture.
-    for (let i = 0; i < 9; i++) t.place("recycling", -1, 64 + i * 20);
+    // demand met at every rung, same sizing as the Tier-1 fixture. A center
+    // is 25 wide, so they sit 25 apart.
+    for (let i = 0; i < 9; i++) t.place("recycling", -1, 64 + i * 25);
     t.place("hotelSuite", 2, 84);
     t.place("hotelSuite", 2, 100);
     // One working parking space per suite (canon), chained to a ramp, clear
     // of the recycling row on B1.
-    t.place("parkingRamp", 0, 260);
-    t.place("parking", 0, 266);
-    t.place("parking", 0, 272);
+    t.place("parkingRamp", 0, 300);
+    t.place("parking", 0, 316);
+    t.place("parking", 0, 320);
     s.vipFavorable = true;
   }
-  if (target >= 5) t.place("metro", -9, 0);
+  if (target >= 5) t.place("metro", -9, c - 15); // 30 wide, under the tower
 
   if (!hosted) {
     s.evaluateStar();

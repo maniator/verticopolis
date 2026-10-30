@@ -15,6 +15,12 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.0.4 (2026-10-30)
+
+- Security, medical, housekeeping and recycling build at SimTower's widths (16, 26, 15 and 25 tiles), and the metro station is 30 tiles wide with a full-width tunnel row. This moves the catalog digest and the conformance checkpoints.
+- Nothing can be built below a metro station, its bottom row holds only the station and its tunnel, and the bottom basement row (B10) takes only the metro. A station needs a clear bottom row and nothing under it.
+- The v1 to v2 save migration keeps the old widths of those kinds, so old saves re-lay exactly as before.
+
 ## 1.0.3 (2026-10-30)
 
 - The service elevator car holds 17 (`Kind::car_capacity`), the figure in the Windows Help file, up from 10. The catalog's `carCapacity`, the per-car load clamp, and the congestion read follow. The `.TDT` exporter keeps its old service capacity byte (`Kind::tdt_header_capacity`), because the byte is unreliable and the referee pins it. The catalog digests and the conformance lock move.

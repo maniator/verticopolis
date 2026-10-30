@@ -20,7 +20,7 @@ fn tower_in(mode: GameMode) -> Simulation {
 #[test]
 fn classic_housekeeping_cannot_be_removed_but_a_gutted_shell_clears() {
     let mut sim = tower_in(GameMode::Classic);
-    let hk = sim.tower.place(Kind::Housekeeping, 2, 30).unit_id.unwrap();
+    let hk = sim.tower.place(Kind::Housekeeping, 2, 20).unit_id.unwrap();
     let money = sim.money;
     assert_eq!(
         sim.remove_facility(hk, RemovalMethod::Bulldoze),
@@ -36,7 +36,7 @@ fn classic_housekeeping_cannot_be_removed_but_a_gutted_shell_clears() {
 #[test]
 fn modern_housekeeping_can_be_sold() {
     let mut sim = tower_in(GameMode::Modern);
-    let hk = sim.tower.place(Kind::Housekeeping, 2, 30).unit_id.unwrap();
+    let hk = sim.tower.place(Kind::Housekeeping, 2, 20).unit_id.unwrap();
     assert!(sim.remove_facility(hk, RemovalMethod::Sell).ok);
 }
 
