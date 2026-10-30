@@ -313,7 +313,7 @@ function wasmParityProjects() {
 }
 
 const expectedPackage = (command: "build" | "serve") => readExpectedPackage(publicDir(), command === "build" ? "build" : "other");
-const fingerprintOf = (command: "build" | "serve") => buildFingerprint(resolve(__dirname, "src"), expectedPackage(command));
+const fingerprintOf = (command: "build" | "serve") => buildFingerprint(resolve(__dirname, "src"), expectedPackage(command), ENGINE_BUILD !== "wasm-only");
 
 export default defineConfig(({ command }) => ({
   root: "src",

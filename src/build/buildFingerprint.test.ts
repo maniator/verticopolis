@@ -42,6 +42,10 @@ describe("the build fingerprint", () => {
     expect(buildFingerprint(srcDir(base), pkg("0.25.0", "bbb")).engine).toMatchObject({ crate: "0.25.0", rust: "bbb" });
   });
 
+  it("leaves the TypeScript engine out of a wasm-only build", () => {
+    expect(buildFingerprint(srcDir(base), null, false).engine.ts).toBeUndefined();
+  });
+
   it("leaves the Rust part out when the build has no package", () => {
     const fp = buildFingerprint(srcDir(base), null);
     expect(fp.engine.crate).toBeUndefined();

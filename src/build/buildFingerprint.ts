@@ -47,16 +47,18 @@ export function shellHash(srcDir: string, engineFiles: ReadonlySet<string>): str
 
 const cache = new Map<string, BuildFingerprint>();
 
-/** The build's fingerprint. Memoized per source tree and package, since the
- *  Vite config reads it for both the page's define and `version.json`. */
-export function buildFingerprint(srcDir: string, pkg: ExpectedEnginePackage | null): BuildFingerprint {
-  const key = `${srcDir}\0${pkg?.package ?? ""}\0${pkg?.sources ?? ""}\0${pkg?.crate?.version ?? ""}`;
+/** The build's fingerprint. A wasm-only build ships no TypeScript engine, so it
+ *  passes `shipsTsEngine` false and a change to that engine's sources does not
+ *  label its update. Memoized per source tree and package, since the Vite config
+ *  reads it for both the page's define and `version.json`. */
+export function buildFingerprint(srcDir: string, pkg: ExpectedEnginePackage | null, shipsTsEngine = true): BuildFingerprint {
+  const key = `${srcDir}\0${pkg?.package ?? ""}\0${pkg?.sources ?? ""}\0${pkg?.crate?.version ?? ""}\0${shipsTsEngine}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const engineDir = resolve(srcDir, "engine");
   const fingerprint: BuildFingerprint = {
     shell: shellHash(srcDir, new Set(tsEngineSourceFiles(engineDir, srcDir))),
-    engine: { crate: pkg?.crate?.version, rust: pkg?.sources ?? pkg?.package, ts: tsEngineSourceHash(engineDir, srcDir) },
+    engine: { crate: pkg?.crate?.version, rust: pkg?.sources ?? pkg?.package, ...(shipsTsEngine ? { ts: tsEngineSourceHash(engineDir, srcDir) } : {}) },
   };
   cache.set(key, fingerprint);
   return fingerprint;
