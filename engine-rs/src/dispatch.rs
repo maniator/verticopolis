@@ -352,6 +352,9 @@ impl ElevatorDispatch {
                 t.car_dir[i] = dir;
             }
         }
+        // The crowd searches the list, and the shafts come in saved order,
+        // which need not be id order.
+        self.closed_cars.sort_unstable();
     }
 }
 
@@ -467,3 +470,7 @@ impl Demand<'_> {
 #[cfg(test)]
 #[path = "dispatch_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "closed_cars_tests.rs"]
+mod closed_cars_tests;
