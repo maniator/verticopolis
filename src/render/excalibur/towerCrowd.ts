@@ -7,6 +7,7 @@ import type { FacilityKind } from "../../engine/types";
 import { isOperational } from "../../engine/types";
 import { drawCar, drawGarbageTruck, drawStreetCar } from "../sprites";
 import { GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
+import { metroTrainOffset } from "../metroTrainSchedule";
 import { addMetro } from "./towerMetro";
 import { buildWalkers } from "./towerWalkerBuild";
 import { crowdPopulation } from "./towerPopulation";
@@ -387,14 +388,11 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
       c.actor.graphics.use(carGfx(c, ind));
     }
   }
+  // The metro train runs on GAME time like the garbage truck: one call per
+  // daytime hour, none overnight, and pausing the game holds it where it is.
   for (const tr of engine.trainActors) {
-    const cycle = (anim % 12) / 12;
-    const span = tr.w + 12;
-    let offset: number;
-    if (cycle < 0.25) offset = (1 - cycle / 0.25) * -span;
-    else if (cycle < 0.75) offset = 0;
-    else offset = ((cycle - 0.75) / 0.25) * span;
-    tr.shift(offset);
+    const c = engine.sim.clock;
+    tr.shift(metroTrainOffset(c.minuteOfDay, tr.w + 12, c.isNight()));
   }
   // The garbage truck runs on GAME time (the collection is a sim event, not
   // ambience): during the collection hour it drives in along the center's

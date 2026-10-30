@@ -245,39 +245,41 @@ export const FEATURE_SCENES: Scene[] = [
         name: "metro-platform-waiting",
         setup: async (page) => {
           // Let the morning rush route commuters down first (the crowd moves on
-          // stepped frames), then park the train's ambient cycle just BEFORE it
-          // enters, so the platform reads with the track honestly empty. These 330
-          // frames are only intermediate crowd-routing, discarded before the shot,
-          // so step them without drawing (pgStepNoDraw): same final sim state, far
-          // faster.
+          // stepped frames), then put the game clock at 12:42, past the hour's
+          // train (it is in the station from :00 to :26), so the platform reads
+          // with the track honestly empty. These 330 frames are only intermediate
+          // crowd-routing, discarded before the shot, so step them without
+          // drawing (pgStepNoDraw): same final sim state, far faster.
           await page.evaluate(pgStepNoDraw, 330);
+          await page.evaluate(pgSetClock, 12.7);
           await page.evaluate(() => {
             const g = (window as any).game;
             const m = g.sim.tower.units.find((u: any) => u.kind === "metro");
             g.engine.setCamera(m.x + m.width / 2, -3, 1.7);
-            g.engine.animClock = 252; // cycle start: the train is still off-lot
           });
+          // Three drawn frames put the train and camera where the pins left them.
+          await page.evaluate(pgStep, 3);
         },
-        // anim lands at exactly 252.5 (settle steps the TestClock in whole
-        // frames): entry runs 252..255, so the nose is at world x ~692 while
-        // the camera frame starts at ~1586, an off-screen margin of ~900px.
-        wait: 500,
+        wait: 0,
       },
       {
         name: "metro-station-train",
         setup: async (page) => {
-          // A little more crowd, then re-base the cycle so the settle lands
-          // mid-dwell: the consist parked at the platform, doors at the crowd.
-          // Intermediate crowd frames, discarded before the shot, so no draw.
-          await page.evaluate(pgStepNoDraw, 60);
+          // A little more crowd, then put the game clock at 13:07 so the settle
+          // lands mid-dwell (the train is parked from :06 to :20): the consist at
+          // the platform, doors at the crowd. Intermediate crowd frames,
+          // discarded before the shot, so no draw.
+          await page.evaluate(pgStepNoDraw, 420);
+          await page.evaluate(pgSetClock, 13 + 7 / 60);
           await page.evaluate(() => {
             const g = (window as any).game;
             const m = g.sim.tower.units.find((u: any) => u.kind === "metro");
             g.engine.setCamera(m.x + m.width / 2, -3, 1.7);
-            g.engine.animClock = 240; // parked window spans +3s to +9s from here
           });
+          // Three drawn frames put the train and camera where the pins left them.
+          await page.evaluate(pgStep, 3);
         },
-        wait: 6000, // anim 246: train parked; six more seconds of arrivals
+        wait: 0, // the clock pin and a few frames are the last move, so the train sits where it set it
       },
     ],
   },
