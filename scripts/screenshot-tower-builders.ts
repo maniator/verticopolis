@@ -453,10 +453,7 @@ export function pgGrowToStar(target: number): number {
   // (Security 8, Medical 16, Suite 10). Basements carry recycling / the Metro.
   const amenityFloor = top + 1;
   for (let x = left; x <= right; x++) s.tower.place("floor", amenityFloor, x);
-  if (target >= 3) {
-    s.tower.place("security", amenityFloor, left);
-    s.tower.place("security", amenityFloor, right - 20); // the 3★ gate wants two offices
-  }
+  if (target >= 3) for (const x of [left, right - 20]) s.tower.place("security", amenityFloor, x); // 3★ wants two
   if (target >= 4) {
     s.tower.place("medical", amenityFloor, left + 10);
     // Two hotel suites so the 4★ suite gate is met (clear of the 16-wide Medical), on the Average rent
