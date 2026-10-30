@@ -67,6 +67,7 @@ pub struct ExportHeaderCounts {
     pub recycling: i64,
     pub commercial: i64,
     pub security: i64,
+    pub medical: i64,
     pub hall_cinema: i64,
 }
 

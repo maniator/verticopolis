@@ -50,11 +50,11 @@ fn classify_stair_record(bytes: &[u8], o: usize) -> i64 {
 
 /// `locateStairs`: find the 64-record stairs table by scanning from `from`
 /// for the window that holds the most built flights with no bad record, the
-/// earliest such window winning a tie.
-pub fn locate_stairs(bytes: &[u8], from: usize) -> Vec<TdtStair> {
+/// earliest such window winning a tie. Returns where the window starts.
+fn find_stairs_table(bytes: &[u8], from: usize) -> Option<usize> {
     const REC: usize = TDT_STAIR_RECORD_SIZE;
     if bytes.len() < REC {
-        return vec![];
+        return None;
     }
     let last = (bytes.len() - REC).min(from + TDT_STAIR_SCAN_WINDOW);
     // Windows start one byte apart and are 64 records long, so each offset is
@@ -88,12 +88,16 @@ pub fn locate_stairs(bytes: &[u8], from: usize) -> Vec<TdtStair> {
         }
         base += 1;
     }
-    let Some(best_base) = best_base else {
-        return vec![];
-    };
+    best_base
+}
+
+/// The built flights of the 64 records that start at `base`; a table that
+/// runs past the end of the file is read as far as it goes.
+fn read_stairs(bytes: &[u8], base: usize) -> Vec<TdtStair> {
+    const REC: usize = TDT_STAIR_RECORD_SIZE;
     let mut stairs = vec![];
     for s in 0..TDT_STAIR_SLOTS {
-        let o = best_base + s * REC;
+        let o = base + s * REC;
         if o + REC > bytes.len() {
             break;
         }
@@ -108,18 +112,36 @@ pub fn locate_stairs(bytes: &[u8], from: usize) -> Vec<TdtStair> {
     stairs
 }
 
-/// Could a complete stairs table start exactly at `at`?
-pub fn stairs_table_starts_at(bytes: &[u8], at: usize) -> bool {
-    if at + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE > bytes.len() {
-        return false;
+/// The flights found by [`find_stairs_table`], or none.
+pub fn locate_stairs(bytes: &[u8], from: usize) -> Vec<TdtStair> {
+    find_stairs_table(bytes, from).map_or_else(Vec::new, |base| read_stairs(bytes, base))
+}
+
+/// The flights of a complete stairs table that starts exactly at `at`, or
+/// `None` when the file is too short or a record is not a stairs record. An
+/// empty table is a table.
+pub fn stairs_in_table_at(bytes: &[u8], at: usize) -> Option<Vec<TdtStair>> {
+    const REC: usize = TDT_STAIR_RECORD_SIZE;
+    if at + TDT_STAIR_SLOTS * REC > bytes.len() {
+        return None;
     }
-    let mut built = 0;
+    let mut stairs = vec![];
     for s in 0..TDT_STAIR_SLOTS {
-        let c = classify_stair_record(bytes, at + s * TDT_STAIR_RECORD_SIZE);
-        if c < 0 {
-            return false;
+        let o = at + s * REC;
+        match classify_stair_record(bytes, o) {
+            c if c < 0 => return None,
+            0 => {}
+            _ => stairs.push(TdtStair {
+                type_id: bytes[o + 1] as i64,
+                x: rd16(bytes, o + 2),
+                floor: rd16(bytes, o + 4),
+            }),
         }
-        built += c;
     }
-    built > 0
+    Some(stairs)
+}
+
+/// Could a complete stairs table with at least one flight start exactly at `at`?
+pub fn stairs_table_starts_at(bytes: &[u8], at: usize) -> bool {
+    stairs_in_table_at(bytes, at).is_some_and(|stairs| !stairs.is_empty())
 }
