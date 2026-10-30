@@ -21,6 +21,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.74.3
+
+- A new elevator car joins the shaft's schedule: every hour that ran the whole fleet now runs the added car too, while hours you cut back stay as you set them.
+- The schedule dialog has a "Run all cars, every hour, both day types" button, so you no longer set 48 hours one at a time.
+
 ## 2.74.2
 
 - Housekeepers no longer climb into a service elevator car that the schedule has parked, so every dirty hotel room gets cleaned on time when you run fewer cars.

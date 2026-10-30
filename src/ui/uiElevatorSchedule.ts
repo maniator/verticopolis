@@ -408,6 +408,7 @@ export function showElevatorScheduleDialog(
       homesDirty = true;
       after();
     },
+    onAllCars: () => { state.schedule.activeCars = { weekday: fullRow(), weekend: fullRow() }; announce(`All ${ctx.cars} cars now run every hour, both day types.`); after(); },
     onPreset: (p: SchedulePreset) => {
       const preset = presetSchedule(p, shaftNow(state.floors));
       state.schedule.activeCars = {

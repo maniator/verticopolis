@@ -368,3 +368,7 @@ mod tests;
 #[cfg(test)]
 #[path = "charges_removal_tests.rs"]
 mod removal_tests;
+
+#[cfg(test)]
+#[path = "charges_schedule_tests.rs"]
+mod schedule_tests;

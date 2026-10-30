@@ -1321,6 +1321,8 @@ ul.slots .slot-actions .btn {
 .es-heading { font-weight: 700; }
 /* Day toggle: the pressed day sits in its bevel like #speed .btn.active. */
 .es-day .btn.es-on { font-weight: 700; box-shadow: var(--bevel-in); }
+/* The day buttons stay one group for assistive tech without boxing the row. */
+.es-daypair { display: contents; }
 /* Presets row (Modern): the recommended preset carries the primary ring. */
 .es-presets .btn.es-rec { box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-out); font-weight: 700; }
 .es-presets .btn.es-rec:active { box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-in); }

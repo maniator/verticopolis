@@ -415,7 +415,18 @@ impl Tower {
                     .collect(),
             );
         }
+        let was = t.cars;
         t.cars = cars;
+        // A car bought joins the shaft's duty pattern (#1546): an hour that
+        // ran every car runs the new fleet, and every other hour (cut back,
+        // or off shift) stays as the player set it.
+        if let Some(s) = t.schedule.as_mut().filter(|_| cars > was) {
+            for row in [&mut s.weekday, &mut s.weekend].into_iter().flatten() {
+                for active in row.iter_mut().filter(|a| **a >= was) {
+                    *active = cars;
+                }
+            }
+        }
         if t.schedule.is_some() {
             let raw = t.schedule.as_ref().unwrap().to_json();
             t.schedule = Schedule::coerce(Some(&raw), t.cars, t.bottom, t.top);

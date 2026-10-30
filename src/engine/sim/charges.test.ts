@@ -59,6 +59,57 @@ describe("addCar / removeCar", () => {
     expect(lift.cars).toBe(maxCarsFor(lift.kind));
   });
 
+  it("puts a bought car on the authored duty pattern and keeps it through a save (#1546)", () => {
+    const { sim, lift } = fixture();
+    const weekend = Array.from({ length: 24 }, (_, h) => (h < 6 ? 0 : 1));
+    lift.schedule = { activeCars: { weekday: Array(24).fill(1), weekend } };
+    expect(sim.addCar(lift.id).ok).toBe(true);
+    expect(sim.addCar(lift.id).ok).toBe(true);
+    const want = { weekday: Array(24).fill(3), weekend: weekend.map((n) => (n === 0 ? 0 : 3)) };
+    expect(lift.schedule?.activeCars).toEqual(want);
+    const loaded = Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())));
+    const again = loaded.tower.transportAt(1, 10)!;
+    expect(again.cars).toBe(3);
+    expect(again.schedule?.activeCars).toEqual(want);
+  });
+
+  it("clamps the pattern when a car is sold and follows the inheritance rule on a rebuy (#1546)", () => {
+    const { sim, lift } = fixture();
+    expect(sim.tower.setCars(lift.id, 4)).toBe(true);
+    // Hours at 4, 3, 2, 1 and 0 active cars, the weekend the other way round.
+    const weekday = Array.from({ length: 24 }, (_, h) => [4, 3, 2, 1, 0][h % 5]);
+    const weekend = Array.from({ length: 24 }, (_, h) => [0, 1, 2, 3, 4][h % 5]);
+    lift.schedule = { activeCars: { weekday, weekend }, homeFloors: [1, 2, 1, 2] };
+    const money = sim.money;
+    const clamp = (row: number[], cars: number) => row.map((n) => Math.min(n, cars));
+    const state = () => ({
+      rows: lift.schedule?.activeCars,
+      homes: lift.schedule?.homeFloors,
+      cars: [lift.cars, lift.carPositions.length],
+    });
+
+    expect(sim.removeCar(lift.id)).toEqual({ ok: true, delta: carResaleRefund() });
+    expect(state()).toEqual({ rows: { weekday: clamp(weekday, 3), weekend: clamp(weekend, 3) }, homes: [1, 2, 1], cars: [3, 3] });
+    expect(sim.removeCar(lift.id)).toEqual({ ok: true, delta: carResaleRefund() });
+    expect(state()).toEqual({ rows: { weekday: clamp(weekday, 2), weekend: clamp(weekend, 2) }, homes: [1, 2], cars: [2, 2] });
+    expect(sim.money).toBe(money + 2 * carResaleRefund());
+
+    const loaded = Simulation.deserialize(JSON.parse(JSON.stringify(sim.serialize())));
+    const again = loaded.tower.transportAt(1, 10)!;
+    expect(again.cars).toBe(2);
+    expect(again.schedule?.activeCars).toEqual({ weekday: clamp(weekday, 2), weekend: clamp(weekend, 2) });
+    expect(again.schedule?.homeFloors).toEqual([1, 2]);
+
+    // Buying one back: the hours that now run the whole fleet of 2 run 3.
+    expect(sim.addCar(lift.id).ok).toBe(true);
+    const regrown = (row: number[]) => clamp(row, 2).map((n) => (n === 2 ? 3 : n));
+    expect(lift.schedule?.activeCars).toEqual({ weekday: regrown(weekday), weekend: regrown(weekend) });
+
+    // The last car is never sold.
+    expect(sim.tower.setCars(lift.id, 1)).toBe(true);
+    expect(sim.removeCar(lift.id)).toEqual({ ok: false, reason: LAST_CAR, delta: 0 });
+  });
+
   it("refuses removing the last car, a missing shaft and a stairway", () => {
     const { sim, lift, stairs } = fixture();
     const money = sim.money;

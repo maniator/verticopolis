@@ -18,6 +18,7 @@ existed as a step inside a stacked branch.
 ## 1.1.1 (2026-10-30)
 
 - An elevator car the schedule has stood down takes no new riders: a person waiting at a floor does not board a parked car, which never left its home floor. A stood-down car that still has riders aboard keeps running to their floors, answers no hall calls and takes nobody new, then parks when the cab is empty. This moves `expected.json` for `amenities-modern`, `fixture-split-tower-4` and `offshift-schedule-modern`. The TypeScript reference engine carries the same rule so the shared lock holds for both.
+- A bought elevator car joins the shaft's duty schedule (`Tower::set_cars`): in each day type, every hour that ran the whole fleet now runs the new fleet, and every other hour keeps its count. Home floors, stops and unscheduled shafts are unchanged, and a shrink still clamps. No conformance scenario buys a car into a schedule, so the lock does not move; the TypeScript reference mirrors the rule.
 
 ## 1.1.0 (2026-10-30)
 
