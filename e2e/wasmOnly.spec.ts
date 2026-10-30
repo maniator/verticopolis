@@ -273,6 +273,53 @@ test.describe("never falls back to the TypeScript engine", () => {
     expect(errors.filter((e) => !/the Rust engine failed during a tick: unreachable/.test(e))).toEqual([]);
   });
 
+  test("a trap during an autosave keeps the last good save, and the reload loads it (#1422)", async ({ page }) => {
+    await page.goto("/");
+    await hostedGame(page);
+    // Run the tower a little, pause it, and save: the last good save.
+    await page.evaluate(() => (window as any).game.setSpeed(3));
+    await page.waitForFunction(() => (window as any).game.reader.header.minutes > 0, undefined, { timeout: 30_000 });
+    const saved = await page.evaluate(() => {
+      const g = (window as any).game;
+      g.setSpeed(0);
+      g.saveLoad.save(true);
+      return { text: localStorage.getItem("verticopolis-save"), minutes: g.reader.header.minutes as number };
+    });
+    expect(saved.text).not.toBeNull();
+    // The engine traps inside the autosave's serialize, and every later call
+    // on it throws, as a poisoned wasm-bindgen object does.
+    await page.evaluate(() => {
+      const engine = (window as any).__vcEngine.port;
+      const proto = Object.getPrototypeOf(engine);
+      Object.defineProperty(engine, "serialize", {
+        value: () => {
+          for (const key of Object.getOwnPropertyNames(proto)) {
+            if (key === "constructor" || typeof Object.getOwnPropertyDescriptor(proto, key)?.value !== "function") continue;
+            Object.defineProperty(engine, key, {
+              value: () => {
+                throw new Error("recursive use of an object detected which would lead to unsafe aliasing in rust");
+              },
+              configurable: true,
+              writable: true,
+            });
+          }
+          throw new WebAssembly.RuntimeError("unreachable");
+        },
+        configurable: true,
+        writable: true,
+      });
+      void (window as any).game.saveLoad.autosave();
+      // The next step hears the poisoned engine as the trap.
+      (window as any).game.setSpeed(1);
+    });
+    await expect(page.locator("#boot-fallback-host")).toContainText("Reloading your tower", { timeout: 30_000 });
+    expect(await page.evaluate(() => localStorage.getItem("verticopolis-save"))).toBe(saved.text);
+    await page.waitForEvent("load", { timeout: 30_000 });
+    await hostedGame(page);
+    await page.waitForFunction((m) => (window as any).game.reader.header.minutes === m, saved.minutes, { timeout: 10_000 });
+    expect(await page.evaluate(() => localStorage.getItem("verticopolis-save"))).toBe(saved.text);
+  });
+
   /** Install the worker and reload under it, so the engine package is in
    *  the precache, then change the cached binary with `edit`. */
   async function installThen(page: Page, edit: (url: string) => Promise<boolean>): Promise<void> {

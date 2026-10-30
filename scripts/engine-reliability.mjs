@@ -19,8 +19,8 @@
  * re-fires on every tab-hide, the error behind the 2026-09-03 readout.
  *
  * The rules:
- * - The window holds the page lives whose `settle` row (or, once it ships,
- *   `attempt` row) falls in it. A page life that settled earlier is left out
+ * - The window holds the page lives whose `settle` row (or `attempt`
+ *   row) falls in it. A page life that settled earlier is left out
  *   whole, so a fault from before the window is never charged to it.
  * - A page life is COUNTED when it settled (sent a `settle` row), asked for a
  *   counted host (`wasm` by default; the experimental hosts are measurement
@@ -77,11 +77,11 @@
  *   on faults over N: about 3/N with none, about 4.74/N with one.
  * - The size of a loop is kept: the report gives the fallbacks the counted
  *   page lives sent in all, and the most in one page life.
- * - The overall rate is early telemetry (plan 4.1, OD-2), whatever commits
- *   are named. Release evidence is the engaged eligible cohort on the commits
- *   the gate review names (`--eligible-shas`). That cohort, the all-attempts safety denominator, the tail and the
- *   arm comparison are counted in `engine-reliability-cohorts.mjs` (#1090),
- *   whose header carries their rules.
+ * - The staged cohort is gone (the Rust engine is the only engine the shipped
+ *   game runs), and so is the script that counted its stages and arms. The
+ *   cohort fields (`stage`, `assigned_arm`, `selected_by`, `size_gated`) and
+ *   the `unclean-exit` and `marker-blocked` codes are still read from the
+ *   rows already stored, so the history stays countable.
  *
  * What it cannot see: the relay is best-effort, with no offline queue and a
  * per-IP rate limit, so a fallback in an offline session never reports, nor
@@ -99,16 +99,13 @@
  *
  * Run: `POSTHOG_PERSONAL_API_KEY=phx_... node scripts/engine-reliability.mjs
  * --window 30 [--hosts wasm] [--shas abc1234,def5678] [--versions 2.36.0]
- * [--builds switchable] [--arms wasm] [--eligible-shas abc1234]
- * [--tail-shas abc1234] [--floor-shas abc1234]`. Any other flag is an error. The key
+ * [--builds switchable] [--arms wasm]`. Any other flag is an error. The key
  * and host are the ones `posthog-report.mjs` reads.
  */
 
 import { appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { lit, parseWindow, rowsToObjects, runQuery } from "./posthog-report.mjs";
-import { OVERRIDE_SELECTIONS, cohortCaveats, isSuppressed, renderCohortsMarkdown, suppressedFault, summarizeCohorts } from "./engine-reliability-cohorts.mjs";
-import { renderFloorsMarkdown, summarizeFloors } from "./engine-reliability-floors.mjs";
 
 /** The event the game sends. */
 export const EVENT = "engine_status";
@@ -146,7 +143,7 @@ export const ROW_LIMIT = 50_000;
 const SAFE_VALUE = /^[A-Za-z0-9._+-]{1,64}$/;
 
 /** HogQL: one row per page life that settled or made an attempt in the
- *  window (the `attempt` row is proposed for #1090 and not sent yet),
+ *  window (the `attempt` row, sent since #1090),
  *  production only,
  *  newest first, so a truncated result keeps the latest builds. `hours` is a
  *  `parseWindow` integer. Booleans compare with `= true` and are coalesced, as
@@ -185,20 +182,6 @@ export function buildPageLivesQuery(hours) {
     "GROUP BY session_id, page_life",
     "HAVING countIf(properties.trigger IN ('settle', 'attempt')) > 0",
     "ORDER BY first_seen DESC",
-    `LIMIT ${ROW_LIMIT}`,
-  ].join("\n");
-}
-
-/** HogQL: the sessions with an `$exception` in the window, production only,
- *  for the arm comparison's crash rate. */
-export function buildCrashSessionsQuery(hours) {
-  return [
-    "SELECT DISTINCT distinct_id AS session_id",
-    "FROM events",
-    "WHERE event = '$exception'",
-    "  AND properties.environment = 'production'",
-    `  AND timestamp >= now() - INTERVAL ${hours} HOUR`,
-    "ORDER BY session_id",
     `LIMIT ${ROW_LIMIT}`,
   ].join("\n");
 }
@@ -291,8 +274,8 @@ export function upperBound(k, n, confidence = 0.95) {
  *  checked commits, so a forged one-letter commit matches nothing. */
 export const shaMatches = (sha, shas) => SHA.test(sha) && shas.some((s) => SHA.test(s) && (sha.startsWith(s) || s.startsWith(sha)));
 
-/** The values A4 (#1197) and #1090 plan for their fields, before any build
- *  sends them; the change that ships them binds these lists to the source. */
+/** The values the retired cohort and #1090 sent for their fields. Old rows
+ *  still carry them, and a value outside these lists is left out. */
 export const STAGES = ["none", "0", "1", "2", "3"];
 export const ASSIGNED_ARMS = ["none", "wasm", "ts", "unassigned"];
 export const SELECTIONS = ["default", "cohort", "setting", "url", "safety-build", "safety-device"];
@@ -312,6 +295,27 @@ export const recognized = (pl) =>
   VERSION.test(pl.version) &&
   isCount(pl.fallbacks) &&
   isCount(pl.settleFallbacks);
+
+/** The `selected_by` values that make a page life an override: the player
+ *  chose either engine (Settings) or the URL did. Old rows only. */
+const OVERRIDE_SELECTIONS = ["setting", "url"];
+
+/** The selections a safety suppression made (old rows only): a build-scoped
+ *  one and a fault kept on the device. */
+const SAFETY_SELECTIONS = ["safety-build", "safety-device"];
+
+/** The reasons that say nothing about the engine. */
+const NON_ENGINE_REASONS = ["package-mismatch", "unverifiable", "marker-blocked"];
+
+/** Whether a safety suppression moved the page life to TypeScript (old rows
+ *  only): the flag, or a safety selection. */
+const isSuppressed = (pl) => pl.safetySuppressed || SAFETY_SELECTIONS.includes(pl.selectedBy);
+
+/** Whether a suppressed page life carries an engine-fault reason: the boot
+ *  that detected a crash loop reported `unclean-exit` on a page life that then
+ *  ran TypeScript, so the fault belongs to the engine. A fallback whose reason
+ *  rows were lost counts too. */
+const suppressedFault = (pl) => isSuppressed(pl) && ((pl.fallbacks > 0 && pl.reasons.length === 0) || pl.reasons.some((r) => !NON_ENGINE_REASONS.includes(r)));
 
 /** The arm a page life is counted under: `override` when a setting or the
  *  URL chose its engine, its assigned arm otherwise. */
@@ -460,15 +464,13 @@ export function renderReliabilityMarkdown(summary, meta) {
   const lines = [
     "# Engine reliability",
     "",
-    `> **Snapshot** of the ${meta.windowLabel} to ${meta.until} (UTC), production only: the page lives that settled (or made an attempt) in that window. It does not refresh: the live figure is this script run again (\`node scripts/engine-reliability.mjs\`), whose rules \`src/engine-reliability.test.ts\`, \`src/engine-reliability-cohorts.test.ts\`, \`src/engine-reliability-cohorts-report.test.ts\` and \`src/engine-reliability-floors.test.ts\` pin.`,
+    `> **Snapshot** of the ${meta.windowLabel} to ${meta.until} (UTC), production only: the page lives that settled (or made an attempt) in that window. It does not refresh: the live figure is this script run again (\`node scripts/engine-reliability.mjs\`), whose rules \`src/engine-reliability.test.ts\` pins.`,
     `> Counted: hosts ${meta.hosts.map(code).join(", ")}; builds ${meta.builds}; arms ${meta.arms}.`,
-    "> **This overall rate is early telemetry** (plan 4.1, OD-2): it is never release evidence, so triage each failure, and do not publish it as a reliability figure. The 1,000-session gate counts the engaged eligible cohort under *Release evidence and safety* (#1090; the owner's direction of 2026-10-21), read beside the all-attempts safety denominator.",
-    ...(meta.cohorts ? cohortCaveats(meta.cohorts, { eligibleShas: meta.eligibleShas ?? [] }) : []),
+    "> **This overall rate is early telemetry** (plan 4.1, OD-2): it is never release evidence, so triage each failure, and do not publish it as a reliability figure. The Rust engine is now the only engine the shipped game runs, so the staged cohort and its arm comparison are gone and old rows are counted as they were sent.",
     "> **A lower bound.** The relay is best-effort, with no offline queue and a per-IP rate limit, so a fallback in an offline session, a tab closed while the engine loads, a tab killed before it reports (or after a capped drop with no later hide) and a boot whose game never started after its engine failed never count. Runtime traps are not reported before #874. Outcomes are as of this run, so a page life that settled near the end of the window can still fall back. Background tabs that were never seen still count. Sessions are not independent, so the bound below is optimistic.",
   ];
   if (meta.hosts.includes("wasm-worker")) lines.push("> **The worker host** reports only its first tower, so its later fallbacks are missing, and its `other` is a boot step outside the engine, counted as a fault.");
   if (meta.truncated) lines.push(`> **Truncated:** the query hit a row limit (${ROW_LIMIT.toLocaleString("en-US")} asked for), so these counts are short. Narrow the window.`);
-  if (meta.crashesTruncated) lines.push(`> **The \`$exception\` sessions are truncated:** that query hit its row limit (${ROW_LIMIT.toLocaleString("en-US")} asked for), so the arm comparison's crash counts are short and skewed. Narrow the window.`);
   lines.push(
     "",
     "| Measure | Value |",
@@ -485,7 +487,7 @@ export function renderReliabilityMarkdown(summary, meta) {
     `| Size-gated page lives (outside the rate) | ${summary.sizeGatedPageLives} |`,
     `| Kept on TypeScript because the crash marker could not be written (outside the rate) | ${summary.markerBlockedPageLives} |`,
     `| Page lives that made an attempt and never settled (outside the rate) | ${summary.unsettledPageLives} |`,
-    `| Safety-suppressed page lives naming a counted host (on TypeScript; outside the rate) | ${summary.safetySuppressedPageLives} (${summary.crashLoopPageLives} reporting a crash loop, an engine fault the cohort section counts) |`,
+    `| Safety-suppressed page lives naming a counted host (on TypeScript; outside the rate) | ${summary.safetySuppressedPageLives} (${summary.crashLoopPageLives} reporting a crash loop, an engine fault of the retired crash-marker path) |`,
     `| Unrecognized page lives (values the game never sends; left out) | ${summary.unrecognizedPageLives} |`,
     ...groupTable("By build", "Version (commit, bundle)", "build", summary.byBuild),
     ...groupTable("By arm", "Arm", "arm", summary.byArm),
@@ -497,22 +499,17 @@ export function renderReliabilityMarkdown(summary, meta) {
     "| --- | --- |",
     ...summary.byReason.map((r) => `| ${code(r.reason)} | ${r.pageLives} |`),
   );
-  if (meta.cohorts) lines.push(...renderCohortsMarkdown(meta.cohorts, { eligibleShas: meta.eligibleShas ?? [], tailShas: meta.tailShas ?? [] }));
-  if (meta.floors) lines.push(...renderFloorsMarkdown(meta.floors));
   return lines.join("\n") + "\n";
 }
 
 /** The flags the script takes; any other is an error. */
-const FLAGS = ["window", "hosts", "shas", "versions", "builds", "arms", "eligible-shas", "tail-shas", "floor-shas"];
+const FLAGS = ["window", "hosts", "shas", "versions", "builds", "arms"];
 
 /** What each list flag may hold: a closed list, or the shape of the value. */
 const FLAG_VALUES = {
   hosts: (v) => HOSTS.includes(v),
   builds: (v) => BUILDS.includes(v),
   shas: (v) => SHA.test(v),
-  "eligible-shas": (v) => SHA.test(v),
-  "tail-shas": (v) => SHA.test(v),
-  "floor-shas": (v) => SHA.test(v),
   versions: (v) => VERSION.test(v),
   arms: (v) => SAFE_VALUE.test(v),
 };
@@ -520,9 +517,6 @@ const FLAG_HELP = {
   hosts: HOSTS.join(", "),
   builds: BUILDS.join(", "),
   shas: "commits of 7 to 40 lowercase hex digits",
-  "eligible-shas": "commits of 7 to 40 lowercase hex digits, each one the gate review names: it carries S4 (#874), S9 (#954) and the slice-10 facade, and the old mirror host cannot run under `wasm` on it",
-  "tail-shas": "commits of 7 to 40 lowercase hex digits",
-  "floor-shas": "commits of 7 to 40 lowercase hex digits, each a build at stage 1 or 2 that carries every fix its stage needed (plan 4.1)",
   versions: "versions like 2.36.0",
   arms: "arm names",
 };
@@ -559,18 +553,10 @@ export function parseArgs(argv) {
     if (bad !== undefined) throw new Error(`--${name} cannot hold "${bad}" (it takes ${FLAG_HELP[name]})`);
     return items;
   };
-  const eligibleShas = list("eligible-shas") ?? [];
-  const tailShas = list("tail-shas") ?? [];
-  const stray = tailShas.find((t) => !eligibleShas.some((e) => t.startsWith(e) || e.startsWith(t)));
-  if (stray !== undefined) throw new Error(`--tail-shas holds "${stray}", which --eligible-shas does not name (the tail is part of the eligible evidence)`);
   const hosts = list("hosts") ?? DEFAULT_HOSTS;
-  if (eligibleShas.length && !hosts.includes("wasm")) throw new Error("--eligible-shas needs --hosts to include wasm (eligible page lives ask for the production host)");
   return {
     window: parseWindow(raw.get("window") ?? "30"),
     opts: { hosts, shas: list("shas"), versions: list("versions"), builds: list("builds"), arms: list("arms") },
-    eligibleShas,
-    tailShas,
-    floorShas: list("floor-shas") ?? [],
   };
 }
 
@@ -596,21 +582,15 @@ async function main() {
     console.error("POSTHOG_PERSONAL_API_KEY is not set (a phx_... personal key with query:read; see scripts/posthog-report.mjs).");
     process.exit(1);
   }
-  const { window: span, opts, eligibleShas, tailShas, floorShas } = args;
-  const [res, crashRes] = await Promise.all([runQuery(buildPageLivesQuery(span.hours)), runQuery(buildCrashSessionsQuery(span.hours))]);
-  for (const r of [res, crashRes]) {
-    if (!r.ok) {
-      console.error(`The query failed: ${r.hint}`);
-      process.exit(1);
-    }
+  const { window: span, opts } = args;
+  const res = await runQuery(buildPageLivesQuery(span.hours));
+  if (!res.ok) {
+    console.error(`The query failed: ${res.hint}`);
+    process.exit(1);
   }
   const { rows, truncated } = responseRows(res.json);
-  const crashes = responseRows(crashRes.json);
   const lives = pageLivesFromRows(rows);
   const summary = summarizeReliability(lives, opts);
-  // The cohorts read every recognized page life: the narrowing flags apply to
-  // the overall rate only, and the cohort section says so.
-  const cohorts = summarizeCohorts(lives, { hosts: opts.hosts, eligibleShas, tailShas, crashSessions: new Set(crashes.rows.map((r) => String(r.session_id ?? ""))) });
   const each = (xs) => xs.map(code).join(", ");
   const builds = [opts.shas && `commits ${each(opts.shas)}`, opts.versions && `versions ${each(opts.versions)}`, opts.builds && `bundles ${each(opts.builds)}`].filter(Boolean).join("; ") || "all";
   const md = renderReliabilityMarkdown(summary, {
@@ -620,11 +600,6 @@ async function main() {
     builds,
     arms: opts.arms ? each(opts.arms) : `all but ${EXCLUDED_ARMS.map(code).join(" and ")}`,
     truncated,
-    crashesTruncated: crashes.truncated,
-    cohorts,
-    floors: summarizeFloors(lives, floorShas),
-    eligibleShas,
-    tailShas,
   });
   console.log(md);
   if (process.env.GITHUB_STEP_SUMMARY) {

@@ -1,6 +1,6 @@
 import { html, type TemplateResult } from "lit-html";
 import { APP_VERSION } from "../appVersion";
-import { crashReportDue, markCrashReportShown, tabStore, type RustCrashFacts } from "../engineCohort/crashReload";
+import { crashReportDue, markCrashReportShown, tabStore, type RustCrashFacts } from "../engineCrash/crashReload";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl, timesText, type CrashEngines, type CrashTower, type RustCrashDescription } from "../game/crashReport";
 import { TS_ENGINE_SOURCES, TS_ENGINE_VERSION } from "../wasmhost/tsEngineIdentity";
 import { downloadFile } from "./downloadFile";
@@ -32,7 +32,7 @@ export interface RustCrashApp {
 export function rustCrashTemplate(crash: RustCrashDescription, reportHref: string): TemplateResult {
   return html`
     <h2>The Rust engine crashed</h2>
-    <p>The Rust engine crashed ${timesText(crash.crashes)}, so this game is running on the TypeScript engine for now. You can switch back in Settings.</p>
+    <p>The Rust engine crashed ${timesText(crash.crashes)}, so this game is running on the TypeScript engine for now.</p>
     <p>A bug report helps us fix it. The crash report is a zip with the crash details and your tower save; nothing is sent anywhere until you attach it to a bug report yourself.</p>
     <p class="crash-status" aria-live="polite"></p>
     <div class="modal-actions">

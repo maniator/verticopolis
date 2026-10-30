@@ -81,10 +81,10 @@ describe("helpTemplate structure and a11y", () => {
     expect(norm(privacy!.textContent ?? "")).toContain(shared);
   });
 
-  it("says what the engine test reports, as the approved analytics packet words it", () => {
+  it("says what the engine reliability rows report", () => {
     const text = (renderToFragment(helpPrivacyBody()).textContent ?? "").replace(/\s+/g, " ");
-    expect(text).toContain("It never sends the test group's number, and none of it identifies you.");
-    expect(text).toContain("whether you started playing, and a short code if the engine stopped.");
+    expect(text).toContain("whether you started playing, and a short code if the engine stopped. None of it identifies you.");
+    expect(text).not.toContain("test group");
   });
 
   it("tells players what happens if the game engine stops, and offers no engine choice", () => {

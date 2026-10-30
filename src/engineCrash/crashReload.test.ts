@@ -1,39 +1,48 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { CRASH_LOOP_PAGES } from "./crashMarker";
 import {
-  clearRustCrashes,
+  CRASH_LOOP_PAGES,
   countRustCrash,
   crashOutcome,
   crashReportDue,
   markCrashReportShown,
-  heldAfterCrashes,
+  crashReloadsSpent,
   RUST_CRASHES_KEY,
 } from "./crashReload";
 
 beforeEach(() => sessionStorage.clear());
 
+/** Whether the tab's stored crashes on `sha` have spent its reloads. */
+function spent(sha: string): boolean {
+  try {
+    const record = JSON.parse(sessionStorage.getItem(RUST_CRASHES_KEY) ?? "null") as { sha?: string; count?: number } | null;
+    return record?.sha === sha && crashReloadsSpent(record.count ?? 0);
+  } catch {
+    return false;
+  }
+}
+
 describe("the tab's Rust crash count", () => {
-  it("counts crashes on one build and holds the tab at the loop size", () => {
-    expect(heldAfterCrashes(sessionStorage, "a")).toBe(false);
+  it("counts crashes on one build and spends the tab's reloads at the loop size", () => {
+    expect(spent("a")).toBe(false);
     expect(countRustCrash(sessionStorage, "a")).toBe(1);
-    expect(heldAfterCrashes(sessionStorage, "a")).toBe(false);
+    expect(spent("a")).toBe(false);
     expect(countRustCrash(sessionStorage, "a")).toBe(CRASH_LOOP_PAGES);
-    expect(heldAfterCrashes(sessionStorage, "a")).toBe(true);
+    expect(spent("a")).toBe(true);
   });
 
-  it("starts over on another build, and after a retry", () => {
+  it("starts over on another build, and in a new tab", () => {
     countRustCrash(sessionStorage, "a");
     countRustCrash(sessionStorage, "a");
-    expect(heldAfterCrashes(sessionStorage, "b")).toBe(false);
+    expect(spent("b")).toBe(false);
     expect(countRustCrash(sessionStorage, "b")).toBe(1);
     countRustCrash(sessionStorage, "b");
-    clearRustCrashes(sessionStorage);
-    expect(heldAfterCrashes(sessionStorage, "b")).toBe(false);
+    sessionStorage.clear();
+    expect(spent("b")).toBe(false);
   });
 
   it("reads an unreadable record as no crashes, and a count storage did not keep as null", () => {
     sessionStorage.setItem(RUST_CRASHES_KEY, "{not json");
-    expect(heldAfterCrashes(sessionStorage, "a")).toBe(false);
+    expect(spent("a")).toBe(false);
     const full = {
       getItem: () => null,
       setItem: () => {
@@ -47,13 +56,11 @@ describe("the tab's Rust crash count", () => {
 });
 
 describe("what a crash does", () => {
-  it("reloads on Rust, then onto TypeScript, and stops where it cannot count or has no TypeScript", () => {
-    expect(crashOutcome(1, false)).toBe("reload");
-    expect(crashOutcome(CRASH_LOOP_PAGES, false)).toBe("reload-on-ts");
-    expect(crashOutcome(CRASH_LOOP_PAGES + 1, false)).toBe("reload-on-ts");
-    expect(crashOutcome(1, true)).toBe("reload");
-    expect(crashOutcome(CRASH_LOOP_PAGES, true)).toBe("stop");
-    expect(crashOutcome(null, false)).toBe("stop");
+  it("reloads on the first crash, and stops once the tab's reloads are spent or the count was not kept", () => {
+    expect(crashOutcome(1)).toBe("reload");
+    expect(crashOutcome(CRASH_LOOP_PAGES)).toBe("stop");
+    expect(crashOutcome(CRASH_LOOP_PAGES + 1)).toBe("stop");
+    expect(crashOutcome(null)).toBe("stop");
   });
 });
 
@@ -67,8 +74,8 @@ describe("the crash report the tab owes", () => {
     expect(crashReportDue(sessionStorage, "a")).toEqual({ count: CRASH_LOOP_PAGES, last: facts });
     expect(markCrashReportShown(sessionStorage, "a")).toBe(true);
     expect(crashReportDue(sessionStorage, "a")).toBeNull();
-    // The tab stays held: the mark only retires the report.
-    expect(heldAfterCrashes(sessionStorage, "a")).toBe(true);
+    // The reloads stay spent: the mark only retires the report.
+    expect(spent("a")).toBe(true);
   });
 
   it("is not due on another build, without kept facts, or with facts of the wrong shape", () => {
@@ -76,12 +83,12 @@ describe("the crash report the tab owes", () => {
     countRustCrash(sessionStorage, "a", facts);
     expect(crashReportDue(sessionStorage, "b")).toBeNull();
     expect(markCrashReportShown(sessionStorage, "b")).toBe(false);
-    clearRustCrashes(sessionStorage);
+    sessionStorage.clear();
     countRustCrash(sessionStorage, "a");
     countRustCrash(sessionStorage, "a");
     expect(crashReportDue(sessionStorage, "a")).toBeNull();
     sessionStorage.setItem(RUST_CRASHES_KEY, JSON.stringify({ v: 1, sha: "a", count: 2, last: { ...facts, rust: { version: 3, sourceHash: null } } }));
     expect(crashReportDue(sessionStorage, "a")).toBeNull();
-    expect(heldAfterCrashes(sessionStorage, "a")).toBe(true);
+    expect(spent("a")).toBe(true);
   });
 });

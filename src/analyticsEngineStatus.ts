@@ -1,8 +1,6 @@
 import { trackEvent, type GameplayEvents } from "./analyticsCore";
 import { APP_VERSION } from "./appVersion";
 import type { EngagedBy } from "./analyticsEngagement";
-import { COHORT_TELEMETRY } from "./engineCohort/config";
-import { cohortFields, type CohortFields } from "./engineCohort/fields";
 import { FALLBACK_REASONS, type BootStage, type FallbackReason, type FallbackStage } from "./wasmhost/engineBoot";
 import type { EngineChoice } from "./wasmhost/engineChoice";
 
@@ -75,11 +73,7 @@ export const ENGINE_STATUS_FIELDS = [
   "page_life",
   "version",
   "sha",
-  "stage",
-  "assigned_arm",
-  "selected_by",
   "engaged_by",
-  "size_gated",
 ] as const satisfies readonly (keyof GameplayEvents["engine_status"])[];
 type MissingField = Exclude<keyof GameplayEvents["engine_status"], (typeof ENGINE_STATUS_FIELDS)[number]>;
 const everyField: [MissingField] extends [never] ? true : MissingField = true;
@@ -92,29 +86,16 @@ void everyField;
  *  count survives the cap through the `summary` row. */
 export const MAX_ENGINE_STATUS_ROWS = 10;
 
-/** `fallback_reason`'s codes: the fallbacks', `unclean-exit`, which only the
- *  crash-loop check raises, on the settle row of the boot that found it, and
- *  `marker-blocked`, on the settle row of a boot that kept a Rust request on
- *  TypeScript because it could not write its crash marker. */
-export const ENGINE_STATUS_REASONS = [...FALLBACK_REASONS, "unclean-exit", "marker-blocked"] as const;
+/** `fallback_reason`'s codes: the fallbacks'. */
+export const ENGINE_STATUS_REASONS = FALLBACK_REASONS;
 export type EngineStatusReason = (typeof ENGINE_STATUS_REASONS)[number];
 
 /** What boot settled on, from its published state (`window.__vcEngineBoot`). */
 export interface EngineSettle {
   build: EngineBuild;
-  /** The engine the policy asked for, before any suppression or hold. */
+  /** The engine the page life asked for. */
   requested: EngineChoice;
-  /** The engine boot started, when it differs from `requested`. */
-  boot?: EngineChoice;
   failure: { stage: BootStage; reason: FallbackReason } | null;
-  /** The cohort's fields for this page life. */
-  cohort?: CohortFields;
-  /** The boot found a crash loop and runs TypeScript (`unclean-exit`). */
-  crashLoop?: boolean;
-  /** The boot could not write its crash marker and runs TypeScript (`marker-blocked`). */
-  markerBlocked?: boolean;
-  /** The size gate held this page life's tower on TypeScript (#1197). */
-  sizeGated?: boolean;
 }
 
 /** The boot stage of a failure, as analytics names it. A failure the settle
@@ -136,8 +117,6 @@ interface Status {
   reason: EngineStatusReason;
   stage: FallbackStage;
   fallbacks: number;
-  cohort?: CohortFields;
-  sizeGated?: true;
 }
 
 let status: Status | null = null;
@@ -171,9 +150,7 @@ function fallbackId(): string {
 
 function send(s: Status, trigger: EngineStatusTrigger, engagedBy?: EngagedBy): void {
   trackEvent("engine_status", {
-    ...(cohortRows.on ? (s.cohort ?? cohortFields(null)) : {}),
     ...(engagedBy ? { engaged_by: engagedBy } : {}),
-    ...(s.sizeGated ? { size_gated: true } : {}),
     trigger,
     engine_requested: s.requested,
     engine: s.engine,
@@ -202,34 +179,23 @@ function sendCapped(s: Status, trigger: EngineStatusTrigger, novel: boolean): vo
   send(s, trigger);
 }
 
-/** Whether the cohort's rows (`attempt`, `engaged`) go out: with the
- *  cohort's fields, which the owner approved on 2026-10-29 and the fields PR
- *  switches on. Exported for the tests. */
-export const cohortRows = { on: COHORT_TELEMETRY };
-
 /** Boot has chosen the engine and the package has not loaded yet: send the
  *  page life's `attempt` row (#1090), so a tab that closes or crashes during
  *  the load is still counted. Once per page life, outside the cap. */
-export function noteEngineAttempt(attempt: { build: EngineBuild; requested: EngineChoice; boot?: EngineChoice; cohort?: CohortFields; sizeGated?: boolean }): void {
-  if (!cohortRows.on || attemptSent) return;
+export function noteEngineAttempt(attempt: { build: EngineBuild; requested: EngineChoice }): void {
+  if (attemptSent) return;
   attemptSent = true;
-  const { build, requested, cohort } = attempt;
-  send({ build, requested, engine: engineKind(build, attempt.boot ?? requested, false), reason: "none", stage: "none", fallbacks: 0, cohort, ...(attempt.sizeGated ? { sizeGated: true as const } : {}) }, "attempt");
+  const { build, requested } = attempt;
+  send({ build, requested, engine: engineKind(build, requested, false), reason: "none", stage: "none", fallbacks: 0 }, "attempt");
 }
 
 /** The page life engaged (`analyticsEngagement.ts`): send its `engaged` row,
  *  with the engine running at that moment. Once per page life, outside the
  *  cap; before `settle` there is no engine to name, so it is ignored. */
 export function noteEngineEngaged(by: EngagedBy): void {
-  if (!cohortRows.on || !status || engagedSent) return;
+  if (!status || engagedSent) return;
   engagedSent = true;
   send(status, "engaged", by);
-}
-
-/** Why a boot without a failure did not start what it asked for, if it did not. */
-function settleReason(settle: EngineSettle): EngineStatusReason {
-  if (settle.crashLoop) return "unclean-exit";
-  return settle.markerBlocked ? "marker-blocked" : "none";
 }
 
 /** Boot has picked its engine: send the page life's `settle` row. Once per
@@ -240,12 +206,10 @@ export function noteEngineSettled(settle: EngineSettle): void {
   status = {
     build: settle.build,
     requested: settle.requested,
-    engine: engineKind(settle.build, settle.boot ?? settle.requested, failed),
-    reason: settle.failure?.reason ?? settleReason(settle),
+    engine: engineKind(settle.build, settle.requested, failed),
+    reason: settle.failure?.reason ?? "none",
     stage: settle.failure ? STAGE_OF_BOOT[settle.failure.stage] : "none",
     fallbacks: failed ? 1 : 0,
-    cohort: settle.cohort,
-    ...(settle.sizeGated ? { sizeGated: true as const } : {}),
   };
   reasonsSent.add(status.reason);
   send(status, "settle");

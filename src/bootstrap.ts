@@ -5,12 +5,11 @@ import { startGameplaySession, trackAppActionOnce } from "./analytics";
 import { installErrorTracking } from "./analyticsErrors";
 import { initPwaInstall } from "./pwaInstall";
 import { dualRunRequested, startDualRun, type DualRunApp } from "./dualrun/dualRun";
-import { noteRustCrashed, noteRustFailed, selectBootEngine, stageNotice } from "./engineCohort/boot";
-import { currentSelection } from "./engineCohort/current";
-import { selectionFacts } from "./engineCohort/fields";
 import { offerRustCrashReport, type RustCrashApp } from "./ui/rustCrashDialog";
 import { parseEngineIdentity } from "./wasmhost/engineIdentity";
-import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, reloadSoon, tabStore } from "./engineCohort/crashReload";
+import { removeLegacyCohortKeys } from "./engineCrash/legacyKeys";
+import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, reloadSoon, tabStore } from "./engineCrash/crashReload";
+import { engineRequested } from "./wasmhost/engineChoice";
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rustEngine";
 import { tsBootTower, type BootTower } from "./game/bootTower";
 import { setEngineWriter } from "./storage/vctowerWriter";
@@ -250,26 +249,18 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       return;
     }
     // The WASM engine is fetched before the app exists, so the first tower
-    // runs on it from its first tick. A switchable player build loads it
-    // only when the player asks for it, by a `?engine=wasm` visit or the
-    // Settings choice (#1422), or when the cohort's draw puts the browser on
-    // the WASM arm (`RUST_ONLY_BY_CHOICE`); a tooling build still honors the stored
-    // `vc.engine` choice. Either stays on the TypeScript engine when the
-    // package fails to load. A wasm-only build
-    // (`VC_ENGINE=wasm`) always loads it and stops here when it cannot: the
+    // runs on it from its first tick. A wasm-only build (`VC_ENGINE=wasm`,
+    // every deploy) always loads it and stops here when it cannot: the
     // TypeScript step loop is not in that bundle, and a silent fallback is
     // what the build rules out. The engine switch is compiled away there with
-    // the `__WASM_ONLY__` define. A TypeScript boot does not await, so it
-    // stays synchronous as before.
-    // The engine is the port (PR 5e), so the old measurement hosts
-    // (`wasm-frame`, `wasm-worker`) have nothing left to measure: a player
-    // build runs them on the TypeScript engine, and a tooling build boots
-    // the same engine on the main thread.
-    // A switchable build asks the staged cohort's policy (#1197): the URL, a
-    // safety suppression, the Settings choice, then the cohort arm.
-    const choice = __WASM_ONLY__ ? "wasm" : selectBootEngine();
+    // the `__WASM_ONLY__` define. A dev serve or tooling build (the e2e,
+    // screenshot and perf lanes) takes `?engine=` or the stored `vc.engine`
+    // choice, and stays on the TypeScript engine when the package fails to
+    // load. A TypeScript boot does not await, so it stays synchronous.
+    removeLegacyCohortKeys();
+    const choice = __WASM_ONLY__ ? "wasm" : engineRequested();
     // Counted before the package loads, so a load the tab never finishes is too (#1090).
-    const facts = selectionFacts(choice, currentSelection());
+    const facts = { requested: choice };
     noteEngineAttempt({ build: __WASM_ONLY__ ? "wasm-only" : "switchable", ...facts });
     const wantsRust = choice !== "ts";
     // The cover says so after a short wait, when the package takes a while (#1132).
@@ -277,11 +268,6 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     const booted = wantsRust ? await loadBootEngine({ wasmOnly: __WASM_ONLY__, load: (signal, onBuild) => loadWasmEngine(undefined, signal, { onBuild }) }) : typescriptBoot();
     let bootState: EngineBootState = booted.state;
     stopLoadingLine();
-    // Rust failed on this device: later boots stay on TypeScript (#1197), for
-    // this build after a load failure, else until a retry. Never throws.
-    const rustFailed = (stage: Parameters<typeof noteRustFailed>[0], reason: string) =>
-      __WASM_ONLY__ || noteRustFailed(stage, reason, bootState.binary?.state === "ok" ? bootState.binary.sourceHash : undefined);
-    if (bootState.failure) rustFailed(bootState.failure.stage, bootState.failure.reason);
     publishBootState(bootState);
     // The reliability instrument's one row per page life (`engine_status`,
     // `analyticsEngineStatus.ts`): codes only, read from the boot state. The
@@ -323,7 +309,6 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       } catch (e) {
         tower = null;
         bootState = failBoot(bootState, "start", bootFailureReason(e), e instanceof Error ? e.message : String(e));
-        rustFailed("start", bootFailureReason(e));
         console.error(__WASM_ONLY__ ? "[wasm] did not start, and this build has no other engine:" : "[wasm] did not start; running on the TypeScript engine:", e);
       }
       publishBootState(bootState);
@@ -359,28 +344,25 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // TypeScript engine mid-game (#1422): the module may be corrupt, so
       // nothing calls it again, the saves stay as last written, and the page
       // reloads onto the last autosave. This tab's second crash on a build
-      // reloads onto TypeScript, and a wasm-only build stops there instead.
+      // stops the game instead of reloading again.
       if (rust) {
         watchEngineTraps((e) => {
           const message = `the Rust engine failed during a tick: ${e instanceof Error ? e.message : String(e)}`;
           console.error(`[wasm] ${message}`);
           rust.status.hosted = false;
           rust.status.lastError = message;
-          // Nothing runs the tower now, on either build.
+          // Nothing runs the tower now.
           bootState = { ...failBoot(bootState, "host", "trap-tick", message), engine: "none" };
           setEngineWriter(null);
-          // Both builds count the trap in the reliability rows, as the stage
-          // its tower was hosted at. The tab keeps the fault and the engine
-          // that crashed for the crash report the TypeScript boot offers.
+          // The trap is counted in the reliability rows, as the stage its tower
+          // was hosted at. The tab keeps the fault and the engine that crashed
+          // for the crash report a TypeScript boot offers.
           const fault = { reason: "trap-tick", stage: runningTowerStage() } as const;
           const rustEngine = {
             version: parseEngineIdentity(bootState.identity)?.crate.version ?? null,
             sourceHash: bootState.binary?.state === "ok" ? bootState.binary.sourceHash : null,
           };
-          const outcome = crashOutcome(countRustCrash(tabStore(), __APP_SHA__, { ...fault, rust: rustEngine }), __WASM_ONLY__);
-          if (outcome === "reload") noteRustCrashed();
-          else if (outcome === "reload-on-ts") rustFailed("crash-loop", "trap-loop");
-          else rustFailed("host", "trap-tick");
+          const outcome = crashOutcome(countRustCrash(tabStore(), __APP_SHA__, { ...fault, rust: rustEngine }));
           publishBootState(bootState);
           // A reload's row names the engine that crashed, and goes out by
           // beacon, so it survives the reload.
@@ -389,7 +371,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
           app.setSpeed?.(0);
           if (outcome === "stop") showEngineFailure(bootState);
           else {
-            showCrashReload(CRASH_RELOAD_LINE[outcome]);
+            showCrashReload(CRASH_RELOAD_LINE);
             reloadSoon();
           }
         });
@@ -397,18 +379,13 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // The engine is settled. Sent before the tooling and service-worker
       // steps below, so a throw in one of them cannot lose the row.
       settle();
-      // A stage change that moved this browser's engine says so once (#1197).
-      // The first TypeScript boot after this tab's Rust crashes spent its
-      // reloads offers the crash report instead (#1422), which says more.
-      // A wasm-only build stopped at that crash and runs no TypeScript.
+      // A dev serve or tooling build on TypeScript, after this tab's Rust
+      // crashes spent its reloads, offers the crash report (#1422). A wasm-only
+      // build stopped at that crash and runs no TypeScript.
       try {
-        const offered = !__WASM_ONLY__ && !onRust && canReportCrash(app) && offerRustCrashReport(app, __APP_SHA__);
-        // The size gate's notice, for a tower it moved off the Rust engine (#1197).
-        const gatedOff = facts.sizeGated && facts.requested !== "ts" ? "This tower is larger than the Rust engine test covers yet, so it runs on the TypeScript engine." : null;
-        const notice = offered ? null : (gatedOff ?? stageNotice());
-        if (notice) app.ui?.toast?.(notice);
+        if (!__WASM_ONLY__ && !onRust && canReportCrash(app)) offerRustCrashReport(app, __APP_SHA__);
       } catch (e) {
-        console.error("[engine] could not show the engine test notice:", e);
+        console.error("[engine] could not offer the crash report:", e);
       }
       // Publish the tooling handle only where tooling runs: dev serves and
       // VC_TOOLING=1 builds (the e2e, screenshot, and perf pipelines; see

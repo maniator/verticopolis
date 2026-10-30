@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import { repoRel, sourceFiles } from "./guardFiles";
 
 /**
- * A page life never returns to Rust after a fallback (cohort spec, acceptance
- * 6, #1258). The engine is the port the app holds: Load, import and New go
- * through it (`enginePort()`), so once the first tower is on the TypeScript
- * port, nothing offers a later tower to the Rust engine. That holds only while
+ * A page life never returns to Rust after a fallback (#1258). The engine is
+ * the port the app holds: Load, import and New go through it
+ * (`enginePort()`), so once the first tower is on the TypeScript port,
+ * nothing offers a later tower to the Rust engine. That holds only while
  * the Rust engine can enter a page life at one place, the boot in
  * `src/bootstrap.ts`. A second caller of the Rust boot (a Load that retries
  * Rust, say) would reopen the gap with every other test green, so this fails
