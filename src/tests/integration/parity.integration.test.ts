@@ -59,7 +59,11 @@ describe("Gameplay parity: rating progression & the TOWER win", () => {
 
     expect(sim.tower.place("security", topFloor, 0).ok).toBe(true);
     sim.evaluateStar();
-    expect(sim.star).toBe(3); // Security unlocks 3★ at this population
+    expect(sim.star).toBe(2); // one office is not enough
+
+    expect(sim.tower.place("security", topFloor, 40).ok).toBe(true);
+    sim.evaluateStar();
+    expect(sim.star).toBe(3); // two Security offices unlock 3★ at this population
   });
 
   itTypeScriptOnly(V1_MODEL)("reaches the TOWER rating via population, Wedding Hall, metro and the VIP", () => {

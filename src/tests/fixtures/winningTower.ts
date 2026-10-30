@@ -70,7 +70,10 @@ export function buildWinningTower(sim: Simulation, opts: WinTowerOpts = {}): voi
   // not sit on the lobby (floor 1) — amenities go on standard floor 2; the metro
   // is a basement facility.
   if (!omit.has("metro")) t.place("metro", GRID.minFloor, 0); // full-lot, bottom of the basement
-  if (!omit.has("security")) t.place("security", 2, LEFT + 20);
+  if (!omit.has("security")) {
+    t.place("security", 2, LEFT + 20);
+    t.place("security", 3, LEFT + 20); // the 3★ gate wants more than one office
+  }
   if (!omit.has("medical")) t.place("medical", 2, LEFT + 40);
   // Recycling demand scales with population (canon: ~2,500/center) — a full
   // tower runs ~17–20k occupants, so build a row of nine centers (22.5k

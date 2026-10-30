@@ -214,6 +214,7 @@ describe("tsPanels answers", () => {
   it("answers each rung's gates as the engine meets them, met and unmet alike", () => {
     const sim = classicTower();
     placeUnit(sim, "security", 3, MID + 6).state = "occupied";
+    placeUnit(sim, "security", 4, MID + 6).state = "occupied"; // the gate wants two offices
     const metAt: Record<number, boolean[]> = {};
     for (const star of [1, 2, 3, 4, 5]) {
       sim.star = star;

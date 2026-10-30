@@ -8,6 +8,9 @@ import type { FacilityKind } from "../types";
 import { isPresent } from "../types";
 import { roomUnits } from "../tower/rooms";
 
+/** The Windows Help file asks for more than one Security Office at 3 stars. */
+const SECURITY_OFFICES_FOR_THREE_STARS = 2;
+
 /** Star rating + population census for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
 
@@ -168,7 +171,11 @@ export interface NextStarProgress {
 export function cumulativeStarGates(sim: Simulation, rung: number): StarRequirement[] {
   const gates: StarRequirement[] = [];
   if (rung >= 3) {
-    gates.push({ id: "security", label: "Security office", met: sim.hasOperational("security") });
+    gates.push({
+      id: "security",
+      label: "2+ security offices",
+      met: sim.countOperational("security") >= SECURITY_OFFICES_FOR_THREE_STARS,
+    });
   }
   if (rung >= 4) {
     gates.push({ id: "medical", label: "Medical center", met: sim.hasOperational("medical") });

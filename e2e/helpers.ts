@@ -177,7 +177,10 @@ export function buildToStar(target: number): number {
   }
 
   // Gates, added at the rung they unlock.
-  if (target >= 3) t.place("security", 2, 24);
+  if (target >= 3) {
+    t.place("security", 2, 24);
+    t.place("security", 2, 34); // the 3★ gate wants two offices
+  }
   if (target >= 4) {
     t.place("medical", 2, 44);
     // Recycling demand scales with population (~2,500/center): the full tower

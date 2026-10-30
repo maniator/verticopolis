@@ -55,7 +55,11 @@ impl Simulation {
     pub fn cumulative_star_gates(&self, rung: i64) -> Vec<(&'static str, bool)> {
         let mut gates = Vec::new();
         if rung >= 3 {
-            gates.push(("security", self.has_operational(Kind::Security)));
+            gates.push((
+                "security",
+                self.count_operational(Kind::Security)
+                    >= crate::star::SECURITY_OFFICES_FOR_THREE_STARS,
+            ));
         }
         if rung >= 4 {
             gates.push(("medical", self.has_operational(Kind::Medical)));

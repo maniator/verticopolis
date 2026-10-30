@@ -73,19 +73,27 @@ describeEngines("nextStarRequirements (what blocks the next star)", (leg) => {
     let req = sim.state.nextStarRequirements()!;
     expect(req.star).toBe(3);
     expect(req.popMet).toBe(true);
-    expect(req.gates.find((g) => g.label === "Security office")!.met).toBe(false);
+    expect(req.gates.find((g) => g.label === "2+ security offices")!.met).toBe(false);
     expect(req.allMet).toBe(false);
     sim.evaluateStar();
     expect(sim.state.star).toBe(2); // promotion refused, matching allMet === false
 
-    // Add an operational Security office: now ready, and evaluateStar promotes.
-    sim.setup((d) => {
-      const sec = d.tower.place("security", 2, W - FACILITIES.security.width);
+    // One operational office is still short of the two the gate wants.
+    const addSecurity = (d: Simulation, floor: number, x: number) => {
+      const sec = d.tower.place("security", floor, x);
       expect(sec.ok).toBe(true);
       d.tower.units.find((u) => u.id === sec.unitId)!.state = "occupied";
-    });
+    };
+    sim.setup((d) => addSecurity(d, 2, W - FACILITIES.security.width));
     req = sim.state.nextStarRequirements()!;
-    expect(req.gates.find((g) => g.label === "Security office")!.met).toBe(true);
+    expect(req.gates.find((g) => g.label === "2+ security offices")!.met).toBe(false);
+    sim.evaluateStar();
+    expect(sim.state.star).toBe(2);
+
+    // The second office makes it ready, and evaluateStar promotes.
+    sim.setup((d) => addSecurity(d, 3, W - FACILITIES.security.width));
+    req = sim.state.nextStarRequirements()!;
+    expect(req.gates.find((g) => g.label === "2+ security offices")!.met).toBe(true);
     expect(req.allMet).toBe(true);
     sim.evaluateStar();
     expect(sim.state.star).toBe(3); // promotion granted, matching allMet === true
@@ -102,7 +110,7 @@ describeEngines("nextStarRequirements (what blocks the next star)", (leg) => {
     const sim = new PortSim(leg, draft);
     const req = sim.state.nextStarRequirements()!;
     expect(req.gates.map((g) => g.label)).toEqual([
-      "Security office",
+      "2+ security offices",
       "Medical center",
       "Recycling meets demand",
       "2+ hotel suites",

@@ -480,11 +480,11 @@
     "star-climb-classic": [
       {"label":"start","state":"95cd144e1fd2ad1c","crowd":"7cb294222cbe0188","events":"4f53cda18c2baa0c"},
       {"label":"two-stars","state":"1f8abe6d66a4d321","crowd":"7cb294222cbe0188","events":"a9318e8eb969a541"},
-      {"label":"t+1440","state":"0020962347180ef3","crowd":"18c1b36ab7c4f082","events":"aa85d39de84b2b89"},
-      {"label":"t+2880","state":"2f0e917610b08eb6","crowd":"e2d2cc5ebfa43c5c","events":"4f53cda18c2baa0c"},
-      {"label":"t+4320","state":"fb04d6d4ad767200","crowd":"3049d5461b3c0561","events":"4f53cda18c2baa0c"},
-      {"label":"three-stars","state":"fb04d6d4ad767200","crowd":"3049d5461b3c0561","events":"4f53cda18c2baa0c"},
-      {"label":"final","state":"f934dadeeb4baae2","crowd":"3a1472c26cf35813","events":"4f53cda18c2baa0c"}
+      {"label":"t+1440","state":"17f7ff014de44eac","crowd":"18c1b36ab7c4f082","events":"8825bd10199620ee"},
+      {"label":"t+2880","state":"762129763f472a52","crowd":"e2d2cc5ebfa43c5c","events":"4f53cda18c2baa0c"},
+      {"label":"t+4320","state":"c06015229a8d8d14","crowd":"3049d5461b3c0561","events":"4f53cda18c2baa0c"},
+      {"label":"three-stars","state":"c06015229a8d8d14","crowd":"3049d5461b3c0561","events":"4f53cda18c2baa0c"},
+      {"label":"final","state":"6dbcda562c50c868","crowd":"3a1472c26cf35813","events":"4f53cda18c2baa0c"}
     ],
     "starter-classic": [
       {"label":"start","state":"7e9896e57a869117","crowd":"ffab01a633931504","events":"61704aba4769df8d"},

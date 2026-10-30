@@ -64,7 +64,7 @@ export function canCallExterminator(report: Pick<StatsReport, "housekeeping" | "
  *  answers (the TypeScript `star.ts` carries the same labels; a test pins the
  *  two together). */
 export const STAR_GATE_LABELS: Readonly<Record<StarGateId, string>> = {
-  security: "Security office",
+  security: "2+ security offices",
   medical: "Medical center",
   recycling: "Recycling meets demand",
   suites: "2+ hotel suites",

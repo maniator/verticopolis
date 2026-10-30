@@ -7,6 +7,8 @@ use crate::tower::{Unit, UnitState};
 
 pub const STAR_THRESHOLDS: [i64; 6] = [0, 0, 300, 1000, 5000, 10000];
 pub const TOWER_POPULATION: i64 = 15000;
+/// The Windows Help file asks for more than one Security Office at 3 stars.
+pub const SECURITY_OFFICES_FOR_THREE_STARS: i64 = 2;
 
 /// `isTenantFloorUnit`.
 pub fn is_tenant_floor_unit(u: &Unit) -> bool {
@@ -44,7 +46,7 @@ impl Simulation {
 
     /// `cumulativeStarGates(rung)`: every gate's met flag.
     pub(crate) fn cumulative_gates_met(&self, rung: i64) -> bool {
-        if rung >= 3 && !self.has_operational(Kind::Security) {
+        if rung >= 3 && self.count_operational(Kind::Security) < SECURITY_OFFICES_FOR_THREE_STARS {
             return false;
         }
         if rung >= 4 {
@@ -220,9 +222,13 @@ mod tests {
                 sim.tick(60.0);
             }
         };
-        // Without Security even the three-star rung fails.
+        // Without Security even the three-star rung fails, and one office is
+        // not enough: the Help file asks for more than one.
         assert!(!sim.cumulative_gates_met(3));
         assert!(sim.build(Kind::Security, 2, 160).ok, "security");
+        settle(&mut sim);
+        assert!(!sim.cumulative_gates_met(3), "one office is short");
+        assert!(sim.build(Kind::Security, 2, 190).ok, "second security");
         assert!(sim.build(Kind::Medical, 2, 170).ok, "medical");
         assert!(sim.build(Kind::HotelSuite, 3, 160).ok, "suite 1");
         assert!(sim.build(Kind::HotelSuite, 3, 172).ok, "suite 2");

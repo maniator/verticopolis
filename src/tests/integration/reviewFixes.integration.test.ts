@@ -82,6 +82,7 @@ describe("F1 — Security is buildable at 2★ (the unwinnable deadlock is gone)
     // The deadlock is broken: at 2★ Security is unlocked and buildable.
     expect(sim.isUnlocked("security")).toBe(true);
     expect(sim.build("security", 11, 0).ok).toBe(true);
+    expect(sim.build("security", 11, 100).ok).toBe(true); // the gate wants two offices
 
     // Phase 2: once Security finishes construction the tower promotes to 3★.
     guard = 0;
@@ -101,6 +102,7 @@ describe("F32 — rating gates ignore facilities that aren't operational yet", (
     expect(sim.population).toBeGreaterThanOrEqual(1000);
     sim.star = 2;
     expect(sim.build("security", 12, 0).ok).toBe(true); // enters a construction window
+    expect(sim.build("security", 12, 100).ok).toBe(true);
     sim.evaluateStar();
     expect(sim.star).toBe(2); // still 2★ while Security is mid-construction
     let guard = 0;
