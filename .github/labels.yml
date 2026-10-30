@@ -68,6 +68,9 @@ labels:
   - name: gate-3
     color: "d93f0b"
     description: Needed before the 3.0.0 flip (3.0 priorities plan)
+  - name: engine-1.0
+    color: "5319e7"
+    description: Needed before the engine crate's 1.0.0 release (#893)
   - name: closes with TS removal
     color: "cfd3d7"
     description: Only affects the TypeScript engine fallback; closes when the TypeScript engine is removed in 3.x
@@ -150,6 +153,7 @@ labels:
 #   gh label create gate-1        -c 0e8a16 -d "Needed before stage 1 of the engine cohort (3.0 priorities plan)" --force
 #   gh label create gate-2        -c bfdadc -d "Needed before stage 3 (3.0 priorities plan)" --force
 #   gh label create gate-3        -c d93f0b -d "Needed before the 3.0.0 flip (3.0 priorities plan)" --force
+#   gh label create engine-1.0    -c 5319e7 -d "Needed before the engine crate's 1.0.0 release (#893)" --force
 #   gh label create "closes with TS removal" -c cfd3d7 -d "Only affects the TypeScript engine fallback; closes when the TypeScript engine is removed in 3.x" --force
 #   gh label create P1            -c e60000 -d "Priority 1: work next" --force
 #   gh label create P2            -c ff8c00 -d "Priority 2: do when you next touch the area" --force
