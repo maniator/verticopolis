@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.63.0
+
+- The update prompt now says whether an update changes the game, the engine, or both, and shows the new engine version.
+
 ## 2.61.0
 
 - A tower exported to SimTower's .TDT format now keeps all 64 stairs and escalators when SimTower opens it. Before, towers with more than 48 lost 16.
@@ -29,10 +33,6 @@ notes, never a past version's.
 ## 2.60.1
 
 - A SimTower save that the original game re-saved now keeps its stairs and escalators when you import it.
-
-## 2.61.0
-
-- The update prompt now says whether an update changes the game, the engine, or both, and shows the new engine version.
 
 ## 2.60.0
 

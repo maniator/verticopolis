@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 0.24.1 (2026-10-30)
+
+- The .TDT exporter writes the stairs table where SimTower keeps it, with the parking and clinic lists, and the importer finds it there (#1501).
+
 ## 0.24.0 (2026-10-29)
 
 - The .TDT export keeps the game clock to the minute, so an exported tower imports with the same time.
