@@ -93,6 +93,9 @@ export function tsHousekeepingCoverage(sim: Simulation): HousekeepingCoverageVie
 export function tsUnitDetail(sim: Simulation, id: number): UnitDetail | null {
   const u = sim.tower.getUnit(id);
   if (!u) return null;
+  // A metro station is saved on its bottom row, but riders board on the
+  // platform floor above it, the floor the card's elevator access reports.
+  const accessFloor = u.kind === "metro" ? u.floor + 1 : u.floor;
   return {
     id: u.id,
     kind: u.kind,
@@ -112,8 +115,8 @@ export function tsUnitDetail(sim: Simulation, id: number): UnitDetail | null {
     subtype: nullish(u.subtype),
     vacateReason: nullish(u.vacateReason),
     filmPolicy: nullish(u.filmPolicy),
-    served: sim.tower.isFloorServed(u.floor),
-    reachable: sim.floorReachable(u.floor),
+    served: sim.tower.isFloorServed(accessFloor),
+    reachable: sim.floorReachable(accessFloor),
     floorHasLobby: sim.tower.floorHasLobby(u.floor),
     blockbuster: u.kind === "cinema" ? sim.isShowingBlockbuster(u.id) : null,
   };
