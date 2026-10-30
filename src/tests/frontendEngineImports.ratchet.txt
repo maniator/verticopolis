@@ -25,7 +25,6 @@
 # src/preview.ts and src/analyticsEngineBridge.ts. src/presentation/ and
 # src/audio/ import the engine for types only; the scan keeps them that way.
 src/analyticsEngineBridge.ts gameplayCatalog gameplayEventRules
-src/gallery.ts catalog facilities retailSubtypes
 src/game/appHistory.ts UndoHistory # moved from src/main.ts with the app's undo history (#874): no new engine import
 src/game/bootTower.ts Simulation port/tsEngine # moved from src/main.ts with the TypeScript engine's first tower (PR 5e): no new engine import
 src/game/editorActions.ts facilities sim/charges
