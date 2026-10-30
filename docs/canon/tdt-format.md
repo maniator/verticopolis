@@ -18,7 +18,9 @@ not here.
   retail game wrote under the Wine harness (`tools/simtower`), and the game's own
   re-saves of our exports.
 
-Where the sources disagree this page names the better-evidenced reading.
+Where the sources disagree this page names the better-evidenced reading. The
+full byte-by-byte table, with an honest unknown for every byte we cannot yet
+explain, is [tdt-byte-map.md](./tdt-byte-map.md).
 
 **Clean room.** This page restates the layout in our own words; no upstream text
 or code is copied, and none may be pasted in. Canon may come from observed
@@ -46,7 +48,7 @@ flowchart TB
     H["Header: 560 bytes (0x230)"] --> F["Floor map: 120 floors, each 6 + 18n + 188 bytes"]
     F --> P["People: u32 count N, then N x 16 bytes"]
     P --> R["Retail table: 512 x 18 = 9,216 bytes"]
-    R --> E["Elevators: 24 slots, 194 bytes empty, built = 194 + 3140 + 324k + 348"]
+    R --> E["Elevators: 24 slots, 194 bytes empty, built = 194 + 720 + 324k + 8 x 346"]
     E --> ST["Statistic words: 22 x i32 = 88 bytes"]
     ST --> FIN["Finance: 33 x i32 = 132 bytes"]
     FIN --> UF["Undecoded flags: 12 bytes"]
@@ -263,7 +265,7 @@ stand.
 24 slots, one pool shared by standard, service and express shafts.
 
 Slot record: an empty slot is 194 bytes; a built slot is
-`194 + 3140 + 324 k + 348` bytes.
+`194 + 720 + 324 k + 8 x 346` bytes (the same total as the `194 + 3140 + 324 k + 348` older versions of this page gave; the byte map, [tdt-byte-map.md](./tdt-byte-map.md), has the parts).
 
 | Offset | Size | Field | Meaning | Confidence |
 | --- | --- | --- | --- | --- |
@@ -278,9 +280,10 @@ Slot record: an empty slot is 194 bytes; a built slot is
 | 65 | u8 | bottomFloor | File floor index | High |
 | 66 | 120 B | serviced | One byte per floor, per-floor stop configuration | High |
 | 186 | 8 B | homes | Per-car home floor | Medium |
-| 194 | 3,140 B | fixed block | Zeros in game saves | High |
-| 3,334 | 324 k | floor entries | Waiting counts and up to 40 queued person indices each way | High |
-| 3,334 + 324 k | 348 | car block | Current floor, passengers, turnaround, destinations. One block per shaft, not per car | High |
+| 194 | 480 B | per-floor map | 120 x 4 bytes, one entry per floor index; stop ordinals and a bit set that is constant between two lobbies; not decoded | Medium |
+| 674 | 240 B | per-floor bytes | 2 x 120; the second is nonzero only at lobby floors; not decoded | Low |
+| 914 | 324 k | floor entries | Waiting counts and up to 40 queued person indices each way | High |
+| 914 + 324 k | 2,768 | car blocks | 8 x 346 bytes: current floor, passengers, turnaround, destinations. All 146 shafts in the nine real saves have eight | High |
 
 Entry count k:
 
