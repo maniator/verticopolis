@@ -362,7 +362,7 @@ describe("wide gap-straddling shaft: a rider alights on the destination run (#66
     for (let x = 16; x <= 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true); // run B, gap 15
     expect(sim.tower.placeTransport("stairs", 10, 1, 2).ok, "wide straddling stair placed").toBe(true);
     expect(sim.tower.hasStructure(2, 15), "the shaft's center sits over a real gap edge").toBe(false);
-    const crewRes = sim.tower.place("housekeeping", 2, 2); // run A
+    const crewRes = sim.tower.place("housekeeping", 2, 0); // run A
     const roomRes = sim.tower.place("hotelSingle", 2, 20); // run B (far side)
     expect(crewRes.ok && roomRes.ok).toBe(true);
     const crew = sim.tower.units.find((u) => u.id === crewRes.unitId)!;

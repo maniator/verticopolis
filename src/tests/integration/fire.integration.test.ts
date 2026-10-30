@@ -9,7 +9,7 @@ import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 function firePrep(leg: Leg, seed: number, n = 1) {
   const draft = newSeededGame(seed);
   const x0 = Math.floor(GRID.width / 2) - 20;
-  for (let i = 0; i < 40; i++) draft.tower.place("floor", 2, x0 + i);
+  for (let i = 0; i < 70; i++) draft.tower.place("floor", 2, x0 + i);
   const sim = new PortSim(leg, draft);
   sim.mustBuildTransport("elevatorStandard", x0, 1, 2);
   for (let i = 0; i < n; i++) sim.mustBuild("office", 2, x0 + i * 9);
@@ -33,8 +33,8 @@ function firePrep(leg: Leg, seed: number, n = 1) {
 function defend(sim: PortSim, x0: number): void {
   sim.setup((d) => {
     d.star = 4;
-    d.tower.place("security", 2, x0 + 30);
-    d.tower.place("medical", 2, x0 + 34);
+    d.tower.place("security", 2, x0 + 20);
+    d.tower.place("medical", 2, x0 + 36);
   });
 }
 
@@ -182,7 +182,7 @@ describeEngines("Emergency counters — the analytics-only tallies the shell rea
   it("a bomb sweep with Security on duty is not counted as a detonation", () => {
     const { sim, x0 } = firePrep(leg, 5, 2);
     sim.setup((d) => {
-      const guard = d.tower.place("security", 2, x0 + 30);
+      const guard = d.tower.place("security", 2, x0 + 20);
       if (guard) {
         const u = d.tower.units.find((unit) => unit.kind === "security");
         if (u) u.state = "occupied";

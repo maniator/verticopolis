@@ -28,11 +28,11 @@ fn the_checklist_and_promotion_agree_at_every_gate_threshold() {
     put(&mut sim, Kind::Security, 2, 160);
     settle(&mut sim, 24);
     agree(&sim, "security");
-    put(&mut sim, Kind::Medical, 2, 170);
+    put(&mut sim, Kind::Medical, 2, 180);
     settle(&mut sim, 24);
     agree(&sim, "medical");
     for fl in [0, -1] {
-        for x in 170..200 {
+        for x in 170..210 {
             put(&mut sim, Kind::Floor, fl, x);
         }
     }
@@ -58,7 +58,7 @@ fn the_checklist_and_promotion_agree_at_every_gate_threshold() {
     );
     assert!(sim.sell_at(3, 172), "sell the second suite");
     agree(&sim, "second suite sold");
-    assert!(sim.sell_at(2, 170), "sell medical");
+    assert!(sim.sell_at(2, 180), "sell medical");
     agree(&sim, "medical sold");
     assert!(sim.sell_at(-1, 180), "sell recycling");
     agree(&sim, "recycling sold");

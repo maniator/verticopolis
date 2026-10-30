@@ -269,7 +269,7 @@ describe("Hotel housekeeping", () => {
   function hotelTower(seed = 4): Simulation {
     const sim = newSeededGame(seed);
     const x0 = Math.floor(GRID.width / 2) - 20;
-    for (let i = 0; i < 20; i++) sim.tower.place("floor", 2, x0 + i);
+    for (let i = 0; i < 24; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
     return sim;
   }
@@ -357,7 +357,7 @@ describe("Hotel housekeeping", () => {
     const sim = hotelTower(8);
     sim.star = 2;
     const x0 = Math.floor(GRID.width / 2) - 20;
-    for (let f = 3; f <= 5; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
+    for (let f = 3; f <= 5; f++) for (let i = 0; i < 24; i++) sim.tower.place("floor", f, x0 + i);
     sim.tower.resizeTransport(sim.tower.transports[0].id, 1, 5); // passenger elevator to 5
     const r = sim.tower.place("hotelDouble", 5, x0);
     sim.tower.place("housekeeping", 2, x0 + 8); // crew stationed 3 floors below
@@ -395,7 +395,7 @@ describe("Hotel housekeeping", () => {
     const sim = hotelTower(41);
     sim.star = 2;
     const x0 = Math.floor(GRID.width / 2) - 20;
-    for (let f = 3; f <= 5; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
+    for (let f = 3; f <= 5; f++) for (let i = 0; i < 24; i++) sim.tower.place("floor", f, x0 + i);
     // Stairs built FIRST (the tie-break used to favor build order)…
     expect(sim.tower.placeTransport("stairs", x0 + 6, 2, 3).ok).toBe(true);
     // …then the service elevator covering the same hop (clear of the 8-wide stairs).
@@ -434,7 +434,7 @@ describe("Hotel housekeeping", () => {
     const sim = hotelTower(31);
     sim.star = 2;
     const x0 = Math.floor(GRID.width / 2) - 20;
-    for (let f = 3; f <= 5; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
+    for (let f = 3; f <= 5; f++) for (let i = 0; i < 24; i++) sim.tower.place("floor", f, x0 + i);
     // Two service shafts sharing every stop floor.
     expect(sim.tower.placeTransport("elevatorService", x0 + 6, 1, 5).ok).toBe(true);
     expect(sim.tower.placeTransport("elevatorService", x0 + 12, 1, 5).ok).toBe(true);
@@ -463,7 +463,7 @@ describe("Hotel housekeeping", () => {
   it("tenants never route over service elevators", () => {
     const sim = hotelTower(9);
     const x0 = Math.floor(GRID.width / 2) - 20;
-    for (let f = 3; f <= 5; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
+    for (let f = 3; f <= 5; f++) for (let i = 0; i < 24; i++) sim.tower.place("floor", f, x0 + i);
     sim.star = 2;
     sim.buildTransport("elevatorService", x0 + 14, 1, 5);
     // The service shaft is not a passenger route and doesn't serve floors…

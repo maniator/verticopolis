@@ -143,7 +143,8 @@ describe("the staff pool scales with built crews (canon: no tower-wide staff cap
     const sim = baseTower(39);
     expect(maxStaffFor(sim.tower)).toBe(0); // no crews: nothing to field
     expect(sim.tower.place("housekeeping", 2, X0 + 8).ok).toBe(true);
-    expect(sim.tower.place("housekeeping", 2, X0 + 16).ok).toBe(true);
+    placeSlab(sim, 3);
+    expect(sim.tower.place("housekeeping", 3, X0 + 8).ok).toBe(true);
     expect(maxStaffFor(sim.tower)).toBe(2 * HK_MAIDS_PER_UNIT);
     // A burning crew keeps its share of the ceiling on purpose: its in-flight
     // maids still count against the pool, and shrinking the ceiling under

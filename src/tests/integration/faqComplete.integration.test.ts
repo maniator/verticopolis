@@ -55,16 +55,16 @@ describe("Canon star ladder (FAQ)", () => {
     lay(sim, "floor", 0);
     lay(sim, "floor", -1);
     sim.tower.place("recycling", -1, 0);
-    sim.tower.place("hotelSuite", top, 20);
-    sim.tower.place("hotelSuite", top, 40);
+    sim.tower.place("hotelSuite", top, 30);
+    sim.tower.place("hotelSuite", top, 45);
     sim.vipFavorable = true;
     expect(sim.recyclingDemandMet()).toBe(false); // 5,200 pop > 2,500 capacity
     sim.evaluateStar();
     expect(sim.star).toBe(3); // canon: recycling DEMAND met, not merely built
 
     // Two more centers (7,500 capacity ≥ 5,200 pop) satisfy the demand.
-    sim.tower.place("recycling", -1, 20);
-    sim.tower.place("recycling", -1, 40);
+    sim.tower.place("recycling", -1, FACILITIES.recycling.width);
+    sim.tower.place("recycling", -1, 2 * FACILITIES.recycling.width);
     expect(sim.recyclingDemandMet()).toBe(true);
     sim.evaluateStar();
     expect(sim.star).toBe(4);
@@ -80,9 +80,9 @@ describe("Canon star ladder (FAQ)", () => {
     sim.tower.place("security", top, 60);
     for (let fl = 0; fl >= -5; fl--) lay(sim, "floor", fl);
     // 10,200 population needs five ~2,500-capacity centers (demand met).
-    for (let i = 0; i < 5; i++) sim.tower.place("recycling", -2, i * 20); // each spans -2/-1
-    sim.tower.place("hotelSuite", top, 20);
-    sim.tower.place("hotelSuite", top, 40);
+    for (let i = 0; i < 5; i++) sim.tower.place("recycling", -2, i * FACILITIES.recycling.width); // each spans -2/-1
+    sim.tower.place("hotelSuite", top, 30);
+    sim.tower.place("hotelSuite", top, 45);
     sim.evaluateStar();
     expect(sim.star).toBe(4); // pop is there, but no Metro → capped at 4
 
@@ -140,7 +140,7 @@ describe("Hotel population counts while climbing up through 4★ (FAQ)", () => {
     sim.tower.place("security", top, 60);
     sim.vipFavorable = true;
     for (let fl = 0; fl >= -8; fl--) lay(sim, "floor", fl);
-    for (let i = 0; i < 6; i++) sim.tower.place("recycling", -2, i * 20); // 15,000 capacity ≥ census
+    for (let i = 0; i < 6; i++) sim.tower.place("recycling", -2, i * FACILITIES.recycling.width); // 15,000 capacity ≥ census
     expect(sim.recyclingDemandMet()).toBe(true);
     expect(sim.tower.place("metro", -8, 0).ok).toBe(true);
 
@@ -614,8 +614,8 @@ describe("Fine FAQ mechanics", () => {
 });
 
 describe("Canon-numbers review regressions (must not come back)", () => {
-  it("m1: the whole-lot Metro spans the full lot width", () => {
-    expect(FACILITIES.metro.width).toBe(GRID.width); // must track any GRID.width change
+  it("m1: the Metro is SimTower's 30 tiles wide", () => {
+    expect(FACILITIES.metro.width).toBe(30);
   });
 
   it("M2: stacked parking with no ramp between floors does NOT connect", () => {

@@ -223,7 +223,7 @@ mod tests {
         // Without Security even the three-star rung fails.
         assert!(!sim.cumulative_gates_met(3));
         assert!(sim.build(Kind::Security, 2, 160).ok, "security");
-        assert!(sim.build(Kind::Medical, 2, 170).ok, "medical");
+        assert!(sim.build(Kind::Medical, 2, 180).ok, "medical");
         assert!(sim.build(Kind::HotelSuite, 3, 160).ok, "suite 1");
         assert!(sim.build(Kind::HotelSuite, 3, 172).ok, "suite 2");
         sim.vip_favorable = true;
@@ -249,7 +249,7 @@ mod tests {
         assert!(sim.cumulative_gates_met(4));
 
         // Medical alone.
-        assert!(sim.sell_at(2, 170), "sell medical");
+        assert!(sim.sell_at(2, 180), "sell medical");
         assert!(!sim.cumulative_gates_met(4), "Medical missing");
         assert!(
             sim.cumulative_gates_met(3),

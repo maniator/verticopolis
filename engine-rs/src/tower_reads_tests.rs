@@ -168,7 +168,7 @@ fn the_kind_checks_match_the_full_walk() {
     let mut sim = game(stacked());
     assert_kind_checks(&sim);
     let security = must(sim.tower.place(Kind::Security, 2, 100));
-    let medical = must(sim.tower.place(Kind::Medical, 2, 110));
+    let medical = must(sim.tower.place(Kind::Medical, 2, 120));
     let recycling = must(sim.tower.place(Kind::Recycling, -1, 100));
     let suite = must(sim.tower.place(Kind::HotelSuite, 4, 100));
     must(sim.tower.place(Kind::HotelSuite, 4, 110));
