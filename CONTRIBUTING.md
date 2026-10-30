@@ -507,9 +507,8 @@ and a patch bump for a lock change on its own. Publishing and 1.0.0 are #893.
 The crate version is independent of the app version: an app release never
 requires a crate release, and the app's 3.0.0 does not wait for crate 1.0.0.
 Crate 1.0.0 means the compatibility policy is published and the conformance lock
-ships inside the crate (#893, labeled `engine-1.0` with its blockers). After
-1.0.0, a save, frame or catalog break takes a major bump, an additive change a
-minor bump, and a lock-only change a patch bump.
+ships inside the crate (#893, labeled `engine-1.0` with its blockers). The bump
+rules after 1.0.0 are part of that compatibility policy, so #893 sets them.
 
 **How:** raise `version` in `engine-rs/Cargo.toml`, then in `engine-rs/Cargo.lock`
 and `engine-rs/consumer/Cargo.lock` (CI builds the consumer with `--locked`),
