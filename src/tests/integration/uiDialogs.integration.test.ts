@@ -74,6 +74,22 @@ describe("wireActions — the anti-dead-button contract", () => {
     expect(dialog().innerHTML).toBe(""); // closeModal also empties the dialog
   });
 
+  it("binds the schedule review's buttons, and puts focus where the caller asks (#1548)", () => {
+    const { ui } = makeUI();
+    const recover = vi.fn();
+    const review = vi.fn();
+    const rows = [{ id: 7, title: "Standard Elevator, floors 15–45", facts: "8 cars installed.", preview: "Using all 8 cars.", kept: false }];
+    ui.showScheduleReview(rows, { "recover:7": recover, "keep:7": vi.fn(), "review:7": review }, "keep:7");
+    expect(document.activeElement).toBe(dialog().querySelector('[data-act="keep:7"]'));
+    click('[data-act="recover:7"]');
+    click('[data-act="review:7"]');
+    expect(recover).toHaveBeenCalledOnce();
+    expect(review).toHaveBeenCalledOnce();
+    ui.showScheduleReview([]); // no rows: only Close, and no focus request
+    click('[data-act="close"]');
+    expect(dialog().open).toBe(false);
+  });
+
   it("binds caller-supplied [data-act] handlers (saves dialog export opens the confirm dialog)", () => {
     const { ui, cb } = makeUI();
     ui.showSaves([]);

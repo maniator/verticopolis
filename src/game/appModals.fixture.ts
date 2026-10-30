@@ -144,6 +144,7 @@ export function makeApp(sim: SimShape) {
     enginePort: typeof enginePort;
     portCodes: PortCodes;
     followSwap: ReturnType<typeof vi.fn>;
+    scheduleReview: { findings: ReturnType<typeof vi.fn>; open: ReturnType<typeof vi.fn> };
   } = {
     /** A swap moves the generation, as the engine's swaps do. */
     get sim() {
@@ -160,7 +161,9 @@ export function makeApp(sim: SimShape) {
     enginePort,
     portCodes,
     followSwap: vi.fn(),
+    // No elevator is short, as on a tower the review has nothing to say about.
+    scheduleReview: { findings: vi.fn(() => []), open: vi.fn() },
   };
   loadInto(enginePort, sim);
-  return { app: app as unknown as GameApp, ui, engine, reader, enginePort, followSwap: app.followSwap };
+  return { app: app as unknown as GameApp, ui, engine, reader, enginePort, followSwap: app.followSwap, scheduleReview: app.scheduleReview };
 }

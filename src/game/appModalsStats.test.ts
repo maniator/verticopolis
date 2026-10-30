@@ -42,6 +42,23 @@ describe("showStats", () => {
     expect(handlers).toEqual({});
   });
 
+  it("leaves the stats body as it was, with no review entry, when no elevator runs short", async () => {
+    const { app, ui } = makeApp(makeSim());
+    await showStats(app);
+    expect(ui.showStats.mock.calls[0][0]).toBe("STATS_BODY");
+    expect(ui.showStats.mock.calls[0][1]).not.toHaveProperty("reviewSchedules");
+  });
+
+  it("adds the elevator schedule review entry, and wires it, when some elevator runs short (#1548)", async () => {
+    const { app, ui, scheduleReview } = makeApp(makeSim());
+    scheduleReview.findings.mockReturnValue([{}, {}]);
+    await showStats(app);
+    expect(ui.showStats.mock.calls[0][0]).not.toBe("STATS_BODY");
+    const handlers = ui.showStats.mock.calls[0][1] as Record<string, () => void>;
+    handlers.reviewSchedules!();
+    expect(scheduleReview.open).toHaveBeenCalledOnce();
+  });
+
   it("also declines when a dispatch is already en route", async () => {
     const sim = makeSim({ exterminationDueDay: 5 });
     const { app, ui } = makeApp(sim);

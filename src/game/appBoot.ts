@@ -1,6 +1,7 @@
 import type { GameApp } from "../main";
 import { BuildActions } from "./buildActions";
 import { EditorActions } from "./editorActions";
+import { ScheduleReview } from "./scheduleReview";
 import { SaveLoad, RESUME_AFTER_RECOVERY_KEY } from "./saveLoad";
 import { InspectorController } from "./inspector";
 import { createCardKit } from "./cardKit";
@@ -102,6 +103,22 @@ export function wireControllers(app: GameApp): void {
     captureUndo: (label) => app.captureUndo(label),
     commitUndo: () => app.commitUndo(),
     announce: (msg) => app.announce(msg),
+  });
+  app.scheduleReview = new ScheduleReview({
+    engine: () => app.enginePort,
+    reader: () => app.reader,
+    kit: () => app.cardKit,
+    ui: {
+      toast: (text, kind) => app.ui.toast(text, kind),
+      sayVisibly: (text, kind) => app.ui.sayVisibly(text, kind),
+      showScheduleReview: (rows, handlers, focus) => app.ui.showScheduleReview(rows, handlers, focus),
+    },
+    audio: app.audio,
+    captureUndo: (label) => app.captureUndo(label),
+    commitUndo: () => app.commitUndo(),
+    refreshEditor: () => app.refreshEditor(),
+    announce: (msg) => app.announce(msg),
+    openSchedule: (id) => app.editor.openSchedule(id),
   });
   app.saveLoad = new SaveLoad({
     getView: () => app.engine.viewState(),
