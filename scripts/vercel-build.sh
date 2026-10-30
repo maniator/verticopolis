@@ -3,7 +3,7 @@
 # build output and is not checked in, so every deploy builds it here before
 # Vite runs (scripts/build-engine-wasm.sh installs the pinned toolchain).
 # A failed engine build fails the deploy: the app would otherwise ship without
-# the engine that `?engine=wasm` and the dual run load.
+# the engine it runs on.
 set -euo pipefail
 
 # The old emergency switch skipped the rebuild and served the committed
@@ -13,4 +13,9 @@ if [ -n "${VC_ENGINE_REBUILD:-}" ]; then
 fi
 
 bash scripts/build-engine-wasm.sh
-npm run build
+
+# Every deploy is the wasm-only build: the Rust engine is the only engine, with
+# no cohort, no runtime switch and no TypeScript fallback (see
+# src/build/engineBundle.ts). A dev serve and the test lanes keep the default
+# switchable build until the TypeScript engine's code is deleted.
+VC_ENGINE=wasm npm run build

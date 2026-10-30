@@ -25,6 +25,10 @@ notes, never a past version's.
 
 - Reaching 3 stars now takes two security offices instead of one, as in SimTower. A tower that already has 3 stars keeps them.
 
+## 2.66.0
+
+- The game runs a little faster.
+
 ## 2.65.0
 
 - In Classic, the metro station only helps shops, restaurants and fast food once its platform floor has an elevator, stairs, or escalator connected, as in SimTower.

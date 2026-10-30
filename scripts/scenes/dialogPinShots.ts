@@ -77,8 +77,7 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
         // (the build line sits above it), so the full downward cover applies
         // and scrolled text cannot show in the band under Close on a phone.
         if (strip.nextElementSibling !== null) throw new Error("Settings renders something after its action row again; scrolled text can show under the Close button");
-        // Keep the Settings Game engine row intact in the capture while still
-        // leaving enough content below the fold to prove the sticky footer rule.
+        // Leave enough content below the fold to prove the sticky footer rule.
         box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight - strip.offsetHeight * 3);
         // The build line sits just above the pinned row, so that scroll can leave
         // it half behind the strip, which the visibility check below rejects.

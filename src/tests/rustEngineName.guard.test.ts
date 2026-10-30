@@ -23,8 +23,6 @@ const COPY_MODULES = [
   "src/wasmhost/catalogCheck.ts",
   "src/wasmhost/stepLoopAbsent.ts",
   "src/build/thirdPartyNotices.ts",
-  "src/engineCohort/settingsView.ts",
-  "src/engineCohort/settingsLive.ts",
   "src/engineCohort/boot.ts",
   "src/bootstrap.ts",
 ];
