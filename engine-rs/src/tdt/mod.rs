@@ -6,6 +6,8 @@
 
 pub mod byte_reader;
 pub mod byte_writer;
+#[cfg(test)]
+mod cathedral_tests;
 pub mod encoder;
 pub mod export;
 pub mod export_gather;

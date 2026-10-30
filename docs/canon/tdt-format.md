@@ -146,7 +146,15 @@ uniform:
 | 0 to 9 | B10 to B1 | -9 to 0 |
 | 10 | Ground | 1 |
 | 11 to 109 | 2F to 100F | 2 to 100 |
-| 110 to 119 | reserved | not buildable |
+| 110 to 119 | above the top floor | no rooms; the cathedral rises into 110 to 113 (floors 101 to 104) |
+
+The cathedral is the one building that stands above floor 100. It is five
+stacked parts (types 36 to 40) on rows 109 to 113: its bottom part (type 40)
+sits on floor 100 and the others rise above it, top part (type 36) last. Our
+Wedding Hall is one unit anchored on floor 100 with the same five stories, so
+the exporter writes the five parts upward from floor 100 and the importer
+reads a cathedral by its lowest floor. It is the tallest building the file
+stores, and the rows above floor 100 hold nothing else.
 
 Lobbies appear at indexes 10, 24, 39, 54, 69, 84, 99 (floors 1, 15, 30, 45, 60,
 75, 90).
@@ -229,7 +237,7 @@ room and checks out at the next morning.
 | 29 / 30 | Party hall top / bottom half | `partyHall` |
 | 31 / 32 / 33 | Metro station top / middle / bottom | `metro` |
 | 34 / 35 | Theatre screen top / bottom [TD] | part of `cinema` |
-| 36 to 40 | Cathedral, five stacked parts | `weddingHall` |
+| 36 to 40 | Cathedral, five stacked parts: 40 is the bottom part on floor 100 and 36 the top part on floor 104 | `weddingHall` |
 | 42 | "Structures" (string table only) [OS] | none |
 | 44 | Parkade ramp [TD] | `parkingRamp` |
 | 45 | Metro tunnel [TD] | metro backdrop |

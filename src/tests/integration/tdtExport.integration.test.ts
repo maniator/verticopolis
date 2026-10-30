@@ -470,7 +470,7 @@ describeWithCodec("buildTDT: export → import round trip", () => {
     });
   });
 
-  it("the wedding hall round-trips at the crown (floor 100)", () => {
+  it("the wedding hall round-trips on floor 100", () => {
     const save = sampleSave();
     save.units.push({
       id: 9_000,
@@ -1026,7 +1026,7 @@ describeWithCodec("buildTDT: review hardening (states, collisions, caps, hostile
     expect(parseTdtBinary(bytes).warnings).toEqual([]);
   });
 
-  it("the cathedral stack stops above a multi-story room's UPPER story (no overlapping tenants)", () => {
+  it("the cathedral stands whole over a multi-story room (no overlapping tenants)", () => {
     const save = sampleSave();
     // Cinema based at 98 occupies 98-99 under the hall's x-range.
     save.units.push(unit({ id: 9_200, kind: "cinema", floor: 98, x: 180, width: 31 }));
@@ -1341,29 +1341,29 @@ describeWithCodec("buildTDT: lobby (type 24) and empty-floor (type 0) paving rec
   });
 
   it("a multi-story unit's part records are never overlapped by a paving span", () => {
-    // A Wedding Hall crowns floor 100 as a 5-part cathedral (PART_STACKS emits
-    // types 36..40 DOWNWARD onto floors 96-100), yet facilityFloors(weddingHall)
-    // is 1. So the old input-footprint coverage marked only floor 100 and let a
-    // paving span overlap the parts on floors 96-99. Coverage is now rebuilt
-    // from the EMITTED records, so no type-0/24 span overlaps a part on ANY of
-    // the five floors, and the tower round-trips byte-identically.
+    // A Wedding Hall stands on floor 100 as a 5-part cathedral that rises through
+    // floors 100-104 (types 40..36, bottom part first). Paving on floor 100 sits
+    // under its bottom part, and coverage is rebuilt from the EMITTED records, so
+    // no type-0/24 span overlaps a part on ANY of the five floors, and the tower
+    // round-trips byte-identically.
     const units: Unit[] = [];
     let id = 1;
     // Full-extent paving on floors 96-100 (under the cathedral too), plus gaps.
     for (let fl = 96; fl <= 100; fl++) {
       for (let x = 0; x < 40; x++) units.push(unit({ id: id++, kind: "floor", floor: fl, x, width: 1 }));
     }
-    units.push(unit({ id: id++, kind: "weddingHall", floor: 100, x: 5, width: 16 })); // parts cover [5, 21)
+    units.push(unit({ id: id++, kind: "weddingHall", floor: 100, x: 5, width: 28 })); // parts cover [5, 33)
     const save = tower(units);
     const { bytes } = buildTDT(save);
 
-    // Each of floors 96-100 carries one cathedral part (types 36..40); assert no
-    // type-0 span overlaps the part's [5, 21) footprint on any of them.
+    // Each of floors 100-104 carries one cathedral part (type 40 on 100 up to 36
+    // on 104); assert no type-0 span overlaps the part's footprint on any of them.
     const cathedralIds = new Set([36, 37, 38, 39, 40]);
-    for (let ourFloor = 96; ourFloor <= 100; ourFloor++) {
+    for (let ourFloor = 100; ourFloor <= 104; ourFloor++) {
       const recs = floorTenants(bytes, ourFloor + 9);
       const parts = recs.filter((t) => cathedralIds.has(Math.abs(t.type)));
       expect(parts.length, `cathedral part on floor ${ourFloor}`).toBe(1);
+      expect(Math.abs(parts[0].type), `part type on floor ${ourFloor}`).toBe(140 - ourFloor);
       const paving = recs.filter((t) => t.type === 0 || t.type === 24);
       for (const p of parts) {
         for (const s of paving) {
@@ -1381,12 +1381,9 @@ describeWithCodec("buildTDT: lobby (type 24) and empty-floor (type 0) paving rec
     expect(again).toEqual(bytes);
   });
 
-  it("only a room that is IN the file can shorten the cathedral stack", () => {
-    // The stack walks down from floor 100 and stops at the first floor another
-    // room occupies, so the file never carries overlapping records. A BURNED
-    // room writes no record at all (it is cleared to paving), so letting it
-    // block would truncate the cathedral with nothing in the file to explain the
-    // gap. Same geometry, same room, only its state differs.
+  it("a room under the cathedral never shortens its stack", () => {
+    // The cathedral rises above floor 100, so what stands below it cannot cut
+    // parts off, whether the room is occupied or burned out.
     const cathedralIds = new Set([36, 37, 38, 39, 40]);
     const partsOf = (blockerState: "occupied" | "gutted") => {
       const units: Unit[] = [];
@@ -1394,27 +1391,22 @@ describeWithCodec("buildTDT: lobby (type 24) and empty-floor (type 0) paving rec
       for (let fl = 96; fl <= 100; fl++) {
         for (let x = 0; x < 40; x++) units.push(unit({ id: id++, kind: "floor", floor: fl, x, width: 1 }));
       }
-      units.push(unit({ id: id++, kind: "weddingHall", floor: 100, x: 5, width: 16 }));
-      // An office on floor 98 straddling the cathedral's [5, 21) footprint.
+      units.push(unit({ id: id++, kind: "weddingHall", floor: 100, x: 5, width: 28 }));
+      // An office on floor 98 under the cathedral's [5, 33) footprint.
       units.push(unit({ id: id++, kind: "office", floor: 98, x: 8, width: 9, state: blockerState }));
       const { bytes } = buildTDT(tower(units));
       let count = 0;
-      for (let fl = 96; fl <= 100; fl++) {
+      for (let fl = 96; fl <= 104; fl++) {
         count += floorTenants(bytes, fl + 9).filter((t) => cathedralIds.has(Math.abs(t.type))).length;
       }
       return { count, bytes };
     };
 
-    // An emitted blocker DOES truncate: the stack stops above floor 98, so only
-    // floors 99 and 100 carry a part.
-    const blocked = partsOf("occupied");
-    expect(blocked.count).toBe(2);
-    expect(parseTdtBinary(blocked.bytes).warnings).toEqual([]);
-
-    // The same room burned writes nothing, so all five parts survive.
-    const cleared = partsOf("gutted");
-    expect(cleared.count).toBe(5);
-    expect(parseTdtBinary(cleared.bytes).warnings).toEqual([]);
+    for (const state of ["occupied", "gutted"] as const) {
+      const { count, bytes } = partsOf(state);
+      expect(count, `${state} room`).toBe(5);
+      expect(parseTdtBinary(bytes).warnings).toEqual([]);
+    }
   });
 });
 

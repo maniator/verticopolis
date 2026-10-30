@@ -324,12 +324,10 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
     }
 
     for m in merge_parts(&part_records) {
-        let floor = if m.kind == Kind::WeddingHall {
-            m.top_floor
-        } else {
-            m.floor
-        };
-        if floor + m.kind.floors() - 1 > MAX_FLOOR {
+        // The cathedral stands on its bottom part and rises above floor 100, so
+        // every kind keys off its lowest floor.
+        let floor = m.floor;
+        if floor + m.kind.floors() - 1 > m.kind.highest_story() {
             counts.off_lot += 1;
             continue;
         }

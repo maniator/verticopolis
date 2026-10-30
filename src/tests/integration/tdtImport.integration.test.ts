@@ -31,13 +31,13 @@ function rooms(spec: TdtSpec) {
  *  parking stall/ramp, recycling parts, metro parts. */
 const BASEMENT_ONLY_IDS = new Set([11, 44, 20, 21, 31, 32, 33]);
 
-/** Cathedral part IDs: their stand-in Wedding Hall must crown floor 100. */
+/** Cathedral part IDs: their stand-in Wedding Hall stands on floor 100. */
 const CATHEDRAL_IDS = new Set([36, 37, 38, 39, 40]);
 
 /** One tenant of the given type on TDT floor 20 (our floor 11); basement-only
  *  kinds go to TDT floor 6 (our floor B4, so even the metro's three stories
- *  stay below ground) and Cathedral parts to TDT 109 (our floor 100, the
- *  crown). */
+ *  stay below ground) and Cathedral parts to TDT 109 (our floor 100, where
+ *  the cathedral's bottom part stands). */
 function oneTenant(type: number, left = 100, right = 109, status = 0): TdtSpec {
   const id = Math.abs(type);
   let index = 20;
@@ -332,13 +332,14 @@ describeWithCodec("parseTDT: golden mappings", () => {
   it("the Cathedral's five stacked parts merge into ONE Wedding Hall at the base", () => {
     const { save, report } = parse({
       floors: Array.from({ length: 5 }, (_, i) => ({
-        index: 105 + i, // ours 96..100
-        tenants: [{ left: 180, right: 196, type: 36 + i }],
+        index: 109 + i, // ours 100..104: the bottom part (40) on floor 100, the top (36) on 104
+        tenants: [{ left: 180, right: 208, type: 40 - i }],
       })),
     });
     const halls = save.units.filter((u) => u.kind === "weddingHall");
     expect(halls).toHaveLength(1);
-    expect(halls[0].floor).toBe(100); // the hall CROWNS the cathedral, canon floor 100
+    expect(halls[0].floor).toBe(100); // the hall stands on floor 100, as the cathedral's bottom part does
+    expect(halls[0].width).toBe(28);
     expect(save.builtWeddingHall).toBe(true);
     expect(report.couldNotBring.join(" ")).toMatch(/Wedding Hall/);
   });
@@ -454,13 +455,13 @@ describeWithCodec("parseTDT: golden mappings", () => {
     expect(merged.save.units.filter((u) => u.kind === "recycling")).toHaveLength(0);
   });
 
-  it("an off-crown Cathedral cluster is dropped: the Wedding Hall crowns floor 100 only", () => {
-    // Parts ending at ours 95 (TDT 100..104): corrupt or hand-edited data;
-    // a real winning save's Cathedral always tops out at floor 100.
+  it("an off-crown Cathedral cluster is dropped: the Wedding Hall stands on floor 100 only", () => {
+    // Parts standing on ours 91..95 (TDT 100..104): corrupt or hand-edited data;
+    // the cathedral's bottom part always stands on floor 100.
     const { save, report } = parse({
       floors: Array.from({ length: 5 }, (_, i) => ({
         index: 100 + i,
-        tenants: [{ left: 180, right: 196, type: 36 + i }],
+        tenants: [{ left: 180, right: 208, type: 40 - i }],
       })),
     });
     expect(save.units.filter((u) => u.kind === "weddingHall")).toHaveLength(0);
@@ -512,8 +513,8 @@ describeWithCodec("parseTDT: golden mappings", () => {
       level: 5,
       currentDay: 10,
       floors: Array.from({ length: 5 }, (_, i) => ({
-        index: 105 + i,
-        tenants: [{ left: 180, right: 196, type: 36 + i }],
+        index: 109 + i,
+        tenants: [{ left: 180, right: 208, type: 40 - i }],
       })),
     };
     const below = parse(spec).save;

@@ -7,10 +7,13 @@ use crate::facilities::Kind;
 use crate::tdt::format::TDT_FLOOR_OFFSET;
 use crate::tdt::LegacyExportError;
 
-/// `fitsTdtRows`: every story of a footprint sits on a writable row (0..109).
-pub(super) fn fits_tdt_rows(floor: f64, stories: f64) -> bool {
+/// `fitsTdtRows`: every story of a footprint sits on a writable row. Rows run
+/// 0..109 (floors -9 to 100), except the wedding hall, which rises above floor
+/// 100 into the file's reserved rows.
+pub(super) fn fits_tdt_rows(kind: Kind, floor: f64, stories: f64) -> bool {
     let bottom = floor + TDT_FLOOR_OFFSET as f64;
-    bottom >= 0.0 && bottom + stories - 1.0 <= 109.0
+    let top_row = (kind.highest_story() + TDT_FLOOR_OFFSET) as f64;
+    bottom >= 0.0 && bottom + stories - 1.0 <= top_row
 }
 
 /// `residentCount(u)`: the household when one is set, else the catalog
