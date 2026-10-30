@@ -7,7 +7,9 @@ use std::collections::HashMap;
 
 use super::{CrewOrders, Housekeeping, HK_MAIDS_PER_UNIT};
 use crate::clock::GameMode;
+use crate::crowd::{ElevatorCalls, CAR_CAPACITY};
 use crate::facilities::Kind;
+use crate::schedule::Schedule;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
 
@@ -327,4 +329,109 @@ fn staff_connectivity_follows_the_network_after_a_build() {
             assert_eq!(sim.tower.staff_connected(a, b), same, "{a} -> {b}");
         }
     }
+}
+
+/// A service elevator of three cars that the schedule runs one of, with a
+/// crew on floor 2 and a dirty room on each of floors 3 to 5. The two parked
+/// cars stand at the crew's floor, and maids board only the running car.
+#[test]
+fn maids_never_board_a_car_the_schedule_has_parked() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let mut sim = Simulation::new_game(11, mode);
+        sim.money = 1.0e9;
+        sim.star = 5;
+        for x in 150..230 {
+            put(&mut sim, Kind::Lobby, 1, x);
+        }
+        for fl in 2..=5 {
+            for x in 151..229 {
+                put(&mut sim, Kind::Floor, fl, x);
+            }
+        }
+        shaft(&mut sim, Kind::ElevatorService, 152, 2, 5);
+        let id = sim.tower.transports[0].id;
+        assert!(sim.set_cars(id, 3));
+        sim.tower.transports[0].schedule = Some(Schedule {
+            weekday: Some(vec![1; 24]),
+            weekend: Some(vec![1; 24]),
+            waiting_car_response: None,
+            standard_floor_departure: None,
+            home_floors: Some(vec![5, 2, 2]),
+        });
+        // The running car waits at the top, so the parked two are the cars
+        // standing at the crew's floor when the maids arrive.
+        sim.tower.transports[0].car_positions = vec![5.0, 2.0, 2.0];
+        let crew = put(&mut sim, Kind::Housekeeping, 2, 200);
+        sim.tower.get_unit_mut(crew).unwrap().state = UnitState::Empty;
+        let rooms = [3, 4, 5].map(|fl| put(&mut sim, Kind::HotelSingle, fl, 170));
+        for room in rooms {
+            dirty(&mut sim, room);
+        }
+        in_shift(&mut sim);
+        // The running car is full for the first stretch, so the maids at the
+        // crew's floor have only the parked cars to step into.
+        sim.crowd.car_riders.insert((id, 0), CAR_CAPACITY);
+        let tick = |sim: &mut Simulation, steps: usize| {
+            for _ in 0..steps {
+                sim.tick(0.5);
+                for p in sim.crowd.people.iter().filter(|p| p.staff) {
+                    assert!(
+                        p.car_index.is_none_or(|ci| ci == 0),
+                        "{mode:?}: a maid boarded car {:?}",
+                        p.car_index
+                    );
+                }
+            }
+        };
+        tick(&mut sim, 60);
+        sim.crowd.car_riders.insert((id, 0), 0);
+        tick(&mut sim, 180);
+        for room in rooms {
+            let state = sim.tower.get_unit(room).unwrap().state;
+            assert_eq!(state, UnitState::Empty, "{mode:?}: room {room} is clean");
+        }
+    }
+}
+
+/// A car the schedule stood down while it holds riders keeps running to
+/// their floors, and stays closed to boarding the whole time.
+#[test]
+fn a_stood_down_car_finishes_its_riders_and_takes_no_more() {
+    let mut sim = Simulation::new_game(11, GameMode::Classic);
+    sim.money = 1.0e9;
+    sim.star = 5;
+    for x in 150..230 {
+        put(&mut sim, Kind::Lobby, 1, x);
+    }
+    for fl in 2..=5 {
+        for x in 151..229 {
+            put(&mut sim, Kind::Floor, fl, x);
+        }
+    }
+    shaft(&mut sim, Kind::ElevatorService, 152, 2, 5);
+    let id = sim.tower.transports[0].id;
+    assert!(sim.set_cars(id, 2));
+    sim.tower.transports[0].schedule = Some(Schedule {
+        weekday: Some(vec![1; 24]),
+        weekend: Some(vec![1; 24]),
+        waiting_car_response: None,
+        standard_floor_departure: None,
+        home_floors: None,
+    });
+    let calls = ElevatorCalls::default();
+    sim.elevators
+        .move_cars(&mut sim.tower, 1.0, &calls, 12, false);
+    assert_eq!(sim.elevators.closed_cars(), [(id, 1)]);
+    // A rider aboard the stood-down car: it still goes to the rider's floor,
+    // answers no hall call on the way, and stays closed to boarding.
+    let start = sim.tower.transports[0].car_positions[1];
+    let mut calls = ElevatorCalls::default();
+    calls.cab.entry(id).or_default().insert(1, [4].into());
+    calls.hall.entry(id).or_default().insert(2, 5.0);
+    for _ in 0..3 {
+        sim.elevators
+            .move_cars(&mut sim.tower, 1.0, &calls, 12, false);
+    }
+    assert!(sim.tower.transports[0].car_positions[1] > start, "heads up");
+    assert_eq!(sim.elevators.closed_cars(), [(id, 1)]);
 }

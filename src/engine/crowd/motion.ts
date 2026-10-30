@@ -164,6 +164,7 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
       for (let i = 0; i < shaft.cars; i++) {
         if (Math.abs(shaft.carPositions[i] - p.floor) > 0.25) continue;
         const key = `${shaft.id}:${i}`;
+        if (crowd.closedCars.has(key)) continue;
         const n = crowd.carRiders.get(key) ?? 0;
         if (n >= CAR_CAPACITY) continue;
         crowd.carRiders.set(key, n + 1);

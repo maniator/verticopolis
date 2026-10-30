@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.74.2
+
+- Housekeepers no longer climb into a service elevator car that the schedule has parked, so every dirty hotel room gets cleaned on time when you run fewer cars.
+
 ## 2.74.0
 
 - The wedding hall's garden no longer has fire-escape stairs hanging beside it, so it stands clear against the sky.

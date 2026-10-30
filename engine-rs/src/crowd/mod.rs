@@ -222,6 +222,11 @@ pub struct Crowd {
     pub staff_done: Vec<StaffResult>,
     pub staff_count: i64,
     pub step: i64,
+    /// The cars the schedule has stood down, as (shaft id, car index),
+    /// ascending: a person waiting at a floor does not board one, even one
+    /// still finishing the riders it carries.
+    /// Swapped in from the dispatch each step; never saved.
+    pub closed_cars: Vec<(i64, i64)>,
     /// The queue projection and the (step, tower revision) it was built
     /// for (`queue_view`, `render_reads.rs`). Never saved.
     pub queue_cache: Option<((i64, i64), crate::render_reads::QueueView)>,
@@ -247,6 +252,7 @@ impl Crowd {
             staff_done: Vec::new(),
             staff_count: 0,
             step: 0,
+            closed_cars: Default::default(),
             queue_cache: None,
         }
     }

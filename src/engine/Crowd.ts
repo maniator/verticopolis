@@ -35,6 +35,10 @@ export class Crowd {
   /** @internal Fractional spawn accumulator carried across steps. */ spawnAcc = 0;
   /** @internal Riders currently aboard each car, keyed "shaftId:carIndex". */
   carRiders = new Map<string, number>();
+  /** The cars the schedule has stood down, keyed like {@link carRiders}: a
+   *  person waiting at a floor boards none of them. The simulation points this
+   *  at the dispatch's set each chunk; never serialized. */
+  closedCars: ReadonlySet<string> = new Set<string>();
   /** @internal Rolling fraction of recent travellers who waited too long (0..1). */
   frustration = 0;
   /** @internal Per-origin-floor commute-stress EMA, in seconds of whole-trip

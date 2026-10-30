@@ -25,7 +25,7 @@ export interface BuildFingerprint {
 export type UpdateKind = "game" | "engine" | "both";
 
 export interface UpdateInfo {
-  /** The incoming build's `package.json` version, e.g. "1.1.1". */
+  /** The incoming build's `package.json` version, e.g. "2.3.4". */
   version?: string;
   /** Short git SHA of the incoming build, e.g. "a1b2c3d". */
   sha?: string;

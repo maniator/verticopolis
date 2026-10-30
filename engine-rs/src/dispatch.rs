@@ -40,6 +40,13 @@ pub struct ElevatorDispatch {
     call_bits: Vec<u64>,
     claimed: Vec<u64>,
     cab_stops: Vec<u64>,
+    /// The cars the schedule has stood down, as (shaft id, car index),
+    /// rebuilt by every `move_cars`. A person waiting at a floor boards only a
+    /// car outside this set, so nobody boards a car that is parked or about
+    /// to park (the crowd keeps its own copy).
+    closed_cars: Vec<(i64, i64)>,
+    /// Scratch of zero words, the calls a stood-down car answers: none.
+    no_calls: Vec<u64>,
 }
 
 impl ElevatorDispatch {
@@ -50,6 +57,20 @@ impl ElevatorDispatch {
     /// `drainBoardings()`: hand over the tally and clear it.
     pub fn drain_boardings(&mut self) -> HashMap<i64, IndexMap<i64, f64>> {
         std::mem::take(&mut self.board_tally)
+    }
+
+    /// The cars a waiting person may not board: stood down by the schedule.
+    /// Ascending, as (shaft id, car index): `move_cars` sorts the list once it
+    /// has walked every shaft, since a save may list its shafts out of id
+    /// order, so a binary search finds a car.
+    pub fn closed_cars(&self) -> &[(i64, i64)] {
+        &self.closed_cars
+    }
+
+    /// Hands the crowd this step's closed cars by swapping the two lists, so
+    /// no step allocates. `move_cars` clears the list it gets back.
+    pub fn swap_closed_cars(&mut self, crowd_list: &mut Vec<(i64, i64)>) {
+        std::mem::swap(&mut self.closed_cars, crowd_list);
     }
 
     pub fn waiting_at(&self, floor: i64) -> f64 {
@@ -129,6 +150,7 @@ impl ElevatorDispatch {
     ) {
         let floors = tower.dispatch_floors();
         let n = tower.transports.len();
+        self.closed_cars.clear();
         for ti in 0..n {
             let (kind, id) = {
                 let t = &tower.transports[ti];
@@ -178,6 +200,8 @@ impl ElevatorDispatch {
             call_bits.resize(words, 0);
             claimed.clear();
             claimed.resize(words, 0);
+            self.no_calls.clear();
+            self.no_calls.resize(words, 0);
             for (k, &fl) in stops.iter().enumerate() {
                 // A crowd call already raises the stop, so the estimate is
                 // only looked up when it would decide.
@@ -191,7 +215,17 @@ impl ElevatorDispatch {
             for i in 0..cars {
                 let car_home =
                     Schedule::home_floor_for(sched, i, idle_floor).clamp(t.bottom, t.top);
-                if i >= active_count {
+                // A car the schedule has stood down takes no new riders and
+                // answers no hall calls, but still takes the riders aboard to
+                // their floors; it parks once the cab is empty.
+                let stood_down = i >= active_count;
+                if stood_down {
+                    self.closed_cars.push((id, i as i64));
+                }
+                let riders_aboard = cabs
+                    .and_then(|c| c.get(&(i as i64)))
+                    .is_some_and(|c| !c.is_empty());
+                if stood_down && !riders_aboard {
                     car_load[i] = 0.0;
                     dwell[i] = 0.0;
                     let cur = t.car_positions[i];
@@ -238,7 +272,11 @@ impl ElevatorDispatch {
                 };
                 let demand = Demand {
                     stops: &stops,
-                    calls: &call_bits[..],
+                    calls: if stood_down {
+                        &self.no_calls[..]
+                    } else {
+                        &call_bits[..]
+                    },
                     claimed: &claimed[..],
                     cab: cab_stops,
                 };
@@ -279,7 +317,12 @@ impl ElevatorDispatch {
                     } else {
                         self.waiting.get(&tf).copied().unwrap_or(0.0)
                     };
-                    let board = (cap - car_load[i]).min(w).max(0.0);
+                    // A stood-down car lets nobody on.
+                    let board = if stood_down {
+                        0.0
+                    } else {
+                        (cap - car_load[i]).min(w).max(0.0)
+                    };
                     if board > 0.0 {
                         car_load[i] += board;
                         if !staff_only {
@@ -309,6 +352,9 @@ impl ElevatorDispatch {
                 t.car_dir[i] = dir;
             }
         }
+        // The crowd searches the list, and the shafts come in saved order,
+        // which need not be id order.
+        self.closed_cars.sort_unstable();
     }
 }
 
@@ -424,3 +470,7 @@ impl Demand<'_> {
 #[cfg(test)]
 #[path = "dispatch_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "closed_cars_tests.rs"]
+mod closed_cars_tests;
