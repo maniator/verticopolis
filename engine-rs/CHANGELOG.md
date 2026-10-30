@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.0.1 (2026-10-30)
+
+- The 3-star gate (both modes) needs `SECURITY_OFFICES_FOR_THREE_STARS` (two) operational security offices instead of one, in the rating evaluation and in the star-gate panel getter. Stars still never downgrade. The `star-climb-classic` conformance scenario builds a second office and the lock moves with it.
+
 ## 0.24.4 (2026-10-30)
 
 - Classic: the metro station's help to commercial demand and its rain relief now need the station's platform floor to be served by transport. Modern keeps the any-operational-station rule.

@@ -236,6 +236,9 @@ describe("Simulation ratings", () => {
     const sec = sim.tower.place("security", 55, x0);
     expect(sec.ok).toBe(true);
     sim.evaluateStar();
+    expect(sim.star).toBe(2); // one office is not enough
+    expect(sim.tower.place("security", 55, x0 + 20).ok).toBe(true);
+    sim.evaluateStar();
     expect(sim.star).toBeGreaterThanOrEqual(3);
   });
 });

@@ -26,6 +26,7 @@ fn the_checklist_and_promotion_agree_at_every_gate_threshold() {
     shaft(&mut sim, Kind::ElevatorStandard, 152, 1, 3);
     agree(&sim, "nothing built");
     put(&mut sim, Kind::Security, 2, 160);
+    put(&mut sim, Kind::Security, 2, 190);
     settle(&mut sim, 24);
     agree(&sim, "security");
     put(&mut sim, Kind::Medical, 2, 170);

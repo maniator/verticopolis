@@ -47,6 +47,7 @@ describe("Canon star ladder (FAQ)", () => {
     lay(sim, "floor", top);
     sim.tower.place("medical", top, 0);
     sim.tower.place("security", top, 60);
+    sim.tower.place("security", top, 100);
     sim.evaluateStar();
     expect(sim.star).toBe(3); // blocked: no recycling / suites / VIP yet
 
@@ -78,6 +79,7 @@ describe("Canon star ladder (FAQ)", () => {
     lay(sim, "floor", top);
     sim.tower.place("medical", top, 0);
     sim.tower.place("security", top, 60);
+    sim.tower.place("security", top, 100);
     for (let fl = 0; fl >= -5; fl--) lay(sim, "floor", fl);
     // 10,200 population needs five ~2,500-capacity centers (demand met).
     for (let i = 0; i < 5; i++) sim.tower.place("recycling", -2, i * 20); // each spans -2/-1
@@ -138,6 +140,7 @@ describe("Hotel population counts while climbing up through 4★ (FAQ)", () => {
     lay(sim, "floor", top);
     sim.tower.place("medical", top, 0);
     sim.tower.place("security", top, 60);
+    sim.tower.place("security", top, 100);
     sim.vipFavorable = true;
     for (let fl = 0; fl >= -8; fl--) lay(sim, "floor", fl);
     for (let i = 0; i < 6; i++) sim.tower.place("recycling", -2, i * 20); // 15,000 capacity ≥ census
