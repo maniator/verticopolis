@@ -60,9 +60,9 @@ impl ElevatorDispatch {
     }
 
     /// The cars a waiting person may not board: stood down by the schedule.
-    /// Ascending, as (shaft id, car index): `move_cars` walks the shafts in
-    /// tower order and each shaft's cars in order, so a binary search finds a
-    /// car.
+    /// Ascending, as (shaft id, car index): `move_cars` sorts the list once it
+    /// has walked every shaft, since a save may list its shafts out of id
+    /// order, so a binary search finds a car.
     pub fn closed_cars(&self) -> &[(i64, i64)] {
         &self.closed_cars
     }

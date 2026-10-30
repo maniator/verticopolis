@@ -222,8 +222,9 @@ pub struct Crowd {
     pub staff_done: Vec<StaffResult>,
     pub staff_count: i64,
     pub step: i64,
-    /// The cars parked off schedule with nobody aboard, as (shaft id, car
-    /// index), ascending: a person waiting at a floor does not board one.
+    /// The cars the schedule has stood down, as (shaft id, car index),
+    /// ascending: a person waiting at a floor does not board one, even one
+    /// still finishing the riders it carries.
     /// Swapped in from the dispatch each step; never saved.
     pub closed_cars: Vec<(i64, i64)>,
     /// The queue projection and the (step, tower revision) it was built
