@@ -33,6 +33,14 @@ vi.mock("../render/sprites", () => ({
 }));
 vi.mock("../telemetry", () => ({ injectVercelTelemetry: () => {} }));
 vi.mock("../analytics", () => ({ trackAppAction: () => {} }));
+// The gallery reads the Rust engine's catalog before it draws. This run has no
+// engine package, so the read answers with the TypeScript tables' catalog, which
+// holds the same kinds; what the page does with it is what these guards watch.
+vi.mock("../wasmhost/rustEngine", () => ({ loadWasmEngine: async () => ({}) }));
+vi.mock("../dualrun/catalog", async () => {
+  const { catalogFor } = await import("../engine/catalog");
+  return { readCatalog: (_mod: unknown, mode: "classic" | "modern") => catalogFor(mode) };
+});
 
 let priorGetContext: PropertyDescriptor | undefined;
 let priorClientWidth: PropertyDescriptor | undefined;
@@ -55,6 +63,8 @@ beforeAll(async () => {
   document.body.append(app);
 
   removeListeners = await importRemovingWindowListeners(() => import("../gallery"));
+  // The gallery draws its first frame once the catalog is read.
+  await vi.waitFor(() => expect((window as unknown as { galleryReady?: boolean }).galleryReady).toBe(true));
 });
 
 afterAll(() => {
