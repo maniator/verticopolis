@@ -15,6 +15,11 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.0.0 (2026-10-30)
+
+- The Rust engine is the only engine the shipped game runs: every deploy builds with `VC_ENGINE=wasm`, so there is no TypeScript engine to fall back to and no cohort draw. The TypeScript engine stays in the repository as the reference the conformance lock and tests compare against until it is deleted.
+- No change to saves, the frame and view layouts, the catalog or the binding's declaration. The version marks that the game depends on this engine alone.
+
 ## 0.24.4 (2026-10-30)
 
 - Classic: the metro station's help to commercial demand and its rain relief now need the station's platform floor to be served by transport. Modern keeps the any-operational-station rule.

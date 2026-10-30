@@ -99,8 +99,8 @@ Verticopolis has **two test tiers**:
     hash. CI restores it from the
     Actions cache, keyed on the engine's source hash, and builds it once per
     engine change (`.github/actions/engine-wasm`); Vercel builds it on every
-    deploy through `scripts/vercel-build.sh`. `VC_ENGINE=wasm npm run build` makes the wasm-only build the 3.0.0
-    flip will deploy: the WASM engine is the only engine, `?engine=` and
+    deploy through `scripts/vercel-build.sh`. `VC_ENGINE=wasm npm run build` makes the wasm-only build, which
+    every deploy runs (`scripts/vercel-build.sh` sets it): the WASM engine is the only engine, `?engine=` and
     `vc.engine` are ignored, the TypeScript step loop is swapped out, and an
     engine that cannot start stops the game with a message instead of
     falling back. Its postbuild check (`scripts/verify-engine-bundle.ts`)
@@ -502,13 +502,15 @@ An internal change that keeps all of these, such as a performance
 optimization, needs no bump. The build hash (`sources` in the package's
 `BUILD.json`) tells such builds apart. While the crate is 0.x, take a minor
 bump for a save, frame or view layout, catalog, identity schema or interface change,
-and a patch bump for a lock change on its own. Publishing and 1.0.0 are #893.
+and a patch bump for a lock change on its own. Publishing is #893.
 
 The crate version is independent of the app version: an app release never
-requires a crate release, and the app's 3.0.0 does not wait for crate 1.0.0.
-Crate 1.0.0 means the compatibility policy is published and the conformance lock
-ships inside the crate (#893, labeled `engine-1.0` with its blockers). The bump
-rules after 1.0.0 are part of that compatibility policy, so #893 sets them.
+requires a crate release, and the app's 3.0.0 does not wait for the crate.
+Crate 1.0.0 (2026-10-30, the owner's call) marks that the shipped game runs on
+this engine alone. Publishing the crate, shipping the conformance lock inside
+it and writing the compatibility policy stay with #893; the bump rules after
+1.0.0 are part of that policy, so #893 sets them, and until then the 0.x rules
+above still say when a bump is due.
 
 **How:** raise `version` in `engine-rs/Cargo.toml`, then in `engine-rs/Cargo.lock`
 and `engine-rs/consumer/Cargo.lock` (CI builds the consumer with `--locked`),
