@@ -21,10 +21,6 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.66.0
-
-- The game now runs on the Rust engine for everyone, and the engine choice is gone from Settings.
-
 ## 2.65.0
 
 - In Classic, the metro station only helps shops, restaurants and fast food once its platform floor has an elevator, stairs, or escalator connected, as in SimTower.

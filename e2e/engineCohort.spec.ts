@@ -38,18 +38,10 @@ async function bootedEngine(page: Page, reload = false): Promise<string> {
   return page.evaluate(() => (window as any).__vcEngineBoot.engine as string);
 }
 
-async function settingsStatus(page: Page): Promise<string> {
-  await page.evaluate(() => (window as any).game.ui.showSettings());
-  const status = page.locator("#set-engine-status");
-  await expect(status).toBeVisible();
-  return (await status.textContent())!.replace(/\s+/g, " ").trim();
-}
-
 test("the cohort puts a WASM-arm browser on the Rust engine with no URL or stored choice", async ({ page }) => {
   await seed(page, 1, 3);
   expect(await bootedEngine(page)).toBe("wasm");
   expect(await bootedEngine(page, true)).toBe("wasm");
-  expect(await settingsStatus(page)).toContain("Running now: Rust engine");
 });
 
 /** Force a trap in a frame's step: the real step runs, then the call throws.
@@ -94,10 +86,6 @@ test("a trap reloads on Rust, and a second keeps every later boot on TypeScript 
     expect(await bootedEngine(page, true)).toBe("ts");
     await expect(page.locator("#modal[open]")).toHaveCount(0);
   }
-  expect(await settingsStatus(page)).toContain("it stopped twice while running");
-  await page.locator("[data-engine-retry]").click();
-  expect(await settingsStatus(page)).toContain("Restart the game to switch engines.");
-  expect(await bootedEngine(page, true)).toBe("wasm");
 });
 
 test("a trap during an autosave keeps the last good save, and both reloads load it", async ({ page }) => {
@@ -163,29 +151,10 @@ test("a test link's tab is held on TypeScript after two traps, and a new tab tri
   expect(await trapAndReload(page)).toBe("ts");
   // A test visit leaves the player's own records alone.
   expect(await page.evaluate(() => localStorage.getItem("vc.engineSafety"))).toBeNull();
-  expect(await settingsStatus(page)).toContain("The Rust engine stopped twice in this tab");
   const fresh = await context.newPage();
   await fresh.goto("/?engine=wasm");
   await fresh.waitForFunction(() => !!(window as any).game && !!(window as any).__vcEngineBoot, undefined, { timeout: 30_000 });
   expect(await fresh.evaluate(() => (window as any).__vcEngineBoot.engine as string)).toBe("wasm");
-});
-
-test("a TypeScript choice in Settings survives a reload and a stage change that enrolls the browser", async ({ page }) => {
-  // Bucket 15 is on the TypeScript arm at stage 1 (10%) and the WASM arm at stage 2 (25%).
-  await seed(page, 1, 15);
-  expect(await bootedEngine(page)).toBe("ts");
-  await settingsStatus(page);
-  await page.locator('input[name="set-engine"][value="typescript"]').check();
-  expect(await page.evaluate(() => localStorage.getItem("vc.engine"))).toBe("ts");
-  expect(await bootedEngine(page, true)).toBe("ts");
-  await page.evaluate(() => localStorage.setItem("vc.cohortTooling", JSON.stringify({ stage: 2 })));
-  expect(await bootedEngine(page, true)).toBe("ts");
-  expect(await page.evaluate(() => localStorage.getItem("vc.engine"))).toBe("ts");
-  // Control: back on Automatic, the same stage puts this browser on Rust.
-  await settingsStatus(page);
-  await page.locator('input[name="set-engine"][value="auto"]').check();
-  await expect(page.locator("#set-engine-status")).toContainText("Restart the game to switch engines.");
-  expect(await bootedEngine(page, true)).toBe("wasm");
 });
 
 test("two page lives that died while visible latch a crash loop", async ({ page }) => {
@@ -203,5 +172,4 @@ test("two page lives that died while visible latch a crash loop", async ({ page 
   }, sha);
   expect(await bootedEngine(page, true)).toBe("ts");
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("vc.engineSafety")!))).toMatchObject({ reason: "unclean-exit", scope: "fault" });
-  expect(await settingsStatus(page)).toContain("the game closed unexpectedly while using it");
 });

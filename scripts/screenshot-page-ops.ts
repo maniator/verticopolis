@@ -51,15 +51,6 @@ export function pgMaskVersion(): void {
       if (n.nodeType === Node.TEXT_NODE && / · (Rust|TypeScript) engine/.test(n.textContent ?? "")) n.textContent = n.textContent!.replace(/ · (Rust|TypeScript) engine.*$/, "");
     }
   });
-  // The Settings "Game engine" section differs between the drift check's two
-  // legs: the WASM leg stores the Rust choice and runs Rust. Show the
-  // TypeScript leg's state, Automatic checked and the TypeScript engine running.
-  document.querySelectorAll<HTMLInputElement>('input[name="set-engine"]').forEach((r) => {
-    r.checked = r.value === "auto";
-  });
-  document.querySelectorAll<HTMLElement>("#set-engine-status b").forEach((b) => {
-    if (b.textContent === "Rust engine") b.textContent = "TypeScript engine";
-  });
 }
 
 /** Assert Settings modal content visibility for screenshot captures.
@@ -70,7 +61,7 @@ export function pgAssertSettingsContentVisible(mode: "require-all" | "visible-on
   const box = document.querySelector("#modal .modal-box") as HTMLElement | null;
   if (!box) throw new Error("the Settings dialog did not mount");
   const boxRect = box.getBoundingClientRect();
-  const selectors = [".set-engine", ".set-engine-status", ".modal-actions", ".set-version"];
+  const selectors = [".modal-actions", ".set-version"];
   for (const selector of selectors) {
     const el = box.querySelector(selector) as HTMLElement | null;
     if (!el) throw new Error(`Settings is missing required content: ${selector}`);

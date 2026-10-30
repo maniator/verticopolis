@@ -81,9 +81,9 @@ describe("settingsTemplate structure and a11y", () => {
 describe("settingsTemplate keeps the pinned Close row as the last child", () => {
   it("renders nothing after the action row, so no scrolled line can show beneath it", () => {
     // The sticky strip covers downward only as a true last child. With the
-    // version line after it, the engine status line scrolled into the band under
-    // Close on a phone (2.53.4).
-    const frag = renderToFragment(settingsTemplate("1.2.3", true, " engine", { choice: "rust", storable: true } as never));
+    // version line after it, a scrolled line showed in the band under Close on
+    // a phone (2.53.4).
+    const frag = renderToFragment(settingsTemplate("1.2.3", true, " engine"));
     const actions = frag.querySelector(".modal-actions")!;
     expect(actions.nextElementSibling).toBeNull();
     expect(frag.querySelector(".set-version")!.compareDocumentPosition(actions)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
