@@ -121,12 +121,8 @@ jobs:
         env:
           VC_TOOLING: "1"
 
-      # The baseline is the TypeScript engine's, so capture on it (PW_ENGINE=ts)
-      # until a Rust baseline replaces it.
       - name: Capture perf baseline
         run: npm run perf:capture
-        env:
-          PW_ENGINE: "ts"
 
       - name: Commit refreshed baseline
         id: commit

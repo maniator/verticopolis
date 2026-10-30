@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page, type Route } from "@playwright/test";
-import { TS_PROJECT, WASM_PROJECT } from "./helpers";
+import { WASM_PROJECT } from "./helpers";
 
 /**
  * The engine-test rows in a real browser (the analytics packet, rev 5,
@@ -10,10 +10,9 @@ import { TS_PROJECT, WASM_PROJECT } from "./helpers";
  *
  * - An aborted package load still leaves its `attempt` row (#1461): the row
  *   goes out before the load, so a tab closed mid-load is counted.
- * - One scripted session engages the same way on each engine (`@ts-smoke`,
- *   so CI runs it on the TypeScript engine too): a refused command and a
- *   paused clock never engage, the first accepted command does, once, after
- *   `attempt` and `settle`.
+ * - One scripted session engages: a refused command and a paused clock never
+ *   engage, the first accepted command does, once, after `attempt` and
+ *   `settle`.
  */
 
 type Row = { trigger: string; engine: string; fallback_reason: string; engaged_by?: string; page_life: string };
@@ -54,9 +53,8 @@ test("a package load that never finishes has already sent its attempt row", asyn
   expect(settle.page_life).toBe(attempt.page_life);
 });
 
-test("a session engages on its first accepted command, after attempt and settle", { tag: "@ts-smoke" }, async ({ page }, info) => {
-  test.skip(info.project.name !== WASM_PROJECT && info.project.name !== TS_PROJECT, "the switchable projects");
-  const engine = info.project.name === TS_PROJECT ? "ts" : "wasm";
+test("a session engages on its first accepted command, after attempt and settle", async ({ page }, info) => {
+  test.skip(info.project.name !== WASM_PROJECT, "the switchable project");
   await page.goto("/");
   await page.waitForFunction(() => !!(window as any).game?.enginePort, undefined, { timeout: 30_000 });
   await page.evaluate(() => {
@@ -85,7 +83,7 @@ test("a session engages on its first accepted command, after attempt and settle"
   expect(accepted, "both lobby tiles are built").toEqual([1, 1]);
   await expect.poll(triggers).toEqual(["attempt", "settle", "engaged"]);
   const rows = await statusRows(page);
-  expect(rows.map((r) => r.engine)).toEqual([engine, engine, engine]);
+  expect(rows.map((r) => r.engine)).toEqual(["wasm", "wasm", "wasm"]);
   expect(rows[2]!.engaged_by).toBe("command");
   expect(new Set(rows.map((r) => r.page_life)).size).toBe(1);
 });

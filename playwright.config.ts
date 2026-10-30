@@ -2,14 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 // The suite runs on the Rust engine (#1353): every spec, the visual specs
-// included, on the `chromium-wasm` project. While players can still be on the
-// TypeScript engine (the Automatic cohort, or a Settings choice), PW_ENGINE=ts
-// runs the same specs on it as the `chromium-ts` project: CI runs the
-// `@ts-smoke` tag that way, and a maintainer can run the whole suite the same
-// way by hand. The visual specs and their baselines are the Rust engine's, so
-// the TypeScript run never compares or writes them.
-if (process.env.PW_ENGINE && process.env.PW_ENGINE !== "ts") throw new Error(`PW_ENGINE must be "ts" or unset; got "${process.env.PW_ENGINE}".`);
-const TS_ENGINE = process.env.PW_ENGINE === "ts";
+// included, on the `chromium-wasm` project. The TypeScript engine has no lane
+// here; players do not run it.
 
 // Playwright drives the BUILT app (via `vite preview`) for the Tier-2 end-to-end
 // smoke. Headless Tier-1 playthrough tests live in vitest (the `src` tree); this
@@ -20,7 +14,6 @@ const TS_ENGINE = process.env.PW_ENGINE === "ts";
 // replaces the other two projects, whose builds it does not serve.
 const WASM_ONLY = process.env.PW_WASM_ONLY === "1";
 if (process.env.PW_WASM_ONLY && !WASM_ONLY) throw new Error(`PW_WASM_ONLY must be "1" or unset; got "${process.env.PW_WASM_ONLY}".`);
-if (WASM_ONLY && TS_ENGINE) throw new Error("PW_WASM_ONLY=1 and PW_ENGINE=ts are separate lanes; set one.");
 // The lane must match the build it serves: the projects of one lane fail in
 // confusing ways against the other's build. The build records its mode.
 const builtMode = (() => {
@@ -78,19 +71,17 @@ export default defineConfig({
     : [
     // The Rust engine: the stored engine choice (`vc.engine`, see
     // src/wasmhost/engineChoice.ts) is seeded into localStorage so every page
-    // the suite opens boots on it. With PW_ENGINE=ts the same project seeds
-    // TypeScript instead and is named `chromium-ts`, so the helpers that key on
-    // the project name (e2e/helpers.ts `onWasm`) follow the engine. The visual
-    // baselines keep their historical `-chromium` file names.
+    // the suite opens boots on it. The visual baselines keep their historical
+    // `-chromium` file names.
     {
-      name: TS_ENGINE ? "chromium-ts" : "chromium-wasm",
-      testIgnore: TS_ENGINE ? [/visual\.spec\.ts/, /wasmOnly\.spec\.ts/] : [/wasmOnly\.spec\.ts/],
+      name: "chromium-wasm",
+      testIgnore: [/wasmOnly\.spec\.ts/],
       snapshotPathTemplate: "{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}-chromium{-snapshotSuffix}{ext}",
       use: {
         ...devices["Desktop Chrome"],
         storageState: {
           cookies: [],
-          origins: [{ origin: "http://127.0.0.1:4173", localStorage: [{ name: "vc.engine", value: TS_ENGINE ? "ts" : "wasm" }] }],
+          origins: [{ origin: "http://127.0.0.1:4173", localStorage: [{ name: "vc.engine", value: "wasm" }] }],
         },
       },
     },

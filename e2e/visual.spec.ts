@@ -26,8 +26,7 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * docs/screenshots/06-sprite-gallery.png, so a second baseline was redundant.)
  *
  * One set of baselines, the Rust engine's (#1353): the suite runs on the
- * `chromium-wasm` project, which mints and compares them. The TypeScript run
- * (PW_ENGINE=ts) skips this file.
+ * `chromium-wasm` project, which mints and compares them.
  */
 
 // The sprite gallery (gallery.html) is a pure canvas of every facility, and the

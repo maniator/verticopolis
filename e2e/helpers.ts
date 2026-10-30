@@ -18,11 +18,8 @@ import { test, expect, type Page } from "@playwright/test";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-/** The Playwright project that seeds `vc.engine = wasm` (playwright.config.ts).
- *  With PW_ENGINE=ts the same project is named `chromium-ts` and seeds TypeScript. */
+/** The Playwright project that seeds `vc.engine = wasm` (playwright.config.ts). */
 export const WASM_PROJECT = "chromium-wasm";
-/** The same project with PW_ENGINE=ts: it seeds `vc.engine = ts` (playwright.config.ts). */
-export const TS_PROJECT = "chromium-ts";
 /** The project that runs the suite against a wasm-only build (`VC_ENGINE=wasm`,
  *  see playwright.config.ts): the WASM engine is the only engine there. */
 export const WASM_ONLY_PROJECT = "chromium-wasm-only";
@@ -47,18 +44,10 @@ export function tsOnlyOnWasm(reason: string): void {
  * Fail a `chromium-wasm` test unless the live tower runs on the engine: the
  * Rust engine is published, it reports itself hosting with no error, and it
  * is the port the app holds. Without this a spec could pass on the project
- * while the page silently ran the TypeScript engine. On `chromium-ts` it
- * checks the opposite: that the page booted the TypeScript engine, so a
- * smoke run never passes on the Rust engine by mistake.
+ * while the page silently ran the TypeScript engine.
  */
 export async function expectEngineHosted(page: Page): Promise<void> {
   const info = test.info();
-  if (info.project.name === TS_PROJECT && info.expectedStatus !== "skipped") {
-    if (info.status === "failed" || info.status === "timedOut" || info.status === "interrupted") return;
-    const engine = await page.evaluate(() => (window as any).__vcEngineBoot?.engine ?? null);
-    expect(engine, "the chromium-ts project must boot the TypeScript engine").toBe("ts");
-    return;
-  }
   if (!onWasm(info.project.name) || info.expectedStatus === "skipped") return;
   // Leave an already-failed test's own failure on top of the report.
   if (info.status === "failed" || info.status === "timedOut" || info.status === "interrupted") return;

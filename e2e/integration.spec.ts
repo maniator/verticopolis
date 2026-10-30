@@ -14,9 +14,7 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * coverage strategy made explicit (see vite.config.ts coverage comment).
  */
 test.describe("app integration — main.ts + TowerEngine boot/render boundary", () => {
-  // @ts-smoke: the one test CI also runs on the TypeScript engine (PW_ENGINE=ts,
-  // playwright.config.ts) while players can still be on it.
-  test("boots the composition root, renders the canvas, and round-trips a build error-free", { tag: "@ts-smoke" }, async ({ page }) => {
+  test("boots the composition root, renders the canvas, and round-trips a build error-free", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
     page.on("console", (m) => {
