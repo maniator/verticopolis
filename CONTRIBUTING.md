@@ -504,6 +504,13 @@ optimization, needs no bump. The build hash (`sources` in the package's
 bump for a save, frame or view layout, catalog, identity schema or interface change,
 and a patch bump for a lock change on its own. Publishing and 1.0.0 are #893.
 
+The crate version is independent of the app version: an app release never
+requires a crate release, and the app's 3.0.0 does not wait for crate 1.0.0.
+Crate 1.0.0 means the compatibility policy is published and the conformance lock
+ships inside the crate (#893, labeled `engine-1.0` with its blockers). After
+1.0.0, a save, frame or catalog break takes a major bump, an additive change a
+minor bump, and a lock-only change a patch bump.
+
 **How:** raise `version` in `engine-rs/Cargo.toml`, then in `engine-rs/Cargo.lock`
 and `engine-rs/consumer/Cargo.lock` (CI builds the consumer with `--locked`),
 then run `npm run engine:compat`. It rewrites `engine-rs/src/compat-record.json`
