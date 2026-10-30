@@ -9,7 +9,7 @@ import { pageShell } from "./ui/templates/pageShell";
 import { injectVercelTelemetry } from "./telemetry";
 import { trackAppAction } from "./analytics";
 import { catalogFor } from "./engine/catalog";
-import { bindViewWorld, viewWorld } from "./presentation/viewWorld";
+import { bindViewWorld } from "./presentation/viewWorld";
 
 // A tooling page draws sprites without a tower, so it binds the Modern
 // catalog's world for the view (the lot geometry the sprites hash on).
@@ -74,14 +74,8 @@ function roomEntry(
       // that overflows the cell down to a smaller whole multiple (and below 1x
       // only when nothing else fits), so a room loses size rather than shape.
       const floors = f.floors ?? 1;
-      // The metro spans the full lot (the world's lotWidth columns): an aspect so wide that
-      // fitting its true width shrinks the tile to nearly nothing and collapses
-      // the height to a sliver. Its platform art is width-responsive (it composes
-      // a whole station into whatever box it is handed), so size it by HEIGHT like
-      // the other multi-floor rooms and let it fill the cell width.
-      const fullLot = f.width >= viewWorld().lotWidth;
-      const box = fitAtGameScale(f.width, floors, fullLot ? Infinity : cw - 16, ch - CAPTION_H, MAG);
-      const w = fullLot ? Math.max(0, cw - 16) : box.w;
+      const box = fitAtGameScale(f.width, floors, cw - 16, ch - CAPTION_H, MAG);
+      const w = box.w;
       const h = box.h;
       // Under 1px is as unusable as zero, and worse than nothing: drawFloor
       // clamps height up to 1, so a sub-pixel box paints a stray hairline. Both
@@ -99,7 +93,7 @@ function roomEntry(
       // box. Inflating the box instead would grow the room while its furniture
       // stayed put, which is the same wrong-proportion defect this page was fixed
       // to stop, just moved from aspect to interior scale.
-      const worldW = fullLot ? w / box.scale : f.width * TILE;
+      const worldW = f.width * TILE;
       const worldH = floors * FLOOR;
       const ctx = d.ctx;
       ctx.save();

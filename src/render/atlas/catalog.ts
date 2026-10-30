@@ -113,7 +113,7 @@ export const PARKING_CAR_COLORS = 7;
  *  a full-lot kind (the metro) has exactly one placement. */
 export function variantPlacements(kind: FacilityKind): { floor: number; x: number; id: number }[] {
   const f = FACILITIES[kind];
-  if (f.width >= 200) return [{ floor: -8, x: 0, id: 1 }];
+  if (kind === "metro") return [{ floor: -8, x: 0, id: 1 }];
   const floors = f.basement ? [-1, -2, -4, -6] : [5, 12, 27, 43];
   const xs = [17, 64, 131, 208];
   const ids = [3, 14, 25, 36];

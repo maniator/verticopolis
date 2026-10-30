@@ -21,6 +21,26 @@ function tileSpan(u: SerializedUnit): { f: number; x: number; w: number } {
   return { f: Number(u.floor), x: Number(u.x), w: Math.min(typeof u.width === "number" ? u.width : 1, GRID.width) };
 }
 
+/** A kind's width as the v1 -> v2 migration has always laid it out. The catalog
+ *  later moved security, medical, housekeeping and recycling to their SimTower
+ *  widths and the metro to 30 tiles; this keeps the old widths for this one
+ *  migration, as the Rust loader's `v2_width` does. */
+function v2Width(kind: FacilityKind): number {
+  switch (kind) {
+    case "security":
+    case "housekeeping":
+      return 8;
+    case "medical":
+      return 16;
+    case "recycling":
+      return 20;
+    case "metro":
+      return GRID.width;
+    default:
+      return FACILITIES[kind].width;
+  }
+}
+
 /**
  * Facility height AS OF a given save-schema version. The party hall only became
  * two stories at v6; a v1..v5 save still holds a one-story hall (the v5 -> v6
@@ -78,7 +98,7 @@ export function migrationLooksValid(data: SerializedGame): boolean {
     // Geometry reads as numbers, as the Rust loader's check reads it: a
     // hand-edited string `x` or `floor` would concatenate here, and a width
     // that is not a number takes the catalog's (#858).
-    const width = typeof r.width === "number" ? r.width : FACILITIES[r.kind].width;
+    const width = typeof r.width === "number" ? r.width : v2Width(r.kind);
     const x = Number(r.x);
     const floor = Number(r.floor);
     if (x < 0 || x + width > GRID.width) return false; // off-lot
@@ -158,7 +178,7 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
   const src = Array.isArray(data.units) ? data.units : [];
   const isStruct = (k: string): boolean => k === "floor" || k === "lobby";
   const isPark = (k: string): boolean => k === "parking" || k === "parkingRamp";
-  const canonW = (k: FacilityKind): number => FACILITIES[k]?.width ?? 1;
+  const canonW = (k: FacilityKind): number => (FACILITIES[k] ? v2Width(k) : 1);
   const LOT = GRID.width;
 
   // Split units: structural paving (kept, plus we may add more), well-formed rooms
