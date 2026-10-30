@@ -93,3 +93,43 @@ fn offices_and_condos_arrive_with_the_people_the_file_counts() {
         assert_eq!(people("condo"), condos, "{name} condos");
     }
 }
+
+/// (file, single, twin and suite rooms holding guests). Each is the file's
+/// hotel guest line divided by the room's complement (1, 2, 2), the rooms in
+/// the checked-in or asleep stay state.
+const GUEST_ROOMS: [(&str, i64, i64, i64); 9] = [
+    ("TOWER1.TDT", 0, 0, 0),
+    ("TOWER2.TDT", 180, 242, 81),
+    ("TOWER3.TDT", 0, 11, 13),
+    ("TOWER4.TDT", 18, 122, 140),
+    ("TOWER5.TDT", 0, 0, 0),
+    ("TOWER6.TDT", 0, 7, 27),
+    ("TOWER7.TDT", 0, 0, 0),
+    ("TOWER8.TDT", 0, 0, 0),
+    ("MYTOWER.TDT", 0, 0, 0),
+];
+
+#[test]
+fn hotel_rooms_arrive_with_guests_exactly_where_the_file_counts_them() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("conformance")
+        .join("fixtures")
+        .join("tdt-reddit");
+    for (name, singles, twins, suites) in GUEST_ROOMS {
+        let bytes = std::fs::read(dir.join(name)).expect("fixture");
+        let (json, _) = import_tdt(&bytes, name).expect("imports");
+        let save: serde_json::Value = serde_json::from_str(&json).expect("save json");
+        let with_guests = |kind: &str| -> i64 {
+            save["units"]
+                .as_array()
+                .expect("units")
+                .iter()
+                .filter(|u| u["kind"] == kind && u["state"] == "asleep")
+                .count() as i64
+        };
+        assert_eq!(with_guests("hotelSingle"), singles, "{name} singles");
+        assert_eq!(with_guests("hotelDouble"), twins, "{name} twins");
+        assert_eq!(with_guests("hotelSuite"), suites, "{name} suites");
+    }
+}

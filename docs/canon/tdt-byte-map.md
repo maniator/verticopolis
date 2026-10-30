@@ -70,11 +70,11 @@ zero in all of them (no field known there).
 | 0 | u16 | magic | `0x2400` | File signature | Known |
 | 2 | u16 | level | 1 to 6 | Star rating; 6 = TOWER | Known |
 | 4 | i32 | balance | | Funds; shown x100 | Known |
-| 8 | i32 | otherIncome | 5,000 in TOWER1, else 0 | Finance window "other income" line | Inferred |
-| 12 | i32 | constructionCosts | | Finance window line | Inferred |
-| 16 | i32 | lastQuarterMoney | | Finance window line | Inferred |
-| 20 | u16 | tick | 0 to 2,599 | Time of day | Known |
-| 22 | i32 | day | | Day counter, signed | Known |
+| 8 | i32 | otherIncome | 5,000 in TOWER1, else 0 | Finance window "other income" line; SimTower zeroes it on save (TOWER1) | Inferred |
+| 12 | i32 | constructionCosts | | Finance window line; SimTower zeroes it on save (non-zero in TOWER1, 2, 5 and 6, zero after the game's own re-save) | Inferred |
+| 16 | i32 | lastQuarterMoney | | Finance window line; changes as the game runs | Inferred |
+| 20 | u16 | tick | 0 to 2,599 | Time of day; changes as the game runs | Known |
+| 22 | i32 | day | | Day counter, signed; changes as the game runs | Known |
 | 26 | u16 | unknown | 1 in TOWER2 only, else 0 | | Unknown |
 | 28 | u16 | lobbyHeight | | Ground lobby height in floors | Inferred |
 | 30 | u16 | unknown | 2 in the 4 and 5 star towers, `0xFFFF` in the 3 star tower | Star-related; could be a rating-state flag | Unknown |
@@ -94,6 +94,12 @@ zero in all of them (no field known there).
 | 58 | u16 | namedPeople | 0 in all nine | Custom-named people | Unknown |
 | 60 | u16 | unknown | 0 | | Unknown |
 | 62 | u32 | bomb | 0 | Floor and position while a bomb event runs [TD] | Unknown |
+
+Comparing each original with SimTower's own re-save (TOWER1, 2, 5, 6, 7): only
+bytes 4 to 7 and 16 to 22 change because the game keeps running, bytes 12 to 15
+(and 8 to 11 in TOWER1) are zeroed, and byte 2 (stars) never changes. No 1-star
+or 2-star save exists to test, so header 30 across those levels is still
+unchecked.
 
 Open question: bytes 26, 30, 32, 34, 36, 44, 60 and the zero tail (66 to 559).
 TOWER3's two count mismatches (46 and 54) suggest the counts are running
@@ -124,8 +130,8 @@ and the game loads that fine; the game's own re-saves rebuild it.
 | --- | --- | --- | --- | --- |
 | 0 | u16 | left | First tile | Known |
 | 2 | u16 | right | End tile, half open | Known |
-| 4 | u8 | type | Section 6 of `tdt-format.md`. 226 and 227 appear once each in the nine saves and are not explained | Known (226/227: Unknown) |
-| 5 | u8 | state flags | Hotel room state (0x03 occupants, 0x08 rented, 0x10 asleep, 0x20 dirty, 0x40 infested); offices and condos carry a nonzero value while occupied | Known for hotels |
+| 4 | u8 | type | Section 6 of `tdt-format.md`. As a signed byte, negative = under construction: 226 and 227 are a Party Hall under construction (-30, -29) in TOWER3 | Known |
+| 5 | u8 | state | Hotels: bits 3 and 4 stay state (1 checked in, 2 asleep, 3 vacant and clean), 0x20 dirty, 0x40 infested, low 2 bits guests inside now; the finance guest lines count rooms in stay state 1 or 2 at full complement (section 7.2). Offices and condos carry a nonzero value while occupied | Known for hotels |
 | 6 | u8 | variant | Shop, restaurant and fast-food style | Known |
 | 7 | u8 | unknown | 0 everywhere except parking stalls (0 or 1) | Unknown |
 | 8 | u32 | counter | High 16 bits always 0; values up to about 9,500; per-unit counter or timer | Unknown |
@@ -291,6 +297,10 @@ All eight blocks have byte 15 = 1 in all 146 shafts.
 | 21 | 11 n, sum of words 11 to 19 | Known |
 
 ### 7.2 Finance (F+88, 132 bytes, 33 x i32)
+
+The hotel lines (single, twin, suite) are the number of rooms in stay state 1 or
+2 (section 3.1, byte 5) times the complement 1, 2 and 2. Checked on all nine
+saves; TOWER2 gives 180, 242 and 81 rooms for lines of 180, 484 and 162.
 
 | Bytes | Content | Status |
 | --- | --- | --- |

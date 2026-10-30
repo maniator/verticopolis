@@ -228,21 +228,19 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
                     state = "dirty";
                     ever_occupied = true;
                     counts.hotel_dirty += 1;
-                } else if t.status & HOTEL_ASLEEP_FLAG != 0 {
-                    ever_occupied = true;
-                    let minute_of_day = ((minutes % 1440) + 1440) % 1440;
-                    if (8 * 60..20 * 60).contains(&minute_of_day) {
-                        state = "dirty";
-                        counts.hotel_dirty += 1;
-                        counts.asleep_converted += 1;
-                    } else {
-                        state = "asleep";
-                        occupants = (t.status & HOTEL_OCCUPANT_MASK).max(1);
-                        counts.hotel_asleep += 1;
-                    }
                 } else {
                     ever_occupied = true;
-                    counts.hotel_booked += 1;
+                    // The finance block counts the guests of every checked-in or
+                    // sleeping room at full complement, and our engine keeps one
+                    // in-room guest state, so both arrive as guests in their room.
+                    match t.status & HOTEL_STAY_STATE_MASK {
+                        HOTEL_STAY_CHECKED_IN | HOTEL_ASLEEP_FLAG => {
+                            state = "asleep";
+                            occupants = kind.facility().population;
+                            counts.hotel_asleep += 1;
+                        }
+                        _ => counts.hotel_booked += 1,
+                    }
                 }
             } else if !under_construction
                 && matches!(kind, Kind::FastFood | Kind::Restaurant | Kind::Shop)

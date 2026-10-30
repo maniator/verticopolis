@@ -623,7 +623,8 @@ describeWithCodec("parseTDT: golden mappings", () => {
     // Default header clock is 7:00 AM (before checkout), so asleep survives.
     const asleep = rooms(oneTenant(3, 100, 104, 16 | 2))[0];
     expect(asleep.state).toBe("asleep");
-    expect(asleep.occupants).toBe(2);
+    // The room holds its full complement (the finance block counts it so).
+    expect(asleep.occupants).toBe(1);
     expect(asleep.everOccupied).toBe(true);
 
     const dirty = rooms(oneTenant(3, 100, 104, 32))[0];
@@ -646,35 +647,41 @@ describeWithCodec("parseTDT: golden mappings", () => {
     const booked = rooms(oneTenant(3, 100, 104, 1))[0]; // occupant bit, not asleep -> guest out
     expect(booked.state).toBe("empty");
     expect(booked.everOccupied).toBe(true);
-    for (const [status, occ] of [
-      [17, 1],
-      [18, 2],
-      [19, 3],
-    ] as const) {
-      const u = rooms(oneTenant(3, 100, 104, status))[0]; // HOTEL_ASLEEP_FLAG(16) | occupant count
+    for (const status of [17, 18, 19]) {
+      const u = rooms(oneTenant(3, 100, 104, status))[0]; // asleep stay state | occupant count
       expect(u.state).toBe("asleep");
-      expect(u.occupants).toBe(occ);
+      expect(u.occupants).toBe(1); // a single room's complement, whatever the count says
       expect(u.everOccupied).toBe(true);
     }
   });
 
-  it("a booked room whose guests are out arrives empty but ever-booked, with a note", () => {
-    const { save, report } = parse(oneTenant(3, 100, 104, 8));
+  it("a checked-in room whose guests are out still arrives with its guests", () => {
+    // Stay state 1 (status 8 to 10): the finance block counts the guests at
+    // full complement even when none are inside.
+    for (const status of [8, 9, 10]) {
+      const room = rooms(oneTenant(3, 100, 104, status))[0];
+      expect(room.state).toBe("asleep");
+      expect(room.occupants).toBe(1);
+      expect(room.everOccupied).toBe(true);
+    }
+  });
+
+  it("a clean vacant room (status 24) arrives empty but ever-booked, with a note", () => {
+    const { save, report } = parse(oneTenant(3, 100, 104, 24));
     const room = save.units.find((u) => u.kind === "hotelSingle")!;
     expect(room.state).toBe("empty");
     expect(room.everOccupied).toBe(true);
     expect(report.couldNotBring.join(" ")).toMatch(/booked hotel room/);
   });
 
-  it("guests asleep past the 8:00 checkout arrive as rooms awaiting housekeeping", () => {
-    // Tick 800 is midday (12:30); the engine's next wake-up would be tomorrow.
-    const { save, report } = parse({
+  it("guests keep their rooms whatever the hour the file was saved", () => {
+    // Tick 800 is midday (12:30); the game counts checked-in guests all day.
+    const room = rooms({
       frameTime: 800,
       floors: [{ index: 20, tenants: [{ left: 100, right: 104, type: 3, status: 16 | 1 }] }],
-    });
-    const room = save.units.find((u) => u.kind === "hotelSingle")!;
-    expect(room.state).toBe("dirty");
-    expect(report.couldNotBring.join(" ")).toMatch(/asleep past checkout/);
+    })[0];
+    expect(room.state).toBe("asleep");
+    expect(room.occupants).toBe(1);
   });
 
   it("rent classes map onto the Classic canon rungs (very low / low / average / high / no-rate)", () => {

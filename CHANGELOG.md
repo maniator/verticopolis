@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.62.0
+
+- Hotel guests from imported SimTower saves now arrive in their rooms, so the guest count matches the original.
+- Clean, empty hotel rooms in imported saves no longer arrive as rooms waiting for housekeeping.
+
 ## 2.61.0
 
 - A tower exported to SimTower's .TDT format now keeps all 64 stairs and escalators when SimTower opens it. Before, towers with more than 48 lost 16.
