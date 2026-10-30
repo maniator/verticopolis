@@ -126,7 +126,7 @@ describe("F15 / Step 3 — service coverage radius (v2): placement matters", () 
   it("a fire is contained faster near a station than far from it (v2)", () => {
     const sim = tallTower(1);
     sim.tower.place("security", 2, C); // ground-level security only
-    sim.tower.place("medical", 2, C + 8);
+    sim.tower.place("medical", 2, C + 16);
     const near = sim.fireContainmentChance(3); // within radius
     const far = sim.fireContainmentChance(100); // a floor-100 fire, far away
     expect(near).toBeGreaterThan(far);
@@ -138,7 +138,7 @@ describe("F15 / Step 3 — service coverage radius (v2): placement matters", () 
     const sim = tallTower(2);
     sim.simModel = "v1";
     sim.tower.place("security", 2, C);
-    sim.tower.place("medical", 2, C + 8);
+    sim.tower.place("medical", 2, C + 16);
     expect(sim.fireContainmentChance(3)).toBeCloseTo(sim.fireContainmentChance(100), 5);
   });
 
@@ -161,7 +161,7 @@ describe("F15 / Step 3 — service coverage radius (v2): placement matters", () 
     // Security more than halves the fire rate — building it is clearly worth it.
     expect(withSecurity).toBeLessThan(bare * 0.5);
 
-    expect(sim.tower.place("medical", 2, C + 8).ok).toBe(true);
+    expect(sim.tower.place("medical", 2, C + 16).ok).toBe(true);
     const withBoth = sim.fireIgnitionChance();
     expect(withBoth).toBeCloseTo(0.025 * 0.45 * 0.5, 5);
     expect(withBoth).toBeLessThan(withSecurity);

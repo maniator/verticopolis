@@ -5,8 +5,9 @@ import { catalogFacility } from "../../engine/catalogTypes";
 import { towerCatalog } from "../../engine/towerCatalog";
 import type { FacilityKind } from "../../engine/types";
 import { isOperational } from "../../engine/types";
-import { drawCar, drawGarbageTruck, drawMetroTrain, drawStreetCar } from "../sprites";
-import { METRO_TRAIN_H, GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
+import { drawCar, drawGarbageTruck, drawStreetCar } from "../sprites";
+import { GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
+import { addMetro } from "./towerMetro";
 import { buildWalkers } from "./towerWalkerBuild";
 import { crowdPopulation } from "./towerPopulation";
 import { carIndicator, type CarIndicator } from "../carIndicator";
@@ -139,11 +140,13 @@ export function clearCrowd(engine: TowerEngine): void {
 export function clearMotion(engine: TowerEngine): void {
   for (const c of engine.carActors) c.actor.kill();
   for (const t of engine.trainActors) t.actor.kill();
+  for (const t of engine.tunnelActors) t.kill();
   for (const t of engine.truckActors) t.actor.kill();
   for (const g of engine.garageCars) g.actor.kill();
   for (const w of engine.walkers) w.actor.kill();
   engine.carActors = [];
   engine.trainActors = [];
+  engine.tunnelActors = [];
   engine.truckActors = [];
   engine.garageCars = [];
   engine.walkers = [];
@@ -206,17 +209,7 @@ export function syncMotion(engine: TowerEngine): void {
     }
   }
   for (const u of engine.sim.tower.units) {
-    if (u.kind !== "metro") continue;
-    const w = u.width * TILE - 6;
-    // The car sits on the track just below the platform edge: its base is 3px
-    // off the station floor and it stands METRO_TRAIN_H tall (was a 9px sliver
-    // stranded mid-trough).
-    const trainY = engine.worldYTop(u.floor) + FLOOR - 3 - METRO_TRAIN_H;
-    const cv = new ex.Canvas({ width: w, height: METRO_TRAIN_H, cache: true, draw: (ctx) => drawMetroTrain(ctx, w, true) });
-    const a = new ex.Actor({ pos: ex.vec(engine.worldX(u.x) + 3, trainY), width: w, height: METRO_TRAIN_H, anchor: ex.vec(0, 0), z: Z.vehicle });
-    a.graphics.use(cv);
-    engine.engine.add(a);
-    engine.trainActors.push({ actor: a, u, w });
+    if (u.kind === "metro") addMetro(engine, u);
   }
   // Garbage trucks: one per recycling center, parked off-screen until the
   // collection hour (updateMotion drives them in and out along the bottom
@@ -401,7 +394,7 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     if (cycle < 0.25) offset = (1 - cycle / 0.25) * -span;
     else if (cycle < 0.75) offset = 0;
     else offset = ((cycle - 0.75) / 0.25) * span;
-    tr.actor.pos = ex.vec(engine.worldX(tr.u.x) + 3 + offset, engine.worldYTop(tr.u.floor) + FLOOR - 3 - METRO_TRAIN_H);
+    tr.shift(offset);
   }
   // The garbage truck runs on GAME time (the collection is a sim event, not
   // ambience): during the collection hour it drives in along the center's

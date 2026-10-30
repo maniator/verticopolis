@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { FACILITIES } from "../engine/facilities";
-import { viewWorld } from "../presentation/viewWorld";
 import { FLOOR, TILE } from "../render/scale";
 import type { Transport, Unit } from "../engine/types";
 import { fakeContext, importRemovingWindowListeners } from "./spriteReviewPageHarness";
@@ -70,7 +69,6 @@ const floorsOf = (u: Unit): number => FACILITIES[u.kind].floors ?? 1;
  *  width it is handed, so the gallery deliberately fills the cell width and takes
  *  only the height from the scale; its box is the one that cannot be checked for
  *  aspect. */
-const isFullLot = (u: Unit): boolean => FACILITIES[u.kind].width >= viewWorld().lotWidth;
 
 let priorGetContext: PropertyDescriptor | undefined;
 let priorClientWidth: PropertyDescriptor | undefined;
@@ -134,17 +132,12 @@ describe("the sprite-review pages draw at the world scale", () => {
   it("gallery.html gives every room the world's tiles per floor", () => {
     // Every catalog cell draws a backing floor strip under its subject, at a
     // deliberately wider box; the subject carries id 1 and the backdrops do not.
-    const subjects = rec.units.filter((r) => r.u.id === 1 && !isFullLot(r.u));
+    const subjects = rec.units.filter((r) => r.u.id === 1);
     expect(subjects.length).toBeGreaterThan(30);
     for (const { u, w, h } of subjects) {
       expect(w, `${u.kind} drew an empty box`).toBeGreaterThan(0);
       expect(tilesPerFloor(u.width, floorsOf(u), w, h), `${u.kind} in the gallery`).toBeCloseTo(TILES_PER_FLOOR, 6);
     }
-    // The full-lot metro is the documented exception, so it is checked only for
-    // being drawn at all rather than dropped from the catalog.
-    const fullLot = rec.units.filter((r) => r.u.id === 1 && isFullLot(r.u));
-    expect(fullLot.length).toBe(1);
-    expect(fullLot[0].h).toBeGreaterThan(0);
   });
 
   it("gallery.html gives every shaft the world's tiles per floor", () => {

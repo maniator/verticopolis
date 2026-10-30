@@ -13,7 +13,7 @@ pub fn migration_looks_valid(data: &Value) -> bool {
         }
         let width = match u.get("width") {
             Some(Value::Number(n)) => n.as_f64().unwrap(),
-            _ => kind.facility().width as f64,
+            _ => v2_width(kind) as f64,
         };
         let x = js_number(u.get("x"));
         let floor = js_number(u.get("floor"));
@@ -165,7 +165,7 @@ pub fn reflow_v1_to_v2(data: &Value) -> Value {
             floor: floor as i64,
             x0: x0 as i64,
             w0: w0 as i64,
-            w: kind.facility().width,
+            w: v2_width(kind),
             fl: stories_at_version(kind, Some(2.0)),
         });
     }

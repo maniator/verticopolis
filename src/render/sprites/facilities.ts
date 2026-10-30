@@ -14,7 +14,7 @@
  *   - `facilities/venue.ts`: the party hall and wedding hall (the event
  *     venues).
  */
-export { drawHousekeeping, drawMedical, drawMetro, drawSecurity } from "./facilities/service";
+export { drawHousekeeping, drawMedical, drawMetro, drawMetroTunnel, drawSecurity, METRO_TUNNEL_TILE } from "./facilities/service";
 export { drawRecycling } from "./facilities/recycling";
 export { drawParking, drawParkingRamp } from "./facilities/garage";
 export { drawGarbageTruck, drawMetroTrain, drawStreetCar } from "./facilities/vehicles";

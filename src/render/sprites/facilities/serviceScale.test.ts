@@ -196,17 +196,22 @@ describe("service sprites on the grid they are authored for", () => {
   );
 
   it.each(SPRITES.map((s) => [s.name, s] as const))(
-    "%s is authored for the footprint the engine gives its kind, and every refMap call says so",
+    "%s is authored on its own grid, and every refMap call resamples it to the footprint the engine gives its kind",
     (name, sp) => {
       // The bounds guard cannot see a sprite whose own RW/RH drifted from its
       // room: a wrong pair still stays in bounds, keeps its rect count and just
-      // resamples. So read the pair each painter hands refMap, and the room size
-      // from the engine's own facility data rather than this file's table.
-      expect([sp.tiles, sp.floors]).toEqual([FACILITIES[name as keyof typeof FACILITIES].width, facilityFloors(name as keyof typeof FACILITIES)]);
+      // resamples. So read the pair each painter hands refMap. The reference is
+      // the grid the art was drawn on (`tiles`); the box is the engine's own
+      // facility data, which the SimTower widths made wider than the art for
+      // security, medical, housekeeping and recycling. The map stretches the art
+      // uniformly to that box until it is redrawn.
+      const kind = name as keyof typeof FACILITIES;
+      expect(facilityFloors(kind)).toBe(sp.floors);
+      const boxW = FACILITIES[kind].width * TILE;
       refMapCalls.length = 0;
-      paint(sp, sp.tiles * TILE, sp.floors * FLOOR);
+      paint(sp, boxW, sp.floors * FLOOR);
       expect(refMapCalls.length).toBeGreaterThan(0);
-      for (const c of refMapCalls) expect(c).toEqual({ RW: c.w, RH: c.h, w: sp.tiles * TILE, h: sp.floors * FLOOR });
+      for (const c of refMapCalls) expect(c).toEqual({ RW: sp.tiles * TILE, RH: sp.floors * FLOOR, w: boxW, h: sp.floors * FLOOR });
     },
   );
 

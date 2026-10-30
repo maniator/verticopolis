@@ -175,7 +175,9 @@ export class TowerEngine {
     gfx: Map<string, ex.Canvas>;
     shown: string;
   }[] = [];
-  trainActors: { actor: ex.Actor; u: UnitView; w: number }[] = [];
+  trainActors: { actor: ex.Actor; u: UnitView; w: number; shift: (offset: number) => void }[] = [];
+  /** The metro's tunnel row, either side of the station. */
+  tunnelActors: ex.Actor[] = [];
   /** The pre-dawn garbage truck: one per recycling center, visible only during
    *  the collection hour (drives in, loads, drives off, like the metro train). */
   truckActors: { actor: ex.Actor; u: UnitView; w: number }[] = [];

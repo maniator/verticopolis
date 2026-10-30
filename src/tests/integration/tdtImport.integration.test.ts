@@ -376,38 +376,38 @@ describeWithCodec("parseTDT: golden mappings", () => {
 
   it("flush neighbors that chain through a building below stay separate units", () => {
     // The shape a real 100-floor save hit: two recycling centers built flush on
-    // B2 (x 92 and x 112) plus a third on B4 at x 107, whose upper story
+    // B2 (x 92 and x 117) plus a third on B4 at x 107, whose upper story
     // overlaps BOTH of them one floor down. All three land in one cluster, so a
-    // split by floor alone fused the flush pair into a single 40-wide unit and
+    // split by floor alone fused the flush pair into a single 50-wide unit and
     // lost a center.
     const { save } = parse({
       floors: [
-        { index: 6, tenants: [{ left: 107, right: 127, type: 21 }] }, // B4 center, bottom
-        { index: 7, tenants: [{ left: 107, right: 127, type: 20 }] }, // its top, on B3
+        { index: 6, tenants: [{ left: 107, right: 132, type: 21 }] }, // B4 center, bottom
+        { index: 7, tenants: [{ left: 107, right: 132, type: 20 }] }, // its top, on B3
         {
           index: 8,
           tenants: [
-            { left: 92, right: 112, type: 21 }, // B2 center, bottom
-            { left: 112, right: 132, type: 21 }, // its flush neighbor, bottom
+            { left: 92, right: 117, type: 21 }, // B2 center, bottom
+            { left: 117, right: 142, type: 21 }, // its flush neighbor, bottom
           ],
         },
         {
           index: 9,
           tenants: [
-            { left: 92, right: 112, type: 20 },
-            { left: 112, right: 132, type: 20 },
+            { left: 92, right: 117, type: 20 },
+            { left: 117, right: 142, type: 20 },
           ],
         },
       ],
     });
     const centers = save.units.filter((u) => u.kind === "recycling");
     expect(centers).toHaveLength(3);
-    expect(centers.map((u) => u.x).sort((a, b) => a - b)).toEqual([92, 107, 112]);
+    expect(centers.map((u) => u.x).sort((a, b) => a - b)).toEqual([92, 107, 117]);
     expect(centers.every((u) => u.width === FACILITIES.recycling.width)).toBe(true);
     // Each center must also land on its OWN base floor: a unit is anchored at
     // its lowest story, and a split that got the width right while anchoring a
     // building one floor off would otherwise pass unnoticed.
-    expect(centers.map((u) => `${u.x}@${u.floor}`).sort()).toEqual(["107@-3", "112@-1", "92@-1"].sort());
+    expect(centers.map((u) => `${u.x}@${u.floor}`).sort()).toEqual(["107@-3", "117@-1", "92@-1"].sort());
   });
 
   it("a merged unit claims EVERY story: a room on its upper floor blocks it", () => {

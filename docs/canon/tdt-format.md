@@ -244,6 +244,33 @@ Type 48: the retail game draws a record of this type as garbage pixels, so the
 exporter writes no record for a burned or burning room and lets paving fill the
 tiles. The importer reads type 48 as cleared floor.
 
+### 6.1 Metro station, tunnel and parking in the original
+
+Measured on TOWER7 in the original game (PC screenshots, release-3.0
+`tdt-reddit/pc-screenshots`) and matching the SimTower wiki:
+
+- The metro station is 30 tiles wide and three rows tall. Types 31, 32 and 33
+  sit on three consecutive floors, tiles 208 to 238 in TOWER7, on B8, B9 and
+  B10 (our floors -7, -8 and -9). B8 and B9 share their floors with parking
+  and other rooms.
+- The tunnel (type 45) runs along the station's bottom row only, on both sides
+  of the station (tiles 0 to 208 and 238 to 375 in TOWER7). Nothing else is on
+  that row, and nothing can be built below it. B10 is the lowest row, so the
+  ideal spot for the station is B8 to B10.
+- Parking stalls (type 11) are 4 tiles wide and the ramp (type 44) is 16, on
+  floors B1 to B9 (our -8 to 0). The original draws stalls at full size, 4 to 5
+  per segment between ramps. TOWER7's B5 holds two paving records (type 0, flags
+  2) of 3 and 1 tiles (tiles 138 to 141 and 149 to 150) between the stalls, drawn
+  as flat grey with cars only in stalls. The file still counts every stall on
+  that row as connected, while TOWER1's stalls 56 tiles from their ramp are not.
+  The importer slides stalls that sit less than one stall's width from their
+  neighbor toward the ramp, so the row chains to it; wider gaps stay split.
+
+Room widths in tiles, from the wiki and the saves: security 16, medical center
+26, housekeeping 15, recycling center 25 (two floors), metro 30 (three floors),
+stairs and escalators 8 (two floors), cinema 31 (two floors), party hall 24
+(two floors).
+
 ## 7. People
 
 `u32 N`, then N records of 16 bytes: home floor, unit index and person-within-unit;
@@ -448,6 +475,11 @@ serviced-only.
   fast food and theatres cannot be seeded: their customers are runtime state in
   our engine and build up after load, so the app's count starts below the
   file's total. Tracked in #1500.
+- **Widths.** A room arrives at the width its record gives. New builds of
+  security, medical, housekeeping, recycling and the metro use the sizes in
+  section 6.1, so a rebuilt room matches the original. The engine puts nothing
+  below a metro station and nothing but the station and its tunnel on the
+  bottom basement row.
 - Retail units keep their variant through `.vctower` and `.TDT`.
 
 ## 18. Round trip (export then import)

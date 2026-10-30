@@ -20,10 +20,11 @@ use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH, MAX_FLOOR};
 use crate::sim::SAVE_VERSION;
 
 mod out_unit;
+mod parking;
 mod seed;
 
+use self::{parking::close_parking_gaps, seed::seed_from_finance};
 use out_unit::OutUnit;
-use seed::seed_from_finance;
 
 /// Result of a successful parse: the save, the binary walk's warnings and the
 /// tally the report is built from.
@@ -317,6 +318,7 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
         }
     }
 
+    close_parking_gaps(&mut units);
     if let Some(pops) = tdt.tail.finance_population {
         units = seed_from_finance(units, &pops, &mut counts);
     }

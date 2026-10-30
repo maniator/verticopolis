@@ -133,3 +133,50 @@ fn hotel_rooms_arrive_with_guests_exactly_where_the_file_counts_them() {
         assert_eq!(with_guests("hotelSuite"), suites, "{name} suites");
     }
 }
+
+/// Left edges of the stalls on one floor of an imported save, with the ramp's.
+fn parking_row(save: &serde_json::Value, floor: i64) -> (Vec<i64>, Vec<i64>) {
+    let at = |kind: &str| -> Vec<i64> {
+        let mut xs: Vec<i64> = save["units"]
+            .as_array()
+            .expect("units")
+            .iter()
+            .filter(|u| u["kind"] == kind && u["floor"] == floor)
+            .map(|u| u["x"].as_i64().expect("x"))
+            .collect();
+        xs.sort();
+        xs
+    };
+    (at("parking"), at("parkingRamp"))
+}
+
+fn import_save(name: &str) -> serde_json::Value {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("conformance")
+        .join("fixtures")
+        .join("tdt-reddit")
+        .join(name);
+    let bytes = std::fs::read(path).expect("fixture");
+    let (json, _) = import_tdt(&bytes, name).expect("imports");
+    serde_json::from_str(&json).expect("save json")
+}
+
+#[test]
+fn tower7_stalls_beside_short_paving_pieces_reach_their_ramp() {
+    // The file leaves a 3-tile and a 1-tile paving piece on this row, and
+    // still counts every stall on it as connected.
+    let save = import_save("TOWER7.TDT");
+    let (stalls, ramps) = parking_row(&save, -4);
+    assert_eq!(ramps, vec![150]);
+    assert_eq!(&stalls[..4], &[134, 138, 142, 146]);
+}
+
+#[test]
+fn tower1_stalls_a_whole_row_away_from_the_ramp_stay_where_the_file_put_them() {
+    // The file counts these 8 stalls as disconnected: 56 tiles of paving.
+    let save = import_save("TOWER1.TDT");
+    let (stalls, ramps) = parking_row(&save, -4);
+    assert_eq!(ramps, vec![145]);
+    assert_eq!(stalls, vec![161, 221]);
+}

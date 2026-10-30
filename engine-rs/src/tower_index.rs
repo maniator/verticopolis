@@ -276,6 +276,26 @@ impl Tower {
         bounds
     }
 
+    /// The floor a metro station stands on, its bottom row, when the tower
+    /// has one. Placement asks it for every tile a drag crosses, so it is
+    /// memoized per revision like the floor bounds.
+    pub(crate) fn metro_floor(&self) -> Option<i64> {
+        let key = self.index_key();
+        let cached = self.memo.borrow().metro_floor;
+        if let Some((built, floor)) = cached {
+            if built == key {
+                return floor;
+            }
+        }
+        let floor = self
+            .units
+            .iter()
+            .find(|u| u.kind == Kind::Metro)
+            .map(|u| u.floor);
+        self.memo.borrow_mut().metro_floor = Some((key, floor));
+        floor
+    }
+
     /// The served and lobby floors in ascending order, so dispatch can
     /// binary search them instead of hashing every room's floor each step
     /// and sorting the lobby floors on every call. Built once per revision.

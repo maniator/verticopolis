@@ -15,16 +15,16 @@ import { renderToFragment } from "../ui/testing/litTestUtils";
 
 const render = (lines: TemplateResult[]): DocumentFragment => renderToFragment(html`${lines}`);
 
-/** A tower with floors 1..`floors` (columns 10-29) and a standard elevator
+/** A tower with floors 1..`floors` (columns 10-33) and a standard elevator
  *  running floor 1-2, then one occupied unit of `kind` placed on `floor`. */
 function simWith(
   kind: Parameters<Simulation["tower"]["place"]>[0],
   { floors = 2, floor = 2 }: { floors?: number; floor?: number } = {},
 ): { sim: Simulation; unit: Unit } {
   const sim = new Simulation();
-  for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+  for (let x = 10; x < 34; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
   for (let fl = 2; fl <= floors; fl++) {
-    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
+    for (let x = 10; x < 34; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
   }
   expect(sim.buildTransport("elevatorStandard", 10, 1, 2).ok).toBe(true);
   const r = sim.tower.place(kind, floor, 12);
@@ -115,7 +115,7 @@ describe("facilityDiagnostics: housekeeping and cockroaches", () => {
 
   it("a housekeeping station shows its maid staffing and the tower's coverage", () => {
     const { sim, unit } = simWith("housekeeping");
-    expect(sim.tower.place("hotelSingle", 2, 24).ok).toBe(true);
+    expect(sim.tower.place("hotelSingle", 2, 28).ok).toBe(true);
     const frag = render(facilityDiagnostics(sim, unit));
     expect(frag.textContent).toContain("Fields 6 maids");
     expect(frag.textContent).toMatch(/hotel room/);

@@ -26,14 +26,14 @@ fn the_checklist_and_promotion_agree_at_every_gate_threshold() {
     shaft(&mut sim, Kind::ElevatorStandard, 152, 1, 3);
     agree(&sim, "nothing built");
     put(&mut sim, Kind::Security, 2, 160);
-    put(&mut sim, Kind::Security, 2, 190);
+    put(&mut sim, Kind::Security, 2, 176);
     settle(&mut sim, 24);
     agree(&sim, "security");
-    put(&mut sim, Kind::Medical, 2, 170);
+    put(&mut sim, Kind::Medical, 2, 192);
     settle(&mut sim, 24);
     agree(&sim, "medical");
     for fl in [0, -1] {
-        for x in 170..200 {
+        for x in 170..210 {
             put(&mut sim, Kind::Floor, fl, x);
         }
     }
@@ -59,7 +59,7 @@ fn the_checklist_and_promotion_agree_at_every_gate_threshold() {
     );
     assert!(sim.sell_at(3, 172), "sell the second suite");
     agree(&sim, "second suite sold");
-    assert!(sim.sell_at(2, 170), "sell medical");
+    assert!(sim.sell_at(2, 192), "sell medical");
     agree(&sim, "medical sold");
     // Classic will not sell a recycling center, so drop it from the tower.
     let recycling = sim.tower.unit_at(-1, 180).unwrap().id;

@@ -75,7 +75,7 @@ describe("lookupRoom", () => {
     expect(wide).toEqual({ frame: "room/office/occupied/-/w9/unlit/always/any/v0/home", chains: { occupants: 3 }, overlays: [], stretchTo: 12 });
     expect(lookupRoom({ kind: "condo", state: "fire", width: 10, occupants: 0, id: 1 }, DAY, 0)).toEqual({ animation: "fire/condo", stretchTo: 10 });
     expect(lookupRoom({ kind: "recycling", state: "occupied", width: 3, occupants: 0, id: 1 }, DAY, 0)).toMatchObject({
-      frame: expect.stringContaining("/w20/"),
+      frame: expect.stringContaining("/w25/"),
       stretchTo: 3,
     });
     // A catalog-width room carries no stretch; a corrupt width reads as the catalog's.
@@ -106,7 +106,7 @@ describe("lookupRoom", () => {
   });
   it("occupant-free kinds carry no presence", () => {
     expect(look({ kind: "security", state: "occupied", occupants: 5, id: 1 }, DAY, 0)).toEqual({
-      frame: "room/security/occupied/-/w8/unlit/always/any/v0",
+      frame: "room/security/occupied/-/w16/unlit/always/any/v0",
       chains: {},
       overlays: [],
     });
