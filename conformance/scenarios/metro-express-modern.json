@@ -18,13 +18,13 @@
       "op": "build",
       "kind": "metro",
       "floor": -7,
-      "x": 0
+      "x": 165
     },
     {
       "op": "build",
       "kind": "metro",
       "floor": -7,
-      "x": 0,
+      "x": 165,
       "expectFail": true,
       "reason": "Only 1 Metro Station allowed per tower."
     },

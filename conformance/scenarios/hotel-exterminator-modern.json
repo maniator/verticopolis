@@ -180,14 +180,8 @@
     {
       "op": "build",
       "kind": "housekeeping",
-      "floor": 12,
-      "x": 158
-    },
-    {
-      "op": "build",
-      "kind": "housekeeping",
-      "floor": 16,
-      "x": 188
+      "floor": 21,
+      "x": 216
     },
     {
       "op": "tick",

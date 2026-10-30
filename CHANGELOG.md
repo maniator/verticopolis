@@ -21,6 +21,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.67.0
+
+- Security, medical, housekeeping and recycling rooms build at the sizes SimTower uses, so a tower from the original game keeps its layout.
+- The metro station is 30 tiles wide with its tunnel along the bottom row. Nothing can be built below it, and the lowest basement row is kept for it.
+
 ## 2.66.0
 
 - The game runs a little faster.
