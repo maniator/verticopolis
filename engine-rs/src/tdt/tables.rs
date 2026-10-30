@@ -80,9 +80,19 @@ pub const TDT_LOBBY: i64 = 24;
 pub const TDT_BURNED: i64 = 48;
 /// Ceiling on the header's signed day counter.
 pub const MAX_IMPORT_DAY: i64 = 360_000;
-/// Hotel status-byte flags.
+/// Hotel status byte. Bits 3 and 4 hold the room's stay state, which the
+/// finance block's hotel guest lines count exactly: a room in the checked-in or
+/// asleep state holds its full complement (1 in a single, 2 in a twin or suite),
+/// whatever the low bits say about how many are inside right now. Bits 5 and 6
+/// are the dirty and infested flags.
 pub const HOTEL_OCCUPANT_MASK: i64 = 0x03;
+pub const HOTEL_STAY_STATE_MASK: i64 = 0x18;
+/// Guests have checked in and may be out in the tower.
+pub const HOTEL_STAY_CHECKED_IN: i64 = 0x08;
 pub const HOTEL_ASLEEP_FLAG: i64 = 16;
+/// Clean and vacant: seen on every room of three of the nine real saves, with
+/// no guests counted.
+pub const HOTEL_STAY_VACANT: i64 = 0x18;
 pub const HOTEL_DIRTY_FLAG: i64 = 32;
 pub const HOTEL_INFESTED_FLAG: i64 = 64;
 

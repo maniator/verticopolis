@@ -21,6 +21,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.64.0
+
+- Hotel guests from imported SimTower saves now arrive in their rooms, so the guest count matches the original.
+- Clean, empty hotel rooms in imported saves no longer arrive as rooms waiting for housekeeping.
+- A hotel suite now holds 2 guests, the same as a double, as in the original.
+
 ## 2.63.0
 
 - The update prompt now says whether an update changes the game, the engine, or both, and shows the new engine version.
