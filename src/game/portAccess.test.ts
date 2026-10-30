@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { catalogFacility } from "../engine/catalogTypes";
 import { Simulation } from "../engine/Simulation";
-import { useTowerCatalogSource } from "../engine/towerCatalog";
-import { catalogOf, isUnlocked, quoteBuild, quoteShaft } from "./portAccess";
+import { catalogFor } from "../engine/catalog";
+import { towerCatalog, useTowerCatalogSource } from "../engine/towerCatalog";
+import { PortRenderSim } from "../simport/portRenderSim";
+import { catalogOf, isUnlocked, newRenderSim, quoteBuild, quoteShaft } from "./portAccess";
 import { portDeps } from "./portDeps.fixture";
 import { KINDS } from "../engine/port/layout";
 
@@ -93,5 +95,19 @@ describe("isUnlocked", () => {
     expect(isUnlocked({ reader }, "elevatorExpress")).toBe(false);
     reader.update();
     expect(isUnlocked({ reader }, "elevatorExpress")).toBe(sim.isUnlocked("elevatorExpress"));
+  });
+});
+
+describe("newRenderSim", () => {
+  it("reads its catalog from the engine's source, so the renderer sizes rooms as the engine does", () => {
+    const { engine, reader } = portDeps(tower());
+    const rustLike = (mode: "classic" | "modern") => {
+      const c = catalogFor(mode);
+      return { ...c, facilities: c.facilities.map((f) => (f.key === "weddingHall" ? { ...f, floors: 5, width: 28 } : f)) };
+    };
+    useTowerCatalogSource(engine, rustLike);
+    const hall = (sim: object) => towerCatalog(sim as { mode: "classic" | "modern" }).facilities.find((f) => f.key === "weddingHall")?.floors;
+    expect(hall(newRenderSim(engine, reader))).toBe(5);
+    expect(hall(new PortRenderSim(engine, reader))).toBe(1);
   });
 });

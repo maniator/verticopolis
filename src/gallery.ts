@@ -10,10 +10,26 @@ import { injectVercelTelemetry } from "./telemetry";
 import { trackAppAction } from "./analytics";
 import { catalogFor } from "./engine/catalog";
 import { bindViewWorld } from "./presentation/viewWorld";
+import { readCatalog } from "./dualrun/catalog";
+import type { CatalogFacility } from "./engine/catalogTypes";
+import { refuseForeignCatalog } from "./wasmhost/catalogCheck";
+import { loadWasmEngine } from "./wasmhost/rustEngine";
 
 // A tooling page draws sprites without a tower, so it binds the Modern
 // catalog's world for the view (the lot geometry the sprites hash on).
 bindViewWorld(catalogFor("modern").world);
+
+/** The Rust engine's facilities by kind, read from its catalog before the page is
+ *  ready. Sizes come from here because the Rust engine is the one the game runs
+ *  on (the wedding hall is the 28 wide, five story cathedral there). Null when
+ *  the package cannot be loaded: the page then draws from the TypeScript tables. */
+let engineFacilities: ReadonlyMap<FacilityKind, CatalogFacility> | null = null;
+
+/** A kind's name, size and population: the Rust engine's catalog once it is read,
+ *  else the TypeScript tables. */
+function facilityOf(kind: FacilityKind): { name: string; width: number; floors?: number; population: number } {
+  return engineFacilities?.get(kind) ?? FACILITIES[kind];
+}
 
 /** A catalog entry to render in the gallery grid. */
 interface Entry {
@@ -36,7 +52,7 @@ const MAG = 3;
 const CAPTION_H = 26;
 
 function makeUnit(kind: FacilityKind, state: UnitState, occupants: number, id = 1, subtype?: string, floorOverride?: number): Unit {
-  const f = FACILITIES[kind];
+  const f = facilityOf(kind);
   return {
     id,
     kind,
@@ -64,10 +80,10 @@ function roomEntry(
   subtype?: string,
   floorOverride?: number,
 ): Entry {
-  const f = FACILITIES[kind];
   return {
     label,
     draw(d, cx, cy, cw, ch) {
+      const f = facilityOf(kind);
       // Size the cell by the facility's own floor count so a genuinely multi-
       // floor kind (cinema, party hall, metro) shows at its true proportion
       // instead of squished into one floor. `fitAtGameScale` steps a footprint
@@ -103,7 +119,10 @@ function roomEntry(
       // Floor strip for context, in world units like everything else here.
       const floorU = makeUnit("floor", "occupied", 0, 999);
       const pad = 6 / box.scale;
-      drawUnit(d, floorU, -pad, 0, worldW + pad * 2, worldH);
+      // The wedding hall crowns the tower: only its ground story stands on a floor,
+      // and the garden above it stands in the open sky.
+      const stripH = kind === "weddingHall" ? FLOOR : worldH;
+      drawUnit(d, floorU, -pad, worldH - stripH, worldW + pad * 2, stripH);
       drawUnit(d, makeUnit(kind, state, occ ?? (state === "occupied" ? f.population : 0), 1, subtype, floorOverride), 0, 0, worldW, worldH);
       ctx.restore();
     },
@@ -117,10 +136,10 @@ function retailEntries(kind: FacilityKind, names: readonly string[]): Entry[] {
 }
 
 function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
-  const f = FACILITIES[kind];
   return {
     label,
     draw(d, cx, cy, cw, ch) {
+      const f = facilityOf(kind);
       // A shaft is drawn as its span plus the floor it lands on, so it is sized
       // as a `span + 1` floor footprint and its per-floor pitch falls out of the
       // fitted box. Same scale as the rooms, so a shaft and a room next to each
@@ -445,5 +464,19 @@ function frame() {
 }
 frame();
 
-// Signal readiness for screenshot tooling.
-(window as unknown as { galleryReady: boolean }).galleryReady = true;
+/** Read the Rust engine's catalog, so every size is the engine's. A package that
+ *  cannot be loaded or read leaves the TypeScript tables in place, and says so. */
+async function readEngineCatalog(): Promise<void> {
+  try {
+    const catalog = readCatalog(await loadWasmEngine(), "modern");
+    refuseForeignCatalog(catalog);
+    engineFacilities = new Map(catalog.facilities.map((f) => [f.key, f]));
+  } catch (e) {
+    console.warn("Sprite gallery: the Rust engine's catalog is unavailable, drawing from the TypeScript tables.", e);
+  }
+}
+
+// Signal readiness for screenshot tooling, once the sizes are the engine's.
+void readEngineCatalog().finally(() => {
+  (window as unknown as { galleryReady: boolean }).galleryReady = true;
+});

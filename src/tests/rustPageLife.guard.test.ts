@@ -14,10 +14,11 @@ import { repoRel, sourceFiles } from "./guardFiles";
  */
 const BOOT_CALLS = ["rustBootTower(", "loadWasmEngine(", "publishRustEngine("] as const;
 
-/** Where each call may appear in shipped code: its definition, the boot, and
- *  the `.TDT` codec, which loads the package only to read and write a file
- *  with a short-lived engine and never offers a tower to Rust. */
-const ALLOWED = new Set(["src/wasmhost/rustEngine.ts", "src/bootstrap.ts", "src/engine/port/tdtCodec.ts"]);
+/** Where each call may appear in shipped code: its definition, the boot, the
+ *  `.TDT` codec, which loads the package only to read and write a file with a
+ *  short-lived engine and never offers a tower to Rust, and the sprite gallery,
+ *  which loads it only to read the catalog tables it draws from. */
+const ALLOWED = new Set(["src/wasmhost/rustEngine.ts", "src/bootstrap.ts", "src/engine/port/tdtCodec.ts", "src/gallery.ts"]);
 
 const isTestFile = (rel: string): boolean => /\.(test|spec|fixture)\.tsx?$/.test(rel) || rel.startsWith("src/tests/");
 

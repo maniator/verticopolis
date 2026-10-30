@@ -1,8 +1,9 @@
 import type { Catalog } from "../engine/catalogTypes";
-import { catalogOn } from "../engine/towerCatalog";
+import { catalogOn, useTowerCatalogSource } from "../engine/towerCatalog";
 import type { FacilityKind } from "../engine/types";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
+import { PortRenderSim } from "../simport/portRenderSim";
 import type { SimView } from "../simport/view";
 import type { ViewReader } from "../simport/viewReader";
 
@@ -48,6 +49,15 @@ export function quoteShaft(
  *  tables. The engine is only a key here, never asked a question. */
 export function catalogOf(app: { readonly enginePort: object; readonly reader: Pick<SimView, "header"> }): Catalog {
   return catalogOn(app.enginePort, app.reader.header.mode);
+}
+
+/** What the renderer draws for `port`: the render sim reads its catalog from the
+ *  engine's source, so a room is sized as the engine sizes it (the Rust engine's
+ *  wedding hall is five stories; the TypeScript tables hold one). */
+export function newRenderSim(port: EnginePort, reader: ViewReader): PortRenderSim {
+  const sim = new PortRenderSim(port, reader);
+  useTowerCatalogSource(sim, (mode) => catalogOn(port, mode));
+  return sim;
 }
 
 /** Whether the tower has unlocked `kind` (the star gate, and Modern-only

@@ -2,7 +2,8 @@ import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import type { FacilityKind } from "../engine/types";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
-import { PortRenderSim } from "../simport/portRenderSim";
+import type { PortRenderSim } from "../simport/portRenderSim";
+import { newRenderSim } from "./portAccess";
 import type { ViewReader } from "../simport/viewReader";
 import type { HudSource } from "../ui/uiStatus";
 import { adoptTelemetry, isTelemetryDocument, telemetryDocument } from "../wasmhost/telemetry";
@@ -381,7 +382,7 @@ export function followToolingEdit(
   shown?: Simulation,
 ): void {
   app.reader.update();
-  app.renderSim = new PortRenderSim(app.enginePort, app.reader);
+  app.renderSim = newRenderSim(app.enginePort, app.reader);
   app.engine.setSim(app.renderSim, { keepCamera: true });
   if (shown) app.ui.resetLog({ reader: app.reader, codes: app.portCodes, port: new TsEngine(shown) });
   app.ui.lastLogSeq = app.reader.header.logSeq;
