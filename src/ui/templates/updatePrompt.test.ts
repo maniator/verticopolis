@@ -14,6 +14,29 @@ import type { UpdateInfo } from "../../pwa";
 const noop = { onLater: () => {}, onUpdate: () => {} };
 const info = (over: Partial<UpdateInfo> = {}): UpdateInfo => ({ version: "1.6.0", sha: "abc1234", notes: [], ...over });
 
+describe("updatePromptTemplate update kind", () => {
+  it("labels the update as game, engine, or both", () => {
+    const label = (kind: "game" | "engine" | "both") =>
+      renderToFragment(updatePromptTemplate(info({ kind }), noop)).querySelector(".update-kind")?.textContent;
+    expect(label("game")).toBe("Game update");
+    expect(label("engine")).toBe("Engine update");
+    expect(label("both")).toBe("Game and engine update");
+  });
+
+  it("shows the engine line above the build line, and neither when absent", () => {
+    const frag = renderToFragment(updatePromptTemplate(info({ kind: "engine", engineLine: "Rust engine 0.24.0 → 0.25.0" }), noop));
+    expect([...frag.querySelectorAll(".build-id")].map((p) => p.textContent)).toEqual(["Rust engine 0.24.0 → 0.25.0", "Build 1.6.0 · abc1234"]);
+    const plain = renderToFragment(updatePromptTemplate(info(), noop));
+    expect(plain.querySelector(".update-kind")).toBeNull();
+    expect(plain.querySelectorAll(".build-id")).toHaveLength(1);
+  });
+
+  it("renders the engine line as text", () => {
+    const frag = renderToFragment(updatePromptTemplate(info({ kind: "engine", engineLine: "<img src=x onerror=alert(1)>" }), noop));
+    expect(frag.querySelector("img")).toBeNull();
+  });
+});
+
 describe("updatePromptTemplate structure", () => {
   it("renders the heading, body copy, and a Later/Update-now actions row", () => {
     const frag = renderToFragment(updatePromptTemplate(null, noop));
