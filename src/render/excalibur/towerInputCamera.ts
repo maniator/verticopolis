@@ -1,5 +1,5 @@
 import * as ex from "excalibur";
-import { isCommercialKind } from "../../engine/facilities";
+import { isCommercialKind } from "../../presentation/viewKinds";
 import { viewWorld } from "../../presentation/viewWorld";
 import { findCatalogFacility } from "../../engine/catalogTypes";
 import type { FacilityKind, SerializedView, WeatherKind } from "../../engine/types";

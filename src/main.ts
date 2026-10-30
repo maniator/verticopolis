@@ -1,7 +1,8 @@
 import type { HeatmapMode, Simulation } from "./engine/Simulation";
 import type { UndoHistory } from "./engine/UndoHistory";
 import { createAppHistory } from "./game/appHistory";
-import { GRID, facilityFloors } from "./engine/facilities";
+import { GRID } from "./engine/facilities";
+import { facilityFloors } from "./presentation/viewKinds";
 import type { FacilityKind } from "./engine/types";
 import type { TransportView, UnitView } from "./simport/view";
 import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/TowerEngine";
@@ -87,7 +88,6 @@ class GameApp implements GameAppPorts {
   readonly grid = GRID;
   speed = 1;
   tool: Tool = { type: "inspect" };
-
   /** @internal */ canvas: HTMLCanvasElement;
   /** @internal */ accMinutes = 0;
   /** Last day each meal-rush bulletin fired (transient, like the log). Kept
