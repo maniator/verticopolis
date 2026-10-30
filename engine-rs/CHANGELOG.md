@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.0.3 (2026-10-30)
+
+- The service elevator car holds 17 (`Kind::car_capacity`), the figure in the Windows Help file, up from 10. The catalog's `carCapacity`, the per-car load clamp, and the congestion read follow. The `.TDT` exporter keeps its old service capacity byte (`Kind::tdt_header_capacity`), because the byte is unreliable and the referee pins it. The catalog digests and the conformance lock move.
+
 ## 1.0.2 (2026-10-30)
 
 - Classic: `GameMode::room_is_permanent` replaces `housekeeping_is_permanent` and also keeps placed security offices, recycling centers and movie theaters (`remove_facility` refuses with a per-kind message; a gutted shell still clears). Modern sells them. The `star-climb-classic` conformance scenario no longer sells its security office (it starts one office short of the 3-star gate), so the lock moves.

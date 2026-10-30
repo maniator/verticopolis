@@ -325,11 +325,21 @@ impl Kind {
     pub fn car_capacity(self) -> f64 {
         match self {
             Kind::ElevatorStandard => 21.0,
-            Kind::ElevatorService => 10.0,
+            Kind::ElevatorService => 17.0,
             Kind::ElevatorExpress => 42.0,
             Kind::Escalator => 30.0,
             Kind::Stairs => 8.0,
             _ => 0.0,
+        }
+    }
+
+    /// The capacity byte the `.TDT` exporter writes in an elevator header. The
+    /// byte is unreliable (a real save's service shaft carried 21), so the
+    /// service value the exporter always wrote stays: the referee pins it.
+    pub fn tdt_header_capacity(self) -> i64 {
+        match self {
+            Kind::ElevatorService => 10,
+            other => other.car_capacity() as i64,
         }
     }
 

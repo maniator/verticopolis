@@ -301,7 +301,7 @@ pub fn encode_tower(
         let cars = clamp(raw_cars, 1.0, e.kind.max_cars() as f64);
         w.u8(1);
         w.u8(type_id);
-        w.u8(e.kind.car_capacity() as i64);
+        w.u8(e.kind.tdt_header_capacity());
         w.u8(to_int32(cars));
         for &v in &schedule {
             w.u8(v);
