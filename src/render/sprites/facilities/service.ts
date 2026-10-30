@@ -379,3 +379,37 @@ export function drawMetro(d: DrawCtx, x: number, y: number, w: number, h: number
   f(0, H - 2, W, 2, "#6E7686");
   for (let tr = 16; tr < W; tr += 64) f(tr, H - 10, 8, 2, "#50565E"); // third rail
 }
+
+/** Pixels in one repeat of the tunnel row: fifteen 64px steel panels. */
+export const METRO_TUNNEL_TILE = 960;
+
+/** One repeat of the metro's tunnel row, drawn at (0,0) into a
+ *  METRO_TUNNEL_TILE x FLOOR rect. SimTower runs the tunnel along the metro's
+ *  bottom row on both sides of the station: riveted gray steel panels over a
+ *  dark rail bed. The engine lays copies of this tile (phase-aligned to the
+ *  world x) across the rest of the lot. */
+export function drawMetroTunnel(ctx: CanvasRenderingContext2D): void {
+  const W = METRO_TUNNEL_TILE;
+  const f: Fill = (px, py, pw, ph, color, alpha = 1) => {
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.fillRect(px, py, pw, ph);
+    ctx.globalAlpha = 1;
+  };
+  f(0, 0, W, FLOOR, "#5E6166"); // steel wall
+  f(0, 0, W, 4, "#2A2C30"); // dark lip under the platform slab
+  f(0, 4, W, 2, "#8A8D92");
+  for (let px = 0; px < W; px += 64) {
+    f(px, 6, 2, FLOOR - 16, "#3A3C40"); // panel seam
+    f(px + 2, 6, 1, FLOOR - 16, "#7C7F84");
+    for (const ry of [12, FLOOR - 18]) {
+      f(px + 8, ry, 2, 2, "#8A8D92"); // rivets
+      f(px + 54, ry, 2, 2, "#8A8D92");
+    }
+  }
+  f(0, 22, W, 1, "#4A4C50"); // mid rib
+  f(0, FLOOR - 10, W, 10, "#26282E"); // rail bed
+  for (let sx = 4; sx < W; sx += 10) f(sx, FLOOR - 9, 3, 7, "#1C1E24"); // sleepers
+  f(0, FLOOR - 8, W, 2, "#6E7686");
+  f(0, FLOOR - 2, W, 2, "#6E7686");
+}

@@ -55,6 +55,7 @@ function eng(over: Record<string, any> = {}): any {
     crowdActors: new Map(),
     carActors: [],
     trainActors: [],
+    tunnelActors: [],
     truckActors: [],
     garageCars: [],
     walkers: [],
@@ -145,6 +146,7 @@ describe("clear paths kill every actor they own", () => {
     };
     e.carActors = [{ actor: mk() }];
     e.trainActors = [{ actor: mk() }];
+    e.tunnelActors = [mk()];
     e.truckActors = [{ actor: mk() }];
     e.garageCars = [{ actor: mk() }];
     e.walkers = [{ actor: mk() }];
@@ -232,16 +234,18 @@ describe("updateMotion repositions the moving actors", () => {
   });
 
   it("cycles the metro train in from the left, holds, then off the right", () => {
-    const train = { actor: actor(), u: { x: 20, floor: 3 }, w: 40 };
-    const e = eng({ trainActors: [train] });
     const xs: number[] = [];
+    const train = { actor: actor(), u: { x: 20, floor: 3 }, w: 40, shift: (offset: number) => xs.push(offset) };
+    const e = eng({ trainActors: [train] });
     for (const anim of [0, 6, 11]) {
       e.d.anim = anim;
       updateMotion(e);
-      xs.push(train.actor.pos.x);
     }
-    // The three legs (arrive / hold / depart) put the train at distinct x's.
-    expect(new Set(xs).size).toBe(3);
+    // The three legs (arrive / hold / depart) put the train at distinct
+    // offsets inside the station-wide canvas: off the left, in place, off the right.
+    expect(xs[0]).toBeLessThan(0);
+    expect(xs[1]).toBe(0);
+    expect(xs[2]).toBeGreaterThan(0);
   });
 
   it("shows the garbage truck only during the collection hour at a running plant", () => {

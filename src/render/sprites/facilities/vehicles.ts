@@ -247,3 +247,30 @@ export function drawMetroTrain(ctx: CanvasRenderingContext2D, w: number, headlig
   ctx.fillStyle = "#9FC0E0"; // glass glints, on the window in front of the riders
   for (const { wx } of windows) ctx.fillRect(wx, bandY, 4, 2);
 }
+
+/** Width of the dark portal drawn over each end of the metro station. */
+export const METRO_PORTAL_W = 22;
+
+/** The tunnel mouth at a station end, drawn at (0,0) into a w x h rect: a steel
+ *  jamb on the station's outer edge and a stretch of darkness that fades toward
+ *  the platform. Over the train it makes the consist emerge from (or sink into)
+ *  the tunnel instead of being cut off at the edge. */
+export function drawMetroPortal(ctx: CanvasRenderingContext2D, w: number, h: number, side: "left" | "right"): void {
+  const jamb = 5;
+  const edge = side === "left" ? 0 : w - jamb;
+  const dark = side === "left" ? jamb : 0;
+  const span = w - jamb;
+  for (let i = 0; i < span; i++) {
+    const depth = side === "left" ? i : span - 1 - i;
+    ctx.globalAlpha = 0.92 * (1 - depth / span);
+    ctx.fillStyle = "#0C0D10";
+    ctx.fillRect(dark + i, 0, 1, h);
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#2A2C30";
+  ctx.fillRect(edge, 0, jamb, h);
+  ctx.fillStyle = "#8A8D92";
+  ctx.fillRect(side === "left" ? edge + jamb - 1 : edge, 0, 1, h);
+  ctx.fillStyle = "#2A2C30";
+  ctx.fillRect(0, 0, w, 5); // lintel
+}
