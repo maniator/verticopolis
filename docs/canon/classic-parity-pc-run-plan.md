@@ -1,8 +1,21 @@
 # Classic parity: original-game PC run plan
 
-Written 2026-10-30. This records how the approved original-SimTower test run (the "classic parity" spec, about 40 scenarios) is split, what is run first, and how a full run would be done later. It is a plan and a hand-off note. No scenario has been run yet.
+Written 2026-10-30. This records how the approved original-SimTower test run (the "classic parity" spec, 33 scenarios) is split, what is run first, and how a full run would be done later. It is a plan and a hand-off note. **No scenario has been run yet and no result exists.**
 
-The spec lives in the project files (`release-3.0/classic-parity/pc-test-spec-2026-10-30.md`), not in the repository. Its scenario ids are used here as written: T1, T2, O1 to O3, E1 to E4, X1, M1 to M3, R1, R2, S1, L1, C1 to C5, F1 and PK1 to PK10.
+The spec is copied into the repository as [classic-parity-pc-test-spec.md](./classic-parity-pc-test-spec.md) (the original is the project file `release-3.0/classic-parity/pc-test-spec-2026-10-30.md`). It has 33 scenarios: T1, T2 (2); O1 to O3 (3); E1 to E4 (4); X1 (1); M1 to M3 (3); R1, R2 (2); S1 (1); L1 (1); C1 to C5 (5); F1 (1); PK1 to PK10 (10).
+
+## Status
+
+Evidence means a kept screenshot or saved `.TDT` from the original game. As of 2026-10-30 there is none for any scenario.
+
+| Scenario | Status | Evidence |
+|---|---|---|
+| PK8 | not run | none |
+| PK10 | not run | none |
+| Version check (1.0 or 1.1B) | not run | none |
+| Every other scenario (30 more) | not run | none |
+
+Update this table with observed or incomplete, plus the evidence file, as each one is run.
 
 ## Rules for every result
 
@@ -17,7 +30,7 @@ Works: load a `.TDT` headlessly under Wine in Docker, screenshot it, run it for 
 
 Does not work reliably: placing buildings by scripted clicks (the toolbar and map windows change focus), and starting a new game without a save (the title screen stays up). So a run that needs a tower with a given layout must either build that tower in code and export it, or have a person place it with `./run.sh`.
 
-## Run now: subset C (no building)
+## Run first: subset C (no building)
 
 These need only real saves already in the repository (`conformance/fixtures/tdt-reddit/`):
 
