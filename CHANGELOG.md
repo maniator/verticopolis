@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.67.1
+
+- Parking stalls in imported SimTower saves that sat a few tiles from their neighbor now sit against the ramp's row, so they are connected instead of showing a red X.
+
 ## 2.67.0
 
 - Security, medical, housekeeping and recycling rooms build at the sizes SimTower uses, so a tower from the original game keeps its layout.

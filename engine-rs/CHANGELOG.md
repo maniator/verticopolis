@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.0.2 (2026-10-30)
+
+- The `.TDT` importer slides parking stalls that the file leaves less than one stall's width from their neighbor toward the ramp, closing the gap, so a row such as TOWER7's B5 (a 3-tile and a 1-tile paving piece between stalls) chains to its ramp. A row split by a wider gap stays split. Saves, frame layout, catalog and identity are unchanged.
+
 ## 1.0.1 (2026-10-30)
 
 - Security, medical, housekeeping and recycling build at SimTower's widths (16, 26, 15 and 25 tiles), and the metro station is 30 tiles wide with a full-width tunnel row. This moves the catalog digest and the conformance checkpoints.
