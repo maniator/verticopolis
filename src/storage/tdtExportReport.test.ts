@@ -90,15 +90,6 @@ describe("exportReport", () => {
     ).toContain("6 stairway/escalator flights");
   });
 
-  it("warns when there are more flights than SimTower kept in our tests", () => {
-    const keeps48 = exportReport(facts({}, { walkwaysLen: 48 }));
-    expect(said(keeps48.staysBehind)).not.toContain("SimTower dropped 16");
-    const over = exportReport(facts({}, { walkwaysLen: 64 }));
-    expect(said(over.staysBehind)).toContain(
-      "more than 48 stairway/escalator flights, SimTower dropped 16",
-    );
-  });
-
   it("reports every loss, plural and singular", () => {
     const plural = said(
       exportReport(

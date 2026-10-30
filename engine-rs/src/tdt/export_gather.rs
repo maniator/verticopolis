@@ -245,6 +245,7 @@ pub fn gather_units<U: Borrow<Value>>(
             Kind::Recycling => header.recycling += 1,
             Kind::Shop | Kind::Restaurant | Kind::FastFood => header.commercial += 1,
             Kind::Security => header.security += 1,
+            Kind::Medical => header.medical += 1,
             Kind::PartyHall | Kind::Cinema => header.hall_cinema += 1,
             _ => {}
         }

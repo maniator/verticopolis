@@ -12,7 +12,7 @@ use verticopolis_engine::tdt::import_tdt;
 /// through its elevator table, express shafts included.
 const SAVES: [(&str, usize, usize); 9] = [
     ("TOWER1.TDT", 15, 1),
-    ("TOWER2.TDT", 24, 31),
+    ("TOWER2.TDT", 24, 30),
     ("TOWER3.TDT", 11, 29),
     ("TOWER4.TDT", 18, 29),
     ("TOWER5.TDT", 7, 7),

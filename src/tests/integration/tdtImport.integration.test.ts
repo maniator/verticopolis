@@ -1021,7 +1021,7 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
     };
     const bare = buildTdt(spec);
     for (const [label, bytes] of [
-      ["stamped", withStamp(bare, TDT_STAMP_SPANNED_GENERATION)],
+      ["stamped", withStamp(buildTdt({ ...spec, generationOneBlocks: true }), TDT_STAMP_SPANNED_GENERATION)],
       ["unstamped", bare],
     ] as const) {
       const walked = parseTdtBinary(bytes);
@@ -1121,7 +1121,7 @@ describeWithCodec("transport decode: the save's own shafts and flights", () => {
       legacyServicedPayload: true,
     };
     const base = buildTdt(legacy);
-    for (const generation of [3, 7, 0, 0xffff]) {
+    for (const generation of [4, 7, 0, 0xffff]) {
       const walked = parseTdtBinary(withStamp(base, generation));
       expect(walked.elevators, `generation ${generation}`).toHaveLength(2);
       expect(walked.elevators!.map((e) => e.x), `generation ${generation}`).toEqual([100, 140]);

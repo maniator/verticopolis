@@ -51,14 +51,43 @@ pub const TDT_ELEVATOR_PER_FLOOR_SIZE: i64 = 324;
 pub const TDT_ELEVATOR_CAR_BLOCK_SIZE: i64 = 348;
 /// Elevator `type` byte for an express shaft.
 pub const TDT_ELEVATOR_TYPE_EXPRESS: i64 = 0;
+/// What follows the elevator slots, in file order, up to the stairs table:
+/// 22 statistic words, the finance block, two blocks of unknown flags and
+/// bytes, the parking block and the medical clinic list. Measured on the nine
+/// 1997 saves, the game's own re-saves of them and the public spec.
+pub const TDT_STATS_SIZE: usize = 22 * 4;
 pub const TDT_FINANCE_SIZE: usize = 132;
+pub const TDT_UNKNOWN_FLAGS_SIZE: usize = 12;
+pub const TDT_UNKNOWN_BYTES_SIZE: usize = 42;
 pub const TDT_PARKING_SIZE: usize = 2 + 512 * 2;
-/// The finance block (`TDT_FINANCE_SIZE` bytes) holds, as little-endian u32s,
-/// the people of each class SimTower counts, then their total. Measured on the
-/// nine 1997 saves: the ten classes sit at byte 88 in the order below, the
-/// total at byte 128 is their sum, and the game shows it as the population.
-pub const TDT_FINANCE_POPULATION_AT: usize = 88;
-pub const TDT_FINANCE_TOTAL_AT: usize = 128;
+/// A u16 count then ten u16 ids of the medical clinics, the same number the
+/// header holds at byte 52.
+pub const TDT_CLINIC_LIST_SIZE: usize = 2 + TDT_CLINIC_MAX * 2;
+pub const TDT_CLINIC_MAX: usize = 10;
+/// From the end of the elevator slots to the stairs table in every save
+/// SimTower wrote. Our exports before generation 3 stopped 160 bytes short of
+/// it (a 132-byte finance block, the parking block and a 4-byte gap), so the
+/// game read their slot 16 as its slot 0 and never saw slots 0 to 15.
+pub const TDT_ELEVATORS_TO_STAIRS: usize = TDT_STATS_SIZE
+    + TDT_FINANCE_SIZE
+    + TDT_UNKNOWN_FLAGS_SIZE
+    + TDT_UNKNOWN_BYTES_SIZE
+    + TDT_PARKING_SIZE
+    + TDT_CLINIC_LIST_SIZE;
+/// The same distance in our exports of generations 1 and 2: a finance block,
+/// the parking block and four zero bytes. Our very first exports left the four
+/// bytes out.
+pub const TDT_LEGACY_ELEVATORS_TO_STAIRS: usize = TDT_LEGACY_NO_GAP_ELEVATORS_TO_STAIRS + 4;
+pub const TDT_LEGACY_NO_GAP_ELEVATORS_TO_STAIRS: usize = TDT_FINANCE_SIZE + TDT_PARKING_SIZE;
+/// Where the header keeps the clinic count.
+pub const TDT_HEADER_CLINIC_COUNT_AT: usize = 0x34;
+/// The finance block holds, as little-endian u32s, the people of each class
+/// SimTower counts, their total, the income of each class, the total income,
+/// the ten expense lines and the total expense. Measured on the nine 1997
+/// saves: the ten classes sit at byte 0 in the order below, the total at byte
+/// 40 is their sum, and the game shows it as the population.
+pub const TDT_FINANCE_POPULATION_AT: usize = 0;
+pub const TDT_FINANCE_TOTAL_AT: usize = 40;
 pub const TDT_POPULATION_CLASSES: usize = 10;
 pub const POP_OFFICE: usize = 0;
 pub const POP_HOTEL_SINGLE: usize = 1;
@@ -89,22 +118,16 @@ pub fn population_class(kind: crate::facilities::Kind) -> Option<usize> {
     })
 }
 
-/// Zero bytes between the parking block and the stairs table in every save
-/// SimTower wrote (measured on the nine 1997 saves and the game's own
-/// re-saves of them). A table written without the gap reads four bytes early.
-pub const TDT_STAIRS_GAP: usize = 4;
 pub const TDT_STAIR_SLOTS: usize = 64;
-/// The first slot the game fills: every save it wrote that has fewer than 64
-/// flights starts at slot 16, and a full table (64 flights) uses slots 0 to 15
-/// last. SimTower dropped the first 16 records of a file that filled the table
-/// from slot 0.
-pub const TDT_STAIR_FIRST_SLOT: usize = 16;
 pub const TDT_STAIR_RECORD_SIZE: usize = 10;
 /// The trailing routing/reachability region the exporter emits, 0xFF-filled.
 pub const TDT_ROUTING_TAIL_SIZE: usize = 0x6400;
 /// Our trailer: the ASCII magic then a u16 generation, at the very end.
 pub const TDT_STAMP_MAGIC: &str = "VCTDT";
-pub const TDT_STAMP_GENERATION: i64 = 2;
+/// Generation 2 sized express payloads by eligible floors; generation 3 also
+/// puts the stairs table where the game keeps it.
+pub const TDT_STAMP_ELIGIBLE_GENERATION: i64 = 2;
+pub const TDT_STAMP_GENERATION: i64 = 3;
 
 /// The first generation of our trailer. Its express payloads were sized by
 /// the floors the shaft spans, which SimTower reads as the wrong length.

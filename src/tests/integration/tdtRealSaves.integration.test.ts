@@ -21,7 +21,7 @@ const load = (name: string) => {
  *  through its elevator table, express shafts included (#1491, #1497). */
 const SAVES = [
   { name: "TOWER1.TDT", shafts: 15, flights: 1 },
-  { name: "TOWER2.TDT", shafts: 24, flights: 31 },
+  { name: "TOWER2.TDT", shafts: 24, flights: 30 },
   { name: "TOWER3.TDT", shafts: 11, flights: 29 },
   { name: "TOWER4.TDT", shafts: 18, flights: 29 },
   { name: "TOWER5.TDT", shafts: 7, flights: 7 },

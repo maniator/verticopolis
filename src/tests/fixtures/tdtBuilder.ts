@@ -4,6 +4,7 @@ import {
   builtShaftPayloadSize,
   builtShaftPayloadSizeFor,
   expressPayloadSize,
+  TDT_CLINIC_LIST_SIZE,
   TDT_FINANCE_SIZE,
   TDT_FLOOR_COUNT,
   TDT_FLOOR_INDEX_ENTRIES,
@@ -15,6 +16,9 @@ import {
   TDT_RETAIL_SLOTS,
   TDT_STAIR_RECORD_SIZE,
   TDT_STAIR_SLOTS,
+  TDT_STATS_SIZE,
+  TDT_UNKNOWN_BYTES_SIZE,
+  TDT_UNKNOWN_FLAGS_SIZE,
 } from "./tdtLayout";
 
 /**
@@ -121,6 +125,10 @@ export interface TdtSpec {
    *  this deliberately encodes a superseded layout so the reader's fallback can
    *  be tested. */
   spannedExpressPayload?: boolean;
+  /** Lay out the blocks after the elevators the way our generation 1 and 2
+   *  exports did (a finance block, the parking block, no statistics or clinic
+   *  list). Only for files that claim one of those generations. */
+  generationOneBlocks?: boolean;
   /** Size an express shaft by the floors it stops at, the reading of the game's
    *  layout before the eligible-floor rule. Only for the reader's fallback. */
   stoppedExpressPayload?: boolean;
@@ -275,9 +283,18 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
   }
 
   // ---- Finance + parking + stairs -------------------------------------------
-  pad(TDT_FINANCE_SIZE);
-  u16(spec.parkingConnected ?? 0);
-  pad(TDT_PARKING_SIZE - 2);
+  if (spec.generationOneBlocks) {
+    // What our writer wrote before generation 3: a finance block, the parking
+    // block, and the table 160 bytes short of where the game keeps it.
+    pad(TDT_FINANCE_SIZE);
+    u16(spec.parkingConnected ?? 0);
+    pad(TDT_PARKING_SIZE - 2);
+  } else {
+    pad(TDT_STATS_SIZE + TDT_FINANCE_SIZE + TDT_UNKNOWN_FLAGS_SIZE + TDT_UNKNOWN_BYTES_SIZE);
+    u16(spec.parkingConnected ?? 0);
+    pad(TDT_PARKING_SIZE - 2);
+    pad(TDT_CLINIC_LIST_SIZE);
+  }
   const stairs = (spec.stairs ?? []).slice(0, TDT_STAIR_SLOTS);
   for (let slot = 0; slot < TDT_STAIR_SLOTS; slot++) {
     const s = stairs[slot];
