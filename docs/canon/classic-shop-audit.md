@@ -42,7 +42,7 @@ Revision 4 adds only a follow-up note (no new wiki pages). It confirms what the 
 
 | # | Rule | Source | Ours (Classic) | Fix or ask | Modern |
 |---|---|---|---|---|---|
-| 17 | Rooms that cannot be deleted | Hotel page: a placed housekeeping room cannot be deleted. Lobby and cathedral show Deletable: No in their infoboxes | Lobby tiles were already refused in both modes; housekeeping and the cathedral could be bulldozed | Housekeeping fixed in Classic (crate 0.24.4, a burned-out shell can still be cleared); lobby already matched; the cathedral waits for the cathedral thread | Keep current (sellable) |
+| 17 | Rooms that cannot be deleted | The Windows Read Me lists housekeeping, security, recycling, the metro, the cathedral and the movie theater as undeletable; the Hotel page and the infoboxes say the same for housekeeping, lobby and cathedral | Lobby tiles were already refused in both modes; the rest could be bulldozed | Housekeeping fixed in Classic (crate 0.24.4); security, recycling and the movie theater fixed (crate 1.0.2, app 2.68.0); a burned-out shell can still be cleared. Metro and the cathedral wait for their own threads. The medical center is a source conflict (one table says removable), so it stays removable | Keep current (sellable) |
 | 18 | 3-star Security | The Windows Help file asks for more than one Security Office to reach 3 stars | One office | Fixed (crate 0.24.5, app 2.67.0): two offices; a tower that already holds 3 stars keeps them | Same (parity default) |
 
 Open source conflicts the note flags and we do not settle: escalator use with offices (kiwizoid says commercial only, furdude2 says offices work), the cinema's capacity (60 versus 120), and whether films age.

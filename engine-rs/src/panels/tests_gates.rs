@@ -61,6 +61,8 @@ fn the_checklist_and_promotion_agree_at_every_gate_threshold() {
     agree(&sim, "second suite sold");
     assert!(sim.sell_at(2, 170), "sell medical");
     agree(&sim, "medical sold");
-    assert!(sim.sell_at(-1, 180), "sell recycling");
+    // Classic will not sell a recycling center, so drop it from the tower.
+    let recycling = sim.tower.unit_at(-1, 180).unwrap().id;
+    sim.tower.remove_unit(recycling);
     agree(&sim, "recycling sold");
 }

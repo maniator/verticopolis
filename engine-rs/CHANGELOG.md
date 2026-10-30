@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.0.2 (2026-10-30)
+
+- Classic: `GameMode::room_is_permanent` replaces `housekeeping_is_permanent` and also keeps placed security offices, recycling centers and movie theaters (`remove_facility` refuses with a per-kind message; a gutted shell still clears). Modern sells them. The `star-climb-classic` conformance scenario no longer sells its security office (it starts one office short of the 3-star gate), so the lock moves.
+
 ## 1.0.1 (2026-10-30)
 
 - The 3-star gate (both modes) needs `SECURITY_OFFICES_FOR_THREE_STARS` (two) operational security offices instead of one, in the rating evaluation and in the star-gate panel getter. Stars still never downgrade. The `star-climb-classic` conformance scenario builds a second office and the lock moves with it.

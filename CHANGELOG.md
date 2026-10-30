@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.68.0
+
+- In Classic, a security office, recycling center or movie theater can no longer be sold or bulldozed once it is placed, as in SimTower. A burned-out one can still be cleared.
+
 ## 2.67.0
 
 - Reaching 3 stars now takes two security offices instead of one, as in SimTower. A tower that already has 3 stars keeps them.
