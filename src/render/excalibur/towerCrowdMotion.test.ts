@@ -36,6 +36,7 @@ function eng(over: Record<string, any> = {}): any {
     crowdActors: new Map(),
     carActors: [],
     trainActors: [],
+    tunnelActors: [],
     truckActors: [],
     garageCars: [],
     walkers: [],
