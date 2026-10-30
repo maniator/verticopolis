@@ -67,6 +67,7 @@ function makeApp(sim: Simulation, ui: UI) {
     engine: { focus: vi.fn(() => ({})) },
     ui,
     onboarding: { tick: vi.fn() },
+    scheduleReview: { tick: vi.fn() },
     selected: null,
     refreshEditor: vi.fn(),
     lastUiUpdate: -1e9,
