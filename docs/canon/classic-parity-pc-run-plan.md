@@ -6,23 +6,16 @@ The spec is copied into the repository as [classic-parity-pc-test-spec.md](./cla
 
 ## Status
 
-Evidence means a kept screenshot or saved `.TDT` from the original game. As of 2026-10-30 there is none for any scenario.
+Evidence means a kept screenshot or saved `.TDT` from the original game. Updated 2026-10-30 after the first PC run (no building; real saves only). Every result is from **SimTower v1.0**: the disc binary on the PC (`simtower.exe`, 6,566,400 bytes) shows "SimTower v1.0" in its about text, not 1.1B, so any v1.0 versus 1.1B difference is unknown.
 
-| Scenario | Status | Evidence |
+| Scenario | Status | Observation and evidence |
 |---|---|---|
-| PK8 | not run | none |
-| PK10 | not run | none |
-| Version check (1.0 or 1.1B) | not run | none |
+| Version check | observed | The about text in the exe reads "SimTower v1.0". Evidence: that string in the extracted `simtower.exe`. |
+| PK8, TOWER7 | observed, with gaps | Loaded unmodified and saved at once (`T7A`, game minute 23,814, 1,481 game minutes after the file's 22,333), then saved again (`T7B`, minute 30,989, 7,175 game minutes or about 5 game days later). Hotel rooms: 29 dirty and 136 empty in the file, 165 empty at `T7A`, still 165 empty and none asleep at `T7B`. Occupied offices 238 in all three, units 14,789 in all three, funds 924,653,000 then 925,618,000 then 928,649,000. Parking floors B1 to B9 show cars in the stalls and no red X (screenshots of the untouched save with only the saved view shifted). Gaps: suite and office evaluation colors were not read (the Query tool was not used), and the five floors the loader reads as unserved were not compared one by one. |
+| PK8, MYTOWER | observed, with gaps | Saved at once (`TMA`, minute 62,865) and again (`TMB`, minute 74,880, which is 12,015 game minutes or about 8.3 game days later). Hotel: 215 empty in the file and in `TMA`, 215 asleep in `TMB`. Occupied offices 307 in all three, units 15,238 in all three, funds 955,094,300 then 956,985,400 then 963,935,700. Gaps: red X stalls and evaluation colors were not recorded. |
+| PK8, TOWER1 | incomplete | Saved at once (`T1A`, 248,616 bytes, the same size as the file). The later save did not write in two attempts, so there is no later comparison and no connected-stall count. |
+| PK10 | incomplete, not run | It needs three built parking rows (no gap, 1-tile gap, 3-tile gap) and the connected-stall count read from a saved file. I did not build them and I have not located that count field in the file with confidence. The only related observation is the TOWER7 B5 row in the original: the paving pieces at tiles 138 to 141 and 149 to 150 draw as plain blocks, and no stall there shows a red X. |
 | Every other scenario (30 more) | not run | none |
-
-Update this table with observed or incomplete, plus the evidence file, as each one is run.
-
-## Rules for every result
-
-- Original game observation only. A result is canon only when a kept screenshot or saved `.TDT` shows it.
-- Mark anything not run with the reason. Do not infer a result.
-- The target is Windows SimTower 1.1B. If the disc binary is 1.0, say so in the results (Help, About).
-- Say how each tower was made. A tower built through our exporter is "the original game running a tower we built", not a tower built in the game.
 
 ## What the harness can and cannot do (learned 2026-10-29)
 
@@ -30,7 +23,7 @@ Works: load a `.TDT` headlessly under Wine in Docker, screenshot it, run it for 
 
 Does not work reliably: placing buildings by scripted clicks (the toolbar and map windows change focus), and starting a new game without a save (the title screen stays up). So a run that needs a tower with a given layout must either build that tower in code and export it, or have a person place it with `./run.sh`.
 
-## Run first: subset C (no building)
+## Subset C (no building): first run done 2026-10-30
 
 These need only real saves already in the repository (`conformance/fixtures/tdt-reddit/`):
 
