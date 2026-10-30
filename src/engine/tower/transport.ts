@@ -279,7 +279,16 @@ export function setCars(tower: Tower, id: number, cars: number): boolean {
     t.carDir.length = cars;
   }
   if (t.carLoad) t.carLoad = Array.from({ length: cars }, (_, i) => t.carLoad![i] ?? 0);
+  const was = t.cars;
   t.cars = cars;
+  // A car bought joins the shaft's duty pattern (#1546): an hour that ran every
+  // car runs the new fleet, and every other hour (cut back, or off shift)
+  // stays as the player set it.
+  if (t.schedule?.activeCars && cars > was) {
+    const grow = (row?: number[]): number[] | undefined => row?.map((n) => (n >= was ? cars : n));
+    const { weekday, weekend } = t.schedule.activeCars;
+    t.schedule = { ...t.schedule, activeCars: { weekday: grow(weekday), weekend: grow(weekend) } };
+  }
   // Re-harden an authored schedule against the new car count (#305): a fleet
   // shrink clamps rows and truncates homes past the last remaining car.
   if (t.schedule) t.schedule = coerceSchedule(t.schedule, t.cars, t.bottom, t.top);

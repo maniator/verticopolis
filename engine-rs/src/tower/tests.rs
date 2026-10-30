@@ -1,4 +1,5 @@
 use super::*;
+use crate::schedule::Schedule;
 
 fn index_matches_positions(t: &Tower) {
     assert_eq!(t.transport_by_id.len(), t.transports.len());
@@ -45,4 +46,69 @@ fn transport_index_survives_add_remove_and_reindex() {
     fresh.reindex();
     index_matches_positions(&fresh);
     assert_eq!(fresh.get_transport(ids[1]).map(|x| x.x), Some(10));
+}
+
+fn scheduled_shaft(t: &mut Tower, cars: i64, weekday: Vec<i64>, weekend: Vec<i64>) -> i64 {
+    for x in 0..30 {
+        assert!(t.place(Kind::Lobby, 1, x).ok);
+    }
+    for x in 0..30 {
+        assert!(t.place(Kind::Floor, 2, x).ok);
+    }
+    let r = t.place_transport(Kind::ElevatorStandard, 2, 1, 2);
+    assert!(r.ok, "{:?}", r.reason);
+    let id = r.unit_id.unwrap();
+    assert!(t.set_cars(id, cars) || cars == 1);
+    t.transports[0].schedule = Some(Schedule {
+        weekday: Some(weekday),
+        weekend: Some(weekend),
+        waiting_car_response: None,
+        standard_floor_departure: None,
+        home_floors: Some(vec![1, 2]),
+    });
+    id
+}
+
+fn rows(t: &Tower) -> (Vec<i64>, Vec<i64>) {
+    let s = t.transports[0].schedule.as_ref().unwrap();
+    (s.weekday.clone().unwrap(), s.weekend.clone().unwrap())
+}
+
+#[test]
+fn a_bought_car_runs_in_every_hour_that_ran_the_whole_fleet() {
+    let mut t = Tower::new();
+    let id = scheduled_shaft(&mut t, 1, vec![1; 24], vec![1; 24]);
+    assert!(t.set_cars(id, 2));
+    assert_eq!(rows(&t), (vec![2; 24], vec![2; 24]));
+    assert!(t.set_cars(id, 4));
+    assert_eq!(rows(&t), (vec![4; 24], vec![4; 24]));
+}
+
+#[test]
+fn a_bought_car_keeps_cut_back_hours_and_the_day_types_apart() {
+    let mut t = Tower::new();
+    let night = |full: i64| -> Vec<i64> {
+        (0..24)
+            .map(|h| {
+                if h < 6 {
+                    0
+                } else if h < 9 {
+                    1
+                } else {
+                    full
+                }
+            })
+            .collect()
+    };
+    let id = scheduled_shaft(&mut t, 3, night(3), vec![1; 24]);
+    assert!(t.set_cars(id, 4));
+    assert_eq!(rows(&t), (night(4), vec![1; 24]));
+    // The staging is untouched, and a shrink clamps the rows.
+    assert_eq!(
+        t.transports[0].schedule.as_ref().unwrap().home_floors,
+        Some(vec![1, 2])
+    );
+    assert!(t.set_cars(id, 2));
+    assert_eq!(rows(&t).1, vec![1; 24]);
+    assert!(rows(&t).0.iter().all(|&n| n <= 2));
 }
