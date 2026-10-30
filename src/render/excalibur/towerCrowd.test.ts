@@ -233,12 +233,13 @@ describe("updateMotion repositions the moving actors", () => {
     expect(car.shown).toBe(changedKey); // adopted the new indicator state
   });
 
-  it("cycles the metro train in from the left, holds, then off the right", () => {
+  it("runs the metro train on game time: in from the left, held, then off the right", () => {
     const xs: number[] = [];
     const train = { actor: actor(), u: { x: 20, floor: 3 }, w: 40, shift: (offset: number) => xs.push(offset) };
+    const clockAt = (minute: number, night = false) => ({ hour: Math.floor(minute / 60), minuteOfDay: minute, isMorning: () => false, isEvening: () => false, isNight: () => night });
     const e = eng({ trainActors: [train] });
-    for (const anim of [0, 6, 11]) {
-      e.d.anim = anim;
+    for (const minute of [12 * 60 + 3, 12 * 60 + 10, 12 * 60 + 23]) {
+      e.sim = { ...e.sim, clock: clockAt(minute) };
       updateMotion(e);
     }
     // The three legs (arrive / hold / depart) put the train at distinct
@@ -246,6 +247,11 @@ describe("updateMotion repositions the moving actors", () => {
     expect(xs[0]).toBeLessThan(0);
     expect(xs[1]).toBe(0);
     expect(xs[2]).toBeGreaterThan(0);
+    // Overnight it stays inside the tunnel however the animation clock runs.
+    e.sim = { ...e.sim, clock: clockAt(2 * 60 + 10, true) };
+    e.d.anim = 7;
+    updateMotion(e);
+    expect(xs[3]).toBe(-(train.w + 12));
   });
 
   it("shows the garbage truck only during the collection hour at a running plant", () => {
