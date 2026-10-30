@@ -88,19 +88,16 @@ export function buildCanonTower(): void {
   if (cine.ok) s.tower.getUnit(cine.unitId).state = "occupied";
   s.tower.place("security", 1, left + 26);
   s.tower.place("medical", 2, left);
-  // Basement: a full-lot B1 concourse, a canon parking run on B2, and the Metro
-  // Station down on B3–B5. The Metro spans the WHOLE lot AND three stories, so a
-  // naive place("metro", 0, …) is rejected: a 3-floor span anchored at B1 pokes
-  // above ground (it would occupy floors 0..2). Dig the basement full-width down
-  // to B5 so the station has floor structure + support on every one of its
-  // stories, then anchor it at B5 (floor -4) so its top story (B3) clears the B2
-  // parking above it. Without an operational Metro the sim loses its +60 transit
-  // capacity and commute relief, so the live hero shot wouldn't behave to canon.
+  // Basement: a full-lot B1 concourse, a canon parking run on B2, and the 30-wide,
+  // three-story Metro on B3-B5. Nothing may sit below it, so the basement is dug
+  // full-width to B5 and the station anchors at B5 (floor -4), beside the
+  // platform bank below. Without a working Metro the sim loses its commute relief.
   for (let x = cx; x < W; x++) s.tower.place("floor", 0, x);
   for (let x = cx - 1; x >= 0; x--) s.tower.place("floor", 0, x);
   for (let f = -1; f >= -4; f--) for (let x = 0; x < W; x++) s.tower.place("floor", f, x);
-  const metro = s.tower.place("metro", -4, 0);
-  if (metro.ok) s.tower.getUnit(metro.unitId).state = "occupied";
+  const metro = s.tower.place("metro", -4, left + 8);
+  if (!metro.ok) throw new Error(`hero metro failed: ${metro.reason}`);
+  s.tower.getUnit(metro.unitId).state = "occupied";
   // The first elevator bank, held back from the transport block above: it
   // serves the metro platform (B4, floor -3) through the lobby up to the
   // 15F sky lobby, and can only be placed once the basement floors exist
@@ -168,8 +165,10 @@ export function buildBasement(): void {
     }
   }
   // A couple of recycling centers on B4 so recycling/garbage shots have a subject.
-  s.tower.place("recycling", -3, left + 4);
-  s.tower.place("recycling", -3, left + 26);
+  for (const rx of [left + 4, left + 31]) {
+    const r = s.tower.place("recycling", -3, rx);
+    if (!r.ok) throw new Error(`basement recycling failed: ${r.reason}`);
+  }
   s.evaluateStar();
   g.engine.setSim(g.enginePort.sim ? s : (g.syncSim(), g.renderSim));
   g.engine.setCamera(cx, -1, 1.6);
@@ -450,36 +449,37 @@ export function pgGrowToStar(target: number): number {
   }
   // Tier amenities sit on a reserved floor ABOVE the offices (floor 2's columns
   // are all taken by the office fill); the widths are spaced so nothing overlaps
-  // (Security 8, Medical 16, Suite 10). Basements carry recycling / the Metro.
+  // (Security 16, Medical 26, Suite 10). Basements carry recycling / the Metro.
   const amenityFloor = top + 1;
   for (let x = left; x <= right; x++) s.tower.place("floor", amenityFloor, x);
   if (target >= 3) s.tower.place("security", amenityFloor, left);
   if (target >= 4) {
-    s.tower.place("medical", amenityFloor, left + 10);
-    // Two hotel suites so the 4★ suite gate is met (clear of the 16-wide Medical), on the Average rent
+    s.tower.place("medical", amenityFloor, left + 18);
+    // Two hotel suites so the 4★ suite gate is met (clear of the 26-wide Medical), on the Average rent
     // a game build gives them: unpriced, the settle's load snaps them and says so over the star line.
     for (let i = 0; i < 2; i++) {
-      const r = s.tower.place("hotelSuite", amenityFloor, left + 30 + i * 12);
+      const r = s.tower.place("hotelSuite", amenityFloor, left + 48 + i * 12);
       if (r.ok) Object.assign(s.tower.getUnit(r.unitId), { state: "asleep", rent: s.rules.priceOptions("hotelSuite").rungs[2].value });
     }
     s.vipFavorable = true; // stands in for a favorable VIP review
     // A basement stack, laid top-down so each deck rests on the one above:
-    //  · Recycling is 2 floors tall (a room's height grows UPWARD), so its floor
-    //    must be low enough that its top stays underground (≤ floor 0).
-    //  · The Metro (5★) is the whole lot × 3 floors, so it claims B1..B3 (0/-1/-2),
-    //    so recycling drops to B5 (floor -4, spanning -4/-3), clear of the Metro.
-    //    Without a Metro (4★), recycling sits at B2 (floor -1, spanning -1/0).
+    //  · Recycling is 2 floors tall (a room's height grows UPWARD), so it sits at
+    //    B2 (floor -1, spanning -1/0) to keep its top underground.
+    //  · The Metro (5★) is 30 wide and 3 floors, and nothing may sit below it, so
+    //    it takes the bottom of the stack: B3..B5 (floor -4, spanning -4/-2),
+    //    under the recycling centers.
     const deepest = target >= 5 ? -4 : -1;
     for (let f = 0; f >= deepest; f--) {
       for (let x = cx; x < W; x++) s.tower.place("floor", f, x);
       for (let x = cx - 1; x >= 0; x--) s.tower.place("floor", f, x);
     }
     if (target >= 5) {
-      const m = s.tower.place("metro", -2, 0); // occupies floors -2/-1/0
-      if (m.ok) s.tower.getUnit(m.unitId).state = "occupied";
+      const m = s.tower.place("metro", -4, cx - 15);
+      if (!m.ok) throw new Error(`milestone metro failed: ${m.reason}`);
+      s.tower.getUnit(m.unitId).state = "occupied";
     }
     // Recycling: one center per ~2,000 population so demand is comfortably met.
-    const recFloor = target >= 5 ? -4 : -1;
+    const recFloor = -1;
     const centers = Math.ceil((placed * 6) / 2000) + 1;
     let rx = left;
     for (let i = 0; i < centers; i++) {
