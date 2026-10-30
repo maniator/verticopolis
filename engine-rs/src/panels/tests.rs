@@ -382,6 +382,34 @@ fn unit_detail_reports_the_card_and_refuses_a_missing_id() {
 }
 
 #[test]
+fn a_metro_card_reports_elevator_access_at_its_platform_floor() {
+    use crate::tower::Tower;
+    let mut tower = Tower::new();
+    let lobby = Kind::Lobby.facility().width;
+    for x in (0..375 - lobby + 1).step_by(lobby as usize) {
+        assert!(tower.place(Kind::Lobby, 1, x).ok);
+    }
+    for floor in [2, 3, 0, -1, -2] {
+        for x in 0..375 {
+            let r = tower.place(Kind::Floor, floor, x);
+            assert!(r.ok, "floor {floor} at {x}: {:?}", r.reason);
+        }
+    }
+    let r = tower.place(Kind::Metro, -2, 0);
+    assert!(r.ok, "{:?}", r.reason);
+    let metro = r.unit_id.expect("the station has an id");
+    let mut sim = Simulation::new_game(7, GameMode::Modern);
+    sim.tower = tower;
+    // A shaft from the platform floor up leaves the station's own row out,
+    // the way an imported station sits (floor -2 here, platform at -1).
+    assert_eq!(sim.unit_detail(metro).unwrap()["served"], false);
+    shaft(&mut sim, Kind::ElevatorStandard, 200, -1, 3);
+    let d = sim.unit_detail(metro).unwrap();
+    assert_eq!(d["served"], true, "riders board on the platform floor");
+    assert_eq!(d["reachable"], true);
+}
+
+#[test]
 fn a_classic_unset_condo_reads_the_catalog_default_not_the_economy_default() {
     let mut sim = founded(GameMode::Classic, 3);
     put(&mut sim, Kind::Condo, 2, 160);

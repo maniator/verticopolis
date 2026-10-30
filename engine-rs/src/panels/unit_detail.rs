@@ -58,9 +58,17 @@ impl Simulation {
     pub(crate) fn card_flags(&mut self, id: i64) -> Option<CardFlags> {
         let u = self.tower.get_unit(id)?;
         let (floor, cinema) = (u.floor, u.kind == Kind::Cinema);
+        // A metro station is anchored on its bottom row, the row SimTower saves
+        // it on, but riders board on the platform floor one above it, so that
+        // is the floor whose elevator access the card reports.
+        let access_floor = if u.kind == Kind::Metro {
+            floor + 1
+        } else {
+            floor
+        };
         Some(CardFlags {
-            served: self.tower.is_floor_served(floor),
-            reachable: self.floor_reachable(floor),
+            served: self.tower.is_floor_served(access_floor),
+            reachable: self.floor_reachable(access_floor),
             has_lobby: self.tower.floor_has_lobby(floor),
             blockbuster: cinema.then(|| self.blockbusters.contains(&(id as f64))),
         })
