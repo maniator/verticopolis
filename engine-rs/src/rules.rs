@@ -97,6 +97,19 @@ impl GameMode {
         }
     }
 
+    /// Whether the metro's help to business needs its platform floor served:
+    /// SimTower's station only draws visitors once the station's floors have
+    /// transport connected. Modern keeps the older any-operational-station rule.
+    pub fn metro_help_needs_service(self) -> bool {
+        self == GameMode::Classic
+    }
+
+    /// Whether a placed housekeeping room stays for good: SimTower gives the
+    /// player no way to delete one. Modern lets it be sold like other rooms.
+    pub fn housekeeping_is_permanent(self) -> bool {
+        self == GameMode::Classic
+    }
+
     pub fn walkway_willingness_applies(self) -> bool {
         self == GameMode::Classic
     }

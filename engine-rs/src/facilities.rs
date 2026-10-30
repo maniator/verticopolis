@@ -302,7 +302,12 @@ pub fn ground_floor_structure_kind(kind: Kind, floor: i64) -> Kind {
 pub fn no_basement(kind: Kind) -> bool {
     matches!(
         kind,
-        Kind::Office | Kind::Condo | Kind::HotelSingle | Kind::HotelDouble | Kind::HotelSuite
+        Kind::Office
+            | Kind::Condo
+            | Kind::HotelSingle
+            | Kind::HotelDouble
+            | Kind::HotelSuite
+            | Kind::Housekeeping
     )
 }
 

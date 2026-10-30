@@ -28,6 +28,8 @@ pub const ONLY_ELEVATOR_EXTEND: &str = "Only elevators can be extended.";
 pub const CAR_LIMIT: &str = "This elevator has all the cars it can hold.";
 pub const LAST_CAR: &str = "An elevator needs at least one car.";
 pub const FACILITY_GONE: &str = "That facility is gone.";
+pub const HOUSEKEEPING_PERMANENT: &str =
+    "Housekeeping rooms are permanent. The 1994 game does not let you remove them.";
 /// `INVALID_REQUEST`: the one refusal for a malformed command (#923), an id or
 /// floor that is not a whole number, or an unknown `end` or `method`.
 /// The typed engine API takes `i64` ids and floors and parsed enums, so it
@@ -307,6 +309,13 @@ impl Simulation {
             if let Some(reason) = self.tower.removal_reason(id) {
                 return ChargeResult::refuse(reason);
             }
+            // A burned-out shell can still be cleared, so the tile is not lost.
+            if kind == Kind::Housekeeping
+                && state != UnitState::Gutted
+                && self.mode.housekeeping_is_permanent()
+            {
+                return ChargeResult::refuse(HOUSEKEEPING_PERMANENT);
+            }
             self.tower.remove_unit(id);
             let refund = if state == UnitState::Gutted {
                 0.0
@@ -339,3 +348,7 @@ impl Simulation {
 #[cfg(test)]
 #[path = "charges_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "charges_removal_tests.rs"]
+mod removal_tests;
