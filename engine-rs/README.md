@@ -1,8 +1,12 @@
 # Verticopolis engine in Rust
 
-`engine-rs/` is a port of the simulation in `src/engine/` to Rust. It exists
-so the same game can run under hosts the TypeScript engine cannot reach (a
-native desktop client, a WASM module) while staying one simulation.
+`engine-rs/` is the game's simulation, written in Rust (crate 1.0.0, in the
+web game since app 2.66.0, where it is the only engine a deploy runs). It began
+as a port of the TypeScript simulation in `src/engine/`, which stays in the
+repository as the reference the conformance lock is checked against until its
+code is deleted. It exists so the same game can run under hosts the TypeScript
+engine cannot reach (a native desktop client, a WASM module) while staying one
+simulation.
 
 Frontends may differ. Simulations may not. The referee for that rule is the
 conformance suite in `../conformance/`: the port replays every scenario and
@@ -145,7 +149,7 @@ byte for byte, reads it back through `decodeVctower`, `fromTowerFile` and
 hash. The same file runs a randomized differential of the compressor
 against fflate.
 
-When the WASM engine runs (`?engine=wasm`), the web game writes its own
+When the WASM engine runs (always, in a deployed build), the web game writes its own
 saves through this writer: `SaveGame.export` and `SaveGame.packSync` hand
 the stamped save JSON to `encodeVctower` (`src/storage/vctowerWriter.ts`),
 and fall back to the TypeScript writer if the engine throws or writes no
@@ -273,9 +277,9 @@ facility table.
 
 ## The switch
 
-Behind `?engine=wasm` (or `localStorage.setItem("vc.engine", "wasm")`,
-`?engine=ts` to override) the web game runs on the WASM engine
-(story-engine-wasm-switch): the engine alone ticks, and the `Simulation`
+Every deployed build runs the web game on the WASM engine (dev serves and the
+test lanes still pick it with `?engine=wasm` or `localStorage.setItem("vc.engine", "wasm")`,
+`?engine=ts` to override) (story-engine-wasm-switch): the engine alone ticks, and the `Simulation`
 instance the app holds becomes a read model of it, refreshed every frame
 from `Engine.frameView()` (one flat number array) and, on every hour pass or
 tower revision, from the engine's save, merged in place so the renderer's
@@ -324,10 +328,12 @@ exits non-zero unless every scenario matches. When a checkpoint diverges,
 compare the two engines' canonical JSON for that label (the `dump` binary on
 this side, `stateView` on the TypeScript side) to find the field.
 
-## Keeping the two engines together
+## Keeping the lock honest
 
-A simulation change lands in both engines in the same pull request, with the
-regenerated `conformance/expected.json` (see `conformance/README.md`). CI runs
+A simulation change lands in this crate, with the regenerated
+`conformance/expected.json` (see `conformance/README.md`). The TypeScript
+reference changes only when the shared lock, a parity test or the catalog
+digest needs it, and the PR says why. CI runs
 the referee on every change to `engine-rs/` or `conformance/`, the save
 fixtures in `conformance/fixtures/` included (`.github/workflows/engine-rs.yml`).
 

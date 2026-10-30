@@ -73,8 +73,12 @@ Verticopolis has **two test tiers**:
     regenerate the lock only on purpose, in the same PR. See
     [conformance/README.md](./conformance/README.md).
 
-    **Two engines, one simulation.** `engine-rs/` is a Rust port of
-    `src/engine/`, held to the same lock by its own referee
+    **One engine, with a TypeScript reference.** `engine-rs/` is the engine the
+    game runs (app 2.66.0, engine crate 1.0.0). It is a Rust port of
+    `src/engine/`, which the shipped game no longer runs: the TypeScript engine
+    stays only as the reference the conformance lock, the dual run and the
+    differential fuzzer compare against, until its code is deleted. The Rust
+    engine is held to the same lock by its own referee
     (`cargo run --release --features conformance --bin conformance`, and again through the WASM
     binding from Node with `npm run wasm:build && npm run test:wasm`, which
     also runs the dual run's day gate: both engines driven by the frame
@@ -84,18 +88,19 @@ Verticopolis has **two test tiers**:
     (`src/engine/port/tdtCodec.ts`). The same command runs the `.vctower`
     writer's test, `conformanceWasmVctower.integration.test.ts`, which writes
     every fixture with the engine and reads it back through the web game's
-    readers. The game runs on the WASM engine behind `?engine=wasm` (the
-    TypeScript engine stays the default). The served package
+    readers. Every deploy runs the WASM engine alone (the wasm-only build
+    below); dev serves and the test lanes still use the switchable build,
+    where `?engine=wasm` or the stored `vc.engine` choice picks it. The served package
     (`src/public/engine/`) is build output and is not checked in: build it
-    locally to use `?engine=wasm`, with `bash scripts/build-engine-wasm.sh`
+    locally to run the game, with `bash scripts/build-engine-wasm.sh`
     on x86_64 Linux (it installs the pinned toolchain) or `npm run wasm:build`
     once the toolchain in engine-rs/README.md is installed. `npm run e2e`
     needs it too, since its `chromium-wasm` project runs every spec on the
     WASM engine, and so does `npm run build`: its precache check
     (`scripts/verify-precache.ts`) refuses a build without the engine, so no
     build ships a silent TypeScript fallback. Without a Rust toolchain, run
-    `VC_ALLOW_NO_ENGINE=1 npm run build` for a deliberate TypeScript-only
-    build. A stale local build fails the unit test that checks its source
+    `VC_ALLOW_NO_ENGINE=1 npm run build` for a deliberate build without the
+    engine (it cannot run the game; it exists for tooling that never boots one). A stale local build fails the unit test that checks its source
     hash. CI restores it from the
     Actions cache, keyed on the engine's source hash, and builds it once per
     engine change (`.github/actions/engine-wasm`); Vercel builds it on every
@@ -107,16 +112,16 @@ Verticopolis has **two test tiers**:
     reads the emitted sourcemaps and fails when a TypeScript engine module
     that `scripts/engine-bundle.allow.txt` does not list ships, or when a
     listed one no longer does (delete its line: the list only shrinks). The
-    default build (`VC_ENGINE` unset, or `switchable`) keeps both engines;
+    default build (`VC_ENGINE` unset, or `switchable`) still carries both engines, for the test lanes and
+    dev serves, until the TypeScript code is deleted;
     like every player build, it no longer ships the dual-run worker, which
     only dev serves and `VC_TOOLING=1` builds use. `VC_ENGINE` applies to
     builds and dev serves only: with it exported, `npm test` refuses to start
     (the WASM test lanes use `VC_REQUIRE_WASM=1`). See
-    `docs/performance/wasm-only-bundle.md` for what still ships and why. Until the Rust engine is the default,
-    every simulation change lands in both engines in one PR with
-    the regenerated lock, and a PR that changes `src/engine/` without touching
-    `engine-rs/` says why (a UI readout, prose, a transient the hash never
-    sees). An engine PR that adds a branch adds a scenario that reaches it;
+    `docs/performance/wasm-only-bundle.md` for what still ships and why. A simulation change lands in the
+    Rust engine. The TypeScript engine changes only when the shared lock, a parity test or the
+    catalog digest needs it (for example the catalog size and price tables both engines read), and
+    the PR says why; no feature or fix is ported to it for its own sake. An engine PR that adds a branch adds a scenario that reaches it;
     the Rust job's coverage step (`cargo llvm-cov`, line floor in
     `engine-rs.yml`) is how review checks that, and the floor only moves up.
     The catalog every frontend reads (prices, sizes and build rules,
@@ -149,7 +154,7 @@ Verticopolis has **two test tiers**:
     through `sim.setup(draft => ...)`, which opens the save as a draft, edits
     it and loads it back, and works only before the first tick since a load.
     The same body runs on the Rust engine and on `TsEngine`, so the Rust
-    engine is the authority and the TypeScript fallback keeps its coverage.
+    engine is the authority and the TypeScript reference keeps its coverage.
     List a converted file in `src/tests/portKit/converted.txt` (a guard checks
     the list): the WASM parity projects then leave it out, and
     `npm run test:port` (part of `npm run test:wasm`) runs it with the Rust

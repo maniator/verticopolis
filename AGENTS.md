@@ -260,7 +260,9 @@ layers, and build cache. Left unattended it balloons the WSL data disk
 
 ## Gameplay model notes
 
-- Facilities are defined in `src/engine/facilities.ts`. Each has a `width` (in
+- Facilities are defined in the Rust catalog (`engine-rs/src/catalog.rs`, the
+  engine the game runs) and mirrored in `src/engine/facilities.ts` under one
+  catalog digest. Each has a `width` (in
   tiles) and optional `floors` (height in stories; e.g. the cinema is 2).
 - `basement: true` facilities (parking, recycling, metro) may only be built
   underground; the metro spans a whole basement floor.

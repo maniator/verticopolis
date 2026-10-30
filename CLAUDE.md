@@ -210,6 +210,13 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 
 ## Canon reference (don't re-derive from memory)
 
+- **The Rust engine is the only engine the shipped game runs** (app 2.66.0,
+  engine crate 1.0.0; every deploy is the wasm-only build). A simulation change
+  lands in `engine-rs/`. The TypeScript engine (`src/engine/`) is a reference
+  that stays until its code is deleted: touch it only when the shared
+  conformance lock, a parity test or the catalog digest needs it, and say why
+  in the PR. Do not port features or fixes to it, and do not add a runtime
+  import of it to frontend code.
 - **The engine crate version (`engine-rs/Cargo.toml`) goes up with the
   conformance lock, the save/frame layout/catalog/identity versions and the
   binding declaration `src/dualrun/engine.d.ts`.** Raise it in `Cargo.toml`,
@@ -220,7 +227,10 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 - **Per-tower build caps live in `src/engine/facilities.ts`** (`BUILD_CAPS`,
   `POOLED_CAPS`, `MAX_CARS`, `maxSpanFor`) and are enforced in one place,
   `Tower.capReason`. That file is the single source of truth; mirror the 1994
-  original there, not from recollection.
+  original there, not from recollection. The Rust catalog
+  (`engine-rs/src/catalog.rs`) carries the same tables, the engine the game
+  runs enforces them, and `conformance/catalog-digests.json` pins the two
+  together, so a changed cap moves the digest in both.
 - **Transport pooling matches the original and is deliberate:** all three
   elevator kinds (standard + service + express) share **one 24-shaft pool**, and
   express is **not** counted separately. Stairs + escalators share a separate
