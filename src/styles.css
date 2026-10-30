@@ -887,26 +887,6 @@ html.reduce-motion *::after {
   margin: 0;
   flex: none;
 }
-/* The Game engine choice (#1197): radios laid out like the switches. */
-.set-radio {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.set-radio input[type="radio"] {
-  accent-color: var(--accent);
-  width: 15px;
-  height: 15px;
-  margin: 0;
-  flex: none;
-}
-.set-engine-status {
-  margin: 4px 0 8px;
-  font-size: 12px;
-}
-.set-engine-status p {
-  margin: 4px 0;
-}
 /* Scoped under .set-row so the 12px wins over the broader .modal-box p rule. */
 .set-row .set-note {
   margin: 2px 0 0 23px;

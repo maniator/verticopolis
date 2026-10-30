@@ -236,23 +236,17 @@ and persistence, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ## Simulation engines
 
-The simulation runs on one of two engines that must produce the same tower:
+The game runs on the **Rust** engine (`engine-rs/`), compiled to WebAssembly,
+which it drives directly through `EnginePort`. Every deploy is the wasm-only
+build: there is no engine choice in Settings and no TypeScript fallback, and if
+the engine cannot start the game stops with a message. The version line in
+Settings and Help names the engine that is running.
 
-- **TypeScript** (`src/engine/`) is the default today.
-- **Rust** (`engine-rs/`), compiled to WebAssembly, which the game drives
-  directly through `EnginePort`. Add `?engine=wasm` to the address to run it for
-  one visit. If the Rust engine fails to load, the game falls back to TypeScript.
-- **Settings** has a *Game engine* choice, saved for the next start: *Automatic
-  (recommended)*, *Rust engine (experimental)* or *TypeScript engine (stable)*.
-  Choosing *Rust engine (experimental)* starts Rust at the next launch, as the
-  `?engine=wasm` link does for one visit. *Automatic* and *TypeScript engine
-  (stable)* start TypeScript. The Settings panel and the version line show which
-  engine is running.
-
-Version 3.0 is in development and is not released. The plan makes Rust the
-default engine while keeping TypeScript selectable. TypeScript would be removed
-in a later 3.x release. During the cutover the game moves onto one synchronous
-numeric interface, `EnginePort`, that the Rust engine implements directly; see
+The old **TypeScript** engine (`src/engine/`) is still in the repository, as the
+reference the conformance lock and the tests compare the Rust engine against, and
+because the interface still reads some of its data. It is not run by the shipped
+game and will be deleted in a later release. During the cutover the game moved
+onto one synchronous numeric interface, `EnginePort`; see
 [ARCHITECTURE.md](ARCHITECTURE.md#the-engine-port-the-cutover-in-progress) for
 the design and [CONTRIBUTING.md](CONTRIBUTING.md) for building the engine
 package (`npm run wasm:build`).

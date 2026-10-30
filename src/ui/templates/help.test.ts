@@ -87,10 +87,11 @@ describe("helpTemplate structure and a11y", () => {
     expect(text).toContain("whether you started playing, and a short code if the engine stopped.");
   });
 
-  it("says Automatic follows the engine test and an engine change waits for a restart", () => {
+  it("tells players what happens if the game engine stops, and offers no engine choice", () => {
     const text = HELP_SECTIONS.map((s) => renderToFragment(s.body()).textContent ?? "").join(" ").replace(/\s+/g, " ");
-    expect(text).toContain("leave it on Automatic, which follows any engine test you are part of.");
-    expect(text).toContain("A change takes effect the next time the game starts.");
+    expect(text).toContain("If the game engine crashes, the game reloads your tower from its last autosave.");
+    expect(text).toContain("Your saves stay on your device, and Reload tries again.");
+    expect(text).not.toContain("Game engine");
   });
 
   // Drift guard. Every member of the GameRules seam is mapped either to a DISTINCT
