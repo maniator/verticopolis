@@ -106,6 +106,27 @@ describe("facadeGeometry → crane anchor (integration)", () => {
   });
 });
 
+describe("facadeGeometry and the wedding hall's garden crown", () => {
+  // The Rust catalog the game draws from has the hall five stories tall (floors
+  // 100 to 104); the TypeScript table keeps it at one.
+  const withTallHall = {
+    ...MODERN,
+    facilities: MODERN.facilities.map((f) => (f.key === "weddingHall" ? { ...f, floors: 5 } : f)),
+  };
+
+  it("dresses the hall's ground story but leaves its garden stories bare", () => {
+    const units = [...tiles(100, 144, 268), ...tiles(100, 192, 192, "weddingHall", 28)];
+    const { edges } = facadeGeometry(units, 104, withTallHall);
+    expect(edges.get(100)).toEqual({ min: 144, max: 269 });
+    for (const f of [101, 102, 103, 104]) expect(edges.has(f)).toBe(false);
+  });
+
+  it("gives the crane no tiles on a tower topped by the hall", () => {
+    const units = [...tiles(100, 144, 268), ...tiles(100, 192, 192, "weddingHall", 28)];
+    expect(facadeGeometry(units, 104, withTallHall).topTiles.size).toBe(0);
+  });
+});
+
 /** Inclusive integer range [lo, hi]. */
 function range(lo: number, hi: number): number[] {
   const out: number[] = [];
