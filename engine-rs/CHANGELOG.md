@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.1.1 (2026-10-30)
+
+- An elevator car the schedule has stood down takes no new riders: a person waiting at a floor does not board a parked car, which never left its home floor. A stood-down car that still has riders aboard keeps running to their floors, answers no hall calls and takes nobody new, then parks when the cab is empty. This moves `expected.json` for `amenities-modern`, `fixture-split-tower-4` and `offshift-schedule-modern`. The TypeScript reference engine carries the same rule so the shared lock holds for both.
+
 ## 1.1.0 (2026-10-30)
 
 - The wedding hall is 28 wide and 5 floors tall in both modes, anchored on floor 100 and rising through floor 104 (`WEDDING_HALL_TOP_FLOOR`, `Kind::highest_story`). Nothing is built above floor 100 but the hall. Saves that hold the old 16 wide hall widen it on load, with no save version change.

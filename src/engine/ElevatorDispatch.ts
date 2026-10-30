@@ -20,6 +20,9 @@ export const CAR_FLOORS_PER_MINUTE = 0.8;
 /** How long a car pauses at a stop to load/unload, in game-minutes. */
 const DWELL_MINUTES = 0.8;
 
+/** The hall calls a stood-down car answers: none. */
+const NO_CALLS: ReadonlySet<number> = new Set<number>();
+
 /**
  * Demand-driven elevator dispatch — a simplified SCAN controller, lifted out of
  * {@link Simulation} so the lift logic can be tested on its own. It owns two
@@ -37,6 +40,10 @@ export class ElevatorDispatch {
    *  floor to boarded count. Pure counting of boardings the SCAN loop already
    *  computes; never serialized, never read back into behavior. */
   private boardTally = new Map<number, Map<number, number>>();
+  /** The cars the schedule has stood down, keyed `shaftId:carIndex` as
+   *  {@link Crowd.carRiders} is. Rebuilt by every {@link moveCars}; the crowd
+   *  boards nobody into a car in it. Never serialized. */
+  readonly closedCars = new Set<string>();
 
   /** Hand over and clear the boarding tally (the hourly origin sampler's feed).
    *  Returned read-only so a consumer can drain and read but never mutate the
@@ -93,6 +100,7 @@ export class ElevatorDispatch {
    *  lobby exactly as before (elevator-scheduling #305 Phase 2). */
   moveCars(tower: Tower, dt: number, crowdCalls?: ElevatorCalls, clock?: DispatchClock): void {
     const demand = this.waiting;
+    this.closedCars.clear();
     // Idle cars rest at the lowest LOBBY the shaft serves (the ground/sky lobby),
     // not merely its lowest stop — review F27.
     const lobbySet = new Set(tower.lobbyFloors());
@@ -152,7 +160,12 @@ export class ElevatorDispatch {
         // Off shift this hour (a scheduled active-car count below the fleet size):
         // the car carries nobody, answers nothing, and drifts home to park. It is
         // skipped before the call scan, so it claims no floor and accrues no load.
-        if (i >= activeCount) {
+        const standingDown = i >= activeCount;
+        if (standingDown) this.closedCars.add(`${t.id}:${i}`);
+        // A stood-down car takes no new riders and answers no hall calls, but
+        // still takes the riders aboard to their floors; it parks once the cab
+        // is empty.
+        if (standingDown && !cabs?.get(i)?.size) {
           t.carLoad[i] = 0;
           dwell[i] = 0;
           const cur = t.carPositions[i];
@@ -204,11 +217,12 @@ export class ElevatorDispatch {
         // Infinity for a moving car or an unscheduled shaft, so the gate is inert and
         // an unscheduled shaft answers exactly as before.
         const reach = wasParked && response !== undefined ? Math.max(0, span - response) : Infinity;
-        let target = this.nextDemandStop(stops, pos, dir, calls, claimed, cab);
+        const heard = standingDown ? NO_CALLS : calls;
+        let target = this.nextDemandStop(stops, pos, dir, heard, claimed, cab);
         if (target !== null && !cab?.has(target) && Math.abs(target - pos) > reach) target = null;
         if (target === null) {
           dir = -dir; // nothing ahead (or a far call held per response), so turn around
-          target = this.nextDemandStop(stops, pos, dir, calls, claimed, cab);
+          target = this.nextDemandStop(stops, pos, dir, heard, claimed, cab);
           if (target !== null && !cab?.has(target) && Math.abs(target - pos) > reach) target = null;
         }
         if (target !== null) claimed.add(target); // reserve this call for this car
@@ -231,7 +245,7 @@ export class ElevatorDispatch {
           // statistical tenant queue never boards a service car.
           t.carLoad[i] = Math.max(0, t.carLoad[i] - Math.ceil(t.carLoad[i] * 0.45));
           const w = staffOnly ? (hall?.get(target) ?? 0) : (demand.get(target) ?? 0);
-          const board = Math.max(0, Math.min(cap - t.carLoad[i], w));
+          const board = standingDown ? 0 : Math.max(0, Math.min(cap - t.carLoad[i], w));
           if (board > 0) {
             t.carLoad[i] += board;
             if (!staffOnly) demand.set(target, Math.max(0, w - board));
@@ -301,7 +315,7 @@ export class ElevatorDispatch {
     stops: number[],
     pos: number,
     dir: number,
-    calls: Set<number>,
+    calls: ReadonlySet<number>,
     claimed?: Set<number>,
     cab?: ReadonlySet<number>,
   ): number | null {

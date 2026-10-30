@@ -80,6 +80,7 @@ export function advanceStep(sim: Simulation, dtMinutes: number): void {
     // row and hour (active-car count, home floors, dwell, response). An unscheduled
     // shaft ignores it, so this changes nothing until a schedule exists (#305 Phase 2).
     sim.elevators.moveCars(sim.tower, chunk, sim.crowd.elevatorCalls(sim.tower), sim.clock);
+    sim.crowd.closedCars = sim.elevators.closedCars;
     sim.crowd.advance(chunk * CROWD_SECONDS_PER_MINUTE, sim.tower);
     left -= chunk;
   }
