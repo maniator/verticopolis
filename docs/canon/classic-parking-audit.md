@@ -6,9 +6,25 @@ Windows SimTower 1.1B is the canonical game. Macintosh claims are labeled and ke
 
 ## The claim under test
 
-A player post on r/SimTower reports that Classic hotel suites can turn red while the garage looks big enough, because each guest may be given a stall they cannot walk from. The post also suggests the stall is picked at random (so a tower can run for years and then fail), that the damage may persist, and that offices behave differently.
+**Source:** u/AskPizza, "Hotel Suites and Parking", r/SimTower, posted 2026-10-30: <https://www.reddit.com/r/SimTower/comments/1xj65d0/hotel_suites_and_parking/>. The thread was supplied by the owner, who read it on Reddit. Reddit blocks the cloud sandbox this audit ran in, so nobody on this side has fetched the page, and what follows is an own-words summary of what the owner reported, not a quotation. The post's exact wording, its screenshots (if any) and any comments beyond the one below are not in this record. Which game the author plays is not stated in what we have: a commenter asked whether it is the original SimTower or Yoot Tower, and no answer was visible. So the post is not yet evidence about Windows 1.1B at all.
 
-**The thread itself has not been read.** Reddit blocks the cloud sandbox this audit ran in, so the post, its comments and the author's wording are not in this record. Every statement about what the post says comes from the relayed summary and is graded unverified until someone pastes the thread.
+The account is split in two on purpose. The first part is what the author says they saw. The second is what they think explains it. The audit treats the first as a lead and the second as a set of hypotheses.
+
+**What the author reports seeing (player-observed, unverified by us):**
+
+- Hotel suites sometimes turn red and stay red while total parking capacity looks adequate.
+- The failures look unpredictable and can show up years into a tower's life.
+- Their workaround is to put suites near the ground lobby, with a dedicated express elevator that serves every parking floor. The post does not say how well it worked.
+- The author's own rough estimate is about one parking space per four offices.
+
+**What the author infers (the author's mechanism, not observed):**
+
+- Each suite guest is given a random space somewhere in the garage.
+- That space needs a usable transport route to the guest's suite.
+- A guest given an unreachable space can make the suite's evaluation collapse, and repeated arrivals make the failures look random.
+- Offices do not suffer the same route-dependent penalty.
+
+None of these inferences has support in our reference set (see P5), and none is marked verified here. The one-space-per-four-offices figure agrees with the 24 workers per space our engine uses if an office holds 6 workers, but it is a second unsourced estimate, so it does not confirm P9.
 
 ## Confidence scale
 
@@ -55,11 +71,13 @@ The TypeScript reference in `src/engine/` has the same parking logic, function f
 
 | # | Finding | Status | Confidence |
 |---|---|---|---|
-| P1 | Ours has no per-guest stall, so the post's failure cannot occur. Ours errs optimistic. | Engine fact | High |
+| P1 | Ours has no per-guest stall, so the mechanism the author describes cannot occur. Ours errs optimistic. | Engine fact | High |
 | P2 | A ramp-chained garage counts as working with no transport to its floors. | Engine fact; Classic rule unknown (H2) | High (engine), Low (canon) |
 | P3 | Suite demand counts built suites. MAN says occupied ones. PC guides say one per suite. | Source conflict (H5) | Medium |
 | P4 | WIKI and KZ tie office parking to evaluation. Ours cuts move-in only. | Likely gap (H6) | Medium |
-| P5 | Random assignment and persistent damage have no support in our reference set. | Unverified (H3, H4, H7) | None |
+| P5 | Random assignment, a per-space route requirement and lasting evaluation damage are the author's inferences (r/SimTower, 2026-10-30). Nothing in our reference set supports them, and the post does not say which game it is about. | Unverified (H3, H4, H7) | None |
+| P5a | Suites turning red with adequate total parking, unpredictably and late in a tower's life, is a player report with no save or screenshot in our hands. | Community-observed, unverified | Low |
+| P5b | Suites near the lobby with an express serving every parking floor is the author's workaround. | Community-observed, untested | Low |
 | P6 | The original keeps a value per stall in its saves. What it is, is not known. | Unknown | Low |
 | P7 | Our ramp flood matches the game's connected-stall list on eight of nine saves; TOWER7 differs by four stalls. | Lead (H1b) | Medium |
 | P8 | Our loader removes the basement stops the file's express shafts carry. This alone makes TOWER7, TOWER1 and MYTOWER look like they have unserved parking floors. | Defect in the loader (H8) | High |
@@ -126,9 +144,13 @@ An earlier version of this audit called TOWER1 "agreement" without saying why 63
 
 TOWER7 is a real difference. On file floor 5 (our B4) the row has stalls at x 130 to 138, then 141 to 149, then the ramp at 150, so there is a 3-tile and a 1-tile gap. The game still counts all four as connected, and ours does not. Either the game's list went stale after the player moved stalls, or its connection test tolerates small gaps (H1b). The manual says each space must connect to an adjacent one, which favors the stale list, but a stale list in a shipped save is a guess. Experiment E10 tests gaps directly. Until then our strict touching rule stays.
 
-## What the post may be describing, in our terms
+## The author's mechanism, in our terms
 
-If the original assigns each guest a stall and routes them stall to suite, a suite could fail when its guest draws a stall on a floor the transport does not serve, even though the stall count is fine. That is a hypothesis built from a summary. The sources do not confirm per-guest assignment, randomness or lasting damage, and the per-stall bytes do not either. Treat the whole chain as unverified.
+If the original assigns each guest a stall and routes them stall to suite, a suite could fail when its guest draws a stall on a floor the transport does not serve, even though the stall count is fine. That is the author's inference, restated. The sources do not confirm per-guest assignment, randomness or lasting damage, and the per-stall bytes do not either. Treat the whole chain as unverified.
+
+Two things to keep apart when reading it. The symptom (red suites with enough stalls) could have causes the author did not consider, such as H5 (demand counted differently) or H2 (the garage floor is not served) with no per-guest stall at all. And the workaround (a dedicated express to every parking floor) would help under H2 or H8 as well as under the author's theory, so its working would not distinguish them. E2 and E3 are built to tell these apart.
+
+No gameplay rule changes on the strength of the post. A rule changes only when Windows 1.1B shows it in a PC run with the save or screenshot kept in the project files (PK1 to PK10).
 
 ## Tests to write before any rule changes
 
@@ -178,9 +200,9 @@ Each step needs: a reviewed proposal, deterministic tests for the changed rule a
 
 ## Recommended next steps
 
-1. The owner pastes the Reddit thread, and P5 is re-graded.
-2. The Classic rules thread folds E1 to E10 into its combined PC spec, and the PC thread runs them once the owner agrees.
+1. Ask the author, through the owner, which game they play and for a save or screenshot of a red suite with its garage, if they are willing. Nothing is posted from this repo.
+2. The Classic rules thread holds E1 to E10 as PK1 to PK10 in its combined PC spec, and the PC thread runs them (the owner approved the run on 2026-10-30).
 3. Land T1 to T10 as characterization tests once the evidence is in.
-4. Decide step 1 (express basement stops) on its own merits, since it is a loader defect whatever parking turns out to need.
+4. Decide step 1 (express basement stops, #1532) on its own merits. It is a loader defect shown by the file's own express stops on three of the nine saves, and it does not depend on the Reddit theory. Keep it out of any speculative parking change.
 
 Nothing here touches the 3.0 release gates.
