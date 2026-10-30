@@ -5,7 +5,8 @@ import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import { PortRenderSim } from "../simport/portRenderSim";
 import type { SimView } from "../simport/view";
-import type { ViewReader } from "../simport/viewReader";
+import { bindViewKinds, facilityFloors } from "../presentation/viewKinds";
+import { ViewReader } from "../simport/viewReader";
 
 /**
  * What the game's callers read through the engine port to price and preview a
@@ -49,6 +50,14 @@ export function quoteShaft(
  *  tables. The engine is only a key here, never asked a question. */
 export function catalogOf(app: { readonly enginePort: object; readonly reader: Pick<SimView, "header"> }): Catalog {
   return catalogOn(app.enginePort, app.reader.header.mode);
+}
+
+/** The reader of `port`'s frame. It asks each kind's height on its first update,
+ *  before the scene is built, so the view's kind facts are bound first (both
+ *  modes' catalogs state the same facts). */
+export function newViewReader(port: EnginePort): ViewReader {
+  bindViewKinds(catalogOn(port, "modern"));
+  return new ViewReader(port, facilityFloors);
 }
 
 /** What the renderer draws for `port`: the render sim reads its catalog from the
