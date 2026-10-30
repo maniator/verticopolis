@@ -287,9 +287,9 @@ describe("F25 / F27 / F36 — smaller review sweep", () => {
     expect(room.state).toBe("empty"); // gave up due to poor access (hotels churn now)
   });
 
-  it("F36: a hotel suite houses 3 (canon), more than a double", () => {
-    expect(FACILITIES.hotelSuite.population).toBe(3);
-    expect(FACILITIES.hotelSuite.population).toBeGreaterThan(FACILITIES.hotelDouble.population);
+  it("F36: a hotel suite houses 2, the same as a double (the finance block of every real save)", () => {
+    expect(FACILITIES.hotelSuite.population).toBe(2);
+    expect(FACILITIES.hotelSuite.population).toBe(FACILITIES.hotelDouble.population);
   });
 
   it("F27: idle cars rest at the shaft's lobby floor", () => {
