@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { catalogFor } from "../../engine/catalog";
+import { catalogLockView } from "../../engine/catalogLockView";
 import { digest } from "../conformance/canonical";
 import { REPO_ROOT } from "../conformance/scenario";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
@@ -22,7 +23,7 @@ describe.skipIf(!hasWasmPackage())("engine package surface", () => {
     const mod = wasm();
     expect(typeof mod.catalog).toBe("function");
     for (const mode of ["classic", "modern"] as const) {
-      expect(digest(JSON.parse(mod.catalog!(mode)))).toBe(digest(catalogFor(mode)));
+      expect(digest(catalogLockView(JSON.parse(mod.catalog!(mode))))).toBe(digest(catalogLockView(catalogFor(mode))));
     }
     const proto = mod.Engine.prototype as unknown as Record<string, unknown>;
     expect(typeof proto.towerSetCars).toBe("function");

@@ -151,7 +151,7 @@ export const FACILITY_PRESENTATION: Readonly<Record<FacilityKind, FacilityPresen
   },
   weddingHall: {
     color: "#f3ecdc",
-    description: "A grand wedding & events hall atop a 5-star tower (floor 100). Triggers the final TOWER evaluation.",
+    description: "A grand wedding hall atop a 5-star tower: 28 tiles wide and five floors tall, standing on floor 100. Triggers the final TOWER evaluation.",
   },
   rentalStudio: {
     color: "#86c5a8",

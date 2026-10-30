@@ -37,6 +37,10 @@ use crate::facilities::{
 };
 use crate::sim::STARTING_MONEY;
 
+mod lock;
+
+pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
+
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
 pub const CATALOG_VERSION: u32 = 2;
@@ -472,9 +476,10 @@ pub fn catalog_json(mode: GameMode) -> String {
 }
 
 /// The canonical hash of the catalog for `mode`, as
-/// `conformance/catalog-digests.json` records it.
+/// `conformance/catalog-digests.json` records it: the lock view, so the
+/// exempt footprints do not move it.
 pub fn catalog_digest(mode: GameMode) -> String {
-    digest(&catalog_value(mode))
+    digest(&lock_view(&catalog_value(mode)))
 }
 
 #[cfg(test)]

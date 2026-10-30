@@ -47,7 +47,7 @@ pub(super) fn drop_overlapping_units(units: &mut Vec<Unit>, ids: &mut Vec<Option
     // `dropOverlappingUnits` keeps one row per floor in a map. A unit's floor
     // and span are clamped to the lot when it is read.
     let lot = LOT as usize;
-    let grid = || vec![0u8; (MAX_FLOOR - MIN_FLOOR + 1) as usize * lot];
+    let grid = || vec![0u8; (WEDDING_HALL_TOP_FLOOR - MIN_FLOOR + 1) as usize * lot];
     let (mut claimed_structure, mut claimed_rooms) = (grid(), grid());
     let tile = |f: i64, i: i64| (f - MIN_FLOOR) as usize * lot + i as usize;
     let mut keep = Vec::with_capacity(units.len());
@@ -59,7 +59,10 @@ pub(super) fn drop_overlapping_units(units: &mut Vec<Unit>, ids: &mut Vec<Option
         };
         let floors = u.floor..u.floor + u.kind.floors();
         debug_assert!(
-            u.floor >= MIN_FLOOR && floors.end - 1 <= MAX_FLOOR && u.x >= 0 && u.x + u.width <= LOT,
+            u.floor >= MIN_FLOOR
+                && floors.end - 1 <= u.kind.highest_story()
+                && u.x >= 0
+                && u.x + u.width <= LOT,
             "a unit off the lot: {u:?}"
         );
         let free = floors
@@ -79,4 +82,48 @@ pub(super) fn drop_overlapping_units(units: &mut Vec<Unit>, ids: &mut Vec<Option
     units.retain(|_| *kept.next().unwrap());
     let mut kept = keep.iter();
     ids.retain(|_| *kept.next().unwrap());
+}
+
+/// A wedding hall saved before it grew to the catalog width stood 16 wide on
+/// floor 100. Widen the first one to the catalog width on that floor, into the
+/// free, floored ground nearest where it stood, so an old tower's hall is a
+/// whole wedding hall. A hall with no room to grow stays as it was: nothing is
+/// dropped, and the pass changes nothing on a save that already holds a full
+/// width hall. Its upper stories stand above floor 100, where no other room can.
+pub(super) fn widen_legacy_wedding_hall(units: &mut [Unit]) {
+    let catalog_width = Kind::WeddingHall.facility().width;
+    let Some(idx) = units
+        .iter()
+        .position(|u| u.kind == Kind::WeddingHall && u.width < catalog_width)
+    else {
+        return;
+    };
+    let lot = LOT as usize;
+    let mut taken = vec![false; lot];
+    let mut floored = vec![false; lot];
+    for (i, u) in units.iter().enumerate() {
+        let (from, to) = (
+            u.x.max(0) as usize,
+            ((u.x + u.width).max(0) as usize).min(lot),
+        );
+        if u.kind.is_structural() {
+            if u.floor == MAX_FLOOR {
+                floored[from..to].fill(true);
+            }
+        } else if i != idx && (u.floor..u.floor + u.kind.floors()).contains(&MAX_FLOOR) {
+            taken[from..to].fill(true);
+        }
+    }
+    let hall = &units[idx];
+    let wanted = (hall.x + hall.width / 2 - catalog_width / 2).clamp(0, LOT - catalog_width);
+    let fits = |x: i64| (x..x + catalog_width).all(|c| !taken[c as usize] && floored[c as usize]);
+    let found = (0..LOT).find_map(|d| {
+        [wanted - d, wanted + d]
+            .into_iter()
+            .find(|&x| x >= 0 && x + catalog_width <= LOT && fits(x))
+    });
+    if let Some(x) = found {
+        units[idx].x = x;
+        units[idx].width = catalog_width;
+    }
 }

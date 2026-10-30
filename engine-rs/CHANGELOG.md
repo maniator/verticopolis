@@ -15,6 +15,13 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.1.0 (2026-10-30)
+
+- The wedding hall is 28 wide and 5 floors tall in both modes, anchored on floor 100 and rising through floor 104 (`WEDDING_HALL_TOP_FLOOR`, `Kind::highest_story`). Nothing is built above floor 100 but the hall. Saves that hold the old 16 wide hall widen it on load, with no save version change.
+- Classic: the wedding hall cannot be sold or bulldozed (`GameMode::room_is_permanent` now lists it, with `CLASSIC_WEDDING_HALL_KEPT` as its refusal), and floor 100 takes only the hall. The reservation is checked after the shared refusals, so the TypeScript reasons still win where both engines refuse.
+- The catalog lock hashes a view of the catalog with the hall's `width` and `floors` left out, on both sides, so the TypeScript table keeps its 16 by 1 hall. `catalog_json` still reports the real footprint. The digest is regenerated.
+- `.TDT`: the cathedral's five parts (types 36 to 40) now read and write upward from floor 100 (rows 109 to 113), bottom part first; the importer keys a hall off its lowest part floor and the exporter allows the hall up to row 113.
+
 ## 1.0.4 (2026-10-30)
 
 - Security, medical, housekeeping and recycling build at SimTower's widths (16, 26, 15 and 25 tiles), and the metro station is 30 tiles wide with a full-width tunnel row. This moves the catalog digest and the conformance checkpoints.

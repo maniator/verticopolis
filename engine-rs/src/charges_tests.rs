@@ -309,10 +309,12 @@ fn remove_facility_refusals() {
 #[test]
 fn remove_facility_cancels_the_vip_with_the_last_wedding_hall() {
     let (mut sim, _, _, _) = fixture();
+    // Classic never removes the wedding hall (`wedding_hall_tests.rs`), so this is Modern.
+    sim.mode = GameMode::Modern;
     sim.star = 5;
     sim.money = 10_000_000.0;
     for fl in 5..=GRID_MAX_FLOOR {
-        for x in 10..26 {
+        for x in 10..38 {
             assert!(sim.tower.place(Kind::Floor, fl, x).ok);
         }
     }

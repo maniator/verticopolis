@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { catalogFor } from "../../engine/catalog";
+import { catalogLockView, LOCK_FOOTPRINT_EXEMPT } from "../../engine/catalogLockView";
 import { ALL_KINDS } from "../../engine/facilities";
 import type { GameMode } from "../../engine/types";
 import { digest } from "../conformance/canonical";
@@ -26,13 +27,27 @@ const MODES: readonly GameMode[] = ["classic", "modern"];
 
 describe("catalog lock", () => {
   it("pins each mode's catalog in conformance/catalog-digests.json", () => {
-    const got = Object.fromEntries(MODES.map((mode) => [mode, digest(catalogFor(mode))]));
+    const got = Object.fromEntries(MODES.map((mode) => [mode, digest(catalogLockView(catalogFor(mode)))]));
     if (UPDATE) {
       writeFileSync(LOCK, `${JSON.stringify({ catalogs: got }, null, 2)}\n`);
       return;
     }
     const lock = JSON.parse(readFileSync(LOCK, "utf8")) as { catalogs: Record<string, string> };
     expect(got).toEqual(lock.catalogs);
+  });
+
+  // The lock leaves out the wedding hall's footprint and nothing else: the Rust
+  // engine builds the cathedral, this one keeps the one story hall.
+  it("leaves out only the exempt kinds' width and floors", () => {
+    expect(LOCK_FOOTPRINT_EXEMPT).toEqual(["weddingHall"]);
+    for (const mode of MODES) {
+      const real = catalogFor(mode).facilities;
+      const view = (catalogLockView(catalogFor(mode)) as { facilities: Record<string, unknown>[] }).facilities;
+      view.forEach((entry, i) => {
+        const exempt = LOCK_FOOTPRINT_EXEMPT.includes(real[i].key);
+        expect(entry).toEqual(exempt ? { ...real[i], width: null, floors: null } : real[i]);
+      });
+    }
   });
 
   // The Rust side serializes every field, `null` included, so a value the

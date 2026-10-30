@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { catalogFor } from "../../engine/catalog";
+import { catalogLockView } from "../../engine/catalogLockView";
 import { CATALOG_VERSION } from "../../engine/catalogTypes";
 import type { WasmModule } from "../../dualrun/binding";
 import { attachMirror } from "../../dualrun/mirror";
@@ -49,9 +50,12 @@ describe.skipIf(!hasWasmPackage())("a hosted tower reads the engine's catalog (#
         expect(built()).toBe(1);
         // Both modes are read once, at attach, before an engine is built.
         expect([...asked].sort()).toEqual(["classic", "modern"]);
-        expect(towerCatalog(sim)).toEqual(catalogFor(mode));
+        // The engine's catalog agrees with the tables everywhere but the wedding
+        // hall's footprint, which the lock leaves out: the Rust hall is the cathedral.
+        expect(catalogLockView(towerCatalog(sim))).toEqual(catalogLockView(catalogFor(mode)));
+        expect(towerCatalog(sim).facilities.find((f) => f.key === "weddingHall")).toMatchObject({ width: 28, floors: 5 });
         const other = mode === "classic" ? "modern" : "classic";
-        expect(towerCatalog(sim, other)).toEqual(catalogFor(other));
+        expect(catalogLockView(towerCatalog(sim, other))).toEqual(catalogLockView(catalogFor(other)));
         expect(towerCatalog(sim, other)).toBe(towerCatalog(sim, other));
         expect(asked).toHaveLength(2);
       } finally {
