@@ -5,6 +5,7 @@ use crate::clock::GameMode;
 use crate::economy::{
     CONDO_MONTHLY_TAX_RATE, OVERHEAD_PER_LEASABLE_UNIT_MONTHLY, REAL_WORLD_QUARTER_DAYS,
 };
+use crate::facilities::Kind;
 use crate::services::{EXTERMINATOR_CALLOUT_FEE, EXTERMINATOR_PER_ROOM_FEE};
 
 #[derive(Clone, Copy, Debug)]
@@ -104,10 +105,15 @@ impl GameMode {
         self == GameMode::Classic
     }
 
-    /// Whether a placed housekeeping room stays for good: SimTower gives the
-    /// player no way to delete one. Modern lets it be sold like other rooms.
-    pub fn housekeeping_is_permanent(self) -> bool {
+    /// Whether a placed room of `kind` stays for good: SimTower gives the
+    /// player no way to delete housekeeping, security, recycling or the movie
+    /// theater. Modern lets them be sold like other rooms.
+    pub fn room_is_permanent(self, kind: Kind) -> bool {
         self == GameMode::Classic
+            && matches!(
+                kind,
+                Kind::Housekeeping | Kind::Security | Kind::Recycling | Kind::Cinema
+            )
     }
 
     pub fn walkway_willingness_applies(self) -> bool {

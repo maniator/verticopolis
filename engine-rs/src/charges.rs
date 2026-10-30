@@ -30,6 +30,22 @@ pub const LAST_CAR: &str = "An elevator needs at least one car.";
 pub const FACILITY_GONE: &str = "That facility is gone.";
 pub const HOUSEKEEPING_PERMANENT: &str =
     "Housekeeping rooms are permanent. The 1994 game does not let you remove them.";
+pub const SECURITY_PERMANENT: &str =
+    "Security offices are permanent. The 1994 game does not let you remove them.";
+pub const RECYCLING_PERMANENT: &str =
+    "Recycling centers are permanent. The 1994 game does not let you remove them.";
+pub const CINEMA_PERMANENT: &str =
+    "Movie theaters are permanent. The 1994 game does not let you remove them.";
+
+/// The refusal for a Classic room `GameMode::room_is_permanent` keeps.
+fn permanent_room_refusal(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Security => SECURITY_PERMANENT,
+        Kind::Recycling => RECYCLING_PERMANENT,
+        Kind::Cinema => CINEMA_PERMANENT,
+        _ => HOUSEKEEPING_PERMANENT,
+    }
+}
 /// `INVALID_REQUEST`: the one refusal for a malformed command (#923), an id or
 /// floor that is not a whole number, or an unknown `end` or `method`.
 /// The typed engine API takes `i64` ids and floors and parsed enums, so it
@@ -310,11 +326,8 @@ impl Simulation {
                 return ChargeResult::refuse(reason);
             }
             // A burned-out shell can still be cleared, so the tile is not lost.
-            if kind == Kind::Housekeeping
-                && state != UnitState::Gutted
-                && self.mode.housekeeping_is_permanent()
-            {
-                return ChargeResult::refuse(HOUSEKEEPING_PERMANENT);
+            if state != UnitState::Gutted && self.mode.room_is_permanent(kind) {
+                return ChargeResult::refuse(permanent_room_refusal(kind));
             }
             self.tower.remove_unit(id);
             let refund = if state == UnitState::Gutted {
