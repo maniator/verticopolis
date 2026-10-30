@@ -78,6 +78,7 @@ impl Simulation {
             let (hour, weekend) = (self.clock.hour(), self.clock.is_weekend());
             self.elevators
                 .move_cars(&mut self.tower, chunk, &calls, hour, weekend);
+            self.elevators.swap_closed_cars(&mut self.crowd.closed_cars);
             motion::advance(
                 &mut self.crowd,
                 chunk * CROWD_SECONDS_PER_MINUTE,

@@ -143,6 +143,9 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
                     continue;
                 }
                 let key = (shaft.id, ci as i64);
+                if crowd.closed_cars.binary_search(&key).is_ok() {
+                    continue;
+                }
                 let n = crowd.car_riders.get(&key).copied().unwrap_or(0);
                 if n >= CAR_CAPACITY {
                     continue;

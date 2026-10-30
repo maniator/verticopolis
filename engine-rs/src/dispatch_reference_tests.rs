@@ -108,7 +108,11 @@ impl Reference {
             let mut claimed: HashSet<i64> = HashSet::new();
             for i in 0..cars {
                 let home = Schedule::home_floor_for(sched.as_ref(), i, idle).clamp(t.bottom, t.top);
-                if i >= active {
+                let stood_down = i >= active;
+                let riders_aboard = cabs
+                    .and_then(|c| c.get(&(i as i64)))
+                    .is_some_and(|c| !c.is_empty());
+                if stood_down && !riders_aboard {
                     car_load[i] = 0.0;
                     dwell[i] = 0.0;
                     let (cur, home) = (t.car_positions[i], home as f64);
@@ -156,10 +160,12 @@ impl Reference {
                     }
                     other => other,
                 };
-                let mut target = held(ref_next(&stops, pos, dir, &call_set, &claimed, cab));
+                let no_calls = HashSet::new();
+                let calls = if stood_down { &no_calls } else { &call_set };
+                let mut target = held(ref_next(&stops, pos, dir, calls, &claimed, cab));
                 if target.is_none() {
                     dir = -dir;
-                    target = held(ref_next(&stops, pos, dir, &call_set, &claimed, cab));
+                    target = held(ref_next(&stops, pos, dir, calls, &claimed, cab));
                 }
                 if let Some(tg) = target {
                     claimed.insert(tg);
@@ -185,7 +191,11 @@ impl Reference {
                     } else {
                         self.waiting.get(&tf).copied().unwrap_or(0.0)
                     };
-                    let board = (cap - car_load[i]).min(w).max(0.0);
+                    let board = if stood_down {
+                        0.0
+                    } else {
+                        (cap - car_load[i]).min(w).max(0.0)
+                    };
                     if board > 0.0 {
                         car_load[i] += board;
                         if !staff_only {
