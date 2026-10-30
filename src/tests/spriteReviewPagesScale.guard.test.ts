@@ -53,6 +53,14 @@ vi.mock("../render/sprites", () => ({
 // Neither belongs in a unit run.
 vi.mock("../telemetry", () => ({ injectVercelTelemetry: () => {} }));
 vi.mock("../analytics", () => ({ trackAppAction: () => {} }));
+// The gallery reads the Rust engine's catalog before it draws. This run has no
+// engine package, so the read answers with the TypeScript tables' catalog, which
+// holds the same kinds; what the page does with it is what these guards watch.
+vi.mock("../wasmhost/rustEngine", () => ({ loadWasmEngine: async () => ({}) }));
+vi.mock("../dualrun/catalog", async () => {
+  const { catalogFor } = await import("../engine/catalog");
+  return { readCatalog: (_mod: unknown, mode: "classic" | "modern") => catalogFor(mode) };
+});
 
 /** The world's floor pitch, in tiles. Both pages must reproduce this whatever
  *  they magnify or shrink by. */
@@ -105,6 +113,8 @@ beforeAll(async () => {
   removeListeners.push(await importRemovingWindowListeners(() => import("../preview")));
   rec.page = "gallery";
   removeListeners.push(await importRemovingWindowListeners(() => import("../gallery")));
+  // The gallery draws its first frame once the catalog is read.
+  await vi.waitFor(() => expect((window as unknown as { galleryReady?: boolean }).galleryReady).toBe(true));
   rec.page = "";
 });
 

@@ -1,6 +1,5 @@
 import { html, render } from "lit-html";
-import { FACILITIES } from "./engine/facilities";
-import { CLINIC_SUBTYPES, AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
+import type { Catalog, CatalogFacility } from "./engine/catalogTypes";
 import type { FacilityKind, Transport, Unit, UnitState } from "./engine/types";
 import { fitAtGameScale } from "./render/catalogScale";
 import { FLOOR, TILE } from "./render/scale";
@@ -8,27 +7,20 @@ import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites
 import { pageShell } from "./ui/templates/pageShell";
 import { injectVercelTelemetry } from "./telemetry";
 import { trackAppAction } from "./analytics";
-import { catalogFor } from "./engine/catalog";
 import { bindViewWorld } from "./presentation/viewWorld";
 import { readCatalog } from "./dualrun/catalog";
-import type { CatalogFacility } from "./engine/catalogTypes";
-import { refuseForeignCatalog } from "./wasmhost/catalogCheck";
 import { loadWasmEngine } from "./wasmhost/rustEngine";
 
-// A tooling page draws sprites without a tower, so it binds the Modern
-// catalog's world for the view (the lot geometry the sprites hash on).
-bindViewWorld(catalogFor("modern").world);
+/** The Rust engine's Modern catalog, read before the page draws. The engine is
+ *  the one the game runs on, so every size, name and variant list on this page
+ *  is its own. */
+let catalog: Catalog | null = null;
 
-/** The Rust engine's facilities by kind, read from its catalog before the page is
- *  ready. Sizes come from here because the Rust engine is the one the game runs
- *  on (the wedding hall is the 28 wide, five story cathedral there). Null when
- *  the package cannot be loaded: the page then draws from the TypeScript tables. */
-let engineFacilities: ReadonlyMap<FacilityKind, CatalogFacility> | null = null;
-
-/** A kind's name, size and population: the Rust engine's catalog once it is read,
- *  else the TypeScript tables. */
-function facilityOf(kind: FacilityKind): { name: string; width: number; floors?: number; population: number } {
-  return engineFacilities?.get(kind) ?? FACILITIES[kind];
+/** A kind's catalog entry: its name, size, population and canon variants. */
+function facilityOf(kind: FacilityKind): CatalogFacility {
+  const f = catalog?.facilities.find((e) => e.key === kind);
+  if (!f) throw new Error(`Sprite gallery: the engine's catalog has no ${kind}.`);
+  return f;
 }
 
 /** A catalog entry to render in the gallery grid. */
@@ -80,10 +72,10 @@ function roomEntry(
   subtype?: string,
   floorOverride?: number,
 ): Entry {
+  const f = facilityOf(kind);
   return {
     label,
     draw(d, cx, cy, cw, ch) {
-      const f = facilityOf(kind);
       // Size the cell by the facility's own floor count so a genuinely multi-
       // floor kind (cinema, party hall, metro) shows at its true proportion
       // instead of squished into one floor. `fitAtGameScale` steps a footprint
@@ -131,15 +123,15 @@ function roomEntry(
 
 /** One gallery cell per canon retail variant, labeled with its canon name so
  *  the catalog teaches the vocabulary the inspector and TDT round-trip use. */
-function retailEntries(kind: FacilityKind, names: readonly string[]): Entry[] {
-  return names.map((name) => roomEntry(`${FACILITIES[kind].name}: ${name}`, kind, "occupied", undefined, name));
+function retailEntries(kind: FacilityKind): Entry[] {
+  return (facilityOf(kind).subtypes ?? []).map((name) => roomEntry(`${facilityOf(kind).name}: ${name}`, kind, "occupied", undefined, name));
 }
 
 function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
+  const f = facilityOf(kind);
   return {
     label,
     draw(d, cx, cy, cw, ch) {
-      const f = facilityOf(kind);
       // A shaft is drawn as its span plus the floor it lands on, so it is sized
       // as a `span + 1` floor footprint and its per-floor pitch falls out of the
       // fitted box. Same scale as the rooms, so a shaft and a room next to each
@@ -199,7 +191,8 @@ function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
   };
 }
 
-const ENTRIES: Entry[] = [
+/** The 1994 catalog, built once the engine's catalog is read. */
+const buildEntries = (): Entry[] => [
   roomEntry("Lobby (ground)", "lobby"),
   roomEntry("Sky Lobby", "lobby", "occupied", undefined, undefined, 5),
   roomEntry("Floor / Corridor", "floor"),
@@ -216,11 +209,11 @@ const ENTRIES: Entry[] = [
   roomEntry("Double Room (cockroaches)", "hotelDouble", "infested", 0),
   roomEntry("Suite (cockroaches)", "hotelSuite", "infested", 0),
   roomEntry("Fast Food (generic)", "fastFood"),
-  ...retailEntries("fastFood", FASTFOOD_SUBTYPES),
+  ...retailEntries("fastFood"),
   roomEntry("Restaurant (generic)", "restaurant"),
-  ...retailEntries("restaurant", RESTAURANT_SUBTYPES),
+  ...retailEntries("restaurant"),
   roomEntry("Retail Shop (generic)", "shop"),
-  ...retailEntries("shop", SHOP_SUBTYPES),
+  ...retailEntries("shop"),
   roomEntry("Cinema (playing)", "cinema"),
   roomEntry("Party Hall", "partyHall"),
   roomEntry("Parking (in use)", "parking"),
@@ -259,30 +252,30 @@ const SUBHEADER_H = 34;
  *  catalog so the canon-vs-Modern line stays clear. Each Modern kind is its own
  *  labeled sub-group, so the zone reads as a catalog (not one undifferentiated
  *  block) as the other containers (Boutique, Fitness, Clinic, Amusements) land. */
-const MODERN_GROUPS: { label: string; entries: Entry[] }[] = [
+const buildModernGroups = (): { label: string; entries: Entry[] }[] => [
   {
     label: "Rental Living",
     entries: [roomEntry("Studio", "rentalStudio"), roomEntry("Apartment", "rentalApartment")],
   },
   {
     label: "Food Hall",
-    entries: [roomEntry("Food Hall", "foodHall"), ...retailEntries("foodHall", FOODHALL_SUBTYPES)],
+    entries: [roomEntry("Food Hall", "foodHall"), ...retailEntries("foodHall")],
   },
   {
     label: "Amusements",
-    entries: [roomEntry("Amusements", "amusements"), ...retailEntries("amusements", AMUSEMENTS_SUBTYPES)],
+    entries: [roomEntry("Amusements", "amusements"), ...retailEntries("amusements")],
   },
   {
     label: "Boutique Bay",
-    entries: [roomEntry("Boutique Bay", "boutiqueBay"), ...retailEntries("boutiqueBay", BOUTIQUE_SUBTYPES)],
+    entries: [roomEntry("Boutique Bay", "boutiqueBay"), ...retailEntries("boutiqueBay")],
   },
   {
     label: "Fitness Club",
-    entries: [roomEntry("Fitness Club", "fitnessClub"), ...retailEntries("fitnessClub", FITNESS_SUBTYPES)],
+    entries: [roomEntry("Fitness Club", "fitnessClub"), ...retailEntries("fitnessClub")],
   },
   {
     label: "Clinic",
-    entries: [roomEntry("Clinic", "clinic"), ...retailEntries("clinic", CLINIC_SUBTYPES)],
+    entries: [roomEntry("Clinic", "clinic"), ...retailEntries("clinic")],
   },
   {
     label: "Nightclub",
@@ -315,11 +308,12 @@ interface SubHeader {
   subHeader: string;
 }
 type GalleryItem = Entry | SectionHeader | SubHeader;
-const ITEMS: GalleryItem[] = [
-  ...ENTRIES,
+const buildItems = (): GalleryItem[] => [
+  ...buildEntries(),
   { header: "Modern additions" },
-  ...MODERN_GROUPS.flatMap((g): GalleryItem[] => [{ subHeader: g.label }, ...g.entries]),
+  ...buildModernGroups().flatMap((g): GalleryItem[] => [{ subHeader: g.label }, ...g.entries]),
 ];
+let ITEMS: GalleryItem[] = [];
 
 /** Assign each item a screen cell. A header closes the current row, spans the
  *  full width in its own shorter band, and forces the next item onto a fresh
@@ -405,7 +399,6 @@ function relayout(): void {
   // Resizing the backing store clears the context transform, so re-apply the dpr scale.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
-relayout();
 let resizePending = 0;
 window.addEventListener("resize", () => {
   if (resizePending) return;
@@ -462,21 +455,25 @@ function frame() {
   ctx.textAlign = "left";
   requestAnimationFrame(frame);
 }
-frame();
 
-/** Read the Rust engine's catalog, so every size is the engine's. A package that
- *  cannot be loaded or read leaves the TypeScript tables in place, and says so. */
-async function readEngineCatalog(): Promise<void> {
+/** Read the engine's catalog, then draw. A package that cannot be loaded leaves
+ *  the page saying so and never signals readiness: there is no second source
+ *  for the sizes. */
+async function start(): Promise<void> {
   try {
-    const catalog = readCatalog(await loadWasmEngine(), "modern");
-    refuseForeignCatalog(catalog);
-    engineFacilities = new Map(catalog.facilities.map((f) => [f.key, f]));
+    catalog = readCatalog(await loadWasmEngine(), "modern");
+    // A tooling page draws sprites without a tower, so it binds the catalog's
+    // world for the view (the lot geometry the sprites hash on).
+    bindViewWorld(catalog.world);
+    ITEMS = buildItems();
   } catch (e) {
-    console.warn("Sprite gallery: the Rust engine's catalog is unavailable, drawing from the TypeScript tables.", e);
+    console.error("Sprite gallery: the Rust engine's catalog is unavailable.", e);
+    document.querySelector(".gallery-scroll")?.replaceChildren("The sprite gallery needs the game engine, and it did not load. Reload the page to try again.");
+    return;
   }
-}
-
-// Signal readiness for screenshot tooling, once the sizes are the engine's.
-void readEngineCatalog().finally(() => {
+  relayout();
+  frame();
+  // Signal readiness for screenshot tooling.
   (window as unknown as { galleryReady: boolean }).galleryReady = true;
-});
+}
+void start();
