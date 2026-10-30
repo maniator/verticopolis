@@ -37,3 +37,16 @@ export function aboveFloor(value: number, baseline: number, tolerance: number): 
   const budget = baseline * tolerance;
   return value >= budget - Math.abs(budget) * PERF_BUDGET_REL_EPSILON;
 }
+
+/**
+ * The median of a non-empty list of repeated measurements (the mean of the two
+ * middle values when the count is even). The gate and the baseline capture both
+ * run the `ui.update` benchmark several times and compare medians, because one
+ * run on a shared runner moves by a third between minutes.
+ */
+export function medianOf(values: number[]): number {
+  if (values.length === 0) throw new Error("medianOf needs at least one value");
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}

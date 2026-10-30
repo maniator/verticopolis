@@ -196,11 +196,9 @@ Verticopolis has **two test tiers**:
   a wasm-only tooling build (`VC_ENGINE=wasm VC_TOOLING=1 npm run build`),
   with `e2e/wasmOnly.spec.ts` covering its boot, failures and offline start;
   CI runs it as the `e2e-wasm-only` job.
-  The suite runs on the Rust engine only (`chromium-wasm`). While players can
-  still be on the TypeScript engine, `PW_ENGINE=ts` runs the same specs on it
-  as the `chromium-ts` project: CI runs the `@ts-smoke` test that way (and the
-  perf gate, whose baseline is TypeScript's), and `npm run e2e:ts` runs the
-  whole suite on it by hand. Visual specs never run on it.
+  The suite runs on the Rust engine only (`chromium-wasm`), and so does the
+  perf gate, whose baseline is the Rust engine's. Nothing runs the TypeScript
+  engine end to end.
   Specs cover boot/integration, milestones, a full win, and visual baselines.
   See [`playwright.config.ts`](./playwright.config.ts) for how visual baselines
   are minted by CI (local runs smoke the flows but skip pixel comparison unless

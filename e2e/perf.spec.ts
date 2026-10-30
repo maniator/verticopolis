@@ -2,9 +2,9 @@ import { test, expect } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
-import { buildToStar, tsOnlyOnWasm } from "./helpers";
+import { buildToStar } from "./helpers";
 import { benchmarkUiUpdate, measureSimSpeed, checkNodeIdentity } from "./perf-harness";
-import { aboveFloor, withinCeiling } from "../src/tests/perfBudget";
+import { aboveFloor, medianOf, withinCeiling } from "../src/tests/perfBudget";
 
 /**
  * The E5-S0 perf gate (BLOCKING, ahead of any live-view migration). It holds a
@@ -39,6 +39,11 @@ const ENFORCE = !!process.env.CI || process.env.PERF_ENFORCE === "1";
 // steady clock, below) so one starved window can't flip the verdict.
 const N_PUMPS = 4000;
 const A_BATCH = 40;
+// (A) runs the whole benchmark this many times and keeps the median of each
+// statistic. A single run moved by about a third between two CI runs minutes
+// apart on the same image, which a 5% ceiling cannot absorb; the median of
+// several runs keeps the tolerances below as they are.
+const A_RUNS = 5;
 const CPU_THROTTLE = 4;
 // `speed` is an index into SPEEDS = [0, 10, 30, 120] sim-minutes/second, so the
 // fastest speed (the "120" the plan names) is key 3.
@@ -64,7 +69,7 @@ if (N_PUMPS % A_BATCH !== 0) {
 }
 
 interface Baseline {
-  uiUpdate: { medianMs: number; p95Ms: number; meanMs: number; n: number; batch: number };
+  uiUpdate: { medianMs: number; p95Ms: number; meanMs: number; n: number; batch: number; runs: number };
   simSpeed: { simMinutesPerRealSecond: number; cpuThrottle: number; speed: number; windowMs: number; windows: number };
 }
 
@@ -77,7 +82,6 @@ test.describe("E5-S0 perf gate @perf", () => {
   test.setTimeout(180_000);
 
   test("ui.update cost, end-to-end speed, and node identity clear the committed baseline @perf", async ({ page }) => {
-    tsOnlyOnWasm("e2e/perf/baseline.json was measured on the TypeScript engine, so the WASM engine has no baseline to clear yet");
     await page.goto("/");
     await page.waitForFunction(() => {
       const g = (window as unknown as { game?: { sim?: unknown; ui?: unknown } }).game;
@@ -88,7 +92,16 @@ test.describe("E5-S0 perf gate @perf", () => {
     await page.evaluate(buildToStar, 6);
 
     // (A) isolated render cost (batched, change-path).
-    const uiUpdate = await page.evaluate(benchmarkUiUpdate, { n: N_PUMPS, batch: A_BATCH });
+    const uiRuns = [];
+    for (let i = 0; i < A_RUNS; i++) uiRuns.push(await page.evaluate(benchmarkUiUpdate, { n: N_PUMPS, batch: A_BATCH }));
+    const uiUpdate = {
+      n: uiRuns[0]!.n,
+      batch: uiRuns[0]!.batch,
+      runs: A_RUNS,
+      medianMs: medianOf(uiRuns.map((r) => r.medianMs)),
+      p95Ms: medianOf(uiRuns.map((r) => r.p95Ms)),
+      meanMs: medianOf(uiRuns.map((r) => r.meanMs)),
+    };
     // (C) node identity across real pumps (measured before the throttle).
     const nodeIdentity = await page.evaluate(checkNodeIdentity, 200);
 
@@ -192,6 +205,7 @@ test.describe("E5-S0 perf gate @perf", () => {
       {
         n: baseline.uiUpdate.n,
         batch: baseline.uiUpdate.batch,
+        runs: baseline.uiUpdate.runs,
         cpuThrottle: baseline.simSpeed.cpuThrottle,
         speed: baseline.simSpeed.speed,
         windowMs: baseline.simSpeed.windowMs,
@@ -201,6 +215,7 @@ test.describe("E5-S0 perf gate @perf", () => {
     ).toEqual({
       n: N_PUMPS,
       batch: A_BATCH,
+      runs: A_RUNS,
       cpuThrottle: CPU_THROTTLE,
       speed: SPEED_MINUTES_PER_SEC,
       windowMs: SPEED_WINDOW_MS,
