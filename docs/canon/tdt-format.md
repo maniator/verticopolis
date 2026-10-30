@@ -259,8 +259,12 @@ Measured on TOWER7 in the original game (PC screenshots, release-3.0
   ideal spot for the station is B8 to B10.
 - Parking stalls (type 11) are 4 tiles wide and the ramp (type 44) is 16, on
   floors B1 to B9 (our -8 to 0). The original draws stalls at full size, 4 to 5
-  per segment between ramps. TOWER7's B5 holds two stall records of 3 and 1
-  tiles (tiles 138 to 141 and 149 to 150) between full ones.
+  per segment between ramps. TOWER7's B5 holds two paving records (type 0, flags
+  2) of 3 and 1 tiles (tiles 138 to 141 and 149 to 150) between the stalls, drawn
+  as flat grey with cars only in stalls. The file still counts every stall on
+  that row as connected, while TOWER1's stalls 56 tiles from their ramp are not.
+  The importer slides stalls that sit less than one stall's width from their
+  neighbor toward the ramp, so the row chains to it; wider gaps stay split.
 
 Room widths in tiles, from the wiki and the saves: security 16, medical center
 26, housekeeping 15, recycling center 25 (two floors), metro 30 (three floors),

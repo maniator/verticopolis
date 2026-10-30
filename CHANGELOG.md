@@ -25,6 +25,7 @@ notes, never a past version's.
 
 - Security, medical, housekeeping and recycling rooms build at the sizes SimTower uses, so a tower from the original game keeps its layout.
 - The metro station is 30 tiles wide with its tunnel along the bottom row. Nothing can be built below it, and the lowest basement row is kept for it.
+- Parking stalls in imported SimTower saves that sat a few tiles from their neighbor now sit against the ramp's row, so they are connected instead of showing a red X.
 
 ## 2.70.0
 
