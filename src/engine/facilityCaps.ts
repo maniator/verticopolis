@@ -1,14 +1,16 @@
 import type { FacilityKind } from "./types";
 import { FACILITIES, GRID } from "./facilitiesData";
 
-/** Passengers a single car of each transport type holds per trip. The three
- *  elevator values are the per-car capacities the .TDT save stores in each
- *  elevator's header (docs/canon/tdt-format.md §8): express 42, standard 21,
- *  service 10. Escalator/stairs are our own throughput figures; the save's
- *  separate walkway table stores occupant counts, not a capacity. */
+/** Passengers a single car of each transport type holds per trip: express 42,
+ *  standard 21 and service 17, the figures in the Windows Help file. The .TDT
+ *  save also stores a capacity byte in each elevator's header, but it is not
+ *  reliable (docs/canon/tdt-format.md §8), so the rules use this table and the
+ *  exporter keeps its old service byte.
+ *  Escalator/stairs are our own throughput figures; the save's separate
+ *  walkway table stores occupant counts, not a capacity. */
 export const TRANSPORT_CAPACITY: Partial<Record<FacilityKind, number>> = {
   elevatorStandard: 21,
-  elevatorService: 10, // canon: the smallest cab (staff-only)
+  elevatorService: 17, // Windows Help file: a service car holds 17 (staff-only)
   elevatorExpress: 42, // canon: PC 1.0 express car carries 42 (standard 21)
   escalator: 30, // continuous flow, treated as per-shaft
   stairs: 8,

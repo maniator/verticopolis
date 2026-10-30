@@ -309,7 +309,7 @@ The game keeps all express shafts when the sizes are right (checked on re-saves
 of TOWER2 and TOWER5, two express each). Swapping two standard shafts is
 harmless: the table needs no global order.
 
-Canon car capacities (not read from the file): express 42, standard 21, service 10.
+Canon car capacities (not read from the file): express 42, standard 21, service 17 (the Windows Help file). The exporter still writes 10 in a service shaft's header byte, because that byte is unreliable (one PC save showed 21) and the referee pins the bytes.
 Limits: 24 shafts, 8 cars, spans in `src/engine/facilities.ts`.
 
 ## 10. Stairs and escalators
