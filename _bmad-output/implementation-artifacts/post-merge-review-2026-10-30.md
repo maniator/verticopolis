@@ -2,6 +2,8 @@
 
 **Snapshot of 2026-10-30, about 16:50 UTC. Not live status.** Main was `54f5e90` (app 2.71.0, engine crate 1.0.4). Test CI was green on it; the Rust engine workflow was still running when I looked. Live status is in the GitHub issues named below. Vercel deploy health could not be checked from here (no access), so "production deploy is healthy" is unverified.
 
+**Live trackers supersede this snapshot.** The option C recommendation for the PC run below is historical: the approved run is tracked in #1543 (and #1544 for the follow-ups), and agents should work from those issues, not from this page.
+
 Grades: **confirmed** (seen in code or a run), **probable**, **conflicting**, **unverified**. Classic findings only unless a line says Modern. Nothing here changes a rule; items that need your call are marked **Your call**.
 
 Open PRs at the time: #1516 (wedding hall, app 2.72.0, crate 1.1.0), #1525 (parking audit, docs only).
