@@ -13,9 +13,9 @@ vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 // a package. The TypeScript engine's first tower is stubbed too, so a test
 // can say whether it reads the stored save.
 const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm" | "wasm-worker", loadError: null as Error | null, module: null as unknown, startError: null as Error | null, rustCorrupt: false, tsCorrupt: false, binary: null as { state: "ok"; sourceHash: string } | null }));
-vi.mock("./engineCohort/boot", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./engineCohort/boot")>();
-  return { ...real, selectBootEngine: () => wasmStub.requested, noteRustFailed: vi.fn() };
+vi.mock("./wasmhost/engineChoice", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./wasmhost/engineChoice")>();
+  return { ...real, engineRequested: () => wasmStub.requested };
 });
 vi.mock("./wasmhost/rustEngine", async (importOriginal) => {
   const real = await importOriginal<typeof import("./wasmhost/rustEngine")>();
@@ -37,8 +37,8 @@ vi.mock("./game/bootTower", async (importOriginal) => {
   return { ...real, tsBootTower: vi.fn(() => ({ port: { engine: "ts" }, corrupt: wasmStub.tsCorrupt, loaded: !wasmStub.tsCorrupt, savedAt: undefined })) };
 });
 // The crash reload (#1422), so a test can say whether the page would reload.
-vi.mock("./engineCohort/crashReload", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./engineCohort/crashReload")>();
+vi.mock("./engineCrash/crashReload", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./engineCrash/crashReload")>();
   return { ...real, reloadSoon: vi.fn() };
 });
 // The relay, so the reliability rows (`engine_status`) can be read back.
@@ -53,7 +53,7 @@ import { SaveGame } from "./storage/SaveGame";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { EngineBootError } from "./wasmhost/engineBoot";
 import { noteEngineThrow, watchEngineTraps } from "./game/engineFault";
-import { countRustCrash, crashReportDue, reloadSoon } from "./engineCohort/crashReload";
+import { countRustCrash, crashReportDue, reloadSoon } from "./engineCrash/crashReload";
 
 /** A tab whose storage keeps nothing, so a crash cannot be counted. */
 function fullTabStore(): void {
@@ -218,7 +218,7 @@ describe("bootGame engine", () => {
     expect(encodeVctower).not.toHaveBeenCalled();
   });
 
-  it("reloads onto TypeScript at the tab's second trap", async () => {
+  it("stops the game at the tab's second trap instead of reloading again", async () => {
     requestWasm();
     document.body.innerHTML = '<div id="stage"></div>';
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -226,10 +226,10 @@ describe("bootGame engine", () => {
     countRustCrash(sessionStorage, __APP_SHA__);
     await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn(), setSpeed: vi.fn() })));
     expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
-    expect(document.getElementById("boot-fallback-host")?.textContent).toContain("on the TypeScript engine.");
-    expect(reloadSoon).toHaveBeenCalledOnce();
-    // The tab keeps the fault and the engine that crashed for the TypeScript
-    // boot's crash report (the stub package records no identity).
+    expect(document.getElementById("engine-failure")?.getAttribute("data-stage")).toBe("host");
+    expect(reloadSoon).not.toHaveBeenCalled();
+    // The tab keeps the fault and the engine that crashed for the crash
+    // report a TypeScript boot offers (the stub package records no identity).
     expect(crashReportDue(sessionStorage, __APP_SHA__)).toEqual({
       count: 2,
       last: { reason: "trap-tick", stage: "start", rust: { version: null, sourceHash: "b".repeat(64) } },

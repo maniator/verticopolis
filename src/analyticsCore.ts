@@ -3,7 +3,6 @@ import { APP_VERSION } from "./appVersion";
 import { telemetryHostAllowed } from "./telemetry";
 import type { EngagedBy } from "./analyticsEngagement";
 import type { EngineBuild, EngineKind, EngineStatusReason, EngineStatusTrigger } from "./analyticsEngineStatus";
-import type { CohortFields } from "./engineCohort/fields";
 import type { FallbackStage } from "./wasmhost/engineBoot";
 import type { EngineChoice } from "./wasmhost/engineChoice";
 
@@ -229,14 +228,8 @@ export interface GameplayEvents {
     page_life: string;
     version: string;
     sha: string;
-    /** The cohort's fields (A4), on every row once they ship. */
-    stage?: CohortFields["stage"];
-    assigned_arm?: CohortFields["assigned_arm"];
-    selected_by?: CohortFields["selected_by"];
     /** Only on `engaged` rows (#1090). */
     engaged_by?: EngagedBy;
-    /** Only on a page life the size gate held on TypeScript (#1197). */
-    size_gated?: true;
   };
 }
 

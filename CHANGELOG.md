@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.70.0
+
+- Help's privacy note no longer mentions an engine test, since the game has none now.
+
 ## 2.69.0
 
 - The service elevator's car now holds 17 riders instead of 10, as the Windows Help file says, so housekeepers wait less.

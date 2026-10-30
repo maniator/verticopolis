@@ -8,7 +8,7 @@ import { Simulation } from "../../engine/Simulation";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { ViewReader } from "../../simport/viewReader";
 import { facilityFloors } from "../../engine/facilities";
-import { countRustCrash, crashReportDue, heldAfterCrashes } from "../../engineCohort/crashReload";
+import { countRustCrash, crashReportDue } from "../../engineCrash/crashReload";
 import { offerRustCrashReport, type RustCrashApp } from "../../ui/rustCrashDialog";
 import { TS_ENGINE_VERSION } from "../../wasmhost/tsEngineIdentity";
 
@@ -52,10 +52,9 @@ describe("the Rust crash report", () => {
     expect(new URL(report.href).searchParams.get("title")).toBe("Rust engine crashed");
     dialog().querySelector<HTMLElement>('[data-act="close"]')!.click();
     expect(dialog().open).toBe(false);
-    // Retired for the tab; the tab stays on TypeScript.
+    // Retired for the tab.
     expect(crashReportDue(sessionStorage, SHA)).toBeNull();
     expect(offerRustCrashReport(a, SHA)).toBe(false);
-    expect(heldAfterCrashes(sessionStorage, SHA)).toBe(true);
   });
 
   it("downloads a zip with both engines, the fault and the TypeScript engine's save", async () => {

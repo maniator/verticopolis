@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../../analyticsEngineStatus", () => ({ cohortRows: { on: true }, noteEngineEngaged: vi.fn() }));
+vi.mock("../../analyticsEngineStatus", () => ({ noteEngineEngaged: vi.fn() }));
 import { noteEngineEngaged } from "../../analyticsEngineStatus";
 import { PLAY_SECONDS } from "../../analyticsEngagement";
 import { TsEngine } from "../../engine/port/tsEngine";

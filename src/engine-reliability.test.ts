@@ -14,7 +14,9 @@ import {
   REASONS,
   REQUESTS,
   ROW_LIMIT,
-  buildCrashSessionsQuery,
+  ASSIGNED_ARMS,
+  SELECTIONS,
+  STAGES,
   buildPageLivesQuery,
   pageLivesFromRows,
   parseArgs,
@@ -114,20 +116,15 @@ describe("the page-lives query", () => {
     expect(view).toContain("AND properties.environment = 'production'");
     expect(q).toContain("distinct_id AS session_id,");
     expect(q).toContain("properties.environment = 'production'");
-    // The crash sessions use the same unit.
-    const crashes = buildCrashSessionsQuery(720);
-    expect(crashes).toContain("distinct_id AS session_id");
-    expect(crashes).toContain("properties.environment = 'production'");
   });
 
-  it("reads only fields the game sends or the cohort work plans", () => {
+  it("reads only fields the game sends or the retired cohort sent", () => {
     // Every properties.x the query names is a real engine_status field, the
-    // relay's environment stamp, one the A4 cohort work adds (#1197), or the
-    // `engaged_by` field proposed for #1090 (a missing one reads as the
-    // default).
-    const planned = ["safety_suppressed", "size_gated", "environment"];
+    // relay's environment stamp, or a field the retired cohort sent, which old
+    // rows still carry (a missing one reads as the default).
+    const retired = ["stage", "assigned_arm", "selected_by", "safety_suppressed", "size_gated", "environment"];
     const read = [...q.matchAll(/properties\.([a-z_]+)/g)].map((m) => m[1]);
-    for (const field of read) expect([...ENGINE_STATUS_FIELDS, ...planned]).toContain(field);
+    for (const field of read) expect([...ENGINE_STATUS_FIELDS, ...retired]).toContain(field);
   });
 });
 
@@ -282,7 +279,22 @@ describe("summarizeReliability", () => {
     expect(REQUESTS).toEqual(ENGINE_KINDS.filter((k) => k !== "ts-fallback" && k !== "none"));
     expect(HOSTS).toEqual(REQUESTS.filter((r) => r !== "ts"));
     expect(BUILDS).toEqual([...ENGINE_BUILDS]);
-    expect(REASONS).toEqual([...ENGINE_STATUS_REASONS]);
+    // The two codes the retired crash-marker path sent stay readable in old rows.
+    expect(REASONS).toEqual([...ENGINE_STATUS_REASONS, "unclean-exit", "marker-blocked"]);
+  });
+
+  it("pins the retired cohort's closed lists, which old rows still carry", () => {
+    expect(STAGES).toEqual(["none", "0", "1", "2", "3"]);
+    expect(ASSIGNED_ARMS).toEqual(["none", "wasm", "ts", "unassigned"]);
+    expect(SELECTIONS).toEqual(["default", "cohort", "setting", "url", "safety-build", "safety-device"]);
+  });
+
+  it("leaves safety-suppressed page lives out of the rate and counts the crash loops among them", () => {
+    const loop = (session: string, over: Partial<PageLife> = {}) => life({ session, selectedBy: "safety-device", safetySuppressed: true, reasons: ["unclean-exit"], ...over });
+    // A flag alone, or a safety selection alone, is a suppression.
+    expect(summarizeReliability([life({ session: "a", safetySuppressed: true }), life({ session: "b", selectedBy: "safety-build" })])).toMatchObject({ n: 0, safetySuppressedPageLives: 2, crashLoopPageLives: 0 });
+    // A suppressed page life with an engine reason, or a fallback whose reason rows were lost, is a crash loop.
+    expect(summarizeReliability([loop("c"), loop("d", { reasons: [], fallbacks: 1 }), loop("e", { reasons: ["package-mismatch"] })])).toMatchObject({ n: 0, faults: 0, safetySuppressedPageLives: 3, crashLoopPageLives: 2 });
   });
 
   it("keeps a loop's size: the fallbacks sent in all and the most in one page life", () => {
@@ -381,7 +393,7 @@ describe("summarizeReliability", () => {
 
 describe("the command line", () => {
   it("reads the window and the lists", () => {
-    expect(parseArgs([])).toEqual({ window: { hours: 720, label: "30 days" }, opts: { hosts: ["wasm"], shas: null, versions: null, builds: null, arms: null }, eligibleShas: [], tailShas: [], floorShas: [] });
+    expect(parseArgs([])).toEqual({ window: { hours: 720, label: "30 days" }, opts: { hosts: ["wasm"], shas: null, versions: null, builds: null, arms: null } });
     expect(parseArgs(["--window=7", "--shas", "abc1234, def5678a", "--arms", "wasm", "--hosts", "wasm,wasm-frame", "--builds", "wasm-only", "--versions", "2.36.0"]).opts).toEqual({
       hosts: ["wasm", "wasm-frame"],
       shas: ["abc1234", "def5678a"],
@@ -434,8 +446,7 @@ describe("renderReliabilityMarkdown", () => {
     const md = renderReliabilityMarkdown(summarizeReliability([life()]), meta);
     const firstFigure = md.indexOf("| Measure |");
     // The overall rate is early telemetry, which plan 4.1 (OD-2) never
-    // publishes as a reliability figure; release evidence is only the engaged
-    // eligible cohort (#1090).
+    // publishes as a reliability figure.
     for (const lead of ["**Snapshot** of the last 30 days to 2026-10-20 12:00 (UTC), production only", "node scripts/engine-reliability.mjs", "src/engine-reliability.test.ts", "**This overall rate is early telemetry**", "**A lower bound.**"]) {
       const at = md.indexOf(lead);
       expect(at, lead).toBeGreaterThan(-1);

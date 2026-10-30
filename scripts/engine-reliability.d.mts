@@ -98,15 +98,9 @@ export interface ReportMeta {
   builds: string;
   arms: string;
   truncated: boolean;
-  crashesTruncated?: boolean;
-  cohorts?: import("./engine-reliability-cohorts.mjs").CohortsSummary;
-  floors?: import("./engine-reliability-floors.mjs").StageFloor[];
-  eligibleShas?: string[];
-  tailShas?: string[];
 }
 
 export function buildPageLivesQuery(hours: number): string;
-export function buildCrashSessionsQuery(hours: number): string;
 export function armOf(pl: PageLife): string;
 export function recognized(pl: PageLife): boolean;
 export function pageLivesFromRows(rows: Array<Record<string, unknown>>): PageLife[];
@@ -116,8 +110,5 @@ export function renderReliabilityMarkdown(summary: ReliabilitySummary, meta: Rep
 export function parseArgs(argv: string[]): {
   window: { hours: number; label: string };
   opts: { hosts: string[]; shas: string[] | null; versions: string[] | null; builds: string[] | null; arms: string[] | null };
-  eligibleShas: string[];
-  tailShas: string[];
-  floorShas: string[];
 };
 export function responseRows(json: unknown): { rows: Array<Record<string, unknown>>; truncated: boolean };

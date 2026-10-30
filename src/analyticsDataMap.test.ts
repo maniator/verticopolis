@@ -3,9 +3,6 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { ENGAGED_BY } from "./analyticsEngagement";
-import { STAGES } from "./engineCohort/config";
-import { WIRE_SELECTIONS } from "./engineCohort/fields";
-import { ASSIGNED_ARMS } from "./engineCohort/policy";
 import { ENGINE_STATUS_REASONS, ENGINE_BUILDS, ENGINE_KINDS, ENGINE_STATUS_FIELDS, ENGINE_STATUS_TRIGGERS, MAX_ENGINE_STATUS_ROWS } from "./analyticsEngineStatus";
 import { FALLBACK_STAGES } from "./wasmhost/engineBoot";
 import { MAX_BODY_BYTES, RATE_LIMIT_MAX } from "./analyticsIngest";
@@ -93,9 +90,6 @@ describe("analytics data map", () => {
       engine: ENGINE_KINDS,
       build: ENGINE_BUILDS,
       fallback_reason: ENGINE_STATUS_REASONS,
-      stage: STAGES,
-      assigned_arm: ASSIGNED_ARMS,
-      selected_by: WIRE_SELECTIONS,
       fallback_stage: FALLBACK_STAGES,
       engaged_by: ENGAGED_BY,
     };

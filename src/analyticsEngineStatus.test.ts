@@ -78,13 +78,7 @@ describe("engine_status rows", () => {
     // The reset cleared the common props (the platform buckets), so the row
     // holds the event's own fields and nothing else.
     // `engaged_by` rides on `engaged` rows only.
-    // `size_gated` only on a page life the size gate held (#1197).
-    expect(Object.keys(rows()[0]).sort()).toEqual(ENGINE_STATUS_FIELDS.filter((f) => f !== "engaged_by" && f !== "size_gated").sort());
-  });
-
-  it("says size_gated on every row of a page life the size gate held, and never otherwise", () => {
-    noteEngineSettled({ ...wasmSettle, boot: "ts", sizeGated: true });
-    expect(rows()[0]).toMatchObject({ engine_requested: "wasm", engine: "ts", fallback_reason: "none", fallbacks: 0, size_gated: true });
+    expect(Object.keys(rows()[0]).sort()).toEqual(ENGINE_STATUS_FIELDS.filter((f) => f !== "engaged_by").sort());
   });
 
   it("reads a boot failure from the settle snapshot, as one fallback", () => {

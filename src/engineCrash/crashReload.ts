@@ -1,16 +1,34 @@
-import { CRASH_LOOP_PAGES } from "./crashMarker";
-import { remove, writeChecked, type KeyValueStore } from "./records";
-
 /**
  * The Rust engine's crash reload (#1422, owner 2026-10-28). A trap in the
- * running engine never hands the tower to the TypeScript engine mid-game:
- * the page reloads, and the tower comes back from its last autosave on Rust.
- * This tab counts those crashes per build, and at `CRASH_LOOP_PAGES` its next
- * boots run TypeScript, with a line that says why, so a crash that repeats
- * cannot reload forever. The count lives in `sessionStorage`: it holds across
- * the reload and ends with the tab, and a `?engine=wasm` test visit, which
- * leaves the player's own records alone, is held all the same.
+ * running engine never hands the tower to another engine mid-game: the page
+ * reloads, and the tower comes back from its last autosave on Rust. This tab
+ * counts those crashes per build, and at `CRASH_LOOP_PAGES` the game stops
+ * with the engine-failure screen instead of reloading again, so a crash that
+ * repeats cannot reload forever. The count lives in `sessionStorage`: it holds
+ * across the reload and ends with the tab.
  */
+
+/** The crashes on one build that spend the tab's reloads: the first reloads,
+ *  the second stops. */
+export const CRASH_LOOP_PAGES = 2;
+
+/** The slice of `Storage` the crash count uses. */
+export interface KeyValueStore {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+/** Write a value and read it back. False when storage threw or did not keep it. */
+function writeChecked(store: KeyValueStore | null, key: string, value: unknown): boolean {
+  if (!store) return false;
+  const text = JSON.stringify(value);
+  try {
+    store.setItem(key, text);
+    return store.getItem(key) === text;
+  } catch {
+    return false;
+  }
+}
 
 /** This tab's Rust crashes on one build. */
 export const RUST_CRASHES_KEY = "vc.rustCrashes";
@@ -93,7 +111,7 @@ export function crashReportDue(
   return { count: record.count, last: record.last };
 }
 
-/** The crash report was offered: later boots in this tab say why in a line.
+/** The crash report was offered: a report is offered once per tab.
  *  Returns false when storage did not keep the mark. */
 export function markCrashReportShown(
   store: KeyValueStore | null,
@@ -104,22 +122,10 @@ export function markCrashReportShown(
   return writeChecked(store, RUST_CRASHES_KEY, { ...record, reportShown: true });
 }
 
-/** Whether this tab crashed often enough on this build that Rust stays off. */
+/** Whether this tab crashed often enough on this build that the game stops
+ *  instead of reloading. */
 export function crashReloadsSpent(count: number): boolean {
   return count >= CRASH_LOOP_PAGES;
-}
-
-/** Whether this tab's boots run TypeScript after its crashes on this build. */
-export function heldAfterCrashes(
-  store: KeyValueStore | null,
-  sha: string,
-): boolean {
-  return crashReloadsSpent(countOf(store, sha));
-}
-
-/** Forget this tab's crashes (the player's retry in Settings). */
-export function clearRustCrashes(store: KeyValueStore | null): void {
-  remove(store, RUST_CRASHES_KEY);
 }
 
 /** The tab's `sessionStorage`, or null where reading the property throws. */
@@ -131,30 +137,16 @@ export function tabStore(): KeyValueStore | null {
   }
 }
 
-/** What a crash does: reload on Rust, reload onto TypeScript once this tab's
- *  crashes are spent, or stop where neither can happen (a count storage did
- *  not keep, or a wasm-only build, which has no TypeScript engine). */
-export type CrashOutcome = "reload" | "reload-on-ts" | "stop";
+/** What a crash does: reload onto the last autosave, or stop where the tab's
+ *  reloads are spent or the count could not be kept. */
+export type CrashOutcome = "reload" | "stop";
 
-export function crashOutcome(
-  count: number | null,
-  wasmOnly: boolean,
-): CrashOutcome {
-  if (count === null) return "stop";
-  if (!crashReloadsSpent(count)) return "reload";
-  return wasmOnly ? "stop" : "reload-on-ts";
+export function crashOutcome(count: number | null): CrashOutcome {
+  return count !== null && !crashReloadsSpent(count) ? "reload" : "stop";
 }
 
 /** The cover line while the page reloads after a crash. */
-export const CRASH_RELOAD_LINE: Record<
-  Exclude<CrashOutcome, "stop">,
-  string
-> = {
-  reload:
-    "The Rust engine hit an error. Reloading your tower from its last autosave.",
-  "reload-on-ts":
-    "The Rust engine hit an error again. Reloading your tower from its last autosave on the TypeScript engine.",
-};
+export const CRASH_RELOAD_LINE = "The Rust engine hit an error. Reloading your tower from its last autosave.";
 
 /** How long the cover line shows before the reload. */
 export const CRASH_RELOAD_DELAY_MS = 2_000;

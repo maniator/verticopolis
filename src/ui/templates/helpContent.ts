@@ -136,10 +136,8 @@ export function helpPrivacyBody(): TemplateResult {
       page-visit counts and page performance metrics.
     </p>
     <p style="color:var(--muted)">
-      While we test the new Rust engine, your browser keeps your engine setting and a random test group on this
-      device. The game reports which group and engine you were in, how that engine was chosen, whether you started
-      playing, and a short code if the engine stopped. It never sends the test group's number, and none of it
-      identifies you.
+      To see whether the game engine runs reliably, the game reports which engine started, whether you started
+      playing, and a short code if the engine stopped. None of it identifies you.
     </p>
     <p style="color:var(--muted)">
       Crash reports are the one place your own words can travel. They carry the technical details of the error and the
