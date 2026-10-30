@@ -33,6 +33,7 @@ const noop: SchedHandlers = {
   onHomeAllBase: () => {},
   onStageUpTower: () => {},
   onPreset: () => {},
+  onAllCars: () => {},
   onAutoTune: () => {},
   onToggleAdvanced: () => {},
   onOk: () => {},
@@ -308,5 +309,23 @@ describe("elevatorScheduleTemplate: day toggle and actions", () => {
     click(frag.querySelector('[data-act="close"]')!);
     expect(onOk).toHaveBeenCalledOnce();
     expect(onCancel).toHaveBeenCalledOnce();
+  });
+});
+
+describe("elevatorScheduleTemplate: run every car (#1546)", () => {
+  it("offers the whole-fleet action in Classic and Modern, naming the fleet and both day types", () => {
+    for (const ux of [CLASSIC_RULES.elevatorScheduleUX(), MODERN_RULES.elevatorScheduleUX()]) {
+      const onAllCars = vi.fn();
+      const frag = renderToFragment(elevatorScheduleTemplate(ctx({ ux }), state(), { ...noop, onAllCars }));
+      const btn = frag.querySelector<HTMLButtonElement>(".es-allcars")!;
+      expect(btn.textContent).toBe("All 4 cars, all hours");
+      click(btn);
+      expect(onAllCars).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("reads the singular for a one-car shaft", () => {
+    const frag = renderToFragment(elevatorScheduleTemplate(ctx({ cars: 1 }), state(), noop));
+    expect(frag.querySelector(".es-allcars")!.textContent).toBe("All 1 car, all hours");
   });
 });

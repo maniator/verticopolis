@@ -108,6 +108,8 @@ export interface SchedHandlers {
   onHomeAllBase: () => void;
   onStageUpTower: () => void;
   onPreset: (preset: SchedulePreset) => void;
+  /** Run the whole fleet every hour of both day types (the bulk fix for editing one slot at a time). */
+  onAllCars: () => void;
   onAutoTune: () => void;
   onToggleAdvanced: () => void;
   onOk: () => void;
@@ -354,9 +356,14 @@ export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: Sc
   return html`
       <h2>${ctx.title}</h2>
       <div class="es-body">
-        <div class="es-row es-day" role="group" aria-label="Day type">
-          <button type="button" class="btn${state.day === "weekday" ? " es-on" : ""}" aria-pressed=${state.day === "weekday"} @click=${() => h.onDay("weekday")}>Weekday</button>
-          <button type="button" class="btn${state.day === "weekend" ? " es-on" : ""}" aria-pressed=${state.day === "weekend"} @click=${() => h.onDay("weekend")}>Weekend</button>
+        <div class="es-row es-day">
+          <span class="es-daypair" role="group" aria-label="Day type">
+            <button type="button" class="btn${state.day === "weekday" ? " es-on" : ""}" aria-pressed=${state.day === "weekday"} @click=${() => h.onDay("weekday")}>Weekday</button>
+            <button type="button" class="btn${state.day === "weekend" ? " es-on" : ""}" aria-pressed=${state.day === "weekend"} @click=${() => h.onDay("weekend")}>Weekend</button>
+          </span>
+          <button type="button" class="btn es-allcars" @click=${h.onAllCars}
+            aria-label="All ${ctx.cars} car${ctx.cars === 1 ? "" : "s"}, all hours, both day types"
+            title="Sets every hour of both Weekday and Weekend to the full fleet">All ${ctx.cars} car${ctx.cars === 1 ? "" : "s"}, all hours</button>
         </div>
 
         ${ctx.ux.presets ? presetsTemplate(ctx, state, h) : nothing}
