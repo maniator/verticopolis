@@ -144,6 +144,20 @@ and the game loads that fine; the game's own re-saves rebuild it.
 
 Multi-story units are one record per floor (parts); the importer merges them.
 
+Rows that are not rooms. Type 0 is a paving piece (state 2) that fills floor
+tiles between rooms; type 45 is the metro tunnel, on floor index 0 only (our
+floor -9, B10), running along both sides of the station (TOWER7: tiles 0 to 208
+and 238 to 375). The metro station is three records, types 31, 32 and 33 on
+floor indexes 2, 1 and 0, 30 tiles wide each (TOWER7: tiles 208 to 238). Widths
+seen in the saves: security 16, medical center 26, housekeeping 15, recycling
+center 25, parking stall 4, parkade ramp 16 (type 44).
+
+Parking rows hold stalls (type 11) and one ramp per segment. A row may carry
+short paving pieces between stalls (TOWER7 B5: tiles 138 to 141 and 149 to 150,
+state 2), drawn flat grey with cars only in stalls; the file still counts those
+stalls as connected. A paving piece 56 tiles wide (TOWER1) leaves the stalls
+beyond it disconnected, as the file's count says.
+
 ---
 
 ## 4. People (`u32 N`, then N records of 16)
@@ -323,7 +337,9 @@ ten-wide groups suggest a per-security-office or per-clinic table.
 ### 7.5 Parking (F+274, 1,026 bytes)
 
 `u16` connected-stall count, then 512 x `u16` ascending stall ids (numbered from
-0, the rest zero). Header byte 50 counts all stalls. Known.
+0, the rest zero). Header byte 50 counts all stalls. Known. All nine reddit
+saves match: the count equals the stall total except TOWER1 (55 of 63, the
+stalls a whole row of paving away from their ramp are not counted).
 
 ### 7.6 Clinic list (F+1,300, 22 bytes)
 
