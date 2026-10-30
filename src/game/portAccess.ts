@@ -60,9 +60,10 @@ export function floorsOfPort(port: EnginePort): (kind: FacilityKind) => number {
   return (kind) => catalogFacility(catalogOn(port, "modern"), kind).floors;
 }
 
-/** The reader of `port`'s frame. It asks each kind's height on its first update,
- *  before the scene is built, so the view's kind facts are bound first (both
- *  modes' catalogs state the same facts). */
+/** The reader of `port`'s frame, sized from the port's own catalog. It also
+ *  binds the view's kind facts to that catalog, so the panels and the scene can
+ *  ask them from the first frame whichever of them builds first (both modes'
+ *  catalogs state the same facts). */
 export function newViewReader(port: EnginePort): ViewReader {
   bindViewKinds(catalogOn(port, "modern"));
   return new ViewReader(port, floorsOfPort(port));

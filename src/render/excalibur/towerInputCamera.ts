@@ -1,5 +1,4 @@
 import * as ex from "excalibur";
-import { isCommercialKind } from "../../presentation/viewKinds";
 import { viewWorld } from "../../presentation/viewWorld";
 import { findCatalogFacility } from "../../engine/catalogTypes";
 import type { FacilityKind, SerializedView, WeatherKind } from "../../engine/types";
@@ -433,7 +432,7 @@ function censusCrowd(
         // (`customersIn` is not persisted: just after a save load a busy venue
         // reads empty for the seconds the crowd system takes to re-route diners
         // in. That is honest and self-heals; see the ambience backlog.)
-        occ += isCommercialKind(u.kind) && def.population > 0 ? (u.customersIn ?? 0) : (u.occupants ?? 0);
+        occ += def.commercial && def.population > 0 ? (u.customersIn ?? 0) : (u.occupants ?? 0);
         cap += unitCap;
       }
     }

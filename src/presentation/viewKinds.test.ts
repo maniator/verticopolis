@@ -17,6 +17,9 @@ describe("the view's kind facts", () => {
         expect(isUnmetDemandKind(kind), `${mode} ${kind} unmet`).toBe(tableUnmet(kind));
         expect(isElevatorKind(kind), `${mode} ${kind} elevator`).toBe(tableElevator(kind));
         expect(hasBusinessHours(kind), `${mode} ${kind} hours`).toBe(tableHasHours(kind));
+        for (const hour of [0, 1.5, 2, 6.99, 7, 10, 13.9, 14, 17, 19.5, 20, 21, 22, 23, 23.75, 24]) {
+          expect(isOpenAt(kind, hour), `${mode} ${kind} at ${hour}`).toBe(tableOpenAt(kind, hour));
+        }
         for (let hour = 0; hour < 24; hour++) expect(isOpenAt(kind, hour), `${mode} ${kind} at ${hour}`).toBe(tableOpenAt(kind, hour));
       }
     }

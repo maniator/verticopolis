@@ -1,12 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { catalogFacility } from "../engine/catalogTypes";
 import { Simulation } from "../engine/Simulation";
 import { catalogFor } from "../engine/catalog";
 import { towerCatalog, useTowerCatalogSource } from "../engine/towerCatalog";
 import { PortRenderSim } from "../simport/portRenderSim";
 import { catalogOf, floorsOfPort, isUnlocked, newRenderSim, newViewReader, quoteBuild, quoteShaft } from "./portAccess";
-import { isHotelKind, resetViewKindsForTests } from "../presentation/viewKinds";
-import { bindViewKinds } from "../presentation/viewKinds";
+import { bindViewKinds, isHotelKind, resetViewKindsForTests } from "../presentation/viewKinds";
 import { portDeps } from "./portDeps.fixture";
 import { KINDS } from "../engine/port/layout";
 
@@ -114,6 +113,9 @@ describe("newRenderSim", () => {
   });
 });
 
+/** Some tests rebind the view's kind facts; leave them bound to the Modern tables for the next. */
+afterEach(() => bindViewKinds(catalogFor("modern")));
+
 describe("newViewReader", () => {
   it("binds the view's kind facts before the reader's first update asks a kind's height", () => {
     const sim = tower();
@@ -122,7 +124,6 @@ describe("newViewReader", () => {
     resetViewKindsForTests();
     expect(() => newViewReader(engine)).not.toThrow();
     expect(isHotelKind("hotelSingle")).toBe(true);
-    bindViewKinds(catalogFor("modern"));
   });
 });
 
@@ -145,6 +146,5 @@ describe("floorsOfPort", () => {
     // The port is pointed back at the TypeScript tables, as a swapped-in tower would be.
     useTowerCatalogSource(engine, null);
     expect(floors("weddingHall")).toBe(catalogFor("modern").facilities.find((f) => f.key === "weddingHall")!.floors);
-    bindViewKinds(catalogFor("modern"));
   });
 });

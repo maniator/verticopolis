@@ -41,6 +41,12 @@ function towerWithHall(): RustEngine {
 }
 
 describe.skipIf(!hasWasmPackage())("the reader over the Rust engine's wedding hall", () => {
+  it("is sized from the Modern catalog because both modes of the Rust catalog state the same heights", () => {
+    const modern = readCatalog(wasm(), "modern").facilities;
+    const classic = new Map(readCatalog(wasm(), "classic").facilities.map((f) => [f.key, f.floors]));
+    for (const f of modern) if (classic.has(f.key)) expect(classic.get(f.key), f.key).toBe(f.floors);
+  });
+
   it("finds the hall on floors 100 to 104 and nothing above, before and after the view's facts are rebound", () => {
     const rust = towerWithHall();
     const reader = newViewReader(rust);
@@ -48,7 +54,10 @@ describe.skipIf(!hasWasmPackage())("the reader over the Rust engine's wedding ha
     expect(hall.floor).toBe(100);
     const check = () => {
       for (let floor = 100; floor <= 104; floor++) expect(reader.tower.unitAt(floor, hall.x + 1), `floor ${floor}`).toBe(hall);
+      for (const x of [hall.x, hall.x + hall.width - 1]) expect(reader.tower.unitAt(102, x), `edge ${x}`).toBe(hall);
       expect(reader.tower.unitAt(105, hall.x + 1)).toBeUndefined();
+      expect(reader.tower.unitAt(99, hall.x + 1)).not.toBe(hall);
+      for (const x of [hall.x - 1, hall.x + hall.width]) expect(reader.tower.unitAt(102, x), `beside ${x}`).not.toBe(hall);
     };
     check();
     // The scene, the UI or another tower binds the view's facts to the TypeScript tables' catalog.

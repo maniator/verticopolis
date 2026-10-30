@@ -1,12 +1,12 @@
-import type { Catalog, CatalogFacility } from "../engine/catalogTypes";
+import { catalogOpenAt, type Catalog, type CatalogFacility } from "../engine/catalogTypes";
 import type { FacilityKind } from "../engine/types";
 
 /**
  * What the view knows about each kind, read from the engine's catalog: which
  * kinds are commercial, hotel rooms, lease amenities, demand tenants or
- * elevators, and which keep business hours and when they are open. The view asks these here instead of keeping kind lists of its own, so
- * a kind the engine adds lands on the right side of every check with no frontend
- * edit.
+ * elevators, and which keep business hours and when they are open. The view
+ * asks these here instead of keeping kind lists of its own, so a kind the
+ * engine adds lands on the right side of every check with no frontend edit.
  *
  * The facts are the same in both modes, so a catalog of either one binds them.
  * Like the view's world they are bound before anything draws, and a kind the
@@ -60,10 +60,10 @@ export function hasBusinessHours(kind: FacilityKind): boolean {
   return entry(kind).openHours !== null;
 }
 
-/** Whether the kind is open in `hour` (0 to 23); a kind with no posted hours is
- *  always open. */
+/** Whether the kind is open in `hour`, read as the engines read it (a fraction
+ *  or 24 wraps onto its hour); a kind with no posted hours is always open. */
 export function isOpenAt(kind: FacilityKind, hour: number): boolean {
-  return entry(kind).openHours?.[hour] ?? true;
+  return catalogOpenAt(entry(kind), hour);
 }
 
 /** Test hook: forget the bound facts. */
