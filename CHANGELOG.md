@@ -9,9 +9,21 @@ simply shows the build-id line. At most three lines are shown; keep to the few
 that matter, written as a player outcome in a calm voice (see CONTRIBUTING.md
 "Player notes" for the house style).
 
+What goes where: this file is for players, one section per app version. The
+engine crate has its own file, [`engine-rs/CHANGELOG.md`](./engine-rs/CHANGELOG.md),
+one section per crate version, written for people who build on the engine.
+Classify a change by what a player would notice, not by which layer changed: an
+engine fix a player can feel (elevators, imports, the engine choice) gets a line
+here. A change to the engine's contract alone gets only a crate entry; the update
+prompt already tells players it is an engine update and shows the new version.
+
 Entries below 1.51.1 were curated from the commit history after the fact, so they
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
+
+## 2.63.0
+
+- The update prompt now says whether an update changes the game, the engine, or both, and shows the new engine version.
 
 ## 2.61.0
 

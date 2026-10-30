@@ -523,6 +523,26 @@ seam. A change like that still needs a bump; review owns it, and the backlog row
 `engine-compat-coverage` tracks closing the gap. A record edited by hand in the
 same PR also skips the main comparison, so a reviewer reads the record's diff.
 
+### Two changelogs, and the update label
+
+Two files, by audience. `CHANGELOG.md` is for players, one section per app
+version. `engine-rs/CHANGELOG.md` is for people who build on the engine, one
+section per crate version, and a crate bump adds its section in the same PR
+(`src/tests/engineChangelog.guard.test.ts` fails otherwise). Classify a change
+by what a player would notice, not by which layer changed: an engine fix a
+player can feel gets a line in `CHANGELOG.md`; a contract-only change gets just
+the crate entry.
+
+The update prompt also labels each update **Game update**, **Engine update** or
+**Game and engine update**, with a line such as "Rust engine 0.24.0 → 0.25.0"
+when an engine changed. Nobody writes the label. The build hashes the shell (all
+of `src` outside the engines, tests and the engine package) and records the
+Rust crate version, the Rust sources hash and the TypeScript engine's sources
+hash. `dist/version.json` carries them (`shell`, `engine`), the running client
+compares its own (`__BUILD_FINGERPRINT__`), and `classifyUpdate` in
+`src/pwaUpdateInfo.ts` picks the label. An older build with no fingerprint shows
+the plain prompt.
+
 ### Player notes (what the update prompt shows players)
 
 The build emits `dist/version.json` (`{ version, sha, notes }`) that the running

@@ -25,6 +25,8 @@ export interface UpdatePromptActions {
   onUpdate: () => void;
 }
 
+const KIND_LABEL = { game: "Game update", engine: "Engine update", both: "Game and engine update" } as const;
+
 export function updatePromptTemplate(
   info: UpdateInfo | null | undefined,
   actions: UpdatePromptActions,
@@ -40,11 +42,15 @@ export function updatePromptTemplate(
     ? html`<div class="whatsnew"><h3 class="win-title sm">What's new</h3><ul>${notes.map((n) => html`<li>${n}</li>`)}</ul></div>`
     : nothing;
   const buildLine = idText ? html`<p class="build-id">Build ${idText}</p>` : nothing;
+  const kind = info?.kind ? html`<p class="update-kind"><strong>${KIND_LABEL[info.kind]}</strong></p>` : nothing;
+  const engineLine = info?.engineLine ? html`<p class="build-id">${info.engineLine}</p>` : nothing;
   return html`
       <h2>Update available</h2>
+      ${kind}
       <p>A newer version of Verticopolis is ready. Update now saves your tower and reloads onto it. You won't lose any progress.</p>
       <p>Or keep playing: it'll apply next time you reopen.</p>
       ${notesBlock}
+      ${engineLine}
       ${buildLine}
       <div class="modal-actions">
         <button class="btn" data-act="later" @click=${actions.onLater}>Later</button>
