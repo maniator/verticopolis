@@ -272,7 +272,7 @@ describeWithCodec("buildTDT: export → import round trip", () => {
     expect(built.report.comesAlong[0]).toMatch(/^0 rooms/); // no census: see above
     // 4 bytes more than before the 4-byte gap that SimTower leaves between the
     // parking block and the stairs table (measured on the nine 1997 saves, #1497).
-    expect(built.bytes.length).toBe(71_295);
+    expect(built.bytes.length).toBe(71_455);
   });
 
   // `builtShaftPayloadSize`'s own arithmetic contract is pinned at the UNIT

@@ -6,9 +6,9 @@
 use super::byte_reader::ByteReader;
 use super::format::*;
 use super::resync::{empty_slots_in_gap, find_next_header, MAX_BUILT_PAYLOAD, MIN_BUILT_PAYLOAD};
-pub use super::stair_scan::{locate_stairs, stairs_table_starts_at};
+pub use super::stair_scan::{locate_stairs, stairs_in_table_at, stairs_table_starts_at};
 use super::stamp::stamped_generation;
-use super::types::{TdtElevator, TdtTail};
+use super::types::{TdtElevator, TdtStair, TdtTail};
 
 /// Does the trailing routing region begin exactly at `at`?
 fn routing_tail_starts_at(bytes: &[u8], at: usize) -> bool {
@@ -23,14 +23,17 @@ fn routing_tail_starts_at(bytes: &[u8], at: usize) -> bool {
 }
 
 /// Does a structure whose position we know sit where a table ending at `end`
-/// puts it: the stairs table after the finance and parking blocks, or the
+/// puts it: the stairs table where the game keeps it, where our exports before
+/// generation 3 put it (with the 4-byte gap or, earlier still, without), or the
 /// routing region one stairs table further on?
 fn table_end_anchored(bytes: &[u8], end: usize) -> bool {
-    let after_parking = end + TDT_FINANCE_SIZE + TDT_PARKING_SIZE;
-    // The game's own files leave a gap before the stairs table; our exports
-    // from before it was measured did not.
-    [TDT_STAIRS_GAP, 0].into_iter().any(|gap| {
-        let stairs = after_parking + gap;
+    let distances = [
+        TDT_ELEVATORS_TO_STAIRS,
+        TDT_LEGACY_ELEVATORS_TO_STAIRS,
+        TDT_LEGACY_NO_GAP_ELEVATORS_TO_STAIRS,
+    ];
+    distances.into_iter().any(|distance| {
+        let stairs = end + distance;
         stairs_table_starts_at(bytes, stairs)
             || routing_tail_starts_at(bytes, stairs + TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE)
     })
@@ -212,7 +215,9 @@ fn read_elevator_table(r: &mut ByteReader, layout: PayloadLayout, resync: bool) 
 fn choose_layout(bytes: &[u8], table_start: usize) -> PayloadLayout {
     match stamped_generation(bytes) {
         Some(TDT_STAMP_SPANNED_GENERATION) => return PayloadLayout::Spanned,
-        Some(TDT_STAMP_GENERATION) => return PayloadLayout::ExpressEligible,
+        Some(TDT_STAMP_ELIGIBLE_GENERATION | TDT_STAMP_GENERATION) => {
+            return PayloadLayout::ExpressEligible
+        }
         _ => {}
     }
     let walk = |layout: PayloadLayout| -> TableWalk {
@@ -357,24 +362,18 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
     tail.elevators = Some(elevators);
     let after_elevators = r.offset();
 
-    // The stairs table comes after the finance block, whose people counts can
-    // read as a flight, so the search starts past it when the block is there.
+    // After the elevators come the statistic words, the finance block, two
+    // blocks nobody has decoded, the parking block, the clinic list and the
+    // stairs table. The people counts sit at the start of the finance block.
+    let blocks_at = after_elevators;
+    let raw = r.raw();
+    let finance_at = blocks_at + TDT_STATS_SIZE;
     let mut stairs_search_from = after_elevators;
     r.enter_block("finance block");
-    if r.remaining() >= TDT_FINANCE_SIZE {
-        let finance = r.bytes(TDT_FINANCE_SIZE).expect("finance block sized");
-        stairs_search_from = r.offset();
-        tail.finance_population = finance_population(&finance);
-        r.enter_block("parking block");
-        if r.remaining() >= TDT_PARKING_SIZE {
-            tail.parking_connected = Some(r.u16().expect("parking block sized"));
-            r.skip(TDT_PARKING_SIZE - 2).expect("parking block sized");
-        } else {
-            tail.warnings.push(
-                "The save ends inside its parking data, so the connected-stall count could not be read."
-                    .into(),
-            );
-        }
+    let people_end = finance_at + TDT_FINANCE_TOTAL_AT + 4;
+    if raw.len() >= people_end {
+        stairs_search_from = people_end;
+        tail.finance_population = finance_population(&raw[finance_at..people_end]);
     } else {
         tail.warnings.push(
             "The save ends right after its elevators, so its finance, parking, and stairway data could not be read."
@@ -383,6 +382,93 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
     }
 
     r.enter_block("stairs table");
-    tail.stairs = Some(locate_stairs(r.raw(), stairs_search_from));
+    let generation = stamped_generation(raw);
+    tail.stairs = Some(locate_stairs_table(
+        raw,
+        blocks_at,
+        stairs_search_from,
+        generation,
+    ));
+
+    r.enter_block("parking block");
+    // Our exports before generation 3 keep the parking count right after a
+    // 132-byte finance block; the game's files keep it after the statistics,
+    // finance and the two blocks nobody has decoded. An unstamped file is read
+    // the older way only when the game's place holds nothing and the older one
+    // holds a count a parking block could (the older place is a finance line in
+    // a game save, and a game save has no stalls there when the line is large).
+    let game_parking_at =
+        finance_at + TDT_FINANCE_SIZE + TDT_UNKNOWN_FLAGS_SIZE + TDT_UNKNOWN_BYTES_SIZE;
+    let count_at = |at: usize| {
+        (raw.len() >= at + 2).then(|| usize::from(u16::from_le_bytes([raw[at], raw[at + 1]])))
+    };
+    let older_export = match generation {
+        Some(g) => g < TDT_STAMP_GENERATION,
+        None => {
+            count_at(game_parking_at) == Some(0)
+                && count_at(blocks_at + TDT_FINANCE_SIZE).is_some_and(|n| (1..=512).contains(&n))
+        }
+    };
+    let parking_at = if older_export {
+        blocks_at + TDT_FINANCE_SIZE
+    } else {
+        game_parking_at
+    };
+    if raw.len() >= parking_at + TDT_PARKING_SIZE && raw.len() >= people_end {
+        tail.parking_connected = Some(i64::from(u16::from_le_bytes([
+            raw[parking_at],
+            raw[parking_at + 1],
+        ])));
+    } else if raw.len() >= people_end {
+        tail.warnings.push(
+            "The save ends inside its parking data, so the connected-stall count could not be read."
+                .into(),
+        );
+    }
     tail
+}
+
+/// Clinic ids are small slot numbers; a list holding larger words is not one.
+const CLINIC_ID_BOUND: usize = 16;
+
+/// Does the 22-byte clinic list that ends at `table` agree with the clinic
+/// count in the header? It does in every save the game wrote that has a
+/// clinic, which is how a table in the game's position is told from a table
+/// our older exports wrote 160 bytes earlier.
+fn clinic_list_matches_header(raw: &[u8], table: usize) -> bool {
+    if raw.len() < TDT_HEADER_CLINIC_COUNT_AT + 2
+        || table < TDT_CLINIC_LIST_SIZE
+        || table > raw.len()
+    {
+        return false;
+    }
+    let word = |at: usize| usize::from(u16::from_le_bytes([raw[at], raw[at + 1]]));
+    let list = table - TDT_CLINIC_LIST_SIZE;
+    let count = word(list);
+    (1..=TDT_CLINIC_MAX).contains(&count)
+        && count == word(TDT_HEADER_CLINIC_COUNT_AT)
+        && (0..TDT_CLINIC_MAX).all(|i| word(list + 2 + 2 * i) < CLINIC_ID_BOUND)
+}
+
+/// The stairs table. A file of ours from generation 3 on, or one whose clinic
+/// list matches its header, keeps the table where the game does, and a table
+/// that fits there is taken as it stands. Anything else is found by the
+/// signature scan, which also reads the tables our older exports wrote 160
+/// bytes earlier (the game's position would read their end-of-parking bytes
+/// and clinic list as a flight, so it is not tried for them).
+fn locate_stairs_table(
+    raw: &[u8],
+    blocks_at: usize,
+    scan_from: usize,
+    generation: Option<i64>,
+) -> Vec<TdtStair> {
+    let game = blocks_at + TDT_ELEVATORS_TO_STAIRS;
+    let at_game_offset =
+        generation == Some(TDT_STAMP_GENERATION) || clinic_list_matches_header(raw, game);
+    if at_game_offset {
+        if let Some(stairs) = stairs_in_table_at(raw, game) {
+            return stairs;
+        }
+    }
+    locate_stairs(raw, scan_from)
 }

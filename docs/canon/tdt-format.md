@@ -18,7 +18,9 @@ not here.
   retail game wrote under the Wine harness (`tools/simtower`), and the game's own
   re-saves of our exports.
 
-Where the sources disagree this page names the better-evidenced reading.
+Where the sources disagree this page names the better-evidenced reading. The
+full byte-by-byte table, with an honest unknown for every byte we cannot yet
+explain, is [tdt-byte-map.md](./tdt-byte-map.md).
 
 **Clean room.** This page restates the layout in our own words; no upstream text
 or code is copied, and none may be pasted in. Canon may come from observed
@@ -46,12 +48,15 @@ flowchart TB
     H["Header: 560 bytes (0x230)"] --> F["Floor map: 120 floors, each 6 + 18n + 188 bytes"]
     F --> P["People: u32 count N, then N x 16 bytes"]
     P --> R["Retail table: 512 x 18 = 9,216 bytes"]
-    R --> E["Elevators: 24 slots, 194 bytes empty, built = 194 + 3140 + 324k + 348"]
-    E --> FIN["Finance: 132 bytes"]
-    FIN --> PK["Parking: 1,026 bytes"]
-    PK --> G["Gap: 4 zero bytes"]
-    G --> S["Stairs: 64 x 10 = 640 bytes"]
-    S --> T["Tail: 17,402 bytes in game-written saves"]
+    R --> E["Elevators: 24 slots, 194 bytes empty, built = 194 + 720 + 324k + 8 x 346"]
+    E --> ST["Statistic words: 22 x i32 = 88 bytes"]
+    ST --> FIN["Finance: 33 x i32 = 132 bytes"]
+    FIN --> UF["Undecoded flags: 12 bytes"]
+    UF --> UB["Undecoded bytes: 42 bytes"]
+    UB --> PK["Parking: 1,026 bytes"]
+    PK --> CL["Medical clinic list: 22 bytes"]
+    CL --> S["Stairs: 64 x 10 = 640 bytes"]
+    S --> T["Tail: 17,242 bytes in game-written saves (+48 with named units)"]
     T --> V["Our stamp (exports only): VCTDT + u16, 7 bytes"]
 ```
 
@@ -62,16 +67,21 @@ offset      size        block
             4 + 16 N    people (N is a pool size, a multiple of 256 in game saves)
             9,216       retail table (512 x 18)
             variable    24 elevator slots
+            88          statistic words (22 x i32)
             132         finance (33 x i32)
+            12          undecoded flags
+            42          undecoded bytes
             1,026       parking (u16 connected count + 512 x u16)
-            4           zero gap
+            22          medical clinic list (u16 count + 10 x u16 ids)
             640         stairs / escalators (64 x 10)
-            17,402      tail (zeros and sparse routing state in game saves)
+            17,242      tail (zeros and sparse routing state in game saves)
 ```
 
 Measured example, TOWER2.TDT (470,530 bytes): people at 68,282 with N = 9,984;
-retail at 228,030; elevators at 237,246 (214,080 bytes for 24 slots); finance at
-451,326; parking at 451,458; stairs at 452,488; tail at 453,128 (17,402 bytes).
+retail at 228,030; elevators at 237,246 (214,080 bytes for 24 slots); statistic
+words at 451,326; finance at 451,414; parking at 451,600; clinic list at 452,626;
+stairs at 452,648; tail at 453,288 (17,242 bytes). The stairs table is always
+1,322 bytes after the end of the elevator slots.
 
 ## 2. Header
 
@@ -91,6 +101,7 @@ retail at 228,030; elevators at 237,246 (214,080 bytes for 24 slots); finance at
 | 0x2E | u16 | commercialCount | Shops + restaurants + fast food [TD] | Medium |
 | 0x30 | u16 | securityCount | Max 10 [TD] | Medium |
 | 0x32 | u16 | parkingStallCount | Includes disconnected stalls [TD] | Medium |
+| 0x34 | u16 | clinicCount | Medical clinics; equals the count in the clinic list (section 12.1) | High |
 | 0x36 | u16 | hallCinemaCount | Party halls + cinemas [TD] | Medium |
 | 0x38 | u16 | namedUnits | Custom-named tenants [TD] | Medium |
 | 0x3A | u16 | namedPeople | Custom-named people [TD] | Medium |
@@ -254,7 +265,7 @@ stand.
 24 slots, one pool shared by standard, service and express shafts.
 
 Slot record: an empty slot is 194 bytes; a built slot is
-`194 + 3140 + 324 k + 348` bytes.
+`194 + 720 + 324 k + 8 x 346` bytes (the same total as the `194 + 3140 + 324 k + 348` older versions of this page gave; the byte map, [tdt-byte-map.md](./tdt-byte-map.md), has the parts).
 
 | Offset | Size | Field | Meaning | Confidence |
 | --- | --- | --- | --- | --- |
@@ -269,9 +280,10 @@ Slot record: an empty slot is 194 bytes; a built slot is
 | 65 | u8 | bottomFloor | File floor index | High |
 | 66 | 120 B | serviced | One byte per floor, per-floor stop configuration | High |
 | 186 | 8 B | homes | Per-car home floor | Medium |
-| 194 | 3,140 B | fixed block | Zeros in game saves | High |
-| 3,334 | 324 k | floor entries | Waiting counts and up to 40 queued person indices each way | High |
-| 3,334 + 324 k | 348 | car block | Current floor, passengers, turnaround, destinations. One block per shaft, not per car | High |
+| 194 | 480 B | per-floor map | 120 x 4 bytes, one entry per floor index; stop ordinals and a bit set that is constant between two lobbies; not decoded | Medium |
+| 674 | 240 B | per-floor bytes | 2 x 120; the second is nonzero only at lobby floors; not decoded | Low |
+| 914 | 324 k | floor entries | Waiting counts and up to 40 queued person indices each way | High |
+| 914 + 324 k | 2,768 | car blocks | 8 x 346 bytes: current floor, passengers, turnaround, destinations. All 146 shafts in the nine real saves have eight | High |
 
 Entry count k:
 
@@ -290,8 +302,9 @@ Limits: 24 shafts, 8 cars, spans in `src/engine/facilities.ts`.
 
 ## 10. Stairs and escalators
 
-A 4-byte zero gap follows the parking block, then 64 records of 10 bytes, then
-the tail.
+64 records of 10 bytes, 1,322 bytes after the end of the elevator slots (section
+1) and right after the clinic list (section 12.1), then the tail. The table is
+at that distance in all nine real saves and in the game's own re-saves of them.
 
 | Offset | Size | Field | Meaning |
 | --- | --- | --- | --- |
@@ -299,40 +312,71 @@ the tail.
 | 1 | u8 | type | 0 escalator, 1 stairs; 2/3 two-story and 4/5 three-story are in the format but the game wrote none in any save we have |
 | 2 | u16 | x | Left tile |
 | 4 | u16 | floor | File floor index of the lower floor |
-| 6 | u16 | crowdUp | People going up (0 in saves) |
-| 8 | u16 | crowdDown | People going down (0 in saves) |
+| 6 | i16 | crowdUp | People going up; the game writes small signed values, 0 in most saves |
+| 8 | i16 | crowdDown | People going down |
 
-- Records sit in any slot, not packed (TOWER2 uses slots 14 to 46). Read all 64.
-- Saves with up to 48 flights start at slot 16 (TOWER1, TOWER5, TOWER2 and MYTOWER do; TOWER6 and TOWER7 hold 64 and so also use slots 0 to 15). SimTower dropped the first 16 records of a file that filled the table from slot 0, so the exporter fills from slot 16 and wraps to slot 0 after slot 63 (confidence: Medium, from the allocation pattern).
-- Open question (#1501): from an export with 64 flights SimTower keeps slots 16
-  to 63 and drops slots 0 to 15, although a file SimTower wrote itself with all
-  64 slots built keeps all of them. The export report warns above 48 flights.
+- Flights sit from slot 0 up. They are not always packed: TOWER2 leaves slot 20
+  empty. Read all 64.
+- TOWER6 and TOWER7 fill all 64 slots; the exporter writes slot 0 up and nothing
+  is dropped.
+- Our exports before generation 3 (section 16) wrote this table 160 bytes too
+  early, with a 4-byte gap before it and the flights starting at slot 16. The
+  game read their slot 16 as its slot 0, so flights 49 to 64 landed in its
+  parking list and clinic list and vanished (#1501).
 - A stacked column of flights is one single-story record per floor. The exporter
   writes the same.
 - Pool: 64 links shared by stairs and escalators.
-- The importer finds the table by shape when the walk of the earlier blocks does
-  not land on it (`locate_stairs` in `engine-rs/src/tdt/tail.rs`).
+- The importer takes the table at the game's place when the file is ours from
+  generation 3, or when its clinic list agrees with header byte 52; every other
+  file, including our older exports, is searched for the table by shape
+  (`locate_stairs` in `engine-rs/src/tdt/stair_scan.rs`).
 
-Real-save types seen: only 0 and 1 (TOWER2: 27 escalators, 4 stairs).
+Real-save types seen: only 0 and 1 (TOWER2: 26 escalators, 4 stairs).
 
-## 11. Finance block (132 bytes = 33 x i32)
+## 11. Statistic words and finance block (88 + 132 bytes)
 
-| Words | Bytes | Content | Confidence |
+Right after the last elevator slot come 22 x i32 of statistic words (88 bytes)
+and the finance block (33 x i32, 132 bytes). Offsets below count from the end of
+the elevator slots.
+
+| Bytes | Words | Content | Confidence |
 | --- | --- | --- | --- |
-| 0 to 21 | 0 to 87 | Income lines (Office, Single, Twin, Suite, Shops, Fast Food, Restaurant, Party Hall, Theatre, Condo), expense lines (Lobby, three elevator kinds, Escalator, Parking, Recycling, Metro, Housekeeping, Security) and totals. Order inside not pinned; we write zeros | Low |
-| 22 to 31 | 88 to 127 | People per class: Office, Hotel single, Hotel twin, Hotel suite, Shop, Fast food, Restaurant, Party hall, Theatre, Condo | High |
-| 32 | 128 | People total (the ten classes added up) | High |
+| 0 to 39 | 0 to 9 | Ten counters, non-zero in word 0 and word 3 only; meaning not known | Low |
+| 40 to 43 | 10 | Sum of words 0 to 9 | High |
+| 44 to 79 | 11 to 19 | Parking lines: 2n, n, n, 2n, n, n, n, n, n for n connected stalls | Medium |
+| 80 to 83 | 20 | Zero in every save | High |
+| 84 to 87 | 21 | 11 n, the sum of words 11 to 19 | High |
+| 88 to 127 | 22 to 31 | People per class: Office, Hotel single, Hotel twin, Hotel suite, Shop, Fast food, Restaurant, Party hall, Theatre, Condo | High |
+| 128 to 131 | 32 | People total (the ten classes added up) | High |
+| 132 to 171 | 33 to 42 | Income per class, in the same order as the people | Medium |
+| 172 to 175 | 43 | Total income (sum of words 33 to 42) | High |
+| 176 to 215 | 44 to 53 | Expense lines: Lobby, Elevator, Express elevator, Service elevator, Escalator, Parking, Recycling, Metro, Housekeeping, Security | Medium |
+| 216 to 219 | 54 | Total expense (sum of words 44 to 53) | High |
+
+We write the people lines and their total and leave everything else zero.
 
 The people lines equal what SimTower shows as its live count (TOWER5 and TOWER7
 match exactly). Example, TOWER7: 1,428 office, 1,362 shop, 292 fast food, 205
 restaurant, 480 theatre, 462 condo. TOWER4 totals 4,515 with 1,620 office and
 1,131 condo.
 
+Then 12 bytes of undecoded flags (`00 00 FF FF FF FF 00 00` and four 0/1 bytes)
+and 42 bytes of undecoded data (two bytes, then ten bytes, ten bytes and ten
+u16). We write zeros for both.
+
 ## 12. Parking (1,026 bytes)
 
 `u16` connected-stall count (excludes stalls with no ramp path) then 512 x u16
-stall indices. Maximum 512 stalls. Real saves read counts such as 8,800 here
-that we have not explained.
+stall indices, numbered from 0 for the connected stalls; the rest are zero.
+Maximum 512 stalls. Header byte 50 counts all stalls, connected or not. The
+exporter writes the same list.
+
+### 12.1 Medical clinic list (22 bytes)
+
+Right after the parking block: a `u16` count and ten `u16` clinic ids (TOWER2
+holds `2, 1, 3`, TOWER5 `2, 0, 2`, TOWER6 and TOWER7 `10, 0 to 9`). The count
+equals header byte 52. A tower has at most 10 clinics. The exporter numbers the
+ids from 0 up.
 
 ## 13. Lobby and reachability table (528 x 6 bytes) [TD]
 
@@ -342,15 +386,16 @@ Not read or written by us.
 
 ## 14. Tail
 
-17,402 bytes follow the stairs table in every real save and in the game's own
-re-saves. In game saves it is mostly zeros with sparse routing state (about 1,500
-non-zero bytes in a 17 KB tail); in the game's re-save of one of our exports
-only 48 bytes are non-zero.
+17,242 bytes follow the stairs table in every real save and in the game's own
+re-saves, 48 more (17,290) in a tower with named units (TOWER6 and TOWER7, the
+three 16-byte names at the end). In game saves it is mostly zeros with sparse
+routing state (about 1,000 to 1,500 non-zero bytes in a 17 KB tail); in the
+game's re-save of one of our exports only 48 bytes are non-zero.
 
 The game reads past the stairs table. A file that ends right after the table
 faults (0x0799). Our exporter writes 25,600 bytes of 0xFF ("all slots empty")
 instead, which loads at every star level tried; zeros read as live routing data
-and invent a phantom population. Matching the exact 17,402 bytes needs a
+and invent a phantom population. Matching the exact 17,242 bytes needs a
 5-star-and-up load check first. The extent the game reads depends on the file's
 own content.
 
@@ -368,6 +413,7 @@ game never reads it and its re-saves drop it. A reader never requires it.
 | --- | --- |
 | 1 | By span (the old writer) |
 | 2 | By eligible floors (section 9) |
+| 3 | By eligible floors, and the blocks after the elevators and the stairs table where the game keeps them (sections 10 to 12) |
 
 An unstamped file, or a generation we do not know, is decided by structural
 inference (`choose_layout` in `engine-rs/src/tdt/tail.rs`): it picks the layout

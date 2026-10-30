@@ -138,6 +138,10 @@ pub fn encode_tower(
     w.set_u16(0x2e, header.commercial.min(512));
     w.set_u16(0x30, header.security.min(10));
     w.set_u16(0x32, counts.parking_stalls.min(512));
+    w.set_u16(
+        TDT_HEADER_CLINIC_COUNT_AT,
+        header.medical.min(TDT_CLINIC_MAX as i64),
+    );
     w.set_u16(0x36, header.hall_cinema.min(0xffff));
     // `viewWordsFromView` keeps the default words unless both members are
     // finite numbers (`Number.isFinite`, no coercion).
@@ -335,8 +339,10 @@ pub fn encode_tower(
         w.pad(size as usize);
     }
 
-    // The people of each class and their total, the way the game's own finance
-    // block carries them; every other field stays zero.
+    // The statistic words stay zero; the finance block carries the people of
+    // each class and their total, the way the game's own one does, and every
+    // other line stays zero.
+    w.pad(TDT_STATS_SIZE);
     let mut finance = [0u8; TDT_FINANCE_SIZE];
     let mut total = 0i64;
     for (class, pop) in class_pop.iter().enumerate() {
@@ -350,12 +356,29 @@ pub fn encode_tower(
     for byte in finance {
         w.u8(byte as i64);
     }
+    w.pad(TDT_UNKNOWN_FLAGS_SIZE + TDT_UNKNOWN_BYTES_SIZE);
 
+    // The connected stalls are numbered from 0 up, the way the game lists them.
     let stalls = connected_stall_count(rooms).min(((TDT_PARKING_SIZE - 2) / 2) as i64);
     w.u16(stalls);
-    w.pad(TDT_PARKING_SIZE - 2);
+    for index in 0..(TDT_PARKING_SIZE - 2) / 2 {
+        w.u16(if (index as i64) < stalls {
+            index as i64
+        } else {
+            0
+        });
+    }
 
-    w.pad(TDT_STAIRS_GAP);
+    // The medical clinics, numbered from 0 up as in a tower that has them all.
+    let clinics = header.medical.min(TDT_CLINIC_MAX as i64);
+    w.u16(clinics);
+    for index in 0..TDT_CLINIC_MAX {
+        w.u16(if (index as i64) < clinics {
+            index as i64
+        } else {
+            0
+        });
+    }
 
     let mut stair_records: Vec<StairRecord> = vec![];
     let mut sorted: Vec<&OutWalkway> = walkways.iter().collect();
@@ -432,11 +455,7 @@ pub fn encode_tower(
         }
     }
     for slot in 0..TDT_STAIR_SLOTS {
-        // Flights fill the table from slot 16 and wrap to slot 0 only once the
-        // upper slots are full, the way the game allocates them.
-        let Some(s) =
-            stair_records.get((slot + TDT_STAIR_SLOTS - TDT_STAIR_FIRST_SLOT) % TDT_STAIR_SLOTS)
-        else {
+        let Some(s) = stair_records.get(slot) else {
             w.pad(TDT_STAIR_RECORD_SIZE);
             continue;
         };

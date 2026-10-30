@@ -23,13 +23,19 @@ export const TDT_RETAIL_SLOTS = 512;
 export const TDT_RETAIL_RECORD_SIZE = 18;
 export const TDT_ELEVATOR_SLOTS = 24;
 export const TDT_ELEVATOR_HEADER_SIZE = 194;
+/** What follows the elevators in a game save: 22 statistic words, the finance
+ *  block, two undecoded blocks, the parking block and the clinic list. */
+export const TDT_STATS_SIZE = 22 * 4;
 export const TDT_FINANCE_SIZE = 132;
+export const TDT_UNKNOWN_FLAGS_SIZE = 12;
+export const TDT_UNKNOWN_BYTES_SIZE = 42;
 export const TDT_PARKING_SIZE = 2 + 512 * 2;
+export const TDT_CLINIC_LIST_SIZE = 2 + 10 * 2;
 export const TDT_STAIR_SLOTS = 64;
 export const TDT_STAIR_RECORD_SIZE = 10;
 /** The trailer our writer stamps: magic plus a u16 generation. */
 export const TDT_STAMP_MAGIC = "VCTDT";
-export const TDT_STAMP_GENERATION = 2;
+export const TDT_STAMP_GENERATION = 3;
 /** The first generation: every shaft sized by its span, express included. */
 export const TDT_STAMP_SPANNED_GENERATION = 1;
 export const TDT_STAMP_SIZE = TDT_STAMP_MAGIC.length + 2;
