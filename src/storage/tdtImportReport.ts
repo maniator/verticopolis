@@ -164,7 +164,7 @@ export function importReport(facts: ImportReportFacts): ImportReport {
   }
   if (counts.hotelBooked > 0) {
     couldNotBring.push(
-      `${counts.hotelBooked} booked hotel room${counts.hotelBooked === 1 ? "" : "s"} arrived empty and ready to re-book (day guests aren't carried over).`,
+      `${counts.hotelBooked} booked hotel room${counts.hotelBooked === 1 ? "" : "s"} arrived empty and ready to re-book.`,
     );
   }
   if (counts.asleepConverted > 0) {

@@ -110,9 +110,9 @@ describe("Hotel population counts while climbing up through 4★ (FAQ)", () => {
   });
 
   it("a 3★ tower can't leap to 5★ on hotel guests in one evaluateStar tick", () => {
-    // Offices give ~5,400 occupant population: past the 4★ bar (5,000), short of
+    // Offices give ~9,000 occupant population: past the 4★ bar (5,000), short of
     // the 5★ bar (10,000). Hotel suites then pad the raw head count over 10,000.
-    const sim = towerWithPop(7, 5400);
+    const sim = towerWithPop(7, 9000);
     sim.star = 3;
     const occupantPop = sim.tower.totalPopulation();
     expect(occupantPop).toBeGreaterThanOrEqual(5000);

@@ -74,9 +74,9 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     width: 10,
     cost: 100000,
     minStar: 3,
-    // A suite houses a larger party than a double, matching the 1994 original
-    // (review F36).
-    population: 3,
+    // The 1994 original counts 2 guests in a suite, the same as a double: the
+    // finance block's suite line is 2 per checked-in room in all nine real saves.
+    population: 2,
   },
   fastFood: {
     kind: "fastFood",

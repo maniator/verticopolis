@@ -183,20 +183,27 @@ so everything after an out-of-order record renders as sky.
 
 Multi-story units are stored as one part per floor; importers merge the parts.
 
-### 5.1 Hotel flags (byte 5)
+### 5.1 Hotel status (byte 5)
 
-| Value | Meaning | Confidence |
+Bits 3 and 4 hold the room's stay state, bit 5 the dirty flag, bit 6 the
+infested flag, bits 0 and 1 the number of guests inside right now.
+
+| Status | Meaning | Confidence |
 | --- | --- | --- |
-| 0x03 | Occupant count mask (guests in the room) | Medium |
-| 0x08 | Set on rented rooms; exact meaning not pinned | Low |
-| 0x10 (16) | Guest asleep | Medium |
-| 0x20 (32) | Dirty, awaiting housekeeping | Medium |
-| 0x40 (64) | Bug-infested | Medium |
+| `0x08` to `0x0A` | Checked in (stay state 1); low bits = guests currently inside, 0 to 2 | High |
+| `0x10` to `0x13` | Asleep (stay state 2); low bits = guests inside | High |
+| `0x18` (24) | Clean and vacant; no guests counted. Every room of TOWER1, TOWER7 and MYTOWER | High |
+| `0x20`, `0x28`, `0x30` | Dirty, awaiting housekeeping (32, 40, 48 seen); no guests counted | High |
+| `0x40` | Bug-infested [TD]; not seen in the nine saves | Low |
 
-Values seen in real saves: 8, 9, 10, 16, 24, 32, 40, 48. TOWER1 stores 24 on
-every one of its 310 rooms and was saved at 13:42. The importer reads asleep
-rooms during the day (08:00 to 20:00) as dirty, and at night as asleep with the
-occupant count.
+The finance block's hotel guest lines count exactly the rooms in stay state 1 or
+2 at full complement (1 in a single room, 2 in a twin and 2 in a suite), whatever
+the low bits say. This reproduces the line for every hotel in all nine saves
+(for example TOWER4: 18 singles, 122 twins and 140 suites, all checked in or
+asleep, for 18 + 244 + 280 guests). The importer therefore brings every room in
+stay state 1 or 2 over as a room with its guests, at any hour. Our engine keeps
+one in-room guest state, so a checked-in guest who was out arrives asleep in the
+room and checks out at the next morning.
 
 ## 6. Unit type IDs
 
@@ -227,6 +234,11 @@ occupant count.
 | 44 | Parkade ramp [TD] | `parkingRamp` |
 | 45 | Metro tunnel [TD] | metro backdrop |
 | 48 | Burned area | cleared floor (reported) |
+
+Type bytes 226 and 227 (read as signed, -30 and -29) appear once each in
+TOWER3, on floors 17 and 18 across the same 24 tiles: a Party Hall under
+construction (negative = under construction, 29 and 30 = hall top and bottom).
+SimTower re-saves both unchanged.
 
 Type 48: the retail game draws a record of this type as garbage pixels, so the
 exporter writes no record for a burned or burning room and lets paving fill the
@@ -431,7 +443,8 @@ serviced-only.
   block's per-class people lines: rooms take people until `people / per-room`
   rooms are full (office 6, condo 3), capped by the rooms built, so the app
   matches the file exactly on the real saves. Hotel guests come from each
-  room's flags (section 5.1), not from the finance line. Shops, restaurants,
+  room's stay state (section 5.1), which reproduces the finance line for every
+  save. Shops, restaurants,
   fast food and theatres cannot be seeded: their customers are runtime state in
   our engine and build up after load, so the app's count starts below the
   file's total. Tracked in #1500.

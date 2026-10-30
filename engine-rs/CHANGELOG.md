@@ -15,6 +15,15 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 0.24.3 (2026-10-30)
+
+- A metro station's unit card reads its elevator access at the platform floor, the floor above the row the station is saved on, the same floor the engine's own metro rule uses.
+
+## 0.24.2 (2026-10-30)
+
+- The .TDT importer reads a hotel room's stay state (checked in, asleep, vacant) from its status byte. Checked-in and asleep rooms arrive with their guests at any hour, and clean vacant rooms arrive empty, so a tower's guest count matches the file's hotel lines.
+- A hotel suite holds 2 guests, as the finance block of every real save counts it. This moves the catalog digest, the conformance checkpoints and the .TDT export hashes.
+
 ## 0.24.1 (2026-10-30)
 
 - The .TDT exporter writes the stairs table where SimTower keeps it, with the parking and clinic lists, and the importer finds it there (#1501).

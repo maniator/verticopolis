@@ -152,7 +152,7 @@ const LEADING: [Facility; 22] = [
         None,
         100000,
         3,
-        3,
+        2,
         None,
         mo = false,
         t = false,
