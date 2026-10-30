@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PERF_BUDGET_REL_EPSILON, aboveFloor, withinCeiling } from "./perfBudget";
+import { PERF_BUDGET_REL_EPSILON, aboveFloor, medianOf, withinCeiling } from "./perfBudget";
 
 /**
  * Regression pins for AUD-009: the perf gate failed a docs-only diff by
@@ -47,5 +47,26 @@ describe("perf gate budget comparison (AUD-009 boundary noise)", () => {
       expect(withinCeiling(budget * (1 + PERF_BUDGET_REL_EPSILON / 2), baseline, 1.05)).toBe(true);
       expect(withinCeiling(budget * (1 + 1e-6), baseline, 1.05)).toBe(false);
     }
+  });
+});
+
+describe("medianOf (repeated benchmark runs)", () => {
+  it("takes the middle value of an odd count, ignoring order", () => {
+    expect(medianOf([0.16, 0.117, 0.12, 0.3, 0.11])).toBe(0.12);
+  });
+
+  it("averages the two middle values of an even count", () => {
+    expect(medianOf([4, 1, 3, 2])).toBe(2.5);
+  });
+
+  it("returns a single value as is and leaves the input unsorted", () => {
+    const input = [3, 1, 2];
+    expect(medianOf([7])).toBe(7);
+    expect(medianOf(input)).toBe(2);
+    expect(input).toEqual([3, 1, 2]);
+  });
+
+  it("refuses an empty list", () => {
+    expect(() => medianOf([])).toThrow(/at least one/);
   });
 });
