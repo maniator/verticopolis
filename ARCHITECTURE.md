@@ -217,16 +217,14 @@ flowchart TD
 
 ## Engine build modes
 
-The simulation runs on one of two engines: the TypeScript engine in
-`src/engine/` or the Rust engine (`engine-rs/`) compiled to WASM and hosted by
-`src/wasmhost/`. While hosted, the TypeScript `Simulation` the app holds is a
-read model the host refreshes from the engine every frame. A build picks how
-the two relate:
+The game runs on the Rust engine (`engine-rs/`) compiled to WASM and hosted by
+`src/wasmhost/`. The TypeScript engine in `src/engine/` is no longer run by the
+shipped game (app 2.66.0, engine crate 1.0.0); its code stays until the
+cutover below removes it. While hosted, the TypeScript `Simulation` the app
+holds is a read model the host refreshes from the engine every frame. A build
+picks how the two relate:
 
-- **Switchable** (the default, `VC_ENGINE` unset): the TypeScript engine runs
-  unless `?engine=wasm` or `vc.engine` asks for WASM, and a package that fails
-  to load leaves the game on TypeScript.
-- **Wasm-only** (`VC_ENGINE=wasm`): only the WASM engine advances the
+- **Wasm-only** (`VC_ENGINE=wasm`, what every deploy builds): only the WASM engine advances the
   simulation. The TypeScript instance stays as the read model, and commands
   and loads still pass through it until #954 and #868 land.
   `bootstrap.ts` always loads it, the `__WASM_ONLY__` define compiles away
@@ -236,6 +234,10 @@ the two relate:
   the host refuses, stops the game with the message in
   `src/wasmhost/engineBoot.ts`. `window.__vcEngineBoot` names the build, the
   engine and any failure.
+- **Switchable** (the default for dev serves and the test lanes, `VC_ENGINE`
+  unset): the TypeScript engine runs unless `?engine=wasm` or `vc.engine` asks
+  for WASM, and a package that fails to load leaves the game on TypeScript.
+  No player build is switchable; it goes away with the TypeScript engine's code.
 
 `scripts/verify-engine-bundle.ts` checks each mode from the emitted
 sourcemaps after every build. The rest of the TypeScript engine still ships
@@ -247,19 +249,20 @@ measures it and names the cutover items that remove it.
 
 The read model above is what the cutover removes. The target, settled with
 the owner on 2026-10-28, is one synchronous, numeric interface, `EnginePort`,
-that both engines implement directly:
+that the Rust engine implements directly (and `TsEngine`, the reference,
+until it is deleted):
 
 ```mermaid
 flowchart LR
     UI["src/game · src/ui · src/render"] --> Port["EnginePort<br/>(synchronous, numeric)"]
     Port -. one of .-> Rust["Engine (Rust → WASM)<br/>engine-rs/src/wasm_port.rs"]
-    Port -. one of .-> Ts["TsEngine<br/>src/engine (fallback)"]
+    Port -. one of .-> Ts["TsEngine<br/>src/engine (reference, not shipped)"]
     Render["renderer records"] --> Reader["shared view reader<br/>src/simport/viewReader.ts"]
     Reader --> Port
 ```
 
 - **The engine is the port.** The game holds the WASM `Engine` class itself,
-  or the TypeScript engine, and calls it with nothing in between: no
+  (or `TsEngine` in the test lanes), and calls it with nothing in between: no
   TypeScript mirror of the Rust simulation and no adapter layer. Refusals,
   the argument checks and the money delta live inside each engine.
 - **Numeric.** The view is the engine's `Float64Array`s (structure once per
