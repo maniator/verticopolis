@@ -15,13 +15,10 @@ import { recyclingLinesOf } from "./recyclingDiagnostics";
 import { createPortUnitDiagnostics } from "./portUnitDiagnostics";
 
 /**
- * What the facility editor and the inspector cards read: the decoded cards,
- * a shaft's schedule (`shaftSchedule`) and the batch dialog's dry run
- * (`quoteRentBatch`) through the port, the catalog of the engine the game
- * holds (`catalogOf`), and the cards' gripe lines (`facilityDiagnostics`),
- * which read the TypeScript engine's tower. The Rust engine's cards carry the
- * recycling lines off the port; the other lines are empty there until the port
- * carries them (#1420).
+ * Shared card data for the inspector and editor. The TypeScript engine uses
+ * its existing Simulation-backed diagnostics; Rust renders the already-ported
+ * unitFacts record and recycling readout without a TypeScript tower mirror.
+ * Additional report categories without port reads are tracked by #1420.
  */
 export interface CardKit {
   readonly cards: Cards;
@@ -61,10 +58,8 @@ export const INERT_STATES: ReadonlySet<UnitState> = new Set<UnitState>(["constru
 export function createCardKit(app: { readonly enginePort: EnginePort; readonly reader: ViewReader }): CardKit {
   const port = app.enginePort;
   const codes = new PortCodes(port);
-  // The gripe lines read the TypeScript engine's own tower, never the
-  // tooling's copy of the Rust engine's (`game.sim`), which a read would
-  // rebuild from a save; the Rust engine shows only the lines the port carries
-  // (#1420).
+  // Read TypeScript's own simulation only on the TypeScript engine. The Rust
+  // path uses facts from EnginePort and never rebuilds a mirror from a save.
   const tsTower = (): Simulation | undefined => (app.enginePort as { readonly sim?: Simulation }).sim;
   const cards = new Cards(app.enginePort, app.reader);
   const tenantLines = createPortUnitDiagnostics(port);
