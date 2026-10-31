@@ -6,6 +6,10 @@ import { Simulation } from "../engine/Simulation";
 import type { EnginePort } from "../simport/enginePort";
 import { ViewReader } from "../simport/viewReader";
 import { createCardKit, INERT_STATES } from "./cardKit";
+import { VIEW_LAYOUT } from "../engine/port/layout";
+import { renderToFragment } from "../ui/testing/litTestUtils";
+import { unitEditorTemplate } from "../ui/templates/editor";
+import { unitInspectorTemplate } from "../ui/templates/inspector";
 
 /** A tower with a recycling center in the basement and an occupied office. */
 function tower(): { sim: Simulation; centerId: number; officeId: number } {
@@ -66,6 +70,35 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
     if (!center) throw new Error("the center is gone");
     center.state = "construction";
     expect(kit.diagnostics.unit(centerId)).toEqual([]);
+  });
+
+  it("shows the engine-reported Main gripe on both mobile and desktop without a TypeScript mirror", () => {
+    const { sim, officeId } = tower();
+    sim.tower.getUnit(officeId)!.satisfaction = 0.01;
+    const engine = new TsEngine(sim);
+    const fields = VIEW_LAYOUT.records.unitFacts;
+    const port = new Proxy(engine, {
+      get(target, key) {
+        if (key === "sim") return undefined;
+        if (key === "unitFacts") return (id: number) => {
+          const record = target.unitFacts(id);
+          if (id === officeId) {
+            record[fields.indexOf("gripe")] = 1;
+            record[fields.indexOf("gripeCause")] = VIEW_LAYOUT.vacateReasons.indexOf("rent");
+          }
+          return record;
+        };
+        return Reflect.get(target, key, target);
+      },
+    }) as unknown as EnginePort;
+    const reader = new ViewReader(port, facilityFloors);
+    const kit = createCardKit({ enginePort: port, reader });
+    const unit = kit.cards.unit(officeId)!;
+    const copy = "Main gripe: the rent is above the going rate. Lower it to keep them.";
+    const mobile = renderToFragment(unitEditorTemplate(unit, kit.catalog(), 12, true, kit.diagnostics.unit(officeId)));
+    const desktop = renderToFragment(unitInspectorTemplate(unit, kit.catalog(), 12, kit.diagnostics.unit(officeId)));
+    expect(mobile.querySelector(".ed-diagnostics")?.textContent).toContain(copy);
+    expect(desktop.textContent).toContain(copy);
   });
 
   it("treat a room as inert in exactly the states the engine does", () => {
