@@ -101,6 +101,89 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
     expect(desktop.textContent).toContain(copy);
   });
 
+  it("does not recalculate Rust grievance facts on every 160ms editor refresh", () => {
+    const { sim, officeId } = tower();
+    sim.tower.getUnit(officeId)!.satisfaction = 0.01;
+    const engine = new TsEngine(sim);
+    let reads = 0;
+    let generation = engine.generation();
+    const port = new Proxy(engine, {
+      get(target, key) {
+        if (key === "sim") return undefined;
+        if (key === "generation") return () => generation;
+        if (key === "unitFacts") return (id: number) => {
+          reads++;
+          return target.unitFacts(id);
+        };
+        return Reflect.get(target, key, target);
+      },
+    }) as unknown as EnginePort;
+    const reader = new ViewReader(port, facilityFloors);
+    const kit = createCardKit({ enginePort: port, reader });
+    const office = sim.tower.getUnit(officeId)!;
+    // Opening a card asks Rust once. A frame pump only changes the clock
+    // within an hour, so it reuses the same engine-authored explanation.
+    kit.diagnostics.unit(officeId, true);
+    expect(reads).toBe(1);
+    for (let i = 0; i < 12; i++) kit.diagnostics.unit(officeId);
+    expect(reads).toBe(1);
+    reader.header = { ...reader.header, minutes: reader.header.minutes + 5 };
+    kit.diagnostics.unit(officeId);
+    expect(reads).toBe(1);
+
+    // Game hour (also across midnight) invalidates the inspector demand memo.
+    reader.header = { ...reader.header, minutes: reader.header.minutes + 60 };
+    kit.diagnostics.unit(officeId);
+    expect(reads).toBe(2);
+    // Selected unit state and price change without a structural revision.
+    office.satisfaction = 0.02;
+    kit.diagnostics.unit(officeId);
+    expect(reads).toBe(3);
+    office.rent = (office.rent ?? 0) + 50;
+    kit.diagnostics.unit(officeId);
+    expect(reads).toBe(4);
+    // A direct command re-reads even if an unrelated room's rent changed.
+    kit.diagnostics.unit(officeId, true);
+    expect(reads).toBe(5);
+
+    reader.header = { ...reader.header, population: reader.header.population + 1 };
+    kit.diagnostics.unit(officeId);
+    expect(reads).toBe(6);
+    reader.header = { ...reader.header, revision: reader.header.revision + 1 };
+    kit.diagnostics.unit(officeId);
+    expect(reads).toBe(7);
+    // A load or undo can reuse the same room id and clock; generation must
+    // keep those tower identities apart.
+    generation++;
+    kit.diagnostics.unit(officeId);
+    expect(reads).toBe(8);
+  });
+
+  it("keeps a Rust tenant's on-notice countdown live instead of caching it per hour", () => {
+    const { sim, officeId } = tower();
+    const office = sim.tower.getUnit(officeId)!;
+    office.state = "vacating";
+    office.vacateReason = "noise";
+    office.vacateAt = sim.clock.minutes + 180;
+    const engine = new TsEngine(sim);
+    let reads = 0;
+    const port = new Proxy(engine, {
+      get(target, key) {
+        if (key === "sim") return undefined;
+        if (key === "unitFacts") return (id: number) => {
+          reads++;
+          return target.unitFacts(id);
+        };
+        return Reflect.get(target, key, target);
+      },
+    }) as unknown as EnginePort;
+    const kit = createCardKit({ enginePort: port, reader: new ViewReader(port, facilityFloors) });
+    kit.diagnostics.unit(officeId);
+    sim.clock.minutes += 5;
+    kit.diagnostics.unit(officeId);
+    expect(reads).toBe(2);
+  });
+
   it("treat a room as inert in exactly the states the engine does", () => {
     const all: UnitState[] = ["construction", "empty", "occupied", "moving_in", "vacating", "asleep", "dirty", "infested", "fire", "gutted"];
     for (const state of all) expect(INERT_STATES.has(state), state).toBe(!isOperational({ state }));
