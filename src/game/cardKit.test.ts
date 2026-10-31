@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { facilityFloors } from "../engine/facilities";
 import { isOperational, type UnitState } from "../engine/types";
 import { TsEngine } from "../engine/port/tsEngine";
@@ -6,6 +6,7 @@ import { Simulation } from "../engine/Simulation";
 import type { EnginePort } from "../simport/enginePort";
 import { ViewReader } from "../simport/viewReader";
 import { createCardKit, INERT_STATES } from "./cardKit";
+import { refreshEditorCard, type EditorCardApp } from "./editorCard";
 import { VIEW_LAYOUT } from "../engine/port/layout";
 import { renderToFragment } from "../ui/testing/litTestUtils";
 import { unitEditorTemplate } from "../ui/templates/editor";
@@ -163,6 +164,47 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
     generation++;
     kit.diagnostics.unit(officeId);
     expect(reads).toBe(9);
+  });
+
+  it("wires cached refreshes through the real mobile editor and invalidates after explicit edits", () => {
+    const { sim, officeId } = tower();
+    const engine = new TsEngine(sim);
+    let reads = 0;
+    const port = new Proxy(engine, {
+      get(target, key) {
+        if (key === "sim") return undefined;
+        if (key === "unitFacts") return (id: number) => {
+          reads++;
+          return target.unitFacts(id);
+        };
+        return Reflect.get(target, key, target);
+      },
+    }) as unknown as EnginePort;
+    const reader = new ViewReader(port, facilityFloors);
+    const kit = createCardKit({ enginePort: port, reader });
+    const editor = {
+      selected: { type: "unit", id: officeId },
+      engine: { selectedId: null },
+      ui: { renderEditor: vi.fn() },
+      mobileMq: { matches: true },
+      cardKit: kit,
+      reader,
+      clearSelection: vi.fn(),
+    } as unknown as EditorCardApp;
+    refreshEditorCard(editor);
+    expect(reads).toBe(1);
+    for (let i = 0; i < 10; i++) refreshEditorCard(editor, false);
+    expect(reads).toBe(1);
+    refreshEditorCard(editor);
+    expect(reads).toBe(2);
+
+    // An edit while the card is on desktop invalidates a mobile snapshot,
+    // even though desktop doesn't fold diagnostic text into its editor.
+    const desktop = { ...editor, mobileMq: { matches: false } };
+    refreshEditorCard(desktop);
+    expect(reads).toBe(2);
+    kit.diagnostics.unit(officeId);
+    expect(reads).toBe(3);
   });
 
   it("keeps a Rust tenant's on-notice countdown live instead of caching it per hour", () => {
