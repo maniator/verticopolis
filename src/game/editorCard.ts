@@ -26,7 +26,7 @@ export interface EditorCardApp {
  * inspector card's diagnostics into the editor (one panel, no hover). A card
  * the port no longer has means the facility is gone, so the selection clears.
  */
-export function refreshEditorCard(app: EditorCardApp): void {
+export function refreshEditorCard(app: EditorCardApp, freshDiagnostics = true): void {
   const sel = app.selected;
   if (!sel) return;
   const mobile = app.mobileMq.matches;
@@ -35,7 +35,7 @@ export function refreshEditorCard(app: EditorCardApp): void {
     const u = kit.cards.unit(sel.id);
     if (!u) return app.clearSelection();
     app.engine.selectedId = u.id;
-    const diag = mobile ? kit.diagnostics.unit(u.id) : [];
+    const diag = mobile ? kit.diagnostics.unit(u.id, freshDiagnostics) : [];
     app.ui.renderEditor(unitEditorTemplate(u, kit.catalog(), clockOf(app.reader.header).hour, mobile, diag));
   } else {
     const t = kit.cards.shaft(sel.id);
