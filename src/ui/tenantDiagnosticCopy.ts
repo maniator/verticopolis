@@ -1,4 +1,5 @@
-import { VACATE_REASON_TEXT, type VacateReason } from "../engine/types";
+import type { VacateReason } from "../engine/types";
+import { VACATE_REASON_TEXT } from "../shared/vacateReasonText";
 
 /**
  * Player-facing language for facts already decided by the active engine.
