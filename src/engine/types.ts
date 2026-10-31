@@ -6,6 +6,7 @@
  */
 
 import type { ElevatorSchedule } from "./elevatorSchedule";
+import { VACATE_REASON_TEXT as sharedVacateReasonText } from "../shared/vacateReasonText";
 
 /** Cosmetic sky weather, derived deterministically from the day. */
 export type WeatherKind = "clear" | "cloudy" | "rain";
@@ -138,17 +139,7 @@ export type VacateReason =
  *  transport-neutral: a floor is "served" by any route to the lobby (elevator,
  *  stairs, or escalator) and congestion capacity counts them all, so the copy
  *  must not single out elevators. */
-export const VACATE_REASON_TEXT: Record<VacateReason, string> = {
-  access: "no route to the lobby",
-  noTransport: "no way to transportation from here",
-  congestion: "overcrowded vertical transport",
-  rent: "rent set too high",
-  noise: "a noisy neighbor nearby",
-  transportFar: "too far from a stairway, escalator, or passenger elevator",
-  lobbyFar: "too far from a lobby or sky lobby",
-  unmetDemand: "too few shops or restaurants within reach",
-  relocation: "the household is relocating",
-};
+export const VACATE_REASON_TEXT: Record<VacateReason, string> = sharedVacateReasonText;
 
 /** Guard for a persisted departure cause from an untrusted save. Derived from
  *  {@link VACATE_REASON_TEXT} so the two can never drift as causes are added. */

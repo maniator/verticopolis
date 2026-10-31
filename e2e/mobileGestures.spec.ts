@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { FLOOR } from "../src/render/scale";
-import { expectEngineHosted, onWasm } from "./helpers";
+import { expectEngineHosted } from "./helpers";
 
 // On chromium-wasm every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
@@ -239,13 +239,12 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
     await dispatchTouch(page, "pointerdown", 8002, spot2.x, spot2.y);
     await dispatchTouch(page, "pointerup", 8002, spot2.x, spot2.y);
 
-    // The editor opens with the card's diagnostics folded in (the office has no
-    // elevator/stair to floor 2, so the access line is present). The Rust
-    // engine's cards carry no diagnostics yet (#1420), so there the line is
-    // checked once they do. The floating hover card is NEVER raised on touch:
-    // one panel, not two.
+    // The editor opens with the card's diagnostics folded in (the office has
+    // no elevator/stair to floor 2). This now MUST hold on Rust/WASM as well,
+    // preventing the unitFacts-to-UI regression (#1559) from shipping again.
+    // The floating inspector stays hidden on touch: one panel, not two.
     await expect(page.locator("#editor")).not.toHaveClass(/hidden/);
-    if (!onWasm(test.info().project.name)) await expect(page.locator("#editor")).toContainText("Access:");
+    await expect(page.locator("#editor")).toContainText("Access: not connected.");
     await expect(page.locator("#inspector")).toHaveClass(/hidden/);
 
     // Tapping empty space (well left of the office, nothing built) closes it.
