@@ -72,14 +72,18 @@ fn the_inspector_reuses_congestion_across_rooms_and_invalidates_on_changes() {
     sim.inspector_congestion_at(2);
     assert!(sim.inspector_congestion_memo_is_fresh());
 
-    // A nonstructural occupancy mutation must invalidate via the view marks.
-    // Use the normal marked setter so this covers exactly what frame views do.
-    sim.tower.get_unit_mut(id).unwrap().state = UnitState::Empty;
-    // The same clock and revision may continue to return the cached map
-    // until a marked state write, so no assertion is made for direct test
-    // fixture mutations that bypass the production setter.
-    sim.clock.minutes += 1.0;
+    // The room-change marks invalidate a cached map even with an unchanged
+    // clock and structural revision. This is the normal production setter.
+    let (u, mark) = sim.tower.marked_by_id(id).expect("marked room");
+    u.set_state(mark, UnitState::Empty);
+    assert!(!sim.inspector_congestion_memo_is_fresh(), "room mark");
     sim.inspector_congestion_at(2);
+    assert!(sim.inspector_congestion_memo_is_fresh());
+
+    sim.crowd.step += 1;
+    assert!(!sim.inspector_congestion_memo_is_fresh(), "crowd step");
+    sim.inspector_congestion_at(2);
+    assert!(sim.inspector_congestion_memo_is_fresh());
 
     let loaded = crate::load::deserialize(&sim.serialize()).expect("loads");
     assert!(!loaded.inspector_congestion_memo_is_fresh(), "load resets the map");
