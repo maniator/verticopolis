@@ -11,6 +11,7 @@ import type { EnginePort } from "../../simport/enginePort";
 import { MAX_SAVE_INFLATED_BYTES, TOWER_FILE_MAGIC, toBase64 } from "../../storage/saveCompression";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import { installTdtCodec } from "../conformance/tdtWasm";
+import { createPortUnitDiagnostics } from "../../game/portUnitDiagnostics";
 
 /**
  * The golden arrays (facade slice 7, PR 3): the Rust `Engine` and `TsEngine`
@@ -439,6 +440,30 @@ describe("TsEngine against the Rust Engine", () => {
       }
     }
     expect(sections).toBeGreaterThan(0);
+  });
+
+  it.skipIf(!hasWasmPackage())("renders a real low-satisfaction Rust grievance from a saved tower", () => {
+    // No synthetic facts or TypeScript mirror: the production adapter
+    // decodes Rust's unitFacts from a tower saved with unhappy tenants.
+    const rust = wasm().Engine.newGame(1, "modern") as unknown as RustEngine;
+    freed.push(rust);
+    const saved = readFileSync(resolve(FIXTURES, "split-tower-4.vctower"), "utf8");
+    expect(rust.loadVctower(saved)[0]).toBe(1);
+    const diagnostic = createPortUnitDiagnostics(rust);
+    const record = VIEW_LAYOUT.records.unitFacts;
+    let found = false;
+    for (const id of units(rust)) {
+      const facts = rust.unitFacts(id);
+      if (facts[record.indexOf("gripe")] !== 1) continue;
+      const rendered = diagnostic(id).map((line) =>
+        line.strings.map((part, i) => part + (i < line.values.length ? String(line.values[i]) : "")).join("")
+      ).join("\n");
+      if (!rendered.includes("Main gripe:")) continue;
+      expect(rendered).toMatch(/Main gripe: (a noisy|crowded|the rent|too few|shops)/);
+      found = true;
+      break;
+    }
+    expect(found, "real Rust save must reach a player-visible Main gripe").toBe(true);
   });
 
   it.skipIf(!hasWasmPackage())("steps each frame's time the same way", () => {
