@@ -52,12 +52,16 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
     expect(lines.map((l) => l.values.join("|")).join("\n")).toContain("2,500");
   });
 
-  it("show no recycling lines for another kind, or a center still under construction", () => {
+  it("show tenant access from port facts, without recycling lines for another kind or a center under construction", () => {
     const { sim, centerId, officeId } = tower();
     const engine = new TsEngine(sim);
     const reader = new ViewReader(engine, facilityFloors);
     const kit = createCardKit({ enginePort: withoutTower(engine), reader });
-    expect(kit.diagnostics.unit(officeId)).toEqual([]);
+    const officeLines = kit.diagnostics.unit(officeId);
+    const officeText = officeLines.map((l) => l.strings.map((s, i) => s + (i < l.values.length ? String(l.values[i]) : "")).join("")).join("\n");
+    expect(officeText).toContain("Access:");
+    // Rust has no TypeScript tower; it still renders the existing engine facts.
+    expect(officeText).toContain("No elevator or stair reaches this floor.");
     const center = sim.tower.getUnit(centerId);
     if (!center) throw new Error("the center is gone");
     center.state = "construction";
