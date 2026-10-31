@@ -6,7 +6,7 @@ import { unitPrice } from "../ui/catalogPricing";
 import { towerCatalog } from "../engine/towerCatalog";
 import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../engine/facilities";
 import { isRentalKind } from "../engine/residentialRentals";
-import { gripeCopy as displayGripe, type GripeCopyFacts } from "../ui/tenantDiagnosticCopy";
+import { gripeCopy as displayGripe, wontLeaseCopy, type GripeCopyFacts } from "../ui/tenantDiagnosticCopy";
 
 /**
  * Legacy TypeScript engine adapter. Read the explanation facts once from the
@@ -101,10 +101,7 @@ export function wontLeaseText(sim: Simulation, u: Unit): string | null {
   // shortage while the occupied unit next door names the shortage.
   const gripe = dominantGripe(sim, u, undefined, 0, undefined, undefined, undefined, unmetActive, cov);
   const text = gripe ? gripeLineText(sim, u, gripe, cov) : undefined;
-  const lead = text
-    ? `Won't lease: ${text}`
-    : "Won't lease: a new tenant here would soon give notice. Fix the flagged problem to fill it.";
-  return `${lead}${carryingCostNote(sim, u)}`;
+  return wontLeaseCopy(text, carryingCost(sim, u));
 }
 
 /** The spec's "fix it or raze it" carrying-cost telegraph: while a gated spot sits
@@ -113,11 +110,10 @@ export function wontLeaseText(sim: Simulation, u: Unit): string | null {
  *  unsold condo, and an unsold condo also pays hold tax scaled to its asking price
  *  (`EconomySystem.payMaintenance`). Classic has neither sink (both rates 0), so an
  *  empty spot there costs nothing to hold and the note is omitted. */
-function carryingCostNote(sim: Simulation, u: Unit): string {
+function carryingCost(sim: Simulation, u: Unit): number {
   const catalog = towerCatalog(sim);
   const overhead = catalog.economy.overheadPerUnitMonthly;
   const holdTax = u.kind === "condo" ? Math.ceil(unitPrice(catalog, u) * catalog.economy.condoHoldTaxRate) : 0;
   const carry = overhead + holdTax;
-  if (carry <= 0) return "";
-  return ` It still costs about $${carry.toLocaleString()} a month to hold empty, so fix the cause or bulldoze it to stop the loss.`;
+  return carry;
 }
