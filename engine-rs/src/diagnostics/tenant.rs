@@ -314,11 +314,7 @@ impl Simulation {
     /// congestion cause, the binding class from the same pass.
     fn main_gripe(&mut self, u: &Unit, served: bool) -> Option<GripeFacts> {
         let att = if served && u.floor != 1 {
-            let (ratios, attribution) = self.spatial_congestion_with_attribution();
-            Some((
-                ratios.get(&u.floor).copied().unwrap_or(0.0),
-                attribution.get(&u.floor).copied(),
-            ))
+            Some(self.inspector_congestion_at(u.floor))
         } else {
             None
         };
