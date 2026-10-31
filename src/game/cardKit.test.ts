@@ -145,18 +145,23 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
     // A direct command re-reads even if an unrelated room's rent changed.
     kit.diagnostics.unit(officeId, true);
     expect(reads).toBe(5);
+    // A command elsewhere in the tower may leave every selected-unit field
+    // unchanged; explicit mutation invalidation still forces a fresh cause.
+    kit.diagnostics.invalidate();
+    kit.diagnostics.unit(officeId);
+    expect(reads).toBe(6);
 
     reader.header = { ...reader.header, population: reader.header.population + 1 };
     kit.diagnostics.unit(officeId);
-    expect(reads).toBe(6);
+    expect(reads).toBe(7);
     reader.header = { ...reader.header, revision: reader.header.revision + 1 };
     kit.diagnostics.unit(officeId);
-    expect(reads).toBe(7);
+    expect(reads).toBe(8);
     // A load or undo can reuse the same room id and clock; generation must
     // keep those tower identities apart.
     generation++;
     kit.diagnostics.unit(officeId);
-    expect(reads).toBe(8);
+    expect(reads).toBe(9);
   });
 
   it("keeps a Rust tenant's on-notice countdown live instead of caching it per hour", () => {
