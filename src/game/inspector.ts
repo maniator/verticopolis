@@ -69,6 +69,7 @@ export class InspectorController {
         return;
       }
       this.deps.setAnchor({ x: u.x + u.width, left: u.x, floor: u.floor + catalogFacility(kit.catalog(), u.kind).floors - 1 });
+      const fresh = this.inspectTarget?.type !== "unit" || this.inspectTarget.id !== u.id;
       this.inspectTarget = { type: p.type, id: p.id };
       // The card body (title/label/status/census/diagnostics/satisfaction) is
       // the lit template in ui/templates/inspector.ts (E6-S2); the access
@@ -76,7 +77,7 @@ export class InspectorController {
       // capacity, and retail patronage lines all come from facilityDiagnostics
       // inside it, shared with the mobile editor fold-in so the two surfaces
       // can't drift.
-      this.deps.ui.showInspector(unitInspectorTemplate(u, kit.catalog(), clockOf(this.deps.reader().header).hour, kit.diagnostics.unit(u.id)));
+      this.deps.ui.showInspector(unitInspectorTemplate(u, kit.catalog(), clockOf(this.deps.reader().header).hour, kit.diagnostics.unit(u.id, fresh)));
     } else {
       const kit = this.deps.kit();
       const t = kit.cards.shaft(p.id);
