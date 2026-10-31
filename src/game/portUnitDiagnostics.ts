@@ -150,9 +150,9 @@ export function createPortUnitDiagnostics(port: Pick<EnginePort, "viewLayout" | 
       const explanation = reason && VACATE_REASON_TEXT[reason];
       if (explanation) {
         const minutes = at(r, "minutesLeft");
-        const left = minutes >= 1440
-          ? `in under ${Math.ceil(minutes / 1440)} day(s)`
-          : minutes > 0 ? `in under ${Math.ceil(minutes / 60)} hour(s)` : "any moment now";
+        let left = "any moment now";
+        if (minutes >= 1440) left = `in under ${Math.ceil(minutes / 1440)} day(s)`;
+        else if (minutes > 0) left = `in under ${Math.ceil(minutes / 60)} hour(s)`;
         if (reason === "relocation") {
           out.push(line(`${explanation}. Leaves ${left}.`, bad));
           out.push(line("A life event, so you cannot keep them. You buy the unit back and re-list it (it re-sells once it is well placed)."));
