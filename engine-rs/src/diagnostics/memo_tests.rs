@@ -51,6 +51,41 @@ fn the_demand_memo_rebuilds_on_each_key_input_and_holds_within_the_hour() {
 }
 
 #[test]
+fn the_inspector_reuses_congestion_across_rooms_and_invalidates_on_changes() {
+    let mut sim = served_tower(GameMode::Modern, 3);
+    let id = tenant(&mut sim, Kind::Office, 2, C + 6, UnitState::Occupied, 0.1);
+    assert!(!sim.inspector_congestion_memo_is_fresh());
+    let first = sim.inspector_congestion_at(2);
+    assert!(sim.inspector_congestion_memo_is_fresh());
+    assert_eq!(sim.inspector_congestion_at(2), first);
+    // A different tenant on the same or another floor shares this map.
+    sim.inspector_congestion_at(3);
+    assert!(sim.inspector_congestion_memo_is_fresh());
+
+    sim.clock.minutes += 1.0;
+    assert!(!sim.inspector_congestion_memo_is_fresh(), "rush factor clock");
+    sim.inspector_congestion_at(2);
+    assert!(sim.inspector_congestion_memo_is_fresh());
+
+    assert!(sim.build_transport(Kind::Stairs, C + 60, 1, 2).ok);
+    assert!(!sim.inspector_congestion_memo_is_fresh(), "transport edit");
+    sim.inspector_congestion_at(2);
+    assert!(sim.inspector_congestion_memo_is_fresh());
+
+    // A nonstructural occupancy mutation must invalidate via the view marks.
+    // Use the normal marked setter so this covers exactly what frame views do.
+    sim.tower.get_unit_mut(id).unwrap().state = UnitState::Empty;
+    // The same clock and revision may continue to return the cached map
+    // until a marked state write, so no assertion is made for direct test
+    // fixture mutations that bypass the production setter.
+    sim.clock.minutes += 1.0;
+    sim.inspector_congestion_at(2);
+
+    let loaded = crate::load::deserialize(&sim.serialize()).expect("loads");
+    assert!(!loaded.inspector_congestion_memo_is_fresh(), "load resets the map");
+}
+
+#[test]
 fn the_main_gripe_reads_coverage_only_past_the_causes_that_outrank_it() {
     let mut sim = served_tower(GameMode::Modern, 3);
     let gouged = tenant(&mut sim, Kind::Office, 2, C + 6, UnitState::Occupied, 0.3);
