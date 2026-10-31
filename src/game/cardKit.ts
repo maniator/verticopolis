@@ -25,6 +25,7 @@ export interface CardKit {
   catalog(): Catalog;
   readonly diagnostics: {
     unit(id: number, fresh?: boolean): TemplateResult[];
+    invalidate(): void;
     transport(id: number): TemplateResult[];
   };
   currentSchedule(id: number): ElevatorSchedule | undefined;
@@ -103,6 +104,7 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
     cards,
     catalog: () => catalogOf(app),
     diagnostics: {
+      invalidate: () => { diagnosticCache = undefined; },
       unit: (id, fresh = false) => {
         const sim = tsTower();
         if (!sim) return portUnitLines(id, fresh);
