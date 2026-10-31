@@ -6,135 +6,34 @@ import { unitPrice } from "../ui/catalogPricing";
 import { towerCatalog } from "../engine/towerCatalog";
 import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../engine/facilities";
 import { isRentalKind } from "../engine/residentialRentals";
+import { gripeCopy as displayGripe, type GripeCopyFacts } from "../ui/tenantDiagnosticCopy";
 
 /**
- * Plain-language phrasing for the pre-notice "Main gripe" inspector line. Only
- * the drains WITHOUT a dedicated diagnostic line on the card are named here:
- * access ("not connected" / "too far"), the long-walk line (W1, office and rental
- * Apartment), and very-far lobby distance already have their own actionable
- * lines, and a relocation is a
- * life event, so those causes map to nothing and the gripe line stays off
- * (deferring to the dedicated line). Congestion, over-market rent, noise, and
- * unmet local retail demand (#395) have no such line, so they surface here.
- * Each string names the lever the player can pull.
+ * Legacy TypeScript engine adapter. Read the explanation facts once from the
+ * simulation and send them to the SAME pure presenter used by the Rust port.
+ * The Rust inspector never instantiates a TypeScript Simulation.
  */
-const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
-  rent: "the rent is above the going rate. Lower it to keep them.",
-  // "noise" is resolved by noiseGripeText and "congestion" by congestionGripeText
-  // (the remedy differs by source / by serving transport); they stay out of this
-  // table so a bare lookup can never return the wrong advice.
-};
-
-/** The congestion gripe names the transport that is actually crowded (#699),
- *  and specifically the shaft class that BINDS the floor's reading (#701).
- *  Congestion capacity counts every passenger transport kind, so a stairs-only
- *  floor crowds for real, and a stair link cross-loaded by a stairs-only
- *  neighbor can bind a floor a healthy elevator also stops at; in both cases
- *  "add cars" prescribes a fix that cannot clear the reading. The binding
- *  class comes from the model's own attribution (ties keep the elevator
- *  wording, see bindingTransportClassAt), and the remedy adapts to whether an
- *  elevator already stops at the floor: when one does, the jam is the floors
- *  only the walkway serves, so the line points there instead of repeating
- *  "give this floor an elevator stop" about a floor that has one. The empty
- *  classification cannot occur for a fired congestion gripe (it needs a
- *  served floor), but a transport-neutral line covers it rather than a lie. */
-function congestionGripeText(sim: Simulation, u: Unit): string {
-  const binding = bindingTransportClassAt(sim, u.floor);
-  if (binding === "elevator") return "crowded elevators. Add cars or a parallel shaft to this block.";
-  if (binding === "none") return "overcrowded vertical transport. Add capacity to this block.";
-  const elevatorHere = servingTransportKindsAt(sim, u.floor).elevator;
-  // When an elevator already stops here, a walkway can only bind by pooling
-  // load from the OTHER floors it serves; those floors may well have elevator
-  // service of their own (the walkway still takes their proportional share),
-  // so the line blames the shared load and prescribes better service there,
-  // never a stop this floor already has and never a claim about stops the
-  // review showed can be false (#703 review, both hunters).
-  if (binding === "walkways") {
-    return elevatorHere
-      ? "crowded stairs and escalators. They are jammed by the other floors they serve; give those floors better elevator service, or add more stairs and escalators."
-      : "crowded stairs and escalators. Add more of them, or give this floor an elevator stop.";
-  }
-  if (binding === "stairs") {
-    return elevatorHere
-      ? "crowded stairs. They are jammed by the other floors they serve; give those floors better elevator service, or add another stair column."
-      : "crowded stairs. Add another stair column, or give this floor an elevator stop.";
-  }
-  return elevatorHere
-    ? "crowded escalators. They are jammed by the other floors they serve; give those floors better elevator service, or add another escalator."
-    : "crowded escalators. Add another escalator, or give this floor an elevator stop.";
-}
-
-/** The "noise" gripe names the RIGHT remedy per source. The nightclub halo is
- *  cross-floor and a lobby tile NEVER shields it (it is keyed on floor distance),
- *  but it penalizes condos, hotels, and the rental Apartment: an office feels no nightclub halo, so
- *  its "noise" is always an adjacent same-floor source and it takes the lobby-tile
- *  remedy regardless of any nearby club (recommending the player move an unrelated
- *  nightclub, and calling the office a "home", would both be wrong). For a condo or
- *  hotel with a club in halo range the club's relocation remedy holds even when the
- *  club also sits within same-floor range and makes the unit noiseAfflicted. */
-function noiseGripeText(sim: Simulation, u: Unit): string {
-  const adjacent = sim.noiseAfflicted(u); // a same-floor office/commercial source, lobby-shieldable
-  // The Apartment joined the club's negative halo in D18, so it needs the club's
-  // remedy too. Without it the copy printed the lobby-tile fix, which is the one
-  // remedy that cannot work on a cross-floor halo (#684). The Studio stays out:
-  // it is not in the halo, so a nearby club is not its cause.
-  const club = (u.kind === "condo" || isHotelKind(u.kind) || u.kind === "rentalApartment") && nearNightclub(sim, u); // cross-floor halo, not shieldable
-  if (adjacent && club) {
-    // Both channels can be at work and either can be the binding cause, so present
-    // both remedies rather than blaming one: a lobby tile shields the same-floor
-    // source, and moving the nightclub (or the unit) addresses the cross-floor beat.
-    return "a noisy neighbor and a nearby nightclub. A lobby tile between the same-floor source and this unit shields the neighbor; the nightclub's beat also carries between floors, so put more floors between it and this unit too.";
-  }
-  if (club) {
-    return "a nightclub too close by. A lobby tile shields same-floor noise, but its beat also carries between floors; put more floors between this unit and the nightclub (move either one).";
-  }
-  return "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it.";
-}
-
-/** The unmet-demand gripe (#395) names which of its causes actually holds,
- *  because the demand model is lobby-anchored and tower-uniform: a tenant that
- *  reaches NO retail while the tower has some needs a connection, while a
- *  tenant that reaches plenty of oversubscribed retail needs more venues built
- *  on any connected floor (a shop on floor 5 helps floor 82 exactly as much as
- *  one next door; the old single string prescribed "near this floor", a
- *  locality the model does not carry). Both gripe reads share one synchronous
- *  render, so `sim.demandMap()` here is a guaranteed memo hit on the same map
- *  `dominantGripe` just read, never a rescan. */
-function unmetDemandGripeText(sim: Simulation, u: Unit, coverage?: number | null): string | undefined {
-  // For an empty gate candidate the caller passes the CANDIDATE-aware coverage (the
-  // unit is not an origin in the real memoized map, where this would read null and
-  // mis-prescribe "add venues" for stranded retail). The occupied "Main gripe"
-  // caller passes nothing and reads the shared memoized map, where the tenant IS an
-  // origin.
-  const cov = coverage !== undefined ? coverage : unmetCoverage(sim.demandMap(), u);
-  if (cov === 0) {
-    // Coverage 0 also covers a tenant whose OWN floor is unreachable: its people
-    // can reach nothing however well the shops are wired, and that cause already
-    // has the dedicated red "Access: no route" line, so the gripe
-    // line stays silent for it (the defer-to-the-dedicated-line rule above)
-    // instead of telling the player to fix retail that is not broken.
-    if (!sim.floorReachable(u.floor)) return undefined;
-    return "shops and restaurants exist, but none of them are reachable from here. Reconnect your retail: shoppers only patronize venues they can actually reach from the lobby.";
-  }
-  // Every other value the gripe can carry (coverage in (0, 0.5), or a null
-  // read from a hand-built context) is the capacity shortfall: more retail,
-  // anywhere connected, always helps a griping tower.
-  return "too few shops and restaurants for the tower's crowds. Add venues on any connected floor: retail is shared tower-wide.";
-}
-
-/** The "Main gripe" line's text for an attributed cause, or undefined when the
- *  cause defers to a dedicated diagnostic line on the card. An explicit ladder
- *  so each case reads on its own (review nit on the former nested ternary). */
 export function gripeLineText(
   sim: Simulation,
   u: Unit,
   gripe: VacateReason,
   unmetCov?: number | null,
 ): string | undefined {
-  if (gripe === "unmetDemand") return unmetDemandGripeText(sim, u, unmetCov);
-  if (gripe === "noise") return noiseGripeText(sim, u);
-  if (gripe === "congestion") return congestionGripeText(sim, u);
-  return GRIPE_TEXT[gripe];
+  const facts: GripeCopyFacts = { cause: gripe };
+  if (gripe === "congestion") {
+    facts.binding = bindingTransportClassAt(sim, u.floor);
+    if (facts.binding === "stairs" || facts.binding === "escalator" || facts.binding === "walkways") {
+      facts.elevatorHere = servingTransportKindsAt(sim, u.floor).elevator;
+    }
+  } else if (gripe === "noise") {
+    facts.adjacent = sim.noiseAfflicted(u);
+    facts.club = (u.kind === "condo" || isHotelKind(u.kind) || u.kind === "rentalApartment") && nearNightclub(sim, u);
+  } else if (gripe === "unmetDemand") {
+    const cov = unmetCov !== undefined ? unmetCov : unmetCoverage(sim.demandMap(), u);
+    facts.coverage = cov;
+    if (cov === 0) facts.floorReachable = sim.floorReachable(u.floor);
+  }
+  return displayGripe(facts);
 }
 
 /**
