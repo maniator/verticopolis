@@ -121,6 +121,7 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
     const reader = new ViewReader(port, facilityFloors);
     const kit = createCardKit({ enginePort: port, reader });
     const office = sim.tower.getUnit(officeId)!;
+    reader.header = { ...reader.header, minutes: 23 * 60 + 50 };
     // Opening a card asks Rust once. A frame pump only changes the clock
     // within an hour, so it reuses the same engine-authored explanation.
     kit.diagnostics.unit(officeId, true);
