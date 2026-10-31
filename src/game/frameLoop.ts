@@ -109,7 +109,8 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // safe while renaming; the pointer guard still skips the rare full rebuild
     // during an active press.
     if (app.selected && app.ui.isEditorOpen() && !isEditorBusy(app)) {
-      app.refreshEditor();
+      // Live stat updates reuse the last engine diagnostic until its inputs change.
+      app.refreshEditor(false);
     }
     // A jingle on every star promotion (2★–5★), not just the TOWER win. The
     // analytics side is the engine's star_reached, through the bridge. The

@@ -13,6 +13,7 @@ on:
       - "engine-rs/**"
       - "conformance/**"
       - "src/engine/**"
+      - "src/shared/vacateReasonText.ts"
       - "src/storage/**"
       - "src/tests/conformance/**"
       - "src/tests/integration/conformance.integration.test.ts"
@@ -117,6 +118,7 @@ jobs:
             case "$f" in engine-rs/*) engine=true ;; esac
             case "$f" in conformance/*) engine=true ;; esac
             case "$f" in src/engine/*) engine=true ;; esac
+            case "$f" in src/shared/vacateReasonText.ts) engine=true ;; esac
             case "$f" in src/storage/*) engine=true ;; esac
             case "$f" in src/tests/conformance/*) engine=true ;; esac
             case "$f" in src/tests/integration/conformance.integration.test.ts) engine=true ;; esac

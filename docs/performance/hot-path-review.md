@@ -303,6 +303,7 @@ Between those PRs the table belongs to the repository owner (maniator), the
 | unit metadata revision and change log (labels and subtypes; the engine view's frame header carries the revision) | none (the TypeScript host gets labels through the hourly merge) | counter; the log holds at most 4,096 ids | Rust-only: `meta_revision`, `MetaLog`, `engine-rs/src/view/meta.rs`; a load builds a fresh `Tower` at meta revision 1 (#1284) |
 | excavated basement tiles | `excavated` (a `Set`), `src/engine/Simulation.ts` | kept on every dig and load | a `Vec` searched linearly on each dig and load (`build.rs`, `load.rs`; #1173) |
 | demand map (inspector reads) | `demandMemo`, `src/engine/sim/demand.ts` | revision and game hour | ported for the inspector (`diag_memo`, `engine-rs/src/diagnostics/memo.rs`, keyed on revision, unit count and game hour, on the `Simulation` a load builds fresh; #1255) |
+| inspector congestion attribution (per-floor ratios and binding classes) | none: TypeScript builds these when its inspector asks for them | tower revision, unit count, exact clock minute bits, crowd step, room mark-log id and position | Rust-only `diag_memo.congestion`, `engine-rs/src/diagnostics/memo.rs`; memoizes one ordered map pair for all inspected rooms on a changed state, resets with the `Simulation` on load (#1560) |
 | reachability within one demand or income pass | `reachCache`, `src/engine/sim/demand.ts`, `src/engine/EconomySystem.ts` | one call | ported |
 | reachability during one move-in pass | `reachMemo`, `src/engine/sim/churn.ts` | one pass | ported |
 

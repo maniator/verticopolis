@@ -12,21 +12,20 @@ import type { EnginePort } from "../simport/enginePort";
 import type { ViewReader } from "../simport/viewReader";
 import { facilityDiagnostics, transportDiagnostics } from "./facilityDiagnostics";
 import { recyclingLinesOf } from "./recyclingDiagnostics";
+import { createPortUnitDiagnostics } from "./portUnitDiagnostics";
 
 /**
- * What the facility editor and the inspector cards read: the decoded cards,
- * a shaft's schedule (`shaftSchedule`) and the batch dialog's dry run
- * (`quoteRentBatch`) through the port, the catalog of the engine the game
- * holds (`catalogOf`), and the cards' gripe lines (`facilityDiagnostics`),
- * which read the TypeScript engine's tower. The Rust engine's cards carry the
- * recycling lines off the port; the other lines are empty there until the port
- * carries them (#1420).
+ * Shared card data for the inspector and editor. The TypeScript engine uses
+ * its existing Simulation-backed diagnostics; Rust renders the already-ported
+ * unitFacts record and recycling readout without a TypeScript tower mirror.
+ * Additional report categories without port reads are tracked by #1420.
  */
 export interface CardKit {
   readonly cards: Cards;
   catalog(): Catalog;
   readonly diagnostics: {
-    unit(id: number): TemplateResult[];
+    unit(id: number, fresh?: boolean): TemplateResult[];
+    invalidate(): void;
     transport(id: number): TemplateResult[];
   };
   currentSchedule(id: number): ElevatorSchedule | undefined;
@@ -60,27 +59,55 @@ export const INERT_STATES: ReadonlySet<UnitState> = new Set<UnitState>(["constru
 export function createCardKit(app: { readonly enginePort: EnginePort; readonly reader: ViewReader }): CardKit {
   const port = app.enginePort;
   const codes = new PortCodes(port);
-  // The gripe lines read the TypeScript engine's own tower, never the
-  // tooling's copy of the Rust engine's (`game.sim`), which a read would
-  // rebuild from a save; the Rust engine shows only the lines the port carries
-  // (#1420).
+  // Read TypeScript's own simulation only on the TypeScript engine. The Rust
+  // path uses facts from EnginePort and never rebuilds a mirror from a save.
   const tsTower = (): Simulation | undefined => (app.enginePort as { readonly sim?: Simulation }).sim;
   const cards = new Cards(app.enginePort, app.reader);
-  /** A recycling center's lines from the port: the card's kind and state, the
-   *  population from the header, the capacity and the bin fill. Read when the
-   *  card opens, not per frame. */
-  const portUnitLines = (id: number): TemplateResult[] => {
+  const tenantLines = createPortUnitDiagnostics(port);
+  // The editor's 160ms UI refresh must not run the Rust engine's full
+  // congestion attribution each time. This keeps only the last unit's
+  // engine-authored explanation. Its key follows the same per-hour and
+  // per-revision contract as the inspector's demand memo, plus the current
+  // unit card, population and stars. A user command explicitly requests a
+  // fresh reading; a notice countdown stays live, minute by minute.
+  let diagnosticCache: { id: number; key: string; lines: TemplateResult[] } | undefined;
+  const portUnitLines = (id: number, fresh = false): TemplateResult[] => {
     const u = cards.unit(id);
-    if (u?.kind !== "recycling" || INERT_STATES.has(u.state)) return [];
-    return recyclingLinesOf(app.reader.header.population, port.recyclingCapacity(), port.recyclingFill());
+    if (!u) {
+      diagnosticCache = undefined;
+      return [];
+    }
+    const header = app.reader.header;
+    const key = JSON.stringify([
+      port.generation(), header.revision, Math.floor(header.minutes / 60),
+      header.population, header.star,
+      u.kind, u.state, u.noRate, u.rent, u.price, u.satisfaction,
+      u.occupants, u.residents, u.served, u.reachable, u.vacateReason,
+      u.floorHasLobby,
+    ]);
+    // The notice deadline is an exact live countdown, not an hourly fact.
+    const liveNotice = u.state === "vacating";
+    let lines: TemplateResult[];
+    if (!fresh && !liveNotice && diagnosticCache?.id === id && diagnosticCache.key === key) {
+      lines = diagnosticCache.lines;
+    } else {
+      lines = tenantLines(id);
+      diagnosticCache = liveNotice ? undefined : { id, key, lines };
+    }
+    if (u.kind === "recycling" && !INERT_STATES.has(u.state)) {
+      // Recycling fill can change between hours; do not store these lines.
+      return [...lines, ...recyclingLinesOf(header.population, port.recyclingCapacity(), port.recyclingFill())];
+    }
+    return lines;
   };
   return {
     cards,
     catalog: () => catalogOf(app),
     diagnostics: {
-      unit: (id) => {
+      invalidate: () => { diagnosticCache = undefined; },
+      unit: (id, fresh = false) => {
         const sim = tsTower();
-        if (!sim) return portUnitLines(id);
+        if (!sim) return portUnitLines(id, fresh);
         const u = sim.tower.getUnit(id);
         return u ? facilityDiagnostics(sim, u) : [];
       },

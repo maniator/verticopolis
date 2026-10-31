@@ -10,7 +10,8 @@ import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeeping
 import { recyclingLines } from "./recyclingDiagnostics";
 import { reachesLobby } from "../engine/sim/gripe";
 import { gripeLineText, wontLeaseText } from "./gripeCopy";
-import { isOperational, isPresent, VACATE_REASON_TEXT } from "../engine/types";
+import { isOperational, isPresent } from "../engine/types";
+import { FAR_WALK_COPY, accessCopy, noRateCopy, lobbyWarningCopy, noticeCopy } from "../ui/tenantDiagnosticCopy";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
 import { towerCatalog } from "../engine/towerCatalog";
 
@@ -179,33 +180,12 @@ export function hasAccessDiagnostic(catalog: Catalog, u: Pick<Unit, "kind">): bo
  *  `reachesLobby` is the unit's own segment reaching the lobby; a gap-free floor
  *  has one segment, so the older whole-floor line is unchanged there. */
 function accessLine(sim: Simulation, u: Unit): TemplateResult {
-  if (!sim.tower.isFloorServed(u.floor))
-    return html`<div style="color:var(--bad)">Access: not connected. No elevator or stair reaches this floor.</div>`;
-  if (!reachesLobby(sim, u))
-    return html`<div style="color:var(--bad)">Access: no way to transportation from here. A gap cuts this section of the floor off from the elevators and stairs. Bridge the gap, or add a stair or elevator that reaches this section.</div>`;
-  if (sim.positionReachable(u.floor, u.x))
-    return html`<div style="color:var(--good)">Access: reachable from the lobby.</div>`;
-  return html`<div style="color:var(--bad)">Access: no route. The only way to this floor is a stairway or escalator climb longer than anyone will make, so no one travels here. Add an elevator that reaches it.</div>`;
-}
-
-/** The exact buildable sky-lobby project, phrased for the eroding "sinks until notice"
- *  warning. Precedence: on the slot itself, above the built top, slot carries a room. */
-function skyLobbySinkingFix(slot: number, onSlot: boolean, needsSupport: boolean, clearFirst: boolean): string {
-  if (onSlot)
-    return `This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor ${slot} to anchor the block.`;
-  if (needsSupport) return `Build floors up to ${slot - 1}, then put the sky lobby on floor ${slot} to lift these tenants.`;
-  if (clearFirst) return `Clear floor ${slot} and build the sky lobby there to lift these tenants.`;
-  return `Build the sky lobby on floor ${slot} to lift these tenants.`;
-}
-
-/** The same project, phrased for the gentler capped-satisfaction band. */
-function skyLobbyCappedFix(slot: number, onSlot: boolean, needsSupport: boolean, clearFirst: boolean): string {
-  if (onSlot)
-    return `This unit sits on the sky lobby slot itself; a lobby here, once it moves and the story is cleared, would lift the block.`;
-  if (needsSupport)
-    return `A sky lobby on floor ${slot} would lift it (build floors up to ${slot - 1} first; the slot story itself stays clear for the lobby).`;
-  if (clearFirst) return `A sky lobby on floor ${slot} would lift it (clear that floor first).`;
-  return `A sky lobby on floor ${slot} would lift it.`;
+  let state = "noRoute";
+  if (!sim.tower.isFloorServed(u.floor)) state = "notConnected";
+  else if (!reachesLobby(sim, u)) state = "cutOff";
+  else if (sim.positionReachable(u.floor, u.x)) state = "reachable";
+  const copy = accessCopy(state)!;
+  return html`<div style="color:${copy.bad ? "var(--bad)" : "var(--good)"}">${copy.text}</div>`;
 }
 
 /**
@@ -236,11 +216,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // and before the on-notice block, so a No Rate unit that is ALSO on notice
   // shows both truthfully (ux-pricing-split-editor §2.2).
   if (u.noRate) {
-    lines.push(
-      isPresent(u)
-        ? html`<div>No Rate: the tenant stays, pays nothing, and still counts toward stars.</div>`
-        : html`<div>Off the market: No Rate. No one moves in until you set a rate.</div>`,
-    );
+    lines.push(html`<div>${noRateCopy(isPresent(u) ? "occupied" : "offMarket")}</div>`);
   }
   // Silent rule: hotel guests stop counting toward the star rating at 4★.
   if (isHotelKind(u.kind)) {
@@ -292,7 +268,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES
   ) {
     lines.push(
-      html`<div style="color:var(--bad)">Long walk to transport. Tenants tire of the hike. Put a stairway, escalator, or passenger elevator within reach.</div>`,
+      html`<div style="color:var(--bad)">${FAR_WALK_COPY}</div>`,
     );
   }
   // W3: a canon commercial venue (not partyHall) more than two floors from a
@@ -321,54 +297,22 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     const lobbyDist = sim.tower.nearestLobbyFloorDistance(u.floor);
     const drain = sim.rules.lobbyDistanceDrain(lobbyDist);
     if (drain.cap < 1) {
-      // Modern shows the live distance; Classic names the situation without it.
-      const distNote = sim.rules.mode === "modern" ? `: ${lobbyDist} floors` : "";
       const slot = sim.tower.nearestBuildableLobbySlot(u.floor);
-      if (slot === null) {
-        // No nearer lobby can legally exist (the short block above the highest
-        // legal slot). Plain information, no imperative. The eroding variant is
-        // unreachable at the current geometry (the invariant test pins the top
-        // block inside the capped band), but the branch handles it anyway so
-        // the neutral copy can never mask an actual slide toward a notice.
-        lines.push(
-          drain.erosion > SERVED_RECOVERY
-            ? html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice, and no closer sky lobby slot exists this high in the tower.</div>`
-            : html`<div>Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out; no closer sky lobby slot exists this high in the tower.</div>`,
-        );
-      } else {
-        // Name the WHOLE project the build rules will actually accept, never a
-        // prescribe-then-refuse loop: a slot above the built top needs floors
-        // laid up to it first; a slot carrying floors or rooms needs clearing;
-        // and a unit sitting on the empty slot itself must move (clearing the
-        // floor demolishes it, so "lift these tenants" would be false for it).
-        const onSlot = slot === u.floor;
-        // A slot one story above the built top rests on the top story and is
-        // directly placeable; only a slot higher than that needs floors first.
-        const needsSupport = slot > sim.tower.highestFloor + 1;
-        // Only ROOMS need clearing now: a lobby upgrades bare floor in place on a
-        // sky story, so a floor-only slot takes the lobby directly. A room is
-        // freely removable no matter what stands above it (removalReason exempts
-        // non-structural units), so clearing the slot is never blocked from above:
-        // remove the room, the lobby upgrades the bare floor left behind, and the
-        // stories above keep their support. No teardown-above step is ever needed.
-        const clearFirst = !onSlot && !needsSupport && sim.tower.floorHasRoom(slot);
-        if (drain.erosion > SERVED_RECOVERY) {
-          // The strong "sinks until notice" warning only when the distance erosion
-          // actually outpaces the served recovery, so the tenant really is sliding
-          // out (a genuinely skipped sky lobby). Name the exact slot that fixes it.
-          const fix = skyLobbySinkingFix(slot, onSlot, needsSupport, clearFirst);
-          lines.push(
-            html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. ${fix}</div>`,
-          );
-        } else {
-          // The ceiling holds satisfaction down without evicting; the gentler line
-          // describes that honestly and names the buildable fix.
-          const fix = skyLobbyCappedFix(slot, onSlot, needsSupport, clearFirst);
-          lines.push(
-            html`<div style="color:var(--bad)">Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. ${fix}</div>`,
-          );
-        }
-      }
+      const sinking = drain.erosion > SERVED_RECOVERY;
+      const onSlot = slot === u.floor;
+      const needsSupport = slot !== null && slot > sim.tower.highestFloor + 1;
+      const clearFirst = slot !== null && !onSlot && !needsSupport && sim.tower.floorHasRoom(slot);
+      const copy = lobbyWarningCopy({
+        sinking,
+        mode: sim.rules.mode,
+        distance: lobbyDist,
+        slotFloor: slot ?? undefined,
+        onSlot,
+        needsSupport,
+        clearFirst,
+      });
+      if (slot !== null || sinking) lines.push(html`<div style="color:var(--bad)">${copy}</div>`);
+      else lines.push(html`<div>${copy}</div>`);
     }
   }
   // Recycling runs on demand: how full it is right now, and whether the
@@ -406,29 +350,16 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // complaint: the player cannot keep them by fixing the tower, so the block
   // drops the recovery-bar line and says plainly what happens instead.
   if (u.state === "vacating" && u.vacateReason) {
-    const isRelocation = u.vacateReason === "relocation";
-    const minsLeft = Math.max(0, (u.vacateAt ?? 0) - sim.clock.minutes);
-    // Framed as an honest UPPER bound ("under N") using ceil, so the block
-    // never implies the tenant has *more* time than they do. Once the notice
-    // has elapsed, say so plainly: they leave on the next hourly tick.
-    let left = "any moment now";
-    if (minsLeft >= 24 * 60) left = `in under ${Math.ceil(minsLeft / (24 * 60))} day(s)`;
-    else if (minsLeft > 0) left = `in under ${Math.ceil(minsLeft / 60)} hour(s)`;
-    // The reason text is a fixed internal enum string; lit auto-escapes it as a
-    // text binding regardless, so no escapeHtml call is needed.
-    if (isRelocation) {
-      lines.push(
-        html`<div style="color:var(--bad)">${VACATE_REASON_TEXT[u.vacateReason]}. Leaves ${left}.</div>`,
-        html`<div>A life event, so you cannot keep them. You buy the unit back and re-list it (it re-sells once it is well placed).</div>`,
-      );
-    } else {
-      const now = Math.round(u.satisfaction * 100);
-      const target = Math.round(VACATE_RESCIND * 100);
-      lines.push(
-        html`<div style="color:var(--bad)">Giving notice: ${VACATE_REASON_TEXT[u.vacateReason]}. Leaves ${left}.</div>`,
-        html`<div>Fix the cause and get satisfaction to ${target}% to keep them (now ${now}%).</div>`,
-      );
-    }
+    const copies = noticeCopy({
+      reason: u.vacateReason,
+      minutesLeft: Math.max(0, (u.vacateAt ?? 0) - sim.clock.minutes),
+      satisfaction: u.satisfaction,
+      keepAt: VACATE_RESCIND,
+    });
+    lines.push(
+      html`<div style="color:var(--bad)">${copies[0]}</div>`,
+      html`<div>${copies[1]}</div>`,
+    );
   }
   // Retail-only patronage / profit block (shop / fastFood / restaurant): shown
   // for every OPERATIONAL retail venue; a legacy unit (from a save predating the
