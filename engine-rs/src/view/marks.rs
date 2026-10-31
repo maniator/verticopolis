@@ -87,10 +87,8 @@ impl FrameMarks {
     }
 
     /// Where the log stands: its id and the position after the newest mark.
-    /// Two reads at one position see the same marked fields, so a memo of
-    /// what only those fields (and the revision) feed may key on it. The
-    /// port's render memo is its one reader.
-    #[cfg(feature = "wasm")]
+    /// Two reads at one position see the same marked fields, so the
+    /// render and inspector congestion memos can key on it in every build.
     pub(crate) fn position(&self) -> (u64, u64) {
         (self.id, self.end())
     }
