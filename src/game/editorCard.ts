@@ -31,6 +31,9 @@ export function refreshEditorCard(app: EditorCardApp, freshDiagnostics = true): 
   if (!sel) return;
   const mobile = app.mobileMq.matches;
   const kit = app.cardKit;
+  // Commands can change another room without changing the selected card.
+  // Invalidate even on desktop, where diagnostics are shown by the inspector.
+  if (freshDiagnostics) kit.diagnostics.invalidate();
   if (sel.type === "unit") {
     const u = kit.cards.unit(sel.id);
     if (!u) return app.clearSelection();
