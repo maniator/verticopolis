@@ -1,4 +1,4 @@
-//! The inspector's demand map cache. The TypeScript inspector reads the
+//! The inspector's demand and congestion map caches. The TypeScript inspector reads the
 //! demand map through `demandMemo` (`sim/demand.ts`, keyed on the tower
 //! revision and the game hour); this is its port, for the diagnostics reads
 //! only. Nothing in the Rust simulation reads it. (The highest built floor,
@@ -15,6 +15,13 @@
 //! The demand memo lags within its hour exactly as the TypeScript one does:
 //! occupancy, residents and unit state (a build finishing, a fire) change
 //! without a revision bump, and the map is rebuilt at the next hour or edit.
+//! Unlike demand, the congestion attribution memo does not accept an in-hour
+//! lag: the frame mark log catches nonstructural room state/census writes,
+//! while the crowd step, exact clock minute, revision and unit count cover
+//! movement, rush, transport and structural changes. Hovering a second room
+//! can reuse the same map at the same simulation state. Only the inspector
+//! uses this memo; it never changes gameplay.
+//!
 //! Only the inspector sees that lag, which `hot-path-review.md` (HP-10)
 //! records as the accepted bound. For the lag to match, the memo fills at the
 //! reads where the TypeScript inspector calls `sim.demandMap()`: the main
