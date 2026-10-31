@@ -12,6 +12,7 @@ import type { EnginePort } from "../simport/enginePort";
 import type { ViewReader } from "../simport/viewReader";
 import { facilityDiagnostics, transportDiagnostics } from "./facilityDiagnostics";
 import { recyclingLinesOf } from "./recyclingDiagnostics";
+import { createPortUnitDiagnostics } from "./portUnitDiagnostics";
 
 /**
  * What the facility editor and the inspector cards read: the decoded cards,
@@ -66,13 +67,18 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
   // (#1420).
   const tsTower = (): Simulation | undefined => (app.enginePort as { readonly sim?: Simulation }).sim;
   const cards = new Cards(app.enginePort, app.reader);
+  const tenantLines = createPortUnitDiagnostics(port);
   /** A recycling center's lines from the port: the card's kind and state, the
    *  population from the header, the capacity and the bin fill. Read when the
    *  card opens, not per frame. */
   const portUnitLines = (id: number): TemplateResult[] => {
     const u = cards.unit(id);
-    if (u?.kind !== "recycling" || INERT_STATES.has(u.state)) return [];
-    return recyclingLinesOf(app.reader.header.population, port.recyclingCapacity(), port.recyclingFill());
+    if (!u) return [];
+    const lines = tenantLines(id);
+    if (u.kind === "recycling" && !INERT_STATES.has(u.state)) {
+      lines.push(...recyclingLinesOf(app.reader.header.population, port.recyclingCapacity(), port.recyclingFill()));
+    }
+    return lines;
   };
   return {
     cards,
