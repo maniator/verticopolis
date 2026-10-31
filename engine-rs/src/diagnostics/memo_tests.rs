@@ -71,10 +71,7 @@ fn the_inspector_reuses_congestion_across_rooms_and_invalidates_on_changes() {
     assert!(sim.inspector_congestion_memo_is_fresh());
 
     assert!(sim.build_transport(Kind::Stairs, C + 60, 1, 2).ok);
-    assert!(
-        !sim.inspector_congestion_memo_is_fresh(),
-        "transport edit"
-    );
+    assert!(!sim.inspector_congestion_memo_is_fresh(), "transport edit");
     sim.inspector_congestion_at(2);
     assert!(sim.inspector_congestion_memo_is_fresh());
 
@@ -82,18 +79,12 @@ fn the_inspector_reuses_congestion_across_rooms_and_invalidates_on_changes() {
     // clock and structural revision. This is the normal production setter.
     let (u, mark) = sim.tower.marked_by_id(id).expect("marked room");
     u.set_state(mark, UnitState::Empty);
-    assert!(
-        !sim.inspector_congestion_memo_is_fresh(),
-        "room mark"
-    );
+    assert!(!sim.inspector_congestion_memo_is_fresh(), "room mark");
     sim.inspector_congestion_at(2);
     assert!(sim.inspector_congestion_memo_is_fresh());
 
     sim.crowd.step += 1;
-    assert!(
-        !sim.inspector_congestion_memo_is_fresh(),
-        "crowd step"
-    );
+    assert!(!sim.inspector_congestion_memo_is_fresh(), "crowd step");
     sim.inspector_congestion_at(2);
     assert!(sim.inspector_congestion_memo_is_fresh());
 
