@@ -425,8 +425,8 @@ class GameApp implements GameAppPorts {
     this.ui.hideEditor();
   }
 
-  /** @internal */ refreshEditor(): void {
-    refreshEditorCard(this);
+  /** @internal */ refreshEditor(freshDiagnostics = true): void {
+    refreshEditorCard(this, freshDiagnostics);
   }
 
   // ---- Save / load / new --------------------------------------------------
