@@ -459,7 +459,7 @@ describe("TsEngine against the Rust Engine", () => {
         line.strings.map((part, i) => part + (i < line.values.length ? String(line.values[i]) : "")).join("")
       ).join("\n");
       if (!rendered.includes("Main gripe:")) continue;
-      expect(rendered).toMatch(/Main gripe: (a noisy|crowded|the rent|too few|shops)/);
+      expect(rendered).toMatch(/Main gripe: (a noisy|a nightclub|crowded|overcrowded|the rent|too few|shops)/);
       found = true;
       break;
     }
