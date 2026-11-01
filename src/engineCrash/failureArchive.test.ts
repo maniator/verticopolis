@@ -15,8 +15,8 @@ describe("Rust engine failure report without a running engine", () => {
     const { filename, bytes } = engineFailureArchive(failure, stored, "test-version");
     const entries = unzipSync(bytes);
     const details = JSON.parse(strFromU8(entries["engine-failure.json"]));
-    expect(filename).toBe("verticopolis-engine-failure-test-version.zip");
-    expect(details.report).toBe("verticopolis-engine-failure");
+    expect(filename).toBe("vc-engine-failure-test-version.zip");
+    expect(details.report).toBe("vc-engine-failure");
     expect(details.failure).toEqual({ stage: "host", reason: "trap-tick" });
     expect(details.savedTower).toBe("stored-copy");
     expect(JSON.stringify(details)).not.toContain("private tower name");
