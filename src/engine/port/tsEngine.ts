@@ -15,7 +15,7 @@ import { VIEW_LAYOUT, VIEW_LAYOUT_TEXT } from "./layout";
 import { MetaLog } from "./metaLog";
 import * as ask from "./queries";
 import * as draw from "./render";
-import { statsSheet, unitFacts } from "./reports";
+import { serviceDiagnostics, statsSheet, unitFacts } from "./reports";
 import { flag, whole, type PortState } from "./record";
 import { FrameEncoder, encodeStructure } from "./viewEncode";
 import { watchRooms } from "../tower/rooms";
@@ -441,4 +441,5 @@ export class TsEngine implements PortState {
   positionReachable = (floor: number, x: number) => draw.positionReachable(this.current, floor, x);
   statsSheet = () => statsSheet(this.current);
   unitFacts = (id: number) => unitFacts(this.current, id);
+  serviceDiagnostics = (id: number) => serviceDiagnostics(this.current, id);
 }

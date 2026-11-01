@@ -21,6 +21,7 @@ mod memo;
 #[cfg(test)]
 mod memo_tests;
 mod tenant;
+pub(crate) mod service;
 #[cfg(test)]
 mod tenant_tests;
 

@@ -14,7 +14,9 @@ import {
 } from "../sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../sim/satisfactionStep";
 import { householdMix } from "../households";
-import { isPresent, type Unit, type VacateReason } from "../types";
+import { isOperational, isPresent, type Unit, type VacateReason } from "../types";
+import { HK_MAIDS_PER_UNIT, HK_NOMINAL_ROOMS_PER_MAID, INFEST_DAYS } from "../economy/housekeeping";
+import type { ServiceDiagnosticFacts } from "../../simport/enginePort";
 import { KIND_CODES, VIEW_LAYOUT, codeOf } from "./layout";
 import { price } from "./queries";
 import { flag, whole } from "./record";
@@ -166,6 +168,74 @@ function wontLease(sim: Simulation, u: Unit): { gripe: Gripe | null; carry: numb
     gripe: cause ? gripeFacts(sim, u, cause, cov) : null,
     carry: catalog.economy.overheadPerUnitMonthly + holdTax,
   };
+}
+
+/** Legacy TypeScript engine's independent parity implementation.
+ * The shipped game uses Rust's structured serviceDiagnostics() instead. */
+export function serviceDiagnostics(sim: Simulation, id: number): ServiceDiagnosticFacts | undefined {
+  const unit = whole(id) ? sim.tower.getUnit(id) : undefined;
+  if (!unit) return undefined;
+
+  let hotel: ServiceDiagnosticFacts["hotel"] = {
+    rating: "notApplicable", condition: "other", infestDays: null, recovery: null,
+  };
+  let parking: ServiceDiagnosticFacts["parking"] = {
+    status: "notApplicable", shortage: null, have: null,
+    total: null, offices: null, suites: null,
+  };
+  let housekeeping: ServiceDiagnosticFacts["housekeeping"] = {
+    status: "notApplicable", crews: null, maids: null, rooms: null,
+    maidsPerUnit: null, roomsPerMaid: null, cleaned: null, leftover: null,
+    infested: null, outOfReach: null, hasInfested: null,
+    hasOutOfReach: null, recovery: null,
+  };
+  if (isHotelKind(unit.kind)) {
+    let condition: ServiceDiagnosticFacts["hotel"]["condition"] = "other";
+    if (unit.state === "dirty") condition = "dirty";
+    else if (unit.state === "infested") condition = "infested";
+    hotel = {
+      rating: sim.hotelsCountTowardRating() ? "counts" : "excluded",
+      condition,
+      infestDays: unit.state === "dirty" ? INFEST_DAYS : null,
+      recovery: unit.state === "infested" ? Boolean(sim.rules.infestationRecovery()) : null,
+    };
+  }
+  if (isOperational(unit) && (unit.kind === "parking" || unit.kind === "parkingRamp")) {
+    const spaces = sim.tower.functionalParkingSet();
+    const connected = spaces.has(unit.id);
+    let status: ServiceDiagnosticFacts["parking"]["status"] = "disconnected";
+    if (unit.kind === "parkingRamp") status = "ramp";
+    else if (connected) status = "connected";
+    if (status === "disconnected") {
+      parking = { ...parking, status };
+    } else {
+      const demand = sim.parkingDemand();
+      parking = {
+        status, shortage: spaces.size < demand.total,
+        have: spaces.size, total: demand.total,
+        offices: demand.offices, suites: demand.suites,
+      };
+    }
+  }
+  if (unit.kind === "housekeeping" && isOperational(unit)) {
+    const coverage = sim.housekeepingCoverage();
+    const report = sim.economy.housekeepingReport();
+    let status: ServiceDiagnosticFacts["housekeeping"]["status"] = "adequate";
+    if (report && report.leftover > 0 && coverage.rooms > 0) {
+      status = "observedShortfall";
+    } else if (coverage.dailyCapacity < coverage.rooms) {
+      status = "nominalShortfall";
+    }
+    housekeeping = {
+      status, crews: coverage.crews, maids: coverage.maids, rooms: coverage.rooms,
+      maidsPerUnit: HK_MAIDS_PER_UNIT, roomsPerMaid: HK_NOMINAL_ROOMS_PER_MAID,
+      cleaned: report?.cleaned ?? null, leftover: report?.leftover ?? null,
+      infested: coverage.infested, outOfReach: coverage.outOfReach,
+      hasInfested: coverage.infested > 0, hasOutOfReach: coverage.outOfReach > 0,
+      recovery: Boolean(sim.rules.infestationRecovery()),
+    };
+  }
+  return { hotel, parking, housekeeping };
 }
 
 /** Unit `id`'s diagnostics facts in the layout's `unitFacts` slots, or an

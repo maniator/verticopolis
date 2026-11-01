@@ -9,6 +9,15 @@ use wasm_bindgen::prelude::*;
 /// refusal's text is `lastReason()`. The logic is in `wasm_port.rs`.
 use super::{port, Engine};
 
+// This low-frequency inspector API deliberately returns a keyed JS object.
+// JSON.parse is an existing wasm-bindgen import; no new crates or runtime
+// types are required. Frame and crowd buffers remain compact numeric records.
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = JSON, js_name = parse)]
+    fn parse_service_diagnostics_json(text: &str) -> JsValue;
+}
+
 #[wasm_bindgen]
 impl Engine {
     // The view's layout (facade slice 6a, #1213) as JSON: the version,
@@ -115,6 +124,14 @@ impl Engine {
     pub fn stats_sheet(&mut self) -> Vec<f64> {
         self.port_stats_sheet()
     }
+    #[wasm_bindgen(js_name = serviceDiagnostics)]
+    pub fn service_diagnostics(&self, id: f64) -> JsValue {
+        match self.port_service_diagnostics(id) {
+            Some(text) => parse_service_diagnostics_json(&text),
+            None => JsValue::UNDEFINED,
+        }
+    }
+
     #[wasm_bindgen(js_name = unitFacts)]
     pub fn unit_facts(&mut self, id: f64) -> Vec<f64> {
         self.port_unit_facts(id)

@@ -17,6 +17,40 @@
 // `src/simport/enginePort.types.test.ts` holds both engines to this shape; a
 // member goes here only when both have it.
 
+/** Low-frequency keyed inspector facts. Rust produces the status verdicts
+ * and the numbers; neither the UI nor the binding recomputes game rules. */
+export interface ServiceDiagnosticFacts {
+  readonly hotel: {
+    readonly rating: "notApplicable" | "counts" | "excluded";
+    readonly condition: "other" | "dirty" | "infested";
+    readonly infestDays: number | null;
+    readonly recovery: boolean | null;
+  };
+  readonly parking: {
+    readonly status: "notApplicable" | "ramp" | "connected" | "disconnected";
+    readonly shortage: boolean | null;
+    readonly have: number | null;
+    readonly total: number | null;
+    readonly offices: number | null;
+    readonly suites: number | null;
+  };
+  readonly housekeeping: {
+    readonly status: "notApplicable" | "adequate" | "nominalShortfall" | "observedShortfall";
+    readonly crews: number | null;
+    readonly maids: number | null;
+    readonly rooms: number | null;
+    readonly maidsPerUnit: number | null;
+    readonly roomsPerMaid: number | null;
+    readonly cleaned: number | null;
+    readonly leftover: number | null;
+    readonly infested: number | null;
+    readonly outOfReach: number | null;
+    readonly hasInfested: boolean | null;
+    readonly hasOutOfReach: boolean | null;
+    readonly recovery: boolean | null;
+  };
+}
+
 /** A `Float64Array` record whose slots `viewLayout().records` names. */
 export type PortRecord = Float64Array;
 
@@ -148,6 +182,8 @@ export interface EnginePortQueries {
   statsSheet(): PortRecord;
   /** One unit's diagnostics facts; empty for an id that names no unit. */
   unitFacts(id: number): PortRecord;
+  /** Low-frequency structured service diagnostics for the inspector. */
+  serviceDiagnostics(id: number): ServiceDiagnosticFacts | undefined;
 }
 
 /** The save files (contract section 2): `.vctower` and the 1994 `.TDT`. */
