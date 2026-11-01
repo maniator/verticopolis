@@ -112,3 +112,91 @@ fn a_bought_car_keeps_cut_back_hours_and_the_day_types_apart() {
     assert_eq!(rows(&t).1, vec![1; 24]);
     assert!(rows(&t).0.iter().all(|&n| n <= 2));
 }
+
+#[test]
+fn a_shift_recovery_preserves_unchanged_legacy_home_floors() {
+    use serde_json::json;
+
+    let mut tower = Tower::new();
+    for x in 0..30 {
+        assert!(tower.place(Kind::Lobby, 1, x).ok);
+        for floor in 2..=4 {
+            assert!(tower.place(Kind::Floor, floor, x).ok);
+        }
+    }
+    let built = tower.place_transport(Kind::ElevatorStandard, 2, 1, 4);
+    assert!(built.ok, "{:?}", built.reason);
+    let id = built.unit_id.unwrap();
+    assert!(tower.set_cars(id, 2));
+    assert!(tower.set_stop(id, 2, false));
+    let legacy = Schedule {
+        weekday: Some(vec![1; 24]),
+        weekend: Some(vec![1; 24]),
+        waiting_car_response: None,
+        standard_floor_departure: None,
+        home_floors: Some(vec![2, 2]),
+    };
+    // Simulate loading an older schedule with staging on a non-stop floor.
+    let index = tower.transport_index(id).unwrap();
+    tower.transports[index].schedule = Some(legacy.clone());
+
+    // The review's ordinary schedule edit changes only the on-duty cars.
+    assert!(tower.set_schedule(
+        id,
+        &json!({
+            "activeCars": { "weekday": vec![2; 24], "weekend": vec![2; 24] },
+            "homeFloors": [2, 2]
+        }),
+    ));
+    let after = tower.get_transport(id).unwrap().schedule.as_ref().unwrap();
+    assert_eq!(after.weekday, Some(vec![2; 24]));
+    assert_eq!(after.weekend, Some(vec![2; 24]));
+    assert_eq!(after.home_floors, legacy.home_floors);
+
+    // Explicitly changing a home still runs the stop-snapping policy.
+    assert!(tower.set_schedule(
+        id,
+        &json!({
+            "activeCars": { "weekday": vec![2; 24], "weekend": vec![2; 24] },
+            "homeFloors": [3, 2]
+        }),
+    ));
+    assert_eq!(
+        tower
+            .get_transport(id)
+            .unwrap()
+            .schedule
+            .as_ref()
+            .unwrap()
+            .home_floors,
+        Some(vec![3, 1])
+    );
+}
+
+#[test]
+fn new_schedules_still_snap_homes_to_served_floors() {
+    use serde_json::json;
+
+    let mut tower = Tower::new();
+    for x in 0..30 {
+        assert!(tower.place(Kind::Lobby, 1, x).ok);
+        for floor in 2..=4 {
+            assert!(tower.place(Kind::Floor, floor, x).ok);
+        }
+    }
+    let built = tower.place_transport(Kind::ElevatorStandard, 2, 1, 4);
+    assert!(built.ok, "{:?}", built.reason);
+    let id = built.unit_id.unwrap();
+    assert!(tower.set_stop(id, 2, false));
+    assert!(tower.set_schedule(id, &json!({"homeFloors": [2]})));
+    assert_eq!(
+        tower
+            .get_transport(id)
+            .unwrap()
+            .schedule
+            .as_ref()
+            .unwrap()
+            .home_floors,
+        Some(vec![1])
+    );
+}
