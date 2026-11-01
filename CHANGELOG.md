@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.76.1
+
+- Parking spaces now explain ramp connections and demand, and hotel and housekeeping cards show their existing coverage and recovery warnings.
+
 ## 2.76.0
 
 - The Rust engine failure screen can now download a crash report and your stored recovery copy, even when the engine cannot start.
