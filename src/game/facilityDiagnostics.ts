@@ -7,6 +7,7 @@ import { isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } fro
 import { catalogFacility, type Catalog } from "../engine/catalogTypes";
 import { isRentalKind } from "../engine/residentialRentals";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
+import { hotelRatingLines, parkingDisplayLines } from "./portServiceDiagnostics";
 import { recyclingLines } from "./recyclingDiagnostics";
 import { reachesLobby } from "../engine/sim/gripe";
 import { gripeLineText, wontLeaseText } from "./gripeCopy";
@@ -33,15 +34,6 @@ import { towerCatalog } from "../engine/towerCatalog";
  * unit-test without a game shell. lit auto-escapes text bindings, so no
  * `escapeHtml` is needed and no `unsafeHTML` bridge is used at the call sites.
  */
-
-/** The shared demand line for parking spaces & ramps: how many working spaces
- *  the tower has (`have`, passed in so the caller's single flood-fill is reused)
- *  vs what its offices (1 per ~24 workers) and suites (1 each) currently need. */
-function parkingDemandLine(sim: Simulation, have: number): TemplateResult {
-  const d = sim.parkingDemand();
-  const color = have < d.total ? "var(--bad)" : "var(--good)";
-  return html`<div style="color:${color}">Demand: ${have}/${d.total} spaces (${d.offices} for offices, ${d.suites} for suites).</div>`;
-}
 
 /** Below this raw demand `share` (pool / reachable capacity) the tower reads as
  *  over-built for commerce: its shoppers fill less than half the reachable
@@ -220,11 +212,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   }
   // Silent rule: hotel guests stop counting toward the star rating at 4★.
   if (isHotelKind(u.kind)) {
-    lines.push(
-      sim.hotelsCountTowardRating()
-        ? html`<div style="color:var(--good)">Counts toward stars: yes.</div>`
-        : html`<div style="color:var(--bad)">Counts toward stars: no. Hotel guests stop counting at 4★ (they still earn income).</div>`,
-    );
+    lines.push(...hotelRatingLines(sim.hotelsCountTowardRating() ? "counts" : "excluded"));
     lines.push(...hotelInfestationLines(sim, u));
   }
   // Housekeeping station: the coverage readout (crews vs rooms, out-of-reach),
@@ -243,16 +231,16 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
       ? sim.tower.functionalParkingSet()
       : null;
   if (parkingSet) {
-    if (u.kind === "parkingRamp") {
-      lines.push(parkingDemandLine(sim, parkingSet.size));
-    } else if (parkingSet.has(u.id)) {
-      lines.push(html`<div style="color:var(--good)">Ramp access: connected.</div>`);
-      lines.push(parkingDemandLine(sim, parkingSet.size));
-    } else {
-      lines.push(
-        html`<div style="color:var(--bad)">Ramp access: none. This space is dead (no relief). Chain it to a Parking Ramp.</div>`,
-      );
-    }
+    const demand = sim.parkingDemand();
+    let status: "ramp" | "connected" | "disconnected" = "disconnected";
+    if (u.kind === "parkingRamp") status = "ramp";
+    else if (parkingSet.has(u.id)) status = "connected";
+    lines.push(...parkingDisplayLines({
+      status,
+      shortage: parkingSet.size < demand.total,
+      have: parkingSet.size, total: demand.total,
+      offices: demand.offices, suites: demand.suites,
+    }));
   }
   // W1: a served office (or rental Apartment) whose nearest stairs/elevator is
   // beyond the walking tolerance is silently eroding, so surface it always (like

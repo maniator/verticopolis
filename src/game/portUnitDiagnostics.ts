@@ -36,7 +36,10 @@ function line(copy: string, color?: string): TemplateResult {
     : html`<div>${copy}</div>`;
 }
 
-export function createPortUnitDiagnostics(port: Pick<EnginePort, "viewLayout" | "unitFacts">): (id: number) => TemplateResult[] {
+export function createPortUnitDiagnostics(
+  port: Pick<EnginePort, "viewLayout" | "unitFacts">,
+  supplemental?: (id: number) => TemplateResult[],
+): (id: number) => TemplateResult[] {
   const layout = JSON.parse(port.viewLayout()) as Layout;
   const slots = new Map(layout.records.unitFacts.map((name, i) => [name, i]));
   const at = (r: PortRecord, name: string): number => r[slots.get(name) ?? -1];
@@ -70,6 +73,7 @@ export function createPortUnitDiagnostics(port: Pick<EnginePort, "viewLayout" | 
     if (access) out.push(line(access.text, access.bad ? bad : good));
     const rate = noRateCopy(named(layout.noRateLines, at(r, "noRate")) ?? "");
     if (rate) out.push(line(rate));
+    if (supplemental) out.push(...supplemental(id));
     if (flag(r, "farWalk")) out.push(line(FAR_WALK_COPY, bad));
 
     if (flag(r, "lobby")) {
