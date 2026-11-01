@@ -13,7 +13,7 @@ export function engineFailureArchive(
   version = APP_VERSION,
 ): { filename: string; bytes: Uint8Array } {
   const details = {
-    report: "verticopolis-engine-failure",
+    report: "vc-engine-failure",
     version,
     createdAt: new Date().toISOString(),
     failure: {
@@ -28,7 +28,7 @@ export function engineFailureArchive(
     "engine-failure.json": strToU8(JSON.stringify(details, null, 2)),
   };
   if (storedSave !== null) files["recovery-copy.txt"] = strToU8(storedSave);
-  return { filename: `verticopolis-engine-failure-${version}.zip`, bytes: zipSync(files) };
+  return { filename: `vc-engine-failure-${version}.zip`, bytes: zipSync(files) };
 }
 
 /** The player chooses this download from the stopped Rust engine screen.
