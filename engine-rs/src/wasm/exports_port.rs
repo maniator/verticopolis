@@ -125,7 +125,7 @@ impl Engine {
         self.port_stats_sheet()
     }
     #[wasm_bindgen(js_name = serviceDiagnostics)]
-    pub fn service_diagnostics(&self, id: f64) -> JsValue {
+    pub fn service_diagnostics(&mut self, id: f64) -> JsValue {
         match self.port_service_diagnostics(id) {
             Some(text) => parse_service_diagnostics_json(&text),
             None => JsValue::UNDEFINED,
