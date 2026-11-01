@@ -1,11 +1,12 @@
-import type { Catalog } from "../engine/catalogTypes";
+import { catalogFacility, type Catalog } from "../engine/catalogTypes";
 import { catalogOn, useTowerCatalogSource } from "../engine/towerCatalog";
 import type { FacilityKind } from "../engine/types";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import { PortRenderSim } from "../simport/portRenderSim";
 import type { SimView } from "../simport/view";
-import type { ViewReader } from "../simport/viewReader";
+import { bindViewKinds } from "../presentation/viewKinds";
+import { ViewReader } from "../simport/viewReader";
 
 /**
  * What the game's callers read through the engine port to price and preview a
@@ -49,6 +50,23 @@ export function quoteShaft(
  *  tables. The engine is only a key here, never asked a question. */
 export function catalogOf(app: { readonly enginePort: object; readonly reader: Pick<SimView, "header"> }): Catalog {
   return catalogOn(app.enginePort, app.reader.header.mode);
+}
+
+/** A kind's height in floors as `port`'s own catalog states it, read on each
+ *  call so it follows the catalog source (the Rust engine's wedding hall is
+ *  five stories; the TypeScript tables hold one). Both modes state the same
+ *  heights. */
+export function floorsOfPort(port: EnginePort): (kind: FacilityKind) => number {
+  return (kind) => catalogFacility(catalogOn(port, "modern"), kind).floors;
+}
+
+/** The reader of `port`'s frame, sized from the port's own catalog. It also
+ *  binds the view's kind facts to that catalog, so the panels and the scene can
+ *  ask them from the first frame whichever of them builds first (both modes'
+ *  catalogs state the same facts). */
+export function newViewReader(port: EnginePort): ViewReader {
+  bindViewKinds(catalogOn(port, "modern"));
+  return new ViewReader(port, floorsOfPort(port));
 }
 
 /** What the renderer draws for `port`: the render sim reads its catalog from the

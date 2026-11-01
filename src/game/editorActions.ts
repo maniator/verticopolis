@@ -1,4 +1,4 @@
-import { isElevatorKind, isHotelKind } from "../engine/facilities";
+import { isElevatorKind, isHotelKind } from "../presentation/viewKinds";
 import { catalogFacility } from "../engine/catalogTypes";
 import { priceOptionsFor } from "../ui/catalogPricing";
 import type { FacilityKind } from "../engine/types";

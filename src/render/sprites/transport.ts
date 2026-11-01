@@ -1,4 +1,4 @@
-import { isElevatorKind } from "../../engine/facilities";
+import { isElevatorKind } from "../../presentation/viewKinds";
 import { facilityColor } from "../../presentation/facilityPresentation";
 import type { FacilityKind } from "../../engine/types";
 import type { TransportView } from "../../simport/view";

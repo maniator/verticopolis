@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.74.5
+
+- Clicking any floor of the wedding hall's garden now selects the hall, not just its bottom floor.
+
 ## 2.74.4
 
 - Rooms now explain what is lowering tenant satisfaction again, including crowded transport, noisy neighbors and rent complaints, so you can see what needs fixing.

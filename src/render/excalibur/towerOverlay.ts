@@ -1,6 +1,6 @@
 import type { HeatmapMode } from "../../engine/sim/constants";
 import { RAIN } from "../sprites/sky";
-import { isElevatorKind } from "../../engine/facilities";
+import { isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility } from "../../engine/catalogTypes";
 import { towerCatalog } from "../../engine/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";

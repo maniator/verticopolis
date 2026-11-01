@@ -312,3 +312,31 @@ fn hours_and_households_follow_the_engine_rules() {
     assert_eq!(json_entry(&v, "office")["openHours"], Value::Null);
     assert_eq!(json_entry(&v, "condo")["ownHousehold"], Value::Bool(true));
 }
+
+/// The kind facts the frontend reads from the catalog are the engine's own
+/// predicates, entry by entry.
+#[test]
+fn kind_facts_follow_the_engine_predicates() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let c = catalog(mode);
+        for e in &c.facilities {
+            let kind = Kind::parse(e.key).unwrap();
+            assert_eq!(e.commercial, kind.is_commercial(), "{} commercial", e.key);
+            assert_eq!(e.hotel, kind.is_hotel(), "{} hotel", e.key);
+            assert_eq!(e.lease_amenity, kind.is_lease_amenity(), "{} lease", e.key);
+            assert_eq!(
+                e.unmet_demand,
+                kind.is_unmet_demand_kind(),
+                "{} unmet",
+                e.key
+            );
+        }
+    }
+    let c = catalog(GameMode::Modern);
+    assert!(entry(&c, "shop").commercial && !entry(&c, "partyHall").commercial);
+    assert!(entry(&c, "hotelSuite").hotel && entry(&c, "hotelSuite").unmet_demand);
+    assert!(entry(&c, "clinic").lease_amenity && !entry(&c, "clinic").unmet_demand);
+    let v = serde_json::to_value(&c).unwrap();
+    assert_eq!(json_entry(&v, "shop")["commercial"], Value::Bool(true));
+    assert_eq!(json_entry(&v, "clinic")["leaseAmenity"], Value::Bool(true));
+}
