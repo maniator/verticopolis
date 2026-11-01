@@ -284,7 +284,7 @@ impl Engine {
     /// save; it changes nothing in the game.
     /// Inspector-only keyed read; the native Rust and WASM engines both
     /// serialize the same typed ServiceDiagnosticFacts struct.
-    pub(crate) fn port_service_diagnostics(&self, id: f64) -> Option<String> {
+    pub(crate) fn port_service_diagnostics(&mut self, id: f64) -> Option<String> {
         let id = crate::charges::whole(id)?;
         let facts = self.sim.service_diagnostic_facts(id)?;
         serde_json::to_string(&facts).ok()

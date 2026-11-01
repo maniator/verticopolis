@@ -74,6 +74,20 @@ impl Simulation {
         unmet_coverage(map, u)
     }
 
+    /// Reuse the tenant demand memo, including its deliberate hour-level lag.
+    /// No entry means demand unknown (not a zero-percent reading).
+    pub(crate) fn inspector_retail_pressure(&mut self, id: i64) -> Option<(f64, f64)> {
+        let key = self.demand_key();
+        if !matches!(&self.diag_memo.demand, Some((k, _)) if *k == key) {
+            let map = compute_demand_map(self);
+            self.diag_memo.demand = Some((key, map));
+        }
+        let (_, map) = self.diag_memo.demand.as_ref().expect("filled above");
+        map.fraction_by_unit
+            .get(&id)
+            .map(|&fraction| (fraction, map.share))
+    }
+
     fn inspector_congestion_key(&self) -> CongestionKey {
         (
             self.tower.revision,

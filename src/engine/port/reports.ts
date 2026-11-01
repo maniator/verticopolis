@@ -20,6 +20,7 @@ import type { ServiceDiagnosticFacts } from "../../simport/enginePort";
 import { KIND_CODES, VIEW_LAYOUT, codeOf } from "./layout";
 import { price } from "./queries";
 import { flag, whole } from "./record";
+import { TRAFFIC_FACTOR_MEAN } from "../EconomySystem";
 
 /**
  * `TsEngine`'s report queries: the stats screen and one unit's diagnostics
@@ -235,7 +236,45 @@ export function serviceDiagnostics(sim: Simulation, id: number): ServiceDiagnost
       recovery: Boolean(sim.rules.infestationRecovery()),
     };
   }
-  return { hotel, parking, housekeeping };
+  let retail: ServiceDiagnosticFacts["retail"] = {
+    active: false, today: null, barWidth: null, tier: "notApplicable",
+    localDemandPct: null, advice: "none", profitYest: null, rainy: null,
+  };
+  if (isOperational(unit)) {
+    // TS remains a reference for differential tests, not production policy.
+    const yardstick = catalogFacility(towerCatalog(sim, "modern"), unit.kind);
+    if (yardstick.spendPerCustomer !== null && yardstick.spendPerCustomer > 0 && yardstick.dailyIncome !== null) {
+      const baseline = yardstick.dailyIncome / yardstick.spendPerCustomer * TRAFFIC_FACTOR_MEAN;
+      const today = Math.max(0, unit.patronageToday ?? 0);
+      let ratio: number | undefined;
+      if (unit.patronageYest !== undefined) {
+        ratio = baseline > 0 ? Math.max(0, unit.patronageYest) / baseline : 0;
+      }
+      let tier: ServiceDiagnosticFacts["retail"]["tier"] = "average";
+      if (ratio === undefined) tier = "noData";
+      else if (ratio < 0.5) tier = "low";
+      else if (ratio > 0.85) tier = "booming";
+      const demand = sim.demandMap();
+      const fraction = demand.fractionByUnit.get(unit.id);
+      let advice: ServiceDiagnosticFacts["retail"]["advice"] = "none";
+      if (fraction !== undefined && sim.rules.mode === "modern") {
+        if (demand.share >= 1) advice = "underServed";
+        else if (demand.share < 0.5) advice = "overBuilt";
+      }
+      retail = {
+        active: true,
+        today: Math.round(today),
+        barWidth: Math.min(100, Math.round((baseline > 0 ? today / baseline : 0) * 100)),
+        tier,
+        localDemandPct: fraction === undefined ? null : Math.round(Math.max(0, Math.min(1, fraction)) * 100),
+        advice,
+        profitYest: unit.patronageYest === undefined && unit.profitYest === undefined
+          ? null : Math.round(Math.max(0, unit.profitYest ?? 0)),
+        rainy: sim.weather === "rain",
+      };
+    }
+  }
+  return { hotel, parking, housekeeping, retail };
 }
 
 /** Unit `id`'s diagnostics facts in the layout's `unitFacts` slots, or an

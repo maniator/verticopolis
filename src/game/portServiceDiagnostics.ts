@@ -1,4 +1,4 @@
-import { html, type TemplateResult } from "lit-html";
+import { html, nothing, type TemplateResult } from "lit-html";
 import type { ServiceDiagnosticFacts } from "../simport/enginePort";
 
 /**
@@ -84,6 +84,40 @@ export function parkingDisplayLines(c: ParkingDisplay): Lines {
   return result;
 }
 
+/** Rust determines business tiers and tower pressure. This module only
+ * formats keyed facts, never recalculating demand or patronage thresholds. */
+export function retailDisplayLines(c: ServiceDiagnosticFacts["retail"]): Lines {
+  if (!c.active) return [];
+  const today = c.today ?? 0;
+  const out: Lines = [
+    html`<div>Today's patronage: ${today.toLocaleString()} customer${today === 1 ? "" : "s"} <span class="evalbar"><span style="width:${c.barWidth ?? 0}%"></span></span></div>`,
+  ];
+  if (c.localDemandPct !== null) {
+    out.push(html`<div>Local demand: ${c.localDemandPct}% of capacity.</div>`);
+    if (c.advice === "underServed") {
+      out.push(html`<div>The tower's shoppers outstrip its retail space; another venue would still sell.</div>`);
+    } else if (c.advice === "overBuilt") {
+      out.push(html`<div>The tower has more retail than its shoppers fill; add homes, or hold off on new venues, to lift every venue.</div>`);
+    }
+  }
+  const verdict: Record<ServiceDiagnosticFacts["retail"]["tier"], string> = {
+    notApplicable: "",
+    noData: "Just opened, no data yet.",
+    low: "Very few customers.",
+    average: "Business is average.",
+    booming: "Business is booming.",
+  };
+  if (verdict[c.tier]) {
+    let style: string | typeof nothing = nothing;
+    if (c.tier === "low") style = `color:${bad}`;
+    else if (c.tier === "booming") style = `color:${good}`;
+    out.push(html`<div style=${style}>${verdict[c.tier]}</div>`);
+  }
+  if (c.profitYest !== null) out.push(html`<div>Yesterday's profit: $${c.profitYest.toLocaleString()}.</div>`);
+  if (c.rainy) out.push(html`<div>Rain might cause fewer customers.</div>`);
+  return out;
+}
+
 /** The WASM export returns a keyed object from Rust's typed struct.
  * This adapter does not know about slots, status code integers or thresholds. */
 export function portServiceLines(facts: ServiceDiagnosticFacts): Lines {
@@ -110,5 +144,6 @@ export function portServiceLines(facts: ServiceDiagnosticFacts): Lines {
     have: p.have ?? NaN, total: p.total ?? NaN,
     offices: p.offices ?? NaN, suites: p.suites ?? NaN,
   }));
+  out.push(...retailDisplayLines(facts.retail));
   return out;
 }

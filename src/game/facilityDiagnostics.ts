@@ -1,4 +1,4 @@
-import { html, nothing, type TemplateResult } from "lit-html";
+import { html, type TemplateResult } from "lit-html";
 import type { Simulation } from "../engine/Simulation";
 import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN } from "../engine/Simulation";
 import { SERVED_RECOVERY } from "../engine/sim/constants";
@@ -7,7 +7,7 @@ import { isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } fro
 import { catalogFacility, type Catalog } from "../engine/catalogTypes";
 import { isRentalKind } from "../engine/residentialRentals";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
-import { hotelRatingLines, parkingDisplayLines } from "./portServiceDiagnostics";
+import { hotelRatingLines, parkingDisplayLines, retailDisplayLines } from "./portServiceDiagnostics";
 import { recyclingLines } from "./recyclingDiagnostics";
 import { reachesLobby } from "../engine/sim/gripe";
 import { gripeLineText, wontLeaseText } from "./gripeCopy";
@@ -82,7 +82,6 @@ export function retailStatsLines(
   // The "Today's patronage" number is the running count so far today; its bar
   // fills as the trading day progresses (a progress indicator, not a verdict).
   const barWidth = Math.min(100, Math.round((baseline > 0 ? today / baseline : 0) * 100));
-  const custRounded = Math.round(today);
   // The VERDICT judges the last COMPLETED day (`patronageYest`), never the
   // partial current day: `patronageToday` resets to 0 at the midnight rollover,
   // so scoring the current day would flash a false red "Very few customers." on
@@ -94,61 +93,32 @@ export function retailStatsLines(
   // a metro pushes appeal to 1, so the green band is genuinely reachable.
   let yRatio: number | undefined;
   if (patronageYest !== undefined) yRatio = baseline > 0 ? Math.max(0, patronageYest) / baseline : 0;
-  let tier = { color: "", verdict: "Business is average." };
-  if (yRatio === undefined) tier = { color: "", verdict: "Just opened, no data yet." };
-  else if (yRatio < 0.5) tier = { color: "var(--bad)", verdict: "Very few customers." };
-  else if (yRatio > 0.85) tier = { color: "var(--good)", verdict: "Business is booming." };
-  // Each line is its own `<div>`, in card order: today's running count with its
-  // progress bar, the verdict (colored only when it is a red/green tier), then
-  // the optional yesterday-profit and rain lines. The verdict's `style` binding
-  // resolves to `nothing` on the neutral tier so no `style` attribute is emitted,
-  // matching the old string that appended none.
-  const lines: TemplateResult[] = [
-    html`<div>Today's patronage: ${custRounded.toLocaleString()} customer${custRounded === 1 ? "" : "s"} <span class="evalbar"><span style="width:${barWidth}%"></span></span></div>`,
-  ];
-  // The venue's share of local demand (commercial demand pools): what fraction of
-  // its capacity the reachable population fills. Surfaced so a low customer count
-  // reads as "thin local demand here" (add population, or spread venues out)
-  // rather than a mystery, and so a venue pinned at 100% reads as fully subscribed.
-  // Plain information in both modes; in Modern the under-served / over-built advice
-  // rides on top of it (just below). Shown only when the fraction is KNOWN (the venue
-  // is in the current demand map: reachable and operational); an absent one, e.g. just
-  // out of construction, passes `undefined` and omits the line rather than fabricating
-  // a misleading "0% of capacity".
-  if (demandFraction !== undefined) {
-    const demandPct = Math.round(Math.max(0, Math.min(1, demandFraction)) * 100);
-    lines.push(html`<div>Local demand: ${demandPct}% of capacity.</div>`);
-    // Modern-only advice on top of the demand number: name whether the TOWER is
-    // under-served for commerce (its shoppers meet or outstrip the reachable
-    // commercial capacity, so more venues would still sell) or over-built (that
-    // capacity outstrips the shoppers, so every venue splits a thin pool). The
-    // demand model is tower-uniform under lobby-anchored reachability, so the copy
-    // speaks about the tower, not "here": naming a local area would overpromise a
-    // locality the share does not carry. Classic shows the number only (it
-    // withholds advice, never information). Keyed on the raw uncapped `share`, so
-    // the Modern floor never masks a genuinely thin tower.
-    if (advice && demandShare !== undefined) {
-      if (demandShare >= 1) {
-        lines.push(html`<div>The tower's shoppers outstrip its retail space; another venue would still sell.</div>`);
-      } else if (demandShare < OVER_BUILT_SHARE) {
-        // Phrased to hold for a one-venue tower and a zero-pool tower too: "add
-        // homes" always lifts the pool, and "hold off on new venues" is the
-        // build-side lever. Avoid telling a player to "thin" a single venue,
-        // which would mean bulldozing their only shop (and could not lift a pool
-        // that is already zero).
-        lines.push(html`<div>The tower has more retail than its shoppers fill; add homes, or hold off on new venues, to lift every venue.</div>`);
-      }
-    }
+  // Reference-engine policy still computes the facts independently. Only
+  // display copy is shared with Rust; there must be exactly one set of strings.
+  let tier: Parameters<typeof retailDisplayLines>[0]["tier"] = "average";
+  if (yRatio === undefined) tier = "noData";
+  else if (yRatio < 0.5) tier = "low";
+  else if (yRatio > 0.85) tier = "booming";
+
+  let retailAdvice: Parameters<typeof retailDisplayLines>[0]["advice"] = "none";
+  if (advice && demandFraction !== undefined && demandShare !== undefined) {
+    if (demandShare >= 1) retailAdvice = "underServed";
+    else if (demandShare < OVER_BUILT_SHARE) retailAdvice = "overBuilt";
   }
-  lines.push(html`<div style=${tier.color ? `color:${tier.color}` : nothing}>${tier.verdict}</div>`);
-  // Yesterday's line is skipped on day 1 (no rollover yet) so the card doesn't
-  // read "$0" for a fresh tower. Once at least one rollover has fired the field
-  // is defined (>= 0) and the line shows even when yesterday earned nothing.
-  if (patronageYest !== undefined || profitYest !== undefined) {
-    lines.push(html`<div>Yesterday's profit: $${Math.round(Math.max(0, profitYest ?? 0)).toLocaleString()}.</div>`);
-  }
-  if (isRaining) lines.push(html`<div>Rain might cause fewer customers.</div>`);
-  return lines;
+  return retailDisplayLines({
+    active: true,
+    today: Math.round(today),
+    barWidth,
+    tier,
+    localDemandPct: demandFraction === undefined
+      ? null
+      : Math.round(Math.max(0, Math.min(1, demandFraction)) * 100),
+    advice: retailAdvice,
+    profitYest: patronageYest === undefined && profitYest === undefined
+      ? null
+      : Math.round(Math.max(0, profitYest ?? 0)),
+    rainy: isRaining,
+  });
 }
 
 /**

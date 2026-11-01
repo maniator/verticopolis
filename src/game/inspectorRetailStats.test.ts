@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { catalogFor } from "../engine/catalog";
 import { html, type TemplateResult } from "lit-html";
 import { retailStatsLines } from "./inspector";
+import { retailDisplayLines } from "./portServiceDiagnostics";
 import { renderToFragment } from "../ui/testing/litTestUtils";
 
 /** The patronage yardstick: the Modern catalog in both modes (#572). */
@@ -24,6 +25,30 @@ const verdictColor = (frag: DocumentFragment): string | null =>
     ?.getAttribute("style") ?? null;
 
 describe("retailStatsLines (commercial-venue inspector card)", () => {
+  it("shares exact commercial wording across TS reference and Rust port, once per refresh", () => {
+    const rustFacts: Parameters<typeof retailDisplayLines>[0] = {
+      active: true, today: 38, barWidth: 38, tier: "low",
+      localDemandPct: 30, advice: "overBuilt", profitYest: 500, rainy: true,
+    };
+    const legacy = render(retailStatsLines(MODERN, "shop", 38, 38, 500, true, 0.3, 0.3, true));
+    const hosted = render(retailDisplayLines(rustFacts));
+    expect(legacy.textContent).toBe(hosted.textContent);
+    expect(legacy.querySelectorAll(".evalbar")).toHaveLength(1);
+    expect(hosted.querySelectorAll(".evalbar")).toHaveLength(1);
+    for (const phrase of [
+      "Today's patronage:", "Local demand:", "Very few customers.",
+      "Yesterday's profit:", "Rain might cause fewer customers.",
+      "hold off on new venues",
+    ]) {
+      expect(hosted.textContent!.split(phrase)).toHaveLength(2);
+      expect(legacy.textContent!.split(phrase)).toHaveLength(2);
+    }
+    const noData = render(retailDisplayLines({ ...rustFacts, tier: "noData", localDemandPct: null, advice: "none", profitYest: null }));
+    expect(noData.textContent).toContain("Just opened, no data yet.");
+    expect(noData.textContent).not.toContain("Local demand:");
+    expect(noData.textContent).not.toContain("Yesterday's profit:");
+  });
+
   it("returns no lines for a kind with no spend baseline", () => {
     expect(retailStatsLines(MODERN, "office", 10, 10, 100, false)).toEqual([]);
   });

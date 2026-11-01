@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
-import { serviceDiagnosticsFixture, setFixtureHotelState } from "../src/tests/fixtures/serviceDiagnostics.fixture";
+import { serviceDiagnosticsFixture, retailServiceFixture, setFixtureHotelState } from "../src/tests/fixtures/serviceDiagnostics.fixture";
 import { onWasm, expectEngineHosted } from "./helpers";
 
 /**
@@ -63,6 +63,26 @@ test.describe("Rust service diagnostics in the real browser", () => {
     }, { id: f.disconnectedParking.id, kind: f.disconnectedParking.kind });
     await expect(page.locator("#inspector")).toContainText("Ramp access: none");
     await expect(page.locator("#inspector")).not.toContainText("Demand:");
+  });
+
+  test("real Rust retail copy appears on desktop and the mobile editor", async ({ page }) => {
+    const f = retailServiceFixture("modern");
+    await loadFixture(page, JSON.stringify(f.sim.serialize()));
+    await page.evaluate(({ id, kind }) => {
+      (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
+    }, { id: f.shop.id, kind: f.shop.kind });
+    await expect(page.locator("#inspector")).toContainText("Today's patronage: 40 customers");
+    await expect(page.locator("#inspector")).toContainText("Very few customers.");
+    await expect(page.locator("#inspector")).toContainText("Yesterday's profit: $200.");
+    await expect(page.locator("#inspector")).toContainText("more retail than its shoppers fill");
+
+    await page.setViewportSize({ width: 390, height: 700 });
+    await page.evaluate(({ id, kind }) => {
+      (window as any).game.selectPicked({ type: "unit", id, kind });
+    }, { id: f.restaurant.id, kind: f.restaurant.kind });
+    await expect(page.locator("#editor .ed-diagnostics")).toContainText("Business is booming.");
+    await expect(page.locator("#editor .ed-diagnostics")).toContainText("Yesterday's profit: $4,800.");
+    await expect(page.locator("#editor .ed-diagnostics")).toContainText("Local demand:");
   });
 
   test("mobile editor folds in Rust housekeeping and infested-hotel warnings", async ({ page }) => {
