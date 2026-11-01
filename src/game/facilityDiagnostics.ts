@@ -393,14 +393,9 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   return lines;
 }
 
-/**
- * The transport diagnostic line: how full a passenger elevator's cars run on
- * average, with a near-capacity nudge. Staff-only service elevators carry no
- * passenger load and stairs/escalators have none, so both return an empty array.
- * Shared by the hover card and the mobile transport editor.
- */
-/** Format a measured elevator load. The engine supplies utilization; the
- * frontend only chooses the player-facing wording and warning color. */
+/** Format a measured passenger-elevator load for the hover card and mobile
+ * editor. The engine supplies utilization; the frontend only renders its value.
+ * Staff-only service elevators, stairs and escalators provide no load reading. */
 export function transportLoadLines(util: number | null | undefined): TemplateResult[] {
   if (util === undefined || util === null || !Number.isFinite(util)) return [];
   const near = util > 0.85;
