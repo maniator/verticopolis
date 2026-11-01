@@ -43,7 +43,7 @@ pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 2;
+pub const CATALOG_VERSION: u32 = 3;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -244,6 +244,16 @@ pub struct FacilityEntry {
     /// then stands in for `population`; a condo's price scales with it
     /// against the condo's `population` (`householdPrice`).
     pub own_household: bool,
+    /// A foot-traffic trading kind: the one predicate the noise and
+    /// lobby-proximity rules key off (`isCommercial`).
+    pub commercial: bool,
+    /// A hotel room of any size.
+    pub hotel: bool,
+    /// A Modern lease amenity (fitness club, clinic): lease tenants that erode
+    /// on unserved placement and an over-market rent.
+    pub lease_amenity: bool,
+    /// A demand tenant whose unmet coverage drains satisfaction.
+    pub unmet_demand: bool,
 }
 
 /// How the player prices a kind: a ladder of fixed rungs (Classic) or a
@@ -411,6 +421,10 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
             .has_business_hours()
             .then(|| (0..24).map(|hour| kind.is_open_at(hour)).collect()),
         own_household: kind.has_household(),
+        commercial: kind.is_commercial(),
+        hotel: kind.is_hotel(),
+        lease_amenity: kind.is_lease_amenity(),
+        unmet_demand: kind.is_unmet_demand_kind(),
     }
 }
 

@@ -1,4 +1,4 @@
-import { isElevatorKind, isHotelKind } from "../engine/facilities";
+import { isElevatorKind, isHotelKind } from "../presentation/viewKinds";
 import { catalogFacility } from "../engine/catalogTypes";
 import { priceOptionsFor } from "../ui/catalogPricing";
 import type { FacilityKind } from "../engine/types";
@@ -84,8 +84,9 @@ export class EditorActions {
    *  actions LIVE against the current tower (each its own undo step, the retired
    *  stops dialog's semantics); the schedule working copy writes once through
    *  `scheduleShaft` on OK (hardened, undoable). */
-  openSchedule(): void {
-    const selected = this.deps.selected();
+  openSchedule(shaftId?: number): void {
+    // The schedule review (#1548) names a shaft without selecting it.
+    const selected = shaftId === undefined ? this.deps.selected() : { type: "transport" as const, id: shaftId };
     if (!selected || selected.type !== "transport") return;
     // The reader has no per-frame pass yet, so read the tower's mode and clock now.
     this.deps.reader().update();

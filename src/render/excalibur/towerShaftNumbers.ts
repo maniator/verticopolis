@@ -1,4 +1,4 @@
-import { isElevatorKind } from "../../engine/facilities";
+import { isElevatorKind } from "../../presentation/viewKinds";
 import { FLOOR, TILE } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
 

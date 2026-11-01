@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { catalogFacility } from "../engine/catalogTypes";
 import { Simulation } from "../engine/Simulation";
 import { catalogFor } from "../engine/catalog";
 import { towerCatalog, useTowerCatalogSource } from "../engine/towerCatalog";
 import { PortRenderSim } from "../simport/portRenderSim";
-import { catalogOf, isUnlocked, newRenderSim, quoteBuild, quoteShaft } from "./portAccess";
+import { catalogOf, floorsOfPort, isUnlocked, newRenderSim, newViewReader, quoteBuild, quoteShaft } from "./portAccess";
+import { bindViewKinds, isHotelKind, resetViewKindsForTests } from "../presentation/viewKinds";
 import { portDeps } from "./portDeps.fixture";
 import { KINDS } from "../engine/port/layout";
 
@@ -109,5 +110,41 @@ describe("newRenderSim", () => {
     const hall = (sim: object) => towerCatalog(sim as { mode: "classic" | "modern" }).facilities.find((f) => f.key === "weddingHall")?.floors;
     expect(hall(newRenderSim(engine, reader))).toBe(5);
     expect(hall(new PortRenderSim(engine, reader))).toBe(1);
+  });
+});
+
+/** Some tests rebind the view's kind facts; leave them bound to the Modern tables for the next. */
+afterEach(() => bindViewKinds(catalogFor("modern")));
+
+describe("newViewReader", () => {
+  it("binds the view's kind facts before the reader's first update asks a kind's height", () => {
+    const sim = tower();
+    sim.tower.place("office", 1, 12);
+    const { engine } = portDeps(sim);
+    resetViewKindsForTests();
+    expect(() => newViewReader(engine)).not.toThrow();
+    expect(isHotelKind("hotelSingle")).toBe(true);
+  });
+});
+
+describe("floorsOfPort", () => {
+  /** The catalog a Rust engine states: the wedding hall five stories tall. */
+  const tallHall = (mode: "classic" | "modern") => {
+    const c = catalogFor(mode);
+    return { ...c, facilities: c.facilities.map((f) => (f.key === "weddingHall" ? { ...f, floors: 5 } : f)) };
+  };
+
+  it("answers from the port's own catalog, whatever the view's kind facts were last bound to", () => {
+    const { engine } = portDeps(tower());
+    const floors = floorsOfPort(engine);
+    useTowerCatalogSource(engine, tallHall);
+    expect(floors("weddingHall")).toBe(5);
+    expect(floors("office")).toBe(1);
+    // Something else rebinds the view's facts to another catalog: this port's heights stay.
+    bindViewKinds(catalogFor("classic"));
+    expect(floors("weddingHall")).toBe(5);
+    // The port is pointed back at the TypeScript tables, as a swapped-in tower would be.
+    useTowerCatalogSource(engine, null);
+    expect(floors("weddingHall")).toBe(catalogFor("modern").facilities.find((f) => f.key === "weddingHall")!.floors);
   });
 });

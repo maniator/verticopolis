@@ -12,6 +12,7 @@ import { relabelPalette, syncPaletteTabs } from "./uiPalette";
 import { toolInfoFor } from "./templates/toolInfo";
 import { towerStatsTemplate, type TowerStatsSnapshot } from "./templates/towerStats";
 import { bindViewWorld } from "../presentation/viewWorld";
+import { bindViewKinds } from "../presentation/viewKinds";
 
 /**
  * Status-bar, palette-lock, tower-stats and bulletin-log rendering for
@@ -99,6 +100,7 @@ export function update(ui: UI, src: HudSource): void {
   if (catalog !== ui.paletteCatalog) {
     // A new catalog must state the world the view was built for.
     bindViewWorld(catalog.world);
+    bindViewKinds(catalog);
     relabelPalette(ui, catalog);
     if (ui.tool.type === "build") render(toolInfoFor(catalog, ui.tool.kind), ui.el.toolInfo);
   }

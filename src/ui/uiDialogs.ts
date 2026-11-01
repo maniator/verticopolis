@@ -9,6 +9,7 @@ import { savesTemplate } from "./templates/saves";
 import { newTowerTemplate } from "./templates/newTower";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./templates/reports";
 import { statsModalTemplate } from "./templates/stats";
+import { scheduleReviewTemplate, type ReviewRow } from "./templates/scheduleReview";
 import { congratsTemplate } from "./templates/congrats";
 import type { TemplateResult } from "lit-html";
 import type { GameMode } from "../engine/types";
@@ -54,6 +55,14 @@ import { openImport } from "./uiImport";
 export function showStats(ui: UI, body: TemplateResult, handlers: Record<string, () => void> = {}): void {
   const box = ui.openModalTemplate(statsModalTemplate(body), { displaceable: true });
   ui.wireActions(box, handlers);
+}
+
+/** The elevator schedule review (#1548). Handlers are keyed by the template's `data-act` values; `focus` names the button to focus. */
+export function showScheduleReview(ui: UI, rows: readonly ReviewRow[], handlers: Record<string, () => void> = {}, focus?: string): void {
+  const box = ui.openModalTemplate(scheduleReviewTemplate(rows), { displaceable: true });
+  ui.wireActions(box, handlers);
+  // A redraw after a choice replaces the button that was pressed; keep the player's place.
+  if (focus) box.querySelector<HTMLElement>(`[data-act="${focus}"]`)?.focus();
 }
 
 /** Saves manager: auto-save + numbered slots, plus export/import. */

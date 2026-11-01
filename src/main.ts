@@ -1,7 +1,7 @@
 import type { HeatmapMode, Simulation } from "./engine/Simulation";
 import type { UndoHistory } from "./engine/UndoHistory";
 import { createAppHistory } from "./game/appHistory";
-import { GRID, facilityFloors } from "./engine/facilities";
+import { GRID } from "./engine/facilities";
 import type { FacilityKind } from "./engine/types";
 import type { TransportView, UnitView } from "./simport/view";
 import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/TowerEngine";
@@ -15,6 +15,7 @@ import { type PlaceOutcome } from "./ui/placement";
 import { OnboardingController } from "./ui/Onboarding";
 import type { BuildActions } from "./game/buildActions";
 import type { EditorActions } from "./game/editorActions";
+import type { ScheduleReview } from "./game/scheduleReview";
 import type { CardKit } from "./game/cardKit";
 import type { SaveLoad } from "./game/saveLoad";
 import { announceLive } from "./game/liveRegion";
@@ -42,7 +43,7 @@ import { PortCodes } from "./simport/portCodes";
 import { PortEvents } from "./simport/portEvents";
 import type { PortRenderSim } from "./simport/portRenderSim";
 import { hudSource } from "./game/hudSource";
-import { catalogOf, newRenderSim } from "./game/portAccess";
+import { catalogOf, newRenderSim, newViewReader } from "./game/portAccess";
 import type { BootTower } from "./game/bootTower";
 import type { EnginePort } from "./simport/enginePort";
 import type { Catalog } from "./engine/catalogTypes";
@@ -77,6 +78,7 @@ class GameApp implements GameAppPorts {
   /** The engine's gameplay events, for the analytics bridge. */ events!: PortEvents;
   /** What the renderer draws: the reader's view and the port's render queries. */ renderSim!: PortRenderSim;
   /** The editor and inspector cards, and the reads the port lacks. @internal */ cardKit!: CardKit;
+  /** The elevator schedule review for older towers (#1548). @internal */ scheduleReview!: ScheduleReview;
   /** The tower the tooling harnesses edit by hand (`toolingSim.ts`); undefined on the Rust engine in production. */
   get sim(): Simulation | undefined { return toolingSim(this); }
   set sim(sim: Simulation) { this.adoptSim(sim); }
@@ -87,17 +89,12 @@ class GameApp implements GameAppPorts {
   readonly grid = GRID;
   speed = 1;
   tool: Tool = { type: "inspect" };
-
   /** @internal */ canvas: HTMLCanvasElement;
   /** @internal */ accMinutes = 0;
   /** Last day each meal-rush bulletin fired (transient, like the log). Kept
    *  per meal so a save reloaded mid-day does not spam an already-fired kind.
    *  @internal */
-  lastMealRushDay: Record<"breakfast" | "lunch" | "dinner", number> = {
-    breakfast: -1,
-    lunch: -1,
-    dinner: -1,
-  };
+  lastMealRushDay: Record<"breakfast" | "lunch" | "dinner", number> = { breakfast: -1, lunch: -1, dinner: -1 };
   /** @internal */ lastUiUpdate = 0;
   /** The last few failures the frame guard and the traffic chip swallowed to
    *  keep the game alive, kept for the crash report (game/frameErrors.ts).
@@ -214,7 +211,7 @@ class GameApp implements GameAppPorts {
     // overwrite them: a save from a *newer* build is only unreadable here, and a
     // future version may recover it. Best-effort, never blocks boot.
     if (tower.corrupt) SaveGame.preserveUnreadable();
-    this.reader = new ViewReader(this.enginePort, facilityFloors);
+    this.reader = newViewReader(this.enginePort);
     this.portCodes = new PortCodes(this.enginePort);
     this.events = new PortEvents(this.enginePort);
     // Seed the promotion latch to the boot tower's rating (followSwap does it

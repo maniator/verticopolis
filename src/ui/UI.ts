@@ -11,6 +11,7 @@ import { downloadFile } from "./downloadFile";
 import { render, type TemplateResult } from "lit-html";
 import { iconElement } from "./icons";
 import { mountToolbarIcons } from "./uiToolbarIcons";
+import type { ReviewRow } from "./templates/scheduleReview";
 import { toolInfoFor, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO } from "./templates/toolInfo";
 import * as dialogs from "./uiDialogs";
 import * as panels from "./uiPanels";
@@ -406,6 +407,10 @@ export class UI {
 
   showStats(body: TemplateResult, handlers: Record<string, () => void> = {}): void {
     dialogs.showStats(this, body, handlers);
+  }
+
+  showScheduleReview(rows: readonly ReviewRow[], handlers: Record<string, () => void> = {}, focus?: string): void {
+    dialogs.showScheduleReview(this, rows, handlers, focus);
   }
 
   showSaves(slots: SlotInfo[], unreadable: string | null = null): void {

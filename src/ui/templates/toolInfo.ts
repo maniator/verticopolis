@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { catalogBuildKind, catalogFacility, type Catalog } from "../../engine/catalogTypes";
-import { isCommercialKind } from "../../engine/facilities";
+import { isCommercialKind } from "../../presentation/viewKinds";
 import { facilityDescription } from "../../presentation/facilityPresentation";
 import type { FacilityKind } from "../../engine/types";
 

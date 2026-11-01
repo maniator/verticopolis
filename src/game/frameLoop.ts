@@ -104,6 +104,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
     app.onboarding.tick(); // advance the first-run checklist on real progress (no-op when inactive)
     gameplaySession.notePlaying(); // this session played: it reports session_emergencies
     tickInstallAffordance(app); // surface the install chip once the play-gate trips (self-terminating)
+    app.scheduleReview.tick(); // once per loaded tower, mention elevators that run fewer cars than they have (#1548)
     // Keep the open editor's live stats fresh. Refresh now patches only the
     // volatile cells in place (never the buttons or rename input), so this is
     // safe while renaming; the pointer guard still skips the rare full rebuild

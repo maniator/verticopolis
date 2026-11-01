@@ -114,6 +114,7 @@ export function makeApp(over: Record<string, unknown> = {}) {
       congratsTower: vi.fn(),
     },
     onboarding: { tick: vi.fn() },
+    scheduleReview: { tick: vi.fn() },
     selected: null,
     refreshEditor: vi.fn(),
     // Far in the past so the ~6Hz throttle block always runs.

@@ -3,6 +3,7 @@ import { Z } from "../depthPlanes";
 import { GROUND, groundBelowFloors } from "../sceneryLayout";
 import type { RenderSim } from "../renderSim";
 import { bindViewWorld, viewWorld } from "../../presentation/viewWorld";
+import { bindViewKinds } from "../../presentation/viewKinds";
 import type { UnitView } from "../../simport/view";
 import {
   AWNING_W,
@@ -42,7 +43,9 @@ import { towerCatalog } from "../../engine/towerCatalog";
  *  when it is built, before any input can read it; a swapped-in tower must
  *  state the same world. */
 export function bindSceneWorld(sim: RenderSim): void {
-  bindViewWorld(towerCatalog(sim).world);
+  const catalog = towerCatalog(sim);
+  bindViewWorld(catalog.world);
+  bindViewKinds(catalog);
 }
 
 export function makeGround(engine: TowerEngine): void {

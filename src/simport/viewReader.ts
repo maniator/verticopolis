@@ -256,6 +256,7 @@ export class ViewReader implements SimView {
     this.byId = new Map();
     this.rooms = [];
     this.roomsByFloor = new Map();
+    const stories = new Map<FacilityKind, number>();
     let at = l.structureWidth;
     for (let i = 0; i < s[sh.rooms]; i++, at += l.roomWidth) {
       const id = s[at + l.room.id];
@@ -273,7 +274,9 @@ export class ViewReader implements SimView {
       this.byId.set(id, r);
       // Filed under every story it covers, so a pick on a cinema's or a
       // metro's upper story finds it.
-      for (let story = 0; story < this.floorsOf(kind); story++) this.listAt(this.roomsByFloor, floor + story).push(r);
+      let height = stories.get(kind);
+      if (height === undefined) stories.set(kind, (height = this.floorsOf(kind)));
+      for (let story = 0; story < height; story++) this.listAt(this.roomsByFloor, floor + story).push(r);
     }
     for (const list of this.roomsByFloor.values()) list.sort((a, b) => a.x - b.x);
     this.runs = [];
