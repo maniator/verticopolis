@@ -34,7 +34,23 @@ fn the_library_uses_no_host_service() {
     let mut found = Vec::new();
     for (name, lib) in library_sources() {
         let code = without_exempt_functions(&name, &lib.code);
-        let (services, reads_files) = host_services(&code);
+        let (mut services, reads_files) = host_services(&code);
+        // A tightly scoped WASM binding import of built-in JSON.parse is not
+        // a native host service. Reject any other extern block or additional
+        // declaration: the exact approved block must remain unchanged.
+        const JSON_PARSE_IMPORT: &str = concat!(
+            "#[wasm_bindgen]\n",
+            "extern \"C\" {\n",
+            "    #[wasm_bindgen(js_namespace = JSON, js_name = parse)]\n",
+            "    fn parse_service_diagnostics_json(text: &str) -> JsValue;\n",
+            "}",
+        );
+        if name == "src/wasm/exports_port.rs"
+            && lib.src.contains(JSON_PARSE_IMPORT)
+            && squeeze(&code).matches("extern{").count() == 1
+        {
+            services.retain(|service| service != "extern{");
+        }
         found.extend(services.into_iter().map(|s| format!("{name}: {s}")));
         if reads_files {
             found.push(format!("{name}: file access (std::fs or std::path)"));

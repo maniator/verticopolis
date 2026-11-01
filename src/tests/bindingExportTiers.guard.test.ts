@@ -137,6 +137,8 @@ function parseBindingExports(rust: string): ParsedExports {
       if (/^impl\b/.test(line)) inImpl = !/\}\s*$/.test(line);
       else if (fn && odd) unsupported.push(`${fn[1]}: ${odd.trim()}`);
       else if (fn) names.push(jsName(attrs) ?? fn[1]);
+      // WASM imports inside an extern block are not JavaScript exports.
+      else if (/^extern\s+"C"\s*\{\s*$/.test(line)) { /* import, not export */ }
       else if (!/^pub struct Engine\b/.test(line)) unsupported.push(`an exported item that is not a function: ${line.trim()}`);
     }
     attrs = [];
@@ -289,6 +291,14 @@ describe("WASM binding export tiers", () => {
       "pub fn maybe() {}",
     ].join("\n");
     expect(parseBindingExports(odd).unsupported).toHaveLength(3);
+    const importedJson = [
+      "#[wasm_bindgen]",
+      'extern "C" {',
+      "    #[wasm_bindgen(js_namespace = JSON, js_name = parse)]",
+      "    fn parse_service_diagnostics_json(text: &str) -> JsValue;",
+      "}",
+    ].join("\n");
+    expect(parseBindingExports(importedJson)).toEqual({ names: [], unsupported: [] });
   });
 
   it("every tier is populated, and the raw ops the issue names are tier 3", () => {

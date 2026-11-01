@@ -219,6 +219,7 @@ export const BINDING_EXPORT_TIERS = {
   // tower the import report shows before the player opens it.
   statsSheet: T2,
   unitFacts: T2,
+  serviceDiagnostics: T2,
   loadVctower: T2,
   exportVctower: T2,
   loadTdt: T2,
