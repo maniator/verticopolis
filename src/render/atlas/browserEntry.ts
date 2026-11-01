@@ -11,10 +11,12 @@ import { verifySample, type SampleResult } from "./verify";
 import { verifyExtras } from "./verifyExtras";
 import { catalogFor } from "../../engine/catalog";
 import { bindViewWorld } from "../../presentation/viewWorld";
+import { bindViewKinds } from "../../presentation/viewKinds";
 
 // A tooling page draws sprites without a tower, so it binds the Modern
 // catalog's world for the view (the lot geometry the sprites hash on).
 bindViewWorld(catalogFor("modern").world);
+bindViewKinds(catalogFor("modern"));
 
 /**
  * The atlas bake's browser half, bundled by `scripts/export-atlas.ts` and run

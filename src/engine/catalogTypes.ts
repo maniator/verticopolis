@@ -10,7 +10,7 @@ import type { FacilityCategory, FacilityKind, GameMode } from "./types";
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 2;
+export const CATALOG_VERSION = 3;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -215,6 +215,17 @@ export interface CatalogFacility {
    *  then stands in for `population`; a condo's price scales with it against
    *  the condo's `population`. */
   readonly ownHousehold: boolean;
+  /** A foot-traffic trading kind: the one predicate the noise and
+   *  lobby-proximity rules key off. */
+  readonly commercial: boolean;
+  /** A hotel room of any size. */
+  readonly hotel: boolean;
+  /** A Modern lease amenity (fitness club, clinic): lease tenants that erode
+   *  on unserved placement and an over-market rent. */
+  readonly leaseAmenity: boolean;
+  /** A demand tenant whose unmet local coverage drains satisfaction (office,
+   *  condo, apartment, hotel rooms). */
+  readonly unmetDemand: boolean;
 }
 
 const facilityIndex = new WeakMap<Catalog, ReadonlyMap<FacilityKind, CatalogFacility>>();

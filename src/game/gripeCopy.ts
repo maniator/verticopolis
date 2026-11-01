@@ -4,7 +4,7 @@ import { unmetCoverage, dominantGripe, nearNightclub, servingTransportKindsAt, b
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
 import { unitPrice } from "../ui/catalogPricing";
 import { towerCatalog } from "../engine/towerCatalog";
-import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../engine/facilities";
+import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../presentation/viewKinds";
 import { isRentalKind } from "../engine/residentialRentals";
 import { gripeCopy as displayGripe, wontLeaseCopy, type GripeCopyFacts } from "../ui/tenantDiagnosticCopy";
 

@@ -25,6 +25,10 @@ notes, never a past version's.
 
 - Tower Statistics can now review elevators that run fewer cars than they have, with an undoable "Use all installed cars" for older towers.
 
+## 2.74.5
+
+- Clicking any floor of the wedding hall's garden now selects the hall, not just its bottom floor.
+
 ## 2.74.4
 
 - Rooms now explain what is lowering tenant satisfaction again, including crowded transport, noisy neighbors and rent complaints, so you can see what needs fixing.

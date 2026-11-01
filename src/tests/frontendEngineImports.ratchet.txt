@@ -27,10 +27,10 @@
 src/analyticsEngineBridge.ts gameplayCatalog gameplayEventRules
 src/game/appHistory.ts UndoHistory # moved from src/main.ts with the app's undo history (#874): no new engine import
 src/game/bootTower.ts Simulation port/tsEngine # moved from src/main.ts with the TypeScript engine's first tower (PR 5e): no new engine import
-src/game/editorActions.ts facilities sim/charges
-src/game/facilityDiagnostics.ts EconomySystem Simulation facilities residentialRentals sim/constants sim/gripe types
+src/game/editorActions.ts sim/charges
+src/game/facilityDiagnostics.ts EconomySystem Simulation residentialRentals sim/constants sim/gripe types
 src/game/frameLoop.ts sim/frameStep # the host step driver, moved here from frameLoop and shared with TsEngine.advance (PR 5a); it goes with #867
-src/game/gripeCopy.ts facilities residentialRentals sim/gripe sim/satisfactionStep
+src/game/gripeCopy.ts residentialRentals sim/gripe sim/satisfactionStep
 src/game/housekeepingDiagnostics.ts economy/housekeeping
 src/game/toolingSim.ts Simulation port/tsEngine # moved from src/main.ts with the tooling harnesses' hand-built towers (PR 5e): no new engine import
 src/game/trafficHud.ts traffic
@@ -44,24 +44,18 @@ src/render/atlas/lookup.ts facilities retailSubtypes
 src/render/atlas/scenery.ts catalog
 src/render/atlas/verify.ts facilities
 src/render/atlas/verifyExtras.ts facilities
-src/render/excalibur/roomSignature.ts facilities
 src/render/excalibur/towerCrowd.ts facilities types
-src/render/excalibur/towerInputCamera.ts facilities types
-src/render/excalibur/towerOverlay.ts facilities
+src/render/excalibur/towerInputCamera.ts types
 src/render/excalibur/towerReconcile.ts types
-src/render/excalibur/towerShaftNumbers.ts facilities
-src/render/pixelSprites.ts facilities
 src/render/pixelSprites/clinic.ts Crowd
 src/render/pixelSprites/common.ts Crowd
 src/render/pixelSprites/food.ts Crowd
 src/render/pixelSprites/residential.ts Crowd
 src/render/sprites/facilities/venue.ts Crowd
 src/render/sprites/facilities/weddingHall.ts Crowd
-src/render/sprites/transport.ts facilities
 src/simport/headerClock.ts Clock calendar gameRules # what panels derive from the view's header instead of sim.clock and sim.rules (facade slice 4, #1211): date arithmetic, the calendar's day names and the static rule set
 src/simport/tsPanels.ts facilities households milestones # the TypeScript adapter's panel answers (facade slice 4, #1211), built from the TypeScript engine's own functions; they leave with it
-src/ui/templates/editor.ts facilities residentialRentals types
-src/ui/templates/inspector.ts facilities types
+src/ui/templates/editor.ts residentialRentals types
+src/ui/templates/inspector.ts types
 src/ui/templates/stats.ts Ledger milestones # milestone copy keyed by the id the stats report answers (facade slice 4, #1211); a static table, like the ledger labels
-src/ui/templates/toolInfo.ts facilities
 src/ui/uiElevatorSchedule.ts elevatorSchedule scheduleAuthoring scheduleOrigins

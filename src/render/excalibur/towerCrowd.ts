@@ -1,6 +1,7 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
-import { GARBAGE_COLLECT_HOUR, isElevatorKind } from "../../engine/facilities";
+import { GARBAGE_COLLECT_HOUR } from "../../engine/facilities";
+import { isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility } from "../../engine/catalogTypes";
 import { towerCatalog } from "../../engine/towerCatalog";
 import type { FacilityKind } from "../../engine/types";

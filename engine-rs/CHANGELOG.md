@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.2.0 (2026-10-30)
+
+- The catalog carries four kind facts on every facility entry: `commercial`, `hotel`, `leaseAmenity` and `unmetDemand`, the engine's own `is_commercial`, `is_hotel`, `is_lease_amenity` and `is_unmet_demand_kind`. A frontend reads them instead of keeping its own kind lists. `CATALOG_VERSION` is 3, so a frontend built for version 2 refuses this catalog, and the catalog digests are regenerated.
+
 ## 1.1.1 (2026-10-30)
 
 - An elevator car the schedule has stood down takes no new riders: a person waiting at a floor does not board a parked car, which never left its home floor. A stood-down car that still has riders aboard keeps running to their floors, answers no hall calls and takes nobody new, then parks when the cab is empty. This moves `expected.json` for `amenities-modern`, `fixture-split-tower-4` and `offshift-schedule-modern`. The TypeScript reference engine carries the same rule so the shared lock holds for both.
