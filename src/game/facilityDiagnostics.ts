@@ -399,11 +399,17 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
  * passenger load and stairs/escalators have none, so both return an empty array.
  * Shared by the hover card and the mobile transport editor.
  */
-export function transportDiagnostics(sim: Simulation, t: Transport): TemplateResult[] {
-  const util = isElevatorKind(t.kind) ? sim.elevatorUtilization(t.id) : undefined;
-  if (util === undefined) return [];
+/** Format a measured elevator load. The engine supplies utilization; the
+ * frontend only chooses the player-facing wording and warning color. */
+export function transportLoadLines(util: number | null | undefined): TemplateResult[] {
+  if (util === undefined || util === null || !Number.isFinite(util)) return [];
   const near = util > 0.85;
   return [
     html`<div style="color:${near ? "var(--bad)" : "var(--good)"}">Avg load: ${Math.round(util * 100)}% full${near ? ". Near capacity; consider more cars or a parallel shaft." : ""}</div>`,
   ];
+}
+
+/** TypeScript reference engine adapter, sharing display copy with Rust. */
+export function transportDiagnostics(sim: Simulation, t: Transport): TemplateResult[] {
+  return transportLoadLines(isElevatorKind(t.kind) ? sim.elevatorUtilization(t.id) : undefined);
 }
