@@ -49,6 +49,16 @@ export interface ServiceDiagnosticFacts {
     readonly hasOutOfReach: boolean | null;
     readonly recovery: boolean | null;
   };
+  readonly retail: {
+    readonly active: boolean;
+    readonly today: number | null;
+    readonly barWidth: number | null;
+    readonly tier: "notApplicable" | "noData" | "low" | "average" | "booming";
+    readonly localDemandPct: number | null;
+    readonly advice: "none" | "underServed" | "overBuilt";
+    readonly profitYest: number | null;
+    readonly rainy: boolean | null;
+  };
 }
 
 /** A `Float64Array` record whose slots `viewLayout().records` names. */
