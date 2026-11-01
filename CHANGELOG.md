@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.77.1
+
+- Parking Space cards now show spaces needed before spaces available, making parking demand easier to read.
+
 ## 2.77.0
 
 - Shops and restaurants again show today's customers, yesterday's business and profit, and local demand.

@@ -59,8 +59,8 @@ describe("service inspector cards against the Rust-style EnginePort", () => {
     expect(f.copy(f.connectedParking.id)).toContain("Ramp access: connected");
     const disconnected = f.copy(f.disconnectedParking.id);
     expect(disconnected).toContain("Ramp access: none");
-    expect(disconnected).not.toContain("Demand:");
-    expect(f.copy(f.ramp.id)).toContain("Demand:");
+    expect(disconnected).not.toContain("Parking demand:");
+    expect(f.copy(f.ramp.id)).toContain("Parking demand:");
   });
 
   it("shows the engine's housekeeping coverage and never duplicates warnings on refresh", () => {

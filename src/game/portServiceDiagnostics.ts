@@ -80,7 +80,7 @@ export function parkingDisplayLines(c: ParkingDisplay): Lines {
   if (c.status !== "ramp" && c.status !== "connected") return [];
   const result: Lines = [];
   if (c.status === "connected") result.push(html`<div style="color:${good}">Ramp access: connected.</div>`);
-  result.push(html`<div style="color:${c.shortage ? bad : good}">Demand: ${c.have}/${c.total} spaces (${c.offices} for offices, ${c.suites} for suites).</div>`);
+  result.push(html`<div style="color:${c.shortage ? bad : good}">Parking demand: ${c.total} needed / ${c.have} available (${c.offices} for offices, ${c.suites} for suites).</div>`);
   return result;
 }
 
