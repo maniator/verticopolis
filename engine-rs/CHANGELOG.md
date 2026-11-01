@@ -15,6 +15,11 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.4.0 (2026-11-01)
+
+- `serviceDiagnostics(id)` now includes keyed, engine-authored `retail` facts for commercial venues: patronage, business tier, demand percentage, Modern-mode under/oversupply advice, yesterday's profit and rain. The inspector's demand map is memoized; no saved-game, frame or view layout change.
+- Editing an older shaft's hourly duty counts keeps existing legacy home floors unchanged. Explicitly reauthored homes still snap to the shaft's stops.
+
 ## 1.3.0 (2026-11-01)
 
 - The inspector can read typed, engine-authored service diagnostics through `serviceDiagnostics(id)`, returned to JavaScript as a keyed object. Parking, hotel and housekeeping verdicts and supporting facts are Rust-owned. Numeric frame and tenant records, the view layout, save format and simulation rules remain unchanged.
