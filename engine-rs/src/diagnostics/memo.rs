@@ -83,7 +83,9 @@ impl Simulation {
             self.diag_memo.demand = Some((key, map));
         }
         let (_, map) = self.diag_memo.demand.as_ref().expect("filled above");
-        map.fraction_by_unit.get(&id).map(|&fraction| (fraction, map.share))
+        map.fraction_by_unit
+            .get(&id)
+            .map(|&fraction| (fraction, map.share))
     }
 
     fn inspector_congestion_key(&self) -> CongestionKey {

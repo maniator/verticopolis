@@ -3,6 +3,7 @@ import type { EnginePort } from "../../simport/enginePort";
 import { TsEngine } from "../../engine/port/tsEngine";
 import {
   serviceDiagnosticsFixture,
+  retailServiceFixture,
   setFixtureHotelState,
 } from "../fixtures/serviceDiagnostics.fixture";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
@@ -84,6 +85,29 @@ describe.skipIf(!hasWasmPackage())("real Rust/WASM keyed service diagnostics fro
       after.free();
     }
   });
+
+  for (const mode of ["classic", "modern"] as const) {
+    it(`${mode}: retail shops, fast food and restaurants match the TS reference through real WASM`, () => {
+      const f = retailServiceFixture(mode);
+      const rust = fromFixture(f.sim);
+      const reference = new TsEngine(f.sim);
+      try {
+        for (const venue of [f.shop, f.fastFood, f.restaurant]) {
+          const actual = rust.serviceDiagnostics(venue.id);
+          expect(actual).toEqual(reference.serviceDiagnostics(venue.id));
+          expect(actual?.retail.active).toBe(true);
+          expect(typeof actual).toBe("object");
+          expect(Array.isArray(actual)).toBe(false);
+        }
+        expect(rust.serviceDiagnostics(f.shop.id)?.retail.tier).toBe("low");
+        expect(rust.serviceDiagnostics(f.fastFood.id)?.retail.tier).toBe("noData");
+        expect(rust.serviceDiagnostics(f.restaurant.id)?.retail.tier).toBe("booming");
+        expect(rust.serviceDiagnostics(f.shop.id)?.retail.advice).toBe(mode === "modern" ? "overBuilt" : "none");
+      } finally {
+        rust.free();
+      }
+    });
+  }
 
   it("keeps housekeeping's coverage figures authoritative after real WASM load", () => {
     const f = serviceDiagnosticsFixture();

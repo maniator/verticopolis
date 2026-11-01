@@ -7,11 +7,11 @@ use serde::Serialize;
 use crate::clock::GameMode;
 use crate::economy::{daily_traffic_income, retail_spend_per_customer};
 use crate::facilities::Kind;
-use crate::jsmath::round;
-use crate::sim_loop::Weather;
 use crate::housekeeping::{HK_MAIDS_PER_UNIT, INFEST_DAYS};
+use crate::jsmath::round;
 use crate::panels::coverage::HK_NOMINAL_ROOMS_PER_MAID;
 use crate::sim::Simulation;
+use crate::sim_loop::Weather;
 use crate::tower::UnitState;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
@@ -82,7 +82,11 @@ fn retail_tier(yesterday: Option<f64>, baseline: f64) -> RetailTier {
     let Some(yesterday) = yesterday else {
         return RetailTier::NoData;
     };
-    let ratio = if baseline > 0.0 { yesterday.max(0.0) / baseline } else { 0.0 };
+    let ratio = if baseline > 0.0 {
+        yesterday.max(0.0) / baseline
+    } else {
+        0.0
+    };
     if ratio < LOW_PATRONAGE_RATIO {
         RetailTier::Low
     } else if ratio > BOOMING_PATRONAGE_RATIO {
@@ -260,8 +264,14 @@ impl Simulation {
                     facts.retail.active = true;
                     facts.retail.today = Some(round(today) as i64);
                     facts.retail.bar_width = Some(
-                        round((if baseline > 0.0 { today / baseline } else { 0.0 }) * 100.0)
-                            .clamp(0.0, 100.0) as i64,
+                        round(
+                            (if baseline > 0.0 {
+                                today / baseline
+                            } else {
+                                0.0
+                            }) * 100.0,
+                        )
+                        .clamp(0.0, 100.0) as i64,
                     );
                     facts.retail.tier = retail_tier(retail.3, baseline);
                     if let Some((fraction, share)) = self.inspector_retail_pressure(id) {
@@ -312,11 +322,20 @@ mod tests {
 
     #[test]
     fn demand_advice_is_modern_only_and_uses_raw_tower_pressure() {
-        assert_eq!(retail_advice(GameMode::Modern, 0.499), RetailAdvice::OverBuilt);
+        assert_eq!(
+            retail_advice(GameMode::Modern, 0.499),
+            RetailAdvice::OverBuilt
+        );
         assert_eq!(retail_advice(GameMode::Modern, 0.5), RetailAdvice::None);
         assert_eq!(retail_advice(GameMode::Modern, 0.99), RetailAdvice::None);
-        assert_eq!(retail_advice(GameMode::Modern, 1.0), RetailAdvice::UnderServed);
-        assert_eq!(retail_advice(GameMode::Modern, 1.5), RetailAdvice::UnderServed);
+        assert_eq!(
+            retail_advice(GameMode::Modern, 1.0),
+            RetailAdvice::UnderServed
+        );
+        assert_eq!(
+            retail_advice(GameMode::Modern, 1.5),
+            RetailAdvice::UnderServed
+        );
         assert_eq!(retail_advice(GameMode::Classic, 0.1), RetailAdvice::None);
         assert_eq!(retail_advice(GameMode::Classic, 2.0), RetailAdvice::None);
     }

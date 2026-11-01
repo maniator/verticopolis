@@ -108,7 +108,9 @@ export function retailDisplayLines(c: ServiceDiagnosticFacts["retail"]): Lines {
     booming: "Business is booming.",
   };
   if (verdict[c.tier]) {
-    const style = c.tier === "low" ? `color:${bad}` : c.tier === "booming" ? `color:${good}` : nothing;
+    let style: string | typeof nothing = nothing;
+    if (c.tier === "low") style = `color:${bad}`;
+    else if (c.tier === "booming") style = `color:${good}`;
     out.push(html`<div style=${style}>${verdict[c.tier]}</div>`);
   }
   if (c.profitYest !== null) out.push(html`<div>Yesterday's profit: ${c.profitYest.toLocaleString()}.</div>`);

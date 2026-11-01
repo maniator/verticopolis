@@ -246,18 +246,21 @@ export function serviceDiagnostics(sim: Simulation, id: number): ServiceDiagnost
     if (yardstick.spendPerCustomer !== null && yardstick.spendPerCustomer > 0 && yardstick.dailyIncome !== null) {
       const baseline = yardstick.dailyIncome / yardstick.spendPerCustomer * TRAFFIC_FACTOR_MEAN;
       const today = Math.max(0, unit.patronageToday ?? 0);
-      const ratio = unit.patronageYest === undefined ? undefined
-        : baseline > 0 ? Math.max(0, unit.patronageYest) / baseline : 0;
+      let ratio: number | undefined;
+      if (unit.patronageYest !== undefined) {
+        ratio = baseline > 0 ? Math.max(0, unit.patronageYest) / baseline : 0;
+      }
       let tier: ServiceDiagnosticFacts["retail"]["tier"] = "average";
       if (ratio === undefined) tier = "noData";
       else if (ratio < 0.5) tier = "low";
       else if (ratio > 0.85) tier = "booming";
       const demand = sim.demandMap();
       const fraction = demand.fractionByUnit.get(unit.id);
-      const advice: ServiceDiagnosticFacts["retail"]["advice"] =
-        fraction === undefined || sim.rules.mode !== "modern" ? "none"
-          : demand.share >= 1 ? "underServed"
-          : demand.share < 0.5 ? "overBuilt" : "none";
+      let advice: ServiceDiagnosticFacts["retail"]["advice"] = "none";
+      if (fraction !== undefined && sim.rules.mode === "modern") {
+        if (demand.share >= 1) advice = "underServed";
+        else if (demand.share < 0.5) advice = "overBuilt";
+      }
       retail = {
         active: true,
         today: Math.round(today),

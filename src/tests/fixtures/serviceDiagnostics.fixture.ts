@@ -46,3 +46,30 @@ export function setFixtureHotelState(fixture: ServiceDiagnosticsFixture, state: 
   fixture.hotel.state = state;
   fixture.hotel.dirtyDays = state === "dirty" ? 1 : 0;
 }
+
+
+/** Commercial-state fixture shared by the WASM differential and browser tests.
+ * Ground-level venues share the same reachable lobby segment. No fabricated
+ * demand pressure values are written into the engine; it calculates them. */
+export function retailServiceFixture(mode: GameMode = "modern") {
+  const sim = Simulation.newGame(71, mode);
+  sim.money = 1e9;
+  sim.star = 5;
+  for (let x = 150; x < 275; x++) {
+    sim.tower.place("lobby", 1, x);
+    if (sim.tower.structureKindAt(1, x) !== "lobby")
+      throw new Error(`retail fixture lobby missing at ${x}`);
+  }
+  const shop = placeUnit(sim, "shop", 1, 165);
+  const fastFood = placeUnit(sim, "fastFood", 1, 200);
+  const restaurant = placeUnit(sim, "restaurant", 1, 235);
+  for (const u of [shop, fastFood, restaurant]) u.state = "occupied";
+  shop.patronageToday = 40;
+  shop.patronageYest = 10;
+  shop.profitYest = 200;
+  fastFood.patronageToday = 3;
+  restaurant.patronageToday = 120;
+  restaurant.patronageYest = 110;
+  restaurant.profitYest = 4800;
+  return { sim, shop, fastFood, restaurant };
+}
