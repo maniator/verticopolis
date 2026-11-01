@@ -57,6 +57,51 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
     expect(lines.map((l) => l.values.join("|")).join("\n")).toContain("2,500");
   });
 
+  it("shows the Rust shaft's average load warning using its port record", () => {
+    const { sim } = tower();
+    const engine = new TsEngine(sim);
+    const reader = new ViewReader(engine, facilityFloors);
+    const slots = VIEW_LAYOUT.records.shaftCard;
+    const slot = (name: string): number => {
+      const index = slots.indexOf(name as (typeof slots)[number]);
+      if (index < 0) throw new Error(`Missing shaftCard slot: ${name}`);
+      return index;
+    };
+    let utilization = 0.91;
+    const port = new Proxy(engine, {
+      get(target, key) {
+        if (key === "sim") return undefined;
+        if (key === "shaftCard") return (id: number) => {
+          if (id !== 73) return new Float64Array(0);
+          const record = new Float64Array(slots.length);
+          record[slot("id")] = id;
+          record[slot("kindCode")] = VIEW_LAYOUT.kinds.indexOf("elevator");
+          record[slot("utilization")] = utilization;
+          return record;
+        };
+        return Reflect.get(target, key, target);
+      },
+    }) as unknown as EnginePort;
+    const kit = createCardKit({ enginePort: port, reader });
+    const copy = (id: number) => kit.diagnostics.transport(id)
+      .map((line) => line.strings.map((s, i) => s + (i < line.values.length ? String(line.values[i]) : "")).join(""))
+      .join("\n");
+
+    expect(copy(73)).toContain("Avg load: 91% full. Near capacity; consider more cars or a parallel shaft.");
+    expect(copy(73)).toContain("var(--bad)");
+    expect(copy(9999)).toBe("");
+
+    utilization = 0.85;
+    kit.cards.forget();
+    expect(copy(73)).toContain("Avg load: 85% full");
+    expect(copy(73)).not.toContain("Near capacity");
+    expect(copy(73)).toContain("var(--good)");
+
+    utilization = NaN;
+    kit.cards.forget();
+    expect(copy(73)).toBe("");
+  });
+
   it("show tenant access from port facts, without recycling lines for another kind or a center under construction", () => {
     const { sim, centerId, officeId } = tower();
     const engine = new TsEngine(sim);

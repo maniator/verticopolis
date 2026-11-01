@@ -10,15 +10,15 @@ import { PortCodes } from "../simport/portCodes";
 import { scheduleFromSlots } from "../simport/scheduleSlots";
 import type { EnginePort } from "../simport/enginePort";
 import type { ViewReader } from "../simport/viewReader";
-import { facilityDiagnostics, transportDiagnostics } from "./facilityDiagnostics";
+import { facilityDiagnostics, transportDiagnostics, transportLoadLines } from "./facilityDiagnostics";
 import { recyclingLinesOf } from "./recyclingDiagnostics";
 import { createPortUnitDiagnostics } from "./portUnitDiagnostics";
 
 /**
  * Shared card data for the inspector and editor. The TypeScript engine uses
  * its existing Simulation-backed diagnostics; Rust renders the already-ported
- * unitFacts record and recycling readout without a TypeScript tower mirror.
- * Additional report categories without port reads are tracked by #1420.
+ * unitFacts, elevator utilization and recycling records without a TypeScript
+ * tower mirror. Additional report categories without port reads are tracked by #1420.
  */
 export interface CardKit {
   readonly cards: Cards;
@@ -113,8 +113,9 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
       },
       transport: (id) => {
         const sim = tsTower();
-        const t = sim?.tower.getTransport(id);
-        return sim && t ? transportDiagnostics(sim, t) : [];
+        if (!sim) return transportLoadLines(cards.shaft(id)?.utilization);
+        const t = sim.tower.getTransport(id);
+        return t ? transportDiagnostics(sim, t) : [];
       },
     },
     currentSchedule: (id) => scheduleFromSlots(port.shaftSchedule(id)),
