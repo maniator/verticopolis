@@ -15,6 +15,7 @@ import { type PlaceOutcome } from "./ui/placement";
 import { OnboardingController } from "./ui/Onboarding";
 import type { BuildActions } from "./game/buildActions";
 import type { EditorActions } from "./game/editorActions";
+import type { ScheduleReview } from "./game/scheduleReview";
 import type { CardKit } from "./game/cardKit";
 import type { SaveLoad } from "./game/saveLoad";
 import { announceLive } from "./game/liveRegion";
@@ -77,6 +78,7 @@ class GameApp implements GameAppPorts {
   /** The engine's gameplay events, for the analytics bridge. */ events!: PortEvents;
   /** What the renderer draws: the reader's view and the port's render queries. */ renderSim!: PortRenderSim;
   /** The editor and inspector cards, and the reads the port lacks. @internal */ cardKit!: CardKit;
+  /** The elevator schedule review for older towers (#1548). @internal */ scheduleReview!: ScheduleReview;
   /** The tower the tooling harnesses edit by hand (`toolingSim.ts`); undefined on the Rust engine in production. */
   get sim(): Simulation | undefined { return toolingSim(this); }
   set sim(sim: Simulation) { this.adoptSim(sim); }
@@ -92,11 +94,7 @@ class GameApp implements GameAppPorts {
   /** Last day each meal-rush bulletin fired (transient, like the log). Kept
    *  per meal so a save reloaded mid-day does not spam an already-fired kind.
    *  @internal */
-  lastMealRushDay: Record<"breakfast" | "lunch" | "dinner", number> = {
-    breakfast: -1,
-    lunch: -1,
-    dinner: -1,
-  };
+  lastMealRushDay: Record<"breakfast" | "lunch" | "dinner", number> = { breakfast: -1, lunch: -1, dinner: -1 };
   /** @internal */ lastUiUpdate = 0;
   /** The last few failures the frame guard and the traffic chip swallowed to
    *  keep the game alive, kept for the crash report (game/frameErrors.ts).
