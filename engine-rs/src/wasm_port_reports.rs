@@ -282,6 +282,14 @@ impl Engine {
     /// record for an id that names no unit (a transport's, or a malformed
     /// one). Like `diagnosticFacts`, the read may fill caches outside the
     /// save; it changes nothing in the game.
+    /// Inspector-only keyed read; the native Rust and WASM engines both
+    /// serialize the same typed ServiceDiagnosticFacts struct.
+    pub(crate) fn port_service_diagnostics(&self, id: f64) -> Option<String> {
+        let id = crate::charges::whole(id)?;
+        let facts = self.sim.service_diagnostic_facts(id)?;
+        serde_json::to_string(&facts).ok()
+    }
+
     pub(crate) fn port_unit_facts(&mut self, id: f64) -> Vec<f64> {
         let Some(id) = crate::charges::whole(id) else {
             return Vec::new();

@@ -20,6 +20,10 @@
 mod memo;
 #[cfg(test)]
 mod memo_tests;
+// The native library retains these Rust facts for parity and future consumers;
+// today only the WASM interface calls them outside tests.
+#[cfg_attr(not(feature = "wasm"), allow(dead_code))]
+pub(crate) mod service;
 mod tenant;
 #[cfg(test)]
 mod tenant_tests;

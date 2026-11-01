@@ -371,6 +371,7 @@ export class Engine {
      * `serialize()` as JSON text.
      */
     serialize(): string;
+    serviceDiagnostics(id: number): any;
     /**
      * `sim.autoBridge = value`, the direct write an undo restore makes.
      */

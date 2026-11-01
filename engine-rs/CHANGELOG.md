@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.3.0 (2026-11-01)
+
+- The inspector can read typed, engine-authored service diagnostics through `serviceDiagnostics(id)`, returned to JavaScript as a keyed object. Parking, hotel and housekeeping verdicts and supporting facts are Rust-owned. Numeric frame and tenant records, the view layout, save format and simulation rules remain unchanged.
+
 ## 1.2.0 (2026-10-30)
 
 - The catalog carries four kind facts on every facility entry: `commercial`, `hotel`, `leaseAmenity` and `unmetDemand`, the engine's own `is_commercial`, `is_hotel`, `is_lease_amenity` and `is_unmet_demand_kind`. A frontend reads them instead of keeping its own kind lists. `CATALOG_VERSION` is 3, so a frontend built for version 2 refuses this catalog, and the catalog digests are regenerated.

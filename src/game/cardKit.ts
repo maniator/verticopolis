@@ -13,6 +13,7 @@ import type { ViewReader } from "../simport/viewReader";
 import { facilityDiagnostics, transportDiagnostics, transportLoadLines } from "./facilityDiagnostics";
 import { recyclingLinesOf } from "./recyclingDiagnostics";
 import { createPortUnitDiagnostics } from "./portUnitDiagnostics";
+import { portServiceLines } from "./portServiceDiagnostics";
 
 /**
  * Shared card data for the inspector and editor. The TypeScript engine uses
@@ -63,7 +64,10 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
   // path uses facts from EnginePort and never rebuilds a mirror from a save.
   const tsTower = (): Simulation | undefined => (app.enginePort as { readonly sim?: Simulation }).sim;
   const cards = new Cards(app.enginePort, app.reader);
-  const tenantLines = createPortUnitDiagnostics(port);
+  const tenantLines = createPortUnitDiagnostics(port, (id) => {
+    const facts = port.serviceDiagnostics(id);
+    return facts ? portServiceLines(facts) : [];
+  });
   // The editor's 160ms UI refresh must not run the Rust engine's full
   // congestion attribution each time. This keeps only the last unit's
   // engine-authored explanation. Its key follows the same per-hour and

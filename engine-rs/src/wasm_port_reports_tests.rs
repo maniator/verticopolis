@@ -92,6 +92,193 @@ fn unit_facts_cover_every_slot_and_refuse_strangers() {
     }
 }
 
+#[test]
+fn keyed_service_diagnostics_return_typed_hotel_verdicts() {
+    let mut engine = built();
+    let placed = engine.sim.tower.place(Kind::HotelSingle, 2, 170);
+    assert!(placed.ok);
+    let id = engine
+        .sim
+        .tower
+        .units
+        .iter()
+        .find(|u| u.kind == Kind::HotelSingle)
+        .unwrap()
+        .id;
+    let read = |engine: &Engine| {
+        serde_json::from_str::<serde_json::Value>(
+            &engine.port_service_diagnostics(id as f64).unwrap(),
+        )
+        .unwrap()
+    };
+    let initial = read(&engine);
+    assert_eq!(initial["hotel"]["rating"], "counts");
+    assert_eq!(initial["hotel"]["condition"], "other");
+    engine.sim.star = 4;
+    engine.sim.tower.get_unit_mut(id).unwrap().state = crate::tower::UnitState::Dirty;
+    let dirty = read(&engine);
+    assert_eq!(dirty["hotel"]["rating"], "excluded");
+    assert_eq!(dirty["hotel"]["condition"], "dirty");
+    assert_eq!(
+        dirty["hotel"]["infestDays"],
+        crate::housekeeping::INFEST_DAYS
+    );
+    engine.sim.tower.get_unit_mut(id).unwrap().state = crate::tower::UnitState::Infested;
+    let infested = read(&engine);
+    assert_eq!(infested["hotel"]["condition"], "infested");
+    assert_eq!(infested["hotel"]["recovery"], true);
+    assert!(engine.port_service_diagnostics(-1.0).is_none());
+}
+
+fn extend_floor_for_housekeeping_fixture(engine: &mut Engine) {
+    // The base fixture stops at x=180. Housekeeping spans 15 tiles from
+    // x=170, and the hotel beside it occupies x=185..189.
+    for x in 180..190 {
+        let lobby = engine.sim.tower.place(Kind::Lobby, 1, x);
+        assert!(lobby.ok, "lobby at {x}: {:?}", lobby.reason);
+        let floor = engine.sim.tower.place(Kind::Floor, 2, x);
+        assert!(floor.ok, "floor at {x}: {:?}", floor.reason);
+    }
+}
+
+#[test]
+fn keyed_service_diagnostics_keep_housekeeping_decisions_in_rust() {
+    let mut engine = built();
+    extend_floor_for_housekeeping_fixture(&mut engine);
+    let placed = engine.sim.tower.place(Kind::Housekeeping, 2, 170);
+    assert!(placed.ok, "{:?}", placed.reason);
+    let id = engine
+        .sim
+        .tower
+        .units
+        .iter()
+        .find(|u| u.kind == Kind::Housekeeping)
+        .unwrap()
+        .id;
+    engine.sim.tower.get_unit_mut(id).unwrap().state = crate::tower::UnitState::Occupied;
+    let read = |engine: &Engine| {
+        serde_json::from_str::<serde_json::Value>(
+            &engine.port_service_diagnostics(id as f64).unwrap(),
+        )
+        .unwrap()
+    };
+    let initial = read(&engine);
+    assert_eq!(initial["housekeeping"]["status"], "adequate");
+    assert_eq!(
+        initial["housekeeping"]["maidsPerUnit"],
+        crate::housekeeping::HK_MAIDS_PER_UNIT
+    );
+    assert_eq!(
+        initial["housekeeping"]["roomsPerMaid"],
+        crate::panels::coverage::HK_NOMINAL_ROOMS_PER_MAID
+    );
+    engine.sim.housekeeping.yesterday = Some((9, 4));
+    let observed = read(&engine);
+    // With no hotel rooms, the engine correctly suppresses the shortage.
+    assert_eq!(observed["housekeeping"]["status"], "adequate");
+    assert_eq!(observed["housekeeping"]["cleaned"], 9);
+}
+
+#[test]
+fn keyed_service_diagnostics_parking_fixture_distinguishes_connected_and_dead_space() {
+    let mut engine = built();
+    for x in 150..235 {
+        assert!(engine.sim.tower.place(Kind::Floor, 0, x).ok);
+    }
+    let ramp = engine.sim.tower.place(Kind::ParkingRamp, 0, 170);
+    let connected = engine.sim.tower.place(Kind::Parking, 0, 186);
+    let dead = engine.sim.tower.place(Kind::Parking, 0, 220);
+    assert!(
+        ramp.ok && connected.ok && dead.ok,
+        "fixture must build all parking units"
+    );
+    let id_of = |engine: &Engine, x: i64| {
+        engine
+            .sim
+            .tower
+            .units
+            .iter()
+            .find(|u| u.kind == Kind::Parking && u.x == x)
+            .unwrap()
+            .id
+    };
+    let ramp_id = engine
+        .sim
+        .tower
+        .units
+        .iter()
+        .find(|u| u.kind == Kind::ParkingRamp)
+        .unwrap()
+        .id;
+    let connected_id = id_of(&engine, 186);
+    let dead_id = id_of(&engine, 220);
+    for id in [ramp_id, connected_id, dead_id] {
+        engine.sim.tower.get_unit_mut(id).unwrap().state = crate::tower::UnitState::Occupied;
+    }
+    assert!(engine
+        .sim
+        .tower
+        .functional_parking_set()
+        .contains(&connected_id));
+    assert!(!engine.sim.tower.functional_parking_set().contains(&dead_id));
+    let read = |engine: &Engine, id: i64| -> serde_json::Value {
+        serde_json::from_str(&engine.port_service_diagnostics(id as f64).unwrap()).unwrap()
+    };
+    assert_eq!(read(&engine, ramp_id)["parking"]["status"], "ramp");
+    let connected_json = read(&engine, connected_id);
+    assert_eq!(connected_json["parking"]["status"], "connected");
+    assert_eq!(connected_json["parking"]["have"], 1);
+    let disconnected_json = read(&engine, dead_id);
+    assert_eq!(disconnected_json["parking"]["status"], "disconnected");
+    assert!(disconnected_json["parking"]["have"].is_null());
+    engine.sim.tower.get_unit_mut(ramp_id).unwrap().state = crate::tower::UnitState::Fire;
+    assert_eq!(
+        read(&engine, connected_id)["parking"]["status"],
+        "disconnected"
+    );
+    engine.sim.tower.get_unit_mut(connected_id).unwrap().state = crate::tower::UnitState::Fire;
+    assert_eq!(
+        read(&engine, connected_id)["parking"]["status"],
+        "notApplicable"
+    );
+}
+
+#[test]
+fn keyed_housekeeping_fixture_emits_observed_shortfall_only_with_hotel_rooms() {
+    let mut engine = built();
+    extend_floor_for_housekeeping_fixture(&mut engine);
+    let hk = engine.sim.tower.place(Kind::Housekeeping, 2, 170);
+    let hotel = engine.sim.tower.place(Kind::HotelSingle, 2, 185);
+    assert!(hk.ok, "housekeeping placement: {:?}", hk.reason);
+    assert!(hotel.ok, "hotel placement: {:?}", hotel.reason);
+    let id_of = |engine: &Engine, kind: Kind| {
+        engine
+            .sim
+            .tower
+            .units
+            .iter()
+            .find(|u| u.kind == kind)
+            .unwrap()
+            .id
+    };
+    let hk_id = id_of(&engine, Kind::Housekeeping);
+    let hotel_id = id_of(&engine, Kind::HotelSingle);
+    for id in [hk_id, hotel_id] {
+        engine.sim.tower.get_unit_mut(id).unwrap().state = crate::tower::UnitState::Occupied;
+    }
+    let read = |engine: &Engine| -> serde_json::Value {
+        serde_json::from_str(&engine.port_service_diagnostics(hk_id as f64).unwrap()).unwrap()
+    };
+    assert_eq!(read(&engine)["housekeeping"]["status"], "adequate");
+    engine.sim.housekeeping.yesterday = Some((8, 4));
+    let active = read(&engine);
+    assert_eq!(active["housekeeping"]["status"], "observedShortfall");
+    assert_eq!(active["housekeeping"]["cleaned"], 8);
+    assert_eq!(active["housekeeping"]["leftover"], 4);
+    engine.sim.tower.get_unit_mut(hotel_id).unwrap().state = crate::tower::UnitState::Construction;
+    assert_eq!(read(&engine)["housekeeping"]["status"], "adequate");
+}
+
 fn fixture(name: &str) -> Engine {
     let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../conformance/fixtures/");
     let text = std::fs::read_to_string(format!("{dir}{name}")).unwrap();
