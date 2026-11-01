@@ -365,8 +365,9 @@ impl Tower {
     }
 
     /// `setSchedule(id, raw)`: an authored per-shaft schedule, hardened
-    /// through `Schedule::coerce` against the live cars and span, homes
-    /// snapped onto the shaft's stops. False for a non-elevator id.
+    /// through `Schedule::coerce` against the live cars and span. New or
+    /// changed staging homes snap to stops, but editing shift counts must not
+    /// move unchanged legacy homes (#1557). False for a non-elevator id.
     pub fn set_schedule(&mut self, id: i64, raw: &Value) -> bool {
         let Some(i) = self.transport_index(id) else {
             return false;
@@ -379,10 +380,20 @@ impl Tower {
             let t = &self.transports[i];
             (t.cars, t.bottom, t.top)
         };
+        // A legacy save may keep a home floor that later stop rules would
+        // otherwise snap. Editing only the active-car rows must preserve it.
+        let previous_homes = self.transports[i]
+            .schedule
+            .as_ref()
+            .and_then(|s| s.home_floors.clone());
         let coerced = Schedule::coerce(Some(raw), cars, bottom, top);
         self.transports[i].schedule = coerced.map(|sch| {
-            let stops = self.stops_of(&self.transports[i]);
-            sch.snap_homes_to_stops(&stops)
+            if sch.home_floors == previous_homes {
+                sch
+            } else {
+                let stops = self.stops_of(&self.transports[i]);
+                sch.snap_homes_to_stops(&stops)
+            }
         });
         true
     }
