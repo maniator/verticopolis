@@ -45,14 +45,23 @@ describe("engine-owned keyed service diagnostic presentation", () => {
   it("uses per-space parking connectivity even when other spaces work", () => {
     const shared = { have: 4, total: 6, offices: 5, suites: 1 };
     expect(printed({ parking: { ...shared, status: "disconnected" } })).toContain("Ramp access: none");
-    expect(printed({ parking: { ...shared, status: "disconnected" } })).not.toContain("Demand:");
+    expect(printed({ parking: { ...shared, status: "disconnected" } })).not.toContain("Parking demand:");
     expect(printed({ parking: { ...shared, status: "connected", shortage: true } })).toContain("Ramp access: connected");
-    expect(printed({ parking: { ...shared, status: "ramp", shortage: true } })).toContain("Demand: 4/6 spaces");
+    expect(printed({ parking: { ...shared, status: "ramp", shortage: true } })).toContain("Parking demand: 6 needed / 4 available");
+  });
+
+  it("presents parking demand before usable capacity and preserves the supplied shortage flag", () => {
+    const facts = { status: "connected" as const, have: 185, total: 178, offices: 49, suites: 129 };
+    const enough = printed({ parking: { ...facts, shortage: false } });
+    expect(enough).toContain("Parking demand: 178 needed / 185 available (49 for offices, 129 for suites).");
+    expect(enough).not.toContain("185 needed / 178 available");
+    const insufficient = printed({ parking: { ...facts, have: 170, shortage: true } });
+    expect(insufficient).toContain("Parking demand: 178 needed / 170 available");
   });
 
   it("does not compute new thresholds from contradictory engine figures", () => {
     const parking = printed({ parking: { status: "connected", shortage: false, have: 1, total: 9, offices: 9, suites: 0 } });
-    expect(parking).toContain("Demand: 1/9 spaces");
+    expect(parking).toContain("Parking demand: 9 needed / 1 available");
     const adequate = printed({ housekeeping: {
       status: "adequate", crews: 2, maids: 12, rooms: 1000, maidsPerUnit: 6,
       roomsPerMaid: 19, cleaned: 10, leftover: 100,

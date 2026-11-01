@@ -56,13 +56,13 @@ test.describe("Rust service diagnostics in the real browser", () => {
       (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
     }, { id: f.connectedParking.id, kind: f.connectedParking.kind });
     await expect(page.locator("#inspector")).toContainText("Ramp access: connected");
-    await expect(page.locator("#inspector")).toContainText("Demand:");
+    await expect(page.locator("#inspector")).toContainText("Parking demand:");
 
     await page.evaluate(({ id, kind }) => {
       (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
     }, { id: f.disconnectedParking.id, kind: f.disconnectedParking.kind });
     await expect(page.locator("#inspector")).toContainText("Ramp access: none");
-    await expect(page.locator("#inspector")).not.toContainText("Demand:");
+    await expect(page.locator("#inspector")).not.toContainText("Parking demand:");
   });
 
   test("real Rust retail copy appears on desktop and the mobile editor", async ({ page }) => {

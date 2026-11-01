@@ -676,7 +676,7 @@ describe("InspectorController (data-rich cards: parking, recycling, notice)", ()
 
     const { inspector, shown } = makeInspector(sim);
     inspector.inspectPicked({ type: "unit", id: ramp.id, kind: "parkingRamp" });
-    expect(last(shown)).toContain("Demand:");
+    expect(last(shown)).toContain("Parking demand:");
 
     inspector.inspectPicked({ type: "unit", id: good.id, kind: "parking" });
     expect(last(shown)).toContain("Ramp access: connected");
