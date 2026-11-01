@@ -20,6 +20,7 @@ import { ENGINE_FAILURE_ID, isEngineStopped } from "./game/interactionState";
 import { showEngineLoading } from "./engineLoading";
 import { bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, typescriptBoot, type EngineBootState } from "./wasmhost/engineBoot";
 import { copyEngineDiagnostics } from "./engineDiagnosticsCopy";
+import { downloadEngineFailureArchive } from "./engineCrash/failureArchive";
 import { pageControlled, repairOffered } from "./wasmhost/engineRepair";
 import { runEngineRepair } from "./engineRepairControl";
 
@@ -132,7 +133,8 @@ let inertWatch: MutationObserver | null = null;
  *  every other boot-fallback message. */
 export function showEngineFailure(state: EngineBootState, online = typeof navigator === "undefined" || navigator.onLine !== false): void {
   if (!state.failure) return;
-  const offerRepair = repairOffered(state.failure, pageControlled());
+  const failure = state.failure;
+  const offerRepair = repairOffered(failure, pageControlled());
   const copy = engineFailureCopy(state.failure, online, { secure: typeof window === "undefined" || window.isSecureContext !== false, repair: offerRepair });
   stopGame(
     html`<div id=${ENGINE_FAILURE_ID} data-stage=${state.failure.stage} role="alert" aria-live="assertive">
@@ -146,6 +148,14 @@ export function showEngineFailure(state: EngineBootState, online = typeof naviga
           ? html`<button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="repair-engine" @click=${runEngineRepair}>Repair engine files</button>
               <span class="engine-failure-repair-status" role="status" aria-live="polite" style="margin:0 .5em;opacity:.8"></span>`
           : nothing}
+        <button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="download-failure-report" @click=${(event: Event) => {
+          const result = downloadEngineFailureArchive(failure);
+          const status = (event.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(".engine-failure-report-status");
+          if (status) status.textContent = result === "saved"
+            ? "Report downloaded. Attach the zip to a bug report if you choose."
+            : "The report could not be downloaded. Your stored save was not changed.";
+        }}>Download crash report</button>
+        <span class="engine-failure-report-status" role="status" aria-live="polite" style="margin-left:.5em;opacity:.8"></span>
         <button style="padding:4px 16px;font:inherit;cursor:pointer" data-act="copy-diagnostics" @click=${copyEngineDiagnostics}>Copy diagnostics</button>
         <span class="engine-failure-copy-status" role="status" aria-live="polite" style="margin-left:.5em;opacity:.8"></span>
       </p>
