@@ -1,6 +1,6 @@
 import { Simulation } from "../../engine/Simulation";
 import type { GameMode, Unit, UnitState } from "../../engine/types";
-import { placeUnit } from "./towerFixtures";
+import { mustBuild, placeUnit } from "./towerFixtures";
 
 /**
  * One deterministic service-diagnostics tower shared by the reference engine,
@@ -57,12 +57,18 @@ export function retailServiceFixture(mode: GameMode = "modern") {
   sim.star = 5;
   for (let x = 150; x < 275; x++) {
     sim.tower.place("lobby", 1, x);
+    sim.tower.place("floor", 2, x);
     if (sim.tower.structureKindAt(1, x) !== "lobby")
       throw new Error(`retail fixture lobby missing at ${x}`);
+    if (sim.tower.structureKindAt(2, x) !== "floor")
+      throw new Error(`retail fixture floor missing at ${x}`);
   }
-  const shop = placeUnit(sim, "shop", 1, 165);
-  const fastFood = placeUnit(sim, "fastFood", 1, 200);
-  const restaurant = placeUnit(sim, "restaurant", 1, 235);
+  // Commercial rooms cannot occupy the ground-floor lobby. An actual
+  // elevator makes the floor-2 venues reachable for the demand-map test.
+  mustBuild(sim, "elevatorStandard", 153, 1, 2);
+  const shop = placeUnit(sim, "shop", 2, 165);
+  const fastFood = placeUnit(sim, "fastFood", 2, 200);
+  const restaurant = placeUnit(sim, "restaurant", 2, 235);
   for (const u of [shop, fastFood, restaurant]) u.state = "occupied";
   shop.patronageToday = 40;
   shop.patronageYest = 10;

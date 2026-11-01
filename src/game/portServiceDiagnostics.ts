@@ -113,7 +113,7 @@ export function retailDisplayLines(c: ServiceDiagnosticFacts["retail"]): Lines {
     else if (c.tier === "booming") style = `color:${good}`;
     out.push(html`<div style=${style}>${verdict[c.tier]}</div>`);
   }
-  if (c.profitYest !== null) out.push(html`<div>Yesterday's profit: ${c.profitYest.toLocaleString()}.</div>`);
+  if (c.profitYest !== null) out.push(html`<div>Yesterday's profit: $${c.profitYest.toLocaleString()}.</div>`);
   if (c.rainy) out.push(html`<div>Rain might cause fewer customers.</div>`);
   return out;
 }

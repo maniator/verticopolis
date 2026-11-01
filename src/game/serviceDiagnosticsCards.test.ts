@@ -3,7 +3,8 @@ import { facilityFloors } from "../engine/facilities";
 import { TsEngine } from "../engine/port/tsEngine";
 import type { EnginePort } from "../simport/enginePort";
 import { ViewReader } from "../simport/viewReader";
-import { serviceDiagnosticsFixture, setFixtureHotelState } from "../tests/fixtures/serviceDiagnostics.fixture";
+import { serviceDiagnosticsFixture, retailServiceFixture, setFixtureHotelState } from "../tests/fixtures/serviceDiagnostics.fixture";
+import { html } from "lit-html";
 import { renderToFragment } from "../ui/testing/litTestUtils";
 import { unitEditorTemplate } from "../ui/templates/editor";
 import { unitInspectorTemplate } from "../ui/templates/inspector";
@@ -75,6 +76,37 @@ describe("service inspector cards against the Rust-style EnginePort", () => {
     f.kit.diagnostics.invalidate();
     f.kit.diagnostics.unit(f.housekeeping.id);
     expect(f.reads()).toBeGreaterThan(count);
+  });
+
+  it("does not duplicate commercial lines through the Rust-style card cache and refresh", () => {
+    const fixture = retailServiceFixture("modern");
+    const ts = new TsEngine(fixture.sim);
+    let reads = 0;
+    const port = new Proxy(ts, {
+      get(target, key) {
+        if (key === "sim") return undefined;
+        if (key === "serviceDiagnostics") return (id: number) => {
+          reads++;
+          return target.serviceDiagnostics(id);
+        };
+        return Reflect.get(target, key, target);
+      },
+    }) as unknown as EnginePort;
+    const reader = new ViewReader(port, facilityFloors);
+    const kit = createCardKit({ enginePort: port, reader });
+    const count = (parts: ReturnType<typeof kit.diagnostics.unit>) =>
+      renderToFragment(html`${parts}`).textContent ?? "";
+    const first = count(kit.diagnostics.unit(fixture.shop.id, true));
+    expect(first.split("Today's patronage:")).toHaveLength(2);
+    expect(first.split("Very few customers.")).toHaveLength(2);
+    const readsAfter = reads;
+    for (let i = 0; i < 8; i++) {
+      expect(count(kit.diagnostics.unit(fixture.shop.id))).toBe(first);
+    }
+    expect(reads).toBe(readsAfter);
+    kit.diagnostics.invalidate();
+    const refreshed = count(kit.diagnostics.unit(fixture.shop.id, true));
+    expect(refreshed.split("Today's patronage:")).toHaveLength(2);
   });
 
   it("does not render service warnings for offices or construction-state service units", () => {
