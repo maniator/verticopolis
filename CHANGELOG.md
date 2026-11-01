@@ -21,6 +21,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.77.0
+
+- Shops and restaurants again show today's customers, yesterday's business and profit, and local demand.
+- In Modern towers, food and retail venues now say when there are too many or too few for the tower's shoppers.
+- Reviewing an older elevator schedule no longer moves a car's home floor when you change its duty hours.
+
 ## 2.76.1
 
 - Parking spaces now explain ramp connections and demand, and hotel and housekeeping cards show their existing coverage and recovery warnings.
