@@ -39,6 +39,9 @@ async function dispatchTouch(
   y: number,
 ): Promise<void> {
   await page.evaluate(({ type, id, x, y }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ex = (window as any).game?.engine?.engine;
+    const startFrame = Number.isFinite(ex?.stats?.currFrame?.id) ? ex.stats.currFrame.id : null;
     const canvas = document.getElementById("view") as HTMLCanvasElement;
     const r = canvas.getBoundingClientRect();
     canvas.dispatchEvent(
@@ -54,11 +57,32 @@ async function dispatchTouch(
         cancelable: true,
       }),
     );
+    // Excalibur flushes pointer events in its update loop; usually two frames are enough.
+    // On overloaded CI, rAF can stall long enough to hit the test timeout, so bound the wait.
+    return new Promise<void>((done, fail) => {
+        let settled = false;
+        const frameAdvanced = () => {
+          if (startFrame === null) return false;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const now = (window as any).game?.engine?.engine?.stats?.currFrame?.id;
+          return Number.isFinite(now) && now > startFrame;
+        };
+        const finish = (ok: boolean, reason: string) => {
+          if (settled) return;
+          settled = true;
+          if (ok) done();
+          else fail(new Error(reason));
+        };
+        let frames = 0;
+        const onFrame = () => {
+          frames++;
+          if (frames >= 2) finish(frameAdvanced(), "pointer event dispatch finished before Excalibur advanced a frame");
+          else requestAnimationFrame(onFrame);
+        };
+        requestAnimationFrame(onFrame);
+        setTimeout(() => finish(frameAdvanced(), "pointer event dispatch timed out before Excalibur advanced a frame"), 100);
+      });
   }, touchArgs(type, id, x, y));
-  // Excalibur flushes pointer events in its update loop; let two frames run.
-  await page.evaluate(
-    () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))),
-  );
 }
 
 /** Camera zoom derived from two world points (no absolute-zoom getter). */
