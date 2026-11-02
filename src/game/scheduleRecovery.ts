@@ -121,7 +121,7 @@ function canonicalKey(key: string): string | null {
   return null;
 }
 
-function canonicalise(entries: Record<string, Decision>): Record<string, Decision> {
+function canonicalize(entries: Record<string, Decision>): Record<string, Decision> {
   const migrated: Record<string, Decision> = {};
   for (const [key, value] of Object.entries(entries)) {
     if (value !== "kept" && value !== "told") continue;
@@ -140,7 +140,7 @@ export function browserAcknowledgements(storage: Pick<Storage, "getItem" | "setI
     try {
       const raw = JSON.parse(storage?.getItem(STORE_KEY) ?? "{}") as unknown;
       const base = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, Decision>) : {};
-      const migrated = canonicalise(base);
+      const migrated = canonicalize(base);
       if (JSON.stringify(base) !== JSON.stringify(migrated)) {
         try {
           storage?.setItem(STORE_KEY, JSON.stringify(migrated));
