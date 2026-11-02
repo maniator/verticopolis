@@ -46,12 +46,12 @@ is breached. Run it locally when you touch measured code. CI runs it without
 without coverage (the 720-hour `holidays-classic` scenario is too slow under
 coverage on a shared runner); `npm test` still runs everything.
 
-Workflow YAML is CI configuration, not a Vitest test fixture. Do not add tests
-that read `.github/workflows/*.yml` and assert particular strings, step names,
-job blocks, or snapshots. Check workflow correctness by running the actual CI
-jobs; use a workflow-aware linter such as `actionlint` when editing YAML. Test
+Workflow YAML is CI configuration. Do not add tests that read
+`.github/workflows/*.yml` and assert particular strings, step names, job
+blocks, or snapshots. Check workflow correctness by running the actual CI jobs;
+use a workflow-aware linter such as `actionlint` when editing YAML. Test
 scripts and runtime behavior directly instead of mirroring the workflow in
-another file. Preserve tests of real behavior, not tests of workflow text.
+another file. Keep assertions on real behavior rather than workflow text.
 
 ## Testing & coverage
 
