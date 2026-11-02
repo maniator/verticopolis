@@ -70,6 +70,13 @@ CI (`.github/workflows/test.yml`) runs all of the above on every PR. When you pu
 new commits to a PR, **re-request a Copilot review**. Copilot reviews are one-shot
 snapshots and won't pick up later commits on their own.
 
+**CI/test configuration testing policy:** Do not add test files or assertions
+that read workflow YAML, `playwright.config.ts`, Vitest config, or other test
+configuration to match exact source text, flags or steps. Do not relocate a
+text-matching guard to another file. Validate the actual runner configuration
+and CI results, and correct an overstated PR description rather than adding a
+decorative guard. See `CONTRIBUTING.md` → **Quality gates** for the full rule.
+
 ## GitHub PR Review: BMGD/BMAD review method
 
 Run this repo's mandatory deep review on **every** PR. GitHub always applies this
