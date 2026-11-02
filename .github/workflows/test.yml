@@ -76,13 +76,14 @@ jobs:
 
       # engine conformance (holidays-classic runs 720 in-game hours of a large
       # tower, 15 s of CPU alone) is excluded here and runs in the next step.
-      # Under v8 coverage with other tests running on the same CPU, it can exceed
-      # the 60 s assertion budget and fail unrelated PRs. Keep the scenario in the
-      # dedicated no-coverage step so the branch-protection signal stays clean.
+      # Under v8 coverage with the other test files running beside it, it took
+      # 61 s against its 60 s limit and failed unrelated PRs. Keep the scenario
+      # in the separate no-coverage step, which CI executes directly.
       - name: Run tests
         run: npm run test:coverage -- --run --exclude '**/conformance.integration.test.ts'
 
       - name: Engine conformance (no coverage)
+        if: ${{ !cancelled() }}
         run: npm exec --no -- vitest run --project integration conformance.integration
 
       # This job only proves the bundle builds, with no engine package (the e2e
@@ -122,47 +123,24 @@ jobs:
 
       - uses: ./.github/actions/engine-wasm
 
-      # Keep the required check names, but surface the real-time startup logs for
-      # each suite and preserve the final exit status if either child fails.
       - name: Run ${{ matrix.project }} on the WASM engine
-        if: ${{ matrix.project == 'unitWasm' }}
         env:
           VC_REQUIRE_WASM: "1"
           VC_LOG_TEST_STARTS: "1"
-        run: npx vitest run --project unitWasm
+        run: npx vitest run --project ${{ matrix.project }}
 
-      - name: Run integrationWasm and host suites on the WASM engine
+      # The integrationWasm project hands host-driven suites to the plain
+      # TypeScript-side project (mirror host, perf comparison, conformance).
+      # Run them exactly once, on the required integrationWasm matrix leg.
+      # Both matrix check names remain present and required for merging,
+      # while the Rust workflow no longer repeats this same test:wasm script.
+      # This step has its own timeout and logs each test start (#1152).
+      - name: Host suites on the WASM engine
         if: ${{ matrix.project == 'integrationWasm' }}
         timeout-minutes: 12
         env:
-          VC_REQUIRE_WASM: "1"
           VC_LOG_TEST_STARTS: "1"
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          npx vitest run --project integrationWasm 2>&1 | tee /tmp/integration-wasm.log &
-          integration_pid=$!
-          npm run test:wasm 2>&1 | tee /tmp/test-wasm.log &
-          host_pid=$!
-
-          if wait "$integration_pid"; then
-            integration_status=0
-          else
-            integration_status=$?
-          fi
-
-          if wait "$host_pid"; then
-            host_status=0
-          else
-            host_status=$?
-          fi
-
-          if [ "$integration_status" -ne 0 ] || [ "$host_status" -ne 0 ]; then
-            echo "integrationWasm exit: $integration_status"
-            echo "test:wasm exit: $host_status"
-            exit 1
-          fi
+        run: npm run test:wasm
 
   # Resolve the Playwright container tag from the repo's own Playwright version so
   # the e2e job's browser can never drift from the one baselines were minted with
