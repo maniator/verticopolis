@@ -79,28 +79,12 @@ jobs:
       # Under v8 coverage with the other test files running beside it, it took
       # 61 s against its 60 s limit and failed unrelated PRs. Keep the scenario
       # in the separate no-coverage step, which CI executes directly.
-      # The coverage run and the no-coverage conformance run are independent and
-      # both use the same checkout and package install. Running them together on a
-      # single runner halves the wall-clock on the same billed runner-minutes and
-      # keeps the proof required by the branch protection unchanged.
       - name: Run tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run test:coverage -- --run --exclude '**/conformance.integration.test.ts' > /tmp/test-coverage.log 2>&1 &
-          coverage_pid=$!
-          npm exec --no -- vitest run --project integration conformance.integration > /tmp/test-conformance.log 2>&1 &
-          conformance_pid=$!
+        run: npm run test:coverage -- --run --exclude '**/conformance.integration.test.ts'
 
-          wait "$coverage_pid"; coverage_status=$?
-          wait "$conformance_pid"; conformance_status=$?
-
-          cat /tmp/test-coverage.log
-          cat /tmp/test-conformance.log
-
-          if [ "$coverage_status" -ne 0 ] || [ "$conformance_status" -ne 0 ]; then
-            exit 1
-          fi
+      - name: Engine conformance (no coverage)
+        if: ${{ !cancelled() }}
+        run: npm exec --no -- vitest run --project integration conformance.integration
 
       # This job only proves the bundle builds, with no engine package (the e2e
       # job below builds with one), so it opts out of the engine requirement
@@ -139,10 +123,6 @@ jobs:
 
       - uses: ./.github/actions/engine-wasm
 
-      # Keep the required check names, but overlap the matrix project's own run
-      # with the host-driven suites it hands off. This uses the same runner and
-      # does not add a second required check, yet trims the integrationWasm
-      # critical-path wall time by starting both commands together.
       - name: Run ${{ matrix.project }} on the WASM engine
         if: ${{ matrix.project == 'unitWasm' }}
         env:
@@ -150,26 +130,45 @@ jobs:
           VC_LOG_TEST_STARTS: "1"
         run: npx vitest run --project unitWasm
 
+      # Keep required check names and run host-driven suites once, on the
+      # integrationWasm matrix leg. Stream both subprocess logs live with stable
+      # prefixes so VC_LOG_TEST_STARTS output remains visible if either suite
+      # stalls or times out.
       - name: Run integrationWasm and host suites on the WASM engine
         if: ${{ matrix.project == 'integrationWasm' }}
-        timeout-minutes: 12
+        timeout-minutes: 16
         env:
           VC_REQUIRE_WASM: "1"
           VC_LOG_TEST_STARTS: "1"
         run: |
           set -euo pipefail
-          npx vitest run --project integrationWasm > /tmp/integration-wasm.log 2>&1 &
+          npx vitest run --project integrationWasm 2>&1 | sed -u 's/^/[integrationWasm] /' &
           integration_pid=$!
-          npm run test:wasm > /tmp/test-wasm.log 2>&1 &
+          npm run test:wasm 2>&1 | sed -u 's/^/[test:wasm] /' &
           host_pid=$!
 
-          wait "$integration_pid"; integration_status=$?
-          wait "$host_pid"; host_status=$?
+          integration_status=0
+          host_status=0
 
-          cat /tmp/integration-wasm.log
-          cat /tmp/test-wasm.log
+          if wait "$integration_pid"; then
+            integration_status=0
+          else
+            integration_status=$?
+          fi
+
+          if wait "$host_pid"; then
+            host_status=0
+          else
+            host_status=$?
+          fi
 
           if [ "$integration_status" -ne 0 ] || [ "$host_status" -ne 0 ]; then
+            if [ "$integration_status" -ne 0 ]; then
+              echo "::error::integrationWasm failed with exit code $integration_status"
+            fi
+            if [ "$host_status" -ne 0 ]; then
+              echo "::error::test:wasm failed with exit code $host_status"
+            fi
             exit 1
           fi
 
