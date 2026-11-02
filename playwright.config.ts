@@ -45,7 +45,7 @@ export default defineConfig({
   // CI keeps a second worker only for the wasm-only browser lane without changing
   // the default local single-worker behavior, so the job gets a faster wall-clock
   // without adding extra jobs or changing the switchable lane's setup.
-  workers: process.env.CI && process.env.PW_WASM_ONLY === "1" ? 2 : 1,
+  workers: process.env.CI && WASM_ONLY ? 2 : 1,
   reporter: "list",
   expect: {
     // Visual-baseline comparisons (visual.spec.ts). Animations are frozen and
