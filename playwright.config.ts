@@ -14,6 +14,12 @@ import { readFileSync } from "node:fs";
 // replaces the other two projects, whose builds it does not serve.
 const WASM_ONLY = process.env.PW_WASM_ONLY === "1";
 if (process.env.PW_WASM_ONLY && !WASM_ONLY) throw new Error(`PW_WASM_ONLY must be "1" or unset; got "${process.env.PW_WASM_ONLY}".`);
+// The default lane is deliberately narrow: the general browser regressions run
+// once on the wasm-only build, while the switchable build only exercises the
+// tests that genuinely depend on the legacy fallback or engine-choice path.
+export const SWITCHABLE_ONLY_SPEC = "engineIdentity|saveWithoutRust|engineStatusRows|atlas|visual|perf";
+export const SWITCHABLE_ONLY_SPEC_PATTERN = new RegExp(`^(?:.*(?:${SWITCHABLE_ONLY_SPEC})\\.spec\\.ts)$`);
+export const GENERAL_SPEC_PATTERN = new RegExp(`^(?!.*(?:${SWITCHABLE_ONLY_SPEC})\\.spec\\.ts$).*\\.spec\\.ts$`);
 // The lane must match the build it serves: the projects of one lane fail in
 // confusing ways against the other's build. The build records its mode.
 const builtMode = (() => {
@@ -67,15 +73,17 @@ export default defineConfig({
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   },
   projects: WASM_ONLY
-    ? [{ name: "chromium-wasm-only", testIgnore: /visual\.spec\.ts/, use: { ...devices["Desktop Chrome"] } }]
+    ? [{ name: "chromium-wasm-only", testIgnore: [/visual\.spec\.ts/, SWITCHABLE_ONLY_SPEC_PATTERN], use: { ...devices["Desktop Chrome"] } }]
     : [
     // The Rust engine: the stored engine choice (`vc.engine`, see
     // src/wasmhost/engineChoice.ts) is seeded into localStorage so every page
-    // the suite opens boots on it. The visual baselines keep their historical
-    // `-chromium` file names.
+    // the suite opens boots on it. This lane intentionally limits itself to the
+    // switchable-only tests whose assertions rely on legacy fallback or engine
+    // negotiation, while the general browser regression suite runs once on the
+    // wasm-only tooling build.
     {
       name: "chromium-wasm",
-      testIgnore: [/wasmOnly\.spec\.ts/],
+      testIgnore: [/wasmOnly\.spec\.ts/, GENERAL_SPEC_PATTERN],
       snapshotPathTemplate: "{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}-chromium{-snapshotSuffix}{ext}",
       use: {
         ...devices["Desktop Chrome"],

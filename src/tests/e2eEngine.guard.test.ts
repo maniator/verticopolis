@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+const switchableSpecPattern = /engineIdentity|saveWithoutRust|engineStatusRows|atlas|visual|perf/;
+
 // The Playwright suite and the perf gate run on the Rust engine (#1353). The
 // TypeScript engine has no lane: no second project, no second set of baselines
 // and no smoke leg, so nothing drifts back to dual-engine runs.
@@ -18,6 +20,31 @@ describe("the end-to-end suite's engines", () => {
     expect(config).not.toMatch(/name: "chromium"[,\s]/);
     expect(config).toContain('value: "wasm"');
     expect(config).toMatch(/snapshotPathTemplate: ".*\{arg\}-chromium\{-snapshotSuffix\}\{ext\}"/);
+    expect(switchableSpecPattern.test("engineIdentity.spec.ts")).toBe(true);
+    expect(switchableSpecPattern.test("wasmOnly.spec.ts")).toBe(false);
+  });
+
+  it("keeps the switchable lane restricted to switchable-only specs", () => {
+    const all = [
+      "engineIdentity.spec.ts",
+      "saveWithoutRust.spec.ts",
+      "engineStatusRows.spec.ts",
+      "atlas.spec.ts",
+      "visual.spec.ts",
+      "perf.spec.ts",
+      "wasmOnly.spec.ts",
+      "offline.spec.ts",
+      "milestones.spec.ts",
+    ];
+    expect(all.filter((file) => switchableSpecPattern.test(file))).toEqual([
+      "engineIdentity.spec.ts",
+      "saveWithoutRust.spec.ts",
+      "engineStatusRows.spec.ts",
+      "atlas.spec.ts",
+      "visual.spec.ts",
+      "perf.spec.ts",
+    ]);
+    expect(switchableSpecPattern.test("wasmOnly.spec.ts")).toBe(false);
   });
 
   it("keeps the parity-leg switches gone", () => {
