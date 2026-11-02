@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
+import { Simulation } from "../src/engine/Simulation";
 import { serviceDiagnosticsFixture, retailServiceFixture, setFixtureHotelState } from "../src/tests/fixtures/serviceDiagnostics.fixture";
 import { onWasm, expectEngineHosted } from "./helpers";
 
@@ -39,6 +40,72 @@ test.describe("Rust service diagnostics in the real browser", () => {
     }, save);
     expect(status).toEqual({ wasm: true, hasStructuredPort: true });
   }
+
+  function buildUtilizedPassengerLiftFixture(): { save: string; id: number; kind: "elevatorStandard" } {
+    const sim = Simulation.newGame(11, "modern");
+    sim.money = 1e9;
+    sim.star = 5;
+    sim.clock.minutes = 7 * 60;
+    for (let x = 150; x < 240; x++) {
+      expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+      for (let floor = 2; floor <= 16; floor++) {
+        expect(sim.tower.place("floor", floor, x).ok).toBe(true);
+      }
+    }
+    const shaft = sim.tower.placeTransport("elevatorStandard", 165, 1, 16);
+    if (!shaft.ok || shaft.transportId === undefined) throw new Error("fixture failed to build the passenger shaft");
+    expect(sim.tower.setCars(shaft.transportId, 1)).toBe(true);
+    for (let floor = 2; floor <= 16; floor++) {
+      for (let x = 150; x < 240; x += 9) {
+        const room = sim.tower.place("office", floor, x);
+        if (!room.ok || room.unitId === undefined) throw new Error(`fixture failed to build office at ${floor}/${x}`);
+        const unit = sim.tower.getUnit(room.unitId);
+        if (!unit) throw new Error(`fixture lost office at ${floor}/${x}`);
+        unit.state = "occupied";
+      }
+    }
+    return { save: JSON.stringify(sim.serialize()), id: shaft.transportId, kind: "elevatorStandard" };
+  }
+
+  test("desktop inspector and the mobile editor show the real Rust passenger-elevator load warning", async ({ page }) => {
+    const fixture = buildUtilizedPassengerLiftFixture();
+    await loadFixture(page, fixture.save);
+    const readout = await page.evaluate(({ id }) => {
+      const g = (window as any).game;
+      const slots = JSON.parse(g.enginePort.viewLayout()).records.shaftCard;
+      const index = slots.indexOf("utilization");
+      const shaft = g.sim.tower.getTransport(id);
+      if (!shaft) throw new Error("fixture did not restore the passenger shaft");
+      let util = Number.NaN;
+      let peak = Number.NEGATIVE_INFINITY;
+      let crossedAtHour = -1;
+      for (let hour = 1; hour <= 120; hour++) {
+        g.enginePort.tick(60);
+        g.reader.update();
+        util = g.enginePort.shaftCard(id)[index];
+        if (Number.isFinite(util)) peak = Math.max(peak, util);
+        if (Number.isFinite(util) && util > 0.85) {
+          crossedAtHour = hour;
+          break;
+        }
+      }
+      if (crossedAtHour < 0) throw new Error(`Rust runtime never crossed 85% utilization (peak=${peak})`);
+      return { util, pct: Number.isFinite(util) ? Math.round(util * 100) : NaN, crossedAtHour };
+    }, { id: fixture.id });
+    expect(readout.util).toBeGreaterThan(0.85);
+    await page.evaluate(({ id, kind }) => {
+      (window as any).game.inspector.inspectPicked({ type: "transport", id, kind });
+    }, { id: fixture.id, kind: fixture.kind });
+    await expect(page.locator("#inspector")).toContainText(`Avg load: ${readout.pct}% full`);
+    await expect(page.locator("#inspector")).toContainText("Near capacity; consider more cars or a parallel shaft.");
+
+    await page.setViewportSize({ width: 390, height: 700 });
+    await page.evaluate(({ id, kind }) => {
+      (window as any).game.selectPicked({ type: "transport", id, kind });
+    }, { id: fixture.id, kind: fixture.kind });
+    await expect(page.locator("#editor .ed-diagnostics")).toContainText(`Avg load: ${readout.pct}% full`);
+    await expect(page.locator("#editor .ed-diagnostics")).toContainText("Near capacity; consider more cars or a parallel shaft.");
+  });
 
   test("desktop inspector renders Rust hotel and connected/disconnected garage verdicts", async ({ page }) => {
     const f = serviceDiagnosticsFixture("modern");
