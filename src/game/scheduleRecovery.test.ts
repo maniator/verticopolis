@@ -252,13 +252,43 @@ describe("browserAcknowledgements", () => {
     expect(store.get("a")).toBe("kept");
   });
 
-  it("migrates legacy keys that still carried the old mutable bottom floor", () => {
+  it("migrates legacy keys that still carried the old mutable bottom floor, and keeps the newest decision for a legacy collision", () => {
     const storage = memory();
-    storage.setItem("vc-elevator-schedule-review", JSON.stringify({ "classic:1:1139:elevatorStandard:4:1": "kept" }));
+    storage.setItem(
+      "vc-elevator-schedule-review",
+      JSON.stringify({
+        "classic:1:1139:elevatorStandard:4:1": "kept",
+        "classic:1:1139:elevatorStandard:4:2": "told",
+        "classic:1:1139:elevatorStandard:4": "told",
+      }),
+    );
     const store = browserAcknowledgements(storage);
-    expect(store.get("classic:1:1139:elevatorStandard:4")).toBe("kept");
-    store.set("classic:1:1139:elevatorStandard:4", "told");
-    expect(JSON.parse(storage.getItem("vc-elevator-schedule-review") ?? "{}")).toEqual({ "classic:1:1139:elevatorStandard:4": "told" });
+    expect(store.get("classic:1:1139:elevatorStandard:4")).toBe("told");
+    expect(store.get("classic:1:1139:elevatorStandard:4:1")).toBe("told");
+    expect(store.get("classic:1:1139:elevatorStandard:4:2")).toBe("told");
+    store.set("classic:1:1139:elevatorStandard:4", "kept");
+    expect(JSON.parse(storage.getItem("vc-elevator-schedule-review") ?? "{}")).toEqual({
+      "classic:1:1139:elevatorStandard:4": "kept",
+    });
+  });
+
+  it("keeps legacy told answers through a reload, and refuses malformed non-legacy keys", () => {
+    const storage = memory();
+    storage.setItem(
+      "vc-elevator-schedule-review",
+      JSON.stringify({
+        "classic:1:1139:elevatorStandard:4:1": "told",
+        "classic:1:1139:elevatorStandard:4:2": "kept",
+        "classic:1:1139:elevatorStandard:4": "told",
+        "garbage:more:parts:than:expected": "kept",
+      }),
+    );
+    const store = browserAcknowledgements(storage);
+    expect(store.get("classic:1:1139:elevatorStandard:4")).toBe("told");
+    expect(store.get("garbage:more:parts:than:expected")).toBeUndefined();
+    expect(JSON.parse(storage.getItem("vc-elevator-schedule-review") ?? "{}")).toEqual({
+      "classic:1:1139:elevatorStandard:4": "told",
+    });
   });
 
   it("trims the oldest decisions past its cap", () => {

@@ -110,12 +110,21 @@ const STORE_KEY = "vc-elevator-schedule-review";
 const MAX_REMEMBERED = 400;
 
 /** Old keys used to include the shaft's mutable bottom floor; a geometry-only resize should still match the same
- *  answer. The canonical form drops legacy suffixes that only change with a valid resize, but keeps the rest of the
- *  shaft identity and tower identity intact. */
+ *  answer. Only the exact canonical (mode, seed, shaft id, kind, x) or known legacy six-part shape is rewritten,
+ *  so unrelated or malformed storage keys stay distinct. */
 function canonicalKey(key: string): string | null {
   const parts = key.split(":");
-  if (parts.length === 5 && parts.every(Boolean)) return key;
-  if (parts.length > 5 && parts.slice(0, 5).every(Boolean) && parts.slice(5).every((part) => /^-?\d+$/.test(part))) {
+  const isNumeric = (value: string): boolean => /^-?\d+$/.test(value);
+  const hasCanonicalShape = (fields: readonly string[]): boolean =>
+    fields.length === 5 &&
+    fields[0].length > 0 &&
+    fields[3].length > 0 &&
+    isNumeric(fields[1]) &&
+    isNumeric(fields[2]) &&
+    isNumeric(fields[4]);
+
+  if (hasCanonicalShape(parts)) return key;
+  if (parts.length === 6 && hasCanonicalShape(parts.slice(0, 5)) && isNumeric(parts[5])) {
     return parts.slice(0, 5).join(":");
   }
   return null;
@@ -125,8 +134,17 @@ function canonicalize(entries: Record<string, Decision>): Record<string, Decisio
   const migrated: Record<string, Decision> = {};
   for (const [key, value] of Object.entries(entries)) {
     if (value !== "kept" && value !== "told") continue;
-    const next = canonicalKey(key) ?? key;
-    migrated[next] = value;
+    const next = canonicalKey(key);
+    if (next !== null) {
+      // A canonical key can have several legacy-span variants in the browser store. The
+      // last entry wins so the newest decision survives an upgrade or a later saved edit.
+      migrated[next] = value;
+      continue;
+    }
+    // A shaft key from the game has a compact canonical form or the known legacy shape with a bottom-floor suffix.
+    // Other browser keys are ordinary values and should stay intact, while malformed shaft-looking strings are dropped.
+    if (key.includes(":") && key.split(":").length >= 5) continue;
+    migrated[key] = value;
   }
   return migrated;
 }

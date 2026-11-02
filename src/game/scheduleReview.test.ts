@@ -302,7 +302,14 @@ describe("what the player is told, and what they decide (#1548)", () => {
     const keep = play(load("split-tower-4"), store);
     keep.review.open();
     keep.dialog().handlers[keepAct(1139)]!();
-    expect(keep.port.sim.resizeTransport(1139, 1, 2).ok).toBe(true);
+
+    const before = { ...keep.port.sim.tower.transports.find((t) => t.id === 1139)! };
+    expect(before.bottom).toBe(15);
+    expect(keep.port.sim.resizeTransport(1139, 11, 35).ok).toBe(true);
+    const after = keep.port.sim.tower.transports.find((t) => t.id === 1139)!;
+    expect(after.bottom).toBeLessThan(before.bottom);
+    expect(after.bottom).toBe(11);
+    expect(after.top).toBe(35);
 
     const reloaded = play(JSON.parse(keep.port.serialize()) as SerializedGame, store);
     reloaded.review.tick();
@@ -311,6 +318,10 @@ describe("what the player is told, and what they decide (#1548)", () => {
     expect(reloaded.dialog().rows.find((r) => r.id === 1139)).toMatchObject({ kept: true });
     expect(reloaded.dialog().handlers[keepAct(1139)]).toBeUndefined();
     expect(reloaded.dialog().handlers[recoverAct(1139)]).toBeDefined();
+
+    const other = play(reseeded("split-tower-4", 7), store);
+    other.review.open();
+    expect(other.dialog().rows.find((r) => r.id === 1139)).toMatchObject({ kept: false });
   });
 
   it("sends Review schedule to that shaft's own schedule dialog and changes nothing", () => {
