@@ -110,17 +110,22 @@ const STORE_KEY = "vc-elevator-schedule-review";
 const MAX_REMEMBERED = 400;
 
 /** Old keys used to include the shaft's mutable bottom floor; a geometry-only resize should still match the same
- *  answer. Reading and writing through this helper keeps the browser store on the stable canonical form. */
-function canonicalKey(key: string): string {
+ *  answer. The canonical form drops legacy suffixes that only change with a valid resize, but keeps the rest of the
+ *  shaft identity and tower identity intact. */
+function canonicalKey(key: string): string | null {
   const parts = key.split(":");
-  if (parts.length <= 5) return key;
-  return parts.slice(0, 5).join(":");
+  if (parts.length === 5 && parts.every(Boolean)) return key;
+  if (parts.length > 5 && parts.slice(0, 5).every(Boolean) && parts.slice(5).every((part) => /^-?\d+$/.test(part))) {
+    return parts.slice(0, 5).join(":");
+  }
+  return null;
 }
 
 function canonicalise(entries: Record<string, Decision>): Record<string, Decision> {
   const migrated: Record<string, Decision> = {};
   for (const [key, value] of Object.entries(entries)) {
-    const next = canonicalKey(key);
+    if (value !== "kept" && value !== "told") continue;
+    const next = canonicalKey(key) ?? key;
     migrated[next] = value;
   }
   return migrated;
@@ -135,18 +140,27 @@ export function browserAcknowledgements(storage: Pick<Storage, "getItem" | "setI
     try {
       const raw = JSON.parse(storage?.getItem(STORE_KEY) ?? "{}") as unknown;
       const base = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, Decision>) : {};
-      return canonicalise(base);
+      const migrated = canonicalise(base);
+      if (JSON.stringify(base) !== JSON.stringify(migrated)) {
+        try {
+          storage?.setItem(STORE_KEY, JSON.stringify(migrated));
+        } catch {
+          // ignore a blocked browser store; the in-memory copy still reflects the canonical values
+        }
+      }
+      return migrated;
     } catch {
       return {};
     }
   };
   return {
     get: (key) => {
-      const v = unsaved.get(key) ?? read()[key]; // a newer answer storage refused beats an older one it took
+      const canonical = canonicalKey(key) ?? key;
+      const v = unsaved.get(canonical) ?? read()[canonical]; // a newer answer storage refused beats an older one it took
       return v === "kept" || v === "told" ? v : undefined;
     },
     set: (key, decision) => {
-      const canonical = canonicalKey(key);
+      const canonical = canonicalKey(key) ?? key;
       // The key goes last, so the oldest entries are the ones trimmed.
       const others = Object.entries(read()).filter(([k]) => k !== canonical);
       const all = Object.fromEntries([...others, [canonical, decision]].slice(-MAX_REMEMBERED));

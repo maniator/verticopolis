@@ -297,6 +297,22 @@ describe("what the player is told, and what they decide (#1548)", () => {
     expect(later.dialog().handlers[recoverAct(1139)]).toBeDefined();
   });
 
+  it("keeps the decision through a genuine resize, save and reload, and stays quiet on the next tick", () => {
+    const store = memory();
+    const keep = play(load("split-tower-4"), store);
+    keep.review.open();
+    keep.dialog().handlers[keepAct(1139)]!();
+    expect(keep.port.sim.resizeTransport(1139, 1, 2).ok).toBe(true);
+
+    const reloaded = play(JSON.parse(keep.port.serialize()) as SerializedGame, store);
+    reloaded.review.tick();
+    expect(reloaded.toasts).toEqual([]);
+    reloaded.review.open();
+    expect(reloaded.dialog().rows.find((r) => r.id === 1139)).toMatchObject({ kept: true });
+    expect(reloaded.dialog().handlers[keepAct(1139)]).toBeUndefined();
+    expect(reloaded.dialog().handlers[recoverAct(1139)]).toBeDefined();
+  });
+
   it("sends Review schedule to that shaft's own schedule dialog and changes nothing", () => {
     const g = play(load("split-tower-4"));
     const before = g.saved();
