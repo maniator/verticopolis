@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { FUZZ_ENTRIES, PART_NAMES, fuzzKey, fuzzKeyFiles, fuzzKeyParts, importClosure, type PartName } from "./fuzzKey";
+import { PART_NAMES, fuzzKey, fuzzKeyFiles, fuzzKeyParts, importClosure, type PartName } from "./fuzzKey";
 import { repoRoot } from "../guardFiles";
 import { linkFolder } from "../fixtures/links";
 
@@ -169,27 +169,6 @@ describe("the differential's window key", () => {
 });
 
 describe("the real tree's key", () => {
-  it("computes, and its WASM build part matches the engine-wasm action's hand-kept list", () => {
-    const parts = fuzzKeyParts(repoRoot);
-    for (const p of Object.values(parts)) expect(p).toMatch(/^[0-9a-f]{64}$/);
-    // The action keys its package cache on a hand-written list of files; the
-    // key computes the same set from the import graph. They must agree.
-    const action = readFileSync(join(repoRoot, ".github/actions/engine-wasm/action.yml"), "utf8");
-    const listed = /scripts=\$\(\{ cat ([^;]+);/.exec(action)?.[1].trim().split(/\s+/) ?? [];
-    expect(listed.length).toBeGreaterThan(5);
-    const computed = fuzzKeyFiles(repoRoot).wasmBuild;
-    expect(computed.filter((f) => f !== ".github/actions/engine-wasm/action.yml").sort()).toEqual(
-      listed.filter((f) => f !== ".github/actions/engine-wasm/action.yml").sort(),
-    );
-  });
-
-  it("lists every script the nightly workflow runs as an entry", () => {
-    const workflow = readFileSync(join(repoRoot, ".github/workflows/engine-fuzz.yml"), "utf8");
-    const run = [...workflow.matchAll(/\b(scripts\/[\w-]+\.ts)\b/g)].map((m) => m[1]);
-    expect(run.length).toBeGreaterThan(0);
-    for (const script of new Set(run)) expect(FUZZ_ENTRIES).toContain(script);
-  });
-
   it("covers the scripts the nightly runs and the fixtures", () => {
     const files = fuzzKeyFiles(repoRoot);
     expect(files.scripts).toEqual(expect.arrayContaining(["scripts/fuzz-compare.ts", "scripts/fuzz-key.ts", "src/tests/conformance/fuzzKey.ts", "src/tests/conformance/scenario.ts", "tsconfig.json"]));

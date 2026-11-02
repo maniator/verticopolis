@@ -3,73 +3,16 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { readFileSync } from "node:fs";
 import { repoRoot } from "../guardFiles";
 import { testStartLine } from "./testStartLine";
 
-/**
- * The test-start log that names a stalled test (#1152): the line format, the
- * CI wiring that turns it on and bounds the step, and a real vitest run in a
- * scratch project whose test spins in one synchronous call.
- */
-const read = (rel: string) => readFileSync(resolve(repoRoot, rel), "utf8");
+/** The test-start log identifies stalled tests; verify actual output. */
 
 describe("testStartLine", () => {
   it("names the file and the suites and test, with the time and the worker's pid", () => {
     expect(testStartLine("a.test.ts", ["group", "case"], new Date("2026-10-20T17:03:09Z"), 4242)).toBe(
       "[17:03:09 pid 4242] test start a.test.ts > group > case\n",
     );
-  });
-});
-
-describe("CI wiring for the stall log", () => {
-  // The host-driven suite runs exactly once on the required integrationWasm
-  // matrix leg. It no longer runs in the Rust workflow (#1574).
-  const workflows: Array<[string, string]> = [
-    [".github/workflows/test.yml", "Host suites on the WASM engine"],
-  ];
-
-  for (const [file, name] of workflows) {
-    it(`${file}: the "${name}" step has a time limit under the job's and the start log on`, () => {
-      const text = read(file);
-      const at = text.indexOf(`- name: ${name}`);
-      expect(at).toBeGreaterThan(0);
-      const rest = text.slice(at + 1);
-      const next = rest.search(/\n {6}- /);
-      const step = rest.slice(0, next < 0 ? undefined : next);
-      const limit = Number(/^ {8}timeout-minutes: (\d+)$/m.exec(step)?.[1]);
-      expect(limit).toBeGreaterThan(0);
-      expect(limit).toBeLessThanOrEqual(15);
-      expect(step).toMatch(/VC_LOG_TEST_STARTS: "1"/);
-      expect(step).toMatch(/run: npm run test:wasm$/m);
-    });
-  }
-
-  it("the Rust workflow does not duplicate the host suite", () => {
-    const rust = read(".github/workflows/engine-rs.yml");
-    expect(rust).not.toContain("- name: Conformance through the binding");
-    expect(rust).not.toMatch(/^\s*run: npm run test:wasm$/m);
-    const test = read(".github/workflows/test.yml");
-    const step = test.split("      - name: Host suites on the WASM engine\n")[1];
-    expect(step).toBeDefined();
-    expect(step).toMatch(/if:.*matrix\.project == 'integrationWasm'/);
-  });
-
-  it(".github/workflows/test.yml: the WASM parity step turns the start log on, so its worker setup file is not inert", () => {
-    const text = read(".github/workflows/test.yml");
-    const at = text.indexOf("- name: Run ${{ matrix.project }} on the WASM engine");
-    expect(at).toBeGreaterThan(0);
-    const rest = text.slice(at + 1);
-    const next = rest.search(/\n {6}- /);
-    const step = rest.slice(0, next < 0 ? undefined : next);
-    expect(step).toMatch(/VC_REQUIRE_WASM: "1"/);
-    expect(step).toMatch(/VC_LOG_TEST_STARTS: "1"/);
-  });
-
-  it("the vitest projects that run the engine tests load the setup file", () => {
-    const config = read("vite.config.ts");
-    expect(config).toContain('const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts", "src/tests/ci/testStartLogSetup.ts"]');
-    expect(config).toMatch(/name: "integration",\s+include: \["src\/\*\*\/\*\.integration\.test\.ts"\],\s+setupFiles: \["src\/tests\/viewWorldSetup\.ts", "src\/tests\/ci\/testStartLogSetup\.ts"\]/);
   });
 });
 

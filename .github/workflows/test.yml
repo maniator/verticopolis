@@ -77,9 +77,8 @@ jobs:
       # engine conformance (holidays-classic runs 720 in-game hours of a large
       # tower, 15 s of CPU alone) is excluded here and runs in the next step.
       # Under v8 coverage with the other test files running beside it, it took
-      # 61 s against its 60 s limit and failed unrelated PRs. The scenario and
-      # its assertions are unchanged; src/tests/conformanceCi.guard.test.ts
-      # keeps the two steps paired.
+      # 61 s against its 60 s limit and failed unrelated PRs. Keep the scenario
+      # in the separate no-coverage step, which CI executes directly.
       - name: Run tests
         run: npm run test:coverage -- --run --exclude '**/conformance.integration.test.ts'
 
