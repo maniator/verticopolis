@@ -6,6 +6,11 @@ name: Rust engine
 # crate, the scenarios or the lock, and on main. Format and lint run as hard
 # gates, like the TypeScript lane.
 
+concurrency:
+  # Cancel superseded PR runs; preserve main pushes for cache warming.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches: [main]
@@ -64,10 +69,9 @@ on:
       - ".github/workflows/engine-rs.yml"
   # Every PR runs this workflow, because engine-rs is a required check: a
   # path filter here would leave a PR that touches none of these files
-  # waiting on a check that never starts. The changes job below applies the
-  # same list instead, and the jobs skip (which counts as passing) only when
-  # the filter succeeded and found no engine file. The two lists must match;
-  # src/tests/engineRsPaths.guard.test.ts fails when they differ.
+  # waiting on a check that never starts. The changes job below reads this
+  # same push.paths list at runtime, so the workflow owns its filter once.
+  # An unreadable list fails closed and runs the engine jobs.
   pull_request:
     branches: [main]
 
@@ -112,61 +116,36 @@ jobs:
           # backslash or newline still matches its pattern.
           list="$RUNNER_TEMP/changed-files"
           git diff -z --no-renames --name-only "$BASE_SHA...$HEAD_SHA" > "$list" || exit 1
+          # Reuse the authoritative on.push.paths globs for pull requests.
+          # Bash case patterns match slashes (including a trailing **).
+          # If someone changes the YAML shape, fail closed rather than
+          # silently skipping required engine checks.
+          mapfile -t patterns < <(
+            awk '
+              /^  push:$/ { push = 1; next }
+              push && /^    paths:$/ { paths = 1; next }
+              paths && /^      - "/ {
+                sub(/^      - "/, "", $0)
+                sub(/"$/, "", $0)
+                print
+                next
+              }
+              paths { exit }
+            ' .github/workflows/engine-rs.yml
+          )
+          if [ "${#patterns[@]}" -lt 30 ]; then
+            echo "::error::Cannot read the engine path filter from on.push.paths"
+            exit 1
+          fi
           engine=false
           while IFS= read -r -d '' f; do
             [ -z "$f" ] && continue
-            case "$f" in engine-rs/*) engine=true ;; esac
-            case "$f" in conformance/*) engine=true ;; esac
-            case "$f" in src/engine/*) engine=true ;; esac
-            case "$f" in src/shared/vacateReasonText.ts) engine=true ;; esac
-            case "$f" in src/storage/*) engine=true ;; esac
-            case "$f" in src/tests/conformance/*) engine=true ;; esac
-            case "$f" in src/tests/integration/conformance.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/conformanceWasm.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/conformanceWasmLoadFidelity.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/conformanceWasmCanBuild.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/conformanceWasmVctower.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/conformanceWasmSaves.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/dualRunDay.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/dualRunEdits.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/chargeBindingRaw.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/panelGettersWasm.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/panelGettersCost.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/engineView.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/tsEngine.golden.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/viewReader.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/viewLayoutJson.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/dualrun/*) engine=true ;; esac
-            case "$f" in src/dualrun/*) engine=true ;; esac
-            case "$f" in src/wasmhost/*) engine=true ;; esac
-            case "$f" in src/tests/integration/wasmHost.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/wasmHostCatalog.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/wasmHostExtermination.integration.test.ts) engine=true ;; esac
-            case "$f" in e2e/wasmEngine.spec.ts) engine=true ;; esac
-            case "$f" in src/game/frameLoop.ts) engine=true ;; esac
-            case "$f" in src/tests/integration/loaderCases.integration.test.ts) engine=true ;; esac
-            case "$f" in src/tests/fixtures/tdtBuilder.ts) engine=true ;; esac
-            case "$f" in src/tests/fixtures/tdtLayout.ts) engine=true ;; esac
-            case "$f" in scripts/wasm-build.ts) engine=true ;; esac
-            case "$f" in scripts/build-engine-wasm.sh) engine=true ;; esac
-            case "$f" in scripts/gen-gameplay-events.ts) engine=true ;; esac
-            case "$f" in .github/actions/engine-wasm/*) engine=true ;; esac
-            case "$f" in scripts/engine-third-party.ts) engine=true ;; esac
-            case "$f" in scripts/license-files.ts) engine=true ;; esac
-            case "$f" in src/build/thirdPartyNotices.ts) engine=true ;; esac
-            case "$f" in src/build/rustNotices.ts) engine=true ;; esac
-            case "$f" in src/build/engineCompat.ts) engine=true ;; esac
-            case "$f" in package.json) engine=true ;; esac
-            case "$f" in package-lock.json) engine=true ;; esac
-            case "$f" in .nvmrc) engine=true ;; esac
-            case "$f" in vite.config.ts) engine=true ;; esac
-            case "$f" in scripts/fuzz-compare.ts) engine=true ;; esac
-            case "$f" in scripts/fuzz-corpus.ts) engine=true ;; esac
-            case "$f" in scripts/fuzz-key.ts) engine=true ;; esac
-            case "$f" in scripts/fuzz-shrink.ts) engine=true ;; esac
-            case "$f" in tsconfig.json) engine=true ;; esac
-            case "$f" in .github/workflows/engine-fuzz.yml) engine=true ;; esac
-            case "$f" in .github/workflows/engine-rs.yml) engine=true ;; esac
+            for pattern in "${patterns[@]}"; do
+              case "$f" in
+                $pattern) engine=true; break ;;
+              esac
+            done
+            [ "$engine" = true ] && break
           done < "$list"
           echo "engine=$engine" >> "$GITHUB_OUTPUT"
 
@@ -177,8 +156,9 @@ jobs:
   # the checkout and built there against the engine by an absolute path, the
   # way a crate in its own repository would depend on a local clone, and it
   # lints, tests, runs the smoke and replays every scenario of the lock
-  # (API.md). The engine's own tests and the full referee also run from the
-  # sparse checkout, the save fixtures included (conformance/fixtures/). What
+  # (API.md). The engine's own tests and referee run in the rust job, not
+  # again here. The consumer still replays the full suite against a copied
+  # fixture directory outside the checkout. What
   # this proves and what it does not: the engine builds, tests and runs with
   # no web game and no Node.js, from a crate outside the tree; it does not
   # prove a packaged or registry release, which needs the conformance files
@@ -252,17 +232,10 @@ jobs:
         working-directory: engine-rs
         run: cargo build --locked --lib
 
-      # Every crate test, the binding's included (it builds natively), and
-      # every scenario of the lock, from a checkout that holds no web game:
-      # the tests and the referee read nothing outside engine-rs/ and
-      # conformance/.
-      - name: The engine's tests and the full referee, without the web game
-        working-directory: engine-rs
-        run: |
-          cargo test --locked
-          cargo test --locked --features conformance
-          cargo test --locked --features wasm
-          cargo run --locked --release --features conformance --bin conformance
+      # The default/WASM tests, instrumented conformance tests and release
+      # referee run in the rust job. Repeating them here duplicates minutes without
+      # adding host-independence coverage: the external consumer below
+      # exercises the engine from an actual standalone crate instead.
 
       - name: The consumer, in place
         working-directory: engine-rs/consumer
@@ -353,9 +326,14 @@ jobs:
           cargo clippy --locked --lib --target wasm32-unknown-unknown --features wasm -- -D warnings
 
       - name: Unit tests
+        # Run native/default and WASM-feature variants. The conformance
+        # feature variant is exercised below by cargo llvm-cov's test run;
+        # don't run those same tests twice in this job.
+        # Keep debug assertions and overflow checks enabled.
+        env:
+          CARGO_PROFILE_TEST_OPT_LEVEL: "1"
         run: |
           cargo test --locked
-          cargo test --locked --features conformance
           cargo test --locked --features wasm
 
       - name: Conformance
@@ -375,8 +353,9 @@ jobs:
       # only ratchets up as scenarios land (80.58% at the first measurement,
       # 84.47% after the first scenario slice, 88.7% with the full library; the
       # floor sits about a point and a half under the measurement).
-      # The referee is replayed in the debug profile here so one report
-      # merges both runs; the release replay above is the parity gate.
+      # The conformance-feature unit tests run here (not a second time
+      # in the Unit tests step). The referee runs in the debug profile here
+      # to merge coverage; the release replay above is the parity gate.
       - name: Coverage
         run: |
           rustup component add llvm-tools-preview
@@ -391,18 +370,14 @@ jobs:
         if: ${{ cancelled() }}
         run: exit 1
 
-  # The referee again, through the WASM binding from Node: the same
-  # TypeScript runner replays every scenario on the module wasm-bindgen
-  # generates (story-engine-wasm-binding), and the dual run's day gate
-  # (story-engine-dual-run) compares both engines every hour for a day on
-  # every fixture at each game speed. This job and the fuzz corpus below are
-  # the two here that need Node.js, so the Rust jobs above carry no Node.js
-  # setup at all. The
-  # package comes from .github/actions/engine-wasm: restored from the cache
-  # the other workflows share when the Rust sources are unchanged, and built
-  # on a miss with the prebuilt wasm-bindgen CLI at the version Cargo.toml
-  # pins, checked against its recorded hash (scripts/build-engine-wasm.sh;
-  # scripts/wasm-build.ts checks the version).
+  # Verify the WASM binding builds and its generated declarations match
+  # the sources. The host-driven WASM conformance and dual-run suites are
+  # executed ONCE in the required test-wasm-parity (integrationWasm) check
+  # from test.yml. Running them again here would duplicate billed minutes.
+  # This job and fuzz-corpus below need Node.js; the native Rust jobs do not.
+  # The package comes from .github/actions/engine-wasm, shared by cache with
+  # the other workflows, and built on a miss using a pinned wasm-bindgen CLI
+  # verified by scripts/build-engine-wasm.sh and scripts/wasm-build.ts.
   wasm-binding:
     needs: changes
     # Fail closed, as the rust job above.
@@ -441,16 +416,6 @@ jobs:
           cmp engine-rs/pkg/verticopolis_engine.d.ts src/dualrun/engine.d.ts || { echo "src/dualrun/engine.d.ts is stale: run npm run wasm:build and commit it"; exit 1; }
           npm run gen:events
           test -z "$(git status --porcelain -- src/dualrun/engine.d.ts src/engine/gameplayEvents.d.ts src/engine/gameplayEventRules.ts src/engine/viewLayout.json)" || { echo "src/dualrun/engine.d.ts, src/engine/gameplayEvents.d.ts, src/engine/gameplayEventRules.ts or src/engine/viewLayout.json is stale or untracked: run npm run wasm:build (or npm run gen:events for the two event files) and commit them"; exit 1; }
-
-      # The step limit and the start log keep a stall from running to the job's
-      # limit with no test name (#1152); see the same step in test.yml.
-      - name: Conformance through the binding
-        timeout-minutes: 12
-        env:
-          # A missing package fails the suite here instead of skipping it.
-          VC_REQUIRE_WASM: "1"
-          VC_LOG_TEST_STARTS: "1"
-        run: npm run test:wasm
 
       - name: Fail a cancelled run
         if: ${{ cancelled() }}

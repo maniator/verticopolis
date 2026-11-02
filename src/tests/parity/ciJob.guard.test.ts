@@ -9,7 +9,8 @@ import { repoRoot } from "../guardFiles";
  * and integration" row). The job splits them across a matrix to run side by
  * side; this keeps the script a developer runs and the job CI runs from
  * drifting apart, keeps both on the real engine (`VC_REQUIRE_WASM=1`), and
- * keeps the job from being skipped or allowed to fail. Whether the job is a
+ * keeps the required jobs from being skipped or allowed to fail, while
+ * running the separate host-driven suite only once on integrationWasm. Whether the job is a
  * required check is branch protection, not the workflow (backlog row
  * `wasm-parity-required-check`, #1082).
  */
@@ -78,10 +79,21 @@ describe("the WASM parity CI job", () => {
     expect(names).toEqual(["test-wasm-parity (integrationWasm)", "test-wasm-parity (unitWasm)"]);
   });
 
-  it("is a plain gate: after the engine build, never skipped, never allowed to fail", () => {
+  it("is a plain gate: after the engine build, no job-level skip or allowed failure", () => {
     expect(job).toMatch(/^ {4}needs: (engine-wasm|\[[^\]]*\bengine-wasm\b[^\]]*\])$/m);
-    expect(job).not.toMatch(/\bif:/); // job level or any step
+    expect(job).not.toMatch(/^ {4}if:/m);
     expect(job).not.toMatch(/continue-on-error/);
+  });
+
+  it("runs the host suites only in required integrationWasm, never both matrix legs", () => {
+    const hostSteps = steps.filter((s) => s.some((l) => l.includes("run: npm run test:wasm")));
+    expect(hostSteps).toHaveLength(1);
+    const host = hostSteps[0].join("\n");
+    expect(host).toMatch(/^ {8}if: \$\{\{ matrix\.project == 'integrationWasm' \}\}$/m);
+    expect(host).not.toContain("continue-on-error");
+    // Do not add other conditional skips to the two required matrix checks.
+    const otherSteps = steps.filter((s) => s !== hostSteps[0]);
+    for (const step of otherSteps) expect(step.join("\n")).not.toMatch(/^ {8}if:/m);
   });
 
   it("runs the matrix project through vitest, on the real engine, in that step", () => {

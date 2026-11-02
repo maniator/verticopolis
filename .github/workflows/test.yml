@@ -1,5 +1,10 @@
 name: Test CI
 
+concurrency:
+  # Cancel superseded PR runs; preserve main pushes for cache warming.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches: [main]
@@ -125,20 +130,14 @@ jobs:
           VC_LOG_TEST_STARTS: "1"
         run: npx vitest run --project ${{ matrix.project }}
 
-      # The integrationWasm project hands some suites to the TypeScript side
-      # because they host the engine themselves: the mirror host's wasmHost
-      # suites and the perf-compare engine check. The
-      # engine-rs workflow runs them too, but only when its path filter
-      # matches, which misses the analytics modules and the suites' own files
-      # (#1122). Running them here puts them on every PR and every push to
-      # main. Both matrix legs run it (src/tests/parity/ciJob.guard.test.ts
-      # keeps this job free of `if:`), so the job names stay as they are.
-      #
-      # The step has its own limit, well under the job's, and each test writes
-      # a line to stderr as it starts (src/tests/ci/testStartLogSetup.ts), so a
-      # stall names the test it stopped in and ends the step in minutes
-      # instead of holding every PR for the job's 40 (#1152).
+      # The integrationWasm project hands host-driven suites to the plain
+      # TypeScript-side project (mirror host, perf comparison, conformance).
+      # Run them exactly once, on the required integrationWasm matrix leg.
+      # Both matrix check names remain present and required for merging,
+      # while the Rust workflow no longer repeats this same test:wasm script.
+      # This step has its own timeout and logs each test start (#1152).
       - name: Host suites on the WASM engine
+        if: ${{ matrix.project == 'integrationWasm' }}
         timeout-minutes: 12
         env:
           VC_LOG_TEST_STARTS: "1"
