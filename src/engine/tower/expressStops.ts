@@ -60,8 +60,12 @@ export function coerceExpressStops(tower: Tower): void {
   let changed = false;
   for (const t of tower.transports) {
     if (t.kind !== "elevatorExpress") continue;
+    // A TDT marker is only meaningful for Classic express elevators.
+    if (tower.rules.mode !== "classic") delete t.preserveBasementStops;
+    const keepBasement = tower.rules.mode === "classic" && t.preserveBasementStops === true && t.bottom < 0;
     const skip = new Set(t.skipFloors ?? []);
     for (let fl = t.bottom + 1; fl < t.top; fl++) {
+      if (keepBasement && fl <= 0) continue;
       if (!tower.floorHasLobby(fl)) skip.add(fl);
     }
     // Endpoints always stop (a shaft can't disconnect from itself), so scrub a

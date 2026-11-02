@@ -49,6 +49,22 @@ function mutate(seed: Any, edit: (s: Any) => void): Any {
   return copy;
 }
 
+/** A deliberately hand-edited Classic express shaft crossing the basement.
+ * The TDT import writes the marker; older .vctower saves omit it. */
+function basementExpress(seed: Any, marker: unknown, skips: number[]): Any {
+  return mutate(seed, (s) => {
+    const shaft = transports(s)[0];
+    shaft.kind = "elevatorExpress";
+    shaft.width = 6;
+    shaft.bottom = -3;
+    shaft.top = 3;
+    shaft.carPositions = [-3];
+    shaft.skipFloors = skips;
+    if (marker === undefined) delete shaft.preserveBasementStops;
+    else shaft.preserveBasementStops = marker;
+  });
+}
+
 function units(s: Any): Any[] { return s.units as Any[]; }
 function transports(s: Any): Any[] { return s.transports as Any[]; }
 
@@ -65,6 +81,13 @@ function buildCases(): Case[] {
     ["exterminator-orphan-list", mutate(modern, (s) => { s.exterminationRoomIds = [1]; })],
     ["exterminator-classic-list", mutate(classic, (s) => { s.exterminationDueDay = 2; s.exterminationRoomIds = [1]; })],
     ["classic-roundtrip", classic],
+    // #1567: explicit TDT basement-stop provenance is a shared save-loader
+    // contract. Pin marked/unmarked, mixed, malformed and Modern branches.
+    ["transport-classic-basement-imported-empty", basementExpress(classic, true, [])],
+    ["transport-classic-basement-legacy-empty", basementExpress(classic, undefined, [])],
+    ["transport-classic-basement-imported-mixed", basementExpress(classic, true, [-2, 2])],
+    ["transport-classic-basement-marker-string", basementExpress(classic, "true", [])],
+    ["transport-modern-basement-marker-ignored", basementExpress(modern, true, [])],
     ["optional-keys-absent", mutate(modern, (s) => { delete s.towerName; delete s.builtWeddingHall; delete s.evaluatedTower; delete s.view; })],
     ["seed-hex-string", mutate(modern, (s) => { s.seed = "0x10"; })],
     ["seed-null", mutate(modern, (s) => { s.seed = null; })],
@@ -237,6 +260,20 @@ describe("loader conformance table", () => {
       expect({ id: c.id, expected: c.expected, input: digest(c.input), knownDivergence: c.knownDivergence })
         .toEqual({ id: lock.cases[i].id, expected: lock.cases[i].expected, input: digest(lock.cases[i].input), knownDivergence: lock.cases[i].knownDivergence });
     }
+  });
+
+  it("separates marked imported basement stops from unmarked legacy and Modern coercion", () => {
+    const byId = (id: string) => {
+      const entry = cases.find((c) => c.id === id);
+      expect(entry, id).toBeDefined();
+      expect(entry!.expected, id).not.toBe("throws");
+      return entry!.expected;
+    };
+    const marked = byId("transport-classic-basement-imported-empty");
+    expect(marked).not.toBe(byId("transport-classic-basement-legacy-empty"));
+    expect(marked).not.toBe(byId("transport-classic-basement-imported-mixed"));
+    expect(byId("transport-classic-basement-marker-string")).toBe(byId("transport-classic-basement-legacy-empty"));
+    expect(byId("transport-modern-basement-marker-ignored")).not.toBe(marked);
   });
 
   // The billed-room cases (#902) where the loader ignores or empties the list

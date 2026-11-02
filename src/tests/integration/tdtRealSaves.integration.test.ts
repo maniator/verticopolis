@@ -8,8 +8,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, it } from "vitest";
-import { describeWithCodec, parseTDT } from "../conformance/tdtWasm";
-import { deserializeSave, readVctower, writeVctower } from "../../engine/port/files";
+import { describeWithCodec, installTdtCodec, parseTDT } from "../conformance/tdtWasm";
+import { deserializeSave, readVctower, stageTdt, writeVctower } from "../../engine/port/files";
 
 const DIR = resolve(__dirname, "../../../conformance/fixtures/tdt-reddit");
 const load = (name: string) => {
@@ -65,4 +65,69 @@ describeWithCodec("real 1997 saves keep their shop, restaurant and fast-food sty
       expect(before.every((line) => !line.endsWith("=undefined"))).toBe(true);
     });
   }
+});
+
+
+describeWithCodec("imported TDT basement express stop persistence", () => {
+  it("marks real TDT basement express stops and keeps them on ordinary .vctower reload", () => {
+    const source = load("TOWER7.TDT").save;
+    // Production boot installs the codec before stageTdt; this isolated WASM
+    // integration suite must do the same instead of treating it as unavailable.
+    installTdtCodec();
+    const imported = stageTdt(readFileSync(resolve(DIR, "TOWER7.TDT")), "TOWER7.TDT").sim;
+    const shafts = source.transports.filter((t) => t.kind === "elevatorExpress" && t.bottom < 0 && Array.isArray(t.skipFloors));
+    expect(shafts.length).toBeGreaterThan(0);
+    for (const fromFile of shafts) {
+      const actual = imported.tower.transports.find((t) =>
+        t.kind === fromFile.kind && t.x === fromFile.x && t.bottom === fromFile.bottom && t.top === fromFile.top);
+      expect(actual?.preserveBasementStops).toBe(true);
+      for (let floor = fromFile.bottom + 1; floor <= 0; floor++) {
+        expect(actual?.skipFloors?.includes(floor)).toBe(fromFile.skipFloors!.includes(floor));
+      }
+    }
+    const reloaded = readVctower(writeVctower(imported, "3.0.0", 0));
+    for (const t of imported.tower.transports.filter((t) => t.preserveBasementStops)) {
+      const again = reloaded.tower.transports.find((s) => s.id === t.id);
+      expect(again?.preserveBasementStops).toBe(true);
+      expect(again?.skipFloors).toEqual(t.skipFloors);
+    }
+  });
+
+  it("preserves zero/mixed skips twice without changing older or Modern saves", () => {
+    const source = load("TOWER7.TDT").save;
+    const index = source.transports.findIndex((t) =>
+      t.kind === "elevatorExpress" && t.bottom <= -2 && t.top > 4);
+    expect(index).toBeGreaterThanOrEqual(0);
+    const original = source.transports[index];
+    const baseline = original.bottom + 1;
+    const sky = original.top - 1;
+    for (const skips of [[], [baseline, sky], [sky]]) {
+      const raw = structuredClone(source);
+      raw.transports[index].skipFloors = skips;
+      raw.transports[index].preserveBasementStops = true;
+      const sim = deserializeSave(raw);
+      const before = sim.tower.transports.find((t) => t.id === original.id);
+      expect(before?.preserveBasementStops).toBe(true);
+      for (let fl = original.bottom + 1; fl <= 0; fl++) {
+        expect(before?.skipFloors?.includes(fl)).toBe(skips.includes(fl));
+      }
+      const first = readVctower(writeVctower(sim, "3.0.0", 0));
+      const second = readVctower(writeVctower(first, "3.0.0", 0));
+      for (const roundTrip of [first, second]) {
+        const after = roundTrip.tower.transports.find((t) => t.id === original.id);
+        expect(after?.skipFloors).toEqual(before?.skipFloors);
+        expect(after?.preserveBasementStops).toBe(true);
+      }
+    }
+    const legacy = structuredClone(source);
+    legacy.transports[index].skipFloors = [sky];
+    const oldShaft = deserializeSave(legacy).tower.transports.find((t) => t.id === original.id);
+    expect(oldShaft?.preserveBasementStops).toBeUndefined();
+    expect(oldShaft?.skipFloors).toContain(baseline);
+    legacy.mode = "modern";
+    legacy.transports[index].preserveBasementStops = true;
+    const modern = deserializeSave(legacy).tower.transports.find((t) => t.id === original.id);
+    expect(modern?.preserveBasementStops).toBeUndefined();
+    expect(modern?.skipFloors).toContain(baseline);
+  });
 });

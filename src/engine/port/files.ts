@@ -100,7 +100,15 @@ export function stageTdt(bytes: Uint8Array, filename: string): StagedTdt {
   const read = tdtCodec().read(bytes, filename);
   let sim: Simulation;
   try {
-    sim = Simulation.deserialize(JSON.parse(read.saveJson) as SerializedGame);
+    const raw = JSON.parse(read.saveJson) as SerializedGame;
+    // Only this entrypoint knows the tower came from an authentic PC TDT;
+    // carry the provenance through both engines' ordinary save/reload paths.
+    for (const t of raw.transports ?? []) {
+      if (t.kind === "elevatorExpress" && t.bottom < 0 && Array.isArray(t.skipFloors)) {
+        t.preserveBasementStops = true;
+      }
+    }
+    sim = Simulation.deserialize(raw);
   } catch (e) {
     throw new Error(`This SimTower save couldn't be read. (${message(e)})`);
   }

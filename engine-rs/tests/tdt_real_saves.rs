@@ -180,3 +180,184 @@ fn tower1_stalls_a_whole_row_away_from_the_ramp_stay_where_the_file_put_them() {
     assert_eq!(ramps, vec![145]);
     assert_eq!(stalls, vec![161, 221]);
 }
+
+#[test]
+fn original_tdt_basement_express_stops_survive_actual_import_boundary() {
+    use verticopolis_engine::facilities::Kind;
+    use verticopolis_engine::load::{deserialize, deserialize_tdt};
+
+    // Nine real 1997 files; preserve authored basement skips while ordinary
+    // serialized-game loading retains its original reference behavior.
+    for (name, _, _) in SAVES {
+        let raw = import_save(name);
+        let ordinary = deserialize(&raw).expect("ordinary saved-game loader");
+        let imported = deserialize_tdt(&raw).expect("original TDT loader");
+        assert_eq!(
+            ordinary.tower.transports.len(),
+            imported.tower.transports.len(),
+            "{name}"
+        );
+        for source in raw["transports"].as_array().expect("transports") {
+            if source["kind"] != "elevatorExpress" {
+                continue;
+            }
+            let Some(bottom) = source["bottom"].as_i64() else {
+                continue;
+            };
+            if bottom >= 0 {
+                continue;
+            }
+            let x = source["x"].as_i64().expect("x");
+            let top = source["top"].as_i64().expect("top");
+            let shaft = imported
+                .tower
+                .transports
+                .iter()
+                .find(|t| {
+                    t.kind == Kind::ElevatorExpress
+                        && t.x == x
+                        && t.bottom == bottom
+                        && t.top == top
+                })
+                .expect("the imported shaft remains");
+            let authored: Vec<f64> = source["skipFloors"]
+                .as_array()
+                .map(|a| a.iter().filter_map(serde_json::Value::as_f64).collect())
+                .unwrap_or_default();
+            let actual = shaft.skip_floors.as_ref().expect("express skip list");
+            for floor in bottom + 1..=0 {
+                let skip = floor as f64;
+                assert_eq!(
+                    actual.contains(&skip),
+                    authored.contains(&skip),
+                    "{name} x={x}, basement floor {floor} must match file"
+                );
+            }
+            let previous = ordinary
+                .tower
+                .transports
+                .iter()
+                .find(|t| {
+                    t.kind == Kind::ElevatorExpress
+                        && t.x == x
+                        && t.bottom == bottom
+                        && t.top == top
+                })
+                .expect("same shaft in generic loader");
+            for floor in 1..top {
+                let skip = floor as f64;
+                assert_eq!(
+                    actual.contains(&skip),
+                    previous
+                        .skip_floors
+                        .as_ref()
+                        .is_some_and(|s| s.contains(&skip)),
+                    "{name} x={x}, above-ground floor {floor}"
+                );
+            }
+        }
+    }
+    // The two B8-to-sky express shafts in TOWER7 serve its basements.
+    let raw = import_save("TOWER7.TDT");
+    let imported = deserialize_tdt(&raw).expect("TOWER7");
+    for floor in -8..=0 {
+        assert!(
+            imported.tower.is_floor_served(floor),
+            "TOWER7 basement {floor}"
+        );
+    }
+    // The repaired tower must remain repaired after it becomes a normal
+    // player .vctower save. Without this, the next save/reopen undoes #1532.
+    let reopened = deserialize(&imported.serialize()).expect("TOWER7 save/reopen");
+    for floor in -8..=0 {
+        assert!(
+            reopened.tower.is_floor_served(floor),
+            "TOWER7 after save/reopen: basement {floor}"
+        );
+    }
+}
+
+#[test]
+fn imported_basement_express_stops_survive_repeated_save_round_trips_for_all_skip_patterns() {
+    use serde_json::json;
+    use verticopolis_engine::facilities::Kind;
+    use verticopolis_engine::load::{deserialize, deserialize_tdt};
+
+    let original = import_save("TOWER7.TDT");
+    let shafts = original["transports"].as_array().expect("transports");
+    let index = shafts
+        .iter()
+        .position(|t| {
+            t["kind"] == "elevatorExpress"
+                && t["bottom"].as_i64().is_some_and(|b| b <= -2)
+                && t["top"].as_i64().is_some_and(|top| top > 4)
+        })
+        .expect("TOWER7 has an express shaft from the basement into the sky");
+    let shaft = &shafts[index];
+    let (x, bottom, top) = (
+        shaft["x"].as_i64().unwrap(),
+        shaft["bottom"].as_i64().unwrap(),
+        shaft["top"].as_i64().unwrap(),
+    );
+    let basement_skip = bottom + 1;
+    let sky_skip = top - 1;
+    // Return owned facts, not a reference from a closure with mismatched
+    // lifetimes. The regression only needs the marker and saved skip list.
+    let pick = |sim: &verticopolis_engine::sim::Simulation| {
+        let t = sim
+            .tower
+            .transports
+            .iter()
+            .find(|t| {
+                t.kind == Kind::ElevatorExpress && t.x == x && t.bottom == bottom && t.top == top
+            })
+            .expect("imported shaft survives");
+        (t.preserve_basement_stops, t.skip_floors.clone().unwrap())
+    };
+
+    for (case, skips) in [
+        ("no skips", vec![]),
+        (
+            "some basement stops deliberately skipped",
+            vec![basement_skip as f64, sky_skip as f64],
+        ),
+        ("positive-only skips", vec![sky_skip as f64]),
+    ] {
+        let mut raw = original.clone();
+        raw["transports"][index]["skipFloors"] = json!(skips);
+        let imported = deserialize_tdt(&raw).expect(case);
+        let (marked, expected) = pick(&imported);
+        assert!(marked, "{case} must carry explicit import provenance");
+        for floor in bottom + 1..=0 {
+            assert_eq!(
+                expected.contains(&(floor as f64)),
+                skips.contains(&(floor as f64)),
+                "{case}: imported floor {floor} must match the original TDT"
+            );
+        }
+        let once = deserialize(&imported.serialize()).expect("first ordinary reload");
+        let (once_marked, once_skips) = pick(&once);
+        assert!(once_marked, "{case}: marker survived first reload");
+        assert_eq!(once_skips, expected, "{case}: first reload");
+        let twice = deserialize(&once.serialize()).expect("second ordinary reload");
+        let (twice_marked, twice_skips) = pick(&twice);
+        assert!(twice_marked, "{case}: marker survived second reload");
+        assert_eq!(twice_skips, expected, "{case}: second reload");
+    }
+
+    // Older app-generated shafts do not acquire imported-stop provenance.
+    let mut old = original.clone();
+    old["transports"][index]["skipFloors"] = json!([sky_skip]);
+    let legacy = deserialize(&old).expect("old save");
+    let (legacy_marked, legacy_skips) = pick(&legacy);
+    assert!(!legacy_marked);
+    assert!(legacy_skips.contains(&(basement_skip as f64)));
+
+    // Modern cannot claim imported-Classic basement-stop provenance.
+    old["mode"] = json!("modern");
+    old["transports"][index]["preserveBasementStops"] = json!(true);
+    let modern = deserialize(&old).expect("modern save");
+    let (modern_marked, modern_skips) = pick(&modern);
+    assert!(!modern_marked);
+    assert!(modern_skips.contains(&(basement_skip as f64)));
+}

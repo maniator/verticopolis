@@ -227,6 +227,7 @@ export function coerceTransportRecord(t: SerializedGame["transports"][number]): 
     skipFloors: Array.isArray(t.skipFloors)
       ? t.skipFloors.filter((n) => typeof n === "number" && Number.isFinite(n))
       : undefined,
+    preserveBasementStops: t.kind === "elevatorExpress" && bottom < 0 && t.preserveBasementStops === true ? true : undefined,
     // Harden the authored schedule (#305) at the load boundary: clamp its
     // active-car counts to [0, cars], its response tunables to sane ranges,
     // and its home floors onto the shaft, so a forged save cannot drive the

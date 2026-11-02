@@ -132,6 +132,7 @@ impl Tower {
             car_load: None,
             load: 0,
             skip_floors: None,
+            preserve_basement_stops: false,
             schedule: None,
         };
         self.transport_by_id.insert(id, self.transports.len());
