@@ -170,10 +170,11 @@ Verticopolis has **two test tiers**:
     cadence. The story's test-mapping table names each one with the same
     reason, and `src/tests/parity/exclusions.ratchet.txt` pins how many each
     file holds. CI runs both projects on every PR (`test-wasm-parity` in
-    `test.yml`), and both legs also run `npm run test:wasm` for the suites
-    that host the engine themselves (the `wasmHost` and `wasmWorker` suites and
-    the perf-compare engine check); a guard in
-    `src/tests/engineRsPaths.guard.test.ts` fails when one of them drops out.
+    `test.yml`). The required `integrationWasm` leg also runs
+    `npm run test:wasm` once for the host-driven suites (including `wasmHost`,
+    `wasmWorker` and perf-compare); the `unitWasm` leg does not duplicate it.
+    The Rust workflow uses its own `on.push.paths` list to select PR engine
+    jobs, so there is no second independent list or YAML snapshot test.
     Knobs: `VC_WASM_SYNC=hour` runs every test at the host's own
     cadence, `VC_PARITY_DUMP=<dir>` writes both views where the instance
     and the engine depart, `VC_PARITY_TRACE=1` logs each re-host (see the header of

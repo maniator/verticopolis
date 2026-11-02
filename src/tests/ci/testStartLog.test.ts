@@ -23,9 +23,10 @@ describe("testStartLine", () => {
 });
 
 describe("CI wiring for the stall log", () => {
+  // The host-driven suite runs exactly once on the required integrationWasm
+  // matrix leg. It no longer runs in the Rust workflow (#1574).
   const workflows: Array<[string, string]> = [
     [".github/workflows/test.yml", "Host suites on the WASM engine"],
-    [".github/workflows/engine-rs.yml", "Conformance through the binding"],
   ];
 
   for (const [file, name] of workflows) {
@@ -43,6 +44,16 @@ describe("CI wiring for the stall log", () => {
       expect(step).toMatch(/run: npm run test:wasm$/m);
     });
   }
+
+  it("the Rust workflow does not duplicate the host suite", () => {
+    const rust = read(".github/workflows/engine-rs.yml");
+    expect(rust).not.toContain("- name: Conformance through the binding");
+    expect(rust).not.toMatch(/^\s*run: npm run test:wasm$/m);
+    const test = read(".github/workflows/test.yml");
+    const step = test.split("      - name: Host suites on the WASM engine\n")[1];
+    expect(step).toBeDefined();
+    expect(step).toMatch(/if:.*matrix\.project == 'integrationWasm'/);
+  });
 
   it(".github/workflows/test.yml: the WASM parity step turns the start log on, so its worker setup file is not inert", () => {
     const text = read(".github/workflows/test.yml");
