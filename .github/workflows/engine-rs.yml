@@ -357,12 +357,37 @@ jobs:
       # in the Unit tests step). The referee runs in the debug profile here
       # to merge coverage; the release replay above is the parity gate.
       - name: Coverage
+        # The slow conformance tests and referee both execute in instrumented
+        # debug profiles. Try mild optimization without losing debug/overflow
+        # checks or changing the 87% line gate. Keep instrumentation live:
+        # never restore raw profraw or coverage reports from an artifact/cache.
+        env:
+          CARGO_PROFILE_TEST_OPT_LEVEL: "1"
+          CARGO_PROFILE_DEV_OPT_LEVEL: "1"
+          CARGO_PROFILE_TEST_DEBUG_ASSERTIONS: "true"
+          CARGO_PROFILE_TEST_OVERFLOW_CHECKS: "true"
+          CARGO_PROFILE_DEV_DEBUG_ASSERTIONS: "true"
+          CARGO_PROFILE_DEV_OVERFLOW_CHECKS: "true"
         run: |
           rustup component add llvm-tools-preview
           cargo llvm-cov --version | grep -qw '0\.9\.1'
+          start=$SECONDS
           cargo llvm-cov --no-report --locked test --features conformance
+          tests_seconds=$((SECONDS - start))
+          start=$SECONDS
           cargo llvm-cov --no-report --locked run --features conformance --bin conformance
+          referee_seconds=$((SECONDS - start))
+          start=$SECONDS
           cargo llvm-cov report --fail-under-lines 87
+          report_seconds=$((SECONDS - start))
+          {
+            echo "### Instrumented Rust coverage (current commit)"
+            echo "| Phase | Elapsed seconds |"
+            echo "| --- | ---: |"
+            echo "| Conformance-feature tests | $tests_seconds |"
+            echo "| Conformance referee | $referee_seconds |"
+            echo "| LLVM coverage report (87% line floor) | $report_seconds |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # A cancelled run can skip every step above and still leave the job
       # green, which would pass the required check unchecked. Fail instead.
