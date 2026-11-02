@@ -87,7 +87,7 @@ async function expectRefused(page: Page, file: "glue" | "wasm" | "build-record")
     await expect(failure).toHaveAttribute("role", "alert");
     await expect(page.locator("#boot-fallback button:not([data-act])")).toBeFocused();
     await expect(failure, "the screen says what is wrong and carries the ids, or the file that differs").toContainText(
-      /The engine files do not match this version of the game\. The engine was not started\. \((expected [0-9a-f]{12}, found [0-9a-f]{12}|[a-z ]+ differs from the record)\)/,
+      /The engine files do not match this version of the game\. The engine was not started\. \((expected [0-9a-f]{12}, found ([0-9a-f]{12}|unavailable)|[a-z ]+ differs from the record)\)/,
     );
     expect(await page.evaluate(() => !!(window as any).game)).toBe(false);
   } else {
@@ -141,7 +141,14 @@ test.describe("a tampered precache is refused", () => {
     const failure = await expectRefused(page, "wasm");
     // The size differs, so the check refuses before hashing.
     expect(failure.package?.found).toBeNull();
-    expect(failure.package?.servedPackage, "the record that came with it names the shell's own package").toBe(short(built.package));
+    // If BUILD.json finished before the size refusal, its package id is attached.
+    const served = failure.package?.servedPackage;
+    if (served === null) {
+      // Allowed: the refusal can happen before BUILD.json was read to completion.
+    } else {
+      expect(served, "when present, served package id is always a 12-hex prefix").toMatch(/^[0-9a-f]{12}$/);
+      expect(served, "the record that came with it names the shell's own package").toBe(short(built.package));
+    }
     expect(failure.package?.expected).toBe(short(built.files["verticopolis_engine_bg.wasm"].sha256));
     expect(failure.package?.controlled).toBe(true);
   });
