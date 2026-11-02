@@ -167,12 +167,14 @@ describe("acknowledgementKey", () => {
     expect(acknowledgementKey(header(b), facts)).toBe(acknowledgementKey(header(a), facts));
   });
 
-  it("differs between towers and between shafts", () => {
+  it("differs between towers and between shafts, and ignores mutable span geometry", () => {
     const one = acknowledgementKey({ seed: 1, mode: "classic" }, shaft(8));
     expect(acknowledgementKey({ seed: 2, mode: "classic" }, shaft(8))).not.toBe(one);
     expect(acknowledgementKey({ seed: 1, mode: "modern" }, shaft(8))).not.toBe(one);
     expect(acknowledgementKey({ seed: 1, mode: "classic" }, shaft(8, { id: 8 }))).not.toBe(one);
     expect(acknowledgementKey({ seed: 1, mode: "classic" }, shaft(8, { x: 11 }))).not.toBe(one);
+    expect(acknowledgementKey({ seed: 1, mode: "classic" }, shaft(8, { bottom: 3 }))).toBe(one);
+    expect(acknowledgementKey({ seed: 1, mode: "classic" }, shaft(8, { top: 12 }))).toBe(one);
     expect(acknowledgementKey({ seed: 1, mode: "classic" }, shaft(8, { cars: 3 }))).toBe(one); // buying a car is not a new shaft
   });
 

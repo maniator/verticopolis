@@ -99,10 +99,11 @@ export interface Acknowledgements {
 }
 
 /** One key per tower and shaft: the founding seed and mode name the tower (they survive saving, loading and
- *  importing a copy), and the shaft's id, kind, column and bottom floor name the shaft, so a different tower
- *  that reuses a shaft id, or a rebuilt shaft in the same column, does not inherit an old answer. */
+ *  importing a copy), and the shaft's id, kind and column name the shaft. The span ends move as the player edits
+ *  the shaft, so they are not part of the remembered answer: a geometry change that keeps the same logical shaft
+ *  must not re-ask the same decision. */
 export function acknowledgementKey(tower: { readonly seed: number; readonly mode: string }, shaft: ShaftFacts): string {
-  return [tower.mode, tower.seed, shaft.id, shaft.kind, shaft.x, shaft.bottom].join(":");
+  return [tower.mode, tower.seed, shaft.id, shaft.kind, shaft.x].join(":");
 }
 
 const STORE_KEY = "vc-elevator-schedule-review";

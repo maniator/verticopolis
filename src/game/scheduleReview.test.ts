@@ -282,6 +282,21 @@ describe("what the player is told, and what they decide (#1548)", () => {
     expect(g.toasts).toEqual([]);
   });
 
+  it("keeps a Keep as is decision when the shaft span changes but the shaft identity stays the same", () => {
+    const store = memory();
+    const keep = play(load("split-tower-4"), store);
+    keep.review.open();
+    keep.dialog().handlers[keepAct(1139)]!();
+    const shaft = keep.port.sim.tower.transports.find((t) => t.id === 1139)!;
+    shaft.bottom = 4;
+    shaft.top = 52;
+    const later = play(JSON.parse(keep.port.serialize()) as SerializedGame, store);
+    later.review.open();
+    expect(later.dialog().rows.find((r) => r.id === 1139)).toMatchObject({ kept: true });
+    expect(later.dialog().handlers[keepAct(1139)]).toBeUndefined();
+    expect(later.dialog().handlers[recoverAct(1139)]).toBeDefined();
+  });
+
   it("sends Review schedule to that shaft's own schedule dialog and changes nothing", () => {
     const g = play(load("split-tower-4"));
     const before = g.saved();
