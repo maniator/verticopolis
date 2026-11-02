@@ -488,10 +488,34 @@ describe("Express elevator sky-lobby stops", () => {
     expect(t.stopsAt(ex, 15)).toBe(true);
     expect(t.stopsAt(ex, 20)).toBe(false);
     expect(t.stopsAt(ex, 25)).toBe(false);
-    // Old top endpoint (12), no longer an endpoint, is now a plain in-span
-    // non-lobby floor — its previous stop status is preserved (it was NOT in
-    // skipFloors, so it stays as a stop). That's fine: the invariant only asks
-    // that newly-in-span non-lobby floors get skipped.
+    // The former endpoint (12) becomes a non-lobby interior floor and must
+    // be skipped too, even though it was an unconditional stop beforehand.
+    expect(t.stopsAt(ex, 12)).toBe(false);
+  });
+
+  it("resize: repeated upward extensions skip former non-lobby endpoints immediately (#1572)", () => {
+    const t = tower(30, [15]);
+    const ex = express(t, 1, 12);
+    for (const top of [14, 16, 18, 20]) {
+      expect(t.resizeTransport(ex.id, 1, top).ok).toBe(true);
+      // Read the memoized stop set immediately, without a save/load to heal it.
+      expect(t.stopsOf(ex)).toEqual(top < 15 ? [1, top] : [1, 15, top]);
+      for (let floor = 2; floor < top; floor++) {
+        expect(t.stopsAt(ex, floor), `floor ${floor}, top ${top}`).toBe(floor === 15);
+      }
+    }
+  });
+
+  it("resize: downward extensions skip former bottoms but keep authored sky-lobby skips (#1572)", () => {
+    const t = tower(30, [15]);
+    const ex = express(t, 8, 20);
+    expect(t.setStop(ex.id, 15, false)).toBe(true); // intentional lobby skip
+    for (const bottom of [6, 4, 2]) {
+      expect(t.resizeTransport(ex.id, bottom, 20).ok).toBe(true);
+      expect(t.stopsOf(ex)).toEqual([bottom, 20]);
+      expect(t.stopsAt(ex, 8)).toBe(false); // old bottom isn't special anymore
+      expect(t.stopsAt(ex, 15)).toBe(false); // keep deliberate lobby skip
+    }
   });
 
   it("resize: shrinking prunes skipFloors that fall outside the new span", () => {

@@ -233,10 +233,10 @@ export function resizeTransport(tower: Tower, id: number, newBottom: number, new
   // Keep express skipFloors coherent after a resize (a common build-order path):
   //   - Drop the new endpoints from skip, so shrinking onto a formerly-skipped
   //     floor doesn't disconnect the new endpoint.
-  //   - Add newly-in-span non-lobby floors to skip, so growing past new territory
-  //     doesn't turn the express into a local elevator.
-  //   - Floors that were already in-span are LEFT ALONE, so a manual stop the
-  //     player set inside the old range survives the resize.
+  //   - Add newly interior non-lobby floors to skip, including the former
+  //     endpoints (which only stopped by virtue of being endpoints).
+  //   - Preserve the stops/skips of the OLD strict interior, including deliberate
+  //     lobby skips, without changing unrelated authored choices.
   if (t.kind === "elevatorExpress") {
     // Rebuild the skip set by (a) preserving only in-span choices, pruning
     // anything now outside [newBottom, newTop] so the model can't carry ghost
@@ -248,8 +248,10 @@ export function resizeTransport(tower: Tower, id: number, newBottom: number, new
       if (f > newBottom && f < newTop) skip.add(f); // in-span (endpoints excluded)
     }
     for (let fl = newBottom + 1; fl < newTop; fl++) {
-      if (fl >= prevBottom && fl <= prevTop) continue; // preserve pre-existing choice
-      if (!tower.floorHasLobby(fl)) skip.add(fl); // newly-in-span non-lobby → skip
+      // Former endpoints must obey the lobby rule now that they are interior.
+      // Only old strict-interior choices are player-authored stops/skips.
+      if (fl > prevBottom && fl < prevTop) continue;
+      if (!tower.floorHasLobby(fl)) skip.add(fl);
     }
     t.skipFloors = [...skip].sort((a, b) => a - b);
   }
