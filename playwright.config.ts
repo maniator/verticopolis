@@ -2,17 +2,16 @@ import { defineConfig, devices } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { GENERAL_SPEC_PATTERN, SWITCHABLE_ONLY_SPEC_PATTERN } from "./src/tests/playwrightLaneSelection";
 
-// The suite runs on the Rust engine (#1353): every spec, the visual specs
-// included, on the `chromium-wasm` project. The TypeScript engine has no lane
-// here; players do not run it.
+// The suite runs on the Rust engine (#1353). The switchable lane keeps the
+// specs that depend on the engine-choice build, while the wasm-only lane runs
+// the general browser-regression suite once against the wasm-only build, which
+// sets no engine preference because it has no engine switch to read. The dual-
+// lane integrity spec remains in both lanes because it checks the same behavior
+// across the switchable and wasm-only builds.
 
 // Playwright drives the BUILT app (via `vite preview`) for the Tier-2 end-to-end
 // smoke. Headless Tier-1 playthrough tests live in vitest (the `src` tree); this
 // config only covers the `e2e` folder. Run with `npm run e2e` after a build.
-// The wasm-only lane (`VC_ENGINE=wasm` build; see src/build/engineBundle.ts):
-// the suite runs once more against that build on its own project, which sets
-// no engine preference because the build has no engine switch to read. It
-// replaces the other two projects, whose builds it does not serve.
 const WASM_ONLY = process.env.PW_WASM_ONLY === "1";
 if (process.env.PW_WASM_ONLY && !WASM_ONLY) throw new Error(`PW_WASM_ONLY must be "1" or unset; got "${process.env.PW_WASM_ONLY}".`);
 // The lane must match the build it serves: the projects of one lane fail in
