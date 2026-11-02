@@ -10,6 +10,8 @@ import { TILE } from "../scale";
 import { compareImages, composeFrame, composeLayered, composeLookup } from "./compose";
 import type { Placed } from "./schema";
 import { ATLAS_SCALES, ATLAS_SCHEMA_VERSION } from "./schema";
+import { resetViewWorldForTests } from "../../presentation/viewWorld";
+import { resetViewKindsForTests } from "../../presentation/viewKinds";
 
 /** A fake renderer: a person spec paints a w x h opaque block whose color is
  *  its fill's first byte; a car spec paints one opaque pixel per rider. */
@@ -99,6 +101,10 @@ describe("bake", () => {
       licenseText: "# License\n",
       icons: { "icon.svg": strToU8("<svg/>\n") },
     };
+    // Simulate a fresh standalone Node atlas exporter: it has not imported
+    // the browser atlas entrypoint, so no view world or kinds are bound.
+    resetViewWorldForTests();
+    resetViewKindsForTests();
     const a = buildArchive(r, info, undefined, 32);
     expect(buildArchive(r, info, undefined, 32).zip).toEqual(a.zip);
     const files = unzipSync(a.zip);

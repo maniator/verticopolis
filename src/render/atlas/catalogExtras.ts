@@ -1,4 +1,3 @@
-import { FACILITIES, isElevatorKind } from "../../engine/facilities";
 import { SKYLINE_FILLS } from "../sceneryLayout";
 import type { FacilityKind } from "../../engine/types";
 import type { PersonBuild } from "../pixelSprites/common";
@@ -17,6 +16,7 @@ import { CLOUD_COUNT, MOON_R, SUN_R, cloudRadius, cloudSeed } from "../sprites/s
 import type { AnimJob, Job, Keys, StillJob } from "./catalog";
 import { cloudOrigin, personSize, type PaintSpec } from "./paint";
 import { CRANE_DT, CRANE_FRAMES } from "./schema";
+import { findViewKind, isElevatorKind, viewKindKeys } from "../../presentation/viewKinds";
 
 /**
  * The non-room half of the atlas catalog: structure tiles and entrances,
@@ -77,8 +77,9 @@ export const RIDER_CAP = 4;
  *  the cabs with their rider chains. */
 export function transportJobs(): Job[] {
   const jobs: Job[] = [];
-  for (const kind of Object.keys(FACILITIES) as FacilityKind[]) {
-    if (FACILITIES[kind].transport) jobs.push(...shaftJobs(kind, FACILITIES[kind].width));
+  for (const kind of viewKindKeys()) {
+    const f = findViewKind(kind);
+    if (f?.transport) jobs.push(...shaftJobs(kind, f.width));
   }
   return jobs;
 }
@@ -212,7 +213,9 @@ export function vehicleJobs(): Job[] {
     still(`vehicle/streetcar/s${s}`, 16, 8, { p: "streetCar", seed }, { vehicle: "streetcar", variant: s }),
   );
   jobs.push(still("vehicle/garbagetruck", 68, GARBAGE_TRUCK_H, { p: "garbageTruck", w: 68 }, { vehicle: "garbagetruck" }));
-  const trainW = FACILITIES.metro.width * TILE - 6;
+  const metro = findViewKind("metro");
+  if (!metro) throw new Error('the bound catalog lists no facility "metro"');
+  const trainW = metro.width * TILE - 6;
   for (const headlight of [true, false]) {
     jobs.push(
       { ...still(`vehicle/metrotrain/${headlight ? "headlight" : "dark"}`, trainW, METRO_TRAIN_H, { p: "metroTrain", w: trainW, headlight }, { vehicle: "metrotrain", headlight }), layers: true, front: true },

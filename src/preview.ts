@@ -1,11 +1,10 @@
-import { FACILITIES } from "./engine/facilities";
 import type { FacilityKind, Unit, UnitState } from "./engine/types";
 import { fitAtGameScale } from "./render/catalogScale";
 import { FLOOR, TILE } from "./render/scale";
 import { drawRoom, type RoomCtx } from "./render/pixelSprites";
 import { catalogFor } from "./engine/catalog";
 import { bindViewWorld } from "./presentation/viewWorld";
-import { bindViewKinds } from "./presentation/viewKinds";
+import { bindViewKinds, findViewKind } from "./presentation/viewKinds";
 
 // A tooling page draws sprites without a tower, so it binds the Modern
 // catalog's world for the view (the lot geometry the sprites hash on).
@@ -37,12 +36,14 @@ const ENTRIES: Entry[] = [
 ];
 
 function makeUnit(e: Entry): Unit {
+  const f = findViewKind(e.kind);
+  if (!f) throw new Error(`the bound catalog lists no facility "${e.kind}"`);
   return {
     id: e.label.length * 13 + e.kind.length,
     kind: e.kind,
     floor: 5,
     x: 0,
-    width: FACILITIES[e.kind].width,
+    width: f.width,
     state: e.state,
     satisfaction: 1,
     occupants: e.occ,
@@ -103,7 +104,9 @@ function frame() {
     // Size by the facility's own footprint, its floor count included: a cinema
     // is two floors tall, and drawing it one floor tall squashed art the game
     // never squashes.
-    const floors = FACILITIES[e.kind].floors ?? 1;
+    const f = findViewKind(e.kind);
+    if (!f) throw new Error(`the bound catalog lists no facility "${e.kind}"`);
+    const floors = f.floors;
     const box = fitAtGameScale(u.width, floors, CELL_W - 28, CELL_H - ROOM_TOP - SLAB_H - CAPTION_H, MAG);
     // A box under 1px draws nothing, but the caption below still prints, so a
     // missing room reads as missing rather than as a gap in the grid.

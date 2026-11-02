@@ -1,10 +1,7 @@
-import { FACILITIES, facilityFloors, hasBusinessHours, isOpenAt } from "../../engine/facilities";
-import { HOUSEHOLD_SIZES } from "../../engine/households";
-import { hasHousehold } from "../../engine/residentialRentals";
-import { subtypeListFor } from "../../engine/retailSubtypes";
 import type { FacilityKind, UnitState } from "../../engine/types";
 import { LATE_NIGHT_KINDS, isLateHour } from "../lateNight";
 import { TILE, FLOOR } from "../scale";
+import { findViewKind, hasBusinessHours, isOpenAt, viewKindKeys } from "../../presentation/viewKinds";
 import { CONSTRUCTION_FRAMES, FIRE_FRAMES, ROOM_VARIANTS } from "./schema";
 import type { PaintSpec, UnitPaint } from "./paint";
 import { CINEMA_CYCLES, clockFor } from "./cycles";
@@ -108,11 +105,17 @@ export const RECYCLE_BREAKS: readonly number[] = recyclingFillBreaks();
 /** Parked car colors: `ACCENTS[id % 7]` in the garage art. */
 export const PARKING_CAR_COLORS = 7;
 
+function facilityEntry(kind: FacilityKind) {
+  const f = findViewKind(kind);
+  if (!f) throw new Error(`the bound catalog lists no facility "${kind}"`);
+  return f;
+}
+
 /** The sampled per-footprint seeds for variant `v` of `kind`. Above-ground
  *  and basement kinds sample floors on their own side of the ground line, and
  *  a full-lot kind (the metro) has exactly one placement. */
 export function variantPlacements(kind: FacilityKind): { floor: number; x: number; id: number }[] {
-  const f = FACILITIES[kind];
+  const f = facilityEntry(kind);
   if (kind === "metro") return [{ floor: -8, x: 0, id: 1 }];
   const floors = f.basement ? [-1, -2, -4, -6] : [5, 12, 27, 43];
   const xs = [17, 64, 131, 208];
@@ -122,9 +125,7 @@ export function variantPlacements(kind: FacilityKind): { floor: number; x: numbe
 
 /** The kinds that bake as rooms: everything but structure and transport. */
 export function roomKinds(): FacilityKind[] {
-  return (Object.keys(FACILITIES) as FacilityKind[]).filter(
-    (k) => k !== "floor" && k !== "lobby" && !FACILITIES[k].transport,
-  );
+  return viewKindKeys().filter((kind) => kind !== "floor" && kind !== "lobby" && !facilityEntry(kind).transport);
 }
 
 /** An hour that realizes the requested open/closed and late-night bits for
@@ -146,8 +147,8 @@ export function hourFor(kind: FacilityKind, open: boolean, late: boolean): numbe
  *  household runs up to the largest family size. A frontend clamps a larger
  *  (forged) count to the chain's `max`. */
 export function occupantCap(kind: FacilityKind): number {
-  const f = FACILITIES[kind];
-  const household = hasHousehold(kind) ? Math.max(...HOUSEHOLD_SIZES) : 0;
+  const f = facilityEntry(kind);
+  const household = f.maxHousehold ?? 0;
   return Math.max(f.population, f.attendance ?? 0, household);
 }
 
@@ -162,12 +163,12 @@ function subtypeToken(s: string | undefined): string {
 export function roomJobs(): Job[] {
   const jobs: Job[] = [];
   for (const kind of roomKinds()) {
-    const f = FACILITIES[kind];
+    const f = facilityEntry(kind);
     const w = f.width * TILE;
-    const h = facilityFloors(kind) * FLOOR;
+    const h = f.floors * FLOOR;
     jobs.push(...roomAnimations(kind, w, h));
-    const subtypes: (string | undefined)[] = [undefined, ...(subtypeListFor(kind) ?? [])];
-    const hoursSet = hasBusinessHours(kind) ? ["open", "closed"] : ["always"];
+    const subtypes: (string | undefined)[] = [undefined, ...(f.subtypes ?? [])];
+    const hoursSet = f.openHours !== null ? ["open", "closed"] : ["always"];
     const lateSet = LATE_NIGHT_KINDS.has(kind) ? ["late", "notlate"] : ["any"];
     const placements = variantPlacements(kind);
     for (const state of UNIT_STATES) {
@@ -296,7 +297,7 @@ function roomAnimations(kind: FacilityKind, w: number, h: number): AnimJob[] {
     floor: 5,
     x: 17,
     id: 3,
-    width: FACILITIES[kind].width,
+    width: facilityEntry(kind).width,
     occupants: 0,
     outForMeal: 0,
     lit: false,
@@ -312,7 +313,7 @@ function roomAnimations(kind: FacilityKind, w: number, h: number): AnimJob[] {
     w,
     h,
     anchor: { x: 0, y: 0 },
-    keys: { kind, state, width: FACILITIES[kind].width },
+    keys: { kind, state, width: facilityEntry(kind).width },
     dt: period / n,
     loop: true,
     frames: Array.from({ length: n }, (_, i) => base(state, (period * i) / n)),

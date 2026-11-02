@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import { useTowerCatalogSource } from "../../engine/towerCatalog";
+import { towerCatalog, useTowerCatalogSource } from "../../engine/towerCatalog";
 import type { EnginePort } from "../../simport/enginePort";
-import { newViewReader } from "../../game/portAccess";
-import { bindViewKinds } from "../../presentation/viewKinds";
+import { newRenderSim, newViewReader } from "../../game/portAccess";
+import { bindViewKinds, findViewKind } from "../../presentation/viewKinds";
 import { catalogFor } from "../../engine/catalog";
 import { readCatalog } from "../../dualrun/catalog";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
@@ -51,6 +51,12 @@ describe.skipIf(!hasWasmPackage())("the reader over the Rust engine's wedding ha
     const rust = towerWithHall();
     const reader = newViewReader(rust);
     const hall = reader.rooms.find((u) => u.kind === "weddingHall")!;
+    // The frontend kind facts must be bound from the live Rust source, not the
+    // TypeScript reference (which still gives this hall a 16-tile footprint).
+    expect(findViewKind("weddingHall")).toMatchObject({ width: 28, floors: 5 });
+    expect(findViewKind("weddingHall")?.width).not.toBe(catalogFor("modern").facilities.find((f) => f.key === "weddingHall")!.width);
+    const renderSim = newRenderSim(rust, reader);
+    expect(towerCatalog(renderSim).economy.garbageCollectHour).toBe(readCatalog(wasm(), "modern").economy.garbageCollectHour);
     expect(hall.floor).toBe(100);
     const check = () => {
       for (let floor = 100; floor <= 104; floor++) expect(reader.tower.unitAt(floor, hall.x + 1), `floor ${floor}`).toBe(hall);

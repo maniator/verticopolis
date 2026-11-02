@@ -46,6 +46,11 @@ pub const DAYCARE_HALO_MAX: f64 = 0.035;
 pub const DEMAND_PER_CAPITA: f64 = 30.0;
 pub const DEMAND_FLOOR_MODERN: f64 = 0.25;
 pub const CLASSIC_HOUSEHOLD: f64 = 3.0;
+/// The 2-5 person family sizes a Modern condo can sell to. Both the gameplay
+/// churn roll and the catalog's exposed `maxHousehold` read from this single
+/// array so the rule cannot drift.
+pub const HOUSEHOLD_SIZES: [i64; 4] = [2, 3, 4, 5];
+pub const MAX_HOUSEHOLD: i64 = *HOUSEHOLD_SIZES.last().unwrap();
 pub const HOUSEHOLD_CHURN_PER_PERSON: f64 = 0.06;
 pub const CONDO_RELOCATION_CHANCE_MONTHLY: f64 = 0.015;
 pub const HOTEL_DAYTIME_PRESENCE: f64 = 0.2;

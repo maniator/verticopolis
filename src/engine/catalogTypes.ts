@@ -10,7 +10,7 @@ import type { FacilityCategory, FacilityKind, GameMode } from "./types";
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 3;
+export const CATALOG_VERSION = 5;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -76,6 +76,8 @@ export interface CatalogEconomy {
   readonly cinemaBookingBlockbusterMonthly: number;
   /** A nightclub's monthly DJ booking. */
   readonly nightclubDjMonthly: number;
+  /** Hour of the daily garbage-truck collection that empties recycling bins. */
+  readonly garbageCollectHour: number;
   /** The paid exterminator's fees, or null where the mode has none. */
   readonly exterminator: { readonly calloutFee: number; readonly perRoomFee: number } | null;
   /** Whether the player can switch automatic bridging off. When false,
@@ -163,6 +165,8 @@ export interface CatalogFacility {
   readonly minStar: number;
   /** The people it holds (tenants, residents or customers at a time). */
   readonly population: number;
+  /** The most residents a household-sized unit may carry, or null. */
+  readonly maxHousehold: number | null;
   /** The audience an attendance venue seats, or null. */
   readonly attendance: number | null;
   readonly modernOnly: boolean;

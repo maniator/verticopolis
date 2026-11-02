@@ -69,6 +69,15 @@ describe("lookupRoom", () => {
     expect(look({ kind: "shop", state: "occupied", subtype: "Nope", occupants: 1, id: 1 }, DAY, 0)).toMatchObject({ frame: expect.stringContaining("room/shop/occupied/-/") });
     expect(look({ kind: "rentalStudio", state: "occupied", occupants: 1, id: 1 }, { ...DAY, hour: 2 }, 0)).toMatchObject({ frame: expect.stringContaining("/always/late/") });
   });
+  it("falls back cleanly for unknown kinds and legacy subtypes without throwing", () => {
+    const legacy = { kind: "shop" as const, state: "occupied" as const, subtype: "Nope", occupants: 1, id: 1, width: 6 };
+    expect(() => lookupRoom(legacy, { ...DAY, hour: 22 }, 0)).not.toThrow();
+    expect(lookupRoom(legacy, { ...DAY, hour: 22 }, 0)).toMatchObject({ frame: expect.stringContaining("room/shop/occupied/-/") });
+    const unknown = { kind: "lounge" as any, state: "occupied" as const, occupants: 1, id: 1, width: 6 };
+    expect(() => lookupRoom(unknown, { ...DAY, hour: 22 }, 0)).not.toThrow();
+    expect(lookupRoom(unknown, { ...DAY, hour: 22 }, 0)).toMatchObject({ frame: expect.stringContaining("room/lounge/occupied/-/") });
+    expect(lookupRoom({ kind: "shop", state: "occupied", subtype: "Bank", occupants: 1, id: 1, width: 6 }, { ...DAY, hour: 22 }, 0)).toMatchObject({ frame: expect.stringContaining("/closed/") });
+  });
   it("draws a room at an off-catalog width from its catalog frame, stretched (#917)", () => {
     // A TDT import or a legacy save keeps a room's original width.
     const wide = lookupRoom({ kind: "office", state: "occupied", width: 12, occupants: 3, id: 1 }, DAY, 0);

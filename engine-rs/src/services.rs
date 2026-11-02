@@ -7,6 +7,7 @@ use crate::star::is_tenant_floor_unit;
 use crate::tower::{Unit, UnitState};
 
 pub const PARKING_WORKERS_PER_SPACE: f64 = 24.0;
+pub const GARBAGE_COLLECT_HOUR: f64 = 5.0;
 pub const METRO_PLATFORM_CUTOFF_MSG: &str = "Your metro platform is cut off. Build a passenger elevator, stairs, or an escalator down to the platform so commuters can reach the station.";
 /// `ECON.exterminatorCalloutFee`: the flat fee of one exterminator call.
 pub const EXTERMINATOR_CALLOUT_FEE: f64 = 5000.0;

@@ -1,6 +1,5 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
-import { GARBAGE_COLLECT_HOUR } from "../../engine/facilities";
 import { isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility } from "../../engine/catalogTypes";
 import { towerCatalog } from "../../engine/towerCatalog";
@@ -399,14 +398,15 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   // ambience): during the collection hour it drives in along the center's
   // bottom story, loads, and drives off, pausing the game freezes it.
   const clock = engine.sim.clock;
-  const truckHour = clock.hour === GARBAGE_COLLECT_HOUR;
+  const garbageCollectHour = towerCatalog(engine.sim).economy.garbageCollectHour;
+  const truckHour = clock.hour === garbageCollectHour;
   for (const tk of engine.truckActors) {
     // No collection at a center that isn't running (under construction, on
     // fire, or a gutted shell), a non-operational plant processes no waste.
     const show = truckHour && isOperational(tk.u);
     if (tk.actor.graphics.visible !== show) tk.actor.graphics.visible = show;
     if (!show) continue;
-    const p = (clock.minuteOfDay - GARBAGE_COLLECT_HOUR * 60) / 60; // 0..1 through the hour
+    const p = (clock.minuteOfDay - garbageCollectHour * 60) / 60; // 0..1 through the hour
     const base = engine.worldX(tk.u.x);
     const uw = tk.u.width * TILE;
     let x: number;
@@ -461,4 +461,3 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     }
   }
 }
-

@@ -9,8 +9,10 @@ import type { FacilityKind } from "../engine/types";
  * engine adds lands on the right side of every check with no frontend edit.
  *
  * The facts are the same in both modes, so a catalog of either one binds them.
- * Like the view's world they are bound before anything draws, and a kind the
- * catalog does not list throws instead of answering for it.
+ * Like the view's world, they must be bound before anything draws: all lookups
+ * throw if no catalog is bound. Once bound, findViewKind returns null for an
+ * unknown kind so legacy/unknown-kind rendering can fall back; strict helpers
+ * throw for unknown kinds rather than silently inventing simulation rules.
  */
 
 let bound: ReadonlyMap<FacilityKind, CatalogFacility> | null = null;
@@ -27,6 +29,19 @@ function entry(kind: FacilityKind): CatalogFacility {
   const f = bound.get(kind);
   if (!f) throw new Error(`the catalog lists no ${kind}`);
   return f;
+}
+
+/** The catalog facts for `kind`, or null when the bound catalog lists none.
+ *  Throws before the first bind. */
+export function findViewKind(kind: FacilityKind): CatalogFacility | null {
+  if (!bound) throw new Error("the view's kind facts are not bound yet: bind them from the tower's catalog before drawing");
+  return bound.get(kind) ?? null;
+}
+
+/** The kind keys in the bound catalog, in catalog order. */
+export function viewKindKeys(): FacilityKind[] {
+  if (!bound) throw new Error("the view's kind facts are not bound yet: bind them from the tower's catalog before drawing");
+  return [...bound.keys()];
 }
 
 /** A foot-traffic trading kind (fast food, restaurant, shop, cinema and the

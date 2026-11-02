@@ -1,5 +1,6 @@
 use super::*;
 use crate::charges::ExtendEnd;
+use crate::services::GARBAGE_COLLECT_HOUR;
 use crate::sim::Simulation;
 
 /// `conformance/catalog-digests.json`, which the TypeScript engine writes
@@ -113,6 +114,12 @@ fn values_resolve_for_the_mode() {
     let modern = catalog(GameMode::Modern);
     assert!(!entry(&classic, "foodHall").available);
     assert!(entry(&modern, "foodHall").available);
+    assert_eq!(entry(&classic, "condo").max_household, Some(MAX_HOUSEHOLD));
+    assert_eq!(entry(&modern, "condo").max_household, Some(MAX_HOUSEHOLD));
+    assert_eq!(
+        json_entry(&serde_json::to_value(&classic).unwrap(), "condo")["maxHousehold"],
+        Value::from(MAX_HOUSEHOLD)
+    );
     assert!(entry(&classic, "office").available);
     // Classic prices the canon kinds on the ladder, starting at Average.
     match entry(&classic, "condo").rent.as_ref().unwrap() {
@@ -146,6 +153,8 @@ fn values_resolve_for_the_mode() {
     assert!(modern.economy.exterminator.is_some());
     assert!(!classic.economy.auto_bridge_toggleable);
     assert!(modern.economy.auto_bridge_toggleable);
+    assert_eq!(classic.economy.garbage_collect_hour, GARBAGE_COLLECT_HOUR);
+    assert_eq!(modern.economy.garbage_collect_hour, GARBAGE_COLLECT_HOUR);
     assert_eq!(classic.economy.overhead_per_unit_monthly, 0.0);
     assert_eq!(modern.economy.overhead_per_unit_monthly, 700.0);
     // Classic always runs the canon calendar: upkeep lands every three

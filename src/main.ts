@@ -1,7 +1,6 @@
 import type { HeatmapMode, Simulation } from "./engine/Simulation";
 import type { UndoHistory } from "./engine/UndoHistory";
 import { createAppHistory } from "./game/appHistory";
-import { GRID } from "./engine/facilities";
 import type { FacilityKind } from "./engine/types";
 import type { TransportView, UnitView } from "./simport/view";
 import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/TowerEngine";
@@ -86,7 +85,10 @@ class GameApp implements GameAppPorts {
   audio = new AudioEngine();
   ui: UI;
   /** Lot geometry, exposed for tooling (e.g. the screenshot harness). */
-  readonly grid = GRID;
+  get grid() {
+    const world = catalogOf(this).world;
+    return { width: world.lotWidth, minFloor: world.minFloor, maxFloor: world.maxFloor, lobbyInterval: world.lobbyInterval };
+  }
   speed = 1;
   tool: Tool = { type: "inspect" };
   /** @internal */ canvas: HTMLCanvasElement;

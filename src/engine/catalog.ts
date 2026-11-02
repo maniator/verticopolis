@@ -33,9 +33,11 @@ import {
   maxCarsFor,
   maxSpanFor,
   transportCarCapacity,
+  GARBAGE_COLLECT_HOUR,
 } from "./facilities";
 import { REAL_WORLD, resolveCalendar, type CalendarKind } from "./calendar";
 import { hasOwnHousehold } from "./census";
+import { HOUSEHOLD_SIZES } from "./households";
 import { makeRules } from "./gameRules";
 import { priceNeutral } from "./pricing";
 import { isRentalKind } from "./residentialRentals";
@@ -103,6 +105,7 @@ function facilityEntry(mode: GameMode, rules: ReturnType<typeof makeRules>, kind
     cost: f.cost,
     minStar: f.minStar,
     population: f.population,
+    maxHousehold: hasOwnHousehold(kind) ? Math.max(...HOUSEHOLD_SIZES) : null,
     attendance: f.attendance ?? null,
     modernOnly: f.modernOnly === true,
     transport,
@@ -175,6 +178,7 @@ export function catalogFor(mode: GameMode): Catalog {
       cinemaBookingMonthly: ECON.cinemaBookingMonthly,
       cinemaBookingBlockbusterMonthly: ECON.cinemaBookingBlockbuster,
       nightclubDjMonthly: ECON.nightclubDjMonthly,
+      garbageCollectHour: GARBAGE_COLLECT_HOUR,
       exterminator: exterminator ? { calloutFee: exterminator.calloutFee, perRoomFee: exterminator.perRoomFee } : null,
       autoBridgeToggleable: rules.bridgingToggleable(),
     },
