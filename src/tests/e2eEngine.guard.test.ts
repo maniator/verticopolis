@@ -90,6 +90,10 @@ describe("the end-to-end suite's engines", () => {
     expect(read(".github/workflows/update-visual-baselines.yml")).not.toMatch(/^ {2}engine-parity:/m);
   });
 
+  it("uses a second worker only for CI wasm-only runs, keeping the local default at one", () => {
+    expect(config).toContain('workers: process.env.CI && process.env.PW_WASM_ONLY === "1" ? 2 : 1');
+  });
+
   it("has no TypeScript engine lane: no switch, no smoke test, no script, no perf pin", () => {
     for (const rel of ["playwright.config.ts", ".github/workflows/test.yml", ".github/workflows/update-perf-baseline.yml", "e2e/helpers.ts"]) {
       expect(read(rel), rel).not.toMatch(/PW_ENGINE|chromium-ts|TS_PROJECT|ts-smoke/);
