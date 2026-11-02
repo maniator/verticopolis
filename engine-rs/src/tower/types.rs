@@ -171,6 +171,8 @@ pub struct Transport {
     /// does, so a hand-edited fraction re-saves unchanged and never matches a
     /// floor.
     pub skip_floors: Option<Vec<f64>>,
+    /// True only for imported Classic PC TDT express shafts; persisted in saves.
+    pub preserve_basement_stops: bool,
     pub schedule: Option<Schedule>,
 }
 
@@ -193,6 +195,9 @@ impl Transport {
         m.insert("load".into(), json!(self.load));
         if let Some(s) = &self.skip_floors {
             m.insert("skipFloors".into(), json!(s));
+        }
+        if self.preserve_basement_stops {
+            m.insert("preserveBasementStops".into(), json!(true));
         }
         if let Some(s) = &self.schedule {
             if !s.is_empty() {

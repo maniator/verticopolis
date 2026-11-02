@@ -231,7 +231,7 @@ impl Engine {
         };
         // The importer's output goes through the trust boundary every save
         // does, and is never marked as a founder's tower.
-        let sim = match crate::load::deserialize(&parsed.save) {
+        let sim = match crate::load::deserialize_tdt(&parsed.save) {
             Ok(sim) => sim,
             Err(e) => {
                 self.reason = Some(format!("This SimTower save couldn't be read. ({e})"));

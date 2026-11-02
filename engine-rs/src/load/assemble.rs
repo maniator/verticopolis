@@ -248,6 +248,10 @@ pub(crate) fn assemble(
                     .unwrap_or(0.0)
                     .clamp(-MAX_SAFE_INTEGER, MAX_SAFE_INTEGER) as i64,
                 skip_floors,
+                preserve_basement_stops: mode == GameMode::Classic
+                    && kind == Kind::ElevatorExpress
+                    && bottom < 0
+                    && t.get("preserveBasementStops").and_then(Value::as_bool) == Some(true),
                 schedule: Schedule::coerce(t.get("schedule"), cars, bottom, top),
             };
             mapped.push((tr, sane_id(t.get("id"))));

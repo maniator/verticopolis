@@ -350,6 +350,8 @@ export interface Transport {
   load: number;
   /** Floors this transport is configured NOT to stop at (express service). */
   skipFloors?: number[];
+  /** Only a PC TDT-imported Classic express shaft may preserve authored basement stops. */
+  preserveBasementStops?: boolean;
   /** Optional per-shaft manual schedule (elevator-scheduling, #305); absent means today's automatic dispatch. Type and helpers live in the `elevatorSchedule` leaf. */
   schedule?: ElevatorSchedule;
 }

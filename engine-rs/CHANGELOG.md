@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.5.0 (2026-11-01)
+
+- Classic PC .TDT imports now record an explicit per-express-shaft `preserveBasementStops` provenance flag in saved transport data. Its underground stop choices are retained across ordinary .vctower serialization and reload, including empty and mixed skip lists. Older unmarked towers and Modern shafts retain their existing normalization; the save version and binding layout are unchanged.
+
 ## 1.4.0 (2026-11-01)
 
 - `serviceDiagnostics(id)` now includes keyed, engine-authored `retail` facts for commercial venues: patronage, business tier, demand percentage, Modern-mode under/oversupply advice, yesterday's profit and rain. The inspector's demand map is memoized; no saved-game, frame or view layout change.

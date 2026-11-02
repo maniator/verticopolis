@@ -186,7 +186,7 @@ export function coerceLastVipNagDay(clockDay: number, raw: unknown): number {
  *  holds. */
 const TRANSPORT_FIELDS: Record<keyof Transport, true> = {
   id: true, kind: true, x: true, width: true, bottom: true, top: true, cars: true,
-  carPositions: true, carDir: true, carLoad: true, load: true, skipFloors: true, schedule: true,
+  carPositions: true, carDir: true, carLoad: true, load: true, skipFloors: true, preserveBasementStops: true, schedule: true,
 };
 const TRANSPORT_KEYS: ReadonlySet<string> = new Set(Object.keys(TRANSPORT_FIELDS));
 

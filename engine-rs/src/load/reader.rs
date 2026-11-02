@@ -7,6 +7,57 @@ pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     deserialize_owned(raw.clone())
 }
 
+/// Restore underground express stops from an ORIGINAL PC SimTower TDT file.
+/// Ordinary saved towers keep the existing normalization; changing new
+/// shafts or generic Classic save rules is not part of this bug (#1532).
+pub fn deserialize_tdt(raw: &Value) -> Result<Simulation, String> {
+    let mut sim = deserialize(raw)?;
+    if sim.mode != GameMode::Classic {
+        return Ok(sim);
+    }
+    let Some(source) = raw.get("transports").and_then(Value::as_array) else {
+        return Ok(sim);
+    };
+    let mut changed = false;
+    for shaft in &mut sim.tower.transports {
+        if shaft.kind != Kind::ElevatorExpress || shaft.bottom >= 0 {
+            continue;
+        }
+        let original = source.iter().find(|t| {
+            t.get("kind").and_then(Value::as_str) == Some("elevatorExpress")
+                && t.get("x").and_then(Value::as_i64) == Some(shaft.x)
+                && t.get("bottom").and_then(Value::as_i64) == Some(shaft.bottom)
+                && t.get("top").and_then(Value::as_i64) == Some(shaft.top)
+        });
+        let Some(authored) = original
+            .and_then(|t| t.get("skipFloors"))
+            .and_then(Value::as_array)
+        else {
+            continue;
+        };
+        let saved_skips: Vec<f64> = authored
+            .iter()
+            .filter_map(Value::as_f64)
+            .filter(|v| v.is_finite())
+            .collect();
+        let Some(skips) = shaft.skip_floors.as_mut() else {
+            continue;
+        };
+        // Mark only shafts actually read from the original TDT. The marker
+        // remains on ordinary .vctower saves and is checked during reload.
+        shaft.preserve_basement_stops = true;
+        let before = skips.len();
+        // Only remove basement skips added by general load normalization.
+        // Authored underground skips and all above-ground rules survive.
+        skips.retain(|floor| *floor > 0.0 || saved_skips.contains(floor));
+        changed |= skips.len() != before;
+    }
+    if changed {
+        sim.tower.revision += 1;
+    }
+    Ok(sim)
+}
+
 /// `deserialize` on a save this call owns: the save is migrated in place and
 /// each unit entry is freed as it is converted, so the load holds the save
 /// and the game it builds, not the save several times over (#1225).
