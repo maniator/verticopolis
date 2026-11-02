@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.77.3
+
+- Express elevators in imported SimTower towers now keep their basement stops after saving and reopening.
+
 ## 2.77.2
 
 - Extending an express elevator no longer adds unintended stops on ordinary floors.
