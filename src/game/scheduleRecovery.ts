@@ -99,14 +99,55 @@ export interface Acknowledgements {
 }
 
 /** One key per tower and shaft: the founding seed and mode name the tower (they survive saving, loading and
- *  importing a copy), and the shaft's id, kind, column and bottom floor name the shaft, so a different tower
- *  that reuses a shaft id, or a rebuilt shaft in the same column, does not inherit an old answer. */
+ *  importing a copy), and the shaft's id, kind and column name the shaft. The span ends move as the player edits
+ *  the shaft, so they are not part of the remembered answer: a geometry change that keeps the same logical shaft
+ *  must not re-ask the same decision. */
 export function acknowledgementKey(tower: { readonly seed: number; readonly mode: string }, shaft: ShaftFacts): string {
-  return [tower.mode, tower.seed, shaft.id, shaft.kind, shaft.x, shaft.bottom].join(":");
+  return [tower.mode, tower.seed, shaft.id, shaft.kind, shaft.x].join(":");
 }
 
 const STORE_KEY = "vc-elevator-schedule-review";
 const MAX_REMEMBERED = 400;
+
+/** Old keys used to include the shaft's mutable bottom floor; a geometry-only resize should still match the same
+ *  answer. Only the exact canonical (mode, seed, shaft id, kind, x) or known legacy six-part shape is rewritten,
+ *  so unrelated or malformed storage keys stay distinct. */
+function canonicalKey(key: string): string | null {
+  const parts = key.split(":");
+  const isNumeric = (value: string): boolean => /^-?\d+$/.test(value);
+  const hasCanonicalShape = (fields: readonly string[]): boolean =>
+    fields.length === 5 &&
+    fields[0].length > 0 &&
+    fields[3].length > 0 &&
+    isNumeric(fields[1]) &&
+    isNumeric(fields[2]) &&
+    isNumeric(fields[4]);
+
+  if (hasCanonicalShape(parts)) return key;
+  if (parts.length === 6 && hasCanonicalShape(parts.slice(0, 5)) && isNumeric(parts[5])) {
+    return parts.slice(0, 5).join(":");
+  }
+  return null;
+}
+
+function canonicalize(entries: Record<string, Decision>): Record<string, Decision> {
+  const migrated: Record<string, Decision> = {};
+  for (const [key, value] of Object.entries(entries)) {
+    if (value !== "kept" && value !== "told") continue;
+    const next = canonicalKey(key);
+    if (next !== null) {
+      // A canonical key can have several legacy-span variants in the browser store. The
+      // last entry wins so the newest decision survives an upgrade or a later saved edit.
+      migrated[next] = value;
+      continue;
+    }
+    // A shaft key from the game has a compact canonical form or the known legacy shape with a bottom-floor suffix.
+    // Other browser keys are ordinary values and should stay intact, while malformed shaft-looking strings are dropped.
+    if (key.includes(":") && key.split(":").length >= 5) continue;
+    migrated[key] = value;
+  }
+  return migrated;
+}
 
 /** The decisions as the browser keeps them. Storage can be blocked or full; every read and write is best effort.
  *  An answer storage would not take is held in memory instead, so within this session Keep still sticks and the
@@ -116,25 +157,36 @@ export function browserAcknowledgements(storage: Pick<Storage, "getItem" | "setI
   const read = (): Record<string, Decision> => {
     try {
       const raw = JSON.parse(storage?.getItem(STORE_KEY) ?? "{}") as unknown;
-      return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, Decision>) : {};
+      const base = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, Decision>) : {};
+      const migrated = canonicalize(base);
+      if (JSON.stringify(base) !== JSON.stringify(migrated)) {
+        try {
+          storage?.setItem(STORE_KEY, JSON.stringify(migrated));
+        } catch {
+          // ignore a blocked browser store; the in-memory copy still reflects the canonical values
+        }
+      }
+      return migrated;
     } catch {
       return {};
     }
   };
   return {
     get: (key) => {
-      const v = unsaved.get(key) ?? read()[key]; // a newer answer storage refused beats an older one it took
+      const canonical = canonicalKey(key) ?? key;
+      const v = unsaved.get(canonical) ?? read()[canonical]; // a newer answer storage refused beats an older one it took
       return v === "kept" || v === "told" ? v : undefined;
     },
     set: (key, decision) => {
+      const canonical = canonicalKey(key) ?? key;
       // The key goes last, so the oldest entries are the ones trimmed.
-      const others = Object.entries(read()).filter(([k]) => k !== key);
-      const all = Object.fromEntries([...others, [key, decision]].slice(-MAX_REMEMBERED));
+      const others = Object.entries(read()).filter(([k]) => k !== canonical);
+      const all = Object.fromEntries([...others, [canonical, decision]].slice(-MAX_REMEMBERED));
       try {
         storage?.setItem(STORE_KEY, JSON.stringify(all));
-        unsaved.delete(key);
+        unsaved.delete(canonical);
       } catch {
-        unsaved.set(key, decision);
+        unsaved.set(canonical, decision);
       }
     },
   };

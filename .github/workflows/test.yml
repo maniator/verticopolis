@@ -214,18 +214,6 @@ jobs:
       - name: Perf gate (E5-S0)
         run: npm run perf
 
-      # Per-run visual proof of the ★-progression. milestones.spec.ts writes to
-      # the untracked e2e/output/ dir (never the committed, human-blessed
-      # docs/screenshots/milestones/ gallery, which only the pinned-container
-      # pipeline may regenerate), and this uploads that per-run set.
-      - name: Upload milestone screenshots
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: milestone-screenshots
-          path: e2e/output/milestones/
-          if-no-files-found: warn
-
       # When a visual baseline (visual.spec.ts) fails, Playwright writes the
       # actual/expected/diff triplet to test-results/, upload it so the drift
       # can be reviewed (and, if intentional, adopted as the new baseline)
@@ -301,6 +289,18 @@ jobs:
         run: npx playwright test --grep-invert @perf
         env:
           PW_WASM_ONLY: "1"
+
+      # Per-run visual proof of the ★-progression. milestones.spec.ts writes to
+      # the untracked e2e/output/ dir (never the committed, human-blessed
+      # docs/screenshots/milestones/ gallery, which only the pinned-container
+      # pipeline may regenerate), and this uploads that per-run set.
+      - name: Upload milestone screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: milestone-screenshots
+          path: e2e/output/milestones/
+          if-no-files-found: error
 
       - name: Upload test results on failure
         if: failure()

@@ -203,7 +203,16 @@ Verticopolis has **two test tiers**:
   `PW_WASM_ONLY=1 npx playwright test --grep-invert @perf` runs the suite on
   a wasm-only tooling build (`VC_ENGINE=wasm VC_TOOLING=1 npm run build`),
   with `e2e/wasmOnly.spec.ts` covering its boot, failures and offline start;
-  CI runs it as the `e2e-wasm-only` job.
+  CI runs it as the `e2e-wasm-only` job. The general browser regression suite
+  runs only here, once, so the default `e2e` lane stays focused on the
+  switchable-only paths that still depend on engine choice or fallback.
+  The default `chromium-wasm` project keeps the switchable-only specs and the
+  pinned visual/perf checks (`engineIdentity`, `saveWithoutRust`,
+  `engineStatusRows`, `atlas`, `visual`, `perf`), plus the dual-lane
+  `engineIntegrity` assertions whose fallback behavior differs by build.
+  The wasm-only lane keeps the general suite, that same integrity spec, the
+  runtime guard, the negative bundle canary, and the milestone screenshot
+  artifact upload (`milestone-screenshots`).
   The suite runs on the Rust engine only (`chromium-wasm`), and so does the
   perf gate, whose baseline is the Rust engine's. Nothing runs the TypeScript
   engine end to end.

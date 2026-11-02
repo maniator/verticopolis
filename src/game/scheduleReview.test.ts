@@ -282,6 +282,48 @@ describe("what the player is told, and what they decide (#1548)", () => {
     expect(g.toasts).toEqual([]);
   });
 
+  it("keeps a Keep as is decision when the shaft span changes but the shaft identity stays the same", () => {
+    const store = memory();
+    const keep = play(load("split-tower-4"), store);
+    keep.review.open();
+    keep.dialog().handlers[keepAct(1139)]!();
+    const shaft = keep.port.sim.tower.transports.find((t) => t.id === 1139)!;
+    shaft.bottom = 4;
+    shaft.top = 52;
+    const later = play(JSON.parse(keep.port.serialize()) as SerializedGame, store);
+    later.review.open();
+    expect(later.dialog().rows.find((r) => r.id === 1139)).toMatchObject({ kept: true });
+    expect(later.dialog().handlers[keepAct(1139)]).toBeUndefined();
+    expect(later.dialog().handlers[recoverAct(1139)]).toBeDefined();
+  });
+
+  it("keeps the decision through a genuine resize, save and reload, and stays quiet on the next tick", () => {
+    const store = memory();
+    const keep = play(load("split-tower-4"), store);
+    keep.review.open();
+    keep.dialog().handlers[keepAct(1139)]!();
+
+    const before = { ...keep.port.sim.tower.transports.find((t) => t.id === 1139)! };
+    expect(before.bottom).toBe(15);
+    expect(keep.port.sim.resizeTransport(1139, 11, 35).ok).toBe(true);
+    const after = keep.port.sim.tower.transports.find((t) => t.id === 1139)!;
+    expect(after.bottom).toBeLessThan(before.bottom);
+    expect(after.bottom).toBe(11);
+    expect(after.top).toBe(35);
+
+    const reloaded = play(JSON.parse(keep.port.serialize()) as SerializedGame, store);
+    reloaded.review.tick();
+    expect(reloaded.toasts).toEqual([]);
+    reloaded.review.open();
+    expect(reloaded.dialog().rows.find((r) => r.id === 1139)).toMatchObject({ kept: true });
+    expect(reloaded.dialog().handlers[keepAct(1139)]).toBeUndefined();
+    expect(reloaded.dialog().handlers[recoverAct(1139)]).toBeDefined();
+
+    const other = play(reseeded("split-tower-4", 7), store);
+    other.review.open();
+    expect(other.dialog().rows.find((r) => r.id === 1139)).toMatchObject({ kept: false });
+  });
+
   it("sends Review schedule to that shaft's own schedule dialog and changes nothing", () => {
     const g = play(load("split-tower-4"));
     const before = g.saved();

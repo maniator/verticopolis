@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { GENERAL_SPEC_PATTERN, SWITCHABLE_ONLY_SPEC_PATTERN } from "./src/tests/playwrightLaneSelection";
 
 // The suite runs on the Rust engine (#1353): every spec, the visual specs
 // included, on the `chromium-wasm` project. The TypeScript engine has no lane
@@ -67,15 +68,17 @@ export default defineConfig({
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   },
   projects: WASM_ONLY
-    ? [{ name: "chromium-wasm-only", testIgnore: /visual\.spec\.ts/, use: { ...devices["Desktop Chrome"] } }]
+    ? [{ name: "chromium-wasm-only", testIgnore: [/visual\.spec\.ts/, SWITCHABLE_ONLY_SPEC_PATTERN], use: { ...devices["Desktop Chrome"] } }]
     : [
     // The Rust engine: the stored engine choice (`vc.engine`, see
     // src/wasmhost/engineChoice.ts) is seeded into localStorage so every page
-    // the suite opens boots on it. The visual baselines keep their historical
-    // `-chromium` file names.
+    // the suite opens boots on it. This lane intentionally limits itself to the
+    // switchable-only tests and the dual-lane integrity fallback assertions
+    // whose behavior differs across builds, while the general browser
+    // regression suite runs once on the wasm-only tooling build.
     {
       name: "chromium-wasm",
-      testIgnore: [/wasmOnly\.spec\.ts/],
+      testIgnore: [/wasmOnly\.spec\.ts/, GENERAL_SPEC_PATTERN],
       snapshotPathTemplate: "{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}-chromium{-snapshotSuffix}{ext}",
       use: {
         ...devices["Desktop Chrome"],
