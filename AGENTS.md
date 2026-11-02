@@ -223,6 +223,12 @@ These rules sit on top of the two test tiers in
   tower shipped for months with no sky lobbies and no express elevators
   because nothing checked `ok`, and it kept passing for the wrong reason.
 
+- **No tests that mirror CI or test config text.** Do not introduce
+  standalone test files or add source-text assertions for workflow YAML,
+  Playwright/Vitest settings, or other test configuration. Check the resolved
+  tool behavior and actual CI runs instead. See `CONTRIBUTING.md` under
+  **Quality gates** for the canonical policy.
+
 ## Docker housekeeping: clean up after yourself
 
 Agent runs that spin up Docker (most often the pinned Playwright screenshot

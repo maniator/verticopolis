@@ -46,12 +46,23 @@ is breached. Run it locally when you touch measured code. CI runs it without
 without coverage (the 720-hour `holidays-classic` scenario is too slow under
 coverage on a shared runner); `npm test` still runs everything.
 
-Workflow YAML is CI configuration. Do not add tests that read
-`.github/workflows/*.yml` and assert particular strings, step names, job
-blocks, or snapshots. Check workflow correctness by running the actual CI jobs;
-use a workflow-aware linter such as `actionlint` when editing YAML. Test
-scripts and runtime behavior directly instead of mirroring the workflow in
-another file. Keep assertions on real behavior rather than workflow text.
+Workflow YAML and test-runner configuration are configuration, not behavior.
+Do not create standalone test files, or add assertions to existing tests, that
+read `.github/workflows/*.yml`, `playwright.config.ts`, `vite.config.ts` /
+Vitest settings, or other CI/test configuration just to match source text,
+regular expressions, filenames, step names, job blocks, worker counts, flags,
+or snapshots. These checks duplicate the configuration, can pass when it
+behaves incorrectly, and break on harmless refactors. Do not move the same
+source-text assertion to another file to satisfy a review.
+
+Verify workflow/config changes with the actual tools and observed behavior:
+use a workflow-aware linter such as `actionlint` for YAML, inspect resolved
+Playwright/Vitest settings and test discovery where relevant, and run the real
+CI jobs to check pass/skip counts, artifacts, coverage and timings. Test
+executable helpers, validators and runtime behavior directly when they have a
+real contract. Do not add a config-text guard merely because a PR description
+promised one; correct the description instead. Do not remove existing tests
+as incidental cleanup; review any existing source-text guards separately.
 
 ## Testing & coverage
 
