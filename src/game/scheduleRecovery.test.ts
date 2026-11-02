@@ -252,6 +252,15 @@ describe("browserAcknowledgements", () => {
     expect(store.get("a")).toBe("kept");
   });
 
+  it("migrates legacy keys that still carried the old mutable bottom floor", () => {
+    const storage = memory();
+    storage.setItem("vc-elevator-schedule-review", JSON.stringify({ "classic:1:1139:elevatorStandard:4:1": "kept" }));
+    const store = browserAcknowledgements(storage);
+    expect(store.get("classic:1:1139:elevatorStandard:4")).toBe("kept");
+    store.set("classic:1:1139:elevatorStandard:4", "told");
+    expect(JSON.parse(storage.getItem("vc-elevator-schedule-review") ?? "{}")).toEqual({ "classic:1:1139:elevatorStandard:4": "told" });
+  });
+
   it("trims the oldest decisions past its cap", () => {
     const storage = memory();
     const store = browserAcknowledgements(storage);

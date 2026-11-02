@@ -109,6 +109,23 @@ export function acknowledgementKey(tower: { readonly seed: number; readonly mode
 const STORE_KEY = "vc-elevator-schedule-review";
 const MAX_REMEMBERED = 400;
 
+/** Old keys used to include the shaft's mutable bottom floor; a geometry-only resize should still match the same
+ *  answer. Reading and writing through this helper keeps the browser store on the stable canonical form. */
+function canonicalKey(key: string): string {
+  const parts = key.split(":");
+  if (parts.length <= 5) return key;
+  return parts.slice(0, 5).join(":");
+}
+
+function canonicalise(entries: Record<string, Decision>): Record<string, Decision> {
+  const migrated: Record<string, Decision> = {};
+  for (const [key, value] of Object.entries(entries)) {
+    const next = canonicalKey(key);
+    migrated[next] = value;
+  }
+  return migrated;
+}
+
 /** The decisions as the browser keeps them. Storage can be blocked or full; every read and write is best effort.
  *  An answer storage would not take is held in memory instead, so within this session Keep still sticks and the
  *  one-time notice does not come back; only a reload forgets it. */
@@ -117,7 +134,8 @@ export function browserAcknowledgements(storage: Pick<Storage, "getItem" | "setI
   const read = (): Record<string, Decision> => {
     try {
       const raw = JSON.parse(storage?.getItem(STORE_KEY) ?? "{}") as unknown;
-      return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, Decision>) : {};
+      const base = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, Decision>) : {};
+      return canonicalise(base);
     } catch {
       return {};
     }
@@ -128,14 +146,15 @@ export function browserAcknowledgements(storage: Pick<Storage, "getItem" | "setI
       return v === "kept" || v === "told" ? v : undefined;
     },
     set: (key, decision) => {
+      const canonical = canonicalKey(key);
       // The key goes last, so the oldest entries are the ones trimmed.
-      const others = Object.entries(read()).filter(([k]) => k !== key);
-      const all = Object.fromEntries([...others, [key, decision]].slice(-MAX_REMEMBERED));
+      const others = Object.entries(read()).filter(([k]) => k !== canonical);
+      const all = Object.fromEntries([...others, [canonical, decision]].slice(-MAX_REMEMBERED));
       try {
         storage?.setItem(STORE_KEY, JSON.stringify(all));
-        unsaved.delete(key);
+        unsaved.delete(canonical);
       } catch {
-        unsaved.set(key, decision);
+        unsaved.set(canonical, decision);
       }
     },
   };
