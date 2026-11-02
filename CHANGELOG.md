@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.77.5
+
+- Room previews and elevator displays now use facility information consistent with the live tower's engine rules.
+
 ## 2.77.4
 
 - A kept elevator schedule no longer reappears after a valid shaft resize, so the same shaft keeps its earlier decision through a save and reload.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { catalogFor, type Catalog, type CatalogFacility } from "./catalog";
-import { GRID } from "./facilities";
+import { GARBAGE_COLLECT_HOUR, GRID } from "./facilities";
 import { Simulation } from "./Simulation";
 
 const entry = (c: Catalog, key: string): CatalogFacility => {
@@ -36,6 +36,8 @@ describe("catalogFor", () => {
     const modern = catalogFor("modern");
     expect(entry(classic, "foodHall").available).toBe(false);
     expect(entry(modern, "foodHall").available).toBe(true);
+    expect(entry(classic, "condo")).toMatchObject({ maxHousehold: 5, ownHousehold: true });
+    expect(entry(modern, "condo")).toMatchObject({ maxHousehold: 5, ownHousehold: true });
     expect(entry(classic, "condo").rent).toMatchObject({ shape: "ladder", default: 150_000, noRate: true });
     expect(entry(modern, "condo").rent).toMatchObject({ shape: "band", default: 160_000, noRate: false });
     expect(entry(classic, "rentalStudio").rent).toBeNull();
@@ -43,6 +45,8 @@ describe("catalogFor", () => {
     expect(entry(modern, "shop").dailyIncome).toBe(2_500);
     expect(classic.economy).toMatchObject({ exterminator: null, autoBridgeToggleable: false, overheadPerUnitMonthly: 0, condoHoldTaxRate: 0 });
     expect(modern.economy).toMatchObject({ autoBridgeToggleable: true, overheadPerUnitMonthly: 700 });
+    expect(classic.economy.garbageCollectHour).toBe(GARBAGE_COLLECT_HOUR);
+    expect(modern.economy.garbageCollectHour).toBe(GARBAGE_COLLECT_HOUR);
     expect(modern.economy.exterminator).not.toBeNull();
     // Classic always runs the canon calendar: upkeep every three days at a
     // tenth of the monthly figure, quarterly rent in full.

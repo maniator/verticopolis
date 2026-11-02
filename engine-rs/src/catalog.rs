@@ -1,23 +1,14 @@
-//! The catalog: the reference data a frontend draws a build menu, a price
-//! label or a placement ghost from, read out of the engine's own tables and
-//! resolved for one mode, so a frontend never applies a rule itself.
+//! The catalog: engine-authored data a frontend draws menus, prices and
+//! placement ghosts from, resolved for one mode so the frontend never applies
+//! simulation rules itself.
 //!
-//! [`catalog`] returns a [`Catalog`]: the world geometry a placement needs,
-//! the economy constants a UI shows, the pooled build caps, and one
-//! [`FacilityEntry`] per facility kind in the engine's catalog order (its
-//! key, name, size, price, star gate, capacity, build time, resale refund,
-//! build cap, transport limits, subtypes and rent configuration). It
-//! serializes to JSON with the TypeScript engine's camelCase keys, and the
-//! WASM binding hands frontends the same text (`catalog(mode)`).
+//! [`catalog`] returns a [`Catalog`]: world geometry, economy constants, pooled
+//! caps and one [`FacilityEntry`] per facility kind. It serializes to JSON
+//! with camelCase keys, and the WASM binding returns the same text.
 //!
-//! The TypeScript engine builds the same catalog from its own tables
-//! (`src/engine/catalog.ts`), and `conformance/catalog-digests.json` pins the
-//! canonical hash of each mode's catalog, so the two engines cannot quote
-//! a different price or size while both exist. A catalog change is a deliberate
-//! change to that lock.
-//!
-//! Presentation stays with the frontend: display copy beyond the facility
-//! name, icons, sprite sizes in pixels and colors are not here.
+//! The TypeScript engine builds the same catalog from its own tables and
+//! `conformance/catalog-digests.json` pins each mode's canonical hash, so a
+//! catalog change is a deliberate lock change.
 
 use serde::Serialize;
 use serde_json::Value;
@@ -35,15 +26,18 @@ use crate::facilities::{
     build_cap, ground_floor_structure_kind, no_basement, Kind, FACILITIES, LOBBY_INTERVAL,
     LOT_WIDTH, MAX_FLOOR, MIN_FLOOR, POOLED_CAPS,
 };
+use crate::rules::MAX_HOUSEHOLD;
+use crate::services::GARBAGE_COLLECT_HOUR;
 use crate::sim::STARTING_MONEY;
-
+mod build;
 mod lock;
 
+pub use build::catalog;
 pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 3;
+pub const CATALOG_VERSION: u32 = 5;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -116,6 +110,8 @@ pub struct Economy {
     pub cinema_booking_blockbuster_monthly: f64,
     /// A nightclub's monthly DJ booking.
     pub nightclub_dj_monthly: f64,
+    /// Hour of the daily garbage-truck collection that empties recycling bins.
+    pub garbage_collect_hour: f64,
     /// The paid exterminator's fees, or null where the mode has none.
     pub exterminator: Option<ExterminatorFees>,
     /// Whether the player can switch automatic bridging off. When false,
@@ -191,6 +187,8 @@ pub struct FacilityEntry {
     pub min_star: i64,
     /// The people it holds (tenants, residents or customers at a time).
     pub population: i64,
+    /// The largest generated household size for this kind, or null.
+    pub max_household: Option<i64>,
     /// The audience an attendance venue seats, or null.
     pub attendance: Option<i64>,
     pub modern_only: bool,
@@ -394,6 +392,7 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
         cost: f.cost,
         min_star: f.min_star,
         population: f.population,
+        max_household: kind.has_household().then_some(MAX_HOUSEHOLD),
         attendance: f.attendance,
         modern_only: f.modern_only,
         transport,
@@ -425,56 +424,6 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
         hotel: kind.is_hotel(),
         lease_amenity: kind.is_lease_amenity(),
         unmet_demand: kind.is_unmet_demand_kind(),
-    }
-}
-
-/// The catalog for `mode`.
-pub fn catalog(mode: GameMode) -> Catalog {
-    Catalog {
-        version: CATALOG_VERSION,
-        mode: mode.as_str(),
-        world: World {
-            lot_width: LOT_WIDTH,
-            min_floor: MIN_FLOOR,
-            max_floor: MAX_FLOOR,
-            ground_floor: 1,
-            ground_floor_structure: ground_floor_structure_kind(Kind::Floor, 1).as_str(),
-            lobby_interval: LOBBY_INTERVAL,
-        },
-        economy: Economy {
-            starting_money: STARTING_MONEY,
-            add_car_cost: ADD_CAR_COST,
-            car_resale_refund: car_resale_refund(),
-            transport_floor_cost: TRANSPORT_FLOOR_COST,
-            calendars: calendars_for(mode),
-            maintenance_per_car_monthly: MAINTENANCE_PER_CAR_MONTHLY,
-            overhead_per_unit_monthly: mode.operating_overhead_per_unit(),
-            condo_hold_tax_rate: mode.condo_hold_tax_rate(),
-            cinema_booking_monthly: CINEMA_BOOKING_MONTHLY,
-            cinema_booking_blockbuster_monthly: CINEMA_BOOKING_BLOCKBUSTER,
-            nightclub_dj_monthly: NIGHTCLUB_DJ_MONTHLY,
-            exterminator: mode
-                .infestation_recovery()
-                .map(|(callout_fee, per_room_fee)| ExterminatorFees {
-                    callout_fee,
-                    per_room_fee,
-                }),
-            auto_bridge_toggleable: mode.bridging_toggleable(),
-        },
-        pools: POOLED_CAPS
-            .iter()
-            .zip(POOL_KEYS)
-            .map(|(p, key)| PoolEntry {
-                key,
-                label: p.label,
-                cap: p.cap,
-                kinds: p.kinds.iter().map(|k| k.as_str()).collect(),
-            })
-            .collect(),
-        facilities: FACILITIES
-            .iter()
-            .map(|f| facility_entry(mode, f.kind))
-            .collect(),
     }
 }
 

@@ -10,7 +10,7 @@ use crate::services::with_thousands;
 use crate::sim::{LogKind, Simulation};
 use crate::tower::UnitState;
 
-use crate::rules::CLASSIC_HOUSEHOLD;
+use crate::rules::{CLASSIC_HOUSEHOLD, HOUSEHOLD_SIZES};
 
 mod move_in;
 mod names;
@@ -30,7 +30,6 @@ pub enum CongestionBindingClass {
 /// `BINDING_TIE_EPS`: two ratios within this band count as tied.
 const BINDING_TIE_EPS: f64 = 1e-9;
 
-const HOUSEHOLD_SIZES: [i64; 4] = [2, 3, 4, 5];
 const HOUSEHOLD_WEIGHTS: [i64; 4] = [4, 6, 2, 1];
 
 /// `householdPrice`.

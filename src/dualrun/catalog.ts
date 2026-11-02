@@ -88,6 +88,7 @@ const ECONOMY: Shape = {
   cinemaBookingMonthly: amount,
   cinemaBookingBlockbusterMonthly: amount,
   nightclubDjMonthly: amount,
+  garbageCollectHour: count,
   exterminator: (v) => v === null || isRecord(v),
   autoBridgeToggleable: bool,
 };
@@ -109,6 +110,7 @@ const FACILITY: Shape = {
   cost: amount,
   minStar: count,
   population: count,
+  maxHousehold: orNull(count),
   attendance: orNull(count),
   modernOnly: bool,
   transport: bool,

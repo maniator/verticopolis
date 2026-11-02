@@ -1,6 +1,6 @@
 import type { HeatmapMode } from "../engine/sim/constants";
 import type { Simulation } from "../engine/Simulation";
-import { isElevatorKind } from "../engine/facilities";
+import { catalogFacility } from "../engine/catalogTypes";
 import { householdMix } from "../engine/households";
 import { MILESTONES } from "../engine/milestones";
 import { towerCatalog } from "../engine/towerCatalog";
@@ -128,7 +128,7 @@ export function tsTransportDetail(sim: Simulation, id: number): TransportDetail 
   const hourly = sim.elevatorHourlyLoad(id);
   const origins = sim.elevatorOriginLoad(id);
   const stops: { floor: number; served: boolean; lobby: boolean; endpoint: boolean }[] = [];
-  if (isElevatorKind(t.kind)) {
+  if (catalogFacility(towerCatalog(sim), t.kind).maxCars !== null) {
     const lobbies = new Set(sim.tower.lobbyFloors());
     for (let fl = t.top; fl >= t.bottom; fl--) {
       stops.push({ floor: fl, served: sim.tower.stopsAt(t, fl), lobby: lobbies.has(fl), endpoint: fl === t.bottom || fl === t.top });

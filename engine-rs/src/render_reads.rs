@@ -8,11 +8,9 @@ use indexmap::IndexMap;
 
 use crate::crowd::{Crowd, PState, STRESS_WAIT};
 use crate::facilities::Kind;
+use crate::services::GARBAGE_COLLECT_HOUR;
 use crate::sim::Simulation;
 use crate::tower::{Tower, UnitState};
-
-/// `GARBAGE_COLLECT_HOUR` (census.ts): the hour the recycling bins empty.
-const GARBAGE_COLLECT_HOUR: f64 = 5.0;
 
 /// One elevator landing's waiting line: the riders and the worst wait tier.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

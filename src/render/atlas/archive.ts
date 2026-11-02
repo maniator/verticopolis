@@ -23,6 +23,9 @@ import {
 import { FLOOR, TILE } from "../scale";
 import { skyColor } from "../sprites/sky";
 import { SHIRTS } from "../pixelSprites/common";
+import { catalogFor } from "../../engine/catalog";
+import { bindViewWorld } from "../../presentation/viewWorld";
+import { bindViewKinds } from "../../presentation/viewKinds";
 
 /**
  * Turns a bake into the release archive: packs the unique images into 1x
@@ -143,6 +146,12 @@ export function buildArchive(
   onProgress?: (msg: string) => void,
   pageSize: number = ATLAS_PAGE_BASE,
 ): Archive {
+  // Node's archive builder runs in a separate realm from browserEntry's atlas
+  // bake, so it must bind its own catalog before reading room/scenery data.
+  // Offline atlas tooling deliberately uses the parity-locked TS catalog.
+  const atlasCatalog = catalogFor("modern");
+  bindViewWorld(atlasCatalog.world);
+  bindViewKinds(atlasCatalog);
   const packed = packGroups(bake, pageSize);
   onProgress?.(`packed ${bake.images.length} images into ${packed.pages} pages`);
   const pages: Image[] = Array.from({ length: packed.pages }, () => blank(pageSize, pageSize));
