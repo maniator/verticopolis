@@ -201,8 +201,11 @@ Verticopolis has **two test tiers**:
   switchable-only paths that still depend on engine choice or fallback.
   The default `chromium-wasm` project keeps the switchable-only specs and the
   pinned visual/perf checks (`engineIdentity`, `saveWithoutRust`,
-  `engineStatusRows`, `atlas`, `visual`, `perf`), while the wasm-only lane keeps
-  the full general suite with the runtime guard and the negative bundle canary.
+  `engineStatusRows`, `atlas`, `visual`, `perf`), plus the dual-lane
+  `engineIntegrity` assertions whose fallback behavior differs by build.
+  The wasm-only lane keeps the general suite, that same integrity spec, the
+  runtime guard, the negative bundle canary, and the milestone screenshot
+  artifact upload (`milestone-screenshots`).
   The suite runs on the Rust engine only (`chromium-wasm`), and so does the
   perf gate, whose baseline is the Rust engine's. Nothing runs the TypeScript
   engine end to end.
