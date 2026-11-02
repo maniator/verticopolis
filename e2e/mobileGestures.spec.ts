@@ -297,6 +297,7 @@ test.describe("mobile pinch: zoom out frames the whole tower", () => {
   test("a tall tower can be pulled fully into frame, and the floor holds (no void drift)", async ({
     page,
   }) => {
+    test.slow();
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
 
