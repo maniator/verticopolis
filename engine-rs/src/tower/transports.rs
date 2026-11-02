@@ -299,8 +299,9 @@ impl Tower {
             }
         }
         if kind == Kind::ElevatorExpress {
-            // Keep the in-span choices, drop the new endpoints, skip the
-            // newly served non-lobby floors.
+            // Keep old strict-interior choices, drop the new endpoints, and
+            // skip newly interior non-lobby floors. Former endpoints no longer
+            // qualify for an unconditional stop after an extension.
             let mut skip: Vec<f64> = Vec::new();
             for &f in self.transports[i].skip_floors.as_deref().unwrap_or(&[]) {
                 if f > new_bottom as f64 && f < new_top as f64 && !skip.contains(&f) {
@@ -308,7 +309,9 @@ impl Tower {
                 }
             }
             for fl in new_bottom + 1..new_top {
-                if fl >= prev_bottom && fl <= prev_top {
+                // Preserve old strict-interior choices, but reclassify the
+                // former endpoints when they become interior floors.
+                if fl > prev_bottom && fl < prev_top {
                     continue;
                 }
                 let f = fl as f64;

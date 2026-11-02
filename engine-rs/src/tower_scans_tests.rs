@@ -367,3 +367,71 @@ fn the_bottom_basement_row_takes_only_the_metro_and_its_tunnel() {
     assert!(!tower.can_place(Kind::Shop, MIN_FLOOR, 20).ok);
     must(tower.place(Kind::Metro, MIN_FLOOR, 100));
 }
+
+#[test]
+fn express_extension_reclassifies_former_endpoints_without_waiting_for_reload() {
+    // Reproduce the repeated two-floor drag that left fake stops in a player's
+    // 1..60 express after its top passed floor 45 (#1572).
+    let mut tower = Tower::new();
+    let lobby_width = Kind::Lobby.facility().width;
+    for x in (0..24 - lobby_width + 1).step_by(lobby_width as usize) {
+        must(tower.place(Kind::Lobby, 1, x));
+    }
+    for floor in 2..=20 {
+        if floor == 15 {
+            for x in (0..24 - lobby_width + 1).step_by(lobby_width as usize) {
+                must(tower.place(Kind::Lobby, floor, x));
+            }
+        } else {
+            for x in 0..24 {
+                must(tower.place(Kind::Floor, floor, x));
+            }
+        }
+    }
+    let up = must(tower.place_transport(Kind::ElevatorExpress, 2, 1, 12));
+    for top in [14, 16, 18, 20] {
+        assert!(tower.resize_transport(up, 1, top).ok);
+        let shaft = tower.get_transport(up).unwrap();
+        for floor in 2..top {
+            assert_eq!(
+                shaft.stops_at(floor),
+                floor == 15,
+                "former top became a false stop at {floor}, top {top}"
+            );
+        }
+        assert!(shaft.stops_at(top), "the new endpoint always stops");
+        let expected = if top < 15 {
+            vec![1, top]
+        } else {
+            vec![1, 15, top]
+        };
+        assert_eq!(tower.stops_of(shaft), expected, "stop cache must be fresh");
+    }
+
+    // The same bug occurs at the former bottom when extending down. A
+    // deliberate skip of an existing sky lobby must remain untouched.
+    let down = must(tower.place_transport(Kind::ElevatorExpress, 12, 8, 20));
+    assert!(tower.set_stop(down, 15, false));
+    for bottom in [6, 4, 2] {
+        assert!(tower.resize_transport(down, bottom, 20).ok);
+        let shaft = tower.get_transport(down).unwrap();
+        assert_eq!(tower.stops_of(shaft), vec![bottom, 20]);
+        assert!(!shaft.stops_at(8));
+        assert!(!shaft.stops_at(15));
+    }
+
+    let loaded = crate::load::deserialize(&game(tower).serialize())
+        .expect("valid in-memory stops should persist unchanged");
+    assert_eq!(
+        loaded
+            .tower
+            .stops_of(loaded.tower.get_transport(up).unwrap()),
+        vec![1, 15, 20]
+    );
+    assert_eq!(
+        loaded
+            .tower
+            .stops_of(loaded.tower.get_transport(down).unwrap()),
+        vec![2, 20]
+    );
+}
