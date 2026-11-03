@@ -1,6 +1,7 @@
 import type { GameMode, SerializedView } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
 import { SaveGame, isStorageWriteError, saveFailureMessage } from "../storage/SaveGame";
+import { trackAppAction, trackAppActionOnce } from "../analytics";
 import { exportReport, type ExportReport } from "../storage/tdtExportReport";
 import { importReport } from "../storage/tdtImportReport";
 import { runExportFlow, runLegacyDownload } from "./exportFlow";
@@ -125,6 +126,7 @@ export class SaveLoad {
       // the crash screen, and the autosave drain treats it as best-effort.
       // Each owns its own failure surface, so the silent path never toasts.
       if (silent) throw err;
+      trackAppActionOnce("autosave_failed", "manual");
       // A manual Quick Save must never fail silently: without this catch the
       // throw escapes the button handler as an uncaught error, the player
       // gets no feedback at all, and believes the tower saved. A failed
@@ -161,6 +163,7 @@ export class SaveLoad {
       } while (this.autosaveQueued);
     } catch {
       /* periodic autosave is best effort and has no UI surface; manual and pre-reload saves still report errors */
+      trackAppActionOnce("autosave_failed", "timer");
     }
   }
 
@@ -394,6 +397,7 @@ export class SaveLoad {
       this.deps.towerSwapped();
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
+      trackAppAction("import_failed", "save");
       this.deps.ui.sayVisibly("Import failed: " + (err as Error).message);
     }
   }
@@ -414,6 +418,7 @@ export class SaveLoad {
     if (rec[0] !== 1) {
       // The refusal is already player-readable: the importer's own sentence,
       // or "This SimTower save couldn't be read." with the detail.
+      trackAppAction("import_failed", "tdt");
       this.deps.ui.toast(port.lastReason() ?? "This SimTower save couldn't be read.", "bad");
       return;
     }

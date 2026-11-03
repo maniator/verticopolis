@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { showSaves, saveToSlot, loadFromSlot, deleteSlot, showTowerPicker, loadFromSplash } from "./appModals";
 import { SaveGame } from "../storage/SaveGame";
 import { makeApp, makeSim } from "./appModals.fixture";
+import { trackAppAction, trackAppActionOnce } from "../analytics";
 
 /**
  * These pin the save-slot commands against the hand-built fake `GameApp`
@@ -9,6 +10,11 @@ import { makeApp, makeSim } from "./appModals.fixture";
  * compression). The stats screen and the exterminator are in
  * `appModalsStats.test.ts`.
  */
+
+vi.mock("../analytics", async (importActual) => {
+  const actual = await importActual<typeof import("../analytics")>();
+  return { ...actual, trackAppAction: vi.fn(), trackAppActionOnce: vi.fn() };
+});
 
 vi.mock("../storage/SaveGame", async (importActual) => {
   // Spread the real module so isStorageWriteError/saveFailureMessage stay
@@ -34,6 +40,8 @@ beforeEach(() => {
   vi.mocked(SaveGame.load).mockClear();
   vi.mocked(SaveGame.loadSlot).mockClear();
   vi.mocked(SaveGame.deleteSlot).mockClear();
+  vi.mocked(trackAppAction).mockClear();
+  vi.mocked(trackAppActionOnce).mockClear();
 });
 
 describe("showSaves", () => {
@@ -68,6 +76,7 @@ describe("saveToSlot", () => {
       "Save failed: storage is full or blocked. Free up space or allow site storage, then try again.",
       "bad",
     );
+    expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "manual");
   });
 
   it("keeps the raw detail (no storage blame) when a non-storage bug throws instead", () => {
@@ -113,6 +122,7 @@ describe("loadFromSlot", () => {
     loadFromSlot(app, 3);
     expect(followSwap).not.toHaveBeenCalled();
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith("That slot is empty or corrupt.", "bad");
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("load_failed");
   });
 });
 
@@ -165,6 +175,7 @@ describe("loadFromSplash", () => {
     expect(loadFromSplash(app, 1)).toBe(false);
     expect(followSwap).not.toHaveBeenCalled();
     expect(ui.toast).not.toHaveBeenCalled();
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("load_failed");
   });
 
   it("reports failure WITHOUT adopting or toasting, so the title screen survives", () => {
@@ -175,6 +186,7 @@ describe("loadFromSplash", () => {
     expect(loadFromSplash(app, 1)).toBe(false);
     expect(followSwap).not.toHaveBeenCalled();
     expect(ui.toast).not.toHaveBeenCalled();
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("load_failed");
   });
 });
 
