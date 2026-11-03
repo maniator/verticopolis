@@ -36,8 +36,6 @@ src/game/toolingSim.ts Simulation port/tsEngine # moved from src/main.ts with th
 src/preview.ts catalog
 src/render/atlas/archive.ts catalog # archive records atlas metadata from the same engine-authored catalog as atlas runtime reads
 src/render/atlas/browserEntry.ts catalog
-src/render/atlas/verify.ts facilities
-src/render/atlas/verifyExtras.ts facilities
 src/simport/headerClock.ts gameRules # what panels derive from the view's header instead of sim.clock and sim.rules (facade slice 4, #1211): date arithmetic, the calendar's day names and the static rule set
 src/simport/tsPanels.ts households milestones # the TypeScript adapter's panel answers (facade slice 4, #1211), built from the TypeScript engine's own functions; they leave with it
 src/ui/templates/editor.ts residentialRentals

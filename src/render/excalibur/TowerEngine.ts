@@ -153,6 +153,9 @@ export class TowerEngine {
    *  graphic. Cells, not unit ids, because the view gives tiles no ids. */
   structTileMap!: ex.TileMap;
   structTiles = new Set<ex.Tile>();
+  /** What the tile pass last drew from (towerReconcile `syncScene`); a null
+   *  sim makes the next sync walk the tiles. @internal friend-module access. */
+  structPass: { sim: RenderSim | null; units: readonly UnitView[] | null; revision: number; lit: boolean } = { sim: null, units: null, revision: -1, lit: false };
   // Settled rooms compose into region canvases (towerRegions, spec CAP-2).
   regions = new Map<number, RegionRec>();
   regionUnits = new Map<number, number[]>(); // unit id -> its region keys
