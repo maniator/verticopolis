@@ -63,10 +63,24 @@ impl ShaftGeometry {
     /// The fleet split: the lower half homed at the base lobby, the rest at
     /// `up`, in car order.
     pub fn split_homes(&self, up: i64) -> Vec<i64> {
+        self.staged_homes(self.cars / 2, up)
+    }
+
+    /// The staging a preset or Auto-tune seeds: the fleet split like
+    /// [`split_homes`](Self::split_homes), except that a one-car shaft keeps
+    /// its only car at the base lobby so the lobby up-rush has a staged car
+    /// (#1634). The one-press "stage upper half up-tower" play keeps the plain
+    /// split, since the player asked for it.
+    pub fn seeded_homes(&self, up: i64) -> Vec<i64> {
+        let lobby_cars = if self.cars == 1 { 1 } else { self.cars / 2 };
+        self.staged_homes(lobby_cars, up)
+    }
+
+    /// The first `lobby_cars` cars homed at the base lobby, the rest at `up`.
+    fn staged_homes(&self, lobby_cars: i64, up: i64) -> Vec<i64> {
         let base = self.base_lobby();
-        let lower = self.cars / 2;
         (0..self.cars)
-            .map(|i| if i < lower { base } else { up })
+            .map(|i| if i < lobby_cars { base } else { up })
             .collect()
     }
 

@@ -161,7 +161,7 @@ fn build(preset: Preset, geo: &ShaftGeometry) -> PresetProposal {
             })),
             // The midday-half curve all weekend.
             Some(row(|_| half(cars))),
-            geo.split_homes(geo.up_tower_target()),
+            geo.seeded_homes(geo.up_tower_target()),
         ),
         // A daytime hump, half the shoulders, a skeleton overnight; every car
         // home at the base lobby. The safe default.

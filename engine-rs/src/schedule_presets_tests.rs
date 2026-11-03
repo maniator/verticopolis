@@ -57,11 +57,26 @@ fn a_small_fleet_keeps_one_car_and_the_overnight_cap_never_exceeds_it() {
     let (sim, id) = tower(GameMode::Modern, 1);
     let p = ask(&sim, id, "rush");
     assert_eq!(p.weekday.unwrap(), vec![1; 24]);
-    // The one car homes up-tower, the rule the dialog has always used (#1634).
-    assert_eq!(p.home_floors, vec![TOP]);
+    // The one car stays at the base lobby, so the lobby up-rush has a staged car (#1634).
+    assert_eq!(p.home_floors, vec![1]);
     let (sim, id) = tower(GameMode::Modern, 2);
     let night = ask(&sim, id, "rush").weekday.unwrap();
     assert_eq!((night[2], night[12], night[8]), (2, 1, 2));
+}
+
+#[test]
+fn rush_stages_a_three_car_fleet_with_one_car_at_the_lobby() {
+    let (sim, id) = tower(GameMode::Modern, 3);
+    assert_eq!(ask(&sim, id, "rush").home_floors, vec![1, TOP, TOP]);
+}
+
+#[test]
+fn staging_one_car_up_tower_is_the_players_own_play() {
+    // The one-press play keeps the plain split: asked for, so it goes up-tower (#1634).
+    let (sim, id) = tower(GameMode::Modern, 1);
+    assert_eq!(ask(&sim, id, "stage-up-tower").home_floors, vec![TOP]);
+    let (sim, id) = tower(GameMode::Classic, 1);
+    assert_eq!(ask(&sim, id, "stage-up-tower").home_floors, vec![TOP]);
 }
 
 #[test]

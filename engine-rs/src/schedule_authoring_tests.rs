@@ -245,6 +245,17 @@ fn untouched_homes_are_seeded_and_hand_set_homes_are_kept() {
 }
 
 #[test]
+fn the_seed_keeps_a_one_car_shafts_only_car_at_the_lobby() {
+    // A one-car shaft keeps its only car at the lobby; three cars split 1 and 2 (#1634).
+    for (cars, want) in [(1, vec![1]), (2, vec![1, TOP]), (3, vec![1, TOP, TOP])] {
+        let (mut sim, id) = tower(GameMode::Modern, cars);
+        seed(&mut sim, id, warm_ring(0.5), warm_ring(0.5), None);
+        let p = sim.auto_tune_proposal(id, None, false).proposal.unwrap();
+        assert_eq!(p.home_floors, want, "{cars} cars");
+    }
+}
+
+#[test]
 fn a_home_on_a_skipped_floor_snaps_to_the_nearest_served_one() {
     let (mut sim, id) = tower(GameMode::Modern, 2);
     assert!(sim.tower.set_stop(id, 6, false));

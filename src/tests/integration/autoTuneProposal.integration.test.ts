@@ -85,6 +85,29 @@ describe.skipIf(!hasWasmPackage())("the Rust Auto-tune proposal matches the Type
       else expect(available).toBeGreaterThan(40);
     });
 
+    it(`${mode}: the seed on 1, 2 and 3 cars, whichever floor is busiest`, () => {
+      const f = tower(mode);
+      const kinds = [f.standard, f.service, f.express] as const;
+      for (const cars of [1, 2, 3]) {
+        for (const id of kinds) f.sim.tower.setCars(id, cars);
+        for (const [oname, wdO, weO] of ORIGINS) {
+          for (const id of kinds) measure(f.sim, id, MEASURES[0][1], wdO, weO);
+          const rust = wasm().Engine.fromSave(JSON.stringify(f.sim.serialize())) as unknown as RustPort;
+          try {
+            rust.seedElevatorTelemetry(JSON.stringify(telemetryDocument(f.sim)));
+            for (const id of kinds) {
+              const none = new Float64Array(0);
+              const want = autoTuneProposal(f.sim, id, none, false);
+              const got = asJson(rust.autoTuneProposal(id, none, false));
+              expect(got, `${mode} ${cars} cars / ${oname} / shaft ${id}`).toEqual(want);
+            }
+          } finally {
+            rust.free();
+          }
+        }
+      }
+    });
+
     it(`${mode}: stairs, missing ids and unreadable drafts`, () => {
       const f = tower(mode);
       const rust = wasm().Engine.fromSave(JSON.stringify(f.sim.serialize())) as unknown as RustPort;
