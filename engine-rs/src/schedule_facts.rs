@@ -17,7 +17,7 @@ use serde::Serialize;
 use crate::clock::GameMode;
 use crate::jsmath;
 use crate::schedule::{Schedule, SCHEDULE_HOURS};
-use crate::schedule_authoring::readiness;
+use crate::schedule_authoring::warm_curve;
 use crate::schedule_geometry::ShaftGeometry;
 use crate::schedule_presets::{recommended_preset, AssistedPreset};
 use crate::sim::Simulation;
@@ -99,6 +99,10 @@ pub struct ScheduleFacts {
     pub recommended: Option<AssistedPreset>,
     pub advice: Advice,
     pub staging: Option<StagingSummary>,
+    /// The draft's homes as the shaft would hold them: one per car, each on
+    /// the nearest served floor (ties to the lower one), a car the draft lists
+    /// no home for at the base lobby. Empty on a refusal.
+    pub home_floors: Vec<i64>,
 }
 
 impl ScheduleFacts {
@@ -112,6 +116,7 @@ impl ScheduleFacts {
                 short: Vec::new(),
             },
             staging: None,
+            home_floors: Vec::new(),
         }
     }
 }
@@ -137,6 +142,19 @@ fn peak_hour(curve: Option<&[f64]>) -> usize {
         }
     }
     peak
+}
+
+/// One home per car on a served floor; a car with no listed home waits at the
+/// base lobby.
+fn served_homes(draft: Option<&Schedule>, geo: &ShaftGeometry) -> Vec<i64> {
+    let homes = draft.and_then(|d| d.home_floors.as_ref());
+    (0..geo.cars.max(0) as usize)
+        .map(|i| {
+            homes
+                .and_then(|h| h.get(i))
+                .map_or(geo.base_lobby(), |&f| geo.snap_to_served(f))
+        })
+        .collect()
 }
 
 fn advice(row: Option<&Vec<i64>>, curve: &[f64], cars: i64) -> Advice {
@@ -207,12 +225,11 @@ impl Simulation {
             weekend: Vec::new(),
         };
         let rings = self.telemetry.hourly.get(&id).unwrap_or(&empty);
-        let day = readiness(if weekend_view {
+        let curve = warm_curve(if weekend_view {
             &rings.weekend
         } else {
             &rings.weekday
         });
-        let curve = day.curve.as_deref();
         let row = draft.and_then(|d| {
             if weekend_view {
                 d.weekend.as_ref()
@@ -241,6 +258,7 @@ impl Simulation {
             recommended: assisted.then(|| recommended_preset(t.kind)),
             advice,
             staging: Some(staging(draft, row, &geo, curve)),
+            home_floors: served_homes(draft, &geo),
         }
     }
 }

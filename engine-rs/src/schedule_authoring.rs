@@ -96,8 +96,19 @@ impl AutoTuneProposal {
     }
 }
 
+/// The hours of a day's ring with a measured load, the count the warm gate
+/// reads.
+fn sampled_hours(curve: &[f64]) -> usize {
+    curve.iter().filter(|v| **v > 0.0).count()
+}
+
+/// The ring when the day is warm, for a caller that only reads it.
+pub(crate) fn warm_curve(curve: &[f64]) -> Option<&[f64]> {
+    (sampled_hours(curve) >= WARMED_MIN_HOURS).then_some(curve)
+}
+
 pub(crate) fn readiness(curve: &[f64]) -> DayReadiness {
-    let sampled_hours = curve.iter().filter(|v| **v > 0.0).count();
+    let sampled_hours = sampled_hours(curve);
     let warm = sampled_hours >= WARMED_MIN_HOURS;
     DayReadiness {
         warm,

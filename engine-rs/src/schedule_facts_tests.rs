@@ -225,3 +225,24 @@ fn a_shaft_with_no_cars_and_a_refused_query_say_so_in_their_advice_status() {
         "no-cars"
     );
 }
+
+#[test]
+fn the_homes_come_back_on_served_floors_with_the_base_for_unlisted_cars() {
+    let (mut sim, id) = tower(GameMode::Modern, 4);
+    // Floor 6 is skipped: a car homed there snaps to the nearer served floor,
+    // the lower one on a tie; the two unlisted cars wait at the base lobby.
+    assert!(sim.tower.set_stop(id, 6, false));
+    let d = draft(None, None, Some(vec![6, 12]));
+    let f = sim.schedule_facts(id, Some(&d), false);
+    assert_eq!(f.home_floors, vec![5, 12, 1, 1]);
+    // No draft homes at all: the whole fleet is at the base.
+    assert_eq!(
+        sim.schedule_facts(id, None, false).home_floors,
+        vec![1, 1, 1, 1]
+    );
+    // A refusal has no homes.
+    assert!(sim
+        .schedule_facts(id + 9, None, false)
+        .home_floors
+        .is_empty());
+}
