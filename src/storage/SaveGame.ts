@@ -25,6 +25,7 @@ import {
 import { packVctower, payloadLine } from "./vctowerWriter";
 import { stampText } from "./saveStamp";
 import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
+import { slotPopulation } from "./slotCensus";
 
 /**
  * Persistence. Games are stored in localStorage: one auto-save slot plus a
@@ -134,11 +135,11 @@ function parseSavedAt(value: unknown): number | undefined {
  * save, and reading only the first would call that row unreadable while
  * `load()` opens it fine and the splash offers Continue for it.
  *
- * `exists` means LOADABLE by construction: it is claimed only once
- * `Simulation.deserialize` has accepted the payload, the same bar `loadSlot`
- * clears, so a row can never offer a Load that is certain to fail. Defensive
- * today (deserialize coerces rather than throws, and readSlot already catches a
- * null payload); it keeps the guarantee free if that ever changes.
+ * `exists` means LOADABLE by construction: the save decodes and parses, and
+ * once the engine package is installed the census in `slotCensus.ts` also
+ * loads it, the same bar `loadSlot` clears. With no census installed (before
+ * the package loads, or after a tick trap) a parseable save still reads as
+ * existing and its row carries no population.
  */
 function infoFrom(slot: number | "auto", ...keys: string[]): SlotInfo {
   // From the RAW keys, before any parse: readSlotText returns null for an
@@ -147,10 +148,10 @@ function infoFrom(slot: number | "auto", ...keys: string[]): SlotInfo {
   for (const key of keys) {
     const text = readSlotText(key);
     if (text === null) continue;
-    let data: SerializedGame, population: number;
+    let data: SerializedGame, population: number | undefined;
     try {
       data = parseSaveJson(text) as SerializedGame;
-      population = Simulation.deserialize(data).population;
+      population = slotPopulation(text);
     } catch {
       continue; // undecodable, or the schema will not load: try the next key
     }

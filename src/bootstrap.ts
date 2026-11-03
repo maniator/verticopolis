@@ -8,7 +8,9 @@ import { removeLegacyCohortKeys } from "./engineCrash/legacyKeys";
 import { CRASH_RELOAD_LINE, countRustCrash, crashOutcome, reloadSoon, tabStore } from "./engineCrash/crashReload";
 import { loadWasmEngine, publishRustEngine, rustBootTower } from "./wasmhost/rustEngine";
 import type { BootTower } from "./game/bootTower";
+import { setSlotPopulationReader } from "./storage/slotCensus";
 import { setEngineWriter } from "./storage/vctowerWriter";
+import { populationReaderFromModule } from "./wasmhost/slotPopulation";
 import { noteEngineAttempt, noteEngineCrashReload, noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "./analyticsEngineStatus";
 import { startEngagementWatch } from "./game/engagementWatch";
 import { runningTowerStage, watchEngineTraps } from "./game/engineFault";
@@ -286,6 +288,9 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     const wasmModule = booted.module;
     let tower: BootTower | null = null;
     if (wasmModule) {
+      // Slot rows count their population through the engine, which has to be
+      // installed before the first screen that lists saves can draw.
+      setSlotPopulationReader(populationReaderFromModule(wasmModule));
       try {
         tower = rustBootTower(wasmModule);
       } catch (e) {
@@ -331,6 +336,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
         // Nothing runs the tower now.
         bootState = failBoot(bootState, "host", "trap-tick", message);
         setEngineWriter(null);
+        setSlotPopulationReader(null);
         // The trap is counted in the reliability rows, as the stage its tower
         // was hosted at.
         const fault = { reason: "trap-tick", stage: runningTowerStage() } as const;

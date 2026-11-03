@@ -138,3 +138,12 @@ describe("savesTemplate list name", () => {
     expect(list.previousElementSibling!.tagName).toBe("H2");
   });
 });
+
+describe("savesTemplate population", () => {
+  it("leaves the population out while no census has run, rather than reading 'pop 0'", () => {
+    const slots: SlotInfo[] = [{ slot: 1, exists: true, present: true, towerName: "One", star: 2, funds: 5000, savedAt: AT }];
+    const row = renderToFragment(savesTemplate(slots)).querySelector(".slot")!;
+    expect(row.textContent).not.toContain("pop");
+    expect(row.textContent).toContain("$5,000");
+  });
+});
