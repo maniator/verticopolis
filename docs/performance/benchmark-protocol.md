@@ -318,7 +318,10 @@ leg of `perf:compare` serves a pinned pre-cutover build (`TS_BASELINE` in
 checks that commit out into `.perf-ts-baseline/` (a git worktree, so the commit
 must be in the clone: a shallow clone needs `git fetch origin <commit>` first),
 runs `npm ci` there and builds it into `dist-perf-ts/`; the checkout is reused,
-and the install and build repeat on every run without `--skip-build`. The build
+and the install and build repeat on every run without `--skip-build`. A second
+run that starts the build while the first is still building stops with an
+error that names the other process, because the build holds
+`.perf-ts-baseline.lock` (delete it if its process died). The build
 carries a stamp, and `--skip-build` refuses a `dist-perf-ts/` whose stamp,
 `version.json` (version, commit, `switchable` engine build) or `engine/`
 folder (there must be none) does not match the pin. The server overlays the current engine package

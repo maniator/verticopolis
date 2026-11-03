@@ -117,8 +117,9 @@ impl Simulation {
             let is_retail = kind.subtype_list().is_some() && spend.is_some_and(|s| s > 0.0);
             if is_retail {
                 let cust_per_hour = daily / (spend.unwrap() * open_h);
-                u.patronage_today = Some(
-                    u.patronage_today.unwrap_or(0.0)
+                let tally = u.retail_mut();
+                tally.patronage_today = Some(
+                    tally.patronage_today.unwrap_or(0.0)
                         + cust_per_hour
                             * frac
                             * rain_mult
@@ -131,7 +132,8 @@ impl Simulation {
                 let earned = u.pending_income.floor();
                 u.pending_income -= earned;
                 if is_retail {
-                    u.profit_today = Some(u.profit_today.unwrap_or(0.0) + earned);
+                    let tally = u.retail_mut();
+                    tally.profit_today = Some(tally.profit_today.unwrap_or(0.0) + earned);
                 }
                 self.money += earned;
                 if let Some(cat) = ledger_cat_for(kind) {

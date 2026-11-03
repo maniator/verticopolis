@@ -608,7 +608,8 @@ async function main() {
   // counts-versus-rates rules (`persistence-failures.mjs`). A dynamic import:
   // that module reads `upperBound` from this one.
   const { persistenceSection } = await import("./persistence-failures.mjs");
-  const full = `${md}\n\n${await persistenceSection(span.hours, `last ${span.label}`)}\n`;
+  const { coverageSection } = await import("./reliability-coverage.mjs");
+  const full = `${md}\n\n${await persistenceSection(span.hours, `last ${span.label}`)}\n\n${await coverageSection(span.hours, `last ${span.label}`, lives)}\n`;
   console.log(full);
   if (process.env.GITHUB_STEP_SUMMARY) {
     try {

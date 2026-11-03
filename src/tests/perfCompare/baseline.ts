@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildTooling, npmEntry, runNodeCli } from "../perfWorker/build";
+import { acquireBaselineLock } from "./baselineLock";
 import { startServer, type PerfServer } from "./server";
 
 /**
@@ -60,16 +61,18 @@ export function baselineErrors(dist: string): string[] {
   return errors;
 }
 
-const git = (repo: string, ...args: string[]): string => {
+type Git = (repo: string, ...args: string[]) => string;
+
+const git: Git = (repo, ...args) => {
   const env: NodeJS.ProcessEnv = { ...process.env };
   for (const name of GIT_REPO_ENV) delete env[name];
   return execFileSync("git", args, { cwd: repo, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env }).trim();
 };
 
 /** Fails fast, before any slow build, when the clone does not hold the pinned commit (a shallow clone). */
-export function requireBaselineCommit(repo: string): void {
+export function requireBaselineCommit(repo: string, run: Git = git): void {
   try {
-    git(repo, "cat-file", "-e", `${TS_BASELINE.commit}^{commit}`);
+    run(repo, "cat-file", "-e", `${TS_BASELINE.commit}^{commit}`);
   } catch {
     throw new Error(`the pinned baseline commit ${TS_BASELINE.commit} is not in this clone; fetch it with \`git fetch origin ${TS_BASELINE.commit}\` (or a full fetch) and run again`);
   }
@@ -81,11 +84,35 @@ const SCRUBBED_ENV = /^(VC_ENGINE|VC_PUBLIC_DIR|VC_TOOLING|NODE_ENV|npm_lifecycl
 /** Variables that would point git at another repository than the one it is run in. */
 const GIT_REPO_ENV = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"] as const;
 
-/** Check out the pinned commit, install its dependencies and build it into `dist-perf-ts/`. */
-export function buildBaseline(repo: string, log: (line: string) => void): void {
+/** The steps `buildBaseline` takes outside the filesystem: git, the dependency install and the build itself.
+ *  They are parameters so a test can drive the branches without a network, a clone or a build. */
+export interface BaselineSteps {
+  git: Git;
+  install: (tree: string, env: NodeJS.ProcessEnv) => void;
+  build: (tree: string, dist: string, env: NodeJS.ProcessEnv) => void;
+}
+
+const REAL_STEPS: BaselineSteps = {
+  git,
+  install: (tree, env) => runNodeCli(npmEntry(env), ["ci", "--no-audit", "--no-fund"], tree, env),
+  build: buildTooling,
+};
+
+/** Check out the pinned commit, install its dependencies and build it into `dist-perf-ts/`, holding the baseline lock throughout. */
+export function buildBaseline(repo: string, log: (line: string) => void, steps: BaselineSteps = REAL_STEPS): void {
+  const release = acquireBaselineLock(repo);
+  try {
+    buildLocked(repo, log, steps);
+  } finally {
+    release();
+  }
+}
+
+function buildLocked(repo: string, log: (line: string) => void, steps: BaselineSteps): void {
+  const { git } = steps;
   const tree = join(repo, BASELINE_TREE);
   const dist = join(repo, BASELINE_DIST);
-  requireBaselineCommit(repo);
+  requireBaselineCommit(repo, git);
   if (existsSync(tree)) {
     let head = "";
     try {
@@ -115,11 +142,11 @@ export function buildBaseline(repo: string, log: (line: string) => void): void {
   log("baseline: installing the baseline's dependencies (npm ci)");
   const env: NodeJS.ProcessEnv = { ...process.env, VC_ALLOW_NO_ENGINE: "1" };
   for (const name of Object.keys(env)) if (SCRUBBED_ENV.test(name)) delete env[name];
-  runNodeCli(npmEntry(env), ["ci", "--no-audit", "--no-fund"], tree, env);
+  steps.install(tree, env);
   log(`baseline: TypeScript-only tooling build of the baseline into ${BASELINE_DIST}/`);
   // A stale dist from an earlier pin or a failed build must not survive into this one's stamp.
   rmSync(dist, { recursive: true, force: true });
-  buildTooling(tree, dist, env);
+  steps.build(tree, dist, env);
   const record: BaselineRecord = { commit: TS_BASELINE.commit, appVersion: TS_BASELINE.appVersion };
   writeFileSync(join(dist, BASELINE_STAMP), JSON.stringify(record) + "\n");
 }
