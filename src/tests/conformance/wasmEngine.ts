@@ -2,8 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { rentOf } from "../../engine/econConfig";
+import { digest } from "./canonical";
+import type { CheckpointDetail } from "./checkpointDetail";
 import { REPO_ROOT, type EngineStart, type Outcome, type ScenarioEngine, type Start } from "./scenario";
 import type { ChargeOutcome } from "./chargeOps";
+import { decodeHeader } from "../../wasmhost/frameView";
 import { checkBinding, type WasmEngine, type WasmModule } from "../../dualrun/binding";
 
 /**
@@ -52,6 +55,31 @@ function i32(v: number, what: string): number {
 function u32(v: number, what: string): number {
   if (!Number.isInteger(v) || v < 0 || v > 0xffffffff) throw new Error(`${what} ${v} is outside the binding's unsigned 32-bit range`);
   return v;
+}
+
+interface LogEntry { seq: number; minute: number; text: string; kind: string }
+
+const LOG_FROM_START = -0x80000000;
+
+/** The fuzz record of a binding instance, built from what the binding returns
+ *  (the money, the log ring and the full save), the way the TypeScript runner
+ *  builds it from its own engine, so a wasm32 difference shows in the money,
+ *  the log or a named save field. The ring is read from before its first
+ *  possible sequence number: `logSince` is exclusive, and a loaded game counts
+ *  its ring back from `logSeq` 0, so the older lines have negative numbers.
+ *  The sequence is the frame header's `logSeq`, read through the host's own decoder. */
+export function wasmCheckpointDetail(handle: WasmEngine): Omit<CheckpointDetail, "label"> {
+  const entries = JSON.parse(handle.logSince(LOG_FROM_START)) as LogEntry[];
+  const save = JSON.parse(handle.serialize()) as Record<string, unknown>;
+  return {
+    money: handle.money(),
+    log: {
+      seq: decodeHeader(handle.frameView()).logSeq,
+      count: entries.length,
+      digest: digest(entries.map((e) => ({ minute: e.minute, text: e.text, kind: e.kind }))),
+    },
+    save: Object.fromEntries(Object.entries(save).map(([k, v]) => [k, digest(v)])),
+  };
 }
 
 interface SavedUnit { id: number; kind: string; rent?: number; noRate?: boolean }
@@ -143,6 +171,7 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
     crowdDigest: () => live().crowdDigest(),
     drainEvents: () => JSON.parse(live().drainGameplayEvents()) as unknown[],
     eventsDropped: () => live().gameplayEventsDropped(),
+    detail: () => wasmCheckpointDetail(live()),
   };
 }
 

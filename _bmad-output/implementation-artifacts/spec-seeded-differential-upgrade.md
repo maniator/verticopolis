@@ -117,7 +117,16 @@ still needs a 100-story tower, which the fuzzer's 40 stories do not reach.
 
 ### Slice 4: the shipped artifact, and the key
 
-- A share of each night's seeds runs through the WASM build in Node.
+- The WASM leg (done): every fourth seed (`wasm_every`, 0 turns it off) is also
+  replayed through the shipped build in Node (`scripts/fuzz-compare.ts --wasm`,
+  the same `replayCompare` with the `WASM` leg) and compared with the native
+  Rust run's records. The WASM adapter builds the detail record from the
+  binding (`wasmCheckpointDetail`: money, the log ring read from before its
+  first sequence number, a digest of each field of `serialize()`), and an
+  integration test pins it against the TypeScript engine on every corpus
+  entry. The package comes from the `engine-wasm` action's cache. The run
+  summary splits divergences by leg, files a 300 s timeout apart from harness
+  failures and reports each leg's seconds.
 - The key script (done): `scripts/fuzz-key.ts` prints a SHA-256 over six
   parts (the crate, `src/engine` without its tests, the nightly scripts' import
   closure with `tsconfig.json`, the WASM build's inputs, the pins and the
@@ -130,10 +139,10 @@ still needs a 100-story tower, which the fuzzer's 40 stories do not reach.
   guard and the window ledger treat such a night as not counting. A guard test
   ties `FUZZ_ENTRIES` to the scripts the workflow runs, and another checks that
   the WASM build part matches the engine-wasm action's hand-kept key list. The
-  WASM runner and the shrinker join `FUZZ_ENTRIES` when they land. The freeze
+  WASM runner is in the closure of `fuzz-compare.ts` and the shrinker is an entry. The freeze
   guard, a PR check that recomputes the key and fails on a change while a window
   is open, comes next and picks the marker file that opens and closes it.
-- The nightly's time budget is set from the measured cost after slices 1 to 3.
+- The nightly's time budget (done): measured on 2026-11-03, a seed costs about 3 to 5 s on the TypeScript compare and about 3 s on the WASM leg beside the Rust run, so 20 seeds fit the 60 minute job with wide margin. The loop enforces a 30 minute budget: a seed that would start after it is listed as not run and the night is red.
 
 ## Boundaries
 
