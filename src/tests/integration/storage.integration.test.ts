@@ -643,6 +643,57 @@ describe("SaveGame", () => {
     expect(localStorage.getItem(AUTO_KEY)).toBe(unreadable); // original left in place
   });
 
+  it("preserveUnreadable says whether the bytes are kept, and leaves a stash that already holds them alone", () => {
+    const KEY = "simtower-clone-unreadable";
+    expect(SaveGame.preserveUnreadable()).toBe(false); // nothing to keep
+    localStorage.setItem(AUTO_KEY, "VCZ1:abc");
+    const write = vi.spyOn(localStorage, "setItem");
+    expect(SaveGame.preserveUnreadable()).toBe(true);
+    expect(SaveGame.preserveUnreadable()).toBe(true);
+    expect(write.mock.calls.filter(([k]) => k === KEY)).toHaveLength(1); // the second call wrote nothing
+    write.mockRestore();
+    // A full quota reports the loss instead of pretending the bytes are safe.
+    localStorage.removeItem(KEY);
+    const full = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    try {
+      expect(SaveGame.preserveUnreadable()).toBe(false);
+    } finally {
+      full.mockRestore();
+    }
+  });
+
+  it("a damaged autosave never replaces a stash that holds a different save, a newer one does", () => {
+    const KEY = "simtower-clone-unreadable";
+    localStorage.setItem(KEY, "VCZ1:first");
+    localStorage.setItem(AUTO_KEY, "VCZ1:second");
+    expect(SaveGame.preserveUnreadable()).toBe(false);
+    expect(localStorage.getItem(KEY)).toBe("VCZ1:first");
+    expect(SaveGame.preserveUnreadable(AUTO_KEY, true)).toBe(true);
+    expect(localStorage.getItem(KEY)).toBe("VCZ1:second");
+  });
+
+  it("a stash that is only the VCZ1 prefix downloads as stored, not as an empty tower file", () => {
+    localStorage.setItem("simtower-clone-unreadable", "VCZ1:");
+    expect(SaveGame.unreadableBackup()).toBe("VCZ1:");
+  });
+
+  it("the kept save downloads as a .vctower file the game can import once updated", async () => {
+    const sim = sampleGame();
+    sim.money = 424_242;
+    const stored = SaveGame.packSync(saveOf(sim));
+    localStorage.setItem(AUTO_KEY, stored);
+    SaveGame.preserveUnreadable();
+    const file = SaveGame.unreadableBackup()!;
+    expect(file.startsWith("VCTOWER1\n")).toBe(true);
+    expect(file.endsWith("\n")).toBe(true);
+    expect((await SaveGame.import(file)).money).toBe(424_242);
+    // Text that is not a compressed store value comes back as stored.
+    localStorage.setItem("simtower-clone-unreadable", "plain text");
+    expect(SaveGame.unreadableBackup()).toBe("plain text");
+  });
+
   it("falls back to a healthy legacy save when the Verticopolis autosave is unreadable, and still flags corruption", () => {
     const sim = sampleGame();
     sim.money = 555_555;

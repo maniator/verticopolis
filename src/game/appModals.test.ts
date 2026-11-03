@@ -3,6 +3,7 @@ import { showSaves, saveToSlot, loadFromSlot, deleteSlot, showTowerPicker, loadF
 import { SaveGame } from "../storage/SaveGame";
 import { makeApp, makeSim } from "./appModals.fixture";
 import { trackAppAction, trackAppActionOnce } from "../analytics";
+import { NEWER_SAVE_REFUSAL } from "./portLifecycle";
 
 /**
  * These pin the save-slot commands against the hand-built fake `GameApp`
@@ -123,6 +124,25 @@ describe("loadFromSlot", () => {
     expect(followSwap).not.toHaveBeenCalled();
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith("That slot is empty or corrupt.", "bad");
     expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("load_failed");
+  });
+});
+
+describe("loadFromSlot with a save from a newer version", () => {
+  it("says to update the game, and does not adopt the tower", () => {
+    vi.mocked(SaveGame.loadSlot).mockImplementationOnce((_slot, load) => load("BAD"));
+    const { app, ui, enginePort, followSwap } = makeApp(makeSim());
+    (enginePort as { lastReason: () => string | undefined }).lastReason = () => NEWER_SAVE_REFUSAL;
+    loadFromSlot(app, 1);
+    expect(followSwap).not.toHaveBeenCalled();
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith(NEWER_SAVE_REFUSAL, "bad");
+  });
+
+  it("keeps the empty-or-corrupt copy when the slot held nothing to try, whatever the engine last refused", () => {
+    vi.mocked(SaveGame.loadSlot).mockReturnValueOnce(false);
+    const { app, ui, enginePort } = makeApp(makeSim());
+    (enginePort as { lastReason: () => string | undefined }).lastReason = () => NEWER_SAVE_REFUSAL;
+    loadFromSlot(app, 2);
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith("That slot is empty or corrupt.", "bad");
   });
 });
 

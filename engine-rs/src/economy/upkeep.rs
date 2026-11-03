@@ -56,7 +56,7 @@ impl Simulation {
                 charge(ledger_cat_for(u.kind).unwrap_or("upkeep"), overhead);
             }
             if u.kind == Kind::Cinema && operational {
-                let blockbuster = match u.film_policy {
+                let blockbuster = match u.extras().film_policy {
                     Some("blockbuster") => true,
                     Some("feature") => false,
                     _ => self.rng.chance(0.4),
@@ -133,10 +133,15 @@ impl Simulation {
             if u.kind.subtype_list().is_none() || !u.is_operational() {
                 continue;
             }
-            // A unit with no tallies has no box, and keeps none.
-            let Some(tally) = u.retail.as_deref_mut() else {
+            let tally = u.extras();
+            let has_data = tally.patronage_today.is_some()
+                || tally.patronage_yest.is_some()
+                || tally.profit_today.is_some()
+                || tally.profit_yest.is_some();
+            if !has_data {
                 continue;
-            };
+            }
+            let mut tally = u.extras_mut();
             tally.patronage_yest = Some(tally.patronage_today.unwrap_or(0.0));
             tally.patronage_today = Some(0.0);
             tally.profit_yest = Some(tally.profit_today.unwrap_or(0.0));

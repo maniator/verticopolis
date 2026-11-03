@@ -12,8 +12,8 @@ export interface RunRecord {
 }
 
 /** Which part of a checkpoint differed first, in the order the compare looks:
- *  the label, the three hashes, then the detail (money, log, save field). */
-export type DivergenceKind = "count" | "label" | "state" | "crowd" | "events" | "money" | "log" | "save";
+ *  the label, the three hashes, then the detail (money, log, save field, fx slots). */
+export type DivergenceKind = "count" | "label" | "state" | "crowd" | "events" | "money" | "log" | "save" | "fx";
 
 /** The engine compared with the native Rust run: the TypeScript reference, or
  *  the shipped WASM build in Node. The record fields keep the name `ts`
@@ -44,7 +44,7 @@ export function recordProblem(run: RunRecord, what: string): string | null {
     const c: unknown = run.checkpoints[i];
     const d: unknown = run.details[i];
     if (!isObject(c) || !["label", "state", "crowd", "events"].every((k) => typeof c[k] === "string")) return `${what}: checkpoint ${i} is not a label with state, crowd and events hashes`;
-    if (!isObject(d) || d.label !== c.label || typeof d.money !== "number" || !isObject(d.log) || !isObject(d.save)) return `${what}: detail ${i} does not match checkpoint ${i} (${String(c.label)})`;
+    if (!isObject(d) || d.label !== c.label || typeof d.money !== "number" || !isObject(d.log) || !isObject(d.save) || !isObject(d.fx)) return `${what}: detail ${i} does not match checkpoint ${i} (${String(c.label)})`;
   }
   return null;
 }
@@ -57,6 +57,9 @@ function detailDivergence(a: CheckpointDetail, b: CheckpointDetail): Pick<Diverg
   }
   for (const key of [...new Set([...Object.keys(a.save), ...Object.keys(b.save)])].sort()) {
     if (a.save[key] !== b.save[key]) return { kind: "save", field: key, ts: String(a.save[key] ?? "(absent)"), rust: String(b.save[key] ?? "(absent)") };
+  }
+  for (const key of [...new Set([...Object.keys(a.fx), ...Object.keys(b.fx)])].sort()) {
+    if (a.fx[key] !== b.fx[key]) return { kind: "fx", field: key, ts: String(a.fx[key] ?? "(absent)"), rust: String(b.fx[key] ?? "(absent)") };
   }
   return null;
 }

@@ -1,0 +1,47 @@
+{
+  "id": "fx-thief-caught",
+  "description": "A three-star tower with a security office for sixty days. The thief is caught, which bumps the thief fx sequence with caught true (#879).",
+  "start": {
+    "newGame": {
+      "seed": 2,
+      "mode": "classic",
+      "star": 3
+    }
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 150,
+      "to": 190
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 150,
+      "to": 190
+    },
+    {
+      "op": "build",
+      "kind": "security",
+      "floor": 2,
+      "x": 150
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 1440,
+      "checkpointEvery": 24
+    },
+    {
+      "op": "checkpoint",
+      "label": "end"
+    }
+  ]
+}

@@ -1,8 +1,7 @@
 import type { UnitView } from "../../../simport/view";
-import { visibleOccupants } from "../../../engine/Crowd";
 import { shade, type DrawCtx } from "../common";
 import { FLOOR } from "../../scale";
-import { personFigure, personSeated } from "../../pixelSprites/common";
+import { personFigure, personSeated, roomOccupants } from "../../pixelSprites/common";
 import { layerBreak, layerEnd } from "../../pixelSprites/layers";
 
 /**
@@ -39,7 +38,7 @@ function bloom(ctx: CanvasRenderingContext2D, x: number, y: number, c: string): 
  * handed. Integer coordinates throughout.
  *
  * Honest occupancy, the same contract the party hall keeps: figures fill in
- * order up to `visibleOccupants(u)`, so a hall with no wedding in it draws its
+ * order up to `roomOccupants(u)`, so a hall with no wedding in it draws its
  * chairs, arch and flower stand with nobody in them (#552). The couple fills
  * first, because one attendee at a wedding reads as the couple rather than as a
  * lone guest in an empty hall. The room's live attendance arrives through the
@@ -47,7 +46,7 @@ function bloom(ctx: CanvasRenderingContext2D, x: number, y: number, c: string): 
  */
 function drawWeddingNave(d: DrawCtx, u: UnitView, x: number, y: number, w: number, h: number) {
   const ctx = d.ctx;
-  const n = visibleOccupants(u);
+  const n = roomOccupants(u);
   let filled = 0;
   /** Draws the next figure only while the hall still has attendees to seat. */
   const takeSeat = (): boolean => (filled < n ? (filled++, true) : false);

@@ -1,5 +1,4 @@
 import type { UnitView } from "../../simport/view";
-import { visibleOccupants } from "../../engine/Crowd";
 import { isLateHour } from "../lateNight";
 import { PAL, SKIN, ceilingFixture, dado, geoVariant, maybeMirrored, personSeated, roomGlow, roomOccupants, shade, vacancy, windowView, type RoomCtx } from "./common";
 import { artRow, authoredWidth, screenLength } from "./artScale";
@@ -16,10 +15,10 @@ import { CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, SUITE_WALLS } f
  * warm-inside-cool-outside seam) over the shared primitives.
  *
  * Every look resolves from the room bake signature only (`u.state`, `d.lit`,
- * `u.width`, `u.occupants`, `u.outForMeal` via `visibleOccupants`, and the
+ * `u.width`, `u.occupants`, `u.outForMeal` via `roomOccupants`, and the
  * late-night flag from `d.hour` via `isLateHour`); none reads `d.anim`, so a
  * static room stays cacheable and repaints exactly when its look changes.
- * Seated occupants map one-to-one to `visibleOccupants(u)`, capped by the
+ * Seated occupants map one-to-one to `roomOccupants(u)`, capped by the
  * layout's seats and filled in seat order: no ghost people. Integer pixel
  * coordinates only.
  */
@@ -207,7 +206,7 @@ export function condo(d: RoomCtx, u: UnitView, x: number, y: number, w: number, 
   const { ctx } = d;
   if (u.state === "empty") return vacancy(ctx, x, y, w, h, vacancyLabel);
   // Residents are "up" only when home and not asleep in the small hours.
-  const home = visibleOccupants(u) > 0 && !isLateHour(d.hour);
+  const home = roomOccupants(u) > 0 && !isLateHour(d.hour);
   // Geo-seeded variety, geometry first: three true layouts (living, dining with a
   // kitchenette, a study), any of them mirrored, over warm plaster and maple. The
   // standing lamp appears in every layout so the home-glow signal survives.
@@ -266,7 +265,7 @@ export function condo(d: RoomCtx, u: UnitView, x: number, y: number, w: number, 
       fill(ctx, tx + 28, floorY - 13, 3, 9, "#5A3A2A");
       if (home) {
         personSeated(ctx, tx - 5, floorY - 1, (u.id * 5) | 0);
-        if (visibleOccupants(u) > 1) personSeated(ctx, tx + 27, floorY - 1, (u.id * 5 + 11) | 0);
+        if (roomOccupants(u) > 1) personSeated(ctx, tx + 27, floorY - 1, (u.id * 5 + 11) | 0);
       }
       bevelBox(ctx, x + w - 30, railY + 1, 10, floorY - railY - 1, "#8A6A4A"); // sideboard
       lamp(x + w - 12);
@@ -376,7 +375,7 @@ export function hotel(d: RoomCtx, u: UnitView, x: number, y: number, w: number, 
     fill(ctx, bx + 5, top + 1, pw, 3, "#FBF7EC"); // pillow
     fill(ctx, bx + 5, top + 1, pw, 1, "#FFFFFF");
     if (pillows > 1) fill(ctx, bx + 5, top + 5, 5, 2, "#FBF7EC");
-    if (asleep && sleeper < visibleOccupants(u)) {
+    if (asleep && sleeper < roomOccupants(u)) {
       fill(ctx, bx + Math.round(bw * 0.32), top + 3, Math.round(bw * 0.55), 6, PAL.hotelRed); // blanket
       fill(ctx, bx + 6, top + 1, 3, 3, SKIN[(u.id + sleeper) % SKIN.length]); // sleeper head
     } else if (soiled) {
@@ -458,7 +457,7 @@ export function hotel(d: RoomCtx, u: UnitView, x: number, y: number, w: number, 
     const fx = geoVariant(u, 31, 2) === 1 ? 1 : -1;
     drawRoach(ctx, x + w * 0.3, floorY - 8, 11, fx, 1, ROACH_AMBER);
   }
-  if (asleep && visibleOccupants(u) > 0) {
+  if (asleep && roomOccupants(u) > 0) {
     // The "z" is text, so it draws OUTSIDE the mirror wrapper at a computed
     // position (mirrored text would render backward), floating over the first
     // occupied bed. Its baseline stays exactly where it shipped (floorY - 10),

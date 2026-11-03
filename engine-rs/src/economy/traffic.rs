@@ -117,7 +117,7 @@ impl Simulation {
             let is_retail = kind.subtype_list().is_some() && spend.is_some_and(|s| s > 0.0);
             if is_retail {
                 let cust_per_hour = daily / (spend.unwrap() * open_h);
-                let tally = u.retail_mut();
+                let mut tally = u.extras_mut();
                 tally.patronage_today = Some(
                     tally.patronage_today.unwrap_or(0.0)
                         + cust_per_hour
@@ -132,7 +132,7 @@ impl Simulation {
                 let earned = u.pending_income.floor();
                 u.pending_income -= earned;
                 if is_retail {
-                    let tally = u.retail_mut();
+                    let mut tally = u.extras_mut();
                     tally.profit_today = Some(tally.profit_today.unwrap_or(0.0) + earned);
                 }
                 self.money += earned;

@@ -21,6 +21,7 @@
 import { chromium, type BrowserContext, type Page } from "playwright";
 import { AUTO_KEY, SLOT_KEYS, UNREADABLE_KEY, decodeStored, expectedRow, readSeeds, rowMatches, storedForm } from "../src/build/rollbackRehearsalStore.ts";
 import { diffSaves, judgeDiffs, type AllowedLoss, type DiffEntry } from "../src/build/rollbackRehearsal.ts";
+import { classifyLosses, isLoss, type ChurnMap } from "../src/build/rollbackRehearsalChurn.ts";
 
 const BOOT_TIMEOUT_MS = 60_000;
 /** The autosave timer ticks every 30 s from page load and skips ticks while the title screen is up, so a verify that plays allows two ticks. */
@@ -128,29 +129,22 @@ export interface VerifyReport {
   unreadableKept: boolean;
   /** The saves whose save stamp moved, so the running build rewrote them (empty when the verify only read). */
   rewrittenLabels: string[];
-  /** Top-level fields the running build dropped from a stored save it rewrote (empty when it wrote nothing): a loss, and a failure unless accepted. */
+  /** Losses the running build caused in a stored save it rewrote (empty when it wrote nothing): a failure unless the allowed-loss list accepts them. */
   rewritten: { label: string; unexplained: DiffEntry[]; explained: { entry: DiffEntry; allowed: AllowedLoss }[] }[];
   /**
-   * Nested fields that vanished and lists that came back shorter after the rewrite. Play alone causes these (the engine leaves default and
-   * empty fields out of a save), so they are for a person to read, not a failure; the engine layer is the field-by-field check.
+   * Losses that play alone explains (the engine leaves default and empty fields out of a save), for a person to read. With a churn record
+   * these are exactly the paths the candidate engine loses by playing the same save; without one, every nested loss lands here.
    */
   toReview: { label: string; entries: DiffEntry[] }[];
+  /** Whether a churn record was used: when it was not, only a dropped top-level field can fail the rewrite check. */
+  churnUsed: boolean;
   problems: string[];
 }
-
-/** A top-level key of the save, as opposed to a path inside a list or an object. */
-const isTopLevel = (d: DiffEntry): boolean => !d.path.includes(".") && !d.path.includes("[");
-
-/** A list that came back shorter is a loss too (`diffSaves` words it as a change at the list's path). */
-const shrank = (d: DiffEntry): boolean => {
-  const lengths = /: (\d+) -> (\d+)$/.exec(d.example);
-  return d.kind === "changed" && d.path.endsWith("[] length") && lengths !== null && Number(lengths[2]) < Number(lengths[1]);
-};
 
 /** Paths that play always moves, so they are never a loss. */
 const PLAY_PATHS = new Set(["minutes", "savedAt", "appVersion"]);
 
-export async function verifyProfile(opts: BrowserOptions & { savesDir: string; playSeconds: number; allowed: readonly AllowedLoss[]; expectSha: string }): Promise<VerifyReport> {
+export async function verifyProfile(opts: BrowserOptions & { savesDir: string; playSeconds: number; allowed: readonly AllowedLoss[]; expectSha: string; churn?: ChurnMap | undefined }): Promise<VerifyReport> {
   const seeds = readSeeds(opts.savesDir);
   if (seeds.length === 0) throw new Error(`${opts.savesDir} holds no .json saves; run the engine step first`);
   const problems: string[] = [];
@@ -221,16 +215,19 @@ export async function verifyProfile(opts: BrowserOptions & { savesDir: string; p
         continue;
       }
       if (now.savedAt !== seedStamps.get(s.key)) rewrittenLabels.push(s.label);
-      const all = diffSaves(s.save, now).filter((d) => (d.kind === "dropped" || shrank(d)) && !PLAY_PATHS.has(d.path));
-      const nested = all.filter((d) => !(d.kind === "dropped" && isTopLevel(d)));
-      if (nested.length > 0) toReview.push({ label: s.label, entries: nested });
-      const judged = judgeDiffs(all.filter((d) => d.kind === "dropped" && isTopLevel(d)), opts.allowed);
+      const losses = diffSaves(s.save, now).filter((d) => isLoss(d) && !PLAY_PATHS.has(d.path));
+      const churnName = s.name.replace(/\.json$/, "");
+      const counts = opts.churn?.[churnName];
+      if (opts.churn && !counts) problems.push(`${s.label}: the churn record has no entry for ${churnName}; run the engine step again so churn.json matches this saves folder`);
+      const { failing, review } = classifyLosses(losses, opts.churn ? (counts ?? {}) : undefined);
+      if (review.length > 0) toReview.push({ label: s.label, entries: review });
+      const judged = judgeDiffs(failing, opts.allowed);
       if (judged.unexplained.length + judged.explained.length > 0) rewritten.push({ label: s.label, unexplained: judged.unexplained, explained: judged.explained });
       for (const e of judged.unexplained) problems.push(`${s.label}: the running build dropped \`${e.path}\` (${e.count}), first at ${e.example}`);
     }
     if (opts.playSeconds > 0 && !voidRun && !rewrittenLabels.includes("Auto-save")) problems.push("the build played but did not rewrite the autosave, so the data-loss check did not run on it; play longer or check the autosave");
     if (stored.kept) problems.push("the page moved an autosave to the unreadable slot: the running build could not read it");
-    return { ok: problems.length === 0, origin: opts.origin, build: first.build, engine: first.state.engine, failure: first.state.failure, rows, unreadableKept: stored.kept, rewrittenLabels, rewritten, toReview, problems };
+    return { ok: problems.length === 0, origin: opts.origin, build: first.build, engine: first.state.engine, failure: first.state.failure, rows, unreadableKept: stored.kept, rewrittenLabels, rewritten, toReview, churnUsed: opts.churn !== undefined, problems };
   } finally {
     await context.close();
   }

@@ -363,17 +363,21 @@ fn the_notice_counts_down_and_never_goes_negative() {
     let now = sim.clock.minutes;
     {
         let u = sim.tower.get_unit_mut(id).unwrap();
-        u.vacate_reason = Some("rent");
-        u.vacate_at = Some(now + 90.0);
+        u.extras_mut().vacate_reason = Some("rent");
+        u.extras_mut().vacate_at = Some(now + 90.0);
     }
     let n = facts(&mut sim, id).notice.unwrap();
     assert_eq!(
         (n.reason, n.minutes_left, n.satisfaction, n.keep_at),
         ("rent", 90.0, 0.2, 0.4)
     );
-    sim.tower.get_unit_mut(id).unwrap().vacate_at = Some(now - 5.0);
+    sim.tower.get_unit_mut(id).unwrap().extras_mut().vacate_at = Some(now - 5.0);
     assert_eq!(facts(&mut sim, id).notice.unwrap().minutes_left, 0.0);
-    sim.tower.get_unit_mut(id).unwrap().vacate_reason = None;
+    sim.tower
+        .get_unit_mut(id)
+        .unwrap()
+        .extras_mut()
+        .vacate_reason = None;
     assert_eq!(facts(&mut sim, id).notice, None, "no reason, no block");
 }
 

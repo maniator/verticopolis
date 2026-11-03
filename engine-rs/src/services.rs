@@ -336,7 +336,7 @@ impl Simulation {
             u.set_state(at, UnitState::Empty);
             u.satisfaction = 1.0;
             u.set_occupants(at, 0);
-            u.dirty_days = None;
+            u.extras_mut().dirty_days = None;
             cleared += 1;
         }
         if cleared > 0 {

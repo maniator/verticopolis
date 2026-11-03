@@ -269,7 +269,7 @@ impl Simulation {
         // Retail policy stays in Rust. Score the Modern catalog's average
         // good day even in Classic, never Classic's higher sellout ceiling.
         let unit = self.tower.get_unit(id)?;
-        let tally = unit.retail();
+        let tally = unit.extras();
         let retail = (
             unit.kind,
             unit.is_operational(),
