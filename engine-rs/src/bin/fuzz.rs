@@ -374,9 +374,24 @@ fn main() {
                         }
                     }
                     // There may be no choice pending, or the tower may not afford
-                    // the accept. The scenario has no refusal form for it, so the
-                    // command is dropped with the prefix still valid.
-                    "resolveChoice" => eprintln!("seed {seed}: dropped {op} ({what})"),
+                    // the accept. The scenario has no refusal form for it, so a
+                    // choice the tower cannot pay for is answered with a decline
+                    // instead, and anything else is dropped with the prefix still
+                    // valid.
+                    "resolveChoice" => {
+                        let mut declined = cmd.clone();
+                        declined["accept"] = json!(false);
+                        let unaffordable = cmd["accept"] == true && what.contains("cannot pay");
+                        if unaffordable {
+                            trial.pop();
+                            trial.push(declined.clone());
+                        }
+                        if unaffordable && run(&trial).error.is_none() {
+                            kept_one(&mut commands, declined);
+                        } else {
+                            eprintln!("seed {seed}: dropped {op} ({what})");
+                        }
+                    }
                     // tick, reload, bombThreat, evaluateStar cannot legitimately refuse:
                     // a failure here is the engine's own. The failing scenario is
                     // written before the panic so the artifact carries it.
