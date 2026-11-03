@@ -319,7 +319,7 @@ and font rasterization may differ from the pinned image. See
 
 The gallery and the Playwright visual baselines are both the Rust engine's
 (#1353), one set of images each. The gallery generator hosts the tower on the
-WASM engine (`VC_SHOT_ENGINE=ts` is refused), and it needs the engine package (`npm run wasm:build`). The
+WASM engine, and it needs the engine package (`npm run wasm:build`). The
 baselines are minted and compared on the `chromium-serial` project, in `npm run
 e2e` and in `update-visual-baselines`.
 

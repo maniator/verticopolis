@@ -42,7 +42,7 @@ import { COUNTED_FIELDS, VIEW_FIELDS } from "../engine/tower/rooms";
  * that follows; a scene that writes a counted field after the HUD has read,
  * with no placement after it, bumps `tower.revision` so the next read counts
  * the rooms again (the stats-tenancy-classic scene in
- * `scripts/scenes/features.ts`, as `e2e/regions.spec.ts` does for its fire).
+ * `scripts/scenes/features.ts`).
  */
 
 const FIELD = [...COUNTED_FIELDS, ...VIEW_FIELDS].join("|");

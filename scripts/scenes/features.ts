@@ -211,8 +211,7 @@ export const FEATURE_SCENES: Scene[] = [
               if (i < 2) u.noRate = true;
             }
             // The writes above mark no room, so a new revision makes the HUD
-            // and the report count the rooms again (as e2e/regions.spec.ts
-            // does after its staged fire).
+            // and the report count the rooms again.
             g.sim.tower.revision++;
           });
           await page.evaluate(() => document.getElementById("btn-stats")?.click());

@@ -272,7 +272,7 @@ export const SHOWCASE_SCENES: Scene[] = [
             g.speed = 0;
             g.engine.setCamera(Math.floor(g.grid.width / 2), 2, 1.7);
           });
-          // 08:30, moved on the engine too on the WASM leg.
+          // 08:30, moved on the engine too.
           await page.evaluate(pgSetClock, 8.5);
         },
         wait: 1200,

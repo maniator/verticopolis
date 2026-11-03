@@ -1,6 +1,6 @@
 /**
  * The engine the gallery renders on (story-engine-test-parity AC3), and the
- * settle points that make the two engines render the same scenes (#899).
+ * settle points that make a scene build and its shots repeatable (#899).
  *
  * The committed gallery is the Rust engine's (#1353): every game scene renders
  * with the WASM engine hosting the tower. The game boots on it with no
@@ -10,25 +10,22 @@
  * On the Rust engine `game.sim` is a copy of the engine's save
  * (src/game/toolingSim.ts): scene builders build in place (a fresh
  * `Simulation` swapped into `game.sim`, `tower.place`, unit state writes), and
- * the copy hands what they did to the engine as a restore of its save. Both
- * legs also go through the app's load path (`adoptSim`) at the settle points
- * below, so the two engines load the same tower there. A load is not a no-op: it prices
- * an unpriced Classic room on its ladder, adopts the milestones the tower
- * already meets, and starts the crowd, the boarding tally and the housekeeping
- * report empty. So both legs load at the same points: before a builder's
- * ticks (`__vcShotHandoff`), once a game scene is ready (after its build, if
- * it has one, unless the builder already settled), and after the setups
- * listed in SETTLE_AFTER_SETUP. Before a build or a listed setup the WASM leg
- * hands on any pending edit (`beginSettleStep`), so the step edits the
- * engine's current tower.
+ * the copy hands what they did to the engine as a restore of its save. The
+ * scenes also go through the app's load path (`adoptSim`) at the settle points
+ * below. A load is not a no-op: it prices an unpriced Classic room on its
+ * ladder, adopts the milestones the tower already meets, and starts the crowd,
+ * the boarding tally and the housekeeping report empty. So the tower loads at
+ * fixed points: before a builder's ticks (`__vcShotHandoff`), once a game
+ * scene is ready (after its build, if it has one, unless the builder already
+ * settled), and after the setups listed in SETTLE_AFTER_SETUP. Before a build
+ * or a listed setup `beginSettleStep` hands on any pending edit, so the step
+ * edits the engine's current tower.
  *
  * Each settle carries the loop's pass memos and the elevator telemetry
- * across, so the owed passes and a builder's authored demand curve survive on
- * both legs alike. On the WASM leg both come from the engine, and the copy
- * hands both back with its edits.
+ * across, from the engine, and the copy hands both back with its edits.
  *
- * Everywhere else the WASM leg checks that what a clock pin or a setup
- * changed reached the engine (see SETTLE_AFTER_SETUP for what that covers).
+ * Everywhere else the scene checks that what a clock pin or a setup changed
+ * reached the engine (see SETTLE_AFTER_SETUP for what that covers).
  *
  * Keep this file ERASABLE (no enums / namespaces / parameter properties). The
  * `pg*` functions are BROWSER-INJECTED: self-contained, no module-scope refs.
@@ -38,35 +35,21 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export type ShotEngine = "wasm"; // "ts" is refused by resolveShotEngine
-
-/** Read the engine switch; unset is the Rust engine. A typo fails the run
- *  instead of silently rendering one engine under the other's label. */
-export function resolveShotEngine(raw: string | undefined): ShotEngine {
-  const v = (raw ?? "").trim();
-  if (v === "" || v === "wasm") return "wasm";
-  if (v === "ts") throw new Error('VC_SHOT_ENGINE="ts" is gone: the game always runs on the Rust engine, so there is no TypeScript render to look at.');
-  throw new Error(`VC_SHOT_ENGINE="${raw}" is not an engine; use "wasm" (the default).`);
-}
-
-export const SHOT_ENGINE: ShotEngine = resolveShotEngine(process.env.VC_SHOT_ENGINE);
-
 /** The Rust render needs the engine package in the build this script serves.
  *  Say so up front instead of timing out on every game scene. A run against an
  *  already-served BASE_URL builds nothing here, so it is not checked. */
 export function assertEnginePackage(): void {
-  if (SHOT_ENGINE !== "wasm" || process.env.BASE_URL) return;
+  if (process.env.BASE_URL) return;
   if (existsSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "src", "public", "engine", "BUILD.json"))) return;
-  throw new Error("VC_SHOT_ENGINE is the Rust engine (the default), but src/public/engine/ has no engine package: run `npm run wasm:build`.");
+  throw new Error("The gallery renders on the Rust engine, but src/public/engine/ has no engine package: run `npm run wasm:build`.");
 }
 
 /** The shots whose setup edits the tower in place (a unit's state or
- *  occupancy, a fire, a placed room), as "scene/shot". On the WASM leg such an
- *  edit reaches the engine as a load of the copy's save, which the TypeScript
- *  leg does not make, so both legs settle after these setups and load at the
- *  same point; the WASM leg hands on any pending edit first, so the setup
- *  edits the engine's current tower. A setup missing from the list shows up
- *  as a pixel difference between the legs. */
+ *  occupancy, a fire, a placed room), as "scene/shot". Such an edit reaches the
+ *  engine as a load of the copy's save, so the scene settles after these setups
+ *  and loads at a fixed point; `beginSettleStep` hands on any pending edit
+ *  first, so the setup edits the engine's current tower. A setup missing from
+ *  the list is caught by the hosted check, which finds the edit unfollowed. */
 export const SETTLE_AFTER_SETUP: ReadonlySet<string> = new Set<string>([
   // Builds the demo tower in place on the live instance.
   "engine/11-game-tower",
@@ -105,24 +88,24 @@ export function shotShape(v: any): any {
  *  call before they tick. */
 export async function installShotHelpers(page: Page): Promise<void> {
   await page.addInitScript(`window.__vcShotShape = ${shotShape.toString()};`);
-  await page.addInitScript(`window.__vcShotHandoff = () => (${pgSettle.toString()})(${JSON.stringify(SHOT_ENGINE)});`);
+  await page.addInitScript(`window.__vcShotHandoff = () => (${pgSettle.toString()})();`);
 }
 
-/** Settle the tower on both legs (see the header) and fail the scene if the
- *  WASM leg does not end up hosted. A title screen still up skips the settle on
- *  both legs alike where `allowSkip` says a skip is harmless (a scene build on
- *  a title-screen scene); a listed setup must settle. */
+/** Settle the tower (see the header) and fail the scene if it does not end up
+ *  hosted. A title screen still up skips the settle where `allowSkip` says a
+ *  skip is harmless (a scene build on a title-screen scene); a listed setup
+ *  must settle. */
 async function settleTower(page: Page, where: string, allowSkip: boolean): Promise<void> {
-  const state = await page.evaluate(pgSettle, SHOT_ENGINE);
-  if (!state.startsWith("settled") && !(allowSkip && state.startsWith("skipped"))) throw new Error(`${SHOT_ENGINE === "wasm" ? "WASM" : "TypeScript"} leg: could not settle ${where} (${state})`);
+  const state = await page.evaluate(pgSettle);
+  if (!state.startsWith("settled") && !(allowSkip && state.startsWith("skipped"))) throw new Error(`could not settle ${where} (${state})`);
   await expectHosted(page, where);
 }
 
 /** After a scene build or a listed setup: settle, unless the code it ran
  *  already settled before its ticks (`__vcShotHandoff`, which a builder calls).
- *  A second load would drop the crowd and the live counters those ticks grew,
- *  on both legs. In that case the WASM leg checks instead that what changed
- *  since that settle reached the engine. */
+ *  A second load would drop the crowd and the live counters those ticks grew.
+ *  In that case the scene checks instead that what changed since that settle
+ *  reached the engine. */
 export async function settleUnlessSettled(page: Page, where: string, allowSkip: boolean): Promise<void> {
   const shape = await page.evaluate(() => {
     const w = window as unknown as { __vcShotSettled?: boolean; __vcShotSettledShape?: string };
@@ -130,20 +113,19 @@ export async function settleUnlessSettled(page: Page, where: string, allowSkip: 
   });
   if (shape === null) return settleTower(page, where, allowSkip);
   await expectHosted(page, where);
-  await checkHosted(page, where, SHOT_ENGINE === "wasm" ? shape : null, HOSTED_FIX.settled);
+  await checkHosted(page, where, shape, HOSTED_FIX.settled);
 }
 
-/** Before a scene build or a listed setup, on both legs: forget any earlier
- *  settle, so `settleUnlessSettled` sees only one the step itself makes, and on
- *  the WASM leg hand any pending edit of `game.sim` to the engine, so a step
+/** Before a scene build or a listed setup: forget any earlier settle, so
+ *  `settleUnlessSettled` sees only one the step itself makes, and hand any
+ *  pending edit of `game.sim` to the engine, so a step
  *  that edits the tower and then settles starts from the engine's current
  *  tower. Fails the scene when the engine does not hold the tower or the hand
  *  on throws. */
 export async function beginSettleStep(page: Page, where: string): Promise<void> {
-  const state = await page.evaluate((wasm) => {
+  const state = await page.evaluate(() => {
     const w = window as unknown as { __vcEngine?: any; __vcShotSettled?: boolean };
     w.__vcShotSettled = false;
-    if (!wasm) return "synced";
     const vc = w.__vcEngine;
     if (!vc) return "no engine host (did the engine package load?)";
     const g = (window as unknown as { game?: any }).game;
@@ -155,22 +137,20 @@ export async function beginSettleStep(page: Page, where: string): Promise<void> 
       return `the hand on threw: ${e instanceof Error ? e.message : String(e)}`;
     }
     return "synced";
-  }, SHOT_ENGINE === "wasm");
-  if (state !== "synced") throw new Error(`WASM leg: could not hand the edits on ${where} (${state})`);
+  });
+  if (state !== "synced") throw new Error(`could not hand the edits on ${where} (${state})`);
 }
 
-/** WASM leg only: the app's engine is the Rust engine. Catches a leg that
- *  silently rendered on the TypeScript engine (the engine package never
- *  loaded, or boot left the stored tower on TypeScript). */
+/** The app's engine is the Rust engine and it holds the tower. Catches a scene
+ *  that rendered without it (the engine package never loaded). */
 async function expectHosted(page: Page, where: string): Promise<void> {
-  if (SHOT_ENGINE !== "wasm") return;
   const hosted = await page.evaluate(() => {
     const w = window as unknown as { game?: any; __vcEngine?: any };
     if (!w.__vcEngine) return "no engine host (did the engine package load?)";
     if (!w.__vcEngine.status?.hosted) return "the engine does not hold the tower";
     return w.game?.enginePort === w.__vcEngine.port ? "hosted" : "the app does not run on the Rust engine";
   });
-  if (hosted !== "hosted") throw new Error(`WASM leg: the tower is not on the engine ${where} (${hosted})`);
+  if (hosted !== "hosted") throw new Error(`the tower is not on the engine ${where} (${hosted})`);
 }
 
 /** Fail the run when a SETTLE_AFTER_SETUP entry names no shot, or a shot
@@ -182,20 +162,17 @@ export function checkSettleList(scenes: readonly { id: string; shots: readonly {
   if (stale.length > 0) throw new Error(`SETTLE_AFTER_SETUP names no shot with a setup: ${stale.join(", ")}`);
 }
 
-/** WASM leg only: the page's view of the tower before a clock pin or a
- *  setup, for `checkHosted` to compare against. Null on the TypeScript leg. */
-export async function hostedSnapshot(page: Page): Promise<string | null> {
-  if (SHOT_ENGINE !== "wasm") return null;
+/** The page's view of the tower before a clock pin or a setup, for
+ *  `checkHosted` to compare against. */
+export async function hostedSnapshot(page: Page): Promise<string> {
   return page.evaluate(pgOwnShape);
 }
 
-/** WASM leg only: fail the scene if a clock pin or a setup changed the page's
- *  tower in a way the engine did not follow. Only what changed since `before`
- *  is compared. A no-op on the TypeScript leg. */
-export async function checkHosted(page: Page, where: string, before: string | null, fix: string): Promise<void> {
-  if (SHOT_ENGINE !== "wasm" || before === null) return;
+/** Fail the scene if a clock pin or a setup changed the page's tower in a way
+ *  the engine did not follow. Only what changed since `before` is compared. */
+export async function checkHosted(page: Page, where: string, before: string, fix: string): Promise<void> {
   const state = await page.evaluate(pgCheckHosted, before);
-  if (state !== "hosted") throw new Error(`WASM leg: the tower is not on the engine ${where} (${state}); ${fix}`);
+  if (state !== "hosted") throw new Error(`the tower is not on the engine ${where} (${state}); ${fix}`);
 }
 
 /** What to change when `checkHosted` fails, by where it ran. */
@@ -205,7 +182,7 @@ export const HOSTED_FIX = {
   settled: "code that ran after a builder's __vcShotHandoff edited the tower in a way the engine did not follow: move that edit before the handoff",
 } as const;
 
-/** In-page: the page's tower (`game.sim`, on the WASM leg the copy) in the
+/** In-page: the page's tower (`game.sim`, the copy of the engine's save) in the
  *  shared shape, as JSON. */
 export function pgOwnShape(): string {
   const w = window as unknown as { game?: any; __vcShotShape?: (v: any) => any };
@@ -214,7 +191,7 @@ export function pgOwnShape(): string {
   return JSON.stringify(w.__vcShotShape(sim.serialize()));
 }
 
-/** In-page, WASM leg: compare what changed on the page since `before` with
+/** In-page: compare what changed on the page since `before` with
  *  the engine's own save, in the shared shape. Returns "hosted", or what the
  *  engine did not follow. */
 export function pgCheckHosted(before: string): string {
@@ -260,28 +237,24 @@ export function pgCheckHosted(before: string): string {
 }
 
 /**
- * In-page, both legs: settle the live tower through the app's load path. The
- * page's save is deserialized and adopted with `adoptSim` (undo-restore
- * flavor, so the camera and history stay); on the WASM leg the engine loads
- * it. What a load resets and the TypeScript leg would otherwise keep is
- * carried over on both legs: the loop's pass memos (from the engine on the
- * WASM leg) and the elevator telemetry. What
- * `adoptSim` resets in the app is put back (speed, pause, the star and win
+ * In-page: settle the live tower through the app's load path. The page's save
+ * is deserialized and adopted with `adoptSim` (undo-restore flavor, so the
+ * camera and history stay) and the engine loads it. What a load resets is
+ * carried over from the engine: the loop's pass memos and the elevator
+ * telemetry. What `adoptSim` resets in the app is put back (speed, pause, the star and win
  * latches, the step accumulator, the meal-rush day, the log cursor and
  * panel, the selection). Skips while the title screen is up, since
  * `adoptSim` would dismiss it.
  * Returns "settled", "skipped: ...", or why it failed.
  */
-export function pgSettle(leg: "ts" | "wasm"): string {
+export function pgSettle(): string {
   const run = (): string => {
     const w = window as unknown as { game?: any; __vcEngine?: any; __vcShotSettled?: boolean; __vcShotSettledShape?: string; __vcShotShape?: (v: any) => any };
     const g = w.game;
-    // The leg is handed in, so a WASM leg whose engine never loaded fails here
-    // instead of settling as the TypeScript leg does.
-    const vc = leg === "wasm" ? w.__vcEngine : null;
+    const vc = w.__vcEngine;
     if (!g?.sim) return "no game";
-    if (leg === "wasm" && !vc) return "no engine host (did the engine package load?)";
-    if (leg === "wasm" && g.enginePort !== vc.port) return "the app does not run on the Rust engine";
+    if (!vc) return "no engine host (did the engine package load?)";
+    if (g.enginePort !== vc.port) return "the app does not run on the Rust engine";
     if (typeof w.__vcShotShape !== "function") return "the shared shape is not installed (installShotHelpers did not run on this page)";
     const shapeOf = w.__vcShotShape;
     // Only a title screen still in the page counts: the runner's splash
@@ -292,7 +265,7 @@ export function pgSettle(leg: "ts" | "wasm"): string {
     if (document.getElementById("splash")) return "skipped: the title screen is up";
     const sim = g.sim;
     const Sim = sim.constructor;
-    const engineBefore = vc ? vc.port : null;
+    const engineBefore = vc.port;
     // The instance's telemetry in the engine's document shape (see
     // src/wasmhost/telemetry.ts; restated here, as injected code cannot import).
     const telemetryOf = (s: any) => ({
@@ -304,8 +277,8 @@ export function pgSettle(leg: "ts" | "wasm"): string {
     // writes a whole float as 0.0 and its keys in its own order.
     const canonOf = (v: unknown) =>
       JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
-    const telemetry = engineBefore ? JSON.parse(engineBefore.elevatorTelemetry()) : telemetryOf(sim);
-    const memos: number[] = engineBefore ? [...engineBefore.loopMemos()] : [sim.lastHour, sim.lastDay, sim.lastMonth, sim.lastQuarter];
+    const telemetry = JSON.parse(engineBefore.elevatorTelemetry());
+    const memos: number[] = [...engineBefore.loopMemos()];
     const own = sim.serialize();
     const keep = {
       speed: g.speed,
@@ -324,8 +297,8 @@ export function pgSettle(leg: "ts" | "wasm"): string {
     // A load restarts the log cursor; keep the live one, before the engine
     // loads the tower.
     fresh.logSeq = keep.logSeq;
-    // Both legs carry the memos and the telemetry on the instance; on the
-    // WASM leg `adoptSim` seeds them into the engine after the load.
+    // The memos and the telemetry ride on the instance; `adoptSim` seeds them
+    // into the engine after the load.
     [fresh.lastHour, fresh.lastDay, fresh.lastMonth, fresh.lastQuarter] = memos;
     const adopt = (store: Map<number, unknown>, entries: [number, unknown][]) => {
       store.clear();
@@ -360,21 +333,14 @@ export function pgSettle(leg: "ts" | "wasm"): string {
       g.refreshEditor?.();
     }
     if (refused) return refused;
-    if (vc) {
-      if (canonOf(JSON.parse(vc.port.elevatorTelemetry())) !== canonOf(telemetry)) return "the engine's elevator telemetry differs from the one handed to it";
-      if (JSON.stringify([...vc.port.loopMemos()]) !== JSON.stringify(memos)) return "the engine's loop memos differ from the ones handed to it";
-    }
-    // The page holds the carried telemetry, on both legs: the TypeScript leg
-    // keeps it on the instance, and on the WASM leg a fresh copy reads it
-    // back from the engine, so this also checks that the copy decodes the
-    // seeded document.
+    if (canonOf(JSON.parse(vc.port.elevatorTelemetry())) !== canonOf(telemetry)) return "the engine's elevator telemetry differs from the one handed to it";
+    if (JSON.stringify([...vc.port.loopMemos()]) !== JSON.stringify(memos)) return "the engine's loop memos differ from the ones handed to it";
+    // The page holds the carried telemetry: a fresh copy reads it back from the
+    // engine, so this also checks that the copy decodes the seeded document.
     if (canonOf(telemetryOf(g.sim)) !== canonOf(telemetry)) return "the page's elevator telemetry differs from the one carried over";
-    // The TypeScript leg holds the memos on the instance; the WASM leg's
-    // live memos are the engine's, checked above.
-    if (!vc && JSON.stringify([g.sim.lastHour, g.sim.lastDay, g.sim.lastMonth, g.sim.lastQuarter]) !== JSON.stringify(memos)) return "the page's loop memos differ from the ones carried over";
     const settled = JSON.stringify(shapeOf(g.sim.serialize()));
     // The engine loaded the same tower the page did.
-    if (vc && JSON.stringify(shapeOf(JSON.parse(vc.port.serialize()))) !== settled) return "the engine's tower differs from the one handed to it";
+    if (JSON.stringify(shapeOf(JSON.parse(vc.port.serialize()))) !== settled) return "the engine's tower differs from the one handed to it";
     w.__vcShotSettled = true;
     w.__vcShotSettledShape = settled;
     return "settled";

@@ -194,9 +194,9 @@ export function buildStatsTower(): void {
   }
   // Run a simulated quarter so incomeBreakdown()/elevator loads have data.
   s.evaluateStar();
-  // The gallery settles the tower here on both legs (scripts/screenshot-engine.ts):
-  // a load, so the WASM leg's engine runs the ticks and grows its own crowd (a
-  // save carries none) and the TypeScript leg starts from the same load.
+  // The gallery settles the tower here (scripts/screenshot-engine.ts): a
+  // load, so the engine runs the ticks and grows its own crowd (a save
+  // carries none).
   // Unset outside the gallery, where nothing changes.
   const handoff = (window as unknown as { __vcShotHandoff?: () => string }).__vcShotHandoff;
   if (handoff) {
@@ -320,9 +320,9 @@ export function buildOverlayTower(): void {
   // every run, then FREEZE so the capture is byte-stable.
   const c = s.clock;
   c.minutes = c.minutes - c.minuteOfDay + 8 * 60;
-  // The gallery settles the tower here on both legs (scripts/screenshot-engine.ts):
-  // a load, so the WASM leg's engine runs the ticks and grows its own crowd (a
-  // save carries none) and the TypeScript leg starts from the same load.
+  // The gallery settles the tower here (scripts/screenshot-engine.ts): a
+  // load, so the engine runs the ticks and grows its own crowd (a save
+  // carries none).
   // Unset outside the gallery, where nothing changes.
   const handoff = (window as unknown as { __vcShotHandoff?: () => string }).__vcShotHandoff;
   if (handoff) {
