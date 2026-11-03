@@ -17,6 +17,11 @@ pub struct Memo {
     pub cols: Option<(i64, HashMap<i64, Vec<(i64, i64)>>)>,
     pub tiles: Option<(crate::tower_index::IndexKey, crate::tower_index::FloorTiles)>,
     pub bounds: Option<(crate::tower_index::IndexKey, (i64, i64))>,
+    /// Each floor's built extent for the overlays, per revision (#1237).
+    pub floor_extents: Option<(
+        crate::tower_index::IndexKey,
+        std::sync::Arc<[(i64, i64, i64)]>,
+    )>,
     pub metro_floor: Option<(crate::tower_index::IndexKey, Option<i64>)>,
     pub rooms: Option<(crate::tower_index::IndexKey, std::sync::Arc<[usize]>)>,
     pub census: Option<(

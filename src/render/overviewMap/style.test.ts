@@ -24,7 +24,7 @@ describe("overview map style table", () => {
     expect(Object.keys(KIND_GROUP).sort()).toEqual([...KINDS].sort());
   });
 
-  it("gives every group a Modern pattern and every shaft group a Classic line color", () => {
+  it("gives every group a Modern pattern and every elevator group a Classic line color", () => {
     expect(Object.keys(GROUP_PATTERN).sort()).toEqual([...GROUPS].sort());
     // KIND_GROUP is the source of truth for which groups exist: the groups kinds use are exactly the groups with a pattern.
     expect([...new Set(Object.values(KIND_GROUP))].sort()).toEqual([...GROUPS].sort());
