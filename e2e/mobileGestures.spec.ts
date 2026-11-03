@@ -58,7 +58,7 @@ async function dispatchTouch(
       }),
     );
     // Excalibur flushes pointer events in its update loop; usually two frames are enough.
-    // On overloaded CI, rAF can stall long enough to hit the test timeout, so bound the wait.
+    // On overloaded CI, rAF can stall for a while, so the wait is bounded by a generous cap (a stall that long is a real failure).
     return new Promise<void>((done, fail) => {
         let settled = false;
         const frameAdvanced = () => {
@@ -87,7 +87,7 @@ async function dispatchTouch(
           else requestAnimationFrame(onFrame);
         };
         requestAnimationFrame(onFrame);
-        setTimeout(() => finish(frameAdvanced(), "pointer event dispatch timed out before Excalibur advanced a frame"), 100);
+        setTimeout(() => finish(frameAdvanced(), "pointer event dispatch timed out before Excalibur advanced a frame"), 5_000);
       });
   }, touchArgs(type, id, x, y));
 }

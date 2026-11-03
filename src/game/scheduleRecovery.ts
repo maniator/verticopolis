@@ -130,23 +130,43 @@ function canonicalKey(key: string): string | null {
   return null;
 }
 
-function canonicalize(entries: Record<string, Decision>): Record<string, Decision> {
-  const migrated: Record<string, Decision> = {};
+const isDecision = (value: unknown): value is Decision => value === "kept" || value === "told";
+
+/** The player's choice to keep a schedule outranks the one-time notice flag, so when two answers meet for one shaft
+ *  (a legacy key and its canonical form, or a notice written after a Keep) the kept one stays. */
+const strongerDecision = (a: Decision | undefined, b: Decision): Decision => (a === "kept" || b === "kept" ? "kept" : b);
+
+/** Rewrites the known legacy shaft keys to their canonical form, at the position of the first entry for that shaft.
+ *  Every other entry stays where and as it is: this slot is the game's own, but a newer build or another tab may
+ *  write shapes this one does not know, and an upgrade must not erase what it cannot read. (The slot is still
+ *  capped, so the oldest entries go first once it is full.) */
+function canonicalize(entries: Record<string, unknown>): Record<string, unknown> {
+  // The canonical key a decision entry belongs under, or null when the entry is left as it is. A legacy key never
+  // overwrites a canonical key that holds something this build cannot read.
+  const target = (key: string, value: unknown): string | null => {
+    if (!isDecision(value)) return null;
+    const canonical = canonicalKey(key);
+    if (canonical === null) return null;
+    if (canonical !== key && Object.prototype.hasOwnProperty.call(entries, canonical) && !isDecision(entries[canonical])) return null;
+    return canonical;
+  };
+  const merged = new Map<string, Decision>();
   for (const [key, value] of Object.entries(entries)) {
-    if (value !== "kept" && value !== "told") continue;
-    const next = canonicalKey(key);
-    if (next !== null) {
-      // A canonical key can have several legacy-span variants in the browser store. The
-      // last entry wins so the newest decision survives an upgrade or a later saved edit.
-      migrated[next] = value;
-      continue;
-    }
-    // A shaft key from the game has a compact canonical form or the known legacy shape with a bottom-floor suffix.
-    // Other browser keys are ordinary values and should stay intact, while malformed shaft-looking strings are dropped.
-    if (key.includes(":") && key.split(":").length >= 5) continue;
-    migrated[key] = value;
+    const canonical = target(key, value);
+    if (canonical !== null) merged.set(canonical, strongerDecision(merged.get(canonical), value as Decision));
   }
-  return migrated;
+  const out: [string, unknown][] = [];
+  const placed = new Set<string>();
+  for (const [key, value] of Object.entries(entries)) {
+    const canonical = target(key, value);
+    if (canonical === null) {
+      out.push([key, value]);
+    } else if (!placed.has(canonical)) {
+      placed.add(canonical);
+      out.push([canonical, merged.get(canonical)]);
+    }
+  }
+  return Object.fromEntries(out); // not indexed assignment, so a stored "__proto__" entry survives as an own key
 }
 
 /** The decisions as the browser keeps them. Storage can be blocked or full; every read and write is best effort.
@@ -154,10 +174,10 @@ function canonicalize(entries: Record<string, Decision>): Record<string, Decisio
  *  one-time notice does not come back; only a reload forgets it. */
 export function browserAcknowledgements(storage: Pick<Storage, "getItem" | "setItem"> | undefined = safeStorage()): Acknowledgements {
   const unsaved = new Map<string, Decision>();
-  const read = (): Record<string, Decision> => {
+  const read = (): Record<string, unknown> => {
     try {
       const raw = JSON.parse(storage?.getItem(STORE_KEY) ?? "{}") as unknown;
-      const base = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, Decision>) : {};
+      const base = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
       const migrated = canonicalize(base);
       if (JSON.stringify(base) !== JSON.stringify(migrated)) {
         try {
@@ -171,22 +191,31 @@ export function browserAcknowledgements(storage: Pick<Storage, "getItem" | "setI
       return {};
     }
   };
+  // What is held for a shaft: a Keep outranks the notice, and an answer storage refused counts like one it took.
+  const held = (canonical: string, stored: Record<string, unknown>): Decision | undefined => {
+    const kept = stored[canonical];
+    const fromStorage = isDecision(kept) ? kept : undefined;
+    const fromMemory = unsaved.get(canonical);
+    return fromMemory !== undefined && fromStorage !== undefined ? strongerDecision(fromMemory, fromStorage) : (fromMemory ?? fromStorage);
+  };
   return {
     get: (key) => {
       const canonical = canonicalKey(key) ?? key;
-      const v = unsaved.get(canonical) ?? read()[canonical]; // a newer answer storage refused beats an older one it took
-      return v === "kept" || v === "told" ? v : undefined;
+      return held(canonical, read());
     },
     set: (key, decision) => {
       const canonical = canonicalKey(key) ?? key;
+      const stored = read();
+      // The one-time notice never overwrites a Keep: the notice can go out after the player has already decided.
+      const answer = strongerDecision(held(canonical, stored), decision);
       // The key goes last, so the oldest entries are the ones trimmed.
-      const others = Object.entries(read()).filter(([k]) => k !== canonical);
-      const all = Object.fromEntries([...others, [canonical, decision]].slice(-MAX_REMEMBERED));
+      const others = Object.entries(stored).filter(([k]) => k !== canonical);
+      const all = Object.fromEntries([...others, [canonical, answer]].slice(-MAX_REMEMBERED));
       try {
         storage?.setItem(STORE_KEY, JSON.stringify(all));
         unsaved.delete(canonical);
       } catch {
-        unsaved.set(canonical, decision);
+        unsaved.set(canonical, answer);
       }
     },
   };

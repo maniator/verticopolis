@@ -252,7 +252,7 @@ describe("browserAcknowledgements", () => {
     expect(store.get("a")).toBe("kept");
   });
 
-  it("migrates legacy keys that still carried the old mutable bottom floor, and keeps the newest decision for a legacy collision", () => {
+  it("migrates legacy keys that still carried the old mutable bottom floor, and lets a Keep win a legacy collision", () => {
     const storage = memory();
     storage.setItem(
       "vc-elevator-schedule-review",
@@ -263,32 +263,124 @@ describe("browserAcknowledgements", () => {
       }),
     );
     const store = browserAcknowledgements(storage);
-    expect(store.get("classic:1:1139:elevatorStandard:4")).toBe("told");
-    expect(store.get("classic:1:1139:elevatorStandard:4:1")).toBe("told");
-    expect(store.get("classic:1:1139:elevatorStandard:4:2")).toBe("told");
+    expect(store.get("classic:1:1139:elevatorStandard:4")).toBe("kept");
+    expect(store.get("classic:1:1139:elevatorStandard:4:1")).toBe("kept");
+    expect(store.get("classic:1:1139:elevatorStandard:4:2")).toBe("kept");
     store.set("classic:1:1139:elevatorStandard:4", "kept");
     expect(JSON.parse(storage.getItem("vc-elevator-schedule-review") ?? "{}")).toEqual({
       "classic:1:1139:elevatorStandard:4": "kept",
     });
   });
 
-  it("keeps legacy told answers through a reload, and refuses malformed non-legacy keys", () => {
+  it("never lets the one-time notice overwrite a Keep, in storage or in memory", () => {
     const storage = memory();
-    storage.setItem(
-      "vc-elevator-schedule-review",
-      JSON.stringify({
-        "classic:1:1139:elevatorStandard:4:1": "told",
-        "classic:1:1139:elevatorStandard:4:2": "kept",
-        "classic:1:1139:elevatorStandard:4": "told",
-        "garbage:more:parts:than:expected": "kept",
-      }),
-    );
     const store = browserAcknowledgements(storage);
-    expect(store.get("classic:1:1139:elevatorStandard:4")).toBe("told");
-    expect(store.get("garbage:more:parts:than:expected")).toBeUndefined();
-    expect(JSON.parse(storage.getItem("vc-elevator-schedule-review") ?? "{}")).toEqual({
-      "classic:1:1139:elevatorStandard:4": "told",
+    store.set("a", "kept");
+    store.set("a", "told");
+    expect(store.get("a")).toBe("kept");
+    expect(browserAcknowledgements(storage).get("a")).toBe("kept");
+    const data = new Map<string, string>();
+    let full = false;
+    const tight = browserAcknowledgements({
+      getItem: (k) => data.get(k) ?? null,
+      setItem: (k, v) => {
+        if (full) throw new Error("quota");
+        data.set(k, v);
+      },
     });
+    tight.set("b", "kept");
+    full = true;
+    tight.set("b", "told");
+    expect(tight.get("b")).toBe("kept");
+  });
+
+  it("keeps a legacy Keep through a reload and leaves keys it does not recognize where they are", () => {
+    const storage = memory();
+    const stored = {
+      "classic:1:1139:elevatorStandard:4:1": "told",
+      "classic:1:1139:elevatorStandard:4:2": "kept",
+      "classic:1:1139:elevatorStandard:4": "told",
+      "garbage:more:parts:than:expected": "kept",
+      "from-a-newer-build": { note: "x" },
+      "classic:2:9:elevatorService:3:1": "maybe",
+    };
+    storage.setItem("vc-elevator-schedule-review", JSON.stringify(stored));
+    const store = browserAcknowledgements(storage);
+    expect(store.get("classic:1:1139:elevatorStandard:4")).toBe("kept");
+    expect(store.get("from-a-newer-build")).toBeUndefined();
+    const after = JSON.parse(storage.getItem("vc-elevator-schedule-review") ?? "{}");
+    expect(after).toEqual({
+      "classic:1:1139:elevatorStandard:4": "kept",
+      "garbage:more:parts:than:expected": "kept",
+      "from-a-newer-build": { note: "x" },
+      "classic:2:9:elevatorService:3:1": "maybe",
+    });
+    // The migrated shaft takes the place of its first entry; everything else keeps its place.
+    expect(Object.keys(after)).toEqual([
+      "classic:1:1139:elevatorStandard:4",
+      "garbage:more:parts:than:expected",
+      "from-a-newer-build",
+      "classic:2:9:elevatorService:3:1",
+    ]);
+  });
+
+  it("does not rewrite the slot when nothing needs migrating, whatever the entry order", () => {
+    const writes: string[] = [];
+    const raw = JSON.stringify({ "classic:1:1139:elevatorStandard:4": "kept", unknown: { note: "x" }, "classic:2:9:elevatorService:3": "told" });
+    const store = browserAcknowledgements({ getItem: () => raw, setItem: (_k, v) => void writes.push(v) });
+    expect(store.get("classic:1:1139:elevatorStandard:4")).toBe("kept");
+    expect(writes).toEqual([]);
+  });
+
+  it("lets a stored Keep beat an unsaved notice", () => {
+    const data = new Map<string, string>([["vc-elevator-schedule-review", JSON.stringify({ a: "kept" })]]);
+    let full = false;
+    const store = browserAcknowledgements({
+      getItem: (k) => data.get(k) ?? null,
+      setItem: (k, v) => {
+        if (full) throw new Error("quota");
+        data.set(k, v);
+      },
+    });
+    full = true;
+    store.set("b", "told"); // refused by storage, held in memory
+    data.set("vc-elevator-schedule-review", JSON.stringify({ a: "kept", b: "kept" })); // another tab keeps b
+    expect(store.get("b")).toBe("kept");
+    full = false;
+    store.set("b", "told"); // the notice is written now that storage takes it, and must not undo the Keep
+    expect(JSON.parse(data.get("vc-elevator-schedule-review") ?? "{}")).toMatchObject({ a: "kept", b: "kept" });
+    expect(store.get("b")).toBe("kept");
+  });
+
+  it("lets a legacy Keep beat a canonical notice that comes first in the slot", () => {
+    const storage = memory();
+    storage.setItem("vc-elevator-schedule-review", JSON.stringify({ "classic:1:1139:elevatorStandard:4:2": "kept", "classic:1:1139:elevatorStandard:4": "told" }));
+    expect(browserAcknowledgements(storage).get("classic:1:1139:elevatorStandard:4")).toBe("kept");
+  });
+
+  it("migrates a legacy slot with one write however often it is read, and keeps an own '__proto__' entry", () => {
+    const data = new Map<string, string>([["vc-elevator-schedule-review", '{"classic:1:1139:elevatorStandard:4:1":"kept","__proto__":{"a":1}}']]);
+    let writes = 0;
+    const store = browserAcknowledgements({
+      getItem: (k) => data.get(k) ?? null,
+      setItem: (k, v) => {
+        writes++;
+        data.set(k, v);
+      },
+    });
+    store.get("x");
+    store.get("x");
+    store.get("classic:1:1139:elevatorStandard:4");
+    expect(writes).toBe(1);
+    expect(data.get("vc-elevator-schedule-review")).toBe('{"classic:1:1139:elevatorStandard:4":"kept","__proto__":{"a":1}}');
+  });
+
+  it("does not let a legacy key overwrite a canonical key holding something unreadable", () => {
+    const storage = memory();
+    const stored = { "classic:1:1139:elevatorStandard:4": { note: "x" }, "classic:1:1139:elevatorStandard:4:2": "kept" };
+    storage.setItem("vc-elevator-schedule-review", JSON.stringify(stored));
+    browserAcknowledgements(storage).get("anything");
+    expect(JSON.parse(storage.getItem("vc-elevator-schedule-review") ?? "{}")).toEqual(stored);
   });
 
   it("trims the oldest decisions past its cap", () => {

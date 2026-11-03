@@ -27,7 +27,7 @@ notes, never a past version's.
 
 ## 2.77.4
 
-- A kept elevator schedule no longer reappears after a valid shaft resize, so the same shaft keeps its earlier decision through a save and reload.
+- A kept elevator schedule no longer reappears after a valid shaft resize, so the same shaft keeps its earlier decision after a reload in this browser.
 
 ## 2.77.3
 
