@@ -3,7 +3,8 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { replayCompare, throwSignature } from "./fuzzReplay";
-import { loadScenario, runScenario, type Checkpoint } from "./scenario";
+import { DetailError, isWasmTrap, requireDetail } from "./checkpointDetail";
+import { loadScenario, runScenario, startTsEngine, type Checkpoint } from "./scenario";
 import type { CheckpointDetail } from "./checkpointDetail";
 
 const dir = mkdtempSync(join(tmpdir(), "vc-fuzz-replay-"));
@@ -142,5 +143,74 @@ describe("replayCompare", () => {
     expect(readFileSync(join(dir, "seed-9315-min.rs.detail.json"), "utf8")).toBe(detailsAfterFirst);
     expect(a).toMatchObject({ status: "diverged", signature: "money" });
     expect(b).toEqual(a);
+  });
+});
+
+describe("isWasmTrap", () => {
+  // (module (func (export "f") unreachable)): the trap a Rust panic becomes in the shipped build.
+  const trapping = new Uint8Array([
+    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x04, 0x01, 0x60, 0x00, 0x00, 0x03, 0x02, 0x01, 0x00,
+    0x07, 0x05, 0x01, 0x01, 0x66, 0x00, 0x00, 0x0a, 0x05, 0x01, 0x03, 0x00, 0x00, 0x0b,
+  ]);
+
+  it("knows a real trap, and an exhausted stack", () => {
+    const f = new WebAssembly.Instance(new WebAssembly.Module(trapping)).exports.f as () => void;
+    let trap: unknown;
+    try {
+      f();
+    } catch (e) {
+      trap = e;
+    }
+    expect(trap).toBeInstanceOf(WebAssembly.RuntimeError);
+    expect(isWasmTrap(trap)).toBe(true);
+    expect(isWasmTrap(new RangeError("Maximum call stack size exceeded"))).toBe(true);
+  });
+
+  it("leaves the errors the binding throws for a refused command alone", () => {
+    expect(isWasmTrap(new Error("build floor @ 2,170 failed: no money"))).toBe(false);
+    expect(isWasmTrap(new TypeError("x is not a function"))).toBe(false);
+    expect(isWasmTrap(new RangeError("Invalid array length"))).toBe(false);
+    expect(isWasmTrap("unreachable")).toBe(false);
+  });
+});
+
+describe("a trap during a run", () => {
+  const trapping = (where: "detail" | "command"): ((start: Parameters<typeof startTsEngine>[0]) => ReturnType<typeof startTsEngine>) =>
+    (start) => {
+      const e = startTsEngine(start);
+      const trap = () => new WebAssembly.RuntimeError("unreachable");
+      return {
+        ...e,
+        ...(where === "detail" ? { detail: () => { throw trap(); } } : { tick: () => { throw trap(); } }),
+        // A poisoned instance's free throws a plain error of its own.
+        free: () => { throw new Error("null pointer passed to rust"); },
+      };
+    };
+  const scenario = () => {
+    const file = join(dir, "trap.json");
+    writeFileSync(file, JSON.stringify({ id: "trap", description: "t", start: { newGame: { seed: 1, mode: "classic" } }, commands: [{ op: "tick", dt: 30, times: 1 }] }));
+    return loadScenario(file);
+  };
+
+  it("reaches the caller as the trap, not as the free's error or a harness failure", () => {
+    for (const where of ["detail", "command"] as const) {
+      let thrown: unknown;
+      try {
+        runScenario(scenario(), trapping(where), []);
+      } catch (e) {
+        thrown = e;
+      }
+      expect(isWasmTrap(thrown), where).toBe(true);
+    }
+  });
+
+  it("still lets a free that fails after a clean run through", () => {
+    const e = (start: Parameters<typeof startTsEngine>[0]) => ({ ...startTsEngine(start), free: () => { throw new Error("free failed"); } });
+    expect(() => runScenario(scenario(), e, [])).toThrow("free failed");
+  });
+
+  it("keeps a detail error that is not a trap a harness failure", () => {
+    expect(() => requireDetail({ detail: () => { throw new Error("no digest"); } })).toThrow(DetailError);
+    expect(() => requireDetail({ detail: () => { throw new WebAssembly.RuntimeError("unreachable"); } })).toThrow(WebAssembly.RuntimeError);
   });
 });

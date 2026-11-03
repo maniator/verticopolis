@@ -8,7 +8,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { compareRuns, describeDivergence, type Leg } from "./fuzzCompare";
-import { DetailError, type CheckpointDetail } from "./checkpointDetail";
+import { DetailError, isWasmTrap, type CheckpointDetail } from "./checkpointDetail";
 import { loadScenario, runScenario, startTsEngine, type Checkpoint, type EngineStart } from "./scenario";
 import { hasWasmPackage, startWasmEngine, wasm, WASM_PKG } from "./wasmEngine";
 
@@ -16,8 +16,9 @@ export type ReplayResult =
   | { status: "ok"; checkpoints: number }
   /** `signature` names the kind of divergence (`state:units`, `money`, `threw`)
    *  without its position, so a shrinker can tell that a smaller scenario
-   *  still shows the same thing. */
-  | { status: "diverged"; signature: string; message: string }
+   *  still shows the same thing. `trap` marks a WASM leg whose engine trapped
+   *  (see {@link isWasmTrap}) instead of returning a different value. */
+  | { status: "diverged"; signature: string; message: string; trap?: true }
   /** The harness itself failed: a missing or malformed record, an unreadable
    *  scenario. Never an engine divergence. */
   | { status: "harness"; message: string };
@@ -80,6 +81,9 @@ export function replayCompare(file: string, rustDir: string = dirname(file), leg
     tsCheckpoints = runScenario(scenario, start, tsDetails);
   } catch (e) {
     if (e instanceof DetailError) return harness(e.message);
+    if (leg === "WASM" && isWasmTrap(e)) {
+      return { status: "diverged", signature: "trap", trap: true, message: `TRAPPED, the WASM build trapped instead of finishing the scenario: ${(e as Error).message}` };
+    }
     // The TypeScript engine refused a command the Rust engine accepted (or an
     // expectFail it did not meet): the divergence the fuzzer exists to find.
     return { status: "diverged", signature: throwSignature((e as Error).message), message: `DIVERGED before any hash compare, ${leg} runner threw: ${(e as Error).message}` };
