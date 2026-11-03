@@ -66,14 +66,18 @@ describe.skipIf(!hasWasmPackage())("rollback rehearsal on the real engine", () =
     expect(dropped).toContain("dropped money");
   });
 
-  it("is why the rehearsal looks for dropped fields: an engine loads a newer save and quietly drops what it does not know", () => {
+  it("refuses a newer save instead of quietly dropping what it does not know (#1603)", () => {
     const tower = saves.find((s) => s.name === "split-tower.vctower")!;
     const newer = { ...(JSON.parse(tower.text) as Record<string, unknown>), version: 9, aFieldFromTheFuture: { keep: true } };
-    const engine = candidate.fromSave(JSON.stringify(newer));
-    const reread = JSON.parse(engine.serialize()) as Record<string, unknown>;
-    engine.free();
-    expect(reread.aFieldFromTheFuture).toBeUndefined();
-    expect(reread.version).not.toBe(9);
+    let engine: ReturnType<typeof candidate.fromSave> | undefined;
+    let refusal: unknown;
+    try {
+      engine = candidate.fromSave(JSON.stringify(newer));
+    } catch (error) {
+      refusal = error;
+    }
+    engine?.free();
+    expect(String(refusal)).toMatch(/newer version/);
   });
 
   it("fails a previous engine that refuses what the candidate wrote", () => {
