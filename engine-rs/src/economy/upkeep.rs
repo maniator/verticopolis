@@ -133,17 +133,14 @@ impl Simulation {
             if u.kind.subtype_list().is_none() || !u.is_operational() {
                 continue;
             }
-            let has_data = u.patronage_today.is_some()
-                || u.patronage_yest.is_some()
-                || u.profit_today.is_some()
-                || u.profit_yest.is_some();
-            if !has_data {
+            // A unit with no tallies has no box, and keeps none.
+            let Some(tally) = u.retail.as_deref_mut() else {
                 continue;
-            }
-            u.patronage_yest = Some(u.patronage_today.unwrap_or(0.0));
-            u.patronage_today = Some(0.0);
-            u.profit_yest = Some(u.profit_today.unwrap_or(0.0));
-            u.profit_today = Some(0.0);
+            };
+            tally.patronage_yest = Some(tally.patronage_today.unwrap_or(0.0));
+            tally.patronage_today = Some(0.0);
+            tally.profit_yest = Some(tally.profit_today.unwrap_or(0.0));
+            tally.profit_today = Some(0.0);
         }
     }
 }
