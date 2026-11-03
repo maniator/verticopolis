@@ -1,0 +1,46 @@
+{
+  "id": "reload-adopts-milestone",
+  "description": "A cinema is placed and the game runs 570 minutes, so it is operational but the daily milestone check has not seen it yet. A reload then adopts the cinema milestone silently. The reload check lets a load add a milestone and nothing else (#1711).",
+  "start": {
+    "newGame": {
+      "seed": 211,
+      "mode": "classic",
+      "star": 3
+    }
+  },
+  "commands": [
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 150,
+      "to": 230
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "build",
+      "kind": "cinema",
+      "floor": 3,
+      "x": 162
+    },
+    {
+      "op": "tick",
+      "dt": 10,
+      "times": 57,
+      "checkpointEvery": 6
+    },
+    {
+      "op": "reload"
+    },
+    {
+      "op": "checkpoint",
+      "label": "after-reload"
+    }
+  ]
+}

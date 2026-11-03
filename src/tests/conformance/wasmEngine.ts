@@ -183,6 +183,7 @@ export function wasmEngine(handle: WasmEngine): ScenarioEngine {
       return wasmEngine(loaded);
     },
     stateDigest: () => live().stateDigest(),
+    stateView: () => JSON.parse(live().stateView()) as unknown,
     crowdDigest: () => live().crowdDigest(),
     drainEvents: () => JSON.parse(live().drainGameplayEvents()) as unknown[],
     eventsDropped: () => live().gameplayEventsDropped(),

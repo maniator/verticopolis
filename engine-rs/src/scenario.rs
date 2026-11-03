@@ -16,11 +16,13 @@ use serde_json::Value;
 mod apply;
 mod command;
 mod expect;
+mod reload;
 mod validate;
 
 use apply::apply;
 pub use command::{Command, NewGame, Start};
 use expect::events_fit;
+use reload::reload_changed;
 use validate::{check_scenario, whole_floats_to_ints};
 
 #[derive(Deserialize, Debug)]
@@ -267,12 +269,12 @@ fn run_scenario_inner(
                 }
                 Command::Reload => {
                     // The events go first, as the TypeScript runner takes them.
-                    let before = digest(&state_view(&sim));
+                    let before = state_view(&sim);
                     events_fit(&sim).map_err(failed)?;
                     carried.borrow_mut().extend(sim.gameplay.drain());
                     let saved: Value = serde_json::from_str(&sim.serialize().to_string()).unwrap();
                     let loaded = crate::load::deserialize(&saved).map_err(failed)?;
-                    if digest(&state_view(&loaded)) != before {
+                    if reload_changed(&before, &state_view(&loaded)) {
                         return Err(failed("reload changed the saved state".into()));
                     }
                     sim = loaded;

@@ -478,3 +478,12 @@ fn removals_report_facility_removed_with_the_method() {
         ]
     );
 }
+
+/// The web compares an outcome's reason against these texts
+/// (`INVALID_COMMAND` and `NOT_ENOUGH_MONEY` in `src/simport/request.ts`, which
+/// `request.test.ts` pins to the same literals). Change both sides together.
+#[test]
+fn refusal_texts_the_web_compares_against() {
+    assert_eq!(INVALID_REQUEST, "That request is not valid.");
+    assert_eq!(NOT_ENOUGH_MONEY, "Not enough money.");
+}

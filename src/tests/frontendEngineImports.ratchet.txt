@@ -27,7 +27,6 @@
 src/analyticsEngineBridge.ts gameplayCatalog gameplayEventRules
 src/catalog/towerCatalog.ts catalog # the default source for a tower that has none set; it goes with the TypeScript engine's tables
 src/game/appHistory.ts UndoHistory # moved from src/main.ts with the app's undo history (#874): no new engine import
-src/game/editorActions.ts sim/charges
 src/game/facilityDiagnostics.ts EconomySystem Simulation residentialRentals sim/constants sim/gripe types
 src/game/frameLoop.ts sim/frameStep # the host step driver, moved here from frameLoop and shared with TsEngine.advance (PR 5a); it goes with #867
 src/game/gripeCopy.ts residentialRentals sim/gripe sim/satisfactionStep
@@ -36,7 +35,6 @@ src/game/toolingSim.ts Simulation port/tsEngine # moved from src/main.ts with th
 src/preview.ts catalog
 src/render/atlas/archive.ts catalog # archive records atlas metadata from the same engine-authored catalog as atlas runtime reads
 src/render/atlas/browserEntry.ts catalog
-src/simport/headerClock.ts Clock calendar gameRules # what panels derive from the view's header instead of sim.clock and sim.rules (facade slice 4, #1211): date arithmetic, the calendar's day names and the static rule set
+src/simport/headerClock.ts gameRules # what panels derive from the view's header instead of sim.clock and sim.rules (facade slice 4, #1211): date arithmetic, the calendar's day names and the static rule set
 src/simport/tsPanels.ts households milestones sim/constants # the TypeScript adapter's panel answers (facade slice 4, #1211), built from the TypeScript engine's own functions; they leave with it
-src/ui/templates/editor.ts residentialRentals
 src/ui/uiElevatorSchedule.ts elevatorSchedule scheduleOrigins
