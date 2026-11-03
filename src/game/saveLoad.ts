@@ -378,10 +378,12 @@ export class SaveLoad {
    */
   async exportLegacy(): Promise<void> {
     const port = this.deps.enginePort();
-    await port.prepareTdt?.();
     let bytes: Uint8Array | undefined;
     let report: ExportReport;
     try {
+      // The codec's own load can fail (a chunk that cannot be fetched offline);
+      // that ends in the same "Export failed" line, not a silent rejection.
+      await port.prepareTdt?.();
       // A null camera (headless) stamps nothing, so it never erases the view
       // a TDT import brought over before any camera existed.
       stampCamera(port, this.deps.getView());
@@ -390,11 +392,13 @@ export class SaveLoad {
       if (!bytes) {
         // The engine's refusal is the player's sentence (a Modern tower, a
         // tower too deep for 1994).
+        trackAppAction("export_failed", "tdt");
         this.deps.ui.sayVisibly(port.lastReason() ?? "Export failed."); // not a toast: a dialog may be up (GH #658)
         return;
       }
       report = exportReport(exportFacts(rec, this.deps.portCodes(), port.towerName()));
     } catch (err) {
+      trackAppAction("export_failed", "tdt");
       this.deps.ui.sayVisibly("Export failed: " + (err instanceof Error ? err.message : String(err)));
       return;
     }
