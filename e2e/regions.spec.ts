@@ -12,8 +12,8 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * gate's job (the tower-scene baselines); this spec pins the mechanism.
  * The burning-room half (a fire moves a room to a private animated actor and
  * extinguishing moves it back) needs a fire the test can start and douse in
- * place, which the Rust engine's commands do not offer; it is tracked in the
- * backlog row `regions-fire-actor-coverage`.
+ * place, which the Rust engine's commands do not offer, so it is a unit test:
+ * `src/render/excalibur/towerReconcileFire.test.ts`.
  */
 test("regions compose settled rooms and drain on budget", async ({ page }) => {
   await page.goto("/");
