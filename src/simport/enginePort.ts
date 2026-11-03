@@ -157,6 +157,10 @@ export interface ScheduleFacts {
   readonly recommended: AssistedPreset | null;
   readonly advice: ScheduleAdvice;
   readonly staging: StagingSummary | null;
+  /** The draft's homes as the shaft would hold them: one per car, each on the
+   *  nearest served floor (ties to the lower), a car the draft lists no home for
+   *  at the base lobby. Empty on a refusal. */
+  readonly homeFloors: readonly number[];
 }
 
 /** A `Float64Array` record whose slots `viewLayout().records` names. */

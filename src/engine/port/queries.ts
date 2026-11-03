@@ -280,6 +280,17 @@ function shaftContext(shaft: ShaftFacts, wd: ReturnType<typeof day>, we: ReturnT
   };
 }
 
+/** The nearest served floor, ties to the lower one. */
+function snapToServed(shaft: ShaftFacts, floor: number): number {
+  let best = shaft.served[0] ?? shaft.bottom;
+  let bestDist = Infinity;
+  for (const f of shaft.served) {
+    const d = Math.abs(f - floor);
+    if (d < bestDist) { bestDist = d; best = f; }
+  }
+  return best;
+}
+
 /** The proposal for one shaft's facts and the working draft (already coerced
  *  to the shaft, or undefined for none). */
 export function referenceProposal(shaft: ShaftFacts, draft: ElevatorSchedule | undefined, weekendView: boolean): AutoTuneProposal {
@@ -303,16 +314,6 @@ export function referenceProposal(shaft: ShaftFacts, draft: ElevatorSchedule | u
   const homesAuthored = !!draft?.homeFloors && draft.homeFloors.length > 0;
   const tuned = autoTuneSchedule(draft ? { ...draft, homeFloors: homesAuthored ? draft.homeFloors : undefined } : undefined, ctx);
 
-  // Snap each home to the nearest served floor, ties to the lower one.
-  const snap = (floor: number): number => {
-    let best = shaft.served[0] ?? shaft.bottom;
-    let bestDist = Infinity;
-    for (const f of shaft.served) {
-      const d = Math.abs(f - floor);
-      if (d < bestDist) { bestDist = d; best = f; }
-    }
-    return best;
-  };
   return {
     status: "available",
     weekday: wd,
@@ -320,7 +321,7 @@ export function referenceProposal(shaft: ShaftFacts, draft: ElevatorSchedule | u
     proposal: {
       weekday: tuned?.activeCars?.weekday ?? null,
       weekend: tuned?.activeCars?.weekend ?? null,
-      homeFloors: (tuned?.homeFloors ?? []).map(snap),
+      homeFloors: (tuned?.homeFloors ?? []).map((f) => snapToServed(shaft, f)),
       homesSeeded: !homesAuthored,
     },
   };
@@ -384,6 +385,7 @@ export function referenceFacts(shaft: ShaftFacts, draft: ElevatorSchedule | unde
     return measured ? "ready" : "insufficient-data";
   })();
   const adv = assisted && measured ? scheduleAdvice(draft, ctx, weekendView) : null;
+  const summary = stagingSummary(draft, ctx, weekendView);
   return {
     status: "available",
     recommended: assisted ? recommendedPreset(!!shaft.express) : null,
@@ -392,7 +394,11 @@ export function referenceFacts(shaft: ShaftFacts, draft: ElevatorSchedule | unde
       over: adv?.over ?? [],
       short: adv?.short ?? [],
     },
-    staging: { measured, ...stagingSummary(draft, ctx, weekendView) },
+    staging: { measured, ...summary },
+    homeFloors: Array.from({ length: Math.max(0, shaft.cars) }, (_, i) => {
+      const home = draft?.homeFloors?.[i];
+      return home === undefined ? summary.baseLobby : snapToServed(shaft, home);
+    }),
   };
 }
 
@@ -401,6 +407,7 @@ const FACTS_REFUSED = (status: ScheduleFacts["status"]): ScheduleFacts => ({
   recommended: null,
   advice: { status: "refused", over: [], short: [] },
   staging: null,
+  homeFloors: [],
 });
 
 export function scheduleFacts(sim: Simulation, id: number, draftSlots: Float64Array, weekendView: boolean): ScheduleFacts {

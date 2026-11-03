@@ -32,7 +32,11 @@ const FACTS: ScheduleFacts = {
   recommended: "rush",
   advice: { status: "ready", over: [], short: [] },
   staging: { measured: true, peakHour: 8, activeAtPeak: 4, upTowerCars: 1, lobbyCars: 3, topLobby: 4, baseLobby: 1 },
+  homeFloors: [1, 1, 1, 1],
 };
+
+/** An engine that keeps the homes it is handed, as the real one does on served floors. */
+const echoHomes = (): ScheduleDialogCtx["facts"] => (draft) => ({ ...FACTS, homeFloors: draft.homeFloors ?? FACTS.homeFloors });
 
 const PRESET: PresetProposal = {
   status: "available",
@@ -48,7 +52,7 @@ function ctx(over: Partial<ScheduleDialogCtx> = {}): ScheduleDialogCtx {
     ux: MODERN_RULES.elevatorScheduleUX(),
     ...base,
     ...referenceEngine(base, true),
-    facts: () => FACTS,
+    facts: echoHomes(),
     preset: () => PRESET,
     initialWeekend: false,
     ...over,
@@ -164,5 +168,29 @@ describe("the dialog's presets come from the engine", () => {
     byLabel("button", "Stage upper half up-tower").click();
     press('[data-act="apply"]');
     expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 1, 1, 1]);
+  });
+});
+
+describe("the dialog's staging comes from the engine's homes and base", () => {
+  it("opens on the homes the engine answers for the saved schedule", () => {
+    const facts = vi.fn((draft: { homeFloors?: number[] }) => ({ ...FACTS, homeFloors: draft.homeFloors ? [2, 2, 3, 4] : [1, 1, 1, 1] }));
+    const { apply } = open({ current: { homeFloors: [9, 9, 9, 9] }, facts: facts as unknown as ScheduleDialogCtx["facts"] });
+    // The saved homes went to the engine, which put them on served floors.
+    expect(facts.mock.calls[0][0].homeFloors).toEqual([9, 9, 9, 9]);
+    press('[data-act="apply"]');
+    expect(apply.mock.calls[0][0].homeFloors).toEqual([2, 2, 3, 4]);
+  });
+
+  it("takes the base floor from the engine's summary", () => {
+    open({ facts: () => ({ ...FACTS, staging: { ...FACTS.staging!, baseLobby: 3 } }) });
+    expect(byLabel("button", "Home all cars at Floor 3")).toBeDefined();
+    expect(dialog().querySelector(".es-base")).not.toBeNull();
+  });
+
+  it("repoints every car at the engine's base floor", () => {
+    const { apply } = open({ facts: (draft) => ({ ...FACTS, staging: { ...FACTS.staging!, baseLobby: 3 }, homeFloors: draft.homeFloors ?? [3, 3, 3, 3] }) });
+    byLabel("button", "Home all cars at Floor 3").click();
+    press('[data-act="apply"]');
+    expect(apply.mock.calls[0][0].homeFloors).toEqual([3, 3, 3, 3]);
   });
 });

@@ -97,9 +97,6 @@ export function showElevatorScheduleDialog(
   const readFloors = (): FloorRow[] => ctx.stops.read();
   const servedFloorsAsc = (floors: FloorRow[]): number[] =>
     floors.filter((f) => f.served).map((f) => f.floor).sort((x, y) => x - y);
-  const servedLobbiesAsc = (floors: FloorRow[]): number[] =>
-    floors.filter((f) => f.served && f.lobby).map((f) => f.floor).sort((x, y) => x - y);
-  const baseOf = (floors: FloorRow[]): number => servedLobbiesAsc(floors)[0] ?? ctx.bottom;
 
   /** The visible day's origin map at hour `h`, gated on that day's warm demand
    *  curve so origins never outrun the demand gate (#465). */
@@ -108,33 +105,20 @@ export function showElevatorScheduleDialog(
     const ring = state.day === "weekend" ? ctx.origins.weekend : ctx.origins.weekday;
     return ring[((h % ORIGIN_HOURS) + ORIGIN_HOURS) % ORIGIN_HOURS];
   };
-  // A stored home floor may sit on a stop the shaft no longer serves: snap it to
-  // the nearest served floor so the grid never marks a chip on a skipped row and
-  // OK re-commits a floor the car can actually wait at.
-  const snapToServed = (floor: number, served: number[]): number => {
-    let bestFloor = served[0] ?? ctx.bottom;
-    let bestDist = Infinity;
-    for (const f of served) {
-      const d = Math.abs(f - floor);
-      if (d < bestDist) { bestDist = d; bestFloor = f; }
-    }
-    return bestFloor;
-  };
-
+  // A stored home floor may sit on a stop the shaft no longer serves. The
+  // engine answers the homes it would hold (each on the nearest served floor, a
+  // car with no home at the base lobby), so the grid never marks a chip on a
+  // skipped row and OK re-commits a floor the car can actually wait at.
   const initialFloors = readFloors();
-  const initialServed = servedFloorsAsc(initialFloors);
-  const base0 = baseOf(initialFloors);
+  const seed = ctx.facts({ homeFloors: ctx.current?.homeFloors ? [...ctx.current.homeFloors] : undefined }, ctx.initialWeekend);
+  const base0 = seed.staging?.baseLobby ?? ctx.bottom;
   const fullRow = (): number[] => Array(SCHEDULE_HOURS).fill(ctx.cars);
   const seedRow = (r: readonly number[] | undefined): number[] => {
     const out = fullRow();
     if (r) for (let h = 0; h < SCHEDULE_HOURS; h++) if (Number.isFinite(r[h])) out[h] = Math.max(0, Math.min(ctx.cars, Math.floor(r[h])));
     return out;
   };
-  const seedHomes = (): number[] =>
-    Array.from({ length: ctx.cars }, (_, i) => {
-      const v = ctx.current?.homeFloors?.[i];
-      return typeof v === "number" && Number.isFinite(v) ? snapToServed(v, initialServed) : base0;
-    });
+  const seedHomes = (): number[] => (seed.homeFloors.length === ctx.cars ? [...seed.homeFloors] : Array(ctx.cars).fill(base0));
 
   const state: SchedState = {
     day: ctx.initialWeekend ? "weekend" : "weekday",
@@ -220,6 +204,9 @@ export function showElevatorScheduleDialog(
     // measured ring must not claim a measured peak (#466): its sentence names
     // the assumed 17:00 down-rush instead of "Busiest".
     const sum = facts.staging;
+    // The engine's base floor and homes follow every edit, a stop edit included.
+    if (sum) state.base = sum.baseLobby;
+    if (facts.homeFloors.length === ctx.cars) state.schedule.homeFloors = [...facts.homeFloors];
     if (!sum) {
       state.simMsg = "";
       state.originFloors = [];
@@ -267,9 +254,6 @@ export function showElevatorScheduleDialog(
    *  the working homes onto the new served set, recompute, repaint. */
   const afterStops = (): void => {
     state.floors = readFloors();
-    state.base = baseOf(state.floors);
-    const served = servedFloorsAsc(state.floors);
-    state.schedule.homeFloors = state.schedule.homeFloors.map((f) => snapToServed(f, served));
     state.cancelArmed = false;
     recompute();
     // A stop edit reshapes the shaft context the advice reads, so it can turn
