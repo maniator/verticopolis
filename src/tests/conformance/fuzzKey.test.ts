@@ -78,10 +78,31 @@ describe("the differential's window key", () => {
     expect(moved(".github/actions/engine-wasm/action.yml", "name: y\n")).toEqual(["wasmBuild"]);
     expect(moved("package.json", JSON.stringify({ scripts: { "wasm:build": "other" } }))).toEqual(["wasmBuild"]);
     expect(moved(".nvmrc", "24\n")).toEqual(["pins"]);
+    const pkg = (extra: object) => JSON.stringify({ name: "x", version: "1.0.0", scripts: { "wasm:build": "bash scripts/build-engine-wasm.sh" }, ...extra });
+    expect(moved("package.json", pkg({ type: "module" }))).toEqual(["pins"]);
+    expect(moved("package.json", pkg({ engines: { node: ">=22" } }))).toEqual(["pins"]);
     expect(moved(".github/workflows/engine-fuzz.yml", "name: other\n")).toEqual(["pins"]);
     expect(moved("conformance/fixtures/f.vctower", "changed\n")).toEqual(["fixtures"]);
     const lock = { ...LOCK, packages: { ...LOCK.packages, "node_modules/dep": { version: "2.0.1" } } };
     expect(moved("package-lock.json", JSON.stringify(lock))).toEqual(["pins"]);
+  });
+
+  it("covers the crate's cargo configuration when it exists", () => {
+    const root = tree();
+    const base = keyOf(root);
+    mkdirSync(join(root, "engine-rs/.cargo"), { recursive: true });
+    writeFileSync(join(root, "engine-rs/.cargo/config.toml"), "[build]\n");
+    const added = keyOf(root);
+    expect(added).not.toBe(base);
+    writeFileSync(join(root, "engine-rs/.cargo/config.toml"), "[build]\nrustflags = []\n");
+    expect(keyOf(root)).not.toBe(added);
+    // The other places cargo and rustup read from.
+    for (const rel of ["engine-rs/.cargo/config", ".cargo/config.toml", "rust-toolchain.toml", "engine-rs/rust-toolchain"]) {
+      const before = keyOf(root);
+      mkdirSync(dirname(join(root, rel)), { recursive: true });
+      writeFileSync(join(root, rel), "x\n");
+      expect(keyOf(root), rel).not.toBe(before);
+    }
   });
 
   it("moves when a file is added, removed or renamed", () => {
