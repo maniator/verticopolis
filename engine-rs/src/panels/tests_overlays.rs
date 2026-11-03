@@ -185,3 +185,35 @@ fn a_tall_room_gives_its_upper_floor_a_cell_over_its_span() {
         "the upper floor spans the cinema"
     );
 }
+
+/// The floor extents are kept per revision: a build or a sale moves them, a
+/// repeat read does not walk the units again, and a fresh read agrees (#1237).
+#[test]
+fn the_overlay_extents_follow_every_layout_edit() {
+    let mut sim = founded(GameMode::Modern, 3);
+    shaft(&mut sim, Kind::ElevatorStandard, 152, 1, 3);
+    put(&mut sim, Kind::Office, 2, 160);
+    let extent = |sim: &crate::sim::Simulation, floor: i64| {
+        heat(sim, HeatmapMode::Congestion)
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["floor"] == floor)
+            .map(|c| (c["minX"].as_i64().unwrap(), c["maxX"].as_i64().unwrap()))
+    };
+    let before = extent(&sim, 2).expect("floor 2 has an office");
+    assert_eq!(extent(&sim, 2), Some(before), "a repeat read agrees");
+    assert_eq!(extent(&sim, 4), None, "nothing is built on floor 4 yet");
+    put(&mut sim, Kind::Floor, 4, 170);
+    let after = extent(&sim, 4).expect("the new floor shows");
+    assert_eq!(after.0, after.1, "one tile wide: {after:?}");
+    assert_eq!(
+        extent(&sim, 2),
+        Some(before),
+        "the other floors keep theirs"
+    );
+    // What a read with no memo says.
+    sim.tower.memo.borrow_mut().floor_extents = None;
+    assert_eq!(extent(&sim, 4), Some(after));
+    assert_eq!(extent(&sim, 2), Some(before));
+}
