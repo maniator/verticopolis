@@ -62,3 +62,7 @@ src/public/engine/
 # Records `fuzz --replay` writes next to a corpus scenario
 conformance/fuzz-corpus/*.rs.json
 conformance/fuzz-corpus/*.rs.detail.json
+
+# Rollback rehearsal output and its throwaway browser profile (#1221)
+.rollback-rehearsal/
+.rollback-profile/
