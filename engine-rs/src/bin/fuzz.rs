@@ -244,11 +244,20 @@ fn main() {
     // picked at random almost never holds one, and a bad address is dropped.
     let mut built_units: Vec<(i64, i64)> = Vec::new();
     let mut built_shafts: Vec<(i64, i64, i64)> = Vec::new();
+    // A tick can leave an emergency waiting on the player's answer (the daily
+    // roll offers a fire rescue or a ransom, and the next daily roll times it
+    // out). The command after a tick tries to answer it: with nothing pending
+    // the engine refuses and the command is dropped. Without this a pending
+    // choice only ever timed out, and the money-gated accepts never ran.
+    let mut choice_due = false;
     while kept < budget || !pressure.is_empty() {
         let burst = pressure.pop();
         let roll = if burst.is_some() { 0 } else { rng.int(0, 99) };
+        let answer_now = std::mem::take(&mut choice_due);
         let mut cmd = if let Some(b) = burst.clone() {
             b
+        } else if answer_now {
+            json!({"op": "resolveChoice", "accept": rng.chance(0.5)})
         } else if rng.chance(0.04) {
             // Cash that runs out, or goes below zero, in the middle of a run.
             let amount = [0, 1_000, 25_000, 250_000, -50_000, 3_000_000][rng.int(0, 5) as usize];
@@ -326,6 +335,9 @@ fn main() {
             if cmd.get("expectFail").is_none() {
                 note_built(&cmd, &mut built_units, &mut built_shafts);
             }
+            if cmd["op"] == "tick" {
+                choice_due = true;
+            }
             commands.push(cmd);
             step += 1;
             if burst.is_none() {
@@ -361,6 +373,10 @@ fn main() {
                             eprintln!("seed {seed}: dropped {op} ({what}): {cmd}");
                         }
                     }
+                    // There may be no choice pending, or the tower may not afford
+                    // the accept. The scenario has no refusal form for it, so the
+                    // command is dropped with the prefix still valid.
+                    "resolveChoice" => eprintln!("seed {seed}: dropped {op} ({what})"),
                     // tick, reload, bombThreat, evaluateStar cannot legitimately refuse:
                     // a failure here is the engine's own. The failing scenario is
                     // written before the panic so the artifact carries it.
