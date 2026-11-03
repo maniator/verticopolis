@@ -3,8 +3,8 @@ name: Milestone new issues
 # Every issue has a milestone (see "How items flow" in
 # _bmad-output/implementation-artifacts/backlog.md). Whoever files an issue sets
 # one. This is the safety net: an issue that is opened with no milestone goes to
-# Triage, where it gets a decision. It never overwrites a milestone that is
-# already set, and the check reads the issue's live state, so a milestone added
+# Triage, where it gets a decision. It does not overwrite a milestone that is
+# already set (it checks again just before writing), and the check reads the issue's live state, so a milestone added
 # a moment after the issue was created (the usual two-step create) wins.
 on:
   issues:
@@ -34,6 +34,13 @@ jobs:
           if [ -z "$triage" ]; then
             echo "::error::No open milestone named Triage."
             exit 1
+          fi
+          # GitHub has no compare-and-set, so read once more right before the
+          # write to shrink the window in which a person's milestone could be lost.
+          current=$(gh api "repos/${GH_REPO}/issues/${ISSUE}" --jq '.milestone.number // empty')
+          if [ -n "$current" ]; then
+            echo "Issue #${ISSUE} got milestone ${current} in the meantime; nothing to do."
+            exit 0
           fi
           gh api -X PATCH "repos/${GH_REPO}/issues/${ISSUE}" -F milestone="$triage" --silent
           echo "Issue #${ISSUE} had no milestone; set Triage (${triage})."
