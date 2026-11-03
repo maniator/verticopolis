@@ -42,7 +42,7 @@ describe("the build fingerprint", () => {
 
   it("leaves the TypeScript engine's code out of both parts", () => {
     const fp = buildFingerprint(srcDir(base), pkg("0.24.0", "aaa"));
-    expect(fp.engine.ts).toBeUndefined();
+    expect(fp.engine).not.toHaveProperty("ts");
     const edited = buildFingerprint(srcDir({ ...base, "engine/Tower.ts": "x" }), pkg("0.24.0", "aaa"));
     expect(edited).toEqual(fp);
   });
