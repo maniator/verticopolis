@@ -59,6 +59,8 @@ pub struct TdtElevator {
     pub serviced: Vec<u8>,
     /// Home floor for each of the 8 car slots (TDT indexes).
     pub car_homes: Vec<i64>,
+    /// Where the slot's header and payload sit in the file.
+    pub record: std::ops::Range<usize>,
 }
 
 /// One decoded stair/escalator record (`TdtStair`; floor is a TDT index).
@@ -73,6 +75,8 @@ pub struct TdtStair {
 /// Everything the tolerant tail walk can produce (`TdtTail`).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TdtTail {
+    /// Where the people block starts (its count, then the records).
+    pub people_at: Option<usize>,
     pub people_count: Option<i64>,
     pub retail_rows: Option<i64>,
     pub elevators: Option<Vec<TdtElevator>>,
