@@ -7,9 +7,10 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { compareRuns, describeDivergence } from "./fuzzCompare";
+import { compareRuns, describeDivergence, type Leg } from "./fuzzCompare";
 import { DetailError, type CheckpointDetail } from "./checkpointDetail";
-import { loadScenario, runScenario, type Checkpoint } from "./scenario";
+import { loadScenario, runScenario, startTsEngine, type Checkpoint, type EngineStart } from "./scenario";
+import { hasWasmPackage, startWasmEngine, wasm, WASM_PKG } from "./wasmEngine";
 
 export type ReplayResult =
   | { status: "ok"; checkpoints: number }
@@ -44,9 +45,22 @@ function readRecord<T>(path: string, what: string): T[] | string {
   return Array.isArray(parsed) ? (parsed as T[]) : `${path}: expected a ${what} array`;
 }
 
-/** Run `file` on the TypeScript engine and compare it with the Rust records in
+/** Run `file` on the TypeScript engine (or, with `leg` `WASM`, on the shipped
+ *  build through the binding in Node) and compare it with the Rust records in
  *  `rustDir` (the scenario's own folder by default). */
-export function replayCompare(file: string, rustDir: string = dirname(file)): ReplayResult {
+export function replayCompare(file: string, rustDir: string = dirname(file), leg: Leg = "TypeScript"): ReplayResult {
+  let start: EngineStart = startTsEngine;
+  if (leg === "WASM") {
+    if (!hasWasmPackage()) return harness(`no WASM package at ${WASM_PKG} (npm run wasm:build)`);
+    // A package that is present but will not load (a stale binding, a bad cache) is
+    // the harness failing, not the engine disagreeing.
+    try {
+      wasm();
+    } catch (e) {
+      return harness(`the WASM package failed to load: ${(e as Error).message}`);
+    }
+    start = startWasmEngine;
+  }
   const stem = basename(file).replace(/\.json$/, "");
   const checkpointsPath = join(rustDir, `${stem}.rs.json`);
   const detailsPath = join(rustDir, `${stem}.rs.detail.json`);
@@ -63,16 +77,16 @@ export function replayCompare(file: string, rustDir: string = dirname(file)): Re
   const tsDetails: CheckpointDetail[] = [];
   let tsCheckpoints: Checkpoint[];
   try {
-    tsCheckpoints = runScenario(scenario, undefined, tsDetails);
+    tsCheckpoints = runScenario(scenario, start, tsDetails);
   } catch (e) {
     if (e instanceof DetailError) return harness(e.message);
     // The TypeScript engine refused a command the Rust engine accepted (or an
     // expectFail it did not meet): the divergence the fuzzer exists to find.
-    return { status: "diverged", signature: throwSignature((e as Error).message), message: `DIVERGED before any hash compare, TypeScript runner threw: ${(e as Error).message}` };
+    return { status: "diverged", signature: throwSignature((e as Error).message), message: `DIVERGED before any hash compare, ${leg} runner threw: ${(e as Error).message}` };
   }
   try {
-    const d = compareRuns({ checkpoints: tsCheckpoints, details: tsDetails }, { checkpoints: rustCheckpoints, details: rustDetails });
-    if (d) return { status: "diverged", signature: d.field ? `${d.kind}:${d.field}` : d.kind, message: describeDivergence(d) };
+    const d = compareRuns({ checkpoints: tsCheckpoints, details: tsDetails }, { checkpoints: rustCheckpoints, details: rustDetails }, leg);
+    if (d) return { status: "diverged", signature: d.field ? `${d.kind}:${d.field}` : d.kind, message: describeDivergence(d, leg) };
   } catch (e) {
     return harness((e as Error).message);
   }

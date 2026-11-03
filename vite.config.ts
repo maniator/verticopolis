@@ -240,6 +240,9 @@ function wasmParityProjects() {
     "**/tsEngine.golden.integration.test.ts",
     "**/viewReader.integration.test.ts",
     "**/viewLayoutJson.integration.test.ts",
+    // The nightly's WASM leg runs the TypeScript engine and the shipped build
+    // side by side itself (#1085).
+    "**/fuzzWasmLeg.integration.test.ts",
     // The engine comparison's own checks run each engine themselves (#972).
     "**/perfCompare/*.integration.test.ts",
     // Pure render: it paints in a software raster and never touches the engine,

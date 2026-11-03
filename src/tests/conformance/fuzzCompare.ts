@@ -15,6 +15,11 @@ export interface RunRecord {
  *  the label, the three hashes, then the detail (money, log, save field). */
 export type DivergenceKind = "count" | "label" | "state" | "crowd" | "events" | "money" | "log" | "save";
 
+/** The engine compared with the native Rust run: the TypeScript reference, or
+ *  the shipped WASM build in Node. The record fields keep the name `ts`
+ *  whichever leg filled them. */
+export type Leg = "TypeScript" | "WASM";
+
 export interface Divergence {
   /** The checkpoint index, or the shorter run's length for `count`. */
   index: number;
@@ -60,8 +65,8 @@ function detailDivergence(a: CheckpointDetail, b: CheckpointDetail): Pick<Diverg
  *  agree. A hash difference also names the first thing the detail records show
  *  differing (money, a log part or a save field), so the report points at the
  *  cause as well as the digest. Throws when a record cannot be compared. */
-export function compareRuns(ts: RunRecord, rust: RunRecord): Divergence | null {
-  const problem = recordProblem(ts, "TypeScript") ?? recordProblem(rust, "Rust");
+export function compareRuns(ts: RunRecord, rust: RunRecord, leg: Leg = "TypeScript"): Divergence | null {
+  const problem = recordProblem(ts, leg) ?? recordProblem(rust, "Rust");
   if (problem) throw new Error(problem);
   const n = Math.min(ts.checkpoints.length, rust.checkpoints.length);
   for (let i = 0; i < n; i++) {
@@ -83,7 +88,7 @@ export function compareRuns(ts: RunRecord, rust: RunRecord): Divergence | null {
 }
 
 /** One line for the nightly's log and summary. */
-export function describeDivergence(d: Divergence): string {
+export function describeDivergence(d: Divergence, leg: Leg = "TypeScript"): string {
   const where = d.kind === "count" ? "checkpoint count" : `checkpoint ${d.index} (${d.label}): ${d.kind}${d.field ? ` field ${d.field}` : ""}`;
-  return `DIVERGED at ${where}, TypeScript ${d.ts} vs Rust ${d.rust}`;
+  return `DIVERGED at ${where}, ${leg} ${d.ts} vs Rust ${d.rust}`;
 }
