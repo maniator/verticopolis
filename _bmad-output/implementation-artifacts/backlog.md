@@ -67,6 +67,8 @@ How items flow:
    `2.x` for closed work by release line. A bug is never in `Backlog`, and a
    closed issue never stays there. Bugs that the renderer choice decides ride
    with `4.x`; every other bug goes to `3.0.0`, `3.x` or `Triage`.
+   Whoever files an issue sets its milestone; one filed without a milestone
+   lands in `Triage` through `.github/workflows/issue-milestone.yml`.
    When a row finishes, close the issue (completed or not planned) and set the
    `GH` cell to `—`; when an issue is closed on GitHub first, true up the row
    the same way in the next session that touches this file.

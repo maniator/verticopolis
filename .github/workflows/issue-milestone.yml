@@ -1,0 +1,39 @@
+name: Milestone new issues
+
+# Every issue has a milestone (see "How items flow" in
+# _bmad-output/implementation-artifacts/backlog.md). Whoever files an issue sets
+# one. This is the safety net: an issue that is opened with no milestone goes to
+# Triage, where it gets a decision. It never overwrites a milestone that is
+# already set, and the check reads the issue's live state, so a milestone added
+# a moment after the issue was created (the usual two-step create) wins.
+on:
+  issues:
+    types: [opened]
+
+# Least privilege: setting a milestone only needs write access to issues.
+permissions:
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      ISSUE: ${{ github.event.issue.number }}
+    steps:
+      - name: Put a milestone-less issue in Triage
+        run: |
+          set -euo pipefail
+          current=$(gh api "repos/${GH_REPO}/issues/${ISSUE}" --jq '.milestone.number // empty')
+          if [ -n "$current" ]; then
+            echo "Issue #${ISSUE} already has milestone ${current}; nothing to do."
+            exit 0
+          fi
+          triage=$(gh api "repos/${GH_REPO}/milestones?state=open&per_page=100" --jq '.[] | select(.title == "Triage") | .number')
+          if [ -z "$triage" ]; then
+            echo "::error::No open milestone named Triage."
+            exit 1
+          fi
+          gh api -X PATCH "repos/${GH_REPO}/issues/${ISSUE}" -F milestone="$triage" --silent
+          echo "Issue #${ISSUE} had no milestone; set Triage (${triage})."
