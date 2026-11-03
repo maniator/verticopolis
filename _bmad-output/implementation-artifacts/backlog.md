@@ -69,7 +69,10 @@ How items flow:
    with `4.x`; every other bug goes to `3.0.0`, `3.x` or `Triage`.
    Whoever files an issue sets its milestone; one filed without a milestone
    lands in `Triage` through `.github/workflows/issue-milestone.yml`, and an issue
-   closed while still in `Triage` moves to `3.0.0` the same way.
+   closed while still in `Triage` takes the milestone of the merged pull request that
+   closed it; when there is none to copy (closed as not planned or a duplicate),
+   it stays in `Triage` with `needs-triage` until a person picks the milestone it
+   would have belonged to (never `Backlog`).
    When a row finishes, close the issue (completed or not planned) and set the
    `GH` cell to `—`; when an issue is closed on GitHub first, true up the row
    the same way in the next session that touches this file.
