@@ -8,8 +8,8 @@ name: Milestone new and closed issues
 # live state, so a milestone added a moment after the issue was created (the
 # usual two-step create) wins.
 #
-# A closed issue never stays in Triage either, and it does not all go to one
-# place. If an issue is closed while it is still in Triage (or has no milestone
+# A closed issue is not left in Triage unflagged either, and it does not all go
+# to one place. If an issue is closed while it is still in Triage (or has no milestone
 # at all):
 #   - closed by a merged pull request: it takes that pull request's milestone
 #     (finished work belongs with the release the pull request shipped in);
