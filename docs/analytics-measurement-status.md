@@ -7,8 +7,9 @@ themselves are in [`analytics-data-map.md`](./analytics-data-map.md); the
 counting rules for the engine fault rate are in
 [`scripts/engine-reliability.mjs`](../scripts/engine-reliability.mjs).
 
-> **Snapshot of the review on 2026-11-03.** The statuses below are definitions
-> and change only when the instrumentation changes. The figures in the
+> **Snapshot of the review on 2026-11-03.** The statuses below are definitions.
+> A status changes when the instrumentation changes, and "Insufficient
+> evidence" also moves with traffic and the window. The figures in the
 > snapshot section at the end are dated, do not refresh, and are not release
 > evidence. The live engine figure is
 > `node scripts/engine-reliability.mjs --window <days>`, whose rules
@@ -36,10 +37,14 @@ retention measure and must not be reported as one.
 | Status | Meaning |
 | --- | --- |
 | **Accurate** | Counted exactly for what reaches the relay, with a stated denominator. |
-| **Lower bound** | Counted exactly, but sessions that never report (blockers, offline play, rate limits, tabs killed early) are missing, so the true value is at least this. |
+| **Lower bound** | A count. Counted exactly for what reaches the relay, but sessions that never report (blockers, offline play, rate limits, tabs killed early) are missing, so the true count is at least this. |
+| **Coverage-limited rate** | A rate computed over the sessions or attempts that reported. It is **not** a lower bound: missing sessions can sit in the numerator or the denominator, so the true rate can be higher or lower. Report it as observed, with unknown bias. Its exact 95% upper bound holds for the observed sample only, and assumes independent sessions, which these are not. |
 | **Approximation** | A proxy for the thing named. Never quote it as the thing. |
 | **Incomplete** | The event exists, but part of the outcome space has no event. |
 | **Not measurable** | No event can answer it, by design or because none exists yet. Report "Not measurable", never 0. |
+| **Not measured** | An event exists that could answer it, but no governed query computes it yet. Treat it as unknown until one does. |
+| **Not collected** | The data map lists the event as planned, and the game does not send it. |
+| **Not applicable** | The question no longer applies to this build. |
 | **Insufficient evidence** | Measurable, but the window holds too few sessions or no occurrences, so a clean result proves little. Report the exact upper bound, not "no failures". |
 
 "Release evidence" below means the figure may go in the #945 sign-off packet.
@@ -50,16 +55,16 @@ telemetry and context.
 
 | # | Measure | Source | Denominator | Window | Limits | Status | Release evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Engine fault rate (sessions) | `engine_status` page lives, `engine-reliability.mjs` | Sessions with a settled page life that ran the engine (N) | Any; the candidate-build tail is the evidence | Needs a `settle` row, so a tab that dies during load is not in N. Sessions are not independent, so the exact 95% upper bound is optimistic | Lower bound | **Yes**, with the bound reported as achieved |
-| 2 | Engine faults by reason and by build | Same | Same | Same | A lone `boot-error` cannot be split between a real fault and files that did not arrive whole (#1086 shapes 1 and 2) | Lower bound, reason partly ambiguous | **Yes**, triaged one by one |
-| 3 | Engine initialization failure | `engine_status` `fallback_reason` `boot-error`, `fallback_stage` | N | Same | A boot that throws before the game exists sends no row; `$exception` may report it. Browsers that block the relay send nothing | Lower bound | **Yes**, inside row 1 |
+| 1 | Engine fault rate (sessions) | `engine_status` page lives, `engine-reliability.mjs` | Sessions with a settled page life that ran the engine (N) | Any; the candidate-build tail is the evidence | Needs a `settle` row, so a tab that dies during load is not in N. Sessions that never report can sit in the numerator or the denominator, so the rate has unknown bias. The exact 95% upper bound holds for the observed sample only, and sessions are not independent, so it is optimistic | Fault count: lower bound. Fault rate: **coverage-limited rate** | **Yes**, as an observed rate with its bound, never as a lower bound or a proven rate |
+| 2 | Engine faults by reason and by build | Same | Same | Same | A lone `boot-error` cannot be split between a real fault and files that did not arrive whole (#1086 shapes 1 and 2) | Counts: lower bound; rates: coverage-limited; reason partly ambiguous | **Yes**, triaged one by one |
+| 3 | Engine initialization failure | `engine_status` `fallback_reason` `boot-error`, `fallback_stage` | N | Same | A boot that throws before the game exists sends no row; `$exception` may report it. Browsers that block the relay send nothing | Count: lower bound. Rate: coverage-limited (inside row 1) | **Yes**, inside row 1 |
 | 4 | Package mismatch and unverifiable engine files | `engine_status` `package-mismatch`, `unverifiable` | N | Same | Deploy race and browsers without `crypto.subtle`; deliberately outside the fault rate and printed on their own lines | Accurate for what reports | Reported, never counted as faults |
-| 5 | WASM traps while running | `engine_status` `trap-command`, `trap-tick`, `trap-undo`, `crash-reload` | N | Same | Zero traps seen means zero reported, not zero happened: a tab killed by the trap before the row sends nothing. The reload path is exercised by the forced-trap E2E spec, not by production traffic so far | Lower bound; Insufficient evidence at current volume | **Yes**; any trap is a stop signal |
+| 5 | WASM traps while running | `engine_status` `trap-command`, `trap-tick`, `trap-undo`, `crash-reload` | N | Same | Zero traps seen means zero reported, not zero happened: a tab killed by the trap before the row sends nothing. The reload path is exercised by the forced-trap E2E spec, not by production traffic so far | Count: lower bound; Insufficient evidence at current volume | **Yes**; any trap is a stop signal |
 | 6 | Trap recovery: recovered versus stopped | `crash-reload` row, then the same `distinct_id`'s later page lives; a second trap on a build stops the game and sends a `fallback` row | Sessions with a trap row | Same | Derivable from existing rows, but no governed query computes it today. The reloaded page life boots as `continue`, so only the session sequence tells recovery apart | **Not measured** (derivable) | Needed; see #1623 |
-| 7 | Writer latch-off | `engine_status` `writer_latched`, trigger `writer-latch` | N | Same | Reports only when the latch happens on a page that can still send | Lower bound | **Yes**; any latch-off fails the row |
-| 8 | Autosave and quick-save failures | None. A quick-save failure toasts the player; an autosave failure is silent (#1533) | None | None | No event, so a quota or storage failure is invisible. Indirect hints only: `writer_latched`, `crash.saveFlushed` | **Not measurable** today | Needed (new field, needs approval) |
-| 9 | Load failures | `boot` `reason=corrupt` only | `boot` rows | Any | Covers a corrupt autosave at boot. A failed manual load is invisible (#1533) | **Incomplete** | Needed for the manual-load half |
-| 10 | Import failures (`.vctower`, `.TDT`) | None | None | None | Successes are counted as `app_action` `import_save` and `import_tdt`; failures are not (#1533) | **Not measurable** today | Needed (new field, needs approval) |
+| 7 | Writer latch-off | `engine_status` `writer_latched`, trigger `writer-latch` | N | Same | Reports only when the latch happens on a page that can still send | Count: lower bound. Rate: coverage-limited | **Yes**; any latch-off fails the row |
+| 8 | Autosave, Quick Save and slot-save failures | `app_action` `autosave_failed` (#1533, approved 2026-11-03), once per page life, `detail` `timer` or `manual` | Sessions | Since the build that ships the code | Counts sessions with a failed save, not failures. A failed pre-update or crash-recovery save is not reported (see #1631) (the latch is per page life, so a reload can send a second event; the session count de-duplicates). `timer` includes the tower-swap autosave. A tab killed by the failure reports nothing. Builds before it report nothing, so earlier windows read Not measurable | Count: lower bound from that build. **Rate unavailable**: no autosave attempt or success is sent | Yes, as a count of sessions, for builds that carry it |
+| 9 | Load failures | `boot` `reason=corrupt` (autosave at boot) and `app_action` `load_failed` (slot loads) | `boot` rows; sessions | Since the build that ships the code | `load_failed` cannot tell an empty slot from an unreadable one. Older builds have the boot reason only. Attempts are `load_slot` plus `load_failed`. Quick Load ("No saved tower found") is outside this measure | Count: lower bound from that build. Rate: coverage-limited, per attempt, printed with its bound | Yes, for builds that carry it |
+| 10 | Import failures (`.vctower`, `.TDT`) | `app_action` `import_failed`, `detail` `save` or `tdt` | Import attempts (`import_save`, `import_tdt`) | Since the build that ships the code | A refusal is counted once per attempt; a file the picker never hands over is not seen. Attempts are the `import_save` and `import_tdt` rows, sent when the file is handed over | Count: lower bound from that build. Rate: coverage-limited, per attempt, printed with its bound | Yes, for builds that carry it |
 | 11 | Save and load usage | `app_action` `save_slot`, `quick_save`, `load_slot`, `export_save` | Sessions | Any | Successes only, with no attempt count, so it is not a success rate | Approximation (usage), never an outcome rate | No |
 | 12 | Crash screens (lost WebGL context) | `crash` | Crash rows | Any | Capped and deduplicated per page life, so the count of repeats is lost (#841). This is a renderer failure, not an engine fault | Incomplete (magnitude) | Reported separately from row 1 |
 | 13 | `$exception` counts | `$exception` | Rows | Any | Raw counts, capped at 10 per page life, not classified by origin (#1090). Never present a raw count as engine failures | Approximation | Only once classified (#1090) |
@@ -73,6 +78,21 @@ telemetry and context.
 | 21 | Frame rate in the field | `session_fps` | Sessions | Any | Sampled at session end, so a killed tab sends none | Lower bound | No (the performance gate uses the pinned PC protocol) |
 | 22 | Build identity (`version`, `sha`) | Every `engine_status` row | N | Any | Accurate; a forged row with valid codes cannot be told apart | Accurate | Yes, for by-build lines |
 | 23 | Engine divergence reports (#954) | None | None | None | Planned in the data map, never collected; its premise (a TypeScript instance to disagree with) ended with the Rust-only build | Not collected | No; the data map's "Planned" entry should be retired |
+
+## Counts and rates for the persistence failures
+
+`scripts/persistence-failures.mjs` (printed under the rate by
+`scripts/engine-reliability.mjs`) keeps counts and rates apart. A count is what
+the relay received. A rate is printed only where the game sends the attempts:
+each import over its own `import_save` or `import_tdt` attempts, and slot loads
+as `load_failed` over `load_slot` plus `load_failed`. The autosave rate is
+**unavailable**: the game sends no autosave attempt or success, and the failure
+is latched once per page life, so the report counts sessions with a failure, not failures. A
+denominator is never inferred from another event. A window with no attempts
+reads Insufficient evidence, and a window before the first build that sends the
+codes reads Not measurable. The first build is `PERSISTENCE_FAILURE_SINCE` in
+the script. Volume is expected to be low, so expect Insufficient evidence or
+wide bounds for a while.
 
 ## Telemetry coverage: why 91 and 104 are not a gap of 13
 
@@ -109,7 +129,7 @@ production only. Live figures: re-run the script above.
 **Governed.** The script's own counting code, run on the rows of its own
 page-life query (the query text came from `buildPageLivesQuery`; the rows came
 through the PostHog connector because this review had no API key, so the
-transport and the 500-row cap of the connector differ from the script's):
+transport and its 500-row cap differ from the script's 50,000-row cap):
 104 engine sessions, 166 page lives that ran the engine, 1 session with an
 engine fault (0.96%, exact 95% upper bound 4.48%). The one fault is a
 `boot-error` on 2.74.3 (2026-10-31 19:55 UTC); no `trap-*`, no
@@ -133,8 +153,8 @@ code, not as a substitute for the script run with the API key.
 
 ## Where the gaps are tracked
 
-- Save, load and import failure events: #1533 (new `app_action` codes need
-  the owner's approval before they ship).
+- Save, load and import failure events: #1533 (the three `app_action` codes
+  were approved 2026-11-03 and ship with this page's change).
 - Trap during attach and older restore points: #1204.
 - Deploy-race shapes still coded as `boot-error`: #1086.
 - Crash loop magnitude: #841.

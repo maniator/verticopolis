@@ -74,7 +74,7 @@ an event sent before boot carries `version` only.
 | `session_builds` | `builds` | Session end | Build volume |
 | `session_peak_floors` | `floors` | Session end | Height reached |
 | `session_fps` | `p50`, `low`, `samples` | Session end | Frame rate |
-| `app_action` | `action`, `detail` | An app-chrome action | Which saves, dialogs and settings get used |
+| `app_action` | `action`, `detail` | An app-chrome action | Which saves, dialogs and settings get used, and whether saves, loads and imports fail (see below) |
 | `economy_action` | `action`, `detail` | Demolish, price or capacity tuning | The removal and tuning side of play |
 | `emergency_choice` | `kind`, `decision` | An answered emergency prompt | Accept and decline split |
 | `session_emergencies` | `fires`, `firesGutRooms`, `bombs` | Session end | How often emergencies happen |
@@ -94,6 +94,20 @@ Outside the typed vocabulary:
   Help copy says so.
 - **Vercel page-view counts and Speed Insights** (`src/telemetry.ts`): anonymous
   page visits and page performance metrics, on the same host gate.
+
+## Persistence failure actions
+
+Three `app_action` codes report a save, load or import that failed (#1533, approved 2026-11-03). Each is the fact only, never a message, file name or tower content.
+
+| `action` | `detail` | When | Reading |
+| --- | --- | --- | --- |
+| `autosave_failed` | `timer` or `manual` | A background autosave (`timer`, which includes the tower-swap autosave) or a Quick Save or slot save (`manual`) threw, such as a full or blocked `localStorage` | Latched once per page life, so events can exceed sessions; read sessions with a failed save, not failures. The `detail` is the first source that failed |
+| `load_failed` | none | A slot load from the saves manager or the title-screen picker adopted nothing | An empty slot and an unreadable one read alike. Quick Load ("No saved tower found") is not counted |
+| `import_failed` | `save` (.vctower) or `tdt` (.TDT) | An imported file was refused or unreadable | Counted per attempt |
+
+These are lower bounds like every client event: a failure that kills the tab, or
+a blocked relay, reports nothing. `docs/analytics-measurement-status.md` rows 8
+to 10 say what they can and cannot support.
 
 ## `engine_status`
 
@@ -164,7 +178,8 @@ own line. Rows from the retired cohort are read as they were sent: overrides and
 the `unassigned` arm are left out unless asked for, and safety-suppressed page
 lives (which ran TypeScript) are always left out and counted on their own line.
 The bound is the exact one-sided 95% Clopper-Pearson bound, by build and by arm
-as well. That rate is early telemetry. It is a lower bound: the relay has no
+as well. That rate is early telemetry. The fault count is a lower bound and the rate is
+observed and coverage-limited, with unknown bias, because the relay has no
 offline queue and a per-IP limit, a tab closed or crashed while the engine loads
 is counted as having left (its `attempt` row is the only one it sent), runtime traps are reported only from
 builds that carry #874, and the worker host reports only its first tower. The
