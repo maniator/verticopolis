@@ -8,16 +8,16 @@
  * and retail, entertainment, amenities, services, shafts). In Modern the room
  * groups each get their own pattern, the three elevator kinds get one each, and
  * the plain solid groups (floor, lobby, offices) differ in lightness by a wide
- * margin, so the tower reads without color vision. A kind with no group is a compile error
- * (`KIND_GROUP` is an exhaustive record). A kind the table has never heard of
+ * margin, so the tower reads without color vision. A kind with no group is a
+ * compile error (`KIND_GROUP` is an exhaustive record). A kind the table has never heard of
  * at run time (a forged save, a newer engine) paints as a loud placeholder.
  *
  * Classic follows what the retail game's Edit tab draws, measured on the PC
  * harness (SPEC, "Retail capture findings"): one flat light-gray silhouette for
  * every structure run and room, with the shafts picked out as lines (black
  * standard elevators, red service, blue express; stairs and escalators are not
- * drawn). It carries no pattern, since the original
- * does not tell kinds apart there. Modern keeps the per-kind groups: the room
+ * drawn). It carries no pattern, since the original does not tell kinds apart
+ * there. Modern keeps the per-kind groups: the room
  * groups get a pattern each as an accessibility addition, and the fills are the
  * facility colors the sprites and palette already use.
  */
@@ -101,7 +101,8 @@ export const GROUP_PATTERN: Readonly<Record<MapGroup, MapPattern>> = {
   elevatorExpress: "grid",
 };
 
-/** Classic's tower: one flat light gray for everything that is not a shaft. */
+/** Classic's tower: one flat light gray for every structure run and room (the
+ *  elevators are colored lines, and stairs and escalators are not drawn). */
 export const CLASSIC_TOWER_FILL = "#cccccc";
 
 /** Classic's elevator lines, confirmed against the retail saves: each shaft's
@@ -163,7 +164,10 @@ export interface MapKindStyle {
 export const UNKNOWN_KIND_STYLE: MapKindStyle = { fill: "#ff00ff", pattern: "outline" };
 
 /** The fill and pattern for a kind in a theme. An unknown kind or theme at run
- *  time reads as the placeholder and as Modern, never throws. */
+ *  time reads as the placeholder and as Modern, never throws. It answers for
+ *  every kind, including the ones a theme leaves off the map: ask `drawsOnMap`
+ *  first (a legend or a view that paints marks must, or Classic stairs would
+ *  show as gray marks in the sky). */
 export function mapStyleFor(kind: FacilityKind, theme: MapTheme): MapKindStyle {
   if (!Object.prototype.hasOwnProperty.call(KIND_GROUP, kind)) return UNKNOWN_KIND_STYLE;
   const group = KIND_GROUP[kind];

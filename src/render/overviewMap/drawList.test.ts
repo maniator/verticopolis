@@ -144,4 +144,30 @@ describe("buildMapDrawList", () => {
     const [m] = buildMapDrawList(layout, source({ rooms: [{ kind: "office", floor: 5, x: 370, width: 9 }] }));
     expect(m.rect.x + m.rect.w).toBe(layout.width);
   });
+
+  it("draws shafts as lines at their left tile when asked, and leaves rooms and structure alone", () => {
+    const src = source({
+      structure: [{ kind: "floor", floor: 1, x: 0, width: 1, count: 60 }],
+      rooms: [{ kind: "office", floor: 1, x: 10, width: 9 }],
+      transports: [
+        { kind: "elevatorExpress", x: 40, width: 4, bottom: 1, top: 30 },
+        { kind: "elevatorStandard", x: 374, width: 4, bottom: 1, top: 2 },
+      ],
+    });
+    const blocks = buildMapDrawList(layout, src);
+    const lines = buildMapDrawList(layout, src, { shaftLineWidth: 2 });
+    expect(lines[0]).toEqual(blocks[0]);
+    expect(lines[1]).toEqual(blocks[1]);
+    expect(lines[2].rect).toEqual({ ...blocks[2].rect, w: 2 });
+    // A shaft in the last column moves in just enough to keep its whole line on the map.
+    expect(lines[3].rect.w).toBe(2);
+    expect(lines[3].rect.x).toBe(layout.width - 2);
+  });
+
+  it("draws blocks for a line width that is not a positive number", () => {
+    const src = source({ transports: [{ kind: "elevatorService", x: 40, width: 4, bottom: 1, top: 3 }] });
+    const blocks = buildMapDrawList(layout, src);
+    for (const w of [0, -1, NaN, Infinity]) expect(buildMapDrawList(layout, src, { shaftLineWidth: w })).toEqual(blocks);
+    expect(buildMapDrawList(layout, src, { shaftLineWidth: 0.4 })[0].rect.w).toBe(1);
+  });
 });

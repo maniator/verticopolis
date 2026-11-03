@@ -30,10 +30,10 @@ Sources: the retail manual's Map Window and Tutorial sections (PDF pp. 14, 23, 3
 
 - A small separate window shows the whole lot as a miniature, in a schematic tower layout.
 - An outlined rectangle marks what the main view shows. Clicking the map or dragging the rectangle scrolls the main view.
-- The tower is drawn in gray, with elevators as lines colored by kind (the manual: express blue, standard gray, service red).
+- The tower is drawn in gray, with elevators as lines colored by kind (the manual: express blue, standard gray, service red; the retail capture shows the standard line black, see the SPEC's Retail capture findings).
 - Four buttons sit on top: Edit (the default), Eval, Pricing, Hotel. Eval colors tenants by rating, Pricing by rent level, Hotel marks rooms that are dirty in red. The three tinted views pause the game while active.
 - The lot is 375 segments wide and the map shows it in full, basements included.
-- The manual's tutorial describes the elevator as a black vertical line, while its Map Window section gives colors by kind; the plain description does not settle which Classic should draw. v1 draws a shaft-width mark colored by kind.
+- The manual's tutorial describes the elevator as a black vertical line, while its Map Window section gives colors by kind; the plain description did not settle which Classic should draw. The retail capture settled it: Classic draws a line 1 CSS px wide at the shaft's left tile, colored by kind, and leaves stairs and escalators out (SPEC, Retail capture findings).
 - Pixel-level styling was measured later the same day from the PC harness (decision 4): see the SPEC's Retail capture findings. The window is fixed at 200 by 288 px with a fixed scale, and the Edit tab is a flat gray silhouette with no rooms, which changes the Classic style (slice S2b).
 
 ## Architecture findings
@@ -60,15 +60,16 @@ Sources: the retail manual's Map Window and Tutorial sections (PDF pp. 14, 23, 3
 | Slice | Scope | Status |
 | --- | --- | --- |
 | S0 | Spec and evidence: `SPEC.md`, optional retail MAP capture on the PC | spec written; retail capture done, findings in the SPEC |
-| S1 | Pure geometry (`src/render/overviewMap/geometry.ts`) with unit tests | in this PR |
-| S2 | Draw-list builder and style table (`src/render/overviewMap/`) with unit tests and a large-tower budget test | in this PR |
-| S2b | Apply the retail capture to Classic: flat gray silhouette, 1 px shaft lines, fixed-scale layout option, dotted camera outline (SPEC, Retail capture findings); the style table part only, the fixed-scale layout and camera outline land in S3 | in review |
-| S3 | Window, Map button, camera binding, a11y, "Floor heatmap" rename; all chrome and CSS in one PR | after file ownership is agreed |
+| S1 | Pure geometry (`src/render/overviewMap/geometry.ts`) with unit tests | merged (#1626) |
+| S2 | Draw-list builder and style table (`src/render/overviewMap/`) with unit tests and a large-tower budget test | merged (#1626) |
+| S2b | Apply the retail capture to Classic: flat gray silhouette, 1 px shaft lines, fixed-scale layout option, dotted camera outline (SPEC, Retail capture findings); the style table part only, the fixed-scale layout and camera outline land in S3 | merged (#1636); retail elevator colors and stairs left out of Classic in #1640 |
+| S3a | Pure state, no caller: Classic shaft lines, the Modern banded crop, the view's placement against the map (clipped, above, below) and the edge band, the text summary, the per-layout open preference, and the model that decides when to rebuild and redraw | in review, stacked on #1640 |
+| S3b | Window, Map button and phone pill, camera binding (click, tap, drag, keys), a11y, "Floor heatmap" rename; all chrome and CSS in one PR, hidden from players until S5 | after S3a |
 | S4 | Playwright desktop and phone-touch specs, visual snapshots (pinned image), gallery scenes, large-tower performance run with the real catalog height lookup, the real pattern source and a real canvas (the S2 unit budget is synthetic and only pins the algorithm's shape), PC run for hardware claims | after S3 |
 | S5 | Help entry, CHANGELOG line, minor version bump, backlog row finished, #343 closed | after S4 |
 | S6 | Hotel (#1617), Eval (#1618), Pricing (#1619): 3.1.0 | later |
 
-Visibility rule (decision 8): S1 and S2 are pure modules with no caller, so merging them exposes nothing. The Map button and window arrive only in S3 and are enabled for players only once S3 to S5 are all merged.
+Visibility rule (decision 8): S1 and S2 are pure modules with no caller, so merging them exposes nothing. S3a adds more pure modules with no caller. The Map button and window arrive only in S3b and are enabled for players only once S3 to S5 are all merged.
 
 ## Risks
 
