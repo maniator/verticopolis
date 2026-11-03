@@ -107,3 +107,16 @@ pub(super) fn vacate_reason(v: Option<&Value>) -> Option<&'static str> {
         _ => return None,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The web keeps the same pair in `src/shared/viewZoom.ts` and pins it in
+    /// `src/shared/viewZoom.test.ts`. Change all three together.
+    #[test]
+    fn view_zoom_range_matches_the_web_copy() {
+        assert_eq!(VIEW_ZOOM_MIN, 0.06);
+        assert_eq!(VIEW_ZOOM_MAX, 3.0);
+    }
+}

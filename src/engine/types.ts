@@ -148,45 +148,9 @@ export function isVacateReason(v: unknown): v is VacateReason {
   return typeof v === "string" && VACATE_REASONS.has(v);
 }
 
-/** A unit that is live: not under construction, ablaze, or a burned-out shell.
- *  The single predicate every "is this room working?" check should route through
- *  so a new inert state (like `gutted`) is honored everywhere at once. */
-export function isOperational(u: { state: UnitState }): boolean {
-  return u.state !== "construction" && u.state !== "fire" && u.state !== "gutted";
-}
-
-/** People are physically present (the canon "counts as live population" rule):
- *  a settled/working tenant, a sleeping guest, or a lease on notice (`vacating`)
- *  — who hasn't actually left yet and so keeps counting until the departure
- *  resolves. (`moving_in` is a reserved lifecycle state the sim never currently
- *  assigns; it stays in the set so it would count if a move-in phase is added.) */
-export function isPresent(u: { state: UnitState }): boolean {
-  return (
-    u.state === "occupied" ||
-    u.state === "asleep" ||
-    u.state === "moving_in" ||
-    u.state === "vacating"
-  );
-}
-
-/** State-based: a unit that is settled (`occupied`) or on notice (`vacating`) —
- *  i.e. still in residence, not yet gone. Purely a `state` check, so it applies
- *  to any unit the caller iterates (population, crowd, events), not just leases;
- *  today only office/condo leases ever reach `vacating`, but the predicate makes
- *  no such assumption. Both states pay rent, count toward population, and
- *  commute — a vacating tenant merely carries a pending departure a timely fix
- *  can still rescind — so routing through this keeps the grace-period state
- *  honored everywhere at once. */
-export function isTenanted(u: { state: UnitState }): boolean {
-  return u.state === "occupied" || u.state === "vacating";
-}
-
-/** Nobody home and nothing to simulate: the per-tick loops skip these (NOT the
- *  inverse of {@link isOperational}; an operational `empty` is dormant). `infested` is here so a roach-ruined room isn't dragged through the satisfaction loop and self-vacated to a free `empty`, bypassing its bulldoze/exterminator recovery. */
-export function isDormant(u: { state: UnitState }): boolean {
-  const s = u.state;
-  return s === "empty" || s === "construction" || s === "fire" || s === "gutted" || s === "infested";
-}
+// The unit-state predicates live in `shared/unitState.ts` so the web can use them
+// without importing this module at runtime; the engine keeps its old names.
+export { isOperational, isPresent, isTenanted, isDormant } from "../shared/unitState";
 
 export interface Facility {
   kind: FacilityKind;
@@ -383,26 +347,9 @@ export interface LogEntry {
   kind: "info" | "good" | "bad" | "money";
 }
 
-/** Camera zoom bounds (screen pixels per world pixel). Owned here because the
- *  save schema clamps a restored zoom at the deserialize trust boundary; the
- *  renderer re-exports these as its own MIN_ZOOM/MAX_ZOOM so the range exists
- *  in exactly one place.
- *
- *  `VIEW_ZOOM_MIN` is the absolute HARD floor: low enough that the tallest legal
- *  tower fits even a small phone held in LANDSCAPE (the manifest allows any
- *  orientation, so a short viewport must still frame the whole tower). The span
- *  that has to fit is the 110 buildable floors (basement B10 up to floor 100)
- *  plus `fitZoom`'s own 6-floor sky headroom (FIT_SKY_FLOORS), i.e. 116 floors
- *  (this is the renderer's fit-span, not clampCameraY's dirt-margin math): ~116
- *  floors x 44px x 0.06 is about 306px, under any real device height. It is not
- *  the everyday
- *  zoom-out limit a player feels; the renderer layers a tower-aware fit floor on
- *  top of it (see `fitZoom` in render/cameraBounds), so pinch/wheel/keyboard
- *  zoom-out stops when the whole tower plus a breath of sky is in frame rather
- *  than drifting into empty void. This constant only guards the trust boundary
- *  (a forged or foreign save's zoom) and backstops the dynamic floor. */
-export const VIEW_ZOOM_MIN = 0.06;
-export const VIEW_ZOOM_MAX = 3;
+/** Camera zoom bounds. They live in `shared/viewZoom.ts`; the save schema clamps a
+ *  restored zoom to them at the deserialize trust boundary. */
+export { VIEW_ZOOM_MIN, VIEW_ZOOM_MAX } from "../shared/viewZoom";
 
 /**
  * The camera view carried inside a save: the camera CENTER in grid units
