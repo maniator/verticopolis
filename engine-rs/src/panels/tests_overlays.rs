@@ -229,3 +229,24 @@ fn the_overlay_extents_follow_every_layout_edit() {
     assert_eq!(extent(&sim, 4), None, "a removal drops the floor");
     assert_eq!(extent(&sim, 2), Some(before));
 }
+
+/// The onboarding floor fact is kept per revision, so a build and a sale
+/// have to move it (#1237).
+#[test]
+fn the_onboarding_floor_fact_follows_a_build_and_a_sale() {
+    let mut sim = crate::sim::Simulation::new_game(3, GameMode::Classic);
+    let floor = |sim: &crate::sim::Simulation| sim.onboarding_facts()["floor"].clone();
+    for x in 150..230 {
+        put(&mut sim, Kind::Lobby, 1, x);
+    }
+    assert_eq!(floor(&sim), json!(false), "a lobby alone is not a floor");
+    assert_eq!(floor(&sim), json!(false), "a repeat read agrees");
+    put(&mut sim, Kind::Floor, 2, 170);
+    assert_eq!(floor(&sim), json!(true), "a build moves it");
+    let tile = id_at(&sim, 2, 170);
+    assert!(sim.tower.remove_unit(tile).is_some());
+    assert_eq!(floor(&sim), json!(false), "a sale moves it back");
+    // What a read with no memo says.
+    sim.tower.memo.borrow_mut().floor_above_lobby = None;
+    assert_eq!(floor(&sim), json!(false));
+}

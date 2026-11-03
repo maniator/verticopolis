@@ -14,7 +14,8 @@
 //! They are keyed on `revision` and the unit count. Every placement and
 //! removal bumps the revision, a load ends in `reindex`, which resets the
 //! memo and bumps it too, and no other path adds, removes, moves, resizes or
-//! retypes a unit (the census reads each unit's kind and floor). The
+//! retypes a unit (the census, the overlay floor extents and the onboarding
+//! floor fact read each unit's kind and floor). The
 //! dispatch floor lists also read the transports' spans and stops and the
 //! lobby tiles: placing, removing or resizing a transport, a stop toggle, a
 //! stop clear and the express-stop rule bump the revision as well. The
