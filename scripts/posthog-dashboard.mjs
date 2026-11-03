@@ -508,6 +508,16 @@ function buildInsights(ids) {
       }),
     },
     {
+      name: "Persistence failures (counts, not rates)",
+      description:
+        "autosave_failed, load_failed and import_failed events, by action, production (#1533). These are COUNTS. A rate needs attempts: imports have them (import_save, import_tdt) and slot loads have them (load_slot plus load_failed); autosave has none, so its rate is unavailable. scripts/engine-reliability.mjs prints the rates and bounds. Only builds from 2.78.4 send these codes, so an earlier range reads Not measurable, not zero. See docs/analytics-measurement-status.md.",
+      query: trends([series("app_action", "Failures")], {
+        breakdown: "action",
+        display: "ActionsBar",
+        where: [inAction(["autosave_failed", "load_failed", "import_failed"])],
+      }),
+    },
+    {
       name: "Persistence actions by platform (cohort)",
       description: "The persistence surface split by platform, so 'who exports' reads as a cohort (web / twa / ios), production. Never a person.",
       query: trends([series("app_action", "Actions")], {

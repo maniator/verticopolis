@@ -93,9 +93,12 @@
  * host reports only its first tower (none of its runtime faults). Outcomes are as of the run, so a page
  * life that settled near the end of the window can still fall back later. A
  * page life that never became visible (a background tab) still counts. The
- * rate is a lower bound, and the report says so at the top. Sessions are not
- * independent (a device that traps once may trap every time), so the bound is
- * optimistic; triage reads repeats by reason and build.
+ * count is a lower bound; the rate is not. It is an observed, coverage-limited
+ * rate with unknown bias (sessions that never report can sit in the numerator
+ * or the denominator), and the report says so at the top. The exact bound holds
+ * for the observed sample only. Sessions are not independent (a device that
+ * traps once may trap every time), so the bound is optimistic; triage reads
+ * repeats by reason and build.
  *
  * Run: `POSTHOG_PERSONAL_API_KEY=phx_... node scripts/engine-reliability.mjs
  * --window 30 [--hosts wasm] [--shas abc1234,def5678] [--versions 2.36.0]
@@ -467,7 +470,7 @@ export function renderReliabilityMarkdown(summary, meta) {
     `> **Snapshot** of the ${meta.windowLabel} to ${meta.until} (UTC), production only: the page lives that settled (or made an attempt) in that window. It does not refresh: the live figure is this script run again (\`node scripts/engine-reliability.mjs\`), whose rules \`src/engine-reliability.test.ts\` pins.`,
     `> Counted: hosts ${meta.hosts.map(code).join(", ")}; builds ${meta.builds}; arms ${meta.arms}.`,
     "> **This overall rate is early telemetry** (plan 4.1, OD-2): it is never release evidence, so triage each failure, and do not publish it as a reliability figure. The Rust engine is now the only engine the shipped game runs, so the staged cohort and its arm comparison are gone and old rows are counted as they were sent.",
-    "> **A lower bound.** The relay is best-effort, with no offline queue and a per-IP rate limit, so a fallback in an offline session, a tab closed while the engine loads, a tab killed before it reports (or after a capped drop with no later hide) and a boot whose game never started after its engine failed never count. Runtime traps are not reported before #874. Outcomes are as of this run, so a page life that settled near the end of the window can still fall back. Background tabs that were never seen still count. Sessions are not independent, so the bound below is optimistic.",
+    "> **Coverage-limited.** The fault count is a lower bound: the relay is best-effort, with no offline queue and a per-IP rate limit, so a fallback in an offline session, a tab closed while the engine loads, a tab killed before it reports (or after a capped drop with no later hide) and a boot whose game never started after its engine failed never count. The fault rate is not a lower bound. It is observed over the sessions that reported, with unknown bias: sessions that never report can sit in the numerator or the denominator, so the true rate can be higher or lower. The exact bound below holds for the observed sample only, and assumes independent sessions, which these are not (a device that traps once may trap every time), so it is optimistic. Runtime traps are not reported before #874. Outcomes are as of this run, so a page life that settled near the end of the window can still fall back. Background tabs that were never seen still count.",
   ];
   if (meta.hosts.includes("wasm-worker")) lines.push("> **The worker host** reports only its first tower, so its later fallbacks are missing, and its `other` is a boot step outside the engine, counted as a fault.");
   if (meta.truncated) lines.push(`> **Truncated:** the query hit a row limit (${ROW_LIMIT.toLocaleString("en-US")} asked for), so these counts are short. Narrow the window.`);
@@ -601,10 +604,15 @@ async function main() {
     arms: opts.arms ? each(opts.arms) : `all but ${EXCLUDED_ARMS.map(code).join(" and ")}`,
     truncated,
   });
-  console.log(md);
+  // The persistence failure counts ride under the rate (#1533), with their own
+  // counts-versus-rates rules (`persistence-failures.mjs`). A dynamic import:
+  // that module reads `upperBound` from this one.
+  const { persistenceSection } = await import("./persistence-failures.mjs");
+  const full = `${md}\n\n${await persistenceSection(span.hours, `last ${span.label}`)}\n`;
+  console.log(full);
   if (process.env.GITHUB_STEP_SUMMARY) {
     try {
-      appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
+      appendFileSync(process.env.GITHUB_STEP_SUMMARY, full);
     } catch {
       /* best-effort */
     }

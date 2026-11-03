@@ -132,6 +132,14 @@ impl Engine {
         }
     }
 
+    /// The Auto-tune proposal for a shaft (`wasm_port_life.rs`): a keyed
+    /// object, read-only. `draft` is the dialog's working schedule in
+    /// `scheduleShaft`'s slots, or empty for none.
+    #[wasm_bindgen(js_name = autoTuneProposal)]
+    pub fn auto_tune_proposal(&self, id: f64, draft: &[f64], weekend_view: bool) -> JsValue {
+        parse_service_diagnostics_json(&self.port_auto_tune_proposal(id, draft, weekend_view))
+    }
+
     #[wasm_bindgen(js_name = unitFacts)]
     pub fn unit_facts(&mut self, id: f64) -> Vec<f64> {
         self.port_unit_facts(id)

@@ -422,6 +422,7 @@ export class TsEngine implements PortState {
   quoteShaft = (kind: number, x: number, bottom: number, top: number) => ask.quoteShaft(this, kind, x, bottom, top);
   quoteRentBatch = (kind: number, target: number, onlyDefault: boolean) => ask.quoteRentBatch(this, kind, target, onlyDefault);
   shaftSchedule = (id: number) => ask.shaftSchedule(this, id);
+  autoTuneProposal = (id: number, draft: Float64Array, weekendView: boolean) => ask.autoTuneProposal(this.current, id, draft, weekendView);
   founder = () => this.current.founder;
   statsStrip = () => ask.statsStrip(this.current);
   hotspot = () => ask.hotspot(this.current);

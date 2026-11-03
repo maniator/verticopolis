@@ -2,7 +2,7 @@
  * Paints a draw list onto a 2D canvas context (#343). Nothing here reads the
  * simulation: it takes the marks and a theme, looks each kind's style up, and
  * fills rectangles. A pattern is one cached tile per fill, pattern and theme,
- * so a repaint is one `fillRect` per mark, with the style resolved once per run
+ * so a repaint is at most one `fillRect` per mark (Classic skips the kinds it does not draw), with the style resolved once per run
  * of same-kind marks (the draw list groups them) and the fill style changing
  * only when the style does.
  *
@@ -12,7 +12,7 @@
  * per canvas: a repeating fill is created on one context and cached by fill,
  * pattern and theme only.
  */
-import { mapStyleFor, patternInk, type MapPattern, type MapTheme } from "./style";
+import { drawsOnMap, mapStyleFor, patternInk, type MapPattern, type MapTheme } from "./style";
 import type { MapMark } from "./drawList";
 
 /** The slice of a 2D context the painter uses. */
@@ -112,8 +112,9 @@ export function createPatternSource(makeCanvas: () => HTMLCanvasElement, target:
 export const MIN_PATTERN_SIDE = PATTERN_TILE;
 
 /**
- * Clear the map and paint `marks` in order. Returns how many `fillRect` calls
- * the marks took, which the budget tests read.
+ * Clear the map and paint `marks` in order, skipping kinds the theme does not
+ * draw (`drawsOnMap`). Returns how many `fillRect` calls the marks took, which
+ * the budget tests read.
  */
 export function paintMapMarks(
   ctx: MapPaintContext,
@@ -128,15 +129,20 @@ export function paintMapMarks(
   let kind: MapMark["kind"] | null = null;
   let styled: string | CanvasPattern = "";
   let plain: string | CanvasPattern = "";
+  let drawn = true;
   let fills = 0;
   for (const mark of marks) {
     if (mark.kind !== kind) {
       // The draw list groups same-kind marks, so this resolves about once per kind.
-      const style = mapStyleFor(mark.kind, theme);
-      styled = patterns.get(style.fill, style.pattern, theme);
-      plain = patterns.get(style.fill, "solid", theme);
       kind = mark.kind;
+      drawn = drawsOnMap(kind, theme);
+      if (drawn) {
+        const style = mapStyleFor(kind, theme);
+        styled = patterns.get(style.fill, style.pattern, theme);
+        plain = patterns.get(style.fill, "solid", theme);
+      }
     }
+    if (!drawn) continue;
     const small = mark.rect.w < MIN_PATTERN_SIDE || mark.rect.h < MIN_PATTERN_SIDE;
     const fillStyle = small ? plain : styled;
     if (fillStyle !== last) {

@@ -72,6 +72,7 @@ mod scenario_star_tests;
 #[cfg(test)]
 mod scenario_tune_tests;
 pub mod schedule;
+pub mod schedule_authoring;
 pub mod services;
 pub mod sim;
 pub mod sim_loop;

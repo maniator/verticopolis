@@ -198,6 +198,17 @@ describe("paintMapMarks", () => {
     expect(String(big.styleSets[0])).toContain("dots:");
   });
 
+  it("leaves stairs and escalators out of a Classic map, even one that overhangs a floor's end, and draws them in Modern", () => {
+    // A stair may stick out past the end of a floor row (the engine needs structure under one of its tiles),
+    // so this one starts inside the 40-wide floor and ends past it.
+    const at = (m: MapMark, x: number): MapMark => ({ ...m, rect: { ...m.rect, x } });
+    const marks = [mark("floor", 40, 4), at(mark("stairs", 8, 8), 36), mark("escalator", 8, 8), mark("elevatorStandard", 4, 20)];
+    const classic = fakeCtx();
+    expect(paintMapMarks(classic, 60, 30, marks, "classic", plain)).toBe(2);
+    expect(classic.styleSets).toEqual(["#cccccc", "#000000"]);
+    expect(paintMapMarks(fakeCtx(), 60, 30, marks, "modern", plain)).toBe(4);
+  });
+
   it("paints an empty list as a cleared map", () => {
     const ctx = fakeCtx();
     expect(paintMapMarks(ctx, 5, 5, [], "modern", plain)).toBe(0);

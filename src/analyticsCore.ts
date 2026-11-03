@@ -258,6 +258,16 @@ export type AppActionName =
   | "import_save"
   | "export_tdt"
   | "import_tdt"
+  // Persistence FAILURES (the 3.0 reliability gate, #1533). `autosave_failed`
+  // is latched once per page life (a full disk fails every 30 s tick), with
+  // `detail` `timer` or `manual` (Quick Save and slot saves). `load_failed` is a
+  // slot or title-screen load that adopted nothing (an empty or unreadable
+  // slot; the two read alike). `import_failed` is a refused or unreadable file,
+  // `detail` `save` (.vctower) or `tdt` (.TDT). The fact only: never the
+  // message, the file name or any tower content.
+  | "autosave_failed"
+  | "load_failed"
+  | "import_failed"
   // Dialogs / navigation.
   | "settings_open"
   | "help_open"

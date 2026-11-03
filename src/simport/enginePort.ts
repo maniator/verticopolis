@@ -67,6 +67,41 @@ export interface ServiceDiagnosticFacts {
   };
 }
 
+/** How an Auto-tune proposal query ended. The engine decides every status;
+ *  the host only picks wording and button state from it. */
+export type AutoTuneStatus =
+  | "available"
+  | "insufficient-data"
+  | "unavailable-in-mode"
+  | "not-an-elevator"
+  | "missing-shaft"
+  | "invalid-draft";
+
+/** One day type's readiness: `warm` is what Auto-tune needs to tune that day.
+ *  A warm day also carries its measured 24-hour `curve` (0 to 1 per hour of
+ *  day), the ring the engine tuned from; a cold day has none. */
+export interface AutoTuneDay {
+  readonly warm: boolean;
+  readonly sampledHours: number;
+  readonly curve: readonly number[] | null;
+}
+
+/** What `autoTuneProposal` answers (engine-rs `schedule_authoring.rs`).
+ *  `proposal` is present only for `available`. A day type that is not warm
+ *  keeps the draft's own row (null when the draft has none). */
+export interface AutoTuneProposal {
+  readonly status: AutoTuneStatus;
+  readonly weekday: AutoTuneDay;
+  readonly weekend: AutoTuneDay;
+  readonly proposal: {
+    readonly weekday: readonly number[] | null;
+    readonly weekend: readonly number[] | null;
+    readonly homeFloors: readonly number[];
+    /** True when the engine seeded the homes, false when they are the draft's own. */
+    readonly homesSeeded: boolean;
+  } | null;
+}
+
 /** A `Float64Array` record whose slots `viewLayout().records` names. */
 export type PortRecord = Float64Array;
 
@@ -177,6 +212,11 @@ export interface EnginePortQueries {
   quoteRentBatch(kind: number, target: number, onlyDefault: boolean): PortRecord;
   /** A shaft's schedule as `scheduleShaft`'s slots; empty when it has none. */
   shaftSchedule(id: number): PortRecord;
+  /** The read-only Auto-tune proposal for a shaft against the dialog's
+   *  working schedule (`scheduleShaft`'s slots, empty for none, home count 0
+   *  for staging the player has not set by hand). `weekendView` is the day tab
+   *  on screen. Writes nothing; applying it is the ordinary `scheduleShaft`. */
+  autoTuneProposal(id: number, draft: Float64Array, weekendView: boolean): AutoTuneProposal;
   /** Whether the tower came from a pre-2.0 save (the founder's welcome). */
   founder(): boolean;
   statsStrip(): PortRecord;
