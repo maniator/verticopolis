@@ -16,6 +16,34 @@ use verticopolis_engine::scenario::{run_scenario, run_scenario_detailed, Run, Ru
 const LEFT: i64 = 150;
 const RIGHT: i64 = 230;
 
+/// Remember what an accepted command built: a unit's tile, or an elevator
+/// shaft's column and the floors it serves. Stairs and escalators carry no
+/// cars or schedule, so they are left out.
+fn note_built(cmd: &Value, units: &mut Vec<(i64, i64)>, shafts: &mut Vec<(i64, i64, i64)>) {
+    let int = |key: &str| cmd[key].as_i64().unwrap_or(0);
+    match cmd["op"].as_str() {
+        Some("build") => units.push((int("floor"), int("x"))),
+        Some("buildTransport")
+            if cmd["kind"]
+                .as_str()
+                .is_some_and(|k| k.starts_with("elevator")) =>
+        {
+            shafts.push((int("x"), int("bottom"), int("top")));
+        }
+        _ => {}
+    }
+}
+
+/// The address of an elevator for `setCars` and `setSchedule`: a floor the
+/// shaft serves and its column, from a shaft built earlier when there is one.
+fn elevator_address(rng: &mut Rng, shafts: &[(i64, i64, i64)]) -> (i64, i64) {
+    if shafts.is_empty() || !rng.chance(0.75) {
+        return (1, rng.int(LEFT, RIGHT));
+    }
+    let (x, bottom, top) = shafts[rng.int(0, shafts.len() as i64 - 1) as usize];
+    (rng.int(bottom, top), x)
+}
+
 /// Write a scenario that broke the engine beside the ordinary output so the
 /// workflow artifact carries it even when the run panics.
 fn write_failed(out: &std::path::Path, id: &str, scenario: &Value) {
@@ -211,6 +239,11 @@ fn main() {
     }
     let mut kept = 0;
     let mut step = 0;
+    // Where the commands kept so far built something, so the tuning ops can
+    // aim at a real unit or elevator shaft instead of a random tile. A tile
+    // picked at random almost never holds one, and a bad address is dropped.
+    let mut built_units: Vec<(i64, i64)> = Vec::new();
+    let mut built_shafts: Vec<(i64, i64, i64)> = Vec::new();
     while kept < budget || !pressure.is_empty() {
         let burst = pressure.pop();
         let roll = if burst.is_some() { 0 } else { rng.int(0, 99) };
@@ -235,15 +268,24 @@ fn main() {
         } else if roll < 54 {
             json!({"op": "sell", "floor": rng.int(1, height), "x": rng.int(LEFT, RIGHT)})
         } else if roll < 60 {
-            json!({"op": "adjustRent", "floor": rng.int(2, height), "x": rng.int(LEFT, RIGHT), "dir": if rng.chance(0.5) { 1 } else { -1 }})
+            // Three in four aim at a unit built earlier; a refused rent change
+            // is kept with its expectFail, so a non-rentable unit still counts.
+            let (floor, x) = if !built_units.is_empty() && rng.chance(0.75) {
+                built_units[rng.int(0, built_units.len() as i64 - 1) as usize]
+            } else {
+                (rng.int(2, height), rng.int(LEFT, RIGHT))
+            };
+            json!({"op": "adjustRent", "floor": floor, "x": x, "dir": if rng.chance(0.5) { 1 } else { -1 }})
         } else if roll < 63 {
-            json!({"op": "setCars", "floor": 1, "x": rng.int(LEFT, RIGHT), "cars": rng.int(1, 8)})
+            let (floor, x) = elevator_address(&mut rng, &built_shafts);
+            json!({"op": "setCars", "floor": floor, "x": x, "cars": rng.int(1, 8)})
         } else if roll < 66 {
             let row = |rng: &mut Rng| -> Vec<i64> { (0..24).map(|_| rng.int(0, 3)).collect() };
             let weekday = row(&mut rng);
             let weekend = row(&mut rng);
             let homes: Vec<i64> = (0..rng.int(0, 3)).map(|_| rng.int(1, height)).collect();
-            json!({"op": "setSchedule", "floor": 1, "x": rng.int(LEFT, RIGHT), "schedule": {
+            let (floor, x) = elevator_address(&mut rng, &built_shafts);
+            json!({"op": "setSchedule", "floor": floor, "x": x, "schedule": {
                 "activeCars": {"weekday": weekday, "weekend": weekend},
                 "waitingCarResponse": rng.int(1, 30),
                 "standardFloorDeparture": rng.int(1, 60),
@@ -281,6 +323,9 @@ fn main() {
         // checkpoint: the carry path stays covered.
         let mut kept_one = |commands: &mut Vec<Value>, cmd: Value| {
             let reload = cmd["op"] == "reload";
+            if cmd.get("expectFail").is_none() {
+                note_built(&cmd, &mut built_units, &mut built_shafts);
+            }
             commands.push(cmd);
             step += 1;
             if burst.is_none() {

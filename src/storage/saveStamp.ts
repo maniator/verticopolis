@@ -6,6 +6,11 @@ export interface SaveStamp {
   appVersion: string;
 }
 
+/** The stamp a file written now carries: the time and this build's version. */
+export function currentStamp(): SaveStamp {
+  return { savedAt: nowMs(), appVersion: typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev" };
+}
+
 function nowMs(): number {
   // Date is unavailable in the deterministic engine, but the storage layer is
   // UI-side, so a wall-clock stamp here is fine.
@@ -24,7 +29,7 @@ function nowMs(): number {
  * object with keys, takes that parse instead.
  */
 export function stampText(text: SaveText): { json: string; stamp: SaveStamp } {
-  const stamp: SaveStamp = { savedAt: nowMs(), appVersion: typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev" };
+  const stamp = currentStamp();
   const keys = `"savedAt":${JSON.stringify(stamp.savedAt)},"appVersion":${JSON.stringify(stamp.appVersion)}`;
   const body = text.trimEnd();
   const spliceable =

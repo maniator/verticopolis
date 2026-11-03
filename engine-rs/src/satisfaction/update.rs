@@ -18,13 +18,20 @@ impl Simulation {
         }
         let mut notices: Vec<(i64, Kind, &'static str)> = Vec::new();
         for i in self.tower.room_indices() {
-            let u = self.tower.units[i].clone();
-            if u.is_dormant() {
+            if self.tower.units[i].is_dormant() {
                 continue;
             }
+            // One copy of the room per hour (#1689). The step reads the room
+            // by reference and writes nothing to it, so the copy taken before
+            // it equals the unit once the new satisfaction is stored.
+            let mut u = self.tower.units[i].clone();
             let r = self.satisfaction_step(&u, u.satisfaction, &mut ctx);
             self.tower.units[i].satisfaction = r.next;
-            let mut u = self.tower.units[i].clone();
+            u.satisfaction = r.next;
+            debug_assert!(
+                u == self.tower.units[i],
+                "the satisfaction step changed the room it read"
+            );
             let lease_tenant = matches!(
                 u.kind,
                 Kind::Office | Kind::Condo | Kind::FitnessClub | Kind::Clinic

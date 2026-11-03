@@ -185,11 +185,13 @@ fn save_facts(save: &Value) -> [f64; 7] {
 }
 
 impl Engine {
-    /// Load a `.vctower` file (the `stored` source from a file): a save from
-    /// before 2.0 is marked as a founder's tower, as `SaveGame` does.
+    /// Load a `.vctower` file the player opened (the `stored` source from a
+    /// file): a save from before 2.0 is marked as a founder's tower. A refusal
+    /// is the player's sentence (`vctower_import`), so the page shows
+    /// `lastReason()` as it is.
     pub(crate) fn port_load_vctower(&mut self, text: &str) -> Vec<f64> {
         self.reason = None;
-        match crate::load_stream::load_vctower_text(text, None) {
+        match crate::vctower_import::import_vctower(text) {
             Ok(next) => {
                 self.adopt(next);
                 self.swap_record(true)

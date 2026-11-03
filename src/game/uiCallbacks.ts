@@ -1,5 +1,5 @@
 import { trackAppAction } from "../analytics";
-import { wellFormed } from "../engine/wellFormed";
+import { wellFormed } from "../shared/wellFormed";
 import type { UICallbacks, Tool } from "../ui/UI";
 import type { Catalog } from "../catalog/catalogTypes";
 import type { GameMode } from "../engine/types";

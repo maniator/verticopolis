@@ -39,6 +39,7 @@ import { showTowerPicker } from "./appModals";
 // re-exported because the boot snapshot below reads it, and the alias stays so
 // the suites that import it from here keep resolving.
 import { APP_VERSION } from "../appVersion";
+import { wireOverviewMap } from "./overviewMapWiring";
 export { APP_VERSION };
 
 /** Classify why this boot happened, for the analytics boot snapshot. Mirrors
@@ -227,6 +228,8 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // during initial load, so its capture must be in place before then. The chip
   // stays hidden until the play-gate trips (see tickInstallAffordance).
   initInstallAffordance(app);
+  // The overview map window (shown only behind its preview flag until it ships).
+  wireOverviewMap(app);
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,
@@ -425,21 +428,37 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // dropping them into a fresh tower with no explanation. Goes to the bulletin
   // (persists) and pops as a toast on the first UI update after the splash.
   if (app.saveWasCorrupt) {
-    // The corrupt flag can coexist with a loaded tower: an unreadable
-    // Verticopolis autosave with a healthy legacy save behind it loads the
-    // legacy tower, and the message must not claim a fresh start.
-    app.enginePort.logLine(
-      app.hadReadableSave
-        ? "⚠️ Your latest autosave couldn't be read, so an older saved tower was loaded instead."
-        : "⚠️ Your saved tower couldn't be read. It may be corrupted or from a newer version. Starting a new tower.",
-      app.portCodes.code("logKinds", "bad"),
-    );
+    app.enginePort.logLine(unreadableSaveNotice(app), app.portCodes.code("logKinds", "bad"));
   }
 
   // Autosave periodically, but never while the first-run splash is up, so an
   // idle first visit can't persist the throwaway boot sim (which would flip
   // hasSave() true for a tower the player never started).
   window.setInterval(() => autosaveIfLive(app.saveLoad), 30000);
+}
+
+/** What the player is told when a stored save could not be read. The corrupt
+ *  flag can coexist with a loaded tower: an unreadable Verticopolis autosave
+ *  with a healthy legacy save behind it loads the legacy tower, and the
+ *  message must not claim a fresh start. A save a newer build wrote is named
+ *  as such and says whether it is kept aside. It asks the player to update the
+ *  game when the newer save is kept (or when no readable save loaded and the
+ *  player is told not to start another tower first). With a readable older save
+ *  loaded and the newer one not kept, there is nothing to update for, so the
+ *  notice only says the next autosave replaces it. */
+export function unreadableSaveNotice(flags: { hadReadableSave: boolean; saveWasNewer: boolean; unreadableKept: boolean }): string {
+  if (flags.hadReadableSave) {
+    if (!flags.saveWasNewer) return "⚠️ Your latest autosave couldn't be read, so an older saved tower was loaded instead.";
+    return flags.unreadableKept
+      ? "⚠️ Your latest autosave was made by a newer version of Verticopolis, so an older saved tower was loaded instead. Update the game to open the newer one. It is kept aside, and Saves can download it."
+      : "⚠️ Your latest autosave was made by a newer version of Verticopolis, so an older saved tower was loaded instead. The newer one could not be kept aside, so the next autosave replaces it.";
+  }
+  if (flags.saveWasNewer) {
+    return flags.unreadableKept
+      ? "⚠️ Your saved tower was made by a newer version of Verticopolis. Update the game to open it. It is kept aside, and Saves can download it. Starting a new tower."
+      : "⚠️ Your saved tower was made by a newer version of Verticopolis. Update the game to open it, and do not start or load another tower first: it could not be kept aside.";
+  }
+  return "⚠️ Your saved tower couldn't be read. It may be corrupted. Starting a new tower.";
 }
 
 /** Autosave now, unless the first-run splash is up (see the timer above), or

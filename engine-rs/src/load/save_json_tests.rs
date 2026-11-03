@@ -82,7 +82,7 @@ fn a_vctower_with_a_lone_surrogate_opens() {
 fn the_encoder_refuses_a_save_over_the_read_cap() {
     let big = "x".repeat(super::MAX_SAVE_INFLATED_BYTES as usize);
     let err = encode_vctower(&json!({ "towerName": big })).unwrap_err();
-    assert!(err.contains("more than"), "{err}");
+    assert!(err.contains("larger than"), "{err}");
     let fits = "x".repeat(super::MAX_SAVE_INFLATED_BYTES as usize - 20);
     assert!(encode_vctower(&json!({ "t": fits })).is_ok());
 }

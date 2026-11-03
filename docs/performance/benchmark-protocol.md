@@ -411,7 +411,7 @@ Other flags both accept: `--quick` (a 2-rep smoke test that never counts),
 `--resume DIR` (continue a run that stopped; it keeps its own folder, and an A/A folder resumes with `--aa <engine>` repeated),
 `--scenarios a,b`. `perf:compare` also takes `--throttles 1,4` and
 `--aa ts|wasm` (section 6.1);
-`perf:worker` also takes `--read-model` (Node only, no browser) and `--aa ts|wasm` (an A/A pass, section 6.1).
+`perf:worker` also takes `--aa ts|wasm` (an A/A pass, section 6.1).
 `perf:restore` takes `--quick`, `--scenarios`, `--throttles`, `--skip-build`
 and `--out`, but not `--resume`: a stopped run starts again in a new folder,
 and its `results.json` keeps the runs it finished. In PowerShell, quote a
@@ -951,8 +951,9 @@ hour's churn, both from `perf:compare`:
   does not divide an hour is refused. The character counts leave out the keys
   and punctuation between units, so they are smaller than the serialized
   save. The unit definition is in `src/tests/perfCompare/churn.ts`. This
-  is a different measure from `perf:worker --read-model` in
-  `docs/architecture/read-model-deltas.md`, which counts changed units per
+  is a different measure from the read model rows the retired
+  `perf:worker --read-model` mode wrote (see
+  `docs/architecture/read-model-deltas.md`), which counted changed units per
   merge on the TypeScript engine. A5's design rule reads RUN-0b's WASM
   numbers on the large tower.
 

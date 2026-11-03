@@ -14,10 +14,13 @@
  * Map space has its origin at the top-left, x to the right and y downward, and
  * its unit is the DEVICE pixel: the window builds its layout from the canvas's
  * backing-store size (CSS size times `devicePixelRatio`), so snapping to whole
- * map pixels is snapping to whole device pixels at any ratio. The
- * map shows the whole lot across and, vertically, the same span the camera is
- * allowed to see (sky above the top floor, one floor of ground below the
- * deepest basement), so a clamped camera rectangle never leaves the map.
+ * map pixels is snapping to whole device pixels at any ratio. The map shows
+ * the whole lot across. Vertically, `mapExtent` (Classic) is the same span the
+ * camera is allowed to see (sky above the top floor, one floor of ground below
+ * the deepest basement), so there a clamped camera rectangle never leaves the
+ * map. A Modern crop (`extent.ts`) is shorter, so a camera can sit wholly or
+ * partly above or below it: `viewportRect` clips the rectangle to the map and
+ * `viewPlacement` says which edge it passed.
  */
 import { FLOOR, TILE } from "../scale";
 

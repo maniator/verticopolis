@@ -89,12 +89,15 @@ export async function advanceClock(page: Page): Promise<number> {
 
 type AudioResponse = { file: string; ok: boolean; fromSW: boolean };
 
-/** Record every audio fetch from now on: the Tone chunk and the recordings. */
+/** Record every audio fetch from now on: the Tone chunk and any sound file. */
 export function recordAudio(page: Page): AudioResponse[] {
   const responses: AudioResponse[] = [];
   page.on("response", (r) => {
     const path = new URL(r.url()).pathname;
-    const file = AUDIO_ENGINE_CHUNK.test(path) ? "audio engine chunk" : AUDIO_RUNTIME_FILES.find((f) => path.endsWith(`/${f}`));
+    // Any sound file the page asks for is recorded, listed or not, so one the
+    // list lacks shows up as its own path and fails expectAudioFromWorker.
+    const sound = /\/audio\/|\.(?:mp3|ogg|wav|m4a|flac|aac|opus|webm)$/i.test(path);
+    const file = AUDIO_ENGINE_CHUNK.test(path) ? "audio engine chunk" : sound ? (AUDIO_RUNTIME_FILES.find((f) => path.endsWith(`/${f}`)) ?? path) : undefined;
     if (file) responses.push({ file, ok: r.ok(), fromSW: r.fromServiceWorker() });
   });
   return responses;

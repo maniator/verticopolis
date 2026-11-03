@@ -7,7 +7,7 @@ import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/Towe
 import { AudioEngine } from "./audio/Audio";
 import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, type Prefs } from "./storage/Prefs";
-import { type TrafficTier } from "./engine/traffic";
+import { type TrafficTier } from "./presentation/traffic";
 import { UI, type Tool } from "./ui/UI";
 import { refreshEditorCard } from "./game/editorCard";
 import { type PlaceOutcome } from "./ui/placement";
@@ -103,9 +103,11 @@ class GameApp implements GameAppPorts {
    *  @internal */
   frameErrors: FrameErrorEntry[] = [];
   /** @internal */ shownWin = false;
-  /** A save existed at boot but couldn't be read (corrupt / incompatible).
-   *  @internal */
+  /** @internal A save existed at boot but couldn't be read; `saveWasNewer`
+   *  says a newer build wrote it, `unreadableKept` that it was kept aside. */
   saveWasCorrupt = false;
+  /** @internal */ saveWasNewer = false;
+  /** @internal */ unreadableKept = false;
   /**
    * Whether a *readable* save existed at boot, snapshotted once, up front, so
    * the splash and the "new tower" confirm agree on reality. Reading it live
@@ -208,11 +210,10 @@ class GameApp implements GameAppPorts {
     // stays honest and the player is told (below).
     this.enginePort = tower.port;
     this.saveWasCorrupt = tower.corrupt;
+    this.saveWasNewer = tower.newer;
     this.hadReadableSave = tower.loaded;
-    // Stash the unreadable bytes off the autosave slot before the 30s timer can
-    // overwrite them: a save from a *newer* build is only unreadable here, and a
-    // future version may recover it. Best-effort, never blocks boot.
-    if (tower.corrupt) SaveGame.preserveUnreadable();
+    // Keep the unreadable bytes aside: a newer build's save is only unreadable here.
+    if (tower.corrupt) this.unreadableKept = SaveGame.preserveUnreadable(tower.stashKey, tower.newer);
     this.reader = newViewReader(this.enginePort);
     this.portCodes = new PortCodes(this.enginePort);
     this.events = new PortEvents(this.enginePort);

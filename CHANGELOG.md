@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.78.8
+
+- A saved tower from a newer version of Verticopolis now says so when you start the game or load it from Saves. Update the game, then use Import from file on the copy that Saves keeps.
+
 ## 2.78.5
 
 - A tower file saved by a newer version of Verticopolis is now refused with a message to update the game, instead of loading and dropping what this version does not know.
