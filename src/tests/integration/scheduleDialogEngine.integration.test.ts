@@ -35,8 +35,13 @@ const FACTS: ScheduleFacts = {
   homeFloors: [1, 1, 1, 1],
 };
 
-/** An engine that keeps the homes it is handed, as the real one does on served floors. */
-const echoHomes = (): ScheduleDialogCtx["facts"] => (draft) => ({ ...FACTS, homeFloors: draft.homeFloors ?? FACTS.homeFloors });
+/** An engine that keeps the homes it is handed on served floors and, as the
+ *  real one does, answers one home per car with the base lobby for any car the
+ *  draft lists none for. */
+const echoHomes = (): ScheduleDialogCtx["facts"] => (draft) => ({
+  ...FACTS,
+  homeFloors: FACTS.homeFloors.map((base, i) => draft.homeFloors?.[i] ?? base),
+});
 
 const PRESET: PresetProposal = {
   status: "available",
@@ -185,6 +190,34 @@ describe("the dialog's staging comes from the engine's homes and base", () => {
     open({ facts: () => ({ ...FACTS, staging: { ...FACTS.staging!, baseLobby: 3 } }) });
     expect(byLabel("button", "Home all cars at Floor 3")).toBeDefined();
     expect(dialog().querySelector(".es-base")).not.toBeNull();
+  });
+
+  it("takes the engine's snapped homes and staging after a stop edit", async () => {
+    let skipped = false;
+    const st = stops();
+    st.expressStops = vi.fn(async () => {
+      skipped = true;
+    });
+    // Before the edit one car is homed up-tower; after it the engine has moved
+    // that car down to the base and counts it there.
+    const facts: ScheduleDialogCtx["facts"] = () => ({
+      ...FACTS,
+      staging: { ...FACTS.staging!, upTowerCars: skipped ? 0 : 1, lobbyCars: skipped ? 4 : 3 },
+      homeFloors: skipped ? [1, 1, 1, 1] : [1, 1, 1, 3],
+    });
+    const { apply } = open({ stops: st, facts });
+    expect(text(".es-sim")).toContain("1 staged up-tower, 3 at the lobby");
+    byLabel("button", "Express (lobbies)").click();
+    await vi.waitFor(() => expect(text(".es-sim")).toContain("0 staged up-tower, 4 at the lobby"));
+    press('[data-act="apply"]');
+    expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 1, 1, 1]);
+  });
+
+  it("keeps the stored homes when the engine refuses the opening query", () => {
+    const refused: ScheduleDialogCtx["facts"] = () => ({ ...FACTS, status: "invalid-draft", staging: null, homeFloors: [], recommended: null });
+    const { apply } = open({ current: { homeFloors: [2, 3, 4, 1] }, facts: refused });
+    press('[data-act="apply"]');
+    expect(apply.mock.calls[0][0].homeFloors).toEqual([2, 3, 4, 1]);
   });
 
   it("repoints every car at the engine's base floor", () => {

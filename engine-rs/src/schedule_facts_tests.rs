@@ -246,3 +246,48 @@ fn the_homes_come_back_on_served_floors_with_the_base_for_unlisted_cars() {
         .home_floors
         .is_empty());
 }
+
+#[test]
+fn the_staging_counts_follow_the_homes_the_shaft_would_hold() {
+    let (mut sim, id) = tower(GameMode::Modern, 4);
+    // A car homed at floor 2 is up-tower while floor 2 is a stop.
+    let d = draft(None, None, Some(vec![2, 1, 1, 1]));
+    assert_eq!(
+        sim.schedule_facts(id, Some(&d), false)
+            .staging
+            .unwrap()
+            .up_tower_cars,
+        1
+    );
+    // Skip floors 2 and 3: the home snaps down to the base lobby, so the
+    // sentence must stop counting that car as staged up-tower.
+    assert!(sim.tower.set_stop(id, 2, false));
+    assert!(sim.tower.set_stop(id, 3, false));
+    let f = sim.schedule_facts(id, Some(&d), false);
+    assert_eq!(f.home_floors, vec![1, 1, 1, 1]);
+    let s = f.staging.unwrap();
+    assert_eq!((s.up_tower_cars, s.lobby_cars), (0, s.active_at_peak));
+}
+
+#[test]
+fn homes_are_held_to_the_fleet_and_the_span() {
+    let (sim, id) = tower(GameMode::Modern, 2);
+    // A longer list is cut to the cars; a home above the span snaps to the top.
+    let d = draft(None, None, Some(vec![999, 1, 7, 7]));
+    let f = sim.schedule_facts(id, Some(&d), false);
+    assert_eq!(f.home_floors.len(), 2);
+    assert_eq!(f.home_floors[1], 1);
+    let top = f.staging.as_ref().expect("staging").top_lobby;
+    assert_eq!(f.home_floors[0], top);
+}
+
+#[test]
+fn a_shaft_with_no_cars_has_no_homes() {
+    let (mut sim, id) = tower(GameMode::Modern, 4);
+    sim.tower.get_transport_mut(id).unwrap().cars = 0;
+    let d = draft(None, None, Some(vec![3, 3]));
+    assert!(sim
+        .schedule_facts(id, Some(&d), false)
+        .home_floors
+        .is_empty());
+}

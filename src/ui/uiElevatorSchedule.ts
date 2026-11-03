@@ -118,7 +118,13 @@ export function showElevatorScheduleDialog(
     if (r) for (let h = 0; h < SCHEDULE_HOURS; h++) if (Number.isFinite(r[h])) out[h] = Math.max(0, Math.min(ctx.cars, Math.floor(r[h])));
     return out;
   };
-  const seedHomes = (): number[] => (seed.homeFloors.length === ctx.cars ? [...seed.homeFloors] : Array(ctx.cars).fill(base0));
+  // A refused seed query keeps the stored homes where they are readable; the
+  // first recompute then asks again and the engine snaps them.
+  const storedHome = (i: number): number => {
+    const home = ctx.current?.homeFloors?.[i];
+    return home !== undefined && Number.isFinite(home) ? home : base0;
+  };
+  const seedHomes = (): number[] => (seed.homeFloors.length === ctx.cars ? [...seed.homeFloors] : Array.from({ length: ctx.cars }, (_, i) => storedHome(i)));
 
   const state: SchedState = {
     day: ctx.initialWeekend ? "weekend" : "weekday",
@@ -250,8 +256,8 @@ export function showElevatorScheduleDialog(
     unfoldOnAdvice();
     rerender();
   };
-  /** A stop edit landed (applied live): refresh rows, re-derive the base, re-snap
-   *  the working homes onto the new served set, recompute, repaint. */
+  /** A stop edit landed (applied live): refresh rows, recompute (the engine
+   *  re-derives the base and snaps the homes onto the new served set), repaint. */
   const afterStops = (): void => {
     state.floors = readFloors();
     state.cancelArmed = false;

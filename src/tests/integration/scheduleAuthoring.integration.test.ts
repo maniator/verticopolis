@@ -43,6 +43,9 @@ const DRAFTS = (cars: number): ReadonlyArray<readonly [string, ElevatorSchedule 
   ],
   ["homes above the base", { activeCars: { weekday: Array(SCHEDULE_HOURS).fill(cars) }, homeFloors: [3, 11, 20, 1].slice(0, cars) }],
   ["one home only", { homeFloors: [20] }],
+  // The fixture skips floor 6, so a home there snaps to its nearer neighbor.
+  ["homes on the skipped floor", { homeFloors: [6, 7, 6, 7].slice(0, cars) }],
+  ["a longer list than the fleet", { homeFloors: [3, 6, 9, 12, 15, 18, 20, 2, 4, 5] }],
 ];
 
 describe.skipIf(!hasWasmPackage())("the Rust schedule facts and presets match the TypeScript reference", () => {

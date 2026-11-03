@@ -4,7 +4,8 @@
 //! then, and how the fleet is staged). A port of `scheduleAdvice`,
 //! `stagingSummary` and the preset recommendation
 //! (`src/engine/scheduleAuthoring.ts`) so the host reads facts instead of
-//! recomputing them.
+//! recomputing them. The answer also carries the draft's homes as the shaft
+//! would hold them (each on a served floor), and the staging counts read those.
 //!
 //! Data only: no sentence, number format or "critical" styling lives here, and
 //! nothing is written. The measured curve is the day's warm one (the same
@@ -178,8 +179,10 @@ fn advice(row: Option<&Vec<i64>>, curve: &[f64], cars: i64) -> Advice {
     }
 }
 
+/// `homes` are the served homes, one per car, so the count follows the floors
+/// the shaft would actually hold.
 fn staging(
-    draft: Option<&Schedule>,
+    homes: &[i64],
     row: Option<&Vec<i64>>,
     geo: &ShaftGeometry,
     curve: Option<&[f64]>,
@@ -187,11 +190,12 @@ fn staging(
     let peak = peak_hour(curve);
     let active = active_at(row, peak, geo.cars);
     let base = geo.base_lobby();
-    let homes = draft.and_then(|d| d.home_floors.as_ref());
     // A car counts as staged up-tower the moment its home sits above the base
     // lobby, whatever the lobby layout; a car with no home idles at the base.
-    let up_tower = (0..active as usize)
-        .filter(|&i| homes.and_then(|h| h.get(i)).copied().unwrap_or(base) > base)
+    let up_tower = homes
+        .iter()
+        .take(active as usize)
+        .filter(|&&home| home > base)
         .count() as i64;
     StagingSummary {
         measured: curve.is_some(),
@@ -253,12 +257,13 @@ impl Simulation {
                 |c| advice(row, c, geo.cars),
             )
         };
+        let home_floors = served_homes(draft, &geo);
         ScheduleFacts {
             status: FactsStatus::Available,
             recommended: assisted.then(|| recommended_preset(t.kind)),
             advice,
-            staging: Some(staging(draft, row, &geo, curve)),
-            home_floors: served_homes(draft, &geo),
+            staging: Some(staging(&home_floors, row, &geo, curve)),
+            home_floors,
         }
     }
 }

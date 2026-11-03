@@ -108,11 +108,11 @@ pub(crate) fn warm_curve(curve: &[f64]) -> Option<&[f64]> {
 }
 
 pub(crate) fn readiness(curve: &[f64]) -> DayReadiness {
-    let sampled_hours = sampled_hours(curve);
-    let warm = sampled_hours >= WARMED_MIN_HOURS;
+    let sampled = sampled_hours(curve);
+    let warm = sampled >= WARMED_MIN_HOURS;
     DayReadiness {
         warm,
-        sampled_hours,
+        sampled_hours: sampled,
         curve: warm.then(|| curve.to_vec()),
     }
 }

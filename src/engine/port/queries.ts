@@ -385,7 +385,15 @@ export function referenceFacts(shaft: ShaftFacts, draft: ElevatorSchedule | unde
     return measured ? "ready" : "insufficient-data";
   })();
   const adv = assisted && measured ? scheduleAdvice(draft, ctx, weekendView) : null;
-  const summary = stagingSummary(draft, ctx, weekendView);
+  // The staging counts read the homes as the shaft would hold them (each on a
+  // served floor), the same list the answer carries, so a stop edit that
+  // strands a home never leaves the sentence counting the stale floor.
+  const base = stagingSummary(undefined, ctx, weekendView).baseLobby;
+  const homeFloors = Array.from({ length: Math.max(0, shaft.cars) }, (_, i) => {
+    const home = draft?.homeFloors?.[i];
+    return home === undefined ? base : snapToServed(shaft, home);
+  });
+  const summary = stagingSummary({ ...draft, homeFloors }, ctx, weekendView);
   return {
     status: "available",
     recommended: assisted ? recommendedPreset(!!shaft.express) : null,
@@ -395,10 +403,7 @@ export function referenceFacts(shaft: ShaftFacts, draft: ElevatorSchedule | unde
       short: adv?.short ?? [],
     },
     staging: { measured, ...summary },
-    homeFloors: Array.from({ length: Math.max(0, shaft.cars) }, (_, i) => {
-      const home = draft?.homeFloors?.[i];
-      return home === undefined ? summary.baseLobby : snapToServed(shaft, home);
-    }),
+    homeFloors,
   };
 }
 

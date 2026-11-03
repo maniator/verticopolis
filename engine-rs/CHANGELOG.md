@@ -17,7 +17,7 @@ existed as a step inside a stacked branch.
 
 ## 1.10.0 (2026-11-03)
 
-- `scheduleFacts` gains `homeFloors`: the draft's homes as the shaft would hold them, one per car, each on the nearest served floor (ties to the lower one), with a car the draft lists no home for at the base lobby. It is empty on a refusal. The host no longer snaps homes to served stops or works out the base lobby itself. The advice and staging answers are unchanged, and the query still reads the day's measured ring without copying it. No saved-game, frame, view layout or catalog change.
+- `scheduleFacts` gains `homeFloors`: the draft's homes as the shaft would hold them, one per car, each on the nearest served floor (ties to the lower one), with a car the draft lists no home for at the base lobby. It is empty on a refusal. The host no longer snaps homes to served stops or works out the base lobby itself. The advice answer is unchanged. The staging counts (`upTowerCars`, `lobbyCars`) now follow the snapped homes, so a draft with a home on a skipped floor counts that car where the shaft would hold it. The query also borrows the day's measured ring instead of copying it (`autoTuneProposal` still copies it, since it returns the curve). No saved-game, frame, view layout or catalog change.
 
 ## 1.9.0 (2026-11-03)
 
