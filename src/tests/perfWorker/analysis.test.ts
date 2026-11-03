@@ -286,6 +286,9 @@ describe("perf:worker analysis", () => {
       // The refusal names the machine keys that differ (channel, switches, renderer, exception), so the resume can repeat them.
       expect(() => loadWorkerCheckpoint(dir, { ...meta, machine: { cpu: "a", channel: "chrome", args: ["--use-angle=d3d11"] } })).toThrow(/its machine differs from this run's \(channel, args; run on the machine and browser the run started with\)/);
       expect(() => loadWorkerCheckpoint(dir, { ...meta, dirty: true })).toThrow(/clean tree/);
+      // A checkpoint from before the baseline existed names none; a run that now has one cannot resume it.
+      expect(loadWorkerCheckpoint(dir, { ...meta, tsBaseline: null }).runs).toHaveLength(1);
+      expect(() => loadWorkerCheckpoint(dir, { ...meta, tsBaseline: { commit: "f".repeat(40), appVersion: "2.77.5" } })).toThrow(/its tsBaseline differs/);
       writeFileSync(join(dir, "checkpoint.json"), JSON.stringify({ ...meta, dirty: true, startedAt: "x" }));
       expect(() => loadWorkerCheckpoint(dir, meta)).toThrow(/started on a dirty tree/);
       writeFileSync(join(dir, "results.json"), "{}");

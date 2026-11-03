@@ -325,7 +325,9 @@ folder (there must be none) does not match the pin. The server overlays the curr
 at `/engine`, so the package-load measurements have a package in that origin.
 The two arms therefore differ in app code as well as engine, and the report
 says so in its header, its environment table and its limitations. An A/A pass
-of WASM does not build or serve the baseline.
+of WASM does not build or serve the baseline. `perf:worker` serves its `ts` mode
+from the same build in the same way (`perf:calibrate` and `perf:before-after`
+only read results folders, so they need nothing).
 
 At least **10 valid paired repetitions** per engine, each in a fresh browser
 process, with the engine order rotated (the harness alternates which engine

@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, truncateSy
 import { basename, join, resolve } from "node:path";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
-import { BASELINE_DIST, baselineErrors, buildBaseline, requireBaselineCommit, TS_BASELINE, type BaselineRecord } from "./baseline";
+import { BASELINE_DIST, buildBaseline, requireBaselineCommit, requireBaselineDist, startArmServers, TS_BASELINE, type BaselineRecord } from "./baseline";
 import { buildTree, collectEnvironment, ENGINE_PACKAGE_FILES, packageState, type Environment, type PackageState } from "./env";
 import { buildLimitations } from "./limitations";
 import { gateBrowser, probeBrowser, type BrowserProbe } from "./browserProbe";
@@ -15,7 +15,6 @@ import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
 import { engineOrder, runProcess } from "./runner";
 import { autosaveSeed, checkAutosaveSeeds } from "./savedStart";
 import { SCENARIO_NAMES, buildScenarios, unknownScenarios } from "./scenarios";
-import { startServer, type PerfServer } from "./server";
 import type { CompareConfig, CompareResults, EngineName, ProcessRun } from "./types";
 import type { Environment as Env } from "./env";
 import { incompleteTreeError } from "./treeRecord";
@@ -146,11 +145,8 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     if (needsBaseline) buildBaseline(repo, log);
     for (const p of stampPaths) writeFileSync(p, JSON.stringify(tree) + "\n");
   }
-  for (const d of [dist, distPerf, ...(needsBaseline ? [distTs] : [])]) if (!existsSync(join(d, "index.html"))) throw new Error(`no build at ${d}; run without --skip-build`);
-  if (needsBaseline) {
-    const baselineProblems = baselineErrors(distTs);
-    if (baselineProblems.length) throw new Error(`the TypeScript baseline build cannot be used:\n  - ${baselineProblems.join("\n  - ")}`);
-  }
+  for (const d of [dist, distPerf]) if (!existsSync(join(d, "index.html"))) throw new Error(`no build at ${d}; run without --skip-build`);
+  if (needsBaseline) requireBaselineDist(distTs);
 
   const unknown = unknownScenarios(args.scenarios ?? []);
   if (unknown.length) throw new Error(`unknown scenario ${unknown.join(",")}; expected ${SCENARIO_NAMES.join(",")}`);
@@ -216,17 +212,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   checkAutosaveSeeds(scenarios);
   log(`perf:compare: each scenario's autosave seed loads back as its tower (${scenarios.map((s) => `${s.name} ${autosaveSeed(s).sha256.slice(0, 12)}`).join(", ")})`);
 
-  // Rust runs from the current timed build. TypeScript runs from the pinned baseline build, with the current
-  // engine package overlaid so the package-load side measurements have a package in that origin.
-  const servers: Partial<Record<EngineName, PerfServer>> = { wasm: await startServer(distPerf) };
-  if (needsBaseline) {
-    try {
-      servers.ts = await startServer(distTs, 0, { prefix: "/engine", dir: join(distPerf, "engine") });
-    } catch (e) {
-      await servers.wasm?.close();
-      throw e;
-    }
-  }
+  const servers = await startArmServers(distPerf, distTs, needsBaseline);
   let browserVersion: string | null = runs.find((r) => r.browserVersion)?.browserVersion ?? null;
   try {
     for (let rep = 0; rep < config.reps; rep++) {

@@ -95,6 +95,7 @@ export function markdown(res: WorkerResults): string {
   for (const banner of rendererBanners(res.browser, res.config.quick)) lines.push("", banner);
   lines.push("");
   if (treeSummary(env.tree, env.dirty)) lines.push(`- Working tree: ${treeSummary(env.tree, env.dirty)}`);
+  if (res.tsBaseline) lines.push(`- TypeScript baseline: ${res.tsBaseline.commit} (app ${res.tsBaseline.appVersion}, pinned pre-cutover build; ${aa ? "both slots ran it" : "the ts mode ran it, the other modes ran this commit"})`);
   lines.push(`- Engine package: ${Object.entries(env.enginePackage).map(([k, v]) => `${k} \`${String(v).slice(0, 16)}\``).join(", ")}; source hash \`${env.engineBuildHash ?? "none"}\``);
   lines.push(`- Machine: ${env.cpuModel}, ${env.logicalCpus} CPUs, ${(env.totalMemoryBytes / 2 ** 30).toFixed(1)} GiB, ${env.os}; Node ${env.node}; Playwright ${env.playwright}`);
   lines.push(`- Browser: ${browserName(res.browser.channel, res.browser.executable)} ${res.browser.version ?? "unknown"} (headless${res.browser.channel ? `, channel ${res.browser.channel}` : ""}${res.browser.executable ? `, ${res.browser.executable}` : ""}${res.browser.args?.length ? `, extra switches ${res.browser.args.join(" ")}` : ""})`);
