@@ -1,0 +1,90 @@
+name: tdt-fuzz
+
+# Nightly fuzz of the .TDT codec (#885): damaged copies of the nine real saves and
+# forged towers go through import, export and import again, and each must hold
+# the properties in engine-rs/tests/tdt_fuzz.rs. Never a pull-request gate (the
+# pull-request run takes a small budget). A failing night opens an issue that names
+# the seeds; replay one with workflow_dispatch first=<seed> seeds=1.
+
+on:
+  schedule:
+    - cron: "52 4 * * *"
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: "How many seeds to run (a positive whole number)"
+        default: "6000"
+      first:
+        description: "The first seed. Empty takes today's block."
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tdt-fuzz-${{ github.event_name == 'schedule' && 'night' || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.97.0 --profile minimal
+          rustup default 1.97.0
+      - name: Fuzz
+        id: fuzz
+        env:
+          SEEDS: ${{ github.event.inputs.seeds || '6000' }}
+          FIRST_INPUT: ${{ github.event.inputs.first }}
+        run: |
+          # A failing cargo test must fail the step even though tee ends the pipe.
+          set -o pipefail
+          # Whole numbers only, read as base 10.
+          num() { case "$1" in ''|*[!0-9]*) echo "$2 must be a whole number, got '$1'" >&2; exit 2;; esac; [ "${#1}" -le 10 ] || { echo "$2 is too long: '$1'" >&2; exit 2; }; echo $(( 10#$1 )); }
+          seeds=$(num "$SEEDS" seeds)
+          [ "$seeds" -ge 1 ] || { echo "seeds must be a positive whole number"; exit 2; }
+          if [ -n "$FIRST_INPUT" ]; then
+            first=$(num "$FIRST_INPUT" first)
+          else
+            # One block of seeds per day, so each night tries new files.
+            first=$(( ($(date +%s) / 86400) * 100000 + 1 ))
+          fi
+          echo "first=$first" >> "$GITHUB_OUTPUT"
+          echo "seeds=$seeds" >> "$GITHUB_OUTPUT"
+          {
+            echo "### tdt-fuzz"
+            echo "- commit: \`$GITHUB_SHA\`; seeds $first to $(( first + seeds - 1 ))"
+            echo "- replay: workflow_dispatch first=$first seeds=$seeds, or locally: \`VC_TDT_FUZZ_FIRST=$first VC_TDT_FUZZ_SEEDS=$seeds cargo test --release --manifest-path engine-rs/Cargo.toml --test tdt_fuzz\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          VC_TDT_FUZZ_FIRST="$first" VC_TDT_FUZZ_SEEDS="$seeds" \
+            cargo test --locked --release --manifest-path engine-rs/Cargo.toml --test tdt_fuzz 2>&1 | tee fuzz.log
+      - name: Keep the damaged files of a failing run
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tdt-fuzz-files
+          path: engine-rs/target/tdt-fuzz
+          if-no-files-found: ignore
+          retention-days: 30
+      - name: Open an issue for a failing night
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FIRST: ${{ steps.fuzz.outputs.first }}
+          SEEDS: ${{ steps.fuzz.outputs.seeds }}
+        run: |
+          {
+            echo "The nightly .TDT fuzz broke a codec property at \`$GITHUB_SHA\`."
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            echo "Seeds $FIRST to $(( FIRST + SEEDS - 1 )). The failing seeds are named in the run's log; the damaged files are in the \`tdt-fuzz-files\` artifact. Replay one seed locally with \`VC_TDT_FUZZ_FIRST=<seed> VC_TDT_FUZZ_SEEDS=1 cargo test --release --manifest-path engine-rs/Cargo.toml --test tdt_fuzz\`, then pin the file in the conformance lock in the fix."
+          } > body.md
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "Nightly .TDT fuzz found a failing input" --body-file body.md --label bug --label tdt
