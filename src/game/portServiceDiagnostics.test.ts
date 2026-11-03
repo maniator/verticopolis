@@ -11,6 +11,7 @@ const base: ServiceDiagnosticFacts = {
     active: false, today: null, barWidth: null, tier: "notApplicable",
     localDemandPct: null, advice: "none", profitYest: null, rainy: null,
   },
+  commercial: { lobbyFar: null },
   housekeeping: {
     status: "notApplicable", crews: null, maids: null, rooms: null, maidsPerUnit: null,
     roomsPerMaid: null, cleaned: null, leftover: null, infested: null,
@@ -22,17 +23,25 @@ function printed(parts: {
   parking?: Partial<ServiceDiagnosticFacts["parking"]>;
   housekeeping?: Partial<ServiceDiagnosticFacts["housekeeping"]>;
   retail?: Partial<ServiceDiagnosticFacts["retail"]>;
+  commercial?: Partial<ServiceDiagnosticFacts["commercial"]>;
 } = {}): string {
   const facts: ServiceDiagnosticFacts = {
     hotel: { ...base.hotel, ...parts.hotel },
     parking: { ...base.parking, ...parts.parking },
     housekeeping: { ...base.housekeeping, ...parts.housekeeping },
     retail: { ...base.retail, ...parts.retail },
+    commercial: { ...base.commercial, ...parts.commercial },
   };
   return renderToFragment(html`${portServiceLines(facts)}`).textContent ?? "";
 }
 
 describe("engine-owned keyed service diagnostic presentation", () => {
+  it("words the far-from-lobby shopper warning only when Rust says it applies", () => {
+    expect(printed({ commercial: { lobbyFar: true } })).toContain("Shoppers: too far from a lobby. Traffic is halved.");
+    expect(printed({ commercial: { lobbyFar: false } })).not.toContain("Shoppers:");
+    expect(printed()).not.toContain("Shoppers:");
+  });
+
   it("renders hotel eligibility, dirty deadlines and recovery without recalculating game policy", () => {
     expect(printed({ hotel: { rating: "counts", condition: "dirty", infestDays: 3 } })).toContain("Left dirty for 3 days");
     const classic = printed({ hotel: { rating: "excluded", condition: "infested", recovery: false } });

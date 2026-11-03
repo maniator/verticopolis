@@ -5,7 +5,10 @@
 use serde::Serialize;
 
 use crate::clock::GameMode;
-use crate::economy::{daily_traffic_income, retail_spend_per_customer};
+use crate::economy::{
+    catalog_spend_per_customer, commercial_daily_income, daily_traffic_income,
+    COMMERCIAL_LOBBY_FLOORS,
+};
 use crate::facilities::Kind;
 use crate::housekeeping::{HK_MAIDS_PER_UNIT, INFEST_DAYS};
 use crate::jsmath::round;
@@ -116,6 +119,7 @@ pub(crate) struct ServiceDiagnosticFacts {
     parking: ParkingServiceFacts,
     housekeeping: HousekeepingServiceFacts,
     retail: RetailServiceFacts,
+    commercial: CommercialServiceFacts,
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize)]
@@ -167,6 +171,16 @@ struct RetailServiceFacts {
     advice: RetailAdvice,
     profit_yest: Option<i64>,
     rainy: Option<bool>,
+}
+
+/// Placement facts for a foot-traffic venue. `lobby_far` is true when the
+/// venue sits more than two floors from the nearest (sky) lobby, which halves
+/// its trade; it is `None` for any unit that penalty never applies to. It is
+/// not the very-far "lobbyFar" vacate cause tenants carry.
+#[derive(Clone, Copy, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CommercialServiceFacts {
+    lobby_far: Option<bool>,
 }
 
 impl Simulation {
@@ -243,6 +257,15 @@ impl Simulation {
             facts.housekeeping.has_out_of_reach = Some(coverage.out_of_reach > 0);
             facts.housekeeping.recovery = Some(self.mode.infestation_recovery().is_some());
         }
+        // W3: the same predicate the daily income uses for its lobby penalty
+        // (a sky bar is exempt: its view premium pays for the height).
+        if unit.kind.is_commercial()
+            && unit.kind != Kind::SkyBar
+            && commercial_daily_income(self.mode, unit.kind).is_some()
+        {
+            facts.commercial.lobby_far =
+                Some(self.tower.nearest_lobby_floor_distance(unit.floor) > COMMERCIAL_LOBBY_FLOORS);
+        }
         // Retail policy stays in Rust. Score the Modern catalog's average
         // good day even in Classic, never Classic's higher sellout ceiling.
         let unit = self.tower.get_unit(id)?;
@@ -255,7 +278,7 @@ impl Simulation {
         );
         if retail.1 {
             if let (Some(spend), Some(daily)) = (
-                retail_spend_per_customer(retail.0),
+                catalog_spend_per_customer(self.mode, retail.0),
                 daily_traffic_income(retail.0),
             ) {
                 if spend > 0.0 {
@@ -338,5 +361,63 @@ mod tests {
         );
         assert_eq!(retail_advice(GameMode::Classic, 0.1), RetailAdvice::None);
         assert_eq!(retail_advice(GameMode::Classic, 2.0), RetailAdvice::None);
+    }
+
+    #[test]
+    fn a_venue_far_from_a_lobby_is_flagged_and_a_sky_bar_is_exempt() {
+        use super::super::tenant_tests::{served_tower, tenant};
+        use crate::tower::UnitState;
+        for mode in [GameMode::Classic, GameMode::Modern] {
+            let mut sim = served_tower(mode, 8);
+            let near = tenant(&mut sim, Kind::Shop, 3, 2, UnitState::Empty, 100.0);
+            let far = tenant(&mut sim, Kind::Shop, 6, 2, UnitState::Empty, 100.0);
+            let bar = tenant(&mut sim, Kind::SkyBar, 7, 20, UnitState::Empty, 100.0);
+            let office = tenant(&mut sim, Kind::Office, 6, 20, UnitState::Empty, 100.0);
+            let lobby_far = |sim: &mut Simulation, id| {
+                sim.service_diagnostic_facts(id)
+                    .unwrap()
+                    .commercial
+                    .lobby_far
+            };
+            assert_eq!(lobby_far(&mut sim, near), Some(false), "{mode:?}");
+            assert_eq!(lobby_far(&mut sim, far), Some(true), "{mode:?}");
+            assert_eq!(lobby_far(&mut sim, bar), None, "{mode:?}");
+            assert_eq!(lobby_far(&mut sim, office), None, "{mode:?}");
+        }
+    }
+
+    #[test]
+    fn only_the_venues_the_catalog_prices_per_customer_carry_the_patronage_block() {
+        use super::super::tenant_tests::{served_tower, tenant};
+        use crate::tower::UnitState;
+        for mode in [GameMode::Classic, GameMode::Modern] {
+            let mut sim = served_tower(mode, 4);
+            let shop = tenant(&mut sim, Kind::Shop, 3, 2, UnitState::Occupied, 100.0);
+            let bar = tenant(&mut sim, Kind::SkyBar, 4, 40, UnitState::Occupied, 100.0);
+            let active =
+                |sim: &mut Simulation, id| sim.service_diagnostic_facts(id).unwrap().retail.active;
+            assert!(active(&mut sim, shop), "{mode:?} shop");
+            assert!(!active(&mut sim, bar), "{mode:?} sky bar");
+            // Every other kind agrees with the catalog's own spendPerCustomer.
+            let others = [
+                Kind::FastFood,
+                Kind::Restaurant,
+                Kind::FoodHall,
+                Kind::Amusements,
+                Kind::BoutiqueBay,
+                Kind::Nightclub,
+                Kind::Spa,
+                Kind::Daycare,
+            ];
+            for (i, kind) in others.into_iter().enumerate() {
+                let (floor, x) = (3 + (i as i64 % 2), 60 + 30 * (i as i64 / 2));
+                let id = tenant(&mut sim, kind, floor, x, UnitState::Occupied, 100.0);
+                assert_eq!(
+                    active(&mut sim, id),
+                    catalog_spend_per_customer(mode, kind).is_some(),
+                    "{mode:?} {kind:?}"
+                );
+            }
+        }
     }
 }

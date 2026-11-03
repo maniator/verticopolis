@@ -18,7 +18,7 @@ use crate::charges::{car_resale_refund, ADD_CAR_COST, TRANSPORT_FLOOR_COST};
 use crate::clock::{resolve_calendar, CalendarKind, GameMode};
 use crate::econ::{classic_ladder, rent_config};
 use crate::economy::{
-    commercial_daily_income, retail_spend_per_customer, service_maintenance_monthly,
+    catalog_spend_per_customer, commercial_daily_income, service_maintenance_monthly,
     CINEMA_BOOKING_BLOCKBUSTER, CINEMA_BOOKING_MONTHLY, MAINTENANCE_PER_CAR_MONTHLY,
     NIGHTCLUB_DJ_MONTHLY, REAL_WORLD_MAINT_PERIOD_DAYS,
 };
@@ -411,10 +411,7 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
         subtypes: kind.subtype_list().map(|l| l.to_vec()),
         rent: rent_for(mode, kind),
         daily_income: commercial_daily_income(mode, kind),
-        spend_per_customer: kind
-            .subtype_list()
-            .and(commercial_daily_income(mode, kind))
-            .and_then(|_| retail_spend_per_customer(kind)),
+        spend_per_customer: catalog_spend_per_customer(mode, kind),
         upkeep_monthly: service_maintenance_monthly(kind),
         open_hours: kind
             .has_business_hours()

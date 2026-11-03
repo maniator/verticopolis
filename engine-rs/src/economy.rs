@@ -102,6 +102,20 @@ pub fn retail_spend_per_customer(kind: Kind) -> Option<f64> {
     })
 }
 
+/// What the catalog publishes as a facility's spend per customer: a venue that
+/// has subtypes and earns a daily income in `mode` (the shop, fast food and
+/// restaurant, plus the food hall, amusements and boutique bay in Modern).
+/// The inspector's patronage block gates on exactly this.
+pub fn catalog_spend_per_customer(mode: GameMode, kind: Kind) -> Option<f64> {
+    let has_subtypes = kind.subtype_list().is_some();
+    let earns_in_mode = commercial_daily_income(mode, kind).is_some();
+    if has_subtypes && earns_in_mode {
+        retail_spend_per_customer(kind)
+    } else {
+        None
+    }
+}
+
 /// `GameRules.weekendMultiplier`.
 pub fn weekend_multiplier(mode: GameMode, kind: Kind, is_weekend: bool) -> f64 {
     if !is_weekend {

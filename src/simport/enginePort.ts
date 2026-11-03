@@ -59,6 +59,12 @@ export interface ServiceDiagnosticFacts {
     readonly profitYest: number | null;
     readonly rainy: boolean | null;
   };
+  readonly commercial: {
+    /** More than two floors from a (sky) lobby, which halves a venue's trade;
+     *  null for a unit the penalty never applies to (a sky bar, or a venue that
+     *  earns no traffic income in this mode). */
+    readonly lobbyFar: boolean | null;
+  };
 }
 
 /** A `Float64Array` record whose slots `viewLayout().records` names. */
