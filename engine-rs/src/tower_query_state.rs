@@ -112,6 +112,46 @@ mod tests {
         (1, Some(1), 0),
     ];
 
+    /// One row per unit state and what each predicate says of it. The web keeps
+    /// a copy of the rule (`src/shared/unitState.ts`) and holds it to the same
+    /// table in `src/shared/unitState.test.ts`. Keep the two tables identical.
+    struct StateRow {
+        state: UnitState,
+        operational: bool,
+        present: bool,
+        tenanted: bool,
+        dormant: bool,
+    }
+
+    const fn row(
+        state: UnitState,
+        operational: bool,
+        present: bool,
+        tenanted: bool,
+        dormant: bool,
+    ) -> StateRow {
+        StateRow {
+            state,
+            operational,
+            present,
+            tenanted,
+            dormant,
+        }
+    }
+
+    const UNIT_STATE_ROWS: [StateRow; 10] = [
+        row(UnitState::Construction, false, false, false, true),
+        row(UnitState::Empty, true, false, false, true),
+        row(UnitState::Occupied, true, true, true, false),
+        row(UnitState::MovingIn, true, true, false, false),
+        row(UnitState::Vacating, true, true, true, false),
+        row(UnitState::Asleep, true, true, false, false),
+        row(UnitState::Dirty, true, false, false, false),
+        row(UnitState::Infested, true, false, false, true),
+        row(UnitState::Fire, false, false, false, true),
+        row(UnitState::Gutted, false, false, false, true),
+    ];
+
     fn unit(occupants: i64, out_for_meal: Option<i64>) -> Unit {
         Unit {
             id: 1,
@@ -144,6 +184,37 @@ mod tests {
                 shown,
                 "occupants {occupants}, out {out:?}"
             );
+        }
+    }
+
+    /// Position of each state in `UNIT_STATE_ROWS`. The match has no wildcard, so
+    /// a new `UnitState` variant fails to compile here until it has a row.
+    fn row_index(state: UnitState) -> usize {
+        match state {
+            UnitState::Construction => 0,
+            UnitState::Empty => 1,
+            UnitState::Occupied => 2,
+            UnitState::MovingIn => 3,
+            UnitState::Vacating => 4,
+            UnitState::Asleep => 5,
+            UnitState::Dirty => 6,
+            UnitState::Infested => 7,
+            UnitState::Fire => 8,
+            UnitState::Gutted => 9,
+        }
+    }
+
+    #[test]
+    fn state_predicates_match_the_shared_table() {
+        for (i, r) in UNIT_STATE_ROWS.iter().enumerate() {
+            assert_eq!(row_index(r.state), i, "{} row position", r.state.as_str());
+            let mut u = unit(0, None);
+            u.state = r.state;
+            let name = r.state.as_str();
+            assert_eq!(u.is_operational(), r.operational, "{name} operational");
+            assert_eq!(u.is_present(), r.present, "{name} present");
+            assert_eq!(u.is_tenanted(), r.tenanted, "{name} tenanted");
+            assert_eq!(u.is_dormant(), r.dormant, "{name} dormant");
         }
     }
 }

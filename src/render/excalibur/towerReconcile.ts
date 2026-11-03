@@ -3,7 +3,7 @@ import { Z } from "../depthPlanes";
 import { catalogFacility } from "../../catalog/catalogTypes";
 import { towerCatalog } from "../../catalog/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
-import { isPresent } from "../../engine/types";
+import { isPresent } from "../../shared/unitState";
 import type { TransportView, UnitView } from "../../simport/view";
 import {
   CRANE_H,
