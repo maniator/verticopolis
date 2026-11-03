@@ -376,7 +376,7 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
         tail.finance_population = finance_population(&raw[finance_at..people_end]);
     } else {
         tail.warnings.push(
-            "The save ends right after its elevators, so its finance, parking, and stairway data could not be read."
+            "The save ends right after its elevators, so its finance and parking data could not be read."
                 .into(),
         );
     }

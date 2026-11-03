@@ -15,6 +15,11 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.7.0 (2026-11-03)
+
+- The `tdtExport` record gains `retailRowsDropped` after `outOfRange`: the shops, restaurants and fast food places past the 512 style rows a 1994 file holds, which the export used to drop without a count. The view layout is now version 9; the save and frame layouts and the catalog are unchanged.
+- The `.TDT` importer's rebuilt elevator layout (used when a save's elevator table cannot be read) places each shaft on the nearest columns free of rooms and of earlier shafts over every floor it serves, reads the rooms from the final tower (after parking stalls slide onto their ramps), and leaves a shaft out with a warning when no column is free. The "ends right after its elevators" warning no longer says the stairways could not be read, since the importer still looks for them.
+
 ## 1.6.0 (2026-11-03)
 
 - `serviceDiagnostics(id)` gains a keyed `commercial` section: `lobbyFar` is true when a foot-traffic venue sits more than two floors from the nearest (sky) lobby, which halves its trade, and null for a unit the penalty never applies to (a sky bar is exempt and a venue that earns nothing in the current mode has no trade to halve, as in the income rule). The `retail` patronage block is now limited to the venues the catalog prices per customer (shop, fast food and restaurant, plus food hall, amusements and boutique bay in Modern), the set the TypeScript reference showed it for. Sky Bar, Nightclub, Spa and Daycare no longer answer `retail.active`. No saved-game, frame, view layout or catalog change.

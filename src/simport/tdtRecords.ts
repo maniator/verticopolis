@@ -54,6 +54,7 @@ const EXPORT_COUNTS = [
   "burnedOut",
   "vacancyHistoryLost",
   "outOfRange",
+  "retailRowsDropped",
 ] as const satisfies readonly (keyof ExportCounts)[];
 
 const ENCODE_STATS = [

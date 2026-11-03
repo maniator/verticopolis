@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -663,6 +663,7 @@
       "burnedOut",
       "vacancyHistoryLost",
       "outOfRange",
+      "retailRowsDropped",
       "balance",
       "money",
       "star",

@@ -68,7 +68,7 @@ pub(crate) const LOAD_TDT: [&str; 44] = [
 
 /// `tdtExport`'s record: the status, the gather tally, the encoder's
 /// stats, and the floors the file holds. A refused tower answers `[0]`.
-pub(crate) const TDT_EXPORT: [&str; 23] = [
+pub(crate) const TDT_EXPORT: [&str; 24] = [
     "status",
     "rooms",
     "rentsSnapped",
@@ -80,6 +80,7 @@ pub(crate) const TDT_EXPORT: [&str; 23] = [
     "burnedOut",
     "vacancyHistoryLost",
     "outOfRange",
+    "retailRowsDropped",
     "balance",
     "money",
     "star",
@@ -314,6 +315,7 @@ impl Engine {
                 c.burned_out,
                 c.vacancy_history_lost,
                 c.out_of_range,
+                c.retail_rows_dropped,
                 s.balance,
             ]
             .map(|n| n as f64),

@@ -146,3 +146,24 @@ fn forged_transports_drop_or_clamp_the_way_the_importer_sanitizes() {
     assert_eq!(built.stats.transports_dropped, 2);
     assert_eq!(built.stats.elevators_len, 1);
 }
+
+#[test]
+fn shops_past_the_512_style_rows_are_counted_not_silently_dropped() {
+    // 30 shops a floor over 18 floors is 540, so 28 do not fit the table.
+    let mut units = vec![unit(1, "lobby", 1, 0, 1)];
+    let mut id = 2;
+    for floor in 2..20 {
+        for slot in 0..30 {
+            units.push(unit(id, "shop", floor, slot * 12, 12));
+            id += 1;
+        }
+    }
+    let built = build_tdt(&tower(units, vec![])).expect("builds");
+    assert_eq!(built.counts.retail_rows_dropped, 540 - 512);
+    let few = build_tdt(&tower(
+        vec![unit(1, "lobby", 1, 0, 1), unit(2, "shop", 2, 0, 12)],
+        vec![],
+    ))
+    .expect("builds");
+    assert_eq!(few.counts.retail_rows_dropped, 0);
+}

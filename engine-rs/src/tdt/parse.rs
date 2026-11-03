@@ -11,19 +11,18 @@ use super::import_report::{DecodeStats, ImportCounts};
 use super::pacing::minute_of_day_for_frame;
 use super::part_merge::{merge_parts, PartRecord};
 use super::tables::*;
-use super::transports::{
-    synthesize_transports, transports_from_decoded, BuiltExtents, OutTransport,
-};
+use super::transports::{transports_from_decoded, BuiltExtents, OutTransport};
 use super::types::{TdtTenant, TdtTower};
 use super::LegacyImportError;
 use crate::facilities::{is_lobby_floor, Kind, LOT_WIDTH, MAX_FLOOR};
 use crate::sim::SAVE_VERSION;
 
+mod fallback;
 mod out_unit;
 mod parking;
 mod seed;
 
-use self::{parking::close_parking_gaps, seed::seed_from_finance};
+use self::{fallback::fallback_transports, parking::close_parking_gaps, seed::seed_from_finance};
 use out_unit::OutUnit;
 
 /// Result of a successful parse: the save, the binary walk's warnings and the
@@ -423,6 +422,7 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
 
     let decoded = tdt.tail.elevators.is_some();
     let mut decode_stats = DecodeStats::default();
+    let mut warnings = tdt.tail.warnings.clone();
     let transports: Vec<OutTransport> = match &tdt.tail.elevators {
         Some(elevators) => {
             let d = transports_from_decoded(
@@ -438,17 +438,16 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
             d.transports
         }
         None => {
-            let hotel_floors: Vec<i64> = units
-                .iter()
-                .filter(|u| u.kind.is_hotel())
-                .map(|u| u.floor)
-                .collect();
-            let staff_floors: Vec<i64> = units
-                .iter()
-                .filter(|u| u.kind == Kind::Housekeeping)
-                .map(|u| u.floor)
-                .collect();
-            synthesize_transports(&built_extents, &hotel_floors, &staff_floors, next_id)
+            let rebuilt = fallback_transports(&units, &built_extents, next_id);
+            if rebuilt.left_out > 0 {
+                warnings.push(format!(
+                    "{} rebuilt elevator shaft{} had no free column and {} left out.",
+                    rebuilt.left_out,
+                    if rebuilt.left_out == 1 { "" } else { "s" },
+                    if rebuilt.left_out == 1 { "was" } else { "were" },
+                ));
+            }
+            rebuilt.transports
         }
     };
     next_id += transports.len() as i64;
@@ -488,7 +487,7 @@ pub fn parse_tdt(bytes: &[u8], filename: &str) -> Result<ParsedLegacyTower, Lega
 
     Ok(ParsedLegacyTower {
         save: Value::Object(save),
-        warnings: tdt.tail.warnings.clone(),
+        warnings,
         counts,
         decode_stats,
         decoded,
