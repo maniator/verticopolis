@@ -1,6 +1,6 @@
 //! The tower signature: undo's per-command fingerprint. Today undo
 //! fingerprints the TypeScript instance with `towerStateSig`
-//! (`src/engine/UndoHistory.ts`) at a gesture's capture and commit, and
+//! (`src/engine/towerStateSig.ts`) at a gesture's capture and commit, and
 //! drops the step when the two match. The signature answers the same
 //! question for the tower half of that string, as a number: it is a pure
 //! read of the fields `towerStateSig` reads, so a capture and a commit

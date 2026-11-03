@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { EngineBootError } from "./engineBoot";
-import { towerStateSig } from "../engine/UndoHistory";
+import { towerStateSig } from "../engine/towerStateSig";
 import { FaultLatch, RestorePoints, carryLiveState, hostFault, isEngineTrap, isHostFault, runEach, signatureOfSave, type FaultContext } from "./hostFault";
 
 /** A save told apart by its clock. */

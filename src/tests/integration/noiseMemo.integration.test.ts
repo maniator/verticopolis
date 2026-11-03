@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { noiseAfflictedFresh } from "../../engine/sim/satisfaction";
 import { OFFICE_NOISE_TILES, HOTEL_NOISE_TILES } from "../../engine/sim/constants";
-import { towerStateSig } from "../../engine/UndoHistory";
+import { towerStateSig } from "../../engine/towerStateSig";
 import { lay, layTile, mustBuild, placeUnit as place } from "../fixtures/towerFixtures";
 
 /**

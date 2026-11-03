@@ -1,4 +1,4 @@
-import { UndoHistory } from "../engine/UndoHistory";
+import { UndoHistory } from "./UndoHistory";
 import type { EnginePort } from "../simport/enginePort";
 import { swapDone } from "./portLifecycle";
 

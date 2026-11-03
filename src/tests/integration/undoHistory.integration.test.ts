@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
-import { UndoHistory, towerStateSig } from "../../engine/UndoHistory";
+import { UndoHistory } from "../../game/UndoHistory";
+import { towerStateSig } from "../../engine/towerStateSig";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { createAppHistory } from "../../game/appHistory";

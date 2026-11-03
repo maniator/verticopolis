@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
-import { towerStateSig } from "../../engine/UndoHistory";
+import { towerStateSig } from "../../engine/towerStateSig";
 import { GRID } from "../../engine/facilities";
 
 // What the undo history fingerprints: a gesture that changes only one of

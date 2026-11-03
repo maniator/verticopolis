@@ -1,5 +1,5 @@
 import type { HeatmapMode, Simulation } from "./engine/Simulation";
-import type { UndoHistory } from "./engine/UndoHistory";
+import type { UndoHistory } from "./game/UndoHistory";
 import { createAppHistory } from "./game/appHistory";
 import type { FacilityKind } from "./engine/types";
 import type { TransportView, UnitView } from "./simport/view";
@@ -478,7 +478,7 @@ class GameApp implements GameAppPorts {
   /** Tooling: draw the engine again after a hand edit on `sim` reached it. */
   followEdit(shown?: Simulation): void { followToolingEdit(this, shown); }
 
-  // ---- Undo / redo (state + logic live in engine/UndoHistory) -------------
+  // ---- Undo / redo (state + logic live in game/UndoHistory) -------------
   // Thin delegators kept so the many gesture call sites read unchanged.
 
   /** @internal */ captureUndo(label: string): void { this.history.capture(label); }

@@ -36,7 +36,7 @@ src/engine/ElevatorDispatch.ts
 src/engine/EventSystem.ts
 src/engine/Ledger.ts
 src/engine/Tower.ts
-src/engine/UndoHistory.ts
+src/engine/towerStateSig.ts
 
 # Simulation friend modules (commands, reads, the save codec)
 # The floor and lobby brush moved here from src/simport/brush.ts (#1290) so

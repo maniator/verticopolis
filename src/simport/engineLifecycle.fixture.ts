@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
-import { towerStateSig } from "../engine/UndoHistory";
+import { towerStateSig } from "../engine/towerStateSig";
 import type { SerializedGame } from "../engine/types";
 import { MID, newSeededGame } from "../tests/fixtures/towerFixtures";
 import type { EnginePort, PortRecord } from "./enginePort";

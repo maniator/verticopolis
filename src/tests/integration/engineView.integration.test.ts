@@ -3,7 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../engine/serializedGame";
 import { isStructural } from "../../engine/tower/towerTopology";
 import type { FacilityKind, Unit } from "../../engine/types";
-import { towerStateSig } from "../../engine/UndoHistory";
+import { towerStateSig } from "../../engine/towerStateSig";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 
 /**

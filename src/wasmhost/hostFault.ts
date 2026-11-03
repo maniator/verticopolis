@@ -1,5 +1,5 @@
 import { Simulation } from "../engine/Simulation";
-import { towerStateSig } from "../engine/UndoHistory";
+import { towerStateSig } from "../engine/towerStateSig";
 
 /**
  * The runtime fallback's state (#874; spec-874-runtime-fallback.md): what a

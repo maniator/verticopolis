@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { UndoHistory } from "../../engine/UndoHistory";
+import { UndoHistory } from "../../game/UndoHistory";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { createAppHistory } from "../../game/appHistory";

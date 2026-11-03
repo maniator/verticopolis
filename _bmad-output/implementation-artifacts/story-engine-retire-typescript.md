@@ -87,7 +87,7 @@ own line: the PR, the files, and why the fallback needs them):
   - The undo trail's tidy after a recovery and its redo hold:
     `UndoHistory.dropUnchanged`, `UndoHistory.holdClearedRedo` with the
     `cleared` field on its steps, and the fingerprint the tidy takes
-    (`sigOf`, `src/engine/UndoHistory.ts`),
+    (`sigOf`, `src/engine/towerStateSig.ts`),
     `GameApp.dropEmptyUndo` and `GameApp.holdClearedRedo` (`src/main.ts`),
     and `WasmHostApp.dropEmptyUndo` and `WasmHostApp.holdClearedRedo`.
   - The analytics bridge's `release` option on `drainGameplayEvents`

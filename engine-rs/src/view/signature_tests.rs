@@ -1,5 +1,5 @@
 //! Tests for `signature.rs`, and the port of undo's `towerStateSig`
-//! (`src/engine/UndoHistory.ts`) that the seeded sessions in
+//! (`src/engine/towerStateSig.ts`) that the seeded sessions in
 //! `oracle_tests.rs` hold the signature to: two states have the same
 //! signature exactly when they have the same `towerStateSig` tower half.
 //! `engineView.integration.test.ts` checks the port against the real

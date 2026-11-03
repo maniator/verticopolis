@@ -1,5 +1,5 @@
 import { Simulation } from "../Simulation";
-import { towerStateSig } from "../UndoHistory";
+import { towerStateSig } from "../towerStateSig";
 import type { StepDebt } from "../sim/fixedStep";
 import { advanceOwedMinutes } from "../sim/frameStep";
 import type { GameplayEvent } from "../gameplayEventBuffer";
