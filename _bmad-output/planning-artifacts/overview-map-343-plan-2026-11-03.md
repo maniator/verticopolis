@@ -34,7 +34,7 @@ Sources: the retail manual's Map Window and Tutorial sections (PDF pp. 14, 23, 3
 - Four buttons sit on top: Edit (the default), Eval, Pricing, Hotel. Eval colors tenants by rating, Pricing by rent level, Hotel marks rooms that are dirty in red. The three tinted views pause the game while active.
 - The lot is 375 segments wide and the map shows it in full, basements included.
 - The manual's tutorial describes the elevator as a black vertical line, while its Map Window section gives colors by kind; the plain description does not settle which Classic should draw. v1 draws a shaft-width mark colored by kind.
-- Not verified: pixel-level styling. A retail capture from the PC harness is in progress (decision 4, a non-blocker).
+- Pixel-level styling was measured later the same day from the PC harness (decision 4): see the SPEC's Retail capture findings. The window is fixed at 200 by 288 px with a fixed scale, and the Edit tab is a flat gray silhouette with no rooms, which changes the Classic style (slice S2b).
 
 ## Architecture findings
 
@@ -59,9 +59,10 @@ Sources: the retail manual's Map Window and Tutorial sections (PDF pp. 14, 23, 3
 
 | Slice | Scope | Status |
 | --- | --- | --- |
-| S0 | Spec and evidence: `SPEC.md`, optional retail MAP capture on the PC | spec written; capture running (not a blocker) |
+| S0 | Spec and evidence: `SPEC.md`, optional retail MAP capture on the PC | spec written; retail capture done, findings in the SPEC |
 | S1 | Pure geometry (`src/render/overviewMap/geometry.ts`) with unit tests | in this PR |
 | S2 | Draw-list builder and style table (`src/render/overviewMap/`) with unit tests and a large-tower budget test | in this PR |
+| S2b | Apply the retail capture to Classic: flat gray silhouette, 1 px shaft lines, fixed-scale layout option, dotted camera outline (SPEC, Retail capture findings) | next, before S3 |
 | S3 | Window, Map button, camera binding, a11y, "Floor heatmap" rename; all chrome and CSS in one PR | after file ownership is agreed |
 | S4 | Playwright desktop and phone-touch specs, visual snapshots (pinned image), gallery scenes, large-tower performance run with the real catalog height lookup, the real pattern source and a real canvas (the S2 unit budget is synthetic and only pins the algorithm's shape), PC run for hardware claims | after S3 |
 | S5 | Help entry, CHANGELOG line, minor version bump, backlog row finished, #343 closed | after S4 |

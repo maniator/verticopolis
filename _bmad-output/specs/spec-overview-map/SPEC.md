@@ -66,10 +66,32 @@ A player with a 100-floor tower and a phone opens the Map, sees the tower's shap
 
 ## Assumptions
 
-- The original window's drawing scale and exact colors are refined from a retail capture (in progress, not a blocker); until then the style table's Classic column follows the manual and wiki description.
+- The original window's drawing was measured from a retail capture (see Retail capture findings). The style table's Classic column still follows the manual and wiki description until slice S2b applies those findings.
 - The map's drawing box proportions are chosen in S3 from phone and desktop layouts; the geometry (S1) takes any box, so the choice changes no tested logic.
+
+## Retail capture findings (2026-11-03)
+
+Measured in the real game on the PC harness with five saves (TOWER1, TOWER2, TOWER5, TOWER7, MYTOWER), all four tabs each. Own-words notes only: no game bytes, screenshots or third-party text are committed. Screenshots stay in the gitignored harness folders.
+
+- **Window.** A small fixed window at the top-left of the game desktop, about 202 by 316 px, identical at 1024x768 and 1600x1000. It cannot be resized. A thin strip about 9 px tall sits on top (no real title bar), then a row of four equal beveled buttons (Edit, Eval, Pricing, Hotel, Edit active on load), then the map body, 200 by 288 px with a 1 px gray border and no scrollbars. The body background is the same sky and ground as the main view and follows the time of day.
+- **Scale.** The whole lot is always visible: 375 tiles map to 200 px (8/15 px per tile) and 120 floor slots to 288 px (exactly 2.4 px per slot). The scale is fixed and never fits the tower, so a 40-slot tower is a small stub at the bottom under empty sky and a 110-slot tower nearly fills the body. Ground sits about 10 slots above the bottom, and the silhouette runs down through the ground strip to the bottom edge.
+- **Edit tab.** A flat light-gray silhouette of each floor row's built extent (setbacks and steps show). No rooms and no facility kinds are drawn; lobbies, offices, hotels and condos are all the same gray. Elevators are 1 px vertical lines over the shaft's height: black for most, red for a few (probably express, unconfirmed). Long blue 1 px lines line up with stair and escalator columns (inferred, unconfirmed). Wide structures such as parking ramps show as thin horizontal bars.
+- **Eval tab.** A three-swatch legend (Excellent cyan, Good olive-yellow, Terrible red) over the top of the body without shifting the map. Rooms are solid rectangles colored by score, one per room, kinds not told apart. Shafts and stairs keep their lines; lobbies and structure stay gray.
+- **Pricing tab.** A four-swatch legend (High red, Average olive, Low green, Very Low cyan). Rooms are rectangles colored by rent tier. Default-priced towers are almost all olive.
+- **Hotel tab.** One swatch for dirty rooms under the buttons. With no dirty rooms the map equals the Edit silhouette.
+- **Camera rectangle.** A 1 px dotted outline (an inverting pen: black on light, red over red rooms, pale on a dark night sky), about 53 by 33 px, matching the main view of about 99 tiles by 14 floors. It is clipped at the map's right edge.
+- **Open items.** What the black, red and blue lines mean is unconfirmed (a short live session clicking a line would settle it). Dirty-room coloring was seen only in TOWER1.
+
+### What changes for Classic (applied in slice S2b, before S3)
+
+1. Classic's Edit view is a single light-gray silhouette: every structure run and room paints the same flat gray, no patterns and no per-kind groups. The per-kind groups and patterns stay as the Modern theme.
+2. Classic shafts are 1 px lines (black for standard and service, red for express, blue for stairs and escalators) until the live session settles the meanings. The manual's blue/gray/red-by-kind description and the capture disagree, and the capture wins for pixels; the choice is recorded here when confirmed.
+3. Classic layout is the fixed scale (8/15 px per tile, 2.4 px per slot) in a fixed 200 by 288 body, not fit-to-extent. Modern keeps fit-to-extent. `fitLayout` already takes any box, so this is a layout choice in S3, not new geometry.
+4. The camera rectangle is a 1 px dotted outline in Classic (a solid theme-colored outline in Modern is a free choice).
+5. Eval, Pricing and Hotel tab colors above are the Classic palette for #1618, #1619 and #1617.
 
 ## Decision log
 
 - 2026-11-03: placement approved (3.0.0 train with automatic deferral to 3.1.0 if v1 is not complete before the freeze), closed by default, "Map overlay" renamed "Floor heatmap", Hotel/Eval/Pricing tracked as separate 3.1.0 items. See the plan file.
 - 2026-11-03: DOM canvas window chosen over an Excalibur layer: the world canvas's gesture arbiter and the map never compete for pointers, and a closed window costs nothing in the frame.
+- 2026-11-03: retail capture measured the original window (fixed 200 by 288 body, fixed scale, flat gray silhouette in Edit, no rooms). Classic adopts that look in slice S2b; Modern keeps the per-kind groups. See Retail capture findings.
