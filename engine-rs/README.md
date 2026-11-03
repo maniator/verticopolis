@@ -277,9 +277,8 @@ facility table.
 
 ## The switch
 
-Every deployed build runs the web game on the WASM engine (dev serves and the
-test lanes still pick it with `?engine=wasm` or `localStorage.setItem("vc.engine", "wasm")`,
-`?engine=ts` to override) (story-engine-wasm-switch): the engine alone ticks, and the `Simulation`
+Every build of the web game runs on the WASM engine, whatever `?engine=` or
+`vc.engine` says (story-engine-wasm-switch): the engine alone ticks, and the `Simulation`
 instance the app holds becomes a read model of it, refreshed every frame
 from `Engine.frameView()` (one flat number array) and, on every hour pass or
 tower revision, from the engine's save, merged in place so the renderer's
@@ -308,15 +307,11 @@ and the same test counts that each event arrives once.
 
 ## The dual run
 
-The binding's second consumer is the dual run (story-engine-dual-run): the
-web game, behind a developer switch, runs the WASM engine in a worker beside
-the live TypeScript engine, mirrors every command to it and compares the two
-hashed views at every hour. Switch it on under `npm run dev` with
-`?dualrun=1` (or `localStorage.setItem("vc.dualrun", "1")`) after
-`npm run wasm:build`, which also writes the browser package to
-`src/public/engine/`; the first divergence prints in the console with the
-JSON path where the views depart. The same mirror and shadow run in Node as
-the gate, a full day on every fixture at each game speed through the frame
+The binding's second consumer is the dual run (story-engine-dual-run): a
+mirror drives the WASM engine beside the TypeScript engine, mirrors every
+command to it and compares the two hashed views at every hour. The browser
+switch for it is gone with the TypeScript engine in the game; the mirror and
+shadow run in Node as the gate, a full day on every fixture at each game speed through the frame
 loop's own step math: `npm run test:wasm` (the `dualRun*` suites; the same
 command runs `conformanceWasmTdt`, the `.TDT` differential test, whose
 `VC_TDT_DIFF_*` switches are described in the `.TDT` section above, and

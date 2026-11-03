@@ -11,7 +11,7 @@ describe("screenshot engine selection", () => {
     expect(resolveShotEngine(undefined)).toBe("wasm");
     expect(resolveShotEngine("")).toBe("wasm");
     expect(resolveShotEngine("wasm")).toBe("wasm");
-    expect(resolveShotEngine("ts")).toBe("ts");
+    expect(() => resolveShotEngine("ts")).toThrow(/is gone/);
     expect(() => resolveShotEngine("rust")).toThrow(/not an engine/);
   });
 });

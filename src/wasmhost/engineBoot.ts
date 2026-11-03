@@ -4,13 +4,9 @@ import { readEngineIdentity } from "./engineIdentity";
 import type { BuildMetadataResult } from "./buildSection";
 
 /**
- * How boot gets its engine, for both build modes (see
- * `src/build/engineBundle.ts`). A switchable build loads the WASM package only
- * when asked (`?engine=wasm`, `vc.engine`) and stays on the TypeScript engine
- * when it fails, with the reason in the console. A wasm-only build always
- * loads it, and a package that fails to load or lacks a part the game needs
- * is a failure that stops boot: there is no TypeScript engine to fall back to,
- * and a quiet fallback is what the build exists to rule out.
+ * How boot gets its engine. Boot always loads the WASM package, and a package
+ * that fails to load or lacks a part the game needs is a failure that stops
+ * boot: there is no other engine to fall back to.
  *
  * The result is published on `window.__vcEngineBoot` so a tester, the e2e
  * suites and a support session can read which build this is, which engine it
@@ -176,7 +172,6 @@ export interface EngineBootState {
 }
 
 export interface EngineBootOptions {
-  wasmOnly: boolean;
   /** Loads the engine. The signal fires at the time limit; the loader checks
    *  it after each step and drops a result that arrives later. `onBuild` gets
    *  the binary's build metadata as soon as it is read, so a failure later in
@@ -219,17 +214,10 @@ export interface EngineBootResult {
   state: EngineBootState;
 }
 
-/** A switchable build's boot when the WASM engine was not asked for. Boot
- *  takes it without awaiting, so a TypeScript boot stays synchronous. */
-export function typescriptBoot(): EngineBootResult {
-  return { module: null, state: { build: "switchable", engine: "ts", failure: null } };
-}
-
-/** Load the WASM engine for boot (a wasm-only build, or a switchable one
- *  that asked for it). Never throws: a failure is in the state. */
+/** Load the WASM engine for boot. Never throws: a failure is in the state. */
 export async function loadBootEngine(opts: EngineBootOptions): Promise<EngineBootResult> {
   const log = opts.log ?? console;
-  const build = opts.wasmOnly ? "wasm-only" : "switchable";
+  const build = "wasm-only";
   let mod: WasmModule;
   let binary: BuildMetadataResult | undefined;
   const binaryField = () => (binary === undefined ? {} : { binary });
@@ -237,17 +225,12 @@ export async function loadBootEngine(opts: EngineBootOptions): Promise<EngineBoo
     const attempt = new AbortController();
     mod = await withTimeout(opts.load(attempt.signal, (b) => (binary = b)), opts.timeoutMs ?? ENGINE_LOAD_TIMEOUT_MS, () => attempt.abort());
   } catch (e) {
-    if (!opts.wasmOnly) {
-      // The fallback is recorded with its reason (#874) as well as logged.
-      log.error("[wasm] the engine package did not load; running on the TypeScript engine:", e);
-      return { module: null, state: { build, engine: "ts", failure: bootFailure("load", e), ...binaryField() } };
-    }
     log.error("[wasm] the engine package did not load, and this build has no other engine:", e);
     return { module: null, state: { build, engine: "none", failure: bootFailure("load", e), ...binaryField() } };
   }
-  // Saves go through the engine's own writer (#935). A switchable build keeps
-  // the TypeScript writer for a package without one; a wasm-only build needs it.
-  if (opts.wasmOnly && !mod.encodeVctower) {
+  // Saves go through the engine's own writer (#935), so a package without one
+  // cannot run the game.
+  if (!mod.encodeVctower) {
     const message = NO_SAVE_WRITER_MESSAGE;
     log.error(`[wasm] ${message}`);
     return { module: null, state: { build, engine: "none", failure: { stage: "load", reason: "package-mismatch", message, cause: "no-save-writer" }, ...binaryField() } };
@@ -258,7 +241,7 @@ export async function loadBootEngine(opts: EngineBootOptions): Promise<EngineBoo
 
 /** Mark a boot that loaded its engine but could not start or keep it. */
 export function failBoot(state: EngineBootState, stage: BootStage, reason: FallbackReason, message: string): EngineBootState {
-  return { ...state, engine: state.build === "wasm-only" ? "none" : "ts", failure: { stage, reason, message } };
+  return { ...state, engine: "none", failure: { stage, reason, message } };
 }
 
 /** Publish the boot state for tooling, tests and support. */

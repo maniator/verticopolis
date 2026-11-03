@@ -116,22 +116,11 @@ export function buildToStar(target: number): number {
   };
   const W = g.grid.width;
   const port = (window as any).__vcEngine?.port;
-  const hosted = Boolean(port) && g.enginePort === port;
-  // The WASM engine was asked for but holds no tower: building in place here
-  // would script the read model alone, so fail loudly instead.
-  // A wasm-only build has no other engine, whatever the URL or storage say.
-  let wantsWasm = (window as any).__vcEngineBoot?.build === "wasm-only";
-  try {
-    // The same rule as engineRequested (src/wasmhost/engineChoice.ts): the
-    // query wins, then the stored choice.
-    const q = new URLSearchParams(location.search).get("engine");
-    wantsWasm ||= q === "wasm" || (q !== "ts" && localStorage.getItem("vc.engine") === "wasm");
-  } catch {
-    /* storage blocked: decide on the host alone */
-  }
-  if (wantsWasm && !hosted) throw new Error("buildToStar: the WASM engine was requested but no host holds the tower");
+  // The Rust engine is the only engine, so a tower it does not hold would be
+  // scripted into the read model alone: fail loudly instead.
+  if (!port || g.enginePort !== port) throw new Error("buildToStar: no engine host holds the tower");
   g.speed = 0; // freeze time so the crowd sim can't churn the setup
-  const s = hosted ? scratch() : g.sim;
+  const s = scratch();
   const t = s.tower;
   s.money = 1e9;
 
@@ -187,18 +176,6 @@ export function buildToStar(target: number): number {
     s.vipFavorable = true;
   }
   if (target >= 5) t.place("metro", -9, c - 15); // 30 wide, under the tower
-
-  if (!hosted) {
-    s.evaluateStar();
-    if (target === 6) {
-      s.build("weddingHall", 100, c); // schedules the VIP inspection
-      const wh = (t.units as any[]).find((u) => u.kind === "weddingHall");
-      if (wh && wh.state === "construction") wh.state = "empty"; // done building
-      s.clock.advance(10 * 24 * 60);
-      s.checkVip(); // real win logic → star 6, evaluatedTower = true
-    }
-    return s.star;
-  }
 
   g.adoptSim(s, true);
   g.speed = 0; // adopting the tower can dismiss a lingering title screen, whose teardown resumes play

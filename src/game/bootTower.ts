@@ -1,5 +1,3 @@
-import { Simulation } from "../engine/Simulation";
-import { TsEngine } from "../engine/port/tsEngine";
 import type { EnginePort } from "../simport/enginePort";
 import { SaveGame } from "../storage/SaveGame";
 import { loadStored } from "./portLifecycle";
@@ -31,9 +29,4 @@ export function bootTower(port: EnginePort): BootTower {
   const boot = SaveGame.loadResult(loadStored(port));
   port.setBackdrop(false);
   return { port, ...boot };
-}
-
-/** The TypeScript engine, with the stored tower loaded. */
-export function tsBootTower(): BootTower {
-  return bootTower(new TsEngine(Simulation.newGame(BOOT_SEED)));
 }

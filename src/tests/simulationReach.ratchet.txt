@@ -5,7 +5,6 @@
 # facade's slices (#1207) move each consumer behind the port; a new line needs
 # a reason the PR states and a reviewer accepts.
 src/game/facilityDiagnostics.ts Simulation # reads the gripe thresholds Simulation exports; facade slice 4 (#1211)
-src/game/bootTower.ts Simulation port/tsEngine # the TypeScript engine's first tower, moved from src/main.ts (PR 5e)
 src/game/toolingSim.ts Simulation port/tsEngine # the tooling harnesses' hand-built towers on either engine, moved from src/main.ts (PR 5e); tooling builds only past the TsEngine check
 src/storage/SaveGame.ts Simulation # slot listing and loads deserialize a save into a Simulation; facade slice 5 (#1212)
 src/wasmhost/hostFault.ts Simulation # the fallback deserializes the Simulation the TypeScript engine resumes on; facade slice 8 (#1218)

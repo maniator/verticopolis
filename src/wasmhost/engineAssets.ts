@@ -48,7 +48,7 @@ export interface EngineFile {
 /** Every file the package build leaves in `src/public/engine/`. Add a new
  *  one here in the same change that writes it. */
 export const ENGINE_PACKAGE: readonly EngineFile[] = [
-  { name: ENGINE_GLUE, runtime: true, readBy: "the WASM host, the engine worker and the dual run's worker, through the verified loader (loadEngineModule.ts), which imports the checked bytes" },
+  { name: ENGINE_GLUE, runtime: true, readBy: "the WASM host and the engine worker, through the verified loader (loadEngineModule.ts), which imports the checked bytes" },
   { name: ENGINE_WASM, runtime: true, readBy: "the verified loader (loadEngineModule.ts), which fetches and hashes it and passes the bytes to the glue's init" },
   { name: ENGINE_BUILD_RECORD, runtime: true, readBy: "the verified loader (enginePackageCheck.ts hashes the glue and binary against this record); also the build, CI's package cache and packageHash.test.ts" },
   { name: ENGINE_THIRD_PARTY_RECORD, runtime: false, readBy: "the third-party notices build (scripts/gen-third-party-notices.ts)" },

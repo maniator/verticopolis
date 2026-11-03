@@ -10,14 +10,9 @@ vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 // Mock `virtual:pwa-register` (Vite virtual module via bootstrap.ts/pwa.ts) so the import resolves on Windows too (as pwa.test.ts does).
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
-// The WASM engine switch: the request and the package load are stubbed so the
-// fallback (package fails to load, the game boots on the TypeScript engine)
-// can be asserted without a package.
-const wasmStub = vi.hoisted(() => ({ requested: "ts" as "ts" | "wasm", loadError: null as Error | null, module: null as unknown }));
-vi.mock("./wasmhost/engineChoice", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./wasmhost/engineChoice")>();
-  return { ...real, engineRequested: () => wasmStub.requested };
-});
+// The package load is stubbed so boot runs without an engine package. The
+// default package has a save writer, the one part boot requires of it.
+const wasmStub = vi.hoisted(() => ({ loadError: null as Error | null, module: { Engine: class {}, encodeVctower: () => "" } as unknown }));
 vi.mock("./wasmhost/rustEngine", async (importOriginal) => {
   const real = await importOriginal<typeof import("./wasmhost/rustEngine")>();
   return {
@@ -347,7 +342,7 @@ describe("bootGame", () => {
     delete (window as unknown as { game?: unknown }).game;
   });
 
-  it("boots immediately when the document is ready (WebGL present)", () => {
+  it("boots immediately when the document is ready (WebGL present)", async () => {
     // Stub createElement so hasWebGL() sees a real GL context.
     const real = document.createElement.bind(document);
     vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
@@ -361,7 +356,7 @@ describe("bootGame", () => {
 
     // readyState is "interactive" under happy-dom (non-loading), so boot runs now.
     expect(document.readyState).not.toBe("loading");
-    bootGame(create);
+    await bootGame(create);
 
     expect(create).toHaveBeenCalledTimes(1);
     // Vitest runs with `import.meta.env.DEV` true, so this is the dev-serve
@@ -375,7 +370,7 @@ describe("bootGame", () => {
   // this test for a reason that has nothing to do with the code, so skip it
   // there instead of baffling the developer; CI never sets the var for `npm
   // test`, so the assertion always runs where it matters.
-  it.runIf(!__TOOLING_BUILD__)("publishes no window.game in a player session (DEV off, no tooling build)", () => {
+  it.runIf(!__TOOLING_BUILD__)("publishes no window.game in a player session (DEV off, no tooling build)", async () => {
     // With `__TOOLING_BUILD__` false, stubbing DEV off leaves exactly what a
     // deployed player session sees: the game boots, the update wiring still
     // lands, and no console handle into the sim is handed out.
@@ -384,7 +379,7 @@ describe("bootGame", () => {
     const app = { onUpdateAvailable: vi.fn() };
     const create = vi.fn(() => app);
 
-    bootGame(create);
+    await bootGame(create);
 
     expect(create).toHaveBeenCalledTimes(1);
     expect((window as unknown as { game?: unknown }).game).toBeUndefined();
@@ -425,17 +420,18 @@ describe("bootGame", () => {
     expect(html).toContain("kaboom");
   });
 
-  it("defers boot until DOMContentLoaded while the document is still loading", () => {
+  it("defers boot until DOMContentLoaded while the document is still loading", async () => {
     stubWebGL();
     const ready = vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
     const app = { onUpdateAvailable: vi.fn() };
     const create = vi.fn(() => app);
 
-    bootGame(create);
+    const booted = bootGame(create);
     expect(create).not.toHaveBeenCalled(); // parked on the DOMContentLoaded listener
 
     ready.mockReturnValue("interactive");
     document.dispatchEvent(new Event("DOMContentLoaded"));
+    await booted;
     expect(create).toHaveBeenCalledTimes(1);
   });
 });
@@ -479,7 +475,7 @@ describe("bootGame telemetry gate", () => {
     expect(injectWebAnalytics).not.toHaveBeenCalled();
   });
 
-  it("never lets a telemetry failure block boot", () => {
+  it("never lets a telemetry failure block boot", async () => {
     stubWebGL();
     window.location.href = "https://verticopolis.com/";
     vi.mocked(injectSpeedInsights).mockImplementationOnce(() => {
@@ -487,7 +483,7 @@ describe("bootGame telemetry gate", () => {
     });
     const app = { onUpdateAvailable: vi.fn() };
 
-    expect(() => bootGame(vi.fn(() => app))).not.toThrow();
+    await expect(bootGame(vi.fn(() => app))).resolves.toBeUndefined();
     // Boot still finished: the game handle is published despite the telemetry throw.
     expect((window as unknown as { game?: unknown }).game).toBe(app);
   });

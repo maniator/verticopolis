@@ -95,7 +95,7 @@ export interface WasmHost {
  *  engine's. */
 export interface WasmHostOptions {
   /** When the read model follows the engine. "step" (the default, and the
-   *  only mode the shipped `?engine=wasm` uses) applies the frame view after
+   *  only mode the shipped game uses) applies the frame view after
    *  every step. "frame" (experimental, `?engine=wasm-frame`) applies it once
    *  per rendered frame, from the frame loop's `flush` (see `stepGate.ts`),
    *  straight from the engine's array (`frameApply.ts`); between steps the

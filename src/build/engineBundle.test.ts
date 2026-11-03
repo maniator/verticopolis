@@ -56,16 +56,6 @@ describe("checkEngineBundle", () => {
     expect(checkEngineBundle(wasmOnly({ allowed: ["src/engine/Simulation.ts", "src/engine/Tower.ts"] })).errors).toEqual([expect.stringContaining("no longer ship in the wasm-only bundle; remove them from scripts/engine-bundle.allow.txt so the list only shrinks: src/engine/Tower.ts")]);
   });
 
-  it("fails a wasm-only build that carries the engine switch or the dual run", () => {
-    const chunks = [{ file: "assets/main.js", sources: ["src/engine/Simulation.ts", "src/wasmhost/engineChoice.ts", "src/dualrun/dualRun.ts"] }, { file: "assets/worker-x.js", sources: ["src/dualrun/worker.ts"] }];
-    const { errors } = checkEngineBundle(wasmOnly({ chunks, tooling: true }));
-    expect(errors).toEqual([
-      "assets/main.js carries the runtime engine switch (src/wasmhost/engineChoice.ts) in a wasm-only build",
-      "assets/main.js carries the dual run (src/dualrun/dualRun.ts) in a wasm-only build",
-      "assets/worker-x.js carries the dual-run worker (src/dualrun/worker.ts) in a wasm-only build",
-    ]);
-  });
-
   it("fails a wasm-only build that does not precache the engine package", () => {
     expect(checkEngineBundle(wasmOnly({ precache: ["index.html", "engine/verticopolis_engine.js"] })).errors).toEqual([expect.stringContaining("does not precache the engine package (engine/verticopolis_engine_bg.wasm)")]);
   });
@@ -80,7 +70,7 @@ describe("checkEngineBundle", () => {
   });
 
   it("lets a switchable build carry the TypeScript engine and the switch, but no test code", () => {
-    const chunks = [{ file: "assets/main.js", sources: [TS_STEP_LOOP, "src/wasmhost/engineChoice.ts", "src/engine/crowd/motion.ts"] }];
+    const chunks = [{ file: "assets/main.js", sources: [TS_STEP_LOOP, "src/engine/crowd/motion.ts"] }];
     const ok = checkEngineBundle({ build: "switchable", tooling: false, chunks, precache: [], stamp: "switchable", allowed: [] });
     expect(ok.errors).toEqual([]);
     expect(ok.engineModules).toEqual(["src/engine/crowd/motion.ts", TS_STEP_LOOP]);
@@ -91,13 +81,6 @@ describe("checkEngineBundle", () => {
   it("fails a switchable build that lost the TypeScript step loop (a wasm-only swap leaked)", () => {
     const chunks = [{ file: "assets/main.js", sources: ["src/engine/Simulation.ts"] }];
     expect(checkEngineBundle({ build: "switchable", tooling: false, chunks, precache: [], stamp: "switchable", allowed: [] }).errors).toEqual([expect.stringContaining("does not carry the TypeScript step loop")]);
-  });
-
-  it("keeps the dual run out of a player build and lets a tooling build keep it", () => {
-    const chunks = [{ file: "assets/main.js", sources: [TS_STEP_LOOP] }, { file: "assets/worker-x.js", sources: ["src/dualrun/worker.ts"] }];
-    const base = { build: "switchable" as const, chunks, precache: [], stamp: "switchable", allowed: [] };
-    expect(checkEngineBundle({ ...base, tooling: false }).errors).toEqual(["assets/worker-x.js carries the dual run (src/dualrun/worker.ts), a tooling-only switch, in a player build"]);
-    expect(checkEngineBundle({ ...base, tooling: true }).errors).toEqual([]);
   });
 });
 

@@ -2,7 +2,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { WASM_ONLY_PROJECT, onWasm } from "./helpers";
+import { onWasm } from "./helpers";
 import { hostedGame } from "./offlineHelpers";
 import { ENGINE_PATH, SALT_SECTION, installed, tamperCache } from "./engineCacheHelpers";
 
@@ -15,9 +15,8 @@ import { ENGINE_PATH, SALT_SECTION, installed, tamperCache } from "./engineCache
  * the page must refuse it with a reason, instantiate nothing, and add no
  * reload of its own.
  *
- * It runs on `chromium-wasm`, where a refusal leaves the game on the
- * TypeScript engine, and on `chromium-wasm-only`, where it stops behind the
- * engine failure message. Instrumentation, installed before the page's own
+ * It runs on `chromium-wasm` and `chromium-wasm-only`; a refusal stops the game
+ * behind the engine failure message on both. Instrumentation, installed before the page's own
  * scripts: counters on `WebAssembly.instantiate` and friends and on Blob URLs
  * for scripts. A refused package must leave both at zero; a good boot must
  * move them (so a broken spy cannot pass the refusals).
@@ -74,26 +73,20 @@ const spied = (page: Page) => page.evaluate(() => ({ ...(window as any).__engine
 /** The page refused the engine: the boot state says why, nothing was
  *  instantiated, and what the player sees matches the build. */
 async function expectRefused(page: Page, file: "glue" | "wasm" | "build-record"): Promise<NonNullable<Boot["failure"]>> {
-  const wasmOnly = test.info().project.name === WASM_ONLY_PROJECT;
   await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 30_000 });
   const state = await bootState(page);
   expect(state.failure, "the boot state names the refusal").toMatchObject({ stage: "load", reason: "package-mismatch", package: { kind: "mismatch", file, expectedPackage: short(built.package) } });
-  expect(state.engine).toBe(wasmOnly ? "none" : "ts");
+  expect(state.engine).toBe("none");
   expect(await spied(page), "nothing was compiled or imported from the refused bytes").toEqual({ instantiate: 0, scriptBlobs: 0 });
   expect(await page.evaluate(() => !!(window as any).__vcEngine?.status?.hosted)).toBe(false);
-  if (wasmOnly) {
-    const failure = page.locator("#engine-failure");
-    await expect(failure).toBeVisible();
-    await expect(failure).toHaveAttribute("role", "alert");
-    await expect(page.locator("#boot-fallback button:not([data-act])")).toBeFocused();
-    await expect(failure, "the screen says what is wrong and carries the ids, or the file that differs").toContainText(
-      /The engine files do not match this version of the game\. The engine was not started\. \((expected [0-9a-f]{12}, found ([0-9a-f]{12}|unavailable)|[a-z ]+ differs from the record)\)/,
-    );
-    expect(await page.evaluate(() => !!(window as any).game)).toBe(false);
-  } else {
-    // The default build keeps the game on the TypeScript engine.
-    await page.waitForFunction(() => !!(window as any).game, undefined, { timeout: 30_000 });
-  }
+  const failure = page.locator("#engine-failure");
+  await expect(failure).toBeVisible();
+  await expect(failure).toHaveAttribute("role", "alert");
+  await expect(page.locator("#boot-fallback button:not([data-act])")).toBeFocused();
+  await expect(failure, "the screen says what is wrong and carries the ids, or the file that differs").toContainText(
+    /The engine files do not match this version of the game\. The engine was not started\. \((expected [0-9a-f]{12}, found ([0-9a-f]{12}|unavailable)|[a-z ]+ differs from the record)\)/,
+  );
+  expect(await page.evaluate(() => !!(window as any).game)).toBe(false);
   return state.failure!;
 }
 

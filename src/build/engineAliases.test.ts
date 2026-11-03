@@ -3,8 +3,8 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 /**
- * vite.config.ts swaps two modules by import specifier (`engineAliases`):
- * `./sim/loop` in wasm-only builds and `./dualrun/dualRun` in player builds.
+ * vite.config.ts swaps a module by import specifier (`engineAliases`):
+ * `./sim/loop` in wasm-only builds.
  * A specifier alias matches the text from any importer, so these pin that
  * exactly the intended file uses each one, and that the real modules are not
  * reached by another specifier the alias would miss. The postbuild guard
@@ -51,13 +51,6 @@ describe("the engine aliases' specifiers", () => {
   it("only Simulation.ts imports ./sim/loop, and no app code reaches the loop another way", () => {
     expect(files.filter((f) => f.specs.includes("./sim/loop")).map((f) => f.file)).toEqual(["src/engine/Simulation.ts"]);
     const other = files.filter((f) => f.specs.some((s) => names(f.file, s, "src/engine/sim/loop") && !(f.file === "src/engine/Simulation.ts" && s === "./sim/loop")));
-    expect(other.map((f) => f.file)).toEqual([]);
-  });
-
-  it("only bootstrap.ts imports ./dualrun/dualRun as a value", () => {
-    expect(files.filter((f) => f.specs.includes("./dualrun/dualRun")).map((f) => f.file)).toEqual(["src/bootstrap.ts"]);
-    // dualRunAbsent.ts imports the real module's types only, which are erased.
-    const other = files.filter((f) => f.specs.some((s) => names(f.file, s, "src/dualrun/dualRun") && !(f.file === "src/bootstrap.ts" && s === "./dualrun/dualRun")));
     expect(other.map((f) => f.file)).toEqual([]);
   });
 });
