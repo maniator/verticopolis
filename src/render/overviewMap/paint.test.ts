@@ -191,10 +191,10 @@ describe("paintMapMarks", () => {
 
   it("paints a mark too small to read a pattern in as a plain fill", () => {
     const ctx = fakeCtx();
-    paintMapMarks(ctx, 50, 50, [mark("condo", MIN_PATTERN_SIDE - 1, 10)], "classic", plain);
+    paintMapMarks(ctx, 50, 50, [mark("condo", MIN_PATTERN_SIDE - 1, 10)], "modern", plain);
     expect(ctx.styleSets[0]).not.toContain(":");
     const big = fakeCtx();
-    paintMapMarks(big, 50, 50, [mark("condo", MIN_PATTERN_SIDE, 10)], "classic", plain);
+    paintMapMarks(big, 50, 50, [mark("condo", MIN_PATTERN_SIDE, 10)], "modern", plain);
     expect(String(big.styleSets[0])).toContain("dots:");
   });
 

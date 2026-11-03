@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import type { FacilityKind } from "../../engine/types";
 import { FACILITY_PRESENTATION } from "../../presentation/facilityPresentation";
 import {
-  CLASSIC_FILL,
+  CLASSIC_SHAFT_FILL,
+  CLASSIC_TOWER_FILL,
   GROUP_PATTERN,
   KIND_GROUP,
   UNKNOWN_KIND_STYLE,
@@ -22,18 +23,12 @@ describe("overview map style table", () => {
     expect(Object.keys(KIND_GROUP).sort()).toEqual([...KINDS].sort());
   });
 
-  it("gives every group a pattern and a Classic fill", () => {
-    expect(Object.keys(CLASSIC_FILL).sort()).toEqual([...GROUPS].sort());
-    for (const g of GROUPS) expect(CLASSIC_FILL[g]).toMatch(/^#[0-9a-f]{6}$/);
-  });
-
-  it("keeps groups apart in Classic by fill, pattern or both (no two groups look the same)", () => {
-    const seen = new Map<string, MapGroup>();
-    for (const g of GROUPS) {
-      const key = `${GROUP_PATTERN[g]}|${CLASSIC_FILL[g]}`;
-      expect(seen.get(key), `${g} looks like ${seen.get(key)}`).toBeUndefined();
-      seen.set(key, g);
-    }
+  it("gives every group a Modern pattern and every shaft group a Classic line color", () => {
+    expect(Object.keys(GROUP_PATTERN).sort()).toEqual([...GROUPS].sort());
+    // KIND_GROUP is the source of truth for which groups exist: the groups kinds use are exactly the groups with a pattern.
+    expect([...new Set(Object.values(KIND_GROUP))].sort()).toEqual([...GROUPS].sort());
+    expect(Object.keys(CLASSIC_SHAFT_FILL).sort()).toEqual(["elevatorExpress", "elevatorService", "elevatorStandard", "stairs"]);
+    for (const color of [CLASSIC_TOWER_FILL, ...Object.values(CLASSIC_SHAFT_FILL)]) expect(color).toMatch(/^#[0-9a-f]{6}$/);
   });
 
   it("separates the room groups by pattern, so the map reads without color", () => {
@@ -48,29 +43,25 @@ describe("overview map style table", () => {
     expect(new Set(shafts.map((g) => GROUP_PATTERN[g])).size).toBe(3);
   });
 
-  it("keeps the plain solid groups apart by lightness as well as hue", () => {
-    const solid = GROUPS.filter((g) => GROUP_PATTERN[g] === "solid" && !g.startsWith("elevator"));
-    for (let i = 0; i < solid.length; i++) {
-      for (let j = i + 1; j < solid.length; j++) {
-        const a = hexLuminance(CLASSIC_FILL[solid[i]])!;
-        const b = hexLuminance(CLASSIC_FILL[solid[j]])!;
-        expect(contrastRatio(a, b), `${solid[i]} vs ${solid[j]}`).toBeGreaterThanOrEqual(1.15);
-      }
-    }
-  });
-
-  it("draws Classic elevators by kind: express blue, standard gray, service red", () => {
-    expect(mapStyleFor("elevatorExpress", "classic").fill).toBe("#2f6fdb");
-    expect(mapStyleFor("elevatorStandard", "classic").fill).toBe("#8a8a8a");
-    expect(mapStyleFor("elevatorService", "classic").fill).toBe("#d23c3c");
-  });
-
-  it("keeps the Classic tower gray (no hue outside the shafts)", () => {
+  it("draws Classic as the retail Edit tab does: every room and floor run in one flat gray, with no pattern", () => {
     for (const kind of KINDS) {
-      if (KIND_GROUP[kind].startsWith("elevator")) continue;
-      const hex = mapStyleFor(kind, "classic").fill;
-      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-      expect(r === g && g === b, `${kind} ${hex}`).toBe(true);
+      if (CLASSIC_SHAFT_FILL[KIND_GROUP[kind]]) continue;
+      expect(mapStyleFor(kind, "classic"), kind).toEqual({ fill: CLASSIC_TOWER_FILL, pattern: "solid" });
+    }
+    expect(hexLuminance(CLASSIC_TOWER_FILL)).toBeGreaterThan(0.5);
+  });
+
+  it("draws Classic shafts as lines that stand out from the tower: black elevators, red express, blue stairs", () => {
+    expect(mapStyleFor("elevatorStandard", "classic").fill).toBe("#000000");
+    expect(mapStyleFor("elevatorService", "classic").fill).toBe("#000000");
+    expect(mapStyleFor("elevatorExpress", "classic").fill).toBe("#c41a1a");
+    expect(mapStyleFor("stairs", "classic").fill).toBe("#2f4fd0");
+    expect(mapStyleFor("escalator", "classic").fill).toBe("#2f4fd0");
+    const tower = hexLuminance(CLASSIC_TOWER_FILL)!;
+    for (const kind of KINDS) {
+      const { fill } = mapStyleFor(kind, "classic");
+      if (fill === CLASSIC_TOWER_FILL) continue;
+      expect(contrastRatio(tower, hexLuminance(fill)!), `${kind} ${fill}`).toBeGreaterThanOrEqual(3);
     }
   });
 
@@ -80,8 +71,11 @@ describe("overview map style table", () => {
     expect(mapStyleFor("elevatorExpress", "modern").fill).not.toBe(FACILITY_PRESENTATION.elevatorExpress.color);
   });
 
-  it("answers the same pattern in both themes", () => {
-    for (const kind of KINDS) expect(mapStyleFor(kind, "classic").pattern).toBe(mapStyleFor(kind, "modern").pattern);
+  it("keeps Modern's per-kind patterns and Classic plain", () => {
+    for (const kind of KINDS) {
+      expect(mapStyleFor(kind, "classic").pattern).toBe("solid");
+      expect(mapStyleFor(kind, "modern").pattern).toBe(GROUP_PATTERN[KIND_GROUP[kind]]);
+    }
   });
 
   it("falls back to a placeholder for a kind it has never heard of, in either theme", () => {

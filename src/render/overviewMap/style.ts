@@ -1,22 +1,23 @@
 /**
  * How each kind looks on the overview MAP window (#343): a fill and a pattern
- * per kind, for Classic and for Modern. Presentation only: no rule lives here,
+ * per kind, for Classic (one gray plus shaft lines) and for Modern (per-group
+ * patterns and facility colors). Presentation only: no rule lives here,
  * so it sits with the renderer, like `FACILITY_PRESENTATION`.
  *
  * Kinds are grouped by what they are to the player (work, homes, hotels, food
- * and retail, entertainment, amenities, services, shafts). The room groups each
- * get their own pattern, the three elevator kinds get one each, and the plain
- * solid groups (floor, lobby, offices) differ in lightness by a wide margin, so
- * the tower reads without color vision. A kind with no group is a compile error
+ * and retail, entertainment, amenities, services, shafts). In Modern the room
+ * groups each get their own pattern, the three elevator kinds get one each, and
+ * the plain solid groups (floor, lobby, offices) differ in lightness by a wide
+ * margin, so the tower reads without color vision. A kind with no group is a compile error
  * (`KIND_GROUP` is an exhaustive record). A kind the table has never heard of
  * at run time (a forged save, a newer engine) paints as a loud placeholder.
  *
- * Patterns are an accessibility addition to the original's plain look, shown
- * in both themes. The Classic column here is provisional: it follows the
- * manual and the wiki (a gray tower with the elevators picked out by kind:
- * express blue, standard gray, service red). The retail capture (SPEC,
- * "Retail capture findings") shows a flat gray silhouette with no rooms and
- * 1 px shaft lines, and slice S2b applies that to Classic. Modern borrows the
+ * Classic follows what the retail game's Edit tab draws, measured on the PC
+ * harness (SPEC, "Retail capture findings"): one flat light-gray silhouette for
+ * every structure run and room, with the shafts picked out as lines (black
+ * elevators, red express, blue stairs and escalators). It carries no pattern, since the original
+ * does not tell kinds apart there. Modern keeps the per-kind groups: the room
+ * groups get a pattern each as an accessibility addition, and the fills are the
  * facility colors the sprites and palette already use.
  */
 import type { FacilityKind } from "../../engine/types";
@@ -27,7 +28,7 @@ export type MapTheme = "classic" | "modern";
 /** The marks a pattern tile is built from. `solid` is a plain fill. */
 export type MapPattern = "solid" | "dots" | "diagonal" | "horizontal" | "grid" | "checker" | "outline";
 
-/** What a kind is to the player, for patterns and for Classic's grays. */
+/** What a kind is to the player, for Modern's patterns and for picking the shafts out. */
 export type MapGroup =
   | "ground"
   | "lobby"
@@ -99,21 +100,17 @@ export const GROUP_PATTERN: Readonly<Record<MapGroup, MapPattern>> = {
   elevatorExpress: "grid",
 };
 
-/** Classic's fills: the tower in grays, the shafts by kind. */
-export const CLASSIC_FILL: Readonly<Record<MapGroup, string>> = {
-  ground: "#6e6e6e",
-  lobby: "#d4d4d4",
-  work: "#bcbcbc",
-  homes: "#a6a6a6",
-  hotels: "#b2b2b2",
-  foodAndRetail: "#c6c6c6",
-  entertainment: "#9c9c9c",
-  amenities: "#b8b8b8",
-  services: "#a0a0a0",
-  stairs: "#505050",
-  elevatorStandard: "#8a8a8a",
-  elevatorService: "#d23c3c",
-  elevatorExpress: "#2f6fdb",
+/** Classic's tower: one flat light gray for everything that is not a shaft. */
+export const CLASSIC_TOWER_FILL = "#cccccc";
+
+/** Classic's shaft lines. The retail capture shows black for most elevators,
+ *  red for a few (probably express, not yet confirmed in the live game) and
+ *  blue on the stair columns. */
+export const CLASSIC_SHAFT_FILL: Readonly<Partial<Record<MapGroup, string>>> = {
+  stairs: "#2f4fd0",
+  elevatorStandard: "#000000",
+  elevatorService: "#000000",
+  elevatorExpress: "#c41a1a",
 };
 
 /** Relative luminance of a `#rrggbb` color (0 to 1), or null for any other
@@ -169,8 +166,7 @@ export const UNKNOWN_KIND_STYLE: MapKindStyle = { fill: "#ff00ff", pattern: "out
 export function mapStyleFor(kind: FacilityKind, theme: MapTheme): MapKindStyle {
   if (!Object.prototype.hasOwnProperty.call(KIND_GROUP, kind)) return UNKNOWN_KIND_STYLE;
   const group = KIND_GROUP[kind];
-  const pattern = GROUP_PATTERN[group];
-  if (theme === "classic") return { fill: CLASSIC_FILL[group], pattern };
+  if (theme === "classic") return { fill: CLASSIC_SHAFT_FILL[group] ?? CLASSIC_TOWER_FILL, pattern: "solid" };
   const shaft = MODERN_SHAFT_FILL[group];
-  return { fill: shaft ?? FACILITY_PRESENTATION[kind].color, pattern };
+  return { fill: shaft ?? FACILITY_PRESENTATION[kind].color, pattern: GROUP_PATTERN[group] };
 }
