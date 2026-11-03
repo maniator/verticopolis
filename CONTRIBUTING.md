@@ -156,8 +156,9 @@ Verticopolis has **two test tiers**:
     --release --test tdt_fuzz`. A nightly differential fuzzer
     (`engine-fuzz.yml`) runs seeded random scenarios through both engines and
     compares the state, crowd and events hashes at checkpoints at least
-    every in-game hour, then the money, the log and each field of the full
-    save, naming the first one that differs (`scripts/fuzz-compare.ts`; exit
+    every in-game hour, then the money, the log, each field of the full
+    save, and the fx sequences and emergency counters (which sit outside the
+    hashed views), naming the first one that differs (`scripts/fuzz-compare.ts`; exit
     3 marks a harness failure, not a divergence). One seed in four grows a
     tall tower that fills the shaft and stair pools; every seed sets a cash
     profile once the tower is built, and cash can drop to zero or below mid-run. A divergence it finds is
