@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { TS_BASELINE } from "../perfCompare/baseline";
+import { aaBaselineLimitation, baselineLimitation } from "../perfCompare/limitations";
 import { aggregate, ranOf, ratios, validate } from "./analysis";
 import { comparability } from "./beforeAfter";
 import { after, before } from "./beforeAfterFixture";
@@ -36,6 +38,14 @@ describe("the arguments and the configuration", () => {
     expect(limitations(aaConfig("ts"))[0]).toBe(aaLimitation("ts"));
     expect(limitations(aaConfig("ts"))[0]).toMatch(/An A\/A pass: the TypeScript mode ran in both slots/);
     expect(limitations(comparisonConfig).some((l) => l.startsWith("An A/A pass"))).toBe(false);
+  });
+
+  it("names the pinned TypeScript baseline, and in an A/A pass of ts says both slots ran it", () => {
+    expect(limitations(comparisonConfig, [], null, TS_BASELINE)).toContain(baselineLimitation(TS_BASELINE));
+    expect(limitations(comparisonConfig)).not.toContain(baselineLimitation(TS_BASELINE));
+    const aaTs = limitations(aaConfig("ts"), [], null, TS_BASELINE);
+    expect(aaTs).toContain(aaBaselineLimitation(TS_BASELINE));
+    expect(aaTs).not.toContain(baselineLimitation(TS_BASELINE));
   });
 });
 
@@ -111,6 +121,10 @@ describe("the output", () => {
     const cmp = markdown({ ...result, config: comparisonConfig });
     expect(cmp.split("\n")[0]).toBe("# Worker host benchmark (npm run perf:worker)");
     expect(cmp).not.toContain("A/A pass.");
+    // The pinned TypeScript baseline is named in the environment list, and only when one ran.
+    expect(cmp).not.toContain("TypeScript baseline:");
+    expect(markdown({ ...result, config: comparisonConfig, tsBaseline: TS_BASELINE })).toContain(`- TypeScript baseline: ${TS_BASELINE.commit} (app ${TS_BASELINE.appVersion}, pinned pre-cutover build; the ts mode ran it`);
+    expect(markdown({ ...result, tsBaseline: TS_BASELINE })).toMatch(/both slots ran it\)/);
   });
 });
 

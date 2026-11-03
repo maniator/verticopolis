@@ -2,7 +2,7 @@ import { chromium, type Browser, type BrowserContext, type CDPSession, type Page
 import { processTreePss } from "../perfCompare/env";
 import { adoptScenario, cpuProbe, digestStashed, installProbes, pageInfo, prepareLiveApp, stashSave, watchContextLoss, webglRenderer } from "../perfCompare/page";
 import { trackContextLoss } from "../perfCompare/contextLoss";
-import type { PerfServer } from "../perfCompare/server";
+import { serverFor, type PerfServer } from "../perfCompare/server";
 import type { Scenario } from "../perfCompare/scenarios";
 import { frameStats, quantile } from "../perfCompare/stats";
 import { simRun } from "../perfCompare/pageSim";
@@ -309,7 +309,7 @@ async function throttle(cdp: CDPSession, rate: number): Promise<void> {
 }
 
 export interface RunnerOptions {
-  server: PerfServer;
+  servers: Partial<Record<"ts" | "wasm", PerfServer>>; // ts: the pinned baseline build (perf:compare/baseline.ts); every other mode: the current timed build
   config: WorkerConfig;
   scenarios: Scenario[];
   executablePath: string | null;
@@ -319,8 +319,9 @@ export interface RunnerOptions {
 
 /** `slot` is the mode the run is recorded under; in an A/A pass (`config.aa`) both slots run the same mode, which is the one every page check and measurement below uses. */
 export async function runMode(opts: RunnerOptions, rep: number, slot: ModeName, order: number): Promise<ModeRun> {
-  const { server, config, scenarios, log } = opts;
+  const { servers, config, scenarios, log } = opts;
   const mode: ModeName = config.aa ?? slot;
+  const server = serverFor(servers, mode === "ts" ? "ts" : "wasm");
   const run: ModeRun = { rep, mode: slot, ranMode: mode, order, ok: false, error: null, pageErrors: [], browserVersion: null, page: null, cold: null, warm: null, cold4x: null, cpuProbe: null, scenarios: {}, offline: null, contextLost: [] };
   const noteLoss = (line: string): void => {
     run.contextLost?.push(line);

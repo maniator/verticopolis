@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildTooling, npmEntry, runNodeCli } from "../perfWorker/build";
+import { startServer, type PerfServer } from "./server";
 
 /**
  * The TypeScript engine's performance baseline (issue #1597). The game no
@@ -108,17 +109,37 @@ export function buildBaseline(repo: string, log: (line: string) => void): void {
     }
   }
   if (!existsSync(tree)) {
-    log(`perf:compare: checking out the TypeScript baseline ${TS_BASELINE.commit.slice(0, 8)} (app ${TS_BASELINE.appVersion}) into ${BASELINE_TREE}/`);
+    log(`baseline: checking out the TypeScript baseline ${TS_BASELINE.commit.slice(0, 8)} (app ${TS_BASELINE.appVersion}) into ${BASELINE_TREE}/`);
     git(repo, "worktree", "add", "--detach", "--force", tree, TS_BASELINE.commit);
   }
-  log("perf:compare: installing the baseline's dependencies (npm ci)");
+  log("baseline: installing the baseline's dependencies (npm ci)");
   const env: NodeJS.ProcessEnv = { ...process.env, VC_ALLOW_NO_ENGINE: "1" };
   for (const name of Object.keys(env)) if (SCRUBBED_ENV.test(name)) delete env[name];
   runNodeCli(npmEntry(env), ["ci", "--no-audit", "--no-fund"], tree, env);
-  log(`perf:compare: TypeScript-only tooling build of the baseline into ${BASELINE_DIST}/`);
+  log(`baseline: TypeScript-only tooling build of the baseline into ${BASELINE_DIST}/`);
   // A stale dist from an earlier pin or a failed build must not survive into this one's stamp.
   rmSync(dist, { recursive: true, force: true });
   buildTooling(tree, dist, env);
   const record: BaselineRecord = { commit: TS_BASELINE.commit, appVersion: TS_BASELINE.appVersion };
   writeFileSync(join(dist, BASELINE_STAMP), JSON.stringify(record) + "\n");
+}
+
+/** Throws unless `dist-perf-ts/` holds a usable baseline build: a build is there and its stamp, version and shape match the pin. */
+export function requireBaselineDist(distTs: string): void {
+  if (!existsSync(join(distTs, "index.html"))) throw new Error(`no build at ${distTs}; run without --skip-build`);
+  const problems = baselineErrors(distTs);
+  if (problems.length) throw new Error(`the TypeScript baseline build cannot be used:\n  - ${problems.join("\n  - ")}`);
+}
+
+/** The servers a run measures from: the current timed build for Rust, and, when a TypeScript arm runs, the pinned baseline
+ *  with the current engine package overlaid at `/engine` so the package-load side measurements have a package in that origin. */
+export async function startArmServers(distPerf: string, distTs: string, needsBaseline: boolean): Promise<Partial<Record<"ts" | "wasm", PerfServer>>> {
+  const wasm = await startServer(distPerf);
+  if (!needsBaseline) return { wasm };
+  try {
+    return { wasm, ts: await startServer(distTs, 0, { prefix: "/engine", dir: join(distPerf, "engine") }) };
+  } catch (e) {
+    await wasm.close();
+    throw e;
+  }
 }

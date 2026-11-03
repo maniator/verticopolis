@@ -7,11 +7,11 @@ import { buildTree, collectEnvironment, packageState, type Environment } from ".
 import { machineOf, packageErrors, stampErrors } from "../perfCompare/main";
 import { incompleteTreeError } from "../perfCompare/treeRecord";
 import { gateBrowser, probeBrowser } from "../perfCompare/browserProbe";
-import { rendererLimitation } from "../perfCompare/limitations";
+import { aaBaselineLimitation, baselineLimitation, rendererLimitation } from "../perfCompare/limitations";
 import { checkExceptionFolder, exceptionMarker, resolveLaunch } from "../perfCompare/exceptionRegister";
 import { browserName, recordedGpuVerified } from "../perfCompare/renderer";
 import { SCENARIO_NAMES, buildScenarios, unknownScenarios } from "../perfCompare/scenarios";
-import { startServer } from "../perfCompare/server";
+import { BASELINE_DIST, buildBaseline, requireBaselineCommit, requireBaselineDist, startArmServers, TS_BASELINE, type BaselineRecord } from "../perfCompare/baseline";
 import { aggregate, ratios, validate, type Metric, type Ratio } from "./analysis";
 import type { ModeName } from "./pageWorker";
 import { modeOrder, runMode, type ModeRun, type WorkerConfig } from "./runner";
@@ -21,9 +21,11 @@ import { buildProduction, buildTooling } from "./build";
 import { AA_SLOTS, aaLimitation, checkAaFolder, parseAa, type AaMode } from "./aa";
 
 /**
- * `npm run perf:worker`: the engine-host comparison (TypeScript, the shipped
- * main-thread WASM host, the coalesced main-thread host and the worker
- * host) on one build, one browser and the same towers as `perf:compare`.
+ * `npm run perf:worker`: the engine-host comparison, now the `ts` and `wasm`
+ * modes (the coalesced and worker hosts were dropped), in one browser on the
+ * same towers as `perf:compare`. The `ts` mode serves the pinned pre-cutover
+ * build (perfCompare/baseline.ts, issue #1597); the `wasm` mode runs this
+ * commit.
  * Builds the production app and a tooling build of the same sources (or,
  * with --skip-build, proves the stamped builds are this clean commit's),
  * refuses an engine package it cannot tie to the sources, runs every
@@ -121,12 +123,13 @@ export function makeConfig(args: Args, scenarios: string[]): WorkerConfig {
 }
 
 /** The report's limitations, worded from the run's own configuration. */
-export function limitations(config: WorkerConfig, renderers: readonly string[] = [], exception: string | null = null): string[] {
+export function limitations(config: WorkerConfig, renderers: readonly string[] = [], exception: string | null = null, tsBaseline: BaselineRecord | null = null): string[] {
   const k = config.modes.length;
   const firsts = Array.from({ length: k }, (_, i) => Math.floor(config.reps / k) + (i < config.reps % k ? 1 : 0));
   const firstText = firsts.every((n) => n === firsts[0]) ? `each mode first ${firsts[0]} time(s)` : `modes first between ${Math.min(...firsts)} and ${Math.max(...firsts)} times`;
   return [
   ...(config.aa ? [aaLimitation(config.aa)] : []),
+  ...(tsBaseline ? [config.aa === "ts" ? aaBaselineLimitation(tsBaseline) : baselineLimitation(tsBaseline)] : []),
   "One machine and one headless browser (its name and version are in the Browser row). The renderer line says whether the page used the GPU; a software rasterizer fails validation in a protocol run, because render cost then dominates every frame and the FPS rows say more about the CPU than about GPU-backed frame rates.",
   "CPU throttling is DevTools emulation of the page's main thread. Chromium refuses it on worker targets and a page-level throttle leaves a dedicated worker nearly unthrottled (probed on Chromium 141: a busy loop took 41 ms at 1x and 44 to 58 ms with the page at 4x, 7 to 41% slower against about 4x on the main thread). So at a throttle above 1x the worker host's main thread ran throttled and its engine thread did not; its rows are marked † and carry an `unthrottled` column in the CSVs. A comparison of the worker host with a main-thread host at that throttle favors the worker. Two runs of the same mode are comparable with each other.",
   `Hosted rows run ${config.steps} steps of ${config.dt} minutes in batches of ${config.batch} (the frame loop's cap is 4) with no rendering. Wall time includes the worker host's wait for each reply; main-thread time counts the steps, the flushes and the time applying replies, and leaves the worker's own time out (reported apart). The browser's unpacking of each reply (the structured clone of its strings, the full save's included) runs on the main thread before the host sees the reply and is not in the hosted main-thread rows; the frames rows (frame times, long tasks) include it.`,
@@ -193,6 +196,8 @@ export interface WorkerResults {
   browser: { version: string | null; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null; rendererExceptionSha256?: string | null; rendererExceptionCommit?: string | null; gpuVerified?: boolean };
   scenarios: { name: string; sha256: string; population: number; units: number; transports: number; saveBytes: number }[];
   scripts: ReturnType<typeof scriptSizes>;
+  /** The pinned TypeScript baseline the ts mode served (issue #1597), or null when no ts mode ran; absent from older results. */
+  tsBaseline?: BaselineRecord | null;
   runs: ModeRun[];
   metrics: Metric[];
   ratios: Ratio[];
@@ -229,6 +234,10 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const log = (line: string) => process.stderr.write(`${line}\n`);
   const dist = join(repo, "dist");
   const distPerf = join(repo, "dist-perf");
+  const distTs = join(repo, BASELINE_DIST);
+  // The ts mode runs the pinned pre-cutover build (issue #1597). Every comparison has a ts mode; an A/A pass of wasm does not.
+  const needsBaseline = args.aa !== "wasm";
+  const tsBaseline: BaselineRecord | null = needsBaseline ? { commit: TS_BASELINE.commit, appVersion: TS_BASELINE.appVersion } : null;
   // The browser is settled first, as in perf:compare: launch settings parsed
   // and the adapter read before any build or results folder exists.
   const launch = resolveLaunch(process.env, repo);
@@ -239,13 +248,16 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const stampPaths = [join(dist, ".perf-build.json"), join(distPerf, ".perf-build.json")];
   const tree = buildTree(repo);
   if (!args.skipBuild) {
+    if (needsBaseline) requireBaselineCommit(repo);
     buildProduction(repo);
     buildTooling(repo, distPerf);
+    if (needsBaseline) buildBaseline(repo, log);
     for (const p of stampPaths) writeFileSync(p, JSON.stringify(tree) + "\n");
   } else {
     const errs = stampErrors(stampPaths, tree);
     if (errs.length) throw new Error(errs.join("; "));
   }
+  if (needsBaseline) requireBaselineDist(distTs);
   const unknown = unknownScenarios(args.scenarios ?? []);
   if (unknown.length) throw new Error(`unknown scenario ${unknown.join(",")}; expected ${SCENARIO_NAMES.join(",")}`);
   const scenarios = buildScenarios(args.scenarios);
@@ -257,7 +269,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   // The sizes, read before anything is measured: a build without the
   // worker chunk or the package fails here, not after hours of runs.
   const scripts = scriptSizes(dist);
-  const meta = { commit: environment.commit, dirty: environment.dirty, skipBuild: args.skipBuild, config, enginePackage: environment.enginePackage, scenarios: scenarios.map((s) => s.sha256), machine: machineOf(environment, executablePath, launch, probe) };
+  const meta = { commit: environment.commit, dirty: environment.dirty, skipBuild: args.skipBuild, config, enginePackage: environment.enginePackage, scenarios: scenarios.map((s) => s.sha256), tsBaseline, machine: machineOf(environment, executablePath, launch, probe) };
   const runs: ModeRun[] = [];
   let out: string;
   let startedAt = started;
@@ -287,7 +299,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     return measureReadModel(s, { steps: config.steps, dt: config.dt, batch: config.batch });
   });
   log(`perf:worker: measuring ${environment.commit}${environment.dirty ? " (dirty)" : ""}, ${config.reps} reps of ${config.aa ? `${config.aa} in both slots (A/A)` : config.modes.join(", ")}`);
-  const server = await startServer(distPerf);
+  const servers = await startArmServers(distPerf, distTs, needsBaseline);
   try {
     for (let rep = 0; rep < config.reps; rep++) {
       let order = 0;
@@ -295,13 +307,13 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
         const position = order++;
         if (runs.some((r) => r.rep === rep && r.mode === mode)) continue;
         log(`perf:worker: rep ${rep + 1}/${config.reps}, ${mode}`);
-        const run = await runMode({ server, config, scenarios, executablePath, launch, log }, rep, mode, position);
+        const run = await runMode({ servers, config, scenarios, executablePath, launch, log }, rep, mode, position);
         runs.push(run);
         appendFileSync(join(out, "runs.jsonl"), JSON.stringify(run) + "\n");
       }
     }
   } finally {
-    await server.close();
+    await Promise.allSettled(Object.values(servers).map((srv) => srv.close()));
   }
   const v = validate(config, runs, launch.rendererException);
   for (const e of packageErrors(packageState(distPerf), packageState(dist), sourceHash, { files: environment.enginePackage, buildHash: environment.engineBuildHash })) v.errors.push(e);
@@ -318,12 +330,13 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     browser: { version: runs.find((r) => r.browserVersion)?.browserVersion ?? null, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException, rendererExceptionSha256: launch.rendererExceptionSha256, rendererExceptionCommit: launch.rendererExceptionCommit, gpuVerified: recordedGpuVerified(launch.rendererException, runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer), runs.filter((r) => r.ok).map((r) => r.rendererEnd), runs.filter((r) => r.ok).map((r) => r.rendererEndCold)) },
     scenarios: scenarios.map((s) => ({ name: s.name, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
     scripts,
+    tsBaseline,
     runs,
     metrics,
     ratios: ratios(metrics, config.modes),
     readModel,
     validation: { ok: v.errors.length === 0, ...v },
-    limitations: limitations(config, [...new Set(runs.filter((r) => r.ok).flatMap((r) => [r.page?.webgl?.renderer, r.rendererEnd, r.rendererEndCold]).filter((x): x is string => !!x))], launch.rendererException),
+    limitations: limitations(config, [...new Set(runs.filter((r) => r.ok).flatMap((r) => [r.page?.webgl?.renderer, r.rendererEnd, r.rendererEndCold]).filter((x): x is string => !!x))], launch.rendererException, tsBaseline),
   };
   writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 1) + "\n");
   writeFileSync(join(out, "metrics.csv"), metricsCsv(results.metrics, config.aa));
@@ -353,8 +366,9 @@ export function loadWorkerCheckpoint(dir: string, expected: Record<string, unkno
   const saved = JSON.parse(readFileSync(join(dir, "checkpoint.json"), "utf8")) as Record<string, unknown> & { startedAt: string };
   if (saved.dirty) throw new Error(`cannot resume ${dir}: it started on a dirty tree`);
   if (expected.dirty) throw new Error("--resume needs a clean tree, the same one the run started on");
-  for (const k of ["commit", "skipBuild", "config", "enginePackage", "scenarios", "machine"]) {
-    if (JSON.stringify(saved[k]) === JSON.stringify(expected[k])) continue;
+  for (const k of ["commit", "skipBuild", "config", "enginePackage", "scenarios", "tsBaseline", "machine"]) {
+    // A checkpoint from before the baseline existed lacks the field, which reads as none, the same as an A/A pass of wasm records.
+    if (JSON.stringify(saved[k] ?? null) === JSON.stringify(expected[k] ?? null)) continue;
     // Name the options that differ, so a resume can repeat them.
     const a = (saved[k] ?? {}) as Record<string, unknown>;
     const b = (expected[k] ?? {}) as Record<string, unknown>;
