@@ -1,3 +1,4 @@
+import { referenceAutoTune } from "../fixtures/autoTuneDouble";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mountAppDom, makeUI } from "../uiFixture";
 import { CLASSIC_RULES } from "../../engine/gameRules";
@@ -21,17 +22,18 @@ const stops = () => ({
 });
 
 /** A 4-car shaft whose saved schedule runs one car every hour of both day types. */
-const ctx = (current?: ScheduleDialogCtx["current"]): ScheduleDialogCtx => ({
-  title: "Schedule: Service elevator (floors 1-4)",
-  ux: CLASSIC_RULES.elevatorScheduleUX(),
-  isExpress: false,
-  cars: 4,
-  bottom: 1,
-  top: 4,
-  stops: stops(),
-  initialWeekend: false,
-  current,
-});
+const ctx = (current?: ScheduleDialogCtx["current"]): ScheduleDialogCtx => {
+  const base = { cars: 4, bottom: 1, top: 4, stops: stops() };
+  return {
+    title: "Schedule: Service elevator (floors 1-4)",
+    ux: CLASSIC_RULES.elevatorScheduleUX(),
+    isExpress: false,
+    ...base,
+    autoTune: referenceAutoTune(base, false),
+    initialWeekend: false,
+    current,
+  };
+};
 const oneCar = { activeCars: { weekday: Array(24).fill(1), weekend: Array(24).fill(1) } };
 
 beforeEach(() => mountAppDom());

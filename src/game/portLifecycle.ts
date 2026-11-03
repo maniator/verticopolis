@@ -1,6 +1,6 @@
 import type { SerializedView } from "../engine/types";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
-import { engineTrapped } from "./engineFault";
+import { engineTrapped, noteEngineThrow } from "./engineFault";
 
 /**
  * The lifecycle members' records as the game's callers read them (contract
@@ -46,7 +46,15 @@ export function exportFileText(
 ): string {
   if (engineTrapped()) throw new Error(TRAPPED_SAVE_REFUSED);
   stampCamera(port, view);
-  const file = port.exportVctower(stamp.appVersion, stamp.savedAt);
+  let file: string | undefined;
+  try {
+    file = port.exportVctower(stamp.appVersion, stamp.savedAt);
+  } catch (err) {
+    // A trap here latches now, so the next export or save is refused
+    // up front and does not call into the dead engine again.
+    noteEngineThrow(err);
+    throw err;
+  }
   if (file === undefined) throw new Error(port.lastReason() ?? "The tower could not be exported.");
   return file;
 }

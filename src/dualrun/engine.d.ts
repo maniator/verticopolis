@@ -47,6 +47,12 @@ export class Engine {
      */
     autoBridge(): boolean;
     /**
+     * The Auto-tune proposal for a shaft (`wasm_port_life.rs`): a keyed
+     * object, read-only. `draft` is the dialog's working schedule in
+     * `scheduleShaft`'s slots, or empty for none.
+     */
+    autoTuneProposal(id: number, draft: Float64Array, weekend_view: boolean): any;
+    /**
      * `beginExtend(id)`: open an extend gesture on an elevator (#990), its
      * high-water mark starting at the shaft's span; any open gesture is
      * dropped first. False, with no gesture open, when `id` is not a whole

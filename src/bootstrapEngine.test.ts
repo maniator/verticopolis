@@ -42,7 +42,7 @@ import { SaveGame } from "./storage/SaveGame";
 import { setSlotPopulationReader, slotPopulation } from "./storage/slotCensus";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { EngineBootError } from "./wasmhost/engineBoot";
-import { noteEngineThrow, watchEngineTraps } from "./game/engineFault";
+import { engineTrapped, noteEngineThrow, watchEngineTraps } from "./game/engineFault";
 import { countRustCrash, reloadSoon } from "./engineCrash/crashReload";
 
 /** A tab whose storage keeps nothing, so a crash cannot be counted. */
@@ -193,6 +193,52 @@ describe("bootGame engine", () => {
     expect(error).toHaveBeenCalledWith(`[wasm] ${message}`);
     await SaveGame.export(saveOf(new Simulation(1)));
     expect(encodeVctower).not.toHaveBeenCalled();
+  });
+
+  it("stops the game when the engine's save writer traps, and still writes the save in hand (#1205)", async () => {
+    stubWebGL();
+    const encodeVctower = vi.fn(() => {
+      throw new WebAssembly.RuntimeError("unreachable");
+    });
+    wasmStub.module = { Engine: class {}, encodeVctower };
+    document.body.innerHTML = '<div id="stage"></div>';
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const setSpeed = vi.fn();
+    await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn(), setSpeed })));
+    const file = await SaveGame.export(saveOf(new Simulation(1)));
+    // The save was written on the TypeScript writer, not lost to the trap.
+    expect(file).toMatch(/^VCTOWER1\n[A-Za-z0-9+/]+={0,2}\n$/);
+    expect(encodeVctower).toHaveBeenCalledTimes(1);
+    // The host stopped as it does for a trap in a tick: nothing runs the tower, the page reloads.
+    const message = "the Rust engine failed during a save: unreachable";
+    expect(published()?.status).toMatchObject({ hosted: false, lastError: message });
+    expect(bootState()).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "trap-tick", message }, writerLatched: true });
+    expect(engineTrapped()).toBe(true);
+    expect(setSpeed).toHaveBeenCalledWith(0);
+    expect(reloadSoon).toHaveBeenCalledOnce();
+    expect(error).toHaveBeenCalledWith(`[wasm] ${message}`);
+    // The writer is off and the engine is never asked again; a later tick's throw is not heard twice.
+    await SaveGame.export(saveOf(new Simulation(1)));
+    expect(encodeVctower).toHaveBeenCalledTimes(1);
+    expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(false);
+  });
+
+  it("keeps the host running when the save writer fails without trapping", async () => {
+    stubWebGL();
+    wasmStub.module = {
+      Engine: class {},
+      encodeVctower: () => {
+        throw new Error("a refusal, not a trap");
+      },
+    };
+    document.body.innerHTML = '<div id="stage"></div>';
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn(), setSpeed: vi.fn() })));
+    await SaveGame.export(saveOf(new Simulation(1)));
+    expect(bootState()).toEqual({ build: "wasm-only", engine: "wasm", failure: null, writerLatched: true });
+    expect(published()?.status).toMatchObject({ hosted: true });
+    expect(engineTrapped()).toBe(false);
+    expect(reloadSoon).not.toHaveBeenCalled();
   });
 
   it("stops the game at the tab's second trap instead of reloading again", async () => {

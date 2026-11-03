@@ -13,7 +13,7 @@ import { setEngineWriter } from "./storage/vctowerWriter";
 import { populationReaderFromModule } from "./wasmhost/slotPopulation";
 import { noteEngineAttempt, noteEngineCrashReload, noteEngineFallback, noteEngineSettled, noteEngineWriterLatched } from "./analyticsEngineStatus";
 import { startEngagementWatch } from "./game/engagementWatch";
-import { runningTowerStage, watchEngineTraps } from "./game/engineFault";
+import { noteEngineThrow, runningTowerStage, watchEngineTraps } from "./game/engineFault";
 import { ENGINE_FAILURE_ID, isEngineStopped } from "./game/interactionState";
 import { showEngineLoading } from "./engineLoading";
 import { bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, type EngineBootState } from "./wasmhost/engineBoot";
@@ -318,18 +318,22 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       startEngagementWatch(tower.port, () => app.reader?.header.minutes ?? 0);
       // Saves are written through the engine too (same bytes, #935).
       if (wasmModule?.encodeVctower) {
-        setEngineWriter(wasmModule.encodeVctower, () => {
+        setEngineWriter(wasmModule.encodeVctower, (error) => {
           bootState = { ...bootState, writerLatched: true };
           publishBootState(bootState);
           noteEngineWriterLatched();
+          // A trap in the writer may have left the module's memory corrupt,
+          // so the host stops as it does for a trap in a tick (#1205). The
+          // save in hand is still written, on the TypeScript writer.
+          noteEngineThrow(error, "save");
         });
       }
       // A trap in the running engine (#874): the module may be corrupt, so
       // nothing calls it again, the saves stay as last written, and the page
       // reloads onto the last autosave. This tab's second crash on a build
       // stops the game instead of reloading again.
-      watchEngineTraps((e) => {
-        const message = `the Rust engine failed during a tick: ${e instanceof Error ? e.message : String(e)}`;
+      watchEngineTraps((e, during) => {
+        const message = `the Rust engine failed during ${during === "save" ? "a save" : "a tick"}: ${e instanceof Error ? e.message : String(e)}`;
         console.error(`[wasm] ${message}`);
         rust.status.hosted = false;
         rust.status.lastError = message;

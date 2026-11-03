@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.8.0 (2026-11-03)
+
+- New read-only query `autoTuneProposal(id, draft, weekendView)` on the port and the binding (`EnginePortQueries`, `Engine::autoTuneProposal`, native `Simulation::auto_tune_proposal`). It answers a keyed object: a `status` (`available`, `insufficient-data`, `unavailable-in-mode`, `not-an-elevator`, `missing-shaft` or `invalid-draft`), each day type's readiness (`warm` once six hours of its curve are sampled, `sampledHours`, and the warm day's measured 24-hour `curve`) and, when available, the proposed weekday and weekend rows and home floors. The engine now owns the warm-up gate, the per-hour tuning (load fraction times installed cars, at least one car, at most the cars installed), the staging seed aimed at the busiest served boarding floor and the snap of homes to served stops. `draft` is the working schedule in `scheduleShaft`'s slots (empty for none; a home count of 0 marks staging as untouched, which the engine seeds, while hand-set homes are kept). A day that is not warm keeps the draft's own row. Classic answers `unavailable-in-mode` with readiness filled in. The query writes nothing: no tower, telemetry, rng, cash, event or save byte changes. The tuning rule itself is unchanged from the dialog's. No saved-game, frame, view layout or catalog change.
+
 ## 1.7.0 (2026-11-03)
 
 - The `tdtExport` record gains `retailRowsDropped` after `outOfRange`: the shops, restaurants and fast food places past the 512 style rows a 1994 file holds, which the export used to drop without a count. The view layout is now version 9; the save and frame layouts and the catalog are unchanged.

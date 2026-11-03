@@ -5,7 +5,7 @@ Status: **approved by the owner on 2026-11-03** (decisions below). Repo: maniato
 ## Owner decisions (2026-11-03)
 
 1. Target 3.0.0. If the complete feature cannot be reviewed, tested and merged before the release candidate freeze, it moves to 3.1.0 automatically. The existing freeze criteria apply (no new calendar deadline). No existing release gate is weakened or delayed. If a release blocker appears, the blocker takes priority and the remaining MAP work moves to 3.1.0.
-2. The window is closed by default, with a clearly discoverable Map button.
+2. The window is open by default on desktop (closable, with only an explicit choice remembered) and closed on phone behind a Map pill. This revises the same day's first call, which was closed by default everywhere with a Map button. The party's follow-up calls (memory per layout class, onboarding, phone card, Modern banded crop) are in the SPEC decision log.
 3. The existing sidebar control labeled "Map overlay" is renamed "Floor heatmap" (done in S3, the same PR as the new chrome).
 4. Capture the original PC MAP window for Classic fidelity if practical. It is not a blocker.
 5. Classic keeps the original MAP window behavior and styling as closely as the evidence allows. Modern may use richer facility colors and presentation.
@@ -84,4 +84,4 @@ Visibility rule (decision 8): S1 and S2 are pure modules with no caller, so merg
 
 ## Release-gate impact
 
-None by design. No change to #945, #1104, #1561, their labels or the milestones. The Performance gate is the one row the feature could touch; closed by default with no per-frame cost, plus the freeze cut-off, keeps its measurements valid. A slice that lands after the freeze waits for 3.1.0.
+None by design. No change to #945, #1104, #1561, their labels or the milestones. The Performance gate is the one row the feature could touch; since the Map is open by default on desktop, the paired open-versus-closed measurement on the `large` fixture covers the default state, and with no per-frame cost and the freeze cut-off its measurements stay valid. A slice that lands after the freeze waits for 3.1.0.
