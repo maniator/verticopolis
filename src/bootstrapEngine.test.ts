@@ -39,6 +39,7 @@ import { resetEngineStatus } from "./analyticsEngineStatus";
 import * as pwa from "./pwa";
 import { Simulation } from "./engine/Simulation";
 import { SaveGame } from "./storage/SaveGame";
+import { setSlotPopulationReader, slotPopulation } from "./storage/slotCensus";
 import { setEngineWriter } from "./storage/vctowerWriter";
 import { EngineBootError } from "./wasmhost/engineBoot";
 import { noteEngineThrow, watchEngineTraps } from "./game/engineFault";
@@ -78,6 +79,7 @@ function resetStubs(): void {
   sessionStorage.clear();
   vi.mocked(reloadSoon).mockClear();
   setEngineWriter(null);
+  setSlotPopulationReader(null);
   watchEngineTraps(null);
   vi.mocked(rustBootTower).mockClear();
   delete (globalThis as { __vcEngine?: unknown }).__vcEngine;
@@ -172,8 +174,12 @@ describe("bootGame engine", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const setSpeed = vi.fn();
     await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn(), setSpeed })));
+    // Boot installed the slot census on the package (this one has no `fromSave`, so the read fails).
+    expect(() => slotPopulation("a save")).toThrow();
     expect(noteEngineThrow(new Error("a refusal, not a trap"))).toBe(false);
     expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(true);
+    // A poisoned engine is not asked to count anything again.
+    expect(slotPopulation("a save")).toBeUndefined();
     // Heard once: the poisoned engine's later throws are frame errors only.
     expect(noteEngineThrow(new WebAssembly.RuntimeError("unreachable"))).toBe(false);
     const message = "the Rust engine failed during a tick: unreachable";

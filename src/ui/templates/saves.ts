@@ -68,7 +68,9 @@ export function slotDetail(s: SlotInfo): TemplateResult {
   const when = [Number.isFinite(s.day) ? `Day ${Math.floor(s.day!)}` : "", fmtWhen(s.savedAt)]
     .filter(Boolean)
     .join(" · ");
-  return html`<div class="slot-detail">${s.towerName ?? "Tower"} ${modeChip} · ${s.star === 6 ? "TOWER" : (s.star ?? 1) + "★"} · pop ${(s.population ?? 0).toLocaleString()} · $${Math.round(s.funds ?? 0).toLocaleString()}<br /><span class="slot-when">${when}</span></div>`;
+  // No census yet (the engine package is not installed): say nothing rather than "pop 0".
+  const population = s.population === undefined ? nothing : html` · pop ${s.population.toLocaleString()}`;
+  return html`<div class="slot-detail">${s.towerName ?? "Tower"} ${modeChip} · ${s.star === 6 ? "TOWER" : (s.star ?? 1) + "★"}${population} · $${Math.round(s.funds ?? 0).toLocaleString()}<br /><span class="slot-when">${when}</span></div>`;
 }
 
 function slotRow(s: SlotInfo): TemplateResult {
