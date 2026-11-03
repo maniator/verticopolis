@@ -22,6 +22,13 @@ import type { Command, CommandOp } from "./commands";
  *  pins the two to the same text). */
 export const INVALID_COMMAND = "That request is not valid.";
 
+/** The refusal reason when a build or a car change costs more than the cash on
+ *  hand. The web compares an outcome's reason against it to tell a money refusal
+ *  (which speaks) from the others (which stay quiet). The engine's own text is
+ *  `NOT_ENOUGH_MONEY` in `engine-rs/src/charges.rs`; `request.test.ts` and
+ *  `charges_tests.rs` pin both to the same words. */
+export const NOT_ENOUGH_MONEY = "Not enough money.";
+
 /** The most tiles one brush command may carry. The web's brush sends
  *  `STRUCTURE_BRUSH` (8); the cap keeps a hostile request's repeated passes
  *  (at most one per tile) small. Both engines refuse more with the same

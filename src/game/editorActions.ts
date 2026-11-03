@@ -11,8 +11,7 @@ import { outcome, type PortCodes } from "../simport/portCodes";
 import { clockOf, rulesOf } from "../simport/headerClock";
 import { scheduleSlots } from "../simport/scheduleSlots";
 import type { ViewReader } from "../simport/viewReader";
-import { NOT_ENOUGH_MONEY } from "../engine/sim/charges";
-import { INVALID_COMMAND, MAX_TEXT } from "../simport/request";
+import { INVALID_COMMAND, MAX_TEXT, NOT_ENOUGH_MONEY } from "../simport/request";
 import { BATCH_COUNTERS, batchTargetCode, type CardKit } from "./cardKit";
 
 /**

@@ -206,6 +206,13 @@ describe("unit editor row and action branches", () => {
     expect(frag.querySelector('[data-field="rent"]')!.textContent).toContain("/night");
   });
 
+  it.each(["rentalStudio", "rentalApartment"] as const)("%s (Modern): the price is a monthly rent", (kind) => {
+    const { sim, unit } = simWithModern(kind);
+    const frag = renderToFragment(unitEditor(sim, unit));
+    expect(frag.textContent).toContain("Monthly rent");
+    expect(frag.textContent).not.toContain("Quarterly rent");
+  });
+
   it("fast food: open and closed customer readouts", () => {
     const { sim, unit } = simWith("fastFood");
     unit.customersIn = 7;
