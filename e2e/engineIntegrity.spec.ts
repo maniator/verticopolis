@@ -68,8 +68,11 @@ async function spy(page: Page): Promise<void> {
 const spied = (page: Page) => page.evaluate(() => ({ ...(window as any).__engineSpy }) as { instantiate: number; scriptBlobs: number });
 
 /** The page refused the engine: the boot state says why, nothing was
- *  instantiated, and what the player sees matches the build. */
-async function expectRefused(page: Page, file: "glue" | "wasm" | "build-record"): Promise<NonNullable<Boot["failure"]>> {
+ *  instantiated, and what the player sees matches the build. A file that arrives
+ *  longer than the shell expects is refused while it streams, which can happen
+ *  before the record has been read whole; only then (`oversize`) is the served
+ *  package id allowed to be missing, and the screen must say exactly which. */
+async function expectRefused(page: Page, file: "glue" | "wasm" | "build-record", opts: { oversize?: boolean } = {}): Promise<NonNullable<Boot["failure"]>> {
   await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure != null, undefined, { timeout: 30_000 });
   const state = await bootState(page);
   expect(state.failure, "the boot state names the refusal").toMatchObject({ stage: "load", reason: "package-mismatch", package: { kind: "mismatch", file, expectedPackage: short(built.package) } });
@@ -80,9 +83,13 @@ async function expectRefused(page: Page, file: "glue" | "wasm" | "build-record")
   await expect(failure).toBeVisible();
   await expect(failure).toHaveAttribute("role", "alert");
   await expect(page.locator("#boot-fallback button:not([data-act])")).toBeFocused();
+  const served = state.failure!.package?.servedPackage ?? null;
+  if (served === null) expect(opts.oversize, "the served package id is missing only when an oversize file was refused first").toBe(true);
+  else expect(served, "the served package id is a 12-hex prefix").toMatch(/^[0-9a-f]{12}$/);
   await expect(failure, "the screen says what is wrong and carries the ids, or the file that differs").toContainText(
     /The engine files do not match this version of the game\. The engine was not started\. \((expected [0-9a-f]{12}, found ([0-9a-f]{12}|unavailable)|[a-z ]+ differs from the record)\)/,
   );
+  if (served === null) await expect(failure).toContainText(/expected [0-9a-f]{12}, found unavailable/);
   expect(await page.evaluate(() => !!(window as any).game)).toBe(false);
   return state.failure!;
 }
@@ -128,17 +135,12 @@ test.describe("a tampered precache is refused", () => {
     await installed(page);
     await tamperCache(page, "wasm", "salt");
     await page.reload();
-    const failure = await expectRefused(page, "wasm");
+    const failure = await expectRefused(page, "wasm", { oversize: true });
     // The size differs, so the check refuses before hashing.
     expect(failure.package?.found).toBeNull();
-    // If BUILD.json finished before the size refusal, its package id is attached.
+    // If BUILD.json finished before the size refusal, its package id is attached, and it is the shell's own.
     const served = failure.package?.servedPackage;
-    if (served === null) {
-      // Allowed: the refusal can happen before BUILD.json was read to completion.
-    } else {
-      expect(served, "when present, served package id is always a 12-hex prefix").toMatch(/^[0-9a-f]{12}$/);
-      expect(served, "the record that came with it names the shell's own package").toBe(short(built.package));
-    }
+    if (served !== null) expect(served, "the record that came with it names the shell's own package").toBe(short(built.package));
     expect(failure.package?.expected).toBe(short(built.files["verticopolis_engine_bg.wasm"].sha256));
     expect(failure.package?.controlled).toBe(true);
   });
@@ -170,7 +172,7 @@ test.describe("a tampered precache is refused", () => {
     await tamperCache(page, "wasm", "salt");
     const seen = navigations(page);
     await page.reload();
-    await expectRefused(page, "wasm");
+    await expectRefused(page, "wasm", { oversize: true });
     // Long enough for a reload loop to show, and past the browser's own
     // worker update check (about two seconds after a load).
     await page.waitForTimeout(5_000);
@@ -186,11 +188,11 @@ test.describe("an uncontrolled page", () => {
     await page.route("**/engine/verticopolis_engine_bg.wasm", async (route) => {
       const response = await route.fetch();
       const body = Buffer.concat([await response.body(), Buffer.from(SALT_SECTION)]);
-      // The new length goes in the header, so the refusal is the digest's, not a cut body's.
+      // The new length goes in the header, so the refusal is the body being longer than the build's file, not a cut body.
       await route.fulfill({ response, body, headers: { ...response.headers(), "content-length": String(body.length) } });
     });
     await page.goto("/");
-    const failure = await expectRefused(page, "wasm");
+    const failure = await expectRefused(page, "wasm", { oversize: true });
     expect(failure.package?.controlled, "no worker controlled this page").toBe(false);
   });
 
@@ -202,7 +204,7 @@ test.describe("an uncontrolled page", () => {
       await route.fulfill({ response, body, headers: { ...response.headers(), "content-length": String(body.length) } });
     });
     await page.goto("/");
-    const failure = await expectRefused(page, "glue");
+    const failure = await expectRefused(page, "glue", { oversize: true });
     expect(failure.package?.controlled).toBe(false);
   });
 });
