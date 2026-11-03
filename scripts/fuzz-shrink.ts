@@ -4,22 +4,28 @@
  * the corpus. Delta debugging does not promise the globally shortest list, and
  * a run cut off by `--max-tests` may not be 1-minimal; the entry's description
  * says so. Usage:
- *   npx tsx scripts/fuzz-shrink.ts <fuzz-out>/fuzz-<seed>.json <name> [--max-tests 4000]
- * The fuzzer (`cargo build --release --features conformance --bin fuzz`, in
- * engine-rs/) must be built. A candidate counts as still failing only when the
- * Rust engine runs it cleanly and the TypeScript replay shows the same kind of
- * divergence as the original (`state:units`, `money`, `threw`), so a smaller
- * scenario that merely breaks differently is not accepted. The result goes to
+ *   npx tsx scripts/fuzz-shrink.ts <fuzz-out>/fuzz-<seed>.json <name> [--wasm] [--max-tests 4000]
+ * With `--wasm` the candidates replay on the shipped WASM build in Node
+ * (`npm run wasm:build`) instead of the TypeScript engine, so a night that
+ * diverged only on the WASM leg, or trapped there, can be shrunk. The fuzzer
+ * (`cargo build --release --features conformance --bin fuzz`, in engine-rs/)
+ * must be built. A candidate counts as still failing only when the Rust engine
+ * runs it cleanly and the chosen leg (TypeScript, or WASM with `--wasm`) shows
+ * the same kind of divergence as the original (`state:units`, `money`,
+ * `threw`, or `trap` on the WASM leg), so a smaller scenario that merely
+ * breaks differently is not accepted. The result goes to
  * conformance/fuzz-corpus/<name>.json; commit it with the fix, where the corpus
  * job then holds it to agreement. Exit 0 written, 1 the original does not
  * diverge (or the Rust engine refuses it), 2 bad arguments, an unreadable input
- * or a taken name, 3 the harness failed (no fuzzer, a timeout, a malformed
- * record). The default limit is 4000 tests: a tall night needs about 1300.
+ * or a taken name, 3 the harness failed (no fuzzer, no WASM package with
+ * `--wasm`, a timeout, a malformed record). The default limit is 4000 tests: a
+ * tall night needs about 1300.
  */
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { binaryProblem, rustMessage, rustReplay } from "../src/tests/conformance/fuzzBinary";
+import type { Leg } from "../src/tests/conformance/fuzzCompare";
 import { replayCompare } from "../src/tests/conformance/fuzzReplay";
 import { ddmin } from "../src/tests/conformance/fuzzShrink";
 import { CORPUS_NAME, corpusDir } from "../src/tests/conformance/fuzzCorpus";
@@ -32,14 +38,34 @@ type Shown =
   | { kind: "refused"; message: string }
   | { kind: "harness"; message: string };
 
+/** The flags after the file and name: `--wasm` and `--max-tests <n>`, each at
+ *  most once. Anything else (a typo such as `--wams`) is refused, so a shrink
+ *  never quietly runs on the leg the caller did not mean. */
+function parseOptions(args: readonly string[]): { maxTests: number; leg: Leg } | null {
+  let maxTests = 4000;
+  let leg: Leg = "TypeScript";
+  const seen = new Set<string>();
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (seen.has(arg)) return null;
+    seen.add(arg);
+    if (arg === "--wasm") leg = "WASM";
+    else if (arg === "--max-tests") {
+      maxTests = Number(args[++i]);
+      if (!Number.isInteger(maxTests) || maxTests < 1) return null;
+    } else return null;
+  }
+  return { maxTests, leg };
+}
+
 function main(): number {
   const [file, name, ...rest] = process.argv.slice(2);
-  const flag = rest.indexOf("--max-tests");
-  const maxTests = flag >= 0 ? Number(rest[flag + 1]) : 4000;
-  if (!file || !name || !CORPUS_NAME.test(name) || !Number.isInteger(maxTests) || maxTests < 1) {
-    console.error("usage: fuzz-shrink <scenario.json> <name: lowercase words and digits joined by dashes> [--max-tests <n>]");
+  const options = parseOptions(rest);
+  if (!file || !name || !CORPUS_NAME.test(name) || !options) {
+    console.error("usage: fuzz-shrink <scenario.json> <name: lowercase words and digits joined by dashes> [--wasm] [--max-tests <n>]");
     return 2;
   }
+  const { maxTests, leg } = options;
   const problem = binaryProblem();
   if (problem) {
     console.error(problem);
@@ -64,14 +90,14 @@ function main(): number {
   const work = mkdtempSync(join(tmpdir(), "vc-shrink-"));
   try {
     /** Run a candidate: the Rust engine must run it cleanly (a scenario it
-     *  refuses is not a valid shrink) and TypeScript must then differ. */
+     *  refuses is not a valid shrink) and the chosen leg must then differ. */
     const show = (commands: readonly unknown[], id = "candidate"): Shown => {
       const path = join(work, `${id}.json`);
       writeFileSync(path, JSON.stringify({ ...original, id, commands }));
       const rust = rustReplay(path, work);
       if (rust.code === 1) return { kind: "refused", message: `the Rust engine refuses it: ${rustMessage(rust.stderr)}` };
       if (rust.code !== 0) return { kind: "harness", message: `the Rust replay failed (${rust.code}): ${rustMessage(rust.stderr)}` };
-      const r = replayCompare(path, work);
+      const r = replayCompare(path, work, leg);
       if (r.status === "harness") return { kind: "harness", message: r.message };
       return r.status === "diverged" ? { kind: "diverged", signature: r.signature } : { kind: "converged" };
     };
@@ -95,7 +121,7 @@ function main(): number {
     const note = r.exhausted ? " The search stopped at its test limit, so the list may not be 1-minimal." : "";
     const shrunk = {
       id: name,
-      description: `Shrunk from ${original.id} (${original.commands.length} to ${r.kept.length} commands), which diverged as ${target}.${note} ${original.description}`,
+      description: `Shrunk from ${original.id} (${original.commands.length} to ${r.kept.length} commands), which diverged as ${target} on the ${leg} leg.${note} ${original.description}`,
       start: original.start,
       commands: r.kept,
     };
