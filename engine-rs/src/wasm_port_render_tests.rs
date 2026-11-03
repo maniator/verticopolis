@@ -176,7 +176,7 @@ fn congestion_is_kept_until_a_room_the_tower_or_the_clock_moves() {
 
 /// The hotspot is kept on the congestion key (#1237): a read between steps
 /// returns the kept pair, and a marked room write, the clock or the revision
-/// each move it to what a fresh read says.
+/// each move it to what a fresh read says (the revision through a second car).
 #[test]
 fn the_hotspot_is_kept_until_a_room_the_tower_or_the_clock_moves() {
     let fresh = |e: &Engine| {
@@ -211,8 +211,11 @@ fn the_hotspot_is_kept_until_a_room_the_tower_or_the_clock_moves() {
     let later = fresh(&e);
     assert!(same(e.port_hotspot(), later));
     assert!(!same(later, busy), "the rush factor moved the ratio");
-    assert!(e.sim.tower.place(Kind::Office, 3, 170).ok);
-    assert!(same(e.port_hotspot(), fresh(&e)));
+    let lift = shaft(&e, Kind::ElevatorStandard);
+    assert!(e.sim.tower.set_cars(lift, 2));
+    let more_cars = fresh(&e);
+    assert!(!same(more_cars, later), "a second car lowered the ratio");
+    assert!(same(e.port_hotspot(), more_cars));
 }
 
 #[test]
