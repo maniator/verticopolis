@@ -165,7 +165,8 @@ Verticopolis has **two test tiers**:
     pinned as a named scenario in the fix PR. One seed in four (`wasm_every`)
     is also replayed through the shipped WASM build in Node and compared with
     the native Rust run (`scripts/fuzz-compare.ts --wasm`), which is where a
-    wasm32-only difference shows. A run summary names its seed range and the
+    wasm32-only difference shows (a WASM trap is its own finding: exit 4, its
+    own line in the summary, and a red night). A run summary names its seed range and the
     `seed_block` and `seed_offset` that replay it, the seeds that diverged on
     each leg, the seeds that timed out, and the time each leg took. The 14
     counted nights need one unchanged window key (`scripts/fuzz-key.ts`). The

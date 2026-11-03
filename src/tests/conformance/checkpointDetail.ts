@@ -54,6 +54,15 @@ export function tsCheckpointDetail(sim: Simulation): Omit<CheckpointDetail, "lab
   };
 }
 
+/** A WebAssembly trap (an unreachable, an out-of-bounds access, an exhausted
+ *  stack or memory) rather than the JavaScript error the binding throws for a
+ *  refused command. The binding is poisoned after one, so it is a finding of its
+ *  own, not a value that differs. */
+export function isWasmTrap(e: unknown): boolean {
+  if (e instanceof WebAssembly.RuntimeError) return true;
+  return e instanceof RangeError && /WebAssembly|Maximum call stack/i.test(e.message);
+}
+
 /** The detail record could not be built: a harness problem, not a finding. */
 export class DetailError extends Error {}
 
@@ -63,6 +72,9 @@ export function requireDetail(e: { detail?(): Omit<CheckpointDetail, "label"> })
     if (!e.detail) throw new Error("this engine does not provide the checkpoint detail");
     return e.detail();
   } catch (err) {
+    // A trap while the record is built (it serializes the whole tower) is a finding in
+    // the engine, not a harness failure.
+    if (isWasmTrap(err)) throw err;
     throw err instanceof DetailError ? err : new DetailError((err as Error).message);
   }
 }
