@@ -1,5 +1,5 @@
-import { Clock } from "../engine/Clock";
-import { resolveCalendar, type Calendar } from "../engine/calendar";
+import { Clock } from "../shared/Clock";
+import { resolveCalendar, type Calendar } from "../shared/calendar";
 import { makeRules, type GameRules } from "../engine/gameRules";
 import type { HeaderView } from "./view";
 

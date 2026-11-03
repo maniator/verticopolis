@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, chromium, devices, type BrowserContext, type LaunchOptions, type Page } from "@playwright/test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expectEngineHosted } from "./helpers";
 import {
   ENGINE_FILES,
@@ -34,6 +37,24 @@ test.setTimeout(120_000);
 // The project's device, minus `defaultBrowserType`, which is not a context option.
 const { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch } = devices["Desktop Chrome"];
 const DESKTOP_CHROME = { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch };
+
+const profiles: string[] = [];
+
+/** A fresh browser profile folder with a short path. `info.outputPath` sits
+ *  under `test-results/<long test title>/`, and Chromium's service worker and
+ *  cache folders nest many levels below the profile: on Windows that can pass
+ *  the 260-character path limit, and the worker then never registers (the PC
+ *  run of #1522 saw `registered: false` after 25 s on the first online visit,
+ *  while the same flow from a profile under the OS temp folder worked). */
+function newProfile(): string {
+  const dir = mkdtempSync(join(tmpdir(), "vc-cold-"));
+  profiles.push(dir);
+  return dir;
+}
+
+test.afterAll(() => {
+  for (const dir of profiles.splice(0)) rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+});
 
 /**
  * Open the persistent profile at `dir`, online or offline from the start.
@@ -104,8 +125,8 @@ async function engineMinutes(page: Page): Promise<number> {
   return ((await engineSave(page)) as { minutes: number }).minutes;
 }
 
-test("after one online visit, a fresh offline browser session opens the game on the WASM engine, runs the clock and plays today's sounds", async ({ baseURL, launchOptions }, info) => {
-  const dir = info.outputPath("profile");
+test("after one online visit, a fresh offline browser session opens the game on the WASM engine, runs the clock and plays today's sounds", async ({ baseURL, launchOptions }) => {
+  const dir = newProfile();
   await onlineVisit(dir, baseURL!, launchOptions);
 
   const context = await launch(dir, baseURL!, launchOptions, true);
@@ -127,8 +148,8 @@ test("after one online visit, a fresh offline browser session opens the game on 
   }
 });
 
-test("a tower saved online loads in a fresh offline browser session, runs, saves and reloads", async ({ baseURL, launchOptions }, info) => {
-  const dir = info.outputPath("profile");
+test("a tower saved online loads in a fresh offline browser session, runs, saves and reloads", async ({ baseURL, launchOptions }) => {
+  const dir = newProfile();
   // Online: build a lobby, run the clock, and save to slot 1.
   let savedAt = 0;
   let savedState: unknown;

@@ -78,7 +78,7 @@ telemetry and context.
 | 21 | Frame rate in the field | `session_fps` | Sessions | Any | Sampled at session end, so a killed tab sends none | Lower bound | No (the performance gate uses the pinned PC protocol) |
 | 22 | Build identity (`version`, `sha`) | Every `engine_status` row | N | Any | Accurate; a forged row with valid codes cannot be told apart | Accurate | Yes, for by-build lines |
 | 23 | Engine divergence reports (#954) | None | None | None | Planned in the data map, never collected; its premise (a TypeScript instance to disagree with) ended with the Rust-only build | Not collected | No; the data map's "Planned" entry should be retired |
-| 24 | Export failures (`.vctower`, `.TDT`) | `app_action` `export_failed` (#1655), `detail` `save` or `tdt` | Export attempts (`export_save`, `export_tdt`), not yet tallied | Since the build that ships the code | An export that wrote no file: the engine threw (a memory failure on a huge tower, or the `.TDT` codec failing to load) or refused (a Modern tower cannot become a `.TDT`). A download the browser blocks is not seen, and a failure that kills the tab reports nothing. The attempt rows are sent when the player clicks Export, so they also count a cancelled report and a click the export latch drops, which makes any rate a lower bound | Count: lower bound from that build. No rate is printed yet | No, until the report script tallies it (`scripts/persistence-failures.mjs` does not yet; see the backlog row `persistence-report-export`) |
+| 24 | Export failures (`.vctower`, `.TDT`) | `app_action` `export_failed` (#1655), `detail` `save` or `tdt` | Export attempts (`export_save`, `export_tdt`), printed beside the failures and not divided into a rate | From 2.78.10, the first production version that ships the code (2.78.8 carried it for two minutes and is left out) | An export that wrote no file: the engine threw (a memory failure on a huge tower, or the `.TDT` codec failing to load) or refused (a Modern tower cannot become a `.TDT`). A download the browser blocks is not seen, and a failure that kills the tab reports nothing. The attempt rows are sent when the player clicks Export, so they also count a cancelled report and a click the export latch drops, which would make the ratio understate the failure rate | Count: lower bound from that build. No rate is printed | Yes, as two count rows in `scripts/persistence-failures.mjs` and the "Persistence failures" dashboard tile; the tile has no version filter, so read it from the 2.78.10 deploy on 2026-11-03 |
 
 ## Counts and rates for the persistence failures
 
@@ -88,7 +88,8 @@ the relay received. A rate is printed only where the game sends the attempts:
 each import over its own `import_save` or `import_tdt` attempts, and slot loads
 as `load_failed` over `load_slot` plus `load_failed`. The autosave rate is
 **unavailable**: the game sends no autosave attempt or success, and the failure
-is latched once per page life, so the report counts sessions with a failure, not failures. A
+is latched once per page life, so the report counts sessions with a failure, not failures. The two export rows (`.vctower`, `.TDT`) print their `export_failed` counts next to the `export_save` and `export_tdt` attempts with the rate marked unavailable, and read their own builds (from 2.78.10).
+A
 denominator is never inferred from another event. A window with no attempts
 reads Insufficient evidence, and a window before the first build that sends the
 codes reads Not measurable. The first build is `PERSISTENCE_FAILURE_SINCE` in

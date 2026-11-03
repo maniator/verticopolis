@@ -121,7 +121,7 @@ const servedGlue = (page: Page): Promise<string> => servedByWorker(page, "engine
 /** The requests the browser itself makes to check for a new worker: the worker
  *  script and the scripts it imports. They are not the game's or the worker's
  *  fetches, and Playwright's offline flag does not stop them. */
-const isUpdateCheck = (path: string): boolean => path === "/sw.js" || /^\/workbox-[\w-]+\.js$/.test(path);
+const isUpdateCheck = (path: string): boolean => path === "/sw.js" || path === "/sw-navigation-fallback.js" || /^\/workbox-[\w-]+\.js$/.test(path);
 
 // The second deployment is a full `vite build`. It runs here, with a budget of
 // its own, so the build does not eat into the test's.

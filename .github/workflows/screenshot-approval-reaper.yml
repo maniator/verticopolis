@@ -37,6 +37,7 @@ concurrency:
 jobs:
   reap:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Cancel stale screenshot-approval runs
         env:
