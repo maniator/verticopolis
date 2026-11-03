@@ -9,11 +9,18 @@ name: Milestone new and closed issues
 # usual two-step create) wins.
 #
 # A closed issue never stays in Triage either. If an issue is closed while it is
-# still in Triage, it moves to 3.0.0 (finished Rust-cycle work goes there) and
-# a comment says so; fix the milestone by hand if it belongs in 1.x or 2.x.
+# still in Triage (or has no milestone at all), it moves to 3.0.0 (finished
+# Rust-cycle work goes there) and a comment says so; fix the milestone by hand
+# if it belongs in 1.x or 2.x. Change the target here when 3.0.0 ships.
 on:
   issues:
     types: [opened, closed]
+
+# One run at a time per issue, so an issue opened and closed within seconds is
+# handled in order: the closed run always sees what the opened run did.
+concurrency:
+  group: issue-milestone-${{ github.event.issue.number }}
+  cancel-in-progress: false
 
 # Least privilege: setting a milestone only needs write access to issues.
 permissions:
@@ -51,12 +58,12 @@ jobs:
           fi
           gh api -X PATCH "repos/${GH_REPO}/issues/${ISSUE}" -F milestone="$triage" --silent
           echo "Issue #${ISSUE} had no milestone; set Triage (${triage})."
-      - name: Move an issue closed in Triage to 3.0.0
+      - name: Move an issue closed in Triage or with no milestone to 3.0.0
         if: github.event.action == 'closed'
         run: |
           set -euo pipefail
           title=$(gh api "repos/${GH_REPO}/issues/${ISSUE}" --jq '.milestone.title // empty')
-          if [ "$title" != "Triage" ]; then
+          if [ -n "$title" ] && [ "$title" != "Triage" ]; then
             echo "Issue #${ISSUE} closed in milestone '${title}'; nothing to do."
             exit 0
           fi
@@ -67,5 +74,5 @@ jobs:
           fi
           gh api -X PATCH "repos/${GH_REPO}/issues/${ISSUE}" -F milestone="$target" --silent
           gh api -X POST "repos/${GH_REPO}/issues/${ISSUE}/comments" \
-            -f body="Closed while still in Triage, so it moved to 3.0.0 (finished Rust-cycle work goes there). If it belongs in 1.x or 2.x instead, change the milestone." --silent
+            -f body="Closed without a decided milestone, so it moved to 3.0.0 (finished Rust-cycle work goes there). If it belongs in 1.x or 2.x instead, change the milestone." --silent
           echo "Issue #${ISSUE} closed in Triage; moved to 3.0.0 (${target})."
