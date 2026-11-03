@@ -194,6 +194,7 @@ records under their own names.
 | `parkingUsage` | spots | number, 0 to 1: the garage fill for that many working spaces; a count that is not a positive finite number reads as none | scene sync |
 | `recyclingFill` | none | number, 0 to 1 | scene sync |
 | `recyclingCapacity` | none | number, the population the working recycling centers process | recycling card |
+| `recyclingDemandMet` | none | boolean: whether the working recycling centers can process the whole population (the engine's verdict, so the card compares nothing) | recycling card |
 | `positionReachable` | floor, x | boolean: whether a walker can stand there; a position that is not a whole tile is not one | walker placement |
 
 `towerName()`, `unitLabel(id)`, `logText(seq)` and the other text getters

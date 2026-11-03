@@ -224,6 +224,7 @@ fn the_fills_and_the_parking_set_read_the_simulation() {
     assert_eq!(e.port_congestion().to_bits(), e.sim.congestion().to_bits());
     assert_eq!(e.port_recycling_fill(), e.sim.recycling_fill());
     assert_eq!(e.port_recycling_capacity(), 0.0);
+    assert_eq!(e.port_recycling_demand_met(), e.sim.recycling_demand_met());
     for floor in [0, -1] {
         for x in 150..230 {
             assert!(e.sim.tower.place(Kind::Floor, floor, x).ok);
@@ -233,6 +234,10 @@ fn the_fills_and_the_parking_set_read_the_simulation() {
     assert!(center.ok);
     assert_eq!(e.port_recycling_capacity(), 2500.0);
     assert_eq!(e.port_recycling_capacity(), e.sim.recycling_capacity());
+    assert!(
+        e.port_recycling_demand_met(),
+        "an empty tower is within capacity"
+    );
     e.sim
         .tower
         .get_unit_mut(center.unit_id.unwrap())

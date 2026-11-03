@@ -75,12 +75,13 @@ pub(crate) const UNIT_CARD: [&str; 20] = [
 ];
 
 /// `shaftCard`'s header. `utilization` is NaN when the shaft has no reading.
+/// `nearCapacity` is 1 when the engine calls that load near capacity, else 0.
 /// `hourly` is 1 when the 24 weekday then 24 weekend demand slots follow,
 /// `stops` the number of stop rows after them (top to bottom, each
 /// [`STOP_ROW`]), and `origins` 1 when the origin rings follow the stops:
 /// for each weekday hour, then each weekend hour, a pair count and then that
 /// many (floor, count) pairs.
-pub(crate) const SHAFT_CARD: [&str; 12] = [
+pub(crate) const SHAFT_CARD: [&str; 13] = [
     "id",
     "kindCode",
     "x",
@@ -90,6 +91,7 @@ pub(crate) const SHAFT_CARD: [&str; 12] = [
     "cars",
     "capacity",
     "utilization",
+    "nearCapacity",
     "hourly",
     "stops",
     "origins",
@@ -164,6 +166,7 @@ fn shaft_card(sim: &Simulation, id: i64) -> Option<Vec<f64>> {
         t.cars as f64,
         Simulation::transport_capacity(t.kind, t.cars),
         utilization,
+        flag(crate::panels::elevators::is_near_capacity(utilization)),
         flag(hourly.is_some()),
         stops as f64,
         flag(origins.is_some()),

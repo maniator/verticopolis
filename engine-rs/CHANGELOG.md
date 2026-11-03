@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.11.0 (2026-11-03)
+
+- Two card verdicts now come from the engine. The `shaftCard` record gains a `nearCapacity` slot (1 when the shaft's average car load is above 85%, else 0; a shaft with no reading is 0), placed right after `utilization`, so the slots after it move up by one. A new read-only `recyclingDemandMet()` on the port and the binding answers whether the working recycling centers can process the whole population. The host used to compare the load with 0.85 and the population with the capacity itself. The transport detail the stats and inspector read also carries `nearCapacity`. No saved-game, frame, catalog or identity change.
+
 ## 1.10.1 (2026-11-03)
 
 - The `.TDT` export writes an infested hotel room with the dirty flag (32) and counts it as a dirty room in the people and finance blocks, as a `dirty` room is. It used to write no flag, so the room re-imported as a clean vacant room. What flag 64 means in the original game is still unchecked (#1629), so it is not written. No saved-game, frame, view layout or catalog change.

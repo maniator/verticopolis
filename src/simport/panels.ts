@@ -172,6 +172,8 @@ export interface TransportDetail {
   readonly capacity: number;
   /** Average car load, or null for a shaft with none recorded. */
   readonly utilization: number | null;
+  /** The engine's verdict that the average load is near capacity. */
+  readonly nearCapacity: boolean;
   readonly hourly: HourlyView | null;
   readonly origins: OriginsView | null;
   /** Elevators only; empty for stairs and escalators. */

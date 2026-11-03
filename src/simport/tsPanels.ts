@@ -1,4 +1,4 @@
-import type { HeatmapMode } from "../engine/sim/constants";
+import { isNearCapacity, type HeatmapMode } from "../engine/sim/constants";
 import type { Simulation } from "../engine/Simulation";
 import { catalogFacility } from "../catalog/catalogTypes";
 import { householdMix } from "../engine/households";
@@ -145,6 +145,7 @@ export function tsTransportDetail(sim: Simulation, id: number): TransportDetail 
     cars: t.cars,
     capacity: sim.transportCapacity(t),
     utilization: nullish(sim.elevatorUtilization(id)),
+    nearCapacity: isNearCapacity(sim.elevatorUtilization(id)),
     hourly: hourly ? { weekday: [...hourly.weekday], weekend: [...hourly.weekend] } : null,
     origins: origins ? { weekday: ring(origins.weekday), weekend: ring(origins.weekend) } : null,
     stops,

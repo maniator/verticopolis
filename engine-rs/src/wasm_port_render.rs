@@ -161,6 +161,12 @@ impl Engine {
         self.sim.recycling_capacity()
     }
 
+    /// Whether the working recycling centers can process the whole population
+    /// (the 4-star demand check).
+    pub(crate) fn port_recycling_demand_met(&self) -> bool {
+        self.sim.recycling_demand_met()
+    }
+
     /// Whether a walker can stand at `floor`, `x`; a position that is not a
     /// whole tile is not one. `&mut` because reachability memoizes its graph
     /// by tower revision.

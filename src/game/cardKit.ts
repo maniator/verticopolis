@@ -100,7 +100,7 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
     }
     if (u.kind === "recycling" && !INERT_STATES.has(u.state)) {
       // Recycling fill can change between hours; do not store these lines.
-      return [...lines, ...recyclingLinesOf(header.population, port.recyclingCapacity(), port.recyclingFill())];
+      return [...lines, ...recyclingLinesOf(header.population, port.recyclingCapacity(), port.recyclingFill(), port.recyclingDemandMet())];
     }
     return lines;
   };
@@ -117,7 +117,10 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
       },
       transport: (id) => {
         const sim = tsTower();
-        if (!sim) return transportLoadLines(cards.shaft(id)?.utilization);
+        if (!sim) {
+          const shaft = cards.shaft(id);
+          return transportLoadLines(shaft?.utilization, shaft?.nearCapacity === true);
+        }
         const t = sim.tower.getTransport(id);
         return t ? transportDiagnostics(sim, t) : [];
       },

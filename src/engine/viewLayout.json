@@ -478,6 +478,7 @@
       "cars",
       "capacity",
       "utilization",
+      "nearCapacity",
       "hourly",
       "stops",
       "origins"

@@ -12,6 +12,16 @@ use serde_json::{json, Value};
 use crate::facilities::Kind;
 use crate::sim::Simulation;
 
+/// A passenger shaft whose average car load is above this share reads as near
+/// capacity on its card. The cutoff is the engine's; the card only words it.
+pub const NEAR_CAPACITY_UTILIZATION: f64 = 0.85;
+
+/// Whether an average car load is near capacity. A shaft with no reading
+/// (NaN) is not.
+pub fn is_near_capacity(utilization: f64) -> bool {
+    utilization > NEAR_CAPACITY_UTILIZATION
+}
+
 /// One passenger shaft's row on the stats screen (`ElevatorStatsRow`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ElevatorRow {
@@ -125,6 +135,7 @@ impl Simulation {
             "cars": t.cars,
             "capacity": Simulation::transport_capacity(t.kind, t.cars),
             "utilization": utilization,
+            "nearCapacity": utilization.is_some_and(is_near_capacity),
             "hourly": hourly,
             "origins": origins,
             "stops": stops,

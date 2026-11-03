@@ -184,6 +184,10 @@ impl Engine {
     pub fn recycling_capacity(&self) -> f64 {
         self.port_recycling_capacity()
     }
+    #[wasm_bindgen(js_name = recyclingDemandMet)]
+    pub fn recycling_demand_met(&self) -> bool {
+        self.port_recycling_demand_met()
+    }
     #[wasm_bindgen(js_name = positionReachable)]
     pub fn position_reachable(&mut self, floor: f64, x: f64) -> bool {
         self.port_position_reachable(floor, x)

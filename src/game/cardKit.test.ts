@@ -68,6 +68,7 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
       return index;
     };
     let utilization = 0.91;
+    let nearCapacity = 1;
     const port = new Proxy(engine, {
       get(target, key) {
         if (key === "sim") return undefined;
@@ -77,6 +78,7 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
           record[slot("id")] = id;
           record[slot("kindCode")] = VIEW_LAYOUT.kinds.indexOf("elevator");
           record[slot("utilization")] = utilization;
+          record[slot("nearCapacity")] = nearCapacity;
           return record;
         };
         return Reflect.get(target, key, target);
@@ -92,10 +94,22 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
     expect(copy(9999)).toBe("");
 
     utilization = 0.85;
+    nearCapacity = 0;
     kit.cards.forget();
     expect(copy(73)).toContain("Avg load: 85% full");
     expect(copy(73)).not.toContain("Near capacity");
     expect(copy(73)).toContain("var(--good)");
+
+    // The engine owns the verdict: a high load it does not call near capacity
+    // shows no warning, and a low load it does call near capacity shows one.
+    utilization = 0.97;
+    nearCapacity = 0;
+    kit.cards.forget();
+    expect(copy(73)).not.toContain("Near capacity");
+    utilization = 0.4;
+    nearCapacity = 1;
+    kit.cards.forget();
+    expect(copy(73)).toContain("Avg load: 40% full. Near capacity");
 
     utilization = NaN;
     kit.cards.forget();

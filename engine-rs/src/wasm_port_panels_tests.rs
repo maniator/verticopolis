@@ -178,6 +178,7 @@ fn the_shaft_card_is_the_transport_detail() {
     let mut e = built();
     let id = e.sim.tower.transports[0].id;
     let stairs = e.sim.tower.transports[1].id;
+    let head_slot = |name: &str| SHAFT_CARD.iter().position(|k| *k == name).unwrap();
     let check = |e: &Engine, id: i64| {
         let r = e.port_shaft_card(id as f64);
         let json = e.sim.transport_detail(id).unwrap();
@@ -186,13 +187,14 @@ fn the_shaft_card_is_the_transport_detail() {
         for (slot, key) in SHAFT_CARD.iter().enumerate() {
             match *key {
                 "kindCode" => {}
+                "nearCapacity" => assert_eq!(head[slot], flag(json[key] == true)),
                 "hourly" | "origins" => assert_eq!(head[slot], flag(!json[key].is_null())),
                 "stops" => assert_eq!(head[slot], json["stops"].as_array().unwrap().len() as f64),
                 _ => assert!(same(head[slot], num(&json[key])), "{key}"),
             }
         }
         let mut at = SHAFT_CARD.len();
-        if head[9] == 1.0 {
+        if head[head_slot("hourly")] == 1.0 {
             for day in ["weekday", "weekend"] {
                 for v in json["hourly"][day].as_array().unwrap() {
                     assert_eq!(r[at], num(v));
@@ -206,7 +208,7 @@ fn the_shaft_card_is_the_transport_detail() {
             }
             at += STOP_ROW.len();
         }
-        if head[11] == 1.0 {
+        if head[head_slot("origins")] == 1.0 {
             for day in ["weekday", "weekend"] {
                 for ring in json["origins"][day].as_array().unwrap() {
                     let pairs = ring.as_array().unwrap();
@@ -228,6 +230,11 @@ fn the_shaft_card_is_the_transport_detail() {
     let at = |name: &str| SHAFT_CARD.iter().position(|k| *k == name).unwrap();
     assert_eq!(r[at("stops")], 0.0);
     assert!(r[at("utilization")].is_nan());
+    assert_eq!(
+        r[at("nearCapacity")],
+        0.0,
+        "no reading is not near capacity"
+    );
     e.port_mark_stop(id as f64, 2.0, false);
     e.sim.telemetry.util.insert(id, 0.25);
     let hours: Vec<f64> = (0..24).map(f64::from).collect();
@@ -247,4 +254,24 @@ fn the_shaft_card_is_the_transport_detail() {
     check(&e, id);
     assert!(e.port_shaft_card(id as f64 + 1000.0).is_empty());
     assert!(e.port_shaft_card(f64::INFINITY).is_empty());
+}
+
+#[test]
+fn the_shaft_card_calls_a_load_near_capacity_only_above_the_cutoff() {
+    use crate::panels::elevators::{is_near_capacity, NEAR_CAPACITY_UTILIZATION};
+    assert!(!is_near_capacity(f64::NAN));
+    assert!(!is_near_capacity(0.0));
+    assert!(
+        !is_near_capacity(NEAR_CAPACITY_UTILIZATION),
+        "the cutoff itself is not near"
+    );
+    assert!(is_near_capacity(NEAR_CAPACITY_UTILIZATION + 0.001));
+    let mut e = built();
+    let id = e.sim.tower.transports[0].id;
+    let at = |name: &str| SHAFT_CARD.iter().position(|k| *k == name).unwrap();
+    for (load, want) in [(0.85, 0.0), (0.86, 1.0), (1.0, 1.0), (0.2, 0.0)] {
+        e.sim.telemetry.util.insert(id, load);
+        let r = e.port_shaft_card(id as f64);
+        assert_eq!(r[at("nearCapacity")], want, "load {load}");
+    }
 }

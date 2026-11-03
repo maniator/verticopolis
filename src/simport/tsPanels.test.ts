@@ -47,7 +47,7 @@ const KEYS = {
   statsReport: "elevators exterminationDueDay functionalParking hotelsCountTowardRating households housekeeping housekeepingReport income milestones nextStar nextStarThreshold parkingDemand ratingPopulation recycling stats strandedFloors vipFavorable vipVisits",
   housekeeping: "crews dailyCapacity dirty infested maids outOfReach rooms",
   unitDetail: "blockbuster customersIn everOccupied filmPolicy floor floorHasLobby id kind label noRate occupants price reachable rent residents satisfaction served state subtype vacateReason width x",
-  transportDetail: "bottom capacity cars hourly id kind origins stops top utilization width x",
+  transportDetail: "bottom capacity cars hourly id kind nearCapacity origins stops top utilization width x",
   parkingDemand: "officePop offices suites total",
   recycling: "capacity demandMet",
   housekeepingReport: "cleaned leftover",
