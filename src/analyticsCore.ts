@@ -265,9 +265,13 @@ export type AppActionName =
   // slot; the two read alike). `import_failed` is a refused or unreadable file,
   // `detail` `save` (.vctower) or `tdt` (.TDT). The fact only: never the
   // message, the file name or any tower content.
+  // `export_failed` is an export that wrote no file: the engine threw (a
+  // memory failure on a huge tower) or refused (#1655), `detail` `save`
+  // (.vctower) or `tdt` (.TDT). A download the browser blocks is not seen.
   | "autosave_failed"
   | "load_failed"
   | "import_failed"
+  | "export_failed"
   // Dialogs / navigation.
   | "settings_open"
   | "help_open"

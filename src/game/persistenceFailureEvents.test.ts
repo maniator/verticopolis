@@ -6,7 +6,7 @@ import { NEWER_SAVE_REFUSAL } from "./portLifecycle";
 
 /**
  * The persistence failure signals of the 3.0 reliability gate (#1533): a save,
- * a load or an import that fails reports its `app_action` code, and the
+ * a load, an import or an export that fails reports its `app_action` code, and the
  * matching success reports nothing. The codes carry the fact only. The slot
  * and title-screen load paths are pinned in `appModals.test.ts`.
  */
@@ -21,7 +21,7 @@ vi.mock("./portLifecycle", async (importActual) => {
 });
 
 function makeLoad(port: Record<string, unknown> = {}) {
-  const ui = { toast: vi.fn(), sayVisibly: vi.fn(), showImportReport: vi.fn() };
+  const ui = { toast: vi.fn(), sayVisibly: vi.fn(), showImportReport: vi.fn(), downloadFile: vi.fn(() => true) };
   const towerSwapped = vi.fn();
   const deps = { ui, towerSwapped, enginePort: () => port, getView: () => null } as unknown as SaveLoadDeps;
   return { load: new SaveLoad(deps), ui, towerSwapped };
@@ -106,6 +106,69 @@ describe("a refused import reports import_failed", () => {
     await load.importLegacy(new ArrayBuffer(4), "tiny.TDT");
     expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("import_failed", "tdt");
     expect(ui.toast).toHaveBeenCalledWith("too small", "bad");
+  });
+});
+
+describe("an export that writes no file reports export_failed (#1655)", () => {
+  it("reports an engine that throws on a .vctower export as `save`, and a good export as nothing", async () => {
+    const bad = makeLoad({
+      setCamera: () => {},
+      exportVctower: () => {
+        throw new Error("memory access out of bounds");
+      },
+      towerName: () => "Tower",
+    });
+    await bad.load.exportGame();
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("export_failed", "save");
+    expect(bad.ui.toast).toHaveBeenCalledWith("Export failed: memory access out of bounds", "bad");
+
+    // The WASM binding can throw a bare string or null, not only an Error.
+    for (const [thrown, line] of [
+      ["trap", "Export failed: trap"],
+      [null, "Export failed: null"],
+    ] as const) {
+      vi.mocked(trackAppAction).mockClear();
+      const odd = makeLoad({
+        setCamera: () => {},
+        exportVctower: () => {
+          throw thrown;
+        },
+        towerName: () => "Tower",
+      });
+      await odd.load.exportGame();
+      expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("export_failed", "save");
+      expect(odd.ui.toast).toHaveBeenCalledWith(line, "bad");
+    }
+
+    vi.mocked(trackAppAction).mockClear();
+    const good = makeLoad({ setCamera: () => {}, exportVctower: () => "VCTOWER1\nabc", towerName: () => "Tower" });
+    await good.load.exportGame();
+    expect(trackAppAction).not.toHaveBeenCalled();
+    expect(good.ui.downloadFile).toHaveBeenCalledOnce();
+  });
+
+  it("reports a refused, throwing or unloadable .TDT export as `tdt`", async () => {
+    const refused = makeLoad({ setCamera: () => {}, tdtExport: () => [0], lastReason: () => "Modern towers cannot be exported." });
+    await refused.load.exportLegacy();
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("export_failed", "tdt");
+    expect(refused.ui.sayVisibly).toHaveBeenCalledWith("Modern towers cannot be exported.");
+
+    vi.mocked(trackAppAction).mockClear();
+    const thrown = makeLoad({
+      setCamera: () => {},
+      tdtExport: () => {
+        throw new Error("out of memory");
+      },
+    });
+    await thrown.load.exportLegacy();
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("export_failed", "tdt");
+    expect(thrown.ui.sayVisibly).toHaveBeenCalledWith("Export failed: out of memory");
+
+    vi.mocked(trackAppAction).mockClear();
+    const unloaded = makeLoad({ prepareTdt: () => Promise.reject(new Error("Failed to fetch the codec")) });
+    await unloaded.load.exportLegacy();
+    expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("export_failed", "tdt");
+    expect(unloaded.ui.sayVisibly).toHaveBeenCalledWith("Export failed: Failed to fetch the codec");
   });
 });
 
