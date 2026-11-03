@@ -1,7 +1,8 @@
 /**
  * The overview MAP window's text summary (#343, CAP-5): what a screen reader
- * hears for the map canvas, and what a sighted player can read when the view
- * sits above a Modern crop. DOM-free, so it is unit-tested on its own.
+ * hears for the map canvas, including where the view is when it sits past a
+ * Modern crop (a sighted player sees the edge band and its chevron). DOM-free,
+ * so it is unit-tested on its own.
  */
 import type { BuiltFloors, ViewPlacement } from "../render/overviewMap/extent";
 import { floorLabel } from "./floorLabel";

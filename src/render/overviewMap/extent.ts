@@ -22,7 +22,8 @@ export const CLASSIC_BODY_CSS = { width: 200, height: 288 } as const;
 /** The Modern crop's top rounds up to a multiple of this many floor lines. */
 export const MODERN_BAND_FLOORS = 10;
 
-/** The Modern crop is never shorter than this many floors. */
+/** The Modern crop is at least this many floors tall, unless the world itself
+ *  is shorter (the crop never goes past the world's top). */
 export const MODERN_MIN_FLOORS = 30;
 
 /** The floors the tower has built, as `SimView.tower` reports them. */

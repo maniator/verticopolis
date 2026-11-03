@@ -5,6 +5,7 @@ import { tickInstallAffordance } from "./installAffordance";
 import { hasBlockingModal, isEditorBusy, isEngineStopped, isSplashUp } from "./interactionState";
 import { engineTrapped } from "./engineFault";
 import { positionPanels } from "./panelAnchoring";
+import { tickOverviewMap } from "./overviewMapWiring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
 import { gameplaySession } from "../analytics";
 import { drainEngineEvents } from "../analyticsEngineBridge";
@@ -178,6 +179,8 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // World-anchor the editor card and inspector tooltip every frame (cheap,
   // just writes left/top), so they ride the tower as the camera pans/zooms.
   positionPanels(app);
+  // The overview map: constant work unless the tower or the camera changed.
+  tickOverviewMap(app);
 }
 
 /** Once per weekday, when this frame's ticks actually CROSSED noon with the

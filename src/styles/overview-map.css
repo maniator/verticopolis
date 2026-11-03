@@ -1,0 +1,140 @@
+/* ---- Overview MAP window (#343) ----
+   A small window in #stage: the Classic body is the retail map's 200 by 288
+   CSS px. On desktop it sits at the stage's bottom-right corner, clear of the
+   sidebar, the palette, the toasts (top-right) and the Floor heatmap legend
+   (drawn at the canvas's top-left). On a phone it is a card at the top-left of
+   the world view, inside the safe-area insets, about 150 px wide and never
+   taller than half the world view; its Map pill stays at the bottom-right. The window is placed before #view, so the
+   inspector and editor cards paint over it. */
+.overview-map {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100% - 20px);
+  padding: 2px;
+  /* Its own stacking context: the close button's raised touch halo stays
+     inside the window, so a card painted over the window still wins. */
+  isolation: isolate;
+  /* The window owns its pointers: a touch on its title bar or frame never
+     pans or zooms the page. */
+  touch-action: none;
+}
+/* A left mouse or pen press on the world is held: pointers pass through the
+   window and its button, so a world drag released over either still ends on
+   the world canvas. */
+.overview-map.world-press,
+.overview-map-toggle.world-press {
+  pointer-events: none;
+}
+.overview-map[hidden],
+.overview-map-toggle[hidden] {
+  display: none;
+}
+.overview-map > .win-title {
+  margin: 0 0 2px;
+  padding: 1px 2px 1px 6px;
+  font-size: 11px;
+}
+.overview-map .overview-map-close {
+  width: 20px;
+  height: 18px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1;
+}
+.overview-map-body {
+  position: relative;
+  /* The Classic view mark blends with the tower canvas and the backdrop only,
+     never with the page behind the window. */
+  isolation: isolate;
+  flex: 0 1 auto;
+  width: 200px;
+  height: 288px;
+  min-height: 0;
+  border: 1px solid #808080;
+}
+.overview-map-body canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.overview-map-view {
+  cursor: pointer;
+  /* The map owns its pointers: a drag on it never scrolls or zooms the page. */
+  touch-action: none;
+}
+/* Classic's inverting pen: the white outline reads dark over the light gray
+   tower and pale over the sky, like the retail map's dotted rectangle. */
+.overview-map[data-map-theme="classic"] .overview-map-view {
+  mix-blend-mode: difference;
+}
+/* The focus ring goes on the body, outside the blend, so Classic never
+   inverts it. A browser without :has() keeps the ring on the canvas. */
+.overview-map-view:focus-visible {
+  outline: 2px solid #ffd84d;
+  outline-offset: -2px;
+}
+@supports selector(:has(*)) {
+  .overview-map-view:focus-visible {
+    outline: none;
+  }
+  .overview-map-body:has(> .overview-map-view:focus-visible) {
+    outline: 2px solid #ffd84d;
+    outline-offset: 1px;
+  }
+}
+.overview-map-toggle {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+}
+
+/* Phone tier: the same query as `mobileMq` in src/main.ts. */
+@media (max-width: 767px), (max-width: 1023px) and (max-height: 599px) {
+  .overview-map {
+    top: max(8px, env(safe-area-inset-top));
+    left: max(8px, env(safe-area-inset-left));
+    right: auto;
+    bottom: auto;
+    max-height: 50%;
+  }
+  .overview-map-body {
+    width: 150px;
+    height: 216px;
+  }
+  /* The pill keeps the bottom-right corner, clear of the Floor heatmap
+     legend at the top-left, at 44 px wide. On a 320 px phone the open editor
+     card at the bottom-left reaches it, so the pill then sits above the card,
+     over part of the card's 12 px right padding and no control, and keeps its
+     full touch target. The inspector card and the toasts, which may land in
+     that corner, stay above the pill. */
+  .overview-map-toggle {
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    border-radius: 999px;
+    padding: 0 8px;
+  }
+  #stage:has(> .overview-map-toggle:not([hidden])):has(> #editor:not(.hidden)) > :is(.overview-map-toggle, #inspector, #toast-wrap) {
+    z-index: 1;
+  }
+}
+
+/* Touch targets (CAP-5): the pill and the close button are at least 44 px.
+   The close button keeps its title-bar look and grows an invisible halo, the
+   way styles.css grows every title-bar .btn.xs, here to 46 by 44. */
+@media (pointer: coarse) {
+  .overview-map-toggle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* Raised over the map body, which comes later and would otherwise take
+     the halo's lower part: a tap just under the close button closes. */
+  .overview-map .win-title .overview-map-close::after {
+    inset: -13px;
+    z-index: 1;
+  }
+}
