@@ -1,0 +1,100 @@
+{
+  "id": "fx-treasure-cap",
+  "description": "Twelve basement parking spaces on fresh ground at three stars. Each has a chance of buried treasure, capped at three per tower, which bumps the treasure fx sequence (#879).",
+  "start": {
+    "newGame": {
+      "seed": 3,
+      "mode": "classic",
+      "star": 3
+    }
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 150,
+      "to": 190
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 0,
+      "x": 150
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 0,
+      "x": 154
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 0,
+      "x": 158
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 0,
+      "x": 162
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 0,
+      "x": 166
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 0,
+      "x": 170
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 0,
+      "x": 174
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 0,
+      "x": 178
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 0,
+      "x": 182
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 0,
+      "x": 186
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 0,
+      "x": 190
+    },
+    {
+      "op": "build",
+      "kind": "parking",
+      "floor": 0,
+      "x": 194
+    },
+    {
+      "op": "checkpoint",
+      "label": "end"
+    }
+  ]
+}

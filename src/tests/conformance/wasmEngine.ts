@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { rentOf } from "../../engine/econConfig";
 import { digest } from "./canonical";
-import type { CheckpointDetail } from "./checkpointDetail";
+import type { CheckpointDetail, FxSlot } from "./checkpointDetail";
 import { REPO_ROOT, type EngineStart, type Outcome, type ScenarioEngine, type Start } from "./scenario";
 import type { ChargeOutcome } from "./chargeOps";
 import { decodeHeader } from "../../wasmhost/frameView";
@@ -61,6 +61,20 @@ interface LogEntry { seq: number; minute: number; text: string; kind: string }
 
 const LOG_FROM_START = -0x80000000;
 
+/** The fx sequences and emergency counters, read from the frame header. */
+export function wasmFxSlots(handle: WasmEngine): Record<FxSlot, number> {
+  const h = decodeHeader(handle.frameView());
+  const counts = h.counts;
+  return {
+    santaFxSeq: h.santaFxSeq,
+    explosionSeq: h.explosionFx.seq, explosionFloor: h.explosionFx.floor, explosionX: h.explosionFx.x,
+    thiefSeq: h.thiefFx.seq, thiefCaught: h.thiefFx.caught ? 1 : 0, thiefFloor: h.thiefFx.floor,
+    treasureSeq: h.treasureFx.seq, treasureFloor: h.treasureFx.floor, treasureX: h.treasureFx.x,
+    vipFxSeq: h.vipFxSeq,
+    fires: counts.fires, firesGutRooms: counts.firesGutRooms, bombs: counts.bombs,
+  };
+}
+
 /** The fuzz record of a binding instance, built from what the binding returns
  *  (the money, the log ring and the full save), the way the TypeScript runner
  *  builds it from its own engine, so a wasm32 difference shows in the money,
@@ -79,6 +93,7 @@ export function wasmCheckpointDetail(handle: WasmEngine): Omit<CheckpointDetail,
       digest: digest(entries.map((e) => ({ minute: e.minute, text: e.text, kind: e.kind }))),
     },
     save: Object.fromEntries(Object.entries(save).map(([k, v]) => [k, digest(v)])),
+    fx: wasmFxSlots(handle),
   };
 }
 

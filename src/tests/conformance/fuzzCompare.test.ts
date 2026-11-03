@@ -7,8 +7,8 @@ const run = (): RunRecord => ({
     { label: "h1", state: "s1", crowd: "c1", events: "e1" },
   ],
   details: [
-    { label: "start", money: 2000000, log: { seq: 0, count: 0, digest: "l0" }, save: { clock: "k0", units: "u0" } },
-    { label: "h1", money: 2000100, log: { seq: 2, count: 2, digest: "l1" }, save: { clock: "k1", units: "u1" } },
+    { label: "start", money: 2000000, log: { seq: 0, count: 0, digest: "l0" }, save: { clock: "k0", units: "u0" }, fx: { santaFxSeq: 0, bombs: 0 } },
+    { label: "h1", money: 2000100, log: { seq: 2, count: 2, digest: "l1" }, save: { clock: "k1", units: "u1" }, fx: { santaFxSeq: 0, bombs: 1 } },
   ],
 });
 
@@ -30,6 +30,18 @@ describe("seeded differential compare", () => {
     rust.checkpoints[1].state = "x";
     rust.details[1].save.units = "other";
     expect(compareRuns(run(), rust)).toMatchObject({ kind: "state", field: "units" });
+  });
+
+  it("names an fx sequence or an emergency counter by its slot", () => {
+    const rust = run();
+    rust.details[1].fx.bombs += 1;
+    expect(compareRuns(run(), rust)).toMatchObject({ index: 1, kind: "fx", field: "bombs", ts: "1", rust: "2" });
+    const absent = run();
+    delete absent.details[1].fx.santaFxSeq;
+    expect(compareRuns(run(), absent)).toMatchObject({ kind: "fx", field: "santaFxSeq", rust: "(absent)" });
+    const unlabeled = run();
+    (unlabeled.details[0] as { fx?: unknown }).fx = undefined;
+    expect(() => compareRuns(unlabeled, run())).toThrow(/detail 0/);
   });
 
   it("labels the leg that was compared", () => {
