@@ -21,6 +21,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.78.0
+
+- Shops, restaurants and other venues more than two floors from a lobby warn again that their traffic is halved, in the hover card and the phone editor.
+- Sky Bars, nightclubs, spas and daycares no longer show a customer count and demand advice meant for shops and restaurants.
+
 ## 2.77.5
 
 - Room previews and elevator displays now use facility information consistent with the live tower's engine rules.
