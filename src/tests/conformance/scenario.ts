@@ -10,6 +10,7 @@ import { decodeVctower } from "../../storage/vctowerContainer";
 import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
 import { rentOf } from "../../engine/econConfig";
 import { serializeUnit } from "../../engine/sim/coerce";
+import { reloadChanged } from "./reloadCheck";
 import { digest } from "./canonical";
 import { check, own, type Spec } from "./scenarioSchema";
 export type { Spec } from "./scenarioSchema";
@@ -167,6 +168,8 @@ export interface ScenarioEngine extends ChargeEngine {
   /** A save round trip: serialize, then load the result as a fresh engine. */
   reload(): ScenarioEngine;
   stateDigest(): string;
+  /** The state view itself (the same one `stateDigest` hashes). */
+  stateView(): unknown;
   crowdDigest(): string;
   /** The gameplay events emitted since the last drain, as `{ name, payload }`
    *  objects; the engine's buffer is empty afterwards. */
@@ -234,6 +237,7 @@ export function tsEngine(sim: Simulation): ScenarioEngine {
     tick: (dt) => sim.tick(dt),
     reload: () => tsEngine(reloadTsSim(sim)),
     stateDigest: () => digest(stateView(sim)),
+    stateView: () => stateView(sim),
     crowdDigest: () => digest(crowdView(sim)),
     drainEvents: () => sim.drainGameplayEvents(),
     eventsDropped: () => sim.gameplayEventsDropped,
@@ -367,10 +371,10 @@ function apply(e: ScenarioEngine, c: Command, emit: (label: string) => void, clo
     case "reload": {
       // A save round trip must lose nothing the save carries. The events go
       // first: a binding's reload frees the engine it replaces.
-      const before = e.stateDigest();
+      const before = e.stateView();
       carry(drainChecked(e));
       const loaded = e.reload();
-      if (loaded.stateDigest() !== before) {
+      if (reloadChanged(before, loaded.stateView())) {
         loaded.free?.();
         throw new Error("reload changed the saved state");
       }
