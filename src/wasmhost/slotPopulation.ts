@@ -1,5 +1,6 @@
 import type { WasmModule } from "../dualrun/binding";
 import type { SlotPopulationReader } from "../storage/slotCensus";
+import { runEach } from "./hostFault";
 
 /** How many saves' counts the reader remembers. The dialogs list the autosave
  *  and the manual slots on every open; the memo holds more than those so a
@@ -26,8 +27,14 @@ function hashText(text: string): number {
  * the text's length and hash, so reopening the Saves dialog does not load every
  * tower again (the engine's memory only grows, and it is the memory the live
  * tower runs in). A refused save is not remembered: it throws every time.
+ *
+ * The census runs in the same module as the live tower, so a wasm trap in it (or
+ * in the free behind it, including an abort from an allocation failure inside
+ * wasm) may leave that module corrupt. `onThrow` hears every
+ * throw before it propagates, and boot hands it to the trap path the tick and
+ * the save writer use (#1612); a plain refusal is not a trap and stops nothing.
  */
-export function populationReaderFromModule(mod: Pick<WasmModule, "Engine">): SlotPopulationReader {
+export function populationReaderFromModule(mod: Pick<WasmModule, "Engine">, onThrow?: (error: unknown) => void): SlotPopulationReader {
   const memo = new Map<string, number>();
   return (text) => {
     const key = `${text.length}:${hashText(text)}`;
@@ -37,14 +44,21 @@ export function populationReaderFromModule(mod: Pick<WasmModule, "Engine">): Slo
       memo.set(key, known);
       return known;
     }
-    const engine = mod.Engine.fromSave(text);
-    let population: number;
+    let population = 0;
     try {
-      const stats = JSON.parse(engine.towerStats()) as { population: unknown };
-      if (typeof stats.population !== "number" || !Number.isFinite(stats.population)) throw new Error("The engine reported no population.");
-      population = stats.population;
-    } finally {
-      engine.free();
+      const engine = mod.Engine.fromSave(text);
+      // The free runs whatever the read did, and a trap in either is the one thrown.
+      runEach(
+        () => {
+          const stats = JSON.parse(engine.towerStats()) as { population: unknown };
+          if (typeof stats.population !== "number" || !Number.isFinite(stats.population)) throw new Error("The engine reported no population.");
+          population = stats.population;
+        },
+        () => engine.free(),
+      );
+    } catch (e) {
+      onThrow?.(e);
+      throw e;
     }
     memo.set(key, population);
     if (memo.size > SLOT_MEMO_ENTRIES) {

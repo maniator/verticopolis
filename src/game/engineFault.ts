@@ -9,8 +9,9 @@ import { isEngineTrap } from "../wasmhost/hostFault";
  * is a frame error like any other.
  */
 
-/** Where the trap happened: a frame's step, or the engine's save writer (#1205). */
-export type TrapDuring = "tick" | "save";
+/** Where the trap happened: a frame's step, the engine's save writer (#1205), or the slot population
+ *  reader that loads a save into a short-lived engine in the same module (#1612). */
+export type TrapDuring = "tick" | "save" | "census";
 
 let onTrap: ((error: unknown, during: TrapDuring) => void) | null = null;
 let trapped = false;
@@ -42,7 +43,7 @@ export function engineTrapped(): boolean {
   return trapped;
 }
 
-/** The engine threw `error` in a frame or in its save writer: when it is the
+/** The engine threw `error` in a frame, its save writer or the slot population reader: when it is the
  *  engine's trap, hand it on. True when it was one. */
 export function noteEngineThrow(error: unknown, during: TrapDuring = "tick"): boolean {
   if (!onTrap || !isEngineTrap(error)) return false;
