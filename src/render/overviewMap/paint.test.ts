@@ -198,15 +198,26 @@ describe("paintMapMarks", () => {
     expect(String(big.styleSets[0])).toContain("dots:");
   });
 
-  it("leaves stairs and escalators out of a Classic map, even one that overhangs a floor's end, and draws them in Modern", () => {
-    // A stair may stick out past the end of a floor row (the engine needs structure under one of its tiles),
-    // so this one starts inside the 40-wide floor and ends past it.
-    const at = (m: MapMark, x: number): MapMark => ({ ...m, rect: { ...m.rect, x } });
-    const marks = [mark("floor", 40, 4), at(mark("stairs", 8, 8), 36), mark("escalator", 8, 8), mark("elevatorStandard", 4, 20)];
+  it("leaves stairs and escalators out of a Classic map and draws them in Modern", () => {
+    // The painter skips by kind, wherever the mark is: a stair that sticks out past the end of a
+    // floor row (the engine needs structure under only one of its tiles) leaves nothing in the sky.
+    const marks = [mark("floor", 40, 4), mark("stairs", 8, 8), mark("escalator", 8, 8), mark("elevatorStandard", 4, 20)];
     const classic = fakeCtx();
     expect(paintMapMarks(classic, 60, 30, marks, "classic", plain)).toBe(2);
     expect(classic.styleSets).toEqual(["#cccccc", "#000000"]);
     expect(paintMapMarks(fakeCtx(), 60, 30, marks, "modern", plain)).toBe(4);
+  });
+
+  it("re-resolves an elevator after a skipped stair between two of them, and never asks a skipped kind's style", () => {
+    // Transports keep the draw list's order, so a stairway can sit between two elevators.
+    const asked: string[] = [];
+    const counting: PatternSource = { get: (fill, pattern) => (asked.push(`${pattern}:${fill}`), fill) };
+    const ctx = fakeCtx();
+    const marks = [mark("elevatorStandard", 4, 20), mark("stairs", 8, 8), mark("elevatorStandard", 4, 20)];
+    expect(paintMapMarks(ctx, 60, 30, marks, "classic", counting)).toBe(2);
+    expect(ctx.styleSets).toEqual(["#000000"]);
+    // Only the elevator was ever asked about: once for each of its two runs, patterned and plain.
+    expect(asked.every((a) => a.endsWith("#000000"))).toBe(true);
   });
 
   it("paints an empty list as a cleared map", () => {

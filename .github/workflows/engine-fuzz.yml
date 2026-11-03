@@ -2,8 +2,11 @@ name: engine-fuzz
 
 # Nightly differential fuzz of the two engines: random scenarios grown on the
 # Rust engine, replayed on the TypeScript engine, hashes compared at every
-# checkpoint. Never a pull-request gate; a divergence is pinned as a named
-# scenario in the fix PR.
+# checkpoint. One seed in `wasm_every` is also replayed through the shipped
+# WASM build in Node and compared with the native Rust run, which is how a
+# wasm32-only difference (32-bit usize, float handling in the build) shows.
+# Never a pull-request gate; a divergence is pinned as a named scenario in the
+# fix PR.
 
 on:
   schedule:
@@ -21,6 +24,9 @@ on:
         default: ""
       seed_offset:
         description: "With seed_block: the offset its summary printed. Empty means 0 when seed_block is set, and a block range the nightly run does not use when it is not."
+        default: ""
+      wasm_every:
+        description: "Replay every Nth seed (seed number divisible by N) through the WASM build too; 0 turns the WASM leg off. Empty takes 4."
         default: ""
 
 permissions:
@@ -47,6 +53,9 @@ jobs:
         run: |
           rustup toolchain install 1.97.0 --profile minimal
           rustup default 1.97.0
+      # The shipped build's Node package (engine-rs/pkg/), from the shared
+      # cache and built on a miss with the pinned wasm-bindgen CLI.
+      - uses: ./.github/actions/engine-wasm
       - name: Build the fuzzer
         run: cargo build --locked --release --features conformance --bin fuzz
         working-directory: engine-rs
@@ -56,12 +65,15 @@ jobs:
           ONE: ${{ github.event.inputs.seed }}
           BLOCK: ${{ github.event.inputs.seed_block }}
           OFFSET: ${{ github.event.inputs.seed_offset }}
+          WASM_EVERY: ${{ github.event.inputs.wasm_every }}
           EVENT: ${{ github.event_name }}
           RUN_NUMBER: ${{ github.run_number }}
         run: |
           # Whole numbers only, read as base 10 (a leading zero is not octal).
           num() { case "$1" in ''|*[!0-9]*) echo "$2 must be a whole number, got '$1'" >&2; exit 2;; esac; [ "${#1}" -le 10 ] || { echo "$2 is too long: '$1'" >&2; exit 2; }; echo $(( 10#$1 )); }
           seeds=$(num "$SEEDS" seeds)
+          wasm_every=4
+          [ -z "$WASM_EVERY" ] || wasm_every=$(num "$WASM_EVERY" wasm_every)
           [ "$seeds" -ge 1 ] || { echo "seeds must be a positive whole number"; exit 2; }
           block=$(( $(date +%s) / 86400 ))
           offset=0
@@ -95,32 +107,50 @@ jobs:
           { [ "${#key}" -eq 64 ] && printf '%s' "$key" | grep -Eq '^[0-9a-f]+$'; } || key="unavailable"
           mkdir -p fuzz-out
           echo "key=$key event=$EVENT ref=$GITHUB_REF sha=$GITHUB_SHA" > fuzz-out/window-key.txt
-          engine=""; diverged=""; harness=""
+          engine=""; diverged=""; harness=""; wasmdiv=""; timedout=""; unrun=""
+          # The job limit is 60 minutes and covers the setup steps before this one (a
+          # cache-miss WASM build takes several minutes) and a last seed's three 300 s
+          # steps. A seed that would start after this budget is listed as not run and
+          # the night is red, so a slow runner never ends the job mid-seed with no summary.
+          budget=1800
+          ts_secs=0; wasm_secs=0; wasm_seeds=0; started=$SECONDS
           summary() {
             {
               echo "### engine-fuzz"
               echo "- commit: \`$GITHUB_SHA\`; seeds $first to $last"
               echo "- window key: \`$key\` (event $EVENT, ref $GITHUB_REF)"
-              [ -n "$ONE" ] || echo "- replay this range at this commit: seed_block=$block seed_offset=$offset seeds=$seeds"
+              [ -n "$ONE" ] || echo "- replay this range at this commit: seed_block=$block seed_offset=$offset seeds=$seeds wasm_every=$wasm_every"
+              echo "- WASM leg: $([ "$wasm_every" -gt 0 ] && echo "seeds divisible by $wasm_every" || echo "off") ($wasm_seeds replayed), diverged from native Rust:${wasmdiv:- none}"
+              echo "- time: ${ts_secs} s on the TypeScript compare, ${wasm_secs} s on the WASM leg, $(( SECONDS - started )) s in all"
               echo "- TypeScript and Rust diverged:${diverged:- none}"
               echo "- the fuzzer failed on its own scenario (the Rust engine refused it, or the fuzzer crashed):${engine:- none}"
+              echo "- not run, the ${budget} s budget was spent first:${unrun:- none}"
+              echo "- timed out (300 s per step; a hang in an engine, not a divergence):${timedout:- none}"
               echo "- harness failed (missing or malformed record, bad arguments):${harness:- none}"
             } >> "$GITHUB_STEP_SUMMARY"
           }
           trap summary EXIT
           for seed in $(seq "$first" "$last"); do
+            if [ $(( SECONDS - started )) -gt "$budget" ]; then unrun="$unrun $seed"; continue; fi
             echo "seed $seed"
             code=0
             timeout 300 engine-rs/target/release/fuzz "$seed" fuzz-out 40 || code=$?
             # 101 is a Rust panic (the engine refused a scenario it grew, or the
             # fuzzer crashed); anything else is the harness.
-            case "$code" in 0) ;; 101) engine="$engine $seed"; continue ;; *) harness="$harness $seed"; continue ;; esac
-            code=0
+            case "$code" in 0) ;; 101) engine="$engine $seed"; continue ;; 124) timedout="$timedout $seed"; continue ;; *) harness="$harness $seed"; continue ;; esac
+            code=0; t0=$SECONDS
             timeout 300 npx tsx scripts/fuzz-compare.ts "fuzz-out/fuzz-$seed.json" || code=$?
-            case "$code" in 0) ;; 1) diverged="$diverged $seed" ;; *) harness="$harness $seed" ;; esac
+            ts_secs=$(( ts_secs + SECONDS - t0 ))
+            case "$code" in 0) ;; 1) diverged="$diverged $seed" ;; 124) timedout="$timedout $seed" ;; *) harness="$harness $seed" ;; esac
+            if [ "$wasm_every" -gt 0 ] && [ $(( seed % wasm_every )) -eq 0 ]; then
+              code=0; t0=$SECONDS
+              timeout 300 npx tsx scripts/fuzz-compare.ts --wasm "fuzz-out/fuzz-$seed.json" || code=$?
+              wasm_secs=$(( wasm_secs + SECONDS - t0 )); wasm_seeds=$(( wasm_seeds + 1 ))
+              case "$code" in 0) ;; 1) wasmdiv="$wasmdiv $seed" ;; 124) timedout="$timedout $seed(wasm)" ;; *) harness="$harness $seed(wasm)" ;; esac
+            fi
           done
-          echo "replay one seed with: workflow_dispatch seed=<number>, or locally: cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin fuzz -- <number> out 40 && npx tsx scripts/fuzz-compare.ts out/fuzz-<number>.json"
-          [ -z "$diverged$engine$harness" ]
+          echo "replay one seed with: workflow_dispatch seed=<number> wasm_every=1, or locally: cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin fuzz -- <number> out 40 && npx tsx scripts/fuzz-compare.ts [--wasm] out/fuzz-<number>.json (--wasm needs npm run wasm:build)"
+          [ -z "$diverged$wasmdiv$engine$timedout$unrun$harness" ]
       - name: Keep the scenarios of this run
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

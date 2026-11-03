@@ -32,6 +32,17 @@ describe("seeded differential compare", () => {
     expect(compareRuns(run(), rust)).toMatchObject({ kind: "state", field: "units" });
   });
 
+  it("labels the leg that was compared", () => {
+    const rust = run();
+    rust.details[1].money += 1;
+    const d = compareRuns(run(), rust, "WASM");
+    expect(d && describeDivergence(d, "WASM")).toMatch(/WASM 2000100 vs Rust 2000101/);
+    expect(d && describeDivergence(d)).toMatch(/TypeScript 2000100 vs Rust 2000101/);
+    const bad = run();
+    bad.details.pop();
+    expect(() => compareRuns(bad, run(), "WASM")).toThrow(/^WASM:/);
+  });
+
   it("names a money difference", () => {
     const rust = run();
     rust.details[1].money += 1;
