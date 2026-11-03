@@ -312,6 +312,21 @@ A run proves it measured the commit it names.
 
 ## 4. Runs
 
+**TypeScript baseline arm.** The shipped game is Rust-only, so the TypeScript
+leg of `perf:compare` serves a pinned pre-cutover build (`TS_BASELINE` in
+`src/tests/perfCompare/baseline.ts`: commit `f3304e3f`, app 2.77.5). The run
+checks that commit out into `.perf-ts-baseline/` (a git worktree, so the commit
+must be in the clone: a shallow clone needs `git fetch origin <commit>` first),
+runs `npm ci` there and builds it into `dist-perf-ts/`; the checkout is reused,
+and the install and build repeat on every run without `--skip-build`. The build
+carries a stamp, and `--skip-build` refuses a `dist-perf-ts/` whose stamp,
+`version.json` (version, commit, `switchable` engine build) or `engine/`
+folder (there must be none) does not match the pin. The server overlays the current engine package
+at `/engine`, so the package-load measurements have a package in that origin.
+The two arms therefore differ in app code as well as engine, and the report
+says so in its header, its environment table and its limitations. An A/A pass
+of WASM does not build or serve the baseline.
+
 At least **10 valid paired repetitions** per engine, each in a fresh browser
 process, with the engine order rotated (the harness alternates which engine
 goes first). A failed repetition is re-run and the report says how many were.
@@ -440,8 +455,8 @@ three into warnings, and the report says so at the top.
 
 ## 6. The pass rule (fixed before any verdict run)
 
-On the host that ships (`wasm`, main thread) against `ts`, the same build,
-every desktop metric at both throttles. A speed metric passes only when the
+On the host that ships (`wasm`, main thread) against `ts` (the pinned
+pre-cutover baseline build of section 4), every desktop metric at both throttles. A speed metric passes only when the
 **upper bound** of its paired interval stays within the tolerance. An upper
 bound below 1.0 is "beat". Tolerances come from measured noise (section 6.1),
 never from a number picked to pass.

@@ -134,6 +134,15 @@ describe("loadCheckpoint", () => {
     expect(cp.startedAt).toBe("2026-10-14T00:00:00.000Z");
     expect(cutTo).toBe(Buffer.byteLength(text.slice(0, text.lastIndexOf("\n") + 1)));
   });
+  it("compares the pinned TypeScript baseline, and reads a checkpoint from before it existed as having none", () => {
+    const pin = { commit: "f".repeat(40), appVersion: "2.77.5" };
+    const R0 = JSON.stringify(processRun(0, "ts")) + "\n";
+    expect(() => loadCheckpoint("d", { ...expected, tsBaseline: pin }, files({ [M]: meta, [R]: R0 }))).toThrow(/its tsBaseline differs/);
+    expect(() => loadCheckpoint("d", expected, files({ [M]: JSON.stringify({ ...expected, tsBaseline: pin, startedAt: "x" }), [R]: R0 }))).toThrow(/its tsBaseline differs/);
+    expect(loadCheckpoint("d", { ...expected, tsBaseline: null }, files({ [M]: meta, [R]: R0 })).runs).toHaveLength(1);
+    const pinned = JSON.stringify({ ...expected, tsBaseline: pin, startedAt: "x" });
+    expect(loadCheckpoint("d", { ...expected, tsBaseline: pin }, files({ [M]: pinned, [R]: R0 })).runs).toHaveLength(1);
+  });
   it("refuses a run line that ran another engine than the configuration calls for", () => {
     const aaExpected = { ...expected, config: { ...config, aa: "wasm" as const } };
     const aaMeta = JSON.stringify({ ...aaExpected, startedAt: "x" });

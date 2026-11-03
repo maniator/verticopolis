@@ -265,6 +265,8 @@ export interface CompareResults {
   issue: string;
   config: CompareConfig;
   environment: Environment;
+  /** The pinned pre-cutover build the TypeScript arm ran (baseline.ts), or null for an A/A pass of WASM. Absent in results written before the pin. */
+  tsBaseline?: { commit: string; appVersion: string } | null;
   browser: { version: string | null; headless: boolean; executable: string | null; channel?: string | null; args?: string[]; rendererException?: string | null; rendererExceptionSha256?: string | null; rendererExceptionCommit?: string | null; gpuVerified?: boolean };
   scenarios: { name: string; description: string; sha256: string; population: number; units: number; transports: number; saveBytes: number }[];
   nodeChecks: NodeCheck[];

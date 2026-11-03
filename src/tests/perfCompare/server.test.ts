@@ -106,6 +106,52 @@ describe("startServer", () => {
     }
   });
 
+  it("answers a prefix from the overlay folder alone, and keeps the root build's other files", async () => {
+    const pkg = mkdtempSync(join(tmpdir(), "vc-overlay-"));
+    writeFileSync(join(pkg, "e.wasm"), Buffer.alloc(2048, 9));
+    writeFileSync(join(pkg, "secret.txt"), "x");
+    const other = await startServer(dir, 0, { prefix: "/engine/", dir: pkg });
+    try {
+      // The overlay's e.wasm, not the root build's engine/e.wasm of 4096 bytes.
+      expect((await get(`${other.url}/engine/e.wasm`)).body.length).toBe(2048);
+      expect((await get(`${other.url}/sw.js`)).status).toBe(200);
+      // Neither the overlay nor the root can be escaped through the prefix.
+      expect((await get(`${other.url}/engine/..%2F..%2Findex.html`)).status).toBe(404);
+      expect((await get(`${other.url}/engine/nope.js`)).status).toBe(404);
+      expect((await get(`${other.url}/engine/../index.html`)).status).toBe(200); // the URL parser resolves the dots: the root build's page, not an escape
+      expect((await get(`${other.url}/engine/%2e%2e/index.html`)).status).toBe(200); // the parser reads %2e%2e as dots too
+      expect((await get(`${other.url}/engine/%2e%2e%2f%2e%2e%2fetc%2fpasswd`)).status).toBe(404);
+    } finally {
+      await other.close();
+      rmSync(pkg, { recursive: true, force: true });
+    }
+  });
+
+  it("cannot be escaped into a sibling folder that holds a real file, and never falls back to the root build", async () => {
+    // The overlay sits inside the root build, so ../sw.js is a file that exists one level up from it.
+    mkdirSync(join(dir, "pkg"), { recursive: true });
+    writeFileSync(join(dir, "pkg/in-overlay.js"), "o;");
+    writeFileSync(join(dir, "engine/only-in-root.js"), "r;");
+    const other = await startServer(dir, 0, { prefix: "/engine", dir: join(dir, "pkg") });
+    try {
+      expect((await get(`${other.url}/engine/in-overlay.js`)).status).toBe(200);
+      expect((await get(`${other.url}/engine/..%2Fsw.js`)).status).toBe(404);
+      expect((await get(`${other.url}/engine/only-in-root.js`)).status).toBe(404);
+    } finally {
+      await other.close();
+    }
+  });
+
+  it("refuses a prefix that is not a path and an overlay folder that does not exist", async () => {
+    await expect(startServer(dir, 0, { prefix: "/", dir })).rejects.toThrow(/must be a path/);
+    await expect(startServer(dir, 0, { prefix: "engine", dir })).rejects.toThrow(/must be a path/);
+    await expect(startServer(dir, 0, { prefix: "/engine", dir: join(dir, "missing") })).rejects.toThrow(/does not exist/);
+  });
+
+  it("refuses an overlay that is not a folder", async () => {
+    await expect(startServer(dir, 0, { prefix: "/engine", dir: join(dir, "sw.js") })).rejects.toThrow(/not a folder/);
+  });
+
   it("refuses a directory with no build", async () => {
     await expect(startServer(join(dir, "engine"))).rejects.toThrow(/index.html missing/);
   });

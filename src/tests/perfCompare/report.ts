@@ -125,7 +125,7 @@ export function markdownReport(res: CompareResults): string {
   const out: string[] = [];
   out.push(`# ${aa ? "A/A pass" : "Engine comparison results"}: ${e.commitShort}`, "");
   out.push(
-    `> **Snapshot, not a live figure.** Measured ${res.startedAt ?? "?"} to ${res.generatedAt} on commit \`${e.commit}\`${e.dirty ? " (dirty tree)" : ""} (app ${e.appVersion}), with public main at \`${e.mainCommit ?? "unknown"}\`${e.mainFetched === false ? " as last fetched (the fetch before the run failed)" : ""}.${preThree(e.appVersion) ? " A pre-3.0 baseline of an engine still being cut over (#945), not release performance." : ""} The live number comes from ${aa ? `\`npm run perf:calibrate\` over fresh A/A folders, made by re-running \`npm run perf:compare -- --aa ${aa}\`` : "re-running `npm run perf:compare`"} (src/tests/perfCompare, its tests beside it); this file never refreshes.`,
+    `> **Snapshot, not a live figure.** Measured ${res.startedAt ?? "?"} to ${res.generatedAt} on commit \`${e.commit}\`${e.dirty ? " (dirty tree)" : ""} (app ${e.appVersion}${res.tsBaseline ? `; ${aa ? "both slots" : "the TypeScript arm"} ran the pinned pre-cutover build ${res.tsBaseline.commit.slice(0, 8)}, app ${res.tsBaseline.appVersion}` : ""}), with public main at \`${e.mainCommit ?? "unknown"}\`${e.mainFetched === false ? " as last fetched (the fetch before the run failed)" : ""}.${preThree(e.appVersion) ? " A pre-3.0 baseline of an engine still being cut over (#945), not release performance." : ""} The live number comes from ${aa ? `\`npm run perf:calibrate\` over fresh A/A folders, made by re-running \`npm run perf:compare -- --aa ${aa}\`` : "re-running `npm run perf:compare`"} (src/tests/perfCompare, its tests beside it); this file never refreshes.`,
     "",
   );
   if (aa) {
@@ -145,6 +145,7 @@ export function markdownReport(res: CompareResults): string {
         ...(treeSummary(e.tree, e.dirty) ? [["Working tree", treeSummary(e.tree, e.dirty)!]] : []),
         ["Public main (origin/main as last fetched)", e.mainCommit ? `${e.mainCommit} (merge base ${e.mergeBase ?? "unknown"}; ${e.behindMain === 0 ? "this tree contains it" : `${e.behindMain ?? "?"} commit(s) of it missing here`})` : "unknown"],
         ["App version", e.appVersion],
+        ...(res.tsBaseline ? [["TypeScript baseline", `${res.tsBaseline.commit} (app ${res.tsBaseline.appVersion}, pinned pre-cutover build)`]] : []),
         ["OS", `${e.os} (kernel ${e.kernel}, ${e.arch})`],
         ["CPU", `${e.cpuModel}, ${e.logicalCpus} logical CPUs`],
         ["Memory", fmt(e.totalMemoryBytes, "bytes")],
@@ -226,7 +227,7 @@ export function markdownReport(res: CompareResults): string {
     ]));
     if (res.toolingBundleTotals) {
       const d = res.toolingBundleTotals.game.brotli - t.game.brotli;
-      out.push("", `The timed runs used the VC_TOOLING=1 build of the same sources; its game files are ${fmt(res.toolingBundleTotals.game.brotli, "bytes")} Brotli (${d >= 0 ? "+" : ""}${fmt(d, "bytes")} against the production build above).`);
+      out.push("", `The timed runs of the current build used the VC_TOOLING=1 build of the same sources; its game files are ${fmt(res.toolingBundleTotals.game.brotli, "bytes")} Brotli (${d >= 0 ? "+" : ""}${fmt(d, "bytes")} against the production build above).`);
     }
     out.push("", `Precache: ${res.bundle.precache.entries} entries, ${fmt(res.bundle.precache.raw, "bytes")} raw, ${fmt(res.bundle.precache.brotli, "bytes")} Brotli.`);
     if (res.bundle.wasm) {

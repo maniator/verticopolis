@@ -4,7 +4,7 @@ import { adoptScenario, cpuProbe, digestStashed, installEngineBootProbe, install
 import { trackContextLoss } from "./contextLoss";
 import { audioStatus, measureFrames, startAudio, type FrameRun } from "./pageFrames";
 import { simRun, type SimRun } from "./pageSim";
-import type { PerfServer, ServedRequest } from "./server";
+import { serverFor, type PerfServer, type ServedRequest } from "./server";
 import { launchOptions, type BrowserLaunch } from "./renderer";
 import { autosaveSeed, autosaveState, bootedTower } from "./savedStart";
 import { eachScenarioFresh } from "./scenarioPages";
@@ -35,7 +35,7 @@ import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun
  */
 
 export interface RunnerOptions {
-  server: PerfServer;
+  servers: Partial<Record<EngineName, PerfServer>>; // Rust: the current timed build. TypeScript: the pinned baseline (baseline.ts).
   config: CompareConfig;
   scenarios: Scenario[];
   executablePath: string | null;
@@ -206,8 +206,8 @@ async function memoryPass(page: Page, cdp: CDPSession, opts: RunnerOptions, engi
 }
 
 export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineName, order: number): Promise<ProcessRun> {
-  const { server, config, scenarios, log } = opts;
-  const engine = config.aa ?? slot;
+  const { config, scenarios, log, servers } = opts;
+  const engine = config.aa ?? slot, server = serverFor(servers, engine);
   const run: ProcessRun = {
     rep,
     engine: slot,
@@ -399,7 +399,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
       error: e instanceof Error ? e.message : String(e),
     }));
     sink.side = null;
-    run.coldSaved = await savedStarts(browser, opts, url, engine, run.page?.webgl?.renderer ?? null, listen, sink);
+    run.coldSaved = await savedStarts(browser, opts, server, url, engine, run.page?.webgl?.renderer ?? null, listen, sink);
     for (const [name, r] of Object.entries(run.coldSaved)) log(`  rep ${rep} ${slot} ${name} saved tower: ${r.sample ? `cold ready ${r.sample.gameReadyMs?.toFixed(0)} ms` : `no sample (${r.error})`}`);
   }
   // The package's load in a blank page (#1005), after everything else.
@@ -413,7 +413,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
  *  scenario, a fresh context (fresh HTTP cache, this process) at 1x whose
  *  autosave slot holds the scenario's save. A failed check leaves that
  *  scenario's row without a sample from this repetition and fails nothing. */
-async function savedStarts(browser: Browser, opts: RunnerOptions, url: string, engine: EngineName, startRenderer: string | null, listen: (p: Page) => void, sink: { side: string[] | null }): Promise<Record<string, SavedStart>> {
+async function savedStarts(browser: Browser, opts: RunnerOptions, server: PerfServer, url: string, engine: EngineName, startRenderer: string | null, listen: (p: Page) => void, sink: { side: string[] | null }): Promise<Record<string, SavedStart>> {
   const out: Record<string, SavedStart> = {};
   for (const sc of opts.scenarios) {
     const row: SavedStart = { sample: null, error: null, seedSha256: "", renderer: null, pageErrors: [], contextLost: [] };
@@ -423,10 +423,10 @@ async function savedStarts(browser: Browser, opts: RunnerOptions, url: string, e
     try {
       const seed = autosaveSeed(sc);
       row.seedSha256 = seed.sha256;
-      ctx = await newContext(browser, opts.config, "block", (line) => row.contextLost.push(line), autosaveState(opts.server.url, seed));
+      ctx = await newContext(browser, opts.config, "block", (line) => row.contextLost.push(line), autosaveState(server.url, seed));
       const page = await ctx.newPage();
       listen(page);
-      const s = await within("saved-tower start", startup(page, opts.server, () => page.goto(url, { waitUntil: "commit" })), 5 * 60_000);
+      const s = await within("saved-tower start", startup(page, server, () => page.goto(url, { waitUntil: "commit" })), 5 * 60_000);
       if (s.sample.engineActive !== engine) throw new Error(`requested the ${engine} engine but ${s.sample.engineActive} is active`);
       if (engine === "wasm" && !(s.sample.engineHostedMs !== null && s.sample.gameReadyMs !== null && s.sample.engineHostedMs <= s.sample.gameReadyMs)) throw new Error(`the engine was not hosted by the time the game was ready (hosted ${s.sample.engineHostedMs ?? "never"}, ready ${s.sample.gameReadyMs ?? "never"})`);
       // The boot must have loaded the seeded tower, or the row times an empty one.
