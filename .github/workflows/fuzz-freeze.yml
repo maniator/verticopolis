@@ -16,10 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # The merge result: the key is computed on what main would become.
+      # The merge result: the key is computed on what main would become. One
+      # commit is enough; the base branch tip is fetched below. A full-history
+      # checkout (fetch-depth: 0) pulls every branch and tag, which on this
+      # repository ran past its timeout in the Rust engine workflow.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
@@ -32,6 +33,7 @@ jobs:
           set -euo pipefail
           # The base branch must resolve, or the guard cannot decide (no silent "no base").
           base="origin/${BASE_REF}"
+          git fetch --no-tags --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
           git rev-parse --verify --quiet "${base}^{commit}" > /dev/null || { echo "::error::${base} is not fetched"; exit 3; }
           # The marker on the base branch: empty only when the base has no marker file yet.
           if git cat-file -e "${base}:conformance/fuzz-window.json"; then
