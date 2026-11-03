@@ -36,6 +36,11 @@ fn a_real_file_loads_and_an_unstamped_one_is_a_founders_tower() {
     let sim = import_vctower(&file).expect("loads");
     assert!(sim.founder, "no appVersion stamp: a founder's tower");
     // The page's trailing newline and an editor's re-wrapped lines are fine.
+    // A version 6 file goes through the full reader, not the streamed one.
+    let mut old = tower();
+    old["version"] = json!(6);
+    let old_file = String::from_utf8(encode_vctower(&old).expect("packs")).expect("text");
+    assert!(import_vctower(&old_file).expect("loads").founder);
     let wrapped = file.replace('\n', "\r\n  ");
     assert!(import_vctower(&wrapped).is_ok());
 }
@@ -75,6 +80,8 @@ fn a_damaged_file_is_told_apart_from_a_crafted_or_wrong_one() {
         "VCTOWER1".to_string(),
         truncated,
         file_of(b"\xff\xfe not json"),
+        file_of(br#"{"minutes":0,"units":[]} trailing"#),
+        file_of(br#"{"minutes":0,"units":[}"#),
         file_of(b""),
     ] {
         assert_eq!(refusal(&text), DAMAGED_FILE, "{text:?}");
@@ -123,4 +130,27 @@ fn the_loaders_own_refusals_pass_through() {
     newer["version"] = json!(999);
     let file = String::from_utf8(encode_vctower(&newer).expect("packs")).expect("text");
     assert_eq!(refusal(&file), crate::load::NEWER_SAVE_REFUSAL);
+}
+
+#[test]
+fn a_file_text_past_the_cap_is_refused_before_it_is_read() {
+    let huge = format!("{TOWER_FILE_MAGIC}\n{}", "A".repeat(49 * 1024 * 1024));
+    assert_eq!(refusal(&huge), TOO_LARGE_FILE);
+}
+
+#[test]
+fn a_byte_order_mark_and_loose_base64_still_load_and_bad_text_in_a_string_is_damaged() {
+    let json = br#"{"version":7,"mode":"classic","minutes":0,"units":[]}"#;
+    let mut with_bom = b"\xEF\xBB\xBF".to_vec();
+    with_bom.extend_from_slice(json);
+    assert!(import_vctower(&file_of(&with_bom)).is_ok(), "a leading BOM");
+    // The reader skips characters outside the alphabet and takes the URL-safe one.
+    let file = file_of(json);
+    let (magic, body) = file.trim().split_once('\n').expect("two lines");
+    let stray = format!("{magic}\n{}!{}\n", &body[..10], &body[10..]);
+    assert!(import_vctower(&stray).is_ok(), "a stray character");
+    let url_safe = format!("{magic}\n{}\n", body.replace('+', "-").replace('/', "_"));
+    assert!(import_vctower(&url_safe).is_ok(), "the URL-safe alphabet");
+    let bad_string = b"{\"minutes\":0,\"units\":[],\"name\":\"\xff\"}";
+    assert_eq!(refusal(&file_of(bad_string)), DAMAGED_FILE);
 }

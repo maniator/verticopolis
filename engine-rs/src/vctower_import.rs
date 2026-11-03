@@ -19,6 +19,10 @@ pub const NEWER_FILE_REFUSAL: &str =
 pub const DAMAGED_FILE: &str = "This tower file is damaged and can't be read.";
 /// The file inflates past the size cap.
 pub const TOO_LARGE_FILE: &str = "This tower file is too large to open safely.";
+/// The most file text the engine takes: the inflate cap (32 MiB) as base64
+/// is under 43 MiB, so a longer text cannot be a tower this game saved. The
+/// check keeps a huge pick from growing the engine's memory.
+const MAX_FILE_TEXT_BYTES: usize = 48 * 1024 * 1024;
 /// The contents are JSON but have no clock or no units list.
 pub const NOT_A_TOWER_SAVE: &str = "Not a valid tower save file.";
 
@@ -27,6 +31,9 @@ pub const NOT_A_TOWER_SAVE: &str = "Not a valid tower save file.";
 /// the save, then the loader's own refusals (a save from a newer build, a
 /// `null` save, too many units), which are passed through unchanged.
 pub fn import_vctower(text: &str) -> Result<Simulation, String> {
+    if text.len() > MAX_FILE_TEXT_BYTES {
+        return Err(TOO_LARGE_FILE.into());
+    }
     let trimmed = js_trim(text);
     let family = container_family(trimmed).ok_or(NOT_A_TOWER_FILE)?;
     if family != TOWER_FILE_MAGIC {
