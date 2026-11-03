@@ -35,9 +35,11 @@ const FACTS: ScheduleFacts = {
   homeFloors: [1, 1, 1, 1],
 };
 
-/** An engine that keeps the homes it is handed on served floors and, as the
- *  real one does, answers one home per car with the base lobby for any car the
- *  draft lists none for. */
+/** An engine for a shaft that serves every floor (see `stops`), so the homes
+ *  it is handed already sit on served floors and come back as they are. It
+ *  answers one home per car, with the base lobby for any car the draft lists
+ *  none for, as the real one does. It does not snap: the engine's own tests
+ *  cover that. */
 const echoHomes = (): ScheduleDialogCtx["facts"] => (draft) => ({
   ...FACTS,
   homeFloors: FACTS.homeFloors.map((base, i) => draft.homeFloors?.[i] ?? base),
