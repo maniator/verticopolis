@@ -87,11 +87,11 @@ describe.skipIf(!hasWasmPackage())("the Rust schedule facts and presets match th
       }
     });
 
-    it(`${mode}: every preset on 1, 2 and 8 cars, each shaft kind`, () => {
+    it(`${mode}: every preset on 1, 2, 3 and 8 cars, each shaft kind`, () => {
       const f = tower(mode);
       const kinds = [f.standard, f.service, f.express] as const;
       let available = 0;
-      for (const cars of [1, 2, 8]) {
+      for (const cars of [1, 2, 3, 8]) {
         for (const id of kinds) f.sim.tower.setCars(id, cars);
         const rust = wasm().Engine.fromSave(JSON.stringify(f.sim.serialize())) as unknown as RustPort;
         try {
@@ -108,7 +108,7 @@ describe.skipIf(!hasWasmPackage())("the Rust schedule facts and presets match th
         }
       }
       // Classic answers only the staging play; Modern answers all four.
-      expect(available).toBe(mode === "classic" ? 9 : 36);
+      expect(available).toBe(mode === "classic" ? 12 : 48);
     });
 
     it(`${mode}: stairs, missing ids, unknown names and unreadable drafts`, () => {

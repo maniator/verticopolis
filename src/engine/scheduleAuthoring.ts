@@ -73,12 +73,29 @@ function upTowerTarget(ctx: ShaftContext): number {
 
 /** Split the fleet: the lower half homes at the base lobby, the upper half up-tower
  *  (see {@link upTowerTarget}), staged for the evening down-rush. The one-press
- *  "stage upper half up-tower" play, as a preset seed. */
+ *  "stage upper half up-tower" play keeps this plain split. */
 function splitStaging(ctx: ShaftContext): number[] {
+  return stagedHomes(ctx, Math.floor(ctx.cars / 2), upTowerTarget(ctx));
+}
+
+/** The first `lobbyCars` cars home at the base lobby, the rest at `up`. */
+function stagedHomes(ctx: ShaftContext, lobbyCars: number, up: number): number[] {
   const base = baseLobby(ctx);
-  const up = upTowerTarget(ctx);
-  const lower = Math.floor(ctx.cars / 2);
-  return Array.from({ length: ctx.cars }, (_, i) => (i < lower ? base : up));
+  return Array.from({ length: ctx.cars }, (_, i) => (i < lobbyCars ? base : up));
+}
+
+/** The split a preset or Auto-tune seeds: the same split, except that a one-car
+ *  shaft keeps its only car at the base lobby so the lobby up-rush has a staged
+ *  car (#1634). The one-press play keeps {@link splitStaging} as is, since the
+ *  player asked for it. */
+function seedLobbyCars(cars: number): number {
+  return cars === 1 ? 1 : Math.floor(cars / 2);
+}
+
+/** The home floors the one-press "stage upper half up-tower" play sets: the plain
+ *  split, held to the shaft's span. */
+export function stageUpTowerHomes(ctx: ShaftContext): number[] {
+  return coerceSchedule({ homeFloors: splitStaging(ctx) }, ctx.cars, ctx.bottom, ctx.top)?.homeFloors ?? [];
 }
 
 /** Auto-tune's staging seed (#465): the split, but with the up-tower half AIMED
@@ -87,11 +104,9 @@ function splitStaging(ctx: ShaftContext): number[] {
  *  are fixed intents, not measurements. */
 function aimedStaging(ctx: ShaftContext): number[] {
   const aim = ctx.peakOriginFloor;
-  if (aim === undefined || aim <= baseLobby(ctx)) return splitStaging(ctx);
-  const base = baseLobby(ctx);
-  const up = Math.max(ctx.bottom, Math.min(ctx.top, aim));
-  const lower = Math.floor(ctx.cars / 2);
-  return Array.from({ length: ctx.cars }, (_, i) => (i < lower ? base : up));
+  const aimed = aim !== undefined && aim > baseLobby(ctx);
+  const up = aimed ? Math.max(ctx.bottom, Math.min(ctx.top, aim)) : upTowerTarget(ctx);
+  return stagedHomes(ctx, seedLobbyCars(ctx.cars), up);
 }
 
 /** All cars home at one floor. */
@@ -123,7 +138,7 @@ export function presetSchedule(preset: SchedulePreset, ctx: ShaftContext): Eleva
       return half(cars);
     });
     weekend = fullRow(half(cars)); // the midday-half curve all weekend
-    homeFloors = splitStaging(ctx);
+    homeFloors = stagedHomes(ctx, seedLobbyCars(ctx.cars), upTowerTarget(ctx));
   } else if (preset === "balanced") {
     // A daytime hump: full 08:00-18:00, half the shoulders, skeleton overnight; all
     // cars home at the base lobby. The safe default.

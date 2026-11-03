@@ -4,6 +4,7 @@ import {
   recommendedPreset,
   autoTuneSchedule,
   scheduleAdvice,
+  stageUpTowerHomes,
   stagingSummary,
   type ShaftContext,
 } from "./scheduleAuthoring";
@@ -35,6 +36,16 @@ describe("presetSchedule", () => {
     expect(s.activeCars?.weekday?.[3]).toBe(2); // overnight skeleton
     // Lower half homes at the base lobby (1), upper half up-tower (the top lobby, 30).
     expect(s.homeFloors).toEqual([1, 1, 1, 30, 30, 30]);
+  });
+
+  it("Rush keeps a one-car shaft's only car at the base lobby and a three-car fleet's first car there (#1634)", () => {
+    expect(presetSchedule("rush", { ...CTX, cars: 1 }).homeFloors).toEqual([1]);
+    expect(presetSchedule("rush", { ...CTX, cars: 3 }).homeFloors).toEqual([1, 30, 30]);
+  });
+
+  it("the one-press stage-up-tower play keeps the plain split, so a one-car shaft goes up-tower (#1634)", () => {
+    expect(stageUpTowerHomes({ ...CTX, cars: 1 })).toEqual([30]);
+    expect(stageUpTowerHomes(CTX)).toEqual([1, 1, 1, 30, 30, 30]);
   });
 
   it("Balanced runs the full fleet through the day and homes all at the base lobby", () => {
@@ -95,6 +106,16 @@ describe("autoTuneSchedule", () => {
     expect(seeded.homeFloors).toEqual([1, 1, 1, 30, 30, 30]); // seeded split
     const authored = autoTuneSchedule({ homeFloors: [15, 15, 15, 15, 15, 15] }, { ...CTX, hourly: { weekday: rushCurve() } })!;
     expect(authored.homeFloors).toEqual([15, 15, 15, 15, 15, 15]); // preserved
+  });
+
+  it("seeds a one-car shaft's only car at the base lobby (#1634)", () => {
+    const ctx = { ...CTX, cars: 1, hourly: { weekday: rushCurve() } };
+    expect(autoTuneSchedule(undefined, ctx)!.homeFloors).toEqual([1]);
+  });
+
+  it("keeps a one-car shaft's only car at the lobby even when the busiest floor is up-tower (#1634)", () => {
+    const ctx = { ...CTX, cars: 1, hourly: { weekday: rushCurve() }, peakOriginFloor: 22 };
+    expect(autoTuneSchedule(undefined, ctx)!.homeFloors).toEqual([1]);
   });
 
   it("returns the current schedule unchanged when there is no measured history", () => {

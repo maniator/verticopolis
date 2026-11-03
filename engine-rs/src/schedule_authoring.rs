@@ -164,15 +164,15 @@ fn peak_origin_floor(totals: &IndexMap<i64, f64>, served: &[i64]) -> Option<i64>
     }
 }
 
-/// The staging seed: the lower half of the fleet at the base lobby, the upper
-/// half up-tower, aimed at the busiest measured boarding floor when it sits
-/// above the base.
+/// The staging seed: the lower half of the fleet at the base lobby (the only
+/// car of a one-car shaft included), the upper half up-tower, aimed at the
+/// busiest measured boarding floor when it sits above the base.
 fn seeded_homes(geo: &ShaftGeometry, aim: Option<i64>) -> Vec<i64> {
     let up = match aim {
         Some(a) if a > geo.base_lobby() => a.clamp(geo.bottom, geo.top),
         _ => geo.up_tower_target(),
     };
-    geo.split_homes(up)
+    geo.seeded_homes(up)
 }
 
 impl Simulation {

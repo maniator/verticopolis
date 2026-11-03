@@ -56,7 +56,7 @@ telemetry and context.
 | # | Measure | Source | Denominator | Window | Limits | Status | Release evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Engine fault rate (sessions) | `engine_status` page lives, `engine-reliability.mjs` | Sessions with a settled page life that ran the engine (N) | Any; the candidate-build tail is the evidence | Needs a `settle` row, so a tab that dies during load is not in N. Sessions that never report can sit in the numerator or the denominator, so the rate has unknown bias. The exact 95% upper bound holds for the observed sample only, and sessions are not independent, so it is optimistic | Fault count: lower bound. Fault rate: **coverage-limited rate** | **Yes**, as an observed rate with its bound, never as a lower bound or a proven rate |
-| 2 | Engine faults by reason and by build | Same | Same | Same | A lone `boot-error` cannot be split between a real fault and files that did not arrive whole (#1086 shapes 1 and 2) | Counts: lower bound; rates: coverage-limited; reason partly ambiguous | **Yes**, triaged one by one |
+| 2 | Engine faults by reason and by build | Same | Same | Same | A lone `boot-error` cannot be split between a real fault and files that did not arrive whole. By design (#1086, closed): a 404 or `TypeError` at the glue import, and a web page served where an engine file belongs, stay `boot-error`. Triage reads a `boot-error` spike right after a deploy as the deploy race, not an engine fault | Counts: lower bound; rates: coverage-limited; reason partly ambiguous | **Yes**, triaged one by one |
 | 3 | Engine initialization failure | `engine_status` `fallback_reason` `boot-error`, `fallback_stage` | N | Same | A boot that throws before the game exists sends no row; `$exception` may report it. Browsers that block the relay send nothing | Count: lower bound. Rate: coverage-limited (inside row 1) | **Yes**, inside row 1 |
 | 4 | Package mismatch and unverifiable engine files | `engine_status` `package-mismatch`, `unverifiable` | N | Same | Deploy race and browsers without `crypto.subtle`; deliberately outside the fault rate and printed on their own lines | Accurate for what reports | Reported, never counted as faults |
 | 5 | WASM traps while running | `engine_status` `trap-command`, `trap-tick`, `trap-undo`, `crash-reload` | N | Same | Zero traps seen means zero reported, not zero happened: a tab killed by the trap before the row sends nothing. The reload path is exercised by the forced-trap E2E spec, not by production traffic so far | Count: lower bound; Insufficient evidence at current volume | **Yes**; any trap is a stop signal |
@@ -163,7 +163,6 @@ code, not as a substitute for the script run with the API key.
 - Save, load and import failure events: #1533 (the three `app_action` codes
   were approved 2026-11-03 and ship with this page's change).
 - Trap during attach and older restore points: #1204.
-- Deploy-race shapes still coded as `boot-error`: #1086.
 - Crash loop magnitude: #841.
 - `$exception` origin classification and the "no data" reading for builds
   with no eligible sessions: #1090.

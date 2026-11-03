@@ -9,7 +9,7 @@ import type { Transport, Unit } from "../types";
 import { scheduleFromSlots, scheduleSlots } from "../../simport/scheduleSlots";
 import type { AutoTuneProposal, PresetProposal, ScheduleFacts } from "../../simport/enginePort";
 import { coerceSchedule, type ElevatorSchedule, type HourlyByDay } from "../elevatorSchedule";
-import { autoTuneSchedule, presetSchedule, recommendedPreset, scheduleAdvice, stagingSummary, type ShaftContext } from "../scheduleAuthoring";
+import { autoTuneSchedule, presetSchedule, recommendedPreset, scheduleAdvice, stageUpTowerHomes, stagingSummary, type ShaftContext } from "../scheduleAuthoring";
 import { dayOriginTotals, peakOriginFloor, type OriginRings } from "../scheduleOrigins";
 import { BATCH_SLOTS, batchTarget } from "./commands";
 import { KIND_CODES, UNIT_STATE_CODES, VIEW_LAYOUT, codeOf, kindOf } from "./layout";
@@ -431,7 +431,7 @@ const PRESET_NAMES: ReadonlySet<string> = new Set(["rush", "balanced", "feeder",
 /**
  * The TypeScript reference for `EnginePort.schedulePreset`: the rows and homes
  * a named preset sets (`engine-rs/src/schedule_presets.rs`). `stage-up-tower`
- * is the Rush split staging alone, offered in both modes.
+ * is the plain split staging alone (a one-car shaft goes up-tower, unlike Rush), offered in both modes.
  */
 export function referencePreset(shaft: ShaftFacts, name: string): PresetProposal {
   const none = (status: PresetProposal["status"]): PresetProposal => ({ status, weekday: null, weekend: null, homeFloors: [] });
@@ -440,11 +440,13 @@ export function referencePreset(shaft: ShaftFacts, name: string): PresetProposal
   if (!stageOnly && !shaft.modern) return none("unavailable-in-mode");
   if (shaft.cars <= 0) return none("no-cars");
   const cold = day(undefined);
-  const built = presetSchedule(stageOnly ? "rush" : (name as "rush" | "balanced" | "feeder"), shaftContext(shaft, cold, cold));
+  const ctx = shaftContext(shaft, cold, cold);
+  if (stageOnly) return { status: "available", weekday: null, weekend: null, homeFloors: stageUpTowerHomes(ctx) };
+  const built = presetSchedule(name as "rush" | "balanced" | "feeder", ctx);
   return {
     status: "available",
-    weekday: stageOnly ? null : (built.activeCars?.weekday ?? null),
-    weekend: stageOnly ? null : (built.activeCars?.weekend ?? null),
+    weekday: built.activeCars?.weekday ?? null,
+    weekend: built.activeCars?.weekend ?? null,
     homeFloors: built.homeFloors ?? [],
   };
 }
