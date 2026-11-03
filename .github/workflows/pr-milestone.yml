@@ -4,9 +4,9 @@ name: Milestone pull requests
 # _bmad-output/implementation-artifacts/backlog.md). A pull request takes the
 # milestone of the issue it closes ("Closes #123" and the other closing words in
 # its description). A pull request that closes no issue, or only issues still in
-# Triage, goes to the current release milestone below. It never overwrites a
-# milestone a person already set, and it reads the live state again right before
-# writing. This also gives issue-milestone.yml a milestone to copy when a pull
+# Triage or Backlog, goes to the current release milestone below. It never
+# overwrites a milestone a person already set, and it reads the live state
+# again right before writing. This also gives issue-milestone.yml a milestone to copy when a pull
 # request closes an issue that had none.
 #
 # Change CURRENT_RELEASE when a release ships and the next one opens.
@@ -49,11 +49,11 @@ jobs:
           # The first issue this pull request closes that has a real milestone.
           target=""
           for n in $(printf '%s' "$PR_BODY" \
-              | grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?)[: ]+#[0-9]+' \
-              | grep -oE '[0-9]+' | awk '!seen[$0]++'); do
+              | grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[: ]+#[0-9]+' \
+              | grep -oE '[0-9]+' | awk '!seen[$0]++' | head -n 20); do
             m=$(gh api "repos/${GH_REPO}/issues/${n}" --jq '.milestone.number // empty' 2>/dev/null || true)
             title=$(jq -r --arg m "${m:-0}" '.[] | select((.number | tostring) == $m) | .title' <<<"$milestones")
-            if [ -n "$m" ] && [ "$title" != "Triage" ]; then
+            if [ -n "$m" ] && [ "$title" != "Triage" ] && [ "$title" != "Backlog" ]; then
               target=$m
               echo "PR #${PR} closes #${n}, milestone ${m} (${title})."
               break

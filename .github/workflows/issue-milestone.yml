@@ -9,14 +9,15 @@ name: Milestone new and closed issues
 # usual two-step create) wins.
 #
 # A closed issue is not left in Triage unflagged either, and it does not all go
-# to one place. If an issue is closed while it is still in Triage (or has no milestone
-# at all):
+# to one place. If an issue is closed while it is still in Triage or Backlog (or
+# has no milestone at all):
 #   - closed by a merged pull request: it takes that pull request's milestone
 #     (finished work belongs with the release the pull request shipped in);
 #   - otherwise (closed as not planned or a duplicate, or the pull request has
 #     no milestone either): the workflow cannot tell where it belongs, so it
-#     stays in Triage with the needs-triage label and a comment asking a person
-#     to pick the milestone it would have had. It never goes to Backlog.
+#     moves to (or stays in) Triage with the needs-triage label and a comment
+#     asking a person to pick the milestone it would have had. It never goes
+#     to Backlog.
 on:
   issues:
     types: [opened, closed]
@@ -63,13 +64,13 @@ jobs:
           fi
           gh api -X PATCH "repos/${GH_REPO}/issues/${ISSUE}" -F milestone="$triage" --silent
           echo "Issue #${ISSUE} had no milestone; set Triage (${triage})."
-      - name: Place an issue closed in Triage or with no milestone
+      - name: Place an issue closed in Triage, Backlog or with no milestone
         if: github.event.action == 'closed'
         run: |
           set -euo pipefail
           issue=$(gh api "repos/${GH_REPO}/issues/${ISSUE}")
           title=$(jq -r '.milestone.title // empty' <<<"$issue")
-          if [ -n "$title" ] && [ "$title" != "Triage" ]; then
+          if [ -n "$title" ] && [ "$title" != "Triage" ] && [ "$title" != "Backlog" ]; then
             echo "Issue #${ISSUE} closed in milestone '${title}'; nothing to do."
             exit 0
           fi
@@ -77,13 +78,13 @@ jobs:
           # The merged pull request that closed it: a merged pull request that
           # mentions this issue and merged within two minutes before the close
           # (the close fires on the merge). Its milestone is the answer, when it
-          # has one that is not Triage.
+          # has one that is not Triage or Backlog.
           pr_milestone=$(gh api --paginate "repos/${GH_REPO}/issues/${ISSUE}/timeline?per_page=100" \
             | jq -r --arg closed "$closed_at" '
                 .[] | select(.event == "cross-referenced") | .source.issue
                 | select(.pull_request.merged_at != null)
                 | select((($closed | fromdateiso8601) - (.pull_request.merged_at | fromdateiso8601)) | . >= -5 and . <= 120)
-                | .milestone.title // empty | select(. != "Triage")')
+                | .milestone.title // empty | select(. != "Triage" and . != "Backlog")')
           pr_milestone=${pr_milestone%%$'\n'*}
           if [ -n "$pr_milestone" ]; then
             target=$(gh api "repos/${GH_REPO}/milestones?state=all&per_page=100" \
@@ -97,7 +98,7 @@ jobs:
             fi
           fi
           # Cannot decide: keep it findable in Triage and flag it for a person.
-          if [ -z "$title" ]; then
+          if [ -z "$title" ] || [ "$title" = "Backlog" ]; then
             triage=$(gh api "repos/${GH_REPO}/milestones?state=open&per_page=100" --jq 'first(.[] | select(.title == "Triage") | .number)')
             if [ -z "$triage" ]; then
               echo "::error::No open milestone named Triage."
