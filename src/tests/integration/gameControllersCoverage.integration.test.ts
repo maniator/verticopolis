@@ -669,6 +669,55 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(announced.length).toBe(spoken);
   });
 
+  it("the schedule dialog's Auto-tune asks the engine live: a preview writes nothing and Save is the one undo step", async () => {
+    lift.cars = 4;
+    sel = { type: "transport", id: lift.id };
+    render(transportEditor(sim, lift), root);
+    await editor.handleEditAction("schedule", root);
+    const dlg = scheduleDlg!;
+    undo = { captures: [], commits: 0 };
+    // Classic offers no proposal, but still reports what has been measured.
+    sim.elevatorHourly.set(lift.id, { weekday: Array(24).fill(0.5), weekend: Array<number>(24).fill(0) });
+    const classic = dlg.ctx.autoTune({}, false);
+    expect(classic.status).toBe("unavailable-in-mode");
+    expect(classic.weekday.warm).toBe(true);
+    expect(classic.proposal).toBeNull();
+    sim.elevatorHourly.delete(lift.id);
+    // The rest runs as a Modern tower (this suite's tower is Classic).
+    Object.defineProperty(sim, "mode", { value: "modern", configurable: true }); // a fresh sim per test
+    // Cold: the engine says so, with each day's sampled hours.
+    const cold = dlg.ctx.autoTune({}, false);
+    expect(cold.status).toBe("insufficient-data");
+    expect(cold.weekday).toEqual({ warm: false, sampledHours: 0, curve: null });
+    // Measured traffic arrives while the dialog is open: the next ask sees it.
+    const rings = { weekday: Array<number>(24).fill(0), weekend: Array<number>(24).fill(0) };
+    for (const h of [7, 8, 9, 12, 17, 18]) rings.weekday[h] = h === 8 ? 1 : 0.5;
+    sim.elevatorHourly.set(lift.id, rings);
+    const preview = dlg.ctx.autoTune({}, false);
+    expect(preview.status).toBe("available");
+    expect(preview.weekday.warm).toBe(true);
+    expect(preview.weekend.warm).toBe(false);
+    expect(preview.weekday.curve).toEqual(rings.weekday); // the ring the engine tuned from
+    expect(preview.weekend.curve).toBeNull();
+    expect(preview.proposal!.weekday![8]).toBe(4);
+    expect(preview.proposal!.weekend).toBeNull();
+    // Previewing changed nothing: no schedule, no undo step, no refresh.
+    expect(lift.schedule).toBeUndefined();
+    expect(undo).toEqual({ captures: [], commits: 0 });
+    // Saving the previewed rows is the ordinary write, one undo step.
+    await dlg.cb.apply({
+      activeCars: { weekday: [...preview.proposal!.weekday!], weekend: Array(24).fill(4) },
+      waitingCarResponse: 0,
+      standardFloorDeparture: 48,
+      homeFloors: [...preview.proposal!.homeFloors],
+    });
+    expect(lift.schedule!.activeCars?.weekday?.[8]).toBe(4);
+    expect(undo).toEqual({ captures: ["Set elevator schedule"], commits: 1 });
+    // The saved schedule is now the draft's own row for the cold weekend.
+    const again = dlg.ctx.autoTune({ activeCars: { weekend: Array(24).fill(3) } }, true);
+    expect(again.proposal!.weekend).toEqual(Array(24).fill(3));
+  });
+
   it("schedule on a non-elevator transport (stairs) does nothing", async () => {
     sel = { type: "transport", id: stairs.id };
     render(transportEditor(sim, stairs), root);

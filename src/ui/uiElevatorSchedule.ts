@@ -2,9 +2,10 @@ import type { UI } from "./UI";
 import { render } from "lit-html";
 import { elevatorScheduleTemplate, floorLabel, type FloorRow, type SchedCtx, type SchedState, type SchedHandlers } from "./templates/elevatorSchedule";
 import { SCHEDULE_HOURS, type ElevatorSchedule, type ElevatorScheduleUX } from "../engine/elevatorSchedule";
-import { ORIGIN_HOURS, dayOriginTotals, peakOriginFloor, topOriginFloors, type OriginRings } from "../engine/scheduleOrigins";
+import { ORIGIN_HOURS, topOriginFloors, type OriginRings } from "../engine/scheduleOrigins";
+import type { AutoTuneProposal } from "../simport/enginePort";
 import { hh, fmtHours, originClause } from "./scheduleFormat";
-import { presetSchedule, autoTuneSchedule, scheduleAdvice, stagingSummary, recommendedPreset, type ShaftContext, type SchedulePreset } from "../engine/scheduleAuthoring";
+import { presetSchedule, scheduleAdvice, stagingSummary, recommendedPreset, type ShaftContext, type SchedulePreset } from "../engine/scheduleAuthoring";
 
 /**
  * The per-shaft elevator Schedule dialog controller (elevator-scheduling #305
@@ -43,12 +44,16 @@ export interface ScheduleDialogCtx {
   top: number;
   /** The live stops port (the folded-in `Configure stops…` model). */
   stops: ScheduleStopsPort;
-  /** Measured 24-hour demand curves (0..1) split by day type (#466), or undefined
-   *  if the shaft has never been sampled. Either day may still be cold. */
-  hourly?: { weekday?: readonly number[]; weekend?: readonly number[] };
   /** Per-floor boarding-origin rings (#465), day-split like `hourly`; feeds the
-   *  grid's hotspot markers, the Simulate origin clause, and Auto-tune's aim. */
+   *  grid's hotspot markers and the Simulate origin clause (the engine aims
+   *  Auto-tune's staging from its own copy). */
   origins?: OriginRings;
+  /** The engine's read-only Auto-tune proposal for this shaft against the
+   *  dialog's working schedule (homes left out while the player has not staged
+   *  by hand); `weekendView` is the day tab on screen. It owns which days are
+   *  warm, whether Auto-tune is offered and what it proposes: the dialog only
+   *  shows and applies the answer. */
+  autoTune: (draft: ElevatorSchedule, weekendView: boolean) => AutoTuneProposal;
   /** The shaft's current authored schedule (the working copy is seeded from it). */
   current?: ElevatorSchedule;
   /** The live day type, so the dialog opens on the day the player is in. */
@@ -58,11 +63,6 @@ export interface ScheduleDialogCtx {
 }
 
 const DEFAULT_SFD = 48; // the second-equivalent of the 0.8 game-minute dwell (DWELL_DEFAULT_SECONDS)
-
-/** Sampled hours (nonzero slots) before the curve counts as measured. One busy hour
- *  must not arm Auto-tune and advice against 23 empty slots; the on-screen note
- *  promises "a day or two", so the gate waits for a real spread of the day. */
-const WARMED_MIN_HOURS = 6;
 
 /** Announcement-cased preset names for the applied-schedule toast. */
 const PRESET_LABEL: Record<SchedulePreset, string> = {
@@ -76,20 +76,21 @@ export function showElevatorScheduleDialog(
   ctx: ScheduleDialogCtx,
   cb: { apply: (schedule: ElevatorSchedule) => Promise<void> },
 ): void {
-  // Each day's measured curve arms the assists only once genuinely warmed (#466);
-  // a cold curve is withheld from the authoring model entirely, so advice and
-  // Auto-tune cannot read a mostly-empty ring as a day of traffic, and a warmed
-  // weekday never stands in for an unmeasured weekend. Computed LIVE (not once at
-  // open): ctx.hourly holds the sim's own rings, so a day that warms while the
-  // dialog sits open is picked up by the next recompute.
-  const warm = (c?: readonly number[]): boolean => !!c && c.filter((v) => v > 0).length >= WARMED_MIN_HOURS;
-  const warmedWd = (): boolean => warm(ctx.hourly?.weekday);
-  const warmedWe = (): boolean => warm(ctx.hourly?.weekend);
+  // The engine says which day's curve is warm (#1550), asked afresh on every
+  // recompute so a day that warms while the dialog sits open is picked up. A
+  // cold curve is withheld from the authoring model entirely, so advice cannot
+  // read a mostly-empty ring as a day of traffic, and a warmed weekday never
+  // stands in for an unmeasured weekend.
+  let tune: AutoTuneProposal = ctx.autoTune({}, ctx.initialWeekend);
+  // The same answer carries each warm day's measured curve (0..1 per hour of
+  // day, #466), so the ghost and the advice draw the ring the engine tuned from.
+  const warmedWd = (): boolean => tune.weekday.warm;
+  const warmedWe = (): boolean => tune.weekend.warm;
   const measured = (): { weekday?: readonly number[]; weekend?: readonly number[] } | undefined =>
     warmedWd() || warmedWe()
       ? {
-          ...(warmedWd() ? { weekday: ctx.hourly!.weekday } : {}),
-          ...(warmedWe() ? { weekend: ctx.hourly!.weekend } : {}),
+          ...(tune.weekday.curve ? { weekday: tune.weekday.curve } : {}),
+          ...(tune.weekend.curve ? { weekend: tune.weekend.curve } : {}),
         }
       : undefined;
 
@@ -107,24 +108,6 @@ export function showElevatorScheduleDialog(
     const ring = state.day === "weekend" ? ctx.origins.weekend : ctx.origins.weekday;
     return ring[((h % ORIGIN_HOURS) + ORIGIN_HOURS) % ORIGIN_HOURS];
   };
-  /** Auto-tune's staging aim (#465): the busiest boarding floor across the
-   *  WHOLE day's origin rings (a single peak-hour slot is the wrong basis:
-   *  the demand peak is often the lobby-dominated up-rush, and one slot can
-   *  be empty at the sampled instant). Prefers the VISIBLE day when warm so
-   *  a Weekend-tab Auto-tune aims at weekend geography, else the other warm
-   *  day. Filtered to floors the shaft still serves; undefined with no
-   *  origin data, which falls back to the plain split seed. */
-  const originAim = (floors: FloorRow[]): number | undefined => {
-    if (!ctx.origins) return undefined;
-    const dayIsWe = state.day === "weekend";
-    const useWe = dayIsWe ? warmedWe() || !warmedWd() : warmedWe() && !warmedWd();
-    if (!(useWe ? warmedWe() : warmedWd())) return undefined;
-    const totals = dayOriginTotals(useWe ? ctx.origins.weekend : ctx.origins.weekday);
-    const served = new Set(servedFloorsAsc(floors));
-    for (const floor of [...totals.keys()]) if (!served.has(floor)) totals.delete(floor);
-    return peakOriginFloor(totals);
-  };
-
   /** The authoring-model view of the shaft, rebuilt from the LIVE rows so preset
    *  staging and the Simulate readout follow stop edits made inside the dialog. */
   const shaftNow = (floors: FloorRow[]): ShaftContext => ({
@@ -133,7 +116,6 @@ export function showElevatorScheduleDialog(
     top: ctx.top,
     servedLobbies: servedLobbiesAsc(floors),
     hourly: measured(),
-    peakOriginFloor: originAim(floors),
   });
 
   // A stored home floor may sit on a stop the shaft no longer serves: snap it to
@@ -195,8 +177,8 @@ export function showElevatorScheduleDialog(
   // ghost even while the weekday curve is warm. `recompute` keeps them current.
   const dayWarmed = (): boolean => (state.day === "weekend" ? warmedWe() : warmedWd());
   const dayCurve = (): readonly number[] | undefined => {
-    if (state.day === "weekend") return warmedWe() ? ctx.hourly?.weekend : undefined;
-    return warmedWd() ? ctx.hourly?.weekday : undefined;
+    const day = state.day === "weekend" ? tune.weekend : tune.weekday;
+    return day.curve ?? undefined;
   };
 
   const sctx: SchedCtx = {
@@ -206,20 +188,26 @@ export function showElevatorScheduleDialog(
     cars: ctx.cars,
     hasMeasured: dayWarmed(),
     hourly: dayCurve(),
-    canTune: warmedWd() || warmedWe(),
+    canTune: tune.status === "available",
     recommended: recommendedPreset(ctx.isExpress),
   };
 
   const announce = (msg: string): void => ctx.announce?.(msg);
+  /** The working copy as the engine reads a draft: homes only once hand-set. */
+  const workingDraft = (): ElevatorSchedule => ({
+    ...state.schedule,
+    homeFloors: homesDirty ? state.schedule.homeFloors : undefined,
+  });
   // Whether the last recompute produced CRITICAL advice, straight from the
   // model (never parsed back out of the rendered copy, which a copy tweak
   // would silently break): the auto-unfold keys on this.
   let adviceCritical = false;
   const recompute = (): void => {
     const isWeekend = state.day === "weekend";
+    tune = ctx.autoTune(workingDraft(), isWeekend);
     sctx.hasMeasured = dayWarmed();
     sctx.hourly = dayCurve();
-    sctx.canTune = warmedWd() || warmedWe();
+    sctx.canTune = tune.status === "available";
     const shaft = shaftNow(state.floors);
     const adv = ctx.ux.advice ? scheduleAdvice(state.schedule, shaft, isWeekend) : null;
     adviceCritical = adv !== null;
@@ -422,29 +410,26 @@ export function showElevatorScheduleDialog(
       after();
     },
     onAutoTune: () => {
-      // Hand the model an "unauthored homes" copy while the player has not touched
-      // staging, so the documented seed branch is reachable from the dialog.
-      const probe: ElevatorSchedule = { ...state.schedule, homeFloors: homesDirty ? state.schedule.homeFloors : undefined };
-      const tuned = autoTuneSchedule(probe, shaftNow(state.floors));
-      if (tuned) {
-        // A day the model left untuned (its ring unmeasured, #466) keeps ITS OWN
-        // working row; falling back to curRow() would copy the visible day across.
-        // (The working copy always seeds both rows, so the fallbacks are belt-and-
-        // suspenders; fullRow keeps them total if that seeding ever changes.)
-        state.schedule.activeCars = {
-          weekday: tuned.activeCars?.weekday ? [...tuned.activeCars.weekday] : [...(state.schedule.activeCars?.weekday ?? fullRow())],
-          weekend: tuned.activeCars?.weekend ? [...tuned.activeCars.weekend] : [...(state.schedule.activeCars?.weekend ?? fullRow())],
-        };
-        // Snap the tuned homes onto the served set (#465): the aim is filtered
-        // to served floors, but a stale schedule row or a race with a live stop
-        // edit could still hand back a floor with no chip row, and the grid
-        // must never stage a car where it cannot show it.
-        const servedNow = servedFloorsAsc(state.floors);
-        if (tuned.homeFloors) state.schedule.homeFloors = tuned.homeFloors.map((f) => snapToServed(f, servedNow));
+      // Ask the engine against the working copy, handing over homes only once
+      // the player has staged by hand so an untouched shaft gets the seed.
+      const res = ctx.autoTune(workingDraft(), state.day === "weekend");
+      const p = res.proposal;
+      if (res.status !== "available" || !p) {
+        // Only a cold shaft is fixed by waiting; any other refusal (the shaft
+        // is gone, the mode offers none) stays quiet rather than mislead.
+        if (res.status === "insufficient-data") announce("Auto-tune needs a day or two of measured traffic first.");
+        return;
       }
+      // A day the engine left untuned (its ring unmeasured, #466) keeps ITS OWN
+      // working row; falling back to curRow() would copy the visible day across.
+      state.schedule.activeCars = {
+        weekday: p.weekday ? [...p.weekday] : [...(state.schedule.activeCars?.weekday ?? fullRow())],
+        weekend: p.weekend ? [...p.weekend] : [...(state.schedule.activeCars?.weekend ?? fullRow())],
+      };
+      state.schedule.homeFloors = [...p.homeFloors];
       // Name the days that were actually tuned: on a cold Weekend tab a blanket
       // "auto-tuned" would claim a change the visible row never shows (#466).
-      const tunedDays = [warmedWd() ? "weekday" : null, warmedWe() ? "weekend" : null].filter(Boolean);
+      const tunedDays = [res.weekday.warm ? "weekday" : null, res.weekend.warm ? "weekend" : null].filter(Boolean);
       announce(
         `Auto-tuned the ${tunedDays.join(" and ")} ${tunedDays.length > 1 ? "schedules" : "schedule"} and staging to measured demand.`,
       );

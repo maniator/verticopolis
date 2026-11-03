@@ -6,7 +6,11 @@ import type { HeatmapMode } from "../sim/constants";
 import { towerCatalog } from "../towerCatalog";
 import { roomUnits } from "../tower/rooms";
 import type { Unit } from "../types";
-import { scheduleSlots } from "../../simport/scheduleSlots";
+import { scheduleFromSlots, scheduleSlots } from "../../simport/scheduleSlots";
+import type { AutoTuneProposal } from "../../simport/enginePort";
+import { coerceSchedule, type ElevatorSchedule, type HourlyByDay } from "../elevatorSchedule";
+import { autoTuneSchedule, type ShaftContext } from "../scheduleAuthoring";
+import { dayOriginTotals, peakOriginFloor, type OriginRings } from "../scheduleOrigins";
 import { BATCH_SLOTS, batchTarget } from "./commands";
 import { KIND_CODES, UNIT_STATE_CODES, VIEW_LAYOUT, codeOf, kindOf } from "./layout";
 import { flag, whole, type PortState } from "./record";
@@ -222,4 +226,121 @@ export function shaftCard(sim: Simulation, id: number): Float64Array {
     }
   }
   return Float64Array.from(r);
+}
+
+/**
+ * The TypeScript reference for `EnginePort.autoTuneProposal`: the same query
+ * the Rust engine answers (`engine-rs/src/schedule_authoring.rs`), built from
+ * the retiring `autoTuneSchedule` plus the warm-up gate and origin aim the
+ * schedule dialog used to own. The shipped game reads Rust's answer; this is
+ * the reference the real-WASM parity test compares it to, and the pure
+ * {@link referenceProposal} is what the dialog's unit tests stand in for the
+ * engine with.
+ */
+
+/** Sampled hours a day's curve needs before it counts as measured. */
+const WARMED_MIN_HOURS = 6;
+
+/** The shaft facts a proposal reads. `served` is ascending; `lobbies` the
+ *  floors that carry a (sky) lobby. */
+export interface ShaftFacts {
+  modern: boolean;
+  cars: number;
+  bottom: number;
+  top: number;
+  served: readonly number[];
+  lobbies: ReadonlySet<number>;
+  hourly?: HourlyByDay;
+  origins?: OriginRings;
+}
+
+const COLD = { warm: false, sampledHours: 0, curve: null };
+const refused = (status: AutoTuneProposal["status"]): AutoTuneProposal => ({ status, weekday: COLD, weekend: COLD, proposal: null });
+
+const day = (curve: readonly number[] | undefined) => {
+  const sampledHours = curve ? curve.filter((v) => v > 0).length : 0;
+  const warm = sampledHours >= WARMED_MIN_HOURS;
+  return { warm, sampledHours, curve: warm ? [...curve!] : null };
+};
+
+/** The proposal for one shaft's facts and the working draft (already coerced
+ *  to the shaft, or undefined for none). */
+export function referenceProposal(shaft: ShaftFacts, draft: ElevatorSchedule | undefined, weekendView: boolean): AutoTuneProposal {
+  const wd = day(shaft.hourly?.weekday);
+  const we = day(shaft.hourly?.weekend);
+  if (!shaft.modern || shaft.cars <= 0) return { status: "unavailable-in-mode", weekday: wd, weekend: we, proposal: null };
+  if (!wd.warm && !we.warm) return { status: "insufficient-data", weekday: wd, weekend: we, proposal: null };
+
+  const servedSet = new Set(shaft.served);
+  // The origin aim: the visible day when warm, else the other warm day.
+  let peakOrigin: number | undefined;
+  const useWeekend = weekendView ? we.warm || !wd.warm : we.warm && !wd.warm;
+  if (shaft.origins && (useWeekend ? we.warm : wd.warm)) {
+    const totals = dayOriginTotals(useWeekend ? shaft.origins.weekend : shaft.origins.weekday);
+    for (const floor of [...totals.keys()]) if (!servedSet.has(floor)) totals.delete(floor);
+    peakOrigin = peakOriginFloor(totals);
+  }
+  const ctx: ShaftContext = {
+    cars: shaft.cars,
+    bottom: shaft.bottom,
+    top: shaft.top,
+    servedLobbies: shaft.served.filter((f) => shaft.lobbies.has(f)),
+    hourly: {
+      ...(wd.warm ? { weekday: shaft.hourly!.weekday } : {}),
+      ...(we.warm ? { weekend: shaft.hourly!.weekend } : {}),
+    },
+    peakOriginFloor: peakOrigin,
+  };
+  const homesAuthored = !!draft?.homeFloors && draft.homeFloors.length > 0;
+  const tuned = autoTuneSchedule(draft ? { ...draft, homeFloors: homesAuthored ? draft.homeFloors : undefined } : undefined, ctx);
+
+  // Snap each home to the nearest served floor, ties to the lower one.
+  const snap = (floor: number): number => {
+    let best = shaft.served[0] ?? shaft.bottom;
+    let bestDist = Infinity;
+    for (const f of shaft.served) {
+      const d = Math.abs(f - floor);
+      if (d < bestDist) { bestDist = d; best = f; }
+    }
+    return best;
+  };
+  return {
+    status: "available",
+    weekday: wd,
+    weekend: we,
+    proposal: {
+      weekday: tuned?.activeCars?.weekday ?? null,
+      weekend: tuned?.activeCars?.weekend ?? null,
+      homeFloors: (tuned?.homeFloors ?? []).map(snap),
+      homesSeeded: !homesAuthored,
+    },
+  };
+}
+
+export function autoTuneProposal(sim: Simulation, id: number, draftSlots: Float64Array, weekendView: boolean): AutoTuneProposal {
+  const t = whole(id) ? sim.tower.getTransport(id) : undefined;
+  if (!t) return refused("missing-shaft");
+  let draft: ElevatorSchedule | undefined;
+  if (draftSlots.length > 0) {
+    const parsed = scheduleFromSlots(draftSlots);
+    if (!parsed) return refused("invalid-draft");
+    draft = coerceSchedule(parsed, t.cars, t.bottom, t.top);
+  }
+  if (!isElevatorKind(t.kind)) return refused("not-an-elevator");
+  const served: number[] = [];
+  for (let f = t.bottom; f <= t.top; f++) if (sim.tower.stopsAt(t, f)) served.push(f);
+  return referenceProposal(
+    {
+      modern: sim.mode === "modern",
+      cars: t.cars,
+      bottom: t.bottom,
+      top: t.top,
+      served,
+      lobbies: new Set(sim.tower.lobbyFloors()),
+      hourly: sim.elevatorHourlyLoad(id),
+      origins: sim.elevatorOriginLoad(id),
+    },
+    draft,
+    weekendView,
+  );
 }

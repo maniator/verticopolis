@@ -298,3 +298,75 @@ fn advance_steps_a_frame_as_the_host_stepper_does() {
     e.port_load_save(&save);
     assert_eq!(e.port_advance(1.5, 0.0, 30.0, true, false), vec![0.0, 1.5]);
 }
+
+fn proposal(e: &Engine, id: f64, draft: &[f64], weekend: bool) -> serde_json::Value {
+    serde_json::from_str(&e.port_auto_tune_proposal(id, draft, weekend)).unwrap()
+}
+
+#[test]
+fn the_proposal_query_answers_its_statuses_and_writes_nothing() {
+    let mut e = engine();
+    let id = shaft(&mut e);
+    assert_eq!(
+        proposal(&e, id + 1000.0, &[], false)["status"],
+        "missing-shaft"
+    );
+    assert_eq!(proposal(&e, 0.5, &[], false)["status"], "missing-shaft");
+    assert_eq!(proposal(&e, id, &[], false)["status"], "insufficient-data");
+    // A draft that is not the schedule slots gets its own status.
+    assert_eq!(
+        proposal(&e, id, &[1.0, 2.0], false)["status"],
+        "invalid-draft"
+    );
+    let mut bad = vec![0.0; SCHEDULE_LEN];
+    bad[0] = 7.0;
+    assert_eq!(proposal(&e, id, &bad, false)["status"], "invalid-draft");
+
+    let ring: Vec<f64> = (0..24)
+        .map(|h| if (8..14).contains(&h) { 0.5 } else { 0.0 })
+        .collect();
+    let empty: Vec<serde_json::Value> = (0..24).map(|_| serde_json::json!([])).collect();
+    e.sim
+        .seed_telemetry(&serde_json::json!({
+            "util": [],
+            "hourly": [[id as i64, { "weekday": ring, "weekend": ring }]],
+            "origins": [[id as i64, { "weekday": empty, "weekend": empty }]],
+        }))
+        .unwrap();
+    let before = e.sim.serialize();
+    let mut draft = vec![0.0; SCHEDULE_LEN];
+    draft[0] = 1.0;
+    draft[1..=SCHEDULE_HOURS].fill(2.0);
+    let on = proposal(&e, id, &draft, false);
+    assert_eq!(on["status"], "available");
+    assert_eq!(
+        on["proposal"]["weekday"].as_array().unwrap().len(),
+        SCHEDULE_HOURS
+    );
+    assert_eq!(on["proposal"]["homesSeeded"], true);
+    // Asking twice with the same draft gives the same answer.
+    assert_eq!(proposal(&e, id, &draft, false), on);
+    assert_eq!(e.sim.serialize(), before);
+    assert!(e.last_reason_text().is_none());
+    assert!(e.sim.tower.transports[0].schedule.is_none());
+    // A stair is no elevator, whatever the telemetry says.
+    assert!(e.sim.build_transport(Kind::Stairs, 170, 1, 2).ok);
+    let stairs = e
+        .sim
+        .tower
+        .transports
+        .iter()
+        .find(|t| t.kind == Kind::Stairs)
+        .unwrap()
+        .id;
+    assert_eq!(
+        proposal(&e, stairs as f64, &[], false)["status"],
+        "not-an-elevator"
+    );
+    // Classic offers no proposal, but still reports the readiness.
+    e.sim.mode = GameMode::Classic;
+    let classic = proposal(&e, id, &draft, false);
+    assert_eq!(classic["status"], "unavailable-in-mode");
+    assert_eq!(classic["weekday"]["warm"], true);
+    assert!(classic["proposal"].is_null());
+}

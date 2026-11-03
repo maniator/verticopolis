@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { referenceAutoTune } from "../fixtures/autoTuneDouble";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { pump, rebaseLog } from "../../ui/hud.fixture";
 import { towerCatalog, useTowerCatalogSource } from "../../engine/towerCatalog";
@@ -2558,8 +2559,12 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     };
     return port;
   }
-  function baseCtx(over: Partial<ScheduleDialogCtx> = {}): ScheduleDialogCtx {
-    return {
+  /** The dialog's ctx plus the shaft's measured curves, which the engine (here
+   *  its TypeScript reference double) holds rather than the dialog. */
+  type TestCtx = Partial<ScheduleDialogCtx> & { hourly?: { weekday?: readonly number[]; weekend?: readonly number[] } };
+  function baseCtx(over: TestCtx = {}): ScheduleDialogCtx {
+    const { hourly, ...dialogOver } = over;
+    const ctx = {
       title: "Schedule: Standard elevator (floors 1-10)",
       ux: MODERN_RULES.elevatorScheduleUX(),
       isExpress: false,
@@ -2568,10 +2573,14 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
       top: 10,
       stops: fakeStops(),
       initialWeekend: false,
-      ...over,
+      ...dialogOver,
     };
+    // The dialog asks the engine for readiness, the warm curves and the tuned
+    // rows; these tests answer from their fake curves through the TypeScript
+    // reference.
+    return { ...ctx, autoTune: over.autoTune ?? referenceAutoTune({ ...ctx, hourly }) };
   }
-  function open(over: Partial<ScheduleDialogCtx> = {}) {
+  function open(over: TestCtx = {}) {
     const { ui } = makeUI();
     const apply = vi.fn(async (_schedule: any) => {});
     ui.showElevatorScheduleDialog(baseCtx(over), { apply });
@@ -2900,6 +2909,73 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     okBtn().click();
     expect(apply.mock.calls[0][0].homeFloors).toEqual([5, 1, 1, 1]);
   });
+
+  it("asks the engine with the working copy: homes only once the player has staged by hand", () => {
+    const hourly = Array(24).fill(0.5);
+    const base = baseCtx({ hourly: { weekday: hourly } });
+    const autoTune = vi.fn(base.autoTune);
+    const { ui } = makeUI();
+    ui.showElevatorScheduleDialog({ ...base, autoTune }, { apply: vi.fn(async () => {}) });
+    const lastDraft = () => autoTune.mock.calls[autoTune.mock.calls.length - 1][0];
+    dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
+    expect(lastDraft().homeFloors).toBeUndefined(); // untouched staging is left for the engine to seed
+    expect(lastDraft().activeCars?.weekday).toHaveLength(24);
+    chipAt(5, 1).click();
+    dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
+    expect(lastDraft().homeFloors).toEqual([5, 1, 8, 8]);
+    expect(autoTune.mock.calls.every(([, weekend]) => weekend === false)).toBe(true);
+  });
+
+  it("takes Auto-tune's readiness from the engine's answer alone", () => {
+    const hourly = Array(24).fill(0);
+    hourly[8] = 0.9; // one sampled hour: cold by any count
+    const base = baseCtx({ hourly: { weekday: hourly } });
+    const ready = base.autoTune({}, false);
+    const warm = { ...ready, status: "available" as const, weekday: { warm: true, sampledHours: 9, curve: Array(24).fill(0.5) }, proposal: { weekday: Array(24).fill(2), weekend: null, homeFloors: [1, 1, 1, 1], homesSeeded: true } };
+    const { ui } = makeUI();
+    const announce = vi.fn();
+    const apply = vi.fn(async (_s: any) => {});
+    ui.showElevatorScheduleDialog({ ...base, announce, autoTune: () => warm }, { apply });
+    const tune = dialog().querySelector<HTMLButtonElement>(".es-autotune")!;
+    expect(tune.disabled).toBe(false);
+    tune.click();
+    okBtn().click();
+    expect(apply.mock.calls[0][0].activeCars.weekday).toEqual(Array(24).fill(2));
+    expect(announce).toHaveBeenCalledWith("Auto-tuned the weekday schedule and staging to measured demand.");
+  });
+
+  it("says so, and changes nothing, when the engine has no proposal at the click", () => {
+    const hourly = Array(24).fill(0.5);
+    const base = baseCtx({ hourly: { weekday: hourly } });
+    let offered = true;
+    const autoTune: ScheduleDialogCtx["autoTune"] = (draft, weekend) =>
+      offered ? base.autoTune(draft, weekend) : { ...base.autoTune(draft, weekend), status: "insufficient-data", proposal: null };
+    const { ui } = makeUI();
+    const announce = vi.fn();
+    const apply = vi.fn(async (_s: any) => {});
+    ui.showElevatorScheduleDialog({ ...base, announce, autoTune }, { apply });
+    offered = false;
+    dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
+    expect(announce).toHaveBeenCalledWith("Auto-tune needs a day or two of measured traffic first.");
+    okBtn().click();
+    expect(apply.mock.calls[0][0].activeCars.weekday).toEqual(Array(24).fill(4)); // the seeded full fleet, untouched
+  });
+
+  it.each(["unavailable-in-mode", "missing-shaft", "invalid-draft", "not-an-elevator"] as const)(
+    "stays quiet when the engine refuses with %s, a reason waiting cannot fix",
+    (status) => {
+      const base = baseCtx({ hourly: { weekday: Array(24).fill(0.5) } });
+      let offered = true;
+      const autoTune: ScheduleDialogCtx["autoTune"] = (draft, weekend) =>
+        offered ? base.autoTune(draft, weekend) : { ...base.autoTune(draft, weekend), status, proposal: null };
+      const { ui } = makeUI();
+      const announce = vi.fn();
+      ui.showElevatorScheduleDialog({ ...base, announce, autoTune }, { apply: vi.fn(async () => {}) });
+      offered = false;
+      dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
+      expect(announce).not.toHaveBeenCalled();
+    },
+  );
 
   it("a preset keeps its hands off hand-set homes (counts only)", () => {
     const { apply } = open();
