@@ -30,10 +30,10 @@ Sources: the retail manual's Map Window and Tutorial sections (PDF pp. 14, 23, 3
 
 - A small separate window shows the whole lot as a miniature, in a schematic tower layout.
 - An outlined rectangle marks what the main view shows. Clicking the map or dragging the rectangle scrolls the main view.
-- The tower is drawn in gray, with elevators as lines colored by kind (the manual: express blue, standard gray, service red).
+- The tower is drawn in gray, with elevators as lines colored by kind (the manual: express blue, standard gray, service red; the retail capture shows the standard line black, see the SPEC's Retail capture findings).
 - Four buttons sit on top: Edit (the default), Eval, Pricing, Hotel. Eval colors tenants by rating, Pricing by rent level, Hotel marks rooms that are dirty in red. The three tinted views pause the game while active.
 - The lot is 375 segments wide and the map shows it in full, basements included.
-- The manual's tutorial describes the elevator as a black vertical line, while its Map Window section gives colors by kind; the plain description does not settle which Classic should draw. v1 draws a shaft-width mark colored by kind.
+- The manual's tutorial describes the elevator as a black vertical line, while its Map Window section gives colors by kind; the plain description did not settle which Classic should draw. The retail capture settled it: Classic draws a line 1 CSS px wide at the shaft's left tile, colored by kind, and leaves stairs and escalators out (SPEC, Retail capture findings).
 - Pixel-level styling was measured later the same day from the PC harness (decision 4): see the SPEC's Retail capture findings. The window is fixed at 200 by 288 px with a fixed scale, and the Edit tab is a flat gray silhouette with no rooms, which changes the Classic style (slice S2b).
 
 ## Architecture findings
