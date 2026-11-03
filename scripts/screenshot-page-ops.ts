@@ -302,11 +302,12 @@ export function pgFillRow(kind: string, floor: number, x0: number, x1: number, s
  *  is 08:30), into the next day when the clock is already past that time.
  *
  *  The clock moves and nothing runs: whatever pass the move skips is owed and
- *  runs on the next tick. On the WASM leg (the app runs on the Rust engine,
- *  and `game.sim` is a copy of its save) the engine's own clock moves
+ *  runs on the next tick. When the page is hosted on the Rust engine,
+ *  `game.sim` is a copy of its save, so the engine's own clock moves
  *  (`advanceClock`, the counterpart of `clock.advance`), with no load, so the
- *  crowd stays. The crowd, the latches and the owed passes stay as they are
- *  on both legs. */
+ *  crowd stays. The crowd, the latches and the owed passes stay as they are.
+ *  When the page is not hosted, the fallback advances `game.sim.clock`
+ *  directly. */
 export function pgSetClock(hour: number): void {
   const g = (window as unknown as { game: any }).game;
   const c = g.sim.clock;

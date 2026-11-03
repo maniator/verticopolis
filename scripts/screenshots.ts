@@ -38,10 +38,9 @@
  * Env knobs: RUN_SERVER=1 spawns its own `vite preview`; ONLY=milestones,tablet
  * re-shoots just those scene ids; BASE_URL / PORT / PW_CHROME override targets;
  * SHOTS_DIR relocates the output gallery (used by the determinism guard to render
- * two independent legs into separate roots concurrently); VC_SHOT_ENGINE
- * can only name the Rust engine (WASM), which needs the engine package in
- * src/public/engine/ (npm run wasm:build); "ts" is refused (see
- * screenshot-engine.ts).
+ * two independent runs into separate roots concurrently). The gallery renders
+ * on the Rust engine (WASM), which needs the engine package in
+ * src/public/engine/ (npm run wasm:build); see screenshot-engine.ts.
  *
  * TypeScript runs natively on Node ≥ 22.18 (type-stripping): no build step, no
  * extra dep. Keep every module here ERASABLE (type annotations / interfaces /
@@ -142,11 +141,13 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
       const where = `after the ${shot.name} setup`;
       if (settles) {
         await beginSettleStep(page, `before the ${shot.name} setup`);
+        await shot.setup(page);
+        await settleUnlessSettled(page, where, false);
+      } else {
+        const before = await hostedSnapshot(page);
+        await shot.setup(page);
+        await checkHosted(page, where, before, HOSTED_FIX.setup);
       }
-      const before = settles ? null : await hostedSnapshot(page);
-      await shot.setup(page);
-      if (settles) await settleUnlessSettled(page, where, false);
-      else await checkHosted(page, where, before, HOSTED_FIX.setup);
     }
     if (shot.phaseWatch) await markPhaseTarget(page);
     if (shot.frame) {

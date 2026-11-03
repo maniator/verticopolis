@@ -6,15 +6,16 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
  * Region composition wiring (CAP-2 of the mobile render-perf spec): settled
- * rooms live in a few dozen region canvases instead of per-unit actors, a
- * burning room moves to a private animated actor with its region footprint
- * unpainted, extinguishing moves it back the same frame, and a full-tower
- * invalidation drains through the per-frame budget instead of repainting
- * everything at once. Pixel identity itself is the CI visual gate's job
- * (the tower-scene baselines); this spec pins the mechanism.
+ * rooms live in a few dozen region canvases instead of per-unit actors, and a
+ * full-tower invalidation drains through the per-frame budget instead of
+ * repainting everything at once. Pixel identity itself is the CI visual
+ * gate's job (the tower-scene baselines); this spec pins the mechanism.
+ * The burning-room half (a fire moves a room to a private animated actor and
+ * extinguishing moves it back) needs a fire the test can start and douse in
+ * place, which the Rust engine's commands do not offer; it is tracked in the
+ * backlog row `regions-fire-actor-coverage`.
  */
-test("regions compose settled rooms, animate fires privately, and drain on budget", async ({ page }) => {
-  test.skip(true, "tracked in #1599: it toggles one office between fire and empty in place to pin the per-sync region move; no relayed command douses a fire, and a load would rebuild every region instead");
+test("regions compose settled rooms and drain on budget", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as any).game?.sim && (window as any).game?.ui));
   await page.evaluate(buildToStar, 2);
@@ -44,36 +45,6 @@ test("regions compose settled rooms, animate fires privately, and drain on budge
   expect(before.membership).toBe(before.settled);
   expect(before.allMembersSettled).toBe(true);
   expect(before.animated).toBe(0);
-
-  // Ignite an office: it must leave its region THIS sync and stand up a
-  // private animated actor (no baked ghost under the flames).
-  const fire = await page.evaluate(() => {
-    const g = (window as any).game;
-    const office = g.sim.tower.units.find((u: any) => u.kind === "office");
-    office.state = "fire";
-    g.sim.tower.revision++;
-    return office.id;
-  });
-  await page.waitForTimeout(200);
-  const burning = await page.evaluate((id: number) => {
-    const e = (window as any).game.engine;
-    return { animated: e.animatedRooms.has(id), inRegions: e.regionUnits.has(id) };
-  }, fire);
-  expect(burning).toEqual({ animated: true, inRegions: false });
-
-  // Extinguish: back into the region layer, private actor retired.
-  await page.evaluate((id: number) => {
-    const g = (window as any).game;
-    const office = g.sim.tower.units.find((u: any) => u.id === id);
-    office.state = "empty";
-    g.sim.tower.revision++;
-  }, fire);
-  await page.waitForTimeout(200);
-  const doused = await page.evaluate((id: number) => {
-    const e = (window as any).game.engine;
-    return { animated: e.animatedRooms.has(id), inRegions: e.regionUnits.has(id) };
-  }, fire);
-  expect(doused).toEqual({ animated: false, inRegions: true });
 
   // A full-tower invalidation (mark every region dirty) drains at most the
   // budget per frame, never all at once (I2). Precondition: buildToStar left
