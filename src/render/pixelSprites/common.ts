@@ -1,6 +1,5 @@
 import type { FacilityKind } from "../../engine/types";
 import type { UnitView } from "../../simport/view";
-import { visibleOccupants } from "../../engine/Crowd";
 import { viewWorld } from "../../presentation/viewWorld";
 
 /**
@@ -81,9 +80,9 @@ export function hash(seed: number): number {
 /**
  * A room's occupancy as its art has to read it: whole people.
  *
- * `visibleOccupants` is the people system's canonical figure and can arrive
- * fractional from a forged save, because nothing upstream rounds it. Art cannot
- * draw four fifths of a person, so it has to pick a whole number, and a room
+ * A room's occupants minus those out for a meal can arrive fractional from a
+ * forged save, because nothing upstream rounds it. Art cannot draw four fifths
+ * of a person, so it has to pick a whole number, and a room
  * that draws one gated figure as well as a row (a barber's seated client, a
  * spa's tub guest, a golfer, the staff who appear because the room is open) has
  * to pick it in one place or the two halves disagree.
@@ -95,19 +94,15 @@ export function hash(seed: number): number {
  * finite reads as nobody, and a corrupt `outForMeal` reads as nobody out, again
  * as the atlas reads them. `roomOccupants.test.ts` holds the two in step.
  *
- * Used by the room kinds whose crowds the #813 fix rewired. The residential,
- * food, clinic and venue painters still read `visibleOccupants` directly. They
- * round up through their loops and so agree for every honest value, but they
- * do not clamp `outForMeal`: a negative or non-finite one gives them a
- * different count from the atlas. Routing them through here is part of
- * backlog row `room-painters-read-ts-engine` (#1106).
+ * Every room painter reads its crowd through here, so none of them imports the
+ * TypeScript engine for it and a corrupt `outForMeal` reads the same in each.
  */
 export function roomOccupants(u: { occupants: number; outForMeal?: number }): number {
   const occupants = Number.isFinite(u.occupants) ? Math.max(0, u.occupants) : 0;
   const out = u.outForMeal !== undefined && Number.isFinite(u.outForMeal)
     ? Math.min(occupants, Math.max(0, u.outForMeal))
     : 0;
-  return Math.ceil(visibleOccupants({ occupants, outForMeal: out }));
+  return Math.ceil(Math.max(0, occupants - out));
 }
 
 /**
