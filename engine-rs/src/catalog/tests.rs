@@ -182,6 +182,7 @@ fn values_resolve_for_the_mode() {
     assert_eq!(cadence(&classic, "condo"), "sale");
     assert_eq!(cadence(&classic, "hotelSuite"), "nightly");
     assert_eq!(cadence(&modern, "rentalStudio"), "maintenancePeriod");
+    assert_eq!(cadence(&modern, "rentalApartment"), "maintenancePeriod");
     assert_eq!(cadence(&modern, "clinic"), "quarterly");
     // Only the venues that track customers quote a ticket.
     assert_eq!(entry(&modern, "shop").spend_per_customer, Some(20.0));

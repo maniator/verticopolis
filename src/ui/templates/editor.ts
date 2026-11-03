@@ -5,7 +5,6 @@ import { isCommercialKind, isHotelKind } from "../../presentation/viewKinds";
 import { catalogFacility, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
 import { priceOptionsFor } from "../catalogPricing";
-import { isRentalKind } from "../../engine/residentialRentals";
 import { hasAccessDiagnostic } from "../../game/facilityDiagnostics";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
 import { floorTag } from "../format";
@@ -114,7 +113,7 @@ export function unitEditorTemplate(
     let label = "Quarterly rent";
     if (u.kind === "condo") label = "Sale price";
     else if (isHotelKind(u.kind)) label = "Room rate";
-    else if (isRentalKind(u.kind)) label = "Monthly rent";
+    else if (rcfg.cadence === "maintenancePeriod") label = "Monthly rent";
     // For a SOLD condo the "Sale price" is what it actually fetched, the
     // household-scaled amount (and exactly what the buy-back will reclaim), not
     // the base asking. householdPrice falls back to the base when there's no
