@@ -92,7 +92,7 @@ jobs:
             if [ -n "$target" ]; then
               gh api -X PATCH "repos/${GH_REPO}/issues/${ISSUE}" -F milestone="$target" --silent
               gh api -X POST "repos/${GH_REPO}/issues/${ISSUE}/comments" \
-                -f body="Closed by a merged pull request with no decided milestone, so it took that pull request's milestone, ${pr_milestone}. Change it if that is wrong." --silent
+                -f body="This issue had no decided milestone when a merged pull request closed it, so it took that pull request's milestone, ${pr_milestone}. Change it if that is wrong." --silent
               echo "Issue #${ISSUE} moved to '${pr_milestone}' (${target}) from its closing pull request."
               exit 0
             fi
