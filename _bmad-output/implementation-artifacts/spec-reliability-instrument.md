@@ -183,7 +183,7 @@ counting is plain JavaScript over those rows, which is what the test pins:
   on the engine-fault rate: about 3/*n* with no fallback, about 4.74/*n* with
   one.
 - The report says at the top that it is a snapshot with its window, and that
-  the rate is a lower bound: the relay has no offline queue and a per-IP
+  the fault count is a lower bound and the rate is observed and coverage-limited, with unknown bias: the relay has no offline queue and a per-IP
   limit, so a fallback in an offline session, a tab closed while the engine
   loads, a tab killed before its first row (or after a capped drop with no
   later hide) and a boot whose game never started after its engine failed

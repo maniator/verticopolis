@@ -4,6 +4,7 @@ import { FACILITY_PRESENTATION } from "../../presentation/facilityPresentation";
 import {
   CLASSIC_SHAFT_FILL,
   CLASSIC_TOWER_FILL,
+  drawsOnMap,
   GROUP_PATTERN,
   KIND_GROUP,
   UNKNOWN_KIND_STYLE,
@@ -27,7 +28,7 @@ describe("overview map style table", () => {
     expect(Object.keys(GROUP_PATTERN).sort()).toEqual([...GROUPS].sort());
     // KIND_GROUP is the source of truth for which groups exist: the groups kinds use are exactly the groups with a pattern.
     expect([...new Set(Object.values(KIND_GROUP))].sort()).toEqual([...GROUPS].sort());
-    expect(Object.keys(CLASSIC_SHAFT_FILL).sort()).toEqual(["elevatorExpress", "elevatorService", "elevatorStandard", "stairs"]);
+    expect(Object.keys(CLASSIC_SHAFT_FILL).sort()).toEqual(["elevatorExpress", "elevatorService", "elevatorStandard"]);
     for (const color of [CLASSIC_TOWER_FILL, ...Object.values(CLASSIC_SHAFT_FILL)]) expect(color).toMatch(/^#[0-9a-f]{6}$/);
   });
 
@@ -51,12 +52,15 @@ describe("overview map style table", () => {
     expect(hexLuminance(CLASSIC_TOWER_FILL)).toBeGreaterThan(0.5);
   });
 
-  it("draws Classic shafts as lines that stand out from the tower: black elevators, red express, blue stairs", () => {
+  it("draws Classic elevators as the retail map does (black standard, red service, blue express) and leaves stairs out", () => {
     expect(mapStyleFor("elevatorStandard", "classic").fill).toBe("#000000");
-    expect(mapStyleFor("elevatorService", "classic").fill).toBe("#000000");
-    expect(mapStyleFor("elevatorExpress", "classic").fill).toBe("#c41a1a");
-    expect(mapStyleFor("stairs", "classic").fill).toBe("#2f4fd0");
-    expect(mapStyleFor("escalator", "classic").fill).toBe("#2f4fd0");
+    expect(mapStyleFor("elevatorService", "classic").fill).toBe("#c41a1a");
+    expect(mapStyleFor("elevatorExpress", "classic").fill).toBe("#2f4fd0");
+    expect(drawsOnMap("stairs", "classic")).toBe(false);
+    expect(drawsOnMap("escalator", "classic")).toBe(false);
+    expect(drawsOnMap("stairs", "modern")).toBe(true);
+    expect(drawsOnMap("elevatorExpress", "classic")).toBe(true);
+    expect(drawsOnMap("notAKind" as FacilityKind, "classic")).toBe(true);
     const tower = hexLuminance(CLASSIC_TOWER_FILL)!;
     for (const kind of KINDS) {
       const { fill } = mapStyleFor(kind, "classic");

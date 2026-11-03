@@ -21,7 +21,7 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.78.2
+## 2.78.5
 
 - A tower file saved by a newer version of Verticopolis is now refused with a message to update the game, instead of loading and dropping what this version does not know.
 

@@ -15,7 +15,8 @@
  * Classic follows what the retail game's Edit tab draws, measured on the PC
  * harness (SPEC, "Retail capture findings"): one flat light-gray silhouette for
  * every structure run and room, with the shafts picked out as lines (black
- * elevators, red express, blue stairs and escalators). It carries no pattern, since the original
+ * standard elevators, red service, blue express; stairs and escalators are not
+ * drawn). It carries no pattern, since the original
  * does not tell kinds apart there. Modern keeps the per-kind groups: the room
  * groups get a pattern each as an accessibility addition, and the fills are the
  * facility colors the sprites and palette already use.
@@ -103,14 +104,14 @@ export const GROUP_PATTERN: Readonly<Record<MapGroup, MapPattern>> = {
 /** Classic's tower: one flat light gray for everything that is not a shaft. */
 export const CLASSIC_TOWER_FILL = "#cccccc";
 
-/** Classic's shaft lines. The retail capture shows black for most elevators,
- *  red for a few (probably express, not yet confirmed in the live game) and
- *  blue on the stair columns. */
+/** Classic's elevator lines, confirmed against the retail saves: each shaft's
+ *  tile position lands on a line of its kind's color (black standard, red
+ *  service, blue express). Stairs and escalators are not drawn on the original
+ *  map: `drawsOnMap` leaves them out of a Classic paint. */
 export const CLASSIC_SHAFT_FILL: Readonly<Partial<Record<MapGroup, string>>> = {
-  stairs: "#2f4fd0",
   elevatorStandard: "#000000",
-  elevatorService: "#000000",
-  elevatorExpress: "#c41a1a",
+  elevatorService: "#c41a1a",
+  elevatorExpress: "#2f4fd0",
 };
 
 /** Relative luminance of a `#rrggbb` color (0 to 1), or null for any other
@@ -169,4 +170,17 @@ export function mapStyleFor(kind: FacilityKind, theme: MapTheme): MapKindStyle {
   if (theme === "classic") return { fill: CLASSIC_SHAFT_FILL[group] ?? CLASSIC_TOWER_FILL, pattern: "solid" };
   const shaft = MODERN_SHAFT_FILL[group];
   return { fill: shaft ?? FACILITY_PRESENTATION[kind].color, pattern: GROUP_PATTERN[group] };
+}
+
+/** Groups the original map does not draw at all: Classic skips them, so a stair
+ *  that overhangs a floor's end leaves no mark in the sky and none over a room. */
+const CLASSIC_UNDRAWN_GROUPS: ReadonlySet<MapGroup> = new Set<MapGroup>(["stairs"]);
+
+/** Whether a kind is painted in a theme. Modern draws everything; Classic leaves
+ *  stairs and escalators out, as the retail map does. A kind the table does not
+ *  know is drawn, as the placeholder. */
+export function drawsOnMap(kind: FacilityKind, theme: MapTheme): boolean {
+  if (theme !== "classic") return true;
+  if (!Object.prototype.hasOwnProperty.call(KIND_GROUP, kind)) return true;
+  return !CLASSIC_UNDRAWN_GROUPS.has(KIND_GROUP[kind]);
 }
