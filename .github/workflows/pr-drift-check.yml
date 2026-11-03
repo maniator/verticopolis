@@ -79,6 +79,7 @@ jobs:
   # silently skip a real render change, so keep the rules inclusive.
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -172,6 +173,7 @@ jobs:
   verify-drift:
     needs: capture
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
@@ -264,6 +266,7 @@ jobs:
       needs.verify-drift.outputs.has_drift == 'true' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: screenshot-approval
     # Earns write: it pushes the approved commit. It runs no PR-head code (only
     # git/jq/cp over downloaded artifacts), so the write token is never exposed to
@@ -392,6 +395,7 @@ jobs:
     needs: [changes, capture, verify-drift]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions: {}
     steps:
       - name: Report the determinism and drift result

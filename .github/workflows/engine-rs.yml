@@ -187,10 +187,12 @@ jobs:
   consumer:
     needs: changes
     # Fail closed: run unless the filter succeeded and found no engine file.
-    # always() rather than !cancelled(): a skipped required job counts as
-    # passed, so a run cancelled before this job starts must not skip it.
-    # Its last step fails the job if the run was cancelled.
-    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    # !cancelled(), not always(): an always() job still starts in a run that a
+    # newer push cancelled (during the changes job, say) and runs to the end on
+    # the stale commit, which defeats cancel-in-progress. The required
+    # engine-rs job below keeps always() and fails a cancelled run, so a
+    # skipped job here cannot pass the check.
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -299,10 +301,9 @@ jobs:
   rust:
     needs: changes
     # Fail closed: run unless the filter succeeded and found no engine file.
-    # always() rather than !cancelled(): a run cancelled before this job
-    # starts must not skip it. Its last step fails the job if the run was
-    # cancelled.
-    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    # !cancelled(), not always(), as the consumer job above explains: a run a
+    # newer push cancelled must stop here. The engine-rs job fails it.
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -402,7 +403,7 @@ jobs:
   wasm-binding:
     needs: changes
     # Fail closed, as the rust job above.
-    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
     # A cache miss compiles the crate for wasm32 (a few minutes, with the
     # prebuilt CLI); anything near this is a hang.
@@ -453,7 +454,7 @@ jobs:
   fuzz-corpus:
     needs: changes
     # Fail closed, as the rust job above.
-    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
