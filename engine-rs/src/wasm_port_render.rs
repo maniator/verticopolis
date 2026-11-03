@@ -45,6 +45,8 @@ type CongestionKey = (u64, i64, i64, u64, (u64, u64));
 pub(crate) struct RenderMemo {
     queue: Option<(QueueKey, Vec<f64>)>,
     congestion: Option<(CongestionKey, f64)>,
+    /// The busiest floor's `[ratio, floor]`, on the same key (#1237).
+    hotspot: Option<(CongestionKey, [f64; 2])>,
 }
 
 impl Engine {
@@ -53,13 +55,7 @@ impl Engine {
     /// edit or a room's change moves its key: a frame between them reads it
     /// without walking the rooms.
     pub(crate) fn port_congestion(&mut self) -> f64 {
-        let key = (
-            self.generation,
-            self.sim.crowd.step,
-            self.sim.tower.revision,
-            self.sim.clock.minutes.to_bits(),
-            self.sim.tower.view.marks.position(),
-        );
+        let key = self.congestion_key();
         if let Some((k, c)) = self.render_memo.congestion {
             if k == key {
                 return c;
@@ -68,6 +64,35 @@ impl Engine {
         let c = self.sim.congestion();
         self.render_memo.congestion = Some((key, c));
         c
+    }
+
+    /// What the congestion answers read: the tower, the crowd step, the
+    /// revision, the clock's minutes and the mark log's position.
+    fn congestion_key(&self) -> CongestionKey {
+        (
+            self.generation,
+            self.sim.crowd.step,
+            self.sim.tower.revision,
+            self.sim.clock.minutes.to_bits(),
+            self.sim.tower.view.marks.position(),
+        )
+    }
+
+    /// `[ratio, floor]` for the busiest served floor, the floor NaN when
+    /// none. The HUD asks about six times a second, so the answer is kept
+    /// until the congestion key moves, as `port_congestion` is: a read between
+    /// steps walks no rooms (#1237).
+    pub(crate) fn port_hotspot(&mut self) -> [f64; 2] {
+        let key = self.congestion_key();
+        if let Some((k, h)) = self.render_memo.hotspot {
+            if k == key {
+                return h;
+            }
+        }
+        let (ratio, floor) = self.sim.peak_congestion();
+        let h = [ratio, floor.map_or(f64::NAN, |f| f as f64)];
+        self.render_memo.hotspot = Some((key, h));
+        h
     }
 
     /// The queue projection as one record. The frame asks once per frame, so
