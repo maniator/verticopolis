@@ -82,10 +82,10 @@ export function hash(seed: number): number {
  *
  * A room's occupants minus those out for a meal can arrive fractional from a
  * forged save, because nothing upstream rounds it. Art cannot draw four fifths
- * of a person, so it has to pick a whole number, and a room
- * that draws one gated figure as well as a row (a barber's seated client, a
- * spa's tub guest, a golfer, the staff who appear because the room is open) has
- * to pick it in one place or the two halves disagree.
+ * of a person, so it has to pick a whole number, and a room that draws one
+ * gated figure as well as a row (a barber's seated client, a spa's tub guest, a
+ * golfer, the staff who appear because the room is open) has to pick it in one
+ * place or the two halves disagree.
  *
  * The rule is the one every other room's `i < n` figure loop already follows,
  * and the one the atlas reader (`atlas/lookup.ts`) uses to pick a baked crowd:
