@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.11.0 (2026-11-03)
+
+- The view's frame header (`VIEW_LAYOUT_VERSION` 10) gains seven slots after `transports`: `day`, `dayOfWeek`, `isWeekend` (0 or 1), `quarter` and `year`, all counted from 0 on the tower's calendar, then `weekDays` and `weekendDays`, the calendar's week and weekend lengths in days. A host shows dates from them and no longer does the date arithmetic itself. The header is 39 slots wide (it was 32), so every record after it moves; read the offsets from `viewLayout()`. No saved-game, catalog or rule change.
+
 ## 1.10.1 (2026-11-03)
 
 - The `.TDT` export writes an infested hotel room with the dirty flag (32) and counts it as a dirty room in the people and finance blocks, as a `dirty` room is. It used to write no flag, so the room re-imported as a clean vacant room. What flag 64 means in the original game is still unchecked (#1629), so it is not written. No saved-game, frame, view layout or catalog change.

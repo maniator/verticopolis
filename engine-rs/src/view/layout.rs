@@ -10,14 +10,18 @@
 use serde_json::{json, Map, Value};
 
 /// The version of the view's layout, reported by `viewLayout()`.
-pub const VIEW_LAYOUT_VERSION: u32 = 9;
+pub const VIEW_LAYOUT_VERSION: u32 = 10;
 
 /// The dynamic frame's header slots, one name each. `UNLOCKED` holds the
 /// unlocked kinds as a bitmask by kind code in one double, with more than 32
 /// bits in use: read bit k as `Math.floor(mask / 2 ** k) % 2`, since
 /// JavaScript's bitwise operators cut a number to 32 bits. `FRAME_SEQ` counts
 /// the reader's frames from 1: a host that sees it skip a number missed a
-/// frame, and asks for a full one before it applies another.
+/// frame, and asks for a full one before it applies another. `DAY` through
+/// `WEEKEND_DAYS` are the clock's readings on the tower's calendar (the day
+/// count, the day of the week, the weekend flag as 0 or 1, the quarter and the
+/// year, all counted from 0) and the calendar's week and weekend lengths in
+/// days, so a host shows dates without doing the date arithmetic.
 pub mod header {
     pub const MINUTES: usize = 0;
     pub const TOWER_REVISION: usize = 1;
@@ -51,10 +55,17 @@ pub mod header {
     pub const PEOPLE: usize = 29;
     pub const UNITS: usize = 30;
     pub const TRANSPORTS: usize = 31;
+    pub const DAY: usize = 32;
+    pub const DAY_OF_WEEK: usize = 33;
+    pub const IS_WEEKEND: usize = 34;
+    pub const QUARTER: usize = 35;
+    pub const YEAR: usize = 36;
+    pub const WEEK_DAYS: usize = 37;
+    pub const WEEKEND_DAYS: usize = 38;
 }
 
 /// Slots of the dynamic frame's header.
-pub const HEADER: usize = header::TRANSPORTS + 1;
+pub const HEADER: usize = header::WEEKEND_DAYS + 1;
 
 /// The slots of a drawn person's record.
 pub mod person {
@@ -219,6 +230,13 @@ pub(crate) const TABLES: &[Table] = &[
             ("people", header::PEOPLE),
             ("units", header::UNITS),
             ("transports", header::TRANSPORTS),
+            ("day", header::DAY),
+            ("dayOfWeek", header::DAY_OF_WEEK),
+            ("isWeekend", header::IS_WEEKEND),
+            ("quarter", header::QUARTER),
+            ("year", header::YEAR),
+            ("weekDays", header::WEEK_DAYS),
+            ("weekendDays", header::WEEKEND_DAYS),
         ],
         width_name: "headerWidth",
         width: HEADER,
