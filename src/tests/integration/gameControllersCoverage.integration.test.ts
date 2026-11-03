@@ -1074,13 +1074,16 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     // the controller surfaces its reason as a toast and downloads nothing.
     const write = vi.spyOn(TsEngine.prototype, "exportVctower").mockReturnValue(undefined);
     const reason = vi.spyOn(TsEngine.prototype, "lastReason").mockReturnValue("This tower's save data is larger than 32 MB, the most a save can hold.");
-    await saveLoad.exportGame();
-    expect(f.downloads).toHaveLength(0);
-    expect(f.toasts).toEqual([
-      { text: "Export failed: This tower's save data is larger than 32 MB, the most a save can hold.", kind: "bad" },
-    ]);
-    write.mockRestore();
-    reason.mockRestore();
+    try {
+      await saveLoad.exportGame();
+      expect(f.downloads).toHaveLength(0);
+      expect(f.toasts).toEqual([
+        { text: "Export failed: This tower's save data is larger than 32 MB, the most a save can hold.", kind: "bad" },
+      ]);
+    } finally {
+      write.mockRestore();
+      reason.mockRestore();
+    }
   });
 
   it("importGame adopts a Simulation from a SaveGame.export round-trip", async () => {

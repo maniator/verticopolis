@@ -5,9 +5,13 @@ import { describe, expect, it } from "vitest";
 
 /**
  * The Rust codec pin (#1522 item 1, #1498, #1301). `.vctower` and `.TDT`
- * import and export run through the Rust engine, and no TypeScript parser or
- * writer runs outside tests. The TypeScript copies stay as test referees until
- * they are deleted (#1336), so this guard fails when production code calls one.
+ * import and export run through the Rust engine, and the player's import and
+ * export reach no TypeScript parser or writer. The TypeScript copies stay as
+ * test referees until they are deleted (#1336), so this guard fails when
+ * production code names one of the banned entry points below. It does not
+ * cover the `VCZ1:` storage container the autosave and slots write
+ * (`packVctower`, `packSync`, `saveToAsync`, `encodeSaveJson`): that layer is
+ * TypeScript by design, and its writer is the engine's when the engine is up.
  *
  * Production code is every `src/` file that is not a test, a fixture or under
  * `src/tests/`. Each rule names the calls that are banned there and the few
@@ -24,7 +28,7 @@ function production(dir: string): string[] {
     if (entry.isDirectory()) {
       if (path === resolve(root, "src/tests")) continue;
       files.push(...production(path));
-    } else if (/\.ts$/.test(entry.name) && !/\.(test|fixture|d)\.ts$/.test(entry.name)) {
+    } else if (/\.tsx?$/.test(entry.name) && !/\.(test|fixture|d)\.tsx?$/.test(entry.name)) {
       files.push(path);
     }
   }
@@ -33,8 +37,34 @@ function production(dir: string): string[] {
 
 const FILES = production(resolve(root, "src")).map((path) => ({ rel: relative(root, path).replace(/\\/g, "/"), text: readFileSync(path, "utf8") }));
 
-/** The code of a file without its comments, so a rule reads calls, not prose. */
-const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+/**
+ * The code of a file without its comments, so a rule reads code, not prose.
+ * A small scanner, not a regex pass: a `/*` or `//` inside a string or
+ * template literal is text, and must not hide the code after it.
+ */
+function code(text: string): string {
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    const next = text[i + 1];
+    if (c === "/" && next === "*") {
+      const end = text.indexOf("*/", i + 2);
+      i = end < 0 ? text.length : end + 2;
+    } else if (c === "/" && next === "/") {
+      while (i < text.length && text[i] !== "\n") i++;
+    } else if (c === '"' || c === "'" || c === "`") {
+      let j = i + 1;
+      while (j < text.length && text[j] !== c) j += text[j] === "\\" ? 2 : 1;
+      out += text.slice(i, j + 1);
+      i = j + 1;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return out;
+}
 
 interface Rule {
   name: string;
@@ -46,7 +76,7 @@ interface Rule {
 const RULES: Rule[] = [
   {
     name: "the TypeScript .vctower reader runs only in tests",
-    banned: /\b(?:SaveGame\.import(?:Text)?|importObjection|looksLikeTowerSave|readVctower|decodeVctower)\s*\(/,
+    banned: /\b(?:SaveGame\s*\??\.\s*import(?:Text)?|SaveGame\s*\[\s*["'`]import(?:Text)?|importObjection|looksLikeTowerSave|readVctower|decodeVctower)\b/,
     allowed: {
       "src/storage/SaveGame.ts": "defines the test referee (`import`, `importText`) and its checks",
       "src/storage/saveTextRead.ts": "defines `importObjection` and `looksLikeTowerSave` for that referee",
@@ -57,7 +87,7 @@ const RULES: Rule[] = [
   },
   {
     name: "the TypeScript .vctower writer is not the player's export",
-    banned: /\b(?:SaveGame\.export|writeVctower)\s*\(/,
+    banned: /\b(?:SaveGame\s*\??\.\s*export|SaveGame\s*\[\s*["'`]export|writeVctower)\b/,
     allowed: {
       "src/engine/port/files.ts": "the TypeScript engine's file writer, a test referee until #1336 deletes it",
       "src/engine/port/tsEngine.ts": "the TypeScript engine's `exportVctower`, the same referee",
@@ -67,6 +97,16 @@ const RULES: Rule[] = [
 ];
 
 describe("the Rust codec pin (#1522 item 1)", () => {
+  it("the comment scanner keeps code after a comment opener inside a string", () => {
+    expect(code('const a = "/**"; SaveGame.export(x); // note')).toBe('const a = "/**"; SaveGame.export(x); ');
+    expect(code("const b = `a // b`; /* gone */ y")).toBe("const b = `a // b`;  y");
+  });
+
+  it("no production file renames SaveGame or loads it lazily, which would dodge the name rules", () => {
+    const dodgers = FILES.filter((f) => /\bSaveGame\s+as\b|\bimport\s*\(\s*["'`][^"'`]*SaveGame/.test(code(f.text))).map((f) => f.rel);
+    expect(dodgers).toEqual([]);
+  });
+
   for (const rule of RULES) {
     it(rule.name, () => {
       const offenders = FILES.filter((f) => rule.banned.test(code(f.text)) && !(f.rel in rule.allowed)).map((f) => f.rel);
