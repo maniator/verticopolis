@@ -205,20 +205,22 @@ export function snappedBlock(layout: MapLayout, x: number, width: number, floor:
  */
 export function viewportRect(layout: MapLayout, cam: MapCamera): MapRect {
   const zoom = positive(cam.zoom, 1);
-  // A tiny zoom or a huge viewport must not overflow to Infinity, which the
-  // transforms below would read as 0: cap the half sizes at the whole map.
-  const halfW = Math.min(positive(cam.viewWidth, 0) / 2 / zoom, layout.extent.width * TILE);
-  const halfH = Math.min(positive(cam.viewHeight, 0) / 2 / zoom, extentFloors(layout.extent) * FLOOR);
+  const halfW = positive(cam.viewWidth, 0) / 2 / zoom;
+  const halfH = positive(cam.viewHeight, 0) / 2 / zoom;
   const posX = finite(cam.posX, 0);
   const posY = finite(cam.posY, 0);
-  const left = tileToMapX(layout, (posX - halfW) / TILE);
-  const right = tileToMapX(layout, (posX + halfW) / TILE);
-  const top = lineToMapY(layout, -(posY - halfH) / FLOOR);
-  const bottom = lineToMapY(layout, -(posY + halfH) / FLOOR);
-  const x0 = clamp(left, 0, layout.width);
-  const x1 = clamp(right, 0, layout.width);
-  const y0 = clamp(top, 0, layout.height);
-  const y1 = clamp(bottom, 0, layout.height);
+  const { extent } = layout;
+  // Clip in world units, before the transforms: a tiny zoom or a huge viewport
+  // can overflow the edges to Infinity, which the transforms would read as 0,
+  // and a view taller than a cropped map must still cover all of it.
+  const leftTile = clamp((posX - halfW) / TILE, 0, extent.width);
+  const rightTile = clamp((posX + halfW) / TILE, 0, extent.width);
+  const topLine = clamp(-(posY - halfH) / FLOOR, extent.bottomLine, extent.topLine);
+  const bottomLine = clamp(-(posY + halfH) / FLOOR, extent.bottomLine, extent.topLine);
+  const x0 = clamp(tileToMapX(layout, leftTile), 0, layout.width);
+  const x1 = clamp(tileToMapX(layout, rightTile), 0, layout.width);
+  const y0 = clamp(lineToMapY(layout, topLine), 0, layout.height);
+  const y1 = clamp(lineToMapY(layout, bottomLine), 0, layout.height);
   return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
 }
 
@@ -256,9 +258,10 @@ export function mapPointToCenter(layout: MapLayout, mx: number, my: number): Map
  * camera's center when the drag began (the real camera; the rectangle is
  * clipped to the map), `grab` is where on the map the pointer went
  * down. The center moves by the pointer's travel since then, so the rectangle
- * does not jump to the pointer when the drag starts. Only the result is kept on
- * the map; a start outside it is not pulled in until the pointer moves. A
- * non-finite grab or pointer reads as "no travel" on that axis.
+ * does not jump to the pointer when the drag starts. The result is kept on the
+ * map, except that a start outside it (a camera above a Modern crop) is never
+ * pulled in or pushed further out by the drag: it moves only by the travel back
+ * toward the map. A non-finite grab or pointer reads as "no travel" on that axis.
  *
  * The renderer clamps the camera after each move, so at a clamp edge the
  * rectangle can stop short of the pointer. The caller reads the camera again
@@ -274,9 +277,14 @@ export function dragCenter(
   const dx = Number.isFinite(grab.x) && Number.isFinite(pointer.x) ? pointer.x - grab.x : 0;
   const dy = Number.isFinite(grab.y) && Number.isFinite(pointer.y) ? pointer.y - grab.y : 0;
   const { extent } = layout;
+  const tile0 = finite(start.tile, 0);
+  const floor0 = finite(start.floor, extent.topLine);
+  // A start already past an edge (a camera in the sky above a Modern crop) stays
+  // where it is: the result may not go further out than the start, and is not
+  // pulled onto the map by a move along the other axis.
   return {
-    tile: clamp(finite(start.tile, 0) + dx / layout.pxPerTile, 0, extent.width),
-    floor: clamp(finite(start.floor, extent.topLine) - dy / layout.pxPerFloor, extent.bottomLine, extent.topLine),
+    tile: clamp(tile0 + dx / layout.pxPerTile, Math.min(0, tile0), Math.max(extent.width, tile0)),
+    floor: clamp(floor0 - dy / layout.pxPerFloor, Math.min(extent.bottomLine, floor0), Math.max(extent.topLine, floor0)),
   };
 }
 

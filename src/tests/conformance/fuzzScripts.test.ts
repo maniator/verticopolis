@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { REPO_ROOT } from "./scenario";
+import { hasWasmPackage } from "./wasmEngine";
 
 /**
  * The exit codes of the two fuzz scripts. The corpus job is a required check,
@@ -92,5 +93,27 @@ describe("scripts/fuzz-shrink.ts", () => {
     expect(run("fuzz-shrink.ts", [bad, "ok-name"], present).code).toBe(2);
     writeFileSync(bad, '{"id":"x"}');
     expect(run("fuzz-shrink.ts", [bad, "ok-name"], present).code).toBe(2);
+  });
+});
+
+describe("scripts/fuzz-compare.ts", () => {
+  it("exits 2 with the usage line on no file, a stray argument, or a file that is not json", () => {
+    for (const args of [[], ["--wasm"], ["a.json", "b.json"], ["--wasm", "a.json", "b.json"], ["a.txt"], ["--wasm", "a.txt"]]) {
+      const r = run("fuzz-compare.ts", args, present);
+      expect(r.code, args.join(" ")).toBe(2);
+    }
+    expect(run("fuzz-compare.ts", [], present).out).toContain("usage: fuzz-compare [--wasm]");
+  });
+
+  it("exits 3 on either leg when the Rust records are missing, rather than passing on nothing", () => {
+    const file = join(dir, "no-records.json");
+    writeFileSync(file, "{}");
+    const ts = run("fuzz-compare.ts", [file], present);
+    expect(ts.code).toBe(3);
+    expect(ts.out).toContain("no Rust checkpoints");
+    // Without the package the WASM leg stops earlier, for that reason; with it, for the records.
+    const wasmLeg = run("fuzz-compare.ts", ["--wasm", file], present);
+    expect(wasmLeg.code).toBe(3);
+    expect(wasmLeg.out).toContain(hasWasmPackage() ? "no Rust checkpoints" : "no WASM package");
   });
 });

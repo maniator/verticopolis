@@ -183,8 +183,15 @@ describe("viewportRect", () => {
 
   it("covers the whole map for a camera so far out that its half sizes would overflow", () => {
     const r = viewportRect(l, { posX: 187 * TILE, posY: -50 * FLOOR, zoom: 1e-310, viewWidth: 1e308, viewHeight: 1e308 });
-    expect(r.w).toBeGreaterThan(0);
-    expect(r.h).toBeGreaterThan(0);
+    expect(r).toEqual({ x: 0, y: 0, w: l.width, h: l.height });
+  });
+
+  it("covers the whole map for a view taller than the world at the lowest saved zoom", () => {
+    // 1700 px at zoom 0.06 is about 630 floors, far more than the world's span.
+    const y = clampCameraY(-50 * FLOOR, 1700, 0.06, FLOOR, WORLD.minFloor, WORLD.maxFloor);
+    const r = viewportRect(l, { posX: 187 * TILE, posY: y, zoom: 0.06, viewWidth: 1280, viewHeight: 1700 });
+    expect(r.y).toBe(0);
+    expect(r.h).toBeCloseTo(l.height, 9);
   });
 
   it("is unclipped vertically whenever the clamp leaves room (the rectangle is the whole view)", () => {
@@ -352,7 +359,16 @@ describe("hardening", () => {
     const l = layoutFor();
     const out = { tile: 100, floor: l.extent.topLine + 50 };
     const still = dragCenter(l, out, { x: 5, y: 5 }, { x: 5, y: 5 });
-    expect(still.floor).toBeCloseTo(l.extent.topLine);
+    expect(still.floor).toBeCloseTo(out.floor);
+    // A sideways move leaves the floor alone; it does not snap onto the map.
+    expect(dragCenter(l, out, { x: 5, y: 5 }, { x: 40, y: 5 }).floor).toBeCloseTo(out.floor);
+    // Travel away from the map goes no further out than the start.
+    expect(dragCenter(l, out, { x: 5, y: 50 }, { x: 5, y: 5 }).floor).toBeCloseTo(out.floor);
+    // Travel toward the map moves the center by the travel.
+    const down = dragCenter(l, out, { x: 5, y: 5 }, { x: 5, y: 5 + 10 * l.pxPerFloor });
+    expect(down.floor).toBeCloseTo(out.floor - 10);
+    // Once back on the map, the map's edges hold it as usual.
+    expect(dragCenter(l, out, { x: 5, y: 0 }, { x: 5, y: 1e6 }).floor).toBeCloseTo(l.extent.bottomLine);
   });
 
   it("holds nothing in an empty rectangle", () => {
