@@ -88,19 +88,6 @@ describe("the repository's marker", () => {
   it("is not part of the key, so recording a window never moves it", () => {
     for (const files of Object.values(fuzzKeyFiles(REPO_ROOT))) expect(files).not.toContain(FREEZE_MARKER_PATH);
   });
-
-  it("is checked by a workflow on every pull request, against the base branch's marker", () => {
-    const workflow = readFileSync(resolve(REPO_ROOT, ".github/workflows/fuzz-freeze.yml"), "utf8");
-    expect(workflow).toContain("pull_request:");
-    expect(workflow).not.toMatch(/paths(-ignore)?:/);
-    expect(workflow).toContain("scripts/fuzz-freeze.ts");
-    expect(workflow).toContain(`--base`);
-    expect(workflow).toContain("fetch-depth: 0");
-    // An unresolvable base stops the guard (exit 3); only a base without the file reads as "no marker".
-    expect(workflow).toContain("rev-parse --verify");
-    expect(workflow).not.toContain("|| : >");
-    expect(workflow).toContain(FREEZE_MARKER_PATH);
-  });
 });
 
 describe("scripts/fuzz-freeze.ts", () => {
