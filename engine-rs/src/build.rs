@@ -231,7 +231,7 @@ impl Simulation {
             if dur > 0.0 {
                 let (u, at) = self.tower.marked_by_id(id).unwrap();
                 u.set_state(at, UnitState::Construction);
-                u.complete_at = Some(self.clock.minutes + dur);
+                u.extras_mut().complete_at = Some(self.clock.minutes + dur);
                 self.constructing.insert(id);
             }
             if kind == Kind::WeddingHall {

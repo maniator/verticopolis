@@ -49,7 +49,7 @@ pub(super) fn ts_sig(tower: &Tower) -> String {
                 u.label,
                 u.rent.map(number_to_string).unwrap_or_default(),
                 if u.no_rate { "N" } else { "" },
-                u.film_policy.unwrap_or(""),
+                u.extras().film_policy.unwrap_or(""),
                 u.subtype.unwrap_or(""),
             )
         })

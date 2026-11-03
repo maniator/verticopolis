@@ -478,8 +478,8 @@ fn every_slot_matches_the_json_getters_on_real_towers() {
             .find(|u| u.kind == Kind::Office && u.is_present())
         {
             u.state = crate::tower::UnitState::Vacating;
-            u.vacate_reason = Some("rent");
-            u.vacate_at = Some(now + 90.0);
+            u.extras_mut().vacate_reason = Some("rent");
+            u.extras_mut().vacate_at = Some(now + 90.0);
         }
         let r = e.port_stats_sheet();
         for (k, slot) in ["gates", "elevators", "mix"].iter().enumerate() {
