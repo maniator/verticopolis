@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { FLOOR } from "../src/render/scale";
-import { expectEngineHosted } from "./helpers";
+import { dispatchTouch, expectEngineHosted } from "./helpers";
 
 // Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
@@ -24,73 +24,6 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * pointerIds (as Android Chrome assigns) so Excalibur's id normalization is
  * exercised for real, not simulated.
  */
-
-/** Dispatch one synthetic touch PointerEvent on the game canvas at
- *  canvas-relative coordinates. Self-contained for page.evaluate. */
-function touchArgs(type: string, id: number, x: number, y: number) {
-  return { type, id, x, y };
-}
-
-async function dispatchTouch(
-  page: import("@playwright/test").Page,
-  type: "pointerdown" | "pointermove" | "pointerup" | "pointercancel",
-  id: number,
-  x: number,
-  y: number,
-): Promise<void> {
-  await page.evaluate(({ type, id, x, y }) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ex = (window as any).game?.engine?.engine;
-    const startFrame = Number.isFinite(ex?.stats?.currFrame?.id) ? ex.stats.currFrame.id : null;
-    const canvas = document.getElementById("view") as HTMLCanvasElement;
-    const r = canvas.getBoundingClientRect();
-    canvas.dispatchEvent(
-      new PointerEvent(type, {
-        pointerId: id,
-        pointerType: "touch",
-        isPrimary: false,
-        button: 0,
-        buttons: type === "pointerup" || type === "pointercancel" ? 0 : 1,
-        clientX: r.left + x,
-        clientY: r.top + y,
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
-    // Excalibur flushes pointer events in its update loop; usually two frames are enough.
-    // On overloaded CI, rAF can stall for a while, so the wait is bounded by a generous cap (a stall that long is a real failure).
-    return new Promise<void>((done, fail) => {
-        let settled = false;
-        const frameAdvanced = () => {
-          if (startFrame === null) return false;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const now = (window as any).game?.engine?.engine?.stats?.currFrame?.id;
-          return Number.isFinite(now) && now > startFrame;
-        };
-        const finish = (ok: boolean, reason: string) => {
-          if (settled) return;
-          settled = true;
-          if (ok) done();
-          else fail(new Error(reason));
-        };
-        // Do not treat a missing Excalibur frame as success. If the engine can
-        // not provide a stats frame, the test must fail fast rather than mask a
-        // missing input update behind a synthetic pass.
-        if (startFrame === null) {
-          finish(false, "Excalibur frame stats were unavailable before pointer dispatch");
-          return;
-        }
-        let frames = 0;
-        const onFrame = () => {
-          frames++;
-          if (frames >= 2) finish(frameAdvanced(), "pointer event dispatch finished before Excalibur advanced a frame");
-          else requestAnimationFrame(onFrame);
-        };
-        requestAnimationFrame(onFrame);
-        setTimeout(() => finish(frameAdvanced(), "pointer event dispatch timed out before Excalibur advanced a frame"), 5_000);
-      });
-  }, touchArgs(type, id, x, y));
-}
 
 /** Camera zoom derived from two world points (no absolute-zoom getter). */
 async function readZoom(page: import("@playwright/test").Page): Promise<number> {

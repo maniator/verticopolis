@@ -64,9 +64,9 @@ Sources: the retail manual's Map Window and Tutorial sections (PDF pp. 14, 23, 3
 | S2 | Draw-list builder and style table (`src/render/overviewMap/`) with unit tests and a large-tower budget test | merged (#1626) |
 | S2b | Apply the retail capture to Classic: flat gray silhouette, 1 px shaft lines, fixed-scale layout option, dotted camera outline (SPEC, Retail capture findings); the style table part only, the fixed-scale layout and camera outline land in S3 | merged (#1636); retail elevator colors and stairs left out of Classic in #1640 |
 | S3a | Pure state, no caller: Classic shaft lines, the Modern banded crop, the view's placement against the map (clipped, above, below) and the edge band, the text summary, the per-layout open preference, and the model that decides when to rebuild and redraw | merged (#1665) |
-| S3b | Window, Map button and phone pill, camera binding (click, tap, drag, keys), a11y; all chrome and CSS in one PR, built only behind the `?map` preview flag in dev and tooling builds until S5 | in review |
-| S4 | Playwright desktop and phone-touch specs, visual snapshots (pinned image), gallery scenes, large-tower performance run with the real catalog height lookup, the real pattern source and a real canvas (the S2 unit budget is synthetic and only pins the algorithm's shape), PC run for hardware claims | after S3 |
-| S5 | "Floor heatmap" rename, Help entry, CHANGELOG line, minor version bump, remove the preview flag, backlog row finished, #343 closed | after S4 |
+| S3b | Window, Map button and phone pill, camera binding (click, tap, drag, keys), a11y; all chrome and CSS in one PR, built only behind the `?map` preview flag in dev and tooling builds until S5 | merged (#1690) |
+| S4 | Playwright desktop and phone-touch specs, visual snapshots (pinned image), large-tower performance run of the map alone with the real catalog height lookup, the real pattern source and a real canvas (the S2 unit budget is synthetic and only pins the algorithm's shape). The gallery scenes move to S5: the gallery documents the player build, which shows the map only once the flag comes off. S4 makes no hardware claim, so it needs no PC run | in review |
+| S5 | "Floor heatmap" rename, Help entry, gallery scenes (desktop and phone, the phone one with the heatmap on to settle whether its legend moves from under the card), the paired open versus closed perf run on `large`, CHANGELOG line, minor version bump, remove the preview flag, backlog row finished, #343 closed | after S4 |
 | S6 | Hotel (#1617), Eval (#1618), Pricing (#1619): 3.1.0 | later |
 
 Visibility rule (decision 8): S1 and S2 are pure modules with no caller, so merging them exposes nothing. S3a adds more pure modules with no caller. The Map button and window arrive only in S3b and are enabled for players only once S3 to S5 are all merged.
@@ -77,7 +77,7 @@ Visibility rule (decision 8): S1 and S2 are pure modules with no caller, so merg
 | --- | --- | --- |
 | Simulation, save or conformance regression | Very low | Read-only projection, no export, no migration. |
 | Gesture or input regression on mobile | Medium | DOM window outside the world canvas; S4 proves the world canvas still pans and pinches with the map open. |
-| Frame-time regression | Low to medium | Revision-keyed bitmap, O(1) camera overlay, closed costs nothing, open versus closed measured in S4. |
+| Frame-time regression | Low to medium | Revision-keyed bitmap, O(1) camera overlay, closed costs nothing; S4 measures the map's own cost on a large tower, and S5 runs the paired open versus closed whole-frame measurement before the flag comes off. |
 | Screenshot and baseline churn near the freeze | Medium | One chrome PR, one approval click, local compare first. |
 | File-ceiling and rebase conflicts | Medium | New files, near-zero lines in capped files, file ownership agreed before S3. |
 | Review capacity | Medium | Review skill per PR (`/bmad-code-review`, since this is UI plumbing) plus the hot-path record. |
@@ -85,4 +85,4 @@ Visibility rule (decision 8): S1 and S2 are pure modules with no caller, so merg
 
 ## Release-gate impact
 
-None by design. No change to #945, #1104, #1561, their labels or the milestones. The Performance gate is the one row the feature could touch; since the Map is open by default on desktop, the paired open-versus-closed measurement on the `large` fixture covers the default state, and with no per-frame cost and the freeze cut-off its measurements stay valid. A slice that lands after the freeze waits for 3.1.0.
+None by design. No change to #945, #1104, #1561, their labels or the milestones. The Performance gate is the one row the feature could touch; since the Map is open by default on desktop, the paired open-versus-closed measurement on the `large` fixture covers the default state (it runs in S5, before the flag comes off, since only then does the player build carry the map), and with no per-frame cost and the freeze cut-off its measurements stay valid. A slice that lands after the freeze waits for 3.1.0.
