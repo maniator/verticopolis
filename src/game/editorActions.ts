@@ -135,6 +135,8 @@ export class EditorActions {
         // The engine owns the warm-up gate and the tuning (#1550): ask it live,
         // so undo/redo and stop edits made while the dialog is open are read.
         autoTune: (draft, weekendView) => this.deps.engine().autoTuneProposal(id, scheduleSlots(draft), weekendView),
+        facts: (draft, weekendView) => this.deps.engine().scheduleFacts(id, scheduleSlots(draft), weekendView),
+        preset: (name) => this.deps.engine().schedulePreset(id, name),
         current: kit.currentSchedule(id),
         initialWeekend: clockOf(header).isWeekend,
         announce: (msg) => this.deps.announce(msg),

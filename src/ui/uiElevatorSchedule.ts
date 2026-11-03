@@ -3,9 +3,8 @@ import { render } from "lit-html";
 import { elevatorScheduleTemplate, floorLabel, type FloorRow, type SchedCtx, type SchedState, type SchedHandlers } from "./templates/elevatorSchedule";
 import { SCHEDULE_HOURS, type ElevatorSchedule, type ElevatorScheduleUX } from "../engine/elevatorSchedule";
 import { ORIGIN_HOURS, topOriginFloors, type OriginRings } from "../engine/scheduleOrigins";
-import type { AutoTuneProposal } from "../simport/enginePort";
+import type { AssistedPreset, AutoTuneProposal, PresetProposal, ScheduleFacts, SchedulePresetName } from "../simport/enginePort";
 import { hh, fmtHours, originClause } from "./scheduleFormat";
-import { presetSchedule, scheduleAdvice, stagingSummary, recommendedPreset, type ShaftContext, type SchedulePreset } from "../engine/scheduleAuthoring";
 
 /**
  * The per-shaft elevator Schedule dialog controller (elevator-scheduling #305
@@ -54,6 +53,14 @@ export interface ScheduleDialogCtx {
    *  warm, whether Auto-tune is offered and what it proposes: the dialog only
    *  shows and applies the answer. */
   autoTune: (draft: ElevatorSchedule, weekendView: boolean) => AutoTuneProposal;
+  /** The engine's advice and staging facts for this shaft against the working
+   *  schedule (homes included: they are the staging being summarized). It owns
+   *  the over and short hours, the busiest hour, the staging counts and which
+   *  preset to highlight; the dialog words them. */
+  facts: (draft: ElevatorSchedule, weekendView: boolean) => ScheduleFacts;
+  /** The rows and homes a named preset sets for this shaft. Reads the engine's
+   *  live stops, so it follows stop edits made inside the dialog. */
+  preset: (name: SchedulePresetName) => PresetProposal;
   /** The shaft's current authored schedule (the working copy is seeded from it). */
   current?: ElevatorSchedule;
   /** The live day type, so the dialog opens on the day the player is in. */
@@ -65,7 +72,7 @@ export interface ScheduleDialogCtx {
 const DEFAULT_SFD = 48; // the second-equivalent of the 0.8 game-minute dwell (DWELL_DEFAULT_SECONDS)
 
 /** Announcement-cased preset names for the applied-schedule toast. */
-const PRESET_LABEL: Record<SchedulePreset, string> = {
+const PRESET_LABEL: Record<AssistedPreset, string> = {
   rush: "Rush",
   balanced: "Balanced",
   feeder: "Feeder",
@@ -86,20 +93,10 @@ export function showElevatorScheduleDialog(
   // day, #466), so the ghost and the advice draw the ring the engine tuned from.
   const warmedWd = (): boolean => tune.weekday.warm;
   const warmedWe = (): boolean => tune.weekend.warm;
-  const measured = (): { weekday?: readonly number[]; weekend?: readonly number[] } | undefined =>
-    warmedWd() || warmedWe()
-      ? {
-          ...(tune.weekday.curve ? { weekday: tune.weekday.curve } : {}),
-          ...(tune.weekend.curve ? { weekend: tune.weekend.curve } : {}),
-        }
-      : undefined;
 
   const readFloors = (): FloorRow[] => ctx.stops.read();
   const servedFloorsAsc = (floors: FloorRow[]): number[] =>
     floors.filter((f) => f.served).map((f) => f.floor).sort((x, y) => x - y);
-  const servedLobbiesAsc = (floors: FloorRow[]): number[] =>
-    floors.filter((f) => f.served && f.lobby).map((f) => f.floor).sort((x, y) => x - y);
-  const baseOf = (floors: FloorRow[]): number => servedLobbiesAsc(floors)[0] ?? ctx.bottom;
 
   /** The visible day's origin map at hour `h`, gated on that day's warm demand
    *  curve so origins never outrun the demand gate (#465). */
@@ -108,43 +105,26 @@ export function showElevatorScheduleDialog(
     const ring = state.day === "weekend" ? ctx.origins.weekend : ctx.origins.weekday;
     return ring[((h % ORIGIN_HOURS) + ORIGIN_HOURS) % ORIGIN_HOURS];
   };
-  /** The authoring-model view of the shaft, rebuilt from the LIVE rows so preset
-   *  staging and the Simulate readout follow stop edits made inside the dialog. */
-  const shaftNow = (floors: FloorRow[]): ShaftContext => ({
-    cars: ctx.cars,
-    bottom: ctx.bottom,
-    top: ctx.top,
-    servedLobbies: servedLobbiesAsc(floors),
-    hourly: measured(),
-  });
-
-  // A stored home floor may sit on a stop the shaft no longer serves: snap it to
-  // the nearest served floor so the grid never marks a chip on a skipped row and
-  // OK re-commits a floor the car can actually wait at.
-  const snapToServed = (floor: number, served: number[]): number => {
-    let bestFloor = served[0] ?? ctx.bottom;
-    let bestDist = Infinity;
-    for (const f of served) {
-      const d = Math.abs(f - floor);
-      if (d < bestDist) { bestDist = d; bestFloor = f; }
-    }
-    return bestFloor;
-  };
-
+  // A stored home floor may sit on a stop the shaft no longer serves. The
+  // engine answers the homes it would hold (each on the nearest served floor, a
+  // car with no home at the base lobby), so the grid never marks a chip on a
+  // skipped row and OK re-commits a floor the car can actually wait at.
   const initialFloors = readFloors();
-  const initialServed = servedFloorsAsc(initialFloors);
-  const base0 = baseOf(initialFloors);
+  const seed = ctx.facts({ homeFloors: ctx.current?.homeFloors ? [...ctx.current.homeFloors] : undefined }, ctx.initialWeekend);
+  const base0 = seed.staging?.baseLobby ?? ctx.bottom;
   const fullRow = (): number[] => Array(SCHEDULE_HOURS).fill(ctx.cars);
   const seedRow = (r: readonly number[] | undefined): number[] => {
     const out = fullRow();
     if (r) for (let h = 0; h < SCHEDULE_HOURS; h++) if (Number.isFinite(r[h])) out[h] = Math.max(0, Math.min(ctx.cars, Math.floor(r[h])));
     return out;
   };
-  const seedHomes = (): number[] =>
-    Array.from({ length: ctx.cars }, (_, i) => {
-      const v = ctx.current?.homeFloors?.[i];
-      return typeof v === "number" && Number.isFinite(v) ? snapToServed(v, initialServed) : base0;
-    });
+  // A refused seed query keeps the stored homes where they are readable; the
+  // first recompute then asks again and the engine snaps them.
+  const storedHome = (i: number): number => {
+    const home = ctx.current?.homeFloors?.[i];
+    return home !== undefined && Number.isFinite(home) ? home : base0;
+  };
+  const seedHomes = (): number[] => (seed.homeFloors.length === ctx.cars ? [...seed.homeFloors] : Array.from({ length: ctx.cars }, (_, i) => storedHome(i)));
 
   const state: SchedState = {
     day: ctx.initialWeekend ? "weekend" : "weekday",
@@ -189,7 +169,7 @@ export function showElevatorScheduleDialog(
     hasMeasured: dayWarmed(),
     hourly: dayCurve(),
     canTune: tune.status === "available",
-    recommended: recommendedPreset(ctx.isExpress),
+    recommended: null, // the first recompute sets it from the engine's facts
   };
 
   const announce = (msg: string): void => ctx.announce?.(msg);
@@ -208,11 +188,15 @@ export function showElevatorScheduleDialog(
     sctx.hasMeasured = dayWarmed();
     sctx.hourly = dayCurve();
     sctx.canTune = tune.status === "available";
-    const shaft = shaftNow(state.floors);
-    const adv = ctx.ux.advice ? scheduleAdvice(state.schedule, shaft, isWeekend) : null;
-    adviceCritical = adv !== null;
-    if (!ctx.ux.advice) state.adviceMsg = "";
-    else if (!adv) state.adviceMsg = sctx.hasMeasured ? "Measured demand and your schedule line up." : "";
+    // The facts read the whole working copy: its homes are the staging the
+    // Simulate sentence summarizes.
+    const facts = ctx.facts(state.schedule, isWeekend);
+    sctx.recommended = facts.recommended;
+    const adv = ctx.ux.advice && facts.advice.status === "ready" ? facts.advice : null;
+    const advised = adv !== null && (adv.over.length > 0 || adv.short.length > 0);
+    adviceCritical = advised;
+    if (!adv) state.adviceMsg = "";
+    else if (!advised) state.adviceMsg = "Measured demand and your schedule line up.";
     else {
       const parts: string[] = [];
       if (adv.over.length) parts.push(`over-staffed ${fmtHours(adv.over)}`);
@@ -225,10 +209,18 @@ export function showElevatorScheduleDialog(
     // read as a place it never touches; party ruling, spec §16). A day with no
     // measured ring must not claim a measured peak (#466): its sentence names
     // the assumed 17:00 down-rush instead of "Busiest".
-    const sum = stagingSummary(state.schedule, shaft, isWeekend);
+    const sum = facts.staging;
+    // The engine's base floor and homes follow every edit, a stop edit included.
+    if (sum) state.base = sum.baseLobby;
+    if (facts.homeFloors.length === ctx.cars) state.schedule.homeFloors = [...facts.homeFloors];
+    if (!sum) {
+      state.simMsg = "";
+      state.originFloors = [];
+      return;
+    }
     // floorLabel keeps the pinned B-n basement grammar for below-ground bases.
-    const baseClause = state.base === 1 ? "at the lobby" : `at Floor ${floorLabel(state.base)} (the base)`;
-    const peakClause = sctx.hasMeasured
+    const baseClause = sum.baseLobby === 1 ? "at the lobby" : `at Floor ${floorLabel(sum.baseLobby)} (the base)`;
+    const peakClause = sum.measured
       ? `Busiest ${state.day} hour ${hh(sum.peakHour)}`
       : `No measured ${state.day} peak yet; at the ${hh(sum.peakHour)} down-rush`;
     // Origin readouts (#465): hotspot markers for the visible day's peak hour,
@@ -264,13 +256,10 @@ export function showElevatorScheduleDialog(
     unfoldOnAdvice();
     rerender();
   };
-  /** A stop edit landed (applied live): refresh rows, re-derive the base, re-snap
-   *  the working homes onto the new served set, recompute, repaint. */
+  /** A stop edit landed (applied live): refresh rows, recompute (the engine
+   *  re-derives the base and snaps the homes onto the new served set), repaint. */
   const afterStops = (): void => {
     state.floors = readFloors();
-    state.base = baseOf(state.floors);
-    const served = servedFloorsAsc(state.floors);
-    state.schedule.homeFloors = state.schedule.homeFloors.map((f) => snapToServed(f, served));
     state.cancelArmed = false;
     recompute();
     // A stop edit reshapes the shaft context the advice reads, so it can turn
@@ -391,21 +380,23 @@ export function showElevatorScheduleDialog(
       after();
     },
     onStageUpTower: () => {
-      const preset = presetSchedule("rush", shaftNow(state.floors)); // its split staging is the one-press play
-      if (preset.homeFloors) state.schedule.homeFloors = [...preset.homeFloors];
+      const play = ctx.preset("stage-up-tower");
+      if (play.status !== "available") return;
+      state.schedule.homeFloors = [...play.homeFloors];
       homesDirty = true;
       after();
     },
     onAllCars: () => { state.schedule.activeCars = { weekday: fullRow(), weekend: fullRow() }; announce(`All ${ctx.cars} cars now run every hour, both day types.`); after(); },
-    onPreset: (p: SchedulePreset) => {
-      const preset = presetSchedule(p, shaftNow(state.floors));
+    onPreset: (p: AssistedPreset) => {
+      const preset = ctx.preset(p);
+      if (preset.status !== "available") return; // the mode offers no presets; the buttons are not shown
       state.schedule.activeCars = {
-        weekday: preset.activeCars?.weekday ? [...preset.activeCars.weekday] : fullRow(),
-        weekend: preset.activeCars?.weekend ? [...preset.activeCars.weekend] : fullRow(),
+        weekday: preset.weekday ? [...preset.weekday] : fullRow(),
+        weekend: preset.weekend ? [...preset.weekend] : fullRow(),
       };
       // A preset re-stages only staging the player has not hand-set (spec §14.3):
       // counts are its business, a hand-placed fleet is not.
-      if (!homesDirty && preset.homeFloors) state.schedule.homeFloors = [...preset.homeFloors];
+      if (!homesDirty) state.schedule.homeFloors = [...preset.homeFloors];
       announce(`Applied the ${PRESET_LABEL[p] ?? "Feeder"} schedule.`);
       after();
     },

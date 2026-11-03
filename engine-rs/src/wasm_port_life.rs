@@ -11,6 +11,7 @@ use crate::gameplay::GameplayEvents;
 use crate::save_delta::SaveMirror;
 use crate::schedule::{Schedule, SCHEDULE_HOURS};
 use crate::sim::{LogKind, Simulation};
+use crate::tower::Transport;
 use crate::view::layout::{CALENDARS, MODES};
 
 use super::port::record;
@@ -336,6 +337,18 @@ impl Engine {
             .map_or_else(Vec::new, schedule_slots)
     }
 
+    /// The player's working `draft` (the `scheduleShaft` slots, empty for none)
+    /// as the schedule shaft `t` would store it. `Err` is a draft that is not
+    /// the schedule slots; `Ok(None)` is no draft, or one that sets nothing.
+    fn working_draft(t: &Transport, draft: &[f64]) -> Result<Option<Schedule>, ()> {
+        if draft.is_empty() {
+            return Ok(None);
+        }
+        schedule_json(draft)
+            .map(|raw| Schedule::coerce(Some(&raw), t.cars, t.bottom, t.top))
+            .ok_or(())
+    }
+
     /// The Auto-tune proposal for shaft `id` as JSON (`AutoTuneProposal`),
     /// against the player's working `draft` in the [`SCHEDULE_LEN`] slots
     /// `scheduleShaft` takes (empty for no draft; leave the home count 0 for
@@ -351,21 +364,39 @@ impl Engine {
         let shaft = whole(id).and_then(|id| self.sim.tower.get_transport(id).map(|t| (id, t)));
         let answer = match shaft {
             None => AutoTuneProposal::refused(ProposalStatus::MissingShaft),
-            Some((id, t)) => {
-                // `Err` is a draft that is not the schedule slots; `Ok(None)` is no
-                // draft, or one that sets nothing.
-                let parsed: Result<Option<Schedule>, ()> = if draft.is_empty() {
-                    Ok(None)
-                } else {
-                    schedule_json(draft)
-                        .map(|raw| Schedule::coerce(Some(&raw), t.cars, t.bottom, t.top))
-                        .ok_or(())
-                };
-                match parsed {
-                    Err(()) => AutoTuneProposal::refused(ProposalStatus::InvalidDraft),
-                    Ok(d) => self.sim.auto_tune_proposal(id, d.as_ref(), weekend_view),
-                }
-            }
+            Some((id, t)) => match Self::working_draft(t, draft) {
+                Err(()) => AutoTuneProposal::refused(ProposalStatus::InvalidDraft),
+                Ok(d) => self.sim.auto_tune_proposal(id, d.as_ref(), weekend_view),
+            },
+        };
+        serde_json::to_string(&answer).unwrap_or_default()
+    }
+
+    /// The advice and staging facts for shaft `id` as JSON (`ScheduleFacts`),
+    /// against the player's working `draft` (same slots as the Auto-tune
+    /// query; here the draft's homes are the staging being summarized).
+    /// Read-only. `weekend_view` is the day tab on screen.
+    pub(crate) fn port_schedule_facts(&self, id: f64, draft: &[f64], weekend_view: bool) -> String {
+        use crate::schedule_facts::{FactsStatus, ScheduleFacts};
+        let shaft = whole(id).and_then(|id| self.sim.tower.get_transport(id).map(|t| (id, t)));
+        let answer = match shaft {
+            None => ScheduleFacts::refused(FactsStatus::MissingShaft),
+            Some((id, t)) => match Self::working_draft(t, draft) {
+                Err(()) => ScheduleFacts::refused(FactsStatus::InvalidDraft),
+                Ok(d) => self.sim.schedule_facts(id, d.as_ref(), weekend_view),
+            },
+        };
+        serde_json::to_string(&answer).unwrap_or_default()
+    }
+
+    /// The rows and homes the named preset sets for shaft `id`, as JSON
+    /// (`PresetProposal`). Read-only; `preset` is `rush`, `balanced`,
+    /// `feeder` or `stage-up-tower`.
+    pub(crate) fn port_schedule_preset(&self, id: f64, preset: &str) -> String {
+        use crate::schedule_presets::{PresetProposal, PresetStatus};
+        let answer = match whole(id) {
+            None => PresetProposal::refused(PresetStatus::MissingShaft),
+            Some(id) => self.sim.schedule_preset(id, preset),
         };
         serde_json::to_string(&answer).unwrap_or_default()
     }

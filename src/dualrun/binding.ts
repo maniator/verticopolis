@@ -70,6 +70,8 @@ export const INSTANCE_METHODS = [
   "demolishTile", "quoteRentBatch", "shaftSchedule", "founder",
   // The read-only Auto-tune proposal (#1550).
   "autoTuneProposal",
+  "scheduleFacts",
+  "schedulePreset",
   // The recycling card's capacity line.
   "recyclingCapacity",
 ] as const satisfies readonly (keyof WasmEngine)[];
