@@ -214,6 +214,12 @@ export interface GameplayEvents {
    *  ZERO so "fraction of sessions that had a fire" has its denominator. Counts
    *  only, never a currency figure. */
   session_emergencies: { fires: number; firesGutRooms: number; bombs: number };
+  /** How many crash screens this page life showed, counted before the `crash`
+   *  event's cap and dedup so a loop's size survives (#841). Sent once, at the
+   *  terminal page hide, and only when at least one crash screen showed. A tab
+   *  killed outright never sends it, so the worst loops can be missing: read it
+   *  as a lower bound, like the `crash` rows. Counts only. */
+  session_crashes: { crashes: number };
   /** The reliability instrument (`analyticsEngineStatus.ts`, issue #1081):
    *  which engine this page life runs, whether it fell back and why, and
    *  whether the engine save writer turned itself off. Every value is a code

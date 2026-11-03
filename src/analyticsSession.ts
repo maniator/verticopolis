@@ -2,7 +2,7 @@ import { telemetryHostAllowed } from "./telemetry";
 import type { GameplayMilestoneId } from "./engine/gameplayEvents";
 import { trackEvent, setCommonProps, type GameplayEvents } from "./analyticsCore";
 import { clearActionLatches } from "./analyticsActions";
-import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots } from "./analyticsCrash";
+import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots, takeCrashCount } from "./analyticsCrash";
 import { resetEngineStatus } from "./analyticsEngineStatus";
 
 /**
@@ -331,6 +331,15 @@ class GameplaySession {
     if (isFinal && this.played && !this.emergReported) {
       this.emergReported = true;
       trackEvent("session_emergencies", { fires: this.emerg.fires, firesGutRooms: this.emerg.gutRooms, bombs: this.emerg.bombs });
+    }
+    // How many crash screens this page life showed, which the `crash` event's cap
+    // and dedup cannot say (#841). Final only, for the reason given above, and
+    // sent only when there was one: it needs no zero-denominator, since the
+    // sessions come from `session_end`. Taking the count here and not at the
+    // hide keeps a later bfcache restore from reporting the same crashes twice.
+    if (isFinal) {
+      const crashesSeen = takeCrashCount();
+      if (crashesSeen > 0) trackEvent("session_crashes", { crashes: crashesSeen });
     }
     const seconds = Math.round(this.activeMs / 1000);
     // The terminal emission is let through the whole-second dedup once, because it

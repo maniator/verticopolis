@@ -139,4 +139,40 @@ describe("crash event cap and dedup", () => {
     // A full second budget, under what would be the same session id on the wire.
     expect(crashCalls()).toHaveLength(20);
   });
+
+  describe("session_crashes summary (#841)", () => {
+    const loop = { kind: "webgl-context-lost", repeat: true, recoveryFailed: false, saveFlushed: true, behindSplash: false, ...context };
+    const summaries = () => vi.mocked(sendToRelay).mock.calls.filter(([name]) => name === "session_crashes").map(([, props]) => props);
+
+    it("counts every crash screen the cap and dedup hide, and sends the total once at the terminal hide", () => {
+      for (let i = 0; i < 40; i++) gameplaySession.noteCrash(loop);
+      expect(crashCalls()).toHaveLength(1); // the cap and dedup still hold
+      gameplaySession.end(true);
+      expect(summaries()).toEqual([{ crashes: 40 }]);
+      gameplaySession.end(true);
+      expect(summaries()).toHaveLength(1); // taken, so a second final hide does not repeat it
+    });
+
+    it("waits for the terminal hide, as a tab switch is not the end", () => {
+      gameplaySession.noteCrash(loop);
+      gameplaySession.end(false);
+      expect(summaries()).toEqual([]);
+      gameplaySession.end(true);
+      expect(summaries()).toEqual([{ crashes: 1 }]);
+    });
+
+    it("sends nothing for a page life with no crash screen", () => {
+      gameplaySession.end(true);
+      expect(summaries()).toEqual([]);
+    });
+
+    it("reports only new crash screens after a bfcache restore", () => {
+      gameplaySession.noteCrash(loop);
+      gameplaySession.end(true);
+      gameplaySession.noteCrash(loop);
+      gameplaySession.noteCrash(loop);
+      gameplaySession.end(true);
+      expect(summaries()).toEqual([{ crashes: 1 }, { crashes: 2 }]);
+    });
+  });
 });
