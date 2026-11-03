@@ -75,6 +75,16 @@ export function hasBusinessHours(kind: FacilityKind): boolean {
   return entry(kind).openHours !== null;
 }
 
+/** The kind's width in tiles, as the bound catalog states it. */
+export function kindWidth(kind: FacilityKind): number {
+  return entry(kind).width;
+}
+
+/** The kind's height in floors, as the bound catalog states it. */
+export function kindFloors(kind: FacilityKind): number {
+  return entry(kind).floors;
+}
+
 /** Whether the kind is open in `hour`, read as the engines read it (a fraction
  *  or 24 wraps onto its hour); a kind with no posted hours is always open. */
 export function isOpenAt(kind: FacilityKind, hour: number): boolean {

@@ -1,4 +1,4 @@
-import { FACILITIES, facilityFloors } from "../../engine/facilities";
+import { kindFloors, kindWidth } from "../../presentation/viewKinds";
 import type { UnitView } from "../../simport/view";
 import { paintAnimatedUnit, paintSettledUnit } from "../regionPaint";
 import { FLOOR, TILE } from "../scale";
@@ -63,7 +63,7 @@ function region(doc: Document, w: number, h: number): CanvasRenderingContext2D {
  *  its own canvas when `at` is null. */
 function webPaint(doc: Document, unit: UnitView, s: LiveScene, anim: number, at: { x: number; y: number } | null): Image {
   const w = unit.width * TILE;
-  const h = facilityFloors(unit.kind) * FLOOR;
+  const h = kindFloors(unit.kind) * FLOOR;
   const ox = at?.x ?? 0;
   const oy = at?.y ?? 0;
   const ctx = region(doc, w + 2 * ox, h + 2 * oy);
@@ -83,7 +83,7 @@ export function verifySample(doc: Document, jobs: readonly Job[], renderer: Rend
     // Only the garage reads the id outside the sampled seeds (car color and
     // presence), so the sample keeps its own id there.
     id: sample.unit.kind === "parking" ? sample.unit.id : pl.id,
-    width: FACILITIES[sample.unit.kind].width,
+    width: kindWidth(sample.unit.kind),
     label: "",
   };
   const found = lookupRoom(unit, sample.scene, sample.variant, { recyclingEighths: sample.eighths });
