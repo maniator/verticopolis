@@ -1,0 +1,7226 @@
+{
+ "schema": 1,
+ "startedAt": "2026-11-03T22:08:57.233Z",
+ "generatedAt": "2026-11-03T22:26:28.284Z",
+ "config": {
+  "reps": 10,
+  "dt": 2,
+  "steps": 720,
+  "warmSteps": 120,
+  "batch": 4,
+  "memorySteps": 30,
+  "throttles": [
+   1,
+   4
+  ],
+  "frameWindowMs": 15000,
+  "frameWarmMs": 2000,
+  "commandEveryMs": 1000,
+  "speed": 3,
+  "viewport": {
+   "width": 1280,
+   "height": 720
+  },
+  "scenarios": [
+   "large"
+  ],
+  "modes": [
+   "ts",
+   "wasm"
+  ],
+  "quick": false,
+  "aa": "wasm"
+ },
+ "environment": {
+  "commit": "5cec61d18ee4f3c5446b390a27ecaa4e0970dd16",
+  "commitShort": "5cec61d",
+  "dirty": false,
+  "tree": {
+   "porcelain": [],
+   "diffSha256": null,
+   "untracked": [],
+   "hidden": [],
+   "complete": true
+  },
+  "branch": "claude/awesome-kepler-5c1a68",
+  "mainCommit": "100bda1956d11092d35ce5d9ac5cf33032fd495c",
+  "mainFetched": true,
+  "mergeBase": "5cec61d18ee4f3c5446b390a27ecaa4e0970dd16",
+  "behindMain": 40,
+  "os": "win32 10.0.26200",
+  "kernel": "10.0.26200",
+  "arch": "x64",
+  "cpuModel": "AMD Ryzen 5 5600X 6-Core Processor             ",
+  "logicalCpus": 12,
+  "totalMemoryBytes": 34246979584,
+  "freeMemoryBytesAtStart": 5745582080,
+  "node": "v22.22.0",
+  "rust": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+  "playwright": "1.61.1",
+  "appVersion": "2.78.8",
+  "engineBuildHash": "70e0046aa86f4b8911646c18df527914ce6737f9baaf63cea50b16d91ab1b473",
+  "engineSourceHash": "70e0046aa86f4b8911646c18df527914ce6737f9baaf63cea50b16d91ab1b473",
+  "enginePackage": {
+   "verticopolis_engine_bg.wasm": "8b8a35d95d785941b3a8d71f2ad6396966d01568b2af3dc1f1e50e535511b574",
+   "verticopolis_engine.js": "c4c29dfd63eec1b0a9056ad77d0e7ebbd86b3738b513ca3ffc6470ca0a1e7815"
+  }
+ },
+ "browser": {
+  "version": "149.0.7827.55",
+  "executable": "C:\\Users\\nafta\\AppData\\Local\\ms-playwright\\chromium-1228\\chrome-win64\\chrome.exe",
+  "channel": null,
+  "args": [],
+  "rendererException": null,
+  "gpuVerified": true
+ },
+ "scenarios": [
+  {
+   "name": "large",
+   "sha256": "fe381e36acf1267fa088d40ab1ff65fcfa1605e217d291618253fc46b202b20e",
+   "population": 17314,
+   "units": 43358,
+   "transports": 5,
+   "saveBytes": 2157123
+  }
+ ],
+ "scripts": {
+  "worker": null,
+  "otherJs": {
+   "raw": 1565314,
+   "brotli": 400401
+  },
+  "enginePackage": {
+   "raw": 2162654,
+   "brotli": 468324
+  }
+ },
+ "tsBaseline": null,
+ "runs": [
+  {
+   "rep": 0,
+   "mode": "ts",
+   "ranMode": "wasm",
+   "order": 0,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 460.22000002861023,
+    "modeReadyMs": 548.6400001049042,
+    "firstFrameMs": 543.8100001811981,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 99.375,
+    "modeReadyMs": 170.23499989509583,
+    "firstFrameMs": 164.7699999809265,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 739.9400000572205,
+    "modeReadyMs": 1096.2250001430511,
+    "firstFrameMs": 1072.770000219345,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.78999996185303,
+    "timed": {
+     "large:4": 249.50500011444092,
+     "frames-large:4": 249.5199999809265,
+     "cold:4": 247.8949999809265
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 70985504,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 156.9300000667572,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 845.8150000572205,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 187.49000000953674,
+       "mainMs": 187.34999990463257,
+       "batchMainP50Ms": 0.6274999380111694,
+       "batchMainP95Ms": 3.9182499647140494,
+       "batchMainMaxMs": 16.705000162124634,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 887.3150000572205,
+       "mainMs": 886.6449997425079,
+       "batchMainP50Ms": 3.5075000524520874,
+       "batchMainP95Ms": 17.777000093460078,
+       "batchMainMaxMs": 73.92000007629395,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1015,
+       "meanFps": 67.63925022390924,
+       "medianMs": 14.580000000001746,
+       "p95Ms": 15.066500000001541,
+       "p99Ms": 28.9609000000007,
+       "onePercentLowFps": 33.50757271143252,
+       "simMinutesPerSecond": 119.95137970742526,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 14.492500066757202,
+       "commandToFrameP95Ms": 18.948999929428098,
+       "commandToFrameMinMs": 4.15500020980835,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 560,
+       "meanFps": 37.323243616475686,
+       "medianMs": 15,
+       "p95Ms": 87.10774999999877,
+       "p99Ms": 146.5706999999993,
+       "onePercentLowFps": 5.289745827712966,
+       "simMinutesPerSecond": 114.10248762751138,
+       "clampedFrames": 3,
+       "longTasks": 45,
+       "blockingMs": 2669,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 20.394999980926514,
+       "commandToFrameP95Ms": 107.18325004577636,
+       "commandToFrameMinMs": 11.27999997138977,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 0,
+   "mode": "wasm",
+   "ranMode": "wasm",
+   "order": 1,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 476.0550000667572,
+    "modeReadyMs": 567.6849999427795,
+    "firstFrameMs": 562.2000000476837,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 91.63000011444092,
+    "modeReadyMs": 156.08500003814697,
+    "firstFrameMs": 152.41499996185303,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 769.8999998569489,
+    "modeReadyMs": 1118.034999847412,
+    "firstFrameMs": 1092.0899999141693,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.794999837875366,
+    "timed": {
+     "large:4": 250.58500003814697,
+     "frames-large:4": 250.3400001525879,
+     "cold:4": 247.43499994277954
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 71366800,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 136.10000014305115,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 839.8799998760223,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 170.31500005722046,
+       "mainMs": 170.1550006866455,
+       "batchMainP50Ms": 0.5824999809265137,
+       "batchMainP95Ms": 3.429249954223631,
+       "batchMainMaxMs": 16.955000162124634,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 872.9900000095367,
+       "mainMs": 871.6799998283386,
+       "batchMainP50Ms": 3.1675000190734863,
+       "batchMainP95Ms": 17.44924985170363,
+       "batchMainMaxMs": 75.49000000953674,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1014,
+       "meanFps": 67.5526230936703,
+       "medianMs": 14.569999999999709,
+       "p95Ms": 15.080000000001746,
+       "p99Ms": 29.04239999999867,
+       "onePercentLowFps": 30.65509947579771,
+       "simMinutesPerSecond": 119.9158989828467,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 13.295000076293945,
+       "commandToFrameP95Ms": 15.103249990940094,
+       "commandToFrameMinMs": 3.700000047683716,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 541,
+       "meanFps": 36.036804168279225,
+       "medianMs": 15.005000000001019,
+       "p95Ms": 89.02500000000146,
+       "p99Ms": 147.16500000000087,
+       "onePercentLowFps": 5.7899185937446225,
+       "simMinutesPerSecond": 116.30362306435403,
+       "clampedFrames": 0,
+       "longTasks": 46,
+       "blockingMs": 2573,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 26.399999856948853,
+       "commandToFrameP95Ms": 110.74749989509583,
+       "commandToFrameMinMs": 11.675000190734863,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 1,
+   "mode": "wasm",
+   "ranMode": "wasm",
+   "order": 0,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 482.52500009536743,
+    "modeReadyMs": 587.3600001335144,
+    "firstFrameMs": 580.7699999809265,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 92.10999989509583,
+    "modeReadyMs": 157.3949999809265,
+    "firstFrameMs": 153.7649998664856,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 736.585000038147,
+    "modeReadyMs": 1080.8550000190735,
+    "firstFrameMs": 1054.5250000953674,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.65499997138977,
+    "timed": {
+     "large:4": 254.22000002861023,
+     "frames-large:4": 254.46999979019165,
+     "cold:4": 247.49000000953674
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 70984612,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 133.59499979019165,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 850.8449997901917,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 155.44000005722046,
+       "mainMs": 155.3099992275238,
+       "batchMainP50Ms": 0.5649999380111694,
+       "batchMainP95Ms": 2.7669999003410264,
+       "batchMainMaxMs": 16.914999961853027,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 829.375,
+       "mainMs": 828.7300000190735,
+       "batchMainP50Ms": 2.2424999475479126,
+       "batchMainP95Ms": 16.15849996805191,
+       "batchMainMaxMs": 75.92499995231628,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1014,
+       "meanFps": 67.56853558526245,
+       "medianMs": 14.569999999999709,
+       "p95Ms": 15.117000000000733,
+       "p99Ms": 28.8810500000012,
+       "onePercentLowFps": 32.34257252821903,
+       "simMinutesPerSecond": 119.94414600934165,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 13.445000052452087,
+       "commandToFrameP95Ms": 15.569500052928925,
+       "commandToFrameMinMs": 4.375,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 584,
+       "meanFps": 38.68916600666527,
+       "medianMs": 15.00499999999738,
+       "p95Ms": 87.62974999999862,
+       "p99Ms": 146.55544999999915,
+       "onePercentLowFps": 5.33256544390944,
+       "simMinutesPerSecond": 116.33249230771268,
+       "clampedFrames": 0,
+       "longTasks": 46,
+       "blockingMs": 2546,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 20.49500000476837,
+       "commandToFrameP95Ms": 108.73749991655349,
+       "commandToFrameMinMs": 11.480000019073486,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 1,
+   "mode": "ts",
+   "ranMode": "wasm",
+   "order": 1,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 534.1800000667572,
+    "modeReadyMs": 635.25,
+    "firstFrameMs": 628.2350001335144,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 91.89499998092651,
+    "modeReadyMs": 152.28999996185303,
+    "firstFrameMs": 148.6600000858307,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 826.704999923706,
+    "modeReadyMs": 1221.289999961853,
+    "firstFrameMs": 1192.664999961853,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.37999987602234,
+    "timed": {
+     "large:4": 248.80000019073486,
+     "frames-large:4": 249.35999989509583,
+     "cold:4": 252.7149999141693
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 72601012,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 146.44500017166138,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 870.6950001716614,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 156.88499999046326,
+       "mainMs": 156.785001039505,
+       "batchMainP50Ms": 0.5674998760223389,
+       "batchMainP95Ms": 2.975750148296349,
+       "batchMainMaxMs": 17.08999991416931,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 852.9299998283386,
+       "mainMs": 851.3999991416931,
+       "batchMainP50Ms": 2.884999990463257,
+       "batchMainP95Ms": 15.77575008869171,
+       "batchMainMaxMs": 76.24500012397766,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1012,
+       "meanFps": 67.35909419324005,
+       "medianMs": 14.56000000000131,
+       "p95Ms": 15.084500000000206,
+       "p99Ms": 29.101149999999578,
+       "onePercentLowFps": 31.065548306927653,
+       "simMinutesPerSecond": 119.94178630061124,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 13.772500038146973,
+       "commandToFrameP95Ms": 21.46999996900558,
+       "commandToFrameMinMs": 2.429999828338623,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 535,
+       "meanFps": 35.63167636048067,
+       "medianMs": 15.010000000002037,
+       "p95Ms": 86.65599999999829,
+       "p99Ms": 146.9466000000004,
+       "onePercentLowFps": 5.581821124960233,
+       "simMinutesPerSecond": 116.15260480874446,
+       "clampedFrames": 0,
+       "longTasks": 47,
+       "blockingMs": 2454,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 32.75249981880188,
+       "commandToFrameP95Ms": 127.54375005960463,
+       "commandToFrameMinMs": 11.644999980926514,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 2,
+   "mode": "ts",
+   "ranMode": "wasm",
+   "order": 0,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 474.6199998855591,
+    "modeReadyMs": 577.2850000858307,
+    "firstFrameMs": 569.2799999713898,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 93.85000014305115,
+    "modeReadyMs": 162.86500000953674,
+    "firstFrameMs": 156.85000014305115,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 767.1300001144409,
+    "modeReadyMs": 1118.5699999332428,
+    "firstFrameMs": 1086,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.514999866485596,
+    "timed": {
+     "large:4": 251.3549997806549,
+     "frames-large:4": 250.50999999046326,
+     "cold:4": 248.0699999332428
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 71523688,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 129.03999996185303,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 831.375,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 152.75499987602234,
+       "mainMs": 152.64500045776367,
+       "batchMainP50Ms": 0.5575000047683716,
+       "batchMainP95Ms": 3.184999942779541,
+       "batchMainMaxMs": 16.03500008583069,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 869.1099998950958,
+       "mainMs": 868.3299996852875,
+       "batchMainP50Ms": 3.4924999475479126,
+       "batchMainP95Ms": 17.164749979972836,
+       "batchMainMaxMs": 66.91499996185303,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1011,
+       "meanFps": 67.32612080343836,
+       "medianMs": 14.569999999999709,
+       "p95Ms": 15.210000000000946,
+       "p99Ms": 29.092999999998572,
+       "onePercentLowFps": 31.955007349651638,
+       "simMinutesPerSecond": 120.00165152106422,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 13.702499866485596,
+       "commandToFrameP95Ms": 21.70025010108947,
+       "commandToFrameMinMs": 7.009999990463257,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 580,
+       "meanFps": 38.65429729153337,
+       "medianMs": 15.00499999999738,
+       "p95Ms": 86.6397500000021,
+       "p99Ms": 146.87904999999665,
+       "onePercentLowFps": 5.876441931939103,
+       "simMinutesPerSecond": 117.02921731712516,
+       "clampedFrames": 0,
+       "longTasks": 46,
+       "blockingMs": 2401,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 16.397500038146973,
+       "commandToFrameP95Ms": 113.44550002813338,
+       "commandToFrameMinMs": 10.880000114440918,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 2,
+   "mode": "wasm",
+   "ranMode": "wasm",
+   "order": 1,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 494.085000038147,
+    "modeReadyMs": 594.6500000953674,
+    "firstFrameMs": 588.4100000858307,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 92.05999994277954,
+    "modeReadyMs": 155.9649999141693,
+    "firstFrameMs": 152.2850000858307,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 747.1900000572205,
+    "modeReadyMs": 1091.6849999427795,
+    "firstFrameMs": 1066.4049999713898,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.375,
+    "timed": {
+     "large:4": 251.07999992370605,
+     "frames-large:4": 250.3550000190735,
+     "cold:4": 248.56500005722046
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 72625108,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 138.52500009536743,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 798.3899998664856,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 150.93499994277954,
+       "mainMs": 150.8250012397766,
+       "batchMainP50Ms": 0.5625,
+       "batchMainP95Ms": 2.8510000228881816,
+       "batchMainMaxMs": 13.865000009536743,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 857.7449998855591,
+       "mainMs": 856.8849997520447,
+       "batchMainP50Ms": 2.8924999237060547,
+       "batchMainP95Ms": 15.282250034809092,
+       "batchMainMaxMs": 66.82500004768372,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1015,
+       "meanFps": 67.61816190519333,
+       "medianMs": 14.545000000000073,
+       "p95Ms": 15.069999999999709,
+       "p99Ms": 28.629399999998533,
+       "onePercentLowFps": 30.894233591300058,
+       "simMinutesPerSecond": 119.91398170379115,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 14.332499861717224,
+       "commandToFrameP95Ms": 15.649000024795532,
+       "commandToFrameMinMs": 3.2300000190734863,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 576,
+       "meanFps": 38.38495309838543,
+       "medianMs": 15.00499999999738,
+       "p95Ms": 74.77624999999898,
+       "p99Ms": 147.07124999999996,
+       "onePercentLowFps": 5.976393246675683,
+       "simMinutesPerSecond": 116.62095125377517,
+       "clampedFrames": 0,
+       "longTasks": 46,
+       "blockingMs": 2362,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 17.990000128746033,
+       "commandToFrameP95Ms": 104.17200005054474,
+       "commandToFrameMinMs": 12.839999914169312,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 3,
+   "mode": "wasm",
+   "ranMode": "wasm",
+   "order": 0,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 494.414999961853,
+    "modeReadyMs": 596.1699998378754,
+    "firstFrameMs": 590.7449998855591,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 91.98000001907349,
+    "modeReadyMs": 152.75500011444092,
+    "firstFrameMs": 149.1600000858307,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 764.2000000476837,
+    "modeReadyMs": 1113.579999923706,
+    "firstFrameMs": 1082.2300000190735,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.68500018119812,
+    "timed": {
+     "large:4": 249.6449999809265,
+     "frames-large:4": 249.29999995231628,
+     "cold:4": 248.41499996185303
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 71391480,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 134.5899999141693,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 861.539999961853,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 169.95499992370605,
+       "mainMs": 169.82500004768372,
+       "batchMainP50Ms": 0.6024999618530273,
+       "batchMainP95Ms": 3.247000014781946,
+       "batchMainMaxMs": 17.480000019073486,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 885.6350002288818,
+       "mainMs": 884.8349990844727,
+       "batchMainP50Ms": 3.4625000953674316,
+       "batchMainP95Ms": 17.35525002479553,
+       "batchMainMaxMs": 69.02499985694885,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1011,
+       "meanFps": 67.29582606125717,
+       "medianMs": 14.565000000002328,
+       "p95Ms": 15.102499999999054,
+       "p99Ms": 29.083000000000172,
+       "onePercentLowFps": 30.630685821055422,
+       "simMinutesPerSecond": 119.94765436437729,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 14.102500081062317,
+       "commandToFrameP95Ms": 17.238750028610227,
+       "commandToFrameMinMs": 3.0950000286102295,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 569,
+       "meanFps": 37.930893112543096,
+       "medianMs": 15,
+       "p95Ms": 87.33999999999507,
+       "p99Ms": 142.88940000000122,
+       "onePercentLowFps": 5.6731151075054935,
+       "simMinutesPerSecond": 116.92581110615217,
+       "clampedFrames": 0,
+       "longTasks": 46,
+       "blockingMs": 2368,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 19.31000006198883,
+       "commandToFrameP95Ms": 101.77425005435943,
+       "commandToFrameMinMs": 11.915000200271606,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 3,
+   "mode": "ts",
+   "ranMode": "wasm",
+   "order": 1,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 527.3949999809265,
+    "modeReadyMs": 632.7999999523163,
+    "firstFrameMs": 626.7849998474121,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 92.51999998092651,
+    "modeReadyMs": 153.32000017166138,
+    "firstFrameMs": 149.67499995231628,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 798.8349997997284,
+    "modeReadyMs": 1150.6150000095367,
+    "firstFrameMs": 1124.7149999141693,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.33999991416931,
+    "timed": {
+     "large:4": 252.84499979019165,
+     "frames-large:4": 248.93499994277954,
+     "cold:4": 248.8199999332428
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 71363320,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 179.72000002861023,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 825.2850000858307,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 152.32999992370605,
+       "mainMs": 152.23999977111816,
+       "batchMainP50Ms": 0.5674999952316284,
+       "batchMainP95Ms": 2.8860001206397956,
+       "batchMainMaxMs": 14.125,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 874.6099998950958,
+       "mainMs": 873.8500001430511,
+       "batchMainP50Ms": 3.1874998807907104,
+       "batchMainP95Ms": 16.770499980449678,
+       "batchMainMaxMs": 74.6100001335144,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1013,
+       "meanFps": 67.52286728890356,
+       "medianMs": 14.56499999999869,
+       "p95Ms": 15.084999999999127,
+       "p99Ms": 29.090000000000146,
+       "onePercentLowFps": 30.94873342308416,
+       "simMinutesPerSecond": 119.9814028825532,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 14.289999961853027,
+       "commandToFrameP95Ms": 15.344500076770782,
+       "commandToFrameMinMs": 9.419999837875366,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 596,
+       "meanFps": 39.723614289037286,
+       "medianMs": 15,
+       "p95Ms": 73.95750000000407,
+       "p99Ms": 133.2904999999995,
+       "onePercentLowFps": 6.285473641866221,
+       "simMinutesPerSecond": 117.57123423802311,
+       "clampedFrames": 0,
+       "longTasks": 47,
+       "blockingMs": 2254,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 18.112500071525574,
+       "commandToFrameP95Ms": 110.79474996328352,
+       "commandToFrameMinMs": 12.089999914169312,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 4,
+   "mode": "ts",
+   "ranMode": "wasm",
+   "order": 0,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 471.2999999523163,
+    "modeReadyMs": 556.4300000667572,
+    "firstFrameMs": 551.4800000190735,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 96.97499990463257,
+    "modeReadyMs": 161.25,
+    "firstFrameMs": 157.5849997997284,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 791.8400001525879,
+    "modeReadyMs": 1221.7800002098083,
+    "firstFrameMs": 1188.8200001716614,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.610000133514404,
+    "timed": {
+     "large:4": 250.71000003814697,
+     "frames-large:4": 250.25500011444092,
+     "cold:4": 253.88499999046326
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 70950328,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 130.68499994277954,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 843.5299999713898,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 153.3549997806549,
+       "mainMs": 153.2850000858307,
+       "batchMainP50Ms": 0.5649999380111694,
+       "batchMainP95Ms": 2.9469999432563743,
+       "batchMainMaxMs": 14.319999933242798,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 857.670000076294,
+       "mainMs": 857.2200002670288,
+       "batchMainP50Ms": 2.9799998998641968,
+       "batchMainP95Ms": 17.343000149726862,
+       "batchMainMaxMs": 72.16000008583069,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1011,
+       "meanFps": 67.37702443466779,
+       "medianMs": 14.555000000000291,
+       "p95Ms": 15.069999999999709,
+       "p99Ms": 28.97650000000285,
+       "onePercentLowFps": 28.3241987792273,
+       "simMinutesPerSecond": 119.95909394896341,
+       "clampedFrames": 0,
+       "longTasks": 1,
+       "blockingMs": 1,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 13.305000066757202,
+       "commandToFrameP95Ms": 15.689749956130981,
+       "commandToFrameMinMs": 6.690000057220459,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 581,
+       "meanFps": 38.57591787114049,
+       "medianMs": 15.00499999999738,
+       "p95Ms": 73.7300000000032,
+       "p99Ms": 147.9899999999995,
+       "onePercentLowFps": 5.89956579195776,
+       "simMinutesPerSecond": 116.32531516392108,
+       "clampedFrames": 0,
+       "longTasks": 46,
+       "blockingMs": 2375,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 20.850000023841858,
+       "commandToFrameP95Ms": 110.80100010633468,
+       "commandToFrameMinMs": 12.299999952316284,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 4,
+   "mode": "wasm",
+   "ranMode": "wasm",
+   "order": 1,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 484.90499997138977,
+    "modeReadyMs": 578.9900000095367,
+    "firstFrameMs": 573.6349999904633,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 90.51999998092651,
+    "modeReadyMs": 183.6050000190735,
+    "firstFrameMs": 175.7300000190735,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 779.6900000572205,
+    "modeReadyMs": 1133.9400000572205,
+    "firstFrameMs": 1107.4449999332428,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 58.24500012397766,
+    "timed": {
+     "large:4": 247.58500003814697,
+     "frames-large:4": 250.0199999809265,
+     "cold:4": 246.42499995231628
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 71525464,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 132.2849998474121,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 790.1150000095367,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 160.39999985694885,
+       "mainMs": 160.31500124931335,
+       "batchMainP50Ms": 0.5525001287460327,
+       "batchMainP95Ms": 3.3332499265670767,
+       "batchMainMaxMs": 14.410000085830688,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 876.3550000190735,
+       "mainMs": 875.6849994659424,
+       "batchMainP50Ms": 3.6475000381469727,
+       "batchMainP95Ms": 16.979999792575832,
+       "batchMainMaxMs": 69.95500016212463,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1014,
+       "meanFps": 67.5107732613396,
+       "medianMs": 14.532500000001164,
+       "p95Ms": 15.086750000000665,
+       "p99Ms": 29.135250000000344,
+       "onePercentLowFps": 30.665440049065353,
+       "simMinutesPerSecond": 119.97476668336682,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 13.777500033378601,
+       "commandToFrameP95Ms": 20.85650012493133,
+       "commandToFrameMinMs": 2.1600000858306885,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 585,
+       "meanFps": 38.91788326630809,
+       "medianMs": 15.00499999999738,
+       "p95Ms": 74.20500000000465,
+       "p99Ms": 145.38920000000036,
+       "onePercentLowFps": 6.081097516479765,
+       "simMinutesPerSecond": 117.08628127983287,
+       "clampedFrames": 0,
+       "longTasks": 46,
+       "blockingMs": 2276,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 20.75,
+       "commandToFrameP95Ms": 103.06299998760223,
+       "commandToFrameMinMs": 15.15500020980835,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 5,
+   "mode": "wasm",
+   "ranMode": "wasm",
+   "order": 0,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 502.77499985694885,
+    "modeReadyMs": 598.2699999809265,
+    "firstFrameMs": 592.1349999904633,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 91.38499999046326,
+    "modeReadyMs": 160.0149998664856,
+    "firstFrameMs": 156.2149999141693,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 753.3650000095367,
+    "modeReadyMs": 1088.0999999046326,
+    "firstFrameMs": 1060.8150000572205,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.355000019073486,
+    "timed": {
+     "large:4": 248.53999996185303,
+     "frames-large:4": 257.5149998664856,
+     "cold:4": 250.3399999141693
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 70949096,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 130.44999980926514,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 836.4300000667572,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 155.77999997138977,
+       "mainMs": 155.71000027656555,
+       "batchMainP50Ms": 0.5649999380111694,
+       "batchMainP95Ms": 2.865000009536743,
+       "batchMainMaxMs": 16.319999933242798,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 862.75,
+       "mainMs": 862.4250001907349,
+       "batchMainP50Ms": 2.965000033378601,
+       "batchMainP95Ms": 16.5602500796318,
+       "batchMainMaxMs": 75.91000008583069,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1016,
+       "meanFps": 67.61961967291671,
+       "medianMs": 14.55999999999949,
+       "p95Ms": 15.066250000001673,
+       "p99Ms": 28.48325000000159,
+       "onePercentLowFps": 32.41333484595569,
+       "simMinutesPerSecond": 120.06475776569069,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 15,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 13.639999866485596,
+       "commandToFrameP95Ms": 20.73099982738493,
+       "commandToFrameMinMs": 2.940000057220459,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 569,
+       "meanFps": 37.88513081855519,
+       "medianMs": 15,
+       "p95Ms": 87.77300000000105,
+       "p99Ms": 141.8948000000015,
+       "onePercentLowFps": 5.869715788361491,
+       "simMinutesPerSecond": 117.18423592382624,
+       "clampedFrames": 0,
+       "longTasks": 48,
+       "blockingMs": 2511,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 19.84500002861023,
+       "commandToFrameP95Ms": 62.70974987745282,
+       "commandToFrameMinMs": 13.734999895095825,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 5,
+   "mode": "ts",
+   "ranMode": "wasm",
+   "order": 1,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 488.3549997806549,
+    "modeReadyMs": 593.6699998378754,
+    "firstFrameMs": 585.664999961853,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 98.78999996185303,
+    "modeReadyMs": 168.50499987602234,
+    "firstFrameMs": 164.05499982833862,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 755.5700001716614,
+    "modeReadyMs": 1127.6800000667572,
+    "firstFrameMs": 1099.1950001716614,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.959999799728394,
+    "timed": {
+     "large:4": 248.77500009536743,
+     "frames-large:4": 250.75999999046326,
+     "cold:4": 250.61500000953674
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 70978716,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 133.45500016212463,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 804.125,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 160.59500002861023,
+       "mainMs": 160.410001039505,
+       "batchMainP50Ms": 0.5874999761581421,
+       "batchMainP95Ms": 2.948000073432916,
+       "batchMainMaxMs": 14.825000047683716,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 882.9049999713898,
+       "mainMs": 882.1000001430511,
+       "batchMainP50Ms": 3.5024999380111694,
+       "batchMainP95Ms": 17.530999970436095,
+       "batchMainMaxMs": 66.1949999332428,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1019,
+       "meanFps": 67.91746328607883,
+       "medianMs": 14.529999999998836,
+       "p95Ms": 15.06000000000131,
+       "p99Ms": 15.763199999999705,
+       "onePercentLowFps": 33.761542227248555,
+       "simMinutesPerSecond": 120.1052687355388,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 12.649999976158142,
+       "commandToFrameP95Ms": 14.478000020980835,
+       "commandToFrameMinMs": 3.884999990463257,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 589,
+       "meanFps": 39.25725801049683,
+       "medianMs": 15,
+       "p95Ms": 82.16300000000075,
+       "p99Ms": 148.37140000000267,
+       "onePercentLowFps": 5.274706726306068,
+       "simMinutesPerSecond": 114.6391914737768,
+       "clampedFrames": 2,
+       "longTasks": 45,
+       "blockingMs": 2533,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 17.230000019073486,
+       "commandToFrameP95Ms": 103.7442499756813,
+       "commandToFrameMinMs": 11.055000066757202,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 6,
+   "mode": "ts",
+   "ranMode": "wasm",
+   "order": 0,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 504.1800000667572,
+    "modeReadyMs": 600.2599999904633,
+    "firstFrameMs": 594.3949999809265,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 89.38000011444092,
+    "modeReadyMs": 153.76500010490417,
+    "firstFrameMs": 149.44000005722046,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 809.4150002002716,
+    "modeReadyMs": 1153.4049999713898,
+    "firstFrameMs": 1129.5350000858307,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.40500020980835,
+    "timed": {
+     "large:4": 250.7699999809265,
+     "frames-large:4": 250.50999999046326,
+     "cold:4": 247.24500012397766
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 71401788,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 134.36999988555908,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 849.2799999713898,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 166.22500014305115,
+       "mainMs": 166.1300003528595,
+       "batchMainP50Ms": 0.5575000047683716,
+       "batchMainP95Ms": 3.271499991416927,
+       "batchMainMaxMs": 15.460000038146973,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 881.0299999713898,
+       "mainMs": 880.7099997997284,
+       "batchMainP50Ms": 3.5649999380111694,
+       "batchMainP95Ms": 17.57600004673004,
+       "batchMainMaxMs": 66.63000011444092,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1015,
+       "meanFps": 67.49897670886295,
+       "medianMs": 14.559999999997672,
+       "p95Ms": 15.086500000001978,
+       "p99Ms": 28.803600000000262,
+       "onePercentLowFps": 31.076650558602807,
+       "simMinutesPerSecond": 119.96862461358499,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 12.759999871253967,
+       "commandToFrameP95Ms": 15.82625013589859,
+       "commandToFrameMinMs": 3.7699999809265137,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 589,
+       "meanFps": 39.2301303386113,
+       "medianMs": 15.00499999999738,
+       "p95Ms": 81.6710000000009,
+       "p99Ms": 134.62119999999769,
+       "onePercentLowFps": 5.964807634953798,
+       "simMinutesPerSecond": 116.69132148259254,
+       "clampedFrames": 0,
+       "longTasks": 46,
+       "blockingMs": 2439,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 22.297500014305115,
+       "commandToFrameP95Ms": 105.69275002479552,
+       "commandToFrameMinMs": 11.72000002861023,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 6,
+   "mode": "wasm",
+   "ranMode": "wasm",
+   "order": 1,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 486.4800000190735,
+    "modeReadyMs": 587.8800001144409,
+    "firstFrameMs": 581.5350000858307,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 90.1949999332428,
+    "modeReadyMs": 160.18499994277954,
+    "firstFrameMs": 155.99499988555908,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 771.5600001811981,
+    "modeReadyMs": 1118.7400000095367,
+    "firstFrameMs": 1087.3200001716614,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.68499994277954,
+    "timed": {
+     "large:4": 248.8600001335144,
+     "frames-large:4": 250.9150002002716,
+     "cold:4": 249.875
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 71552852,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 131.68500018119812,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 829.5699999332428,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 151.75999999046326,
+       "mainMs": 151.65000104904175,
+       "batchMainP50Ms": 0.5699999332427979,
+       "batchMainP95Ms": 2.9235000848770096,
+       "batchMainMaxMs": 14.925000190734863,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 855.4800000190735,
+       "mainMs": 854.9649991989136,
+       "batchMainP50Ms": 3.0950000286102295,
+       "batchMainP95Ms": 16.556499862670886,
+       "batchMainMaxMs": 70.08500003814697,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1011,
+       "meanFps": 67.31399515219388,
+       "medianMs": 14.580000000001746,
+       "p95Ms": 15.082500000001346,
+       "p99Ms": 29.077999999998966,
+       "onePercentLowFps": 32.15434083601249,
+       "simMinutesPerSecond": 119.98003883704587,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 13.455000042915344,
+       "commandToFrameP95Ms": 14.809249901771546,
+       "commandToFrameMinMs": 3.25,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 567,
+       "meanFps": 37.79232815738405,
+       "medianMs": 15,
+       "p95Ms": 88.11199999999661,
+       "p99Ms": 152.8446999999996,
+       "onePercentLowFps": 5.242271581121552,
+       "simMinutesPerSecond": 114.24347524119268,
+       "clampedFrames": 2,
+       "longTasks": 46,
+       "blockingMs": 2709,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 15.65499997138977,
+       "commandToFrameP95Ms": 68.83874993324277,
+       "commandToFrameMinMs": 10.650000095367432,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 7,
+   "mode": "wasm",
+   "ranMode": "wasm",
+   "order": 0,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 502.585000038147,
+    "modeReadyMs": 600.7349998950958,
+    "firstFrameMs": 594.9249999523163,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 88.91000008583069,
+    "modeReadyMs": 153.4649999141693,
+    "firstFrameMs": 149.04500007629395,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 742.5,
+    "modeReadyMs": 1102.3499999046326,
+    "firstFrameMs": 1077.4700000286102,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.44000005722046,
+    "timed": {
+     "large:4": 248.8399999141693,
+     "frames-large:4": 250.90499997138977,
+     "cold:4": 249.8199999332428
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 70962912,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 131.64999985694885,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 818.1900000572205,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 152.59500002861023,
+       "mainMs": 152.48499965667725,
+       "batchMainP50Ms": 0.5674998760223389,
+       "batchMainP95Ms": 2.9555000543594305,
+       "batchMainMaxMs": 14.224999904632568,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 873.2700002193451,
+       "mainMs": 872.2850005626678,
+       "batchMainP50Ms": 3.392500162124634,
+       "batchMainP95Ms": 17.175749945640565,
+       "batchMainMaxMs": 70.64000010490417,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1013,
+       "meanFps": 67.4452947419302,
+       "medianMs": 14.554999999998472,
+       "p95Ms": 15.075000000000728,
+       "p99Ms": 29.16959999999948,
+       "onePercentLowFps": 30.60865306622217,
+       "simMinutesPerSecond": 119.97672371664189,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 13.944999933242798,
+       "commandToFrameP95Ms": 15.131000053882598,
+       "commandToFrameMinMs": 3.125,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 579,
+       "meanFps": 38.53715873981495,
+       "medianMs": 15.005000000004657,
+       "p95Ms": 74.47500000000365,
+       "p99Ms": 134.1242999999992,
+       "onePercentLowFps": 6.090282345489486,
+       "simMinutesPerSecond": 117.00919700275418,
+       "clampedFrames": 0,
+       "longTasks": 46,
+       "blockingMs": 2265,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 21.232499957084656,
+       "commandToFrameP95Ms": 108.58824986219405,
+       "commandToFrameMinMs": 10.819999933242798,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 7,
+   "mode": "ts",
+   "ranMode": "wasm",
+   "order": 1,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 466.5349998474121,
+    "modeReadyMs": 552.875,
+    "firstFrameMs": 547.9949998855591,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 91.39499998092651,
+    "modeReadyMs": 151.57500004768372,
+    "firstFrameMs": 147.92500019073486,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 743.5299999713898,
+    "modeReadyMs": 1085.9500000476837,
+    "firstFrameMs": 1059.380000114441,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.39999985694885,
+    "timed": {
+     "large:4": 252.86999988555908,
+     "frames-large:4": 221.6600000858307,
+     "cold:4": 247.74499988555908
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 70983208,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 180.24500012397766,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 839.1500000953674,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 158.79999995231628,
+       "mainMs": 158.7200005054474,
+       "batchMainP50Ms": 0.5724999904632568,
+       "batchMainP95Ms": 3.2452500104904156,
+       "batchMainMaxMs": 14.769999980926514,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 880.6749999523163,
+       "mainMs": 880.370001077652,
+       "batchMainP50Ms": 3.490000009536743,
+       "batchMainP95Ms": 17.227000033855433,
+       "batchMainMaxMs": 69.07999992370605,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1016,
+       "meanFps": 67.59292030688252,
+       "medianMs": 14.520000000000437,
+       "p95Ms": 15.06000000000131,
+       "p99Ms": 29.385249999999367,
+       "onePercentLowFps": 30.597414518472952,
+       "simMinutesPerSecond": 120.01735062363784,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 15,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 13.47000002861023,
+       "commandToFrameP95Ms": 23.242499947547902,
+       "commandToFrameMinMs": 2.3399999141693115,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 584,
+       "meanFps": 38.858116971582014,
+       "medianMs": 15.00499999999738,
+       "p95Ms": 74.00799999999764,
+       "p99Ms": 143.13080000000429,
+       "onePercentLowFps": 6.081985159956167,
+       "simMinutesPerSecond": 117.10665388695948,
+       "clampedFrames": 0,
+       "longTasks": 46,
+       "blockingMs": 2302,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 18.850000023841858,
+       "commandToFrameP95Ms": 107.65900001525878,
+       "commandToFrameMinMs": 13.240000009536743,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 8,
+   "mode": "ts",
+   "ranMode": "wasm",
+   "order": 0,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 473.2650001049042,
+    "modeReadyMs": 574.6800000667572,
+    "firstFrameMs": 568.3150000572205,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 108.16000008583069,
+    "modeReadyMs": 174.22500014305115,
+    "firstFrameMs": 169.5350000858307,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 761.914999961853,
+    "modeReadyMs": 1121.119999885559,
+    "firstFrameMs": 1091.9849998950958,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.575000047683716,
+    "timed": {
+     "large:4": 247.84999990463257,
+     "frames-large:4": 253.8199999332428,
+     "cold:4": 251.13499999046326
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 72614496,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 129.5900001525879,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 868.3899998664856,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 196.12000012397766,
+       "mainMs": 195.93499994277954,
+       "batchMainP50Ms": 0.6375000476837158,
+       "batchMainP95Ms": 4.02850009202957,
+       "batchMainMaxMs": 19.09999990463257,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 876.5049998760223,
+       "mainMs": 876.014999628067,
+       "batchMainP50Ms": 3.2874999046325684,
+       "batchMainP95Ms": 17.37475000619888,
+       "batchMainMaxMs": 70.57500004768372,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1015,
+       "meanFps": 67.64862703279125,
+       "medianMs": 14.550000000001091,
+       "p95Ms": 15.06000000000131,
+       "p99Ms": 28.309099999998946,
+       "onePercentLowFps": 30.940594059406042,
+       "simMinutesPerSecond": 119.96800853105837,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 14.617500066757202,
+       "commandToFrameP95Ms": 17.34175007343292,
+       "commandToFrameMinMs": 2.695000171661377,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 566,
+       "meanFps": 37.723977786842184,
+       "medianMs": 15,
+       "p95Ms": 87.93249999999898,
+       "p99Ms": 150.87925000000067,
+       "onePercentLowFps": 5.57705821333366,
+       "simMinutesPerSecond": 115.43803803323439,
+       "clampedFrames": 1,
+       "longTasks": 45,
+       "blockingMs": 2553,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 25.71250009536743,
+       "commandToFrameP95Ms": 120.31799999475479,
+       "commandToFrameMinMs": 11.240000009536743,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 8,
+   "mode": "wasm",
+   "ranMode": "wasm",
+   "order": 1,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 496.61500000953674,
+    "modeReadyMs": 581.3949999809265,
+    "firstFrameMs": 576.5650000572205,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 89.03999996185303,
+    "modeReadyMs": 149.9650001525879,
+    "firstFrameMs": 146.22000002861023,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 740.8900001049042,
+    "modeReadyMs": 1112.914999961853,
+    "firstFrameMs": 1083.744999885559,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 57.87000012397766,
+    "timed": {
+     "large:4": 251.94000005722046,
+     "frames-large:4": 253.17500019073486,
+     "cold:4": 246.95500016212463
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 71404596,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 130.375,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 804.6599998474121,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 155.24500012397766,
+       "mainMs": 155.16499972343445,
+       "batchMainP50Ms": 0.5699999332427979,
+       "batchMainP95Ms": 2.960499930381773,
+       "batchMainMaxMs": 14.170000076293945,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 879.3799998760223,
+       "mainMs": 878.4499995708466,
+       "batchMainP50Ms": 3.457499861717224,
+       "batchMainP95Ms": 17.555499839782716,
+       "batchMainMaxMs": 66.57000017166138,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1014,
+       "meanFps": 67.54283624625693,
+       "medianMs": 14.580000000001746,
+       "p95Ms": 15.07175000000243,
+       "p99Ms": 29.125,
+       "onePercentLowFps": 33.810626679965786,
+       "simMinutesPerSecond": 120.16496704955374,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 15,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 14.5,
+       "commandToFrameP95Ms": 16.877999973297115,
+       "commandToFrameMinMs": 4.31499981880188,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 581,
+       "meanFps": 38.72691757398857,
+       "medianMs": 15.00499999999738,
+       "p95Ms": 74.16500000000087,
+       "p99Ms": 133.33299999999508,
+       "onePercentLowFps": 5.871714775583106,
+       "simMinutesPerSecond": 117.44720957894643,
+       "clampedFrames": 0,
+       "longTasks": 47,
+       "blockingMs": 2331,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 15.65999984741211,
+       "commandToFrameP95Ms": 103.00224993228912,
+       "commandToFrameMinMs": 10.230000019073486,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 9,
+   "mode": "wasm",
+   "ranMode": "wasm",
+   "order": 0,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 508.6300001144409,
+    "modeReadyMs": 617.460000038147,
+    "firstFrameMs": 609.164999961853,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 97.48000001907349,
+    "modeReadyMs": 160.05999994277954,
+    "firstFrameMs": 156.13000011444092,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 749.8599998950958,
+    "modeReadyMs": 1097.7549998760223,
+    "firstFrameMs": 1071.329999923706,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.875,
+    "timed": {
+     "large:4": 252.70000004768372,
+     "frames-large:4": 251.96000003814697,
+     "cold:4": 246.05999994277954
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 70946912,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 130.8550000190735,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 837.9900000095367,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 151.85999989509583,
+       "mainMs": 151.76999974250793,
+       "batchMainP50Ms": 0.5575000047683716,
+       "batchMainP95Ms": 3.0750000476837123,
+       "batchMainMaxMs": 13.900000095367432,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 879.7799999713898,
+       "mainMs": 878.5899994373322,
+       "batchMainP50Ms": 3.3625000715255737,
+       "batchMainP95Ms": 17.194499957561487,
+       "batchMainMaxMs": 67.07500004768372,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1017,
+       "meanFps": 67.70555075669442,
+       "medianMs": 14.56000000000131,
+       "p95Ms": 15.064999999999054,
+       "p99Ms": 29.09219999999987,
+       "onePercentLowFps": 33.642847530615015,
+       "simMinutesPerSecond": 119.9659807901311,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 13.170000076293945,
+       "commandToFrameP95Ms": 15.385750079154969,
+       "commandToFrameMinMs": 3.620000123977661,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 580,
+       "meanFps": 38.64613268816502,
+       "medianMs": 15,
+       "p95Ms": 88.16074999999891,
+       "p99Ms": 147.1898500000016,
+       "onePercentLowFps": 5.480382969161922,
+       "simMinutesPerSecond": 115.67187301147322,
+       "clampedFrames": 0,
+       "longTasks": 48,
+       "blockingMs": 2664,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 16.28250002861023,
+       "commandToFrameP95Ms": 130.2247500538826,
+       "commandToFrameMinMs": 11.839999914169312,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  {
+   "rep": 9,
+   "mode": "ts",
+   "ranMode": "wasm",
+   "order": 1,
+   "ok": true,
+   "error": null,
+   "pageErrors": [],
+   "browserVersion": "149.0.7827.55",
+   "page": {
+    "crossOriginIsolated": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+    "webgl": {
+     "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+     "vendor": "Google Inc. (NVIDIA)"
+    }
+   },
+   "cold": {
+    "mode": "wasm",
+    "gameReadyMs": 506.43499994277954,
+    "modeReadyMs": 609.2550001144409,
+    "firstFrameMs": 602.6050000190735,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "warm": {
+    "mode": "wasm",
+    "gameReadyMs": 89.81500005722046,
+    "modeReadyMs": 154.09500002861023,
+    "firstFrameMs": 150.22000002861023,
+    "bytesBeforeReady": 0,
+    "requestsBeforeReady": 5,
+    "wasmRequests": 1
+   },
+   "cold4x": {
+    "mode": "wasm",
+    "gameReadyMs": 782.4449999332428,
+    "modeReadyMs": 1131.0149998664856,
+    "firstFrameMs": 1101.9449999332428,
+    "bytesBeforeReady": 813177,
+    "requestsBeforeReady": 14,
+    "wasmRequests": 1
+   },
+   "cpuProbe": {
+    "unthrottledMs": 56.40000009536743,
+    "timed": {
+     "large:4": 251.00500011444092,
+     "frames-large:4": 249,
+     "cold:4": 252.39999985694885
+    }
+   },
+   "scenarios": {
+    "large": {
+     "memory": {
+      "mainHeapUsedBytes": 70949368,
+      "workerHeapUsedBytes": null,
+      "mainWasmBytes": 19398656,
+      "workerWasmBytes": null,
+      "processPssBytes": null
+     },
+     "raw": {
+      "1": {
+       "engine": "wasm",
+       "totalMs": 133.6949999332428,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      },
+      "4": {
+       "engine": "wasm",
+       "totalMs": 823.1449999809265,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797"
+      }
+     },
+     "hosted": {
+      "1": {
+       "wallMs": 154.54999995231628,
+       "mainMs": 154.45499992370605,
+       "batchMainP50Ms": 0.5525000095367432,
+       "batchMainP95Ms": 2.945250058174128,
+       "batchMainMaxMs": 14.725000143051147,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "wallMs": 919.3999998569489,
+       "mainMs": 918.5599999427795,
+       "batchMainP50Ms": 3.287500023841858,
+       "batchMainP95Ms": 18.51524987220764,
+       "batchMainMaxMs": 79.79500007629395,
+       "startDigest": "0825b3c6a6ec69b3",
+       "endDigest": "e8af6d4707059797",
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     },
+     "frames": {
+      "1": {
+       "frames": 1021,
+       "meanFps": 68.04219415750136,
+       "medianMs": 14.56000000000131,
+       "p95Ms": 15.069999999999709,
+       "p99Ms": 15.569999999999709,
+       "onePercentLowFps": 41.3522175126643,
+       "simMinutesPerSecond": 119.95685551763216,
+       "clampedFrames": 0,
+       "longTasks": 0,
+       "blockingMs": 0,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 13.117500066757202,
+       "commandToFrameP95Ms": 14.773499953746795,
+       "commandToFrameMinMs": 4.629999876022339,
+       "worker": null,
+       "hostErrorsAdded": []
+      },
+      "4": {
+       "frames": 585,
+       "meanFps": 38.99828407550069,
+       "medianMs": 15.00499999999738,
+       "p95Ms": 74.65399999999931,
+       "p99Ms": 147.124600000004,
+       "onePercentLowFps": 6.0958140045231435,
+       "simMinutesPerSecond": 117.19484342688925,
+       "clampedFrames": 0,
+       "longTasks": 46,
+       "blockingMs": 2353,
+       "commands": 14,
+       "commandsUnanswered": 0,
+       "commandToFrameP50Ms": 23.137499928474426,
+       "commandToFrameP95Ms": 108.83524998426437,
+       "commandToFrameMinMs": 11.695000171661377,
+       "worker": null,
+       "hostErrorsAdded": []
+      }
+     }
+    }
+   },
+   "offline": {
+    "swActive": true,
+    "onlineMode": "wasm",
+    "offlineMode": "wasm",
+    "error": null,
+    "pageErrors": []
+   },
+   "contextLost": [],
+   "rendererEnd": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "rendererEndCold": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  }
+ ],
+ "metrics": [
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "1",
+   "metric": "cold start to mode ready",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    548.6400001049042,
+    635.25,
+    577.2850000858307,
+    632.7999999523163,
+    556.4300000667572,
+    593.6699998378754,
+    600.2599999904633,
+    552.875,
+    574.6800000667572,
+    609.2550001144409
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 548.6400001049042,
+    "max": 635.25,
+    "mean": 588.1145000219345,
+    "median": 585.477499961853,
+    "p95": 634.1474999785423,
+    "p99": 635.0294999957084,
+    "sd": 31.527019549161654,
+    "cv": 0.05360694141699586,
+    "medianCiLow": 552.875,
+    "medianCiHigh": 632.7999999523163
+   }
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "1",
+   "metric": "cold start to mode ready",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    567.6849999427795,
+    587.3600001335144,
+    594.6500000953674,
+    596.1699998378754,
+    578.9900000095367,
+    598.2699999809265,
+    587.8800001144409,
+    600.7349998950958,
+    581.3949999809265,
+    617.460000038147
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 567.6849999427795,
+    "max": 617.460000038147,
+    "mean": 591.059500002861,
+    "median": 591.2650001049042,
+    "p95": 609.933749973774,
+    "p99": 615.9547500252723,
+    "sd": 13.706608593970513,
+    "cv": 0.02318989643835209,
+    "medianCiLow": 578.9900000095367,
+    "medianCiHigh": 600.7349998950958
+   }
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "1",
+   "metric": "warm start to mode ready",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    170.23499989509583,
+    152.28999996185303,
+    162.86500000953674,
+    153.32000017166138,
+    161.25,
+    168.50499987602234,
+    153.76500010490417,
+    151.57500004768372,
+    174.22500014305115,
+    154.09500002861023
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 151.57500004768372,
+    "max": 174.22500014305115,
+    "mean": 160.21250002384187,
+    "median": 157.67250001430511,
+    "p95": 172.42950003147124,
+    "p99": 173.86590012073518,
+    "sd": 8.416593452567325,
+    "cv": 0.05253393743506167,
+    "medianCiLow": 152.28999996185303,
+    "medianCiHigh": 170.23499989509583
+   }
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "1",
+   "metric": "warm start to mode ready",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    156.08500003814697,
+    157.3949999809265,
+    155.9649999141693,
+    152.75500011444092,
+    183.6050000190735,
+    160.0149998664856,
+    160.18499994277954,
+    153.4649999141693,
+    149.9650001525879,
+    160.05999994277954
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 149.9650001525879,
+    "max": 183.6050000190735,
+    "mean": 158.9494999885559,
+    "median": 156.74000000953674,
+    "p95": 173.06599998474118,
+    "p99": 181.49720001220703,
+    "sd": 9.312420141476712,
+    "cv": 0.058587288051533286,
+    "medianCiLow": 152.75500011444092,
+    "medianCiHigh": 160.18499994277954
+   }
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "4",
+   "metric": "cold start to mode ready",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    1096.2250001430511,
+    1221.289999961853,
+    1118.5699999332428,
+    1150.6150000095367,
+    1221.7800002098083,
+    1127.6800000667572,
+    1153.4049999713898,
+    1085.9500000476837,
+    1121.119999885559,
+    1131.0149998664856
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 1085.9500000476837,
+    "max": 1221.7800002098083,
+    "mean": 1142.7650000095368,
+    "median": 1129.3474999666214,
+    "p95": 1221.5595000982285,
+    "p99": 1221.7359001874925,
+    "sd": 46.425349358202624,
+    "cv": 0.040625456115487596,
+    "medianCiLow": 1096.2250001430511,
+    "medianCiHigh": 1221.289999961853
+   }
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "4",
+   "metric": "cold start to mode ready",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    1118.034999847412,
+    1080.8550000190735,
+    1091.6849999427795,
+    1113.579999923706,
+    1133.9400000572205,
+    1088.0999999046326,
+    1118.7400000095367,
+    1102.3499999046326,
+    1112.914999961853,
+    1097.7549998760223
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 1080.8550000190735,
+    "max": 1133.9400000572205,
+    "mean": 1105.795499944687,
+    "median": 1107.6324999332428,
+    "p95": 1127.1000000357628,
+    "p99": 1132.5720000529288,
+    "sd": 16.436918564929137,
+    "cv": 0.014864338447526082,
+    "medianCiLow": 1088.0999999046326,
+    "medianCiHigh": 1118.7400000095367
+   }
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "1",
+   "metric": "bytes before mode ready (cold)",
+   "unit": "bytes",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    813177,
+    813177,
+    813177,
+    813177,
+    813177,
+    813177,
+    813177,
+    813177,
+    813177,
+    813177
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 813177,
+    "max": 813177,
+    "mean": 813177,
+    "median": 813177,
+    "p95": 813177,
+    "p99": 813177,
+    "sd": 0,
+    "cv": 0,
+    "medianCiLow": 813177,
+    "medianCiHigh": 813177
+   }
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "1",
+   "metric": "bytes before mode ready (cold)",
+   "unit": "bytes",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    813177,
+    813177,
+    813177,
+    813177,
+    813177,
+    813177,
+    813177,
+    813177,
+    813177,
+    813177
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 813177,
+    "max": 813177,
+    "mean": 813177,
+    "median": 813177,
+    "p95": 813177,
+    "p99": 813177,
+    "sd": 0,
+    "cv": 0,
+    "medianCiLow": 813177,
+    "medianCiHigh": 813177
+   }
+  },
+  {
+   "group": "memory",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread JS heap",
+   "unit": "bytes",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    70985504,
+    72601012,
+    71523688,
+    71363320,
+    70950328,
+    70978716,
+    71401788,
+    70983208,
+    72614496,
+    70949368
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 70949368,
+    "max": 72614496,
+    "mean": 71435142.8,
+    "median": 71174412,
+    "p95": 72608428.2,
+    "p99": 72613282.44,
+    "sd": 654047.5990046392,
+    "cv": 0.009155824057576312,
+    "medianCiLow": 70950328,
+    "medianCiHigh": 72601012
+   }
+  },
+  {
+   "group": "memory",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread JS heap",
+   "unit": "bytes",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    71366800,
+    70984612,
+    72625108,
+    71391480,
+    71525464,
+    70949096,
+    71552852,
+    70962912,
+    71404596,
+    70946912
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 70946912,
+    "max": 72625108,
+    "mean": 71370983.2,
+    "median": 71379140,
+    "p95": 72142592.8,
+    "p99": 72528604.96,
+    "sd": 506070.5957456924,
+    "cv": 0.007090705116497433,
+    "medianCiLow": 70949096,
+    "medianCiHigh": 71552852
+   }
+  },
+  {
+   "group": "memory",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "JS heaps + WASM memory (main and worker)",
+   "unit": "bytes",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    90384160,
+    91999668,
+    90922344,
+    90761976,
+    90348984,
+    90377372,
+    90800444,
+    90381864,
+    92013152,
+    90348024
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 90348024,
+    "max": 92013152,
+    "mean": 90833798.8,
+    "median": 90573068,
+    "p95": 92007084.2,
+    "p99": 92011938.44,
+    "sd": 654047.5990046392,
+    "cv": 0.007200487127536487,
+    "medianCiLow": 90348984,
+    "medianCiHigh": 91999668
+   }
+  },
+  {
+   "group": "memory",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "JS heaps + WASM memory (main and worker)",
+   "unit": "bytes",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    90765456,
+    90383268,
+    92023764,
+    90790136,
+    90924120,
+    90347752,
+    90951508,
+    90361568,
+    90803252,
+    90345568
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 90345568,
+    "max": 92023764,
+    "mean": 90769639.2,
+    "median": 90777796,
+    "p95": 91541248.8,
+    "p99": 91927260.96,
+    "sd": 506070.5957456924,
+    "cv": 0.005575328933836859,
+    "medianCiLow": 90347752,
+    "medianCiHigh": 90951508
+   }
+  },
+  {
+   "group": "memory",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "browser process PSS",
+   "unit": "bytes",
+   "better": "lower",
+   "mode": "ts",
+   "values": [],
+   "reps": [],
+   "summary": null
+  },
+  {
+   "group": "memory",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "browser process PSS",
+   "unit": "bytes",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [],
+   "reps": [],
+   "summary": null
+  },
+  {
+   "group": "raw",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "bare engine, 720 steps",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    156.9300000667572,
+    146.44500017166138,
+    129.03999996185303,
+    179.72000002861023,
+    130.68499994277954,
+    133.45500016212463,
+    134.36999988555908,
+    180.24500012397766,
+    129.5900001525879,
+    133.6949999332428
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 129.03999996185303,
+    "max": 180.24500012397766,
+    "mean": 145.41750004291535,
+    "median": 134.03249990940094,
+    "p95": 180.00875008106232,
+    "p99": 180.1977501153946,
+    "sd": 20.17025911062709,
+    "cv": 0.1387058579928446,
+    "medianCiLow": 129.5900001525879,
+    "medianCiHigh": 179.72000002861023
+   }
+  },
+  {
+   "group": "raw",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "bare engine, 720 steps",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    136.10000014305115,
+    133.59499979019165,
+    138.52500009536743,
+    134.5899999141693,
+    132.2849998474121,
+    130.44999980926514,
+    131.68500018119812,
+    131.64999985694885,
+    130.375,
+    130.8550000190735
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 130.375,
+    "max": 138.52500009536743,
+    "mean": 133.01099996566774,
+    "median": 131.98500001430511,
+    "p95": 137.4337501168251,
+    "p99": 138.30675009965896,
+    "sd": 2.688941188656425,
+    "cv": 0.02021593093315954,
+    "medianCiLow": 130.44999980926514,
+    "medianCiHigh": 136.10000014305115
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "wall time, 720 steps",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    187.49000000953674,
+    156.88499999046326,
+    152.75499987602234,
+    152.32999992370605,
+    153.3549997806549,
+    160.59500002861023,
+    166.22500014305115,
+    158.79999995231628,
+    196.12000012397766,
+    154.54999995231628
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 152.32999992370605,
+    "max": 196.12000012397766,
+    "mean": 163.9104999780655,
+    "median": 157.84249997138977,
+    "p95": 192.23650007247923,
+    "p99": 195.34330011367797,
+    "sd": 15.430344354501605,
+    "cv": 0.09413884013877385,
+    "medianCiLow": 152.75499987602234,
+    "medianCiHigh": 187.49000000953674
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "wall time, 720 steps",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    170.31500005722046,
+    155.44000005722046,
+    150.93499994277954,
+    169.95499992370605,
+    160.39999985694885,
+    155.77999997138977,
+    151.75999999046326,
+    152.59500002861023,
+    155.24500012397766,
+    151.85999989509583
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 150.93499994277954,
+    "max": 170.31500005722046,
+    "mean": 157.42849998474122,
+    "median": 155.34250009059906,
+    "p95": 170.15299999713898,
+    "p99": 170.28260004520416,
+    "sd": 7.2411831620831775,
+    "cv": 0.04599664713050706,
+    "medianCiLow": 151.75999999046326,
+    "medianCiHigh": 169.95499992370605
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread time, 720 steps",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    187.34999990463257,
+    156.785001039505,
+    152.64500045776367,
+    152.23999977111816,
+    153.2850000858307,
+    160.410001039505,
+    166.1300003528595,
+    158.7200005054474,
+    195.93499994277954,
+    154.45499992370605
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 152.23999977111816,
+    "max": 195.93499994277954,
+    "mean": 163.79550030231476,
+    "median": 157.7525007724762,
+    "p95": 192.0717499256134,
+    "p99": 195.1623499393463,
+    "sd": 15.4025971256462,
+    "cv": 0.09403553270522004,
+    "medianCiLow": 152.64500045776367,
+    "medianCiHigh": 187.34999990463257
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread time, 720 steps",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    170.1550006866455,
+    155.3099992275238,
+    150.8250012397766,
+    169.82500004768372,
+    160.31500124931335,
+    155.71000027656555,
+    151.65000104904175,
+    152.48499965667725,
+    155.16499972343445,
+    151.76999974250793
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 150.8250012397766,
+    "max": 170.1550006866455,
+    "mean": 157.32100028991698,
+    "median": 155.23749947547913,
+    "p95": 170.0065003991127,
+    "p99": 170.12530062913893,
+    "sd": 7.225511499621213,
+    "cv": 0.045928461466083814,
+    "medianCiLow": 151.65000104904175,
+    "medianCiHigh": 169.82500004768372
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread time per batch, p95",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    3.9182499647140494,
+    2.975750148296349,
+    3.184999942779541,
+    2.8860001206397956,
+    2.9469999432563743,
+    2.948000073432916,
+    3.271499991416927,
+    3.2452500104904156,
+    4.02850009202957,
+    2.945250058174128
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 2.8860001206397956,
+    "max": 4.02850009202957,
+    "mean": 3.235050034523007,
+    "median": 3.080375045537945,
+    "p95": 3.9788875347375856,
+    "p99": 4.018577580571173,
+    "sd": 0.41347976221232274,
+    "cv": 0.1278124782614957,
+    "medianCiLow": 2.945250058174128,
+    "medianCiHigh": 3.9182499647140494
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread time per batch, p95",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    3.429249954223631,
+    2.7669999003410264,
+    2.8510000228881816,
+    3.247000014781946,
+    3.3332499265670767,
+    2.865000009536743,
+    2.9235000848770096,
+    2.9555000543594305,
+    2.960499930381773,
+    3.0750000476837123
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 2.7669999003410264,
+    "max": 3.429249954223631,
+    "mean": 3.0406999945640534,
+    "median": 2.9579999923706017,
+    "p95": 3.3860499417781815,
+    "p99": 3.420609951734541,
+    "sd": 0.22347953681087507,
+    "cv": 0.07349608222132925,
+    "medianCiLow": 2.8510000228881816,
+    "medianCiHigh": 3.3332499265670767
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread time per batch, max",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    16.705000162124634,
+    17.08999991416931,
+    16.03500008583069,
+    14.125,
+    14.319999933242798,
+    14.825000047683716,
+    15.460000038146973,
+    14.769999980926514,
+    19.09999990463257,
+    14.725000143051147
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 14.125,
+    "max": 19.09999990463257,
+    "mean": 15.715500020980835,
+    "median": 15.142500042915344,
+    "p95": 18.195499908924102,
+    "p99": 18.919099905490874,
+    "sd": 1.550473828249682,
+    "cv": 0.09865889256973917,
+    "medianCiLow": 14.319999933242798,
+    "medianCiHigh": 17.08999991416931
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread time per batch, max",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    16.955000162124634,
+    16.914999961853027,
+    13.865000009536743,
+    17.480000019073486,
+    14.410000085830688,
+    16.319999933242798,
+    14.925000190734863,
+    14.224999904632568,
+    14.170000076293945,
+    13.900000095367432
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 13.865000009536743,
+    "max": 17.480000019073486,
+    "mean": 15.316500043869018,
+    "median": 14.667500138282776,
+    "p95": 17.243750083446503,
+    "p99": 17.43275003194809,
+    "sd": 1.4345654505925192,
+    "cv": 0.09366144004724863,
+    "medianCiLow": 13.900000095367432,
+    "medianCiHigh": 16.955000162124634
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "mean FPS",
+   "unit": "fps",
+   "better": "higher",
+   "mode": "ts",
+   "values": [
+    67.63925022390924,
+    67.35909419324005,
+    67.32612080343836,
+    67.52286728890356,
+    67.37702443466779,
+    67.91746328607883,
+    67.49897670886295,
+    67.59292030688252,
+    67.64862703279125,
+    68.04219415750136
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 67.32612080343836,
+    "max": 68.04219415750136,
+    "mean": 67.5924538436276,
+    "median": 67.55789379789303,
+    "p95": 67.98606526536122,
+    "p99": 68.03096837907333,
+    "sd": 0.23537750810001584,
+    "cv": 0.0034823045283213444,
+    "medianCiLow": 67.35909419324005,
+    "medianCiHigh": 67.91746328607883
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "mean FPS",
+   "unit": "fps",
+   "better": "higher",
+   "mode": "wasm",
+   "values": [
+    67.5526230936703,
+    67.56853558526245,
+    67.61816190519333,
+    67.29582606125717,
+    67.5107732613396,
+    67.61961967291671,
+    67.31399515219388,
+    67.4452947419302,
+    67.54283624625693,
+    67.70555075669442
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 67.29582606125717,
+    "max": 67.70555075669442,
+    "mean": 67.51732164767148,
+    "median": 67.54772966996362,
+    "p95": 67.66688176899446,
+    "p99": 67.69781695915442,
+    "sd": 0.13174749008880957,
+    "cv": 0.0019513139276512346,
+    "medianCiLow": 67.31399515219388,
+    "medianCiHigh": 67.61961967291671
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "1% low FPS",
+   "unit": "fps",
+   "better": "higher",
+   "mode": "ts",
+   "values": [
+    33.50757271143252,
+    31.065548306927653,
+    31.955007349651638,
+    30.94873342308416,
+    28.3241987792273,
+    33.761542227248555,
+    31.076650558602807,
+    30.597414518472952,
+    30.940594059406042,
+    41.3522175126643
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 28.3241987792273,
+    "max": 41.3522175126643,
+    "mean": 32.35294794467179,
+    "median": 31.07109943276523,
+    "p95": 37.93641363422721,
+    "p99": 40.669056736976884,
+    "sd": 3.512329361499614,
+    "cv": 0.1085628848260197,
+    "medianCiLow": 30.597414518472952,
+    "medianCiHigh": 33.761542227248555
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "1% low FPS",
+   "unit": "fps",
+   "better": "higher",
+   "mode": "wasm",
+   "values": [
+    30.65509947579771,
+    32.34257252821903,
+    30.894233591300058,
+    30.630685821055422,
+    30.665440049065353,
+    32.41333484595569,
+    32.15434083601249,
+    30.60865306622217,
+    33.810626679965786,
+    33.642847530615015
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 30.60865306622217,
+    "max": 33.810626679965786,
+    "mean": 31.781783442420867,
+    "median": 31.524287213656272,
+    "p95": 33.73512606275794,
+    "p99": 33.795526556524216,
+    "sd": 1.2665153283586439,
+    "cv": 0.03985035423368209,
+    "medianCiLow": 30.630685821055422,
+    "medianCiHigh": 33.642847530615015
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "frame time p95",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    15.066500000001541,
+    15.084500000000206,
+    15.210000000000946,
+    15.084999999999127,
+    15.069999999999709,
+    15.06000000000131,
+    15.086500000001978,
+    15.06000000000131,
+    15.06000000000131,
+    15.069999999999709
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 15.06000000000131,
+    "max": 15.210000000000946,
+    "mean": 15.085250000000716,
+    "median": 15.069999999999709,
+    "p95": 15.15442500000141,
+    "p99": 15.198885000001038,
+    "sd": 0.04508525873892535,
+    "cv": 0.002988698148119733,
+    "medianCiLow": 15.06000000000131,
+    "medianCiHigh": 15.086500000001978
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "frame time p95",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    15.080000000001746,
+    15.117000000000733,
+    15.069999999999709,
+    15.102499999999054,
+    15.086750000000665,
+    15.066250000001673,
+    15.082500000001346,
+    15.075000000000728,
+    15.07175000000243,
+    15.064999999999054
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 15.064999999999054,
+    "max": 15.117000000000733,
+    "mean": 15.081675000000715,
+    "median": 15.077500000001237,
+    "p95": 15.110474999999978,
+    "p99": 15.115695000000581,
+    "sd": 0.016687091651081173,
+    "cv": 0.0011064481664722508,
+    "medianCiLow": 15.066250000001673,
+    "medianCiHigh": 15.102499999999054
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "frame time p99",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    28.9609000000007,
+    29.101149999999578,
+    29.092999999998572,
+    29.090000000000146,
+    28.97650000000285,
+    15.763199999999705,
+    28.803600000000262,
+    29.385249999999367,
+    28.309099999998946,
+    15.569999999999709
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 15.569999999999709,
+    "max": 29.385249999999367,
+    "mean": 26.305269999999986,
+    "median": 28.968700000001775,
+    "p95": 29.257404999999462,
+    "p99": 29.359680999999387,
+    "sd": 5.614024811191017,
+    "cv": 0.21341825463836792,
+    "medianCiLow": 15.763199999999705,
+    "medianCiHigh": 29.101149999999578
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "frame time p99",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    29.04239999999867,
+    28.8810500000012,
+    28.629399999998533,
+    29.083000000000172,
+    29.135250000000344,
+    28.48325000000159,
+    29.077999999998966,
+    29.16959999999948,
+    29.125,
+    29.09219999999987
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 28.48325000000159,
+    "max": 29.16959999999948,
+    "mean": 28.971914999999882,
+    "median": 29.080499999999567,
+    "p95": 29.154142499999868,
+    "p99": 29.16650849999956,
+    "sd": 0.23489706380283543,
+    "cv": 0.008107750688997824,
+    "medianCiLow": 28.629399999998533,
+    "medianCiHigh": 29.135250000000344
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "sim minutes per second",
+   "unit": "min/s",
+   "better": "higher",
+   "mode": "ts",
+   "values": [
+    119.95137970742526,
+    119.94178630061124,
+    120.00165152106422,
+    119.9814028825532,
+    119.95909394896341,
+    120.1052687355388,
+    119.96862461358499,
+    120.01735062363784,
+    119.96800853105837,
+    119.95685551763216
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 119.94178630061124,
+    "max": 120.1052687355388,
+    "mean": 119.98514223820696,
+    "median": 119.96831657232168,
+    "p95": 120.06570558518337,
+    "p99": 120.09735610546771,
+    "sd": 0.04809595529452182,
+    "cv": 0.00040084925847765995,
+    "medianCiLow": 119.95137970742526,
+    "medianCiHigh": 120.01735062363784
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "sim minutes per second",
+   "unit": "min/s",
+   "better": "higher",
+   "mode": "wasm",
+   "values": [
+    119.9158989828467,
+    119.94414600934165,
+    119.91398170379115,
+    119.94765436437729,
+    119.97476668336682,
+    120.06475776569069,
+    119.98003883704587,
+    119.97672371664189,
+    120.16496704955374,
+    119.9659807901311
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 119.91398170379115,
+    "max": 120.16496704955374,
+    "mean": 119.98489159027869,
+    "median": 119.97037373674897,
+    "p95": 120.11987287181536,
+    "p99": 120.15594821400606,
+    "sd": 0.07615129511163235,
+    "cv": 0.0006346740335580901,
+    "medianCiLow": 119.9158989828467,
+    "medianCiHigh": 120.06475776569069
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "frames over 200 ms (clamped)",
+   "unit": "count",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 0,
+    "max": 0,
+    "mean": 0,
+    "median": 0,
+    "p95": 0,
+    "p99": 0,
+    "sd": 0,
+    "cv": 0,
+    "medianCiLow": 0,
+    "medianCiHigh": 0
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "frames over 200 ms (clamped)",
+   "unit": "count",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 0,
+    "max": 0,
+    "mean": 0,
+    "median": 0,
+    "p95": 0,
+    "p99": 0,
+    "sd": 0,
+    "cv": 0,
+    "medianCiLow": 0,
+    "medianCiHigh": 0
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread blocking (long tasks past 50 ms)",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 0,
+    "max": 1,
+    "mean": 0.1,
+    "median": 0,
+    "p95": 0.5499999999999989,
+    "p99": 0.9100000000000001,
+    "sd": 0.31622776601683794,
+    "cv": 3.162277660168379,
+    "medianCiLow": 0,
+    "medianCiHigh": 0
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread blocking (long tasks past 50 ms)",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 0,
+    "max": 0,
+    "mean": 0,
+    "median": 0,
+    "p95": 0,
+    "p99": 0,
+    "sd": 0,
+    "cv": 0,
+    "medianCiLow": 0,
+    "medianCiHigh": 0
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "command to visible frame, median",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    14.492500066757202,
+    13.772500038146973,
+    13.702499866485596,
+    14.289999961853027,
+    13.305000066757202,
+    12.649999976158142,
+    12.759999871253967,
+    13.47000002861023,
+    14.617500066757202,
+    13.117500066757202
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 12.649999976158142,
+    "max": 14.617500066757202,
+    "mean": 13.617750000953674,
+    "median": 13.586249947547913,
+    "p95": 14.561250066757202,
+    "p99": 14.606250066757202,
+    "sd": 0.6904029389637619,
+    "cv": 0.05069875265116571,
+    "medianCiLow": 12.759999871253967,
+    "medianCiHigh": 14.492500066757202
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "command to visible frame, median",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    13.295000076293945,
+    13.445000052452087,
+    14.332499861717224,
+    14.102500081062317,
+    13.777500033378601,
+    13.639999866485596,
+    13.455000042915344,
+    13.944999933242798,
+    14.5,
+    13.170000076293945
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 13.170000076293945,
+    "max": 14.5,
+    "mean": 13.766250002384187,
+    "median": 13.708749949932098,
+    "p95": 14.424624937772752,
+    "p99": 14.48492498755455,
+    "sd": 0.44693745649998623,
+    "cv": 0.03246617317153043,
+    "medianCiLow": 13.295000076293945,
+    "medianCiHigh": 14.332499861717224
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "command to visible frame, p95",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    18.948999929428098,
+    21.46999996900558,
+    21.70025010108947,
+    15.344500076770782,
+    15.689749956130981,
+    14.478000020980835,
+    15.82625013589859,
+    23.242499947547902,
+    17.34175007343292,
+    14.773499953746795
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 14.478000020980835,
+    "max": 23.242499947547902,
+    "mean": 17.881550016403196,
+    "median": 16.584000104665755,
+    "p95": 22.548487516641607,
+    "p99": 23.103697461366643,
+    "sd": 3.237609820035649,
+    "cv": 0.1810586787535593,
+    "medianCiLow": 14.773499953746795,
+    "medianCiHigh": 21.70025010108947
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "command to visible frame, p95",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    15.103249990940094,
+    15.569500052928925,
+    15.649000024795532,
+    17.238750028610227,
+    20.85650012493133,
+    20.73099982738493,
+    14.809249901771546,
+    15.131000053882598,
+    16.877999973297115,
+    15.385750079154969
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 14.809249901771546,
+    "max": 20.85650012493133,
+    "mean": 16.735200005769727,
+    "median": 15.609250038862228,
+    "p95": 20.80002499103545,
+    "p99": 20.845205098152153,
+    "sd": 2.2737924601286164,
+    "cv": 0.135868854829622,
+    "medianCiLow": 15.103249990940094,
+    "medianCiHigh": 20.73099982738493
+   }
+  },
+  {
+   "group": "raw",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "bare engine, 720 steps",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    845.8150000572205,
+    870.6950001716614,
+    831.375,
+    825.2850000858307,
+    843.5299999713898,
+    804.125,
+    849.2799999713898,
+    839.1500000953674,
+    868.3899998664856,
+    823.1449999809265
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 804.125,
+    "max": 870.6950001716614,
+    "mean": 840.0790000200271,
+    "median": 841.3400000333786,
+    "p95": 869.6577500343323,
+    "p99": 870.4875501441956,
+    "sd": 20.39405480039336,
+    "cv": 0.024276353533307194,
+    "medianCiLow": 823.1449999809265,
+    "medianCiHigh": 868.3899998664856
+   }
+  },
+  {
+   "group": "raw",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "bare engine, 720 steps",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    839.8799998760223,
+    850.8449997901917,
+    798.3899998664856,
+    861.539999961853,
+    790.1150000095367,
+    836.4300000667572,
+    829.5699999332428,
+    818.1900000572205,
+    804.6599998474121,
+    837.9900000095367
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 790.1150000095367,
+    "max": 861.539999961853,
+    "mean": 826.7609999418258,
+    "median": 833,
+    "p95": 856.7272498846054,
+    "p99": 860.5774499464035,
+    "sd": 23.3308468621799,
+    "cv": 0.028219578407570688,
+    "medianCiLow": 798.3899998664856,
+    "medianCiHigh": 850.8449997901917
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "wall time, 720 steps",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    887.3150000572205,
+    852.9299998283386,
+    869.1099998950958,
+    874.6099998950958,
+    857.670000076294,
+    882.9049999713898,
+    881.0299999713898,
+    880.6749999523163,
+    876.5049998760223,
+    919.3999998569489
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 852.9299998283386,
+    "max": 919.3999998569489,
+    "mean": 878.2149999380111,
+    "median": 878.5899999141693,
+    "p95": 904.961749947071,
+    "p99": 916.5123498749733,
+    "sd": 18.18190659612191,
+    "cv": 0.020703252161948134,
+    "medianCiLow": 857.670000076294,
+    "medianCiHigh": 887.3150000572205
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "wall time, 720 steps",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    872.9900000095367,
+    829.375,
+    857.7449998855591,
+    885.6350002288818,
+    876.3550000190735,
+    862.75,
+    855.4800000190735,
+    873.2700002193451,
+    879.3799998760223,
+    879.7799999713898
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 829.375,
+    "max": 885.6350002288818,
+    "mean": 867.2760000228882,
+    "median": 873.1300001144409,
+    "p95": 883.0002501130105,
+    "p99": 885.1080502057075,
+    "sd": 16.59274222029911,
+    "cv": 0.019132020510035114,
+    "medianCiLow": 855.4800000190735,
+    "medianCiHigh": 879.7799999713898
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread time, 720 steps",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    886.6449997425079,
+    851.3999991416931,
+    868.3299996852875,
+    873.8500001430511,
+    857.2200002670288,
+    882.1000001430511,
+    880.7099997997284,
+    880.370001077652,
+    876.014999628067,
+    918.5599999427795
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 851.3999991416931,
+    "max": 918.5599999427795,
+    "mean": 877.5199999570847,
+    "median": 878.1925003528595,
+    "p95": 904.1982498526572,
+    "p99": 915.6876499247551,
+    "sd": 18.261546382828804,
+    "cv": 0.020810404758548968,
+    "medianCiLow": 857.2200002670288,
+    "medianCiHigh": 886.6449997425079
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread time, 720 steps",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    871.6799998283386,
+    828.7300000190735,
+    856.8849997520447,
+    884.8349990844727,
+    875.6849994659424,
+    862.4250001907349,
+    854.9649991989136,
+    872.2850005626678,
+    878.4499995708466,
+    878.5899994373322
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 828.7300000190735,
+    "max": 884.8349990844727,
+    "mean": 866.4529997110367,
+    "median": 871.9825001955032,
+    "p95": 882.0247492432594,
+    "p99": 884.27294911623,
+    "sd": 16.460277159367887,
+    "cv": 0.018997311065755917,
+    "medianCiLow": 854.9649991989136,
+    "medianCiHigh": 878.5899994373322
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread time per batch, p95",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    17.777000093460078,
+    15.77575008869171,
+    17.164749979972836,
+    16.770499980449678,
+    17.343000149726862,
+    17.530999970436095,
+    17.57600004673004,
+    17.227000033855433,
+    17.37475000619888,
+    18.51524987220764
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 15.77575008869171,
+    "max": 18.51524987220764,
+    "mean": 17.30550002217293,
+    "median": 17.35887507796287,
+    "p95": 18.183037471771236,
+    "p99": 18.448807392120358,
+    "sd": 0.7046166848297248,
+    "cv": 0.0407163435859654,
+    "medianCiLow": 16.770499980449678,
+    "medianCiHigh": 17.777000093460078
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread time per batch, p95",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    17.44924985170363,
+    16.15849996805191,
+    15.282250034809092,
+    17.35525002479553,
+    16.979999792575832,
+    16.5602500796318,
+    16.556499862670886,
+    17.175749945640565,
+    17.555499839782716,
+    17.194499957561487
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 15.282250034809092,
+    "max": 17.555499839782716,
+    "mean": 16.826774935722348,
+    "median": 17.0778748691082,
+    "p95": 17.507687345147126,
+    "p99": 17.5459373408556,
+    "sd": 0.7035242038456166,
+    "cv": 0.04180980648597565,
+    "medianCiLow": 16.15849996805191,
+    "medianCiHigh": 17.44924985170363
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread time per batch, max",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    73.92000007629395,
+    76.24500012397766,
+    66.91499996185303,
+    74.6100001335144,
+    72.16000008583069,
+    66.1949999332428,
+    66.63000011444092,
+    69.07999992370605,
+    70.57500004768372,
+    79.79500007629395
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 66.1949999332428,
+    "max": 79.79500007629395,
+    "mean": 71.61250004768371,
+    "median": 71.3675000667572,
+    "p95": 78.19750009775161,
+    "p99": 79.47550008058548,
+    "sd": 4.555262724128238,
+    "cv": 0.06360988264751381,
+    "medianCiLow": 66.63000011444092,
+    "medianCiHigh": 76.24500012397766
+   }
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread time per batch, max",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    75.49000000953674,
+    75.92499995231628,
+    66.82500004768372,
+    69.02499985694885,
+    69.95500016212463,
+    75.91000008583069,
+    70.08500003814697,
+    70.64000010490417,
+    66.57000017166138,
+    67.07500004768372
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 66.57000017166138,
+    "max": 75.92499995231628,
+    "mean": 70.75000004768371,
+    "median": 70.0200001001358,
+    "p95": 75.91825001239776,
+    "p99": 75.92364996433258,
+    "sd": 3.746397506415804,
+    "cv": 0.052952614895983414,
+    "medianCiLow": 66.82500004768372,
+    "medianCiHigh": 75.91000008583069
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "mean FPS",
+   "unit": "fps",
+   "better": "higher",
+   "mode": "ts",
+   "values": [
+    37.323243616475686,
+    35.63167636048067,
+    38.65429729153337,
+    39.723614289037286,
+    38.57591787114049,
+    39.25725801049683,
+    39.2301303386113,
+    38.858116971582014,
+    37.723977786842184,
+    38.99828407550069
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 35.63167636048067,
+    "max": 39.723614289037286,
+    "mean": 38.39765166117005,
+    "median": 38.75620713155769,
+    "p95": 39.51375396369408,
+    "p99": 39.681642223968645,
+    "sd": 1.2073553575488263,
+    "cv": 0.031443468684043886,
+    "medianCiLow": 37.323243616475686,
+    "medianCiHigh": 39.25725801049683
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "mean FPS",
+   "unit": "fps",
+   "better": "higher",
+   "mode": "wasm",
+   "values": [
+    36.036804168279225,
+    38.68916600666527,
+    38.38495309838543,
+    37.930893112543096,
+    38.91788326630809,
+    37.88513081855519,
+    37.79232815738405,
+    38.53715873981495,
+    38.72691757398857,
+    38.64613268816502
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 36.036804168279225,
+    "max": 38.91788326630809,
+    "mean": 38.154736763008884,
+    "median": 38.46105591910019,
+    "p95": 38.83194870476431,
+    "p99": 38.90069635399933,
+    "sd": 0.8416838932555704,
+    "cv": 0.022059748399878492,
+    "medianCiLow": 37.79232815738405,
+    "medianCiHigh": 38.72691757398857
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "1% low FPS",
+   "unit": "fps",
+   "better": "higher",
+   "mode": "ts",
+   "values": [
+    5.289745827712966,
+    5.581821124960233,
+    5.876441931939103,
+    6.285473641866221,
+    5.89956579195776,
+    5.274706726306068,
+    5.964807634953798,
+    6.081985159956167,
+    5.57705821333366,
+    6.0958140045231435
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 5.274706726306068,
+    "max": 6.285473641866221,
+    "mean": 5.792742005750911,
+    "median": 5.888003861948431,
+    "p95": 6.200126805061836,
+    "p99": 6.268404274505344,
+    "sd": 0.34620082575083067,
+    "cv": 0.059764585649961594,
+    "medianCiLow": 5.289745827712966,
+    "medianCiHigh": 6.0958140045231435
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "1% low FPS",
+   "unit": "fps",
+   "better": "higher",
+   "mode": "wasm",
+   "values": [
+    5.7899185937446225,
+    5.33256544390944,
+    5.976393246675683,
+    5.6731151075054935,
+    6.081097516479765,
+    5.869715788361491,
+    5.242271581121552,
+    6.090282345489486,
+    5.871714775583106,
+    5.480382969161922
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 5.242271581121552,
+    "max": 6.090282345489486,
+    "mean": 5.740745736803256,
+    "median": 5.829817191053056,
+    "p95": 6.086149172435111,
+    "p99": 6.089455710878611,
+    "sd": 0.3013302663948049,
+    "cv": 0.05248974265886947,
+    "medianCiLow": 5.33256544390944,
+    "medianCiHigh": 6.081097516479765
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "frame time p95",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    87.10774999999877,
+    86.65599999999829,
+    86.6397500000021,
+    73.95750000000407,
+    73.7300000000032,
+    82.16300000000075,
+    81.6710000000009,
+    74.00799999999764,
+    87.93249999999898,
+    74.65399999999931
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 73.7300000000032,
+    "max": 87.93249999999898,
+    "mean": 80.8519500000004,
+    "median": 81.91700000000083,
+    "p95": 87.56136249999889,
+    "p99": 87.85827249999896,
+    "sd": 6.167607050819964,
+    "cv": 0.0762827247929077,
+    "medianCiLow": 73.95750000000407,
+    "medianCiHigh": 87.10774999999877
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "frame time p95",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    89.02500000000146,
+    87.62974999999862,
+    74.77624999999898,
+    87.33999999999507,
+    74.20500000000465,
+    87.77300000000105,
+    88.11199999999661,
+    74.47500000000365,
+    74.16500000000087,
+    88.16074999999891
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 74.16500000000087,
+    "max": 89.02500000000146,
+    "mean": 82.566175,
+    "median": 87.48487499999685,
+    "p95": 88.63608750000031,
+    "p99": 88.94721750000123,
+    "sd": 7.039184938463587,
+    "cv": 0.08525506890035281,
+    "medianCiLow": 74.20500000000465,
+    "medianCiHigh": 88.16074999999891
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "frame time p99",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    146.5706999999993,
+    146.9466000000004,
+    146.87904999999665,
+    133.2904999999995,
+    147.9899999999995,
+    148.37140000000267,
+    134.62119999999769,
+    143.13080000000429,
+    150.87925000000067,
+    147.124600000004
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 133.2904999999995,
+    "max": 150.87925000000067,
+    "mean": 144.58041000000046,
+    "median": 146.91282499999852,
+    "p95": 149.75071750000157,
+    "p99": 150.65354350000084,
+    "sd": 5.923009307251342,
+    "cv": 0.0409668869195441,
+    "medianCiLow": 134.62119999999769,
+    "medianCiHigh": 148.37140000000267
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "frame time p99",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    147.16500000000087,
+    146.55544999999915,
+    147.07124999999996,
+    142.88940000000122,
+    145.38920000000036,
+    141.8948000000015,
+    152.8446999999996,
+    134.1242999999992,
+    133.33299999999508,
+    147.1898500000016
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 133.33299999999508,
+    "max": 152.8446999999996,
+    "mean": 143.84569499999986,
+    "median": 145.97232499999976,
+    "p95": 150.30001750000048,
+    "p99": 152.33576349999979,
+    "sd": 6.083268516342966,
+    "cv": 0.04229023688434313,
+    "medianCiLow": 134.1242999999992,
+    "medianCiHigh": 147.1898500000016
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "sim minutes per second",
+   "unit": "min/s",
+   "better": "higher",
+   "mode": "ts",
+   "values": [
+    114.10248762751138,
+    116.15260480874446,
+    117.02921731712516,
+    117.57123423802311,
+    116.32531516392108,
+    114.6391914737768,
+    116.69132148259254,
+    117.10665388695948,
+    115.43803803323439,
+    117.19484342688925
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 114.10248762751138,
+    "max": 117.57123423802311,
+    "mean": 116.22509074587776,
+    "median": 116.50831832325682,
+    "p95": 117.40185837301287,
+    "p99": 117.53735906502106,
+    "sd": 1.157052692299339,
+    "cv": 0.009955274587216246,
+    "medianCiLow": 114.6391914737768,
+    "medianCiHigh": 117.19484342688925
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "sim minutes per second",
+   "unit": "min/s",
+   "better": "higher",
+   "mode": "wasm",
+   "values": [
+    116.30362306435403,
+    116.33249230771268,
+    116.62095125377517,
+    116.92581110615217,
+    117.08628127983287,
+    117.18423592382624,
+    114.24347524119268,
+    117.00919700275418,
+    117.44720957894643,
+    115.67187301147322
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 114.24347524119268,
+    "max": 117.44720957894643,
+    "mean": 116.48251497700198,
+    "median": 116.77338117996368,
+    "p95": 117.32887143414234,
+    "p99": 117.4235419499856,
+    "sd": 0.9431389776394093,
+    "cv": 0.00809682876288875,
+    "medianCiLow": 115.67187301147322,
+    "medianCiHigh": 117.18423592382624
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "frames over 200 ms (clamped)",
+   "unit": "count",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    3,
+    0,
+    0,
+    0,
+    0,
+    2,
+    0,
+    0,
+    1,
+    0
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 0,
+    "max": 3,
+    "mean": 0.6,
+    "median": 0,
+    "p95": 2.549999999999999,
+    "p99": 2.91,
+    "sd": 1.0749676997731399,
+    "cv": 1.7916128329552332,
+    "medianCiLow": 0,
+    "medianCiHigh": 2
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "frames over 200 ms (clamped)",
+   "unit": "count",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    2,
+    0,
+    0,
+    0
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 0,
+    "max": 2,
+    "mean": 0.2,
+    "median": 0,
+    "p95": 1.0999999999999979,
+    "p99": 1.8200000000000003,
+    "sd": 0.6324555320336759,
+    "cv": 3.162277660168379,
+    "medianCiLow": 0,
+    "medianCiHigh": 0
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread blocking (long tasks past 50 ms)",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    2669,
+    2454,
+    2401,
+    2254,
+    2375,
+    2533,
+    2439,
+    2302,
+    2553,
+    2353
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 2254,
+    "max": 2669,
+    "mean": 2433.3,
+    "median": 2420,
+    "p95": 2616.7999999999997,
+    "p99": 2658.56,
+    "sd": 124.97204131769277,
+    "cv": 0.0513590766932531,
+    "medianCiLow": 2302,
+    "medianCiHigh": 2553
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread blocking (long tasks past 50 ms)",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    2573,
+    2546,
+    2362,
+    2368,
+    2276,
+    2511,
+    2709,
+    2265,
+    2331,
+    2664
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 2265,
+    "max": 2709,
+    "mean": 2460.5,
+    "median": 2439.5,
+    "p95": 2688.75,
+    "p99": 2704.95,
+    "sd": 160.89005908107285,
+    "cv": 0.06538917255885911,
+    "medianCiLow": 2276,
+    "medianCiHigh": 2664
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "command to visible frame, median",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    20.394999980926514,
+    32.75249981880188,
+    16.397500038146973,
+    18.112500071525574,
+    20.850000023841858,
+    17.230000019073486,
+    22.297500014305115,
+    18.850000023841858,
+    25.71250009536743,
+    23.137499928474426
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 16.397500038146973,
+    "max": 32.75249981880188,
+    "mean": 21.57350000143051,
+    "median": 20.622500002384186,
+    "p95": 29.584499943256372,
+    "p99": 32.11889984369278,
+    "sd": 4.8538287906456725,
+    "cv": 0.2249903256459926,
+    "medianCiLow": 17.230000019073486,
+    "medianCiHigh": 25.71250009536743
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "command to visible frame, median",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    26.399999856948853,
+    20.49500000476837,
+    17.990000128746033,
+    19.31000006198883,
+    20.75,
+    19.84500002861023,
+    15.65499997138977,
+    21.232499957084656,
+    15.65999984741211,
+    16.28250002861023
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 15.65499997138977,
+    "max": 26.399999856948853,
+    "mean": 19.361999988555908,
+    "median": 19.57750004529953,
+    "p95": 24.07462490200996,
+    "p99": 25.934924865961076,
+    "sd": 3.253900158446596,
+    "cv": 0.16805599423457515,
+    "medianCiLow": 15.65999984741211,
+    "medianCiHigh": 21.232499957084656
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "command to visible frame, p95",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "ts",
+   "values": [
+    107.18325004577636,
+    127.54375005960463,
+    113.44550002813338,
+    110.79474996328352,
+    110.80100010633468,
+    103.7442499756813,
+    105.69275002479552,
+    107.65900001525878,
+    120.31799999475479,
+    108.83524998426437
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 103.7442499756813,
+    "max": 127.54375005960463,
+    "mean": 111.60175001978874,
+    "median": 109.81499997377395,
+    "p95": 124.29216253042219,
+    "p99": 126.89343255376815,
+    "sd": 7.258640616940273,
+    "cv": 0.06504056267624121,
+    "medianCiLow": 105.69275002479552,
+    "medianCiHigh": 120.31799999475479
+   }
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "command to visible frame, p95",
+   "unit": "ms",
+   "better": "lower",
+   "mode": "wasm",
+   "values": [
+    110.74749989509583,
+    108.73749991655349,
+    104.17200005054474,
+    101.77425005435943,
+    103.06299998760223,
+    62.70974987745282,
+    68.83874993324277,
+    108.58824986219405,
+    103.00224993228912,
+    130.2247500538826
+   ],
+   "reps": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "summary": {
+    "n": 10,
+    "min": 62.70974987745282,
+    "max": 130.2247500538826,
+    "mean": 100.18579995632172,
+    "median": 103.61750001907347,
+    "p95": 121.45998748242853,
+    "p99": 128.4717975395918,
+    "sd": 19.94251816052701,
+    "cv": 0.19905533687629787,
+    "medianCiLow": 68.83874993324277,
+    "medianCiHigh": 110.74749989509583
+   }
+  }
+ ],
+ "ratios": [
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "1",
+   "metric": "cold start to mode ready",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 0.9875809415839047,
+   "ciLow": 0.9610355965691844,
+   "ciHigh": 1.0614422062908269,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "1",
+   "metric": "cold start to mode ready",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 1.0125760154082308,
+   "ciLow": 0.9421144119513256,
+   "ciHigh": 1.0405441833475422,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "1",
+   "metric": "warm start to mode ready",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 0.9956916114102146,
+   "ciLow": 0.9599213419473192,
+   "ciHigh": 1.0906557315148195,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "1",
+   "metric": "warm start to mode ready",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 1.0043919852045975,
+   "ciLow": 0.9168796083903514,
+   "ciHigh": 1.0417520231099107,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "4",
+   "metric": "cold start to mode ready",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0306419756477485,
+   "ciLow": 0.9851226925582912,
+   "ciHigh": 1.0774644162373277,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "4",
+   "metric": "cold start to mode ready",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9702691476646814,
+   "ciLow": 0.9281048960226034,
+   "ciHigh": 1.0151019843051972,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "1",
+   "metric": "bytes before mode ready (cold)",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1,
+   "ciLow": 1,
+   "ciHigh": 1,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "startup",
+   "scenario": "-",
+   "throttle": "1",
+   "metric": "bytes before mode ready (cold)",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 1,
+   "ciLow": 1,
+   "ciHigh": 1,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "memory",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread JS heap",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 0.9998200863030373,
+   "ciLow": 0.9919590035794804,
+   "ciHigh": 1.016944287451749,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "memory",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread JS heap",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 1.0001799921201835,
+   "ciLow": 0.9833380376281893,
+   "ciHigh": 1.00810617817017,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "memory",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "JS heaps + WASM memory (main and worker)",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 0.9998585093283882,
+   "ciLow": 0.9936745497234397,
+   "ciHigh": 1.0133244126542957,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "memory",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "JS heaps + WASM memory (main and worker)",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 1.0001415391574529,
+   "ciLow": 0.986850792808402,
+   "ciHigh": 1.006365716298481,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "raw",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "bare engine, 720 steps",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0223695300473175,
+   "ciLow": 0.9879049030012614,
+   "ciHigh": 1.33531466039989,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "raw",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "bare engine, 720 steps",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9781203323452201,
+   "ciLow": 0.7488871572042259,
+   "ciHigh": 1.0122431794416584,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "wall time, 720 steps",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.024311329306201,
+   "ciLow": 0.9560785531011412,
+   "ciHigh": 1.100842556125685,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "wall time, 720 steps",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9763061876741658,
+   "ciLow": 0.9083951146650879,
+   "ciHigh": 1.0459391613339668,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread time, 720 steps",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0239377831991598,
+   "ciLow": 0.9561488250712734,
+   "ciHigh": 1.1010549155099654,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread time, 720 steps",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9766581856514159,
+   "ciLow": 0.9082199133880977,
+   "ciHigh": 1.0458622902407038,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread time per batch, p95",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0867401752621357,
+   "ciLow": 0.8888204827537108,
+   "ciHigh": 1.1425967826836716,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread time per batch, p95",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9202826065358933,
+   "ciLow": 0.8751993836804373,
+   "ciHigh": 1.125086583178008,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread time per batch, max",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0230958647757218,
+   "ciLow": 0.9083946144807352,
+   "ciHigh": 1.156509201211782,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread time per batch, max",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9775773364697546,
+   "ciLow": 0.8646710280836566,
+   "ciHigh": 1.100843162276594,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "mean FPS",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0018775481332485,
+   "ciLow": 0.9969003118062532,
+   "ciHigh": 1.0044046922269427,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "mean FPS",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.998126066793505,
+   "ciLow": 0.9956146240046164,
+   "ciHigh": 1.0031093261352588,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "1% low FPS",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0050080655445957,
+   "ciLow": 0.9236521221905827,
+   "ciHigh": 1.0930505294196435,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "1% low FPS",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9950453543719311,
+   "ciLow": 0.9148707887557139,
+   "ciHigh": 1.0826586936522666,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "frame time p95",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 0.9991625851546355,
+   "ciLow": 0.9988412514484404,
+   "ciHigh": 1.0003318951211853,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "frame time p95",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 1.0008381200472063,
+   "ciLow": 0.9996682149966387,
+   "ciHigh": 1.0011600928074198,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "frame time p99",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 0.9958725159462052,
+   "ciLow": 0.5534199924516628,
+   "ciHigh": 1.0076209140595085,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "frame time p99",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 1.0041463582655745,
+   "ciLow": 0.9924367250092048,
+   "ciHigh": 1.8069459246854778,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "sim minutes per second",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.00013084349415,
+   "ciLow": 0.9998693664106489,
+   "ciHigh": 1.0003386232407205,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "sim minutes per second",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9998691962700745,
+   "ciLow": 0.9996614913861633,
+   "ciHigh": 1.0001306506567154,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "main-thread blocking (long tasks past 50 ms)",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0,
+   "ciLow": null,
+   "ciHigh": null,
+   "n": 1,
+   "zeroReference": 9,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "command to visible frame, median",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 0.9809756427240135,
+   "ciLow": 0.9483463270572544,
+   "ciHigh": 1.0243584964237435,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "command to visible frame, median",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 1.0196329145997507,
+   "ciLow": 0.9762207308195477,
+   "ciHigh": 1.0544670986421474,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "command to visible frame, p95",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0480749572005825,
+   "ciLow": 0.7522714675112654,
+   "ciHigh": 1.3866860544894786,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "1",
+   "metric": "command to visible frame, p95",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.954498915314182,
+   "ciLow": 0.7211437634080479,
+   "ciHigh": 1.329307362019582,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "raw",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "bare engine, 720 steps",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0235445230744005,
+   "ciLow": 0.9613775210547459,
+   "ciHigh": 1.067604082900854,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "raw",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "bare engine, 720 steps",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.976997112960393,
+   "ciLow": 0.9366768224441754,
+   "ciHigh": 1.040174102368111,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "wall time, 720 steps",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0148294906893311,
+   "ciLow": 0.9875513046221788,
+   "ciHigh": 1.0298662738483035,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "wall time, 720 steps",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9853895969972587,
+   "ciLow": 0.9709998524986141,
+   "ciHigh": 1.0126056188873993,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread time, 720 steps",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0152622576734902,
+   "ciLow": 0.9875852571916939,
+   "ciHigh": 1.0301123445111056,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread time, 720 steps",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9849706476577167,
+   "ciLow": 0.9707679024801931,
+   "ciHigh": 1.0125708061333447,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread time per batch, p95",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0200805847165682,
+   "ciLow": 0.9763127839764235,
+   "ciHigh": 1.0768123480127922,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread time per batch, p95",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9803162935695167,
+   "ciLow": 0.9286669138271437,
+   "ciHigh": 1.0242619132027555,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread time per batch, max",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0027807439349783,
+   "ciLow": 0.9507027192434114,
+   "ciHigh": 1.0809127169596553,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "hosted",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread time per batch, max",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9972290063001789,
+   "ciLow": 0.9251440789897976,
+   "ciHigh": 1.0518535182015891,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "mean FPS",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0087203707849186,
+   "ciLow": 0.9741022562606422,
+   "ciHigh": 1.0380448162716942,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "mean FPS",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9913551662597047,
+   "ciLow": 0.9633495436080126,
+   "ciHigh": 1.0265862680975335,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "1% low FPS",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 0.9909566407929364,
+   "ciLow": 0.9136131608876091,
+   "ciHigh": 1.112297085591326,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "1% low FPS",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 1.0091865192127134,
+   "ciLow": 0.8990403849420985,
+   "ciHigh": 1.0945551605544548,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "frame time p95",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 0.9836759104248758,
+   "ciLow": 0.8467940665205348,
+   "ciHigh": 1.1586533157252907,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "frame time p95",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 1.0166235283120792,
+   "ciLow": 0.8630709345305956,
+   "ciHigh": 1.1809246657915144,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "frame time p99",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0011128253255368,
+   "ciLow": 0.9328228685962595,
+   "ciHigh": 1.0671503970570966,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "frame time p99",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9988908251592964,
+   "ciLow": 0.9370750390551523,
+   "ciHigh": 1.0720148847817492,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "sim minutes per second",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 0.9996432886461141,
+   "ciLow": 0.981074231577251,
+   "ciHigh": 1.0131662985630479,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "sim minutes per second",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 1.0003582553334223,
+   "ciLow": 0.9870048001184787,
+   "ciHigh": 1.0192908628252548,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "equivalent"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "frames over 200 ms (clamped)",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 0,
+   "ciLow": null,
+   "ciHigh": null,
+   "n": 1,
+   "zeroReference": 9,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "frames over 200 ms (clamped)",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0,
+   "ciLow": null,
+   "ciHigh": null,
+   "n": 3,
+   "zeroReference": 7,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread blocking (long tasks past 50 ms)",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.0125484952302584,
+   "ciLow": 0.9003322259136213,
+   "ciHigh": 1.0434973637961336,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "main-thread blocking (long tasks past 50 ms)",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.9876208333233293,
+   "ciLow": 0.9583157894736842,
+   "ciHigh": 1.1107011070110702,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "command to visible frame, median",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 0.9714023893457301,
+   "ciLow": 0.8682287727000888,
+   "ciHigh": 1.5980726914458,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "command to visible frame, median",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 1.0306591983857847,
+   "ciLow": 0.6257537628624923,
+   "ciHigh": 1.1517701686965733,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "command to visible frame, p95",
+   "mode": "ts",
+   "against": "wasm",
+   "ratio": 1.088826739936993,
+   "ciLow": 0.9678164305948608,
+   "ciHigh": 1.5353670734476204,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  },
+  {
+   "group": "frames",
+   "scenario": "large",
+   "throttle": "4",
+   "metric": "command to visible frame, p95",
+   "mode": "wasm",
+   "against": "ts",
+   "ratio": 0.918419795515429,
+   "ciLow": 0.6513100464988677,
+   "ciHigh": 1.0332537952319716,
+   "n": 10,
+   "zeroReference": 0,
+   "verdict": "inconclusive"
+  }
+ ],
+ "validation": {
+  "ok": true,
+  "errors": [],
+  "warnings": []
+ },
+ "limitations": [
+  "An A/A pass: the WASM main-thread host mode ran in both slots. The wasm-frame and wasm-worker modes did not run, so their columns and the comparisons with them are absent. A slot's name is a label, not the mode that ran; each run records both.",
+  "One machine and one headless browser (its name and version are in the Browser row). The renderer line says whether the page used the GPU; a software rasterizer fails validation in a protocol run, because render cost then dominates every frame and the FPS rows say more about the CPU than about GPU-backed frame rates.",
+  "CPU throttling is DevTools emulation of the page's main thread. Chromium refuses it on worker targets and a page-level throttle leaves a dedicated worker nearly unthrottled (probed on Chromium 141: a busy loop took 41 ms at 1x and 44 to 58 ms with the page at 4x, 7 to 41% slower against about 4x on the main thread). So at a throttle above 1x the worker host's main thread ran throttled and its engine thread did not; its rows are marked † and carry an `unthrottled` column in the CSVs. A comparison of the worker host with a main-thread host at that throttle favors the worker. Two runs of the same mode are comparable with each other.",
+  "Hosted rows run 720 steps of 2 minutes in batches of 4 (the frame loop's cap is 4) with no rendering. Wall time includes the worker host's wait for each reply; main-thread time counts the steps, the flushes and the time applying replies, and leaves the worker's own time out (reported apart). The browser's unpacking of each reply (the structured clone of its strings, the full save's included) runs on the main thread before the host sees the reply and is not in the hosted main-thread rows; the frames rows (frame times, long tasks) include it.",
+  "The worker host keeps one batch in flight. A frame that finds a batch still out takes no steps (the frame loop banks its minutes under the 30-minute cap), so on a tower the engine cannot step in real time the worker host simulates fewer minutes per second rather than queueing work; the sim-minutes-per-second row shows it.",
+  "Command latency times a tower rename (relayed by every host, read by nothing in the simulation) from the call to the clock inside the first frame callback that runs once the engine's answer is in the read model. The main-thread hosts answer in the call, so their figure is the wait for the next frame callback. One command is in flight at a time, one per second. A negative sample fails validation.",
+  "Memory is measured after 30 steps on a freshly loaded page, after a forced GC. The harness keeps the scenario saves it loads from in the page for every mode (the same text in every mode's JS heap rows); its own stashed start and end saves are dropped before the read. WASM linear memory only grows, so it is a high-water mark that includes the boot tower. The worker's JS heap is read through the DevTools target protocol; when that is unavailable the combined row has no worker sample. Process PSS sums the browser's processes (Linux).",
+  "Frames render at a 1280x720 CSS viewport (set with --viewport). A frame longer than 200 ms is handed 1 ms of game time, so rows with clamped frames understate the simulation work; the clamped-frame row counts them.",
+  "Message sizes are counted on the way in (frame views, full saves, events, log and pending text at two bytes a character); the way out (steps and commands, a few numbers each) is not measured, so as not to serialize every message twice on the measured thread.",
+  "The serialize and deserialize halves of the full save are split only on the worker host (the worker's reply time includes the serialize, the main thread's merge time the parse and merge). The main-thread hosts' read-model sync is split in perf:compare's attribution pass.",
+  "Throttles run in a fixed order (1x then 4x) in each process. The mode order rotates by repetition (10 repetitions over 2 modes: each mode first 5 time(s)). The throttled cold start throttles before the navigation and again at commit; its CPU probe runs after startup, so a throttle gap at navigation would not show.",
+  "Audio was not started in these frames (measured in perf:compare). The coalesced and worker hosts are experimental and opt-in; the shipped default is unchanged.",
+  "WebGL renderer in these runs: ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11). Frame rates are for this GPU; other GPUs and displays will differ. The simulation-only rows do not depend on rendering."
+ ]
+}
