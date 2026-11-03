@@ -59,10 +59,12 @@ pub struct Unit {
     pub vacate_at: Option<f64>,
     pub film_policy: Option<&'static str>,
     pub subtype: Option<&'static str>,
-    pub patronage_today: Option<f64>,
-    pub patronage_yest: Option<f64>,
-    pub profit_today: Option<f64>,
-    pub profit_yest: Option<f64>,
+    /// A retail room's daily tallies (`retail()`, `retail_mut()`). Held out of
+    /// line: only a few hundred shops and restaurants carry them, and the
+    /// tiles that make up most of a tower would each pay 64 bytes for them
+    /// (#1259). `None` means all four tallies are unset; a box is kept only
+    /// while one of them is set, so two units with the same tallies compare equal.
+    pub retail: Option<Box<RetailTally>>,
     pub complete_at: Option<f64>,
     /// A `completeAt` the save carried that is not a number (a string, a
     /// boolean, null). The TypeScript keeps and re-saves it as is, and the
@@ -70,11 +72,40 @@ pub struct Unit {
     /// string that reads as a number completes then and anything else never
     /// completes. Kept beside `complete_at` so the hash and the behavior both
     /// match.
-    pub complete_at_raw: Option<Value>,
+    pub complete_at_raw: Option<Box<Value>>,
     pub dirty_days: Option<i64>,
 }
 
+/// A retail room's four daily tallies (`patronageToday`, `patronageYest`,
+/// `profitToday`, `profitYest` in the save), each unset until the room trades.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct RetailTally {
+    pub patronage_today: Option<f64>,
+    pub patronage_yest: Option<f64>,
+    pub profit_today: Option<f64>,
+    pub profit_yest: Option<f64>,
+}
+
+impl RetailTally {
+    /// The out-of-line record for these tallies: `None` when none is set.
+    pub fn boxed(self) -> Option<Box<RetailTally>> {
+        (self != RetailTally::default()).then(|| Box::new(self))
+    }
+}
+
 impl Unit {
+    /// The room's daily tallies, all unset for a unit that has none.
+    pub fn retail(&self) -> RetailTally {
+        self.retail.as_deref().copied().unwrap_or_default()
+    }
+
+    /// The room's daily tallies to write. Set at least one of them after
+    /// asking for this, or the unit keeps an empty record (`retail = None`
+    /// clears them all).
+    pub fn retail_mut(&mut self) -> &mut RetailTally {
+        self.retail.get_or_insert_default()
+    }
+
     /// `serializeUnit` (sim/coerce.ts).
     pub fn serialize(&self) -> Value {
         let f = self.kind.facility();
@@ -126,23 +157,24 @@ impl Unit {
             m.insert("subtype".into(), json!(v));
         }
         if self.kind.subtype_list().is_some() {
-            if let Some(v) = self.patronage_today {
+            let retail = self.retail();
+            if let Some(v) = retail.patronage_today {
                 m.insert("patronageToday".into(), json!(v));
             }
-            if let Some(v) = self.patronage_yest {
+            if let Some(v) = retail.patronage_yest {
                 m.insert("patronageYest".into(), json!(v));
             }
-            if let Some(v) = self.profit_today {
+            if let Some(v) = retail.profit_today {
                 m.insert("profitToday".into(), json!(v));
             }
-            if let Some(v) = self.profit_yest {
+            if let Some(v) = retail.profit_yest {
                 m.insert("profitYest".into(), json!(v));
             }
         }
         if let Some(v) = self.complete_at {
             m.insert("completeAt".into(), json!(v));
         } else if let Some(raw) = &self.complete_at_raw {
-            m.insert("completeAt".into(), raw.clone());
+            m.insert("completeAt".into(), (**raw).clone());
         }
 
         if let Some(d) = self.dirty_days {

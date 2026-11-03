@@ -1,6 +1,11 @@
 //! Reading a save into a `Simulation`: the entry points and the per-unit reader.
 
 use super::*;
+use crate::tower::RetailTally;
+
+/// The sentence a save written by a newer build is refused with.
+pub const NEWER_SAVE_REFUSAL: &str =
+    "This save was made by a newer version of Verticopolis. Update the game to load it.";
 
 /// `Simulation.deserialize(raw)`.
 pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
@@ -66,6 +71,14 @@ pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
     // loads as the TypeScript loads it (#858).
     if raw.is_null() {
         return Err("not a tower save (the save is null)".into());
+    }
+    // A save from a build newer than this one may carry fields this loader
+    // would drop, and the next save would write the loss back. Refuse it so
+    // the stored copy stays whole until the game is updated (#1603).
+    if let Some(version) = raw.get("version").and_then(Value::as_f64) {
+        if version.is_finite() && version > SAVE_VERSION as f64 {
+            return Err(NEWER_SAVE_REFUSAL.into());
+        }
     }
     // The founder test reads the save as written, and `assemble` reads
     // nothing else from it, so two keys stand in for it.
@@ -242,13 +255,16 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
         vacate_at: u.get("vacateAt").map(|v| num(Some(v), 0.0)),
         film_policy,
         subtype,
-        patronage_today: retail_field("patronageToday"),
-        patronage_yest: retail_field("patronageYest"),
-        profit_today: retail_field("profitToday"),
-        profit_yest: retail_field("profitYest"),
+        retail: RetailTally {
+            patronage_today: retail_field("patronageToday"),
+            patronage_yest: retail_field("patronageYest"),
+            profit_today: retail_field("profitToday"),
+            profit_yest: retail_field("profitYest"),
+        }
+        .boxed(),
         complete_at: u.get("completeAt").and_then(Value::as_f64),
         complete_at_raw: match u.get("completeAt") {
-            Some(v) if !v.is_number() => Some(v.clone()),
+            Some(v) if !v.is_number() => Some(Box::new(v.clone())),
             _ => None,
         },
         dirty_days: coerce_dirty_days(state, kind, u.get("dirtyDays")),

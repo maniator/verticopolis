@@ -105,7 +105,7 @@ describe("isDifferentBuild — running vs deployed", () => {
 describe("classifyUpdate: game, engine or both", () => {
   const fp = (over: Partial<BuildFingerprint["engine"]> & { shell?: string } = {}): BuildFingerprint => {
     const { shell = "s1", ...engine } = over;
-    return { shell, engine: { crate: "0.24.0", rust: "r1", ts: "t1", ...engine } };
+    return { shell, engine: { crate: "0.24.0", rust: "r1", ...engine } };
   };
 
   it("says nothing without both fingerprints, or when nothing differs", () => {
@@ -129,8 +129,9 @@ describe("classifyUpdate: game, engine or both", () => {
     expect(classifyUpdate(fp({ rust: "r2" }), fp())).toEqual({ kind: "engine", engineLine: "Rust engine 0.24.0 (new build)" });
   });
 
-  it("calls a TypeScript engine change an engine update", () => {
-    expect(classifyUpdate(fp({ ts: "t2" }), fp())).toEqual({ kind: "engine", engineLine: "TypeScript engine (new build)" });
+  it("ignores a TypeScript engine hash an older build still reports", () => {
+    const old = (ts: string): BuildFingerprint => ({ shell: "s1", engine: { crate: "0.24.0", rust: "r1", ts } as BuildFingerprint["engine"] });
+    expect(classifyUpdate(old("t2"), old("t1"))).toBeNull();
   });
 
   it("calls a change to both the shell and an engine both", () => {
@@ -145,7 +146,8 @@ describe("classifyUpdate: game, engine or both", () => {
 describe("withUpdateKind and the fingerprint in version.json", () => {
   it("parses a bounded fingerprint and drops a malformed one", () => {
     const ok = parseUpdateInfo({ shell: "abc", engine: { crate: "0.24.0", rust: "r", ts: "t", extra: 1 } });
-    expect(ok?.fingerprint).toEqual({ shell: "abc", engine: { crate: "0.24.0", rust: "r", ts: "t" } });
+    // An older build's `ts` is tolerated in the payload and dropped from the fingerprint.
+    expect(ok?.fingerprint).toEqual({ shell: "abc", engine: { crate: "0.24.0", rust: "r" } });
     expect(parseUpdateInfo({ shell: "abc" })?.fingerprint).toBeUndefined();
     expect(parseUpdateInfo({ shell: "x".repeat(65), engine: {} })?.fingerprint).toBeUndefined();
     expect(parseUpdateInfo({ shell: "abc", engine: { crate: 5 } })?.fingerprint?.engine.crate).toBeUndefined();
@@ -158,8 +160,8 @@ describe("withUpdateKind and the fingerprint in version.json", () => {
   });
 
   it("fills the kind from the running build and leaves other info alone", () => {
-    const running: BuildFingerprint = { shell: "s1", engine: { ts: "t1" } };
-    const info = { version: "2.61.0", fingerprint: { shell: "s2", engine: { ts: "t1" } } };
+    const running: BuildFingerprint = { shell: "s1", engine: { rust: "r1" } };
+    const info = { version: "2.61.0", fingerprint: { shell: "s2", engine: { rust: "r1" } } };
     expect(withUpdateKind(info, running)?.kind).toBe("game");
     expect(withUpdateKind(info, undefined)).toBe(info);
     expect(withUpdateKind(undefined, running)).toBeUndefined();
