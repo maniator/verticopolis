@@ -349,6 +349,18 @@ export class Engine {
      * save was taken yet: the host then takes a full one.
      */
     saveDelta(): string | undefined;
+    /**
+     * The advice and staging facts for a shaft (`wasm_port_life.rs`): a
+     * keyed object, read-only. `draft` is the dialog's working schedule in
+     * `scheduleShaft`'s slots, or empty for none.
+     */
+    scheduleFacts(id: number, draft: Float64Array, weekend_view: boolean): any;
+    /**
+     * The rows and homes a named preset (`rush`, `balanced`, `feeder` or
+     * `stage-up-tower`) sets for a shaft (`wasm_port_life.rs`): a keyed
+     * object, read-only.
+     */
+    schedulePreset(id: number, preset: string): any;
     scheduleShaft(id: number, slots: Float64Array): Float64Array;
     /**
      * Replace the elevator telemetry with an `elevatorTelemetry` document.

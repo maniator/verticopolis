@@ -184,6 +184,8 @@ export const BINDING_EXPORT_TIERS = {
   quoteRentBatch: T2,
   shaftSchedule: T2,
   autoTuneProposal: T2,
+  scheduleFacts: T2,
+  schedulePreset: T2,
   founder: T2,
   statsStrip: T2,
   hotspot: T2,

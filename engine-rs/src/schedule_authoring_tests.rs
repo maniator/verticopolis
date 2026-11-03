@@ -6,11 +6,11 @@ use serde_json::json;
 use super::*;
 use crate::facilities::{Kind, LOT_WIDTH};
 
-const TOP: i64 = 12;
+pub(crate) const TOP: i64 = 12;
 
 /// A served tower with one standard elevator of `cars` cars from floor 1 to
 /// [`TOP`]; returns the sim and the shaft's id.
-fn tower(mode: GameMode, cars: i64) -> (Simulation, i64) {
+pub(crate) fn tower(mode: GameMode, cars: i64) -> (Simulation, i64) {
     let mut sim = Simulation::new_game(7, mode);
     sim.money = 1e12;
     sim.star = 3;
@@ -33,7 +33,35 @@ fn tower(mode: GameMode, cars: i64) -> (Simulation, i64) {
     (sim, id)
 }
 
-fn ring(hours: &[(usize, f64)]) -> Vec<f64> {
+/// A tower to [`SKY_TOP`] with a sky lobby at floor [`SKY`]: the shaft serves two
+/// lobbies, and a stop edit on that floor changes the up-tower target.
+pub(crate) const SKY: i64 = 15;
+/// The top of [`sky_tower`]'s shaft.
+pub(crate) const SKY_TOP: i64 = 20;
+
+pub(crate) fn sky_tower(mode: GameMode, cars: i64) -> (Simulation, i64) {
+    let mut sim = Simulation::new_game(7, mode);
+    sim.money = 1e12;
+    sim.star = 3;
+    for x in 0..LOT_WIDTH {
+        assert!(sim.tower.place(Kind::Lobby, 1, x).ok);
+    }
+    for f in 2..=SKY_TOP {
+        let kind = if f == SKY { Kind::Lobby } else { Kind::Floor };
+        for x in 0..LOT_WIDTH {
+            assert!(sim.tower.place(kind, f, x).ok, "{kind:?} at {f},{x}");
+        }
+    }
+    assert!(
+        sim.build_transport(Kind::ElevatorStandard, LOT_WIDTH / 2, 1, SKY_TOP)
+            .ok
+    );
+    let id = sim.tower.transports[0].id;
+    sim.tower.set_cars(id, cars);
+    (sim, id)
+}
+
+pub(crate) fn ring(hours: &[(usize, f64)]) -> Vec<f64> {
     let mut r = vec![0.0; 24];
     for &(h, v) in hours {
         r[h] = v;
@@ -41,12 +69,12 @@ fn ring(hours: &[(usize, f64)]) -> Vec<f64> {
     r
 }
 
-fn warm_ring(v: f64) -> Vec<f64> {
+pub(crate) fn warm_ring(v: f64) -> Vec<f64> {
     ring(&(8..14).map(|h| (h, v)).collect::<Vec<_>>())
 }
 
 /// Replace the shaft's curves (and origins, if given).
-fn seed(
+pub(crate) fn seed(
     sim: &mut Simulation,
     id: i64,
     weekday: Vec<f64>,
@@ -62,7 +90,7 @@ fn seed(
     sim.seed_telemetry(&doc).expect("a telemetry document");
 }
 
-fn draft(
+pub(crate) fn draft(
     weekday: Option<Vec<i64>>,
     weekend: Option<Vec<i64>>,
     homes: Option<Vec<i64>>,
@@ -311,4 +339,20 @@ fn the_answer_serializes_with_kebab_statuses_and_camel_keys() {
     let none =
         serde_json::to_value(AutoTuneProposal::refused(ProposalStatus::InvalidDraft)).unwrap();
     assert_eq!(none["status"], "invalid-draft");
+}
+
+#[test]
+fn a_shaft_with_no_cars_gets_its_own_status_with_readiness_filled_in() {
+    let (mut sim, id) = tower(GameMode::Modern, 4);
+    seed(&mut sim, id, warm_ring(0.5), warm_ring(0.5), None);
+    sim.tower.transports[0].cars = 0;
+    let p = sim.auto_tune_proposal(id, None, false);
+    assert_eq!(p.status, ProposalStatus::NoCars);
+    assert!(p.proposal.is_none() && p.weekday.warm);
+    // The mode is the more basic reason, so Classic keeps its own status.
+    sim.mode = GameMode::Classic;
+    assert_eq!(
+        sim.auto_tune_proposal(id, None, false).status,
+        ProposalStatus::UnavailableInMode
+    );
 }

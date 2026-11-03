@@ -20,6 +20,7 @@ use serde::Serialize;
 
 use crate::clock::GameMode;
 use crate::schedule::{Schedule, SCHEDULE_HOURS};
+use crate::schedule_geometry::ShaftGeometry;
 use crate::sim::Simulation;
 use crate::telemetry::{HourlyByDay, OriginRings};
 
@@ -38,6 +39,9 @@ pub enum ProposalStatus {
     /// The tower's mode offers no Auto-tune (Classic). Readiness is still
     /// reported.
     UnavailableInMode,
+    /// The shaft holds no cars (a loaded save can), so there is nothing to
+    /// tune. Readiness is still reported.
+    NoCars,
     /// The id names a stair or escalator.
     NotAnElevator,
     /// The id names no shaft.
@@ -92,7 +96,7 @@ impl AutoTuneProposal {
     }
 }
 
-fn readiness(curve: &[f64]) -> DayReadiness {
+pub(crate) fn readiness(curve: &[f64]) -> DayReadiness {
     let sampled_hours = curve.iter().filter(|v| **v > 0.0).count();
     let warm = sampled_hours >= WARMED_MIN_HOURS;
     DayReadiness {
@@ -152,32 +156,12 @@ fn peak_origin_floor(totals: &IndexMap<i64, f64>, served: &[i64]) -> Option<i64>
 /// The staging seed: the lower half of the fleet at the base lobby, the upper
 /// half up-tower, aimed at the busiest measured boarding floor when it sits
 /// above the base.
-fn seeded_homes(cars: i64, bottom: i64, top: i64, lobbies: &[i64], aim: Option<i64>) -> Vec<i64> {
-    let base = lobbies.first().copied().unwrap_or(bottom);
-    let top_lobby = lobbies.last().copied().unwrap_or(top);
+fn seeded_homes(geo: &ShaftGeometry, aim: Option<i64>) -> Vec<i64> {
     let up = match aim {
-        Some(a) if a > base => a.clamp(bottom, top),
-        _ if top_lobby > base => top_lobby,
-        _ => top,
+        Some(a) if a > geo.base_lobby() => a.clamp(geo.bottom, geo.top),
+        _ => geo.up_tower_target(),
     };
-    let lower = cars / 2;
-    (0..cars)
-        .map(|i| if i < lower { base } else { up })
-        .collect()
-}
-
-/// The nearest served floor, ties to the lower one.
-fn snap_to_served(floor: i64, served: &[i64], bottom: i64) -> i64 {
-    let mut best = served.first().copied().unwrap_or(bottom);
-    let mut best_dist = i64::MAX;
-    for &f in served {
-        let d = (f - floor).abs();
-        if d < best_dist {
-            best_dist = d;
-            best = f;
-        }
-    }
-    best
+    geo.split_homes(up)
 }
 
 impl Simulation {
@@ -206,9 +190,16 @@ impl Simulation {
         let (wd, we) = (readiness(&rings.weekday), readiness(&rings.weekend));
         // Readiness is the shaft's, whatever the mode offers: the Classic grid
         // still shows a measured curve, it just gets no proposal.
-        if self.mode != GameMode::Modern || t.cars <= 0 {
+        let unavailable = if self.mode != GameMode::Modern {
+            Some(ProposalStatus::UnavailableInMode)
+        } else if t.cars <= 0 {
+            Some(ProposalStatus::NoCars)
+        } else {
+            None
+        };
+        if let Some(status) = unavailable {
             return AutoTuneProposal {
-                status: ProposalStatus::UnavailableInMode,
+                status,
                 weekday: wd,
                 weekend: we,
                 proposal: None,
@@ -246,14 +237,7 @@ impl Simulation {
             draft_row(true)
         };
 
-        // Both lists are ascending and come from the tower's per-revision caches.
-        let served = self.tower.stops_of(t);
-        let lobby_floors = self.tower.dispatch_floors();
-        let lobbies: Vec<i64> = served
-            .iter()
-            .copied()
-            .filter(|f| lobby_floors.lobbies.binary_search(f).is_ok())
-            .collect();
+        let geo = self.shaft_geometry(t);
         let authored = draft
             .and_then(|d| d.home_floors.as_ref())
             .filter(|h| !h.is_empty());
@@ -263,15 +247,15 @@ impl Simulation {
             None => {
                 let aim = aim_on_weekend(weekend_view, wd.warm, we.warm).and_then(|weekend| {
                     let origins = self.telemetry.origins.get(&id)?;
-                    origin_aim(origins, weekend, &served)
+                    origin_aim(origins, weekend, &geo.served)
                 });
-                seeded_homes(cars, t.bottom, t.top, &lobbies, aim)
+                seeded_homes(&geo, aim)
             }
         };
         let home_floors = homes
             .into_iter()
             .take(cars as usize)
-            .map(|f| snap_to_served(f.clamp(t.bottom, t.top), &served, t.bottom))
+            .map(|f| geo.snap_to_served(f.clamp(geo.bottom, geo.top)))
             .collect();
         AutoTuneProposal {
             status: ProposalStatus::Available,
@@ -309,4 +293,4 @@ fn origin_aim(origins: &OriginRings, weekend: bool, served: &[i64]) -> Option<i6
 
 #[cfg(test)]
 #[path = "schedule_authoring_tests.rs"]
-mod tests;
+pub(crate) mod tests;
