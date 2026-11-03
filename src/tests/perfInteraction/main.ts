@@ -106,7 +106,7 @@ async function waitForGame(page: Page): Promise<void> {
   }
 }
 
-type Run = ArmRun & { renderer: string | null; browserVersion: string; startMinute: number; errors: string[]; frameErrors: number; stalled: string[]; noEffect: string[] };
+type Run = ArmRun & { renderer: string | null; browserVersion: string; startMinute: number; errors: string[]; frameErrors: number; stalled: string[]; noEffect: string[]; missedAutosave: string[] };
 
 /** One arm at one throttle in one repetition, in its own browser. */
 async function runArm(ctx: RunContext, server: PerfServer, arm: Arm, rep: number, throttle: number): Promise<Run> {
@@ -150,11 +150,15 @@ async function runArm(ctx: RunContext, server: PerfServer, arm: Arm, rep: number
     const record = await page.evaluate(collectRecord);
     const phases: ArmRun["phases"] = {};
     const stalled: string[] = [];
+    // Each phase carries one autosave stall. A phase blocked until its window
+    // closed loses it, which would flatter the slower arm.
+    const missedAutosave: string[] = [];
     for (const phase of PHASES) {
       const p = record.phases[phase];
       if (!p) throw new Error(`${arm} rep ${rep}: the ${phase} phase recorded nothing`);
       phases[phase] = phaseMetrics(p, loafSupported, acts[phase]);
       if (p.simMinutes <= 0) stalled.push(phase);
+      if ((p.parts.autosave?.n ?? 0) !== 1) missedAutosave.push(phase);
     }
     // A phase whose script took no effect measured nothing it names.
     const noEffect: string[] = [];
@@ -163,7 +167,8 @@ async function runArm(ctx: RunContext, server: PerfServer, arm: Arm, rep: number
     const built = acts.build?.effective ?? 0;
     ctx.log(`perf:interaction: rep ${rep} ${throttle}x ${arm}: start ${Math.floor(startMinute / 60)}:${String(startMinute % 60).padStart(2, "0")}, ${built} offices placed, ${errors.length} page errors, ${record.frameErrors} frame errors${stalled.length ? `, tower stalled in ${stalled.join(", ")}` : ""}`);
     for (const what of noEffect) ctx.log(`perf:interaction: warning: ${arm} rep ${rep}: ${what}, so that phase measured nothing it names`);
-    return { arm, rep, throttle, phases, renderer, browserVersion: browser.version(), startMinute, errors: [...errors], frameErrors: record.frameErrors, stalled, noEffect };
+    for (const phase of missedAutosave) ctx.log(`perf:interaction: warning: ${arm} rep ${rep}: ${phase} did not run exactly one autosave, so it is not comparable with the other arm`);
+    return { arm, rep, throttle, phases, renderer, browserVersion: browser.version(), startMinute, errors: [...errors], frameErrors: record.frameErrors, stalled, noEffect, missedAutosave };
   } finally {
     await browser.close();
   }
@@ -245,7 +250,7 @@ export async function main(argv: readonly string[], repo: string, log: (line: st
   ].join("\n");
   writeFileSync(join(out, "report.md"), report);
   log(`perf:interaction: wrote ${out}`);
-  const problems = runs.filter((r) => r.errors.length || r.frameErrors || r.stalled.length || r.noEffect.length);
-  for (const r of problems) log(`perf:interaction: ${r.arm} rep ${r.rep} at ${r.throttle}x is not clean: ${r.errors.length} page errors, ${r.frameErrors} frame errors, stalled in ${r.stalled.join(", ") || "none"}, took no effect in ${r.noEffect.join(", ") || "none"}`);
+  const problems = runs.filter((r) => r.errors.length || r.frameErrors || r.stalled.length || r.noEffect.length || r.missedAutosave.length);
+  for (const r of problems) log(`perf:interaction: ${r.arm} rep ${r.rep} at ${r.throttle}x is not clean: ${r.errors.length} page errors, ${r.frameErrors} frame errors, stalled in ${r.stalled.join(", ") || "none"}, took no effect in ${r.noEffect.join(", ") || "none"}, autosave not run once in ${r.missedAutosave.join(", ") || "none"}`);
   return problems.length ? 1 : 0;
 }

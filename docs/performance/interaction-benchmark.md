@@ -46,10 +46,10 @@ arms alternate (A then B on odd repetitions, B then A on even ones). In each:
    same view on every run.
 
 Autosave runs once in the middle of every phase, and its timer is switched
-off, so its stall lands at the same point for both arms. If the main thread is
-blocked until the phase ends, that phase's autosave is cancelled, so it never
-runs inside the next phase. The time recorded
-for it covers the synchronous part (the engine serialize and the encode). The
+off, so its stall lands at the same point for both arms. If a phase's autosave
+has not run by the time its window closes, it is cancelled, so it never runs
+between phases or inside the next one, and the run is marked not clean. The
+time recorded for it covers the synchronous part (the engine serialize and the encode). The
 compression runs in a `CompressionStream`, off the main thread; the steps
 after it that run on the main thread (the base64 encoding and the storage
 write) show in the long tasks.
@@ -88,8 +88,9 @@ dominates every frame (any cloud container renders with SwiftShader).
 says so, with its date, in its first line, and whose `results.json` carries
 `"preview": true`; a preview is never evidence. The run exits 1 when the page
 threw an error or left a promise rejection unhandled, the app caught a frame
-error, the tower stalled in a phase, or the build or panels phase took no
-effect (no office placed, no dialog opened).
+error, the tower stalled in a phase, the build or panels phase took no
+effect (no office placed, no dialog opened), or a phase did not run exactly
+one autosave.
 
 ## Running it
 
