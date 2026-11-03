@@ -7,8 +7,8 @@
  * adapter: a wrong detail field here would read as a wasm32 divergence on a
  * night where there is none, or hide a real one.
  *
- * Runs in `npm run test:wasm` (the required wasm-parity checks) with the package built; without it
- * the suite fails under `VC_REQUIRE_WASM=1` and is not part of a plain `npm test`.
+ * Runs in `npm run test:wasm` (the required wasm-parity checks), where a missing package fails it
+ * under `VC_REQUIRE_WASM=1`; a plain `npm test` skips it without the package and runs it with one.
  */
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

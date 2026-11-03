@@ -161,8 +161,12 @@ Verticopolis has **two test tiers**:
     3 marks a harness failure, not a divergence). One seed in four grows a
     tall tower that fills the shaft and stair pools; every seed sets a cash
     profile once the tower is built, and cash can drop to zero or below mid-run. A divergence it finds is
-    pinned as a named scenario in the fix PR. A run summary names its seed
-    range and the `seed_block` and `seed_offset` that replay it.
+    pinned as a named scenario in the fix PR. One seed in four (`wasm_every`)
+    is also replayed through the shipped WASM build in Node and compared with
+    the native Rust run (`scripts/fuzz-compare.ts --wasm`), which is where a
+    wasm32-only difference shows. A run summary names its seed range and the
+    `seed_block` and `seed_offset` that replay it, the seeds that diverged on
+    each leg, the seeds that timed out, and the time each leg took.
 
     **Suites on the engine port.** A converted suite does not build a
     `Simulation` and poke it. It names its engines with `describeEngines`
