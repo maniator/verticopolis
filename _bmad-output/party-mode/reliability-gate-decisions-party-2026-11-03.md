@@ -17,10 +17,16 @@ relates_to:
 > not refresh. No figure here is release evidence. The live numbers come from
 > `scripts/engine-reliability.mjs` (which prints `scripts/persistence-failures.mjs`
 > and `scripts/reliability-coverage.mjs` beneath it) and their tests; the
-> status of each measure is `docs/analytics-measurement-status.md`. The one
-> traffic figure used (about 104 governed Rust sessions in 30 days) is the
-> governed script's count as quoted in that doc, and every day count derived
-> from it is a projection.
+> status of each measure is `docs/analytics-measurement-status.md`. The only
+> traffic figure used is a one-off count run on 2026-11-03 (not a governed
+> measure, and not saved as one): production `engine_status` sessions with a
+> settle or attempt row on build 2.66.0 or later, bucketed by the day their
+> page life first appeared, from 2026-10-30 (the first Rust-only deploy) to
+> 2026-11-03 (a partial day). It came to about 110 sessions in under five days,
+> at about 30, 22, 18 and 20 a day on 2026-10-31 to 2026-11-03, so the
+> rate is roughly 20 a day and falling. A session that spans two days counts
+> once per day, so the total is a slight overcount. Every day count below is a
+> projection from that rate.
 
 Naftali asked that these three questions be settled by a roundtable instead of
 waiting on him. The gate is his release decision: he can accept, change or
@@ -32,7 +38,7 @@ own words. What follows is the recommendation he delegated.
 | Voice | Pushed for |
 |---|---|
 | **Mary**, Analyst and data skeptic | No threshold the data cannot honestly support. A bound, never a bare rate; "Insufficient evidence" before "pass". |
-| **John**, PM and release owner | A gate that can close in months, not a year, at the traffic we actually have. |
+| **John**, PM and release owner | A gate that can close in weeks, not months, at the traffic we actually have. |
 | **Winston**, Architect | Thresholds that fall out of the governed scripts as they are, with no new fields and no new measures. |
 | **Amelia**, Dev | Rules a script prints and a test pins, so nobody computes the gate by hand. |
 | **Paige**, Technical Writer | Dated documents stay honest without being rewritten, and the wording says count and rate separately. |
@@ -44,16 +50,17 @@ unknown bias, its bound optimistic (Mary); no new analytics fields (John).
 
 ## 1. Reliability gate thresholds for 3.0.0
 
-**John:** The old standard was 1,000 eligible sessions. At about 104 governed
-Rust sessions a month that is roughly ten months (projection). The Rust-only
+**John:** The old standard was 1,000 eligible sessions. At about 20 Rust-only
+sessions a day (a falling rate, projection) that is about 45 more days from
+2026-11-03, so mid-December. The Rust-only
 plan replaced the 300 and 1,000 standards, so the row needs new numbers.
 
 **Mary:** Then pick the numbers from the bound table, not from the calendar.
 With zero faults the bound is about 3/n: 1.49% at n=200, 0.99% at n=300, 0.60%
 at n=500. I want 300, so a clean run means something under 1%.
 
-**John:** 300 is about three months of traffic before the first candidate even
-freezes. 200 is about two, and a 1.5% ceiling is still a real statement for a
+**John:** 300 is about nine more days of traffic at today's rate, before the
+first candidate even freezes. 200 is about five, and a 1.5% ceiling is still a real statement for a
 game whose failure screen keeps the save.
 
 **Winston:** Separate the two windows the plan already has. The tail is the
@@ -125,8 +132,10 @@ Zero versus one fault: zero faults pass B2 at 200 sessions. One fault passes
 only once it is triaged (B5), absent from the tail (B4), not repeated (B6) and
 the release window reaches 315 sessions; until then the row reads "Not yet: 1
 fault, bound X%". The stricter option for the owner: 300 sessions and a 1.0%
-ceiling (one fault then needs 473). Projection at about 104 sessions a month:
-200 in about two months from 2.66.0, 315 in about three.
+ceiling (one fault then needs 473). Projection at about 20
+sessions a day (the rate is falling, so these are early estimates): 200 sessions
+about 2026-11-07 or 11-08, 315 about 11-13, 473 about 11-21. The 14-night
+candidate tail is the longer wait for a fresh candidate.
 
 Proposed #945 row text:
 
