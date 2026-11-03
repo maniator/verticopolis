@@ -372,6 +372,7 @@ const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
   first_build: { tool: "office" },
   tool_used: { tool: "lobby" },
   star_reached: { star: 3 },
+  milestone_reached: { id: "pop-500" },
   session_end: { seconds: 42, final: true },
   boot: { reason: "continue", version: "1.0.0", mode: "modern", star: 2, floors: 10, population: 90 },
   crash: {

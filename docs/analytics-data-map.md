@@ -66,6 +66,7 @@ an event sent before boot carries `version` only.
 | `first_build` | `tool` | First facility in a tower | Funnel: did they build anything |
 | `tool_used` | `tool` | First use of each tool in a session | Tool mix |
 | `star_reached` | `star` | Each star rung crossed | Progression depth |
+| `milestone_reached` | `id` | An optional milestone is achieved (from the engine's event) | Which goals players reach, beyond stars |
 | `session_end` | `seconds`, `final` | Every tab hide and page hide | Session length, read only through the `session_lengths` view |
 | `boot` | `reason`, `version`, `mode`, `star`, `floors`, `population` | Once per page life | Why a session started and the tower it opened |
 | `crash` | `kind`, `repeat`, `recoveryFailed`, `saveFlushed`, `behindSplash`, `version`, `star`, `population` | A crash screen | Crash reliability |
@@ -97,17 +98,18 @@ Outside the typed vocabulary:
 
 ## Persistence failure actions
 
-Three `app_action` codes report a save, load or import that failed (#1533, approved 2026-11-03). Each is the fact only, never a message, file name or tower content.
+Four `app_action` codes report a save, load, import or export that failed (#1533 and #1655, approved 2026-11-03). Each is the fact only, never a message, file name or tower content.
 
 | `action` | `detail` | When | Reading |
 | --- | --- | --- | --- |
 | `autosave_failed` | `timer` or `manual` | A background or system save (`timer`: the timer and tower-swap autosaves, the pre-update flush, the context-loss flush and the .TDT adoption flush) or a Quick Save or slot save (`manual`) threw, such as a full or blocked `localStorage` | Latched once per page life, so events can exceed sessions; read sessions with a failed save, not failures. The `detail` is the first source that failed |
 | `load_failed` | none | A slot load from the saves manager or the title-screen picker adopted nothing | An empty slot and an unreadable one read alike. Quick Load ("No saved tower found") is not counted |
 | `import_failed` | `save` (.vctower) or `tdt` (.TDT) | An imported file was refused or unreadable | Counted per attempt |
+| `export_failed` | `save` (.vctower) or `tdt` (.TDT) | An export wrote no file: the engine threw (a memory failure on a huge tower) or refused (a Modern tower cannot become a `.TDT`) | Counted per attempt. A download the browser blocks is not seen |
 
 These are lower bounds like every client event: a failure that kills the tab, or
 a blocked relay, reports nothing. `docs/analytics-measurement-status.md` rows 8
-to 10 say what they can and cannot support.
+to 10 and 24 say what they can and cannot support.
 
 ## `engine_status`
 

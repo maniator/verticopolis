@@ -1,3 +1,4 @@
+import { trackAppAction } from "../analytics";
 import { SaveGame } from "../storage/SaveGame";
 import type { UI } from "../ui/UI";
 
@@ -96,7 +97,8 @@ export async function runExportFlow(
   } catch (err) {
     // Never fail silently: main.ts fires this with `void`, so an unhandled
     // rejection here would leave the player with no download and no feedback.
-    deps.ui.toast("Export failed: " + (err as Error).message, "bad");
+    trackAppAction("export_failed", "save");
+    deps.ui.toast("Export failed: " + (err instanceof Error ? err.message : String(err)), "bad");
   } finally {
     clearTimeout(watchdog);
     if (latchOwner === run) latchOwner = 0;

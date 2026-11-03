@@ -304,3 +304,91 @@ test.describe("tower scene (region-composition tripwire)", () => {
     await expect(page.locator("#view")).toHaveScreenshot("scene-detail-night.png", { timeout: 30_000 });
   });
 });
+
+// The overview MAP window (#343), behind its `?map` preview flag until S5. The
+// shots are of the window alone: its two canvases redraw only when the tower
+// or the camera changes, so a paused tower at a pinned camera is still.
+test.describe("overview map", () => {
+  /** Boot with the map, grow the 3-star Classic tower and pin the camera. */
+  async function classicMap(page: import("@playwright/test").Page): Promise<void> {
+    await page.goto("/?map");
+    await page.waitForFunction(() => Boolean((window as any).game));
+    await page.evaluate(() => document.getElementById("splash")?.remove());
+    expect(await page.evaluate(buildToStar, 3)).toBe(3);
+    await page.evaluate(() => (window as any).game.engine.setCamera(Math.floor((window as any).game.grid.width / 2), 6, 1));
+    await hideTransientChrome(page);
+  }
+
+  /** Hide the toasts and the hint bar, which can sit over the map card (a
+   *  build's toast lands on the phone card), so a late toast never moves a
+   *  shot. Then quiet the world behind the card the way the scene shots do:
+   *  reduced motion, and the region repaint queue drained, so a busy main
+   *  thread on a CI runner does not stall the screenshot's own checks. */
+  async function hideTransientChrome(page: import("@playwright/test").Page): Promise<void> {
+    await page.addStyleTag({ content: "#toast-wrap, #hint { visibility: hidden !important; }" });
+    await page.evaluate(() => {
+      const e = (window as any).game.engine;
+      e.setReducedMotion(true);
+      e.resetDecorativeClock();
+    });
+    await page.waitForFunction(() => {
+      const e = (window as any).game.engine;
+      return !e.hourSyncPending && e.regionDirty.size === 0;
+    });
+  }
+
+  test.describe("on the desktop", () => {
+    test.use({ viewport: { width: 1280, height: 800 } });
+
+    test("Classic map matches baseline", async ({ page }) => {
+      await classicMap(page);
+      await expect(page.locator("#overview-map")).toHaveScreenshot("overview-map-classic.png", { timeout: 30_000 });
+    });
+
+    test("Modern map matches baseline", async ({ page }) => {
+      await page.goto("/?map");
+      await page.waitForFunction(() => Boolean((window as any).game));
+      await page.evaluate(() => document.getElementById("splash")?.remove());
+      await page.evaluate(() => {
+        const g = (window as any).game;
+        // A small Modern tower: offices, condos and a shaft, so the map shows
+        // each group's color. Self-contained for page.evaluate.
+        const s = g.sim.constructor.newGame(4400, "modern");
+        s.money = 1e9;
+        const cx = Math.floor(g.grid.width / 2);
+        const left = cx - 30;
+        const right = cx + 30;
+        for (let x = cx; x <= right; x++) s.tower.place("lobby", 1, x);
+        for (let x = cx - 1; x >= left; x--) s.tower.place("lobby", 1, x);
+        for (let f = 2; f <= 8; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
+        const shaft = s.tower.placeTransport("elevatorStandard", left + 4, 1, 8);
+        if (!shaft.ok) throw new Error(`elevator refused: ${shaft.reason ?? "unknown"}`);
+        for (let f = 2; f <= 8; f++) {
+          const kind = f <= 5 ? "office" : "condo";
+          for (let x = left + 8; x + 1 <= right; ) {
+            const r = s.tower.place(kind, f, x);
+            x += r.ok ? s.tower.getUnit(r.unitId).width : 1;
+          }
+        }
+        // A refused build would mint a near-empty map: check every group landed.
+        const count = (kind: string) => s.tower.units.filter((u: { kind: string }) => u.kind === kind).length;
+        for (const kind of ["lobby", "office", "condo"]) if (count(kind) === 0) throw new Error(`no ${kind} placed`);
+        g.adoptSim(s, true);
+        g.speed = 0;
+        g.engine.setCamera(cx, 4, 1);
+      });
+      await hideTransientChrome(page);
+      await expect(page.locator("#overview-map")).toHaveScreenshot("overview-map-modern.png", { timeout: 30_000 });
+    });
+  });
+
+  test.describe("on a phone", () => {
+    test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+    test("open phone map matches baseline", async ({ page }) => {
+      await classicMap(page);
+      await page.locator("#btn-map").tap();
+      await expect(page.locator("#overview-map")).toHaveScreenshot("overview-map-phone.png", { timeout: 30_000 });
+    });
+  });
+});

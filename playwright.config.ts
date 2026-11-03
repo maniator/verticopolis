@@ -13,7 +13,7 @@ import { defineConfig, devices } from "@playwright/test";
 //   - `chromium`: the general browser regression suite.
 // `npm run e2e` runs both; CI runs them as the `e2e` and `e2e-wasm-only` jobs
 // with `--project`.
-const SERIAL_SPECS = ["engineIdentity", "engineStatusRows", "atlas", "visual", "perf"];
+const SERIAL_SPECS = ["engineIdentity", "engineStatusRows", "atlas", "visual", "perf", "overviewMapPerf"];
 const SERIAL_SPEC_PATTERN = new RegExp(`(?:^|[\\\\/])(?:${SERIAL_SPECS.join("|")})\\.spec\\.ts$`);
 
 export default defineConfig({

@@ -6,6 +6,7 @@ import type { GameplayEvent } from "../gameplayEventBuffer";
 import { INVALID_REQUEST } from "../request";
 import { markFounderFromLoadedFile } from "../sim/founderStatus";
 import type { SerializedGame } from "../types";
+import type { SchedulePresetName } from "../../simport/enginePort";
 import type { CalendarKind } from "../calendar";
 import type { GameMode } from "../types";
 import * as cmd from "./commands";
@@ -423,6 +424,8 @@ export class TsEngine implements PortState {
   quoteRentBatch = (kind: number, target: number, onlyDefault: boolean) => ask.quoteRentBatch(this, kind, target, onlyDefault);
   shaftSchedule = (id: number) => ask.shaftSchedule(this, id);
   autoTuneProposal = (id: number, draft: Float64Array, weekendView: boolean) => ask.autoTuneProposal(this.current, id, draft, weekendView);
+  scheduleFacts = (id: number, draft: Float64Array, weekendView: boolean) => ask.scheduleFacts(this.current, id, draft, weekendView);
+  schedulePreset = (id: number, preset: SchedulePresetName) => ask.schedulePreset(this.current, id, preset);
   founder = () => this.current.founder;
   statsStrip = () => ask.statsStrip(this.current);
   hotspot = () => ask.hotspot(this.current);

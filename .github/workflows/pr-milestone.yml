@@ -22,9 +22,13 @@ concurrency:
   group: pr-milestone-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
+# Setting a milestone on a pull request goes through the issues endpoint, but
+# GitHub checks pull requests against the pull-requests permission there, so a
+# token with only issues: write gets a 403 on the PATCH below. Nothing else is
+# granted, and nothing from the pull request is checked out or run.
 permissions:
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   milestone:

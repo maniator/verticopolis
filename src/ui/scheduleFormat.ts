@@ -11,7 +11,7 @@ export const hh = (h: number): string => `${String(h).padStart(2, "0")}:00`;
 
 /** Compress an ascending hour list into ranges ("07:00–10:00, 13:00") so a
  *  long advice stretch reads as one span, not a two-line comma flood (§11). */
-export function fmtHours(hs: number[]): string {
+export function fmtHours(hs: readonly number[]): string {
   const parts: string[] = [];
   for (let i = 0; i < hs.length; ) {
     let j = i;
