@@ -60,7 +60,7 @@ jobs:
             fi
           done
           if [ -z "$target" ]; then
-            target=$(jq -r --arg t "$CURRENT_RELEASE" '.[] | select(.title == $t) | .number' <<<"$milestones")
+            target=$(jq -r --arg t "$CURRENT_RELEASE" 'first(.[] | select(.title == $t) | .number)' <<<"$milestones")
             echo "PR #${PR} closes no issue with a milestone; using ${CURRENT_RELEASE} (${target})."
           fi
           if [ -z "$target" ]; then
