@@ -312,8 +312,18 @@ fn a_save_past_the_reader_cap_is_refused_in_the_trees_words() {
     let text = tower(&format!(r#","towerName":"{name}""#));
     let got = encode_vctower_text(text.as_bytes(), "3.0.0", NOW);
     assert!(
-        got.as_ref().is_err_and(|e| e.contains("more than the")),
+        got.as_ref().is_err_and(|e| e.contains("larger than")),
         "{got:?}"
     );
     assert_eq!(got, tree(text.as_bytes(), "3.0.0", NOW));
+}
+
+#[test]
+fn a_save_past_the_cap_is_refused_in_words_a_player_can_read() {
+    let json = " ".repeat(33 * 1024 * 1024);
+    let err = crate::load::pack_json(&json).unwrap_err();
+    assert_eq!(
+        err,
+        "This tower's save data is larger than 32 MB, the most a save can hold."
+    );
 }

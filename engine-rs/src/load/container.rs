@@ -183,8 +183,8 @@ pub fn encode_vctower(save: &Value) -> Result<Vec<u8>, String> {
 pub(crate) fn pack_json(json: &str) -> Result<Vec<u8>, String> {
     if json.len() as u64 > MAX_SAVE_INFLATED_BYTES {
         return Err(format!(
-            "this save is {} bytes of JSON, more than the {MAX_SAVE_INFLATED_BYTES} a .vctower reader will hold",
-            json.len()
+            "This tower's save data is larger than {} MB, the most a save can hold.",
+            MAX_SAVE_INFLATED_BYTES / (1024 * 1024)
         ));
     }
     let packed = crate::fflate::deflate_level1(json.as_bytes());
