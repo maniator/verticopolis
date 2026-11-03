@@ -15,8 +15,8 @@ counting rules for the engine fault rate are in
 > `node scripts/engine-reliability.mjs --window <days>`, whose rules
 > `src/engine-reliability.test.ts` pins. Sessions and engaged sessions are
 > read from the `session_lengths` view and the `engaged` rows through the same
-> script. The coverage numbers have no governed definition yet (see
-> "Telemetry coverage" below).
+> script. The coverage cross-checks and the trap recovery counts are governed by
+> `scripts/reliability-coverage.mjs` (see "Telemetry coverage" below).
 
 ## Privacy limits that cannot be worked around
 
@@ -60,7 +60,7 @@ telemetry and context.
 | 3 | Engine initialization failure | `engine_status` `fallback_reason` `boot-error`, `fallback_stage` | N | Same | A boot that throws before the game exists sends no row; `$exception` may report it. Browsers that block the relay send nothing | Count: lower bound. Rate: coverage-limited (inside row 1) | **Yes**, inside row 1 |
 | 4 | Package mismatch and unverifiable engine files | `engine_status` `package-mismatch`, `unverifiable` | N | Same | Deploy race and browsers without `crypto.subtle`; deliberately outside the fault rate and printed on their own lines | Accurate for what reports | Reported, never counted as faults |
 | 5 | WASM traps while running | `engine_status` `trap-command`, `trap-tick`, `trap-undo`, `crash-reload` | N | Same | Zero traps seen means zero reported, not zero happened: a tab killed by the trap before the row sends nothing. The reload path is exercised by the forced-trap E2E spec, not by production traffic so far | Count: lower bound; Insufficient evidence at current volume | **Yes**; any trap is a stop signal |
-| 6 | Trap recovery: recovered versus stopped | `crash-reload` row, then the same `distinct_id`'s later page lives; a second trap on a build stops the game and sends a `fallback` row | Sessions with a trap row | Same | Derivable from existing rows, but no governed query computes it today. The reloaded page life boots as `continue`, so only the session sequence tells recovery apart | **Not measured** (derivable) | Needed; see #1623 |
+| 6 | Trap recovery: recovered versus stopped | `crash-reload` row, then the same `distinct_id`'s later page lives; a second trap on a build stops the game and sends a `fallback` row | Sessions with a trap row | Same | Counted by `scripts/reliability-coverage.mjs` (printed under the persistence failures) as sessions per outcome: recovered, stopped, reloaded without recovering (including a second trap and reload), unknown. A count of sessions, not a rate. Zero trapped sessions reads Insufficient evidence. A session that closed its tab after the trap is unknown, not failed | Count: lower bound | Yes, once traps occur |
 | 7 | Writer latch-off | `engine_status` `writer_latched`, trigger `writer-latch` | N | Same | Reports only when the latch happens on a page that can still send | Count: lower bound. Rate: coverage-limited | **Yes**; any latch-off fails the row |
 | 8 | Autosave, Quick Save and slot-save failures | `app_action` `autosave_failed` (#1533, approved 2026-11-03), once per page life, `detail` `timer` or `manual` | Sessions | Since the build that ships the code | Counts sessions with a failed save, not failures. A failed pre-update or crash-recovery save is not reported (see #1631) (the latch is per page life, so a reload can send a second event; the session count de-duplicates). `timer` includes the tower-swap autosave. A tab killed by the failure reports nothing. Builds before it report nothing, so earlier windows read Not measurable | Count: lower bound from that build. **Rate unavailable**: no autosave attempt or success is sent | Yes, as a count of sessions, for builds that carry it |
 | 9 | Load failures | `boot` `reason=corrupt` (autosave at boot) and `app_action` `load_failed` (slot loads) | `boot` rows; sessions | Since the build that ships the code | `load_failed` cannot tell an empty slot from an unreadable one. Older builds have the boot reason only. Attempts are `load_slot` plus `load_failed`. Quick Load ("No saved tower found") is outside this measure | Count: lower bound from that build. Rate: coverage-limited, per attempt, printed with its bound | Yes, for builds that carry it |
@@ -70,7 +70,7 @@ telemetry and context.
 | 13 | `$exception` counts | `$exception` | Rows | Any | Raw counts, capped at 10 per page life, not classified by origin (#1090). Never present a raw count as engine failures | Approximation | Only once classified (#1090) |
 | 14 | Engaged sessions | `engine_status` `engaged` rows, `engaged_by` | Sessions | Since 2026-10-29 | Lower bound on real play; a boot fault cannot engage, so engagement must never be the fault-rate denominator | Lower bound | Reported beside N, not as N |
 | 15 | Sessions (per tab) | `session_lengths` view | Sessions that sent `session_end` | Any | `session_end` re-fires on every hide, so only the view is governed; a tab killed without a hide sends none | Lower bound | Context only |
-| 16 | Sessions with incomplete terminal telemetry | `engine_status` sessions with no `session_end` | `engine_status` sessions | Any | See "Telemetry coverage". No governed query yet | **Not measured** (derivable) | Needed as a caveat line |
+| 16 | Sessions with incomplete terminal telemetry | `engine_status` sessions with no `session_end` | `engine_status` sessions | Any | See "Telemetry coverage". Counted by `scripts/reliability-coverage.mjs` as a cross-check, never a rate | Count: lower bound on tabs that never sent a hide | Caveat line only |
 | 17 | Page lives that attempted and never settled | `engine_status` `attempt` without `settle` | `attempt` page lives | Any | Printed by the script on its own line today. Mixes tabs closed during load with boot throws | Accurate for what reports | Reported, outside the rate |
 | 18 | Unique players, returning players, retention | None, by design | None | None | No person profile, cookie or stored id | **Not measurable** | Never, without an approved identity strategy |
 | 19 | Sessions that never report | None | None | None | Blockers, offline play, rate limits and tabs killed before the first row are invisible to every event that uses the relay | **Not measurable** | Stated as a limit in every readout |
@@ -118,8 +118,13 @@ hides from both. Only an independent counter could bound that, for example
 page-view counts from a different transport, and no such comparison has been
 run yet.
 
-None of these coverage figures is governed. Do not publish them as a rate;
-#1623 proposes a tested definition.
+The cross-checks are governed by `scripts/reliability-coverage.mjs`, which
+`src/reliability-coverage.test.ts` pins and `scripts/engine-reliability.mjs`
+prints under the persistence failures: boot rows, settle page lives, attempt
+page lives that never settled, and sessions with engine rows and no
+`session_end`. They are cross-checks, not rates, and loss on the relay itself
+hides from all of them. The figures in the snapshot below were a one-off read
+before that script existed; the script is the live definition.
 
 ## Snapshot, 2026-11-03 14:00 UTC (not refreshing)
 
@@ -160,4 +165,5 @@ code, not as a substitute for the script run with the API key.
 - Crash loop magnitude: #841.
 - `$exception` origin classification and the "no data" reading for builds
   with no eligible sessions: #1090.
-- Derived coverage, recovery outcome and the dashboard status card: #1623.
+- Derived coverage and recovery outcome: `scripts/reliability-coverage.mjs`
+  (#1623). The dashboard status card is still open under #1623.
