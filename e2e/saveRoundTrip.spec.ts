@@ -85,14 +85,14 @@ test("the engine loads the autosave, plays, saves, reloads and downloads it as a
   // The exported bytes load: play on, then import the file and the tower is the one that was exported.
   const exported = await page.evaluate(() => {
     const h = (window as any).game.reader.header;
-    return { minutes: h.minutes as number, money: h.money as number };
+    return { minutes: h.minutes as number, header: JSON.stringify(h) };
   });
   await playAndSave(page, second);
   expect(await page.evaluate(() => (window as any).game.reader.header.minutes)).toBeGreaterThan(exported.minutes);
   await page.evaluate((text) => (window as any).game.saveLoad.importGame(text), file);
   await expect(page.getByText("Tower imported.")).toBeVisible();
   await clockReads(page, exported.minutes);
-  expect(await page.evaluate(() => (window as any).game.reader.header.money)).toBe(exported.money);
+  expect(await page.evaluate(() => JSON.stringify((window as any).game.reader.header)), "every header figure matches the exported tower").toBe(exported.header);
 });
 
 test("a tower file saved by a newer version is refused and changes nothing", async ({ page }) => {

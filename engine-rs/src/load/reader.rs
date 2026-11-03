@@ -75,7 +75,7 @@ pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
     // would drop, and the next save would write the loss back. Refuse it so
     // the stored copy stays whole until the game is updated (#1603).
     if let Some(version) = raw.get("version").and_then(Value::as_f64) {
-        if version.is_finite() && version.fract() == 0.0 && version > SAVE_VERSION as f64 {
+        if version.is_finite() && version > SAVE_VERSION as f64 {
             return Err(NEWER_SAVE_REFUSAL.into());
         }
     }
