@@ -174,6 +174,47 @@ fn congestion_is_kept_until_a_room_the_tower_or_the_clock_moves() {
     assert_eq!(e.port_congestion().to_bits(), e.sim.congestion().to_bits());
 }
 
+/// The hotspot is kept on the congestion key (#1237): a read between steps
+/// returns the kept pair, and a marked room write, the clock or the revision
+/// each move it to what a fresh read says.
+#[test]
+fn the_hotspot_is_kept_until_a_room_the_tower_or_the_clock_moves() {
+    let fresh = |e: &Engine| {
+        let (ratio, floor) = e.sim.peak_congestion();
+        [ratio, floor.map_or(f64::NAN, |f| f as f64)]
+    };
+    let same = |a: [f64; 2], b: [f64; 2]| {
+        a[0].to_bits() == b[0].to_bits() && (a[1] == b[1] || a[1].is_nan() && b[1].is_nan())
+    };
+    let mut e = built();
+    let office = e
+        .sim
+        .tower
+        .units
+        .iter()
+        .find(|u| u.kind == Kind::Office)
+        .unwrap()
+        .id;
+    let quiet = e.port_hotspot();
+    assert!(same(quiet, fresh(&e)));
+    // A write that skips the mark log is not seen: the kept answer stands.
+    e.sim.tower.get_unit_mut(office).unwrap().state = UnitState::Occupied;
+    assert!(same(e.port_hotspot(), quiet));
+    // A marked write moves the key.
+    let (u, at) = e.sim.tower.marked_by_id(office).unwrap();
+    u.set_state(at, UnitState::Vacating);
+    let busy = fresh(&e);
+    assert!(busy[0] > 0.0, "a present tenant loads the shaft");
+    assert!(same(e.port_hotspot(), busy));
+    // So do the clock (the rush factor) and the revision.
+    e.sim.clock.minutes += 8.0 * 60.0;
+    let later = fresh(&e);
+    assert!(same(e.port_hotspot(), later));
+    assert!(!same(later, busy), "the rush factor moved the ratio");
+    assert!(e.sim.tower.place(Kind::Office, 3, 170).ok);
+    assert!(same(e.port_hotspot(), fresh(&e)));
+}
+
 #[test]
 fn the_fills_and_the_parking_set_read_the_simulation() {
     let mut e = built();

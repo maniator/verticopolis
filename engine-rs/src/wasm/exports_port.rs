@@ -91,7 +91,7 @@ impl Engine {
     pub fn stats_strip(&self) -> Vec<f64> {
         self.sim.tower_stats_record().to_vec()
     }
-    pub fn hotspot(&self) -> Vec<f64> {
+    pub fn hotspot(&mut self) -> Vec<f64> {
         self.port_hotspot().to_vec()
     }
     pub fn onboarding(&self) -> f64 {
