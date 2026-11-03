@@ -186,8 +186,9 @@ fn a_tall_room_gives_its_upper_floor_a_cell_over_its_span() {
     );
 }
 
-/// The floor extents are kept per revision: a build or a sale moves them, a
-/// repeat read does not walk the units again, and a fresh read agrees (#1237).
+/// The floor extents follow a build and a sale, and a read with the memo
+/// cleared agrees with the kept one (#1237). This checks the answers, not
+/// whether a read hit the memo.
 #[test]
 fn the_overlay_extents_follow_every_layout_edit() {
     let mut sim = founded(GameMode::Modern, 3);

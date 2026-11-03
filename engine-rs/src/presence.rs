@@ -202,6 +202,9 @@ impl Simulation {
                 if cong > c {
                     c = cong;
                 }
+                if !with_attribution {
+                    continue;
+                }
                 // The same reading folded into its class max; the staff
                 // filter above admits only these three classes today.
                 if kind.is_elevator() {
