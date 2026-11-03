@@ -10,7 +10,7 @@
  *                                                [--hours 24] [--only A.TDT,b.vctower] [--out <folder>]
  *   node scripts/rollback-rehearsal.ts seed      --origin <url> --profile <folder> --saves <folder> [--app-version x.y.z] [--headed]
  *   node scripts/rollback-rehearsal.ts verify    --origin <url> --profile <folder> --saves <folder> [--play-seconds 65]
- *                                                --expect-sha <sha7> [--out <folder>] [--headed]
+ *                                                --expect-sha <sha7> [--churn <churn.json>] [--out <folder>] [--headed]
  *
  * `engine` needs the Node engine package built in both checkouts
  * (`npm run wasm:build`). `prepare` makes the previous checkout. Nothing here
@@ -24,6 +24,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildFactsOf, candidateSaves, loadEnginePackage, nodePackageProblem } from "../src/build/rollbackRehearsalNode.ts";
+import { CHURN_HOURS, parseChurn, playChurn, type ChurnMap } from "../src/build/rollbackRehearsalChurn.ts";
 import { buildReport, parseAllowedLosses, preflight, rehearseCase, renderReport } from "../src/build/rollbackRehearsal.ts";
 import { seedProfile, verifyProfile, AUTOSAVE_WAIT_SECONDS } from "./rollback-rehearsal-browser.ts";
 
@@ -39,7 +40,14 @@ const fail = (message: string): never => {
 
 /** Flags that take no value: their presence is the setting. */
 const SWITCHES = new Set(["headed"]);
-const VALUE_FLAGS = new Set(["ref", "dir", "previous", "candidate", "hours", "only", "out", "allowed", "origin", "profile", "saves", "app-version", "play-seconds", "expect-sha"]);
+/** The console line for a passing verify: says plainly when the data-loss check did not run or ran leniently. */
+function passLine(churnUsed: boolean, played: boolean, toReview: number): string {
+  if (!played) return "PASS (read only: the data-loss check needs --play-seconds)";
+  if (!churnUsed) return `PASS (LENIENT: no churn.json, so only a dropped top-level field was checked and ${toReview} nested paths are unchecked; run the engine step and verify again)`;
+  return toReview > 0 ? `PASS (${toReview} paths under toReview, within what play alone does, to read before you rely on it)` : "PASS";
+}
+
+const VALUE_FLAGS = new Set(["ref", "dir", "previous", "candidate", "hours", "only", "out", "allowed", "origin", "profile", "saves", "app-version", "play-seconds", "expect-sha", "churn"]);
 
 /** `--name value` pairs after the subcommand, plus the value-less switches above. */
 function flags(args: string[]): Map<string, string> {
@@ -130,11 +138,24 @@ if (command === "prepare") {
   // Leftovers from an earlier run (or an earlier --only) must never be seeded as this run's saves.
   for (const old of readdirSync(join(out, "saves"))) if (old.endsWith(".json")) rmSync(join(out, "saves", old));
   for (const s of saves) writeFileSync(join(out, "saves", `${s.name}.json`), s.text);
+  // What play alone loses from each save, on the candidate engine, so the browser layer can tell it from a rollback loss.
+  // A save the candidate cannot play is reported and fails the step, but never costs the engine report.
+  const churn: ChurnMap = {};
+  const churnFailures: string[] = [];
+  for (const x of saves) {
+    try {
+      churn[x.name] = playChurn(candidate, x.text, CHURN_HOURS);
+    } catch (e) {
+      churnFailures.push(`${x.name}: the candidate could not play this save to find its churn (${e instanceof Error ? e.message : String(e)})`);
+    }
+  }
+  writeFileSync(join(out, "churn.json"), `${JSON.stringify(churn, null, 2)}\n`);
   writeFileSync(join(out, "engine-report.json"), `${JSON.stringify(report, null, 2)}\n`);
   writeFileSync(join(out, "engine-report.md"), renderReport(report));
   console.log(renderReport(report));
   console.log(`written to ${out}`);
-  process.exit(report.ok ? 0 : 1);
+  for (const line of churnFailures) console.log(`FAIL ${line}`);
+  process.exit(report.ok && churnFailures.length === 0 ? 0 : 1);
 } else if (command === "seed") {
   const appVersion = f.get("app-version") ?? buildFactsOf(root, "candidate").appVersion;
   const report = await seedProfile({ origin: need(f, "origin"), profile: resolve(need(f, "profile")), savesDir: resolve(need(f, "saves")), appVersion, headed: f.has("headed") });
@@ -146,7 +167,13 @@ if (command === "prepare") {
   if (playSeconds > 0 && playSeconds < AUTOSAVE_WAIT_SECONDS) fail(`--play-seconds must be at least ${AUTOSAVE_WAIT_SECONDS} so the autosave timer can fire twice, or 0 to only read`);
   const expectSha = need(f, "expect-sha");
   if (!/^[0-9a-f]{7,40}$/i.test(expectSha)) fail("--expect-sha must be 7 to 40 hex characters: the commit of the build that is supposed to be running");
-  const report = await verifyProfile({ origin: need(f, "origin"), profile: resolve(need(f, "profile")), savesDir: resolve(need(f, "saves")), playSeconds, allowed: allowedLosses(f), expectSha, headed: f.has("headed") });
+  const savesDir = resolve(need(f, "saves"));
+  // The engine step writes churn.json beside the saves folder; without it only a dropped top-level field can fail the rewrite check.
+  const churnPath = f.get("churn") ?? join(dirname(savesDir), "churn.json");
+  let churn: ChurnMap | undefined;
+  if (existsSync(churnPath)) churn = parseChurn(JSON.parse(readFileSync(churnPath, "utf8")));
+  else if (f.has("churn")) fail(`${churnPath} does not exist`);
+  const report = await verifyProfile({ origin: need(f, "origin"), profile: resolve(need(f, "profile")), savesDir, churn, playSeconds, allowed: allowedLosses(f), expectSha, headed: f.has("headed") });
   const out = f.get("out");
   if (out) {
     mkdirSync(resolve(out), { recursive: true });
@@ -154,7 +181,7 @@ if (command === "prepare") {
   }
   console.log(JSON.stringify(report, null, 2));
   const toReview = report.toReview.reduce((n, r) => n + r.entries.length, 0);
-  console.log(report.ok ? (playSeconds > 0 ? `PASS${toReview > 0 ? ` (${toReview} nested paths under toReview to read before you rely on it)` : ""}` : "PASS (read only: the data-loss check needs --play-seconds)") : `FAIL\n${report.problems.map((p) => `- ${p}`).join("\n")}`);
+  console.log(report.ok ? passLine(report.churnUsed, playSeconds > 0, toReview) : `FAIL\n${report.problems.map((p) => `- ${p}`).join("\n")}`);
   process.exit(report.ok ? 0 : 1);
 } else {
   fail(`unknown command ${String(command)}; expected prepare, preflight, engine, seed or verify (see the header of this file)`);

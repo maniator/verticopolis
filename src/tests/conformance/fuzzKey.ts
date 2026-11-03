@@ -15,8 +15,9 @@
  *               outside `src/engine`, and `tsconfig.json`
  *   wasmBuild   the WASM build's inputs (the closure of `scripts/wasm-build.ts`,
  *               the build script, the cache action and the `wasm:build` line)
- *   pins        the lockfile without its root `version` fields, `.nvmrc` and
- *               `engine-fuzz.yml`
+ *   pins        the lockfile without its root `version` fields, `.nvmrc`,
+ *               `engine-fuzz.yml`, `package.json`'s `type` and `engines`, and
+ *               the cargo configuration and `rust-toolchain` files when there are any
  *   fixtures    `conformance/fixtures/`
  * A version bump leaves the key alone.
  */
@@ -31,6 +32,19 @@ import { engineSourceHash } from "../../wasmhost/packageHash.ts";
 export const FUZZ_ENTRIES = ["scripts/fuzz-compare.ts", "scripts/fuzz-corpus.ts", "scripts/fuzz-key.ts", "scripts/fuzz-shrink.ts"];
 /** The entry of the WASM package build. */
 export const WASM_BUILD_ENTRY = "scripts/wasm-build.ts";
+
+/** Cargo's own configuration (it merges the files from the crate's folder up) and
+ *  the toolchain files rustup reads, which change how the crate builds. All are optional. */
+const CARGO_CONFIG = [
+  "engine-rs/.cargo/config.toml",
+  "engine-rs/.cargo/config",
+  ".cargo/config.toml",
+  ".cargo/config",
+  "rust-toolchain.toml",
+  "rust-toolchain",
+  "engine-rs/rust-toolchain.toml",
+  "engine-rs/rust-toolchain",
+];
 
 export const PART_NAMES = ["engine", "srcEngine", "scripts", "wasmBuild", "pins", "fixtures"] as const;
 export type PartName = (typeof PART_NAMES)[number];
@@ -145,7 +159,8 @@ export function fuzzKeyFiles(root: string = process.cwd()): Record<"srcEngine" |
 
 export function fuzzKeyParts(root: string = process.cwd()): KeyParts {
   const files = fuzzKeyFiles(root);
-  const wasmLine = (JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { scripts: Record<string, string> }).scripts["wasm:build"];
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { scripts: Record<string, string>; type?: string; engines?: unknown };
+  const wasmLine = pkg.scripts["wasm:build"];
   if (typeof wasmLine !== "string") throw new Error("fuzz key: package.json has no wasm:build script");
   return {
     engine: engineSourceHash(join(root, "engine-rs")),
@@ -155,7 +170,9 @@ export function fuzzKeyParts(root: string = process.cwd()): KeyParts {
     pins: sha(
       [
         sha(lockfileText(root)),
-        filesHash(root, [".nvmrc", ".github/workflows/engine-fuzz.yml"]),
+        filesHash(root, [".nvmrc", ".github/workflows/engine-fuzz.yml", ...CARGO_CONFIG.filter((rel) => existsSync(join(root, rel)))]),
+        // How Node reads the scripts and which Node they need, which the lockfile does not carry.
+        sha(JSON.stringify({ type: pkg.type ?? null, engines: pkg.engines ?? null })),
       ].join("\n"),
     ),
     fixtures: filesHash(root, files.fixtures),

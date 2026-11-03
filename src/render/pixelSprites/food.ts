@@ -1,6 +1,5 @@
-import { visibleOccupants } from "../../engine/Crowd";
 import type { UnitView } from "../../simport/view";
-import { geoVariant, type RoomCtx } from "./common";
+import { geoVariant, roomOccupants, type RoomCtx } from "./common";
 import { drawCinema, drawFastFood, drawRestaurant } from "./food.interiors";
 import { FASTFOOD_DEFAULT, FASTFOOD_LOOKS, FOODHALL_DEFAULT, FOODHALL_LOOKS, RESTAURANT_DEFAULT, RESTAURANT_LOOKS } from "./food.looks";
 
@@ -13,7 +12,7 @@ import { FASTFOOD_DEFAULT, FASTFOOD_LOOKS, FOODHALL_DEFAULT, FOODHALL_LOOKS, RES
  * the look, count the real occupants, and hand off. An undefined or unknown
  * subtype falls back to the `_DEFAULT` look, no throw.
  *
- * Occupancy is honest: figures fill in seed order up to `visibleOccupants(u)`
+ * Occupancy is honest: figures fill in seed order up to `roomOccupants(u)`
  * (driven by `occupants` / `outForMeal`), the look by `subtype`, and each
  * figure's variety by a stable geography seed (`floor`, `x`). All are fixed for
  * a placed unit, so the room stays cacheable, an empty venue reads empty, a
@@ -35,12 +34,12 @@ function figureSeed(u: Pick<UnitView, "floor" | "x">): number {
 
 export function fastFood(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const look = (u.subtype !== undefined && FASTFOOD_LOOKS[u.subtype]) || FASTFOOD_DEFAULT;
-  drawFastFood(d.ctx, x, y, w, h, look, visibleOccupants(u), figureSeed(u));
+  drawFastFood(d.ctx, x, y, w, h, look, roomOccupants(u), figureSeed(u));
 }
 
 export function restaurant(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const look = (u.subtype !== undefined && RESTAURANT_LOOKS[u.subtype]) || RESTAURANT_DEFAULT;
-  drawRestaurant(d.ctx, x, y, w, h, look, d.lit, visibleOccupants(u), figureSeed(u));
+  drawRestaurant(d.ctx, x, y, w, h, look, d.lit, roomOccupants(u), figureSeed(u));
 }
 
 /** The Modern Food Hall: rendered with the restaurant dining-room drawer, but
@@ -48,7 +47,7 @@ export function restaurant(d: RoomCtx, u: UnitView, x: number, y: number, w: num
  *  stalls read as visibly different counters instead of identical restaurants. */
 export function foodHall(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
   const look = (u.subtype !== undefined && FOODHALL_LOOKS[u.subtype]) || FOODHALL_DEFAULT;
-  drawRestaurant(d.ctx, x, y, w, h, look, d.lit, visibleOccupants(u), figureSeed(u));
+  drawRestaurant(d.ctx, x, y, w, h, look, d.lit, roomOccupants(u), figureSeed(u));
 }
 
 export function cinema(d: RoomCtx, u: UnitView, x: number, y: number, w: number, h: number): void {
@@ -57,5 +56,5 @@ export function cinema(d: RoomCtx, u: UnitView, x: number, y: number, w: number,
   // (art bible geoVariant axis map; no axis is reused within the cinema kind).
   const geoAud = geoVariant(u, 4, 997);
   const geoMar = geoVariant(u, 5, 997);
-  drawCinema(d.ctx, x, y, w, h, d.anim, visibleOccupants(u), geoAud, geoMar);
+  drawCinema(d.ctx, x, y, w, h, d.anim, roomOccupants(u), geoAud, geoMar);
 }

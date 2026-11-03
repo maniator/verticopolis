@@ -12,7 +12,7 @@ mod placement;
 mod transports;
 mod types;
 
-pub use types::{PlaceResult, ResizeResult, RetailTally, Transport, Unit, UnitState};
+pub use types::{Extras, ExtrasMut, PlaceResult, ResizeResult, Transport, Unit, UnitState};
 
 pub struct Tower {
     pub units: Vec<Unit>,

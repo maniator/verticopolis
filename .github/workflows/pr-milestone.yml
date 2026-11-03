@@ -1,0 +1,80 @@
+name: Milestone pull requests
+
+# Every pull request has a milestone, like every issue (see "How items flow" in
+# _bmad-output/implementation-artifacts/backlog.md). A pull request takes the
+# milestone of the issue it closes ("Closes #123" and the other closing words in
+# its description). A pull request that closes no issue, or only issues still in
+# Triage or Backlog, goes to the current release milestone below. It never
+# overwrites a milestone a person already set, and it reads the live state
+# again right before writing. This also gives issue-milestone.yml a milestone to copy when a pull
+# request closes an issue that had none.
+#
+# Change CURRENT_RELEASE when a release ships and the next one opens.
+#
+# pull_request_target runs from the base branch with a write token and does not
+# check out or run any code from the pull request. The description is read as
+# data through an environment variable, never interpolated into the script.
+on:
+  pull_request_target:
+    types: [opened, reopened, edited, ready_for_review]
+
+concurrency:
+  group: pr-milestone-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  milestone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      PR_BODY: ${{ github.event.pull_request.body }}
+      CURRENT_RELEASE: "3.0.0"
+    steps:
+      - name: Give the pull request a milestone
+        run: |
+          set -euo pipefail
+          current=$(gh api "repos/${GH_REPO}/issues/${PR}" --jq '.milestone.number // empty')
+          if [ -n "$current" ]; then
+            echo "PR #${PR} already has milestone ${current}; nothing to do."
+            exit 0
+          fi
+          milestones=$(gh api "repos/${GH_REPO}/milestones?state=all&per_page=100")
+          # The first issue this pull request closes that has a real milestone.
+          target=""
+          # grep exits 1 when the description has no closing word, which under
+          # pipefail would end the step before the fallback; "|| true" keeps it.
+          issues=$({ printf '%s' "$PR_BODY" \
+              | grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[: ]+#[0-9]+' || true; } \
+              | grep -oE '[0-9]+' | awk '!seen[$0]++' | head -n 20 || true)
+          for n in $issues; do
+            m=$(gh api "repos/${GH_REPO}/issues/${n}" --jq '.milestone.number // empty' 2>/dev/null || true)
+            title=$(jq -r --arg m "${m:-0}" '.[] | select((.number | tostring) == $m) | .title' <<<"$milestones")
+            if [ -n "$m" ] && [ "$title" != "Triage" ] && [ "$title" != "Backlog" ]; then
+              target=$m
+              echo "PR #${PR} closes #${n}, milestone ${m} (${title})."
+              break
+            fi
+          done
+          if [ -z "$target" ]; then
+            target=$(jq -r --arg t "$CURRENT_RELEASE" 'first(.[] | select(.title == $t) | .number) // empty' <<<"$milestones")
+            echo "PR #${PR} closes no issue with a milestone; using ${CURRENT_RELEASE} (${target})."
+          fi
+          if [ -z "$target" ]; then
+            echo "::error::No milestone to use."
+            exit 1
+          fi
+          # No compare-and-set on GitHub: look once more right before the write.
+          current=$(gh api "repos/${GH_REPO}/issues/${PR}" --jq '.milestone.number // empty')
+          if [ -n "$current" ]; then
+            echo "PR #${PR} got milestone ${current} in the meantime; nothing to do."
+            exit 0
+          fi
+          gh api -X PATCH "repos/${GH_REPO}/issues/${PR}" -F milestone="$target" --silent
+          echo "PR #${PR} set to milestone ${target}."

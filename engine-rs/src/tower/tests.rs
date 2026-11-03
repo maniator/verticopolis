@@ -203,25 +203,36 @@ fn new_schedules_still_snap_homes_to_served_floors() {
 
 /// Most of a large tower is floor and lobby tiles, each a whole `Unit`, so
 /// every field added to a unit costs 40,000 times its size (#1259). The
-/// retail tallies and the odd `completeAt` value are held out of line; a
-/// field that most units never set belongs out of line too. Raise this only
+/// facts a unit rarely carries are held out of line (`Unit::extras`); a
+/// field that most units never set belongs there too. Raise this only
 /// with a measured reason.
 #[test]
 fn a_unit_stays_small() {
     assert!(
-        std::mem::size_of::<Unit>() <= 280,
+        std::mem::size_of::<Unit>() <= 192,
         "a Unit is {} bytes",
         std::mem::size_of::<Unit>()
     );
 }
 
 #[test]
-fn a_unit_holds_retail_tallies_only_while_one_is_set() {
-    use super::types::RetailTally;
-    assert!(RetailTally::default().boxed().is_none());
-    let tally = RetailTally {
-        profit_today: Some(0.0),
-        ..RetailTally::default()
-    };
-    assert_eq!(tally.boxed().as_deref(), Some(&tally));
+fn a_unit_holds_extras_only_while_one_is_set() {
+    let mut tower = Tower::new();
+    assert!(tower.place(Kind::Lobby, 1, 0).ok);
+    let first = tower.units[0].clone();
+    let mut unit = first.clone();
+    assert!(unit.extras.is_none());
+    assert_eq!(unit.extras().dirty_days, None);
+    // Reading through the writer's handle, or clearing what is not there,
+    // leaves no record behind.
+    let _ = unit.extras_mut().dirty_days;
+    unit.extras_mut().vacate_at = None;
+    assert!(unit.extras.is_none());
+    unit.extras_mut().profit_today = Some(0.0);
+    assert_eq!(unit.extras().profit_today, Some(0.0));
+    assert!(unit.extras.is_some());
+    // Clearing the last one drops the record, so equal units compare equal.
+    unit.extras_mut().profit_today = None;
+    assert!(unit.extras.is_none());
+    assert_eq!(unit, first);
 }

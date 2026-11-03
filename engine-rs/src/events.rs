@@ -83,7 +83,7 @@ impl Simulation {
         if u.kind != Kind::Cinema {
             return None;
         }
-        u.film_policy = Some(policy);
+        u.extras_mut().film_policy = Some(policy);
         Some(policy)
     }
 
@@ -195,8 +195,14 @@ impl Simulation {
         u.set_residents(at, None);
         u.satisfaction = 0.0;
         u.pending_income = 0.0;
-        u.retail = None;
-        u.dirty_days = None;
+        {
+            let mut extras = u.extras_mut();
+            extras.patronage_today = None;
+            extras.patronage_yest = None;
+            extras.profit_today = None;
+            extras.profit_yest = None;
+            extras.dirty_days = None;
+        }
         let name = u.kind.facility().name;
         self.tower.set_unit_label_at(i, name.to_string());
     }

@@ -1,0 +1,42 @@
+name: fuzz-freeze
+
+# The freeze guard (#1647). While a replay window is open (conformance/fuzz-window.json),
+# a PR that moves the differential's window key fails here, because the key
+# decides what the 14 counted nights prove. With no window open it passes at once.
+# It runs on every PR, with no path filter, so it can be a required check.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The merge result: the key is computed on what main would become.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - run: npm ci
+      - name: Check the key against the open window
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          # The base branch must resolve, or the guard cannot decide (no silent "no base").
+          base="origin/${BASE_REF}"
+          git rev-parse --verify --quiet "${base}^{commit}" > /dev/null || { echo "::error::${base} is not fetched"; exit 3; }
+          # The marker on the base branch: empty only when the base has no marker file yet.
+          if git cat-file -e "${base}:conformance/fuzz-window.json"; then
+            git show "${base}:conformance/fuzz-window.json" > "$RUNNER_TEMP/base-window.json"
+          else
+            : > "$RUNNER_TEMP/base-window.json"
+          fi
+          npx tsx scripts/fuzz-freeze.ts --base "$RUNNER_TEMP/base-window.json"

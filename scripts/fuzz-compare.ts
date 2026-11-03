@@ -5,7 +5,7 @@
  *   cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin fuzz -- <seed> <dir> [commands]
  *   npx tsx scripts/fuzz-compare.ts [--wasm] <dir>/fuzz-<seed>.json
  * Compares the state, crowd and events hashes at every checkpoint, then the
- * money, the log and each field of the full save. Exit 1 on the first
+ * money, the log, each field of the full save and the fx sequences. Exit 1 on the first
  * divergence, naming the checkpoint and the field. Exit 3 when the harness
  * itself failed (a missing or malformed record), so a night's summary can tell
  * an engine divergence from a broken run.
