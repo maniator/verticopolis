@@ -169,3 +169,19 @@ describe("OverviewMapModel.syncCamera", () => {
     expect(m.syncCamera(same)).not.toBeNull();
   });
 });
+
+describe("OverviewMapModel.reset", () => {
+  it("rebuilds on the next sync and gives the placement again, for cleared canvases", () => {
+    const m = new OverviewMapModel();
+    const v = view();
+    m.sync(input(v));
+    expect(m.syncCamera(cam())).not.toBeNull();
+    expect(m.syncCamera(cam())).toBeNull();
+    m.reset();
+    expect(m.layout).toBeNull();
+    expect(m.placement).toBeNull();
+    expect(m.syncCamera(cam())).toBeNull();
+    expect(m.sync(input(v))).toBe(true);
+    expect(m.syncCamera(cam())).not.toBeNull();
+  });
+});

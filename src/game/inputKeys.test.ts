@@ -237,6 +237,19 @@ describe("commit / bulldoze", () => {
     expect(app.keyboard.commitCursor).toHaveBeenCalledTimes(2);
   });
 
+  it("Space and Enter on the Map window's canvas (role application) never commit the cursor", () => {
+    const app = makeApp();
+    const map = document.createElement("canvas");
+    map.tabIndex = 0;
+    map.setAttribute("role", "application");
+    document.body.appendChild(map);
+    map.focus();
+    press(" ");
+    press("Enter");
+    expect(app.keyboard.commitCursor).not.toHaveBeenCalled();
+    map.remove();
+  });
+
   it("Delete / x bulldoze the cursor", () => {
     const app = makeApp();
     press("Delete");

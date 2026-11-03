@@ -39,6 +39,7 @@ import { showTowerPicker } from "./appModals";
 // re-exported because the boot snapshot below reads it, and the alias stays so
 // the suites that import it from here keep resolving.
 import { APP_VERSION } from "../appVersion";
+import { wireOverviewMap } from "./overviewMapWiring";
 export { APP_VERSION };
 
 /** Classify why this boot happened, for the analytics boot snapshot. Mirrors
@@ -227,6 +228,8 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // during initial load, so its capture must be in place before then. The chip
   // stays hidden until the play-gate trips (see tickInstallAffordance).
   initInstallAffordance(app);
+  // The overview map window (shown only behind its preview flag until it ships).
+  wireOverviewMap(app);
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,

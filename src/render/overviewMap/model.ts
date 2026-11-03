@@ -123,6 +123,18 @@ export class OverviewMapModel {
     return true;
   }
 
+  /** Forget the layout, so the next `sync` rebuilds and the next `syncCamera`
+   *  gives the placement again: the window calls it when its canvases were
+   *  cleared (a resize) or it was reopened after missing changes. It drops the
+   *  draw list too, so a closed window holds no marks. */
+  reset(): void {
+    this.layout = null;
+    this.marks = [];
+    this.placement = null;
+    this.placementLayout = null;
+    this.cam = null;
+  }
+
   /**
    * The camera's placement on the current layout, or null when it has not
    * changed since the last call (same center, zoom and viewport on the same

@@ -6,7 +6,7 @@ Status: **approved by the owner on 2026-11-03** (decisions below). Repo: maniato
 
 1. Target 3.0.0. If the complete feature cannot be reviewed, tested and merged before the release candidate freeze, it moves to 3.1.0 automatically. The existing freeze criteria apply (no new calendar deadline). No existing release gate is weakened or delayed. If a release blocker appears, the blocker takes priority and the remaining MAP work moves to 3.1.0.
 2. The window is open by default on desktop (closable, with only an explicit choice remembered) and closed on phone behind a Map pill. This revises the same day's first call, which was closed by default everywhere with a Map button. The party's follow-up calls (memory per layout class, onboarding, phone card, Modern banded crop) are in the SPEC decision log.
-3. The existing sidebar control labeled "Map overlay" is renamed "Floor heatmap" (done in S3, the same PR as the new chrome).
+3. The existing sidebar control labeled "Map overlay" is renamed "Floor heatmap" (done in S3, the same PR as the new chrome). Timing note, 2026-11-03: the chrome reaches players only in S5, when the preview flag comes off (decision 8, nothing user-visible before S5), so the rename rides S5 with it; S3b builds the window behind the flag only.
 4. Capture the original PC MAP window for Classic fidelity if practical. It is not a blocker.
 5. Classic keeps the original MAP window behavior and styling as closely as the evidence allows. Modern may use richer facility colors and presentation.
 6. Hotel, Eval and Pricing views are tracked as separate items for 3.1.0 where feasible: #1617 (Hotel), #1618 (Eval), #1619 (Pricing).
@@ -63,10 +63,10 @@ Sources: the retail manual's Map Window and Tutorial sections (PDF pp. 14, 23, 3
 | S1 | Pure geometry (`src/render/overviewMap/geometry.ts`) with unit tests | merged (#1626) |
 | S2 | Draw-list builder and style table (`src/render/overviewMap/`) with unit tests and a large-tower budget test | merged (#1626) |
 | S2b | Apply the retail capture to Classic: flat gray silhouette, 1 px shaft lines, fixed-scale layout option, dotted camera outline (SPEC, Retail capture findings); the style table part only, the fixed-scale layout and camera outline land in S3 | merged (#1636); retail elevator colors and stairs left out of Classic in #1640 |
-| S3a | Pure state, no caller: Classic shaft lines, the Modern banded crop, the view's placement against the map (clipped, above, below) and the edge band, the text summary, the per-layout open preference, and the model that decides when to rebuild and redraw | in review, stacked on #1640 |
-| S3b | Window, Map button and phone pill, camera binding (click, tap, drag, keys), a11y, "Floor heatmap" rename; all chrome and CSS in one PR, hidden from players until S5 | after S3a |
+| S3a | Pure state, no caller: Classic shaft lines, the Modern banded crop, the view's placement against the map (clipped, above, below) and the edge band, the text summary, the per-layout open preference, and the model that decides when to rebuild and redraw | merged (#1665) |
+| S3b | Window, Map button and phone pill, camera binding (click, tap, drag, keys), a11y; all chrome and CSS in one PR, built only behind the `?map` preview flag in dev and tooling builds until S5 | in review |
 | S4 | Playwright desktop and phone-touch specs, visual snapshots (pinned image), gallery scenes, large-tower performance run with the real catalog height lookup, the real pattern source and a real canvas (the S2 unit budget is synthetic and only pins the algorithm's shape), PC run for hardware claims | after S3 |
-| S5 | Help entry, CHANGELOG line, minor version bump, backlog row finished, #343 closed | after S4 |
+| S5 | "Floor heatmap" rename, Help entry, CHANGELOG line, minor version bump, remove the preview flag, backlog row finished, #343 closed | after S4 |
 | S6 | Hotel (#1617), Eval (#1618), Pricing (#1619): 3.1.0 | later |
 
 Visibility rule (decision 8): S1 and S2 are pure modules with no caller, so merging them exposes nothing. S3a adds more pure modules with no caller. The Map button and window arrive only in S3b and are enabled for players only once S3 to S5 are all merged.
