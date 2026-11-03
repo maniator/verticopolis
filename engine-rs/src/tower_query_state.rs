@@ -92,3 +92,58 @@ impl Unit {
         (self.occupants - self.out_for_meal.unwrap_or(0)).max(0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::facilities::Kind;
+
+    /// Whole-number rows of the rule that `src/render/pixelSprites/roomOccupants.test.ts`
+    /// holds the web's drawing copy to: (occupants, out for a meal, people shown).
+    /// Keep the two tables identical.
+    const VISIBLE_ROWS: [(i64, Option<i64>, i64); 8] = [
+        (0, None, 0),
+        (4, None, 4),
+        (4, Some(0), 4),
+        (4, Some(1), 3),
+        (4, Some(4), 0),
+        (4, Some(9), 0),
+        (6, Some(2), 4),
+        (1, Some(1), 0),
+    ];
+
+    fn unit(occupants: i64, out_for_meal: Option<i64>) -> Unit {
+        Unit {
+            id: 1,
+            kind: Kind::Office,
+            floor: 10,
+            x: 0,
+            width: 9,
+            state: UnitState::Occupied,
+            satisfaction: 1.0,
+            occupants,
+            customers_in: None,
+            hotel_customers_in: None,
+            out_for_meal,
+            residents: None,
+            ever_occupied: true,
+            pending_income: 0.0,
+            rent: None,
+            no_rate: false,
+            label: String::new(),
+            subtype: None,
+            extras: None,
+        }
+    }
+
+    #[test]
+    fn visible_occupants_is_occupants_minus_out_for_meal_floored_at_zero() {
+        for (occupants, out, shown) in VISIBLE_ROWS {
+            assert_eq!(
+                unit(occupants, out).visible_occupants(),
+                shown,
+                "occupants {occupants}, out {out:?}"
+            );
+        }
+    }
+}

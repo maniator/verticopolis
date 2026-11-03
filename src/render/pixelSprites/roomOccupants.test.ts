@@ -26,6 +26,30 @@ import { FLOOR, TILE } from "../scale";
 
 const DAY: LiveScene = { hour: 12, lit: false, parkingUse: 0, recycleFill: 0, dead: false };
 
+/**
+ * The rule is the engine's (`Unit::visible_occupants` in
+ * `engine-rs/src/tower_query_state.rs`: occupants minus the ones out for a
+ * meal, never below zero). These are the whole-number rows its own test
+ * holds, so the drawing copy and the engine cannot drift. Keep the two
+ * tables identical.
+ */
+const ENGINE_ROWS: ReadonlyArray<readonly [occupants: number, outForMeal: number | undefined, shown: number]> = [
+  [0, undefined, 0],
+  [4, undefined, 4],
+  [4, 0, 4],
+  [4, 1, 3],
+  [4, 4, 0],
+  [4, 9, 0],
+  [6, 2, 4],
+  [1, 1, 0],
+];
+
+describe("roomOccupants matches the engine's visible_occupants", () => {
+  it.each(ENGINE_ROWS)("occupants %s, out %s shows %s", (occupants, outForMeal, shown) => {
+    expect(roomOccupants({ occupants, outForMeal })).toBe(shown);
+  });
+});
+
 describe("roomOccupants agrees with the atlas reader", () => {
   const counts = [0, 0.4, 0.5, 1, 2.5, 3.7, 6, -2, Number.NaN, Number.POSITIVE_INFINITY];
   const out = [undefined, -9, -0.5, 0, 1, 1.5, 9, Number.NaN, Number.POSITIVE_INFINITY];
