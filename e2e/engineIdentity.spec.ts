@@ -1,15 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page, type Route } from "@playwright/test";
-import { WASM_ONLY_PROJECT } from "./helpers";
 
 /**
  * The engine's identity in Help's About (#963), in a real browser: the
  * engine's own record, the source hash stamped into its binary next to the
  * one the page was built for, and Copy diagnostics, including when the engine
- * never loaded. A wasm-only build stops on a failed load instead of falling
- * back, so these run on the switchable projects.
+ * never loaded. A failed load stops the game, so Copy diagnostics is then read
+ * from the stop screen, where Help cannot be opened.
  */
-test.beforeEach(({}, info) => test.skip(info.project.name === WASM_ONLY_PROJECT, "needs the TypeScript engine to fall back to"));
 test.setTimeout(60_000);
 
 const WASM = "**/engine/verticopolis_engine_bg.wasm";
@@ -65,12 +63,27 @@ async function copyDiagnostics(page: Page): Promise<string> {
   return page.evaluate(() => (window as any).__copied as string);
 }
 
+/** Wait for the stop screen a failed engine load shows, and press its Copy diagnostics. */
+async function copyDiagnosticsFromStopScreen(page: Page): Promise<string> {
+  await expect(page.locator("#engine-failure")).toBeVisible();
+  await page.evaluate(() => {
+    (window as any).__copied = null;
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: async (t: string) => ((window as any).__copied = t) },
+      configurable: true,
+    });
+  });
+  await page.locator('#engine-failure [data-act="copy-diagnostics"]').click();
+  await expect(page.locator("#engine-failure .engine-failure-copy-status")).toHaveText("Copied.");
+  return page.evaluate(() => (window as any).__copied as string);
+}
+
 const state = (page: Page) => page.locator("#modal .help-diagnostics").getAttribute("data-state");
 const short = (hash: string) => hash.slice(0, 12);
 
 test("the main-thread engine shows its record and the source hash BUILD.json records", async ({ page }) => {
   const record = await buildRecord(page);
-  await page.goto("/?engine=wasm");
+  await page.goto("/");
   await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted, undefined, { timeout: 30_000 });
   await openHelp(page);
   expect(await state(page)).toBe("ok");
@@ -91,41 +104,35 @@ test("the main-thread engine shows its record and the source hash BUILD.json rec
 // "no section" and "malformed section" are reachable only on a development serve,
 // which skips the check. buildSection.test.ts and engineDiagnostics.test.ts
 // cover how each is read and drawn.
-test("a binary built from other sources is refused before it runs, and About says the engine did not load", async ({ page }) => {
+test("a binary built from other sources is refused before it runs, and the stop screen copies the reason", async ({ page }) => {
   const record = await buildRecord(page);
   const tampered = `${record.sources.startsWith("0") ? "1" : "0"}${record.sources.slice(1)}`;
   await swapInBinary(page, record.sources, tampered);
-  await page.goto("/?engine=wasm");
+  await page.goto("/");
   await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure, undefined, { timeout: 30_000 });
   const boot = await page.evaluate(() => (window as any).__vcEngineBoot);
   expect(boot.failure).toMatchObject({ stage: "load", reason: "package-mismatch", package: { kind: "mismatch", file: "wasm" } });
   expect(boot.binary, "a refused binary is never compiled, so its section is never read").toBeUndefined();
-  await openHelp(page);
-  expect(await state(page)).toBe("not-loaded");
-  expect(await copyDiagnostics(page)).toContain("Reason: package-mismatch");
+  expect(await copyDiagnosticsFromStopScreen(page)).toContain("Reason: package-mismatch");
 });
 
 test("an engine that never loads still copies the page's expected crate and the reason", async ({ page }) => {
   const record = await buildRecord(page);
   await page.route(GLUE, (route) => route.abort("failed"));
-  await page.goto("/?engine=wasm");
+  await page.goto("/");
   await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure, undefined, { timeout: 30_000 });
-  await openHelp(page);
-  expect(await state(page)).toBe("not-loaded");
-  const copied = await copyDiagnostics(page);
+  const copied = await copyDiagnosticsFromStopScreen(page);
   expect(copied).toContain("Failed at: load");
   expect(copied).toContain(`Crate this page expects: ${record.crate.name} ${record.crate.version}`);
   expect(copied).toContain(`Source hash this page expects: ${short(record.sources)}`);
   expect(copied).not.toContain("Engine crate:");
 });
 
-test("a binary that never arrives is not-loaded, with no source hash to report", async ({ page }) => {
+test("a binary that never arrives stops the game, with no source hash to report", async ({ page }) => {
   await page.route(WASM, (route) => route.fulfill({ status: 404, body: "" }));
-  await page.goto("/?engine=wasm");
+  await page.goto("/");
   await page.waitForFunction(() => (window as any).__vcEngineBoot?.failure, undefined, { timeout: 30_000 });
-  await openHelp(page);
-  expect(await state(page)).toBe("not-loaded");
-  const copied = await copyDiagnostics(page);
+  const copied = await copyDiagnosticsFromStopScreen(page);
   expect(copied).toContain("came back with HTTP 404");
   expect(copied).not.toContain("Source hash in the engine binary");
 });

@@ -1,45 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 import type { WasmModule } from "../dualrun/binding";
-import { EngineBootError, FALLBACK_REASONS, FALLBACK_STAGES, bootFailure, bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, packageFailureOf, publishBootState, typescriptBoot, type EngineBootState } from "./engineBoot";
+import { EngineBootError, FALLBACK_REASONS, FALLBACK_STAGES, bootFailure, bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, packageFailureOf, publishBootState, type EngineBootState } from "./engineBoot";
 import { EnginePackageError, type PackageFailureKind } from "./enginePackageCheck";
 
 const mod = (withWriter = true) => ({ Engine: class {}, ...(withWriter ? { encodeVctower: () => new Uint8Array() } : {}) }) as unknown as WasmModule;
 const quiet = () => ({ error: vi.fn() });
 
-describe("loadBootEngine, switchable build", () => {
-  it("boots on the TypeScript engine, with nothing to load, when WASM is not asked for", () => {
-    expect(typescriptBoot()).toEqual({ module: null, state: { build: "switchable", engine: "ts", failure: null } });
-  });
-
-  it("loads WASM when asked", async () => {
-    const m = mod();
-    const r = await loadBootEngine({ wasmOnly: false, load: async () => m });
-    expect(r).toEqual({ module: m, state: { build: "switchable", engine: "wasm", failure: null } });
-  });
-
-  it("falls back to the TypeScript engine on a load failure, with the reason in the console", async () => {
-    const log = quiet();
-    const r = await loadBootEngine({ wasmOnly: false, load: async () => Promise.reject(new Error("404")), log });
-    expect(r).toEqual({ module: null, state: { build: "switchable", engine: "ts", failure: { stage: "load", reason: "boot-error", message: "404" } } });
-    expect(log.error).toHaveBeenCalledWith(expect.stringContaining("running on the TypeScript engine"), expect.any(Error));
-  });
-
-  it("keeps a package without a save writer (the TypeScript writer stays)", async () => {
-    const m = mod(false);
-    expect((await loadBootEngine({ wasmOnly: false, load: async () => m })).module).toBe(m);
-  });
-});
-
-describe("loadBootEngine, wasm-only build", () => {
+describe("loadBootEngine", () => {
   it("loads the engine", async () => {
     const m = mod();
-    const r = await loadBootEngine({ wasmOnly: true, load: async () => m });
+    const r = await loadBootEngine({ load: async () => m });
     expect(r).toEqual({ module: m, state: { build: "wasm-only", engine: "wasm", failure: null } });
   });
 
   it("reports a load failure as a failure, never as the TypeScript engine", async () => {
     const log = quiet();
-    const r = await loadBootEngine({ wasmOnly: true, load: async () => Promise.reject(new Error("CompileError: bad magic")), log });
+    const r = await loadBootEngine({ load: async () => Promise.reject(new Error("CompileError: bad magic")), log });
     expect(r).toEqual({ module: null, state: { build: "wasm-only", engine: "none", failure: { stage: "load", reason: "boot-error", message: "CompileError: bad magic" } } });
     expect(log.error).toHaveBeenCalledWith(expect.stringContaining("no other engine"), expect.any(Error));
   });
@@ -47,7 +23,7 @@ describe("loadBootEngine, wasm-only build", () => {
   it("gives up on a load that never settles", async () => {
     vi.useFakeTimers();
     try {
-      const pending = loadBootEngine({ wasmOnly: true, load: () => new Promise<WasmModule>(() => {}), log: quiet(), timeoutMs: 1000 });
+      const pending = loadBootEngine({ load: () => new Promise<WasmModule>(() => {}), log: quiet(), timeoutMs: 1000 });
       await vi.advanceTimersByTimeAsync(1000);
       expect((await pending).state.failure).toEqual({ stage: "load", reason: "boot-timeout", message: "the engine package did not load within 1 second" });
     } finally {
@@ -56,12 +32,12 @@ describe("loadBootEngine, wasm-only build", () => {
   });
 
   it("names a thrown non-Error", async () => {
-    const r = await loadBootEngine({ wasmOnly: true, load: async () => Promise.reject("offline"), log: quiet() });
+    const r = await loadBootEngine({ load: async () => Promise.reject("offline"), log: quiet() });
     expect(r.state.failure).toEqual({ stage: "load", reason: "boot-error", message: "offline" });
   });
 
   it("refuses a package without the engine's save writer", async () => {
-    const r = await loadBootEngine({ wasmOnly: true, load: async () => mod(false), log: quiet() });
+    const r = await loadBootEngine({ load: async () => mod(false), log: quiet() });
     expect(r.module).toBeNull();
     expect(r.state).toMatchObject({ engine: "none", failure: { stage: "load", reason: "package-mismatch", message: expect.stringContaining("encodeVctower") } });
   });
@@ -83,7 +59,7 @@ describe("fallback reason codes", () => {
   });
 
   it("reports a glue and binary that do not link as a package mismatch", async () => {
-    const r = await loadBootEngine({ wasmOnly: false, load: async () => Promise.reject(new WebAssembly.LinkError("bad import")), log: quiet() });
+    const r = await loadBootEngine({ load: async () => Promise.reject(new WebAssembly.LinkError("bad import")), log: quiet() });
     expect(r.state.failure).toMatchObject({ stage: "load", reason: "package-mismatch" });
   });
 });
@@ -119,16 +95,8 @@ describe("a refused engine package (#985)", () => {
     expect(packageFailureOf(new EngineBootError("boot-timeout", "slow"))).toBeUndefined();
   });
 
-  it("falls back to the TypeScript engine on a switchable build and records the detail", async () => {
-    const log = quiet();
-    const r = await loadBootEngine({ wasmOnly: false, load: async () => Promise.reject(refusal("mismatch")), log });
-    expect(r.module).toBeNull();
-    expect(r.state).toMatchObject({ build: "switchable", engine: "ts", failure: { stage: "load", reason: "package-mismatch", package: { kind: "mismatch", expectedPackage: "111111111111" } } });
-    expect(log.error).toHaveBeenCalledTimes(1);
-  });
-
-  it("stops a wasm-only build with the same detail", async () => {
-    const r = await loadBootEngine({ wasmOnly: true, load: async () => Promise.reject(refusal("unverifiable")), log: quiet() });
+  it("stops the game with the package detail", async () => {
+    const r = await loadBootEngine({ load: async () => Promise.reject(refusal("unverifiable")), log: quiet() });
     expect(r.state).toMatchObject({ build: "wasm-only", engine: "none", failure: { stage: "load", reason: "unverifiable", package: { kind: "unverifiable" } } });
   });
 });
@@ -139,7 +107,6 @@ describe("the load deadline", () => {
     try {
       let seen: AbortSignal | undefined;
       const pending = loadBootEngine({
-        wasmOnly: false,
         load: (signal) => {
           seen = signal;
           return new Promise<WasmModule>((_, fail) => signal.addEventListener("abort", () => fail(new Error("late"))));
@@ -159,15 +126,14 @@ describe("the load deadline", () => {
 
   it("leaves the signal alone when the load finishes in time", async () => {
     let seen: AbortSignal | undefined;
-    await loadBootEngine({ wasmOnly: false, load: async (signal) => ((seen = signal), mod()), log: quiet() });
+    await loadBootEngine({ load: async (signal) => ((seen = signal), mod()), log: quiet() });
     expect(seen?.aborted).toBe(false);
   });
 });
 
 describe("failBoot and publishBootState", () => {
-  it("marks a wasm-only build as running no engine, and a switchable one as back on TypeScript", () => {
+  it("marks the boot as running no engine", () => {
     expect(failBoot({ build: "wasm-only", engine: "wasm", failure: null }, "host", "attach-refused", "trap")).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "attach-refused", message: "trap" } });
-    expect(failBoot({ build: "switchable", engine: "wasm", failure: null }, "start", "boot-error", "x")).toEqual({ build: "switchable", engine: "ts", failure: { stage: "start", reason: "boot-error", message: "x" } });
   });
 
   it("publishes the state for tooling", () => {
@@ -230,7 +196,7 @@ describe("engineFailureCopy", () => {
 
   it("words the missing save writer from its cause, and a boot that refuses for it sets that cause", async () => {
     expect(engineFailureCopy({ stage: "load", reason: "package-mismatch", message: "any wording", cause: "no-save-writer" }, true).reason).toBe("The engine cannot save towers. Reload after the game is updated.");
-    const r = await loadBootEngine({ wasmOnly: true, log: quiet(), load: async () => mod(false) });
+    const r = await loadBootEngine({ log: quiet(), load: async () => mod(false) });
     expect(r.state.failure).toMatchObject({ stage: "load", reason: "package-mismatch", cause: "no-save-writer" });
     const copy = engineFailureCopy(r.state.failure!, true);
     expect(copy.reason).toBe("The engine cannot save towers. Reload after the game is updated.");
@@ -265,11 +231,9 @@ describe("engineFailureCopy", () => {
 describe("loadBootEngine, engine identity (#963)", () => {
   const withIdentity = (fn: () => string) => ({ ...mod(), engineIdentity: fn }) as unknown as WasmModule;
 
-  it("carries the engine's record on the boot state, in both build modes", async () => {
-    for (const wasmOnly of [false, true]) {
-      const r = await loadBootEngine({ wasmOnly, load: async () => withIdentity(() => '{"schema":1}') });
-      expect(r.state.identity).toBe('{"schema":1}');
-    }
+  it("carries the engine's record on the boot state", async () => {
+    const r = await loadBootEngine({ load: async () => withIdentity(() => '{"schema":1}') });
+    expect(r.state.identity).toBe('{"schema":1}');
   });
 
   it("boots on, with no identity, a package without the call or one whose call throws", async () => {
@@ -277,13 +241,13 @@ describe("loadBootEngine, engine identity (#963)", () => {
       throw new Error("trap");
     });
     for (const m of [mod(), throwing]) {
-      const r = await loadBootEngine({ wasmOnly: false, load: async () => m });
-      expect(r.state).toEqual({ build: "switchable", engine: "wasm", failure: null });
+      const r = await loadBootEngine({ load: async () => m });
+      expect(r.state).toEqual({ build: "wasm-only", engine: "wasm", failure: null });
     }
   });
 
-  it("keeps the record when a later failure puts the game back on TypeScript", async () => {
-    const r = await loadBootEngine({ wasmOnly: false, load: async () => withIdentity(() => "{}") });
+  it("keeps the record when a later failure stops the game", async () => {
+    const r = await loadBootEngine({ load: async () => withIdentity(() => "{}") });
     expect(failBoot(r.state, "start", "attach-refused", "x").identity).toBe("{}");
   });
 });
@@ -291,56 +255,48 @@ describe("loadBootEngine, engine identity (#963)", () => {
 describe("loadBootEngine, the engine binary's build metadata (#963)", () => {
   const ok = { state: "ok", sourceHash: "a".repeat(64) } as const;
 
-  it("carries what the binary's section said on the boot state, in both build modes", async () => {
-    for (const wasmOnly of [false, true]) {
-      const r = await loadBootEngine({
-        wasmOnly,
-        load: async (_signal, onBuild) => {
-          onBuild(ok);
-          return mod();
-        },
-      });
-      expect(r.state.binary).toEqual(ok);
-    }
+  it("carries what the binary's section said on the boot state", async () => {
+    const r = await loadBootEngine({
+      load: async (_signal, onBuild) => {
+        onBuild(ok);
+        return mod();
+      },
+    });
+    expect(r.state.binary).toEqual(ok);
   });
 
   it("carries a missing or malformed section too, and boots on", async () => {
     for (const binary of [{ state: "missing" }, { state: "malformed", why: "not JSON" }] as const) {
       const r = await loadBootEngine({
-        wasmOnly: false,
         load: async (_signal, onBuild) => {
           onBuild(binary);
           return mod();
         },
       });
-      expect(r.state).toEqual({ build: "switchable", engine: "wasm", failure: null, binary });
+      expect(r.state).toEqual({ build: "wasm-only", engine: "wasm", failure: null, binary });
     }
   });
 
   it("leaves the field out when the loader never read a binary", async () => {
-    const r = await loadBootEngine({ wasmOnly: false, load: async () => mod() });
+    const r = await loadBootEngine({ load: async () => mod() });
     expect("binary" in r.state).toBe(false);
   });
 
-  it("keeps it when the load then fails, in both build modes", async () => {
-    for (const wasmOnly of [false, true]) {
-      const r = await loadBootEngine({
-        wasmOnly,
-        log: quiet(),
-        load: async (_signal, onBuild) => {
-          onBuild(ok);
-          throw new WebAssembly.LinkError("import mismatch");
-        },
-      });
-      expect(r.module).toBeNull();
-      expect(r.state.failure).toMatchObject({ stage: "load", reason: "package-mismatch" });
-      expect(r.state.binary).toEqual(ok);
-    }
+  it("keeps it when the load then fails", async () => {
+    const r = await loadBootEngine({
+      log: quiet(),
+      load: async (_signal, onBuild) => {
+        onBuild(ok);
+        throw new WebAssembly.LinkError("import mismatch");
+      },
+    });
+    expect(r.module).toBeNull();
+    expect(r.state.failure).toMatchObject({ stage: "load", reason: "package-mismatch" });
+    expect(r.state.binary).toEqual(ok);
   });
 
   it("keeps it when a wasm-only build refuses a package with no save writer", async () => {
     const r = await loadBootEngine({
-      wasmOnly: true,
       log: quiet(),
       load: async (_signal, onBuild) => {
         onBuild(ok);
@@ -351,9 +307,8 @@ describe("loadBootEngine, the engine binary's build metadata (#963)", () => {
     expect(r.state.binary).toEqual(ok);
   });
 
-  it("keeps it when a later failure puts the game back on TypeScript", async () => {
+  it("keeps it when a later failure stops the game", async () => {
     const r = await loadBootEngine({
-      wasmOnly: false,
       load: async (_signal, onBuild) => {
         onBuild(ok);
         return mod();
@@ -367,7 +322,6 @@ describe("loadBootEngine, the engine binary's build metadata (#963)", () => {
     try {
       let late: ((b: typeof ok) => void) | undefined;
       const pending = loadBootEngine({
-        wasmOnly: false,
         timeoutMs: 1000,
         log: quiet(),
         load: (_signal, onBuild) => {

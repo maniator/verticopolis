@@ -12,8 +12,6 @@ vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 // A package load the test settles itself, to hold the boot while it looks at the cover.
 const held = vi.hoisted(() => ({ fail: (_e: Error) => {} }));
 const noop = held.fail;
-// This page life asks for Rust.
-vi.mock("./wasmhost/engineChoice", async (importOriginal) => ({ ...(await importOriginal<typeof import("./wasmhost/engineChoice")>()), engineRequested: () => "wasm" }));
 vi.mock("./wasmhost/rustEngine", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./wasmhost/rustEngine")>()),
   loadWasmEngine: vi.fn(() => new Promise((_, reject) => (held.fail = reject))),
@@ -36,7 +34,6 @@ describe("bootGame, the engine loading line (#1132)", () => {
 
   it("says the engine is loading after a wait, and the failure copy replaces the line when the load times out", async () => {
     stubWebGL();
-    vi.stubGlobal("__WASM_ONLY__", true);
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.useFakeTimers();
     document.body.innerHTML = '<div id="boot-cover"></div><div id="a11y-live"></div><div id="stage"></div>';
@@ -64,7 +61,6 @@ describe("bootGame, the engine loading line (#1132)", () => {
 
   it("sends a refused package to the exception tracker by code and kind, not by digest", async () => {
     stubWebGL();
-    vi.stubGlobal("__WASM_ONLY__", true);
     vi.spyOn(console, "error").mockImplementation(() => {});
     const run = bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() }))).catch((e: unknown) => e);
     await vi.waitFor(() => expect(held.fail).not.toBe(noop));

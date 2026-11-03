@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { DUAL_RUN } from "../build/engineBundle";
 import { repoRel, repoRoot, sourceFiles } from "./guardFiles";
 import { globRegex, isTestFile, resolveGlob, resolveRelative, scanRuntimeImports, type ImportKind, type RuntimeImport } from "./importScan";
 
@@ -22,8 +21,7 @@ import { globRegex, isTestFile, resolveGlob, resolveRelative, scanRuntimeImports
  * the frontend engine-import guard: type-only imports do not count, a bare
  * import, a re-export, `import()`, a worker or asset URL and
  * `import.meta.glob` do). The reach set is every engine module whose static
- * runtime imports lead to `src/engine/Simulation.ts`, plus a dual-run file
- * whose imports lead there through engine modules. An edge into that set
+ * runtime imports lead to `src/engine/Simulation.ts`. An edge into that set
  * from any other file outside `src/engine/` is a crossing, and the ratchet
  * names each crossing file with the modules it imports, and a reason.
  *
@@ -34,11 +32,7 @@ import { globRegex, isTestFile, resolveGlob, resolveRelative, scanRuntimeImports
  *
  * A lazy crossing (`import()`, a worker or asset URL, a lazy glob) into the
  * reach set, or any crossing into an engine module that loads `Simulation`
- * lazily, fails outright: a lazy edge into `Simulation` is how the adapter
- * that hosts the fallback will load it, and that adapter is the one exception
- * a later slice adds. The dual run's files (`DUAL_RUN` in
- * `src/build/engineBundle.ts`, which a player build may not carry) may import
- * the set statically without a line, and nothing else is exempt. An import
+ * lazily, fails outright, and nothing is exempt. An import
  * the guard cannot read fails too, except the known count in each file that
  * loads the engine package's glue by URL ({@link PACKAGE_LOADERS}).
  *
@@ -50,9 +44,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const SIMULATION = "src/engine/Simulation.ts";
 const ENGINE_DIR = "src/engine/";
 const isEngine = (rel: string): boolean => rel.startsWith(ENGINE_DIR);
-
-/** Files whose static imports of the reach set need no ratchet line. */
-const EXEMPT: ReadonlySet<string> = new Set(DUAL_RUN);
 
 /** Files whose `import()` loads the engine package's glue by URL, a file
  *  outside `src/` that no TypeScript source reaches through, with how many
@@ -123,11 +114,11 @@ function buildGraph(sources: ReadonlyMap<string, string>): Graph {
   return { edges, unreadable };
 }
 
-/** A file the reach set may hold: an engine module or a dual-run file. A
+/** A file the reach set may hold: an engine module. A
  *  chain through any other file counts at that file's own crossing. */
-const inReachScope = (rel: string): boolean => isEngine(rel) || EXEMPT.has(rel);
+const inReachScope = (rel: string): boolean => isEngine(rel);
 
-/** Every engine module and dual-run file whose imports lead to
+/** Every engine module whose imports lead to
  *  `SIMULATION` through such files, following static edges only, or edges
  *  of every kind. */
 function leadsToSimulation(graph: Graph, everyKind: boolean): Set<string> {
@@ -173,7 +164,7 @@ function crossings(graph: Graph, { reach, lazyOnly }: Reach): { pinned: Map<stri
     if (lazyOnly.has(to)) lazy.push(`${from} -> ${moduleName(to)} (${kind}, into a module that loads Simulation lazily)`);
     else if (!reach.has(to)) continue;
     else if (kind !== "static") lazy.push(`${from} -> ${moduleName(to)} (${kind})`);
-    else if (!EXEMPT.has(from)) pinned.set(from, (pinned.get(from) ?? new Set()).add(moduleName(to)));
+    else pinned.set(from, (pinned.get(from) ?? new Set()).add(moduleName(to)));
   }
   return { pinned: new Map([...pinned].map(([rel, mods]) => [rel, [...mods].sort()])), lazy: lazy.sort() };
 }
@@ -240,22 +231,17 @@ describe("where production code crosses into the TypeScript Simulation", () => {
   it("scans all of src/, the engine, host and save code included, and leaves out the tests", () => {
     // A scan that silently found nothing would pass forever.
     expect(files.length).toBeGreaterThan(300);
-    for (const rel of [SIMULATION, "src/main.ts", "src/storage/SaveGame.ts", "src/wasmhost/wasmHost.ts", "src/dualrun/dualRun.ts", "src/engine/port/tsEngine.ts"]) expect(files).toContain(rel);
+    for (const rel of [SIMULATION, "src/main.ts", "src/storage/SaveGame.ts", "src/wasmhost/wasmHost.ts", "src/dualrun/mirror.ts", "src/engine/port/tsEngine.ts"]) expect(files).toContain(rel);
     expect(files.some((rel) => rel.startsWith("src/tests/") || isTestFile(rel))).toBe(false);
     expect(graph.edges.length).toBeGreaterThan(1000);
   });
 
   it("finds the engine modules that lead to Simulation", () => {
     expect(sets.reach.has(SIMULATION)).toBe(true);
-    expect([...sets.reach].every((f) => isEngine(f) || EXEMPT.has(f))).toBe(true);
+    expect([...sets.reach].every(isEngine)).toBe(true);
     // The step loop imports it; if this fails the engine moved, and the
     // ratchet's lines may need their module names updated.
     expect(sets.reach.has("src/engine/sim/loop.ts"), [...sets.reach].sort().join("\n")).toBe(true);
-  });
-
-  it("exempts only the dual run, by the build guard's own list", () => {
-    expect(DUAL_RUN.length).toBeGreaterThan(0);
-    for (const rel of DUAL_RUN) expect(existsSync(resolve(repoRoot, rel)), rel).toBe(true);
   });
 
   it("can read every import under src/, except the engine package's loader", () => {
@@ -378,34 +364,11 @@ describe("the reach guard on a synthetic tree", () => {
     expect(pinned.get("src/ui/panel.ts")).toEqual(["index"]);
   });
 
-  it("lets the dual run import the set statically, but pins whoever imports a dual-run file that reaches it", () => {
-    const [dual] = DUAL_RUN;
-    const { pinned, lazy } = tree({
-      [dual]: 'import { Simulation } from "../engine/Simulation";',
-      "src/bootstrap.ts": 'import { start } from "./dualrun/dualRun";',
-    });
-    expect(pinned.has(dual)).toBe(false);
-    expect(pinned.get("src/bootstrap.ts")).toEqual([dual.replace(/\.ts$/, "")]);
-    expect(lazy).toEqual([]);
-    expect(tree({ [dual]: 'const l = () => import("../engine/sim/save");' }).lazy).toEqual([`${dual} -> sim/save (dynamic)`]);
-  });
-
-  it("keeps a dual-run file that reaches Simulation only through a non-engine file out of the set", () => {
-    const [dual] = DUAL_RUN;
-    const { reach, pinned } = tree({
-      [dual]: 'import { h } from "../game/helper";',
-      "src/bootstrap.ts": 'import { start } from "./dualrun/dualRun";',
-    });
-    expect(reach.has(dual)).toBe(false);
-    expect(pinned.has("src/bootstrap.ts")).toBe(false);
-    expect(pinned.get("src/game/helper.ts")).toEqual(["Simulation"]);
-  });
-
   it("names a directory's index module by its directory", () => {
     expect(moduleName("src/engine/index.ts")).toBe("index");
     expect(moduleName("src/engine/sim/index.ts")).toBe("sim");
     expect(moduleName("src/engine/Simulation.ts")).toBe("Simulation");
-    expect(moduleName("src/dualrun/dualRun.ts")).toBe("src/dualrun/dualRun");
+    expect(moduleName("src/game/helper.ts")).toBe("src/game/helper");
   });
 
   it("reports every import it cannot read, and holds each package loader to its count", () => {
@@ -413,13 +376,13 @@ describe("the reach guard on a synthetic tree", () => {
       "src/ui/computed.ts": "const n = 'x';\nimport(n);\nnew URL(n, import.meta.url);\nimport.meta.glob(n);",
       "src/wasmhost/engineLoad.ts": "const g = 'x';\nimport(g);\nimport(g);",
       "src/wasmhost/loadEngineModule.ts": "const g = 'x';\nimport(g);",
-      "src/dualrun/dualRun.ts": "const g = 'x';\nimport(g);",
+      "src/game/dynamic.ts": "const g = 'x';\nimport(g);",
     });
     expect(unreadableImports(graph)).toEqual([
       "src/ui/computed.ts:2",
       "src/ui/computed.ts:3",
       "src/ui/computed.ts:4",
-      "src/dualrun/dualRun.ts:2",
+      "src/game/dynamic.ts:2",
       "src/wasmhost/engineLoad.ts: 2 unreadable imports where PACKAGE_LOADERS expects 1",
     ]);
   });

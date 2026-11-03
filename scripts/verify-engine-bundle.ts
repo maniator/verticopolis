@@ -7,9 +7,8 @@
  * `VC_TOOLING`, the same variables the build read, so every `npm run build`
  * proves its own output:
  *   - no build ships test code;
- *   - a player build (no VC_TOOLING) ships no dual run or its worker;
- *   - a wasm-only build (VC_ENGINE=wasm) ships no TypeScript step loop, no
- *     runtime engine switch and no dual run, precaches the engine package,
+ *   - a wasm-only build (VC_ENGINE=wasm) ships no TypeScript step loop,
+ *     precaches the engine package,
  *     and carries only the TypeScript engine modules
  *     scripts/engine-bundle.allow.txt lists (and all of them, so the list
  *     only shrinks).

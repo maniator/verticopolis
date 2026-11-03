@@ -227,17 +227,16 @@ picks how the two relate:
 - **Wasm-only** (`VC_ENGINE=wasm`, what every deploy builds): only the WASM engine advances the
   simulation. The TypeScript instance stays as the read model, and commands
   and loads still pass through it until #954 and #868 land.
-  `bootstrap.ts` always loads it, the `__WASM_ONLY__` define compiles away
-  the engine switch and the dual run, and a `resolve.alias` in
+  `bootstrap.ts` always loads it, there is no engine switch or dual run, and a `resolve.alias` in
   `vite.config.ts` swaps the TypeScript step loop for
   `src/wasmhost/stepLoopAbsent.ts`. A package that fails to load, or a tower
   the host refuses, stops the game with the message in
   `src/wasmhost/engineBoot.ts`. `window.__vcEngineBoot` names the build, the
   engine and any failure.
 - **Switchable** (the default for dev serves and the test lanes, `VC_ENGINE`
-  unset): the TypeScript engine runs unless `?engine=wasm` or `vc.engine` asks
-  for WASM, and a package that fails to load leaves the game on TypeScript.
-  No player build is switchable; it goes away with the TypeScript engine's code.
+  unset): the TypeScript step loop still ships, but the game boots on the WASM
+  engine all the same, and a package that fails to load stops the game.
+  No player build is switchable; slice 4b of the Rust-only work retires the mode.
 
 `scripts/verify-engine-bundle.ts` checks each mode from the emitted
 sourcemaps after every build. The rest of the TypeScript engine still ships

@@ -43,12 +43,12 @@ test("a package load that never finishes has already sent its attempt row", asyn
   await page.waitForTimeout(1_000);
   expect((await statusRows(page)).map((r) => r.trigger)).toEqual(["attempt"]);
 
-  // Letting the load fail settles the same page life on TypeScript.
+  // Letting the load fail settles the same page life, with no engine left.
   release = true;
   for (const route of held.splice(0)) await route.abort();
   await expect.poll(async () => (await statusRows(page)).map((r) => r.trigger), { timeout: 30_000 }).toEqual(["attempt", "settle"]);
   const [, settle] = await statusRows(page);
-  expect(settle.engine).toBe("ts-fallback");
+  expect(settle.engine).toBe("none");
   expect(settle.fallback_reason).not.toBe("none");
   expect(settle.page_life).toBe(attempt.page_life);
 });

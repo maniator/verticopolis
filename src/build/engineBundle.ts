@@ -1,12 +1,11 @@
 /**
  * Engine build modes and the emitted-bundle guard for them.
  *
- * A build is either **switchable** (today's default: the TypeScript engine
- * runs unless `?engine=wasm` or `vc.engine` asks for the WASM engine, and a
- * WASM package that fails to load leaves the game on TypeScript) or
- * **wasm-only** (`VC_ENGINE=wasm`: the Rust/WASM engine is the only engine,
- * a failure to start it stops the game with a message, and the TypeScript
- * step loop is not in the bundle). `vite.config.ts` parses the mode with
+ * A build is either **switchable** (the default for dev serves and the test
+ * lanes: it still carries the TypeScript step loop, though the game boots on
+ * the Rust/WASM engine and stops with a message when that fails) or
+ * **wasm-only** (`VC_ENGINE=wasm`, every deploy: the TypeScript step loop is
+ * not in the bundle). Slice 4b retires the switchable mode. `vite.config.ts` parses the mode with
  * {@link parseEngineBuild}; `scripts/verify-engine-bundle.ts` runs after every
  * build and checks the emitted sourcemaps and the service-worker precache with
  * {@link checkEngineBundle}, so the result is proven from what the bundler
@@ -60,7 +59,7 @@ export interface EmittedChunk {
 
 export interface EngineBundleInput {
   build: EngineBuild;
-  /** A `VC_TOOLING=1` build (e2e, screenshots, perf), which keeps the dual run. */
+  /** A `VC_TOOLING=1` build (e2e, screenshots, perf). */
   tooling: boolean;
   chunks: readonly EmittedChunk[];
   /** Precache URLs from `sw.js`, relative to `dist/`. */
@@ -86,19 +85,9 @@ function forbiddenEverywhere(s: string): string | null {
   return isTestSource(s) ? "test code" : null;
 }
 
-/** Sources a player build (no `VC_TOOLING`) may not carry: the dual run is a
- *  developer switch on the tooling-only path, and its worker is emitted (and
- *  was precached) even though the code that starts it is compiled away. */
-export const DUAL_RUN: readonly string[] = ["src/dualrun/dualRun.ts", "src/dualrun/worker.ts"];
-
-/** Sources a wasm-only build may not carry: the TypeScript step loop, the
- *  runtime engine switch, and the dual run, which shadows a TypeScript live
- *  engine that a wasm-only build does not have. */
+/** Sources a wasm-only build may not carry: the TypeScript step loop. */
 const WASM_ONLY_FORBIDDEN: ReadonlyMap<string, string> = new Map([
   [TS_STEP_LOOP, "the TypeScript step loop"],
-  ["src/wasmhost/engineChoice.ts", "the runtime engine switch"],
-  ["src/dualrun/dualRun.ts", "the dual run"],
-  ["src/dualrun/worker.ts", "the dual-run worker"],
 ]);
 
 /** Check the emitted bundle against its build mode. Pure: the script reads
@@ -118,8 +107,6 @@ export function checkEngineBundle(input: EngineBundleInput): EngineBundleResult 
       const wasmOnlyWhy = input.build === "wasm-only" ? WASM_ONLY_FORBIDDEN.get(s) : undefined;
       if (wasmOnlyWhy) {
         errors.push(`${chunk.file} carries ${wasmOnlyWhy} (${s}) in a wasm-only build`);
-      } else if (!input.tooling && DUAL_RUN.includes(s)) {
-        errors.push(`${chunk.file} carries the dual run (${s}), a tooling-only switch, in a player build`);
       }
     }
   }

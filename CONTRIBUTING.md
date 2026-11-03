@@ -108,7 +108,7 @@ Verticopolis has **two test tiers**:
     every fixture with the engine and reads it back through the web game's
     readers. Every deploy runs the WASM engine alone (the wasm-only build
     below); dev serves and the test lanes still use the switchable build,
-    where `?engine=wasm` or the stored `vc.engine` choice picks it. The served package
+    which also boots on the WASM engine and has no TypeScript fallback. The served package
     (`src/public/engine/`) is build output and is not checked in: build it
     locally to run the game, with `bash scripts/build-engine-wasm.sh`
     on x86_64 Linux (it installs the pinned toolchain) or `npm run wasm:build`
@@ -118,22 +118,21 @@ Verticopolis has **two test tiers**:
     (`scripts/verify-precache.ts`) refuses a build without the engine, so no
     build ships a silent TypeScript fallback. Without a Rust toolchain, run
     `VC_ALLOW_NO_ENGINE=1 npm run build` for a deliberate build without the
-    engine (it cannot run the game; it exists for tooling that never boots one). A stale local build fails the unit test that checks its source
+    engine (it cannot run the game, and a dev serve without the package stops on the engine failure screen; it exists for tooling that never boots one). A stale local build fails the unit test that checks its source
     hash. CI restores it from the
     Actions cache, keyed on the engine's source hash, and builds it once per
     engine change (`.github/actions/engine-wasm`); Vercel builds it on every
     deploy through `scripts/vercel-build.sh`. `VC_ENGINE=wasm npm run build` makes the wasm-only build, which
-    every deploy runs (`scripts/vercel-build.sh` sets it): the WASM engine is the only engine, `?engine=` and
-    `vc.engine` are ignored, the TypeScript step loop is swapped out, and an
+    every deploy runs (`scripts/vercel-build.sh` sets it): the WASM engine is the only engine, the
+    TypeScript step loop is swapped out, and an
     engine that cannot start stops the game with a message instead of
     falling back. Its postbuild check (`scripts/verify-engine-bundle.ts`)
     reads the emitted sourcemaps and fails when a TypeScript engine module
     that `scripts/engine-bundle.allow.txt` does not list ships, or when a
     listed one no longer does (delete its line: the list only shrinks). The
-    default build (`VC_ENGINE` unset, or `switchable`) still carries both engines, for the test lanes and
-    dev serves, until the TypeScript code is deleted;
-    like every player build, it no longer ships the dual-run worker, which
-    only dev serves and `VC_TOOLING=1` builds use. `VC_ENGINE` applies to
+    default build (`VC_ENGINE` unset, or `switchable`) still carries the TypeScript step loop, for the test lanes and
+    dev serves, until slice 4b of the Rust-only work retires the mode; it boots on the
+    Rust engine all the same, and `?engine=` and `vc.engine` are ignored in every build. `VC_ENGINE` applies to
     builds and dev serves only: with it exported, `npm test` refuses to start
     (the WASM test lanes use `VC_REQUIRE_WASM=1`). See
     `docs/performance/wasm-only-bundle.md` for what still ships and why. A simulation change lands in the
@@ -216,11 +215,11 @@ Verticopolis has **two test tiers**:
   with `e2e/wasmOnly.spec.ts` covering its boot, failures and offline start;
   CI runs it as the `e2e-wasm-only` job. The general browser regression suite
   runs only here, once, so the default `e2e` lane stays focused on the
-  switchable-only paths that still depend on engine choice or fallback.
+  switchable-only specs.
   The default `chromium-wasm` project keeps the switchable-only specs and the
-  pinned visual/perf checks (`engineIdentity`, `saveWithoutRust`,
+  pinned visual/perf checks (`engineIdentity`,
   `engineStatusRows`, `atlas`, `visual`, `perf`), plus the dual-lane
-  `engineIntegrity` assertions whose fallback behavior differs by build.
+  `engineIntegrity` assertions.
   The wasm-only lane keeps the general suite, that same integrity spec, the
   runtime guard, the negative bundle canary, and the milestone screenshot
   artifact upload (`milestone-screenshots`).
@@ -360,9 +359,6 @@ e2e specs (e.g. `e2e/integration.spec.ts` boots it in a real browser):
   `TowerEngine`, so `new GameApp()` can't run under happy-dom. Its testable
   *logic* lives in the measured `src/game/*` controllers.
 - **`src/render/excalibur/**`**: the Excalibur/WebGL engine wrapper.
-- **`src/dualrun/worker.ts`**: the dual run's Web Worker entry, which loads
-  the WASM package by URL; the controller it serves is measured against a
-  worker stand-in.
 - **`src/wasmhost/engineWorker.ts`**: the experimental worker host's Web
   Worker entry, the browser glue around `EngineWorkerCore`, which is measured
   in Node against the real package and a fake engine.

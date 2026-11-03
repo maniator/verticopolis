@@ -1,7 +1,7 @@
 const SPEC_SUFFIX = "\\.spec\\.ts$";
 
 export const DUAL_LANE_SPECS = ["engineIntegrity"] as const;
-export const SWITCHABLE_ONLY_SPECS = ["engineIdentity", "saveWithoutRust", "engineStatusRows", "atlas", "visual", "perf"] as const;
+export const SWITCHABLE_ONLY_SPECS = ["engineIdentity", "engineStatusRows", "atlas", "visual", "perf"] as const;
 export const SWITCHABLE_LANE_SPECS = [...SWITCHABLE_ONLY_SPECS, ...DUAL_LANE_SPECS] as const;
 
 const toNamePattern = (names: readonly string[]) => names.join("|");

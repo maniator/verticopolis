@@ -4,7 +4,7 @@ import { TOWER_FILE_MAGIC, toBase64 } from "./saveCompression";
 /**
  * The `.vctower` writer behind `SaveGame.export` and `SaveGame.packSync`
  * (whose base64 line the store and the desktop store keep). When the WASM
- * engine runs (`?engine=wasm`), the engine's own writer (`encodeVctower`,
+ * engine runs (always, since the game boots on it), the engine's own writer (`encodeVctower`,
  * `load::encode_vctower`) writes the file, so the game and a non-web
  * frontend write saves through one implementation. For the same stamped save
  * the engine writes the bytes the fflate writer here writes (#939, pinned

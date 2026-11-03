@@ -1,21 +1,16 @@
 # The WASM engine in a Web Worker (experimental)
 
-Status: experimental, opt-in, never a default. The shipped engines are still
-TypeScript (the default) and the main-thread WASM host (`?engine=wasm`).
+Status: experimental and not selectable. The game boots on the main-thread
+WASM host; the flags below no longer pick a host.
 Measurements and the recommendation are in
 [`docs/performance/wasm-worker-host.md`](../performance/wasm-worker-host.md).
 
-## Flags
+## Flags (retired)
 
-| URL or `localStorage["vc.engine"]` | What runs |
-| --- | --- |
-| (none), `ts` | The TypeScript engine (default). |
-| `wasm` | The Rust engine on the main thread. The read model syncs after every step (`src/wasmhost/wasmHost.ts`, unchanged). |
-| `wasm-frame` | Experimental. The same main-thread host, syncing once per rendered frame straight from the frame array. |
-| `wasm-worker` | Experimental. The Rust engine in a dedicated module worker; the read model syncs from its replies. |
-
-`?engine=` wins over the stored value, as before (`src/wasmhost/engineChoice.ts`).
-The title screen reads "Rust engine (worker)" on the worker host.
+`?engine=`, `localStorage["vc.engine"]` and the `wasm-frame` and `wasm-worker`
+values used to pick a host. Boot ignores them now and always starts the Rust
+engine on the main thread (`src/wasmhost/wasmHost.ts`). The worker host's code
+stays for the measurements; nothing in the game starts it.
 
 ## How the main-thread host works today (the baseline)
 

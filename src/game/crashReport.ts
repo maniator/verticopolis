@@ -40,33 +40,13 @@ export interface CrashDescription {
   behindSplash: boolean;
 }
 
-/** The Rust engine crashed often enough in this tab that the game reloaded
- *  onto the TypeScript engine (#1422). The report is offered on that
- *  TypeScript boot, so the tower in it is the TypeScript engine's. */
-export interface RustCrashDescription {
-  kind: "rust-engine-trap";
-  /** This tab's Rust crashes on this build. */
-  crashes: number;
-  /** The fault's reason and stage codes, as the reliability row sends them. */
-  reason: string;
-  stage: string;
-}
-
-/** Both engines, named as the version line names them (#1434). */
-export interface CrashEngines {
-  rust: { version: string | null; sourceHash: string | null };
-  typescript: { version: string; sources: string };
-}
-
 /** The crash-details JSON written into the zip. Field names are part of the
  *  report format; renaming them breaks tooling that reads old reports. */
 export interface CrashDetails {
   report: "verticopolis-crash";
   version: string;
   createdAt: string;
-  crash: CrashDescription | RustCrashDescription;
-  /** The engines, on a report about an engine. */
-  engines?: CrashEngines;
+  crash: CrashDescription;
   userAgent: string;
   viewport: { width: number; height: number; dpr: number };
   /** Chrome-only heap numbers when present; absent elsewhere. */
@@ -99,14 +79,13 @@ export interface CrashTower {
 export function buildCrashDetails(
   { view }: CrashTower,
   crash: CrashDetails["crash"],
-  opts: { version: string; speed: number; frameErrors: readonly FrameErrorEntry[]; engines?: CrashEngines },
+  opts: { version: string; speed: number; frameErrors: readonly FrameErrorEntry[] },
 ): CrashDetails {
   const details: CrashDetails = {
     report: "verticopolis-crash",
     version: opts.version,
     createdAt: new Date().toISOString(),
     crash,
-    ...(opts.engines ? { engines: opts.engines } : {}),
     userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
     viewport:
       typeof window !== "undefined"
@@ -177,26 +156,11 @@ export async function buildCrashReportZip(
   };
 }
 
-/** "twice", or the count for any other number of crashes. */
-export const timesText = (n: number): string => (n === 2 ? "twice" : `${n} times`);
-
-/** The issue title and the first lines of its description, per crash. */
-function crashSummary(details: Pick<CrashDetails, "crash" | "engines">): { title: string; lines: string[] } {
-  const { crash } = details;
-  if (crash.kind === "webgl-context-lost") {
-    return {
-      title: "Game crashed (graphics context lost)",
-      lines: ["The game crashed: the graphics context was lost while playing.", crash.repeat ? "It crashed twice in a row." : ""],
-    };
-  }
-  const rust = details.engines?.rust;
-  const named = [rust?.version ?? "version unknown", rust?.sourceHash ? `source ${rust.sourceHash.slice(0, 12)}` : ""].filter(Boolean).join(", ");
+/** The issue title and the first lines of its description. */
+function crashSummary(crash: CrashDescription): { title: string; lines: string[] } {
   return {
-    title: "Rust engine crashed",
-    lines: [
-      `The Rust engine crashed ${timesText(crash.crashes)}, so the game switched to the TypeScript engine.`,
-      `Rust engine: ${named}. Fault: ${crash.reason} at ${crash.stage}.`,
-    ],
+    title: "Game crashed (graphics context lost)",
+    lines: ["The game crashed: the graphics context was lost while playing.", crash.repeat ? "It crashed twice in a row." : ""],
   };
 }
 
@@ -206,8 +170,8 @@ function crashSummary(details: Pick<CrashDetails, "crash" | "engines">): { title
  * filled in; attachments can't travel by URL, which is why the description
  * tells the reporter to attach the downloaded zip.
  */
-export function bugReportUrl(details: Pick<CrashDetails, "version" | "crash" | "engines">): string {
-  const { title, lines } = crashSummary(details);
+export function bugReportUrl(details: Pick<CrashDetails, "version" | "crash">): string {
+  const { title, lines } = crashSummary(details.crash);
   const params = new URLSearchParams({
     template: "bug_report.yml",
     title,

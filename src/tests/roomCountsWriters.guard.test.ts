@@ -200,7 +200,6 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   "src/render/atlas/browserEntry.ts": { bulk: 1 },
   // The app's hooks, and the simulation's and tower's relayed methods and
   // fields (money, view, the tower's name).
-  "src/dualrun/dualRun.ts": { bulk: 3 },
   "src/dualrun/mirror.ts": { bulk: 5 },
   "src/wasmhost/wasmHost.ts": { bulk: 7 },
   // The port contract's grown-tower setup (the star and the balance) on a

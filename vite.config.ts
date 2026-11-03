@@ -85,18 +85,11 @@ const TOOLING_BUILD = toolingBuild();
  * with `VC_ENGINE=wasm` too, so that serve behaves like the wasm-only build.
  *   - wasm-only builds: `Simulation.ts`'s step loop becomes a stand-in that
  *     throws, since the WASM host replaces `tick` on every tower it holds.
- *   - every build that is neither a dev serve nor a tooling build, and every
- *     wasm-only build: the dual run becomes an inert stand-in. Its call in
- *     bootstrap.ts is compiled away there already, but Vite still emitted (and
- *     the precache still shipped) its Web Worker.
  */
-function engineAliases(command: "build" | "serve"): { find: RegExp; replacement: string }[] {
+function engineAliases(): { find: RegExp; replacement: string }[] {
   const aliases: { find: RegExp; replacement: string }[] = [];
   if (ENGINE_BUILD === "wasm-only") {
     aliases.push({ find: /^\.\/sim\/loop$/, replacement: resolve(__dirname, "src/wasmhost/stepLoopAbsent.ts") });
-  }
-  if (ENGINE_BUILD === "wasm-only" || (command === "build" && !TOOLING_BUILD)) {
-    aliases.push({ find: /^\.\/dualrun\/dualRun$/, replacement: resolve(__dirname, "src/dualrun/dualRunAbsent.ts") });
   }
   return aliases;
 }
@@ -292,7 +285,7 @@ function wasmParityProjects() {
         // engine behind the port, which the parity setup would host on the
         // Rust engine; the golden, reader and port contract integration
         // tests hold the two engines together.
-        exclude: [...configDefaults.exclude, ...portSuites, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/dualrun/dualRun.test.ts", "**/engine/port/tsEngine.test.ts", "**/simport/viewReader.test.ts", "**/simport/engineContract.test.ts"],
+        exclude: [...configDefaults.exclude, ...portSuites, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/engine/port/tsEngine.test.ts", "**/simport/viewReader.test.ts", "**/simport/engineContract.test.ts"],
         setupFiles,
         testTimeout,
         hookTimeout: testTimeout,
@@ -318,7 +311,7 @@ const fingerprintOf = (command: "build" | "serve") => buildFingerprint(resolve(_
 export default defineConfig(({ command }) => ({
   root: "src",
   publicDir: publicDir(),
-  resolve: { alias: engineAliases(command) },
+  resolve: { alias: engineAliases() },
   base: "./",
   // Compile-time app version, shown on the splash. (package.json isn't importable
   // in the browser bundle.)
@@ -338,10 +331,6 @@ export default defineConfig(({ command }) => ({
     // validated by `toolingBuild()` above; scripts/verify-game-handle.ts
     // asserts the resulting dist matches the mode on every `npm run build`.
     __TOOLING_BUILD__: JSON.stringify(TOOLING_BUILD),
-    // The engine build mode (see `engineBuild` above). True compiles away the
-    // runtime engine switch, the TypeScript fallback and the dual run in
-    // bootstrap.ts; scripts/verify-engine-bundle.ts checks the result.
-    __WASM_ONLY__: JSON.stringify(ENGINE_BUILD === "wasm-only"),
     // The engine package this shell was built with (#985 criterion 5): the
     // package id and the glue and binary digests from
     // src/public/engine/BUILD.json. The page hashes what it fetches against
@@ -711,12 +700,6 @@ export default defineConfig(({ command }) => ({
         "src/render/excalibur/TowerEngine.ts",
         "src/render/excalibur/towerScene.ts",
         "src/render/excalibur/towerReconcile.ts",
-        // The dual run's worker entry: it loads the WASM package by URL in a
-        // Web Worker, neither of which exists under happy-dom; it is
-        // exercised by hand under `npm run dev`. The controller, the mirror,
-        // the shadow engine and the command vocabulary are measured and
-        // tested in Node (the controller against a worker stand-in).
-        "src/dualrun/worker.ts",
         // The atlas bake's browser half: the page API the export script
         // drives and the pixel checks, all of which read pixels back from a
         // live canvas (getImageData). The pipeline they call (bake, compose,

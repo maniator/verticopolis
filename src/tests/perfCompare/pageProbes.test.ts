@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { publishBootState, typescriptBoot } from "../../wasmhost/engineBoot";
+import { publishBootState, type EngineBootState } from "../../wasmhost/engineBoot";
 import { installEngineBootProbe, installProbes } from "./page";
 
 type ProbedWindow = { __perfMarks: Record<string, number>; __vcEngineBoot?: unknown };
@@ -17,7 +17,7 @@ describe("installEngineBootProbe", () => {
     installEngineBootProbe();
     const w = window as unknown as ProbedWindow;
     expect(w.__perfMarks.engineLoaded).toBeUndefined();
-    const first = typescriptBoot().state;
+    const first: EngineBootState = { build: "wasm-only", engine: "wasm", failure: null };
     publishBootState(first);
     const at = w.__perfMarks.engineLoaded;
     expect(typeof at).toBe("number");

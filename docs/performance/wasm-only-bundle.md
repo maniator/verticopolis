@@ -93,12 +93,8 @@ What changed:
   smaller Brotli.
 - **One precache entry is gone in both modes:** the dual-run worker
   (`assets/worker-*.js`, 6,409 bytes raw in the baseline build, read from a
-  directory listing of that build rather than from the size script). The dual run is a developer switch that
-  bootstrap only reaches in dev serves and `VC_TOOLING=1` builds. Vite still
-  emitted its worker for every build, and the precache shipped it to every
-  install. Player builds and wasm-only builds now swap in
-  `src/dualrun/dualRunAbsent.ts`, and the guard checks that the worker stays
-  out.
+  directory listing of that build rather than from the size script). The
+  browser-side dual run has since been deleted, so no build emits the worker.
 - **What a first visit fetches before play** is the initial JavaScript, plus
   the engine package wherever the WASM engine runs. A wasm-only build always
   fetches the package: 601.7 KiB Brotli before play (the initial JavaScript
@@ -138,11 +134,8 @@ then checks:
   `__mocks__/`, `e2e/`) ships.
 - **Every switchable build:** the TypeScript step loop still ships, so a
   wasm-only swap cannot leak into the default build.
-- **Every player build** (no `VC_TOOLING`): the dual run and its worker do not
-  ship.
 - **Wasm-only builds:**
-  - The bundle has no step loop, no runtime engine switch
-    (`src/wasmhost/engineChoice.ts`) and no dual run.
+  - The bundle has no step loop.
   - The engine glue and binary are precached.
   - Every `src/engine/` module that ships is listed in
     `scripts/engine-bundle.allow.txt`, and every listed module ships.
@@ -153,9 +146,8 @@ the build (modules with `renderedLength` above zero). The `e2e-wasm-only`
 CI job adds a step-loop import to `src/bootstrap.ts` and checks that the
 build fails with the guard's message.
 `src/build/engineAliases.test.ts` pins that only `Simulation.ts` imports
-`./sim/loop` and only `bootstrap.ts` imports `./dualrun/dualRun`, and that no
-other import, re-export or dynamic import in `src/` reaches either module,
-since a specifier alias matches the text from any importer.
+`./sim/loop`, and that no other import, re-export or dynamic import in `src/`
+reaches that module, since a specifier alias matches the text from any importer.
 
 ## Offline and fallback behavior
 
