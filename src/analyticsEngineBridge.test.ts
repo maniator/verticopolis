@@ -39,6 +39,7 @@ function propsFor(name: string): unknown[] {
 const founded = (mode = "classic") => ({ name: "tower_founded", payload: { mode } });
 const placed = (kind: string, floor: number, count = 1) => ({ name: "facility_placed", payload: { kind, floor, count } });
 const star = (s: number) => ({ name: "star_reached", payload: { star: s } });
+const milestone = (id: string) => ({ name: "milestone_reached", payload: { id } });
 const removed = (kind: string, method: string) => ({ name: "facility_removed", payload: { kind, method } });
 const resolved = (kind: string, decision: string, source: string) => ({ name: "emergency_resolved", payload: { kind, decision, source } });
 
@@ -84,19 +85,30 @@ describe("analytics engine bridge", () => {
     ]);
   });
 
-  it("sends every removal as demolish with its method, and nothing for a milestone yet", () => {
-    forwardGameplayEvents([
-      removed("office", "sell"),
-      removed("stairs", "bulldoze"),
-      removed("office", "bulldoze"),
-      { name: "milestone_reached", payload: { id: "pop-500" } },
-    ]);
+  it("sends every removal as demolish with its method", () => {
+    forwardGameplayEvents([removed("office", "sell"), removed("stairs", "bulldoze"), removed("office", "bulldoze")]);
     expect(sent()).toEqual([
       ["economy_action", { action: "demolish", detail: "sell" }],
       ["economy_action", { action: "demolish", detail: "bulldoze" }],
       ["economy_action", { action: "demolish", detail: "bulldoze" }],
     ]);
     expect(engineBridgeStats().rejected).toBe(0);
+  });
+
+  it("sends each milestone with its catalog id, in order", () => {
+    forwardGameplayEvents([milestone("pop-500"), milestone("star-4"), milestone("full-house")]);
+    expect(sent()).toEqual([
+      ["milestone_reached", { id: "pop-500" }],
+      ["milestone_reached", { id: "star-4" }],
+      ["milestone_reached", { id: "full-house" }],
+    ]);
+    expect(engineBridgeStats().rejected).toBe(0);
+  });
+
+  it("refuses a milestone outside the catalog", () => {
+    forwardGameplayEvents([milestone("pop-999"), { name: "milestone_reached", payload: {} }]);
+    expect(sent()).toEqual([]);
+    expect(engineBridgeStats().rejected).toBe(2);
   });
 
   it("gives removals their own budget, larger than a wire name's", () => {

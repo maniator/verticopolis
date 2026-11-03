@@ -3,6 +3,7 @@ import { APP_VERSION } from "./appVersion";
 import { telemetryHostAllowed } from "./telemetry";
 import type { EngagedBy } from "./analyticsEngagement";
 import type { EngineBuild, EngineKind, EngineStatusReason, EngineStatusTrigger } from "./analyticsEngineStatus";
+import type { GameplayMilestoneId } from "./engine/gameplayEvents";
 import type { FallbackStage } from "./wasmhost/engineBoot";
 import type { EngineChoice } from "./wasmhost/engineChoice";
 
@@ -48,7 +49,7 @@ export interface GameplayEvents {
    *  `analyticsEngineBridge.ts` (#873 phase 2), drive `new_game_started`,
    *  `first_build`, the session build and depth summaries, `star_reached`,
    *  `session_emergencies`, `emergency_choice`, `price_tune` and
-   *  `capacity_tune`; the rest of this vocabulary stays with the shell. `tool` is the
+   *  `capacity_tune`, and since the milestone step `milestone_reached`; the rest of this vocabulary stays with the shell. `tool` is the
    *  kind the engine PLACED rather than the tool held: the Floor tool on the
    *  ground floor lays a lobby and now reports `lobby`, here and in the
    *  `tool_session_uses` mix. Builds made from any input, the editor included,
@@ -62,6 +63,14 @@ export interface GameplayEvents {
    *  before the engine bridge (through 2.29.4) a 6 Hz poll sent only the higher
    *  rung when two promotions landed between polls. */
   star_reached: { star: number };
+  /** The tower achieved an optional milestone (a population mark, the fourth
+   *  or fifth star, or one of the later goals), from the engine's
+   *  `milestone_reached` event through `analyticsEngineBridge.ts` (#873 step 3,
+   *  owner-approved 2026-11-03). `id` is a closed catalog value, never text.
+   *  One row per achievement; loading a save adopts the milestones it already
+   *  met without a row, and an undo or a load of an earlier save can make the
+   *  same milestone fire again, so read distinct sessions, not rows. */
+  milestone_reached: { id: GameplayMilestoneId };
   /** The tab was hidden or unloaded: cumulative foreground session length in
    *  whole seconds, plus whether the emission came from `pagehide`.
    *

@@ -1,4 +1,5 @@
 import { telemetryHostAllowed } from "./telemetry";
+import type { GameplayMilestoneId } from "./engine/gameplayEvents";
 import { trackEvent, setCommonProps, type GameplayEvents } from "./analyticsCore";
 import { clearActionLatches } from "./analyticsActions";
 import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots } from "./analyticsCrash";
@@ -163,6 +164,11 @@ class GameplaySession {
   /** The tower reached a new star rating. */
   noteStar(star: number): void {
     trackEvent("star_reached", { star });
+  }
+
+  /** The tower achieved an optional milestone. */
+  noteMilestone(id: GameplayMilestoneId): void {
+    trackEvent("milestone_reached", { id });
   }
 
   /** Report the boot snapshot: how the session started plus the loaded tower's
