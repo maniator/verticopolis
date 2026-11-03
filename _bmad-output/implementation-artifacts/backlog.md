@@ -58,7 +58,8 @@ How items flow:
    label still orders it among the 3.x work. A bug that only affects the
    TypeScript fallback also carries the `closes with TS removal` label.
    Every issue, open or closed, has a milestone: `3.0.0` (open work carries a
-   `gate-1` or `gate-3` label from the 3.0 priorities plan; `gate-2` was retired on 2026-11-03), `3.x`,
+   `gate-1` or `gate-3` label from the 3.0 priorities plan, and the `gate-2`
+   label was retired on 2026-11-03), `3.x`,
    `Triage` (new or undecided, each gets a decision), `4.x` (Visual Renaissance:
    renderer, art, UI polish and audio on the same simulation), `5.x` (deeper
    simulation: economy, transport, tenants and 1994 parity), `Backlog`

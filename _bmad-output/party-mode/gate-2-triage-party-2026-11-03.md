@@ -4,8 +4,8 @@
 > this date. Live state is the `3.0.0` milestone and the matrix in #1104; the
 > gate rows are in #945 (original table kept verbatim there). Traffic figures
 > are not used here; they belong to the Reliability recommendation
-> (`release-3.0/milestone/reliability-recommendation-2026-11-03.md` in the
-> project files), which comes from the governed `session_lengths` view and
+> (a project-files document, not part of this repository, awaiting the
+> owner's approval), which comes from the governed `session_lengths` view and
 > `scripts/engine-reliability.mjs`.
 
 Room: Cross-Cutting Plan Review. 📋 John (PM), 🏗️ Winston (architect), 🏛️ Cloud
