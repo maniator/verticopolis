@@ -4,8 +4,9 @@ name: Milestone new issues
 # _bmad-output/implementation-artifacts/backlog.md). Whoever files an issue sets
 # one. This is the safety net: an issue that is opened with no milestone goes to
 # Triage, where it gets a decision. It does not overwrite a milestone that is
-# already set (it checks again just before writing), and the check reads the issue's live state, so a milestone added
-# a moment after the issue was created (the usual two-step create) wins.
+# already set: it checks again just before writing, and it reads the issue's
+# live state, so a milestone added a moment after the issue was created (the
+# usual two-step create) wins.
 on:
   issues:
     types: [opened]
@@ -17,6 +18,7 @@ permissions:
 jobs:
   triage:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
