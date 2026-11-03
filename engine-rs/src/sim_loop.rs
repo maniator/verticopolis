@@ -175,7 +175,7 @@ impl Simulation {
             // carried goes through `Number()`, so NaN never completes.
             let threshold = match (u.complete_at, &u.complete_at_raw) {
                 (Some(v), _) => v,
-                (None, Some(raw)) => crate::load::js_number(Some(raw)),
+                (None, Some(raw)) => crate::load::js_number(Some(&**raw)),
                 (None, None) => 0.0,
             };
             if self.clock.minutes >= threshold {

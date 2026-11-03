@@ -9,7 +9,7 @@ use super::source_scan_tests::{
 use super::unit_scan_tests::{new_list_aside, top_level, unit_writes};
 use super::write_cases_tests::{MORE_WRITES, WRITES};
 use crate::frame::unit_fields;
-use crate::tower::Unit;
+use crate::tower::{RetailTally, Unit};
 
 /// The frame fields and the census share read no field but the six the
 /// setters mark and the kind, which no engine code writes in place
@@ -47,10 +47,7 @@ fn the_frame_and_the_census_read_only_marked_fields() {
             vacate_at,
             film_policy,
             subtype,
-            patronage_today,
-            patronage_yest,
-            profit_today,
-            profit_yest,
+            retail,
             complete_at,
             complete_at_raw,
             dirty_days,
@@ -70,12 +67,12 @@ fn the_frame_and_the_census_read_only_marked_fields() {
         *vacate_at = Some(vacate_at.unwrap_or(0.0) + 1.0);
         *film_policy = other(*film_policy);
         *subtype = other(*subtype);
-        *patronage_today = Some(patronage_today.unwrap_or(0.0) + 1.0);
-        *patronage_yest = Some(patronage_yest.unwrap_or(0.0) + 1.0);
-        *profit_today = Some(profit_today.unwrap_or(0.0) + 1.0);
-        *profit_yest = Some(profit_yest.unwrap_or(0.0) + 1.0);
+        *retail = Some(Box::new(RetailTally {
+            patronage_today: Some(1.0),
+            ..retail.as_deref().copied().unwrap_or_default()
+        }));
         *complete_at = Some(complete_at.unwrap_or(0.0) + 1.0);
-        *complete_at_raw = Some(serde_json::json!(format!("{complete_at_raw:?}!")));
+        *complete_at_raw = Some(Box::new(serde_json::json!(format!("{complete_at_raw:?}!"))));
         *dirty_days = Some(dirty_days.unwrap_or(0) + 1);
         let bits = |u: &Unit| unit_fields(u).map(f64::to_bits);
         assert_eq!(bits(&v), bits(u), "unit {}", u.id);

@@ -10,15 +10,14 @@
 
 /**
  * What a build is made of, as two independent parts: the game shell (every
- * source file outside the engines, hashed at build time) and the engines (the
- * Rust crate version and package source hash, and the TypeScript engine's
- * source hash). A running client compares its own fingerprint with the
+ * source file outside the engine, hashed at build time) and the engine (the
+ * Rust crate version and package source hash). A running client compares its own fingerprint with the
  * incoming build's to say whether an update touches the game, the engine or
  * both. Any part may be absent (a dev build, or a package that did not report).
  */
 export interface BuildFingerprint {
   shell: string;
-  engine: { crate?: string; rust?: string; ts?: string };
+  engine: { crate?: string; rust?: string };
 }
 
 /** Which part of the game an update changes. */
@@ -48,13 +47,13 @@ function parseFingerprint(shell: unknown, engine: unknown): BuildFingerprint | u
   const s = token(shell);
   if (!s || typeof engine !== "object" || engine === null) return undefined;
   const e = engine as Record<string, unknown>;
-  return { shell: s, engine: { crate: token(e.crate), rust: token(e.rust), ts: token(e.ts) } };
+  return { shell: s, engine: { crate: token(e.crate), rust: token(e.rust) } };
 }
 
 const differs = (a: string | undefined, b: string | undefined): boolean => a !== undefined && b !== undefined && a !== b;
 
 /**
- * Whether the incoming build changes the game shell, an engine, both or neither
+ * Whether the incoming build changes the game shell, the engine, both or neither
  * (`null`, also when either fingerprint is missing, so an older build shows the
  * plain prompt). `engineLine` names the engine change for the player.
  */
@@ -68,15 +67,12 @@ export function classifyUpdate(
   const b = incoming.engine;
   const crate = differs(a.crate, b.crate);
   const rust = crate || differs(a.rust, b.rust);
-  const ts = differs(a.ts, b.ts);
-  if (!game && !rust && !ts) return null;
+  if (!game && !rust) return null;
   const lines: string[] = [];
   if (crate) lines.push(`Rust engine ${a.crate} → ${b.crate}`);
   else if (rust) lines.push(`Rust engine${b.crate ? ` ${b.crate}` : ""} (new build)`);
-  if (ts) lines.push("TypeScript engine (new build)");
-  const engine = rust || ts;
   let kind: UpdateKind = "game";
-  if (engine) kind = game ? "both" : "engine";
+  if (rust) kind = game ? "both" : "engine";
   return { kind, ...(lines.length > 0 ? { engineLine: lines.join(" · ") } : {}) };
 }
 
