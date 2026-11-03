@@ -62,7 +62,7 @@ Sources: the retail manual's Map Window and Tutorial sections (PDF pp. 14, 23, 3
 | S0 | Spec and evidence: `SPEC.md`, optional retail MAP capture on the PC | spec written; retail capture done, findings in the SPEC |
 | S1 | Pure geometry (`src/render/overviewMap/geometry.ts`) with unit tests | in this PR |
 | S2 | Draw-list builder and style table (`src/render/overviewMap/`) with unit tests and a large-tower budget test | in this PR |
-| S2b | Apply the retail capture to Classic: flat gray silhouette, 1 px shaft lines, fixed-scale layout option, dotted camera outline (SPEC, Retail capture findings) | next, before S3 |
+| S2b | Apply the retail capture to Classic: flat gray silhouette, 1 px shaft lines, fixed-scale layout option, dotted camera outline (SPEC, Retail capture findings); the style table part only, the fixed-scale layout and camera outline land in S3 | in review |
 | S3 | Window, Map button, camera binding, a11y, "Floor heatmap" rename; all chrome and CSS in one PR | after file ownership is agreed |
 | S4 | Playwright desktop and phone-touch specs, visual snapshots (pinned image), gallery scenes, large-tower performance run with the real catalog height lookup, the real pattern source and a real canvas (the S2 unit budget is synthetic and only pins the algorithm's shape), PC run for hardware claims | after S3 |
 | S5 | Help entry, CHANGELOG line, minor version bump, backlog row finished, #343 closed | after S4 |

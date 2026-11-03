@@ -20,13 +20,13 @@ Original Windows SimTower had a small MAP window that shows the whole tower and 
   - **success:** The window is closed by default and a visible Map button opens it; Escape or the button closes it and focus returns to the button. The last open or closed choice is remembered per browser (storage failures never break the page). With the window open, building, inspecting, panning and pinching on the world canvas behave exactly as with it closed (Playwright, desktop and phone-sized touch).
 - **CAP-2: read the whole tower.**
   - **intent:** The map shows the tower's real horizontal silhouette across the full lot, every floor and basement, rooms and facilities, lobbies, and transport shafts, so the tower is recognizable and not only a height bar.
-  - **success:** Every unit in `SimView.rooms`, every run in `SimView.structure` and every shaft or stairway in `tower.transports` appears at its true tile and floor in map space (unit-tested draw list). Kinds fall into groups that are distinguishable by color and by pattern, so the map reads without color vision: each room group has its own pattern, the three elevator kinds have one each, and the plain solid groups differ in lightness (table tests pin all three). Patterns are an accessibility addition to the original's plain look and show in both themes in v1.
+  - **success:** Every unit in `SimView.rooms`, every run in `SimView.structure` and every shaft or stairway in `tower.transports` appears at its true tile and floor in map space (unit-tested draw list). In the Modern theme, kinds fall into groups that are distinguishable by color and by pattern, so the map reads without color vision: each room group has its own pattern, the three elevator kinds have one each, and the plain solid groups differ in lightness (table tests pin all three). Patterns are an accessibility addition and are Modern only: Classic follows the retail Edit tab, one flat gray with shaft lines (CAP-4).
 - **CAP-3: navigate by the map.**
   - **intent:** The map shows the area the main view currently covers, and a click, tap or drag moves the camera.
   - **success:** A camera rectangle matches the visible area in map space and stays in sync after zoom, pan, resize and loading another tower. A click or tap centers the camera on that point; dragging the rectangle pans without the rectangle jumping to the pointer. All camera moves go through the existing clamp, so any point on the map is safe to click on very tall, wide or imported (TDT) towers.
 - **CAP-4: Classic and Modern.**
   - **intent:** Classic follows the original MAP window's behavior and styling as closely as the evidence allows; Modern may use richer facility colors and presentation.
-  - **success:** The style table maps every `FacilityKind` to a group (an exhaustive record, so a new kind is a compile error), and each group has a pattern and a fill per theme. Classic uses a gray tower with elevators colored by kind (express blue, standard gray, service red per the manual) and its schematic layout, refined by the retail capture. Modern uses the facility colors from `FACILITY_PRESENTATION` for rooms and its own shaft colors, kept apart from the room colors. A kind unknown at run time paints as a placeholder and never throws. The manual's tutorial also shows the elevator as a black line; v1 draws a shaft-width mark colored by kind until the capture settles which Classic should do.
+  - **success:** The style table maps every `FacilityKind` to a group (an exhaustive record, so a new kind is a compile error). Classic follows the retail Edit tab (see Retail capture findings): one flat light-gray fill for every structure run and room with no pattern, and shafts picked out as lines (black elevators, red express, blue stairs and escalators; the red and blue meanings are unconfirmed in the live game). Modern uses the facility colors from `FACILITY_PRESENTATION` for rooms, a pattern per room group, and its own shaft colors kept apart from the room colors. A kind unknown at run time paints as a placeholder and never throws.
 - **CAP-5: accessible.**
   - **intent:** Keyboard and assistive-technology users can open and use the map.
   - **success:** The map is focusable; arrow keys move the camera by a step, Enter or Space centers on the focused point; the canvas has an accessible name and a text summary (floors above ground, basements, where the camera is); targets are at least 44 CSS px on touch; the map does not cover the build controls on a phone.
@@ -66,7 +66,7 @@ A player with a 100-floor tower and a phone opens the Map, sees the tower's shap
 
 ## Assumptions
 
-- The original window's drawing was measured from a retail capture (see Retail capture findings). The style table's Classic column still follows the manual and wiki description until slice S2b applies those findings.
+- The original window's drawing was measured from a retail capture (see Retail capture findings). The style table's Classic column follows those findings (slice S2b).
 - The map's drawing box proportions are chosen in S3 from phone and desktop layouts; the geometry (S1) takes any box, so the choice changes no tested logic.
 
 ## Retail capture findings (2026-11-03)
@@ -82,10 +82,10 @@ Measured in the real game on the PC harness with five saves (TOWER1, TOWER2, TOW
 - **Camera rectangle.** A 1 px dotted outline (an inverting pen: black on light, red over red rooms, pale on a dark night sky), about 53 by 33 px, matching the main view of about 99 tiles by 14 floors. It is clipped at the map's right edge.
 - **Open items.** What the black, red and blue lines mean is unconfirmed (a short live session clicking a line would settle it). Dirty-room coloring was seen only in TOWER1.
 
-### What changes for Classic (applied in slice S2b, before S3)
+### What changes for Classic (slice S2b: items 1 and 2 are in the style table; 3 to 5 land in S3 and the later views)
 
 1. Classic's Edit view is a single light-gray silhouette: every structure run and room paints the same flat gray, no patterns and no per-kind groups. The per-kind groups and patterns stay as the Modern theme.
-2. Classic shafts are 1 px lines (black for standard and service, red for express, blue for stairs and escalators) until the live session settles the meanings. The manual's blue/gray/red-by-kind description and the capture disagree, and the capture wins for pixels; the choice is recorded here when confirmed.
+2. Classic shafts are lines (black for standard and service, red for express, blue for stairs and escalators) until the live session settles the meanings. Their width comes from the layout: at the fixed Classic scale a one-tile shaft is about 1 px wide. The manual's blue/gray/red-by-kind description and the capture disagree, and the capture wins for pixels; the choice is recorded here when confirmed.
 3. Classic layout is the fixed scale (8/15 px per tile, 2.4 px per slot) in a fixed 200 by 288 body, not fit-to-extent. Modern keeps fit-to-extent. `fitLayout` already takes any box, so this is a layout choice in S3, not new geometry.
 4. The camera rectangle is a 1 px dotted outline in Classic (a solid theme-colored outline in Modern is a free choice).
 5. Eval, Pricing and Hotel tab colors above are the Classic palette for #1618, #1619 and #1617.
