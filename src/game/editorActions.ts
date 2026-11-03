@@ -129,10 +129,12 @@ export class EditorActions {
         bottom: t.bottom,
         top: t.top,
         stops,
-        hourly: t.hourly ?? undefined,
         origins: t.origins
           ? { weekday: t.origins.weekday.map((ring) => new Map(ring)), weekend: t.origins.weekend.map((ring) => new Map(ring)) }
           : undefined,
+        // The engine owns the warm-up gate and the tuning (#1550): ask it live,
+        // so undo/redo and stop edits made while the dialog is open are read.
+        autoTune: (draft, weekendView) => this.deps.engine().autoTuneProposal(id, scheduleSlots(draft), weekendView),
         current: kit.currentSchedule(id),
         initialWeekend: clockOf(header).isWeekend,
         announce: (msg) => this.deps.announce(msg),
