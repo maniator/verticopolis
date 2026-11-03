@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildToStar, engineSave, expectEngineHosted, fitCamera } from "./helpers";
+import { buildToStar, engineSave, expectEngineHosted, fitCamera, hideMapBeforeLoad } from "./helpers";
 
 // Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
@@ -33,6 +33,8 @@ test.use({ viewport: { width: 1000, height: 1200 } });
 
 test("progression: a screenshot at each ★ milestone, 1★ → TOWER", async ({ page }) => {
   test.setTimeout(180_000); // grows a real 100-floor tower in-page across six rungs
+  // The proof images show the whole tower; the open-by-default Map (#343) would cover its corner.
+  await hideMapBeforeLoad(page);
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game));
 

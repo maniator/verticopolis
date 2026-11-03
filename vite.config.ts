@@ -10,7 +10,6 @@ import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } f
 import type { BuildFingerprint } from "./src/pwaUpdateInfo";
 import { tsEngineSourceHash } from "./src/build/tsEngineSources";
 import { buildFingerprint } from "./src/build/buildFingerprint";
-import { isPreviewDeploy } from "./src/build/previewDeploy";
 import { convertedSuites } from "./src/tests/portKit/convertedList";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
@@ -59,11 +58,6 @@ function publicDir(): string {
 }
 
 const TOOLING_BUILD = toolingBuild();
-
-/** Whether this is a Vercel preview deploy, which builds address-flagged
- *  previews such as the Map window's `?map` (see src/build/previewDeploy.ts).
- *  The production deploy gets `false` and the gated code is compiled away. */
-const PREVIEW_DEPLOY = isPreviewDeploy(process.env);
 
 /**
  * Module swaps that keep engine-specific code out of a bundle that cannot use
@@ -327,9 +321,6 @@ export default defineConfig(({ command }) => ({
     // validated by `toolingBuild()` above; scripts/verify-game-handle.ts
     // asserts the resulting dist matches the mode on every `npm run build`.
     __TOOLING_BUILD__: JSON.stringify(TOOLING_BUILD),
-    // Preview-flag gate for Vercel preview deploys (see PREVIEW_DEPLOY). It
-    // opens only address-flagged previews, never the `window.game` handle.
-    __PREVIEW_DEPLOY__: JSON.stringify(PREVIEW_DEPLOY),
     // The engine package this shell was built with (#985 criterion 5): the
     // package id and the glue and binary digests from
     // src/public/engine/BUILD.json. The page hashes what it fetches against

@@ -33,8 +33,11 @@ describe.each(RUNNERS)("$name runner context-loss wiring", ({ path, record }) =>
   });
 
   it("gives every timed context the recorder and only the service-worker context a no-op", () => {
-    const calls = [...source.matchAll(/await newContext\(browser, config, "(allow|block)", (.*)\);$/gm)].map((m) => [m[1], m[2]]);
+    // A trailing argument after the handler (the perfWorker Map A/B slot) is not the handler.
+    const calls = [...source.matchAll(/await newContext\(browser, config, "(allow|block)", (\(\) => \{\}|[^,()]+)(?:, \w+)?\);$/gm)].map((m) => [m[1], m[2]]);
     expect(calls.length).toBeGreaterThanOrEqual(3);
+    // Every such call is one the pattern read, so a handler of another shape fails here.
+    expect(calls).toHaveLength(source.match(/await newContext\(browser, config, /g)?.length ?? 0);
     for (const [mode, handler] of calls) expect(handler, `serviceWorkers ${mode}`).toBe(mode === "allow" ? "() => {}" : "noteLoss");
     expect(calls.filter(([mode]) => mode === "allow")).toHaveLength(1);
   });

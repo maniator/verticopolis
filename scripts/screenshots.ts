@@ -50,7 +50,7 @@
 import { chromium, type Browser, type Page } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
-import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
+import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, mapForShot, restoreMapAfterShot, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
 import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
 import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
@@ -162,6 +162,7 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     // Mask the app version to a fixed placeholder so a routine version bump does
     // not churn the splash/help pixels (the shipped app still shows the real one).
     await page.evaluate(pgMaskVersion);
+    await mapForShot(page, `${scene.id}/${shot.name}`, shot.crop);
     await page.waitForTimeout(80);
     // animations: "disabled" freezes CSS animation (the splash star twinkle,
     // the onboarding pulse) at a fixed phase so DOM chrome is byte-stable too.
@@ -174,6 +175,7 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     if (shot.phaseWatch) await judgeAndPromote(page, capturePath, path);
   } finally {
     if (shot.phaseWatch) await stopPhaseWatch(page);
+    await restoreMapAfterShot(page);
     // Always restore the scene viewport, even if the shot threw, so one failed
     // shot can't cascade a wrong size into the rest of the scene.
     if (shot.viewport) await page.setViewportSize(baseVp);

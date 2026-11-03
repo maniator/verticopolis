@@ -29,16 +29,40 @@ describe("overview map window: camera binding (CAP-3)", () => {
     expect(r.moves[0].floor).toBeCloseTo(60);
   });
 
-  it("does not center after a press that travels, the release included, or one that is canceled", () => {
+  it("does not center on the release of a press that traveled there, or on a cancel", () => {
     const r = rig();
     viewCanvas().dispatchEvent(pointer("pointerdown", mapX(300), mapY(60)));
     viewCanvas().dispatchEvent(pointer("pointerup", mapX(300) + 20, mapY(60)));
     viewCanvas().dispatchEvent(pointer("pointerdown", mapX(300), mapY(60), "touch"));
-    viewCanvas().dispatchEvent(pointer("pointermove", mapX(300) + 20, mapY(60), "touch"));
-    viewCanvas().dispatchEvent(pointer("pointerup", mapX(300) + 20, mapY(60), "touch"));
-    viewCanvas().dispatchEvent(pointer("pointerdown", mapX(300), mapY(60), "touch"));
     viewCanvas().dispatchEvent(pointer("pointercancel", mapX(300), mapY(60), "touch"));
     expect(r.moves).toHaveLength(0);
+  });
+
+  it("brings the view under a drag that starts off the view mark and follows it (#343 follow-up)", () => {
+    // A finger that lands anywhere on the map and slides takes the view with
+    // it, on the first move past the tap slop; the release adds no move.
+    const r = rig();
+    viewCanvas().dispatchEvent(pointer("pointerdown", mapX(300), mapY(60), "touch"));
+    viewCanvas().dispatchEvent(pointer("pointermove", mapX(300) + 2, mapY(60), "touch"));
+    expect(r.moves).toHaveLength(0);
+    viewCanvas().dispatchEvent(pointer("pointermove", mapX(300) + 20, mapY(60), "touch"));
+    expect(r.moves).toHaveLength(1);
+    expect(r.moves[0].tile).toBeCloseTo(300 + (20 * 375) / 200);
+    expect(r.moves[0].floor).toBeCloseTo(60);
+    viewCanvas().dispatchEvent(pointer("pointermove", mapX(250), mapY(40), "touch"));
+    expect(r.moves).toHaveLength(2);
+    expect(r.moves[1].tile).toBeCloseTo(250);
+    expect(r.moves[1].floor).toBeCloseTo(40);
+    viewCanvas().dispatchEvent(pointer("pointerup", mapX(250), mapY(40), "touch"));
+    expect(r.moves).toHaveLength(2);
+  });
+
+  it("brings the view under a mouse drag that starts off the view mark too", () => {
+    const r = rig();
+    viewCanvas().dispatchEvent(pointer("pointerdown", mapX(300), mapY(60)));
+    viewCanvas().dispatchEvent(pointer("pointermove", mapX(320), mapY(60)));
+    expect(r.moves).toHaveLength(1);
+    expect(r.moves[0].tile).toBeCloseTo(320);
   });
 
   it("drags the view mark by the pointer's travel, without jumping to the pointer", () => {

@@ -40,7 +40,7 @@ export const aaLimitation = (aa: EngineName): string =>
 
 /** The TypeScript arm is a pinned build of an older app, which cannot be switched to from this one. */
 export const baselineLimitation = (b: { commit: string; appVersion: string }): string =>
-  `The TypeScript arm ran the pinned pre-cutover build ${b.commit.slice(0, 8)} (app ${b.appVersion}, the last commit where the game could play on the TypeScript engine), served beside the current build with the current engine package overlaid at /engine/. The two arms therefore differ in app code (rendering, UI, host plumbing) as well as in engine, and the ratios compare the game before the cutover with the game now. The pinned build is a TypeScript-only tooling build, which adds only the window.game handle.`;
+  `The TypeScript arm ran the pinned pre-cutover build ${b.commit.slice(0, 8)} (app ${b.appVersion}, the last commit where the game could play on the TypeScript engine), served beside the current build with the current engine package overlaid at /engine/. The two arms therefore differ in app code (rendering, UI, host plumbing) as well as in engine, and the ratios compare the game before the cutover with the game now. That includes the overview Map window (2.79.0 on), which the current build opens by default at a desktop-sized viewport and the pinned build does not have; \`npm run perf:worker -- --aa wasm --map-ab\` measures its cost alone. The pinned build is a TypeScript-only tooling build, which adds only the window.game handle.`;
 
 /** An A/A pass of TypeScript runs the pinned build in both slots, so no arm differs from the other. */
 export const aaBaselineLimitation = (b: { commit: string; appVersion: string }): string =>

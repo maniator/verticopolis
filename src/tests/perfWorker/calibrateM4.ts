@@ -95,6 +95,7 @@ export function calibrateM4(folders: { folder: string; results: WorkerPass; sha2
     const renderer = rendererProblem(results);
     const lossRecord = lossRecordProblem(results);
     if (engine !== "ts" && engine !== "wasm") leave('not an A/A pass (config.aa is not "ts" or "wasm")');
+    else if (results.config.mapAb) leave("it is a Map A/B pass, whose two slots differ on purpose");
     else if (!results.validation.ok) leave("its validation failed");
     else if (tree) leave(tree);
     else if (results.config.quick) leave("it is a --quick run, which is not a protocol run");

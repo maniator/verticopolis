@@ -308,6 +308,7 @@ Between those PRs the table belongs to the repository owner (maniator), the
 | inspector congestion attribution (per-floor ratios and binding classes) | none: TypeScript builds these when its inspector asks for them | tower revision, unit count, exact clock minute bits, crowd step, room mark-log id and position | Rust-only `diag_memo.congestion`, `engine-rs/src/diagnostics/memo.rs`; memoizes one ordered map pair for all inspected rooms on a changed state, resets with the `Simulation` on load (#1560) |
 | reachability within one demand or income pass | `reachCache`, `src/engine/sim/demand.ts`, `src/engine/EconomySystem.ts` | one call | ported |
 | reachability during one move-in pass | `reachMemo`, `src/engine/sim/churn.ts` | one pass | ported |
+| overview Map draw list, layout and camera placement (#343: added in #1665, wired in #1690, on every page from S5, open by default on desktop); the painter's pattern tiles | `OverviewMapModel`, `src/render/overviewMap/model.ts`; the tile cache in `src/render/overviewMap/paint.ts` | identity of the view's rooms, structure and transports, plus theme, box, extent and Classic line width; the camera's position, zoom and view size plus the layout; reset on open and on close, and when a resize clears the canvases. Tiles: theme, pattern and fill, per canvas | none: render side only |
 
 A row marked "cloned on read" keeps the cache but not its cost, since every
 read copies it (#859, A8 in #1158). It does not answer at the same cost, so a

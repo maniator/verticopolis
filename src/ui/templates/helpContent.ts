@@ -60,6 +60,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
         <li><b>Win.</b> At 5★ with a Metro station, build the <b>Wedding Hall</b> (28 tiles wide and five floors tall) on floor 100 and pass the VIP inspection. The <b>TOWER</b> rank needs 15,000 occupants: office workers, residents, and venue customers. Hotel guests don't count at this stage, even when dining.</li>
         <li><b>Parking</b> spaces only work when they touch a <b>Parking Ramp</b> or a connected space. Chain them off a ramp, or they sit empty. Offices want a space per ~24 workers (one per four offices) from 3★, and every hotel suite needs one of its own (the VIP drives).</li>
         <li><b>Book the films.</b> Cinemas book a film monthly. A <b>Blockbuster</b> costs twice as much but pulls a far bigger crowd (great in a busy tower, a money-loser in a quiet one). Leave it on <b>Auto</b> or set a policy on the cinema.</li>
+        <li><b>Find your way.</b> The <b>Map</b> window shows the whole tower, with a box around the part you're looking at. Click a spot on it to move the view there, or drag anywhere on it to slide the view. Close it with its ✕ and bring it back with the <b>Map</b> button.</li>
         <li><b>Price in bulk.</b> Inspect any office, condo or hotel room and use <b>“Set all …”</b> to re-price every unit of that kind at once (or reset them to the default). No need to edit each room. A preview shows how many change before you apply.</li>
         <li><b>The clock breathes.</b> As in 1994, real time isn't spent evenly: the clock crawls through the lunch crush (watch your elevators earn their keep) and races through the small hours. A full day still takes the same real time, and the speed buttons still multiply it. Prefer an even pace? Toggle <b>Steady clock</b> in Settings.</li>
         <li><b>If the game stops.</b> If the game engine crashes, the game reloads your tower from its last autosave. If it crashes again, the game stops and says so. Your saves stay on your device, and Reload tries again.</li>
@@ -82,6 +83,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
         <li><b>Size an elevator.</b> Drag up or down to set a shaft's height. Stairs and escalators place with a single tap.</li>
         <li><b>Move around.</b> Drag with <b>two fingers</b> to pan (or one finger with <b>Inspect</b> selected), and <b>pinch</b> to zoom.</li>
         <li><b>Peek at a room.</b> Press and hold a room (any tool) to read its card without opening it, the way a mouse hover does. Lift to close. A quick tap still does the armed tool's action: with <b>Inspect</b> it opens the full panel.</li>
+        <li><b>See the whole tower.</b> Tap the <b>Map</b> pill (bottom right) for a small map of the tower. Tap a spot on it to jump there, or drag anywhere on it to slide the view. Close it with its ✕.</li>
         <li><b>Edit or remove.</b> Tap a room with <b>Inspect</b> to open its panel; tap with <b>Bulldoze</b> to demolish it.</li>
         <li><b>Menus.</b> The build menu groups tools under category tabs, and a tab with a dot just gained new tools. The <b>menu</b> button (top bar) opens stats and the game menu, and the <b>Undo</b> button steps a change back.</li>
       </ul>
@@ -97,6 +99,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
         <li><kbd>Enter</kbd> / <kbd>Space</kbd> build (or inspect) at the cursor. For an elevator or stairway, press once to anchor and again at the far end to size the shaft</li>
         <li><kbd>Delete</kbd> / <kbd>Backspace</kbd> / <kbd>X</kbd> bulldoze at the cursor · <kbd>Esc</kbd> cancel</li>
         <li><kbd>+</kbd> / <kbd>−</kbd> zoom · <kbd>C</kbd> re-center · <kbd>0</kbd>–<kbd>3</kbd> game speed · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</li>
+        <li>On the <b>Map</b> (Tab to it): <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> move the view (hold <kbd>Shift</kbd> for a whole screen) · <kbd>Home</kbd> / <kbd>End</kbd> jump to the top or the bottom · <kbd>Esc</kbd> close</li>
       </ul>
     `,
   },

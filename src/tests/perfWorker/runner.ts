@@ -8,6 +8,7 @@ import { frameStats, quantile } from "../perfCompare/stats";
 import { simRun } from "../perfCompare/pageSim";
 import { launchOptions, type BrowserLaunch } from "../perfCompare/renderer";
 import { activeMode, engineMemory, framesRun, hostedRun, type ModeName } from "./pageWorker";
+import { checkMapSlot, storeMapSlot } from "./mapAb";
 
 /**
  * One repetition of one engine mode in a fresh browser process, for the
@@ -40,6 +41,8 @@ export interface WorkerConfig {
   quick: boolean;
   /** `--aa ts|wasm`: an A/A pass, the same mode in both slots ("ts" and "wasm"). Absent in results written before A/A passes existed. */
   aa?: "ts" | "wasm" | null;
+  /** `--map-ab` (mapAb.ts): slot "ts" runs with the Map closed and slot "wasm" with it open; `newContext` stores the slot's choice. Absent in earlier results. */
+  mapAb?: boolean;
 }
 
 export interface Startup {
@@ -98,10 +101,8 @@ export interface MemorySample {
   processPssBytes: number | null;
 }
 
-/** The bare engine (no host, no read model), timed in the TypeScript
- *  process for the TypeScript engine and in the step host's process for the
- *  WASM engine: perf:compare's raw pass, on the same steps as the hosted
- *  runs. */
+/** The bare engine (no host, no read model), timed in the TypeScript process for the TypeScript
+ *  engine and in the step host's process for the WASM engine: perf:compare's raw pass, on the same steps as the hosted runs. */
 export interface RawSummary {
   engine: "ts" | "wasm";
   totalMs: number;
@@ -143,7 +144,6 @@ export interface ModeRun {
 }
 
 const STEP_TIMEOUT_MS = 20 * 60 * 1000;
-
 async function within<T>(what: string, p: Promise<T>, ms = STEP_TIMEOUT_MS): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   try {
@@ -208,10 +208,11 @@ export function summarizeFrames(f: Awaited<ReturnType<typeof framesRun>>): Frame
   };
 }
 
-async function newContext(browser: Browser, config: WorkerConfig, serviceWorkers: "allow" | "block", onLoss: (line: string) => void): Promise<BrowserContext> {
+async function newContext(browser: Browser, config: WorkerConfig, serviceWorkers: "allow" | "block", onLoss: (line: string) => void, slot?: ModeName): Promise<BrowserContext> {
   const ctx = await browser.newContext({ viewport: config.viewport, deviceScaleFactor: 1, serviceWorkers });
   // See perfCompare/runner.ts: esbuild's keepNames helper the page lacks.
   await ctx.addInitScript({ content: "globalThis.__name = (fn) => fn;" });
+  if (slot) await storeMapSlot(ctx, config.mapAb, slot);
   await ctx.addInitScript(installProbes);
   await ctx.addInitScript(watchContextLoss);
   await trackContextLoss(ctx, onLoss);
@@ -343,11 +344,12 @@ export async function runMode(opts: RunnerOptions, rep: number, slot: ModeName, 
   try {
     browser = await chromium.launch(launchOptions(opts.executablePath, opts.launch));
     run.browserVersion = browser.version();
-    const ctx = await newContext(browser, config, "block", noteLoss);
+    const ctx = await newContext(browser, config, "block", noteLoss, slot);
     const page = await ctx.newPage();
     listen(page);
     const cdp = await ctx.newCDPSession(page);
     run.cold = await startup(page, server, mode, () => page.goto(url, { waitUntil: "commit" }));
+    await checkMapSlot(page, config.mapAb, slot);
     const info = await page.evaluate(pageInfo);
     run.page = { crossOriginIsolated: info.crossOriginIsolated, userAgent: info.userAgent, webgl: await ev(page, "renderer", webglRenderer, undefined) };
     run.warm = await startup(page, server, mode, () => page.reload({ waitUntil: "commit" }));
@@ -419,7 +421,7 @@ export async function runMode(opts: RunnerOptions, rep: number, slot: ModeName, 
     await ctx.close();
 
     if (slowRate > 1) {
-      const slow = await newContext(browser, config, "block", noteLoss);
+      const slow = await newContext(browser, config, "block", noteLoss, slot);
       const slowPage = await slow.newPage();
       listen(slowPage);
       const slowCdp = await slow.newCDPSession(slowPage);
@@ -428,6 +430,7 @@ export async function runMode(opts: RunnerOptions, rep: number, slot: ModeName, 
         await slowPage.goto(url, { waitUntil: "commit" });
         await throttle(slowCdp, slowRate);
       });
+      await checkMapSlot(slowPage, config.mapAb, slot);
       // The throttle held in this context too.
       run.cpuProbe.timed[`cold:${slowRate}`] = await ev(slowPage, "cpu probe", cpuProbe, undefined);
       run.rendererEndCold = (await ev(slowPage, "renderer after the cold start", webglRenderer, undefined))?.renderer ?? null;

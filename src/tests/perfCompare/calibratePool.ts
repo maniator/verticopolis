@@ -9,7 +9,7 @@ import type { CompareResults } from "./types";
  */
 
 export interface PoolPass {
-  config: { reps: number; scenarios: string[]; throttles: (number | string)[]; quick?: boolean; aa?: unknown };
+  config: { reps: number; scenarios: string[]; throttles: (number | string)[]; quick?: boolean; aa?: unknown; mapAb?: unknown };
   startedAt?: string;
   browser?: Partial<Pick<CompareResults["browser"], "version" | "executable" | "channel" | "args" | "rendererException" | "gpuVerified">>;
   runs?: { ok: boolean; page?: { webgl?: { renderer?: string | null } | null } | null; rendererEnd?: string | null; rendererEndCold?: string | null; contextLost?: string[] }[];
