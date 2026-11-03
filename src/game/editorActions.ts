@@ -1,5 +1,5 @@
 import { isElevatorKind, isHotelKind } from "../presentation/viewKinds";
-import { catalogFacility } from "../engine/catalogTypes";
+import { catalogFacility } from "../catalog/catalogTypes";
 import { priceOptionsFor } from "../ui/catalogPricing";
 import type { FacilityKind } from "../engine/types";
 import type { BatchRentResult } from "../engine/sim/constants";

@@ -1,5 +1,5 @@
 import type { LogEntry } from "../engine/types";
-import { catalogFacility, type Catalog } from "../engine/catalogTypes";
+import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";

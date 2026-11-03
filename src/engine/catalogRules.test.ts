@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 // The rules a frontend reads off the catalog instead of the engine's tables
 // (#921 part 2b): opening hours, households and the price ladder's rung.
 import { catalogFor } from "./catalog";
-import { catalogFacility, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor } from "./catalogTypes";
+import { catalogFacility, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor } from "../catalog/catalogTypes";
 import { residentCount } from "./census";
 import { ALL_KINDS, hasBusinessHours, isOpenAt } from "./facilities";
 import { householdPrice } from "./households";

@@ -1,5 +1,5 @@
-import { catalogFacility, type Catalog } from "../engine/catalogTypes";
-import { catalogOn, useTowerCatalogSource } from "../engine/towerCatalog";
+import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
+import { catalogOn, useTowerCatalogSource } from "../catalog/towerCatalog";
 import type { FacilityKind } from "../engine/types";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";

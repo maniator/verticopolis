@@ -1,4 +1,4 @@
-import { catalogFacility } from "../engine/catalogTypes";
+import { catalogFacility } from "../catalog/catalogTypes";
 import { clockOf } from "../simport/headerClock";
 import type { ViewReader } from "../simport/viewReader";
 import type { CardKit } from "./cardKit";

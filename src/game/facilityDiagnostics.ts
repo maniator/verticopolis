@@ -4,7 +4,7 @@ import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN } from "../engine/Simul
 import { SERVED_RECOVERY } from "../engine/sim/constants";
 import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
 import { isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } from "../presentation/viewKinds";
-import { catalogFacility, type Catalog } from "../engine/catalogTypes";
+import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
 import { isRentalKind } from "../engine/residentialRentals";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
 import { commercialLobbyLines, hotelRatingLines, parkingDisplayLines, retailDisplayLines } from "./portServiceDiagnostics";
@@ -14,7 +14,7 @@ import { gripeLineText, wontLeaseText } from "./gripeCopy";
 import { isOperational, isPresent } from "../engine/types";
 import { FAR_WALK_COPY, accessCopy, noRateCopy, lobbyWarningCopy, noticeCopy } from "../ui/tenantDiagnosticCopy";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
-import { towerCatalog } from "../engine/towerCatalog";
+import { towerCatalog } from "../catalog/towerCatalog";
 
 // The "Main gripe" phrasing lives in gripeCopy.ts (its own leaf: the
 // unmet-demand copy branches on live coverage, and this file sits against the

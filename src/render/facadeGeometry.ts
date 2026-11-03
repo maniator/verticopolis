@@ -1,4 +1,4 @@
-import { catalogFacility, type Catalog } from "../engine/catalogTypes";
+import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
 import type { UnitView } from "../simport/view";
 
 /** Left/right built extent of one above-ground floor row, in tile columns

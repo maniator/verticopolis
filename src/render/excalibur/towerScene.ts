@@ -24,7 +24,7 @@ import { FLOOR, TILE } from "../scale";
 import * as overlayFx from "./towerOverlay";
 import * as crowd from "./towerCrowd";
 import type { TowerEngine } from "./TowerEngine";
-import { towerCatalog } from "../../engine/towerCatalog";
+import { towerCatalog } from "../../catalog/towerCatalog";
 
 /**
  * Static scene construction, shared-graphics baking, the sky-layer painters

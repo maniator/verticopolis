@@ -3,7 +3,7 @@ import { Z } from "../depthPlanes";
 import { coveredUpperStories, lotCovered, lobbyLaneSpan } from "./towerCrowdLayout";
 import { FLOOR } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
-import { towerCatalog } from "../../engine/towerCatalog";
+import { towerCatalog } from "../../catalog/towerCatalog";
 
 /**
  * Construction of the ambient walker population: the structural runs a tower's

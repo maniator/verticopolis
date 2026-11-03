@@ -1,8 +1,8 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
 import { isElevatorKind } from "../../presentation/viewKinds";
-import { catalogFacility } from "../../engine/catalogTypes";
-import { towerCatalog } from "../../engine/towerCatalog";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { towerCatalog } from "../../catalog/towerCatalog";
 import type { FacilityKind } from "../../engine/types";
 import { isOperational } from "../../engine/types";
 import { drawCar, drawGarbageTruck, drawStreetCar } from "../sprites";

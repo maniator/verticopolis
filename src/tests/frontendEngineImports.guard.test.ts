@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { repoRel, repoRoot, sourceFiles } from "./guardFiles";
@@ -17,8 +17,8 @@ import { isTestFile, resolveRelative, scanRuntimeImports } from "./importScan";
  * except the engine, the test tree and the host and save code (see
  * {@link NOT_FRONTEND}), so a new directory or entry page is scanned without
  * anyone listing it. It pins, in `frontendEngineImports.ratchet.txt`, which
- * engine modules each file imports at runtime, leaving out the catalog handle
- * ({@link CATALOG_HANDLE}).
+ * engine modules each file imports at runtime. The catalog handle lives in
+ * `src/catalog/`, outside the engine, and is not counted.
  *
  * An import counts the way the retirement inventory counts it (the rules are
  * in `importScan.ts`, which the `Simulation` reach guard shares): type-only
@@ -47,13 +47,6 @@ const here = dirname(fileURLToPath(import.meta.url));
  *  the host and save code (`src/wasmhost/`, `src/dualrun/`, `src/storage/`),
  *  whose engine imports the retirement inventory's own tables cover. */
 const NOT_FRONTEND = ["src/engine/", "src/tests/", "src/wasmhost/", "src/dualrun/", "src/storage/"] as const;
-
-/** The catalog handle (#921): how the frontend reads the catalog, from
- *  whichever engine runs the tower. The inventory moves it out of
- *  `src/engine/` before retirement rather than deleting it, so its imports
- *  are not counted. When it moves, the check below fails; delete this list. */
-const CATALOG_HANDLE = ["towerCatalog", "catalogTypes"] as const;
-const counted = (mod: string): boolean => !(CATALOG_HANDLE as readonly string[]).includes(mod);
 
 /** The engine module a relative specifier names from `rel`, as its path under
  *  `src/engine/` without query or extension (`index` for the directory
@@ -158,15 +151,6 @@ describe("the frontend's runtime imports of src/engine/", () => {
     expect(runtimeEngineImports("src/ui/sample.ts", "const name = 'x';\nawait import(`../engine/${name}`);").unreadable).toEqual(["src/ui/sample.ts:2"]);
   });
 
-  it("leaves out the catalog handle while it lives in src/engine/", () => {
-    for (const mod of CATALOG_HANDLE) expect(existsSync(resolve(repoRoot, "src/engine", `${mod}.ts`)), mod).toBe(true);
-    // The handle reaches the TypeScript tables only through its default source.
-    const handleImports = (mod: string) => runtimeEngineImports(`src/engine/${mod}.ts`, readFileSync(resolve(repoRoot, "src/engine", `${mod}.ts`), "utf8")).modules;
-    expect(handleImports("catalogTypes")).toEqual([]);
-    expect(handleImports("towerCatalog")).toEqual(["catalog"]);
-    expect(["towerCatalog", "catalogTypes", "facilities"].filter(counted)).toEqual(["facilities"]);
-  });
-
   it("every dynamic import in the frontend names its module", () => {
     const unreadable = [...scans.values()].flatMap((s) => s.unreadable);
     expect(unreadable, `The guard cannot tell what these import; give import(), the URL or the glob a string literal:\n${unreadable.join("\n")}`).toEqual([]);
@@ -176,7 +160,7 @@ describe("the frontend's runtime imports of src/engine/", () => {
     const grown: string[] = [];
     for (const [rel, { modules }] of scans) {
       const allowed = ratchet.get(rel) ?? new Set<string>();
-      for (const mod of modules) if (counted(mod) && !allowed.has(mod)) grown.push(`${rel}: ${mod}`);
+      for (const mod of modules) if (!allowed.has(mod)) grown.push(`${rel}: ${mod}`);
     }
     expect(
       grown,
@@ -189,7 +173,7 @@ describe("the frontend's runtime imports of src/engine/", () => {
   it("the ratchet has no stale entries", () => {
     const stale: string[] = [];
     for (const [rel, allowed] of ratchet) {
-      const mods = new Set((scans.get(rel)?.modules ?? []).filter(counted));
+      const mods = new Set(scans.get(rel)?.modules ?? []);
       for (const mod of allowed) if (!mods.has(mod)) stale.push(`${rel}: ${mod}`);
     }
     expect(stale, `Delete these from frontendEngineImports.ratchet.txt (a file's line goes when it names nothing):\n${stale.join("\n")}`).toEqual([]);

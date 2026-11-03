@@ -1,7 +1,7 @@
 import { trackAppAction } from "../analytics";
 import { wellFormed } from "../engine/wellFormed";
 import type { UICallbacks, Tool } from "../ui/UI";
-import type { Catalog } from "../engine/catalogTypes";
+import type { Catalog } from "../catalog/catalogTypes";
 import type { GameMode } from "../engine/types";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";

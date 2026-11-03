@@ -1,4 +1,4 @@
-import type { Catalog } from "./catalogTypes";
+import type { Catalog } from "../catalog/catalogTypes";
 import type { FacilityKind } from "./types";
 
 /**
