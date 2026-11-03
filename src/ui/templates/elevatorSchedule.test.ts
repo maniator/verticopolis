@@ -47,6 +47,7 @@ const ctx = (over: Partial<SchedCtx> = {}): SchedCtx => ({
   cars: 4,
   hasMeasured: true,
   canTune: true,
+  tuneStatus: "available",
   recommended: "rush",
   ...over,
 });
@@ -106,12 +107,26 @@ describe("elevatorScheduleTemplate: Classic vs Modern shape", () => {
 
   it("marks the recommended preset and disables Auto-tune before the shaft warms up", () => {
     const frag = renderToFragment(
-      elevatorScheduleTemplate(ctx({ hasMeasured: false, canTune: false, recommended: "feeder" }), state(), noop),
+      elevatorScheduleTemplate(ctx({ hasMeasured: false, canTune: false, tuneStatus: "insufficient-data", recommended: "feeder" }), state(), noop),
     );
     const rec = frag.querySelector(".es-presets .es-rec")!;
     expect(rec.textContent).toBe("Feeder");
     expect(frag.querySelector<HTMLButtonElement>(".es-autotune")!.disabled).toBe(true);
     expect(frag.textContent).toContain("Auto-tune needs a day or two of measured traffic first.");
+  });
+
+  it("gives the wait hint only for the reason waiting fixes", () => {
+    const hint = (tuneStatus: SchedCtx["tuneStatus"]): string =>
+      Array.from(renderToFragment(elevatorScheduleTemplate(ctx({ canTune: false, tuneStatus }), state(), noop)).querySelectorAll(".es-hint"))
+        .map((el) => el.textContent ?? "")
+        .filter((text) => /Auto-tune|no cars/.test(text))
+        .join("");
+    expect(hint("insufficient-data")).toBe("Auto-tune needs a day or two of measured traffic first.");
+    expect(hint("no-cars")).toBe("This shaft has no cars to tune.");
+    for (const status of ["unavailable-in-mode", "not-an-elevator", "missing-shaft", "invalid-draft"] as const) {
+      expect(hint(status), status).toBe("");
+    }
+    expect(hint("available")).toBe("");
   });
 });
 
