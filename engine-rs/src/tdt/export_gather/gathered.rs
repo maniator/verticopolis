@@ -59,6 +59,8 @@ pub struct ExportCounts {
     pub burned_out: i64,
     pub vacancy_history_lost: i64,
     pub out_of_range: i64,
+    /// Shops, restaurants and fast food past the 512 rows the file keeps their styles in.
+    pub retail_rows_dropped: i64,
 }
 
 /// The header aggregate counts the 1994 game trusts.

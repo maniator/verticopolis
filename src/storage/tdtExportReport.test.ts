@@ -17,6 +17,7 @@ const COUNTS: ExportCounts = {
   burnedOut: 0,
   vacancyHistoryLost: 0,
   outOfRange: 0,
+  retailRowsDropped: 0,
 };
 
 const STATS: EncodeStats = {
@@ -98,6 +99,7 @@ describe("exportReport", () => {
             burnedOut: 2,
             vacancyHistoryLost: 2,
             outOfRange: 2,
+            retailRowsDropped: 2,
             namesDropped: 2,
             rentsSnapped: 2,
           },
@@ -116,6 +118,7 @@ describe("exportReport", () => {
       "rebuild them in 1994",
       "2 vacant rooms lose their rental history",
       "2 rooms sit outside the floors",
+      "2 shops, restaurants or fast food places past the first 512 style rows",
       "2 elevator shafts past 1994's 24-shaft limit",
       "2 transports overlap a neighbor",
       "2 stairway/escalator flights past 1994's 64-slot table",
@@ -133,6 +136,7 @@ describe("exportReport", () => {
             burnedOut: 1,
             vacancyHistoryLost: 1,
             outOfRange: 1,
+            retailRowsDropped: 1,
             namesDropped: 1,
             rentsSnapped: 1,
           },
@@ -150,6 +154,7 @@ describe("exportReport", () => {
       "rebuild it in 1994",
       "1 vacant room loses its rental history",
       "1 room sits outside",
+      "1 shop, restaurant or fast food place past the first 512 style rows",
       "1 elevator shaft past",
       "1 transport overlaps a neighbor",
       "1 stairway/escalator flight past",

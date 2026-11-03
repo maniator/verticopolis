@@ -3,7 +3,7 @@
 //! deterministic layout synthesized from the floor map when the save's
 //! transport blocks cannot be read.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use serde_json::{json, Value};
 
@@ -208,15 +208,27 @@ pub fn transports_from_decoded(
 /// order the importer's paving map is filled in).
 pub type BuiltExtents = BTreeMap<i64, (i64, i64)>;
 
+/// The fallback layout and the shafts it had no safe column for.
+pub struct Synthesized {
+    pub transports: Vec<OutTransport>,
+    /// Shafts left out because every column held a room or an earlier shaft on
+    /// a floor they serve; a shaft over a room would be an invalid tower.
+    pub left_out: i64,
+}
+
 /// `synthesizeTransports`: the fallback layout from the floor map alone.
 pub fn synthesize_transports(
     built_extents: &BuiltExtents,
+    claimed: &HashMap<i64, Vec<u8>>,
     hotel_floors: &[i64],
     staff_floors: &[i64],
     first_id: i64,
-) -> Vec<OutTransport> {
+) -> Synthesized {
     if built_extents.is_empty() {
-        return vec![];
+        return Synthesized {
+            transports: vec![],
+            left_out: 0,
+        };
     }
     let mut bottom = i64::MAX;
     let mut top = i64::MIN;
@@ -302,14 +314,40 @@ pub fn synthesize_transports(
     let mut x = round(center as f64 - total_width as f64 / 2.0)
         .min((LOT_WIDTH - total_width) as f64)
         .max(0.0) as i64;
-    let mut transports = vec![];
+    let mut transports: Vec<OutTransport> = vec![];
+    let mut left_out = 0;
     for s in specs {
         let width = s.kind.facility().width;
         let cars = 8;
+        // The strip of shafts goes where the tower's middle is. A shaft whose
+        // column holds a room, or another shaft, moves to the nearest column
+        // that is free over every floor it serves; with none free it is left out.
+        let free = |at: i64| {
+            at >= 0
+                && at + width <= LOT_WIDTH
+                && !(s.bottom..=s.top).any(|floor| {
+                    claimed.get(&floor).is_some_and(|row| {
+                        row[at as usize..(at + width) as usize]
+                            .iter()
+                            .any(|&c| c != 0)
+                    })
+                })
+                && !transports.iter().any(|t| {
+                    at < t.x + t.width && t.x < at + width && s.bottom <= t.top && t.bottom <= s.top
+                })
+        };
+        let placed = (0..=LOT_WIDTH)
+            .flat_map(|step| [x + step, x - step])
+            .find(|&at| free(at));
+        x += width;
+        let Some(placed) = placed else {
+            left_out += 1;
+            continue;
+        };
         transports.push(OutTransport {
             id: first_id + transports.len() as i64,
             kind: s.kind,
-            x,
+            x: placed,
             width,
             bottom: s.bottom,
             top: s.top,
@@ -317,7 +355,9 @@ pub fn synthesize_transports(
             car_positions: (0..cars).map(|i| (s.bottom + i).min(s.top)).collect(),
             skip_floors: s.skip_floors,
         });
-        x += width;
     }
-    transports
+    Synthesized {
+        transports,
+        left_out,
+    }
 }

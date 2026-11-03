@@ -40,6 +40,7 @@ use serde_json::Value;
 use super::export_tables::{class_from_rent, kind_tenant, part_stack, OutTenant};
 use super::format::{
     population_class, TDT_FLOOR_OFFSET, TDT_POPULATION_CLASSES as POPULATION_CLASSES,
+    TDT_RETAIL_SLOTS,
 };
 use super::tables::{
     is_priced, rent_from_class, HOTEL_ASLEEP_FLAG, HOTEL_DIRTY_FLAG, HOTEL_OCCUPANT_MASK,
@@ -313,10 +314,12 @@ pub fn gather_units<U: Borrow<Value>>(
                 subtype_idx: if sub_idx >= 0 { Some(sub_idx) } else { None },
             },
         );
-        if matches!(u.kind, Kind::Shop | Kind::FastFood | Kind::Restaurant)
-            && retail_rows.len() < 512
-        {
-            retail_rows.push((u.floor + TDT_FLOOR_OFFSET as f64, sub_idx.max(0)));
+        if matches!(u.kind, Kind::Shop | Kind::FastFood | Kind::Restaurant) {
+            if retail_rows.len() < TDT_RETAIL_SLOTS {
+                retail_rows.push((u.floor + TDT_FLOOR_OFFSET as f64, sub_idx.max(0)));
+            } else {
+                counts.retail_rows_dropped += 1;
+            }
         }
         counts.rooms += 1;
     }

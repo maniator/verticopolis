@@ -21,6 +21,8 @@ export interface ExportCounts {
   burnedOut: number;
   vacancyHistoryLost: number;
   outOfRange: number;
+  /** Shops, restaurants and fast food past the 512 style rows a 1994 file holds. */
+  retailRowsDropped: number;
 }
 
 /** Numbers the report reads from the encode pass (header money/star + the
@@ -97,6 +99,11 @@ export function exportReport(facts: ExportReportFacts): ExportReport {
   if (counts.outOfRange > 0) {
     staysBehind.push(
       `${counts.outOfRange} room${counts.outOfRange === 1 ? " sits" : "s sit"} outside the floors a 1994 save can hold and stayed behind.`,
+    );
+  }
+  if (counts.retailRowsDropped > 0) {
+    staysBehind.push(
+      `${counts.retailRowsDropped} ${counts.retailRowsDropped === 1 ? "shop, restaurant or fast food place" : "shops, restaurants or fast food places"} past the first 512 style rows a 1994 file holds will open with the default style.`,
     );
   }
   if (stats.shaftsDropped > 0) {

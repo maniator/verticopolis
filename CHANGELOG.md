@@ -21,6 +21,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.78.1
+
+- Exporting a tower with more than 512 shops, restaurants and fast food places now says how many will open with the default style in SimTower.
+- A SimTower save whose elevators cannot be read now gets rebuilt shafts that stand clear of its rooms.
+
 ## 2.78.0
 
 - Shops, restaurants and other venues more than two floors from a lobby warn again that their traffic is halved, in the hover card and the phone editor.
