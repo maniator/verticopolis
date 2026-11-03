@@ -19,6 +19,17 @@ export function swapDone(port: Pick<EnginePort, "lastReason">, rec: PortRecord):
   if (rec[0] !== 1) throw new Error(port.lastReason() ?? SWAP_REFUSED);
 }
 
+/** The engine's refusal of a save from a newer build (engine-rs
+ *  `NEWER_SAVE_REFUSAL`; a test pins the two together). */
+export const NEWER_SAVE_REFUSAL = "This save was made by a newer version of Verticopolis. Update the game to load it.";
+
+/** Whether the engine's last refusal was a save from a newer build, so the
+ *  page can say "update the game" and not "corrupt". Call it right after the
+ *  load that refused. */
+export function newerSaveRefused(port: Pick<EnginePort, "lastReason">): boolean {
+  return port.lastReason() === NEWER_SAVE_REFUSAL;
+}
+
 /** Why no save is written once the running engine trapped. */
 export const TRAPPED_SAVE_REFUSED = "The engine stopped after an error, so the last save is kept.";
 
