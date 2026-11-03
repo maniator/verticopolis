@@ -66,6 +66,7 @@ an event sent before boot carries `version` only.
 | `first_build` | `tool` | First facility in a tower | Funnel: did they build anything |
 | `tool_used` | `tool` | First use of each tool in a session | Tool mix |
 | `star_reached` | `star` | Each star rung crossed | Progression depth |
+| `milestone_reached` | `id` | An optional milestone is achieved (from the engine's event) | Which goals players reach, beyond stars |
 | `session_end` | `seconds`, `final` | Every tab hide and page hide | Session length, read only through the `session_lengths` view |
 | `boot` | `reason`, `version`, `mode`, `star`, `floors`, `population` | Once per page life | Why a session started and the tower it opened |
 | `crash` | `kind`, `repeat`, `recoveryFailed`, `saveFlushed`, `behindSplash`, `version`, `star`, `population` | A crash screen | Crash reliability |

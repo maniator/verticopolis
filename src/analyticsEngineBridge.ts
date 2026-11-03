@@ -165,7 +165,8 @@ function fold(event: GameplayEvent, now: number): void {
       // The engine's sellAt reports one too; no player path calls it.
       if (allowRemoval(now)) trackEconomyAction("demolish", event.payload.method);
       return;
-    case "milestone_reached": // reaches the wire in migration step 3
+    case "milestone_reached":
+      if (allowSend("milestone_reached", now)) gameplaySession.noteMilestone(event.payload.id);
       return;
     default: {
       // A catalog event with no case here fails the typecheck.
