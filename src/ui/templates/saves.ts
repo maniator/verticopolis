@@ -30,9 +30,10 @@ export function savesTemplate(slots: SlotInfo[], keptUnreadable = false): Templa
 }
 
 /** An autosave this version couldn't read is kept aside (SaveGame.preserveUnreadable).
- *  The player can download its text as it is stored, for a later version or a bug report. */
+ *  The player can download it, and a save from a newer version imports from
+ *  that file once the game is updated. */
 const keptUnreadableNote = html`<p class="slot-detail slot-unreadable">
-    An autosave this version couldn't read is kept.
+    An autosave this version couldn't read is kept. If a newer version of the game wrote it, update the game, then use Import from file.
     <button class="btn" data-act="unreadable">Download unreadable save</button>
   </p>`;
 

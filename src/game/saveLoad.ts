@@ -10,7 +10,7 @@ import { shouldArm } from "../ui/Onboarding";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
-import { SWAP_REFUSED, loadStored, saveText, stampCamera, swapDone } from "./portLifecycle";
+import { NEWER_SAVE_REFUSAL, SWAP_REFUSED, loadStored, newerSaveRefused, saveText, stampCamera, swapDone } from "./portLifecycle";
 import { exportFacts, importFacts } from "../simport/tdtRecords";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import type { UI } from "../ui/UI";
@@ -338,11 +338,19 @@ export class SaveLoad {
   }
 
   load(): void {
-    if (SaveGame.load(loadStored(this.deps.enginePort()))) {
+    const port = this.deps.enginePort();
+    const swap = loadStored(port);
+    let newer = false;
+    const loaded = SaveGame.load((text) => {
+      const ok = swap(text);
+      if (!ok && newerSaveRefused(port)) newer = true;
+      return ok;
+    });
+    if (loaded) {
       this.deps.towerSwapped();
       this.deps.ui.toast("Tower loaded.", "good");
     } else {
-      this.deps.ui.toast("No saved tower found.", "bad");
+      this.deps.ui.toast(newer ? NEWER_SAVE_REFUSAL : "No saved tower found.", "bad");
     }
   }
 

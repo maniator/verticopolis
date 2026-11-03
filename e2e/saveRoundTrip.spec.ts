@@ -162,6 +162,7 @@ test("an unreadable autosave is kept, not overwritten, and downloads as it was s
   // The kept text downloads from Saved Towers exactly as it was stored.
   await page.evaluate(() => (window as any).game.showSaves());
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download unreadable save" }).click()]);
-  expect(download.suggestedFilename()).toBe("verticopolis-unreadable-save.txt");
+  // Text that starts like a tower file is named as one, so Import from file takes it after an update.
+  expect(download.suggestedFilename()).toBe("verticopolis-unreadable-save.vctower");
   expect(readFileSync((await download.path())!, "utf8")).toBe(unreadable);
 });
