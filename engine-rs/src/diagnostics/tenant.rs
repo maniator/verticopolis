@@ -198,10 +198,11 @@ impl Simulation {
         }
         f.wont_lease = self.wont_lease(u, &mut served_floor, &mut reaches, &mut at_unit);
         if u.state == UnitState::Vacating {
-            if let Some(reason) = u.vacate_reason {
+            if let Some(reason) = u.extras().vacate_reason {
                 f.notice = Some(NoticeFacts {
                     reason,
-                    minutes_left: (u.vacate_at.unwrap_or(0.0) - self.clock.minutes).max(0.0),
+                    minutes_left: (u.extras().vacate_at.unwrap_or(0.0) - self.clock.minutes)
+                        .max(0.0),
                     satisfaction: u.satisfaction,
                     keep_at: VACATE_RESCIND,
                 });

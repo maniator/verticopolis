@@ -9,7 +9,7 @@ use super::source_scan_tests::{
 use super::unit_scan_tests::{new_list_aside, top_level, unit_writes};
 use super::write_cases_tests::{MORE_WRITES, WRITES};
 use crate::frame::unit_fields;
-use crate::tower::{RetailTally, Unit};
+use crate::tower::{Extras, Unit};
 
 /// The frame fields and the census share read no field but the six the
 /// setters mark and the kind, which no engine code writes in place
@@ -43,14 +43,8 @@ fn the_frame_and_the_census_read_only_marked_fields() {
             rent,
             no_rate,
             label,
-            vacate_reason,
-            vacate_at,
-            film_policy,
             subtype,
-            retail,
-            complete_at,
-            complete_at_raw,
-            dirty_days,
+            extras,
         } = &mut v;
         let other = |s: Option<&'static str>| Some(if s == Some("a") { "b" } else { "a" });
         *id += 1;
@@ -63,17 +57,22 @@ fn the_frame_and_the_census_read_only_marked_fields() {
         *rent = Some(rent.unwrap_or(0.0) + 7.0);
         *no_rate = !*no_rate;
         label.push('x');
-        *vacate_reason = other(*vacate_reason);
-        *vacate_at = Some(vacate_at.unwrap_or(0.0) + 1.0);
-        *film_policy = other(*film_policy);
         *subtype = other(*subtype);
-        *retail = Some(Box::new(RetailTally {
-            patronage_today: Some(1.0),
-            ..retail.as_deref().copied().unwrap_or_default()
+        // Every extra is changed from its own value, and the literal names
+        // each one, so a new field fails to compile here until it is sorted.
+        let old = extras.as_deref().cloned().unwrap_or_default();
+        *extras = Some(Box::new(Extras {
+            vacate_reason: other(old.vacate_reason),
+            vacate_at: Some(old.vacate_at.unwrap_or(0.0) + 1.0),
+            film_policy: other(old.film_policy),
+            patronage_today: Some(old.patronage_today.unwrap_or(0.0) + 1.0),
+            patronage_yest: Some(old.patronage_yest.unwrap_or(0.0) + 1.0),
+            profit_today: Some(old.profit_today.unwrap_or(0.0) + 1.0),
+            profit_yest: Some(old.profit_yest.unwrap_or(0.0) + 1.0),
+            complete_at: Some(old.complete_at.unwrap_or(0.0) + 1.0),
+            complete_at_raw: Some(serde_json::json!(format!("{:?}!", old.complete_at_raw))),
+            dirty_days: Some(old.dirty_days.unwrap_or(0) + 1),
         }));
-        *complete_at = Some(complete_at.unwrap_or(0.0) + 1.0);
-        *complete_at_raw = Some(Box::new(serde_json::json!(format!("{complete_at_raw:?}!"))));
-        *dirty_days = Some(dirty_days.unwrap_or(0) + 1);
         let bits = |u: &Unit| unit_fields(u).map(f64::to_bits);
         assert_eq!(bits(&v), bits(u), "unit {}", u.id);
         assert_eq!(v.census_share(), u.census_share(), "unit {}", u.id);

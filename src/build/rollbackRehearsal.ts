@@ -35,6 +35,8 @@ export interface DiffEntry {
   count: number;
   /** The first place, with its real indices and a short preview of both values. */
   example: string;
+  /** For a `changed` list-length entry: how many elements the lists lost in total, summed over the places that came back shorter. */
+  removed?: number;
 }
 
 /** A difference the owner accepted, tied to an entry of the exception register. */
@@ -90,7 +92,12 @@ export function diffSaves(before: unknown, after: unknown): DiffEntry[] {
   const walk = (a: unknown, b: unknown, path: string, where: string, depth: number): void => {
     if (depth > MAX_DEPTH) throw new Error(`save nests deeper than ${MAX_DEPTH} levels at ${where}`);
     if (Array.isArray(a) && Array.isArray(b)) {
-      if (a.length !== b.length) note("changed", `${path}[] length`, where, a.length, b.length);
+      if (a.length !== b.length) {
+        note("changed", `${path}[] length`, where, a.length, b.length);
+        // Counted in elements lost, over every place: the entry's example is only the first place, and an earlier growth must not hide a later shrink.
+        const entry = found.get(`changed ${path}[] length`);
+        if (entry && b.length < a.length) entry.removed = (entry.removed ?? 0) + (a.length - b.length);
+      }
       for (let i = 0; i < Math.min(a.length, b.length); i++) walk(a[i], b[i], `${path}[]`, `${where}[${i}]`, depth + 1);
       return;
     }

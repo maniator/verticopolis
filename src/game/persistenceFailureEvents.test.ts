@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SaveGame } from "../storage/SaveGame";
 import { SaveLoad, type SaveLoadDeps } from "./saveLoad";
 import { trackAppAction, trackAppActionOnce } from "../analytics";
+import { NEWER_SAVE_REFUSAL } from "./portLifecycle";
 
 /**
  * The persistence failure signals of the 3.0 reliability gate (#1533): a save,
@@ -105,5 +106,17 @@ describe("a refused import reports import_failed", () => {
     await load.importLegacy(new ArrayBuffer(4), "tiny.TDT");
     expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("import_failed", "tdt");
     expect(ui.toast).toHaveBeenCalledWith("too small", "bad");
+  });
+});
+
+describe("Quick Load of a save a newer build wrote", () => {
+  it("says to update the game, and keeps the plain message for no save at all", () => {
+    localStorage.clear();
+    const { load, ui } = makeLoad({ loadSave: () => [0], lastReason: () => NEWER_SAVE_REFUSAL });
+    load.load();
+    expect(ui.toast).toHaveBeenLastCalledWith("No saved tower found.", "bad");
+    localStorage.setItem("verticopolis-save", SaveGame.packSync("{}"));
+    load.load();
+    expect(ui.toast).toHaveBeenLastCalledWith(NEWER_SAVE_REFUSAL, "bad");
   });
 });

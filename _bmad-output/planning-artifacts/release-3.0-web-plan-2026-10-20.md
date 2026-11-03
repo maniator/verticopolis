@@ -2,6 +2,8 @@
 
 > **Superseded in part by Rust-only (2026-10-30).** The owner decided that the Rust engine is the only engine players run: since app 2.66.0 and engine crate 1.0.0 every deploy is the wasm-only build. This document is a dated snapshot and is not rewritten. Where it describes the switchable default build, the staged cohort (stages 0 to 3 and their 0/10/25/50% shares), the 300 and 1,000 session gates, the Settings engine choice or the TypeScript fallback, read those as replaced by [`release-3.0-rust-only-2026-10-30.md`](release-3.0-rust-only-2026-10-30.md). #945 stays open as the owner's release gate.
 
+> **Corrected 2026-11-03: the rate is not a lower bound.** Where this plan calls the reliability rate a lower bound (sections 1.3.4 and 4.1, risk R21, and the "lower-bound caveat" in section 14), read: the fault count is a lower bound; the rate is an observed, coverage-limited rate with unknown bias, since sessions that never report can sit in the numerator or the denominator; the exact 95% bound holds for the observed sample only. See `docs/analytics-measurement-status.md`. The original text is kept.
+
 > **Snapshot, written 2026-10-20 against `main` at `8f3a143` (app 2.35.0),
 > revised the same day after its adversarial review (section 14), after
 > the owner's decisions (section 12), and after the owner's evening direction
@@ -359,7 +361,7 @@ shows a true rate below the bound.
 Zero failures in 1,000 bounds the rate at about 0.30%. It does not show the
 rate is under 0.1%; that takes about 2,995 clean sessions. The bound is also
 optimistic, since sessions from one device are not independent, and the rate
-is a lower bound, since the relay keeps no offline queue (4.1).
+is a lower bound, since the relay keeps no offline queue (4.1). [Corrected 2026-11-03: the count is the lower bound; the rate is observed and coverage-limited, with unknown bias. See the banner.]
 
 Under the analytics packet (1.3.9, item 1) the report prints four lines: the
 gate's bound over engaged eligible sessions; the all-attempts safety line,
@@ -930,7 +932,7 @@ A1, runtime reasons with A3.
   Either way it is a governed source before anyone publishes a rate.
 - **What it cannot see.** The relay is best-effort with no offline queue, so a
   fallback in an offline session or a tab that is killed never reports: the
-  rate is a lower bound, and the report says so. Sessions are not independent
+  rate is a lower bound, and the report says so. [Corrected 2026-11-03: the fault count is a lower bound; the rate is observed and coverage-limited, with unknown bias, and the report says that. See the banner.] Sessions are not independent
   (a device that traps once may trap every time), so the bound is optimistic;
   triage looks for repeats by reason and build.
 - #841 (crash loops lose magnitude once capped) is checked against the new
@@ -1949,7 +1951,7 @@ with its evidence.
 | R18 | The version queue (rendering stack plus player-facing PRs) causes repeated conflicts | High | Hours | Two PRs holding one version | Bump just before the final review, re-bump on rebase (9.7) | Each PR's author |
 | R19 | S4 slips, so the cohort's early stages start late; the reliability clock starts at stage 3, so the slip delays it only if stage 2 is still short of its floor when stage 3's other conditions hold | Medium | Weeks | #1062 not merged when A1 deploys, or #874 without a draft PR a week after both A1 has deployed and #1062 has merged | B1 is WS-B's first code step, and A1 and #902's draft proceed meanwhile; nothing in WS-A merges ahead of #874 except A1 and docs-only specs; the recovered #1059 code shortens it | WS-A |
 | R20 | The replay window miscounts (a manual run cancels a night, or an infrastructure failure reads as green) | Medium | Trust | A ledger date with no scheduled run | B2's run hygiene; the ledger | WS-B |
-| R21 | The reliability rate understates real fallbacks | Medium | Trust | Fallbacks in host status that never reach analytics | Stated as a lower bound; triage by repeat, reason and build | WS-A |
+| R21 | The reliability rate understates real fallbacks | Medium | Trust | Fallbacks in host status that never reach analytics | Stated as a lower bound; [Corrected 2026-11-03: the count is stated as a lower bound and the rate as coverage-limited with unknown bias]; triage by repeat, reason and build | WS-A |
 | R22 | The reliability tail keeps restarting, since every tail fix and every host-path merge restarts it | Medium | Weeks | A second candidate deploy | Triage fast and batch tail fixes; the tail's paths wait like the key's, under the freeze guard (4.1, 4.2); the owner may waive a restart for a change outside engine behavior | WS-A, owner |
 | R23 | A stage moves on past a stop signal, or a drop-back waits on an approval while players hit it | Low to medium | Player-visible | A latch-off or a repeated fallback in a live stage | Stop signals in A1's report hold the stage; the coordinator asks the owner at once, and he approves each drop-back (no pre-approval, 1.2) | WS-A, owner |
 

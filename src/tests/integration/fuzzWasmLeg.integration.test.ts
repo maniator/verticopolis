@@ -1,7 +1,7 @@
 /**
  * The seeded differential's WASM leg (`scripts/fuzz-compare.ts --wasm`): the
  * shipped build, driven through the binding in Node, must produce the same
- * checkpoints and the same detail record (money, log, every save field) as
+ * checkpoints and the same detail record (money, log, every save field, fx slots) as
  * the TypeScript engine on the same scenario. The Rust fuzzer writes the
  * native record the nightly compares against, so this pins the third runner's
  * adapter: a wrong detail field here would read as a wasm32 divergence on a

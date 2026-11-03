@@ -7,7 +7,7 @@ import { trackAppAction, trackAppActionOnce } from "../analytics";
 import { outcome } from "../simport/portCodes";
 import { statsReport } from "../simport/statsSheet";
 import { catalogOf } from "./portAccess";
-import { loadStored, saveText } from "./portLifecycle";
+import { NEWER_SAVE_REFUSAL, loadStored, newerSaveRefused, saveText } from "./portLifecycle";
 
 /**
  * The tower-statistics modal, its exterminator action, and the manual save-slot
@@ -147,13 +147,19 @@ export function saveToSlot(app: GameApp, slot: number): void {
 /** Load a manual slot (or the autosave) and adopt it as the live tower. */
 export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
   // The engine loads the save and the app follows the swap.
-  const load = loadStored(app.enginePort, () => app.followSwap());
+  const swap = loadStored(app.enginePort, () => app.followSwap());
+  let newer = false;
+  const load = (text: string): boolean => {
+    const loaded = swap(text);
+    if (!loaded && newerSaveRefused(app.enginePort)) newer = true;
+    return loaded;
+  };
   if (slot === "auto" ? SaveGame.load(load) : SaveGame.loadSlot(slot, load)) {
     trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
     app.ui.toast("Tower loaded.", "good");
   } else {
     trackAppAction("load_failed");
-    app.ui.toast("That slot is empty or corrupt.", "bad");
+    app.ui.toast(newer ? NEWER_SAVE_REFUSAL : "That slot is empty or corrupt.", "bad");
   }
 }
 

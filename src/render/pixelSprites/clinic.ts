@@ -1,6 +1,5 @@
-import { visibleOccupants } from "../../engine/Crowd";
 import type { UnitView } from "../../simport/view";
-import { castShadow, hash, personSeated, personStanding, shade, shell, type RoomCtx } from "./common";
+import { castShadow, hash, personSeated, personStanding, roomOccupants, shade, shell, type RoomCtx } from "./common";
 import { layerBreak } from "./layers";
 
 /**
@@ -189,7 +188,7 @@ export function clinic(d: RoomCtx, u: UnitView, x: number, y: number, w: number,
   const floorY = shell(ctx, x, y, w, h, look.wall, look.floor);
   const top = clinicalBand(ctx, x, y, w, look.accent);
   layerBreak(ctx); // the shell ends; the practice's equipment and patients follow
-  const occ = visibleOccupants(u);
+  const occ = roomOccupants(u);
   const seed = figureSeed(u);
   switch (look.practice) {
     case "dental":

@@ -171,19 +171,23 @@ function canonicalize(entries: Record<string, unknown>): Record<string, unknown>
 
 /** The decisions as the browser keeps them. Storage can be blocked or full; every read and write is best effort.
  *  An answer storage would not take is held in memory instead, so within this session Keep still sticks and the
- *  one-time notice does not come back; only a reload forgets it. */
+ *  one-time notice does not come back. Once storage takes a write again, every answer held in memory goes in with it,
+ *  so a reload after storage recovers still remembers them. */
 export function browserAcknowledgements(storage: Pick<Storage, "getItem" | "setItem"> | undefined = safeStorage()): Acknowledgements {
   const unsaved = new Map<string, Decision>();
+  // True once a legacy-key rewrite was refused: reads stop retrying it until a write goes through.
+  let migrationRefused = false;
   const read = (): Record<string, unknown> => {
     try {
       const raw = JSON.parse(storage?.getItem(STORE_KEY) ?? "{}") as unknown;
       const base = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
       const migrated = canonicalize(base);
-      if (JSON.stringify(base) !== JSON.stringify(migrated)) {
+      if (!migrationRefused && JSON.stringify(base) !== JSON.stringify(migrated)) {
         try {
           storage?.setItem(STORE_KEY, JSON.stringify(migrated));
         } catch {
-          // ignore a blocked browser store; the in-memory copy still reflects the canonical values
+          // a blocked browser store: the migrated copy below still carries the canonical values, so do not retry per read
+          migrationRefused = true;
         }
       }
       return migrated;
@@ -208,14 +212,26 @@ export function browserAcknowledgements(storage: Pick<Storage, "getItem" | "setI
       const stored = read();
       // The one-time notice never overwrites a Keep: the notice can go out after the player has already decided.
       const answer = strongerDecision(held(canonical, stored), decision);
+      // Answers an earlier refused write left in memory ride along with this one, so a recovered store catches up.
+      const heldBefore = [...unsaved.keys()].filter((k) => k !== canonical);
+      const rewritten = new Set([...heldBefore, canonical]);
+      const others = Object.entries(stored).filter(([k]) => !rewritten.has(k));
+      const carried: [string, Decision][] = heldBefore.map((k) => [k, held(k, stored) as Decision]); // every held key has a memory answer
       // The key goes last, so the oldest entries are the ones trimmed.
-      const others = Object.entries(stored).filter(([k]) => k !== canonical);
-      const all = Object.fromEntries([...others, [canonical, answer]].slice(-MAX_REMEMBERED));
-      try {
-        storage?.setItem(STORE_KEY, JSON.stringify(all));
+      const all = Object.fromEntries([...others, ...carried, [canonical, answer]].slice(-MAX_REMEMBERED));
+      // No storage at all counts as a refusal: the answer is held for the session like any other. A re-answered
+      // shaft moves to the newest slot, which is the last to be trimmed.
+      const hold = (): void => {
         unsaved.delete(canonical);
-      } catch {
         unsaved.set(canonical, answer);
+      };
+      if (!storage) return hold();
+      try {
+        storage.setItem(STORE_KEY, JSON.stringify(all));
+        unsaved.clear();
+        migrationRefused = false;
+      } catch {
+        hold();
       }
     },
   };

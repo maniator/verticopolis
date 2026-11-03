@@ -5,14 +5,16 @@
  *   cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin fuzz -- <seed> <dir> [commands]
  *   npx tsx scripts/fuzz-compare.ts [--wasm] <dir>/fuzz-<seed>.json
  * Compares the state, crowd and events hashes at every checkpoint, then the
- * money, the log and each field of the full save. Exit 1 on the first
+ * money, the log, each field of the full save and the fx sequences. Exit 1 on the first
  * divergence, naming the checkpoint and the field. Exit 3 when the harness
  * itself failed (a missing or malformed record), so a night's summary can tell
- * an engine divergence from a broken run.
+ * an engine divergence from a broken run. Exit 4 when the WASM build trapped
+ * instead of returning a different value.
  */
 import { replayCompare } from "../src/tests/conformance/fuzzReplay";
 
 const HARNESS = 3;
+const TRAP = 4;
 const args = process.argv.slice(2);
 const wasmLeg = args[0] === "--wasm";
 const file = args[wasmLeg ? 1 : 0];
@@ -33,6 +35,6 @@ if (result.status === "harness") {
 }
 if (result.status === "diverged") {
   console.log(`${file}: ${result.message}`);
-  process.exit(1);
+  process.exit(result.trap ? TRAP : 1);
 }
 console.log(`${file}: ok (${result.checkpoints} checkpoints, ${leg} leg)`);
