@@ -423,8 +423,16 @@ export function runScenario(s: Scenario, start: EngineStart = startTsEngine, det
     emit("start");
     for (const c of s.commands) e = apply(e, c, emit, clock, carry);
     emit("final");
-  } finally {
-    e.free?.();
+  } catch (error) {
+    // After a trap the instance is poisoned and its free can throw: that must not
+    // replace the error already on its way out.
+    try {
+      e.free?.();
+    } catch {
+      // the run's own error is the one to report
+    }
+    throw error;
   }
+  e.free?.();
   return out;
 }

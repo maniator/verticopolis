@@ -1,7 +1,6 @@
 import type { UnitView } from "../../../simport/view";
-import { visibleOccupants } from "../../../engine/Crowd";
 import { shade, type DrawCtx } from "../common";
-import { personSeated, personStanding } from "../../pixelSprites/common";
+import { personSeated, personStanding, roomOccupants } from "../../pixelSprites/common";
 import { layerBreak } from "../../pixelSprites/layers";
 
 /**
@@ -47,12 +46,13 @@ export function drawPartyHall(d: DrawCtx, u: UnitView, x: number, y: number, w: 
   };
   // Honest occupancy: dancers (standing), the DJ and banquet guests (seated)
   // fill in seed order up to the hall's occupant count; an empty hall draws
-  // none. `visibleOccupants` is the people-system's canonical figure count; for
+  // none. `roomOccupants` is the renderer's draw count (occupants minus
+  // `outForMeal`, rounded up, as the atlas reads it); for
   // an attendance venue it equals `u.occupants` (only a meal trip's ORIGIN room
   // carries `outForMeal`, and these are destinations), so this matches the
   // spec's Always-rule without changing what draws. Both its inputs are already
   // bake-signature inputs, so no new signature input is needed.
-  const n = visibleOccupants(u);
+  const n = roomOccupants(u);
   const geoSeed = (u.floor * 131 + u.x * 17) | 0;
   let filled = 0;
   const seated = (px: number, footY: number) => { if (filled < n) personSeated(ctx, Math.round(x + px), Math.round(y + footY), geoSeed + filled++); };
@@ -116,7 +116,7 @@ export function drawAquaticCenter(d: DrawCtx, u: UnitView, x: number, y: number,
     ctx.fillRect(Math.round(x + bx), Math.round(y + by), Math.max(1, Math.round(bw)), Math.max(1, Math.round(bh)));
     if (o !== 1) ctx.globalAlpha = 1;
   };
-  const n = visibleOccupants(u);
+  const n = roomOccupants(u);
   const geoSeed = (u.floor * 131 + u.x * 17) | 0;
   let filled = 0;
   const swim = (px: number, footY: number) => { if (filled < n) personStanding(ctx, Math.round(x + px), Math.round(y + footY), geoSeed + filled++); };

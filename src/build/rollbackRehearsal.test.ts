@@ -69,7 +69,7 @@ describe("diffSaves", () => {
   });
 
   it("reports a list of another length once, at the list's path", () => {
-    expect(diffSaves({ units: [1, 2, 3] }, { units: [1, 2] })).toEqual([{ kind: "changed", path: "units[] length", count: 1, example: "units: 3 -> 2" }]);
+    expect(diffSaves({ units: [1, 2, 3] }, { units: [1, 2] })).toEqual([{ kind: "changed", path: "units[] length", count: 1, example: "units: 3 -> 2", removed: 1 }]);
   });
 
   it("treats a type change as a change", () => {

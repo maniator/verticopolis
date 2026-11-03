@@ -261,7 +261,9 @@ it is fixed.
 with, plus smoke entries that keep the job from running on nothing. They use
 the scenario format above, but they are not part of the lock: there are no
 pinned hashes, only the two engines' agreement. The file name is the scenario
-`id`.
+`id`. Three entries (`fx-thief-uncaught`, `fx-thief-caught`, `fx-treasure-cap`)
+reach cosmetic fx sites the locked scenarios do not; `fxSequences.integration.test.ts`
+pins their end values.
 
 A pull request that touches either engine replays every entry on both and
 fails if they differ at any checkpoint (`scripts/fuzz-corpus.ts`, the
