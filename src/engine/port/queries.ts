@@ -5,11 +5,11 @@ import type { Simulation } from "../Simulation";
 import type { HeatmapMode } from "../sim/constants";
 import { towerCatalog } from "../../catalog/towerCatalog";
 import { roomUnits } from "../tower/rooms";
-import type { Unit } from "../types";
+import type { Transport, Unit } from "../types";
 import { scheduleFromSlots, scheduleSlots } from "../../simport/scheduleSlots";
-import type { AutoTuneProposal } from "../../simport/enginePort";
+import type { AutoTuneProposal, PresetProposal, ScheduleFacts } from "../../simport/enginePort";
 import { coerceSchedule, type ElevatorSchedule, type HourlyByDay } from "../elevatorSchedule";
-import { autoTuneSchedule, type ShaftContext } from "../scheduleAuthoring";
+import { autoTuneSchedule, presetSchedule, recommendedPreset, scheduleAdvice, stagingSummary, type ShaftContext } from "../scheduleAuthoring";
 import { dayOriginTotals, peakOriginFloor, type OriginRings } from "../scheduleOrigins";
 import { BATCH_SLOTS, batchTarget } from "./commands";
 import { KIND_CODES, UNIT_STATE_CODES, VIEW_LAYOUT, codeOf, kindOf } from "./layout";
@@ -252,6 +252,8 @@ export interface ShaftFacts {
   lobbies: ReadonlySet<number>;
   hourly?: HourlyByDay;
   origins?: OriginRings;
+  /** An express trunk (the recommended preset is Feeder). */
+  express?: boolean;
 }
 
 const COLD = { warm: false, sampledHours: 0, curve: null };
@@ -263,12 +265,39 @@ const day = (curve: readonly number[] | undefined) => {
   return { warm, sampledHours, curve: warm ? [...curve!] : null };
 };
 
+/** The authoring-model view of a shaft: only a warm day's curve is handed over,
+ *  so advice never reads a mostly-empty ring as a day of traffic. */
+function shaftContext(shaft: ShaftFacts, wd: ReturnType<typeof day>, we: ReturnType<typeof day>): ShaftContext {
+  return {
+    cars: shaft.cars,
+    bottom: shaft.bottom,
+    top: shaft.top,
+    servedLobbies: shaft.served.filter((f) => shaft.lobbies.has(f)),
+    hourly: {
+      ...(wd.warm ? { weekday: shaft.hourly!.weekday } : {}),
+      ...(we.warm ? { weekend: shaft.hourly!.weekend } : {}),
+    },
+  };
+}
+
+/** The nearest served floor, ties to the lower one. */
+function snapToServed(shaft: ShaftFacts, floor: number): number {
+  let best = shaft.served[0] ?? shaft.bottom;
+  let bestDist = Infinity;
+  for (const f of shaft.served) {
+    const d = Math.abs(f - floor);
+    if (d < bestDist) { bestDist = d; best = f; }
+  }
+  return best;
+}
+
 /** The proposal for one shaft's facts and the working draft (already coerced
  *  to the shaft, or undefined for none). */
 export function referenceProposal(shaft: ShaftFacts, draft: ElevatorSchedule | undefined, weekendView: boolean): AutoTuneProposal {
   const wd = day(shaft.hourly?.weekday);
   const we = day(shaft.hourly?.weekend);
-  if (!shaft.modern || shaft.cars <= 0) return { status: "unavailable-in-mode", weekday: wd, weekend: we, proposal: null };
+  if (!shaft.modern) return { status: "unavailable-in-mode", weekday: wd, weekend: we, proposal: null };
+  if (shaft.cars <= 0) return { status: "no-cars", weekday: wd, weekend: we, proposal: null };
   if (!wd.warm && !we.warm) return { status: "insufficient-data", weekday: wd, weekend: we, proposal: null };
 
   const servedSet = new Set(shaft.served);
@@ -280,30 +309,11 @@ export function referenceProposal(shaft: ShaftFacts, draft: ElevatorSchedule | u
     for (const floor of [...totals.keys()]) if (!servedSet.has(floor)) totals.delete(floor);
     peakOrigin = peakOriginFloor(totals);
   }
-  const ctx: ShaftContext = {
-    cars: shaft.cars,
-    bottom: shaft.bottom,
-    top: shaft.top,
-    servedLobbies: shaft.served.filter((f) => shaft.lobbies.has(f)),
-    hourly: {
-      ...(wd.warm ? { weekday: shaft.hourly!.weekday } : {}),
-      ...(we.warm ? { weekend: shaft.hourly!.weekend } : {}),
-    },
-    peakOriginFloor: peakOrigin,
-  };
+  const ctx = shaftContext(shaft, wd, we);
+  ctx.peakOriginFloor = peakOrigin;
   const homesAuthored = !!draft?.homeFloors && draft.homeFloors.length > 0;
   const tuned = autoTuneSchedule(draft ? { ...draft, homeFloors: homesAuthored ? draft.homeFloors : undefined } : undefined, ctx);
 
-  // Snap each home to the nearest served floor, ties to the lower one.
-  const snap = (floor: number): number => {
-    let best = shaft.served[0] ?? shaft.bottom;
-    let bestDist = Infinity;
-    for (const f of shaft.served) {
-      const d = Math.abs(f - floor);
-      if (d < bestDist) { bestDist = d; best = f; }
-    }
-    return best;
-  };
   return {
     status: "available",
     weekday: wd,
@@ -311,26 +321,22 @@ export function referenceProposal(shaft: ShaftFacts, draft: ElevatorSchedule | u
     proposal: {
       weekday: tuned?.activeCars?.weekday ?? null,
       weekend: tuned?.activeCars?.weekend ?? null,
-      homeFloors: (tuned?.homeFloors ?? []).map(snap),
+      homeFloors: (tuned?.homeFloors ?? []).map((f) => snapToServed(shaft, f)),
       homesSeeded: !homesAuthored,
     },
   };
 }
 
-export function autoTuneProposal(sim: Simulation, id: number, draftSlots: Float64Array, weekendView: boolean): AutoTuneProposal {
+/** The elevator `id` names with its facts, or the refusal status. */
+function gather(sim: Simulation, id: number): { t: Transport; shaft: ShaftFacts } | "missing-shaft" | "not-an-elevator" {
   const t = whole(id) ? sim.tower.getTransport(id) : undefined;
-  if (!t) return refused("missing-shaft");
-  let draft: ElevatorSchedule | undefined;
-  if (draftSlots.length > 0) {
-    const parsed = scheduleFromSlots(draftSlots);
-    if (!parsed) return refused("invalid-draft");
-    draft = coerceSchedule(parsed, t.cars, t.bottom, t.top);
-  }
-  if (!isElevatorKind(t.kind)) return refused("not-an-elevator");
+  if (!t) return "missing-shaft";
+  if (!isElevatorKind(t.kind)) return "not-an-elevator";
   const served: number[] = [];
   for (let f = t.bottom; f <= t.top; f++) if (sim.tower.stopsAt(t, f)) served.push(f);
-  return referenceProposal(
-    {
+  return {
+    t,
+    shaft: {
       modern: sim.mode === "modern",
       cars: t.cars,
       bottom: t.bottom,
@@ -339,8 +345,111 @@ export function autoTuneProposal(sim: Simulation, id: number, draftSlots: Float6
       lobbies: new Set(sim.tower.lobbyFloors()),
       hourly: sim.elevatorHourlyLoad(id),
       origins: sim.elevatorOriginLoad(id),
+      express: t.kind === "elevatorExpress",
     },
-    draft,
-    weekendView,
-  );
+  };
+}
+
+/** The working draft as the shaft would store it: `undefined` for none, `null`
+ *  for slots that are not a schedule. */
+function workingDraft(t: Transport, slots: Float64Array): ElevatorSchedule | undefined | null {
+  if (slots.length === 0) return undefined;
+  const parsed = scheduleFromSlots(slots);
+  return parsed ? coerceSchedule(parsed, t.cars, t.bottom, t.top) : null;
+}
+
+export function autoTuneProposal(sim: Simulation, id: number, draftSlots: Float64Array, weekendView: boolean): AutoTuneProposal {
+  const t = whole(id) ? sim.tower.getTransport(id) : undefined;
+  if (!t) return refused("missing-shaft");
+  const draft = workingDraft(t, draftSlots);
+  if (draft === null) return refused("invalid-draft");
+  const got = gather(sim, id);
+  if (typeof got === "string") return refused(got);
+  return referenceProposal(got.shaft, draft, weekendView);
+}
+
+/**
+ * The TypeScript reference for `EnginePort.scheduleFacts`: the advice
+ * comparison, the Simulate staging summary and the recommended preset, the
+ * same facts the Rust engine answers (`engine-rs/src/schedule_facts.rs`).
+ */
+export function referenceFacts(shaft: ShaftFacts, draft: ElevatorSchedule | undefined, weekendView: boolean): ScheduleFacts {
+  const wd = day(shaft.hourly?.weekday);
+  const we = day(shaft.hourly?.weekend);
+  const ctx = shaftContext(shaft, wd, we);
+  const assisted = shaft.modern && shaft.cars > 0;
+  const measured = (weekendView ? we : wd).warm;
+  const adviceStatus = ((): ScheduleFacts["advice"]["status"] => {
+    if (!shaft.modern) return "unavailable-in-mode";
+    if (shaft.cars <= 0) return "no-cars";
+    return measured ? "ready" : "insufficient-data";
+  })();
+  const adv = assisted && measured ? scheduleAdvice(draft, ctx, weekendView) : null;
+  // The staging counts read the homes as the shaft would hold them (each on a
+  // served floor), the same list the answer carries, so a stop edit that
+  // strands a home never leaves the sentence counting the stale floor.
+  const base = stagingSummary(undefined, ctx, weekendView).baseLobby;
+  const homeFloors = Array.from({ length: Math.max(0, shaft.cars) }, (_, i) => {
+    const home = draft?.homeFloors?.[i];
+    return home === undefined ? base : snapToServed(shaft, home);
+  });
+  const summary = stagingSummary({ ...draft, homeFloors }, ctx, weekendView);
+  return {
+    status: "available",
+    recommended: assisted ? recommendedPreset(!!shaft.express) : null,
+    advice: {
+      status: adviceStatus,
+      over: adv?.over ?? [],
+      short: adv?.short ?? [],
+    },
+    staging: { measured, ...summary },
+    homeFloors,
+  };
+}
+
+const FACTS_REFUSED = (status: ScheduleFacts["status"]): ScheduleFacts => ({
+  status,
+  recommended: null,
+  advice: { status: "refused", over: [], short: [] },
+  staging: null,
+  homeFloors: [],
+});
+
+export function scheduleFacts(sim: Simulation, id: number, draftSlots: Float64Array, weekendView: boolean): ScheduleFacts {
+  const t = whole(id) ? sim.tower.getTransport(id) : undefined;
+  if (!t) return FACTS_REFUSED("missing-shaft");
+  const draft = workingDraft(t, draftSlots);
+  if (draft === null) return FACTS_REFUSED("invalid-draft");
+  const got = gather(sim, id);
+  if (typeof got === "string") return FACTS_REFUSED(got);
+  return referenceFacts(got.shaft, draft, weekendView);
+}
+
+const PRESET_NAMES: ReadonlySet<string> = new Set(["rush", "balanced", "feeder", "stage-up-tower"]);
+
+/**
+ * The TypeScript reference for `EnginePort.schedulePreset`: the rows and homes
+ * a named preset sets (`engine-rs/src/schedule_presets.rs`). `stage-up-tower`
+ * is the Rush split staging alone, offered in both modes.
+ */
+export function referencePreset(shaft: ShaftFacts, name: string): PresetProposal {
+  const none = (status: PresetProposal["status"]): PresetProposal => ({ status, weekday: null, weekend: null, homeFloors: [] });
+  if (!PRESET_NAMES.has(name)) return none("unknown-preset");
+  const stageOnly = name === "stage-up-tower";
+  if (!stageOnly && !shaft.modern) return none("unavailable-in-mode");
+  if (shaft.cars <= 0) return none("no-cars");
+  const cold = day(undefined);
+  const built = presetSchedule(stageOnly ? "rush" : (name as "rush" | "balanced" | "feeder"), shaftContext(shaft, cold, cold));
+  return {
+    status: "available",
+    weekday: stageOnly ? null : (built.activeCars?.weekday ?? null),
+    weekend: stageOnly ? null : (built.activeCars?.weekend ?? null),
+    homeFloors: built.homeFloors ?? [],
+  };
+}
+
+export function schedulePreset(sim: Simulation, id: number, name: string): PresetProposal {
+  const got = gather(sim, id);
+  if (typeof got === "string") return { status: got, weekday: null, weekend: null, homeFloors: [] };
+  return referencePreset(got.shaft, name);
 }

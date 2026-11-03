@@ -370,3 +370,62 @@ fn the_proposal_query_answers_its_statuses_and_writes_nothing() {
     assert_eq!(classic["weekday"]["warm"], true);
     assert!(classic["proposal"].is_null());
 }
+
+fn facts(e: &Engine, id: f64, draft: &[f64], weekend: bool) -> serde_json::Value {
+    serde_json::from_str(&e.port_schedule_facts(id, draft, weekend)).unwrap()
+}
+
+fn preset(e: &Engine, id: f64, name: &str) -> serde_json::Value {
+    serde_json::from_str(&e.port_schedule_preset(id, name)).unwrap()
+}
+
+#[test]
+fn the_facts_and_preset_queries_answer_their_statuses_and_write_nothing() {
+    let mut e = engine();
+    let id = shaft(&mut e);
+    assert_eq!(
+        facts(&e, id + 1000.0, &[], false)["status"],
+        "missing-shaft"
+    );
+    assert_eq!(facts(&e, 0.5, &[], false)["status"], "missing-shaft");
+    assert_eq!(facts(&e, id, &[1.0, 2.0], false)["status"], "invalid-draft");
+    assert_eq!(preset(&e, id + 1000.0, "rush")["status"], "missing-shaft");
+    assert_eq!(preset(&e, 0.5, "rush")["status"], "missing-shaft");
+    assert_eq!(preset(&e, id, "nonsense")["status"], "unknown-preset");
+
+    let before = e.sim.serialize();
+    // A cold shaft: no advice, but the staging readout answers.
+    let cold = facts(&e, id, &[], false);
+    assert_eq!(cold["status"], "available");
+    assert_eq!(cold["advice"]["status"], "insufficient-data");
+    assert_eq!(cold["staging"]["measured"], false);
+    assert_eq!(cold["staging"]["peakHour"], 17);
+    assert_eq!(cold["recommended"], "rush");
+
+    let rush = preset(&e, id, "rush");
+    assert_eq!(rush["status"], "available");
+    assert_eq!(rush["weekday"].as_array().unwrap().len(), SCHEDULE_HOURS);
+    assert_eq!(rush["weekend"].as_array().unwrap().len(), SCHEDULE_HOURS);
+    assert_eq!(preset(&e, id, "rush"), rush);
+    assert_eq!(e.sim.serialize(), before);
+    assert!(e.last_reason_text().is_none());
+    assert!(e.sim.tower.transports[0].schedule.is_none());
+
+    // The preset rows read back through the ordinary draft slots as facts.
+    let mut draft = vec![0.0; SCHEDULE_LEN];
+    draft[0] = 1.0;
+    draft[1..=SCHEDULE_HOURS].fill(1.0);
+    let working = facts(&e, id, &draft, false);
+    assert_eq!(working["status"], "available");
+    assert_eq!(working["staging"]["activeAtPeak"], 1);
+
+    // Classic: staging and the stage-up-tower play stay, assisted answers go.
+    e.sim.mode = GameMode::Classic;
+    assert_eq!(
+        facts(&e, id, &[], false)["advice"]["status"],
+        "unavailable-in-mode"
+    );
+    assert!(facts(&e, id, &[], false)["recommended"].is_null());
+    assert_eq!(preset(&e, id, "rush")["status"], "unavailable-in-mode");
+    assert_eq!(preset(&e, id, "stage-up-tower")["status"], "available");
+}

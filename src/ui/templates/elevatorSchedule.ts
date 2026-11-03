@@ -1,7 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import type { ElevatorSchedule, ElevatorScheduleUX } from "../../engine/elevatorSchedule";
-import type { SchedulePreset } from "../../engine/scheduleAuthoring";
+import type { AssistedPreset } from "../../simport/enginePort";
 // floorLabel is a DOM-free pure helper in its own module (so the schedule
 // formatter can reuse it without pulling in lit-html); re-exported here so
 // existing importers and tests keep their `./elevatorSchedule` path.
@@ -49,7 +49,9 @@ export interface SchedCtx {
   /** Whether EITHER day has warmed up (arms the Auto-tune button, which tunes
    *  every measured day at once). */
   canTune: boolean;
-  recommended: SchedulePreset;
+  /** The preset the engine recommends for this shaft; null where the mode
+   *  offers none. */
+  recommended: AssistedPreset | null;
 }
 
 export interface SchedState {
@@ -107,7 +109,7 @@ export interface SchedHandlers {
   onHomeSet: (car: number, floor: number) => void;
   onHomeAllBase: () => void;
   onStageUpTower: () => void;
-  onPreset: (preset: SchedulePreset) => void;
+  onPreset: (preset: AssistedPreset) => void;
   /** Run the whole fleet every hour of both day types (the bulk fix for editing one slot at a time). */
   onAllCars: () => void;
   onAutoTune: () => void;
@@ -116,7 +118,7 @@ export interface SchedHandlers {
   onCancel: () => void;
 }
 
-const PRESET_LABEL: Record<SchedulePreset, string> = { rush: "Rush", balanced: "Balanced", feeder: "Feeder" };
+const PRESET_LABEL: Record<AssistedPreset, string> = { rush: "Rush", balanced: "Balanced", feeder: "Feeder" };
 
 /** The live count row for the selected day. */
 function row(state: SchedState): number[] {
@@ -336,7 +338,7 @@ function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Tem
 function presetsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {
   return html`
     <div class="es-row es-presets">
-      ${(["rush", "balanced", "feeder"] as SchedulePreset[]).map((p) => html`
+      ${(["rush", "balanced", "feeder"] as AssistedPreset[]).map((p) => html`
         <button type="button" class="btn${p === ctx.recommended ? " es-rec" : ""}" @click=${() => h.onPreset(p)}
           title=${p === ctx.recommended ? "Recommended for this shaft" : ""}>${PRESET_LABEL[p]}</button>`)}
       ${ctx.ux.autoTune

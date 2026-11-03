@@ -73,6 +73,7 @@ export type AutoTuneStatus =
   | "available"
   | "insufficient-data"
   | "unavailable-in-mode"
+  | "no-cars"
   | "not-an-elevator"
   | "missing-shaft"
   | "invalid-draft";
@@ -100,6 +101,66 @@ export interface AutoTuneProposal {
     /** True when the engine seeded the homes, false when they are the draft's own. */
     readonly homesSeeded: boolean;
   } | null;
+}
+
+/** A named schedule intent. The first three are the Modern presets;
+ *  `stage-up-tower` is the staging-only play the raw grid offers in both modes. */
+export type SchedulePresetName = "rush" | "balanced" | "feeder" | "stage-up-tower";
+
+/** The three presets the dialog offers as buttons. */
+export type AssistedPreset = Exclude<SchedulePresetName, "stage-up-tower">;
+
+/** How a preset query ended. */
+export type PresetStatus = "available" | "unavailable-in-mode" | "no-cars" | "not-an-elevator" | "missing-shaft" | "unknown-preset";
+
+/** What `schedulePreset` answers (engine-rs `schedule_presets.rs`): the rows and
+ *  homes the preset sets. `weekday` and `weekend` are null for the staging-only
+ *  play and on every refusal. */
+export interface PresetProposal {
+  readonly status: PresetStatus;
+  readonly weekday: readonly number[] | null;
+  readonly weekend: readonly number[] | null;
+  readonly homeFloors: readonly number[];
+}
+
+export type ScheduleFactsStatus = "available" | "not-an-elevator" | "missing-shaft" | "invalid-draft";
+
+/** The advice comparison (engine-rs `schedule_facts.rs`). `ready` with empty
+ *  `over` and `short` means the schedule and the measured load line up. */
+export interface ScheduleAdvice {
+  /** `no-cars`: the shaft holds none (a loaded save can). `refused`: the query
+   *  itself was refused, and the answer's `status` says why. */
+  readonly status: "ready" | "insufficient-data" | "unavailable-in-mode" | "no-cars" | "refused";
+  /** Hours (0 to 23) where the authored cars are well above the measured want. */
+  readonly over: readonly number[];
+  /** Hours where they are well below it; never an hour that runs the whole fleet. */
+  readonly short: readonly number[];
+}
+
+/** The Simulate staging summary: how the fleet is positioned. It promises no wait time. */
+export interface StagingSummary {
+  /** True when `peakHour` is the day's measured busiest hour, false when it is
+   *  the assumed evening down-rush. */
+  readonly measured: boolean;
+  readonly peakHour: number;
+  readonly activeAtPeak: number;
+  readonly upTowerCars: number;
+  readonly lobbyCars: number;
+  readonly topLobby: number;
+  readonly baseLobby: number;
+}
+
+/** What `scheduleFacts` answers. `recommended` is the preset to highlight, null
+ *  where the mode offers no assisted presets; `staging` is null on a refusal. */
+export interface ScheduleFacts {
+  readonly status: ScheduleFactsStatus;
+  readonly recommended: AssistedPreset | null;
+  readonly advice: ScheduleAdvice;
+  readonly staging: StagingSummary | null;
+  /** The draft's homes as the shaft would hold them: one per car, each on the
+   *  nearest served floor (ties to the lower), a car the draft lists no home for
+   *  at the base lobby. Empty on a refusal. */
+  readonly homeFloors: readonly number[];
 }
 
 /** A `Float64Array` record whose slots `viewLayout().records` names. */
@@ -217,6 +278,14 @@ export interface EnginePortQueries {
    *  for staging the player has not set by hand). `weekendView` is the day tab
    *  on screen. Writes nothing; applying it is the ordinary `scheduleShaft`. */
   autoTuneProposal(id: number, draft: Float64Array, weekendView: boolean): AutoTuneProposal;
+  /** The advice and staging facts for a shaft against the dialog's working
+   *  schedule (`draft` in `scheduleShaft`'s slots, empty for none; here its
+   *  homes are the staging being summarized). `weekendView` is the day tab on
+   *  screen. Writes nothing. */
+  scheduleFacts(id: number, draft: Float64Array, weekendView: boolean): ScheduleFacts;
+  /** The rows and homes the named preset sets for a shaft. Writes nothing;
+   *  applying it is the ordinary `scheduleShaft`. */
+  schedulePreset(id: number, preset: SchedulePresetName): PresetProposal;
   /** Whether the tower came from a pre-2.0 save (the founder's welcome). */
   founder(): boolean;
   statsStrip(): PortRecord;
