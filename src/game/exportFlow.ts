@@ -62,7 +62,10 @@ export function resetExportFlowForTests(): void {
  * line reads as the end of the export the watchdog called stuck rather than
  * contradicting that warning.
  */
-export async function runExportFlow(deps: ExportFlowDeps, save: () => { readonly text: string; readonly towerName: string | undefined }): Promise<void> {
+export async function runExportFlow(
+  deps: ExportFlowDeps,
+  save: () => { readonly file: string | Promise<string>; readonly towerName: string | undefined },
+): Promise<void> {
   if (latchOwner !== 0) return;
   const run = ++nextRun;
   latchOwner = run;
@@ -75,9 +78,10 @@ export async function runExportFlow(deps: ExportFlowDeps, save: () => { readonly
     deps.ui.toast("The export is not responding. You can try exporting again.", "bad");
   }, EXPORT_WATCHDOG_MS);
   try {
-    // The engine port saves the tower it holds now, with the camera stamped.
-    const { text, towerName } = save();
-    const file = await SaveGame.export(text);
+    // The engine writes the `.vctower` of the tower it holds now, with the
+    // camera stamped; the page only downloads it.
+    const { file: written, towerName } = save();
+    const file = await written;
     // A download that failed has already said so (GH #997); the success line
     // would contradict it.
     if (!deps.ui.downloadFile(SaveGame.exportFilename(towerName), file)) return;

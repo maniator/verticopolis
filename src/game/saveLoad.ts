@@ -9,7 +9,8 @@ import { shouldArm } from "../ui/Onboarding";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
-import { SWAP_REFUSED, loadStored, saveText, stampCamera, swapDone } from "./portLifecycle";
+import { SWAP_REFUSED, exportFileText, loadStored, saveText, stampCamera, swapDone } from "./portLifecycle";
+import { currentStamp } from "../storage/saveStamp";
 import { exportFacts, importFacts } from "../simport/tdtRecords";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import type { UI } from "../ui/UI";
@@ -339,7 +340,10 @@ export class SaveLoad {
    *  guard; delegating keeps the latch on the one choke point every export
    *  entry converges on. */
   exportGame(): Promise<void> {
-    return runExportFlow(this.deps, () => ({ text: this.saveText(), towerName: this.deps.enginePort().towerName() }));
+    return runExportFlow(this.deps, () => {
+      const port = this.deps.enginePort();
+      return { file: exportFileText(port, this.deps.getView(), currentStamp()), towerName: port.towerName() };
+    });
   }
 
   /**

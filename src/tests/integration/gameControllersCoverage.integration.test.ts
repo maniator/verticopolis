@@ -1,3 +1,4 @@
+import { TsEngine } from "../../engine/port/tsEngine";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../../engine/Simulation";
@@ -1068,16 +1069,18 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(f.toasts[0].text).toMatch(/^Tower exported \(\d+\.\d KB\)\. Check your downloads\.$/);
   });
 
-  it("exportGame toasts the failure instead of swallowing it (main.ts fires it with `void`)", async () => {
-    // Simulate a save too large to export: SaveGame.export rejects, and the
-    // controller must surface that as a toast, not download nothing in silence.
-    const spy = vi.spyOn(SaveGame, "export").mockRejectedValueOnce(new Error("This tower's save data is larger than 32 MB, the most a save can hold."));
+  it("exportGame toasts the engine's refusal instead of swallowing it (main.ts fires it with `void`)", async () => {
+    // The engine refuses the file (a stamp it rejects, a save past the cap):
+    // the controller surfaces its reason as a toast and downloads nothing.
+    const write = vi.spyOn(TsEngine.prototype, "exportVctower").mockReturnValue(undefined);
+    const reason = vi.spyOn(TsEngine.prototype, "lastReason").mockReturnValue("This tower's save data is larger than 32 MB, the most a save can hold.");
     await saveLoad.exportGame();
     expect(f.downloads).toHaveLength(0);
     expect(f.toasts).toEqual([
       { text: "Export failed: This tower's save data is larger than 32 MB, the most a save can hold.", kind: "bad" },
     ]);
-    spy.mockRestore();
+    write.mockRestore();
+    reason.mockRestore();
   });
 
   it("importGame adopts a Simulation from a SaveGame.export round-trip", async () => {

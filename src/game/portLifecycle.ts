@@ -34,6 +34,23 @@ export function saveText(port: Pick<EnginePort, "setCamera" | "serialize">, view
   return port.serialize();
 }
 
+/** The `.vctower` file of the live tower, written by the engine and stamped
+ *  with this build and the time (`stamp`): the file the player downloads.
+ *  Throws the engine's refusal (or, once the engine trapped, the same refusal
+ *  every save gives) and never writes the file itself, so a build without the
+ *  engine package exports nothing rather than a file the engine did not make. */
+export function exportFileText(
+  port: Pick<EnginePort, "setCamera" | "exportVctower" | "lastReason">,
+  view: SerializedView | null,
+  stamp: { appVersion: string; savedAt: number },
+): string {
+  if (engineTrapped()) throw new Error(TRAPPED_SAVE_REFUSED);
+  stampCamera(port, view);
+  const file = port.exportVctower(stamp.appVersion, stamp.savedAt);
+  if (file === undefined) throw new Error(port.lastReason() ?? "The tower could not be exported.");
+  return file;
+}
+
 /** Stamp the live camera onto the tower, so a save or file written next
  *  carries it; a null camera stamps nothing. */
 export function stampCamera(port: Pick<EnginePort, "setCamera">, view: SerializedView | null): void {
