@@ -2,6 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, truncateSy
 import { basename, join, resolve } from "node:path";
 import { engineSourceHash } from "../../wasmhost/packageHash";
 import { analyzeBundle } from "./bundle";
+import { BASELINE_DIST, baselineErrors, buildBaseline, requireBaselineCommit, TS_BASELINE, type BaselineRecord } from "./baseline";
 import { buildTree, collectEnvironment, ENGINE_PACKAGE_FILES, packageState, type Environment, type PackageState } from "./env";
 import { buildLimitations } from "./limitations";
 import { gateBrowser, probeBrowser, type BrowserProbe } from "./browserProbe";
@@ -14,7 +15,7 @@ import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
 import { engineOrder, runProcess } from "./runner";
 import { autosaveSeed, checkAutosaveSeeds } from "./savedStart";
 import { SCENARIO_NAMES, buildScenarios, unknownScenarios } from "./scenarios";
-import { startServer } from "./server";
+import { startServer, type PerfServer } from "./server";
 import type { CompareConfig, CompareResults, EngineName, ProcessRun } from "./types";
 import type { Environment as Env } from "./env";
 import { incompleteTreeError } from "./treeRecord";
@@ -117,6 +118,10 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const log = (line: string) => process.stderr.write(`${line}\n`);
   const dist = join(repo, "dist");
   const distPerf = join(repo, "dist-perf");
+  const distTs = join(repo, BASELINE_DIST);
+  // The TypeScript arm runs the pinned pre-cutover build (issue #1597), so an A/A pass of WASM does not need it.
+  const needsBaseline = args.aa !== "wasm";
+  const tsBaseline: BaselineRecord | null = needsBaseline ? { commit: TS_BASELINE.commit, appVersion: TS_BASELINE.appVersion } : null;
   // The browser is settled first: launch settings are parsed and the adapter
   // is read before any build or results folder exists, so a setting that does
   // not reach the GPU fails in seconds.
@@ -133,13 +138,19 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   const stampPaths = [join(dist, ".perf-build.json"), join(distPerf, ".perf-build.json")];
   const tree = buildTree(repo);
   if (!args.skipBuild) {
+    if (needsBaseline) requireBaselineCommit(repo);
     log("perf:compare: production build (npm run build)");
     buildProduction(repo);
     log("perf:compare: tooling build of the same sources (VC_TOOLING=1) into dist-perf/");
     buildTooling(repo, distPerf);
+    if (needsBaseline) buildBaseline(repo, log);
     for (const p of stampPaths) writeFileSync(p, JSON.stringify(tree) + "\n");
   }
-  for (const d of [dist, distPerf]) if (!existsSync(join(d, "index.html"))) throw new Error(`no build at ${d}; run without --skip-build`);
+  for (const d of [dist, distPerf, ...(needsBaseline ? [distTs] : [])]) if (!existsSync(join(d, "index.html"))) throw new Error(`no build at ${d}; run without --skip-build`);
+  if (needsBaseline) {
+    const baselineProblems = baselineErrors(distTs);
+    if (baselineProblems.length) throw new Error(`the TypeScript baseline build cannot be used:\n  - ${baselineProblems.join("\n  - ")}`);
+  }
 
   const unknown = unknownScenarios(args.scenarios ?? []);
   if (unknown.length) throw new Error(`unknown scenario ${unknown.join(",")}; expected ${SCENARIO_NAMES.join(",")}`);
@@ -168,6 +179,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     config,
     enginePackage: environment.enginePackage,
     scenarios: scenarios.map((s) => s.sha256),
+    tsBaseline,
     machine: machineOf(environment, executablePath, launch, probe),
     startedAt,
   };
@@ -204,7 +216,17 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
   checkAutosaveSeeds(scenarios);
   log(`perf:compare: each scenario's autosave seed loads back as its tower (${scenarios.map((s) => `${s.name} ${autosaveSeed(s).sha256.slice(0, 12)}`).join(", ")})`);
 
-  const server = await startServer(distPerf);
+  // Rust runs from the current timed build. TypeScript runs from the pinned baseline build, with the current
+  // engine package overlaid so the package-load side measurements have a package in that origin.
+  const servers: Partial<Record<EngineName, PerfServer>> = { wasm: await startServer(distPerf) };
+  if (needsBaseline) {
+    try {
+      servers.ts = await startServer(distTs, 0, { prefix: "/engine", dir: join(distPerf, "engine") });
+    } catch (e) {
+      await servers.wasm?.close();
+      throw e;
+    }
+  }
   let browserVersion: string | null = runs.find((r) => r.browserVersion)?.browserVersion ?? null;
   try {
     for (let rep = 0; rep < config.reps; rep++) {
@@ -216,14 +238,14 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
         // A marker first, so an attempt killed mid-way is reported, never
         // silently replaced by its rerun.
         appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify({ started: { rep, engine, at: new Date().toISOString() } }) + "\n");
-        const run = await runProcess({ server, config, scenarios, executablePath, launch, log }, rep, engine, position);
+        const run = await runProcess({ servers, config, scenarios, executablePath, launch, log }, rep, engine, position);
         browserVersion ??= run.browserVersion;
         runs.push(run);
         appendFileSync(join(out, CHECKPOINT_RUNS), JSON.stringify(run) + "\n");
       }
     }
   } finally {
-    await server.close();
+    await Promise.allSettled(Object.values(servers).map((srv) => srv.close()));
   }
 
   const validation = validateResults(config, runs, nodeChecks, launch.rendererException);
@@ -257,6 +279,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     issue: "maniator/verticopolis#972",
     config,
     environment,
+    tsBaseline,
     browser: { version: browserVersion, headless: true, executable: executablePath, channel: launch.channel, args: launch.args, rendererException: launch.rendererException, rendererExceptionSha256: launch.rendererExceptionSha256, rendererExceptionCommit: launch.rendererExceptionCommit, gpuVerified: recordedGpuVerified(launch.rendererException, runs.filter((r) => r.ok).map((r) => r.page?.webgl?.renderer), runs.filter((r) => r.ok).map((r) => r.rendererEnd), runs.filter((r) => r.ok).map((r) => r.rendererEndCold)) },
     scenarios: scenarios.map((s) => ({ name: s.name, description: s.description, sha256: s.sha256, population: s.population, units: s.units, transports: s.transports, saveBytes: s.save.length })),
     nodeChecks,
@@ -267,7 +290,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     metrics,
     comparisons,
     validation,
-    limitations: buildLimitations(config.aa, environment.appVersion, renderers, launch.rendererException),
+    limitations: buildLimitations(config.aa, environment.appVersion, renderers, launch.rendererException, tsBaseline),
   };
 
   writeResultFiles(out, results);
@@ -392,6 +415,8 @@ export interface CheckpointMeta {
   config: CompareConfig;
   enginePackage: Env["enginePackage"];
   scenarios: string[];
+  /** The pinned TypeScript baseline the run served, or null when no TypeScript arm ran. */
+  tsBaseline?: BaselineRecord | null;
   machine: Record<string, string | number | null>;
   startedAt: string;
 }
@@ -435,8 +460,11 @@ export function loadCheckpoint(
   const meta = JSON.parse(metaText) as CheckpointMeta;
   if (meta.dirty) throw new Error(`cannot resume ${dir}: it started on a dirty tree, so its first runs measured uncommitted code`);
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-  for (const key of ["commit", "skipBuild", "config", "enginePackage", "scenarios", "machine"] as const) {
-    if (!same(meta[key], expected[key])) throw new Error(`cannot resume ${dir}: its ${key} differs from this run's (${JSON.stringify(meta[key])} vs ${JSON.stringify(expected[key])})`);
+  for (const key of ["commit", "skipBuild", "config", "enginePackage", "scenarios", "tsBaseline", "machine"] as const) {
+    // A checkpoint from before the baseline existed names none, which is what a run without a TypeScript arm records.
+    const stored = key === "tsBaseline" ? (meta.tsBaseline ?? null) : meta[key];
+    const wanted = key === "tsBaseline" ? (expected.tsBaseline ?? null) : expected[key];
+    if (!same(stored, wanted)) throw new Error(`cannot resume ${dir}: its ${key} differs from this run's (${JSON.stringify(stored)} vs ${JSON.stringify(wanted)})`);
   }
   const path = join(dir, CHECKPOINT_RUNS);
   let text = read(path) ?? "";

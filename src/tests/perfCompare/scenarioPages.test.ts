@@ -43,7 +43,7 @@ describe("the perf:compare runner", () => {
 
   it("gives each saved-tower start a fresh context, seeded at creation and closed whatever happens (#1254)", () => {
     const body = source.slice(source.indexOf("async function savedStarts("), source.indexOf("async function firstVisit("));
-    expect(body).toMatch(/for \(const sc of opts\.scenarios\) \{[\s\S]*ctx = await newContext\(browser, opts\.config, "block", \(line\) => row\.contextLost\.push\(line\), autosaveState\(opts\.server\.url, seed\)\);/);
+    expect(body).toMatch(/for \(const sc of opts\.scenarios\) \{[\s\S]*ctx = await newContext\(browser, opts\.config, "block", \(line\) => row\.contextLost\.push\(line\), autosaveState\(server\.url, seed\)\);/);
     expect(body).toMatch(/\} finally \{\n\s*await ctx\?\.close\(\)/);
     // It runs after the first visit, outside the repetition's try, so it cannot fail the repetition.
     expect(source.indexOf("run.coldSaved = await savedStarts(")).toBeGreaterThan(source.indexOf("run.firstVisitWithServiceWorker = await firstVisit("));

@@ -83,11 +83,30 @@ export interface PerfServer {
   close(): Promise<void>;
 }
 
-export async function startServer(root: string, port = 0): Promise<PerfServer> {
+/** The server that answers an engine's arm; a missing one is a wiring mistake in the run. */
+export function serverFor(servers: Partial<Record<"ts" | "wasm", PerfServer>>, engine: "ts" | "wasm"): PerfServer {
+  const server = servers[engine];
+  if (!server) throw new Error(`no server for the ${engine} engine`);
+  return server;
+}
+
+/** A folder served under a URL prefix instead of from the root build. */
+export interface Overlay {
+  /** The URL prefix, such as "/engine". */
+  prefix: string;
+  /** The folder whose files answer it. */
+  dir: string;
+}
+
+export async function startServer(root: string, port = 0, overlay?: Overlay): Promise<PerfServer> {
   if (!existsSync(join(root, "index.html"))) throw new Error(`no build at ${root} (index.html missing)`);
   // One spelling of the root (no trailing separator), so the containment
   // check below holds whatever the caller passed.
   const base = resolve(root);
+  const over = overlay ? { prefix: overlay.prefix.replace(/\/+$/, ""), base: resolve(overlay.dir) } : null;
+  if (over && !/^(\/[^/]+)+$/.test(over.prefix)) throw new Error(`the overlay prefix "${overlay?.prefix}" must be a path such as /engine`);
+  if (over && !existsSync(over.base)) throw new Error(`the overlay folder ${over.base} does not exist`);
+  if (over && !statSync(over.base).isDirectory()) throw new Error(`the overlay folder ${over.base} is not a folder`);
   const cache = new Map<string, Entry>();
   const log: ServedRequest[] = [];
   const entry = (file: string): Entry => {
@@ -113,6 +132,7 @@ export async function startServer(root: string, port = 0): Promise<PerfServer> {
     }
   };
   warm(base);
+  if (over) warm(over.base);
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     const isolation = { "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "require-corp", "Cross-Origin-Resource-Policy": "same-origin" };
@@ -127,8 +147,11 @@ export async function startServer(root: string, port = 0): Promise<PerfServer> {
       return;
     }
     if (path.endsWith("/")) path += "index.html";
-    const file = normalize(join(base, path));
-    if (!file.startsWith(base + sep) || !existsSync(file) || !statSync(file).isFile()) {
+    // A path under the overlay prefix is answered from the overlay folder alone, never from the root build.
+    const overlaid = over !== null && path.startsWith(over.prefix + "/");
+    const from = overlaid ? over.base : base;
+    const file = normalize(join(from, overlaid ? path.slice(over.prefix.length) : path));
+    if (!file.startsWith(from + sep) || !existsSync(file) || !statSync(file).isFile()) {
       res.writeHead(404, { "Content-Type": "text/plain", ...isolation });
       res.end("not found");
       log.push({ path, status: 404, bytes: 9, encoding: "identity" });
