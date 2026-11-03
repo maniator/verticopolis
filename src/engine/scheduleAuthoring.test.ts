@@ -113,6 +113,11 @@ describe("autoTuneSchedule", () => {
     expect(autoTuneSchedule(undefined, ctx)!.homeFloors).toEqual([1]);
   });
 
+  it("keeps a one-car shaft's only car at the lobby even when the busiest floor is up-tower (#1634)", () => {
+    const ctx = { ...CTX, cars: 1, hourly: { weekday: rushCurve() }, peakOriginFloor: 22 };
+    expect(autoTuneSchedule(undefined, ctx)!.homeFloors).toEqual([1]);
+  });
+
   it("returns the current schedule unchanged when there is no measured history", () => {
     const cur = { waitingCarResponse: 3 };
     expect(autoTuneSchedule(cur, { ...CTX, hourly: undefined })).toBe(cur);

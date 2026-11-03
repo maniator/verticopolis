@@ -269,6 +269,19 @@ fn a_home_on_a_skipped_floor_snaps_to_the_nearest_served_one() {
 }
 
 #[test]
+fn an_aimed_seed_still_keeps_a_one_car_shafts_only_car_at_the_lobby() {
+    // The busiest boarding floor is up-tower, yet the one car stays at the lobby (#1634).
+    let (mut sim, id) = tower(GameMode::Modern, 1);
+    let at_seven: Vec<serde_json::Value> = (0..24)
+        .map(|h| if h == 9 { json!([[7, 5.0]]) } else { json!([]) })
+        .collect();
+    let origins = json!({ "weekday": at_seven.clone(), "weekend": at_seven });
+    seed(&mut sim, id, warm_ring(0.5), warm_ring(0.5), Some(origins));
+    let p = sim.auto_tune_proposal(id, None, false).proposal.unwrap();
+    assert_eq!(p.home_floors, vec![1]);
+}
+
+#[test]
 fn the_up_tower_half_aims_at_the_busiest_served_boarding_floor() {
     let (mut sim, id) = tower(GameMode::Modern, 4);
     let slots = |floor: i64, n: f64| -> Vec<serde_json::Value> {
