@@ -146,7 +146,14 @@ Verticopolis has **two test tiers**:
     `conformance/loader-cases.json` (`loaderCases.integration.test.ts` writes
     it, a Rust test replays it), and the `.TDT` codec by
     `conformance/tdt-cases.json` (frozen; `cargo run --release --features conformance --bin tdt`
-    and a Rust test replay it, and a changed `.TDT` byte moves a hash in the PR that changes it). A nightly differential fuzzer
+    and a Rust test replay it, and a changed `.TDT` byte moves a hash in the PR that changes it).
+    The codec also has a Rust-only fuzz (`engine-rs/tests/tdt_fuzz.rs`):
+    damaged copies of the nine real saves and forged towers must import,
+    export and import again without a panic and reach a fixed point after one
+    round trip. The pull-request run uses 8 seeds; `tdt-fuzz.yml` runs thousands
+    each night and opens an issue on a failure. To replay one seed, from
+    `engine-rs/`: `VC_TDT_FUZZ_FIRST=<seed> VC_TDT_FUZZ_SEEDS=1 cargo test
+    --release --test tdt_fuzz`. A nightly differential fuzzer
     (`engine-fuzz.yml`) runs seeded random scenarios through both engines and
     compares the state, crowd and events hashes at checkpoints at least
     every in-game hour, then the money, the log and each field of the full
