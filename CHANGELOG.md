@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.78.13
+
+- A hotel room with cockroaches now exports to a SimTower file as a room that needs cleaning, instead of coming back as a clean empty room.
+
 ## 2.78.8
 
 - A saved tower from a newer version of Verticopolis now says so when you start the game or load it from Saves. Update the game, then use Import from file on the copy that Saves keeps.

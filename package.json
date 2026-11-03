@@ -68,7 +68,7 @@
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
-    "@vercel/functions": "^3.7.5",
+    "@vercel/functions": "^3.10.6",
     "@vercel/speed-insights": "^2.0.0",
     "excalibur": "^0.32.0",
     "fflate": "^0.8.3",

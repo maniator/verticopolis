@@ -78,6 +78,12 @@ describe("scripts/fuzz-shrink.ts", () => {
     expect(run("fuzz-shrink.ts", ["in.json", "ok-name", "--max-tests", "0"], present).code).toBe(2);
   });
 
+  it("exits 2 on a flag it does not know or one given twice, so a typo never picks the leg", () => {
+    expect(run("fuzz-shrink.ts", ["in.json", "ok-name", "--wams"], present).code).toBe(2);
+    expect(run("fuzz-shrink.ts", ["in.json", "ok-name", "--wasm", "--wasm"], present).code).toBe(2);
+    expect(run("fuzz-shrink.ts", ["in.json", "ok-name", "--max-tests"], present).code).toBe(2);
+  });
+
   it("exits 3 when there is no fuzzer", () => {
     expect(run("fuzz-shrink.ts", ["in.json", "ok-name"], missing).code).toBe(3);
   });

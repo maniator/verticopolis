@@ -185,7 +185,10 @@ pub fn gather_units<U: Borrow<Value>>(
                     add_residents(&mut people_pop, &mut class_pop, u);
                 }
             } else if u.kind.is_hotel() {
-                if u.state == "dirty" {
+                // The format has an infested bit (`HOTEL_INFESTED_FLAG`), but
+                // what the original game means by it is unchecked (#1629), so
+                // an infested room goes out as the dirty room it at least is.
+                if u.state == "dirty" || u.state == "infested" {
                     status = HOTEL_DIRTY_FLAG;
                 } else if u.state == "asleep" {
                     let guests = js_min(js_max(u.occupants, 1.0), HOTEL_OCCUPANT_MASK as f64);
