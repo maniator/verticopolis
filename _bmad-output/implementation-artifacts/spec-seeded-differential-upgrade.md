@@ -140,8 +140,15 @@ still needs a 100-story tower, which the fuzzer's 40 stories do not reach.
   ties `FUZZ_ENTRIES` to the scripts the workflow runs, and another checks that
   the WASM build part matches the engine-wasm action's hand-kept key list. The
   WASM runner is in the closure of `fuzz-compare.ts` and the shrinker is an entry. The freeze
-  guard, a PR check that recomputes the key and fails on a change while a window
-  is open, comes next and picks the marker file that opens and closes it.
+  guard (done, #1647): `fuzz-freeze.yml` runs `scripts/fuzz-freeze.ts` on every
+  PR and compares the key of the merge result with the marker
+  `conformance/fuzz-window.json` (`open`, `key`, `resets`). No window is open
+  yet. While one is, a moved key fails unless the marker carries a reset for
+  that step with a link to the owner's approval, and closing the marker lifts
+  the check. The marker is not a key part. The key now also covers
+  `package.json` `type` and `engines` and `engine-rs/.cargo/config.toml`; the
+  runner image is recorded beside the key in `window-key.txt`, since it cannot
+  be hashed. Making the check required is a branch-protection setting.
 - The nightly's time budget (done): measured on 2026-11-03, a seed costs about 3 to 5 s on the TypeScript compare and about 3 s on the WASM leg beside the Rust run, so 20 seeds fit the 60 minute job with wide margin. The loop enforces a 30 minute budget: a seed that would start after it is listed as not run and the night is red.
 
 ## Boundaries
