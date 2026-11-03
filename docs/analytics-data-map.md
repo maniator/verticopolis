@@ -14,6 +14,10 @@ The player-facing summary of this posture is the Help "Privacy" copy
 Anything here that would make that copy untrue changes the copy in the same
 change.
 
+What each measure can and cannot tell us, and which ones are not measurable
+under this posture, is in
+[`analytics-measurement-status.md`](./analytics-measurement-status.md).
+
 ## Posture
 
 - **Cookieless and personless.** The game posts each event to its own relay
