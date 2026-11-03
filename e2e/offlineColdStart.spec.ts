@@ -161,7 +161,13 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
       (window as any).game.syncSim();
     });
     savedAt = await advanceClock(page);
-    await page.evaluate(() => (window as any).game.saveToSlot(1));
+    await page.evaluate(() => {
+      (window as any).game.saveToSlot(1);
+      // Closing the page saves its tower when it goes to the background. This
+      // test is about the slot, so keep that tower out of the autosave and let
+      // the offline session start a new one.
+      (window as any).game.saveLoad.save = () => {};
+    });
     savedState = await engineSave(page);
   });
 
@@ -187,6 +193,7 @@ test("a tower saved online loads in a fresh offline browser session, runs, saves
       const ok = g.sim.build("lobby", 1, 200).ok;
       (window as any).game.syncSim();
       g.saveToSlot(1);
+      g.saveLoad.save = () => {}; // as above: the reload starts a new tower, not this one
       return { ok, minutes: g.sim.clock.minutes as number };
     });
     const resavedState = await engineSave(page);
