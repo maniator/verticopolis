@@ -290,7 +290,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     if (wasmModule) {
       // Slot rows count their population through the engine, which has to be
       // installed before the first screen that lists saves can draw.
-      setSlotPopulationReader(populationReaderFromModule(wasmModule));
+      setSlotPopulationReader(populationReaderFromModule(wasmModule, (error) => void noteEngineThrow(error, "census")));
       try {
         tower = rustBootTower(wasmModule);
       } catch (e) {
@@ -333,7 +333,8 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // reloads onto the last autosave. This tab's second crash on a build
       // stops the game instead of reloading again.
       watchEngineTraps((e, during) => {
-        const message = `the Rust engine failed during ${during === "save" ? "a save" : "a tick"}: ${e instanceof Error ? e.message : String(e)}`;
+        const where = { tick: "a tick", save: "a save", census: "a save's population read" }[during];
+        const message = `the Rust engine failed during ${where}: ${e instanceof Error ? e.message : String(e)}`;
         console.error(`[wasm] ${message}`);
         rust.status.hosted = false;
         rust.status.lastError = message;
