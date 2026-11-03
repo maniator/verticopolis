@@ -101,7 +101,7 @@ Three `app_action` codes report a save, load or import that failed (#1533, appro
 
 | `action` | `detail` | When | Reading |
 | --- | --- | --- | --- |
-| `autosave_failed` | `timer` or `manual` | A background autosave (`timer`, which includes the tower-swap autosave) or a Quick Save or slot save (`manual`) threw, such as a full or blocked `localStorage` | Latched once per page life, so events can exceed sessions; read sessions with a failed save, not failures. The `detail` is the first source that failed |
+| `autosave_failed` | `timer` or `manual` | A background or system save (`timer`: the timer and tower-swap autosaves, the pre-update flush, the context-loss flush and the .TDT adoption flush) or a Quick Save or slot save (`manual`) threw, such as a full or blocked `localStorage` | Latched once per page life, so events can exceed sessions; read sessions with a failed save, not failures. The `detail` is the first source that failed |
 | `load_failed` | none | A slot load from the saves manager or the title-screen picker adopted nothing | An empty slot and an unreadable one read alike. Quick Load ("No saved tower found") is not counted |
 | `import_failed` | `save` (.vctower) or `tdt` (.TDT) | An imported file was refused or unreadable | Counted per attempt |
 
