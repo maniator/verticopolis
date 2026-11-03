@@ -33,8 +33,6 @@ src/game/frameLoop.ts sim/frameStep # the host step driver, moved here from fram
 src/game/gripeCopy.ts residentialRentals sim/gripe sim/satisfactionStep
 src/game/housekeepingDiagnostics.ts economy/housekeeping
 src/game/toolingSim.ts Simulation port/tsEngine # moved from src/main.ts with the tooling harnesses' hand-built towers (PR 5e): no new engine import
-src/game/trafficHud.ts traffic
-src/game/uiCallbacks.ts wellFormed
 src/preview.ts catalog
 src/render/atlas/archive.ts catalog # archive records atlas metadata from the same engine-authored catalog as atlas runtime reads
 src/render/atlas/browserEntry.ts catalog

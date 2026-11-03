@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { refreshTraffic } from "./trafficHud";
-import { TRAFFIC_LABELS, trafficGlyph } from "../engine/traffic";
+import { TRAFFIC_LABELS, trafficGlyph } from "../presentation/traffic";
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";

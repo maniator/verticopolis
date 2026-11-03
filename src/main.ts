@@ -7,7 +7,7 @@ import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/Towe
 import { AudioEngine } from "./audio/Audio";
 import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, type Prefs } from "./storage/Prefs";
-import { type TrafficTier } from "./engine/traffic";
+import { type TrafficTier } from "./presentation/traffic";
 import { UI, type Tool } from "./ui/UI";
 import { refreshEditorCard } from "./game/editorCard";
 import { type PlaceOutcome } from "./ui/placement";

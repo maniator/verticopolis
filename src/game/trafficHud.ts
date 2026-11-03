@@ -1,5 +1,5 @@
 import type { GameApp } from "../main";
-import { trafficTier, TRAFFIC_BOUNDS, TRAFFIC_LABELS, trafficGlyph } from "../engine/traffic";
+import { trafficTier, TRAFFIC_BOUNDS, TRAFFIC_LABELS, trafficGlyph } from "../presentation/traffic";
 import { floorLabel } from "../ui/floorLabel";
 import { noteFrameError } from "./frameErrors";
 

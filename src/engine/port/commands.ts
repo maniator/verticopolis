@@ -3,7 +3,7 @@ import { subtypeListFor } from "../retailSubtypes";
 import type { BrushKind } from "../sim/brush";
 import type { BatchRentResult, BatchTarget } from "../sim/constants";
 import type { LogEntry } from "../types";
-import { wellFormed } from "../wellFormed";
+import { wellFormed } from "../../shared/wellFormed";
 import { VIEW_LAYOUT, kindOf } from "./layout";
 import { scheduleFromSlots } from "../../simport/scheduleSlots";
 import { finish, flag, record, refuse, whole, type PortState } from "./record";

@@ -2,7 +2,7 @@ import { facilityFloors } from "./facilities";
 import { CLASSIC_RULES, type GameRules } from "./gameRules";
 import { FACILITIES, isFacilityKind } from "./facilitiesData";
 import { INVALID_REQUEST, UNKNOWN_FACILITY, whole } from "./request";
-import { wellFormed } from "./wellFormed";
+import { wellFormed } from "../shared/wellFormed";
 import type { Facility, FacilityKind, PlaceResult, Transport, Unit } from "./types";
 import { isStructural } from "./tower/towerTopology";
 import { markRoom } from "./tower/rooms";
