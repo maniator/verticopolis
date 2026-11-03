@@ -409,11 +409,13 @@ fn an_old_save_peaks_near_what_it_keeps() {
     );
     assert!(sim.tower.units.len() > 12_000);
     assert!(kept > 3 << 20, "only {kept} bytes counted");
-    // What the bound allowed before a smaller `Unit` (#1259): 4.8 times the
-    // 5.49 MB this save kept. The peak is the parsed save and did not move
-    // when the kept bytes fell to 4.29 MB, so the bound is in bytes now.
+    // The old bound was 4.8 times the 5.49 MB this save kept (26.33 MB). The
+    // peak is the parsed save and did not move when a smaller `Unit` (#1259)
+    // cut the kept bytes to 4.29 MB, so the bound is in bytes now, a round
+    // 28 MiB over the 26.2 MB it peaks at. The streamed path this guards
+    // peaked near 60 MB before it was fixed, so the slack hides nothing.
     assert!(
-        peak <= 26_330_000,
+        peak <= 28 << 20,
         "the load peaked at {peak} bytes for {kept} kept"
     );
 }
