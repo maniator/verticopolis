@@ -2,8 +2,8 @@ import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN, type Simulation } from
 import { SERVED_RECOVERY } from "../sim/constants";
 import { isCommercialKind, isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../facilities";
 import { isRentalKind } from "../residentialRentals";
-import { catalogFacility } from "../catalogTypes";
-import { towerCatalog } from "../towerCatalog";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { towerCatalog } from "../../catalog/towerCatalog";
 import {
   bindingTransportClassAt,
   dominantGripe,

@@ -2,7 +2,7 @@ import type { Simulation } from "../../engine/Simulation";
 import { GRIPE_WARN, SERVED_RECOVERY, TRANSPORT_FAR_TILES, VACATE_RESCIND } from "../../engine/sim/constants";
 import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../../engine/facilities";
 import { isRentalKind } from "../../engine/residentialRentals";
-import { towerCatalog } from "../../engine/towerCatalog";
+import { towerCatalog } from "../../catalog/towerCatalog";
 import { bindingTransportClassAt, dominantGripe, nearNightclub, reachesLobby, servingTransportKindsAt, unmetCoverage } from "../../engine/sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../../engine/sim/satisfactionStep";
 import { isPresent, type Unit, type VacateReason } from "../../engine/types";

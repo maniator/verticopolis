@@ -44,7 +44,7 @@ at once (HP-11). A Rust toolchain or Cargo configuration file added later
 | WASM binding | `engine-rs/src/wasm.rs`, `engine-rs/src/wasm/`, `engine-rs/src/frame.rs`, `src/dualrun/` |
 | Hosts (main thread and worker) | `src/wasmhost/` |
 | Saves (load per command, autosave on a timer) | `src/storage/` |
-| Rendering, frame loop and UI | `src/render/`, `src/presentation/`, `src/game/`, `src/ui/` |
+| Rendering, frame loop and UI | `src/render/`, `src/presentation/`, `src/game/`, `src/ui/`, `src/catalog/` |
 | Per-frame and periodic services | `src/analytics*.ts`, `src/audio/` |
 | App shell | `src/main.ts` (`GameApp`, read on every HUD refresh) and any other root `src/*.ts` module that `src/game/`, `src/render/` or `src/ui/` imports |
 

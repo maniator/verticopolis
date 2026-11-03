@@ -1,4 +1,4 @@
-import type { CatalogWorld } from "../engine/catalogTypes";
+import type { CatalogWorld } from "../catalog/catalogTypes";
 
 /**
  * The world geometry the view is built for: the lot width and the floor range

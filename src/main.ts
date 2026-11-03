@@ -45,7 +45,7 @@ import { hudSource } from "./game/hudSource";
 import { catalogOf, newRenderSim, newViewReader } from "./game/portAccess";
 import type { BootTower } from "./game/bootTower";
 import type { EnginePort } from "./simport/enginePort";
-import type { Catalog } from "./engine/catalogTypes";
+import type { Catalog } from "./catalog/catalogTypes";
 
 /**
  * The game controller. Excalibur (via {@link TowerEngine}) owns the render

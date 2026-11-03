@@ -1,7 +1,7 @@
 // The lot geometry comes from the view's world (bound from the tower's
 // catalog), and facility widths and names from the catalog itself (#921).
 import { viewWorld } from "../presentation/viewWorld";
-import { catalogBuildKind, catalogFacility, type Catalog } from "../engine/catalogTypes";
+import { catalogBuildKind, catalogFacility, type Catalog } from "../catalog/catalogTypes";
 import type { FacilityKind } from "../engine/types";
 
 /**

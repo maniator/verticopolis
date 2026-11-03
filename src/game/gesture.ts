@@ -1,6 +1,6 @@
 import type { Tool } from "../ui/UI";
 import type { FacilityKind } from "../engine/types";
-import { catalogFacility, type Catalog } from "../engine/catalogTypes";
+import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
 
 /**
  * Build tools that lay a contiguous RUN by dragging — the original's floor tool.

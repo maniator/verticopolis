@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { catalogFor } from "../../engine/catalog";
 import { catalogLockView } from "../../engine/catalogLockView";
-import { CATALOG_VERSION } from "../../engine/catalogTypes";
+import { CATALOG_VERSION } from "../../catalog/catalogTypes";
 import type { WasmModule } from "../../dualrun/binding";
 import { attachMirror } from "../../dualrun/mirror";
 import { attachWasmHost } from "../../wasmhost/wasmHost";
-import { towerCatalog } from "../../engine/towerCatalog";
+import { towerCatalog } from "../../catalog/towerCatalog";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import { loadFixture } from "../dualrun/dualRunHarness";
 

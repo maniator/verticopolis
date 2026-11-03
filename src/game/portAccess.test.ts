@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { catalogFacility } from "../engine/catalogTypes";
+import { catalogFacility } from "../catalog/catalogTypes";
 import { Simulation } from "../engine/Simulation";
 import { catalogFor } from "../engine/catalog";
-import { towerCatalog, useTowerCatalogSource } from "../engine/towerCatalog";
+import { towerCatalog, useTowerCatalogSource } from "../catalog/towerCatalog";
 import { PortRenderSim } from "../simport/portRenderSim";
 import { catalogOf, floorsOfPort, isUnlocked, newRenderSim, newViewReader, quoteBuild, quoteShaft } from "./portAccess";
 import { bindViewKinds, isHotelKind, resetViewKindsForTests } from "../presentation/viewKinds";

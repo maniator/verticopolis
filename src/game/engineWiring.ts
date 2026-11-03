@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import { TowerEngine } from "../render/excalibur/TowerEngine";
-import { catalogFacility } from "../engine/catalogTypes";
+import { catalogFacility } from "../catalog/catalogTypes";
 import { snapX } from "../ui/placement";
 import { classifyGesture, isPaintKind } from "./gesture";
 import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors, clearBuildRefusal } from "./buildPreview";

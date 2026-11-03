@@ -4,8 +4,8 @@ import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
 import { catalogFor } from "../engine/catalog";
-import { catalogOn, useTowerCatalogSource } from "../engine/towerCatalog";
-import type { CatalogEconomy } from "../engine/catalogTypes";
+import { catalogOn, useTowerCatalogSource } from "../catalog/towerCatalog";
+import type { CatalogEconomy } from "../catalog/catalogTypes";
 
 /**
  * The hand-built fake `GameApp` the `appModals` tests pin the stats,

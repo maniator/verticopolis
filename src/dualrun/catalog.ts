@@ -1,16 +1,16 @@
-import { CATALOG_VERSION, type Catalog } from "../engine/catalogTypes";
+import { CATALOG_VERSION, type Catalog } from "../catalog/catalogTypes";
 import type { GameMode } from "../engine/types";
 import type { WasmModule } from "./binding";
 
 /**
  * The catalog through the WASM binding: `catalog(mode)` on the module returns
  * canonical JSON in the shape of {@link Catalog} (declared in
- * `src/engine/catalogTypes.ts`, which carries no engine tables), so a
+ * `src/catalog/catalogTypes.ts`, which carries no engine tables), so a
  * frontend reads every price, size and build rule from the engine instead of
  * from the TypeScript tables. `conformance/catalog-digests.json` holds the
  * two engines to the same text.
  */
-export { CATALOG_VERSION } from "../engine/catalogTypes";
+export { CATALOG_VERSION } from "../catalog/catalogTypes";
 export type {
   Catalog,
   CatalogCalendar,
@@ -20,7 +20,7 @@ export type {
   CatalogRent,
   CatalogWorld,
   CatalogRentCadence,
-} from "../engine/catalogTypes";
+} from "../catalog/catalogTypes";
 
 /** The catalog for `mode`, parsed and checked. Refuses, by name, a binding
  *  without the export, a refusal or unparsable reply, a shape version other
