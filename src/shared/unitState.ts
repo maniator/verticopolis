@@ -5,7 +5,8 @@ import type { UnitState } from "../engine/types";
  * engine (`Unit::is_operational`, `is_present`, `is_tenanted`, `is_dormant` in
  * `engine-rs/src/tower_query_state.rs`); these are the same checks over the
  * state a frame carries, so drawing code does not import the TypeScript
- * engine for them. `unitState.test.ts` and the Rust test hold one table.
+ * engine at runtime for them (the `UnitState` type below is the only link, and
+ * it is erased at build time). `unitState.test.ts` and the Rust test hold one table.
  */
 
 /** A unit that is live: not under construction, ablaze, or a burned-out shell.
