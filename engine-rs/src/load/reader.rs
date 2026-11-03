@@ -1,7 +1,7 @@
 //! Reading a save into a `Simulation`: the entry points and the per-unit reader.
 
 use super::*;
-use crate::tower::RetailTally;
+use crate::tower::Extras;
 
 /// `Simulation.deserialize(raw)`.
 pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
@@ -239,23 +239,23 @@ pub(crate) fn unit_from_value(u: &Value, modern: bool) -> Option<(Unit, Option<i
             .and_then(Value::as_str)
             .map(|s| s.to_string())
             .unwrap_or_else(|| kind.facility().name.to_string()),
-        vacate_reason: vacate_reason(u.get("vacateReason")),
-        vacate_at: u.get("vacateAt").map(|v| num(Some(v), 0.0)),
-        film_policy,
         subtype,
-        retail: RetailTally {
+        extras: Extras {
+            vacate_reason: vacate_reason(u.get("vacateReason")),
+            vacate_at: u.get("vacateAt").map(|v| num(Some(v), 0.0)),
+            film_policy,
             patronage_today: retail_field("patronageToday"),
             patronage_yest: retail_field("patronageYest"),
             profit_today: retail_field("profitToday"),
             profit_yest: retail_field("profitYest"),
+            complete_at: u.get("completeAt").and_then(Value::as_f64),
+            complete_at_raw: match u.get("completeAt") {
+                Some(v) if !v.is_number() => Some(v.clone()),
+                _ => None,
+            },
+            dirty_days: coerce_dirty_days(state, kind, u.get("dirtyDays")),
         }
         .boxed(),
-        complete_at: u.get("completeAt").and_then(Value::as_f64),
-        complete_at_raw: match u.get("completeAt") {
-            Some(v) if !v.is_number() => Some(Box::new(v.clone())),
-            _ => None,
-        },
-        dirty_days: coerce_dirty_days(state, kind, u.get("dirtyDays")),
     };
     Some((unit, sane_id(u.get("id"))))
 }

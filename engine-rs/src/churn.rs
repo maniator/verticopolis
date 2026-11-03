@@ -224,8 +224,8 @@ impl Simulation {
                 });
             }
         }
-        u.vacate_reason = None;
-        u.vacate_at = None;
+        u.extras_mut().vacate_reason = None;
+        u.extras_mut().vacate_at = None;
         self.tower
             .set_unit_label_at(i, kind.facility().name.to_string());
         let name = kind.facility().name;
@@ -286,8 +286,8 @@ impl Simulation {
             }
             let (u, at) = self.tower.marked(i);
             u.set_state(at, UnitState::Vacating);
-            u.vacate_reason = Some("relocation");
-            u.vacate_at = Some(self.clock.minutes + VACATE_NOTICE_MINUTES);
+            u.extras_mut().vacate_reason = Some("relocation");
+            u.extras_mut().vacate_at = Some(self.clock.minutes + VACATE_NOTICE_MINUTES);
             let msg = format!(
                 "A household in Condominium on {} is relocating. They leave in under {} day(s); you buy the unit back and re-list it.",
                 self.floor_label(floor),

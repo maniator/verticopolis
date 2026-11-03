@@ -30,9 +30,9 @@ impl Simulation {
                 Kind::Office | Kind::Condo | Kind::FitnessClub | Kind::Clinic
             ) || u.kind.is_rental();
             if lease_tenant && u.state == UnitState::Vacating {
-                let is_relocation = u.vacate_reason == Some("relocation");
-                let noise_cannot_evict =
-                    u.vacate_reason == Some("noise") && self.mode.noise_erosion_scale() == 0.0;
+                let is_relocation = u.extras().vacate_reason == Some("relocation");
+                let noise_cannot_evict = u.extras().vacate_reason == Some("noise")
+                    && self.mode.noise_erosion_scale() == 0.0;
                 let price_cfg = if u.kind == Kind::Office || u.kind.is_rental() {
                     rent_config(u.kind)
                 } else {
@@ -46,28 +46,28 @@ impl Simulation {
                     || r.far_walk
                     || r.lobby_far;
                 if noise_cannot_evict && non_noise_problem {
-                    u.vacate_reason = Some(self.vacate_cause(&u, &r));
-                    self.tower.units[i].vacate_reason = u.vacate_reason;
+                    u.extras_mut().vacate_reason = Some(self.vacate_cause(&u, &r));
+                    self.tower.units[i].extras_mut().vacate_reason = u.extras().vacate_reason;
                 }
                 let rescind_noise = noise_cannot_evict && !non_noise_problem;
                 if !is_relocation && (u.satisfaction >= VACATE_RESCIND || rescind_noise) {
                     let (w, at) = self.tower.marked(i);
                     w.set_state(at, UnitState::Occupied);
-                    w.vacate_reason = None;
-                    w.vacate_at = None;
+                    w.extras_mut().vacate_reason = None;
+                    w.extras_mut().vacate_at = None;
                     if rescind_noise {
                         w.satisfaction = w.satisfaction.max(NOISE_CAP);
                     }
-                } else if self.clock.minutes >= u.vacate_at.unwrap_or(0.0) {
-                    let reason = u.vacate_reason.unwrap_or("access");
+                } else if self.clock.minutes >= u.extras().vacate_at.unwrap_or(0.0) {
+                    let reason = u.extras().vacate_reason.unwrap_or("access");
                     self.vacate(i, reason);
                 }
             } else if lease_tenant && u.satisfaction <= 0.0 {
                 let reason = self.vacate_cause(&u, &r);
                 let (w, at) = self.tower.marked(i);
                 w.set_state(at, UnitState::Vacating);
-                w.vacate_reason = Some(reason);
-                w.vacate_at = Some(self.clock.minutes + VACATE_NOTICE_MINUTES);
+                w.extras_mut().vacate_reason = Some(reason);
+                w.extras_mut().vacate_at = Some(self.clock.minutes + VACATE_NOTICE_MINUTES);
                 notices.push((u.floor, u.kind, reason));
             } else if u.satisfaction <= 0.0 && u.kind.is_hotel() {
                 let reason = self.vacate_cause(&u, &r);

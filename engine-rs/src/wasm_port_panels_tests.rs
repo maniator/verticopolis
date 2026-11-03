@@ -110,6 +110,7 @@ fn the_unit_card_is_the_detail_card() {
         .iter_mut()
         .find(|u| u.id == office)
         .unwrap()
+        .extras_mut()
         .vacate_reason = Some("rent");
     let cinema = unit(&e, Kind::Cinema);
     e.sim
@@ -118,6 +119,7 @@ fn the_unit_card_is_the_detail_card() {
         .iter_mut()
         .find(|u| u.id == cinema)
         .unwrap()
+        .extras_mut()
         .film_policy = Some("blockbuster");
     // The cinema twice: booked for the blockbuster, then not.
     e.sim.blockbusters.push(cinema as f64);
