@@ -88,15 +88,13 @@ describe("a failed save reports autosave_failed", () => {
 
 describe("a refused import reports import_failed", () => {
   it("reports an unreadable .vctower as `save`, and a good one as nothing", async () => {
-    vi.spyOn(SaveGame, "importText").mockRejectedValueOnce(new Error("not a tower"));
-    const bad = makeLoad();
+    const bad = makeLoad({ loadVctower: () => [0], lastReason: () => "not a tower" });
     await bad.load.importGame("garbage");
     expect(trackAppAction).toHaveBeenCalledExactlyOnceWith("import_failed", "save");
     expect(bad.ui.sayVisibly).toHaveBeenCalledWith("Import failed: not a tower");
 
     vi.mocked(trackAppAction).mockClear();
-    vi.spyOn(SaveGame, "importText").mockResolvedValueOnce("TEXT");
-    const good = makeLoad({ loadSave: () => [1] });
+    const good = makeLoad({ loadVctower: () => [1] });
     await good.load.importGame("fine");
     expect(trackAppAction).not.toHaveBeenCalled();
     expect(good.towerSwapped).toHaveBeenCalledOnce();

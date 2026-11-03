@@ -2,16 +2,40 @@
 
 use super::*;
 
+/// The reason a `.vctower` is refused for inflating past the size cap.
+pub(crate) const EXPANDS_TOO_FAR: &str =
+    "this .vctower expands to more data than we will hold; it looks crafted rather than saved";
+
 /// `decodeVctower(text)`: the VCTOWER1 container (base64 of raw deflate).
 pub fn decode_vctower(text: &str) -> Result<Value, String> {
     parse_save_json(&inflate_vctower(text)?).map_err(|e| format!("json: {e}"))
 }
 
+/// Why the save text could not be taken out of a `.vctower` container.
+pub(crate) enum InflateError {
+    /// The text does not start with the `VCTOWER1` stamp.
+    NotAContainer,
+    /// The text inflates past the size cap.
+    ExpandsTooFar,
+    /// The packed data is not valid deflate.
+    Damaged(String),
+}
+
 /// The save text inside a VCTOWER1 container, as `decode_vctower` parses it.
 pub(crate) fn inflate_vctower(text: &str) -> Result<Vec<u8>, String> {
+    inflate_container(text).map_err(|e| match e {
+        InflateError::NotAContainer => "not a VCTOWER1 file".to_string(),
+        InflateError::ExpandsTooFar => EXPANDS_TOO_FAR.to_string(),
+        InflateError::Damaged(why) => why,
+    })
+}
+
+/// `inflate_vctower` with the reason as a variant, for a caller that words
+/// each refusal itself.
+pub(crate) fn inflate_container(text: &str) -> Result<Vec<u8>, InflateError> {
     let trimmed = js_trim(text);
     if !trimmed.starts_with(TOWER_FILE_MAGIC) {
-        return Err("not a VCTOWER1 file".into());
+        return Err(InflateError::NotAContainer);
     }
     let packed = lenient_base64(&trimmed[TOWER_FILE_MAGIC.len()..]);
     use std::io::Read;
@@ -19,12 +43,9 @@ pub(crate) fn inflate_vctower(text: &str) -> Result<Vec<u8>, String> {
     flate2::read::DeflateDecoder::new(&packed[..])
         .take(MAX_SAVE_INFLATED_BYTES + 1)
         .read_to_end(&mut out)
-        .map_err(|e| format!("inflate: {e}"))?;
+        .map_err(|e| InflateError::Damaged(format!("inflate: {e}")))?;
     if out.len() as u64 > MAX_SAVE_INFLATED_BYTES {
-        return Err(
-            "this .vctower expands to more data than we will hold; it looks crafted rather than saved"
-                .into(),
-        );
+        return Err(InflateError::ExpandsTooFar);
     }
     // `TextDecoder` drops a leading byte order mark before `JSON.parse` sees it.
     if out.starts_with(b"\xEF\xBB\xBF") {
@@ -276,5 +297,10 @@ pub(super) fn lenient_base64(text: &str) -> Vec<u8> {
 /// with Rust's `is_whitespace`, JavaScript also counts U+FEFF and does not
 /// count U+0085 (NEL).
 pub fn js_trim(s: &str) -> &str {
-    s.trim_matches(|c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}')
+    s.trim_matches(is_js_whitespace)
+}
+
+/// Whether JavaScript's `trim` strips the character (see `js_trim`).
+pub(crate) fn is_js_whitespace(c: char) -> bool {
+    (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}'
 }
