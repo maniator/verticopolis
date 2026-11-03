@@ -2,7 +2,7 @@ import type { TemplateResult } from "lit-html";
 import { facilityFloors } from "../engine/facilities";
 import type { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
-import { towerCatalog } from "../engine/towerCatalog";
+import { towerCatalog } from "../catalog/towerCatalog";
 import type { Transport, Unit } from "../engine/types";
 import { clockOf } from "../simport/headerClock";
 import { PortCodes } from "../simport/portCodes";

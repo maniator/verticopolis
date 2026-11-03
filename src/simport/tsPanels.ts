@@ -1,9 +1,9 @@
 import type { HeatmapMode } from "../engine/sim/constants";
 import type { Simulation } from "../engine/Simulation";
-import { catalogFacility } from "../engine/catalogTypes";
+import { catalogFacility } from "../catalog/catalogTypes";
 import { householdMix } from "../engine/households";
 import { MILESTONES } from "../engine/milestones";
-import { towerCatalog } from "../engine/towerCatalog";
+import { towerCatalog } from "../catalog/towerCatalog";
 import { unitPrice } from "../ui/catalogPricing";
 import type {
   CongestionHotspot,

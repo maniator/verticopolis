@@ -3,7 +3,7 @@ import type { GameApp } from "../main";
 import type { Simulation } from "../engine/Simulation";
 import { showStats, confirmExterminate } from "./appModals";
 import { statsTemplate } from "../ui/templates/stats";
-import { towerCatalog } from "../engine/towerCatalog";
+import { towerCatalog } from "../catalog/towerCatalog";
 import { statsReport } from "../simport/statsSheet";
 import { makeApp, makeSim, settle, withExterminator, type Refusal } from "./appModals.fixture";
 

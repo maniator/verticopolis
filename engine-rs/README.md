@@ -241,7 +241,7 @@ A value a kind does not have is present as `null`, and the shape carries
 a `version` that moves when a field is added, renamed or removed.
 
 The WASM binding returns the same JSON from `catalog(mode)`, typed by
-`Catalog` in `src/engine/catalogTypes.ts` and read through `readCatalog` in
+`Catalog` in `src/catalog/catalogTypes.ts` and read through `readCatalog` in
 `src/dualrun/catalog.ts`, which refuses a reply whose shape is not `Catalog`
 (a missing or mistyped field, a negative price, a pool or ground floor
 structure naming no listed kind). The TypeScript engine builds the same catalog from

@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { keyed } from "lit-html/directives/keyed.js";
 import { isOperational, isTenanted } from "../../engine/types";
 import { isCommercialKind, isHotelKind } from "../../presentation/viewKinds";
-import { catalogFacility, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../engine/catalogTypes";
+import { catalogFacility, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
 import { priceOptionsFor } from "../catalogPricing";
 import { isRentalKind } from "../../engine/residentialRentals";

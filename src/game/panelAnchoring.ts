@@ -1,5 +1,5 @@
 import type { GameApp } from "../main";
-import { catalogFacility } from "../engine/catalogTypes";
+import { catalogFacility } from "../catalog/catalogTypes";
 import { catalogOf } from "./portAccess";
 
 /**

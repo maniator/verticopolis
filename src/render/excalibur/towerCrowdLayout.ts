@@ -1,4 +1,4 @@
-import { catalogFacility, type Catalog } from "../../engine/catalogTypes";
+import { catalogFacility, type Catalog } from "../../catalog/catalogTypes";
 import type { UnitView } from "../../simport/view";
 
 /**

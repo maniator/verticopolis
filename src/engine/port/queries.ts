@@ -1,9 +1,9 @@
-import { catalogFacility } from "../catalogTypes";
+import { catalogFacility } from "../../catalog/catalogTypes";
 import { isElevatorKind } from "../facilities";
 import { INVALID_REQUEST, UNKNOWN_FACILITY } from "../request";
 import type { Simulation } from "../Simulation";
 import type { HeatmapMode } from "../sim/constants";
-import { towerCatalog } from "../towerCatalog";
+import { towerCatalog } from "../../catalog/towerCatalog";
 import { roomUnits } from "../tower/rooms";
 import type { Unit } from "../types";
 import { scheduleFromSlots, scheduleSlots } from "../../simport/scheduleSlots";

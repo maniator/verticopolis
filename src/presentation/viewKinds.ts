@@ -1,4 +1,4 @@
-import { catalogOpenAt, type Catalog, type CatalogFacility } from "../engine/catalogTypes";
+import { catalogOpenAt, type Catalog, type CatalogFacility } from "../catalog/catalogTypes";
 import type { FacilityKind } from "../engine/types";
 
 /**

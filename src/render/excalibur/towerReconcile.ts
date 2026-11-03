@@ -1,7 +1,7 @@
 import * as ex from "excalibur";
 import { Z } from "../depthPlanes";
-import { catalogFacility } from "../../engine/catalogTypes";
-import { towerCatalog } from "../../engine/towerCatalog";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { towerCatalog } from "../../catalog/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
 import { isPresent } from "../../engine/types";
 import type { TransportView, UnitView } from "../../simport/view";

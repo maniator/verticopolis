@@ -113,7 +113,6 @@ src/engine/migrations/v6tov7.ts
 # Reference data, rules and catalog reads (#921)
 src/engine/calendar.ts
 src/engine/catalog.ts
-src/engine/catalogTypes.ts
 src/engine/econConfig.ts
 src/engine/elevatorSchedule.ts
 src/engine/facilitiesData.ts
@@ -128,7 +127,6 @@ src/engine/retailSubtypes.ts
 src/engine/ruleSets.ts
 src/engine/scheduleAuthoring.ts
 src/engine/scheduleOrigins.ts
-src/engine/towerCatalog.ts
 src/engine/traffic.ts
 
 # Shared utilities and event plumbing

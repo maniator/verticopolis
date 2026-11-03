@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { catalogFor } from "./catalog";
-import { catalogBuildKind } from "./catalogTypes";
+import { catalogBuildKind } from "../catalog/catalogTypes";
 import { groundFloorStructureKind } from "./tower/towerTopology";
 import { ALL_KINDS } from "./facilities";
 

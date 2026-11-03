@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { facilityFloors } from "../engine/facilities";
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
-import { towerCatalog } from "../engine/towerCatalog";
+import { towerCatalog } from "../catalog/towerCatalog";
 import { unitPrice } from "../ui/catalogPricing";
 import { Cards } from "./cards";
 import { PortCodes } from "./portCodes";

@@ -1,7 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { isTenanted } from "../../engine/types";
 import { isCommercialKind, isElevatorKind } from "../../presentation/viewKinds";
-import { catalogFacility, catalogOpenAt, catalogResidents, type Catalog } from "../../engine/catalogTypes";
+import { catalogFacility, catalogOpenAt, catalogResidents, type Catalog } from "../../catalog/catalogTypes";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
 import { floorTag } from "../format";
 
