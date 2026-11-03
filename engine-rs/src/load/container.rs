@@ -2,6 +2,10 @@
 
 use super::*;
 
+/// The reason a `.vctower` is refused for inflating past the size cap.
+pub(crate) const EXPANDS_TOO_FAR: &str =
+    "this .vctower expands to more data than we will hold; it looks crafted rather than saved";
+
 /// `decodeVctower(text)`: the VCTOWER1 container (base64 of raw deflate).
 pub fn decode_vctower(text: &str) -> Result<Value, String> {
     parse_save_json(&inflate_vctower(text)?).map_err(|e| format!("json: {e}"))
@@ -21,10 +25,7 @@ pub(crate) fn inflate_vctower(text: &str) -> Result<Vec<u8>, String> {
         .read_to_end(&mut out)
         .map_err(|e| format!("inflate: {e}"))?;
     if out.len() as u64 > MAX_SAVE_INFLATED_BYTES {
-        return Err(
-            "this .vctower expands to more data than we will hold; it looks crafted rather than saved"
-                .into(),
-        );
+        return Err(EXPANDS_TOO_FAR.into());
     }
     // `TextDecoder` drops a leading byte order mark before `JSON.parse` sees it.
     if out.starts_with(b"\xEF\xBB\xBF") {

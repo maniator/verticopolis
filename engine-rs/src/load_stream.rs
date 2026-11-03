@@ -87,12 +87,19 @@ pub fn load_vctower_text(text: &str, mode: Option<&str>) -> Result<Simulation, S
 
 /// `load_vctower_text`, and whether the streamed reader took the file.
 fn read_vctower(text: &str, mode: Option<&str>) -> Result<(Simulation, bool), String> {
-    let json = inflate_vctower(text)?;
-    if let Some((mut sim, data)) = streamed(&json, mode) {
+    read_vctower_json(&inflate_vctower(text)?, mode)
+}
+
+/// `read_vctower` on the save text a file holds, already inflated.
+pub(crate) fn read_vctower_json(
+    json: &[u8],
+    mode: Option<&str>,
+) -> Result<(Simulation, bool), String> {
+    if let Some((mut sim, data)) = streamed(json, mode) {
         mark_founder_from_loaded_file(&mut sim, &data);
         return Ok((sim, true));
     }
-    let mut raw = parse_save_json(&json).map_err(|e| format!("json: {e}"))?;
+    let mut raw = parse_save_json(json).map_err(|e| format!("json: {e}"))?;
     if let Some(m) = mode {
         override_mode(&mut raw, m)?;
     }

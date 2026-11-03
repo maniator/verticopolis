@@ -387,13 +387,12 @@ export class SaveLoad {
 
   async importGame(data: string): Promise<void> {
     try {
-      // SaveGame holds the file to its checks and copy; the engine loads it
-      // (the `stored` source, with the founder rule) and the app follows.
-      const text = await SaveGame.importText(data);
+      // The engine reads the file and says why it refuses one, in the
+      // player's words (`vctower_import.rs`); the page only shows it. The
+      // founder rule for a file without a build stamp is the engine's too.
       const port = this.deps.enginePort();
-      const loaded = port.loadSave(text);
-      // A refused file is told apart in the import's own words when they have any.
-      if (loaded[0] !== 1) throw new Error(SaveGame.importObjection(text) ?? port.lastReason() ?? SWAP_REFUSED);
+      const loaded = port.loadVctower(data);
+      if (loaded[0] !== 1) throw new Error(port.lastReason() ?? SWAP_REFUSED);
       this.deps.towerSwapped();
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
