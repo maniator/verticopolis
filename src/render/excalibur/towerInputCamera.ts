@@ -2,7 +2,7 @@ import * as ex from "excalibur";
 import { viewWorld } from "../../presentation/viewWorld";
 import { findCatalogFacility } from "../../catalog/catalogTypes";
 import type { FacilityKind, SerializedView, WeatherKind } from "../../engine/types";
-import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
+import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../shared/viewZoom";
 import { clampCameraY, fitZoom } from "../cameraBounds";
 import { stablePointerId } from "../pinchTracker";
 import { FLOOR, TILE } from "../scale";
@@ -17,7 +17,7 @@ import { towerCatalog } from "../../catalog/towerCatalog";
  * coordinate transforms these read).
  */
 
-/** Camera zoom range (screen px per world px). Lives in engine/types
+/** Camera zoom range (screen px per world px). Lives in shared/viewZoom
  *  (VIEW_ZOOM_MIN/MAX: the save schema clamps a restored zoom at the
  *  deserialize trust boundary); re-exported under the familiar names. */
 export const MIN_ZOOM = VIEW_ZOOM_MIN;

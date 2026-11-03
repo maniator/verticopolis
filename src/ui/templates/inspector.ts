@@ -1,5 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import { isTenanted } from "../../engine/types";
+import { isTenanted } from "../../shared/unitState";
 import { isCommercialKind, isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility, catalogOpenAt, catalogResidents, type Catalog } from "../../catalog/catalogTypes";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
