@@ -216,4 +216,15 @@ fn the_overlay_extents_follow_every_layout_edit() {
     sim.tower.memo.borrow_mut().floor_extents = None;
     assert_eq!(extent(&sim, 4), Some(after));
     assert_eq!(extent(&sim, 2), Some(before));
+    // A sale moves them back: the tile is gone, so floor 4 reads empty again.
+    let tile = sim
+        .tower
+        .units
+        .iter()
+        .find(|u| u.floor == 4 && u.kind == Kind::Floor)
+        .map(|u| u.id)
+        .expect("the floor 4 tile");
+    assert!(sim.tower.remove_unit(tile).is_some());
+    assert_eq!(extent(&sim, 4), None, "a removal drops the floor");
+    assert_eq!(extent(&sim, 2), Some(before));
 }
