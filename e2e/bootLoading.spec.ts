@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect } from "@playwright/test";
-import { onWasm } from "./helpers";
 import { hostedGame } from "./offlineHelpers";
 import { ENGINE_LOADING_DELAY_MS, ENGINE_LOADING_TEXT } from "../src/engineLoading";
 
@@ -9,7 +8,6 @@ import { ENGINE_LOADING_DELAY_MS, ENGINE_LOADING_TEXT } from "../src/engineLoadi
  * slow (#1132), and says nothing when it is fast. The WASM engine loads before
  * the app exists, so without the line a slow first visit is a blank sky.
  */
-test.beforeEach(({}, info) => test.skip(!onWasm(info.project.name), "the engine loads before the app on the chromium-wasm and chromium-wasm-only projects"));
 test.setTimeout(60_000);
 // No worker, so the route below sees every engine request (an installed game
 // reads the engine from the precache in milliseconds).

@@ -1,51 +1,29 @@
 import { defineConfig, devices } from "@playwright/test";
-import { readFileSync } from "node:fs";
-import { GENERAL_SPEC_PATTERN, SWITCHABLE_ONLY_SPEC_PATTERN } from "./src/tests/playwrightLaneSelection";
-
-// The suite runs on the Rust engine (#1353). The switchable lane keeps the
-// specs that depend on the engine-choice build, while the wasm-only lane runs
-// the general browser-regression suite once against the wasm-only build, which
-// sets no engine preference because it has no engine switch to read. The dual-
-// lane integrity spec remains in both lanes because it checks the same behavior
-// across the switchable and wasm-only builds.
 
 // Playwright drives the BUILT app (via `vite preview`) for the Tier-2 end-to-end
 // smoke. Headless Tier-1 playthrough tests live in vitest (the `src` tree); this
-// config only covers the `e2e` folder. Run with `npm run e2e` after a build.
-const WASM_ONLY = process.env.PW_WASM_ONLY === "1";
-if (process.env.PW_WASM_ONLY && !WASM_ONLY) throw new Error(`PW_WASM_ONLY must be "1" or unset; got "${process.env.PW_WASM_ONLY}".`);
-// The lane must match the build it serves: the projects of one lane fail in
-// confusing ways against the other's build. The build records its mode.
-const builtMode = (() => {
-  let text: string;
-  try {
-    text = readFileSync(new URL("./dist/version.json", import.meta.url), "utf8");
-  } catch {
-    return null; // no build yet: the web server step reports that
-  }
-  try {
-    return (JSON.parse(text) as { engineBuild?: string } | null)?.engineBuild ?? "unrecorded";
-  } catch {
-    throw new Error("dist/version.json is unreadable; rebuild (VC_TOOLING=1 npm run build, with VC_ENGINE=wasm for PW_WASM_ONLY=1).");
-  }
-})();
-if (builtMode !== null && (builtMode === "wasm-only") !== WASM_ONLY) {
-  throw new Error(
-    `dist/ is a${builtMode === "unrecorded" ? "n older build that records no engine mode" : ` ${builtMode} build`}, but ` +
-      `${WASM_ONLY ? "PW_WASM_ONLY=1 expects a wasm-only one" : "this lane expects a switchable one"}. Rebuild for the lane ` +
-      `(VC_TOOLING=1 npm run build, with VC_ENGINE=wasm for PW_WASM_ONLY=1), or set PW_WASM_ONLY to match the build.`,
-  );
-}
+// config only covers the `e2e` folder. Run with `npm run e2e` after a tooling
+// build (`VC_TOOLING=1 npm run build`).
+//
+// The game runs on the Rust engine only, so there is one build and one set of
+// specs. The projects split the specs by how they need the machine, not by
+// engine:
+//   - `chromium-serial`: pixel baselines (visual, atlas), the perf gate and
+//     the engine identity and status specs. These want exclusive CPU and fixed timing.
+//   - `chromium`: the general browser regression suite.
+// `npm run e2e` runs both; CI runs them as the `e2e` and `e2e-wasm-only` jobs
+// with `--project`.
+const SERIAL_SPECS = ["engineIdentity", "engineStatusRows", "atlas", "visual", "perf"];
+const SERIAL_SPEC_PATTERN = new RegExp(`(?:^|[\\\\/])(?:${SERIAL_SPECS.join("|")})\\.spec\\.ts$`);
 
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  // CI keeps a second worker only for the wasm-only browser lane without changing
-  // the default local single-worker behavior, so the job gets a faster wall-clock
-  // without adding extra jobs or changing the switchable lane's setup.
-  workers: process.env.CI && WASM_ONLY ? 2 : 1,
+  // One worker everywhere. Two on the general CI job broke main once (a mobile
+  // gesture spec timed out) and the speed-up was never shown to be steady.
+  workers: 1,
   reporter: "list",
   expect: {
     // Visual-baseline comparisons (visual.spec.ts). Animations are frozen and
@@ -69,26 +47,18 @@ export default defineConfig({
     // the normal case, including CI — Playwright uses its own browser.
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   },
-  projects: WASM_ONLY
-    ? [{ name: "chromium-wasm-only", testIgnore: [/visual\.spec\.ts/, SWITCHABLE_ONLY_SPEC_PATTERN], use: { ...devices["Desktop Chrome"] } }]
-    : [
-    // The Rust engine: the stored engine choice (`vc.engine`, see
-    // src/wasmhost/engineChoice.ts) is seeded into localStorage so every page
-    // the suite opens boots on it. This lane intentionally limits itself to the
-    // switchable-only tests and the dual-lane integrity fallback assertions
-    // whose behavior differs across builds, while the general browser
-    // regression suite runs once on the wasm-only tooling build.
+  projects: [
     {
-      name: "chromium-wasm",
-      testIgnore: [/wasmOnly\.spec\.ts/, GENERAL_SPEC_PATTERN],
+      name: "chromium-serial",
+      testMatch: SERIAL_SPEC_PATTERN,
+      // Baselines are named for the browser, whatever the project is called.
       snapshotPathTemplate: "{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}-chromium{-snapshotSuffix}{ext}",
-      use: {
-        ...devices["Desktop Chrome"],
-        storageState: {
-          cookies: [],
-          origins: [{ origin: "http://127.0.0.1:4173", localStorage: [{ name: "vc.engine", value: "wasm" }] }],
-        },
-      },
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "chromium",
+      testIgnore: SERIAL_SPEC_PATTERN,
+      use: { ...devices["Desktop Chrome"] },
     },
   ],
   webServer: {

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
-import { buildToStar, engineSave, expectEngineHosted, onWasm } from "./helpers";
+import { buildToStar, engineSave, expectEngineHosted } from "./helpers";
 
-// On chromium-wasm every test must end with its tower still on the engine.
+// Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
@@ -10,7 +10,7 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * playthrough cannot check (it has no DOM). `buildToStar(6)` reproduces a
  * winning state through the app's public sim API and runs the REAL win logic
  * (`sim.checkVip`, inside a relayed tick); we then assert the game's own update
- * loop opens the modal. On `chromium-wasm` the engine runs that inspection, and
+ * loop opens the modal. The engine runs that inspection, and
  * the test checks the engine's own save carries the win.
  */
 test("winning the TOWER shows the congratulations modal", async ({ page }) => {
@@ -26,7 +26,7 @@ test("winning the TOWER shows the congratulations modal", async ({ page }) => {
   expect(star).toBe(6); // the real win logic reached TOWER
   await expectEngineHosted(page);
   const engine = await engineSave(page);
-  if (onWasm(test.info().project.name)) expect(engine).toMatchObject({ star: 6, evaluatedTower: true });
+  expect(engine).toMatchObject({ star: 6, evaluatedTower: true });
 
   const modal = page.locator("#modal");
   await expect(modal).toBeVisible();
@@ -65,9 +65,7 @@ test("a TOWER save with an open emergency shows the choice, then the congratulat
     return Boolean(g?.sim?.pendingChoice) && g?.sim?.evaluatedTower === true && Boolean(document.getElementById("splash"));
   });
   await expectEngineHosted(page);
-  if (onWasm(test.info().project.name)) {
-    expect(await engineSave(page)).toMatchObject({ evaluatedTower: true, events: { pending: { kind: "bombThreat" } } });
-  }
+  expect(await engineSave(page)).toMatchObject({ evaluatedTower: true, events: { pending: { kind: "bombThreat" } } });
 
   // Continue: the player leaves the title screen with both dialogs due.
   await page.evaluate(() => {

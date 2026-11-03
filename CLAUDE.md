@@ -48,7 +48,7 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
   `npm test`, `npm run build`. All four must be green. The build needs the
   engine package (`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a
-  deliberate TypeScript-only build; see CONTRIBUTING.md.
+  deliberate build without the engine (it cannot run the game); see CONTRIBUTING.md.
 - **American English everywhere;** keep `src/engine/` free of DOM/rendering.
 - **Preserve readable intent at call sites.** Never obscure gameplay or UI
   rules behind positional shorthand like `done: bit(0)` or an unexplained
@@ -211,7 +211,7 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 ## Canon reference (don't re-derive from memory)
 
 - **The Rust engine is the only engine the shipped game runs** (app 2.66.0,
-  engine crate 1.0.0; every deploy is the wasm-only build). A simulation change
+  engine crate 1.0.0; every build is the Rust-only build). A simulation change
   lands in `engine-rs/`. The TypeScript engine (`src/engine/`) is a reference
   that stays until its code is deleted: touch it only when the shared
   conformance lock, a parity test or the catalog digest needs it, and say why

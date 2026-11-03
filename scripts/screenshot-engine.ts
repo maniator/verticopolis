@@ -3,10 +3,8 @@
  * settle points that make the two engines render the same scenes (#899).
  *
  * The committed gallery is the Rust engine's (#1353): every game scene renders
- * with the WASM engine hosting the tower, the way the `chromium-wasm`
- * Playwright project does. The stored `vc.engine` value is seeded before any page script runs (the
- * game ignores it now; slice 4b removes the seed), and
- * the hosted checks below fail a scene that did not end up on the engine, so
+ * with the WASM engine hosting the tower. The game boots on it with no
+ * stored choice, and the hosted checks below fail a scene that did not end up on the engine, so
  * a missing engine package can never render under a green gate.
  *
  * On the Rust engine `game.sim` is a copy of the engine's save
@@ -40,7 +38,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export type ShotEngine = "ts" | "wasm"; // "ts" is refused by resolveShotEngine; slice 4b drops the type's leg
+export type ShotEngine = "wasm"; // "ts" is refused by resolveShotEngine
 
 /** Read the engine switch; unset is the Rust engine. A typo fails the run
  *  instead of silently rendering one engine under the other's label. */
@@ -103,21 +101,9 @@ export function shotShape(v: any): any {
   };
 }
 
-/** Before navigation: seed the stored engine choice on the WASM leg, and
- *  install the shared shape and the settle that builders call before they
- *  tick, on both legs. Playwright does not promise an order between init
- *  scripts, so a scene init script that cleared storage could drop the engine
- *  seed; the WASM leg's hosted checks would then fail the scene by name. */
-export async function seedEngineChoice(page: Page): Promise<void> {
-  if (SHOT_ENGINE === "wasm") {
-    await page.addInitScript(() => {
-      try {
-        localStorage.setItem("vc.engine", "wasm");
-      } catch {
-        /* storage blocked: the hosted check after boot fails the scene */
-      }
-    });
-  }
+/** Before navigation: install the shared shape and the settle that builders
+ *  call before they tick. */
+export async function installShotHelpers(page: Page): Promise<void> {
   await page.addInitScript(`window.__vcShotShape = ${shotShape.toString()};`);
   await page.addInitScript(`window.__vcShotHandoff = () => (${pgSettle.toString()})(${JSON.stringify(SHOT_ENGINE)});`);
 }
@@ -236,7 +222,7 @@ export function pgCheckHosted(before: string): string {
   const g = w.game;
   const vc = w.__vcEngine;
   if (!g?.sim) return "no game";
-  if (typeof w.__vcShotShape !== "function") return "the shared shape is not installed (seedEngineChoice did not run on this page)";
+  if (typeof w.__vcShotShape !== "function") return "the shared shape is not installed (installShotHelpers did not run on this page)";
   const shapeOf = w.__vcShotShape;
   if (!vc) return "no engine host (did the engine package load?)";
   if (!vc.status?.hosted) return "the engine does not hold the tower";
@@ -296,7 +282,7 @@ export function pgSettle(leg: "ts" | "wasm"): string {
     if (!g?.sim) return "no game";
     if (leg === "wasm" && !vc) return "no engine host (did the engine package load?)";
     if (leg === "wasm" && g.enginePort !== vc.port) return "the app does not run on the Rust engine";
-    if (typeof w.__vcShotShape !== "function") return "the shared shape is not installed (seedEngineChoice did not run on this page)";
+    if (typeof w.__vcShotShape !== "function") return "the shared shape is not installed (installShotHelpers did not run on this page)";
     const shapeOf = w.__vcShotShape;
     // Only a title screen still in the page counts: the runner's splash
     // dismissal removes the node and can leave the controller's reference

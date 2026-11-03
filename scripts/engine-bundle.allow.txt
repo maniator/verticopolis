@@ -1,7 +1,7 @@
-# TypeScript engine modules a wasm-only build (VC_ENGINE=wasm) still ships.
+# TypeScript engine modules the build still ships.
 #
 # scripts/verify-engine-bundle.ts reads every emitted sourcemap after the
-# build and fails when the wasm-only bundle carries a src/engine/ module this
+# build and fails when the bundle carries a src/engine/ module this
 # list does not name, or when a listed module no longer ships. The list only
 # shrinks: delete a line when its module leaves the bundle, and add one only
 # with a reviewed reason the module has to ship.

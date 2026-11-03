@@ -3,19 +3,15 @@ import type { Deployment, Deployments } from "./deployments";
 
 /**
  * Steps shared by the specs that run on the two-deployment server (#985):
- * a context that chooses the engine, and a read of what the precache holds
+ * a context on the deployments' origin, and a read of what the precache holds
  * for the three engine files, checked against what a build's own sw.js and
  * files describe.
  */
 
 export const short = (id: string): string => id.slice(0, 12);
 
-/** A new context on the deployments' origin that chooses the engine, as the project's own contexts do. */
-export const newContext = (browser: Browser, deployments: Deployments): Promise<BrowserContext> =>
-  browser.newContext({
-    baseURL: deployments.origin,
-    storageState: { cookies: [], origins: [{ origin: deployments.origin, localStorage: [{ name: "vc.engine", value: "wasm" }] }] },
-  });
+/** A new context on the deployments' origin. */
+export const newContext = (browser: Browser, deployments: Deployments): Promise<BrowserContext> => browser.newContext({ baseURL: deployments.origin });
 
 /** What the precache holds for the engine files: each key (path and query) with the SHA-256 of its body. */
 export async function engineEntries(page: Page): Promise<Record<string, string>> {

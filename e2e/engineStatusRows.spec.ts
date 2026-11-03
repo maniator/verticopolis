@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page, type Route } from "@playwright/test";
-import { WASM_PROJECT } from "./helpers";
 
 /**
  * The engine-test rows in a real browser (the analytics packet, rev 5,
@@ -28,8 +27,7 @@ test.beforeEach(async ({ page }) => {
 const statusRows = (page: Page): Promise<Row[]> =>
   page.evaluate(() => ((window as any).__vcEvents as { name: string; props: Row }[]).filter((e) => e.name === "engine_status").map((e) => e.props));
 
-test("a package load that never finishes has already sent its attempt row", async ({ page }, info) => {
-  test.skip(info.project.name !== WASM_PROJECT, "needs a boot that asks for the Rust engine");
+test("a package load that never finishes has already sent its attempt row", async ({ page }) => {
   // The package's requests are held, never answered, as on a tab closed mid-load.
   const held: Route[] = [];
   let release = false;
@@ -53,8 +51,7 @@ test("a package load that never finishes has already sent its attempt row", asyn
   expect(settle.page_life).toBe(attempt.page_life);
 });
 
-test("a session engages on its first accepted command, after attempt and settle", async ({ page }, info) => {
-  test.skip(info.project.name !== WASM_PROJECT, "the switchable project");
+test("a session engages on its first accepted command, after attempt and settle", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(() => !!(window as any).game?.enginePort, undefined, { timeout: 30_000 });
   await page.evaluate(() => {

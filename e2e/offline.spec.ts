@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
-import { onWasm, expectEngineHosted } from "./helpers";
+import { expectEngineHosted } from "./helpers";
 import { expectAudioFromWorker, expectControlledWithEngine, expectSoundsAfterGesture, hostedGame, installWorker, recordAudio, watch } from "./offlineHelpers";
 
 /**
@@ -13,10 +13,8 @@ import { expectAudioFromWorker, expectControlledWithEngine, expectSoundsAfterGes
  * binary came from the service worker. A reload here keeps the browser
  * context; offlineColdStart.spec.ts covers a start in a fresh browser session.
  *
- * These run against the production build `npm run e2e` serves (vite preview),
- * on the chromium-wasm project, where the engine is the chosen one.
+ * These run against the production build `npm run e2e` serves (vite preview).
  */
-test.beforeEach(({}, info) => test.skip(!onWasm(info.project.name), "the engine runs on the chromium-wasm and chromium-wasm-only projects"));
 // An install, an offline reload and a game session each: more than the default 30s.
 test.setTimeout(90_000);
 test.afterEach(async ({ page }) => expectEngineHosted(page));

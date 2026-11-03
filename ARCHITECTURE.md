@@ -221,26 +221,20 @@ The game runs on the Rust engine (`engine-rs/`) compiled to WASM and hosted by
 `src/wasmhost/`. The TypeScript engine in `src/engine/` is no longer run by the
 shipped game (app 2.66.0, engine crate 1.0.0); its code stays until the
 cutover below removes it. While hosted, the TypeScript `Simulation` the app
-holds is a read model the host refreshes from the engine every frame. A build
-picks how the two relate:
+holds is a read model the host refreshes from the engine every frame. Every
+build is the same Rust-only build: only the WASM engine advances the
+simulation. The TypeScript instance stays as the read model, and commands
+and loads still pass through it until #954 and #868 land.
+`bootstrap.ts` always loads the engine, there is no engine switch or dual run,
+and a `resolve.alias` in `vite.config.ts` swaps the TypeScript step loop for
+`src/wasmhost/stepLoopAbsent.ts` (Vitest keeps the real loop). A package that
+fails to load, or a tower the host refuses, stops the game with the message in
+`src/wasmhost/engineBoot.ts`. `window.__vcEngineBoot` names the build, the
+engine and any failure.
 
-- **Wasm-only** (`VC_ENGINE=wasm`, what every deploy builds): only the WASM engine advances the
-  simulation. The TypeScript instance stays as the read model, and commands
-  and loads still pass through it until #954 and #868 land.
-  `bootstrap.ts` always loads it, there is no engine switch or dual run, and a `resolve.alias` in
-  `vite.config.ts` swaps the TypeScript step loop for
-  `src/wasmhost/stepLoopAbsent.ts`. A package that fails to load, or a tower
-  the host refuses, stops the game with the message in
-  `src/wasmhost/engineBoot.ts`. `window.__vcEngineBoot` names the build, the
-  engine and any failure.
-- **Switchable** (the default for dev serves and the test lanes, `VC_ENGINE`
-  unset): the TypeScript step loop still ships, but the game boots on the WASM
-  engine all the same, and a package that fails to load stops the game.
-  No player build is switchable; slice 4b of the Rust-only work retires the mode.
-
-`scripts/verify-engine-bundle.ts` checks each mode from the emitted
+`scripts/verify-engine-bundle.ts` checks the bundle from the emitted
 sourcemaps after every build. The rest of the TypeScript engine still ships
-in a wasm-only build, because the read model, the command path and the save
+in the bundle, because the read model, the command path and the save
 loader use it; [the bundle report](docs/performance/wasm-only-bundle.md)
 measures it and names the cutover items that remove it.
 

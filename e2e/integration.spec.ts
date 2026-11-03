@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { buildToStar, engineSave, expectEngineHosted, fitCamera, onWasm } from "./helpers";
+import { buildToStar, engineSave, expectEngineHosted, fitCamera } from "./helpers";
 
-// On chromium-wasm every test must end with its tower still on the engine.
+// Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
@@ -77,7 +77,7 @@ test.describe("app integration — main.ts + TowerEngine boot/render boundary", 
     // Stage the returning player for real: write an autosave whose tower carries
     // a pending bomb threat (the shape EventSystem serializes), then reload so
     // boot loads it behind the title screen. A load is how a save's state reaches
-    // the WASM engine, so on chromium-wasm the engine holds the emergency too.
+    // the WASM engine, so the engine holds the emergency too.
     await page.goto("/");
     await page.waitForFunction(() => Boolean((window as unknown as { game?: { saveLoad?: unknown } }).game?.saveLoad));
     await page.evaluate(() => {
@@ -108,9 +108,7 @@ test.describe("app integration — main.ts + TowerEngine boot/render boundary", 
       return Boolean(g?.sim?.pendingChoice) && Boolean(document.getElementById("splash"));
     });
     await expectEngineHosted(page);
-    if (onWasm(test.info().project.name)) {
-      expect((await engineSave(page))?.events?.pending).toMatchObject({ kind: "bombThreat", cost: 300_000 });
-    }
+    expect((await engineSave(page))?.events?.pending).toMatchObject({ kind: "bombThreat", cost: 300_000 });
 
     const splash = page.locator("#splash");
     const modal = page.locator("#modal");

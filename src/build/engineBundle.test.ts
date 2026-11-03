@@ -1,86 +1,61 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { checkEngineBundle, DEFAULT_ENGINE_BUILD, ENGINE_PACKAGE_FILES, parseAllowList, parseEngineBuild, precacheManifest, repoRelativeSource, TS_STEP_LOOP, type EngineBundleInput } from "./engineBundle";
+import { checkEngineBundle, ENGINE_PACKAGE_FILES, parseAllowList, precacheManifest, repoRelativeSource, TS_STEP_LOOP, type EngineBundleInput } from "./engineBundle";
 
 const ROOT = resolve(__dirname, "..", "..");
 
-/** A wasm-only build that passes: the host, one allowed engine module, and
- *  the engine package precached. */
-function wasmOnly(over: Partial<EngineBundleInput> = {}): EngineBundleInput {
+/** A build that passes: the host, one allowed engine module, and the engine
+ *  package precached. */
+function bundle(over: Partial<EngineBundleInput> = {}): EngineBundleInput {
   return {
-    build: "wasm-only",
     tooling: false,
     chunks: [{ file: "assets/main-abc.js", sources: ["src/main.ts", "src/wasmhost/wasmHost.ts", "src/engine/Simulation.ts", "node_modules/lit-html/lit-html.js"] }],
     precache: ["index.html", "assets/main-abc.js", ...ENGINE_PACKAGE_FILES],
-    stamp: "wasm-only",
+    enginePackageBuilt: true,
     allowed: ["src/engine/Simulation.ts"],
     ...over,
   };
 }
 
-describe("parseEngineBuild", () => {
-  it("defaults to the switchable build and maps the two names", () => {
-    expect(DEFAULT_ENGINE_BUILD).toBe("switchable");
-    expect(parseEngineBuild(undefined)).toBe("switchable");
-    expect(parseEngineBuild("")).toBe("switchable");
-    expect(parseEngineBuild("wasm")).toBe("wasm-only");
-    expect(parseEngineBuild("switchable")).toBe("switchable");
-  });
-
-  it("refuses anything else rather than build the other mode", () => {
-    for (const bad of ["WASM", "ts", "1", "true", "wasm-only", "constructor", "__proto__"]) expect(() => parseEngineBuild(bad)).toThrow(/VC_ENGINE must be/);
-  });
-});
-
 describe("checkEngineBundle", () => {
-  it("passes a wasm-only bundle that carries only listed engine modules", () => {
-    expect(checkEngineBundle(wasmOnly())).toEqual({ errors: [], engineModules: ["src/engine/Simulation.ts"] });
+  it("passes a bundle that carries only listed engine modules", () => {
+    expect(checkEngineBundle(bundle())).toEqual({ errors: [], engineModules: ["src/engine/Simulation.ts"] });
   });
 
   it("fails when a legacy engine import puts the TypeScript step loop back", () => {
     // What a deliberate `import ... from "./engine/sim/loop"` outside
     // Simulation.ts (which the alias does not cover) does to the bundle.
     const chunks = [{ file: "assets/main-abc.js", sources: ["src/main.ts", "src/engine/Simulation.ts", TS_STEP_LOOP] }];
-    const { errors } = checkEngineBundle(wasmOnly({ chunks }));
-    expect(errors).toContain(`assets/main-abc.js carries the TypeScript step loop (${TS_STEP_LOOP}) in a wasm-only build`);
+    const { errors } = checkEngineBundle(bundle({ chunks }));
+    expect(errors).toContain(`assets/main-abc.js carries the TypeScript step loop (${TS_STEP_LOOP})`);
     expect(errors.some((e) => e.includes("does not list: src/engine/sim/loop.ts"))).toBe(true);
   });
 
   it("fails on any engine module the allowlist does not name", () => {
     const chunks = [{ file: "assets/lazy-1.js", sources: ["src/engine/Simulation.ts", "src/engine/crowd/motion.ts"] }];
-    expect(checkEngineBundle(wasmOnly({ chunks })).errors).toEqual([expect.stringContaining("does not list: src/engine/crowd/motion.ts")]);
+    expect(checkEngineBundle(bundle({ chunks })).errors).toEqual([expect.stringContaining("does not list: src/engine/crowd/motion.ts")]);
   });
 
   it("fails when a listed module no longer ships, so the list only shrinks", () => {
-    expect(checkEngineBundle(wasmOnly({ allowed: ["src/engine/Simulation.ts", "src/engine/Tower.ts"] })).errors).toEqual([expect.stringContaining("no longer ship in the wasm-only bundle; remove them from scripts/engine-bundle.allow.txt so the list only shrinks: src/engine/Tower.ts")]);
+    expect(checkEngineBundle(bundle({ allowed: ["src/engine/Simulation.ts", "src/engine/Tower.ts"] })).errors).toEqual([expect.stringContaining("no longer ship in the bundle; remove them from scripts/engine-bundle.allow.txt so the list only shrinks: src/engine/Tower.ts")]);
   });
 
-  it("fails a wasm-only build that does not precache the engine package", () => {
-    expect(checkEngineBundle(wasmOnly({ precache: ["index.html", "engine/verticopolis_engine.js"] })).errors).toEqual([expect.stringContaining("does not precache the engine package (engine/verticopolis_engine_bg.wasm)")]);
+  it("fails a build that does not precache the engine package", () => {
+    expect(checkEngineBundle(bundle({ precache: ["index.html", "engine/verticopolis_engine.js"] })).errors).toEqual([expect.stringContaining("does not precache the engine package (engine/verticopolis_engine_bg.wasm)")]);
   });
 
-  it("fails when the build's stamp names another mode", () => {
-    expect(checkEngineBundle(wasmOnly({ stamp: "switchable" })).errors).toEqual([expect.stringContaining('records engine build "switchable"')]);
-    expect(checkEngineBundle(wasmOnly({ stamp: undefined })).errors).toEqual([expect.stringContaining("records engine build undefined")]);
+  it("does not ask a build with no engine package to precache one", () => {
+    expect(checkEngineBundle(bundle({ precache: ["index.html"], enginePackageBuilt: false })).errors).toEqual([]);
   });
 
   it("fails when nothing was read", () => {
-    expect(checkEngineBundle(wasmOnly({ chunks: [], allowed: [] })).errors).toEqual([expect.stringContaining("no emitted JavaScript")]);
+    expect(checkEngineBundle(bundle({ chunks: [], allowed: [] })).errors).toEqual([expect.stringContaining("no emitted JavaScript")]);
   });
 
-  it("lets a switchable build carry the TypeScript engine and the switch, but no test code", () => {
-    const chunks = [{ file: "assets/main.js", sources: [TS_STEP_LOOP, "src/engine/crowd/motion.ts"] }];
-    const ok = checkEngineBundle({ build: "switchable", tooling: false, chunks, precache: [], stamp: "switchable", allowed: [] });
-    expect(ok.errors).toEqual([]);
-    expect(ok.engineModules).toEqual(["src/engine/crowd/motion.ts", TS_STEP_LOOP]);
-    const tests = [{ file: "assets/main.js", sources: [TS_STEP_LOOP, "src/tests/fixtures/towers.ts", "src/foo.test.ts", "e2e/helpers.ts", "src/ui/x.spec.ts", "src/audio/__mocks__/tone.ts"] }];
-    expect(checkEngineBundle({ build: "switchable", tooling: true, chunks: tests, precache: [], stamp: "switchable", allowed: [] }).errors).toHaveLength(5);
-  });
-
-  it("fails a switchable build that lost the TypeScript step loop (a wasm-only swap leaked)", () => {
-    const chunks = [{ file: "assets/main.js", sources: ["src/engine/Simulation.ts"] }];
-    expect(checkEngineBundle({ build: "switchable", tooling: false, chunks, precache: [], stamp: "switchable", allowed: [] }).errors).toEqual([expect.stringContaining("does not carry the TypeScript step loop")]);
+  it("fails every kind of test code in the bundle", () => {
+    const tests = [{ file: "assets/main.js", sources: ["src/tests/fixtures/towers.ts", "src/foo.test.ts", "e2e/helpers.ts", "src/ui/x.spec.ts", "src/audio/__mocks__/tone.ts"] }];
+    expect(checkEngineBundle(bundle({ tooling: true, chunks: tests, allowed: [] })).errors).toHaveLength(5);
   });
 });
 

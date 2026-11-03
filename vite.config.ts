@@ -6,7 +6,6 @@ import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion } from "./src/changelog";
 import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices";
-import { parseEngineBuild, type EngineBuild } from "./src/build/engineBundle";
 import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 import type { BuildFingerprint } from "./src/pwaUpdateInfo";
 import { tsEngineSourceHash } from "./src/build/tsEngineSources";
@@ -58,21 +57,6 @@ function publicDir(): string {
   return resolve(raw);
 }
 
-/** The engine build mode (`VC_ENGINE`; see src/build/engineBundle.ts). A
- *  wasm-only build ships the Rust/WASM engine as the only engine: no runtime
- *  switch, no TypeScript step loop, no fallback. The value is validated, and
- *  `VC_ENGINE` is refused under Vitest, whose suites pick their engine with
- *  `VC_REQUIRE_WASM` and need the TypeScript step loop the alias below removes. */
-function engineBuild(): EngineBuild {
-  const mode = parseEngineBuild(process.env.VC_ENGINE);
-  if (process.env.VITEST && process.env.VC_ENGINE) {
-    throw new Error("VC_ENGINE selects a build mode and does not apply to Vitest; unset it (the WASM test lanes use VC_REQUIRE_WASM=1).");
-  }
-  if (mode === "wasm-only") console.warn("[build] VC_ENGINE=wasm: a wasm-only build (no TypeScript step loop, no fallback).");
-  return mode;
-}
-
-const ENGINE_BUILD = engineBuild();
 const TOOLING_BUILD = toolingBuild();
 
 /**
@@ -81,14 +65,15 @@ const TOOLING_BUILD = toolingBuild();
  * importer, so src/build/engineAliases.test.ts pins that exactly one file uses
  * each specifier and that no other specifier reaches the real module, and
  * `scripts/verify-engine-bundle.ts` proves from the emitted sourcemaps that
- * the swapped module did not ship. The step-loop swap applies to a dev serve
- * with `VC_ENGINE=wasm` too, so that serve behaves like the wasm-only build.
- *   - wasm-only builds: `Simulation.ts`'s step loop becomes a stand-in that
- *     throws, since the WASM host replaces `tick` on every tower it holds.
+ * the swapped module did not ship.
+ *   - `Simulation.ts`'s step loop becomes a stand-in that throws, since the
+ *     WASM host replaces `tick` on every tower it holds. Vitest keeps the real
+ *     loop: the TypeScript engine's own tests, and the ones that read it as a
+ *     reference, run it until the engine's code is deleted.
  */
 function engineAliases(): { find: RegExp; replacement: string }[] {
   const aliases: { find: RegExp; replacement: string }[] = [];
-  if (ENGINE_BUILD === "wasm-only") {
+  if (!process.env.VITEST) {
     aliases.push({ find: /^\.\/sim\/loop$/, replacement: resolve(__dirname, "src/wasmhost/stepLoopAbsent.ts") });
   }
   return aliases;
@@ -134,7 +119,7 @@ function emitVersionJson(fingerprint: BuildFingerprint): Plugin {
       this.emitFile({
         type: "asset",
         fileName: "version.json",
-        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes(), engineBuild: ENGINE_BUILD, shell: fingerprint.shell, engine: fingerprint.engine }),
+        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes(), shell: fingerprint.shell, engine: fingerprint.engine }),
       });
     },
   };
@@ -306,7 +291,7 @@ function wasmParityProjects() {
 }
 
 const expectedPackage = (command: "build" | "serve") => readExpectedPackage(publicDir(), command === "build" ? "build" : "other");
-const fingerprintOf = (command: "build" | "serve") => buildFingerprint(resolve(__dirname, "src"), expectedPackage(command), ENGINE_BUILD !== "wasm-only");
+const fingerprintOf = (command: "build" | "serve") => buildFingerprint(resolve(__dirname, "src"), expectedPackage(command));
 
 export default defineConfig(({ command }) => ({
   root: "src",

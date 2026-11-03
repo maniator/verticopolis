@@ -3,7 +3,7 @@ import { lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import type { BuildFingerprint } from "../pwaUpdateInfo";
 import type { ExpectedEnginePackage } from "../wasmhost/enginePackageRecord";
-import { tsEngineSourceFiles, tsEngineSourceHash } from "./tsEngineSources";
+import { tsEngineSourceFiles } from "./tsEngineSources";
 
 /**
  * The build's two parts for the update prompt's "Game update / Engine update /
@@ -13,8 +13,9 @@ import { tsEngineSourceFiles, tsEngineSourceHash } from "./tsEngineSources";
  * The shell hash covers every file under `src` that is not part of an engine:
  * not the TypeScript engine's closure (which has its own hash), not the engine
  * package folder, and not tests or fixtures. The engine part is the Rust
- * crate's version and source hash from the package record, plus the
- * TypeScript engine's source hash. Computed from sources before bundling, so
+ * crate's version and source hash from the package record. The TypeScript
+ * engine's sources are in neither part: the shell hash leaves them out and the
+ * engine part is the Rust crate alone. Computed from sources before bundling, so
  * the running client can bake it in as a define.
  */
 
@@ -47,18 +48,18 @@ export function shellHash(srcDir: string, engineFiles: ReadonlySet<string>): str
 
 const cache = new Map<string, BuildFingerprint>();
 
-/** The build's fingerprint. A wasm-only build ships no TypeScript engine, so it
- *  passes `shipsTsEngine` false and a change to that engine's sources does not
- *  label its update. Memoized per source tree and package, since the Vite config
- *  reads it for both the page's define and `version.json`. */
-export function buildFingerprint(srcDir: string, pkg: ExpectedEnginePackage | null, shipsTsEngine = true): BuildFingerprint {
-  const key = `${srcDir}\0${pkg?.package ?? ""}\0${pkg?.sources ?? ""}\0${pkg?.crate?.version ?? ""}\0${shipsTsEngine}`;
+/** The build's fingerprint. A change to the TypeScript engine's sources does
+ *  not label an update, since the game never runs them. Memoized per source
+ *  tree and package, since the Vite config reads it for both the page's define
+ *  and `version.json`. */
+export function buildFingerprint(srcDir: string, pkg: ExpectedEnginePackage | null): BuildFingerprint {
+  const key = `${srcDir}\0${pkg?.package ?? ""}\0${pkg?.sources ?? ""}\0${pkg?.crate?.version ?? ""}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const engineDir = resolve(srcDir, "engine");
   const fingerprint: BuildFingerprint = {
     shell: shellHash(srcDir, new Set(tsEngineSourceFiles(engineDir, srcDir))),
-    engine: { crate: pkg?.crate?.version, rust: pkg?.sources ?? pkg?.package, ...(shipsTsEngine ? { ts: tsEngineSourceHash(engineDir, srcDir) } : {}) },
+    engine: { crate: pkg?.crate?.version, rust: pkg?.sources ?? pkg?.package },
   };
   cache.set(key, fingerprint);
   return fingerprint;

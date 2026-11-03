@@ -1,18 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
-import { WASM_ONLY_PROJECT } from "./helpers";
 import { hostedGame } from "./offlineHelpers";
 import { ENGINE_PATH, SALT_SECTION, installed, tamperCache } from "./engineCacheHelpers";
 
 /**
  * Repair engine files (#985, design 5.4 "Corrupted-entry recovery"). A cached
- * engine file that no longer matches the shell stops the wasm-only build, and
+ * engine file that no longer matches the shell stops the game, and
  * a plain Reload cannot help because the precache returns the bad entry as
  * stored. The stop screen offers Repair when a worker controls the page; it
  * fetches fresh copies, checks them, replaces the running build's three cache
  * entries in place, and leaves the page for the player to reload.
  */
-test.beforeEach(({}, info) => test.skip(info.project.name !== WASM_ONLY_PROJECT, "the stop screen exists on the wasm-only build"));
 test.setTimeout(90_000);
 
 const repairButton = (page: Page) => page.locator('#engine-failure [data-act="repair-engine"]');

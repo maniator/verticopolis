@@ -4,7 +4,7 @@ import { join, relative, resolve } from "node:path";
 
 /**
  * vite.config.ts swaps a module by import specifier (`engineAliases`):
- * `./sim/loop` in wasm-only builds.
+ * `./sim/loop` (outside Vitest).
  * A specifier alias matches the text from any importer, so these pin that
  * exactly the intended file uses each one, and that the real modules are not
  * reached by another specifier the alias would miss. The postbuild guard

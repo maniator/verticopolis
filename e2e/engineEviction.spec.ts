@@ -2,7 +2,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { startDeployments, type Deployments } from "./deployments";
 import { engineEntries, engineEntriesOf, expectEngineIs, newContext } from "./engineDeployHelpers";
-import { onWasm } from "./helpers";
 import { expectControlledWithEngine, hostedGame, installWorker } from "./offlineHelpers";
 
 /**
@@ -16,13 +15,11 @@ import { expectControlledWithEngine, hostedGame, installWorker } from "./offline
  * The two-deployment server (deployments.ts) cuts the connection for the
  * worker's own requests too, which Playwright's offline flag does not.
  */
-test.beforeEach(({}, info) => test.skip(!onWasm(info.project.name), "the engine runs on the chromium-wasm and chromium-wasm-only projects"));
 test.setTimeout(240_000);
 
 let deployments: Deployments;
 
 test.beforeAll(async () => {
-  if (!onWasm(test.info().project.name)) return;
   test.setTimeout(300_000);
   deployments = await startDeployments();
 });

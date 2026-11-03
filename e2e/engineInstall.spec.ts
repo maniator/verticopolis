@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { startDeployments, type Deployment, type Deployments } from "./deployments";
-import { onWasm } from "./helpers";
 import { engineEntries, engineEntriesOf as entriesOf, expectEngineIs as expectIs, newContext as makeContext, short } from "./engineDeployHelpers";
 import { expectControlledWithEngine, hostedGame, installWorker } from "./offlineHelpers";
 
@@ -17,16 +16,14 @@ import { expectControlledWithEngine, hostedGame, installWorker } from "./offline
  * Two cases on the two-deployment server (deployments.ts): an update whose
  * engine files come from the build that is already installed, and a first
  * install whose engine files come from the other build. They run on the
- * production build on the chromium-wasm projects.
+ * production build.
  */
-test.beforeEach(({}, info) => test.skip(!onWasm(info.project.name), "the engine runs on the chromium-wasm and chromium-wasm-only projects"));
 test.setTimeout(240_000);
 
 let deployments: Deployments;
 
 // The second deployment is a full `vite build`, with a budget of its own.
 test.beforeAll(async () => {
-  if (!onWasm(test.info().project.name)) return;
   test.setTimeout(300_000);
   deployments = await startDeployments();
 });

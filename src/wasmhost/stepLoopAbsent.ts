@@ -2,8 +2,8 @@ import type { Simulation } from "../engine/Simulation";
 
 /**
  * The stand-in for the TypeScript engine's step loop (`src/engine/sim/loop.ts`)
- * in a wasm-only build (`VC_ENGINE=wasm`, see `vite.config.ts` and
- * `src/build/engineBundle.ts`). The WASM host replaces `tick` on every tower it
+ * in the build (see `vite.config.ts` and `src/build/engineBundle.ts`; Vitest
+ * keeps the real loop). The WASM host replaces `tick` on every tower it
  * hosts, so the loop never runs there; swapping it out keeps the TypeScript
  * simulation's time stepping out of the shipped bundle, and makes a tower the
  * host does not hold fail loudly instead of quietly ticking on TypeScript.
@@ -11,7 +11,7 @@ import type { Simulation } from "../engine/Simulation";
  */
 export class StepLoopAbsentError extends Error {
   constructor(what: string) {
-    super(`${what}: the TypeScript step loop is not part of this wasm-only build, so only the Rust engine can advance a tower`);
+    super(`${what}: the TypeScript step loop is not part of this build, so only the Rust engine can advance a tower`);
     this.name = "StepLoopAbsentError";
   }
 }

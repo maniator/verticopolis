@@ -2,7 +2,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { onWasm } from "./helpers";
 import { hostedGame } from "./offlineHelpers";
 import { ENGINE_PATH, SALT_SECTION, installed, tamperCache } from "./engineCacheHelpers";
 
@@ -15,13 +14,11 @@ import { ENGINE_PATH, SALT_SECTION, installed, tamperCache } from "./engineCache
  * the page must refuse it with a reason, instantiate nothing, and add no
  * reload of its own.
  *
- * It runs on `chromium-wasm` and `chromium-wasm-only`; a refusal stops the game
- * behind the engine failure message on both. Instrumentation, installed before the page's own
- * scripts: counters on `WebAssembly.instantiate` and friends and on Blob URLs
+ * A refusal stops the game behind the engine failure message. Instrumentation,
+ * installed before the page's own scripts: counters on `WebAssembly.instantiate` and friends and on Blob URLs
  * for scripts. A refused package must leave both at zero; a good boot must
  * move them (so a broken spy cannot pass the refusals).
  */
-test.beforeEach(({}, info) => test.skip(!onWasm(info.project.name), "the engine check runs on the chromium-wasm and chromium-wasm-only projects"));
 test.setTimeout(90_000);
 
 const dist = new URL("../dist/engine/BUILD.json", import.meta.url);

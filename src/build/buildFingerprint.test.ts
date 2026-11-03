@@ -34,16 +34,17 @@ describe("the build fingerprint", () => {
     expect(buildFingerprint(srcDir({ ...base, "ui/panel.test.ts": "x" }), null).shell).toBe(shell);
   });
 
-  it("changes the engine part with the TypeScript engine's code and the Rust package", () => {
+  it("changes the engine part with the Rust package", () => {
     const fp = buildFingerprint(srcDir(base), pkg("0.24.0", "aaa"));
     expect(fp.engine).toMatchObject({ crate: "0.24.0", rust: "aaa" });
-    expect(fp.engine.ts).toMatch(/^[0-9a-f]{64}$/);
-    expect(buildFingerprint(srcDir({ ...base, "engine/Tower.ts": "x" }), pkg("0.24.0", "aaa")).engine.ts).not.toBe(fp.engine.ts);
     expect(buildFingerprint(srcDir(base), pkg("0.25.0", "bbb")).engine).toMatchObject({ crate: "0.25.0", rust: "bbb" });
   });
 
-  it("leaves the TypeScript engine out of a wasm-only build", () => {
-    expect(buildFingerprint(srcDir(base), null, false).engine.ts).toBeUndefined();
+  it("leaves the TypeScript engine's code out of both parts", () => {
+    const fp = buildFingerprint(srcDir(base), pkg("0.24.0", "aaa"));
+    expect(fp.engine.ts).toBeUndefined();
+    const edited = buildFingerprint(srcDir({ ...base, "engine/Tower.ts": "x" }), pkg("0.24.0", "aaa"));
+    expect(edited).toEqual(fp);
   });
 
   it("leaves the Rust part out when the build has no package", () => {

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, chromium, devices, type BrowserContext, type LaunchOptions, type Page } from "@playwright/test";
-import { onWasm, expectEngineHosted } from "./helpers";
+import { expectEngineHosted } from "./helpers";
 import {
   ENGINE_FILES,
   advanceClock,
@@ -21,15 +21,13 @@ import {
  * profile, every page and the browser close, and a new browser opens the same
  * profile with the network off from its very first request. Nothing carries
  * over except what a real restart keeps: the service worker, its caches and
- * localStorage (the engine choice the first visit stored, and the save slots).
+ * localStorage (the save slots).
  *
- * These run against the production build `npm run e2e` serves (vite preview),
- * on the chromium-wasm project. A persistent context takes none of the
+ * These run against the production build `npm run e2e` serves (vite preview).
+ * A persistent context takes none of the
  * project's `use` options, so the profile is launched here with the same
- * device, base URL and browser, and the engine choice (`vc.engine`, which the
- * project seeds into every other context) is stored by the online visit.
+ * device, base URL and browser.
  */
-test.beforeEach(({}, info) => test.skip(!onWasm(info.project.name), "the engine runs on the chromium-wasm and chromium-wasm-only projects"));
 // An install, a browser restart and a game session each: more than the default 30s.
 test.setTimeout(120_000);
 
@@ -57,10 +55,7 @@ async function onlineVisit(dir: string, baseURL: string, launchOptions: LaunchOp
   const context = await launch(dir, baseURL, launchOptions, false);
   try {
     const page = context.pages()[0] ?? (await context.newPage());
-    // Stored once, the way a player's choice is: the offline session reads it
-    // back from the profile, with no init script.
     await page.goto("/");
-    await page.evaluate(() => localStorage.setItem("vc.engine", "wasm"));
     await installWorker(page);
     await page.reload();
     await expectControlledWithEngine(page);
