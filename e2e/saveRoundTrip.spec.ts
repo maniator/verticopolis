@@ -128,6 +128,8 @@ test("an older version's autosave loads, a failed import changes nothing, and an
   const refusals: [string, RegExp][] = [
     ["not a tower", /Not a Verticopolis tower file\./],
     [damaged, /This tower file is damaged and can't be read\./],
+    ["VCTOWER2\nabc", /This tower file was made by a newer version of Verticopolis\. Update the game to load it\./],
+    [`VCTOWER1\n${deflateRawSync('{"minutes":"0","units":[]}').toString("base64")}`, /Not a valid tower save file\./],
   ];
   for (const [text, message] of refusals) {
     await page.evaluate((t) => (window as any).game.saveLoad.importGame(t), text);

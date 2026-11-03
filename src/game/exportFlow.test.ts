@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
+import { saveOf } from "../tests/fixtures/saveText";
 import { runExportFlow, runLegacyDownload, resetExportFlowForTests, EXPORT_WATCHDOG_MS } from "./exportFlow";
 
 /**
@@ -50,13 +51,16 @@ function flowDeps(ui: ReturnType<typeof fakeUi>["ui"], sim = Simulation.newGame(
   return { getSim: () => sim, ui };
 }
 
-/** The flow's save callback: the engine port's save of `sim` and its name. */
-function saved(sim = Simulation.newGame(7)) {
-  return () => ({ text: JSON.stringify(sim.serialize()), towerName: sim.tower.towerName });
+const FAKE_FILE = "VCTOWER1\nfake";
+
+/** The flow's save callback: the engine's `.vctower` text (or a promise of it,
+ *  to hold an export open) and the tower's name. */
+function saved(file: string | Promise<string> = FAKE_FILE, sim = Simulation.newGame(7)) {
+  return () => ({ file, towerName: sim.tower.towerName });
 }
 
 const HUNG_TOAST = { text: "The export is not responding. You can try exporting again.", kind: "bad" };
-// The size line for the 13-byte payload these tests mock into SaveGame.export
+// The size line for the 13-byte file these tests save
 // ("VCTOWER1\nfake" rounds to 0.0 KB).
 const LIVE_TOAST = { text: "Tower exported (0.0 KB). Check your downloads.", kind: "good" };
 const LATE_TOAST = { text: "The earlier export finished after all (0.0 KB). Check your downloads.", kind: "good" };
@@ -75,7 +79,7 @@ describe("export single-flight latch (GH #760)", () => {
   it("hands the player a real .vctower download and says how big it is", async () => {
     const { ui, toasts, downloads } = fakeUi();
     const sim = Simulation.newGame(7);
-    await runExportFlow(flowDeps(ui, sim), saved(sim));
+    await runExportFlow(flowDeps(ui, sim), saved(await SaveGame.export(saveOf(sim)), sim));
     expect(downloads).toHaveLength(1);
     expect(downloads[0]!.filename).toBe(SaveGame.exportFilename(sim.tower.towerName));
     const text = downloads[0]!.contents as string;
@@ -89,7 +93,6 @@ describe("export single-flight latch (GH #760)", () => {
   });
 
   it("REGRESSION (GH #997): a download that failed gets no success toast, and the latch frees", async () => {
-    vi.spyOn(SaveGame, "export").mockResolvedValue("VCTOWER1\nfake");
     const { ui, toasts, downloads } = fakeUi([false]);
     await runExportFlow(flowDeps(ui), saved());
     expect(downloads).toHaveLength(1);
@@ -103,11 +106,15 @@ describe("export single-flight latch (GH #760)", () => {
 
   it("REGRESSION: a second export while the first is compressing is a quiet no-op", async () => {
     const gate = deferred<string>();
-    const spy = vi.spyOn(SaveGame, "export").mockReturnValue(gate.promise);
+    let saves = 0;
+    const held = () => {
+      saves++;
+      return saved(gate.promise)();
+    };
     const { ui, toasts, downloads } = fakeUi();
-    const first = runExportFlow(flowDeps(ui), saved());
-    await runExportFlow(flowDeps(ui), saved());
-    expect(spy).toHaveBeenCalledTimes(1);
+    const first = runExportFlow(flowDeps(ui), held);
+    await runExportFlow(flowDeps(ui), held);
+    expect(saves).toBe(1);
     gate.resolve("VCTOWER1\nfake");
     await first;
     expect(downloads).toHaveLength(1);
@@ -115,11 +122,9 @@ describe("export single-flight latch (GH #760)", () => {
   });
 
   it("the latch releases on success and on failure, so the next export runs", async () => {
-    const spy = vi.spyOn(SaveGame, "export").mockRejectedValueOnce(new Error("boom"));
     const { ui, toasts, downloads } = fakeUi();
-    await runExportFlow(flowDeps(ui), saved());
+    await runExportFlow(flowDeps(ui), () => ({ file: Promise.reject(new Error("boom")), towerName: undefined }));
     expect(toasts).toEqual([{ text: "Export failed: boom", kind: "bad" }]);
-    spy.mockResolvedValue("VCTOWER1\nfake");
     await runExportFlow(flowDeps(ui), saved());
     await runExportFlow(flowDeps(ui), saved());
     expect(downloads).toHaveLength(2);
@@ -131,30 +136,20 @@ describe("export single-flight latch (GH #760)", () => {
       throw new Error("context lost");
     });
     expect(toasts).toEqual([{ text: "Export failed: context lost", kind: "bad" }]);
-    vi.spyOn(SaveGame, "export").mockResolvedValue("VCTOWER1\nfake");
     await runExportFlow(flowDeps(ui), saved());
     expect(toasts[toasts.length - 1]).toEqual(LIVE_TOAST);
   });
 
-  it("stamps the camera before it serializes", async () => {
-    const order: string[] = [];
-    vi.spyOn(SaveGame, "export").mockImplementation(() => {
-      order.push("export");
-      return Promise.resolve("VCTOWER1\nfake");
-    });
-    const { ui } = fakeUi();
-    await runExportFlow(flowDeps(ui), () => {
-      order.push("stamp");
-      return saved()();
-    });
-    expect(order).toEqual(["stamp", "export"]);
+  it("downloads the file the engine wrote, under the tower's name", async () => {
+    const { ui, downloads } = fakeUi();
+    await runExportFlow(flowDeps(ui), () => ({ file: "VCTOWER1\nwritten", towerName: "Skyline One" }));
+    expect(downloads).toEqual([{ filename: SaveGame.exportFilename("Skyline One"), contents: "VCTOWER1\nwritten" }]);
   });
 
   it("REGRESSION: the watchdog frees a latch held by a stuck export and says so", async () => {
     vi.useFakeTimers();
-    vi.spyOn(SaveGame, "export").mockReturnValueOnce(new Promise<string>(() => {}));
     const { ui, toasts } = fakeUi();
-    void runExportFlow(flowDeps(ui), saved());
+    void runExportFlow(flowDeps(ui), saved(new Promise<string>(() => {})));
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS - 1);
     expect(toasts).toEqual([]);
     await vi.advanceTimersByTimeAsync(1);
@@ -165,11 +160,10 @@ describe("export single-flight latch (GH #760)", () => {
     vi.useFakeTimers();
     const slow = deferred<string>();
     const retry = deferred<string>();
-    vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise).mockReturnValueOnce(retry.promise);
     const { ui, toasts, downloads } = fakeUi();
-    const first = runExportFlow(flowDeps(ui), saved());
+    const first = runExportFlow(flowDeps(ui), saved(slow.promise));
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
-    const second = runExportFlow(flowDeps(ui), saved());
+    const second = runExportFlow(flowDeps(ui), saved(retry.promise));
     // The first export lands late: its download still arrives, but the
     // retry still holds the latch, so a third attempt stays a no-op.
     slow.resolve("VCTOWER1\nfake");
@@ -185,9 +179,8 @@ describe("export single-flight latch (GH #760)", () => {
   it("REGRESSION (GH #997): an export that settles after the watchdog says it finished after all", async () => {
     vi.useFakeTimers();
     const slow = deferred<string>();
-    vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise);
     const { ui, toasts, downloads } = fakeUi();
-    const run = runExportFlow(flowDeps(ui), saved());
+    const run = runExportFlow(flowDeps(ui), saved(slow.promise));
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
     slow.resolve("VCTOWER1\nfake");
     await run;
@@ -198,9 +191,8 @@ describe("export single-flight latch (GH #760)", () => {
   it("a late settle whose download fails ends on the failure alone, with no success line", async () => {
     vi.useFakeTimers();
     const slow = deferred<string>();
-    vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise);
     const { ui, toasts, downloads } = fakeUi([false]);
-    const run = runExportFlow(flowDeps(ui), saved());
+    const run = runExportFlow(flowDeps(ui), saved(slow.promise));
     await vi.advanceTimersByTimeAsync(EXPORT_WATCHDOG_MS);
     slow.resolve("VCTOWER1\nfake");
     await run;
@@ -238,9 +230,8 @@ describe("legacy (.TDT) download shares the export latch (GH #760 follow-on)", (
 
   it("REGRESSION (GH #1012): a .TDT download clicked while a .vctower export runs says why nothing happened", async () => {
     const slow = deferred<string>();
-    vi.spyOn(SaveGame, "export").mockReturnValueOnce(slow.promise);
     const { ui, toasts, said, downloads } = fakeUi();
-    const vctower = runExportFlow(flowDeps(ui), saved());
+    const vctower = runExportFlow(flowDeps(ui), saved(slow.promise));
     let legacy = 0;
     const ran = await runLegacyDownload(ui, () => {
       legacy++;

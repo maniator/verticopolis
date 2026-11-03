@@ -1,6 +1,6 @@
 import type { SerializedView } from "../engine/types";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
-import { engineTrapped } from "./engineFault";
+import { engineTrapped, noteEngineThrow } from "./engineFault";
 
 /**
  * The lifecycle members' records as the game's callers read them (contract
@@ -43,6 +43,31 @@ export function saveText(port: Pick<EnginePort, "setCamera" | "serialize">, view
   if (engineTrapped()) throw new Error(TRAPPED_SAVE_REFUSED);
   stampCamera(port, view);
   return port.serialize();
+}
+
+/** The `.vctower` file of the live tower, written by the engine and stamped
+ *  with this build and the time (`stamp`): the file the player downloads.
+ *  Throws the engine's refusal (or, once the engine trapped, the same refusal
+ *  every save gives) and never writes the file itself, so a build without the
+ *  engine package exports nothing rather than a file the engine did not make. */
+export function exportFileText(
+  port: Pick<EnginePort, "setCamera" | "exportVctower" | "lastReason">,
+  view: SerializedView | null,
+  stamp: { appVersion: string; savedAt: number },
+): string {
+  if (engineTrapped()) throw new Error(TRAPPED_SAVE_REFUSED);
+  stampCamera(port, view);
+  let file: string | undefined;
+  try {
+    file = port.exportVctower(stamp.appVersion, stamp.savedAt);
+  } catch (err) {
+    // A trap here latches now, so the next export or save is refused
+    // up front and does not call into the dead engine again.
+    noteEngineThrow(err);
+    throw err;
+  }
+  if (file === undefined) throw new Error(port.lastReason() ?? "The tower could not be exported.");
+  return file;
 }
 
 /** Stamp the live camera onto the tower, so a save or file written next

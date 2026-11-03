@@ -10,7 +10,8 @@ import { shouldArm } from "../ui/Onboarding";
 import type { EnginePort } from "../simport/enginePort";
 import type { PortCodes } from "../simport/portCodes";
 import type { ViewReader } from "../simport/viewReader";
-import { NEWER_SAVE_REFUSAL, SWAP_REFUSED, loadStored, newerSaveRefused, saveText, stampCamera, swapDone } from "./portLifecycle";
+import { NEWER_SAVE_REFUSAL, SWAP_REFUSED, exportFileText, loadStored, newerSaveRefused, saveText, stampCamera, swapDone } from "./portLifecycle";
+import { currentStamp } from "../storage/saveStamp";
 import { exportFacts, importFacts } from "../simport/tdtRecords";
 import { isCrashed, isEngineStopped, isSplashUp } from "./interactionState";
 import type { UI } from "../ui/UI";
@@ -362,7 +363,10 @@ export class SaveLoad {
    *  guard; delegating keeps the latch on the one choke point every export
    *  entry converges on. */
   exportGame(): Promise<void> {
-    return runExportFlow(this.deps, () => ({ text: this.saveText(), towerName: this.deps.enginePort().towerName() }));
+    return runExportFlow(this.deps, () => {
+      const port = this.deps.enginePort();
+      return { file: exportFileText(port, this.deps.getView(), currentStamp()), towerName: port.towerName() };
+    });
   }
 
   /**
@@ -407,13 +411,12 @@ export class SaveLoad {
 
   async importGame(data: string): Promise<void> {
     try {
-      // SaveGame holds the file to its checks and copy; the engine loads it
-      // (the `stored` source, with the founder rule) and the app follows.
-      const text = await SaveGame.importText(data);
+      // The engine reads the file and says why it refuses one, in the
+      // player's words (`vctower_import.rs`); the page only shows it. The
+      // founder rule for a file without a build stamp is the engine's too.
       const port = this.deps.enginePort();
-      const loaded = port.loadSave(text);
-      // A refused file is told apart in the import's own words when they have any.
-      if (loaded[0] !== 1) throw new Error(SaveGame.importObjection(text) ?? port.lastReason() ?? SWAP_REFUSED);
+      const loaded = port.loadVctower(data);
+      if (loaded[0] !== 1) throw new Error(port.lastReason() ?? SWAP_REFUSED);
       this.deps.towerSwapped();
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
