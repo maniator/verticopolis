@@ -195,6 +195,23 @@ describe("bootGame engine", () => {
     expect(encodeVctower).not.toHaveBeenCalled();
   });
 
+  it("reloads the game when the slot census traps, as it does for a tick (#1612)", async () => {
+    requestWasm();
+    const Engine = { fromSave: vi.fn(() => { throw new WebAssembly.RuntimeError("unreachable"); }) };
+    wasmStub.module = { Engine, encodeVctower: () => "" };
+    document.body.innerHTML = '<div id="stage"></div>';
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn(), setSpeed: vi.fn() })));
+    expect(() => slotPopulation("a save")).toThrow("unreachable");
+    // The trap went down the same path as a tick's: the reader is off and the page reloads from the autosave.
+    const message = "the Rust engine failed during a save's population read: unreachable";
+    expect(bootState()).toEqual({ build: "wasm-only", engine: "none", failure: { stage: "host", reason: "trap-tick", message } });
+    expect(slotPopulation("a save")).toBeUndefined();
+    expect(Engine.fromSave).toHaveBeenCalledTimes(1);
+    expect(reloadSoon).toHaveBeenCalledOnce();
+    expect(engineTrapped()).toBe(true);
+  });
+
   it("stops the game when the engine's save writer traps, and still writes the save in hand (#1205)", async () => {
     stubWebGL();
     const encodeVctower = vi.fn(() => {
