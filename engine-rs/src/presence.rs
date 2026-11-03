@@ -100,14 +100,14 @@ impl Simulation {
 
     /// `spatialCongestionByFloor`: floor -> ratio, in the map's insertion order.
     pub fn spatial_congestion_by_floor(&self) -> IndexMap<i64, f64> {
-        self.build_spatial_congestion().0
+        self.build_spatial_congestion(false).0
     }
 
     /// `spatialCongestionAttributionByFloor`: the per-class maxes (elevator,
     /// stairs, escalator) a floor's reading was folded from, for the
     /// congestion copy (`bindingTransportClassAt`).
     pub fn spatial_congestion_attribution_by_floor(&self) -> IndexMap<i64, CongestionAttribution> {
-        self.build_spatial_congestion().1
+        self.build_spatial_congestion(true).1
     }
 
     /// Both maps from one pass, for a reader that needs a floor's ratio and
@@ -116,13 +116,16 @@ impl Simulation {
     pub(crate) fn spatial_congestion_with_attribution(
         &self,
     ) -> (IndexMap<i64, f64>, IndexMap<i64, CongestionAttribution>) {
-        self.build_spatial_congestion()
+        self.build_spatial_congestion(true)
     }
 
-    /// `buildSpatialCongestion` (sim/congestion.ts): the ratio map and the
-    /// per-class attribution, from one pass.
+    /// `buildSpatialCongestion` (sim/congestion.ts): the ratio map and, when
+    /// `with_attribution` is set, the per-class attribution, from one pass.
+    /// The ratio readers (the overlay, the hotspot, the hourly satisfaction
+    /// pass) leave it unset: the map is empty then, not built and dropped.
     fn build_spatial_congestion(
         &self,
+        with_attribution: bool,
     ) -> (IndexMap<i64, f64>, IndexMap<i64, CongestionAttribution>) {
         const HEADROOM: f64 = 12.0;
         let rush = self.rush_factor();
@@ -199,6 +202,9 @@ impl Simulation {
                 if cong > c {
                     c = cong;
                 }
+                if !with_attribution {
+                    continue;
+                }
                 // The same reading folded into its class max; the staff
                 // filter above admits only these three classes today.
                 if kind.is_elevator() {
@@ -214,7 +220,9 @@ impl Simulation {
                 }
             }
             result.insert(*f, c);
-            attribution.insert(*f, att);
+            if with_attribution {
+                attribution.insert(*f, att);
+            }
         }
         (result, attribution)
     }

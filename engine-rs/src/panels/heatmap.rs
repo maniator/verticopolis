@@ -7,6 +7,7 @@
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::facilities::{Kind, MAX_FLOOR, MIN_FLOOR};
 use crate::sim::Simulation;
@@ -214,9 +215,18 @@ impl Simulation {
             .collect()
     }
 
-    /// The congestion and occupancy maps: one cell per floor over its built
-    /// extent, in the order the floors first appear in the unit list.
-    fn floor_cells(&self, mode: HeatmapMode) -> Vec<HeatCell> {
+    /// Every floor with something built on it, as `(floor, min x, max x)`, in
+    /// the order the floors first appear in the unit list: a multi-floor room
+    /// counts on each floor it spans. The overlays read it every refresh
+    /// (hourly game time, every 0.5 s at top speed), and it walks every unit,
+    /// tiles included, so it is kept per revision like the floor bounds (#1237).
+    fn floor_extents(&self) -> Arc<[(i64, i64, i64)]> {
+        let key = self.tower.index_key();
+        if let Some((built, extents)) = &self.tower.memo.borrow().floor_extents {
+            if *built == key {
+                return extents.clone();
+            }
+        }
         let mut ext: FloorSlots<(i64, i64)> = FloorSlots::new();
         for u in &self.tower.units {
             let right = u.x + u.width - 1;
@@ -226,6 +236,22 @@ impl Simulation {
                 e.1 = e.1.max(right);
             }
         }
+        let extents: Arc<[(i64, i64, i64)]> = ext
+            .order
+            .iter()
+            .map(|&floor| {
+                let (min_x, max_x) = ext.get(floor).expect("a seen floor has an extent");
+                (floor, min_x, max_x)
+            })
+            .collect();
+        self.tower.memo.borrow_mut().floor_extents = Some((key, extents.clone()));
+        extents
+    }
+
+    /// The congestion and occupancy maps: one cell per floor over its built
+    /// extent, in the order the floors first appear in the unit list.
+    fn floor_cells(&self, mode: HeatmapMode) -> Vec<HeatCell> {
+        let extents = self.floor_extents();
         let mut occ: FloorSlots<(i64, i64)> = FloorSlots::new();
         if mode == HeatmapMode::Occupancy {
             for u in self.tower.room_units() {
@@ -240,8 +266,7 @@ impl Simulation {
         }
         let cong = (mode == HeatmapMode::Congestion).then(|| self.spatial_congestion_by_floor());
         let mut out = Vec::new();
-        for &floor in &ext.order {
-            let (min_x, max_x) = ext.get(floor).expect("a seen floor has an extent");
+        for &(floor, min_x, max_x) in extents.iter() {
             let severity = match &cong {
                 Some(map) => congestion_severity(map.get(&floor).copied().unwrap_or(0.0)),
                 None => match occ.get(floor) {
