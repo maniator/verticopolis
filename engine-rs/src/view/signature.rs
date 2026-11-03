@@ -107,7 +107,7 @@ fn fingerprint(tower: &Tower) -> u64 {
         h.text(&u.label);
         h.opt(u.rent, Fingerprint::num);
         h.word(u.no_rate as u64);
-        h.opt(u.film_policy, Fingerprint::text);
+        h.opt(u.extras().film_policy, Fingerprint::text);
         h.opt(u.subtype, Fingerprint::text);
     }
     h.word(tower.transports.len() as u64);

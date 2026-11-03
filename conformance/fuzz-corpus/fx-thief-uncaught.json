@@ -1,0 +1,41 @@
+{
+  "id": "fx-thief-uncaught",
+  "description": "A two-star tower with no security for sixty days. Thieves get away with the loot, which bumps the thief fx sequence with caught false (#879). The fx sequences and emergency counters sit outside the hashed views, so the compare reads them from the checkpoint detail.",
+  "start": {
+    "newGame": {
+      "seed": 17,
+      "mode": "classic",
+      "star": 2
+    }
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 150,
+      "to": 190
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 150,
+      "to": 190
+    },
+    {
+      "op": "tick",
+      "dt": 60,
+      "times": 1440,
+      "checkpointEvery": 24
+    },
+    {
+      "op": "checkpoint",
+      "label": "end"
+    }
+  ]
+}

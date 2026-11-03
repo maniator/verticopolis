@@ -55,16 +55,27 @@ pub struct Unit {
     pub rent: Option<f64>,
     pub no_rate: bool,
     pub label: String,
+    pub subtype: Option<&'static str>,
+    /// What a unit rarely carries (`extras()`, `extras_mut()`), held out of
+    /// line: most of a tower is floor and lobby tiles that never set any of
+    /// it, and each would pay 96 bytes (#1259). A box is kept only while one
+    /// of its fields is set, so two units with the same facts compare equal.
+    pub extras: Option<Box<Extras>>,
+}
+
+/// The facts a unit rarely carries, each unset until something sets it: a
+/// move-out notice (`vacate_*`), the cinema's film policy, a retail room's four
+/// daily tallies, a room's opening time (`complete_at*`) and a hotel room's
+/// dirty days.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Extras {
     pub vacate_reason: Option<&'static str>,
     pub vacate_at: Option<f64>,
     pub film_policy: Option<&'static str>,
-    pub subtype: Option<&'static str>,
-    /// A retail room's daily tallies (`retail()`, `retail_mut()`). Held out of
-    /// line: only a few hundred shops and restaurants carry them, and the
-    /// tiles that make up most of a tower would each pay 64 bytes for them
-    /// (#1259). `None` means all four tallies are unset; a box is kept only
-    /// while one of them is set, so two units with the same tallies compare equal.
-    pub retail: Option<Box<RetailTally>>,
+    pub patronage_today: Option<f64>,
+    pub patronage_yest: Option<f64>,
+    pub profit_today: Option<f64>,
+    pub profit_yest: Option<f64>,
     pub complete_at: Option<f64>,
     /// A `completeAt` the save carried that is not a number (a string, a
     /// boolean, null). The TypeScript keeps and re-saves it as is, and the
@@ -72,38 +83,66 @@ pub struct Unit {
     /// string that reads as a number completes then and anything else never
     /// completes. Kept beside `complete_at` so the hash and the behavior both
     /// match.
-    pub complete_at_raw: Option<Box<Value>>,
+    pub complete_at_raw: Option<Value>,
     pub dirty_days: Option<i64>,
 }
 
-/// A retail room's four daily tallies (`patronageToday`, `patronageYest`,
-/// `profitToday`, `profitYest` in the save), each unset until the room trades.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct RetailTally {
-    pub patronage_today: Option<f64>,
-    pub patronage_yest: Option<f64>,
-    pub profit_today: Option<f64>,
-    pub profit_yest: Option<f64>,
+/// A unit with no extras reads as this.
+static NO_EXTRAS: Extras = Extras {
+    vacate_reason: None,
+    vacate_at: None,
+    film_policy: None,
+    patronage_today: None,
+    patronage_yest: None,
+    profit_today: None,
+    profit_yest: None,
+    complete_at: None,
+    complete_at_raw: None,
+    dirty_days: None,
+};
+
+impl Extras {
+    /// The out-of-line record for these facts: `None` when none is set.
+    pub fn boxed(self) -> Option<Box<Extras>> {
+        (self != Extras::default()).then(|| Box::new(self))
+    }
 }
 
-impl RetailTally {
-    /// The out-of-line record for these tallies: `None` when none is set.
-    pub fn boxed(self) -> Option<Box<RetailTally>> {
-        (self != RetailTally::default()).then(|| Box::new(self))
+/// A unit's extras to write: assign through it like the record itself. A
+/// unit that had none gets a record while this lives, and drops it again when
+/// the last fact is cleared, so a unit's extras are never an empty box.
+pub struct ExtrasMut<'a>(&'a mut Option<Box<Extras>>);
+
+impl std::ops::Deref for ExtrasMut<'_> {
+    type Target = Extras;
+    fn deref(&self) -> &Extras {
+        self.0.as_deref().unwrap_or(&NO_EXTRAS)
+    }
+}
+
+impl std::ops::DerefMut for ExtrasMut<'_> {
+    fn deref_mut(&mut self) -> &mut Extras {
+        self.0.get_or_insert_default()
+    }
+}
+
+impl Drop for ExtrasMut<'_> {
+    fn drop(&mut self) {
+        if self.0.as_deref().is_some_and(|e| *e == Extras::default()) {
+            *self.0 = None;
+        }
     }
 }
 
 impl Unit {
-    /// The room's daily tallies, all unset for a unit that has none.
-    pub fn retail(&self) -> RetailTally {
-        self.retail.as_deref().copied().unwrap_or_default()
+    /// What the unit rarely carries; all unset for a unit that has none.
+    pub fn extras(&self) -> &Extras {
+        self.extras.as_deref().unwrap_or(&NO_EXTRAS)
     }
 
-    /// The room's daily tallies to write. Set at least one of them after
-    /// asking for this, or the unit keeps an empty record (`retail = None`
-    /// clears them all).
-    pub fn retail_mut(&mut self) -> &mut RetailTally {
-        self.retail.get_or_insert_default()
+    /// The unit's extras to write (see `ExtrasMut`).
+    pub fn extras_mut(&mut self) -> ExtrasMut<'_> {
+        ExtrasMut(&mut self.extras)
     }
 
     /// `serializeUnit` (sim/coerce.ts).
@@ -144,40 +183,40 @@ impl Unit {
         if self.no_rate {
             m.insert("noRate".into(), json!(true));
         }
-        if let Some(v) = self.vacate_reason {
+        let extras = self.extras();
+        if let Some(v) = extras.vacate_reason {
             m.insert("vacateReason".into(), json!(v));
         }
-        if let Some(v) = self.vacate_at {
+        if let Some(v) = extras.vacate_at {
             m.insert("vacateAt".into(), json!(v));
         }
-        if let Some(v) = self.film_policy {
+        if let Some(v) = extras.film_policy {
             m.insert("filmPolicy".into(), json!(v));
         }
         if let Some(v) = self.subtype {
             m.insert("subtype".into(), json!(v));
         }
         if self.kind.subtype_list().is_some() {
-            let retail = self.retail();
-            if let Some(v) = retail.patronage_today {
+            if let Some(v) = extras.patronage_today {
                 m.insert("patronageToday".into(), json!(v));
             }
-            if let Some(v) = retail.patronage_yest {
+            if let Some(v) = extras.patronage_yest {
                 m.insert("patronageYest".into(), json!(v));
             }
-            if let Some(v) = retail.profit_today {
+            if let Some(v) = extras.profit_today {
                 m.insert("profitToday".into(), json!(v));
             }
-            if let Some(v) = retail.profit_yest {
+            if let Some(v) = extras.profit_yest {
                 m.insert("profitYest".into(), json!(v));
             }
         }
-        if let Some(v) = self.complete_at {
+        if let Some(v) = extras.complete_at {
             m.insert("completeAt".into(), json!(v));
-        } else if let Some(raw) = &self.complete_at_raw {
-            m.insert("completeAt".into(), (**raw).clone());
+        } else if let Some(raw) = &extras.complete_at_raw {
+            m.insert("completeAt".into(), raw.clone());
         }
 
-        if let Some(d) = self.dirty_days {
+        if let Some(d) = extras.dirty_days {
             if d != 0 && self.state == UnitState::Dirty {
                 m.insert("dirtyDays".into(), json!(d));
             }

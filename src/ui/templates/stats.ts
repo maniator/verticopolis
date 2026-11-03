@@ -1,8 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { Catalog } from "../../catalog/catalogTypes";
 import { iconTemplate } from "../icons";
-import { LEDGER_CATS, LEDGER_LABELS } from "../../engine/Ledger";
-import { MILESTONES } from "../../engine/milestones";
+import { LEDGER_CATS, LEDGER_LABELS, MILESTONE_COPY } from "../../presentation/statsCopy";
 import { floorTag } from "../format";
 import { clockOf, rulesOf } from "../../simport/headerClock";
 import type { ElevatorStatsRow, NextStarView, StarGateId, StatsReport } from "../../simport/panels";
@@ -77,9 +76,6 @@ export const STAR_GATE_LABELS: Readonly<Record<StarGateId, string>> = {
  *  own key only, so an id such as "constructor" still reads as itself). */
 const gateLabel = (id: string): string =>
   Object.prototype.hasOwnProperty.call(STAR_GATE_LABELS, id) ? STAR_GATE_LABELS[id as StarGateId] : id;
-
-/** Each milestone's label and description, keyed by id. */
-const MILESTONE_COPY = new Map(MILESTONES.map((m) => [m.id as string, m]));
 
 export function statsTemplate(screen: StatsScreen): TemplateResult {
   const { report, catalog } = screen;

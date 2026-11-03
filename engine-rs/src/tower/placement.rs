@@ -287,14 +287,8 @@ impl Tower {
             rent: None,
             no_rate: false,
             label: f.name.to_string(),
-            vacate_reason: None,
-            vacate_at: None,
-            film_policy: None,
             subtype: None,
-            retail: None,
-            complete_at: None,
-            complete_at_raw: None,
-            dirty_days: None,
+            extras: None,
         };
         // In-place floor to lobby upgrade: clear the plain floor tiles being
         // replaced before registering the lobby. Inside the lobby brush a

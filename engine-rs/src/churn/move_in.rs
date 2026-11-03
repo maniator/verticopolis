@@ -129,8 +129,8 @@ impl Simulation {
             let (u, at) = self.tower.marked(i);
             u.set_state(at, UnitState::Occupied);
             u.satisfaction = 1.0;
-            u.vacate_reason = None;
-            u.vacate_at = None;
+            u.extras_mut().vacate_reason = None;
+            u.extras_mut().vacate_at = None;
         }
         if kind == Kind::Condo && !self.tower.units[i].ever_occupied {
             let asking = {

@@ -47,7 +47,7 @@ export function roomSignature(u: UnitView, s: RoomSigScene): string {
   if (u.kind === "parking") liveBits = `:p${Math.round(s.parkingUse * 6)}`;
   else if (u.kind === "recycling") liveBits = `:r${Math.round(s.recycleFill * 8)}`;
   // Include `outForMeal` in the key: the room art reads visible occupants
-  // via `visibleOccupants(u)` (occupants minus outForMeal), so it must
+  // via `roomOccupants` (occupants minus outForMeal), so it must
   // re-raster when the visible dip changes even though canonical
   // `u.occupants` did not. Without this, an office bakes at t=0 with six
   // workers and would keep rendering six through the whole meal peak.

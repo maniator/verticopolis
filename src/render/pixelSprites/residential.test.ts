@@ -9,7 +9,7 @@ import { APARTMENT_WALLS, CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS
  * Behavior coverage for the enriched tenant-room art (office, condo, and the
  * three hotel grades): the look tables hold their luminance and reserved-color
  * contracts, every kind and state draws without throwing, seated occupancy maps
- * one-to-one to `visibleOccupants(u)` with no ghost people, the empty and
+ * one-to-one to `roomOccupants(u)` with no ghost people, the empty and
  * for-sale reads fall back to the reserved `vacancy` shell, and the hotel state
  * cues render OUTSIDE the mirror (so a flipped room broadcasts them at identical
  * pixels). Pixel fidelity itself is the Playwright visual tier's job.
@@ -173,7 +173,7 @@ describe("residential rooms draw at representative states without throwing", () 
   }
 });
 
-describe("occupancy is honest (maps to visibleOccupants, no ghost people)", () => {
+describe("occupancy is honest (maps to roomOccupants, no ghost people)", () => {
   it("an empty-STATE office draws the vacancy shell and no people", () => {
     const s = spyCtx();
     drawRoom(room(s.ctx), unit({ kind: "office", state: "empty", occupants: 0 }), 0, 0, 9 * TILE, FLOOR);
@@ -190,7 +190,7 @@ describe("occupancy is honest (maps to visibleOccupants, no ghost people)", () =
     expect(peopleCount(sale.log)).toBe(0);
   });
 
-  it("a staffed office seats exactly min(visibleOccupants, seats), and out-for-meal removes figures", () => {
+  it("a staffed office seats exactly min(roomOccupants, seats), and out-for-meal removes figures", () => {
     // A 9-tile office with 3 workers present. This column draws the executive
     // corner, whose chain of furniture used to overrun the narrower 10px-tile
     // room and drop the second side cubicle, so the third worker went undrawn

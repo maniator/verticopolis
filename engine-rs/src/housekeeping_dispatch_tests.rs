@@ -91,7 +91,7 @@ fn in_shift(sim: &mut Simulation) {
 fn dirty(sim: &mut Simulation, room: i64) {
     let u = sim.tower.get_unit_mut(room).unwrap();
     u.state = UnitState::Dirty;
-    u.dirty_days = Some(0);
+    u.extras_mut().dirty_days = Some(0);
 }
 
 /// The crews and rooms the room walk finds are the ones the two walks over
@@ -113,7 +113,15 @@ fn assert_walk_matches_units(sim: &Simulation) {
                 && u.state == UnitState::Dirty
                 && !sim.housekeeping.assigned_room.contains_key(&u.id)
         })
-        .map(|u| (u.id, u.floor, u.x, u.width, u.dirty_days.unwrap_or(0)))
+        .map(|u| {
+            (
+                u.id,
+                u.floor,
+                u.x,
+                u.width,
+                u.extras().dirty_days.unwrap_or(0),
+            )
+        })
         .collect();
     assert_eq!(sim.housekeeping.crews_and_rooms(&sim.tower), (crews, rooms));
 }
@@ -130,7 +138,7 @@ fn dispatch_once(mode: GameMode) -> (Simulation, HashMap<i64, i64>, [i64; 3], [i
     for (id, days) in rooms.iter().zip(dirt) {
         let u = sim.tower.get_unit_mut(*id).unwrap();
         u.state = UnitState::Dirty;
-        u.dirty_days = Some(days);
+        u.extras_mut().dirty_days = Some(days);
     }
     sim.housekeeping = Housekeeping::default();
     sim.housekeeping

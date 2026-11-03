@@ -162,6 +162,7 @@ const ALLOWED_FILES = [
   // The rollback rehearsal (#1221): offline tooling that loads two builds' Node engine packages and plays them, never shipped to the browser.
   "src/build/rollbackRehearsal.ts",
   "src/build/rollbackRehearsalNode.ts",
+  "src/build/rollbackRehearsalChurn.ts",
 ];
 const allowed = (file: string) => ALLOWED_DIRS.some((dir) => file.startsWith(dir)) || ALLOWED_FILES.includes(file);
 /** The port's own loop callers outside the host scope: the shared view

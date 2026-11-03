@@ -408,19 +408,25 @@ fn an_old_save_peaks_near_what_it_keeps() {
         "a version 4 save took the streamed path"
     );
     assert!(sim.tower.units.len() > 12_000);
-    assert!(kept > 5 << 20, "only {kept} bytes counted");
+    assert!(kept > 3 << 20, "only {kept} bytes counted");
+    // The old bound was 4.8 times the 5.49 MB this save kept (26.33 MB). The
+    // peak is the parsed save and did not move when a smaller `Unit` (#1259)
+    // cut the kept bytes to 4.29 MB, so the bound is in bytes now, a round
+    // 28 MiB over the 26.2 MB it peaks at. The streamed path this guards
+    // peaked near 60 MB before it was fixed, so the slack hides nothing.
     assert!(
-        peak * 5 <= kept * 24,
+        peak <= 28 << 20,
         "the load peaked at {peak} bytes for {kept} kept"
     );
 }
 
 /// A version 1 save is also re-laid at canon widths, which builds its own
 /// copies of the units; that step is not yet streamed, so the bound only
-/// keeps it from growing back to the 24 times it peaked at before. The bound
-/// is 17 times what the load keeps: a smaller `Unit` (#1259) cut the kept
-/// bytes by 23% and left the peak (the save's text and its parsed tree) where
-/// it was, which took the ratio from 12.7 to 16.6.
+/// keeps it from growing back to what it peaked at before. The bound is
+/// absolute (100 MiB, where this fixture peaked at 91): a smaller `Unit`
+/// (#1259) cut the bytes the load keeps by 40% and left the peak (the save's
+/// text and its parsed tree) where it was, so a multiple of what is kept no
+/// longer measures it.
 #[test]
 fn a_version_one_save_peaks_below_what_it_did() {
     drop(load_save_text(
@@ -429,7 +435,7 @@ fn a_version_one_save_peaks_below_what_it_did() {
     let text = old_tower("towerone_6.vctower");
     let (_, peak, kept) = measure(|| load_save_text(&text).unwrap());
     assert!(
-        peak <= kept * 17,
+        peak <= 100 << 20,
         "the load peaked at {peak} bytes for {kept} kept"
     );
 }

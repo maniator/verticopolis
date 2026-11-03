@@ -156,8 +156,9 @@ Verticopolis has **two test tiers**:
     --release --test tdt_fuzz`. A nightly differential fuzzer
     (`engine-fuzz.yml`) runs seeded random scenarios through both engines and
     compares the state, crowd and events hashes at checkpoints at least
-    every in-game hour, then the money, the log and each field of the full
-    save, naming the first one that differs (`scripts/fuzz-compare.ts`; exit
+    every in-game hour, then the money, the log, each field of the full
+    save, and the fx sequences and emergency counters (which sit outside the
+    hashed views), naming the first one that differs (`scripts/fuzz-compare.ts`; exit
     3 marks a harness failure, not a divergence). One seed in four grows a
     tall tower that fills the shaft and stair pools; every seed sets a cash
     profile once the tower is built, and cash can drop to zero or below mid-run. A divergence it finds is
@@ -166,7 +167,18 @@ Verticopolis has **two test tiers**:
     the native Rust run (`scripts/fuzz-compare.ts --wasm`), which is where a
     wasm32-only difference shows. A run summary names its seed range and the
     `seed_block` and `seed_offset` that replay it, the seeds that diverged on
-    each leg, the seeds that timed out, and the time each leg took.
+    each leg, the seeds that timed out, and the time each leg took. The 14
+    counted nights need one unchanged window key (`scripts/fuzz-key.ts`). The
+    `fuzz-freeze` check (`scripts/fuzz-freeze.ts`) fails a PR that moves the
+    key while `conformance/fuzz-window.json` is open. The owner opens the
+    window at the freeze by setting `open` and the current key. A PR that
+    must move the key also records a reset (old key, new key, and the link to
+    the owner's approving comment on #1104) in the marker's `resets` list;
+    setting `open` back to false lifts the guard. Pins that move the key
+    include the lockfile, `.nvmrc`, `package.json` `type` and `engines`, and
+    the cargo configuration and `rust-toolchain` files, so a Dependabot or lockfile-only PR also
+    needs a reset while a window is open. The nightly records the runner
+    image version next to the key.
 
     **Suites on the engine port.** A converted suite does not build a
     `Simulation` and poke it. It names its engines with `describeEngines`

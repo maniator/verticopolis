@@ -149,7 +149,13 @@ impl Housekeeping {
                 && u.state == UnitState::Dirty
                 && !self.assigned_room.contains_key(&u.id)
             {
-                rooms.push((u.id, u.floor, u.x, u.width, u.dirty_days.unwrap_or(0)));
+                rooms.push((
+                    u.id,
+                    u.floor,
+                    u.x,
+                    u.width,
+                    u.extras().dirty_days.unwrap_or(0),
+                ));
             }
         }
         (crews, rooms)
@@ -215,14 +221,14 @@ impl Simulation {
             if u.state != UnitState::Dirty || !u.kind.is_hotel() {
                 continue;
             }
-            let days = u.dirty_days.unwrap_or(0) + 1;
+            let days = u.extras().dirty_days.unwrap_or(0) + 1;
             if days >= INFEST_DAYS {
                 u.set_state(at, UnitState::Infested);
                 u.set_occupants(at, 0);
-                u.dirty_days = None;
+                u.extras_mut().dirty_days = None;
                 floors.push(u.floor);
             } else {
-                u.dirty_days = Some(days);
+                u.extras_mut().dirty_days = Some(days);
             }
         }
         if !floors.is_empty() {
@@ -407,7 +413,7 @@ impl Simulation {
             if ok && room.state == UnitState::Dirty {
                 room.set_state(at, UnitState::Empty);
                 room.satisfaction = 1.0;
-                room.dirty_days = None;
+                room.extras_mut().dirty_days = None;
                 self.housekeeping.cleaned_today += 1;
             }
         }
