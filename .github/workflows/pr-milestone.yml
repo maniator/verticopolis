@@ -48,9 +48,12 @@ jobs:
           milestones=$(gh api "repos/${GH_REPO}/milestones?state=all&per_page=100")
           # The first issue this pull request closes that has a real milestone.
           target=""
-          for n in $(printf '%s' "$PR_BODY" \
-              | grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[: ]+#[0-9]+' \
-              | grep -oE '[0-9]+' | awk '!seen[$0]++' | head -n 20); do
+          # grep exits 1 when the description has no closing word, which under
+          # pipefail would end the step before the fallback; "|| true" keeps it.
+          issues=$({ printf '%s' "$PR_BODY" \
+              | grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[: ]+#[0-9]+' || true; } \
+              | grep -oE '[0-9]+' | awk '!seen[$0]++' | head -n 20 || true)
+          for n in $issues; do
             m=$(gh api "repos/${GH_REPO}/issues/${n}" --jq '.milestone.number // empty' 2>/dev/null || true)
             title=$(jq -r --arg m "${m:-0}" '.[] | select((.number | tostring) == $m) | .title' <<<"$milestones")
             if [ -n "$m" ] && [ "$title" != "Triage" ] && [ "$title" != "Backlog" ]; then
@@ -60,7 +63,7 @@ jobs:
             fi
           done
           if [ -z "$target" ]; then
-            target=$(jq -r --arg t "$CURRENT_RELEASE" 'first(.[] | select(.title == $t) | .number)' <<<"$milestones")
+            target=$(jq -r --arg t "$CURRENT_RELEASE" 'first(.[] | select(.title == $t) | .number) // empty' <<<"$milestones")
             echo "PR #${PR} closes no issue with a milestone; using ${CURRENT_RELEASE} (${target})."
           fi
           if [ -z "$target" ]; then

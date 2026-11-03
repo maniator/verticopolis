@@ -50,7 +50,7 @@ jobs:
             echo "Issue #${ISSUE} already has milestone ${current}; nothing to do."
             exit 0
           fi
-          triage=$(gh api "repos/${GH_REPO}/milestones?state=open&per_page=100" --jq 'first(.[] | select(.title == "Triage") | .number)')
+          triage=$(gh api "repos/${GH_REPO}/milestones?state=open&per_page=100" --jq 'first(.[] | select(.title == "Triage") | .number) // empty')
           if [ -z "$triage" ]; then
             echo "::error::No open milestone named Triage."
             exit 1
@@ -88,7 +88,7 @@ jobs:
           pr_milestone=${pr_milestone%%$'\n'*}
           if [ -n "$pr_milestone" ]; then
             target=$(gh api "repos/${GH_REPO}/milestones?state=all&per_page=100" \
-              | jq -r --arg t "$pr_milestone" 'first(.[] | select(.title == $t) | .number)')
+              | jq -r --arg t "$pr_milestone" 'first(.[] | select(.title == $t) | .number) // empty')
             if [ -n "$target" ]; then
               gh api -X PATCH "repos/${GH_REPO}/issues/${ISSUE}" -F milestone="$target" --silent
               gh api -X POST "repos/${GH_REPO}/issues/${ISSUE}/comments" \
@@ -99,7 +99,7 @@ jobs:
           fi
           # Cannot decide: keep it findable in Triage and flag it for a person.
           if [ -z "$title" ] || [ "$title" = "Backlog" ]; then
-            triage=$(gh api "repos/${GH_REPO}/milestones?state=open&per_page=100" --jq 'first(.[] | select(.title == "Triage") | .number)')
+            triage=$(gh api "repos/${GH_REPO}/milestones?state=open&per_page=100" --jq 'first(.[] | select(.title == "Triage") | .number) // empty')
             if [ -z "$triage" ]; then
               echo "::error::No open milestone named Triage."
               exit 1
