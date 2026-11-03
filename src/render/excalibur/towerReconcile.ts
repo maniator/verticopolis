@@ -48,11 +48,20 @@ export function syncScene(engine: TowerEngine): void {
   // or the sim identity moved (grass yields to the apron, plants get paved
   // over, a swapped-in tower re-derives its seed-driven skyline and greenery).
   syncScenery(engine);
+  // The floor and lobby tiles draw from the layout, the lobby lighting and the
+  // sim alone, so the tile pass runs only when one of those moved. Every other
+  // sync (the hour, the meal overlay) skips the tiles, which make up most of a
+  // big tower's units. The unit list identity rides along with the revision:
+  // the view rebuilds both together, and a fresh list always walks.
+  const pass = engine.structPass;
+  const units = tower.units;
+  const tilesStale =
+    pass.sim !== engine.sim || pass.units !== units || pass.revision !== tower.revision || pass.lit !== engine.litState;
   // Refresh the floor-1 entrance map BEFORE the unit loop that will call
   // addStruct / lobbyTileGfx: those consumers need to see a map as fresh as
   // the tiles they're about to bake, so a newly-placed leftmost tile picks
   // up the grand-entrance graphic on the same frame it's added.
-  refreshFloor1EntranceMap(engine);
+  if (tilesStale) refreshFloor1EntranceMap(engine);
   // Fresh flood-fill (not cached, it depends on unit state); read ONCE here
   // per sync. A parking space absent from this set is "dead" and gets a red X.
   // The dead-bit joins the room signature, so a connectivity flip triggers a
@@ -91,8 +100,9 @@ export function syncScene(engine: TowerEngine): void {
   // Rebuilt fresh each sync from the one flood-fill read above; the region
   // draw closures read it live at raster time (dead spaces get the red X).
   const deadNow = new Set<number>();
-  for (const u of tower.units) {
+  for (const u of units) {
     if (u.kind === "floor" || u.kind === "lobby") {
+      if (!tilesStale) continue;
       // Floor/lobby units are one tile wide, so a unit maps to one cell.
       const cell = engine.structTileMap.getTile(u.x, viewWorld().maxFloor - u.floor);
       if (!cell) continue; // outside the grid; the engine never places there
@@ -145,10 +155,13 @@ export function syncScene(engine: TowerEngine): void {
     }
   }
   engine.deadParking = deadNow;
-  for (const cell of engine.structTiles) {
-    if (seenS.has(cell)) continue;
-    cell.clearGraphics();
-    engine.structTiles.delete(cell);
+  if (tilesStale) {
+    for (const cell of engine.structTiles) {
+      if (seenS.has(cell)) continue;
+      cell.clearGraphics();
+      engine.structTiles.delete(cell);
+    }
+    engine.structPass = { sim: engine.sim, units, revision: tower.revision, lit: engine.litState };
   }
   reap(engine.animatedRooms, seenR, (a, id) => {
     a.kill();
@@ -317,7 +330,8 @@ function lobbyTileGfx(engine: TowerEngine, u: UnitView): ex.Canvas {
 
 /** Which entrance (if any) the floor-1 lobby tile at grid `x` should render
  *  as. A plain lookup in the per-tile map computed by
- *  {@link refreshFloor1EntranceMap} at the top of every syncScene. */
+ *  {@link refreshFloor1EntranceMap} at the top of each syncScene that walks
+ *  the tiles (the only syncs that read it). */
 function floor1EntranceKind(engine: TowerEngine, x: number): "grand-left" | "grand-right" | "grand-solo" | "service" | "none" {
   return engine.floor1EntranceMap.get(x) ?? "none";
 }
