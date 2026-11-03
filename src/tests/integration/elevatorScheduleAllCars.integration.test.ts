@@ -1,4 +1,4 @@
-import { referenceAutoTune } from "../fixtures/autoTuneDouble";
+import { referenceEngine } from "../fixtures/autoTuneDouble";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mountAppDom, makeUI } from "../uiFixture";
 import { CLASSIC_RULES } from "../../engine/gameRules";
@@ -29,7 +29,7 @@ const ctx = (current?: ScheduleDialogCtx["current"]): ScheduleDialogCtx => {
     ux: CLASSIC_RULES.elevatorScheduleUX(),
     isExpress: false,
     ...base,
-    autoTune: referenceAutoTune(base, false),
+    ...referenceEngine({ ...base, isExpress: false }, false),
     initialWeekend: false,
     current,
   };

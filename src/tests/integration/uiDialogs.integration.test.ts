@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { referenceAutoTune } from "../fixtures/autoTuneDouble";
+import { referenceEngine } from "../fixtures/autoTuneDouble";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { pump, rebaseLog } from "../../ui/hud.fixture";
 import { towerCatalog, useTowerCatalogSource } from "../../catalog/towerCatalog";
@@ -2578,7 +2578,8 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     // The dialog asks the engine for readiness, the warm curves and the tuned
     // rows; these tests answer from their fake curves through the TypeScript
     // reference.
-    return { ...ctx, autoTune: over.autoTune ?? referenceAutoTune({ ...ctx, hourly }) };
+    const engine = referenceEngine({ ...ctx, hourly });
+    return { ...ctx, autoTune: over.autoTune ?? engine.autoTune, facts: over.facts ?? engine.facts, preset: over.preset ?? engine.preset };
   }
   function open(over: TestCtx = {}) {
     const { ui } = makeUI();
@@ -2961,7 +2962,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(apply.mock.calls[0][0].activeCars.weekday).toEqual(Array(24).fill(4)); // the seeded full fleet, untouched
   });
 
-  it.each(["unavailable-in-mode", "missing-shaft", "invalid-draft", "not-an-elevator"] as const)(
+  it.each(["unavailable-in-mode", "no-cars", "missing-shaft", "invalid-draft", "not-an-elevator"] as const)(
     "stays quiet when the engine refuses with %s, a reason waiting cannot fix",
     (status) => {
       const base = baseCtx({ hourly: { weekday: Array(24).fill(0.5) } });

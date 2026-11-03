@@ -54,4 +54,4 @@ src/simport/tsPanels.ts households milestones # the TypeScript adapter's panel a
 src/ui/templates/editor.ts residentialRentals types
 src/ui/templates/inspector.ts types
 src/ui/templates/stats.ts Ledger milestones # milestone copy keyed by the id the stats report answers (facade slice 4, #1211); a static table, like the ledger labels
-src/ui/uiElevatorSchedule.ts elevatorSchedule scheduleAuthoring scheduleOrigins
+src/ui/uiElevatorSchedule.ts elevatorSchedule scheduleOrigins

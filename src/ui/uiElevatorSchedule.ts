@@ -3,9 +3,8 @@ import { render } from "lit-html";
 import { elevatorScheduleTemplate, floorLabel, type FloorRow, type SchedCtx, type SchedState, type SchedHandlers } from "./templates/elevatorSchedule";
 import { SCHEDULE_HOURS, type ElevatorSchedule, type ElevatorScheduleUX } from "../engine/elevatorSchedule";
 import { ORIGIN_HOURS, topOriginFloors, type OriginRings } from "../engine/scheduleOrigins";
-import type { AutoTuneProposal } from "../simport/enginePort";
+import type { AssistedPreset, AutoTuneProposal, PresetProposal, ScheduleFacts, SchedulePresetName } from "../simport/enginePort";
 import { hh, fmtHours, originClause } from "./scheduleFormat";
-import { presetSchedule, scheduleAdvice, stagingSummary, recommendedPreset, type ShaftContext, type SchedulePreset } from "../engine/scheduleAuthoring";
 
 /**
  * The per-shaft elevator Schedule dialog controller (elevator-scheduling #305
@@ -54,6 +53,14 @@ export interface ScheduleDialogCtx {
    *  warm, whether Auto-tune is offered and what it proposes: the dialog only
    *  shows and applies the answer. */
   autoTune: (draft: ElevatorSchedule, weekendView: boolean) => AutoTuneProposal;
+  /** The engine's advice and staging facts for this shaft against the working
+   *  schedule (homes included: they are the staging being summarized). It owns
+   *  the over and short hours, the busiest hour, the staging counts and which
+   *  preset to highlight; the dialog words them. */
+  facts: (draft: ElevatorSchedule, weekendView: boolean) => ScheduleFacts;
+  /** The rows and homes a named preset sets for this shaft. Reads the engine's
+   *  live stops, so it follows stop edits made inside the dialog. */
+  preset: (name: SchedulePresetName) => PresetProposal;
   /** The shaft's current authored schedule (the working copy is seeded from it). */
   current?: ElevatorSchedule;
   /** The live day type, so the dialog opens on the day the player is in. */
@@ -65,7 +72,7 @@ export interface ScheduleDialogCtx {
 const DEFAULT_SFD = 48; // the second-equivalent of the 0.8 game-minute dwell (DWELL_DEFAULT_SECONDS)
 
 /** Announcement-cased preset names for the applied-schedule toast. */
-const PRESET_LABEL: Record<SchedulePreset, string> = {
+const PRESET_LABEL: Record<AssistedPreset, string> = {
   rush: "Rush",
   balanced: "Balanced",
   feeder: "Feeder",
@@ -86,13 +93,6 @@ export function showElevatorScheduleDialog(
   // day, #466), so the ghost and the advice draw the ring the engine tuned from.
   const warmedWd = (): boolean => tune.weekday.warm;
   const warmedWe = (): boolean => tune.weekend.warm;
-  const measured = (): { weekday?: readonly number[]; weekend?: readonly number[] } | undefined =>
-    warmedWd() || warmedWe()
-      ? {
-          ...(tune.weekday.curve ? { weekday: tune.weekday.curve } : {}),
-          ...(tune.weekend.curve ? { weekend: tune.weekend.curve } : {}),
-        }
-      : undefined;
 
   const readFloors = (): FloorRow[] => ctx.stops.read();
   const servedFloorsAsc = (floors: FloorRow[]): number[] =>
@@ -108,16 +108,6 @@ export function showElevatorScheduleDialog(
     const ring = state.day === "weekend" ? ctx.origins.weekend : ctx.origins.weekday;
     return ring[((h % ORIGIN_HOURS) + ORIGIN_HOURS) % ORIGIN_HOURS];
   };
-  /** The authoring-model view of the shaft, rebuilt from the LIVE rows so preset
-   *  staging and the Simulate readout follow stop edits made inside the dialog. */
-  const shaftNow = (floors: FloorRow[]): ShaftContext => ({
-    cars: ctx.cars,
-    bottom: ctx.bottom,
-    top: ctx.top,
-    servedLobbies: servedLobbiesAsc(floors),
-    hourly: measured(),
-  });
-
   // A stored home floor may sit on a stop the shaft no longer serves: snap it to
   // the nearest served floor so the grid never marks a chip on a skipped row and
   // OK re-commits a floor the car can actually wait at.
@@ -189,7 +179,7 @@ export function showElevatorScheduleDialog(
     hasMeasured: dayWarmed(),
     hourly: dayCurve(),
     canTune: tune.status === "available",
-    recommended: recommendedPreset(ctx.isExpress),
+    recommended: null, // the first recompute sets it from the engine's facts
   };
 
   const announce = (msg: string): void => ctx.announce?.(msg);
@@ -208,11 +198,15 @@ export function showElevatorScheduleDialog(
     sctx.hasMeasured = dayWarmed();
     sctx.hourly = dayCurve();
     sctx.canTune = tune.status === "available";
-    const shaft = shaftNow(state.floors);
-    const adv = ctx.ux.advice ? scheduleAdvice(state.schedule, shaft, isWeekend) : null;
-    adviceCritical = adv !== null;
-    if (!ctx.ux.advice) state.adviceMsg = "";
-    else if (!adv) state.adviceMsg = sctx.hasMeasured ? "Measured demand and your schedule line up." : "";
+    // The facts read the whole working copy: its homes are the staging the
+    // Simulate sentence summarizes.
+    const facts = ctx.facts(state.schedule, isWeekend);
+    sctx.recommended = facts.recommended;
+    const adv = ctx.ux.advice && facts.advice.status === "ready" ? facts.advice : null;
+    const advised = adv !== null && (adv.over.length > 0 || adv.short.length > 0);
+    adviceCritical = advised;
+    if (!adv) state.adviceMsg = "";
+    else if (!advised) state.adviceMsg = "Measured demand and your schedule line up.";
     else {
       const parts: string[] = [];
       if (adv.over.length) parts.push(`over-staffed ${fmtHours(adv.over)}`);
@@ -225,10 +219,15 @@ export function showElevatorScheduleDialog(
     // read as a place it never touches; party ruling, spec §16). A day with no
     // measured ring must not claim a measured peak (#466): its sentence names
     // the assumed 17:00 down-rush instead of "Busiest".
-    const sum = stagingSummary(state.schedule, shaft, isWeekend);
+    const sum = facts.staging;
+    if (!sum) {
+      state.simMsg = "";
+      state.originFloors = [];
+      return;
+    }
     // floorLabel keeps the pinned B-n basement grammar for below-ground bases.
-    const baseClause = state.base === 1 ? "at the lobby" : `at Floor ${floorLabel(state.base)} (the base)`;
-    const peakClause = sctx.hasMeasured
+    const baseClause = sum.baseLobby === 1 ? "at the lobby" : `at Floor ${floorLabel(sum.baseLobby)} (the base)`;
+    const peakClause = sum.measured
       ? `Busiest ${state.day} hour ${hh(sum.peakHour)}`
       : `No measured ${state.day} peak yet; at the ${hh(sum.peakHour)} down-rush`;
     // Origin readouts (#465): hotspot markers for the visible day's peak hour,
@@ -391,21 +390,23 @@ export function showElevatorScheduleDialog(
       after();
     },
     onStageUpTower: () => {
-      const preset = presetSchedule("rush", shaftNow(state.floors)); // its split staging is the one-press play
-      if (preset.homeFloors) state.schedule.homeFloors = [...preset.homeFloors];
+      const play = ctx.preset("stage-up-tower");
+      if (play.status !== "available") return;
+      state.schedule.homeFloors = [...play.homeFloors];
       homesDirty = true;
       after();
     },
     onAllCars: () => { state.schedule.activeCars = { weekday: fullRow(), weekend: fullRow() }; announce(`All ${ctx.cars} cars now run every hour, both day types.`); after(); },
-    onPreset: (p: SchedulePreset) => {
-      const preset = presetSchedule(p, shaftNow(state.floors));
+    onPreset: (p: AssistedPreset) => {
+      const preset = ctx.preset(p);
+      if (preset.status !== "available") return; // the mode offers no presets; the buttons are not shown
       state.schedule.activeCars = {
-        weekday: preset.activeCars?.weekday ? [...preset.activeCars.weekday] : fullRow(),
-        weekend: preset.activeCars?.weekend ? [...preset.activeCars.weekend] : fullRow(),
+        weekday: preset.weekday ? [...preset.weekday] : fullRow(),
+        weekend: preset.weekend ? [...preset.weekend] : fullRow(),
       };
       // A preset re-stages only staging the player has not hand-set (spec §14.3):
       // counts are its business, a hand-placed fleet is not.
-      if (!homesDirty && preset.homeFloors) state.schedule.homeFloors = [...preset.homeFloors];
+      if (!homesDirty) state.schedule.homeFloors = [...preset.homeFloors];
       announce(`Applied the ${PRESET_LABEL[p] ?? "Feeder"} schedule.`);
       after();
     },
