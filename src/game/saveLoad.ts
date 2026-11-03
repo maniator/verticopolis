@@ -129,7 +129,13 @@ export class SaveLoad {
         // Still a failed save the player never hears about from this path, so it
         // is reported with the background `timer` detail (the pre-update flush,
         // the context-loss flush and the TDT adoption flush all land here).
-        trackAppActionOnce("autosave_failed", "timer");
+        // Telemetry must never replace the save error: callers branch on it
+        // (recoverFromContextLoss reads whether it was a storage error).
+        try {
+          trackAppActionOnce("autosave_failed", "timer");
+        } catch {
+          /* reporting is best effort here */
+        }
         throw err;
       }
       trackAppActionOnce("autosave_failed", "manual");

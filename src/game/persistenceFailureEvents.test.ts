@@ -52,6 +52,18 @@ describe("a failed save reports autosave_failed", () => {
     expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "timer");
   });
 
+  it("rethrows the save's own error when reporting it throws", () => {
+    const quota = new DOMException("quota", "QuotaExceededError");
+    vi.spyOn(SaveGame, "save").mockImplementation(() => {
+      throw quota;
+    });
+    vi.mocked(trackAppActionOnce).mockImplementationOnce(() => {
+      throw new TypeError("telemetry broke");
+    });
+    const { load } = makeLoad();
+    expect(() => load.save(true)).toThrow(quota);
+  });
+
   it("reports nothing when the save works", () => {
     vi.spyOn(SaveGame, "save").mockImplementation(() => {});
     const { load } = makeLoad();
