@@ -20,11 +20,12 @@ export type VctowerWriter = (json: string, appVersion: string, savedAtMs: number
 let engineWriter: VctowerWriter | null = null;
 /** Told once when the engine writer turns itself off (the S2 latch-off), so
  *  boot can report it (`engine_status`, `writer_latched`). */
-let onLatchOff: (() => void) | null = null;
+let onLatchOff: ((error: unknown) => void) | null = null;
 
 /** Write through the engine from now on, or (with null) through fflate.
- *  `onLatch` hears about a latch-off once; it is replaced by the next call. */
-export function setEngineWriter(writer: VctowerWriter | null, onLatch: (() => void) | null = null): void {
+ *  `onLatch` hears about a latch-off once, with what the writer threw (the
+ *  host stops on a trap, #1205); it is replaced by the next call. */
+export function setEngineWriter(writer: VctowerWriter | null, onLatch: ((error: unknown) => void) | null = null): void {
   engineWriter = writer;
   onLatchOff = writer ? onLatch : null;
 }
@@ -53,7 +54,7 @@ export function packVctower(json: string, bytes: Uint8Array, stamp: { appVersion
       console.error("[wasm] the engine did not write this save; writing saves on the TypeScript side from now on:", e);
       // Reported, never allowed to cost the save it is reporting on.
       try {
-        latched?.();
+        latched?.(e);
       } catch {
         /* best-effort report */
       }
