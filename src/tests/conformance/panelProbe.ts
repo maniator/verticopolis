@@ -125,8 +125,9 @@ export function probedTsStart(onCheckpoint: (sim: Simulation) => void): EngineSt
   };
 }
 
-/** The Rust engine with the same hook. Its scenario adapter has no checkpoint
- *  detail of its own, so this one answers an empty record after the probe. */
+/** The Rust engine with the same hook. The probe never reads the checkpoint
+ *  detail, so this one answers an empty record after the probe rather than
+ *  paying for a full save at every checkpoint. */
 export function probedWasmStart(onCheckpoint: (h: WasmEngine) => void): EngineStart {
   const probed = (h: WasmEngine): ScenarioEngine => {
     const e = wasmEngine(h);
@@ -134,7 +135,7 @@ export function probedWasmStart(onCheckpoint: (h: WasmEngine) => void): EngineSt
       ...e,
       detail: () => {
         onCheckpoint(h);
-        return { money: h.money(), log: { seq: 0, count: 0, digest: "" }, save: {} };
+        return { money: h.money(), log: { seq: 0, count: 0, digest: "" }, save: {}, fx: {} };
       },
       reload: () => {
         const loaded = wasm().Engine.fromSave(h.serialize());
