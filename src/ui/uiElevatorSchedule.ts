@@ -169,6 +169,7 @@ export function showElevatorScheduleDialog(
     hasMeasured: dayWarmed(),
     hourly: dayCurve(),
     canTune: tune.status === "available",
+    tuneStatus: tune.status,
     recommended: null, // the first recompute sets it from the engine's facts
   };
 
@@ -188,6 +189,7 @@ export function showElevatorScheduleDialog(
     sctx.hasMeasured = dayWarmed();
     sctx.hourly = dayCurve();
     sctx.canTune = tune.status === "available";
+    sctx.tuneStatus = tune.status;
     // The facts read the whole working copy: its homes are the staging the
     // Simulate sentence summarizes.
     const facts = ctx.facts(state.schedule, isWeekend);

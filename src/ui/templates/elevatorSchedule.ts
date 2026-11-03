@@ -1,7 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import type { ElevatorSchedule, ElevatorScheduleUX } from "../../engine/elevatorSchedule";
-import type { AssistedPreset } from "../../simport/enginePort";
+import type { AssistedPreset, AutoTuneStatus } from "../../simport/enginePort";
 // floorLabel is a DOM-free pure helper in its own module (so the schedule
 // formatter can reuse it without pulling in lit-html); re-exported here so
 // existing importers and tests keep their `./elevatorSchedule` path.
@@ -49,6 +49,11 @@ export interface SchedCtx {
   /** Whether EITHER day has warmed up (arms the Auto-tune button, which tunes
    *  every measured day at once). */
   canTune: boolean;
+  /** Why Auto-tune is or is not offered, as the engine answered. Of the
+   *  reasons, only `insufficient-data` and `no-cars` get their own hint under
+   *  the buttons; a tunable shaft whose current day tab is unmeasured gets the
+   *  separate "no measured traffic yet" hint (see `canTune` and `hasMeasured`). */
+  tuneStatus: AutoTuneStatus;
   /** The preset the engine recommends for this shaft; null where the mode
    *  offers none. */
   recommended: AssistedPreset | null;
@@ -345,7 +350,8 @@ function presetsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Te
         ? html`<button type="button" class="btn es-autotune" ?disabled=${!ctx.canTune} @click=${h.onAutoTune}>Auto-tune</button>`
         : nothing}
     </div>
-    ${ctx.ux.autoTune && !ctx.canTune ? html`<p class="es-hint">Auto-tune needs a day or two of measured traffic first.</p>` : nothing}
+    ${ctx.ux.autoTune && ctx.tuneStatus === "insufficient-data" ? html`<p class="es-hint">Auto-tune needs a day or two of measured traffic first.</p>` : nothing}
+    ${ctx.ux.autoTune && ctx.tuneStatus === "no-cars" ? html`<p class="es-hint">This shaft has no cars to tune.</p>` : nothing}
     ${ctx.ux.autoTune && ctx.canTune && !ctx.hasMeasured
       ? html`<p class="es-hint">No measured ${state.day} traffic yet; Auto-tune adjusts only measured days.</p>`
       : nothing}`;

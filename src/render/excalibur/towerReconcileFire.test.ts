@@ -64,6 +64,7 @@ function fakeEngine(unit: { current: UnitView }): TowerEngine {
     litState: false,
     floor1EntranceMap: new Map(),
     structTiles: new Set(),
+    structPass: { sim: null, units: null, revision: -1, lit: false },
     animatedRooms: new Map(),
     roomSig: new Map(),
     regionUnits: new Map(),

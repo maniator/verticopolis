@@ -88,35 +88,55 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       engine: ${{ steps.filter.outputs.engine }}
     steps:
+      # Only this workflow file is needed, for its path list. A full-history
+      # fetch (fetch-depth: 0) pulls every branch and tag, and on this
+      # repository it ran past the job's five minutes and was cancelled, so
+      # the changed files come from the pull request files API instead of a
+      # git diff.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: github.event_name == 'pull_request'
         with:
-          fetch-depth: 0
           persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.github/workflows/engine-rs.yml
       - id: filter
         env:
           EVENT: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if [ "$EVENT" != "pull_request" ]; then
             echo "engine=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # A missing sha or a failed diff fails this job, which runs the
-          # engine checks below (they skip only on a successful "false").
-          [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] || { echo "::error::missing PR shas"; exit 1; }
-          # --no-renames lists both sides of a move, so a file moved out of an
-          # engine path still counts. The three-dot form diffs from the merge
-          # base, as the paths filter did, so engine changes that landed on
-          # main after the branch split do not count as this PR's.
-          # -z keeps every path unquoted, so a name with a quote, tab,
-          # backslash or newline still matches its pattern.
+          # A missing number or a failed API call fails this job, which runs
+          # the engine checks below (they skip only on a successful "false").
+          [ -n "$PR_NUMBER" ] || { echo "::error::missing PR number"; exit 1; }
+          # The files API lists the pull request's own changes, from the merge
+          # base as the three-dot diff does, so engine changes that landed on
+          # main after the branch split do not count as this PR's. A renamed
+          # file lists its old path too (previous_filename), so a file moved
+          # out of an engine path still counts. Each line is "F <path>" for a
+          # file or "P <path>" for the old path of a rename. A path with a
+          # newline in it splits into pieces; a piece can only add a match, so
+          # that errs toward running the engine checks.
           list="$RUNNER_TEMP/changed-files"
-          git diff -z --no-renames --name-only "$BASE_SHA...$HEAD_SHA" > "$list" || exit 1
+          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" \
+            --jq '.[] | "F " + .filename, (if .previous_filename then "P " + .previous_filename else empty end)' \
+            > "$list" || exit 1
+          # The API stops listing at 3000 files; a PR that large fails closed.
+          files="$(grep -c '^F ' "$list" || true)"
+          if [ "$files" -ge 3000 ]; then
+            echo "::warning::3000 or more changed files; running the engine checks"
+            echo "engine=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # Reuse the authoritative on.push.paths globs for pull requests.
           # Bash case patterns match slashes (including a trailing **).
           # If someone changes the YAML shape, fail closed rather than
@@ -139,7 +159,7 @@ jobs:
             exit 1
           fi
           engine=false
-          while IFS= read -r -d '' f; do
+          while IFS= read -r f; do
             [ -z "$f" ] && continue
             for pattern in "${patterns[@]}"; do
               case "$f" in
@@ -147,7 +167,7 @@ jobs:
               esac
             done
             [ "$engine" = true ] && break
-          done < "$list"
+          done < <(sed 's/^[FP] //' "$list")
           echo "engine=$engine" >> "$GITHUB_OUTPUT"
 
   # A host outside the web game. The job runs in the official Rust image
@@ -167,10 +187,12 @@ jobs:
   consumer:
     needs: changes
     # Fail closed: run unless the filter succeeded and found no engine file.
-    # always() rather than !cancelled(): a skipped required job counts as
-    # passed, so a run cancelled before this job starts must not skip it.
-    # Its last step fails the job if the run was cancelled.
-    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    # !cancelled(), not always(): an always() job still starts in a run that a
+    # newer push cancelled (during the changes job, say) and runs to the end on
+    # the stale commit, which defeats cancel-in-progress. The required
+    # engine-rs job below keeps always() and fails a cancelled run, so a
+    # skipped job here cannot pass the check.
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -279,10 +301,9 @@ jobs:
   rust:
     needs: changes
     # Fail closed: run unless the filter succeeded and found no engine file.
-    # always() rather than !cancelled(): a run cancelled before this job
-    # starts must not skip it. Its last step fails the job if the run was
-    # cancelled.
-    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    # !cancelled(), not always(), as the consumer job above explains: a run a
+    # newer push cancelled must stop here. The engine-rs job fails it.
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -382,7 +403,7 @@ jobs:
   wasm-binding:
     needs: changes
     # Fail closed, as the rust job above.
-    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
     # A cache miss compiles the crate for wasm32 (a few minutes, with the
     # prebuilt CLI); anything near this is a hang.
@@ -433,7 +454,7 @@ jobs:
   fuzz-corpus:
     needs: changes
     # Fail closed, as the rust job above.
-    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.engine == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

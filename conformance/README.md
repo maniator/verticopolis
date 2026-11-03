@@ -280,12 +280,13 @@ When a night diverges, shrink its scenario and add the result in the fix pull
 request:
 
 ```sh
-npx tsx scripts/fuzz-shrink.ts fuzz-out/fuzz-<seed>.json <entry-name> [--max-tests 4000]
+npx tsx scripts/fuzz-shrink.ts fuzz-out/fuzz-<seed>.json <entry-name> [--wasm] [--max-tests 4000]
 ```
 
 The shrinker drops commands until none can go, keeping a candidate only when
 the Rust engine runs it cleanly and the TypeScript replay shows the same kind
-of divergence, then writes `fuzz-corpus/<entry-name>.json`. Before the fix the
+of divergence (with `--wasm`, the shipped WASM build in Node shows it instead,
+which includes a trap), then writes `fuzz-corpus/<entry-name>.json`. Before the fix the
 entry fails the corpus job; after it, the entry passes and stays as a
 regression. A tall night needs about 1300 tests, so the default limit is 4000;
 a run that reaches `--max-tests` says so, and its list may not be minimal.

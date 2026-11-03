@@ -167,3 +167,16 @@ fn shops_past_the_512_style_rows_are_counted_not_silently_dropped() {
     .expect("builds");
     assert_eq!(few.counts.retail_rows_dropped, 0);
 }
+
+#[test]
+fn an_infested_hotel_room_exports_the_way_a_dirty_one_does() {
+    let room = |state: &str| {
+        let mut hotel = unit(2, "hotelDouble", 2, 0, 6);
+        hotel["state"] = json!(state);
+        build_tdt(&tower(vec![unit(1, "lobby", 1, 0, 1), hotel], vec![])).expect("builds")
+    };
+    let dirty = room("dirty");
+    let infested = room("infested");
+    assert_eq!(infested.bytes, dirty.bytes);
+    assert_eq!(infested.counts.hotel_states, 1);
+}

@@ -340,6 +340,9 @@ export function disposeScene(engine: TowerEngine): void {
     engine.craneGfx = null;
   }
   engine.structTiles.clear();
+  // The cells were just emptied, so the next sync must walk the tiles again
+  // (and the old view's unit list is not kept alive).
+  engine.structPass = { sim: null, units: null, revision: -1, lit: false };
   engine.animatedRooms.clear();
   engine.roomSig.clear();
   engine.transportActors.clear();

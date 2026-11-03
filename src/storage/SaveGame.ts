@@ -167,7 +167,7 @@ function infoFrom(slot: number | "auto", ...keys: string[]): SlotInfo {
       // string.
       mode: isGameMode(data.mode) ? data.mode : "classic",
       // 1-indexed in-game day, matching the TDT import report's convention. A
-      // day is 1440 minutes in EVERY calendar (see src/engine/calendar.ts), so
+      // day is 1440 minutes in EVERY calendar (see src/shared/calendar.ts), so
       // this cannot disagree with the in-game date for either mode. Same
       // absent-not-clamped posture as savedAt: negative or absurdly large
       // minutes (past ~1,000 in-game years, the TDT importer's own ceiling)

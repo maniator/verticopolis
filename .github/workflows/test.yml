@@ -28,6 +28,65 @@ permissions:
   contents: read
 
 jobs:
+  # Whether this change can reach the engine package, the built game or the
+  # browser suites. A pull request that touches only prose (the docs folder
+  # apart from its screenshot gallery, the BMAD notes, and Markdown files at
+  # the repository root) skips the jobs that build and drive the game; the
+  # test job still runs, since the unit tests read some of those files
+  # (the backlog, the README, the changelog). Every doubt answers true: a
+  # push, a failed lookup, or a path outside that list runs everything. The
+  # changed files come from the pull request files API, as in the Rust engine
+  # and drift-check workflows, so this job needs no checkout.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "$EVENT" != "pull_request" ] || [ -z "$PR_NUMBER" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Each line is "F <path>" for a changed file or "P <path>" for the old
+          # path of a rename, so a file moved out of a code path still counts.
+          list="$RUNNER_TEMP/changed-files"
+          if ! gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" \
+            --jq '.[] | "F " + .filename, (if .previous_filename then "P " + .previous_filename else empty end)' \
+            > "$list"; then
+            echo "::warning::could not list the changed files; running every job"
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The API stops listing at 3000 files; a PR that large runs everything.
+          if [ "$(grep -c '^F ' "$list" || true)" -ge 3000 ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          code=false
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              docs/screenshots/*) code=true ;; # the help media the app builds in
+              docs/* | _bmad-output/*) ;;
+              */*) code=true ;;
+              *.md) ;;
+              *) code=true ;;
+            esac
+            [ "$code" = true ] && break
+          done < <(sed 's/^[FP] //' "$list")
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "code paths changed: $code"
+
   # The Rust engine's WASM package (src/public/engine/, engine-rs/pkg/) is build
   # output and is not checked in. This job restores it from the Actions cache,
   # keyed on the engine's source hash, or builds and caches it on a miss (an
@@ -36,6 +95,9 @@ jobs:
   # build it. The test job needs no package (its hash test skips without one),
   # so lint, typecheck and the unit tests never wait on a Rust build.
   engine-wasm:
+    needs: changes
+    # Skipped only on a successful "false" from the filter (prose-only change).
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     # A cache miss compiles the crate (a few minutes); anything near this is a hang.
     timeout-minutes: 30
@@ -55,6 +117,8 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # About ten minutes at the slowest in the last two days.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -100,7 +164,13 @@ jobs:
   # reason (src/tests/parity/). One job per project so they run side by side.
   # Runs after engine-wasm, so the package comes from the cache it filled.
   test-wasm-parity:
-    needs: engine-wasm
+    needs: [changes, engine-wasm]
+    # A matrix job that is skipped as a whole reports under its unexpanded
+    # name, and the two required checks are named per leg. So the legs always
+    # run on a prose-only change and skip their steps, which keeps both names
+    # reporting. With code changed, a failed engine package skips them as it
+    # always has.
+    if: ${{ !cancelled() && (needs.changes.outputs.code == 'false' || needs.engine-wasm.result == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -108,22 +178,31 @@ jobs:
       matrix:
         project: [unitWasm, integrationWasm]
     steps:
+      - name: No code changed, nothing to run
+        if: ${{ needs.changes.outputs.code == 'false' }}
+        run: echo "Only prose changed; the WASM parity suites are skipped."
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.changes.outputs.code != 'false' }}
         with:
           persist-credentials: false
 
       - name: Use Node.js (from .nvmrc)
+        if: ${{ needs.changes.outputs.code != 'false' }}
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
           cache: "npm"
 
       - name: Install dependencies
+        if: ${{ needs.changes.outputs.code != 'false' }}
         run: npm ci
 
       - uses: ./.github/actions/engine-wasm
+        if: ${{ needs.changes.outputs.code != 'false' }}
 
       - name: Run ${{ matrix.project }} on the WASM engine
+        if: ${{ needs.changes.outputs.code != 'false' }}
         env:
           VC_REQUIRE_WASM: "1"
           VC_LOG_TEST_STARTS: "1"
@@ -136,7 +215,7 @@ jobs:
       # while the Rust workflow no longer repeats this same test:wasm script.
       # This step has its own timeout and logs each test start (#1152).
       - name: Host suites on the WASM engine
-        if: ${{ matrix.project == 'integrationWasm' }}
+        if: ${{ needs.changes.outputs.code != 'false' && matrix.project == 'integrationWasm' }}
         timeout-minutes: 12
         env:
           VC_LOG_TEST_STARTS: "1"
@@ -147,7 +226,10 @@ jobs:
   # the whole basis of a stable visual gate. (container.image is fixed before a
   # job's steps run, so the tag has to come from a prior job's output.)
   resolve-image:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
     outputs:
@@ -166,8 +248,13 @@ jobs:
   # so the baselines it compares against are minted against the identical renderer. Kept
   # in its own job so the container pull never slows the fast lint/test lane.
   e2e:
-    needs: [resolve-image, engine-wasm]
+    needs: [changes, resolve-image, engine-wasm]
+    # Skipped only for a prose-only change; a skipped job counts as passed for
+    # the required check. With code changed, a failed engine package or image
+    # lookup fails this job instead of skipping it.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     container:
@@ -182,6 +269,7 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -235,8 +323,11 @@ jobs:
   # project) on a tooling build. The `e2e` job above runs the
   # serial project: pixel baselines, the perf gate and the engine-status specs.
   e2e-wasm-only:
-    needs: [resolve-image, engine-wasm]
+    needs: [changes, resolve-image, engine-wasm]
+    # As the e2e job: skipped only for a prose-only change.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     container:
@@ -249,6 +340,7 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci

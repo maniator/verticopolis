@@ -1,4 +1,4 @@
-import { FACILITIES } from "../../engine/facilities";
+import { kindWidth } from "../../presentation/viewKinds";
 import type { FacilityKind } from "../../engine/types";
 import type { UnitView, TransportView } from "../../simport/view";
 import { SHIRTS, personFigure } from "../pixelSprites/common";
@@ -54,13 +54,13 @@ interface Case {
 
 /** A shaft stack; `tiles` other than the catalog width names a legacy
  *  width's frames (`shaft/<kind>/w<tiles>/...`). */
-function shaftCase(kind: FacilityKind, skip: number[], pieces: string[], tiles = FACILITIES[kind].width): Case {
+function shaftCase(kind: FacilityKind, skip: number[], pieces: string[], tiles = kindWidth(kind)): Case {
   const w = tiles * TILE;
   const floors = pieces.length;
-  const stem = tiles === FACILITIES[kind].width ? `shaft/${kind}` : `shaft/${kind}/w${tiles}`;
+  const stem = tiles === kindWidth(kind) ? `shaft/${kind}` : `shaft/${kind}/w${tiles}`;
   // Bands run from the top floor down; `pieces` names each band's frame.
   return {
-    label: `${kind} shaft${tiles === FACILITIES[kind].width ? "" : ` ${tiles} tiles wide`}, ${floors} floors skipping ${skip.join(", ") || "none"}`,
+    label: `${kind} shaft${tiles === kindWidth(kind) ? "" : ` ${tiles} tiles wide`}, ${floors} floors skipping ${skip.join(", ") || "none"}`,
     frames: [...new Set(pieces)].map((p) => `${stem}/${p}`),
     atlas: (get) => {
       const out = blank(w, floors * FLOOR);
@@ -77,9 +77,9 @@ function shaftCase(kind: FacilityKind, skip: number[], pieces: string[], tiles =
 }
 
 export function extraCases(): Case[] {
-  const cab = (kind: FacilityKind, s: number, riders: number, arrow: "up" | "down" | null, full: boolean, tiles = FACILITIES[kind].width): Case => {
+  const cab = (kind: FacilityKind, s: number, riders: number, arrow: "up" | "down" | null, full: boolean, tiles = kindWidth(kind)): Case => {
     const w = tiles * TILE;
-    const seg = tiles === FACILITIES[kind].width ? "" : `/w${tiles}`;
+    const seg = tiles === kindWidth(kind) ? "" : `/w${tiles}`;
     const name = `car/${kind}${seg}/${arrow ?? "idle"}/${full ? "full" : "notfull"}/s${s}`;
     return {
       label: `${kind} cab${seg ? ` ${tiles} tiles wide` : ""} with ${riders} riders`,

@@ -79,23 +79,39 @@ jobs:
   # silently skip a real render change, so keep the rules inclusive.
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       render: ${{ steps.filter.outputs.render }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
+      # No checkout: the changed files come from the pull request files API. A
+      # full-history checkout (fetch-depth: 0) pulls every branch and tag, which
+      # on this repository ran past its timeout in the Rust engine workflow's
+      # path filter.
       - id: filter
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          [ -n "$PR_NUMBER" ] || { echo "::error::missing PR number"; exit 1; }
+          # Each line is "F <path>" for a changed file or "P <path>" for the old
+          # path of a rename, so a file moved out of a render path still counts.
+          # The API lists the PR's own changes from the merge base. A path with a
+          # newline in it splits into pieces; a piece can only add a match.
+          list="$RUNNER_TEMP/changed-files"
+          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" \
+            --jq '.[] | "F " + .filename, (if .previous_filename then "P " + .previous_filename else empty end)' \
+            > "$list" || exit 1
           render=false
-          # Two-dot diff (all files differing between base tip and head): if the
-          # base moved a render file too, that only over-includes, which is safe.
+          # The API stops listing at 3000 files; a PR that large renders.
+          if [ "$(grep -c '^F ' "$list" || true)" -ge 3000 ]; then
+            echo "render=true" >> "$GITHUB_OUTPUT"
+            echo "3000 or more changed files; rendering"
+            exit 0
+          fi
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             sign=""
@@ -136,7 +152,7 @@ jobs:
             # which is the price of never missing a dependency-driven pixel change.
             case "$f" in package-lock.json) sign=+ ;; esac
             if [ "$sign" = "+" ]; then render=true; break; fi
-          done < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          done < <(sed 's/^[FP] //' "$list")
           echo "render=$render" >> "$GITHUB_OUTPUT"
           echo "render-affecting paths changed: $render"
 
@@ -157,6 +173,7 @@ jobs:
   verify-drift:
     needs: capture
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
@@ -169,7 +186,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Download the shard artifacts
@@ -250,6 +266,7 @@ jobs:
       needs.verify-drift.outputs.has_drift == 'true' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: screenshot-approval
     # Earns write: it pushes the approved commit. It runs no PR-head code (only
     # git/jq/cp over downloaded artifacts), so the write token is never exposed to
@@ -280,7 +297,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
           token: ${{ secrets.SCREENSHOT_COMMIT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Download the shard artifacts
@@ -379,6 +395,7 @@ jobs:
     needs: [changes, capture, verify-drift]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions: {}
     steps:
       - name: Report the determinism and drift result

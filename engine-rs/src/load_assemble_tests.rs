@@ -229,8 +229,11 @@ fn legacy_parking_on_many_floors_reflows_without_a_scan_per_floor() {
         );
         took
     };
-    let small = reflow(10_000);
-    let large = reflow(40_000);
+    // Best of three per size: one slow run on a busy CI machine is noise, and
+    // a scan per floor stays about sixteen times slower on every run.
+    let best = |n: i64| (0..3).map(|_| reflow(n)).min().unwrap();
+    let small = best(10_000);
+    let large = best(40_000);
     assert!(
         large < small * 8,
         "10,000 floors took {small:?}, 40,000 took {large:?}"

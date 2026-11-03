@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.10.1 (2026-11-03)
+
+- The `.TDT` export writes an infested hotel room with the dirty flag (32) and counts it as a dirty room in the people and finance blocks, as a `dirty` room is. It used to write no flag, so the room re-imported as a clean vacant room. What flag 64 means in the original game is still unchecked (#1629), so it is not written. No saved-game, frame, view layout or catalog change.
+
 ## 1.10.0 (2026-11-03)
 
 - `scheduleFacts` gains `homeFloors`: the draft's homes as the shaft would hold them, one per car, each on the nearest served floor (ties to the lower one), with a car the draft lists no home for at the base lobby. It is empty on a refusal. The host no longer snaps homes to served stops or works out the base lobby itself. The advice answer is unchanged. The staging counts (`upTowerCars`, `lobbyCars`) now follow the snapped homes, so a draft with a home on a skipped floor counts that car where the shaft would hold it. The query also borrows the day's measured ring instead of copying it (`autoTuneProposal` still copies it, since it returns the curve). No saved-game, frame, view layout or catalog change.
