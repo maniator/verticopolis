@@ -12,7 +12,10 @@ export interface CheckpointDetail {
   log: { seq: number; count: number; digest: string };
   save: Record<string, string>;
   /** The cosmetic fx sequences and the emergency counters, outside the hashed
-   *  views (#879), one number per named slot of {@link FX_SLOTS}. */
+   *  views (#879), one number per named slot of {@link FX_SLOTS}. The record
+   *  also holds what the Rust runner wrote to a file, so its keys are checked
+   *  when it is compared (`recordProblem`); the two writers in this repository
+   *  return `Record<FxSlot, number>`, so the compiler holds them to the list. */
   fx: Record<string, number>;
 }
 

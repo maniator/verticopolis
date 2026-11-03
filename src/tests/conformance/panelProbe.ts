@@ -7,7 +7,7 @@ import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
 import type { HeatmapMode } from "../../engine/sim/constants";
 import type { WasmEngine } from "../../dualrun/binding";
 import { REPO_ROOT, tsEngine, type EngineStart, type ScenarioEngine, type Start } from "./scenario";
-import { wasm, wasmEngine } from "./wasmEngine";
+import { wasm, wasmEngine, wasmFxSlots } from "./wasmEngine";
 import {
   tsFloorHeatmap,
   tsHousekeepingCoverage,
@@ -127,7 +127,8 @@ export function probedTsStart(onCheckpoint: (sim: Simulation) => void): EngineSt
 
 /** The Rust engine with the same hook. The probe never reads the checkpoint
  *  detail, so this one answers an empty record after the probe rather than
- *  paying for a full save at every checkpoint. */
+ *  paying for a full save at every checkpoint. The fx slots come from the
+ *  frame header, which is cheap, so the record keeps its whole shape. */
 export function probedWasmStart(onCheckpoint: (h: WasmEngine) => void): EngineStart {
   const probed = (h: WasmEngine): ScenarioEngine => {
     const e = wasmEngine(h);
@@ -135,7 +136,7 @@ export function probedWasmStart(onCheckpoint: (h: WasmEngine) => void): EngineSt
       ...e,
       detail: () => {
         onCheckpoint(h);
-        return { money: h.money(), log: { seq: 0, count: 0, digest: "" }, save: {}, fx: {} };
+        return { money: h.money(), log: { seq: 0, count: 0, digest: "" }, save: {}, fx: wasmFxSlots(h) };
       },
       reload: () => {
         const loaded = wasm().Engine.fromSave(h.serialize());
