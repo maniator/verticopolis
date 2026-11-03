@@ -9,7 +9,10 @@ import { isEngineTrap } from "../wasmhost/hostFault";
  * is a frame error like any other.
  */
 
-let onTrap: ((error: unknown) => void) | null = null;
+/** Where the trap happened: a frame's step, or the engine's save writer (#1205). */
+export type TrapDuring = "tick" | "save";
+
+let onTrap: ((error: unknown, during: TrapDuring) => void) | null = null;
 let trapped = false;
 /** How the running tower reached the engine: the first tower, a later one (a
  *  load, a new tower, an import) or an undo or redo restore. A trap's
@@ -28,7 +31,7 @@ export function runningTowerStage(): "start" | "adopt" | "undo" {
 
 /** Hear the running engine's first trap (boot installs it on the Rust
  *  engine; null stops listening). */
-export function watchEngineTraps(handler: ((error: unknown) => void) | null): void {
+export function watchEngineTraps(handler: ((error: unknown, during: TrapDuring) => void) | null): void {
   onTrap = handler;
   trapped = false;
   towerStage = "start";
@@ -39,13 +42,13 @@ export function engineTrapped(): boolean {
   return trapped;
 }
 
-/** A frame threw `error`: when it is the engine's trap, hand it on. True when
- *  it was one. */
-export function noteEngineThrow(error: unknown): boolean {
+/** The engine threw `error` in a frame or in its save writer: when it is the
+ *  engine's trap, hand it on. True when it was one. */
+export function noteEngineThrow(error: unknown, during: TrapDuring = "tick"): boolean {
   if (!onTrap || !isEngineTrap(error)) return false;
   const handler = onTrap;
   onTrap = null;
   trapped = true;
-  handler(error);
+  handler(error, during);
   return true;
 }
