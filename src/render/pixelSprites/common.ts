@@ -96,6 +96,12 @@ export function hash(seed: number): number {
  *
  * Every room painter reads its crowd through here, so none of them imports the
  * TypeScript engine for it and a corrupt `outForMeal` reads the same in each.
+ *
+ * The gameplay rule itself, who is out for a meal and how many people a room
+ * shows, lives in the Rust engine (`Unit::visible_occupants` in
+ * `engine-rs/src/tower_query_state.rs`, which gates spawns on it). The frame
+ * carries both of its inputs, so this subtraction is drawing, not a second copy
+ * of the rule: the `ceil` only matters for counts the engine never reports.
  */
 export function roomOccupants(u: { occupants: number; outForMeal?: number }): number {
   const occupants = Number.isFinite(u.occupants) ? Math.max(0, u.occupants) : 0;
