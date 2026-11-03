@@ -125,6 +125,7 @@ export function installRecorder(speed: number): { loafSupported: boolean } {
     loafSupported,
     frameErrors: 0,
     autosave: null as null | (() => unknown),
+    autosaveTimer: null as null | ReturnType<typeof setTimeout>,
     camera: null as null | { pos: unknown; zoom: number },
   };
   w.__interaction = rec;
@@ -197,11 +198,15 @@ export function installRecorder(speed: number): { loafSupported: boolean } {
 }
 
 /** Open a phase window named `name` and run one autosave `autosaveAtMs` into
- *  it (when given), or close the open window with null. */
+ *  it (when given), or close the open window with null. Closing a window
+ *  cancels its autosave if it has not run yet, so a timer held back by a
+ *  blocked main thread never saves inside the next phase or between phases. */
 export function setPhase(arg: { name: string | null; autosaveAtMs?: number }): void {
   const rec = (window as any).__interaction;
   const header = (window as any).game.reader.header;
   const now = performance.now();
+  if (rec.autosaveTimer !== null) clearTimeout(rec.autosaveTimer);
+  rec.autosaveTimer = null;
   if (rec.open) {
     rec.open.end = now;
     rec.open.simMinutesEnd = header.minutes;
@@ -210,7 +215,12 @@ export function setPhase(arg: { name: string | null; autosaveAtMs?: number }): v
   }
   if (arg.name === null) return;
   rec.open = { name: arg.name, start: now, end: Infinity, simMinutesStart: header.minutes, simMinutesEnd: header.minutes, minuteOfDayStart: header.minuteOfDay };
-  if (arg.autosaveAtMs !== undefined && rec.autosave) setTimeout(() => rec.autosave(), arg.autosaveAtMs);
+  if (arg.autosaveAtMs !== undefined && rec.autosave) {
+    rec.autosaveTimer = setTimeout(() => {
+      rec.autosaveTimer = null;
+      rec.autosave();
+    }, arg.autosaveAtMs);
+  }
 }
 
 /** Everything recorded, each entry given to the phase whose window holds its

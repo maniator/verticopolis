@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { collectRecord, type PhaseWindow } from "./pageRecorder";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { collectRecord, setPhase, type PhaseWindow } from "./pageRecorder";
 
 // `collectRecord` runs in the page; here it runs against a stubbed recorder,
 // so the attribution of entries to phase windows is checked like the statistics.
@@ -23,6 +23,40 @@ function stub(over: Record<string, unknown>): void {
 
 afterEach(() => {
   delete (window as any).__interaction;
+  delete (window as any).game;
+  vi.useRealTimers();
+});
+
+describe("phase windows", () => {
+  function recorder(): { saves: number[] } {
+    const saves: number[] = [];
+    (window as any).game = { reader: { header: { minutes: 0, minuteOfDay: 0 } } };
+    (window as any).__interaction = { windows: [], open: null, autosave: () => saves.push(Date.now()), autosaveTimer: null };
+    return { saves };
+  }
+
+  it("runs the phase's autosave once inside the window", () => {
+    vi.useFakeTimers();
+    const { saves } = recorder();
+    setPhase({ name: "pan", autosaveAtMs: 500 });
+    vi.advanceTimersByTime(600);
+    setPhase({ name: null });
+    expect(saves).toHaveLength(1);
+    expect((window as any).__interaction.windows.map((w: PhaseWindow) => w.name)).toEqual(["pan"]);
+  });
+
+  it("cancels an autosave that has not run when the window closes, so it never lands in the next phase", () => {
+    vi.useFakeTimers();
+    const { saves } = recorder();
+    setPhase({ name: "pan", autosaveAtMs: 500 });
+    setPhase({ name: "zoom" });
+    vi.advanceTimersByTime(1000);
+    setPhase({ name: "build", autosaveAtMs: 500 });
+    setPhase({ name: null });
+    vi.advanceTimersByTime(1000);
+    expect(saves).toHaveLength(0);
+    expect((window as any).__interaction.autosaveTimer).toBeNull();
+  });
 });
 
 describe("collecting the page's record", () => {

@@ -46,7 +46,9 @@ arms alternate (A then B on odd repetitions, B then A on even ones). In each:
    same view on every run.
 
 Autosave runs once in the middle of every phase, and its timer is switched
-off, so its stall lands at the same point for both arms. The time recorded
+off, so its stall lands at the same point for both arms. If the main thread is
+blocked until the phase ends, that phase's autosave is cancelled, so it never
+runs inside the next phase. The time recorded
 for it covers the synchronous part (the engine serialize and the encode). The
 compression runs in a `CompressionStream`, off the main thread; the steps
 after it that run on the main thread (the base64 encoding and the storage

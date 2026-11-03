@@ -56,10 +56,16 @@ async function offScreen(page: Page, selector: string): Promise<boolean> {
   return Boolean(box && vp && box.x + box.width / 2 > vp.width);
 }
 
-/** Click the side panel's toggle, when the layout shows one. */
+/** Click the side panel's toggle, when the layout shows one. A failed click
+ *  does not stop the run, but its cause is written to stderr, so a phase that
+ *  then opens no dialog can be traced back to it. */
 async function togglePanel(page: Page): Promise<void> {
   const toggle = await page.$("#panel-toggle");
-  if (toggle && (await toggle.isVisible())) await toggle.click({ timeout: 2000, force: true }).catch(() => {});
+  if (toggle && (await toggle.isVisible())) {
+    await toggle.click({ timeout: 2000, force: true }).catch((e: unknown) => {
+      process.stderr.write(`perf:interaction: warning: side panel toggle click failed: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}\n`);
+    });
+  }
   await pause(page, 300);
 }
 
