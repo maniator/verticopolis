@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.6.0 (2026-11-03)
+
+- `serviceDiagnostics(id)` gains a keyed `commercial` section: `lobbyFar` is true when a foot-traffic venue sits more than two floors from the nearest (sky) lobby, which halves its trade, and null for a unit the penalty never applies to (a sky bar is exempt and a venue that earns nothing in the current mode has no trade to halve, as in the income rule). The `retail` patronage block is now limited to the venues the catalog prices per customer (shop, fast food and restaurant, plus food hall, amusements and boutique bay in Modern), the set the TypeScript reference showed it for. Sky Bar, Nightclub, Spa and Daycare no longer answer `retail.active`. No saved-game, frame, view layout or catalog change.
+
 ## 1.5.2 (2026-11-02)
 
 - Added `maxHousehold` to catalog facility entries and `economy.garbageCollectHour` to the catalog economy. The catalog shape is now version 5, with matching TypeScript/Rust catalog locks and compatibility record; save, frame and view layout versions are unchanged.

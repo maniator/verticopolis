@@ -79,3 +79,27 @@ export function retailServiceFixture(mode: GameMode = "modern") {
   restaurant.profitYest = 4800;
   return { sim, shop, fastFood, restaurant };
 }
+
+/** Shops at three heights over one lobby, plus a sky bar and an office on the
+ * far floor: the W3 placement fixture. Floors 2 to 8 are slabs, so a shop on
+ * floor 3 is 2 floors from the ground lobby and one on floor 7 is 6 away. */
+export function lobbyDistanceFixture(mode: GameMode = "modern") {
+  const sim = Simulation.newGame(73, mode);
+  sim.money = 1e9;
+  sim.star = 5;
+  for (let x = 150; x < 275; x++) {
+    const lobby = sim.tower.place("lobby", 1, x);
+    if (!lobby.ok) throw new Error(`lobby at ${x}: ${lobby.reason}`);
+    for (let f = 2; f <= 8; f++) {
+      const slab = sim.tower.place("floor", f, x);
+      if (!slab.ok) throw new Error(`floor ${f} at ${x}: ${slab.reason}`);
+    }
+  }
+  mustBuild(sim, "elevatorStandard", 153, 1, 8);
+  const near = placeUnit(sim, "shop", 3, 165);
+  const far = placeUnit(sim, "shop", 7, 165);
+  const skyBar = placeUnit(sim, "skyBar", 8, 200);
+  const office = placeUnit(sim, "office", 7, 235);
+  for (const u of [near, far, skyBar, office]) u.state = "occupied";
+  return { sim, near, far, skyBar, office };
+}

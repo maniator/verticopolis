@@ -7,7 +7,7 @@ import { isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } fro
 import { catalogFacility, type Catalog } from "../engine/catalogTypes";
 import { isRentalKind } from "../engine/residentialRentals";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
-import { hotelRatingLines, parkingDisplayLines, retailDisplayLines } from "./portServiceDiagnostics";
+import { commercialLobbyLines, hotelRatingLines, parkingDisplayLines, retailDisplayLines } from "./portServiceDiagnostics";
 import { recyclingLines } from "./recyclingDiagnostics";
 import { reachesLobby } from "../engine/sim/gripe";
 import { gripeLineText, wontLeaseText } from "./gripeCopy";
@@ -229,15 +229,16 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
       html`<div style="color:var(--bad)">${FAR_WALK_COPY}</div>`,
     );
   }
-  // W3: a canon commercial venue (not partyHall) more than two floors from a
-  // (sky) lobby loses half its shoppers. Name the ACHIEVABLE fix: lobbies only
-  // go on the ground and every 15th floor, so "add a lobby here" is usually
-  // impossible; the real move is to sit within 2 floors of one of those levels.
-  if (isCommercialKind(u.kind) && sim.tower.nearestLobbyFloorDistance(u.floor) > COMMERCIAL_LOBBY_FLOORS) {
-    lines.push(
-      html`<div style="color:var(--bad)">Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor).</div>`,
-    );
-  }
+  // W3: a canon commercial venue more than two floors from a (sky) lobby loses
+  // half its shoppers. The words are shared with the Rust card; the sky bar is
+  // exempt, as it is in the income rule.
+  // (Reference card only; the shipped card gets `lobbyFar` from Rust. The
+  // reference engine keeps the same rule in `port/reports.ts` `commercialFacts`.)
+  lines.push(...commercialLobbyLines({
+    lobbyFar: isCommercialKind(u.kind) && u.kind !== "skyBar" && catalogFacility(towerCatalog(sim), u.kind).dailyIncome !== null
+      ? sim.tower.nearestLobbyFloorDistance(u.floor) > COMMERCIAL_LOBBY_FLOORS
+      : null,
+  }));
   // W-new (#394): a served office/condo/hotel/Apartment far from the nearest
   // (sky)lobby caps low, and deep in the very-far band also erodes toward a move-out
   // (the Apartment carries the drain, the Studio does not). Name the structural fix

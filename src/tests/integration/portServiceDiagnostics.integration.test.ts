@@ -3,6 +3,7 @@ import type { EnginePort } from "../../simport/enginePort";
 import { TsEngine } from "../../engine/port/tsEngine";
 import {
   serviceDiagnosticsFixture,
+  lobbyDistanceFixture,
   retailServiceFixture,
   setFixtureHotelState,
 } from "../fixtures/serviceDiagnostics.fixture";
@@ -103,6 +104,26 @@ describe.skipIf(!hasWasmPackage())("real Rust/WASM keyed service diagnostics fro
         expect(rust.serviceDiagnostics(f.fastFood.id)?.retail.tier).toBe("noData");
         expect(rust.serviceDiagnostics(f.restaurant.id)?.retail.tier).toBe("booming");
         expect(rust.serviceDiagnostics(f.shop.id)?.retail.advice).toBe(mode === "modern" ? "overBuilt" : "none");
+      } finally {
+        rust.free();
+      }
+    });
+  }
+
+  for (const mode of ["classic", "modern"] as const) {
+    it(`${mode}: a venue past two floors from a lobby is flagged by Rust, a sky bar and an office are not`, () => {
+      const f = lobbyDistanceFixture(mode);
+      const rust = fromFixture(f.sim);
+      const reference = new TsEngine(f.sim);
+      try {
+        for (const u of [f.near, f.far, f.skyBar, f.office]) {
+          expect(rust.serviceDiagnostics(u.id), `${mode}: ${u.kind} on floor ${u.floor}`)
+            .toEqual(reference.serviceDiagnostics(u.id));
+        }
+        expect(rust.serviceDiagnostics(f.near.id)?.commercial.lobbyFar).toBe(false);
+        expect(rust.serviceDiagnostics(f.far.id)?.commercial.lobbyFar).toBe(true);
+        expect(rust.serviceDiagnostics(f.skyBar.id)?.commercial.lobbyFar).toBeNull();
+        expect(rust.serviceDiagnostics(f.office.id)?.commercial.lobbyFar).toBeNull();
       } finally {
         rust.free();
       }

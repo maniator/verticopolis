@@ -118,6 +118,13 @@ export function retailDisplayLines(c: ServiceDiagnosticFacts["retail"]): Lines {
   return out;
 }
 
+/** Shoppers: a venue more than two floors from a (sky) lobby loses half its
+ *  trade. Rust decides whether it applies; this only words it. */
+export function commercialLobbyLines(c: ServiceDiagnosticFacts["commercial"]): Lines {
+  if (c.lobbyFar !== true) return [];
+  return [html`<div style="color:${bad}">Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor).</div>`];
+}
+
 /** The WASM export returns a keyed object from Rust's typed struct.
  * This adapter does not know about slots, status code integers or thresholds. */
 export function portServiceLines(facts: ServiceDiagnosticFacts): Lines {
@@ -144,6 +151,7 @@ export function portServiceLines(facts: ServiceDiagnosticFacts): Lines {
     have: p.have ?? NaN, total: p.total ?? NaN,
     offices: p.offices ?? NaN, suites: p.suites ?? NaN,
   }));
+  out.push(...commercialLobbyLines(facts.commercial));
   out.push(...retailDisplayLines(facts.retail));
   return out;
 }

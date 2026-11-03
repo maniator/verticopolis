@@ -1,6 +1,6 @@
 import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN, type Simulation } from "../Simulation";
 import { SERVED_RECOVERY } from "../sim/constants";
-import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../facilities";
+import { isCommercialKind, isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../facilities";
 import { isRentalKind } from "../residentialRentals";
 import { catalogFacility } from "../catalogTypes";
 import { towerCatalog } from "../towerCatalog";
@@ -20,7 +20,7 @@ import type { ServiceDiagnosticFacts } from "../../simport/enginePort";
 import { KIND_CODES, VIEW_LAYOUT, codeOf } from "./layout";
 import { price } from "./queries";
 import { flag, whole } from "./record";
-import { TRAFFIC_FACTOR_MEAN } from "../EconomySystem";
+import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../EconomySystem";
 
 /**
  * `TsEngine`'s report queries: the stats screen and one unit's diagnostics
@@ -171,6 +171,18 @@ function wontLease(sim: Simulation, u: Unit): { gripe: Gripe | null; carry: numb
   };
 }
 
+/** The reference engine's lobby-distance fact, the same rule as the income
+ *  penalty: a commercial venue that earns in this mode, a sky bar exempt.
+ *  Rust decides this in production. */
+export function commercialFacts(sim: Simulation, unit: Unit): ServiceDiagnosticFacts["commercial"] {
+  const earns = catalogFacility(towerCatalog(sim), unit.kind).dailyIncome !== null;
+  return {
+    lobbyFar: isCommercialKind(unit.kind) && unit.kind !== "skyBar" && earns
+      ? sim.tower.nearestLobbyFloorDistance(unit.floor) > COMMERCIAL_LOBBY_FLOORS
+      : null,
+  };
+}
+
 /** Legacy TypeScript engine's independent parity implementation.
  * The shipped game uses Rust's structured serviceDiagnostics() instead. */
 export function serviceDiagnostics(sim: Simulation, id: number): ServiceDiagnosticFacts | undefined {
@@ -243,7 +255,9 @@ export function serviceDiagnostics(sim: Simulation, id: number): ServiceDiagnost
   if (isOperational(unit)) {
     // TS remains a reference for differential tests, not production policy.
     const yardstick = catalogFacility(towerCatalog(sim, "modern"), unit.kind);
-    if (yardstick.spendPerCustomer !== null && yardstick.spendPerCustomer > 0 && yardstick.dailyIncome !== null) {
+    // The block belongs to the venues the current mode's catalog prices per customer.
+    const priced = catalogFacility(towerCatalog(sim), unit.kind).spendPerCustomer !== null;
+    if (priced && yardstick.spendPerCustomer !== null && yardstick.spendPerCustomer > 0 && yardstick.dailyIncome !== null) {
       const baseline = yardstick.dailyIncome / yardstick.spendPerCustomer * TRAFFIC_FACTOR_MEAN;
       const today = Math.max(0, unit.patronageToday ?? 0);
       let ratio: number | undefined;
@@ -274,7 +288,7 @@ export function serviceDiagnostics(sim: Simulation, id: number): ServiceDiagnost
       };
     }
   }
-  return { hotel, parking, housekeeping, retail };
+  return { hotel, parking, housekeeping, retail, commercial: commercialFacts(sim, unit) };
 }
 
 /** Unit `id`'s diagnostics facts in the layout's `unitFacts` slots, or an
