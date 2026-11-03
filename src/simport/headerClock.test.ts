@@ -36,6 +36,9 @@ describe("headerClock", () => {
     c.year,
     c.format(),
     c.formatRetroDate(),
+    c.isMorning(),
+    c.isEvening(),
+    c.isNight(),
   ];
 
   // The founding minute, the next one, an evening, a weekend day, a quarter
@@ -64,7 +67,9 @@ describe("headerClock", () => {
 
     it(`${name}: the header's calendar is the engine's`, () => {
       const sim = found();
-      expect(calendarOf(headerOf(sim))).toBe(sim.clock.calendar);
+      const { weekDays, weekendDays } = sim.clock.calendar;
+      const cal = calendarOf(headerOf(sim));
+      expect({ weekDays: cal.weekDays, weekendDays: cal.weekendDays }).toEqual({ weekDays, weekendDays });
     });
   }
 
@@ -81,10 +86,19 @@ describe("headerClock", () => {
   });
 
   it("reads minute zero as midnight of the first day", () => {
-    // The Clock constructor reads 0 as a new tower and starts it at 07:00.
-    const c = clockOf({ minutes: 0, mode: "modern", modernCalendar: "realWorld" });
-    expect([c.minutes, c.minuteOfDay, c.hour, c.minute, c.day]).toEqual([0, 0, 0, 0, 0]);
-    const nextDay = clockOf({ minutes: 1440, mode: "modern", modernCalendar: "realWorld" });
-    expect([c.dayOfWeek, c.format(), nextDay.dayOfWeek, nextDay.format()]).toEqual([0, "Mon 00:00", 1, "Tue 00:00"]);
+    // The Clock constructor reads 0 as a new tower and starts it at 07:00; the
+    // header's minute is exact.
+    const sim = Simulation.newGame(1, "modern", "realWorld");
+    const engine = new TsEngine(sim);
+    engine.tick(1);
+    const reader = new ViewReader(engine, facilityFloors);
+    sim.clock.minutes = 0;
+    reader.update();
+    const first = clockOf(reader.header);
+    sim.clock.minutes = 1440;
+    reader.update();
+    const next = clockOf(reader.header);
+    expect([first.minutes, first.minuteOfDay, first.hour, first.minute, first.day]).toEqual([0, 0, 0, 0, 0]);
+    expect([first.dayOfWeek, first.format(), next.dayOfWeek, next.format()]).toEqual([0, "Mon 00:00", 1, "Tue 00:00"]);
   });
 });

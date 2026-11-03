@@ -17,6 +17,8 @@ interface SpiedSim {
 
 export const portCodes = new PortCodes(new TsEngine(Simulation.newGame(1)));
 const LOG_KINDS = ["info", "good", "bad", "money"];
+/** The date slots a fake header carries (a real one reads them off the engine). */
+const DATE_SLOTS = { day: 0, dayOfWeek: 0, isWeekend: false, quarter: 0, year: 0, weekDays: 7, weekendDays: 2 };
 
 export function fakeEnginePort(sim: SpiedSim) {
   // The step mode outlives a frame, as the engine's does.
@@ -54,7 +56,7 @@ export function fakeReader(sim: { star: number; pendingChoice: unknown; clock: {
     rooms: [],
     structure: [],
     get header() {
-      return { star: sim.star, pendingChoice: sim.pendingChoice, population, minutes: sim.clock.minutes, mode: "modern", modernCalendar: "realWorld" };
+      return { star: sim.star, pendingChoice: sim.pendingChoice, population, minutes: sim.clock.minutes, mode: "modern", modernCalendar: "realWorld", ...DATE_SLOTS };
     },
   };
 }
