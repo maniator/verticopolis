@@ -5,6 +5,8 @@ client brief and its engine architecture draft in the private distribution
 repository (`brief-native-client-2026-10-07/`), whose work list this document
 updates now that the port exists.
 
+> **Superseded in part by Rust-only (2026-10-30).** The owner decided that the Rust engine is the only engine players run: since app 2.66.0 and engine crate 1.0.0 every build is the Rust-only build and `?engine=` is ignored. This document is a dated snapshot and is not rewritten. Where it describes the TypeScript fallback, the "lands in both engines" rule or a separate retirement version bump, read those as replaced by [`release-3.0-rust-only-2026-10-30.md`](../release-3.0-rust-only-2026-10-30.md) and CONTRIBUTING.md (a simulation change lands in the Rust engine; the TypeScript engine changes only when the shared lock, a parity test or the catalog digest needs it). The CONTRIBUTING section "Two engines, one simulation" cited below no longer exists. This settles #1112.
+
 ## Where things stand
 
 | Item from the engine architecture draft | State |

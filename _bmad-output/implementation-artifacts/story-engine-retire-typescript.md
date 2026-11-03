@@ -42,8 +42,11 @@ simulation's behavior today.
    test, and the suite the table points at is green.
 4. **AC4 Saves, TDT, screenshots and golden masters unchanged**, byte for
    byte where they are bytes, hash for hash where they are hashes.
-5. **AC5 Version bump: major.** Players see no change, but the engine
-   substrate is a headline milestone and the update flow should say so.
+5. **AC5 Version bump: none.** The retirement is internal. Players already run
+   only the Rust engine (since app 2.66.0 every build is Rust-only and
+   `?engine=` is ignored), so deleting the TypeScript engine changes nothing a
+   player notices and needs no app bump under CLAUDE.md. The engine crate
+   version goes up only if the lock, a layout or `engine.d.ts` changes.
 
 ## What it removes
 
@@ -52,8 +55,8 @@ in the browser, what to close before the removal, and which open and planned
 work adds code this story removes) is the "Retiring the TypeScript engine:
 the inventory" section of the roadmap,
 `_bmad-output/planning-artifacts/architecture/architecture-engine-rust-port-2026-10-08.md`.
-It is a snapshot of `main` at `e34dfdf` (2026-10-20). AC5 disagrees with the
-roadmap's row 7 and the spine on the version bump; #1107 settles it.
+It is a snapshot of `main` at `e34dfdf` (2026-10-20). AC5 now agrees with the
+roadmap's row 7 and the spine on the version bump (none); #1107 settled it.
 
 Temporary code this story also removes that the roadmap's section does not
 list, such as anything merged or opened after its snapshot (each PR adds its
