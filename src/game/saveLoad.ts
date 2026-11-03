@@ -125,7 +125,13 @@ export class SaveLoad {
       // reload on a failed write, recoverFromContextLoss words the failure on
       // the crash screen, and the autosave drain treats it as best-effort.
       // Each owns its own failure surface, so the silent path never toasts.
-      if (silent) throw err;
+      if (silent) {
+        // Still a failed save the player never hears about from this path, so it
+        // is reported with the background `timer` detail (the pre-update flush,
+        // the context-loss flush and the TDT adoption flush all land here).
+        trackAppActionOnce("autosave_failed", "timer");
+        throw err;
+      }
       trackAppActionOnce("autosave_failed", "manual");
       // A manual Quick Save must never fail silently: without this catch the
       // throw escapes the button handler as an uncaught error, the player

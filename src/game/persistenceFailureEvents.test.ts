@@ -43,13 +43,13 @@ describe("a failed save reports autosave_failed", () => {
     expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "manual");
   });
 
-  it("leaves a silent save's throw to its caller and reports nothing", () => {
+  it("leaves a silent save's throw to its caller and reports it as `timer` (pre-update, context-loss and TDT flushes)", () => {
     vi.spyOn(SaveGame, "save").mockImplementation(() => {
       throw new DOMException("quota", "QuotaExceededError");
     });
     const { load } = makeLoad();
     expect(() => load.save(true)).toThrow();
-    expect(trackAppActionOnce).not.toHaveBeenCalled();
+    expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "timer");
   });
 
   it("reports nothing when the save works", () => {
