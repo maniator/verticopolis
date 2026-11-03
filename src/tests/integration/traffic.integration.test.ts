@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { trafficTier, TRAFFIC_LABELS, trafficGlyph } from "../../engine/traffic";
+import { trafficTier, TRAFFIC_LABELS, trafficGlyph } from "../../presentation/traffic";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 

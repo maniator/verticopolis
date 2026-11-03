@@ -40,7 +40,7 @@ reaching for the nearest standard-library call.
 Player-facing prose (log text, event messages) is not part of the conformance
 contract and is not word for word identical yet. Host plumbing and UI-only
 readouts the hashed state never reads (`scheduleOrigins.ts`,
-`scheduleAuthoring.ts`, `traffic.ts`, `sim/fixedStep.ts`, `timePacing.ts`,
+`scheduleAuthoring.ts`, `sim/fixedStep.ts`, `timePacing.ts`,
 `UndoHistory.ts`, `SimContext.ts`, the rest of `sim/stats.ts`) are not ported.
 
 ## Using it from another frontend

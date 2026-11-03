@@ -4,7 +4,7 @@ import { GameApp } from "../main";
 // Loading main.ts boots the game at module scope; this test only needs the
 // class, so the boot is stubbed out.
 vi.mock("../bootstrap", () => ({ bootGame: vi.fn() }));
-import type { TrafficTier } from "../engine/traffic";
+import type { TrafficTier } from "../presentation/traffic";
 
 /**
  * `GameApp.followSwap` restarts the traffic chip's hysteresis on a different
