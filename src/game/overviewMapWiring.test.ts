@@ -16,9 +16,10 @@ describe("overview map preview gate", () => {
   });
 
   // `runIf`, as in bootstrap.test.ts: a shell with VC_TOOLING=1 exported
-  // inlines a true `__TOOLING_BUILD__` (a tooling build shows the preview), so
-  // the assertion runs only where it means a player session.
-  it.runIf(!__TOOLING_BUILD__)("never shows the window in a player build, flag or not", () => {
+  // inlines a true `__TOOLING_BUILD__`, and one with VERCEL=1 and VERCEL_ENV=preview a true
+  // `__PREVIEW_DEPLOY__` (both show the preview), so the assertion runs only
+  // where it means a player session.
+  it.runIf(!__TOOLING_BUILD__ && !__PREVIEW_DEPLOY__)("never shows the window in a player build, flag or not", () => {
     vi.stubEnv("DEV", false);
     expect(mapPreviewOn("?map")).toBe(false);
   });

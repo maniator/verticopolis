@@ -6,9 +6,9 @@
  * class carries no field for it.
  *
  * Players do not see it yet: until the last slice ships (SPEC, Constraints),
- * the window is built only in a dev serve or a tooling build, and only when the
- * page's address carries `?map`. In a player build (neither dev nor tooling)
- * the gate is always false, so no player page ever builds the window.
+ * the window is built only in a dev serve, a tooling build or a Vercel preview
+ * deploy, and only when the page's address carries `?map`. In the production
+ * deploy the gate is always false, so no player page ever builds the window.
  */
 import type { GameApp } from "../main";
 import type { FacilityKind } from "../engine/types";
@@ -24,10 +24,11 @@ export const MAP_PREVIEW_FLAG = "map";
 
 const windows = new WeakMap<GameApp, OverviewMapWindow>();
 
-/** Whether this page shows the window: a dev serve or a tooling build whose
- *  address carries the preview flag, with any value or none. */
+/** Whether this page shows the window: a dev serve, a tooling build or a
+ *  Vercel preview deploy whose address carries the preview flag, with any
+ *  value or none. */
 export function mapPreviewOn(search: string): boolean {
-  if (!(import.meta.env.DEV || __TOOLING_BUILD__)) return false;
+  if (!(import.meta.env.DEV || __TOOLING_BUILD__ || __PREVIEW_DEPLOY__)) return false;
   return new URLSearchParams(search).has(MAP_PREVIEW_FLAG);
 }
 
