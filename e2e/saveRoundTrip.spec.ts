@@ -82,6 +82,31 @@ test("the engine loads the autosave, plays, saves, reloads and downloads it as a
   const [download] = await Promise.all([page.waitForEvent("download"), page.evaluate(() => (window as any).game.saveLoad.exportGame())]);
   const file = readFileSync((await download.path())!, "utf8");
   expect(file.startsWith("VCTOWER1\n")).toBe(true);
+  // The exported bytes load: play on, then import the file and the tower is the one that was exported.
+  const exported = await page.evaluate(() => {
+    const h = (window as any).game.reader.header;
+    return { minutes: h.minutes as number, money: h.money as number };
+  });
+  await playAndSave(page, second);
+  expect(await page.evaluate(() => (window as any).game.reader.header.minutes)).toBeGreaterThan(exported.minutes);
+  await page.evaluate((text) => (window as any).game.saveLoad.importGame(text), file);
+  await expect(page.getByText("Tower imported.")).toBeVisible();
+  await clockReads(page, exported.minutes);
+  expect(await page.evaluate(() => (window as any).game.reader.header.money)).toBe(exported.money);
+});
+
+test("a tower file saved by a newer version is refused and changes nothing", async ({ page }) => {
+  await boot(page, "/");
+  await playAndSave(page, 0);
+  const before = await page.evaluate(() => (window as any).game.reader.header.minutes as number);
+  const storedBefore = await storedSaves(page);
+  const newer = JSON.parse(OLD_SAVE) as Record<string, unknown>;
+  newer.version = 999;
+  const file = `VCTOWER1\n${deflateRawSync(JSON.stringify(newer)).toString("base64")}\n`;
+  await page.evaluate((text) => (window as any).game.saveLoad.importGame(text), file);
+  await expect(page.getByText(/made by a newer version of Verticopolis\. Update the game to load it\./)).toBeVisible();
+  expect(await page.evaluate(() => (window as any).game.reader.header.minutes)).toBe(before);
+  expect(await storedSaves(page)).toEqual(storedBefore);
 });
 
 test("an older version's autosave loads, a failed import changes nothing, and an older file imports", async ({ page }) => {
