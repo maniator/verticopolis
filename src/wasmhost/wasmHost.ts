@@ -12,7 +12,7 @@ import { appendEngineLog, applyRecords, checkRecords } from "./frameApply";
 import { setSaveText, setStepGate } from "./stepGate";
 import { mergeSimulation } from "./merge";
 import { adoptTelemetry, parseCommuteStress, type TelemetryDocument } from "./telemetry";
-import { useTowerCatalogSource } from "../engine/towerCatalog";
+import { useTowerCatalogSource } from "../catalog/towerCatalog";
 import { syncCars, syncPeople, syncUnits } from "./frameSync";
 import { refuseForeignCatalog } from "./catalogCheck";
 export { refuseForeignCatalog } from "./catalogCheck";

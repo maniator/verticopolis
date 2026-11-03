@@ -1,6 +1,6 @@
 import { checkBinding, type WasmModule } from "../dualrun/binding";
 import { readCatalog } from "../dualrun/catalog";
-import { useTowerCatalogSource } from "../engine/towerCatalog";
+import { useTowerCatalogSource } from "../catalog/towerCatalog";
 import { BOOT_SEED, bootTower, type BootTower } from "../game/bootTower";
 import type { EnginePort } from "../simport/enginePort";
 import { refuseForeignCatalog } from "./catalogCheck";

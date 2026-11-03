@@ -1,4 +1,4 @@
-import type { Catalog } from "../engine/catalogTypes";
+import type { Catalog } from "../catalog/catalogTypes";
 import type { LogEntry } from "../engine/types";
 import type { SlotInfo } from "../storage/SaveGame";
 import type { ExportReport } from "../storage/tdtExportReport";

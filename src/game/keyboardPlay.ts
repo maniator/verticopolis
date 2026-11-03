@@ -1,4 +1,4 @@
-import { catalogFacility, type Catalog } from "../engine/catalogTypes";
+import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
 import type { FacilityKind } from "../engine/types";
 import type { Picked, TowerEngine } from "../render/excalibur/TowerEngine";
 import type { Tool, UI } from "../ui/UI";

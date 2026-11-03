@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { Simulation } from "../engine/Simulation";
-import { towerCatalog } from "../engine/towerCatalog";
+import { towerCatalog } from "../catalog/towerCatalog";
 import { isElevatorKind } from "../engine/facilityPredicates";
 import { SCHEDULE_HOURS } from "../engine/elevatorSchedule";
 import { TsEngine } from "../engine/port/tsEngine";

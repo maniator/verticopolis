@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import { towerCatalog, useTowerCatalogSource } from "../../engine/towerCatalog";
+import { towerCatalog, useTowerCatalogSource } from "../../catalog/towerCatalog";
 import type { EnginePort } from "../../simport/enginePort";
 import { newRenderSim, newViewReader } from "../../game/portAccess";
 import { bindViewKinds, findViewKind } from "../../presentation/viewKinds";

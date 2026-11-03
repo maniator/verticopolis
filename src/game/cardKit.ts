@@ -1,6 +1,6 @@
 import type { TemplateResult } from "lit-html";
 import type { Simulation } from "../engine/Simulation";
-import type { Catalog } from "../engine/catalogTypes";
+import type { Catalog } from "../catalog/catalogTypes";
 import type { ElevatorSchedule } from "../engine/elevatorSchedule";
 import type { BatchRentOptions, BatchRentResult, BatchTarget } from "../engine/sim/constants";
 import type { FacilityKind, UnitState } from "../engine/types";

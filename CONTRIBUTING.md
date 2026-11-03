@@ -161,8 +161,12 @@ Verticopolis has **two test tiers**:
     3 marks a harness failure, not a divergence). One seed in four grows a
     tall tower that fills the shaft and stair pools; every seed sets a cash
     profile once the tower is built, and cash can drop to zero or below mid-run. A divergence it finds is
-    pinned as a named scenario in the fix PR. A run summary names its seed
-    range and the `seed_block` and `seed_offset` that replay it.
+    pinned as a named scenario in the fix PR. One seed in four (`wasm_every`)
+    is also replayed through the shipped WASM build in Node and compared with
+    the native Rust run (`scripts/fuzz-compare.ts --wasm`), which is where a
+    wasm32-only difference shows. A run summary names its seed range and the
+    `seed_block` and `seed_offset` that replay it, the seeds that diverged on
+    each leg, the seeds that timed out, and the time each leg took.
 
     **Suites on the engine port.** A converted suite does not build a
     `Simulation` and poke it. It names its engines with `describeEngines`
@@ -423,8 +427,8 @@ diagrams). The prose conventions below are the source of truth.
 
 New frontend code adds no runtime import of `src/engine/`, because retiring the
 TypeScript engine deletes that directory. It reads the catalog through the
-catalog handle (`towerCatalog`, `catalogTypes`, which move out of `src/engine/`
-first and are not counted), the frame view (`src/wasmhost/frameView.ts`) or an
+catalog handle (`towerCatalog`, `catalogTypes`, which live in `src/catalog/` and
+are not counted), the frame view (`src/wasmhost/frameView.ts`) or an
 engine query (#868) instead. `src/tests/frontendEngineImports.guard.test.ts`
 scans every non-test file under `src/` except the engine, the tests, and the
 host and save code (`src/wasmhost/`, `src/dualrun/`, `src/storage/`), and pins

@@ -2,7 +2,7 @@
 import { referenceAutoTune } from "../fixtures/autoTuneDouble";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { pump, rebaseLog } from "../../ui/hud.fixture";
-import { towerCatalog, useTowerCatalogSource } from "../../engine/towerCatalog";
+import { towerCatalog, useTowerCatalogSource } from "../../catalog/towerCatalog";
 import { catalogFor } from "../../engine/catalog";
 import { html, type TemplateResult } from "lit-html";
 import { finishModal, MODAL_TITLE_ID } from "../../ui/uiModal";

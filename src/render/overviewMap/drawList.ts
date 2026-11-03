@@ -54,6 +54,29 @@ function floorsFor(source: MapSource, kind: FacilityKind, memo: Map<FacilityKind
   return floors;
 }
 
+/** How the list draws what the theme asks for. */
+export interface MapDrawOptions {
+  /** Draw each shaft (stairways included; Classic then leaves those out at
+   *  paint time) as a vertical line this many map pixels wide
+   *  at its left tile, as the retail Classic map does (SPEC, Retail capture
+   *  findings), instead of a block as wide as the shaft. Omitted, or not a
+   *  positive finite number, draws blocks. */
+  readonly shaftLineWidth?: number;
+}
+
+/** The line width the list draws for an asked width: a whole number of pixels,
+ *  at least 1, or 0 (blocks) for a width that is not a positive finite number. */
+export function shaftLineWidth(width: number | undefined): number {
+  return width !== undefined && Number.isFinite(width) && width > 0 ? Math.max(1, Math.round(width)) : 0;
+}
+
+/** A shaft's block as a line at its left edge, moved in just enough to stay
+ *  inside the map when the shaft is in the last column. */
+function asLine(layout: MapLayout, rect: MapRect, width: number): MapRect {
+  const w = Math.min(width, Math.max(1, Math.floor(layout.width)));
+  return { x: Math.max(0, Math.min(rect.x, Math.floor(layout.width) - w)), y: rect.y, w, h: rect.h };
+}
+
 /**
  * Build the draw list for a source and a layout. An entry that cannot be drawn
  * (a non-finite coordinate, no width, wholly off the map) is dropped; nothing
@@ -65,7 +88,8 @@ function floorsFor(source: MapSource, kind: FacilityKind, memo: Map<FacilityKind
  * pixel. Shafts keep their order, since a stairway can cross a shaft's column.
  * The layers still paint in order: structure, rooms, then shafts.
  */
-export function buildMapDrawList(layout: MapLayout, source: MapSource): MapMark[] {
+export function buildMapDrawList(layout: MapLayout, source: MapSource, options: MapDrawOptions = {}): MapMark[] {
+  const line = shaftLineWidth(options.shaftLineWidth);
   const heights = new Map<FacilityKind, number>();
   const structure = new Map<FacilityKind, MapMark[]>();
   const rooms = new Map<FacilityKind, MapMark[]>();
@@ -91,7 +115,7 @@ export function buildMapDrawList(layout: MapLayout, source: MapSource): MapMark[
     const lo = Math.min(t.bottom, t.top);
     const hi = Math.max(t.bottom, t.top);
     const rect = snappedBlock(layout, t.x, t.width, lo, hi - lo + 1);
-    if (rect) transports.push({ layer: "transport", kind: t.kind, rect });
+    if (rect) transports.push({ layer: "transport", kind: t.kind, rect: line ? asLine(layout, rect, line) : rect });
   }
   return [...structure.values(), ...rooms.values()].flat().concat(transports);
 }

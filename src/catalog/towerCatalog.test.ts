@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { catalogFor } from "./catalog";
+import { catalogFor } from "../engine/catalog";
 import type { Catalog } from "./catalogTypes";
 import { catalogFacility, findCatalogFacility } from "./catalogTypes";
-import { Simulation } from "./Simulation";
+import { Simulation } from "../engine/Simulation";
 import { towerCatalog, useTowerCatalogSource } from "./towerCatalog";
-import type { GameMode } from "./types";
+import type { GameMode } from "../engine/types";
 
 describe("a tower's catalog handle (#921)", () => {
   it("reads the TypeScript tables for the tower's own mode by default", () => {

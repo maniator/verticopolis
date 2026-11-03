@@ -1,4 +1,4 @@
-import { catalogFacility } from "../engine/catalogTypes";
+import { catalogFacility } from "../catalog/catalogTypes";
 import type { AudioEngine } from "../audio/Audio";
 import type { UI } from "../ui/UI";
 import type { ReviewRow } from "../ui/templates/scheduleReview";

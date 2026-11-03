@@ -26,7 +26,7 @@ use crate::ledger::Ledger;
 use crate::rent::snap_to_ladder;
 use crate::rng::Rng;
 use crate::schedule::Schedule;
-use crate::sim::{LogEntry, LogKind, Simulation, LOG_RING_CAP};
+use crate::sim::{LogEntry, LogKind, Simulation, LOG_RING_CAP, SAVE_VERSION};
 use crate::sim_loop::weather_for;
 use crate::tower::{unit_list_headroom, Transport, Unit, UnitState};
 

@@ -51,9 +51,9 @@ import {
   type CatalogFacility,
   type CatalogPool,
   type CatalogRent,
-} from "./catalogTypes";
+} from "../catalog/catalogTypes";
 
-export * from "./catalogTypes";
+export * from "../catalog/catalogTypes";
 
 /** The key each of {@link POOLED_CAPS} goes by, in its order. */
 const POOL_KEYS = ["elevators", "walkways"] as const;

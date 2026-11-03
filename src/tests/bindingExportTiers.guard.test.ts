@@ -157,7 +157,12 @@ function scannedSources(): string[] {
 /** The tooling harnesses' `game.sim` on the Rust engine (dev serves and
  *  tooling builds only), which hands a hand edit to the engine as a load and
  *  carries the telemetry and memos a load starts empty. */
-const ALLOWED_FILES = ["src/game/toolingSim.ts"];
+const ALLOWED_FILES = [
+  "src/game/toolingSim.ts",
+  // The rollback rehearsal (#1221): offline tooling that loads two builds' Node engine packages and plays them, never shipped to the browser.
+  "src/build/rollbackRehearsal.ts",
+  "src/build/rollbackRehearsalNode.ts",
+];
 const allowed = (file: string) => ALLOWED_DIRS.some((dir) => file.startsWith(dir)) || ALLOWED_FILES.includes(file);
 /** The port's own loop callers outside the host scope: the shared view
  *  reader takes the frames through `EnginePort` (contract section 5,

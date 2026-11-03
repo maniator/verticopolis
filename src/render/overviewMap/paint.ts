@@ -2,9 +2,10 @@
  * Paints a draw list onto a 2D canvas context (#343). Nothing here reads the
  * simulation: it takes the marks and a theme, looks each kind's style up, and
  * fills rectangles. A pattern is one cached tile per fill, pattern and theme,
- * so a repaint is at most one `fillRect` per mark (Classic skips the kinds it does not draw), with the style resolved once per run
- * of same-kind marks (the draw list groups them) and the fill style changing
- * only when the style does.
+ * so a repaint is at most one `fillRect` per mark (Classic skips the kinds it
+ * does not draw, without resolving their style), with the style resolved once
+ * per run of same-kind marks (the draw list groups them) and the fill style
+ * changing only when the style does.
  *
  * Units are device pixels: the caller sizes the canvas's backing store to the
  * layout (CSS size times `devicePixelRatio`) and applies no context scale, so

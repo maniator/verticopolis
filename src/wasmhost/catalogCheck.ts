@@ -1,5 +1,5 @@
 import { catalogFor } from "../engine/catalog";
-import type { Catalog, CatalogWorld } from "../engine/catalogTypes";
+import type { Catalog, CatalogWorld } from "../catalog/catalogTypes";
 
 /** Refuses a binding catalog that states another world, or lists other
  *  facility kinds, than this build's tables for the same mode: the view was

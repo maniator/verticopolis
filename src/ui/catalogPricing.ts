@@ -1,4 +1,4 @@
-import { catalogFacility, type Catalog, type CatalogRent } from "../engine/catalogTypes";
+import { catalogFacility, type Catalog, type CatalogRent } from "../catalog/catalogTypes";
 import type { PriceOptions, PriceRung } from "../engine/gameRules";
 import type { FacilityKind } from "../engine/types";
 

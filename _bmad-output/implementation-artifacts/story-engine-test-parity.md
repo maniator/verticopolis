@@ -302,6 +302,7 @@ run records below.
 | `conformanceWasmTdt`, `conformanceWasmCanBuild`, `conformanceWasmVctower` (left out) | 51 | c | drive the binding directly, as `conformanceWasm` does |
 | `wasmHostCatalog` (left out) | 10 | c | starts its own host to read the engine's catalog |
 | `perfCompare/*.integration.test.ts` (left out) | 6 | c | the engine comparison's checks (`page`, `scenarios`) run each engine themselves (#972) |
+| `fuzzWasmLeg.integration.test.ts` (left out, #1085) | 7 | c | runs the TypeScript engine and the shipped build side by side through the scenario runner, as the nightly's WASM leg does |
 | `conformanceWasm.integration.test.ts` (left out) | 26 | c | drives the binding directly through its own engine instances (the raw binding suites that build no host of their own, `chargeBindingRaw` and the like, stay in the project and pass) |
 | `src/dualrun/mirror.test.ts` (left out) | 12 | c | attaches the relay itself |
 | `hourCost.bench.integration.test.ts` | opt-in | n/a | skipped everywhere unless `RUN_HOUR_BENCH=1`; not a parity exclusion, listed so the 39 skips reconcile (38 marks plus this) |
