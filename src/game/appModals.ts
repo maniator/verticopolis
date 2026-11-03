@@ -3,7 +3,7 @@ import type { GameApp } from "../main";
 import { SaveGame, saveFailureMessage } from "../storage/SaveGame";
 import { scheduleReviewEntry } from "../ui/templates/scheduleReview";
 import { canCallExterminator, statsScreen, statsTemplate } from "../ui/templates/stats";
-import { trackAppAction } from "../analytics";
+import { trackAppAction, trackAppActionOnce } from "../analytics";
 import { outcome } from "../simport/portCodes";
 import { statsReport } from "../simport/statsSheet";
 import { catalogOf } from "./portAccess";
@@ -136,6 +136,7 @@ export function saveToSlot(app: GameApp, slot: number): void {
     // Same contract as Quick Save: a manual save must never fail silently or
     // toast success on a failed write (the throw would otherwise escape the
     // slot button's click handler with no player feedback at all).
+    trackAppActionOnce("autosave_failed", "manual");
     app.ui.toast(saveFailureMessage(err), "bad");
     return;
   }
@@ -151,6 +152,7 @@ export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
     trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
     app.ui.toast("Tower loaded.", "good");
   } else {
+    trackAppAction("load_failed");
     app.ui.toast("That slot is empty or corrupt.", "bad");
   }
 }
@@ -219,9 +221,13 @@ export function loadFromSplash(app: GameApp, slot: number | "auto"): boolean {
     // A throw from the app's adoption, after the tower swapped, is not a
     // failed read: it reaches the caller as before.
     if (app.enginePort.generation() !== before) throw e;
+    trackAppAction("load_failed");
     return false;
   }
-  if (!loaded) return false;
+  if (!loaded) {
+    trackAppAction("load_failed");
+    return false;
+  }
   trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
   return true;
 }
