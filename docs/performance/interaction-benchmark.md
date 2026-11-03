@@ -15,7 +15,7 @@ arms alternate (A then B on odd repetitions, B then A on even ones). In each:
 
 1. Load the scenario the way a player's load does (default `large`, the
    Tier-1 win tower from `src/tests/perfCompare/scenarios.ts`), with the title
-   screen, emergency prompts and the congratulation dialogs calmed after the
+   screen, emergency prompts and the congratulations dialogs calmed after the
    load (a load resets them).
 2. Fast-forward to the next 07:30 (the next day's when the save is already
    past it), start the tower at the fastest speed, and warm up for 10 s. At

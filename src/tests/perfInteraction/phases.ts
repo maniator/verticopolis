@@ -180,7 +180,7 @@ async function build(page: Page, vp: Viewport, end: number, spots: readonly { x:
     await tick();
     if ((await page.evaluate(officeCount)) > before) {
       placed++;
-      await page.keyboard.press("Control+z");
+      await page.keyboard.press("ControlOrMeta+z");
     }
     await tick();
   }

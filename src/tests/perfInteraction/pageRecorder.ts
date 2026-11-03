@@ -7,7 +7,7 @@
  *
  * The recorder keeps the app as a player meets it: the real frame loop at a
  * running speed, and autosave left in (its stall is part of what a player
- * feels). Only the title screen, the emergency prompts and the congratulation
+ * feels). Only the title screen, the emergency prompts and the congratulations
  * dialogs are calmed so a script can drive the page. The autosave timer is
  * replaced by one autosave at a fixed point in each phase, so the stall lands
  * in the same place for both arms instead of wherever 30 s from boot falls.
