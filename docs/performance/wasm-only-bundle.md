@@ -1,5 +1,12 @@
 # The wasm-only build: what leaves the bundle, and what does not
 
+> **The switchable build described below no longer exists.** Slice 4b of the
+> Rust-only work (#1595) retired `VC_ENGINE`: every build is now the wasm-only
+> build, and the postbuild guard checks it without a mode. The sections on
+> the switchable build and the `VC_ENGINE` commands in
+> [Reproduce](#reproduce) describe the measurement as it was taken on
+> 2026-10-14 and cannot be re-run on the current tree.
+
 > **Snapshot, measured 2026-10-14.** Every figure below comes from builds of
 > two commits: `d03747d` (the baseline: `main` at `6b2bb34` with #993 at
 > `c608425` merged in) and `15e71b8` (this change; the review fix after it, a one-line modal gate, adds a few bytes the tables do not include), each built with
@@ -126,17 +133,14 @@ does not alter it.
 `npm run build`, including deploys. It reads every emitted `.js` file's
 sourcemap. A missing map fails the check, except for the engine package's
 wasm-bindgen glue, which is generated from Rust.
-It also reads the `precacheAndRoute` manifest in `sw.js` and the mode
-`dist/version.json` records, which must match `VC_ENGINE` in every build. It
-then checks:
+It also reads the `precacheAndRoute` manifest in `sw.js`. It then checks, for
+every build:
 
-- **Every build:** no test code (`src/tests/`, `*.test.*`, `*.spec.*`,
-  `__mocks__/`, `e2e/`) ships.
-- **Every switchable build:** the TypeScript step loop still ships, so a
-  wasm-only swap cannot leak into the default build.
-- **Wasm-only builds:**
+- No test code (`src/tests/`, `*.test.*`, `*.spec.*`, `__mocks__/`, `e2e/`)
+  ships.
+- **The bundle:**
   - The bundle has no step loop.
-  - The engine glue and binary are precached.
+  - The engine glue and binary are precached (when `dist/` holds the engine package; a `VC_ALLOW_NO_ENGINE=1` build has none, and `scripts/verify-precache.ts` allows that only off a deploy).
   - Every `src/engine/` module that ships is listed in
     `scripts/engine-bundle.allow.txt`, and every listed module ships.
 
@@ -151,10 +155,8 @@ reaches that module, since a specifier alias matches the text from any importer.
 
 ## Offline and fallback behavior
 
-Checked by `e2e/wasmOnly.spec.ts` on the wasm-only build, which CI's
-`e2e-wasm-only` job runs with the rest of the e2e suite. As on the
-`chromium-wasm` project, the suite's TypeScript-only specs (`tsOnlyOnWasm`)
-and the visual baselines are skipped there.
+Checked by `e2e/wasmOnly.spec.ts`, which CI's `e2e-wasm-only` job runs with
+the rest of the general e2e suite (the `chromium` Playwright project).
 
 - **Boot:** the build boots on WASM whatever `?engine=` or `vc.engine` says.
   `window.__vcEngineBoot` reads

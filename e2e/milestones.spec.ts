@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildToStar, engineSave, expectEngineHosted, fitCamera, onWasm } from "./helpers";
+import { buildToStar, engineSave, expectEngineHosted, fitCamera } from "./helpers";
 
-// On chromium-wasm every test must end with its tower still on the engine.
+// Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
@@ -48,7 +48,7 @@ test("progression: a screenshot at each ★ milestone, 1★ → TOWER", async ({
     const reached = await page.evaluate(buildToStar, star);
     expect(reached).toBe(star); // the real assertion — the rung was genuinely earned
     await expectEngineHosted(page);
-    if (onWasm(test.info().project.name)) expect((await engineSave(page))?.star).toBe(star);
+    expect((await engineSave(page))?.star).toBe(star);
 
     if (star === 6) await expect(page.locator("#modal")).toContainText("TOWER achieved");
     await page.evaluate(fitCamera);

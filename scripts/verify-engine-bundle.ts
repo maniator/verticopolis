@@ -1,15 +1,13 @@
 /**
- * Postbuild guard for the engine build mode (see src/build/engineBundle.ts).
+ * Postbuild guard for the engine bundle (see src/build/engineBundle.ts).
  * It reads what the build emitted rather than the source imports: every JavaScript
- * file's sourcemap (the bundler's own record of which modules it carries),
- * the service worker's precache list and the mode `dist/version.json`
- * records. The mode it checks against comes from `VC_ENGINE` and
- * `VC_TOOLING`, the same variables the build read, so every `npm run build`
- * proves its own output:
+ * file's sourcemap (the bundler's own record of which modules it carries) and
+ * the service worker's precache list, so every `npm run build` proves its own
+ * output:
  *   - no build ships test code;
- *   - a wasm-only build (VC_ENGINE=wasm) ships no TypeScript step loop,
- *     precaches the engine package,
- *     and carries only the TypeScript engine modules
+ *   - the build ships no TypeScript step loop, precaches the engine package
+ *     whenever dist/ holds one (a VC_ALLOW_NO_ENGINE=1 build has none), and
+ *     carries only the TypeScript engine modules
  *     scripts/engine-bundle.allow.txt lists (and all of them, so the list
  *     only shrinks).
  * `VC_ENGINE_REPORT=<file>` also writes the engine modules found as JSON.
@@ -19,7 +17,8 @@
 import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative, resolve } from "node:path";
-import { checkEngineBundle, ENGINE_PACKAGE_FILES, parseAllowList, parseEngineBuild, precacheManifest, repoRelativeSource, type EmittedChunk, type EngineBuild } from "../src/build/engineBundle.ts";
+import { checkEngineBundle, ENGINE_PACKAGE_FILES, parseAllowList, precacheManifest, repoRelativeSource, type EmittedChunk } from "../src/build/engineBundle.ts";
+import { ENGINE_DIR } from "../src/wasmhost/enginePackageNames.ts";
 import { MAPLESS_PUBLIC_SCRIPTS } from "../src/build/publicFiles.ts";
 import { sourceToPath } from "../src/build/thirdPartyNotices.ts";
 
@@ -44,12 +43,6 @@ function filesUnder(dir: string, keep: (name: string) => boolean): string[] {
   return out;
 }
 
-let build: EngineBuild;
-try {
-  build = parseEngineBuild(process.env.VC_ENGINE);
-} catch (e) {
-  fail(e instanceof Error ? e.message : String(e));
-}
 const tooling = process.env.VC_TOOLING === "1";
 if (!existsSync(DIST)) fail(`no ${DIST} (run the build first)`);
 
@@ -90,22 +83,18 @@ if (!existsSync(join(DIST, "sw.js"))) fail("no dist/sw.js, so the precache canno
 const precache = precacheManifest(readFileSync(join(DIST, "sw.js"), "utf8"));
 if (precache === null) fail("found no precacheAndRoute manifest in dist/sw.js; did the workbox output format change?");
 
-let stamp: unknown;
-try {
-  stamp = (JSON.parse(readFileSync(join(DIST, "version.json"), "utf8")) as { engineBuild?: unknown }).engineBuild;
-} catch (e) {
-  fail(`could not read dist/version.json: ${e instanceof Error ? e.message : String(e)}`);
-}
-
 const allow = parseAllowList(readFileSync(ALLOW, "utf8"));
 if (allow.errors.length > 0) fail(`scripts/engine-bundle.allow.txt: ${allow.errors.join("; ")}`);
 
-const result = checkEngineBundle({ build, tooling, chunks, precache, stamp, allowed: allow.modules });
+// The same test scripts/verify-precache.ts uses for "the build holds the engine".
+const engineDir = join(DIST, ENGINE_DIR);
+const enginePackageBuilt = existsSync(engineDir) && readdirSync(engineDir).length > 0;
+const result = checkEngineBundle({ tooling, chunks, precache, enginePackageBuilt, allowed: allow.modules });
 if (process.env.VC_ENGINE_REPORT) {
-  writeFileSync(process.env.VC_ENGINE_REPORT, JSON.stringify({ build, tooling, engineModules: result.engineModules }, null, 2));
+  writeFileSync(process.env.VC_ENGINE_REPORT, JSON.stringify({ tooling, engineModules: result.engineModules }, null, 2));
 }
 if (result.errors.length > 0) fail(`\n  - ${result.errors.join("\n  - ")}`);
 console.log(
-  `verify-engine-bundle: ${build}${tooling ? " tooling" : ""} build, ${chunks.length} scripts checked; ` +
-    `${result.engineModules.length} TypeScript engine modules ship${build === "wasm-only" ? " (all listed in scripts/engine-bundle.allow.txt), no step loop, no runtime engine switch" : ""}`,
+  `verify-engine-bundle: ${tooling ? "tooling " : ""}build, ${chunks.length} scripts checked; ` +
+    `${result.engineModules.length} TypeScript engine modules ship (all listed in scripts/engine-bundle.allow.txt), no step loop, no runtime engine switch`,
 );

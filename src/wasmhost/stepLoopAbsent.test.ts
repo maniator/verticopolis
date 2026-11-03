@@ -3,7 +3,7 @@ import type * as loop from "../engine/sim/loop";
 import * as absent from "./stepLoopAbsent";
 import { Simulation } from "../engine/Simulation";
 
-// The stand-in replaces the loop module by alias in a wasm-only build, so it
+// The stand-in replaces the loop module by alias in the build, so it
 // must offer every export the loop has, with the same types; this fails to
 // typecheck when the loop gains or changes one.
 const sameShape: typeof loop = absent;
@@ -15,7 +15,7 @@ describe("stepLoopAbsent", () => {
     for (const step of [() => absent.tick(sim, 1), () => absent.advanceStep(sim, 1), () => absent.onHour(sim), () => absent.onDay(sim), () => absent.finishConstruction(sim)]) {
       expect(step).toThrow(absent.StepLoopAbsentError);
     }
-    expect(() => absent.tick(sim, 1)).toThrow(/tick: the TypeScript step loop is not part of this wasm-only build/);
+    expect(() => absent.tick(sim, 1)).toThrow(/tick: the TypeScript step loop is not part of this build/);
   });
 
   it("still answers the hour count, which is a read", () => {

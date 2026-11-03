@@ -237,7 +237,7 @@ and persistence, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 ## Simulation engines
 
 The game runs on the **Rust** engine (`engine-rs/`), compiled to WebAssembly,
-which it drives directly through `EnginePort`. Every deploy is the wasm-only
+which it drives directly through `EnginePort`. The game is the Rust-only
 build: there is no engine choice in Settings and no TypeScript fallback, and if
 the engine cannot start the game stops with a message. The version line in
 Settings and Help names the engine that is running.

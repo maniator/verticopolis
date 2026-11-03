@@ -101,18 +101,9 @@ function manifestOf(sw: string): { revisionOf(url: string): string; entries: num
 
 const REPO = fileURLToPath(new URL("..", import.meta.url));
 
-/** `VC_ENGINE` for a build that has the first build's engine mode. Spelled out
- *  both ways, so a changed default cannot give the second deployment another
- *  shell; a `version.json` that names neither is an error. */
-function engineModeOf(engineBuild: string | undefined): "wasm" | "switchable" {
-  if (engineBuild === "wasm-only") return "wasm";
-  if (engineBuild === "switchable") return "switchable";
-  throw new Error(`version.json names no engine build (found ${JSON.stringify(engineBuild)}), so the second deployment cannot match the first`);
-}
-
 /** Build the second deployment in a new folder under `into`: a copy of the
  *  public folder with the first build's engine package salted and recorded,
- *  built into `B/` by the same `vite build` as the first, in the same modes. */
+ *  built into `B/` by the same `vite build` as the first. */
 function makeSecond(dist: string, into: string): { dir: string; packageId: string } {
   const publicDir = join(into, "public-B");
   cpSync(join(REPO, "src", "public"), publicDir, { recursive: true });
@@ -127,7 +118,6 @@ function makeSecond(dist: string, into: string): { dir: string; packageId: strin
   const record = engineBuildRecord(changed, wasm, first.sources, sha256Hex);
   writeFileSync(join(publicDir, "engine", "BUILD.json"), `${JSON.stringify(record, null, 2)}\n`);
 
-  const firstVersion = JSON.parse(readFileSync(join(dist, "version.json"), "utf8")) as { engineBuild?: string };
   const dir = join(into, "B");
   const built = spawnSync(process.execPath, [join(REPO, "node_modules", "vite", "bin", "vite.js"), "build", "--outDir", dir, "--emptyOutDir"], {
     cwd: REPO,
@@ -138,8 +128,6 @@ function makeSecond(dist: string, into: string): { dir: string; packageId: strin
       // The e2e builds A with the tooling handle too (specs drive `window.game`).
       VC_TOOLING: "1",
       VC_PUBLIC_DIR: publicDir,
-      // The same engine mode as the first build, or the wrong shell is served.
-      VC_ENGINE: engineModeOf(firstVersion.engineBuild),
     },
   });
   if (built.error) throw built.error;

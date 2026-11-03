@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { expectEngineHosted } from "./helpers";
 
-// On chromium-wasm every test must end with its tower still on the engine.
+// Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**

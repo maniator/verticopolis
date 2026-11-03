@@ -106,15 +106,13 @@ Verticopolis has **two test tiers**:
     (`src/engine/port/tdtCodec.ts`). The same command runs the `.vctower`
     writer's test, `conformanceWasmVctower.integration.test.ts`, which writes
     every fixture with the engine and reads it back through the web game's
-    readers. Every deploy runs the WASM engine alone (the wasm-only build
-    below); dev serves and the test lanes still use the switchable build,
-    which also boots on the WASM engine and has no TypeScript fallback. The served package
+    readers. Every build runs the WASM engine alone
+    (see below), with no TypeScript fallback. The served package
     (`src/public/engine/`) is build output and is not checked in: build it
     locally to run the game, with `bash scripts/build-engine-wasm.sh`
     on x86_64 Linux (it installs the pinned toolchain) or `npm run wasm:build`
     once the toolchain in engine-rs/README.md is installed. `npm run e2e`
-    needs it too, since its `chromium-wasm` project runs every spec on the
-    WASM engine, and so does `npm run build`: its precache check
+    needs it too, since every spec runs on the WASM engine, and so does `npm run build`: its precache check
     (`scripts/verify-precache.ts`) refuses a build without the engine, so no
     build ships a silent TypeScript fallback. Without a Rust toolchain, run
     `VC_ALLOW_NO_ENGINE=1 npm run build` for a deliberate build without the
@@ -122,19 +120,16 @@ Verticopolis has **two test tiers**:
     hash. CI restores it from the
     Actions cache, keyed on the engine's source hash, and builds it once per
     engine change (`.github/actions/engine-wasm`); Vercel builds it on every
-    deploy through `scripts/vercel-build.sh`. `VC_ENGINE=wasm npm run build` makes the wasm-only build, which
-    every deploy runs (`scripts/vercel-build.sh` sets it): the WASM engine is the only engine, the
-    TypeScript step loop is swapped out, and an
+    deploy through `scripts/vercel-build.sh`. Every build (`npm run build`, a dev serve and the
+    deploy alike) is the Rust-only build: the WASM engine is the only engine, the
+    TypeScript step loop is swapped out (Vitest keeps the real loop), and an
     engine that cannot start stops the game with a message instead of
     falling back. Its postbuild check (`scripts/verify-engine-bundle.ts`)
     reads the emitted sourcemaps and fails when a TypeScript engine module
     that `scripts/engine-bundle.allow.txt` does not list ships, or when a
-    listed one no longer does (delete its line: the list only shrinks). The
-    default build (`VC_ENGINE` unset, or `switchable`) still carries the TypeScript step loop, for the test lanes and
-    dev serves, until slice 4b of the Rust-only work retires the mode; it boots on the
-    Rust engine all the same, and `?engine=` and `vc.engine` are ignored in every build. `VC_ENGINE` applies to
-    builds and dev serves only: with it exported, `npm test` refuses to start
-    (the WASM test lanes use `VC_REQUIRE_WASM=1`). See
+    listed one no longer does (delete its line: the list only shrinks).
+    `?engine=` and `vc.engine` are ignored. The WASM test lanes use
+    `VC_REQUIRE_WASM=1`. See
     `docs/performance/wasm-only-bundle.md` for what still ships and why. A simulation change lands in the
     Rust engine. The TypeScript engine changes only when the shared lock, a parity test or the
     catalog digest needs it (for example the catalog size and price tables both engines read), and
@@ -210,22 +205,18 @@ Verticopolis has **two test tiers**:
   and `VC_TOOLING=1` builds; a production build compiles it away so shipped
   sessions carry no console handle into the sim. Run it with `npm run e2e`
   after a tooling build (`VC_TOOLING=1 npm run build`).
-  `PW_WASM_ONLY=1 npx playwright test --grep-invert @perf` runs the suite on
-  a wasm-only tooling build (`VC_ENGINE=wasm VC_TOOLING=1 npm run build`),
-  with `e2e/wasmOnly.spec.ts` covering its boot, failures and offline start;
-  CI runs it as the `e2e-wasm-only` job. The general browser regression suite
-  runs only here, once, so the default `e2e` lane stays focused on the
-  switchable-only specs.
-  The default `chromium-wasm` project keeps the switchable-only specs and the
-  pinned visual/perf checks (`engineIdentity`,
-  `engineStatusRows`, `atlas`, `visual`, `perf`), plus the dual-lane
-  `engineIntegrity` assertions.
-  The wasm-only lane keeps the general suite, that same integrity spec, the
-  runtime guard, the negative bundle canary, and the milestone screenshot
-  artifact upload (`milestone-screenshots`).
-  The suite runs on the Rust engine only (`chromium-wasm`), and so does the
-  perf gate, whose baseline is the Rust engine's. Nothing runs the TypeScript
-  engine end to end.
+  There is one build and two Playwright projects, split by how the specs need
+  the machine (see [`playwright.config.ts`](./playwright.config.ts)):
+  `chromium-serial` holds the pinned visual/perf checks (`engineIdentity`,
+  `engineStatusRows`, `atlas`, `visual`, `perf`) and runs with one worker, as
+  the `e2e` job; `chromium` holds the general browser regression suite,
+  including `e2e/wasmOnly.spec.ts` (boot, failures and offline start), and CI
+  runs it as the `e2e-wasm-only` job, which also runs the
+  negative bundle canary and uploads the milestone screenshots
+  (`milestone-screenshots`). `npm run e2e` runs both locally; pass
+  `--project=chromium` or `--project=chromium-serial` for one.
+  The suite runs on the Rust engine only, and so does the perf gate, whose
+  baseline is the Rust engine's. Nothing runs the TypeScript engine end to end.
   Specs cover boot/integration, milestones, a full win, and visual baselines.
   See [`playwright.config.ts`](./playwright.config.ts) for how visual baselines
   are minted by CI (local runs smoke the flows but skip pixel comparison unless
@@ -328,9 +319,8 @@ and font rasterization may differ from the pinned image. See
 
 The gallery and the Playwright visual baselines are both the Rust engine's
 (#1353), one set of images each. The gallery generator hosts the tower on the
-WASM engine unless `VC_SHOT_ENGINE=ts` says otherwise (a by-hand flag that CI
-never sets), and it needs the engine package (`npm run wasm:build`). The
-baselines are minted and compared on the `chromium-wasm` project, in `npm run
+WASM engine (`VC_SHOT_ENGINE=ts` is refused), and it needs the engine package (`npm run wasm:build`). The
+baselines are minted and compared on the `chromium-serial` project, in `npm run
 e2e` and in `update-visual-baselines`.
 
 ### Coverage floors

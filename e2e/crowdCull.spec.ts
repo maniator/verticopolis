@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { buildToStar, expectEngineHosted } from "./helpers";
 
-// On chromium-wasm every test must end with its tower still on the engine.
+// Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**

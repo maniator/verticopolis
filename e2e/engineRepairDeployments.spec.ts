@@ -3,7 +3,6 @@ import { test, expect, type Page } from "@playwright/test";
 import { startDeployments, type Deployments } from "./deployments";
 import { engineEntries, expectEngineIs, newContext } from "./engineDeployHelpers";
 import { tamperCache } from "./engineCacheHelpers";
-import { WASM_ONLY_PROJECT } from "./helpers";
 import { expectControlledWithEngine, hostedGame, installWorker, lobbyAt } from "./offlineHelpers";
 
 /**
@@ -12,16 +11,13 @@ import { expectControlledWithEngine, hostedGame, installWorker, lobbyAt } from "
  * and never touches anything else, so a save stays, and another tab keeps its
  * own engine until it reloads. A stop screen with a build waiting does not wait
  * for Repair: it takes the build at once. It runs on the two-deployment server
- * (deployments.ts), on the wasm-only build, where the stop screen with the
- * Repair action exists.
+ * (deployments.ts).
  */
-test.beforeEach(({}, info) => test.skip(info.project.name !== WASM_ONLY_PROJECT, "the stop screen exists on the wasm-only build"));
 test.setTimeout(240_000);
 
 let deployments: Deployments;
 
 test.beforeAll(async () => {
-  if (test.info().project.name !== WASM_ONLY_PROJECT) return;
   test.setTimeout(300_000);
   deployments = await startDeployments();
 });

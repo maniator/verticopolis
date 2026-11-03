@@ -12,10 +12,13 @@ if [ -n "${VC_ENGINE_REBUILD:-}" ]; then
   echo "vercel-build: VC_ENGINE_REBUILD is no longer honored (the engine package is not committed, so it is always built); remove it from the project settings" >&2
 fi
 
+if [ -n "${VC_ENGINE:-}" ]; then
+  echo "vercel-build: VC_ENGINE is no longer honored (every build is the Rust-only build); remove it from the project settings" >&2
+fi
+
 bash scripts/build-engine-wasm.sh
 
-# Every deploy is the wasm-only build: the Rust engine is the only engine, with
+# Every build is the Rust-only build: the Rust engine is the only engine, with
 # no cohort, no runtime switch and no TypeScript fallback (see
-# src/build/engineBundle.ts). A dev serve and the test lanes keep the default
-# switchable build until the TypeScript engine's code is deleted.
-VC_ENGINE=wasm npm run build
+# src/build/engineBundle.ts).
+npm run build

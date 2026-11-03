@@ -39,9 +39,9 @@
  * re-shoots just those scene ids; BASE_URL / PORT / PW_CHROME override targets;
  * SHOTS_DIR relocates the output gallery (used by the determinism guard to render
  * two independent legs into separate roots concurrently); VC_SHOT_ENGINE
- * picks the engine hosting the tower: the Rust engine (WASM) by default, which
- * needs the engine package in src/public/engine/ (npm run wasm:build); "ts"
- * is a by-hand flag, never committed (see screenshot-engine.ts).
+ * can only name the Rust engine (WASM), which needs the engine package in
+ * src/public/engine/ (npm run wasm:build); "ts" is refused (see
+ * screenshot-engine.ts).
  *
  * TypeScript runs natively on Node ≥ 22.18 (type-stripping): no build step, no
  * extra dep. Keep every module here ERASABLE (type annotations / interfaces /
@@ -55,7 +55,7 @@ import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, type OutDir,
 import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
 import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
-import { SHOT_ENGINE, SETTLE_AFTER_SETUP, assertEnginePackage, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, seedEngineChoice, settleUnlessSettled } from "./screenshot-engine.ts";
+import { SETTLE_AFTER_SETUP, assertEnginePackage, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, installShotHelpers, settleUnlessSettled } from "./screenshot-engine.ts";
 import { resolveOnlyFilter } from "../src/tests/screenshotOnlyFilter.ts";
 
 // ---- Runner -----------------------------------------------------------------
@@ -248,7 +248,7 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       });
     }
     if (scene.initScript) await page.addInitScript(scene.initScript);
-    await seedEngineChoice(page);
+    await installShotHelpers(page);
     await page.goto(scene.route ? `${BASE}/${scene.route}` : BASE, { waitUntil: "networkidle" });
     // Scrollbars are hidden for every capture, because they were the LAST
     // wall-clock leak (#762). The stepped TestClock pins page time, but a
@@ -407,7 +407,7 @@ async function main(): Promise<void> {
     console.warn(`ONLY entries matched no scene and are ignored: ${unmatched.join(", ")}`);
   }
   const scenes = SCENES.filter((sc) => selected.includes(sc.id));
-  console.log(`engine: ${SHOT_ENGINE === "wasm" ? "Rust (WASM, hosted)" : "TypeScript (by hand, not for commit)"}`);
+  console.log("engine: Rust (WASM, hosted)");
   assertEnginePackage();
 
   let server: ChildProcess | null = null;

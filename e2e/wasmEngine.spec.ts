@@ -1,21 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect } from "@playwright/test";
-import { onWasm, expectEngineHosted } from "./helpers";
+import { expectEngineHosted } from "./helpers";
 
-// On chromium-wasm every test must end with its tower still on the engine.
+// Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
- * The WASM switch (story-engine-wasm-switch) in a real browser: with
- * `?engine=wasm` the served package loads, the boot tower is hosted on the
+ * The WASM engine in a real browser: the served package loads, the boot tower is hosted on the
  * Rust engine, the clock advances through it, and a build reaches the
  * engine.
  */
-test("the game runs on the WASM engine behind ?engine=wasm", async ({ page }) => {
+test("the game runs on the WASM engine on boot", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-  await page.goto("/?engine=wasm");
+  await page.goto("/");
   await page.waitForFunction(() => {
     const w = window as unknown as { __vcEngine?: { status: { hosted: boolean } }; game?: { sim: unknown } };
     return !!w.__vcEngine?.status.hosted && !!w.game;
@@ -49,9 +48,8 @@ test("the game runs on the WASM engine behind ?engine=wasm", async ({ page }) =>
  * charge is the engine's own: the balance change a command reports is exactly
  * how far the engine's balance moved, and a refusal moves nothing.
  */
-test("the car, extend and removal commands charge inside the WASM engine", async ({ page }, info) => {
-  test.skip(!onWasm(info.project.name), "the hosted engine runs on the chromium-wasm and chromium-wasm-only projects");
-  await page.goto("/?engine=wasm");
+test("the car, extend and removal commands charge inside the WASM engine", async ({ page }) => {
+  await page.goto("/");
   await page.waitForFunction(() => {
     const w = window as unknown as { __vcEngine?: { status: { hosted: boolean } }; game?: unknown };
     return !!w.__vcEngine?.status.hosted && !!w.game;

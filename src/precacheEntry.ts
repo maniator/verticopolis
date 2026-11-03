@@ -57,5 +57,5 @@ export function missingEngine(env: Record<string, string | undefined>, builtEngi
   }
   if (env[ALLOW_NO_ENGINE] === "1") return null;
   const seen = env[ALLOW_NO_ENGINE] === undefined ? "" : ` (${ALLOW_NO_ENGINE} is ${JSON.stringify(env[ALLOW_NO_ENGINE])}, and only "1" opts in)`;
-  return `this build has no engine package in dist/, so it would ship without the WASM engine; ${how}, or set ${ALLOW_NO_ENGINE}=1 for a deliberate TypeScript-only build${seen}`;
+  return `this build has no engine package in dist/, so it would ship without the WASM engine; ${how}, or set ${ALLOW_NO_ENGINE}=1 for a deliberate build without the engine, which cannot run the game${seen}`;
 }

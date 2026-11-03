@@ -2,53 +2,28 @@
  * Browser-side E2E helpers. The in-page functions (`buildToStar`, `fitCamera`,
  * `syncEngine`) are SELF-CONTAINED (no module-scope refs) because Playwright
  * serializes them into `page.evaluate`; the canonical, richly-asserted build
- * lives in the Tier-1 fixture `src/tests/fixtures`. The Node-side helpers
- * (`tsOnlyOnWasm`, `expectEngineHosted`) run in the test itself.
+ * lives in the Tier-1 fixture `src/tests/fixtures`. The Node-side helper
+ * (`expectEngineHosted`) runs in the test itself.
  *
- * Engine parity (story-engine-test-parity AC2): the `chromium-wasm` project
- * boots every page on the WASM engine, where `game.sim` is a copy of the
+ * Every page boots on the WASM engine, where `game.sim` is a copy of the
  * engine's save (src/game/toolingSim.ts). Commands and field writes on the
  * copy reach the engine when the task ends, or at `syncEngine`, as a restore
  * of the copy's save; the next read is a fresh copy. The engine itself runs
- * whatever a spec ticks through the app or the port. `buildToStar` keeps its
- * in-place build on the TypeScript engine (see there).
+ * whatever a spec ticks through the app or the port.
  */
 
 import { test, expect, type Page } from "@playwright/test";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-/** The Playwright project that seeds `vc.engine = wasm` (playwright.config.ts). */
-export const WASM_PROJECT = "chromium-wasm";
-/** The project that runs the suite against a wasm-only build (`VC_ENGINE=wasm`,
- *  see playwright.config.ts): the WASM engine is the only engine there. */
-export const WASM_ONLY_PROJECT = "chromium-wasm-only";
-
-/** Whether a project runs every page on the WASM engine. */
-export function onWasm(projectName: string): boolean {
-  return projectName === WASM_PROJECT || projectName === WASM_ONLY_PROJECT;
-}
-
 /**
- * Skip the calling test on the `chromium-wasm` project, with the reason in the
- * report. Use it only where a spec's point cannot survive a relayed setup; the
- * one-line reason is what the story's TypeScript-only table quotes, so grep
- * for `tsOnlyOnWasm(` to list them all.
- */
-export function tsOnlyOnWasm(reason: string): void {
-  const project = test.info().project.name;
-  test.skip(onWasm(project), `TypeScript-only on ${project}: ${reason}`);
-}
-
-/**
- * Fail a `chromium-wasm` test unless the live tower runs on the engine: the
- * Rust engine is published, it reports itself hosting with no error, and it
- * is the port the app holds. Without this a spec could pass on the project
- * while the page silently ran the TypeScript engine.
+ * Fail a test unless the live tower runs on the engine: the Rust engine is
+ * published, it reports itself hosting with no error, and it is the port the
+ * app holds.
  */
 export async function expectEngineHosted(page: Page): Promise<void> {
   const info = test.info();
-  if (!onWasm(info.project.name) || info.expectedStatus === "skipped") return;
+  if (info.expectedStatus === "skipped") return;
   // Leave an already-failed test's own failure on top of the report.
   if (info.status === "failed" || info.status === "timedOut" || info.status === "interrupted") return;
   const state = await page.evaluate(() => {
@@ -61,7 +36,7 @@ export async function expectEngineHosted(page: Page): Promise<void> {
       onEngine: Boolean(h?.port) && w.game?.enginePort === h.port,
     };
   });
-  expect(state, "the chromium-wasm project must run the live tower on the WASM engine").toEqual({
+  expect(state, "the live tower must run on the WASM engine").toEqual({
     host: true,
     hosted: true,
     lastError: null,
@@ -69,12 +44,9 @@ export async function expectEngineHosted(page: Page): Promise<void> {
   });
 }
 
-/**
- * The engine's own save on the `chromium-wasm` project (null elsewhere), for a
- * spec that asserts the engine reached a state.
- */
+/** The engine's own save (null before the engine is published), for a spec that
+ *  asserts the engine reached a state. */
 export async function engineSave(page: Page): Promise<Record<string, any> | null> {
-  if (!onWasm(test.info().project.name)) return null;
   return page.evaluate(() => {
     const port = (window as any).__vcEngine?.port;
     return port ? JSON.parse(port.serialize()) : null;
@@ -84,8 +56,7 @@ export async function engineSave(page: Page): Promise<Record<string, any> | null
 /**
  * Hand the edits a test made to `game.sim` to the engine now. On the Rust
  * engine `game.sim` is a copy of the engine's save (src/game/toolingSim.ts),
- * whose edits otherwise reach the engine when the task ends. A no-op on the
- * TypeScript engine, whose tower a test edits in place.
+ * whose edits otherwise reach the engine when the task ends.
  */
 export function syncEngine(): void {
   (window as any).game.syncSim();
@@ -98,9 +69,7 @@ export function syncEngine(): void {
  * the run tells a real 1★→TOWER growth story. Deterministic: the rating is
  * driven directly (no crowd tick), exactly like the headless fixture.
  *
- * On the TypeScript engine the instance is the engine, so the tower is scripted
- * on it in place (the perf gate's committed baseline measures exactly that
- * tower). On the WASM engine the structure and the occupancy are scripted on a
+ * The structure and the occupancy are scripted on a
  * scratch copy of the live tower, loaded from the engine's own save, and the
  * app then adopts that copy, which the engine restores. The minute that runs
  * the VIP inspection at TOWER is a tick of the engine itself. The

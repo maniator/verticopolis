@@ -3,7 +3,7 @@ import { test, expect, type Browser, type BrowserContext, type Page } from "@pla
 import { readFileSync } from "node:fs";
 import { ENGINE_REVISION_SUFFIX } from "../src/build/enginePackageBuild";
 import { startDeployments, type Deployment, type Deployments } from "./deployments";
-import { onWasm, expectEngineHosted } from "./helpers";
+import { expectEngineHosted } from "./helpers";
 import { expectControlledWithEngine, hostedGame, installWorker, watch } from "./offlineHelpers";
 
 /**
@@ -13,8 +13,7 @@ import { expectControlledWithEngine, hostedGame, installWorker, watch } from "./
  * (deployments.ts): the first is installed, the second is "deployed", and the
  * update prompt moves the page onto it the way a player does.
  *
- * These run against the production build `npm run e2e` serves, on the
- * chromium-wasm project, where the engine is the chosen one. They read the
+ * These run against the production build `npm run e2e` serves. They read the
  * precache the way the worker keeps it: one cache, one key per manifest entry,
  * a revisioned entry keyed `url?__WB_REVISION__=<revision>`.
  *
@@ -22,7 +21,6 @@ import { expectControlledWithEngine, hostedGame, installWorker, watch } from "./
  * scripts/verify-precache.ts, which `postbuild` runs for every e2e build. The
  * half checked here is that the precache does not grow across updates.
  */
-test.beforeEach(({}, info) => test.skip(!onWasm(info.project.name), "the engine runs on the chromium-wasm and chromium-wasm-only projects"));
 // Two installs, two updates and an offline hold: more than the default 30s.
 // (On some machines Chromium holds the first update check on a fresh
 // registration for about a minute; CI does not see it.)
@@ -32,11 +30,7 @@ let deployments: Deployments;
 
 /** A page on the first deployment, installed, controlled and on the engine. */
 async function installedFirst(browser: Browser): Promise<{ page: Page; context: BrowserContext }> {
-  // The engine choice the project seeds into its own contexts (this origin is new).
-  const context = await browser.newContext({
-    baseURL: deployments.origin,
-    storageState: { cookies: [], origins: [{ origin: deployments.origin, localStorage: [{ name: "vc.engine", value: "wasm" }] }] },
-  });
+  const context = await browser.newContext({ baseURL: deployments.origin });
   const page = await context.newPage();
   await installWorker(page);
   await page.reload();
@@ -132,8 +126,6 @@ const isUpdateCheck = (path: string): boolean => path === "/sw.js" || /^\/workbo
 // The second deployment is a full `vite build`. It runs here, with a budget of
 // its own, so the build does not eat into the test's.
 test.beforeAll(async () => {
-  // A project that skips the test builds nothing.
-  if (!onWasm(test.info().project.name)) return;
   test.setTimeout(300_000);
   deployments = await startDeployments();
 });

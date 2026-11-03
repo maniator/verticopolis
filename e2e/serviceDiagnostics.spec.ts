@@ -2,7 +2,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { Simulation } from "../src/engine/Simulation";
 import { serviceDiagnosticsFixture, retailServiceFixture, setFixtureHotelState } from "../src/tests/fixtures/serviceDiagnostics.fixture";
-import { onWasm, expectEngineHosted } from "./helpers";
+import { expectEngineHosted } from "./helpers";
 
 /**
  * Browser-level smoke test for the actual WASM-hosted inspector. The same
@@ -10,9 +10,8 @@ import { onWasm, expectEngineHosted } from "./helpers";
  * No simulation logic or mocked diagnostics are used inside the browser.
  */
 test.describe("Rust service diagnostics in the real browser", () => {
-  test.beforeEach(async ({ page }, info) => {
-    test.skip(!onWasm(info.project.name), "the inspector must run on the actual Rust WASM engine");
-    await page.goto("/?engine=wasm");
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
     await page.waitForFunction(() => {
       const w = window as any;
       return Boolean(w.__vcEngine?.status?.hosted && w.game);

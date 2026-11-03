@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { expectEngineHosted } from "./helpers";
 
-// On chromium-wasm every test must end with its tower still on the engine.
+// Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -14,8 +14,7 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * This proves the feature survives bundling and the main.ts <-> engine <-> sim
  * wiring, not just the headless vitest fixture. The concourse goes down through
  * relayed `sim.build` calls and each check reads the tower back from the engine
- * first, so on the `chromium-wasm` project the assertions are about the WASM
- * engine's tower. It complements the exhaustive
+ * first, so the assertions are about the WASM engine's tower. It complements the exhaustive
  * integration coverage in src/tests/integration/simulation.integration.test.ts.
  */
 test.describe("auto-floor bridge between modules (e2e)", () => {

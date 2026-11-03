@@ -363,7 +363,7 @@ fan-out, and an event is never handed out twice.
   or is not the engine's shape fails before any write),
   `workerController.test.ts`, `wasmHostFrame.test.ts` and
   `frameApply.test.ts`.
-- `e2e/wasmWorker.spec.ts` (chromium-wasm) runs in a real browser:
+- `e2e/wasmWorker.spec.ts` (gone with the worker host) ran in a real browser:
   - the main thread fetches no `.wasm`;
   - the clock advances;
   - a build reaches the engine;

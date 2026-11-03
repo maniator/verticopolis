@@ -1,17 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
-import { WASM_ONLY_PROJECT, expectEngineHosted } from "./helpers";
+import { expectEngineHosted } from "./helpers";
 import { INSTANCE_METHODS, STATIC_METHODS } from "../src/dualrun/binding";
 
 /**
- * The wasm-only build (`VC_ENGINE=wasm`; src/build/engineBundle.ts) in a real
- * browser. The Rust/WASM engine is the only engine: no URL or stored choice
- * reaches the TypeScript engine, a package that cannot start stops the game
- * with a message instead of falling back, and the TypeScript step loop is not
- * in the bundle at all. The rest of the suite runs on this build too, on the
- * same project (see playwright.config.ts, `PW_WASM_ONLY=1`).
+ * The Rust-only build (src/build/engineBundle.ts) in a real browser. The
+ * Rust/WASM engine is the only engine: no URL or stored choice reaches the
+ * TypeScript engine, a package that cannot start stops the game with a
+ * message instead of falling back, and the TypeScript step loop is not in the
+ * bundle at all.
  */
-test.beforeEach(({}, info) => test.skip(info.project.name !== WASM_ONLY_PROJECT, "runs against the wasm-only build (PW_WASM_ONLY=1)"));
 test.setTimeout(90_000);
 
 interface BootState {
@@ -70,7 +68,7 @@ test.describe("starts on the WASM engine", () => {
 
   test("boots on the WASM engine whatever the URL or storage asks for", async ({ page }) => {
     const errors = pageErrors(page);
-    // Both of the switchable build's ways to pick the TypeScript engine.
+    // The two ways the old engine switch took a choice of the TypeScript engine.
     await page.addInitScript(() => localStorage.setItem("vc.engine", "ts"));
     await page.goto("/?engine=ts");
     await page.waitForFunction(() => !!(window as any).__vcEngine?.status.hosted && !!(window as any).game, undefined, { timeout: 30_000 });

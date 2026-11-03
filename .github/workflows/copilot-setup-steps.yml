@@ -60,7 +60,7 @@ jobs:
 
       # The engine's WASM package (src/public/engine/, engine-rs/pkg/) is build
       # output, not checked in: restore it from the Actions cache, or build it,
-      # so `?engine=wasm`, the e2e chromium-wasm project and the WASM test
+      # so the game, the e2e projects and the WASM test
       # suites work for the agent. continue-on-error for the same reason as the
       # Rust steps below: the TypeScript side must still start (without the
       # package, npm test skips the package's hash test).
