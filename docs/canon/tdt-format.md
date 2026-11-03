@@ -154,7 +154,23 @@ infested flag, bits 0 and 1 the number of guests inside right now.
 | `0x10` to `0x13` | Asleep (stay state 2); low bits = guests inside | High |
 | `0x18` (24) | Clean and vacant; no guests counted. Every room of TOWER1, TOWER7 and MYTOWER | High |
 | `0x20`, `0x28`, `0x30` | Dirty, awaiting housekeeping (32, 40, 48 seen); no guests counted | High |
-| `0x40` | Bug-infested [TD]; not seen in the nine saves | Low |
+| `0x40` | Bug-infested [TD]. Not seen in the nine saves, in a TOWER2 run of about four game days in the original, or in the game's re-saves of our exports. Whether the game stores infestation at all is open (#1629) | Low |
+
+What the original does to these bytes when it saves [RE]. A file we exported was
+loaded in the retail game and saved again:
+
+- The "guests inside right now" bits do not survive a load. Rooms we wrote as
+  `0x11` and `0x12` (asleep, one or two guests inside) came back `0x10`.
+- Stay state 0 is not a state the game writes. A room we wrote as a bare `0x01`
+  (a rented room, now empty) came back `0x10`, so the game read it as a sleeping
+  guest. A clean, vacant room is `0x18`.
+- Dirty survives a load but not play. A save made seconds after the load kept
+  every `0x20` room dirty. After about 35 seconds in Fast Mode, housekeeping had
+  cleaned all of them and the game wrote `0x18`. A file with dirty rooms
+  therefore reads back dirty only if it is saved again before the cleaners reach
+  them.
+- No `0x40` was written by us or by the game, so no infested state was observed
+  in either direction. Our export writes an infested room as dirty (`0x20`).
 
 The finance block's hotel guest lines count exactly the rooms in stay state 1 or
 2 at full complement (1 in a single room, 2 in a twin and 2 in a suite), whatever
@@ -404,5 +420,10 @@ point after the first import. Known canonical forms:
   has no vacant retail cell).
 - A room the file's flags mark occupied but whose people the finance lines do not
   count comes back vacant and never lived in.
+- An infested hotel room is written as a dirty room (`0x20`) and comes back
+  dirty; the file has no infested state we can confirm (section 5.1).
+- A hotel room that was rented and is now empty is written `0x18` and comes back
+  the same. Exports before this fix wrote `0x01` there, which the original
+  reads as a sleeping guest.
 
 Do not teach the importer to reconstruct the pre-canonical state.
