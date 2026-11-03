@@ -175,7 +175,7 @@ Verticopolis has **two test tiers**:
     the owner's approving comment on #1104) in the marker's `resets` list;
     setting `open` back to false lifts the guard. Pins that move the key
     include the lockfile, `.nvmrc`, `package.json` `type` and `engines`, and
-    `engine-rs/.cargo/config.toml`, so a Dependabot or lockfile-only PR also
+    the cargo configuration and `rust-toolchain` files, so a Dependabot or lockfile-only PR also
     needs a reset while a window is open. The nightly records the runner
     image version next to the key.
 

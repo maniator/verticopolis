@@ -39,6 +39,11 @@ describe("checkFreeze", () => {
     expect(checkFreeze(open(B, [{ from: A, to: B, approval: APPROVAL }]), open(A), B).ok).toBe(true);
   });
 
+  it("does not take a reset the base already holds (a revert and redo needs a new approval)", () => {
+    const spent = [{ from: A, to: B, approval: APPROVAL }];
+    expect(checkFreeze(open(B, spent), open(A, spent), B).ok).toBe(false);
+  });
+
   it("does not take a reset for another step", () => {
     expect(checkFreeze(open(B, [{ from: B, to: A, approval: APPROVAL }]), open(A), B).ok).toBe(false);
   });
@@ -90,6 +95,10 @@ describe("the repository's marker", () => {
     expect(workflow).not.toMatch(/paths(-ignore)?:/);
     expect(workflow).toContain("scripts/fuzz-freeze.ts");
     expect(workflow).toContain(`--base`);
+    expect(workflow).toContain("fetch-depth: 0");
+    // An unresolvable base stops the guard (exit 3); only a base without the file reads as "no marker".
+    expect(workflow).toContain("rev-parse --verify");
+    expect(workflow).not.toContain("|| : >");
     expect(workflow).toContain(FREEZE_MARKER_PATH);
   });
 });
@@ -131,7 +140,11 @@ describe("scripts/fuzz-freeze.ts", () => {
   it("cannot decide on a missing or malformed marker (exit 3, never a pass)", () => {
     expect(run(["--marker", join(dir, "none.json")]).code).toBe(3);
     expect(run(["--marker", write("bad.json", "{")]).code).toBe(3);
-    expect(run(["--marker", write("ok.json", JSON.stringify(closed)), "--base", write("badbase.json", "[]")]).code).toBe(3);
+    expect(run(["--marker", write("open-ok.json", JSON.stringify(open(key))), "--base", write("badbase.json", "[]")]).code).toBe(3);
+  });
+
+  it("lets a PR with a closed marker repair a damaged base marker", () => {
+    expect(run(["--marker", write("closed-ok.json", JSON.stringify(closed)), "--base", write("badbase2.json", "[]")]).code).toBe(0);
   });
 
   it("reads an absent or empty base file as a base with no marker", () => {

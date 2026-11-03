@@ -13,7 +13,7 @@
 export const FREEZE_MARKER_PATH = "conformance/fuzz-window.json";
 
 /** An owner-approved restart of the window: the old key, the new one, and the
- *  comment on #1104 (or the PR) where the owner said so in his own words. */
+ *  comment on #1104 (or the PR) where the owner said so in their own words. */
 export interface FreezeReset {
   from: string;
   to: string;
@@ -81,7 +81,9 @@ export function checkFreeze(head: FreezeMarker, base: FreezeMarker | null, key: 
     };
   }
   if (base?.open && base.key !== head.key) {
-    const approved = head.resets.some((r) => r.from === base.key && r.to === head.key);
+    // A reset is spent by the PR that records it: one already on the base cannot be reused.
+    const step = (r: FreezeReset): boolean => r.from === base.key && r.to === head.key;
+    const approved = head.resets.some(step) && !base.resets.some(step);
     if (!approved) {
       return {
         ok: false,

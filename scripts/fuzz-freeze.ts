@@ -34,8 +34,11 @@ if (typeof head === "string") fail(`${markerPath}: ${head}`);
 let base: FreezeMarker | null = null;
 if (basePath && existsSync(basePath) && readFileSync(basePath, "utf8").trim() !== "") {
   const parsed = parseMarker(readFileSync(basePath, "utf8"));
-  if (typeof parsed === "string") fail(`the base marker: ${parsed}`);
-  base = parsed;
+  if (typeof parsed !== "string") base = parsed;
+  // A damaged marker on the base must not block the PR that repairs it, so a closed head
+  // marker passes with a warning. An open head cannot be judged against a base it cannot read.
+  else if (head.open) fail(`the base marker: ${parsed}`);
+  else console.warn(`fuzz-freeze: the base marker is damaged (${parsed}); this PR closes the window, so it passes`);
 }
 
 let key: string;

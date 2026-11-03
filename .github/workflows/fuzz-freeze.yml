@@ -30,6 +30,13 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
-          # The marker on the base branch (empty when the base has none yet).
-          git show "origin/${BASE_REF}:conformance/fuzz-window.json" > "$RUNNER_TEMP/base-window.json" 2>/dev/null || : > "$RUNNER_TEMP/base-window.json"
+          # The base branch must resolve, or the guard cannot decide (no silent "no base").
+          base="origin/${BASE_REF}"
+          git rev-parse --verify --quiet "${base}^{commit}" > /dev/null || { echo "::error::${base} is not fetched"; exit 3; }
+          # The marker on the base branch: empty only when the base has no marker file yet.
+          if git cat-file -e "${base}:conformance/fuzz-window.json"; then
+            git show "${base}:conformance/fuzz-window.json" > "$RUNNER_TEMP/base-window.json"
+          else
+            : > "$RUNNER_TEMP/base-window.json"
+          fi
           npx tsx scripts/fuzz-freeze.ts --base "$RUNNER_TEMP/base-window.json"
