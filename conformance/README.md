@@ -263,7 +263,9 @@ the scenario format above, but they are not part of the lock: there are no
 pinned hashes, only the two engines' agreement. The file name is the scenario
 `id`. Three entries (`fx-thief-uncaught`, `fx-thief-caught`, `fx-treasure-cap`)
 reach cosmetic fx sites the locked scenarios do not; `fxSequences.integration.test.ts`
-pins their end values.
+pins their end values. `pool-caps-tall` is the generator's burst for a tall seed with its two
+cap refusals pinned by reason, so a change that stops either pool from filling fails the
+guard in `fuzzCorpusEntries.test.ts`.
 
 A pull request that touches either engine replays every entry on both and
 fails if they differ at any checkpoint (`scripts/fuzz-corpus.ts`, the

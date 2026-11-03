@@ -1,0 +1,964 @@
+{
+  "id": "pool-caps-tall",
+  "description": "A tall Classic tower whose generator burst fills the 24-shaft elevator pool and the 64-link stairs pool and then asks for one more of each (fuzz seed 3, no random commands). Each refusal is pinned by its reason (#1648).",
+  "start": {
+    "newGame": {
+      "seed": 3,
+      "mode": "classic",
+      "star": 3
+    }
+  },
+  "commands": [
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 150,
+      "to": 230
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row2"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 3,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row3"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 4,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row4"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 5,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row5"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 6,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row6"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 7,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row7"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 8,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row8"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 9,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row9"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 10,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row10"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 11,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row11"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 12,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row12"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 13,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row13"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 14,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row14"
+    },
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 15,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row15"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 16,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row16"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 17,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row17"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 18,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row18"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 19,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row19"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 20,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row20"
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 21,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "checkpoint",
+      "label": "row21"
+    },
+    {
+      "op": "setMoney",
+      "amount": 500000000
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 192,
+      "bottom": 1,
+      "top": 7
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 196,
+      "bottom": 1,
+      "top": 7
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 200,
+      "bottom": 1,
+      "top": 7
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 204,
+      "bottom": 1,
+      "top": 7
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 208,
+      "bottom": 1,
+      "top": 7
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 212,
+      "bottom": 1,
+      "top": 7
+    },
+    {
+      "op": "checkpoint",
+      "label": "k6"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 216,
+      "bottom": 1,
+      "top": 7
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 220,
+      "bottom": 1,
+      "top": 7
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 224,
+      "bottom": 1,
+      "top": 7
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 192,
+      "bottom": 8,
+      "top": 14
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 196,
+      "bottom": 8,
+      "top": 14
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 200,
+      "bottom": 8,
+      "top": 14
+    },
+    {
+      "op": "checkpoint",
+      "label": "k12"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 204,
+      "bottom": 8,
+      "top": 14
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 208,
+      "bottom": 8,
+      "top": 14
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 212,
+      "bottom": 8,
+      "top": 14
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 216,
+      "bottom": 8,
+      "top": 14
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 220,
+      "bottom": 8,
+      "top": 14
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 224,
+      "bottom": 8,
+      "top": 14
+    },
+    {
+      "op": "checkpoint",
+      "label": "k18"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 192,
+      "bottom": 15,
+      "top": 21
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 196,
+      "bottom": 15,
+      "top": 21
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 200,
+      "bottom": 15,
+      "top": 21
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 204,
+      "bottom": 15,
+      "top": 21
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 208,
+      "bottom": 15,
+      "top": 21
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 212,
+      "bottom": 15,
+      "top": 21
+    },
+    {
+      "op": "checkpoint",
+      "label": "k24"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 216,
+      "bottom": 15,
+      "top": 21,
+      "expectFail": true,
+      "reason": "Only 24 elevator shafts allowed per tower."
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 220,
+      "bottom": 15,
+      "top": 21,
+      "expectFail": true,
+      "reason": "Only 24 elevator shafts allowed per tower."
+    },
+    {
+      "op": "buildTransport",
+      "kind": "elevatorStandard",
+      "x": 224,
+      "bottom": 15,
+      "top": 21,
+      "expectFail": true,
+      "reason": "Only 24 elevator shafts allowed per tower."
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 1,
+      "top": 2
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 1,
+      "top": 2
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 1,
+      "top": 2
+    },
+    {
+      "op": "checkpoint",
+      "label": "k30"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 1,
+      "top": 2
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 1,
+      "top": 2
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 2,
+      "top": 3
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 2,
+      "top": 3
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 2,
+      "top": 3
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 2,
+      "top": 3
+    },
+    {
+      "op": "checkpoint",
+      "label": "k36"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 2,
+      "top": 3
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 3,
+      "top": 4
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 3,
+      "top": 4
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 3,
+      "top": 4
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 3,
+      "top": 4
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 3,
+      "top": 4
+    },
+    {
+      "op": "checkpoint",
+      "label": "k42"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 4,
+      "top": 5
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 4,
+      "top": 5
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 4,
+      "top": 5
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 4,
+      "top": 5
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 4,
+      "top": 5
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 5,
+      "top": 6
+    },
+    {
+      "op": "checkpoint",
+      "label": "k48"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 5,
+      "top": 6
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 5,
+      "top": 6
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 5,
+      "top": 6
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 5,
+      "top": 6
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 6,
+      "top": 7
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 6,
+      "top": 7
+    },
+    {
+      "op": "checkpoint",
+      "label": "k54"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 6,
+      "top": 7
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 6,
+      "top": 7
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 6,
+      "top": 7
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 7,
+      "top": 8
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 7,
+      "top": 8
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 7,
+      "top": 8
+    },
+    {
+      "op": "checkpoint",
+      "label": "k60"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 7,
+      "top": 8
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 7,
+      "top": 8
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 8,
+      "top": 9
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 8,
+      "top": 9
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 8,
+      "top": 9
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 8,
+      "top": 9
+    },
+    {
+      "op": "checkpoint",
+      "label": "k66"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 8,
+      "top": 9
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 9,
+      "top": 10
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 9,
+      "top": 10
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 9,
+      "top": 10
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 9,
+      "top": 10
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 9,
+      "top": 10
+    },
+    {
+      "op": "checkpoint",
+      "label": "k72"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 10,
+      "top": 11
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 10,
+      "top": 11
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 10,
+      "top": 11
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 10,
+      "top": 11
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 10,
+      "top": 11
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 11,
+      "top": 12
+    },
+    {
+      "op": "checkpoint",
+      "label": "k78"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 11,
+      "top": 12
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 11,
+      "top": 12
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 11,
+      "top": 12
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 11,
+      "top": 12
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 12,
+      "top": 13
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 12,
+      "top": 13
+    },
+    {
+      "op": "checkpoint",
+      "label": "k84"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 12,
+      "top": 13
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 12,
+      "top": 13
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 12,
+      "top": 13
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 151,
+      "bottom": 13,
+      "top": 14
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 159,
+      "bottom": 13,
+      "top": 14
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 167,
+      "bottom": 13,
+      "top": 14
+    },
+    {
+      "op": "checkpoint",
+      "label": "k90"
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 175,
+      "bottom": 13,
+      "top": 14
+    },
+    {
+      "op": "buildTransport",
+      "kind": "stairs",
+      "x": 183,
+      "bottom": 13,
+      "top": 14,
+      "expectFail": true,
+      "reason": "Only 64 stairs/escalators allowed per tower."
+    },
+    {
+      "op": "checkpoint",
+      "label": "end"
+    }
+  ]
+}
