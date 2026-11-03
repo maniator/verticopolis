@@ -23,6 +23,8 @@ pub struct Memo {
         std::sync::Arc<[(i64, i64, i64)]>,
     )>,
     pub metro_floor: Option<(crate::tower_index::IndexKey, Option<i64>)>,
+    /// Whether a floor tile sits above the lobby, per revision (#1237).
+    pub floor_above_lobby: Option<(crate::tower_index::IndexKey, bool)>,
     pub rooms: Option<(crate::tower_index::IndexKey, std::sync::Arc<[usize]>)>,
     pub census: Option<(
         crate::tower_index::IndexKey,

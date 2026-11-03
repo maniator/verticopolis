@@ -73,7 +73,10 @@ export function bindKeys(app: GameApp): void {
     // A focused button / palette item owns Enter/Space activation, don't ALSO
     // fire the build cursor on those keys. Movement/zoom/bulldoze keys still get
     // through, so keyboard play flows right after picking a tool from the palette.
-    const onControl = !!ae && (ae.tagName === "BUTTON" || ae.tagName === "A" || ae.getAttribute("role") === "button");
+    // The Map window's canvas (role "application") counts too: Space held
+    // there still pans the world, and it does not commit the build cursor.
+    const role = ae?.getAttribute("role");
+    const onControl = !!ae && (ae.tagName === "BUTTON" || ae.tagName === "A" || role === "button" || role === "application");
     const activationKey = e.key === "Enter" || e.key === " " || e.key === "Spacebar";
     if (onControl && activationKey) return;
     if (isDialogOpen()) return;

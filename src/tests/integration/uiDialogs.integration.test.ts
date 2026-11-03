@@ -1976,7 +1976,7 @@ describe("showSaves — the save-slot manager", () => {
     expect(cb.onDeleteSlot).toHaveBeenCalledWith(1);
   });
 
-  it("downloads a kept unreadable autosave as it was stored, closing the dialog first", () => {
+  it("downloads a kept unreadable autosave, a tower file when it is one, closing the dialog first", () => {
     const { ui } = makeUI();
     const download = vi.spyOn(ui, "downloadFile").mockReturnValue(true);
     ui.showSaves(slots);
@@ -1984,7 +1984,11 @@ describe("showSaves — the save-slot manager", () => {
     ui.showSaves(slots, "VCTOWER1\nkept");
     dialog().querySelector<HTMLElement>('[data-act="unreadable"]')!.click();
     expect(dialog().open).toBe(false);
-    expect(download).toHaveBeenCalledExactlyOnceWith("verticopolis-unreadable-save.txt", "VCTOWER1\nkept");
+    expect(download).toHaveBeenCalledExactlyOnceWith("verticopolis-unreadable-save.vctower", "VCTOWER1\nkept");
+    download.mockClear();
+    ui.showSaves(slots, "plain kept text");
+    dialog().querySelector<HTMLElement>('[data-act="unreadable"]')!.click();
+    expect(download).toHaveBeenCalledExactlyOnceWith("verticopolis-unreadable-save.txt", "plain kept text");
   });
 
   it("the Auto-save Load routes the special 'auto' slot id", () => {

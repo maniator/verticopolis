@@ -3,6 +3,7 @@ import { confirmTemplate, installHelpTemplate, type InstallHelpVariant } from ".
 import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
 import { helpTemplate } from "./templates/help";
+import { TOWER_FILE_MAGIC } from "../storage/saveCompression";
 import { isSplashUp } from "../game/interactionState";
 import { compareModalTemplate } from "./templates/compare";
 import { savesTemplate } from "./templates/saves";
@@ -99,16 +100,17 @@ export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null =
       ui.closeModal();
       openImport(ui);
     },
-    // The kept text downloads as stored, with no engine involved. A .txt is a
-    // file type GitHub accepts on an issue. The button exists only when text
-    // is kept, and closes the dialog first, as export does, so a failure toast
-    // is not hidden behind it.
+    // The kept text downloads with no engine involved. A compressed save comes
+    // as a `.vctower` the game imports once it is updated; anything else is a
+    // .txt, a file type GitHub accepts on an issue. The button exists only
+    // when text is kept, and closes the dialog first, as export does, so a
+    // failure toast is not hidden behind it.
     ...(unreadable === null
       ? {}
       : {
           unreadable: () => {
             ui.closeModal();
-            ui.downloadFile(UNREADABLE_SAVE_FILENAME, unreadable);
+            ui.downloadFile(unreadable.startsWith(TOWER_FILE_MAGIC) ? UNREADABLE_TOWER_FILENAME : UNREADABLE_SAVE_FILENAME, unreadable);
           },
         }),
   });
@@ -116,6 +118,8 @@ export function showSaves(ui: UI, slots: SlotInfo[], unreadable: string | null =
 
 /** The file name of a downloaded unreadable autosave. */
 export const UNREADABLE_SAVE_FILENAME = "verticopolis-unreadable-save.txt";
+/** The file name when the kept save downloads as a tower file. */
+export const UNREADABLE_TOWER_FILENAME = "verticopolis-unreadable-save.vctower";
 
 /** Open the Add-to-Home-Screen how-to (SPEC-pwa-install CAP-3 / CAP-5). The
  *  install controller calls this directly (keeping UI.ts under its size ceiling);

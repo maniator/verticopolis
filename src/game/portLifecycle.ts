@@ -1,6 +1,6 @@
 import type { SerializedView } from "../engine/types";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
-import { engineTrapped } from "./engineFault";
+import { engineTrapped, noteEngineThrow } from "./engineFault";
 
 /**
  * The lifecycle members' records as the game's callers read them (contract
@@ -19,6 +19,17 @@ export function swapDone(port: Pick<EnginePort, "lastReason">, rec: PortRecord):
   if (rec[0] !== 1) throw new Error(port.lastReason() ?? SWAP_REFUSED);
 }
 
+/** The engine's refusal of a save from a newer build (engine-rs
+ *  `NEWER_SAVE_REFUSAL`; a test pins the two together). */
+export const NEWER_SAVE_REFUSAL = "This save was made by a newer version of Verticopolis. Update the game to load it.";
+
+/** Whether the engine's last refusal was a save from a newer build, so the
+ *  page can say "update the game" and not "corrupt". Call it right after the
+ *  load that refused. */
+export function newerSaveRefused(port: Pick<EnginePort, "lastReason">): boolean {
+  return port.lastReason() === NEWER_SAVE_REFUSAL;
+}
+
 /** Why no save is written once the running engine trapped. */
 export const TRAPPED_SAVE_REFUSED = "The engine stopped after an error, so the last save is kept.";
 
@@ -32,6 +43,31 @@ export function saveText(port: Pick<EnginePort, "setCamera" | "serialize">, view
   if (engineTrapped()) throw new Error(TRAPPED_SAVE_REFUSED);
   stampCamera(port, view);
   return port.serialize();
+}
+
+/** The `.vctower` file of the live tower, written by the engine and stamped
+ *  with this build and the time (`stamp`): the file the player downloads.
+ *  Throws the engine's refusal (or, once the engine trapped, the same refusal
+ *  every save gives) and never writes the file itself, so a build without the
+ *  engine package exports nothing rather than a file the engine did not make. */
+export function exportFileText(
+  port: Pick<EnginePort, "setCamera" | "exportVctower" | "lastReason">,
+  view: SerializedView | null,
+  stamp: { appVersion: string; savedAt: number },
+): string {
+  if (engineTrapped()) throw new Error(TRAPPED_SAVE_REFUSED);
+  stampCamera(port, view);
+  let file: string | undefined;
+  try {
+    file = port.exportVctower(stamp.appVersion, stamp.savedAt);
+  } catch (err) {
+    // A trap here latches now, so the next export or save is refused
+    // up front and does not call into the dead engine again.
+    noteEngineThrow(err);
+    throw err;
+  }
+  if (file === undefined) throw new Error(port.lastReason() ?? "The tower could not be exported.");
+  return file;
 }
 
 /** Stamp the live camera onto the tower, so a save or file written next

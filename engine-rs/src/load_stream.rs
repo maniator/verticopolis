@@ -56,7 +56,7 @@ pub fn load_save_text(text: &[u8]) -> Result<Simulation, String> {
 /// `loadSave` is its only caller, so a build without the binding skips it.
 #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
 pub fn load_stored_text(text: &[u8]) -> Result<Simulation, String> {
-    if let Some((mut sim, data)) = streamed(text, None) {
+    if let Some(Streamed { mut sim, data, .. }) = streamed(text, None) {
         mark_founder_from_loaded_file(&mut sim, &data);
         return Ok(sim);
     }
@@ -69,7 +69,7 @@ pub fn load_stored_text(text: &[u8]) -> Result<Simulation, String> {
 
 /// `load_save_text`, and whether the streamed reader took the text.
 pub(crate) fn read_save(text: &[u8]) -> Result<(Simulation, bool), String> {
-    if let Some((sim, _)) = streamed(text, None) {
+    if let Some(Streamed { sim, .. }) = streamed(text, None) {
         return Ok((sim, true));
     }
     let raw = parse_save_json(text).map_err(|e| e.to_string())?;
@@ -87,19 +87,73 @@ pub fn load_vctower_text(text: &str, mode: Option<&str>) -> Result<Simulation, S
 
 /// `load_vctower_text`, and whether the streamed reader took the file.
 fn read_vctower(text: &str, mode: Option<&str>) -> Result<(Simulation, bool), String> {
-    let json = inflate_vctower(text)?;
-    if let Some((mut sim, data)) = streamed(&json, mode) {
+    read_vctower_json(&inflate_vctower(text)?, mode)
+}
+
+/// `read_vctower` on the save text a file holds, already inflated.
+pub(crate) fn read_vctower_json(
+    json: &[u8],
+    mode: Option<&str>,
+) -> Result<(Simulation, bool), String> {
+    read_vctower_text(json, mode, false).map_err(|e| match e {
+        TowerReadError::Unparseable(why) => format!("json: {why}"),
+        TowerReadError::NotASave => "the file does not hold a saved game".to_string(),
+        TowerReadError::Refused(why) => why,
+    })
+}
+
+/// Why the save text in a tower file did not load, for the import to word.
+pub(crate) enum TowerReadError {
+    /// The text is not JSON the loader can hold.
+    Unparseable(String),
+    /// JSON, but with no numeric `minutes` or no `units` list.
+    NotASave,
+    /// The loader's own refusal, in its own words.
+    Refused(String),
+}
+
+/// `read_vctower_json` for a file the player opened: the same game, or a
+/// typed reason. The shape of the save (a numeric `minutes` and a `units`
+/// list, the last of a repeated key counting) is read off the same pass the
+/// load makes, so the text is not scanned twice.
+pub(crate) fn read_tower_file_json(json: &[u8]) -> Result<Simulation, TowerReadError> {
+    read_vctower_text(json, None, true).map(|(sim, _)| sim)
+}
+
+fn read_vctower_text(
+    json: &[u8],
+    mode: Option<&str>,
+    need_shape: bool,
+) -> Result<(Simulation, bool), TowerReadError> {
+    if let Some(Streamed {
+        mut sim,
+        data,
+        had_units,
+    }) = streamed(json, mode)
+    {
+        if need_shape && !(had_units && has_number(&data, "minutes")) {
+            return Err(TowerReadError::NotASave);
+        }
         mark_founder_from_loaded_file(&mut sim, &data);
         return Ok((sim, true));
     }
-    let mut raw = parse_save_json(&json).map_err(|e| format!("json: {e}"))?;
+    let mut raw = parse_save_json(json).map_err(|e| TowerReadError::Unparseable(e.to_string()))?;
+    if need_shape && !(raw.get("units").is_some_and(Value::is_array) && has_number(&raw, "minutes"))
+    {
+        return Err(TowerReadError::NotASave);
+    }
     if let Some(m) = mode {
-        override_mode(&mut raw, m)?;
+        override_mode(&mut raw, m).map_err(TowerReadError::Refused)?;
     }
     let written = founder_keys(&raw);
-    let mut sim = deserialize_owned(raw)?;
+    let mut sim = deserialize_owned(raw).map_err(TowerReadError::Refused)?;
     mark_founder_from_loaded_file(&mut sim, &written);
     Ok((sim, false))
+}
+
+/// Whether the save object has `key` holding a number.
+fn has_number(save: &Value, key: &str) -> bool {
+    save.get(key).is_some_and(Value::is_number)
 }
 
 /// A game mode by the name the binding takes, or the binding's message.
@@ -123,7 +177,7 @@ pub(crate) fn override_mode(raw: &mut Value, mode: &str) -> Result<(), String> {
 /// and the migrated save without `units` that `assemble` read; `None` when
 /// this reader does not take the save (or it does not parse) and today's
 /// path reads it instead.
-fn streamed(text: &[u8], mode: Option<&str>) -> Option<(Simulation, Value)> {
+fn streamed(text: &[u8], mode: Option<&str>) -> Option<Streamed> {
     // A mode the binding refuses goes to today's path, which refuses it once
     // the text has parsed. The game reads Modern off the string, so the
     // units do too.
@@ -160,9 +214,22 @@ fn streamed(text: &[u8], mode: Option<&str>) -> Option<(Simulation, Value)> {
     // `deserialize` reads the founder flag from the save as written, which
     // the widening leaves alone, so the migrated keys serve for both.
     let data = Value::Object(rest);
+    let had_units = units.is_some();
     let (units, ids) = units.unwrap_or_default();
     let sim = assemble(&data, units, ids, &data);
-    Some((sim, data))
+    Some(Streamed {
+        sim,
+        data,
+        had_units,
+    })
+}
+
+/// A save `streamed` took: the game, the migrated save without `units`, and
+/// whether the save had a `units` list at all.
+struct Streamed {
+    sim: Simulation,
+    data: Value,
+    had_units: bool,
 }
 
 /// Whether the save loads as Modern, when its version and mode (or the mode

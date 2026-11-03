@@ -396,12 +396,6 @@ impl Engine {
         f64::from(u8::from(r.ok))
     }
 
-    /// `[ratio, floor]` for the busiest served floor, the floor NaN when none.
-    pub(crate) fn port_hotspot(&self) -> [f64; 2] {
-        let (ratio, floor) = self.sim.peak_congestion();
-        [ratio, floor.map_or(f64::NAN, |f| f as f64)]
-    }
-
     /// Whether the VIP has rated the tower a TOWER, the win the frame loop
     /// congratulates once. A 6 star save that never stored the rating does
     /// not claim it, as the TypeScript `evaluatedTower` reads it.

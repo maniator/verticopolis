@@ -23,6 +23,7 @@ import {
   TowerTooLargeError,
 } from "./saveCompression";
 import { packVctower, payloadLine } from "./vctowerWriter";
+import { stashedText, stashUnreadable } from "./unreadableStash";
 import { stampText } from "./saveStamp";
 import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
 import { slotPopulation } from "./slotCensus";
@@ -50,14 +51,7 @@ const LEGACY_AUTO_KEY = "simtower-clone-save";
 const SLOT_KEY = (n: number) => `simtower-clone-slot-${n}`;
 export const SLOT_COUNT = 3;
 
-/**
- * Backup key for an autosave that couldn't be read at boot (see
- * {@link SaveGame.preserveUnreadable}). A truly corrupt save is dead, but a save
- * written by a *newer* build and opened on an older one is only unreadable
- * *here* — stashing the raw bytes keeps them off the autosave slot's chopping
- * block so a later version can still recover them.
- */
-export const UNREADABLE_KEY = "simtower-clone-unreadable";
+export { UNREADABLE_KEY } from "./unreadableStash";
 
 // Latest-start write token for same-tab async saves. A synchronous save clears
 // the token before it writes, so an older async compression can never commit
@@ -220,7 +214,10 @@ export const SaveGame = {
    * that promised their old one) — see main.ts. `tryLoad` hands each decoded
    * save to the engine, which says whether it loaded it.
    */
-  loadResult(tryLoad: TryLoad): { loaded: boolean; corrupt: boolean; savedAt: number | undefined } {
+  loadResult(
+    tryLoad: TryLoad,
+    refusedAsNewer: () => boolean = () => false,
+  ): { loaded: boolean; corrupt: boolean; savedAt: number | undefined; refusedKey?: string; newerKey?: string } {
     // Try the Verticopolis key first, then the legacy key: a partial migration
     // or multi-tab divergence can leave an unreadable value on one key beside a
     // healthy save on the other, and the healthy one must still load. `corrupt`
@@ -228,6 +225,8 @@ export const SaveGame = {
     // but unreadable, so boot still stashes those bytes (preserveUnreadable)
     // and warns honestly even when the fallback rescued a tower.
     let corrupt = false;
+    let refusedKey: string | undefined; // the first key that held an unreadable save
+    let newerKey: string | undefined; // the first one the engine said a newer build wrote
     for (const key of [AUTO_KEY, LEGACY_AUTO_KEY]) {
       if (localStorage.getItem(key) === null) continue; // absent, not corrupt
       const text = readSlotText(key); // null ⇒ present but undecodable
@@ -238,33 +237,26 @@ export const SaveGame = {
       // needs no second decode of the slot. A forged or out-of-range stamp
       // reads as absent (parseSavedAt). A save the engine refuses is
       // unreadable, as below.
-      if (text !== null && tryLoad(text)) return { loaded: true, corrupt, savedAt: parseSavedAt(readSavedAt(text)) };
+      if (text !== null && tryLoad(text)) {
+        return { loaded: true, corrupt, savedAt: parseSavedAt(readSavedAt(text)), refusedKey, newerKey };
+      }
       corrupt = true;
+      refusedKey ??= key;
+      if (text !== null && refusedAsNewer()) newerKey ??= key;
     }
-    return { loaded: false, corrupt, savedAt: undefined };
+    return { loaded: false, corrupt, savedAt: undefined, refusedKey, newerKey };
   },
   clear(): void {
     localStorage.removeItem(AUTO_KEY);
     localStorage.removeItem(LEGACY_AUTO_KEY);
   },
-  /**
-   * Stash an unreadable autosave under a backup key so the 30s autosave doesn't
-   * silently destroy it. A truly corrupt compressed save is unrecoverable, but a
-   * save from a *newer* build (opened on an older one) is not — keeping the bytes
-   * lets a later version recover them instead of overwriting on the next tick.
-   */
-  preserveUnreadable(): void {
-    const raw = localStorage.getItem(autosaveKey());
-    if (raw === null) return;
-    try {
-      localStorage.setItem(UNREADABLE_KEY, raw);
-    } catch {
-      /* best effort — a full quota just means we can't back it up */
-    }
+  /** Keep an unreadable autosave aside (see `unreadableStash`); true when kept. */
+  preserveUnreadable(key: string = autosaveKey(), newer = false): boolean {
+    return stashUnreadable(key, newer);
   },
-  /** The autosave text {@link preserveUnreadable} kept, or null when none is kept. */
+  /** The kept save, as text a download can carry, or null when none is kept. */
   unreadableBackup(): string | null {
-    return localStorage.getItem(UNREADABLE_KEY);
+    return stashedText();
   },
 
   // ---- Named manual slots ----------------------------------------------

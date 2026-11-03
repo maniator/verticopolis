@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { refreshTraffic, updateTraffic } from "./trafficHud";
 import { Simulation } from "../engine/Simulation";
 import { GRID } from "../engine/facilities";
-import { TRAFFIC_LABELS, trafficTier } from "../engine/traffic";
+import { TRAFFIC_LABELS, trafficTier } from "../presentation/traffic";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
 import type { GameApp } from "../main";

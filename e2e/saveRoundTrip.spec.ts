@@ -128,6 +128,8 @@ test("an older version's autosave loads, a failed import changes nothing, and an
   const refusals: [string, RegExp][] = [
     ["not a tower", /Not a Verticopolis tower file\./],
     [damaged, /This tower file is damaged and can't be read\./],
+    ["VCTOWER2\nabc", /This tower file was made by a newer version of Verticopolis\. Update the game to load it\./],
+    [`VCTOWER1\n${deflateRawSync('{"minutes":"0","units":[]}').toString("base64")}`, /Not a valid tower save file\./],
   ];
   for (const [text, message] of refusals) {
     await page.evaluate((t) => (window as any).game.saveLoad.importGame(t), text);
@@ -162,6 +164,7 @@ test("an unreadable autosave is kept, not overwritten, and downloads as it was s
   // The kept text downloads from Saved Towers exactly as it was stored.
   await page.evaluate(() => (window as any).game.showSaves());
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download unreadable save" }).click()]);
-  expect(download.suggestedFilename()).toBe("verticopolis-unreadable-save.txt");
+  // Text that starts like a tower file is named as one, so Import from file takes it after an update.
+  expect(download.suggestedFilename()).toBe("verticopolis-unreadable-save.vctower");
   expect(readFileSync((await download.path())!, "utf8")).toBe(unreadable);
 });

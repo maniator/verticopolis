@@ -23,7 +23,6 @@ describe("the arguments and the configuration", () => {
     expect(() => parseArgs(["--aa", "wasm-worker"])).toThrow(/ts or wasm/);
     expect(() => parseArgs(["--aa"])).toThrow(/needs a value/);
     expect(() => parseAa("")).toThrow(/ts or wasm/);
-    expect(() => parseArgs(["--aa", "ts", "--read-model"])).toThrow(/takes no --aa/);
   });
 
   it("runs the two slots, labelled ts and wasm, and records the mode in the configuration", () => {

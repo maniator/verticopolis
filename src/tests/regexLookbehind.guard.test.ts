@@ -8,7 +8,7 @@ import { isTestFile } from "./importScan";
  * parse-time SyntaxError on Safari below 16.4, and the build targets `esnext`
  * with no downleveling, so one such literal stops the whole chunk from
  * loading, and with it the game. Node and the test browsers accept it, so no
- * other gate notices. `towerFileCodec.ts`, `engine/wellFormed.ts` and
+ * other gate notices. `towerFileCodec.ts`, `shared/wellFormed.ts` and
  * `simport/request.ts` each say the same thing without it.
  *
  * The guard reads every non-test source file under `src/` (the test tree,

@@ -36,6 +36,12 @@ export function viewWorld(): ViewWorld {
   return bound;
 }
 
+/** Whether a world is bound yet, for a reader that waits for it instead of
+ *  throwing (the overview map before the scene is built). */
+export function viewWorldBound(): boolean {
+  return bound !== null;
+}
+
 /** Test hook: forget the bound world. */
 export function resetViewWorldForTests(): void {
   bound = null;

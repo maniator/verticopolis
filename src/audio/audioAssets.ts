@@ -6,8 +6,8 @@
  * which are recordings. An installed game must play all of them offline
  * (#985), so each file here has to be in the service worker's precache:
  * scripts/verify-precache.ts fails the build when one is missing from the
- * manifest, and audioAssets.test.ts fails when the source or
- * src/public/audio/ names a file this list lacks.
+ * manifest, audioAssets.test.ts fails when src/public/audio/ holds a file this
+ * list lacks, and audioFetches.test.ts fails when the engine loads one it lacks.
  *
  * Keep this file ERASABLE (type-only TypeScript syntax, no enums or
  * namespaces; the rule is spelled out in scripts/screenshot-env.ts):

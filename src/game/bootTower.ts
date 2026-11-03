@@ -1,6 +1,6 @@
 import type { EnginePort } from "../simport/enginePort";
 import { SaveGame } from "../storage/SaveGame";
-import { loadStored } from "./portLifecycle";
+import { loadStored, newerSaveRefused } from "./portLifecycle";
 
 /**
  * The engine the game starts on, with the stored tower already loaded into
@@ -12,6 +12,10 @@ export interface BootTower {
   port: EnginePort;
   /** A save existed but this engine could not read it. */
   corrupt: boolean;
+  /** The engine refused a stored save because a newer build wrote it. */
+  newer: boolean;
+  /** The stored key whose save is worth keeping aside: the newer one if any. */
+  stashKey: string | undefined;
   /** A readable save existed and loaded. */
   loaded: boolean;
   /** When the loaded save was written, when it says. */
@@ -26,7 +30,8 @@ export const BOOT_SEED = Date.parse("2024-01-01");
  *  tower's events never reach the loaded one (`setBackdrop`). */
 export function bootTower(port: EnginePort): BootTower {
   port.setBackdrop(true);
-  const boot = SaveGame.loadResult(loadStored(port));
+  const boot = SaveGame.loadResult(loadStored(port), () => newerSaveRefused(port));
   port.setBackdrop(false);
-  return { port, ...boot };
+  const { refusedKey, newerKey, ...rest } = boot;
+  return { port, ...rest, newer: newerKey !== undefined, stashKey: newerKey ?? refusedKey };
 }
