@@ -15,9 +15,9 @@
 # in _bmad-output/planning-artifacts/architecture/architecture-engine-rust-port-2026-10-08.md).
 # New frontend code reads the catalog, the frame view or an engine query.
 #
-# The catalog handle (towerCatalog, catalogTypes) is not counted: it is how
-# the frontend reads the catalog, and it moves out of src/engine/ before
-# retirement.
+# The catalog handle (towerCatalog, catalogTypes) moved to src/catalog/ and is
+# not part of the engine. Its default source still reads the TypeScript tables,
+# which is the one line below for it.
 #
 # The list started (2026-10-20, main at 68725a2) with 43 files: the 56 runtime
 # importers the inventory counts in src/ui/, src/game/ and src/render/, less
@@ -25,6 +25,7 @@
 # src/preview.ts and src/analyticsEngineBridge.ts. src/presentation/ and
 # src/audio/ import the engine for types only; the scan keeps them that way.
 src/analyticsEngineBridge.ts gameplayCatalog gameplayEventRules
+src/catalog/towerCatalog.ts catalog # the default source for a tower that has none set; it goes with the TypeScript engine's tables
 src/game/appHistory.ts UndoHistory # moved from src/main.ts with the app's undo history (#874): no new engine import
 src/game/editorActions.ts sim/charges
 src/game/facilityDiagnostics.ts EconomySystem Simulation residentialRentals sim/constants sim/gripe types

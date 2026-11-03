@@ -3,6 +3,10 @@
 use super::*;
 use crate::tower::RetailTally;
 
+/// The sentence a save written by a newer build is refused with.
+pub const NEWER_SAVE_REFUSAL: &str =
+    "This save was made by a newer version of Verticopolis. Update the game to load it.";
+
 /// `Simulation.deserialize(raw)`.
 pub fn deserialize(raw: &Value) -> Result<Simulation, String> {
     deserialize_owned(raw.clone())
@@ -67,6 +71,14 @@ pub fn deserialize_owned(raw: Value) -> Result<Simulation, String> {
     // loads as the TypeScript loads it (#858).
     if raw.is_null() {
         return Err("not a tower save (the save is null)".into());
+    }
+    // A save from a build newer than this one may carry fields this loader
+    // would drop, and the next save would write the loss back. Refuse it so
+    // the stored copy stays whole until the game is updated (#1603).
+    if let Some(version) = raw.get("version").and_then(Value::as_f64) {
+        if version.is_finite() && version > SAVE_VERSION as f64 {
+            return Err(NEWER_SAVE_REFUSAL.into());
+        }
     }
     // The founder test reads the save as written, and `assemble` reads
     // nothing else from it, so two keys stand in for it.

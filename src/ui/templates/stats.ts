@@ -1,5 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import type { Catalog } from "../../engine/catalogTypes";
+import type { Catalog } from "../../catalog/catalogTypes";
 import { iconTemplate } from "../icons";
 import { LEDGER_CATS, LEDGER_LABELS } from "../../engine/Ledger";
 import { MILESTONES } from "../../engine/milestones";

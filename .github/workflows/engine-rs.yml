@@ -20,6 +20,7 @@ on:
       - "src/engine/**"
       - "src/shared/vacateReasonText.ts"
       - "src/storage/**"
+      - "src/catalog/**"
       - "src/tests/conformance/**"
       - "src/tests/integration/conformance.integration.test.ts"
       - "src/tests/integration/conformanceWasm.integration.test.ts"

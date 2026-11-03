@@ -1,8 +1,8 @@
 import type { HeatmapMode } from "../../engine/sim/constants";
 import { RAIN } from "../sprites/sky";
 import { isElevatorKind } from "../../presentation/viewKinds";
-import { catalogFacility } from "../../engine/catalogTypes";
-import { towerCatalog } from "../../engine/towerCatalog";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { towerCatalog } from "../../catalog/towerCatalog";
 import { viewWorld } from "../../presentation/viewWorld";
 import type { TransportView } from "../../simport/view";
 import { drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";

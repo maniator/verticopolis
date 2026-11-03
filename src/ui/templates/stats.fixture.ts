@@ -1,7 +1,7 @@
 import { facilityFloors } from "../../engine/facilities";
 import { TsEngine } from "../../engine/port/tsEngine";
 import type { Simulation } from "../../engine/Simulation";
-import { towerCatalog } from "../../engine/towerCatalog";
+import { towerCatalog } from "../../catalog/towerCatalog";
 import { PortCodes } from "../../simport/portCodes";
 import { statsReport } from "../../simport/statsSheet";
 import { ViewReader } from "../../simport/viewReader";

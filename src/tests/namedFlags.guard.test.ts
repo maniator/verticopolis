@@ -16,20 +16,38 @@ import { repoRel, sourceFiles } from "./guardFiles";
  * flags instead.
  */
 
-const ALLOWED: Readonly<Record<string, string>> = {
-  "src/engine/port/viewEncode.ts": "the unlocked-kinds mask, bit k = kind code k (the whole catalog, past 32 bits)",
-  "engine-rs/src/view/reader.rs": "the unlocked-kinds mask, bit k = kind code k",
-  "src/simport/viewReader.ts": "reads the unlocked-kinds mask, bit k = kind code k (the whole catalog, past 32 bits)",
-  "engine-rs/src/dispatch.rs": "the car's cab-floor bitset, indexed by stop",
-  "engine-rs/src/crowd/spawn_floors.rs": "a per-floor bitset, indexed by floor",
-  "engine-rs/src/fflate.rs": "the deflate port: shift widths and masks of the compression format",
-  "engine-rs/src/canonical.rs": "the sort key that places non-index keys after every array index",
-  "src/wasmhost/buildSection.ts": "the wasm LEB128 varint decoder",
-  "src/build/sourcemapBytes.ts": "the source-map base64 VLQ decoder",
+/** A file that is not a named flag set, how many shift sites it has, and why. The count
+ *  is exact: a new `1 << i` in an allowed file fails until the count here moves with a
+ *  reason, so an allowed file cannot quietly grow a flag set of its own. */
+interface Allowed {
+  sites: number;
+  reason: string;
+}
+
+const ALLOWED: Readonly<Record<string, Allowed>> = {
+  "src/engine/port/viewEncode.ts": { sites: 1, reason: "the unlocked-kinds mask, bit k = kind code k (the whole catalog, past 32 bits)" },
+  "engine-rs/src/view/reader.rs": { sites: 1, reason: "the unlocked-kinds mask, bit k = kind code k" },
+  "src/simport/viewReader.ts": { sites: 1, reason: "reads the unlocked-kinds mask, bit k = kind code k (the whole catalog, past 32 bits)" },
+  "engine-rs/src/dispatch.rs": { sites: 2, reason: "the car's cab-floor bitset, indexed by stop" },
+  "engine-rs/src/crowd/spawn_floors.rs": { sites: 1, reason: "a per-floor bitset, indexed by floor" },
+  "engine-rs/src/fflate.rs": { sites: 2, reason: "the deflate port: shift widths and masks of the compression format" },
+  "engine-rs/src/canonical.rs": { sites: 1, reason: "the sort key that places non-index keys after every array index" },
+  "src/wasmhost/buildSection.ts": { sites: 1, reason: "the wasm LEB128 varint decoder" },
+  "src/build/sourcemapBytes.ts": { sites: 1, reason: "the source-map base64 VLQ decoder" },
 };
 
-const SHIFT_OR_POW = /\b1u?(?:8|16|32|64|size)?\s*<<|\b2\s*\*\*\s*[A-Za-z_]/;
+/** A literal one shifted left (`1 <<`, `1u32 <<`, `1_u8 <<`, `1i64 <<`, `1n <<`, `(1 as u64) <<`)
+ *  or two raised to a variable power. */
+const RUST_INT = "[ui](?:8|16|32|64|128|size)";
+const SHIFT_OR_POW = new RegExp(
+  String.raw`\b1(?:_?${RUST_INT}|n)?\s*<<|\(\s*1\s+as\s+${RUST_INT}\s*\)\s*<<|\b2\s*\*\*\s*[A-Za-z_]`,
+);
+
 const TEST_FILE = /(^|\/)(tests?|tests_[a-z_]+|[a-z_]+_tests)\.rs$|\.(test|spec|fixture)\.ts$|(^|\/)tests\//;
+
+function siteLines(text: string): string[] {
+  return text.split("\n").filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line) && SHIFT_OR_POW.test(line));
+}
 
 function hits(dir: string, exts: string[]): string[] {
   const out: string[] = [];
@@ -47,12 +65,21 @@ function hits(dir: string, exts: string[]): string[] {
 }
 
 describe("named flags guard", () => {
-  it("every allowed file still exists and still has a shift site", () => {
-    for (const rel of Object.keys(ALLOWED)) {
+  it("every allowed file still exists and has exactly its listed shift sites", () => {
+    for (const [rel, { sites }] of Object.entries(ALLOWED)) {
       const abs = sourceFiles(rel.split("/").slice(0, -1).join("/"), [rel.split("/").pop()!]).find((f) => repoRel(f) === rel);
       expect(abs, `${rel} is listed in ALLOWED but not found; drop it`).toBeDefined();
-      const text = readFileSync(abs!, "utf8");
-      expect(text.split("\n").some((l) => SHIFT_OR_POW.test(l)), `${rel} no longer shifts; drop it from ALLOWED`).toBe(true);
+      const found = siteLines(readFileSync(abs!, "utf8"));
+      expect(found.length, `${rel} has ${found.length} shift site(s), the list says ${sites}. A new site needs its reason written down; a removed one lowers the count:\n${found.join("\n")}`).toBe(sites);
+    }
+  });
+
+  it("catches every spelling of a literal one shifted or two raised to an index", () => {
+    for (const code of ["1 << i", "1u32 << i", "1u8<<i", "1i32 << i", "1i64 << n", "1_u8 << k", "1_u64 << k", "1usize << k", "(1 as u64) << k", "( 1 as i128 ) << k", "1n << BigInt(k)", "2 ** i"]) {
+      expect(SHIFT_OR_POW.test(code), code).toBe(true);
+    }
+    for (const code of ["value << 3", "x << 1", "11 << 2", "0x1 << 2", "12u32 << 2", "(2 as u64) << k", "2 ** 8", "a < b << c"]) {
+      expect(SHIFT_OR_POW.test(code), code).toBe(false);
     }
   });
 

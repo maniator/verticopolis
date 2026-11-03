@@ -46,6 +46,7 @@ export const SURFACES: Record<string, string[]> = {
     "src/presentation/",
     "src/game/",
     "src/ui/",
+    "src/catalog/",
   ],
   "Per-frame and periodic services": ["src/analytics*.ts", "src/audio/"],
   "App shell": [

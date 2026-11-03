@@ -1,6 +1,6 @@
 import { ECON, PRICED_KINDS } from "./econConfig";
 import { FACILITIES } from "./facilitiesData";
-import { rungFor } from "./catalogTypes";
+import { rungFor } from "../catalog/catalogTypes";
 
 /**
  * The Classic/Modern pricing split's SHAPE layer (gdd-classic-modern-pricing-
