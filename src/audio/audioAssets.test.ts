@@ -8,8 +8,9 @@ import { globCovers, readWorkboxGlob } from "../build/workboxGlob";
 /**
  * AUDIO_RUNTIME_FILES is what scripts/verify-precache.ts checks against the
  * service worker's manifest, so the offline PWA (#985) plays every sound only
- * if the list is complete. These tests fail when a sound file ships, or the
- * source names one, without being listed.
+ * if the list is complete. These tests fail when a sound file ships without
+ * being listed. That the engine fetches nothing the list lacks is
+ * audioFetches.test.ts, which runs the engine's start-up and records its loads.
  */
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(HERE, "..");
@@ -30,25 +31,6 @@ describe("AUDIO_RUNTIME_FILES", () => {
       .map((f) => `audio/${f}`)
       .sort();
     expect([...AUDIO_RUNTIME_FILES].sort()).toEqual(shipped);
-  });
-
-  it("covers every audio file path the source names, and the source builds none", () => {
-    const named = new Set<string>();
-    const built: string[] = [];
-    for (const f of filesUnder(SRC)) {
-      if (!/\.tsx?$/.test(f) || /\.test\.tsx?$/.test(f) || f === "audio/audioAssets.ts" || f.endsWith(".d.ts")) continue;
-      const text = readFileSync(resolve(SRC, f), "utf8");
-      // A module import ("./audio/x.json") is bundled, never fetched; skip it.
-      for (const m of text.matchAll(/(?<!\.\/|\.\.\/)audio\/[\w./-]+\.(?:mp3|ogg|wav|m4a|flac|aac|opus|webm|json)\b/gi)) named.add(m[0]);
-      // A path assembled at run time (`${base}audio/${name}.mp3`, or
-      // "audio/" + name) can't be checked against the list; name the file in
-      // audioAssets.ts instead. Paths spread over constants or `new URL` are
-      // beyond a text scan; the src/public/audio/ test above still covers
-      // every file shipped there.
-      if (/`[^`]*audio\/[^`]*\$\{[^`]*`|["']audio\/["']\s*\+/.test(text)) built.push(f);
-    }
-    expect([...named].filter((p) => !AUDIO_RUNTIME_FILES.includes(p))).toEqual([]);
-    expect(built).toEqual([]);
   });
 
   it("holds only file types the workbox glob precaches", () => {
