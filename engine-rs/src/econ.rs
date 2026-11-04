@@ -10,6 +10,15 @@ pub struct RentConfig {
     pub step: f64,
 }
 
+impl RentConfig {
+    /// Whether `price` is over the band's neutral price: the test the "rent
+    /// set too high" gripe and the over-market check on a tenant's notice
+    /// make, which the Map's High rent tier shares.
+    pub fn over_neutral(&self, price: f64) -> bool {
+        price > self.default
+    }
+}
+
 const fn cfg(default: f64, min: f64, max: f64, step: f64) -> RentConfig {
     RentConfig {
         default,

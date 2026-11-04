@@ -9,6 +9,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use super::room_tiers::carries_evaluation;
 use crate::facilities::{Kind, MAX_FLOOR, MIN_FLOOR};
 use crate::sim::Simulation;
 use crate::tower::UnitState;
@@ -204,13 +205,12 @@ impl Simulation {
         out
     }
 
+    /// One cell per room that carries an evaluation, the rooms the Map's
+    /// Eval view colors (`room_tiers`).
     fn satisfaction_cells(&self) -> Vec<HeatCell> {
         self.tower
             .room_units()
-            .filter(|u| {
-                let rentable = u.kind.facility().population > 0 || u.kind.is_hotel();
-                rentable && u.is_present()
-            })
+            .filter(|u| carries_evaluation(u))
             .map(|u| cell(u.floor, u.x, u.x + u.width - 1, 1.0 - u.satisfaction, None))
             .collect()
     }

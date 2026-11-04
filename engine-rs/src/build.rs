@@ -224,7 +224,7 @@ impl Simulation {
             if self.mode == GameMode::Classic {
                 if let Some(ladder) = crate::econ::classic_ladder(kind) {
                     let cfg = crate::econ::rent_config(kind).unwrap();
-                    let v = ladder[2];
+                    let v = ladder[crate::rent::AVERAGE_RUNG];
                     self.tower.get_unit_mut(id).unwrap().rent =
                         if v == cfg.default { None } else { Some(v) };
                 }

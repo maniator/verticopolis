@@ -24,6 +24,7 @@ pub mod heatmap;
 pub mod income;
 pub mod onboarding;
 pub mod progress;
+pub mod room_tiers;
 pub mod stats;
 pub mod unit_detail;
 
@@ -33,3 +34,5 @@ mod tests;
 mod tests_gates;
 #[cfg(test)]
 mod tests_overlays;
+#[cfg(test)]
+mod tests_room_tiers;

@@ -297,7 +297,7 @@ pub struct Rung {
     pub value: f64,
 }
 
-const RUNG_LABELS: [&str; 4] = ["Very Low", "Low", "Average", "High"];
+pub(crate) const RUNG_LABELS: [&str; 4] = ["Very Low", "Low", "Average", "High"];
 
 /// The key each of [`POOLED_CAPS`] goes by, in its order.
 const POOL_KEYS: [&str; 2] = ["elevators", "walkways"];
@@ -350,7 +350,7 @@ fn rent_for(mode: GameMode, kind: Kind) -> Option<Rent> {
     match mode {
         GameMode::Classic => classic_ladder(kind).map(|values| Rent::Ladder {
             cadence: rent_cadence(kind),
-            default: values[2],
+            default: values[crate::rent::AVERAGE_RUNG],
             rungs: values
                 .iter()
                 .enumerate()

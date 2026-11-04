@@ -170,7 +170,7 @@ pub(crate) fn assemble(
             let cfg = rent_config(u.kind).unwrap();
             let effective = u.rent.unwrap_or(cfg.default);
             let snapped = match u.rent {
-                None => ladder[2],
+                None => ladder[crate::rent::AVERAGE_RUNG],
                 Some(r) => snap_to_ladder(&ladder, r),
             };
             if !u.no_rate && snapped != effective {

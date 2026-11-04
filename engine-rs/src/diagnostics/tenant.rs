@@ -13,7 +13,7 @@ use crate::economy::commercial_daily_income;
 use crate::facilities::{is_sky_lobby_floor, Kind, LOBBY_INTERVAL, MAX_FLOOR};
 use crate::presence::CongestionAttribution;
 use crate::satisfaction::{
-    StepResult, GRIPE_WARN, SERVED_RECOVERY, TRANSPORT_FAR_TILES, VACATE_RESCIND,
+    names_gripe, StepResult, GRIPE_WARN, SERVED_RECOVERY, TRANSPORT_FAR_TILES, VACATE_RESCIND,
 };
 use crate::sim::Simulation;
 use crate::tower::{Tower, Unit, UnitState};
@@ -186,7 +186,7 @@ impl Simulation {
         }
         if u.is_present()
             && u.state != UnitState::Vacating
-            && u.satisfaction <= GRIPE_WARN
+            && names_gripe(u.satisfaction)
             && (k == Kind::Office
                 || k == Kind::Condo
                 || k.is_lease_amenity()

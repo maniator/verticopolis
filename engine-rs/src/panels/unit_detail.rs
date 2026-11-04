@@ -9,11 +9,9 @@ use serde_json::{json, Value};
 use crate::clock::GameMode;
 use crate::econ::{classic_ladder, rent_config};
 use crate::facilities::Kind;
+use crate::rent::AVERAGE_RUNG;
 use crate::sim::Simulation;
 use crate::tower::Unit;
-
-/// The Average rung of a Classic price ladder (the ladder has four rungs).
-const AVERAGE_RUNG: usize = 2;
 
 /// The default price in the tower's catalog (`catalogFacility(catalog, kind)
 /// .rent.default`): the Average rung in Classic, the band's default in Modern.
