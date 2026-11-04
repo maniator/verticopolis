@@ -167,4 +167,6 @@ code, not as a substitute for the script run with the API key.
 - `$exception` origin classification and the "no data" reading for builds
   with no eligible sessions: #1090.
 - Derived coverage and recovery outcome: `scripts/reliability-coverage.mjs`
-  (#1623). The dashboard status card is still open under #1623.
+  (#1623). The dashboard carries a hand-made status card (not provisioned,
+  since provisioning writes insights only); its wording follows this page, so
+  edit the card when this page changes.

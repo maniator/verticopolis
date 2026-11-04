@@ -189,6 +189,13 @@ export class FrameEncoder {
     const h = L.header;
     const counts = sim.events.counts;
     v[h.minutes] = sim.clock.minutes;
+    v[h.day] = sim.clock.day;
+    v[h.dayOfWeek] = sim.clock.dayOfWeek;
+    v[h.isWeekend] = sim.clock.isWeekend ? 1 : 0;
+    v[h.quarter] = sim.clock.quarter;
+    v[h.year] = sim.clock.year;
+    v[h.weekDays] = sim.clock.calendar.weekDays;
+    v[h.weekendDays] = sim.clock.calendar.weekendDays;
     v[h.towerRevision] = tower.revision;
     v[h.metaRevision] = meta.revision;
     v[h.mealOverlayRevision] = tower.mealOverlayRevision;

@@ -3,7 +3,7 @@ import type { Catalog } from "../../catalog/catalogTypes";
 import { iconTemplate } from "../icons";
 import { LEDGER_CATS, LEDGER_LABELS, MILESTONE_COPY } from "../../presentation/statsCopy";
 import { floorTag } from "../format";
-import { clockOf, rulesOf } from "../../simport/headerClock";
+import { clockOf, rulesOf, type ClockHeader } from "../../simport/headerClock";
 import type { ElevatorStatsRow, NextStarView, StarGateId, StatsReport } from "../../simport/panels";
 import type { HeaderView } from "../../simport/view";
 
@@ -29,7 +29,7 @@ import type { HeaderView } from "../../simport/view";
 export interface StatsScreen {
   readonly report: StatsReport;
   /** The header fields the screen reads: the date and the rule set. */
-  readonly header: Pick<HeaderView, "minutes" | "mode" | "modernCalendar">;
+  readonly header: ClockHeader & Pick<HeaderView, "mode">;
   readonly towerName: string;
   readonly catalog: Catalog;
 }

@@ -132,7 +132,7 @@ export function makeApp(sim: SimShape) {
   };
   const reader = {
     update: vi.fn(),
-    header: { minutes: 420, mode: "modern", modernCalendar: "realWorld" },
+    header: { minutes: 420, mode: "modern", modernCalendar: "realWorld", day: 0, dayOfWeek: 0, isWeekend: false, quarter: 0, year: 0, weekDays: 7, weekendDays: 2 },
     tower: { towerName: "Fake" },
   };
   let tower = sim;

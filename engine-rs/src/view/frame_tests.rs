@@ -94,6 +94,13 @@ fn the_named_slots_read_their_values() {
         (ROOMS, n),
         (PEOPLE, sim.crowd.people.len() as f64),
         (TRANSPORTS, sim.tower.transports.len() as f64),
+        (DAY, 0.0),
+        (DAY_OF_WEEK, 0.0),
+        (IS_WEEKEND, 0.0),
+        (QUARTER, 0.0),
+        (YEAR, 0.0),
+        (WEEK_DAYS, sim.clock.calendar.week_days as f64),
+        (WEEKEND_DAYS, sim.clock.calendar.weekend_days as f64),
     ];
     let first = [
         (POPULATION, population),
@@ -306,4 +313,89 @@ fn the_towers_reader_is_one_per_engine() {
     assert_eq!(view_frame(&sim, true)[header::FULL], 1.0);
     let reloaded = crate::load::deserialize(&sim.serialize()).unwrap();
     assert_eq!(view_frame(&reloaded, false)[header::FULL], 1.0);
+}
+
+/// The clock slots read the engine's clock on the tower's calendar. The web
+/// checks the slots against the TypeScript clock in
+/// `src/simport/headerClock.test.ts` and the engine view integration test.
+#[test]
+fn the_clock_slots_follow_the_calendar() {
+    use crate::clock::{CANON, REAL_WORLD};
+    use header::*;
+    struct Row {
+        name: &'static str,
+        calendar: crate::clock::Calendar,
+        minutes: f64,
+        day: f64,
+        day_of_week: f64,
+        is_weekend: f64,
+        quarter: f64,
+        year: f64,
+    }
+    let rows = [
+        Row {
+            name: "canon, weekend slot",
+            calendar: CANON,
+            minutes: 3665.0,
+            day: 2.0,
+            day_of_week: 2.0,
+            is_weekend: 1.0,
+            quarter: 0.0,
+            year: 0.0,
+        },
+        Row {
+            name: "canon, year rollover",
+            calendar: CANON,
+            minutes: 17880.0,
+            day: 12.0,
+            day_of_week: 0.0,
+            is_weekend: 0.0,
+            quarter: 0.0,
+            year: 1.0,
+        },
+        Row {
+            name: "real world, first Saturday",
+            calendar: REAL_WORLD,
+            minutes: 7710.0,
+            day: 5.0,
+            day_of_week: 5.0,
+            is_weekend: 1.0,
+            quarter: 0.0,
+            year: 0.0,
+        },
+        Row {
+            name: "real world, second quarter",
+            calendar: REAL_WORLD,
+            minutes: 129660.0,
+            day: 90.0,
+            day_of_week: 6.0,
+            is_weekend: 1.0,
+            quarter: 1.0,
+            year: 0.0,
+        },
+    ];
+    for r in rows {
+        let mut sim = busy();
+        sim.clock = crate::clock::Clock::new(r.minutes, r.calendar);
+        let v = ViewReader::new().frame(&sim, false);
+        let got = [
+            v[DAY],
+            v[DAY_OF_WEEK],
+            v[IS_WEEKEND],
+            v[QUARTER],
+            v[YEAR],
+            v[WEEK_DAYS],
+            v[WEEKEND_DAYS],
+        ];
+        let want = [
+            r.day,
+            r.day_of_week,
+            r.is_weekend,
+            r.quarter,
+            r.year,
+            r.calendar.week_days as f64,
+            r.calendar.weekend_days as f64,
+        ];
+        assert_eq!(got, want, "{}", r.name);
+    }
 }

@@ -15,9 +15,13 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.12.0 (2026-11-04)
+
+- Two card verdicts now come from the engine. The `shaftCard` record gains a `nearCapacity` slot (1 when the shaft's average car load is above 85%, else 0; a shaft with no reading is 0), placed right after `utilization`, so the slots after it move up by one. A new read-only `recyclingDemandMet()` on the port and the binding answers whether the working recycling centers can process the whole population. The host used to compare the load with 0.85 and the population with the capacity itself. The transport detail the stats and inspector read also carries `nearCapacity`. The view layout is now version 11; the save and frame layouts and the catalog are unchanged.
+
 ## 1.11.0 (2026-11-03)
 
-- Two card verdicts now come from the engine. The `shaftCard` record gains a `nearCapacity` slot (1 when the shaft's average car load is above 85%, else 0; a shaft with no reading is 0), placed right after `utilization`, so the slots after it move up by one. A new read-only `recyclingDemandMet()` on the port and the binding answers whether the working recycling centers can process the whole population. The host used to compare the load with 0.85 and the population with the capacity itself. The transport detail the stats and inspector read also carries `nearCapacity`. The view layout is now version 10; the save and frame layouts and the catalog are unchanged.
+- The view's frame header (`VIEW_LAYOUT_VERSION` 10) gains seven slots after `transports`: `day`, `dayOfWeek`, `isWeekend` (0 or 1), `quarter` and `year`, all counted from 0 on the tower's calendar, then `weekDays` and `weekendDays`, the calendar's week and weekend lengths in days. A host shows dates from them and no longer does the date arithmetic itself. The header is 39 slots wide (it was 32), so every record after it moves; read the offsets from `viewLayout()`. No saved-game, catalog or rule change.
 
 ## 1.10.1 (2026-11-03)
 

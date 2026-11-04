@@ -193,7 +193,7 @@ function expectStructure(sim: Simulation, engine: Engine): Float64Array {
 describe.skipIf(!hasWasmPackage())("the engine view through the binding (#1213)", () => {
   it("hands over its layout by name, every slot named once", () => {
     const l = layout();
-    expect(l.version).toBe(10);
+    expect(l.version).toBe(11);
     const tables: [Slots, number][] = [
       [l.header, l.headerWidth], [l.person, l.personWidth], [l.unit, l.unitWidth],
       [l.transport, l.transportFixed], [l.car, l.carWidth], [l.structure, l.structureWidth],
@@ -236,6 +236,15 @@ describe.skipIf(!hasWasmPackage())("the engine view through the binding (#1213)"
       expect(f.h("frameSeq")).toBe(frames);
       expect(f.h("full")).toBe(full ? 1 : 0);
       expect(f.h("minutes")).toBe(sim.clock.minutes);
+      expect([f.h("day"), f.h("dayOfWeek"), f.h("isWeekend"), f.h("quarter"), f.h("year"), f.h("weekDays"), f.h("weekendDays")]).toEqual([
+        sim.clock.day,
+        sim.clock.dayOfWeek,
+        sim.clock.isWeekend ? 1 : 0,
+        sim.clock.quarter,
+        sim.clock.year,
+        sim.clock.calendar.weekDays,
+        sim.clock.calendar.weekendDays,
+      ]);
       expect(f.h("towerRevision")).toBe(sim.tower.revision);
       const metaNow = metaOf();
       const moved = [...metaNow].filter(([id, m]) => metaSent.get(id) !== m).map(([id]) => id);

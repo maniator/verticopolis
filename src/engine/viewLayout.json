@@ -1,5 +1,5 @@
 {
-  "version": 10,
+  "version": 11,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -32,9 +32,16 @@
     "frameSeq": 28,
     "people": 29,
     "units": 30,
-    "transports": 31
+    "transports": 31,
+    "day": 32,
+    "dayOfWeek": 33,
+    "isWeekend": 34,
+    "quarter": 35,
+    "year": 36,
+    "weekDays": 37,
+    "weekendDays": 38
   },
-  "headerWidth": 32,
+  "headerWidth": 39,
   "person": {
     "id": 0,
     "seed": 1,
