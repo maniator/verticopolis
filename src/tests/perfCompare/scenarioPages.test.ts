@@ -41,6 +41,12 @@ describe("the perf:compare runner", () => {
     expect(source).not.toMatch(/"timed passes boot"/);
   });
 
+  it("probes the CPU throttle on every frames page and keeps the least-throttled reading (#1165)", () => {
+    expect(source).toMatch(/if \(rate > 1\) await probe\(page, `frames-\$\{block\}:\$\{rate\}`\);/);
+    expect(source).not.toMatch(/sc === scenarios\[0\]/);
+    expect(source).toMatch(/\[key\]: Math\.min\(ms, run\.cpuProbe\?\.timed\[key\] \?\? ms\)/);
+  });
+
   it("gives each saved-tower start a fresh context, seeded at creation and closed whatever happens (#1254)", () => {
     const body = source.slice(source.indexOf("async function savedStarts("), source.indexOf("async function firstVisit("));
     expect(body).toMatch(/for \(const sc of opts\.scenarios\) \{[\s\S]*ctx = await newContext\(browser, opts\.config, "block", \(line\) => row\.contextLost\.push\(line\), autosaveState\(server\.url, seed\)\);/);
