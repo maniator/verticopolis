@@ -4,6 +4,7 @@ import type { TowerEngine } from "./TowerEngine";
 import { syncScene } from "./towerReconcile";
 import { markRegionUnit } from "./towerRegions";
 import { disposeScene } from "./towerScene";
+import { emptyStructPass } from "./towerStructTiles";
 
 // The scene sync's tile pass (floor and lobby cells of the structure TileMap)
 // draws from the layout, the lobby lighting and the sim alone. These tests pin
@@ -90,7 +91,7 @@ function fakeEngine(state: { units: UnitView[]; revision: number }) {
     entranceServiceGfx: ["service 0", "service 1"],
     floor1EntranceMap: new Map(),
     structTiles: new Set(),
-    structPass: { sim: null, units: null, revision: -1, lit: false },
+    structPass: emptyStructPass(),
     animatedRooms: new Map(),
     roomSig: new Map(),
     regionUnits: new Map(),
@@ -103,10 +104,25 @@ function fakeEngine(state: { units: UnitView[]; revision: number }) {
 }
 
 function tower(): { units: UnitView[]; revision: number } {
-  const units = [office];
+  const units = [{ ...office }];
   for (let x = 4; x < 8; x++) units.push(tile("lobby", 1, x));
   for (let x = 4; x < 8; x++) units.push(tile("floor", 2, x));
   return { units, revision: 5 };
+}
+
+/** Put a counting stand-in for the unit list in place before the first sync,
+ *  so the list keeps one identity, and return a reader of how many entries
+ *  have been read since the last reset. It counts every indexed read, so a
+ *  `for...of`, a `some`, a `filter` or an index loop over the list all show. */
+function countReads(state: { units: UnitView[] }): { reads: () => number; reset: () => void } {
+  let reads = 0;
+  state.units = new Proxy(state.units, {
+    get(target, key, receiver) {
+      if (typeof key === "string" && /^\d+$/.test(key)) reads++;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  return { reads: () => reads, reset: () => void (reads = 0) };
 }
 
 describe("the scene sync walks the structure tiles only when what they draw from moved", () => {
@@ -120,12 +136,16 @@ describe("the scene sync walks the structure tiles only when what they draw from
   });
 
   it("skips the tiles on an hour-only sync, and still repaints a room whose look changed", () => {
-    const { engine, getTile, cell } = fakeEngine(tower());
+    const state = tower();
+    const walked = countReads(state);
+    const { engine, getTile, cell } = fakeEngine(state);
     syncScene(engine);
     getTile.mockClear();
     vi.mocked(markRegionUnit).mockClear();
+    walked.reset();
     engine.d.hour = 10;
     syncScene(engine);
+    expect(walked.reads()).toBe(0);
     expect(getTile).not.toHaveBeenCalled();
     expect(markRegionUnit).toHaveBeenCalledTimes(1);
     expect(engine.roomSig.get(office.id)).toBe("hour 10");
@@ -134,14 +154,45 @@ describe("the scene sync walks the structure tiles only when what they draw from
     expect(cell(5, 1)?.gfx).toEqual(["grand-right 0"]);
   });
 
-  it("walks the tiles again when the lobby lights change", () => {
-    const { engine, getTile, cell } = fakeEngine(tower());
+  it("repaints only the kept lobby cells when the lobby lights change", () => {
+    const state = tower();
+    const walked = countReads(state);
+    const { engine, getTile, cell } = fakeEngine(state);
     syncScene(engine);
     getTile.mockClear();
+    walked.reset();
     engine.litState = true;
     syncScene(engine);
-    expect(getTile).toHaveBeenCalledTimes(8);
+    expect(walked.reads()).toBe(0);
+    expect(getTile).not.toHaveBeenCalled();
     expect(cell(4, 1)?.gfx).toEqual(["grand-left 1"]);
+    expect(cell(5, 1)?.gfx).toEqual(["grand-right 1"]);
+    expect(String(cell(6, 1)?.gfx[0])).toMatch(/^ground 1:/);
+    expect(cell(7, 1)?.gfx).toEqual(["service 1"]);
+    expect(cell(6, 2)?.gfx).toEqual(["floor"]);
+    // The lights going off again repaints the same cells back.
+    engine.litState = false;
+    syncScene(engine);
+    expect(cell(4, 1)?.gfx).toEqual(["grand-left 0"]);
+    expect(engine.structTiles.size).toBe(8);
+  });
+
+  it("walks only the kept rooms on a sync that skips the tiles, and reads their entries as patched in place", () => {
+    const state = tower();
+    const room = state.units[0] as { state: string };
+    const walked = countReads(state);
+    const { engine } = fakeEngine(state);
+    syncScene(engine);
+    expect(engine.d.staffed).toBe(true);
+    walked.reset();
+    // The view patches a room's state in place without a revision move.
+    room.state = "empty";
+    engine.d.hour = 10;
+    syncScene(engine);
+    // No read of the unit list at all, so the staffed flag came from the kept rooms.
+    expect(walked.reads()).toBe(0);
+    expect(engine.d.staffed).toBe(false);
+    expect(engine.roomSig.get(office.id)).toBe("hour 10");
   });
 
   it("walks the tiles again when the layout moves, and clears a removed tile", () => {
@@ -181,7 +232,7 @@ describe("the scene sync walks the structure tiles only when what they draw from
     syncScene(engine);
     disposeScene(engine);
     // The whole record resets, so the old view's unit list is not kept alive.
-    expect(engine.structPass).toEqual({ sim: null, units: null, revision: -1, lit: false });
+    expect(engine.structPass).toEqual(emptyStructPass());
     expect(cell(4, 1)?.gfx).toEqual([]);
     expect(engine.structTiles.size).toBe(0);
     getTile.mockClear();

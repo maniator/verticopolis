@@ -17,6 +17,7 @@ import {
 import { drawSanta } from "../sprites/events";
 import { CLOUD_COUNT, CLOUD_DRIFT, SUN_ARC, cloudFill, cloudMotion, cloudRadius, cloudSeed, drawCloud, drawSunDisc, skyColor } from "../sprites/sky";
 import { disposeRegions } from "./towerRegions";
+import { emptyStructPass } from "./towerStructTiles";
 import { clearLongPress } from "./longPress";
 import { SHIRTS } from "../pixelSprites";
 import { personFigure } from "../pixelSprites/common";
@@ -341,8 +342,8 @@ export function disposeScene(engine: TowerEngine): void {
   }
   engine.structTiles.clear();
   // The cells were just emptied, so the next sync must walk the tiles again
-  // (and the old view's unit list is not kept alive).
-  engine.structPass = { sim: null, units: null, revision: -1, lit: false };
+  // (and the old view's unit list, rooms and lobby cells are not kept alive).
+  engine.structPass = emptyStructPass();
   engine.animatedRooms.clear();
   engine.roomSig.clear();
   engine.transportActors.clear();
