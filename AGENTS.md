@@ -158,7 +158,11 @@ resolving review threads). On top of that, in an agent session:
   is clean, stop and ask the user instead of looping forever or merging solo.
   Copilot/Codex being offline never lowers the bar or unblocks merge; note it
   on the PR, re-request them, and resolve their threads as usual once they
-  return.
+  return. Whenever Copilot's review is down, every reviewer (any thread or
+  agent) also runs the stand-in review skill,
+  `.claude/skills/stand-in-pr-review/`, alongside the BMGD/BMAD skill. It
+  reports the review on the PR the way Copilot's does and never replaces the
+  BMGD/BMAD run.
 - **Bring in the agents relevant to the change** rather than reviewing solo:
   - **Cloud Dragonborn** (`gds-agent-game-architect`) / **Winston**
     (`bmad-agent-architect`) for engine, data-model, or structural changes;
