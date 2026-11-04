@@ -90,6 +90,12 @@ export function parkingUsage(sim: Simulation, spots: number): number {
   return Number.isFinite(spots) && spots > 0 ? sim.parkingUsage(spots) : 0;
 }
 
+/** The raw congestion ratio at `floor`, 0 for a floor that is not a whole
+ *  number (the Rust engine answers the same). */
+export function floorCongestion(sim: Simulation, floor: number): number {
+  return whole(floor) ? sim.congestionAt(floor) : 0;
+}
+
 /** Whether a walker can stand at `floor`, `x`; a position that is not a whole
  *  tile is not one. */
 export function positionReachable(sim: Simulation, floor: number, x: number): boolean {

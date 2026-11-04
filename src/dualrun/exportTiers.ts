@@ -234,6 +234,8 @@ export const BINDING_EXPORT_TIERS = {
   // Tier 2, the port's render queries (facade slice 7, PR 5b): what the
   // renderer reads beyond the view frame, per frame or per scene sync.
   congestion: T2,
+  // A test and tooling read (one pass over the rooms), not a per-frame one.
+  floorCongestion: T2,
   queueView: T2,
   parkingSet: T2,
   parkingUsage: T2,

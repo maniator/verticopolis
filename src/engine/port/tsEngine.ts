@@ -437,6 +437,7 @@ export class TsEngine implements PortState {
   unitCard = (id: number) => ask.unitCard(this.current, id);
   shaftCard = (id: number) => ask.shaftCard(this.current, id);
   congestion = () => draw.congestion(this.current);
+  floorCongestion = (floor: number) => draw.floorCongestion(this.current, floor);
   queueView = () => draw.queueView(this.current);
   parkingSet = () => draw.parkingSet(this.current);
   parkingUsage = (spots: number) => draw.parkingUsage(this.current, spots);

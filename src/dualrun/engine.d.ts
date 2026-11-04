@@ -168,6 +168,12 @@ export class Engine {
     fires(): number;
     flipAutoBridge(): Float64Array;
     /**
+     * The raw congestion ratio of one floor (0 for a floor with no reading
+     * or one that is not a whole number): the value `hotspot` takes its peak
+     * from.
+     */
+    floorCongestion(floor: number): number;
+    /**
      * `floorHeatmap(mode)`'s cells as JSON; a mode that is not one of the
      * four overlays is an error.
      */

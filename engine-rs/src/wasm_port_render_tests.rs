@@ -268,3 +268,40 @@ fn reachability_takes_whole_tiles() {
         assert!(!e.port_position_reachable(floor, x), "{floor} {x}");
     }
 }
+
+/// `floorCongestion` is the spatial map's reading for one floor, the value
+/// `hotspot` takes its peak from; a floor with no reading and a floor that is
+/// not a whole number read 0.
+#[test]
+fn a_floors_congestion_is_its_spatial_reading() {
+    let mut e = built();
+    let office = e
+        .sim
+        .tower
+        .units
+        .iter()
+        .find(|u| u.kind == Kind::Office)
+        .unwrap()
+        .id;
+    let (u, at) = e.sim.tower.marked_by_id(office).unwrap();
+    u.set_state(at, UnitState::Vacating);
+    let map = e.sim.spatial_congestion_by_floor();
+    let peak = e.sim.peak_congestion();
+    assert!(peak.0 > 0.0, "a present tenant loads the shaft");
+    let mut top = 0.0_f64;
+    for (&floor, &ratio) in &map {
+        assert_eq!(
+            e.port_floor_congestion(floor as f64).to_bits(),
+            ratio.to_bits()
+        );
+        top = top.max(ratio);
+    }
+    assert_eq!(top.to_bits(), peak.0.to_bits());
+    assert_eq!(
+        e.port_floor_congestion(peak.1.unwrap() as f64).to_bits(),
+        e.port_hotspot()[0].to_bits()
+    );
+    for floor in [9999.0, -40.0, 2.5, f64::NAN, f64::INFINITY] {
+        assert_eq!(e.port_floor_congestion(floor), 0.0, "{floor}");
+    }
+}
