@@ -360,6 +360,14 @@ export function describeEngines(name: string, body: (leg: Leg) => void): void {
   }
 }
 
-function releaseAll(): void {
+/** The engine a test that does not compare engines uses: Rust when the
+ *  package is built, else the TypeScript fallback. */
+export function defaultLeg(): Leg {
+  return hasWasmPackage() ? "rust" : "ts";
+}
+
+/** Free every engine the kit started. A test that makes engines outside
+ *  {@link describeEngines} calls it from an `afterEach`. */
+export function releaseAll(): void {
   for (const sim of [...live]) sim.release();
 }
