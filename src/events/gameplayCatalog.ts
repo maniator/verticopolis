@@ -1,7 +1,7 @@
 /**
  * The gameplay event catalog (`conformance/events/catalog.json`) as data:
  * its shape, the payload rule both engines hold it to, a check for one
- * drained event, and the renderer that writes `src/engine/gameplayEvents.d.ts`
+ * drained event, and the renderer that writes `src/events/gameplayEvents.d.ts`
  * from it (`npm run gen:events`, and `npm run wasm:build`). The Rust twin is
  * `engine-rs/src/gameplay.rs` (`check_catalog`, `check_event`). Pure: no file
  * access here, so the script and the tests hand it the parsed catalog.
@@ -169,11 +169,11 @@ function doc(text: string, indent: string): string {
   return [`${indent}/**`, ...lines.map((l) => `${indent} * ${l}`), `${indent} */`].join("\n");
 }
 
-/** The text of `src/engine/gameplayEvents.d.ts` for a checked catalog. */
+/** The text of `src/events/gameplayEvents.d.ts` for a checked catalog. */
 export function renderGameplayEventsDts(catalog: GameplayCatalog): string {
   const out: string[] = [
     "// Generated from conformance/events/catalog.json by `npm run gen:events`.",
-    "// Do not edit: change the catalog and regenerate (src/engine/gameplayCatalog.test.ts fails while this is stale).",
+    "// Do not edit: change the catalog and regenerate (src/events/gameplayCatalog.test.ts fails while this is stale).",
     "",
     doc(catalog.about, ""),
     `export type GameplayCatalogVersion = ${catalog.catalogVersion};`,
@@ -207,7 +207,7 @@ export function renderGameplayEventsDts(catalog: GameplayCatalog): string {
   return out.join("\n");
 }
 
-/** The text of `src/engine/gameplayEventRules.ts` for a checked catalog: the
+/** The text of `src/events/gameplayEventRules.ts` for a checked catalog: the
  *  rules {@link checkEvent} needs at runtime, so the shipped bridge checks
  *  every drained event against the same catalog the engines are held to. */
 export function renderGameplayEventRules(catalog: GameplayCatalog): string {
@@ -220,7 +220,7 @@ export function renderGameplayEventRules(catalog: GameplayCatalog): string {
   });
   return [
     "// Generated from conformance/events/catalog.json by `npm run gen:events`.",
-    "// Do not edit: change the catalog and regenerate (src/engine/gameplayCatalog.test.ts fails while this is stale).",
+    "// Do not edit: change the catalog and regenerate (src/events/gameplayCatalog.test.ts fails while this is stale).",
     'import type { GameplayEventRules } from "./gameplayCatalog";',
     "",
     "/** The catalog's enums and payload fields, without its prose: what the",

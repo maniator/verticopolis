@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MAX_CARS } from "../../engine/facilities";
 
 const CAR_LIMIT = MAX_CARS.elevatorStandard!;
-import type { GameplayEvent } from "../../engine/gameplayEvents";
+import type { GameplayEvent } from "../../events/gameplayEvents";
 import { Simulation } from "../../engine/Simulation";
 import { attachWasmHost, type WasmHost } from "../../wasmhost/wasmHost";
 import { DualRun } from "../dualrun/dualRunHarness";

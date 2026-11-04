@@ -1,6 +1,6 @@
-import type { GameplayEvent, GameplayEventName, GameplayEventPayloads } from "./gameplayEvents";
+import type { GameplayEvent, GameplayEventName, GameplayEventPayloads } from "../events/gameplayEvents";
 
-export type { GameplayEvent } from "./gameplayEvents";
+export type { GameplayEvent } from "../events/gameplayEvents";
 
 /**
  * The drain buffer of gameplay events (`conformance/events/catalog.json`):

@@ -24,7 +24,6 @@
 # the 17 that import only the catalog handle, plus src/main.ts, src/gallery.ts,
 # src/preview.ts and src/analyticsEngineBridge.ts. src/presentation/ and
 # src/audio/ import the engine for types only; the scan keeps them that way.
-src/analyticsEngineBridge.ts gameplayCatalog gameplayEventRules
 src/catalog/towerCatalog.ts catalog # the default source for a tower that has none set; it goes with the TypeScript engine's tables
 src/game/appHistory.ts UndoHistory # moved from src/main.ts with the app's undo history (#874): no new engine import
 src/game/facilityDiagnostics.ts EconomySystem Simulation residentialRentals sim/constants sim/gripe types

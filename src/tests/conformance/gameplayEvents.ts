@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkCatalog, checkEvent } from "../../engine/gameplayCatalog";
+import { checkCatalog, checkEvent } from "../../events/gameplayCatalog";
 import type { ScenarioEngine } from "./scenario";
 
 /**

@@ -1,5 +1,5 @@
 // Generated from conformance/events/catalog.json by `npm run gen:events`.
-// Do not edit: change the catalog and regenerate (src/engine/gameplayCatalog.test.ts fails while this is stale).
+// Do not edit: change the catalog and regenerate (src/events/gameplayCatalog.test.ts fails while this is stale).
 
 /**
  * The gameplay events the engine emits, one entry per event. This file is the

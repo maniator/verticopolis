@@ -21,7 +21,7 @@ coverage/
 !src/dualrun/engine.d.ts
 # The gameplay event types, generated from conformance/events/catalog.json
 # by gen:events (and wasm:build) and checked in.
-!src/engine/gameplayEvents.d.ts
+!src/events/gameplayEvents.d.ts
 *.js
 !dist/*.js
 !eslint.config.js

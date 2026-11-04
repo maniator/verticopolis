@@ -130,9 +130,7 @@ src/engine/scheduleOrigins.ts
 
 # Shared utilities and event plumbing
 src/engine/census.ts
-src/engine/gameplayCatalog.ts
 src/engine/gameplayEventBuffer.ts
-src/engine/gameplayEventRules.ts
 src/engine/rng.ts
 src/engine/types.ts
 

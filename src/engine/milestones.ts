@@ -2,7 +2,7 @@ import type { Simulation } from "./Simulation";
 import type { Unit } from "./types";
 import { isTenanted } from "./types";
 import { FACILITIES, isHotelKind } from "./facilities";
-import type { GameplayMilestoneId } from "./gameplayEvents";
+import type { GameplayMilestoneId } from "../events/gameplayEvents";
 
 /** An above-ground, currently-occupied, population-bearing tenant unit — the
  *  shared "a real resident/worker/guest lives here" test used by both the

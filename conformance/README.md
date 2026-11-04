@@ -323,7 +323,7 @@ Labels are unique within a scenario. Each checkpoint records three hashes:
   `events/catalog.json` defines every event, its payload (closed enums and
   small integers only, no free text or money) and when it fires;
   `engine-rs/src/gameplay.rs` holds the Rust type to it and
-  `src/engine/gameplayEvents.d.ts` is generated from it (`npm run
+  `src/events/gameplayEvents.d.ts` is generated from it (`npm run
   gen:events`). The events never enter the save or the other two views, and
   emitting them draws no randomness, so adding an event moves only this hash.
 

@@ -1,7 +1,7 @@
 import { LOG_RING_CAP } from "../engine/sim/constants";
 import { Simulation } from "../engine/Simulation";
 import type { LogEntry } from "../engine/types";
-import type { GameplayEvent } from "../engine/gameplayEvents";
+import type { GameplayEvent } from "../events/gameplayEvents";
 import type { WasmEngine, WasmModule } from "../dualrun/binding";
 import { readCatalog } from "../dualrun/catalog";
 import { loadCommand, relayCommands } from "../dualrun/mirror";

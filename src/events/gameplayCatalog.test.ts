@@ -3,11 +3,11 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { FACILITIES, GRID } from "./facilitiesData";
-import { MILESTONES } from "./milestones";
+import { FACILITIES, GRID } from "../engine/facilitiesData";
+import { MILESTONES } from "../engine/milestones";
 import { checkCatalog, checkEvent, renderGameplayEventRules, renderGameplayEventsDts, type GameplayCatalog } from "./gameplayCatalog";
 import { GAMEPLAY_EVENT_RULES } from "./gameplayEventRules";
-import type { FacilityKind, GameMode } from "./types";
+import type { FacilityKind, GameMode } from "../engine/types";
 import type { GameplayFacilityKind, GameplayMilestoneId, GameplayMode } from "./gameplayEvents";
 
 /**
@@ -119,12 +119,12 @@ describe("gameplay event catalog", () => {
   });
 
   it("generates the committed gameplayEvents.d.ts (run npm run gen:events when this fails)", () => {
-    const committed = readFileSync(resolve(root, "src/engine/gameplayEvents.d.ts"), "utf8");
+    const committed = readFileSync(resolve(root, "src/events/gameplayEvents.d.ts"), "utf8");
     expect(committed).toBe(renderGameplayEventsDts(catalog));
   });
 
   it("generates the committed gameplayEventRules.ts (run npm run gen:events when this fails)", () => {
-    const committed = readFileSync(resolve(root, "src/engine/gameplayEventRules.ts"), "utf8");
+    const committed = readFileSync(resolve(root, "src/events/gameplayEventRules.ts"), "utf8");
     expect(committed).toBe(renderGameplayEventRules(catalog));
     // The shipped rules judge every event the same way the full catalog does.
     expect(() => checkEvent(GAMEPLAY_EVENT_RULES, { name: "star_reached", payload: { star: 3 } })).not.toThrow();

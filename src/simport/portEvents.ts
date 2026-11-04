@@ -1,5 +1,5 @@
 import type { GameplayEventSource } from "../analyticsEngineBridge";
-import type { GameplayEvent } from "../engine/gameplayEvents";
+import type { GameplayEvent } from "../events/gameplayEvents";
 import type { EnginePort } from "./enginePort";
 
 /**
