@@ -191,7 +191,7 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       expect(exitCode(base, { "src/a.ts": "b" }, "none")).toBe(1);
     });
 
-    it("builds when Vercel's previous deploy is not in the clone", () => {
+    it("builds when Vercel's previous deploy is not in the clone and is not on GitHub", () => {
       const root = mkdtempSync(join(tmpdir(), "vc-ignore-build-"));
       roots.push(root);
       git(root, "init", "-q");
@@ -200,8 +200,76 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
         git(root, "add", "-A");
         git(root, "commit", "-q", "-m", "c");
       }
-      const env = { ...process.env, VERCEL_GIT_PREVIOUS_SHA: "0123456789012345678901234567890123456789" };
+      const env = { ...process.env, VERCEL_GIT_PROVIDER: "", VERCEL_GIT_PREVIOUS_SHA: "0123456789012345678901234567890123456789" };
       expect(spawnSync("bash", [SCRIPT], { cwd: root, env, encoding: "utf8" }).status).toBe(1);
+    });
+
+    /** A force-pushed branch: the "GitHub" repo holds the base commit, the old
+     *  tip Vercel last deployed (no longer on any branch) and the rewritten tip
+     *  with `rewritten` applied to the base. Vercel's clone is a depth-1 copy
+     *  of the new tip, so the old tip is missing from it. The script's GitHub
+     *  URL is pointed at the local repo through git's url.insteadOf. Runs the
+     *  script with the old tip (or `previous`) as the previous deploy. */
+    function forcePushed(rewritten: Record<string, string>, previous?: string | ((oldTip: string) => string)): { status: number | null; stdout: string } {
+      const github = mkdtempSync(join(tmpdir(), "vc-ignore-build-gh-"));
+      const clone = mkdtempSync(join(tmpdir(), "vc-ignore-build-clone-"));
+      roots.push(github, clone);
+      git(github, "init", "-q", "-b", "topic");
+      git(github, "config", "uploadpack.allowFilter", "true");
+      git(github, "config", "uploadpack.allowAnySHA1InWant", "true");
+      const commit = (files: Record<string, string>): string => {
+        for (const [name, text] of Object.entries(files)) {
+          mkdirSync(dirname(join(github, name)), { recursive: true });
+          writeFileSync(join(github, name), text);
+        }
+        git(github, "add", "-A");
+        git(github, "commit", "-q", "-m", "c");
+        return git(github, "rev-parse", "HEAD");
+      };
+      const first = commit({ "src/a.ts": "a", "docs/a.md": "a" });
+      const oldTip = commit({ "docs/a.md": "b" });
+      git(github, "reset", "-q", "--hard", first);
+      commit(rewritten);
+      git(clone, "clone", "-q", "--depth=1", "--branch", "topic", `file://${github}`, ".");
+      const env = {
+        ...process.env,
+        VERCEL_GIT_PREVIOUS_SHA: typeof previous === "function" ? previous(oldTip) : (previous ?? oldTip),
+        VERCEL_GIT_PROVIDER: "github",
+        VERCEL_GIT_REPO_OWNER: "owner",
+        VERCEL_GIT_REPO_SLUG: "repo",
+        GIT_CONFIG_COUNT: "1",
+        GIT_CONFIG_KEY_0: `url.file://${github}.insteadOf`,
+        GIT_CONFIG_VALUE_0: "https://github.com/owner/repo.git",
+      };
+      const run = spawnSync("bash", [SCRIPT], { cwd: clone, env, encoding: "utf8" });
+      return { status: run.status, stdout: run.stdout };
+    }
+
+    it("fetches a previous deploy that a force-push left outside the clone", () => {
+      const docsOnly = forcePushed({ "docs/a.md": "c" });
+      expect(docsOnly.status).toBe(0);
+      expect(docsOnly.stdout).toContain("fetched previous deploy");
+      const appChange = forcePushed({ "docs/a.md": "c", "src/a.ts": "b" });
+      expect(appChange.status).toBe(1);
+      expect(appChange.stdout).toContain("fetched previous deploy");
+      expect(appChange.stdout).toContain("src/a.ts changed");
+      expect(forcePushed({ "docs/a.md": "c" }, (oldTip) => oldTip.toUpperCase()).status).toBe(0);
+    });
+
+    it("builds when the previous deploy cannot be fetched", () => {
+      const unknown = forcePushed({ "docs/a.md": "c" }, "0123456789012345678901234567890123456789");
+      expect(unknown.status).toBe(1);
+      expect(unknown.stdout).toContain("could not be fetched");
+    });
+
+    it("builds without running git on a previous deploy that is not a full SHA", () => {
+      expect(forcePushed({ "docs/a.md": "c" }, "HEAD").status).toBe(1);
+      const marker = join(tmpdir(), `vc-ignore-build-marker-${process.pid}`);
+      roots.push(marker);
+      const injected = forcePushed({ "docs/a.md": "c" }, `--upload-pack=touch ${marker}`);
+      expect(injected.status).toBe(1);
+      expect(injected.stdout).toContain("not a full commit SHA");
+      expect(existsSync(marker)).toBe(false);
     });
 
     it("builds when there is nothing to diff against", () => {
