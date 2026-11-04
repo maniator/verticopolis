@@ -2,7 +2,7 @@
 //! changes anything. The steps apply one after another, so the tower a step
 //! meets is the one its edit left, moved on only by time; a step that finds
 //! anything else (an edit made outside every gesture) is refused, so its
-//! cash never moves for an edit that is not there to reverse, and nothing it
+//! cash never moves for an edit that is not there to reverse, nothing it
 //! puts back lands on a room or a shaft that took its place, hangs where its
 //! floor was taken away, sits on a lobby or below the metro, or goes past a
 //! cap its build kept to (`sim_undo_ground.rs`). Nor does a
@@ -21,13 +21,12 @@
 //! for treasure is never undone: the dig and its luck stay, so the search
 //! would cost nothing.
 #![cfg_attr(not(feature = "wasm"), allow(dead_code))]
-use std::collections::HashSet;
-
+use crate::crowd::fasthash::FastSet;
 use crate::facilities::{build_cap, Kind, FACILITIES, POOLED_CAPS};
 use crate::sim::Simulation;
 use crate::sim_undo_ground::Ground;
 use crate::tower::{Tower, Transport, Unit, UnitState};
-use crate::undo::{Step, TransportChange, UnitChange, UnitUse};
+use crate::undo::{puts_back, Step, TransportChange, UnitChange, UnitFacts, UnitUse};
 
 /// Why a step was not applied. Nothing changed. `sellable` says the player
 /// can sell the build instead, which a Classic permanent room and a lobby
@@ -125,7 +124,7 @@ impl Simulation {
             let sellable = self.sells_what_it_takes(step);
             found.add(StepRefused::SearchedForTreasure { sellable });
         }
-        let leaving_units: HashSet<i64> = step
+        let leaving_units: FastSet<i64> = step
             .units
             .iter()
             .filter(|img| matches!(img.change, UnitChange::TakeOut(_)))
@@ -152,8 +151,8 @@ impl Simulation {
                         found.add(StepRefused::Blocked);
                     }
                 }
-                (UnitChange::Restore(want), Some(now)) => {
-                    if reprices_a_sold_condo(now, want) {
+                (UnitChange::Restore { want, left }, Some(now)) => {
+                    if reprices_a_sold_condo(now, want, left) {
                         found.add(StepRefused::PriceFixed);
                     }
                 }
@@ -216,13 +215,11 @@ impl Simulation {
     /// Check the shafts a step names, and the shafts it leaves standing on
     /// the floor and lobby tiles it takes out.
     fn check_shafts(&self, found: &mut Found, step: &Step, ground: &Ground, hour_passed: bool) {
-        let named: HashSet<i64> = step.transports.iter().map(|img| img.id).collect();
-        let leaving_shafts: HashSet<i64> = step
-            .transports
-            .iter()
-            .filter(|img| matches!(img.change, TransportChange::TakeOut { .. }))
-            .map(|img| img.id)
-            .collect();
+        // The shafts the step names. Each one's image is a shaft as it stood
+        // beside the others when the step was made, so they never clash
+        // with each other: one shrunk by the step makes room for another it
+        // puts back.
+        let named: FastSet<i64> = step.transports.iter().map(|img| img.id).collect();
         // A shaft the step puts back or gives its old span needs floor in
         // its column on each story of that span and no other shaft there,
         // as building it did.
@@ -232,7 +229,7 @@ impl Simulation {
                     .tower
                     .transports
                     .iter()
-                    .filter(|t| t.id != want.id && !leaving_shafts.contains(&t.id))
+                    .filter(|t| !named.contains(&t.id))
                     .all(|t| !t.clashes_with(want))
         };
         for img in &step.transports {
@@ -304,12 +301,14 @@ fn ridden_since(now: Option<&Transport>, change: &TransportChange) -> bool {
     now.is_some_and(|now| now.rides != left.rides)
 }
 
-/// Whether restoring `want` onto `now` would change the price of a condo
-/// that has sold, which `price_unit` and `set_no_rate` (`rent.rs`) refuse.
-fn reprices_a_sold_condo(now: &Unit, want: &Unit) -> bool {
+/// Whether restoring `want` (where the edit left `left`) onto `now` would
+/// change the price of a condo that has sold, which `price_unit` and
+/// `set_no_rate` (`rent.rs`) refuse.
+fn reprices_a_sold_condo(now: &Unit, want: &UnitFacts, left: &UnitFacts) -> bool {
     now.kind == Kind::Condo
         && now.ever_occupied
-        && (now.rent != want.rent || now.no_rate != want.no_rate)
+        && (puts_back(&want.rent, &left.rent, &now.rent)
+            || puts_back(&want.no_rate, &left.no_rate, &now.no_rate))
 }
 
 /// A cap a step can take the tower up against: one kind's own (`build_cap`)
@@ -349,7 +348,7 @@ fn kinds_added(tower: &Tower, step: &Step) -> Vec<i64> {
                     added[u.kind as usize] -= 1;
                 }
             }
-            UnitChange::Restore(_) => {}
+            UnitChange::Restore { .. } => {}
         }
     }
     for img in &step.transports {

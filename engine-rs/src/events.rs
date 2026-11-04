@@ -139,9 +139,11 @@ impl Simulation {
         }
     }
 
-    /// `resolveChoice(option)`: `accept` is true. The player's answer.
+    /// `resolveChoice(option)`: `accept` is true. The player's answer, which
+    /// is no edit: a fire or a bomb it lets loose is time's doing, so it runs
+    /// outside a gesture the player has open (`sim_undo.rs`).
     pub fn resolve_choice(&mut self, accept: bool) {
-        self.resolve_choice_from(accept, EmergencySource::Player);
+        self.outside_the_gesture(|s| s.resolve_choice_from(accept, EmergencySource::Player));
     }
 
     /// `EventSystem.resolveChoice(option, source)`: the daily roll's

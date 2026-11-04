@@ -173,6 +173,10 @@ export const UNDO_NOTHING_TO_STEP = 2;
 /** The status of a step the engine refused; `lastReason()` says why. */
 export const UNDO_REFUSED = 0;
 
+/** The status of a step the engine took: the tower changed and the
+ *  generation moved, as after a done swap, so the host follows it. */
+export const UNDO_DONE = 1;
+
 /** Time, lifecycle and saves (contract section 2). */
 export interface EnginePortLifecycle {
   /** The frame loop's step; `dtMinutes` is a finite real, 0 or more. */
@@ -209,8 +213,10 @@ export interface EnginePortLifecycle {
   undoSignature(): string;
   /** The engine keeps the undo and redo steps of the tower it runs. A gesture
    *  calls `undoCapture(label)` before its first change and `undoCommit()` at
-   *  its end, which keeps the capture as a step only if the tower changed
-   *  (true when it did); `undoDiscard()` drops a capture for a gesture
+   *  its end, which keeps the capture as a step only if the gesture changed
+   *  the tower or moved cash (true when it did), so a room built and sold
+   *  again in one gesture leaves the price it lost to undo; `undoDiscard()`
+   *  drops a capture for a gesture
    *  canceled into inspection. A gesture that did change the tower is kept
    *  as a step all the same, by `undoDiscard()` and by a capture over it, so
    *  no gesture's edit is left out of the steps. An edit made with no

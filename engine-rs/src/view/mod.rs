@@ -82,6 +82,9 @@ mod marks_guard_tests;
 #[path = "marks_tests.rs"]
 mod marks_tests;
 #[cfg(test)]
+#[path = "merge_guard_tests.rs"]
+mod merge_guard_tests;
+#[cfg(test)]
 #[path = "meta_tests.rs"]
 mod meta_tests;
 #[cfg(test)]

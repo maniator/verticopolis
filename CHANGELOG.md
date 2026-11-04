@@ -21,6 +21,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.85.1
+
+- Undo no longer brings the VIP back early after a visit, and undoing the last Wedding Hall calls off the VIP's visit, as selling it does.
+- Undo no longer renames a room that has taken a new name since, such as an office named for the company that moved in.
+- Pressing Undo partway through dragging an elevator's end arrow ends the drag, as it ends every other drag.
+
 ## 2.85.0
 
 - On a phone held sideways, the tools sit in a column on the left (tabs in one sliding row on a very short or narrow window) and the stats take one line each, so the tower view is almost twice as tall.

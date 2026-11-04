@@ -366,7 +366,9 @@ export function adoptToolingSim(app: ToolingApp, built: Simulation, preserveHist
 /** The app after a hand edit reached the Rust engine as a load: the renderer
  *  draws the engine's tower again with the camera kept, and the rest stays as
  *  an edit in place leaves it on the TypeScript engine (the selection, the
- *  latches, the undo trail). A load numbers the engine's log from nothing, so
+ *  latches). The load forgets the engine's undo steps, as every adopted tower
+ *  does, so the undo trail starts again after a hand edit. A load numbers the
+ *  engine's log from nothing, so
  *  the bulletin keeps the lines it shows and its cursor moves to the engine's
  *  count, from which the next line is read. `shown` is the harness's tower
  *  when it logged lines the engine never saw: the bulletin is rebuilt from

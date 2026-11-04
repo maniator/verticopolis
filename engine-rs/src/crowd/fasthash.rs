@@ -17,9 +17,13 @@
 //! ids come from the save, so a crafted save could pick colliding ids and
 //! slow its own load; std's fixed keys on the wasm32 build allowed as much.
 //!
+//! The undo journal's maps (unit and shaft id to its record) and the step
+//! check's sets (the units and shafts a step takes out, the tiles it lays)
+//! use them too: they are only written and looked up.
+//!
 //! `FastMap` and `FastSet` offer no iteration: their order would follow the
 //! hash, so a result that read it could differ between builds. `FastMap`
-//! inserts, looks up, removes and clears; `FastSet` only adds.
+//! inserts, looks up, removes and clears; `FastSet` adds and looks up.
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{BuildHasherDefault, Hash, Hasher};
@@ -120,6 +124,11 @@ impl<K: Hash + Eq, V> FastMap<K, V> {
         self.0.get(key)
     }
 
+    #[inline]
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.0.contains_key(key)
+    }
+
     /// The value at `key`, made by `make` the first time.
     #[inline]
     pub fn get_or_insert_with(&mut self, key: K, make: impl FnOnce() -> V) -> &mut V {
@@ -152,7 +161,7 @@ impl<K: Hash + Eq, V> Index<&K> for FastMap<K, V> {
     }
 }
 
-/// A set keyed with `FastHasher` that can only be added to.
+/// A set keyed with `FastHasher` that can only be added to and looked up.
 pub struct FastSet<T>(HashSet<T, Build>);
 
 impl<T> Default for FastSet<T> {
@@ -166,6 +175,17 @@ impl<T: Hash + Eq> FastSet<T> {
     #[inline]
     pub fn insert(&mut self, value: T) -> bool {
         self.0.insert(value)
+    }
+
+    #[inline]
+    pub fn contains(&self, value: &T) -> bool {
+        self.0.contains(value)
+    }
+}
+
+impl<T: Hash + Eq> FromIterator<T> for FastSet<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(values: I) -> Self {
+        Self(values.into_iter().collect())
     }
 }
 
@@ -235,7 +255,17 @@ mod tests {
         for (k, v) in &std_map {
             assert_eq!(fast[k], *v);
             assert_eq!(fast.get(k), Some(v));
+            assert!(fast.contains_key(k));
         }
+        for state in &std_set {
+            assert!(fast_set.contains(state));
+        }
+        let collected: FastSet<i64> = std_map.keys().copied().collect();
+        for k in -4001..4002 {
+            assert_eq!(collected.contains(&k), std_map.contains_key(&k));
+        }
+        assert!(!fast_set.contains(&(51, 0, None)));
+        assert!(!fast.contains_key(&4001));
         assert_eq!(fast.get(&4001), None);
         assert_eq!(*fast.get_or_insert_with(4001, || 9), 9);
         assert_eq!(*fast.get_or_insert_with(4001, || 10), 9, "made once");
