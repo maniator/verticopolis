@@ -18,10 +18,10 @@ import { dragCenter, mapPointToCenter, rectContains, type MapCamera, type MapCam
 import { OverviewMapModel, type MapFrameInput, type MapViewInput } from "../render/overviewMap/model";
 import { createPatternSource, paintMapMarks, type PatternSource } from "../render/overviewMap/paint";
 import { MAP_BACKDROP, groundShare, paintViewMark, viewMarkBand } from "../render/overviewMap/viewMark";
-import { buildMapDom } from "./overviewMapDom";
+import { buildMapDom, ContextWatch } from "./overviewMapDom";
 import { MapKeyKeeper, PointerFocusClaim } from "./overviewMapKeys";
 import { WorldPress } from "./overviewMapWorldPress";
-import { cameraCenter, clientToMap, grabRect, isKeyboardClick, isPrimaryPress, keyTarget, MAP_KEY, MAP_MOUSE_TARGET_CSS, MAP_TAP_SLOP_CSS, MAP_TOUCH_TARGET_CSS, noButtonHeld, passesMapKey } from "./overviewMapInput";
+import { cameraCenter, clientToMap, grabRect, isKeyboardClick, isPrimaryPress, keyTarget, MAP_KEY, type MapPress, MAP_MOUSE_TARGET_CSS, MAP_TOUCH_TARGET_CSS, noButtonHeld, passesMapKey, pastTapSlop, pixelRatio } from "./overviewMapInput";
 import { mapStartsOpen, rememberMapOpen, type MapLayoutClass } from "./overviewMapPrefs";
 import { mapSummary } from "./overviewMapText";
 
@@ -52,23 +52,7 @@ export interface OverviewMapDeps {
 }
 
 export { WORLD_PRESS_CLASS } from "./overviewMapWorldPress";
-
 export { MAP_DOM_ID } from "./overviewMapDom";
-
-/** A press on the map. Past the tap slop, one on the view mark drags the view
- *  by its travel and one elsewhere keeps the view centered under it; one that
- *  never travels is a tap that centers the view where it lifts. */
-interface Press {
-  readonly pointerId: number;
-  readonly pointerType: string;
-  readonly onMark: boolean;
-  start: { x: number; y: number };
-  last: { x: number; y: number };
-  /** The layout `start` and `last` are measured on; a rebuilt layout rebases
-   *  both. */
-  layout: MapLayout;
-  traveled: boolean;
-}
 
 export class OverviewMapWindow {
   readonly root: HTMLElement;
@@ -80,7 +64,7 @@ export class OverviewMapWindow {
   private readonly summary: HTMLElement;
   private readonly towerCtx: CanvasRenderingContext2D | null;
   private readonly viewCtx: CanvasRenderingContext2D | null;
-  private readonly patterns: PatternSource | null;
+  private patterns: PatternSource | null = null;
   private readonly model = new OverviewMapModel();
   private readonly cam: MutableMapCamera = { posX: 0, posY: 0, zoom: 1, viewWidth: 0, viewHeight: 0 };
   private layoutClass: MapLayoutClass;
@@ -88,8 +72,11 @@ export class OverviewMapWindow {
   private sizeDirty = true;
   private px = 1;
   private summaryText = "";
-  private press: Press | null = null;
+  private press: MapPress | null = null;
   private resizeObserver: ResizeObserver | null = null;
+  private readonly contexts: ContextWatch;
+  /** The canvases were cleared for a blank map (no tower, or a lost context). */
+  private blanked = false;
   private readonly worldPress: WorldPress;
   /** The last press began on the close button (see `pageUp`). */
   private closePressed = false;
@@ -137,8 +124,6 @@ export class OverviewMapWindow {
 
     this.towerCtx = this.towerCanvas.getContext("2d");
     this.viewCtx = this.viewCanvas.getContext("2d");
-    const ctx = this.towerCtx;
-    this.patterns = ctx ? createPatternSource(() => doc.createElement("canvas"), ctx) : null;
 
     this.toggle.addEventListener("click", (e) => {
       this.setOpen(true, true);
@@ -176,6 +161,7 @@ export class OverviewMapWindow {
     this.keys = new MapKeyKeeper(this.root);
     this.pointerFocus = new PointerFocusClaim(this.keys);
     doc.defaultView?.addEventListener("blur", this.onWindowBlur);
+    this.contexts = new ContextWatch([this.towerCanvas, this.viewCanvas], [this.towerCtx, this.viewCtx], () => this.forgetDrawing());
     if (typeof ResizeObserver !== "undefined") {
       this.resizeObserver = new ResizeObserver(() => (this.sizeDirty = true));
       this.resizeObserver.observe(this.body);
@@ -226,11 +212,14 @@ export class OverviewMapWindow {
     this.root.hidden = !open;
     this.toggle.hidden = open;
     this.press = null;
-    // A reopened window has missed every change while it was closed.
-    this.sizeDirty = true;
     this.forgetDrawing();
     if (hadFocus) this.toggle.focus();
-    if (open) this.frame();
+    // A reopened window has missed every change while it was closed, a loss
+    // and restore of a context that left nothing for a poll to see included.
+    if (open) {
+      this.restart();
+      this.frame();
+    }
   }
 
   /** Close from the window's own controls. A keyboard close (Escape, or the
@@ -249,10 +238,16 @@ export class OverviewMapWindow {
   frame(): void {
     if (!this.open) return;
     const src = this.deps.source();
-    if (!src) return;
+    const contexts = this.contexts.poll();
+    // A restored context starts blank, at its default state, and its pattern
+    // tiles may be gone (`blank` or the event already forgot the drawing).
+    // Taken before the no-tower check, so a restore on such a frame holds.
+    if (contexts === "restored") this.restart();
+    if (!src || contexts === "lost") return this.blank();
+    this.blanked = false;
     // A ResizeObserver does not fire when only the pixel ratio changes (a
     // window dragged to another screen), so the ratio is compared each frame.
-    if (this.sizeDirty || this.ratio() !== this.px) this.resize();
+    if (this.sizeDirty || pixelRatio(this.deps.stage.ownerDocument.defaultView) !== this.px) this.resize();
     const input = this.input;
     input.view = src.view;
     input.world = src.world;
@@ -282,7 +277,7 @@ export class OverviewMapWindow {
    *  Setting a canvas's size clears it, so it is set only when it changes. */
   private resize(): void {
     this.sizeDirty = false;
-    const ratio = this.ratio();
+    const ratio = pixelRatio(this.deps.stage.ownerDocument.defaultView);
     this.px = ratio;
     const w = Math.max(1, Math.round(this.body.clientWidth * ratio));
     const h = Math.max(1, Math.round(this.body.clientHeight * ratio));
@@ -304,10 +299,20 @@ export class OverviewMapWindow {
     delete this.root.dataset.mapDrawn;
   }
 
-  /** The device pixel ratio, or 1 where it is missing or not a positive number. */
-  private ratio(): number {
-    const ratio = this.deps.stage.ownerDocument.defaultView?.devicePixelRatio ?? 1;
-    return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+  /** No tower, or a lost context: clear the old picture and its summary once,
+   *  so no stale view box shows or takes a press, until a full repaint. */
+  private blank(): void {
+    if (this.blanked) return;
+    this.blanked = true;
+    this.forgetDrawing();
+    this.contexts.clear();
+    this.writeSummary("");
+  }
+
+  /** Measure the box again, and start new pattern tiles (they fill lazily). */
+  private restart(): void {
+    this.sizeDirty = true;
+    this.patterns = this.towerCtx ? createPatternSource(() => this.root.ownerDocument.createElement("canvas"), this.towerCtx) : null;
   }
 
   /** Write the summary only when it changed, so a screen reader is not sent the
@@ -427,7 +432,7 @@ export class OverviewMapWindow {
       press.last = p;
       return;
     }
-    if (this.traveledFrom(press.start, p)) press.traveled = true;
+    if (pastTapSlop(press.start, p, this.px)) press.traveled = true;
     // Within the tap slop the press may still be a tap: nothing moves, and
     // `last` stays where it started, so the first drag move catches up.
     if (!press.traveled) return;
@@ -451,13 +456,8 @@ export class OverviewMapWindow {
     const layout = this.model.layout;
     if (!released || press.traveled || !layout || press.layout !== layout) return;
     const p = this.mapPoint(e);
-    if (this.traveledFrom(press.start, p)) return;
+    if (pastTapSlop(press.start, p, this.px)) return;
     this.deps.moveCamera(mapPointToCenter(layout, p.x, p.y));
-  }
-
-  /** Whether a press moved past the tap slop. */
-  private traveledFrom(start: { x: number; y: number }, p: { x: number; y: number }): boolean {
-    return Math.hypot(p.x - start.x, p.y - start.y) > MAP_TAP_SLOP_CSS * this.px;
   }
 
   private onKey(e: KeyboardEvent): void {

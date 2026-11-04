@@ -4,7 +4,7 @@
  * key, and gets back a map point or a camera center. Unit-tested on its own.
  */
 import { FLOOR, TILE } from "../render/scale";
-import type { MapCamera, MapCameraCenter, MapExtent, MapRect } from "../render/overviewMap/geometry";
+import type { MapCamera, MapCameraCenter, MapExtent, MapLayout, MapRect } from "../render/overviewMap/geometry";
 
 /** An element's box on screen, as `getBoundingClientRect` gives it. */
 export interface ClientBox {
@@ -12,6 +12,21 @@ export interface ClientBox {
   readonly top: number;
   readonly width: number;
   readonly height: number;
+}
+
+/** A press on the map. Past the tap slop, one on the view mark drags the view
+ *  by its travel and one elsewhere keeps the view centered under it; one that
+ *  never travels is a tap that centers the view where it lifts. */
+export interface MapPress {
+  readonly pointerId: number;
+  readonly pointerType: string;
+  readonly onMark: boolean;
+  start: { x: number; y: number };
+  last: { x: number; y: number };
+  /** The layout `start` and `last` are measured on; a rebuilt layout rebases
+   *  both. */
+  layout: MapLayout;
+  traveled: boolean;
 }
 
 /** A canvas's backing store, in map (device) pixels. */
@@ -54,6 +69,17 @@ export const MAP_MOUSE_TARGET_CSS = 12;
 /** How far a press may travel, in CSS pixels, and still count as a tap that
  *  centers the view. */
 export const MAP_TAP_SLOP_CSS = 8;
+
+/** Whether a press moved past the tap slop, at `px` backing pixels per CSS pixel. */
+export function pastTapSlop(start: { x: number; y: number }, p: { x: number; y: number }, px: number): boolean {
+  return Math.hypot(p.x - start.x, p.y - start.y) > MAP_TAP_SLOP_CSS * px;
+}
+
+/** The window's device pixel ratio, or 1 where it is missing or not a positive number. */
+export function pixelRatio(win: { devicePixelRatio?: number } | null): number {
+  const ratio = win?.devicePixelRatio ?? 1;
+  return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+}
 
 /** The keys the map answers, by name. */
 export const MAP_KEY = {
