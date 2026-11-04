@@ -15,6 +15,8 @@ export const MAP_DOM_ID = {
 
 export interface MapDom {
   readonly root: HTMLElement;
+  /** The title bar; the view tabs go right after it. */
+  readonly title: HTMLElement;
   readonly close: HTMLButtonElement;
   readonly body: HTMLElement;
   readonly towerCanvas: HTMLCanvasElement;
@@ -69,7 +71,7 @@ export function buildMapDom(doc: Document): MapDom {
   toggle.textContent = "Map";
   toggle.title = "Show the tower map";
   toggle.setAttribute("aria-controls", MAP_DOM_ID.window);
-  return { root, close, body, towerCanvas, viewCanvas, summary, toggle };
+  return { root, title, close, body, towerCanvas, viewCanvas, summary, toggle };
 }
 
 /** What a frame finds of the canvases' 2D contexts (see `ContextWatch.poll`). */

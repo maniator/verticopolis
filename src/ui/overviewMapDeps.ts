@@ -1,0 +1,37 @@
+/**
+ * What the overview MAP window (`overviewMapWindow.ts`) is given: the tower
+ * it draws, the camera it reads and moves, and the view tabs.
+ */
+import type { FacilityKind } from "../engine/types";
+import type { MapCamera, MapCameraCenter, MapWorld } from "../render/overviewMap/geometry";
+import type { MapViewInput } from "../render/overviewMap/model";
+import type { OverviewMapViews } from "./overviewMapViews";
+
+/** What the window draws each frame. */
+export interface OverviewMapSource {
+  readonly view: MapViewInput;
+  readonly world: MapWorld;
+}
+
+/** The camera fields the window reads, filled in place each frame. */
+export type MutableMapCamera = { -readonly [K in keyof MapCamera]: MapCamera[K] };
+
+export interface OverviewMapDeps {
+  /** The element the window and its button go in (`#stage`). */
+  readonly stage: HTMLElement;
+  /** The tower to draw, or null while there is none. */
+  source(): OverviewMapSource | null;
+  /** Fill `out` with the camera as the renderer holds it. */
+  readCamera(out: MutableMapCamera): void;
+  /** Move the camera's center at its current zoom; the renderer clamps it. */
+  moveCamera(center: MapCameraCenter): void;
+  /** A kind's height in floors (the catalog the view binds). */
+  floorsOf(kind: FacilityKind): number;
+  /** Whether the phone layout applies now. */
+  isPhone(): boolean;
+  /** Where the open or closed choice is kept, or null without storage. */
+  readonly storage: Storage | null;
+  /** The view tabs (the game always passes them); without them the window
+   *  draws the Edit view alone. */
+  readonly views?: OverviewMapViews | null;
+}

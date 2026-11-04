@@ -27,6 +27,7 @@
 @import "./styles/retro-tokens.css";
 @import "./styles/retro-components.css";
 @import "./styles/overview-map.css";
+@import "./styles/overview-map-tabs.css";
 
 /* ---- 2. BASE --------------------------------------------------------- */
 * {
