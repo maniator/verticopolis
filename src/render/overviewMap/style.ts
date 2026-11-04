@@ -1,35 +1,26 @@
 /**
  * How each kind looks on the overview MAP window (#343): a fill and a pattern
- * per kind, for Classic (one gray plus shaft lines) and for Modern (per-group
- * patterns and facility colors). Presentation only: no rule lives here,
- * so it sits with the renderer, like `FACILITY_PRESENTATION`.
+ * per kind. Presentation only: no rule lives here, so it sits with the
+ * renderer, like `FACILITY_PRESENTATION`. The map has one look in both game
+ * modes (owner, 2026-11-04).
  *
  * Kinds are grouped by what they are to the player (work, homes, hotels, food
- * and retail, entertainment, amenities, services, shafts). In Modern the room
- * groups each get their own pattern, the three elevator kinds get one each, and
- * the plain solid groups (floor, lobby, offices) differ in lightness by a wide
- * margin, so the tower reads without color vision. A kind with no group is a
- * compile error (`KIND_GROUP` is an exhaustive record). A kind the table has never heard of
- * at run time (a forged save, a newer engine) paints as a loud placeholder.
- *
- * Classic follows what the retail game's Edit tab draws, measured on the PC
- * harness (SPEC, "Retail capture findings"): one flat light-gray silhouette for
- * every structure run and room, with the shafts picked out as lines (black
- * standard elevators, red service, blue express; stairs and escalators are not
- * drawn). It carries no pattern, since the original does not tell kinds apart
- * there. Modern keeps the per-kind groups: the room
- * groups get a pattern each as an accessibility addition, and the fills are the
- * facility colors the sprites and palette already use.
+ * and retail, entertainment, amenities, services, shafts). The room groups
+ * each get their own pattern as an accessibility addition, the three elevator
+ * kinds get one each, and the plain solid groups (floor, lobby, offices) differ
+ * in lightness by a wide margin, so the tower reads without color vision. The
+ * room fills are the facility colors the sprites and palette already use. A
+ * kind with no group is a compile error (`KIND_GROUP` is an exhaustive record).
+ * A kind the table has never heard of at run time (a forged save, a newer
+ * engine) paints as a loud placeholder.
  */
 import type { FacilityKind } from "../../engine/types";
 import { FACILITY_PRESENTATION } from "../../presentation/facilityPresentation";
 
-export type MapTheme = "classic" | "modern";
-
 /** The marks a pattern tile is built from. `solid` is a plain fill. */
 export type MapPattern = "solid" | "dots" | "diagonal" | "horizontal" | "grid" | "checker" | "outline";
 
-/** What a kind is to the player, for Modern's patterns and for picking the shafts out. */
+/** What a kind is to the player, for the patterns and for picking the shafts out. */
 export type MapGroup =
   | "ground"
   | "lobby"
@@ -101,20 +92,6 @@ export const GROUP_PATTERN: Readonly<Record<MapGroup, MapPattern>> = {
   elevatorExpress: "grid",
 };
 
-/** Classic's tower: one flat light gray for every structure run and room (the
- *  elevators are colored lines, and stairs and escalators are not drawn). */
-export const CLASSIC_TOWER_FILL = "#cccccc";
-
-/** Classic's elevator lines, confirmed against the retail saves: each shaft's
- *  tile position lands on a line of its kind's color (black standard, red
- *  service, blue express). Stairs and escalators are not drawn on the original
- *  map: `drawsOnMap` leaves them out of a Classic paint. */
-export const CLASSIC_SHAFT_FILL: Readonly<Partial<Record<MapGroup, string>>> = {
-  elevatorStandard: "#000000",
-  elevatorService: "#c41a1a",
-  elevatorExpress: "#2f4fd0",
-};
-
 /** Relative luminance of a `#rrggbb` color (0 to 1), or null for any other
  *  string. */
 export function hexLuminance(color: string): number | null {
@@ -147,9 +124,11 @@ export function patternInk(fill: string): string {
   return contrastRatio(lum, light) > contrastRatio(lum, dark) ? INK_LIGHT : INK_DARK;
 }
 
-/** Modern's shaft fills, kept clear of the room colors. */
-const MODERN_SHAFT_FILL: Readonly<Partial<Record<MapGroup, string>>> = {
-  stairs: "#59606c",
+/** The shaft fills, kept clear of the room colors and at least 3:1 against
+ *  the backdrop's sky and ground, since a shaft can run past the top floor or
+ *  over the lot's edge onto them. */
+const SHAFT_FILL: Readonly<Partial<Record<MapGroup, string>>> = {
+  stairs: "#6a717d",
   elevatorStandard: "#9aa3b2",
   elevatorService: "#e0544e",
   elevatorExpress: "#4a8cf0",
@@ -163,28 +142,11 @@ export interface MapKindStyle {
 /** What a kind the table does not know paints as. */
 export const UNKNOWN_KIND_STYLE: MapKindStyle = { fill: "#ff00ff", pattern: "outline" };
 
-/** The fill and pattern for a kind in a theme. An unknown kind or theme at run
- *  time reads as the placeholder and as Modern, never throws. It answers for
- *  every kind, including the ones a theme leaves off the map: ask `drawsOnMap`
- *  first (a legend or a view that paints marks must, or Classic stairs would
- *  show as gray marks in the sky). */
-export function mapStyleFor(kind: FacilityKind, theme: MapTheme): MapKindStyle {
+/** The fill and pattern for a kind. An unknown kind at run time reads as the
+ *  placeholder, never throws. */
+export function mapStyleFor(kind: FacilityKind): MapKindStyle {
   if (!Object.prototype.hasOwnProperty.call(KIND_GROUP, kind)) return UNKNOWN_KIND_STYLE;
   const group = KIND_GROUP[kind];
-  if (theme === "classic") return { fill: CLASSIC_SHAFT_FILL[group] ?? CLASSIC_TOWER_FILL, pattern: "solid" };
-  const shaft = MODERN_SHAFT_FILL[group];
+  const shaft = SHAFT_FILL[group];
   return { fill: shaft ?? FACILITY_PRESENTATION[kind].color, pattern: GROUP_PATTERN[group] };
-}
-
-/** Groups the original map does not draw at all: Classic skips them, so a stair
- *  that overhangs a floor's end leaves no mark in the sky and none over a room. */
-const CLASSIC_UNDRAWN_GROUPS: ReadonlySet<MapGroup> = new Set<MapGroup>(["stairs"]);
-
-/** Whether a kind is painted in a theme. Modern draws everything; Classic leaves
- *  stairs and escalators out, as the retail map does. A kind the table does not
- *  know is drawn, as the placeholder. */
-export function drawsOnMap(kind: FacilityKind, theme: MapTheme): boolean {
-  if (theme !== "classic") return true;
-  if (!Object.prototype.hasOwnProperty.call(KIND_GROUP, kind)) return true;
-  return !CLASSIC_UNDRAWN_GROUPS.has(KIND_GROUP[kind]);
 }

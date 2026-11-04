@@ -10,7 +10,6 @@ import type { GameApp } from "../main";
 import type { FacilityKind } from "../engine/types";
 import { findViewKind } from "../presentation/viewKinds";
 import { FLOOR, TILE } from "../render/scale";
-import type { MapTheme } from "../render/overviewMap/style";
 import { browserStorage } from "../ui/overviewMapPrefs";
 import { OverviewMapWindow, type MutableMapCamera, type OverviewMapSource } from "../ui/overviewMapWindow";
 import { viewWorld, viewWorldBound } from "../presentation/viewWorld";
@@ -33,7 +32,6 @@ export function wireOverviewMap(app: GameApp): void {
   const source: { -readonly [K in keyof OverviewMapSource]: OverviewMapSource[K] } = {
     view: app.reader,
     world: { lotWidth: 1, minFloor: 0, maxFloor: 0 },
-    theme: "classic",
   };
   const win = new OverviewMapWindow({
     stage,
@@ -42,7 +40,6 @@ export function wireOverviewMap(app: GameApp): void {
       if (!viewWorldBound()) return null;
       source.view = app.reader;
       source.world = viewWorld();
-      source.theme = app.reader.header.mode satisfies MapTheme;
       return source;
     },
     readCamera: (out: MutableMapCamera) => {

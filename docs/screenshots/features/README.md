@@ -24,7 +24,7 @@ hotel rooms, a cinema, shops, food, 5 elevators) after warming up a quarter.
 | `overlay-cleanliness.png` | **Housekeeping** mode: hotel rooms tinted by service coverage: green where a housekeeping crew can reach them, amber for dirty rooms waiting, red for floors with no service-elevator route (the "build another housekeeping station" nudge). |
 | `overlay-picker-ui.png` | The **Floor heatmap** dropdown in the Tower panel (below Full Statistics); every mode is directly selectable. |
 | `map-desktop.png` | The overview **Map** window (#343) as a desktop player first sees it: open at the bottom-right of the tower view, with a box around the part on screen. |
-| `map-window.png` | The Map window alone: the Classic gray silhouette with elevator lines and the dotted view box. |
+| `map-window.png` | The Map window alone: the rooms in their colors and patterns, fitted to the tower with a margin at each side, and the view box. |
 | `map-phone-pill.png` | On a phone the Map starts closed behind the **Map** pill at the bottom right. |
 | `map-phone-open.png` | The open phone Map card at the top-left of the tower view. |
 | `map-phone-heatmap.png` | With a Floor heatmap on, the phone Map card sits below the heatmap legend. |

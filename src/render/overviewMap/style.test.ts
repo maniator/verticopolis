@@ -1,20 +1,8 @@
 import { describe, it, expect } from "vitest";
 import type { FacilityKind } from "../../engine/types";
 import { FACILITY_PRESENTATION } from "../../presentation/facilityPresentation";
-import {
-  CLASSIC_SHAFT_FILL,
-  CLASSIC_TOWER_FILL,
-  drawsOnMap,
-  GROUP_PATTERN,
-  KIND_GROUP,
-  UNKNOWN_KIND_STYLE,
-  contrastRatio,
-  hexLuminance,
-  mapStyleFor,
-  patternInk,
-  type MapGroup,
-  type MapTheme,
-} from "./style";
+import { GROUP_PATTERN, KIND_GROUP, UNKNOWN_KIND_STYLE, contrastRatio, hexLuminance, mapStyleFor, patternInk, type MapGroup } from "./style";
+import { MAP_BACKDROP } from "./viewMark";
 
 const KINDS = Object.keys(FACILITY_PRESENTATION) as FacilityKind[];
 const GROUPS = Object.keys(GROUP_PATTERN) as MapGroup[];
@@ -24,12 +12,10 @@ describe("overview map style table", () => {
     expect(Object.keys(KIND_GROUP).sort()).toEqual([...KINDS].sort());
   });
 
-  it("gives every group a Modern pattern and every elevator group a Classic line color", () => {
+  it("gives every group a pattern", () => {
     expect(Object.keys(GROUP_PATTERN).sort()).toEqual([...GROUPS].sort());
     // KIND_GROUP is the source of truth for which groups exist: the groups kinds use are exactly the groups with a pattern.
     expect([...new Set(Object.values(KIND_GROUP))].sort()).toEqual([...GROUPS].sort());
-    expect(Object.keys(CLASSIC_SHAFT_FILL).sort()).toEqual(["elevatorExpress", "elevatorService", "elevatorStandard"]);
-    for (const color of [CLASSIC_TOWER_FILL, ...Object.values(CLASSIC_SHAFT_FILL)]) expect(color).toMatch(/^#[0-9a-f]{6}$/);
   });
 
   it("separates the room groups by pattern, so the map reads without color", () => {
@@ -39,73 +25,61 @@ describe("overview map style table", () => {
     expect(patterns).not.toContain("solid");
   });
 
-  it("separates the three elevator kinds by pattern, since two of the Classic hues share a lightness", () => {
+  it("separates the three elevator kinds by pattern, so they read without color", () => {
     const shafts: MapGroup[] = ["elevatorStandard", "elevatorService", "elevatorExpress"];
     expect(new Set(shafts.map((g) => GROUP_PATTERN[g])).size).toBe(3);
   });
 
-  it("draws Classic as the retail Edit tab does: every room and floor run in one flat gray, with no pattern", () => {
-    for (const kind of KINDS) {
-      if (CLASSIC_SHAFT_FILL[KIND_GROUP[kind]]) continue;
-      expect(mapStyleFor(kind, "classic"), kind).toEqual({ fill: CLASSIC_TOWER_FILL, pattern: "solid" });
-    }
-    expect(hexLuminance(CLASSIC_TOWER_FILL)).toBeGreaterThan(0.5);
+  it("uses the facility colors, with shafts kept clear of room colors", () => {
+    expect(mapStyleFor("office").fill).toBe(FACILITY_PRESENTATION.office.color);
+    expect(mapStyleFor("condo").fill).toBe(FACILITY_PRESENTATION.condo.color);
+    expect(mapStyleFor("elevatorExpress").fill).not.toBe(FACILITY_PRESENTATION.elevatorExpress.color);
   });
 
-  it("draws Classic elevators as the retail map does (black standard, red service, blue express) and leaves stairs out", () => {
-    expect(mapStyleFor("elevatorStandard", "classic").fill).toBe("#000000");
-    expect(mapStyleFor("elevatorService", "classic").fill).toBe("#c41a1a");
-    expect(mapStyleFor("elevatorExpress", "classic").fill).toBe("#2f4fd0");
-    expect(drawsOnMap("stairs", "classic")).toBe(false);
-    expect(drawsOnMap("escalator", "classic")).toBe(false);
-    expect(drawsOnMap("stairs", "modern")).toBe(true);
-    expect(drawsOnMap("elevatorExpress", "classic")).toBe(true);
-    expect(drawsOnMap("notAKind" as FacilityKind, "classic")).toBe(true);
-    const tower = hexLuminance(CLASSIC_TOWER_FILL)!;
-    for (const kind of KINDS) {
-      const { fill } = mapStyleFor(kind, "classic");
-      if (fill === CLASSIC_TOWER_FILL) continue;
-      expect(contrastRatio(tower, hexLuminance(fill)!), `${kind} ${fill}`).toBeGreaterThanOrEqual(3);
-    }
+  it("gives every kind its group's pattern, stairs and escalators included", () => {
+    for (const kind of KINDS) expect(mapStyleFor(kind).pattern, kind).toBe(GROUP_PATTERN[KIND_GROUP[kind]]);
+    expect(mapStyleFor("stairs").pattern).toBe("diagonal");
+    expect(mapStyleFor("escalator")).toEqual(mapStyleFor("stairs"));
   });
 
-  it("uses the facility colors in Modern, with shafts kept clear of room colors", () => {
-    expect(mapStyleFor("office", "modern").fill).toBe(FACILITY_PRESENTATION.office.color);
-    expect(mapStyleFor("condo", "modern").fill).toBe(FACILITY_PRESENTATION.condo.color);
-    expect(mapStyleFor("elevatorExpress", "modern").fill).not.toBe(FACILITY_PRESENTATION.elevatorExpress.color);
+  it("falls back to a placeholder for a kind it has never heard of", () => {
+    expect(mapStyleFor("notAKind" as FacilityKind)).toBe(UNKNOWN_KIND_STYLE);
+    expect(mapStyleFor("toString" as FacilityKind)).toBe(UNKNOWN_KIND_STYLE);
   });
 
-  it("keeps Modern's per-kind patterns and Classic plain", () => {
+  it("styles every kind with a #rrggbb fill", () => {
+    for (const kind of KINDS) expect(mapStyleFor(kind).fill, kind).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+
+  it("picks ink that shows on the fill: at least 3 to 1 for every patterned kind", () => {
     for (const kind of KINDS) {
-      expect(mapStyleFor(kind, "classic").pattern).toBe("solid");
-      expect(mapStyleFor(kind, "modern").pattern).toBe(GROUP_PATTERN[KIND_GROUP[kind]]);
+      const { fill, pattern } = mapStyleFor(kind);
+      if (pattern === "solid") continue;
+      const ratio = contrastRatio(hexLuminance(fill)!, hexLuminance(patternInk(fill))!);
+      expect(ratio, `${kind} ${fill}`).toBeGreaterThanOrEqual(3);
     }
   });
 
-  it("falls back to a placeholder for a kind it has never heard of, in either theme", () => {
-    expect(mapStyleFor("notAKind" as FacilityKind, "classic")).toBe(UNKNOWN_KIND_STYLE);
-    expect(mapStyleFor("toString" as FacilityKind, "modern")).toBe(UNKNOWN_KIND_STYLE);
-  });
+  // Every kind can sit on both backdrop colors: a top floor or a setback meets
+  // the sky, a ground-floor room meets the ground under it, a basement room
+  // meets the ground beside it and the sky above it where floor 1 is unbuilt,
+  // and a shaft can run past the top floor or over the lot's edge into the
+  // margin. Non-text contrast (WCAG 1.4.11) asks 3 to 1.
+  // These two keep the facility colors the main view's sprites share
+  // (`FACILITY_PRESENTATION`), so lifting them is a palette call outside the
+  // map; the test fails once either passes, so the entry is then dropped.
+  const BELOW_BACKDROP_CONTRAST: ReadonlySet<FacilityKind> = new Set(["parkingRamp", "security"]);
 
-  it("reads an unknown theme as Modern instead of throwing", () => {
-    expect(mapStyleFor("office", "sepia" as MapTheme)).toEqual(mapStyleFor("office", "modern"));
-  });
-
-  it("styles every kind with a #rrggbb fill in both themes", () => {
+  it("gives every kind's fill at least 3 to 1 against the backdrop's sky and ground", () => {
     for (const kind of KINDS) {
-      for (const theme of ["classic", "modern"] as const) expect(mapStyleFor(kind, theme).fill, `${kind} ${theme}`).toMatch(/^#[0-9a-f]{6}$/i);
-    }
-  });
-
-  it("picks ink that shows on the fill: at least 3 to 1 for every patterned kind in both themes", () => {
-    for (const kind of KINDS) {
-      for (const theme of ["classic", "modern"] as const) {
-        const { fill, pattern } = mapStyleFor(kind, theme);
-        if (pattern === "solid") continue;
-        const ratio = contrastRatio(hexLuminance(fill)!, hexLuminance(patternInk(fill))!);
-        expect(ratio, `${kind} ${theme} ${fill}`).toBeGreaterThanOrEqual(3);
+      const fill = hexLuminance(mapStyleFor(kind).fill)!;
+      for (const [where, color] of Object.entries(MAP_BACKDROP)) {
+        const ratio = contrastRatio(fill, hexLuminance(color)!);
+        if (BELOW_BACKDROP_CONTRAST.has(kind)) expect(ratio, `${kind} on the ${where}`).toBeLessThan(3);
+        else expect(ratio, `${kind} on the ${where}`).toBeGreaterThanOrEqual(3);
       }
     }
+    for (const kind of BELOW_BACKDROP_CONTRAST) expect(mapStyleFor(kind).fill, kind).toBe(FACILITY_PRESENTATION[kind].color);
   });
 
   it("gives a fill that is not a #rrggbb color dark ink", () => {

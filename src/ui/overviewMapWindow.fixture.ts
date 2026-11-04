@@ -5,7 +5,7 @@
  */
 import { vi } from "vitest";
 import { FLOOR, TILE } from "../render/scale";
-import type { MapCameraCenter } from "../render/overviewMap/geometry";
+import type { MapCameraCenter, MapExtent } from "../render/overviewMap/geometry";
 import { MAP_OPEN_STORAGE_KEY } from "./overviewMapPrefs";
 import { MAP_DOM_ID, OverviewMapWindow, WORLD_PRESS_CLASS, type MutableMapCamera, type OverviewMapDeps, type OverviewMapSource } from "./overviewMapWindow";
 
@@ -18,7 +18,6 @@ export function towerSource(): OverviewMapSource & { view: { tower: { transports
       tower: { lowestFloor: 1, highestFloor: 10, transports: [] },
     },
     world: { lotWidth: 375, minFloor: -9, maxFloor: 100 },
-    theme: "classic",
   };
 }
 
@@ -42,7 +41,7 @@ export interface Rig {
 }
 
 /** A window in a 200 by 288 CSS px body at a pixel ratio of 1, so map pixels
- *  are CSS pixels and the Classic layout is 375 tiles by 118 floor lines. */
+ *  are CSS pixels and the layout is `CROP`. */
 export function rig(opts: { phone?: boolean; stored?: string } = {}): Rig {
   document.body.innerHTML = '<section id="stage"><canvas id="view"></canvas></section>';
   const stage = document.getElementById("stage")!;
@@ -95,6 +94,15 @@ export function disposeRigs(): void {
   for (const win of built.splice(0)) win.dispose();
 }
 
+/** A 2D context that draws nothing, for the tests that need the window to
+ *  paint (happy-dom's canvases have none). Build the rig after installing it:
+ *  `vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(silent2d())`. */
+export function silent2d(): CanvasRenderingContext2D {
+  const none = () => {};
+  const ctx = { fillStyle: "", strokeStyle: "", lineWidth: 1, fillRect: none, clearRect: none, strokeRect: none, beginPath: none, moveTo: none, lineTo: none, closePath: none, fill: none, createPattern: () => null };
+  return ctx as unknown as CanvasRenderingContext2D;
+}
+
 export function viewCanvas(): HTMLCanvasElement {
   return document.querySelector(".overview-map-view") as HTMLCanvasElement;
 }
@@ -113,6 +121,12 @@ export function worldPressed(): boolean {
   return rootEl().classList.contains(WORLD_PRESS_CLASS);
 }
 
-/** The map x and y of a tile and floor line in the Classic layout above. */
-export const mapX = (tile: number) => (tile * 200) / 375;
-export const mapY = (line: number) => ((107 - line) * 288) / 118;
+/** The crop the rig's ten-floor tower gets, written out so a wrong margin or
+ *  band fails a test: floor lines -1 to 30 (one floor of ground under floor 1,
+ *  the 30-floor minimum on top), and the 375-tile lot with 15 tiles of margin
+ *  on each side. A window test checks `bandedExtent` gives exactly this. */
+export const CROP: MapExtent = { leftTile: -15, width: 405, topLine: 30, bottomLine: -1 };
+
+/** The map x and y of a tile and floor line in the rig's layout. */
+export const mapX = (tile: number) => ((tile - CROP.leftTile) * 200) / CROP.width;
+export const mapY = (line: number) => ((CROP.topLine - line) * 288) / (CROP.topLine - CROP.bottomLine);

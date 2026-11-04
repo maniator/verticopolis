@@ -93,8 +93,9 @@ export interface Scene {
  *  but the Map (a dialog, a card, the top bar) is about that element, so the
  *  Map and its pill are taken off the page for that capture and the crop's
  *  edge pixels match a page without them. Any other open Map must have drawn
- *  its tower (the window marks its theme on the first paint), so a capture
- *  never commits an empty Map. */
+ *  its tower: the window sets `data-map-drawn` only once it has painted the
+ *  tower's marks, and clears it whenever it closes or its canvases are
+ *  cleared for a repaint, so a capture never commits an empty Map. */
 export async function mapForShot(page: Page, where: string, crop: string | undefined): Promise<void> {
   const state = await page.evaluate((offPage) => {
     const map = document.getElementById("overview-map");
@@ -106,7 +107,7 @@ export async function mapForShot(page: Page, where: string, crop: string | undef
       pill.hidden = true;
       return "closed";
     }
-    return map === null || map.hidden ? "closed" : (map.dataset.mapTheme ?? "");
+    return map === null || map.hidden ? "closed" : (map.dataset.mapDrawn ?? "");
   }, crop !== undefined && !crop.includes("overview-map"));
   if (state === "") throw new Error(`${where}: the Map is open but has not drawn the tower yet`);
 }

@@ -79,14 +79,14 @@ describe("overview map budget on a large tower", () => {
   it("paints exactly one rectangle per mark", () => {
     const marks = buildMapDrawList(layout, tower);
     const ctx = countingCtx();
-    expect(paintMapMarks(ctx, layout.width, layout.height, marks, "modern", patterns)).toBe(marks.length);
+    expect(paintMapMarks(ctx, layout.width, layout.height, marks, patterns)).toBe(marks.length);
     expect(ctx.fills).toBe(marks.length);
   });
 
   it("changes the fill style about once per kind and layer, far less than once per room", () => {
     const marks = buildMapDrawList(layout, tower);
     const ctx = countingCtx();
-    paintMapMarks(ctx, layout.width, layout.height, marks, "modern", patterns);
+    paintMapMarks(ctx, layout.width, layout.height, marks, patterns);
     const kinds = new Set(marks.map((m) => m.kind)).size;
     // Each kind has a patterned and a plain variant, and the shafts add a few switches.
     expect(ctx.styleSets).toBeLessThan(kinds * 2 + 3 * 8 + 90);
@@ -99,7 +99,7 @@ describe("overview map budget on a large tower", () => {
     for (let i = 0; i < 15; i++) {
       const t0 = performance.now();
       const marks = buildMapDrawList(layout, tower);
-      paintMapMarks(countingCtx(), layout.width, layout.height, marks, "classic", patterns);
+      paintMapMarks(countingCtx(), layout.width, layout.height, marks, patterns);
       times.push(performance.now() - t0);
     }
     times.sort((a, b) => a - b);

@@ -1,7 +1,7 @@
 /**
  * The overview MAP window's text summary (#343, CAP-5): what a screen reader
  * hears for the map canvas, including where the view is when it sits past a
- * Modern crop (a sighted player sees the edge band and its chevron). DOM-free,
+ * crop (a sighted player sees the edge band and its chevron). DOM-free,
  * so it is unit-tested on its own.
  */
 import type { BuiltFloors, ViewPlacement } from "../render/overviewMap/extent";
@@ -11,7 +11,7 @@ function count(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-/** The built range as whole floors, the way the Modern crop reads it: a lowest
+/** The built range as whole floors, the way the crop reads it: a lowest
  *  floor that is not finite reads as the ground floor, and a top that is not
  *  finite, or under the lowest, as the lowest. Unlike the crop it is not held
  *  to the world: the view reports the floors it is given. */

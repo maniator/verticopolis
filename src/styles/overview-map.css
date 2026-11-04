@@ -1,11 +1,12 @@
 /* ---- Overview MAP window (#343) ----
-   A small window in #stage: the Classic body is the retail map's 200 by 288
-   CSS px. On desktop it sits at the stage's bottom-right corner, clear of the
-   sidebar, the palette, the toasts (top-right) and the Floor heatmap legend
-   (drawn at the canvas's top-left). On a phone it is a card at the top-left of
-   the world view, inside the safe-area insets, about 150 px wide and never
-   taller than half the world view; its Map pill stays at the bottom-right. The window is placed before #view, so the
-   inspector and editor cards paint over it. */
+   A small window in #stage: the desktop body is 200 by 288 CSS px, the
+   retail map's size. On desktop it sits at the stage's bottom-right corner,
+   clear of the sidebar, the palette, the toasts (top-right) and the Floor
+   heatmap legend (drawn at the canvas's top-left). On a phone it is a card
+   at the top-left of the world view, inside the safe-area insets, about
+   150 px wide and never taller than half the world view; its Map pill stays
+   at the bottom-right. The window is placed before #view, so the inspector
+   and editor cards paint over it. */
 .overview-map {
   position: absolute;
   right: 10px;
@@ -46,9 +47,6 @@
 }
 .overview-map-body {
   position: relative;
-  /* The Classic view mark blends with the tower canvas and the backdrop only,
-     never with the page behind the window. */
-  isolation: isolate;
   flex: 0 1 auto;
   width: 200px;
   height: 288px;
@@ -67,13 +65,9 @@
   /* The map owns its pointers: a drag on it never scrolls or zooms the page. */
   touch-action: none;
 }
-/* Classic's inverting pen: the white outline reads dark over the light gray
-   tower and pale over the sky, like the retail map's dotted rectangle. */
-.overview-map[data-map-theme="classic"] .overview-map-view {
-  mix-blend-mode: difference;
-}
-/* The focus ring goes on the body, outside the blend, so Classic never
-   inverts it. A browser without :has() keeps the ring on the canvas. */
+/* The focus ring goes on the body, 1 px outside the map, so it hides none of
+   the map's pixels. A browser without :has() keeps the ring on the canvas,
+   drawn over the canvas's outer 2 px. */
 .overview-map-view:focus-visible {
   outline: 2px solid #ffd84d;
   outline-offset: -2px;
