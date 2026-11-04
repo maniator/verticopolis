@@ -27,6 +27,10 @@
 //! reads where the TypeScript inspector calls `sim.demandMap()`: the main
 //! gripe reads it lazily (`tenant.rs`), and no simulation step in either
 //! engine reads the demand memo.
+//!
+//! The recycling card's counts are a running tally kept up from the frame
+//! mark log (`view/tally.rs`). It keys on the log's id, the tower revision
+//! and the unit count, so neither the clock nor the crowd step moves its key.
 
 use indexmap::IndexMap;
 
@@ -34,6 +38,8 @@ use crate::demand::{compute_demand_map, unmet_coverage, DemandMap};
 use crate::presence::CongestionAttribution;
 use crate::sim::Simulation;
 use crate::tower::Unit;
+#[cfg(feature = "wasm")]
+use crate::view::{CensusTally, RecyclingCounts};
 
 /// `(revision, unit count, game hour)`.
 type DemandKey = (i64, usize, i64);
@@ -51,6 +57,8 @@ pub struct DiagMemo {
         IndexMap<i64, f64>,
         IndexMap<i64, CongestionAttribution>,
     )>,
+    #[cfg(feature = "wasm")]
+    recycling: CensusTally,
 }
 
 impl Simulation {
@@ -116,6 +124,36 @@ impl Simulation {
             ratios.get(&floor).copied().unwrap_or(0.0),
             attribution.get(&floor).copied(),
         )
+    }
+
+    /// The recycling card's counts (#1745). The card reads the capacity, the
+    /// fill and the verdict on every hover and phone refresh, and the scene
+    /// sync reads the fill (`towerReconcile.ts`, up to once a frame in a
+    /// top-speed meal window); each read used to walk the rooms. Now they
+    /// answer from a running count kept up from the mark log
+    /// (`view/tally.rs`): a read visits the rooms the setters marked since
+    /// the last read, compares every room once when those marks reach half
+    /// the rooms or the log has dropped some, and after an edit or a new unit
+    /// count clears the slots its last count set and makes one pass over the
+    /// rooms (a new tower comes with a fresh tally, whose first read also
+    /// sizes one slot per unit). The clock moves
+    /// neither count, and the crowd moves one only through a marked write
+    /// (customers inside), so a running game visits only the rooms its steps
+    /// changed. A write that skips the setters is not counted until a read
+    /// next compares every room or counts afresh, the frame reader's
+    /// contract; `view/marks_guard_tests.rs` holds
+    /// engine code to the setters. No simulation step reads it, and a load
+    /// starts it empty.
+    #[cfg(feature = "wasm")]
+    pub(crate) fn inspector_recycling(&mut self) -> RecyclingCounts {
+        self.diag_memo.recycling.counts(&self.tower)
+    }
+
+    /// How many of the inspector's recycling reads took each way through the
+    /// tally, so a test can tell which one ran.
+    #[cfg(all(feature = "wasm", test))]
+    pub(crate) fn inspector_recycling_passes(&self) -> crate::view::TallyPasses {
+        self.diag_memo.recycling.passes()
     }
 
     #[cfg(test)]

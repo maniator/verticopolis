@@ -29,6 +29,8 @@ mod meta;
 mod reader;
 mod signature;
 mod structure;
+#[cfg(any(feature = "wasm", test))]
+mod tally;
 
 use std::cell::RefCell;
 
@@ -38,6 +40,10 @@ pub(crate) use meta::FIRST_META_REVISION;
 pub use meta::{meta_changed, meta_since, whole_revision, MetaLog};
 pub use reader::ViewReader;
 pub use structure::structure_view;
+#[cfg(all(feature = "wasm", test))]
+pub(crate) use tally::TallyPasses;
+#[cfg(any(feature = "wasm", test))]
+pub(crate) use tally::{CensusTally, RecyclingCounts};
 
 use crate::sim::Simulation;
 
@@ -66,6 +72,9 @@ pub fn view_frame(sim: &Simulation, full: bool) -> Vec<f64> {
     sim.tower.view.reader.borrow_mut().frame(sim, full)
 }
 
+#[cfg(test)]
+#[path = "census_reads_tests.rs"]
+mod census_reads_tests;
 #[cfg(test)]
 #[path = "frame_tests.rs"]
 mod frame_tests;
@@ -102,6 +111,9 @@ mod source_scan_tests;
 #[cfg(test)]
 #[path = "structure_tests.rs"]
 mod structure_tests;
+#[cfg(test)]
+#[path = "tally_tests.rs"]
+mod tally_tests;
 #[cfg(test)]
 #[path = "unit_scan_tests.rs"]
 mod unit_scan_tests;

@@ -250,6 +250,7 @@ function enginePreload(): Plugin {
 function wasmParityProjects() {
   if (process.env.VC_REQUIRE_WASM !== "1") return [];
   const typescriptSide = [
+    // The conformance, dual-run and loader suites run each engine themselves.
     "**/conformance.integration.test.ts",
     "**/conformanceWasm.integration.test.ts",
     "**/conformanceWasmLoadFidelity.integration.test.ts",
@@ -260,6 +261,7 @@ function wasmParityProjects() {
     "**/conformanceWasmDiagnostics*.integration.test.ts",
     "**/dualRunDay.integration.test.ts",
     "**/dualRunEdits.integration.test.ts",
+    "**/loaderCases.integration.test.ts",
     // The frame-day golden plays each engine through the port itself: the
     // Rust leg in the host suites, the TypeScript referee in the plain run.
     "**/conformanceWasmFrameDays.integration.test.ts",
@@ -273,7 +275,6 @@ function wasmParityProjects() {
     // the TypeScript engine on purpose (in the plain run).
     "**/cardTextParity.integration.test.ts",
     "**/cardTextReferee.integration.test.ts",
-    "**/loaderCases.integration.test.ts",
     // They run each engine themselves, like the conformance suites above.
     "**/panelGettersWasm.integration.test.ts",
     "**/panelGettersCost.integration.test.ts",
@@ -293,6 +294,7 @@ function wasmParityProjects() {
     // Pure render: it paints in a software raster and never touches the engine,
     // so the WASM project would only repeat the TypeScript run.
     "**/originSeedsSweep.integration.test.ts",
+    // The WASM host suites start their own host/engine, so do not repeat them.
     "**/wasmHost.integration.test.ts",
     "**/wasmHostCatalog.integration.test.ts",
     "**/wasmHostLogText.integration.test.ts",

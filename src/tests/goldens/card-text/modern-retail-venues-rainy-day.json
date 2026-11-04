@@ -1,0 +1,12 @@
+{
+  "case": "retail venues, rainy day",
+  "mode": "modern",
+  "units": [
+    {"id":252,"kind":"shop","floor":2,"lines":["Access: reachable from the lobby.","Today's patronage: 40 customers","Local demand: 25% of capacity.","The tower has more retail than its shoppers fill; add homes, or hold off on new venues, to lift every venue.","Very few customers.","Yesterday's profit: $200.","Rain might cause fewer customers."]},
+    {"id":253,"kind":"fastFood","floor":2,"lines":["Access: reachable from the lobby.","Today's patronage: 3 customers","Local demand: 25% of capacity.","The tower has more retail than its shoppers fill; add homes, or hold off on new venues, to lift every venue.","Just opened, no data yet.","Rain might cause fewer customers."]},
+    {"id":254,"kind":"restaurant","floor":2,"lines":["Access: reachable from the lobby.","Today's patronage: 120 customers","Local demand: 25% of capacity.","The tower has more retail than its shoppers fill; add homes, or hold off on new venues, to lift every venue.","Business is booming.","Yesterday's profit: $4,800.","Rain might cause fewer customers."]}
+  ],
+  "transports": [
+    {"id":251,"kind":"elevatorStandard","lines":[]}
+  ]
+}

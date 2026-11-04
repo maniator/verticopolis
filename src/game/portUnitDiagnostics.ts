@@ -44,10 +44,41 @@ export interface SupplementalLines {
   readonly trailing: readonly TemplateResult[];
 }
 
+/** A unit's card lines. `beforeComplaints` reads lines that sit after the
+ *  lobby advice and above any gripe or notice (a recycling center's block),
+ *  read after the unit's facts so the engine reads keep their order. */
+export type PortUnitLines = (id: number, beforeComplaints?: () => readonly TemplateResult[]) => TemplateResult[];
+
+/** A unit's card lines in two halves: `head` runs to the lobby advice and
+ *  `tail` holds the gripes, the notice and the business block, so a caller
+ *  that keeps them can put lines read later between the two. `lines` is the
+ *  two joined, built once and handed out as is, so a cached card costs no
+ *  copy; no caller changes it. A record that is short or names another unit
+ *  has no lines. */
+export interface PortUnitParts {
+  readonly head: readonly TemplateResult[];
+  readonly tail: readonly TemplateResult[];
+  readonly lines: TemplateResult[];
+}
+
+/** The card's lines with `between` (lines read after the unit's facts) in
+ *  their place, after the lobby advice and above any gripe or notice. */
+export function joinParts(parts: PortUnitParts, between?: () => readonly TemplateResult[]): TemplateResult[] {
+  return between ? [...parts.head, ...between(), ...parts.tail] : parts.lines;
+}
+
 export function createPortUnitDiagnostics(
   port: Pick<EnginePort, "viewLayout" | "unitFacts">,
   supplemental?: (id: number) => SupplementalLines,
-): (id: number) => TemplateResult[] {
+): PortUnitLines {
+  const parts = createPortUnitParts(port, supplemental);
+  return (id, beforeComplaints) => joinParts(parts(id), beforeComplaints);
+}
+
+export function createPortUnitParts(
+  port: Pick<EnginePort, "viewLayout" | "unitFacts">,
+  supplemental?: (id: number) => SupplementalLines,
+): (id: number) => PortUnitParts {
   const layout = JSON.parse(port.viewLayout()) as Layout;
   const slots = new Map(layout.records.unitFacts.map((name, i) => [name, i]));
   const at = (r: PortRecord, name: string): number => r[slots.get(name) ?? -1];
@@ -72,11 +103,12 @@ export function createPortUnitDiagnostics(
     return gripeCopy(facts);
   };
 
-  return (id: number): TemplateResult[] => {
+  return (id) => {
     const r = port.unitFacts(id);
-    if (r.length < layout.records.unitFacts.length || at(r, "id") !== id) return [];
+    if (r.length < layout.records.unitFacts.length || at(r, "id") !== id) return { head: [], tail: [], lines: [] };
 
-    const out: TemplateResult[] = [];
+    const head: TemplateResult[] = [];
+    let out = head;
     const access = accessCopy(named(layout.accessLines, at(r, "access")) ?? "");
     if (access) out.push(line(access.text, access.bad ? bad : good));
     const rate = noRateCopy(named(layout.noRateLines, at(r, "noRate")) ?? "");
@@ -99,6 +131,8 @@ export function createPortUnitDiagnostics(
       });
       out.push(line(advice, sinking || hasSlot ? bad : undefined));
     }
+    const tail: TemplateResult[] = [];
+    out = tail;
 
     const main = cause(r, "gripe");
     if (main) out.push(line(`Main gripe: ${main}`, bad));
@@ -121,6 +155,6 @@ export function createPortUnitDiagnostics(
     }
     // The business block closes the card, below any notice.
     if (extra) out.push(...extra.trailing);
-    return out;
+    return { head, tail, lines: [...head, ...tail] };
   };
 }

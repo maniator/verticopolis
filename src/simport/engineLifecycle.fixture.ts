@@ -191,6 +191,19 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
       expect(saved(s)).toMatchObject({ mode: "modern", modernCalendar: "canon", autoBridge: false });
     });
 
+    it("hands on a replaced tower's owed events, unless it was the title backdrop", () => {
+      const owed = (backdrop: boolean): string[] => {
+        const s = subject(make);
+        drain(s.port);
+        s.port.setBackdrop(backdrop);
+        must(s, (p) => p.buildAt(kind("lobby"), 1, lobbyCenter(s) + 20), "a lobby tile");
+        expect(done(s.port.foundTower(4, mode("modern"), calendar("realWorld"), false))).toBe(true);
+        return drain(s.port).map((e) => e.name);
+      };
+      expect(owed(false), "a live tower's build is handed on").toEqual(["facility_placed", "tower_founded"]);
+      expect(owed(true), "the backdrop hands on no build").toEqual(["tower_founded"]);
+    });
+
     it("moves the undo signature on exactly the steps that change what a player can undo", () => {
       const s = subject(make);
       const mid = lobbyCenter(s);
@@ -314,6 +327,27 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
         expect(done(run(s, (p) => p.markStop(shaft, 2, true), "serve floor 2"))).toBe(false);
         expect(s.port.serialize()).toBe(save);
       });
+    });
+
+    it("refuses a Classic escalator that serves an office floor, and builds the same one in Modern", () => {
+      for (const m of ["classic", "modern"] as const) {
+        const sim = newSeededGame(7, m);
+        Object.assign(sim, { star: 3, money: 1e8 });
+        const s = subject(make, sim);
+        must(s, (p) => p.buildAt(kind("office"), 2, MID - 4), `${m}: an office on 2`);
+        const tiles = Float64Array.from({ length: 8 }, (_, i) => MID + 8 + i);
+        expect(slot("paintTiles", must(s, (p) => p.paintTiles(kind("floor"), 2, tiles), `${m}: floor 2`), "placed")).toBe(8);
+        const escalator = (p: EnginePort) => p.buildShaft(kind("escalator"), MID + 8, 1, 2);
+        if (m === "classic") {
+          const save = s.port.serialize();
+          silent(s, () => expect(done(run(s, escalator, "a Classic escalator to the office floor"))).toBe(false));
+          expect(s.port.lastReason()).toBe("Escalators can't serve office floors. They link commercial floors only.");
+          expect(s.port.serialize()).toBe(save);
+        } else {
+          must(s, escalator, "a Modern escalator to the office floor");
+          expect(s.reader.tower.transports.filter((t) => t.kind === "escalator")).toHaveLength(1);
+        }
+      }
     });
 
     it("answers a waiting emergency with what it paid, and a decline pays nothing", () => {

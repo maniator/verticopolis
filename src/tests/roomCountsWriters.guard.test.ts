@@ -204,7 +204,7 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   "src/wasmhost/wasmHost.ts": { bulk: 7 },
   // The port contract's grown-tower setup (the star and the balance) on a
   // tower that reaches the engine only through its save: no live unit.
-  "src/simport/engineLifecycle.fixture.ts": { bulk: 4 },
+  "src/simport/engineLifecycle.fixture.ts": { bulk: 5 },
   // `buildTDT`'s reviver deletes a `toString` key from the export's own
   // `JSON.parse` copy of the save: parsed data that reaches no room.
   // A harness's field write on the tooling copy of the Rust engine's tower,

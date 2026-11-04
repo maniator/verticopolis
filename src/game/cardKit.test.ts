@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { facilityFloors } from "../engine/facilities";
 import { isOperational, type UnitState } from "../engine/types";
 import { TsEngine } from "../engine/port/tsEngine";
@@ -10,6 +12,7 @@ import { refreshEditorCard, type EditorCardApp } from "./editorCard";
 import { VIEW_LAYOUT } from "../engine/port/layout";
 import { renderToFragment } from "../ui/testing/litTestUtils";
 import { unitEditorTemplate } from "../ui/templates/editor";
+import { repoRoot } from "../tests/guardFiles";
 import { unitInspectorTemplate } from "../ui/templates/inspector";
 import { groupDigits } from "../ui/format";
 
@@ -304,5 +307,14 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
   it("treat a room as inert in exactly the states the engine does", () => {
     const all: UnitState[] = ["construction", "empty", "occupied", "moving_in", "vacating", "asleep", "dirty", "infested", "fire", "gutted"];
     for (const state of all) expect(INERT_STATES.has(state), state).toBe(!isOperational({ state }));
+    // The game runs the Rust engine, so its predicate is the one to match,
+    // and this pin outlives the TypeScript one above.
+    const rust = readFileSync(resolve(repoRoot, "engine-rs/src/tower_query_state.rs"), "utf8");
+    // The body must be the one `matches!` over the state, with nothing after
+    // it and no arm guard, so no other condition can hide beside the states.
+    const inert = /fn is_operational\(&self\) -> bool \{\s*!matches!\(\s*self\.state,\s*((?:UnitState::\w+\s*\|\s*)*UnitState::\w+),?\s*\)\s*\}/.exec(rust)?.[1];
+    expect(inert, "is_operational's shape changed; read its states again").toBeDefined();
+    const names = [...(inert ?? "").matchAll(/UnitState::(\w+)/g)].map((m) => m[1].replace(/[A-Z]/g, (c, at: number) => (at ? "_" : "") + c.toLowerCase()));
+    expect(new Set(names)).toEqual(INERT_STATES);
   });
 });
