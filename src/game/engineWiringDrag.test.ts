@@ -30,6 +30,7 @@ interface DragHooks {
   onActionDown?: (tile: number, floor: number, touch: boolean, picked: unknown) => void;
   onActionMove?: (tile: number, floor: number, picked: unknown) => void;
   onActionUp?: () => void;
+  onActionCancel?: () => void;
   preview?: unknown;
   transportPreview?: unknown;
 }
@@ -125,6 +126,65 @@ describe("a drag whose undo gesture closed", () => {
     hooks.onActionDown!(5, 2, false, { id: 1 });
     undo.gesture += 1; // another gesture opened and is still under way
     hooks.onActionUp!();
+    expect(app.commitUndo).not.toHaveBeenCalled();
+  });
+
+  it("closes its own gesture when a pinch cuts a touch paint off, and paints no more", () => {
+    vi.mocked(isPaintTool).mockReturnValue(true);
+    const { app, hooks } = makeApp({ type: "build", kind: "floor" });
+    hooks.onActionDown!(5, 2, true, null);
+    hooks.onActionMove!(6, 2, null); // the first move lays the strip
+    hooks.onActionCancel!(); // a second finger down: the press never releases
+    expect(app.commitUndo, "the step holds what the drag did").toHaveBeenCalledOnce();
+    hooks.onActionMove!(7, 2, null);
+    expect(app.build.paintFloorRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops the anchors and the run a cut-off press left, and places nothing", () => {
+    const { app, hooks } = makeApp({ type: "build", kind: "office" });
+    hooks.onActionDown!(10, 5, true, null); // a touch room waits for its release
+    app.paintAnchor = { tile: 3, floor: 2 };
+    app.transportStart = { x: 4, floor: 1 };
+    app.build.clearPaint.mockClear();
+    hooks.onActionCancel!();
+    expect([app.paintAnchor, app.buildAnchor, app.transportStart]).toEqual([null, null, null]);
+    expect(app.build.clearPaint).toHaveBeenCalledOnce();
+    expect(placeSimpleBuild).not.toHaveBeenCalled();
+  });
+
+  it("drops the ghosts a cut-off elevator drag left, so a press that never moves builds nothing", () => {
+    vi.mocked(placeSimpleBuild).mockReturnValue(null);
+    vi.mocked(isTransportTool).mockReturnValue(true);
+    const { app, hooks } = makeApp({ type: "build", kind: "elevatorStandard" });
+    hooks.onActionDown!(10, 1, true, null);
+    hooks.transportPreview = { kind: "elevatorStandard", x: 10, bottom: 1, top: 3, valid: true };
+    hooks.preview = { kind: "office", floor: 5, x: 10, valid: true };
+    hooks.onActionCancel!(); // the browser canceled the pointer mid-drag
+    expect([hooks.preview, hooks.transportPreview]).toEqual([null, null]);
+    hooks.onActionDown!(30, 4, true, null);
+    hooks.onActionUp!();
+    expect(app.build.tryBuildTransport).not.toHaveBeenCalled();
+  });
+
+  it("drops the ghost a lost release left, so the next press builds only what it sizes", () => {
+    vi.mocked(placeSimpleBuild).mockReturnValue(null);
+    vi.mocked(isTransportTool).mockReturnValue(true);
+    const { app, hooks } = makeApp({ type: "build", kind: "elevatorStandard" });
+    hooks.onActionDown!(10, 1, false, null);
+    hooks.transportPreview = { kind: "elevatorStandard", x: 10, bottom: 1, top: 6, valid: true };
+    // The release happened off the canvas, so no onActionUp or cancel came.
+    hooks.onActionDown!(30, 4, false, null);
+    expect(hooks.transportPreview).toBeNull();
+    hooks.onActionUp!();
+    expect(app.build.tryBuildTransport).not.toHaveBeenCalled();
+  });
+
+  it("leaves a gesture opened over a pinched drag for that gesture to close", () => {
+    vi.mocked(isPaintTool).mockReturnValue(true);
+    const { app, undo, hooks } = makeApp({ type: "build", kind: "floor" });
+    hooks.onActionDown!(5, 2, true, null);
+    undo.gesture += 1;
+    hooks.onActionCancel!();
     expect(app.commitUndo).not.toHaveBeenCalled();
   });
 

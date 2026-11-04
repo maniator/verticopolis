@@ -46,6 +46,7 @@ function play(raw: SerializedGame, store: Parameters<typeof browserAcknowledgeme
     enginePort: port,
     ui: { toast: (t) => void toasts.push(t) },
     followSwap: () => reader.update(),
+    showSteps: () => {},
   });
   const review = new ScheduleReview({
     engine: () => port,

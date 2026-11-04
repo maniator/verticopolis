@@ -10,12 +10,10 @@ import { armLongPress, cancelLongPressOnMove, clearLongPress, finishLongPress } 
 import type { TowerEngine } from "./TowerEngine";
 import { towerCatalog } from "../../catalog/towerCatalog";
 
-/**
- * Pointer input, entity picking, camera control and the audio view-focus for
- * {@link TowerEngine}, as friend functions taking the engine instance
- * (extracted from `TowerEngine.ts`; the class keeps thin delegations and the
- * coordinate transforms these read).
- */
+/** Pointer input, entity picking, camera control and the audio view-focus for
+ *  {@link TowerEngine}, as friend functions taking the engine instance
+ *  (extracted from `TowerEngine.ts`; the class keeps thin delegations and the
+ *  coordinate transforms these read). */
 
 /** Camera zoom range (screen px per world px). Lives in shared/viewZoom
  *  (VIEW_ZOOM_MIN/MAX: the save schema clamps a restored zoom at the
@@ -85,8 +83,9 @@ export function bindInput(engine: TowerEngine): void {
   const ptr = engine.engine.input.pointers;
   ptr.on("down", (ev) => pointerDown(engine, ev as ex.PointerEvent));
   ptr.on("move", (ev) => pointerMove(engine, ev as ex.PointerEvent));
-  ptr.on("up", (ev) => pointerUp(engine, ev as ex.PointerEvent));
-  ptr.on("cancel", (ev) => pointerUp(engine, ev as ex.PointerEvent));
+  ptr.on("up", (ev) => pointerUp(engine, ev as ex.PointerEvent, "release"));
+  // A canceled pointer (the OS took the touch) ends its gesture without acting.
+  ptr.on("cancel", (ev) => pointerUp(engine, ev as ex.PointerEvent, "cancel"));
   ptr.on("wheel", (ev) => {
     const w = ev as ex.WheelEvent;
     // Browsers remap Shift+wheel to horizontal scroll (deltaY 0), so under the
@@ -139,6 +138,7 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
       engine.longPressFired = false;
       engine.onLongPressEnd?.();
     }
+    if (engine.gesture === "action") engine.onActionCancel?.(); // it never releases
     engine.gesture = null;
     engine.preview = null;
     engine.transportPreview = null;
@@ -237,7 +237,7 @@ function pointerMove(engine: TowerEngine, ev: ex.PointerEvent): void {
   }
 }
 
-function pointerUp(engine: TowerEngine, ev: ex.PointerEvent): void {
+function pointerUp(engine: TowerEngine, ev: ex.PointerEvent, how: "release" | "cancel"): void {
   const pid = stablePointerId(ev.pointerId, ev.nativeEvent);
   // Same ownership rule as pointerMove: a release from a pointer that never
   // pressed here (a mouse press begun off-canvas) must not end the tracked
@@ -265,7 +265,7 @@ function pointerUp(engine: TowerEngine, ev: ex.PointerEvent): void {
   }
   if (engine.arrowDrag) {
     // A press without a drag extends a single floor.
-    if (engine.moved < 5) {
+    if (engine.moved < 5 && how === "release") {
       const t = engine.selectedId == null ? undefined : engine.sim.tower.getTransport(engine.selectedId);
       if (t) {
         const target = engine.arrowDrag.end === "up" ? t.top + 1 : t.bottom - 1;
@@ -280,11 +280,12 @@ function pointerUp(engine: TowerEngine, ev: ex.PointerEvent): void {
   const { tile, floor } = tf(ev);
   if (engine.gesture === "pan") {
     // Touch taps jitter more than mouse clicks, so allow a larger slop.
-    if (engine.moved < (engine.downTouch ? 14 : 5)) {
+    if (engine.moved < (engine.downTouch ? 14 : 5) && how === "release") {
       engine.onTap?.(tile, floor, ev.pointerType === "Touch", pickEntityAt(engine, ev.worldPos));
     }
   } else if (engine.gesture === "action") {
-    engine.onActionUp?.(tile, floor, pickEntityAt(engine, ev.worldPos));
+    if (how === "cancel") engine.onActionCancel?.();
+    else engine.onActionUp?.(tile, floor, pickEntityAt(engine, ev.worldPos));
   }
   engine.gesture = null;
 }

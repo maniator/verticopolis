@@ -88,7 +88,7 @@ describe("the app's history through the port", () => {
     const enginePort = new TsEngine(Simulation.newGame(1));
     const toasts: string[] = [];
     const followed: boolean[] = [];
-    const hist = createAppHistory({ enginePort, ui: { toast: (m) => toasts.push(m) }, followSwap: (keep) => followed.push(keep) });
+    const hist = createAppHistory({ enginePort, ui: { toast: (m) => toasts.push(m) }, followSwap: (keep) => followed.push(keep), showSteps: () => {} });
     await hist.undo();
     expect(toasts).toEqual(["Nothing to undo."]);
     expect(followed, "nothing was swapped").toEqual([]);
@@ -114,6 +114,7 @@ describe("the app's history through the port", () => {
       enginePort,
       ui: { toast: (m: string) => void toasts.push(m) },
       followSwap: (keep: boolean) => void followed.push(keep),
+      showSteps: () => {},
     });
     await expect(hist.undo()).resolves.toBeUndefined();
     expect(toasts).toEqual(["no load"]);
@@ -124,7 +125,7 @@ describe("the app's history through the port", () => {
     // `restore` carries the live autoBridge across, so undoing a BUILD never
     // silently flips a Settings toggle the player changed after that build.
     const enginePort = new TsEngine(Simulation.newGame(3, "modern", "realWorld"));
-    const hist = createAppHistory({ enginePort, ui: { toast: () => {} }, followSwap: () => {} });
+    const hist = createAppHistory({ enginePort, ui: { toast: () => {} }, followSwap: () => {}, showSteps: () => {} });
     const cx = Math.floor(GRID.width / 2);
     const before = enginePort.sim.serialize();
     hist.capture("Build"); // snapshot taken while bridging is on

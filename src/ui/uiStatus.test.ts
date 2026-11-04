@@ -5,7 +5,7 @@ import { towerCatalog } from "../catalog/towerCatalog";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
 import { ViewReader } from "../simport/viewReader";
-import { toast, update, type HudSource } from "./uiStatus";
+import { onHistoryClick, setHistoryButtons, toast, update, type HudSource } from "./uiStatus";
 import type { UI } from "./UI";
 
 /**
@@ -110,6 +110,23 @@ describe("toast rail", () => {
   });
 });
 
+/** A UI whose elements are made on demand, pumped from `sim` through the port.
+ *  The palette, catalog and log keys already match, so only the status bar,
+ *  the mode badge, the stats grid and the Undo and Redo buttons draw. */
+function hud(sim: Simulation) {
+  const made: Record<string, HTMLElement> = { undo: document.createElement("button"), redo: document.createElement("button") };
+  const el = new Proxy(made, {
+    get: (target, key: string) => (target[key] ??= document.createElement("div")),
+  });
+  const catalog = towerCatalog(sim);
+  let scanKey = sim.mode + ":" + sim.star;
+  for (const f of catalog.facilities) scanKey += sim.money >= f.cost ? "1" : "0";
+  const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: scanKey, lastLogSeq: sim.logSeq, tool: { type: "inspect" }, setTowerName: () => {} } as unknown as UI;
+  const port = new TsEngine(sim);
+  const src: HudSource = { reader: new ViewReader(port, facilityFloors), port, codes: new PortCodes(port) };
+  return { ui, el, src, port };
+}
+
 describe("update", () => {
   it("reads stats() once and labels the population from it", () => {
     const sim = Simulation.newGame(3, "classic");
@@ -119,17 +136,7 @@ describe("update", () => {
     for (const u of sim.tower.units) if (u.kind === "office") u.state = "occupied";
     const want = sim.stats().population;
     expect(want).toBeGreaterThan(0);
-    // Elements on demand; the palette, catalog and log keys already match,
-    // so only the status bar, the mode badge and the stats grid draw.
-    const el = new Proxy({} as Record<string, HTMLElement>, {
-      get: (made, key: string) => (made[key] ??= document.createElement("div")),
-    });
-    const catalog = towerCatalog(sim);
-    let scanKey = sim.mode + ":" + sim.star;
-    for (const f of catalog.facilities) scanKey += sim.money >= f.cost ? "1" : "0";
-    const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: scanKey, lastLogSeq: sim.logSeq, tool: { type: "inspect" }, setTowerName: () => {} } as unknown as UI;
-    const port = new TsEngine(sim);
-    const src: HudSource = { reader: new ViewReader(port, facilityFloors), port, codes: new PortCodes(port) };
+    const { ui, el, src } = hud(sim);
     const reads = vi.spyOn(sim, "stats");
     const population = vi.spyOn(sim, "population", "get");
     const census = vi.spyOn(sim.tower, "totalPopulation");
@@ -138,5 +145,103 @@ describe("update", () => {
     expect(population).not.toHaveBeenCalled();
     expect(census).not.toHaveBeenCalled();
     expect(el.pop.textContent).toBe(want.toLocaleString());
+  });
+
+  it("grays out Undo and Redo from the engine's steps on every pump", () => {
+    const sim = Simulation.newGame(3, "classic");
+    sim.money = 1e9;
+    const { ui, el, src, port } = hud(sim);
+    const grayed = () => [el.undo, el.redo].map((b) => b.getAttribute("aria-disabled") === "true");
+    update(ui, src);
+    expect(grayed(), "a new tower has no steps").toEqual([true, true]);
+    port.undoCapture("Build Lobby");
+    expect(sim.build("lobby", 1, 180).ok).toBe(true);
+    port.undoCommit();
+    update(ui, src);
+    expect(grayed(), "after an edit").toEqual([false, true]);
+    port.undo();
+    update(ui, src);
+    expect(grayed(), "after its undo").toEqual([true, false]);
+    port.redo();
+    update(ui, src);
+    expect(grayed(), "after its redo").toEqual([false, true]);
+    expect(port.loadSave(port.serialize())[0], "a tower adopted through the port").toBe(1);
+    update(ui, src);
+    expect(grayed(), "forgets the steps").toEqual([true, true]);
+  });
+});
+
+describe("the Undo and Redo buttons", () => {
+  /** A port holding `depths` steps, [undo, redo]. */
+  const holding = (depths: number[]) => ({ undoDepths: () => Float64Array.from(depths) });
+
+  const buttons = () => {
+    const undo = document.body.appendChild(document.createElement("button"));
+    const redo = document.body.appendChild(document.createElement("button"));
+    return { undo, redo, ui: { el: { undo, redo } } as unknown as UI };
+  };
+  const grayed = (...bs: HTMLButtonElement[]) => bs.map((b) => b.getAttribute("aria-disabled") === "true");
+
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("gray out while the engine holds no step that way, and come back when it does", () => {
+    const { undo, redo, ui } = buttons();
+    setHistoryButtons(ui, holding([0, 0]));
+    expect(grayed(undo, redo), "a new tower has no steps").toEqual([true, true]);
+    setHistoryButtons(ui, holding([1, 0]));
+    expect(grayed(undo, redo), "after an edit").toEqual([false, true]);
+    setHistoryButtons(ui, holding([0, 1]));
+    expect(grayed(undo, redo), "after its undo").toEqual([true, false]);
+    setHistoryButtons(ui, holding([0, 0]));
+    expect(grayed(undo, redo), "no step either way again").toEqual([true, true]);
+  });
+
+  it("keep the focus when they gray out, so Enter or Space stays on the button", () => {
+    const { undo, ui } = buttons();
+    undo.focus();
+    setHistoryButtons(ui, holding([0, 0]));
+    expect(undo.disabled, "a disabled button would drop the focus to the page").toBe(false);
+    expect(document.activeElement).toBe(undo);
+  });
+
+  it("write the page only when a state flips", () => {
+    const { undo, ui } = buttons();
+    const set = vi.spyOn(undo, "setAttribute");
+    const clear = vi.spyOn(undo, "removeAttribute");
+    for (const depths of [[0, 0], [0, 0], [1, 0], [1, 0]]) setHistoryButtons(ui, holding(depths));
+    expect([set.mock.calls.length, clear.mock.calls.length]).toEqual([1, 1]);
+  });
+
+  it("do nothing when pressed while grayed out", () => {
+    const { undo, ui } = buttons();
+    const run = vi.fn();
+    onHistoryClick(undo, run);
+    setHistoryButtons(ui, holding([0, 0]));
+    undo.click();
+    expect(run).not.toHaveBeenCalled();
+    setHistoryButtons(ui, holding([1, 0]));
+    undo.click();
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it("still undo a gesture left open when Undo is gray", () => {
+    const { undo, ui } = buttons();
+    const run = vi.fn();
+    let open = true; // a release the canvas never saw left the gesture open
+    onHistoryClick(undo, run, () => open);
+    setHistoryButtons(ui, holding([0, 0]));
+    undo.click();
+    expect(run).toHaveBeenCalledOnce();
+    open = false;
+    undo.click();
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it("leave a page without the buttons alone", () => {
+    const ui = { el: { undo: null, redo: null } } as unknown as UI;
+    expect(() => setHistoryButtons(ui, holding([1, 1]))).not.toThrow();
+    expect(() => onHistoryClick(null, () => {})).not.toThrow();
   });
 });

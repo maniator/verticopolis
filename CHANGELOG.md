@@ -21,6 +21,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.84.0
+
+- The Undo and Redo buttons gray out when there is nothing to undo or redo.
+- When a touch drag is interrupted, nothing that waits for your release gets built, and what it already built can be undone.
+
 ## 2.83.1
 
 - The Map draws itself again after the browser resets its graphics, where it used to stay blank until the tower changed.

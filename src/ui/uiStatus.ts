@@ -15,10 +15,11 @@ import { bindViewWorld } from "../presentation/viewWorld";
 import { bindViewKinds } from "../presentation/viewKinds";
 
 /**
- * Status-bar, palette-lock, tower-stats and bulletin-log rendering for
- * {@link UI}, as friend functions taking the UI instance. This is the per-frame
- * pump ({@link update}) plus the toast rail and log baseline helpers. Extracted
- * from `UI.ts`; the class keeps thin delegations.
+ * Status-bar, palette-lock, tower-stats, Undo and Redo, and bulletin-log
+ * rendering for {@link UI}, as friend functions taking the UI instance. This
+ * is the HUD pump ({@link update}, which runs on a wall-clock throttle)
+ * plus the toast rail and log baseline helpers. Extracted from `UI.ts`; the
+ * class keeps thin delegations.
  *
  * The bulletin log and the toast rail stay IMPERATIVE by decision (E7-S1 of
  * the lit migration; rationale in the implementation backlog): they are
@@ -30,12 +31,12 @@ import { bindViewKinds } from "../presentation/viewKinds";
  */
 
 /** What the HUD pump reads: the shared view reader (header and tower name),
- *  the port's strip and log members, and the codes to read them by name. The
- *  game hands out a source whose members it reads per call
+ *  the port's strip, log and undo-depth members, and the codes to read them
+ *  by name. The game hands out a source whose members it reads per call
  *  (`src/game/hudSource.ts`). */
 export interface HudSource {
   readonly reader: Pick<SimView, "header" | "tower">;
-  readonly port: Pick<EnginePort, "statsStrip" | "logAfter" | "logText">;
+  readonly port: Pick<EnginePort, "statsStrip" | "logAfter" | "logText" | "undoDepths">;
   readonly codes: Pick<PortCodes, "code" | "slot">;
 }
 
@@ -78,7 +79,8 @@ const TOAST_MAX = 5;
  *  the node so the entry is collected once the node is unreachable. */
 const toastTimers = new WeakMap<Element, number>();
 
-/** Refresh status bar, palette locks, tower stats and the bulletin log. */
+/** Refresh the status bar, palette locks, tower stats, the Undo and Redo
+ *  buttons and the bulletin log. */
 export function update(ui: UI, src: HudSource): void {
   const { header } = src.reader;
   const { money, star, mode } = header;
@@ -158,7 +160,46 @@ export function update(ui: UI, src: HudSource): void {
   // #tower-stats is lit's container exclusively (one container, one renderer).
   render(towerStatsTemplate(stats), ui.el.towerStats);
 
+  setHistoryButtons(ui, src.port);
   renderLog(ui, src);
+}
+
+/** Gray out Undo or Redo while the engine holds no step that way, so the
+ *  toolbar shows when there is nothing to step back or forward to. The HUD
+ *  pump calls it, and so does every undo call the app makes
+ *  (`appHistory.ts`), so the buttons never lag an edit, an undo or a redo.
+ *  A gesture under way counts once it closes: one is normally open only
+ *  while a press is held (a release the canvas never saw can leave one open,
+ *  #1014), its release updates the buttons, and Ctrl+Z or a click on Undo
+ *  still closes and undoes it ({@link onHistoryClick}). One two-number read
+ *  per call; the DOM is written only when a state flips. */
+export function setHistoryButtons(ui: UI, port: Pick<EnginePort, "undoDepths">): void {
+  const [undoSteps, redoSteps] = port.undoDepths();
+  grayWhen(ui.el.undo, undoSteps === 0);
+  grayWhen(ui.el.redo, redoSteps === 0);
+}
+
+/** Run `run` when `button` is clicked while it is not grayed out, or while
+ *  `underWay` says a gesture it would close is still open. */
+export function onHistoryClick(button: HTMLButtonElement | null, run: () => void, underWay = () => false): void {
+  button?.addEventListener("click", () => {
+    if (!grayedOut(button) || underWay()) run();
+  });
+}
+
+/** Gray out `button` or bring it back, on a page that has it. It stays
+ *  focusable: `disabled` would drop the focus to the page, and the next Enter
+ *  or Space would then reach the game keys and build at the cursor. So it is
+ *  marked `aria-disabled`, which the stylesheet draws as GrayText, and its
+ *  click does nothing ({@link onHistoryClick}). */
+function grayWhen(button: HTMLButtonElement | null, off: boolean): void {
+  if (!button || grayedOut(button) === off) return;
+  if (off) button.setAttribute("aria-disabled", "true");
+  else button.removeAttribute("aria-disabled");
+}
+
+function grayedOut(button: HTMLButtonElement): boolean {
+  return button.getAttribute("aria-disabled") === "true";
 }
 
 const STRIP_FIELDS = [

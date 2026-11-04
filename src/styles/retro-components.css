@@ -48,10 +48,16 @@ a.btn {
   font-weight: 700;
 }
 /* Disabled = classic GrayText on the same raised chrome (never a hover/
-   pointer affordance). The browser already suppresses :active. */
-.btn:disabled {
+   pointer affordance). The browser already suppresses :active. Undo and Redo
+   gray out with aria-disabled instead, so they keep the keyboard focus; they
+   stay raised when pressed. */
+.btn:disabled,
+.btn[aria-disabled="true"] {
   color: var(--r-shadow);
   cursor: default;
+}
+.btn[aria-disabled="true"]:active {
+  box-shadow: var(--bevel-out);
 }
 /* Title-bar size: the ✕ on every dismissible surface, the coach's Skip. */
 .btn.xs {

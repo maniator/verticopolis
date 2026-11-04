@@ -9,7 +9,7 @@ describe("createAppHistory", () => {
     const enginePort = new TsEngine(Simulation.newGame(1));
     const followSwap = vi.fn();
     const toast = vi.fn();
-    const hist = createAppHistory({ enginePort, ui: { toast }, followSwap });
+    const hist = createAppHistory({ enginePort, ui: { toast }, followSwap, showSteps: () => {} });
     const capture = vi.spyOn(enginePort, "undoCapture");
     hist.capture("build");
     expect(capture).toHaveBeenCalledWith("build");
@@ -22,7 +22,7 @@ describe("createAppHistory", () => {
 
   it("forwards a discard and clears the trail through the engine", () => {
     const enginePort = new TsEngine(Simulation.newGame(1));
-    const hist = createAppHistory({ enginePort, ui: { toast: () => {} }, followSwap: () => {} });
+    const hist = createAppHistory({ enginePort, ui: { toast: () => {} }, followSwap: () => {}, showSteps: () => {} });
     const discard = vi.spyOn(enginePort, "undoDiscard");
     hist.capture("peek");
     hist.discard();
@@ -37,7 +37,7 @@ describe("createAppHistory", () => {
 
   it("numbers the gesture under way until anything closes it", () => {
     const enginePort = new TsEngine(Simulation.newGame(1));
-    const hist = createAppHistory({ enginePort, ui: { toast: () => {} }, followSwap: () => {} });
+    const hist = createAppHistory({ enginePort, ui: { toast: () => {} }, followSwap: () => {}, showSteps: () => {} });
     expect(hist.gesture(), "none open").toBe(NO_GESTURE);
     hist.capture("a");
     const first = hist.gesture();
@@ -52,15 +52,55 @@ describe("createAppHistory", () => {
     }
   });
 
+  it("shows the steps the engine holds after every call that reaches it", async () => {
+    const enginePort = new TsEngine(Simulation.newGame(1));
+    // Each show reads the depths, so it proves the call ran after the engine moved them.
+    const shown: number[][] = [];
+    const showSteps = () => void shown.push(Array.from(enginePort.undoDepths()));
+    const hist = createAppHistory({ enginePort, ui: { toast: () => {} }, followSwap: () => {}, showSteps });
+    hist.capture("a");
+    enginePort.sim.build("lobby", 1, 160);
+    const calls = [hist.commit, hist.undo, hist.redo, hist.discard, hist.clear];
+    for (const call of calls) await call();
+    expect(shown).toEqual([
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 0],
+      [1, 0],
+      [0, 0],
+    ]);
+  });
+
+  it("shows the steps once the host has followed a step", async () => {
+    const enginePort = new TsEngine(Simulation.newGame(1));
+    const order: string[] = [];
+    const hist = createAppHistory({
+      enginePort,
+      ui: { toast: () => {} },
+      followSwap: () => order.push("follow"),
+      showSteps: () => order.push("show"),
+    });
+    hist.capture("build");
+    enginePort.sim.build("lobby", 1, 160);
+    hist.commit();
+    order.length = 0;
+    await hist.undo();
+    expect(order).toEqual(["follow", "show"]);
+  });
+
   it("shows the engine's reason for a refused step and resolves", async () => {
     const enginePort = new TsEngine(Simulation.newGame(1));
     const followSwap = vi.fn();
     const toast = vi.fn();
-    const hist = createAppHistory({ enginePort, ui: { toast }, followSwap });
+    const showSteps = vi.fn();
+    const hist = createAppHistory({ enginePort, ui: { toast }, followSwap, showSteps });
     vi.spyOn(enginePort, "undo").mockReturnValue(Float64Array.of(UNDO_REFUSED, enginePort.generation()));
     vi.spyOn(enginePort, "lastReason").mockReturnValue("Not enough money to undo that.");
     await expect(hist.undo()).resolves.toBeUndefined();
     expect(toast).toHaveBeenCalledExactlyOnceWith("Not enough money to undo that.", "info");
     expect(followSwap).not.toHaveBeenCalled();
+    // An undo may close an open gesture before it is refused, so the depths can move.
+    expect(showSteps, "the refused step still shows the steps").toHaveBeenCalledOnce();
   });
 });

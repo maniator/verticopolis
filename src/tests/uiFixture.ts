@@ -92,6 +92,7 @@ export function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICa
     onToggleAudio: vi.fn(() => true),
     onUndo: vi.fn(),
     onRedo: vi.fn(),
+    undoUnderWay: vi.fn(() => false),
     onEditAction: vi.fn(),
     onToggleReducedMotion: vi.fn(() => true),
     onToggleSteadyClock: vi.fn(() => true),

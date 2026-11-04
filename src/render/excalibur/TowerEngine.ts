@@ -106,6 +106,8 @@ export class TowerEngine {
   onActionDown: ((tile: number, floor: number, touch: boolean, picked: Picked | null) => void) | null = null;
   onActionMove: ((tile: number, floor: number, picked: Picked | null) => void) | null = null;
   onActionUp: ((tile: number, floor: number, picked: Picked | null) => void) | null = null;
+  /** A press cut off by a pinch or a canceled pointer: no onActionUp. */
+  onActionCancel: (() => void) | null = null;
   onHover: ((tile: number, floor: number, picked: Picked | null) => void) | null = null;
   /** Touch long-press "peek" (the touch equivalent of a desktop hover): fires
    *  at the hold knee with the pressed cell/entity; onLongPressEnd on release. */
