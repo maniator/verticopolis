@@ -5,10 +5,9 @@
 > engine still being cut over (#945). It is not a live figure and not release
 > performance. The live number comes from re-running `npm run perf:compare`
 > (`src/tests/perfCompare/`, tests beside it). The raw results behind every
-> figure here are in
-> [`results/2026-10-14-01c6153/`](results/2026-10-14-01c6153/) (`results.json`,
-> `metrics.csv`, `raw.csv`, `comparisons.csv`, and the machine-written
-> `report.md`).
+> figure here are in the private verticopolis-benchmarks repository; the
+> summary of the run is
+> [`results/2026-10-14-01c6153.md`](results/2026-10-14-01c6153.md).
 >
 > **Biased in WASM's favor.** That run measured the medium and large towers in
 > a page an earlier tower had used, which slowed the TypeScript engine (#1162,
