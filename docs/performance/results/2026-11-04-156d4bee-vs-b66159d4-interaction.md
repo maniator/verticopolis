@@ -1,10 +1,11 @@
 # Interaction benchmark, 156d4bee against b66159d4
 
-**Snapshot of 2026-11-04, not refreshing.** One run of `npm run perf:interaction` (see [interaction-benchmark.md](../interaction-benchmark.md)); run it again for current figures. It is not a gate. The raw `results.json`, the full `report.md` and the run log are in the project's shared folder (`interaction-156d4bee-vs-b66159d4-report.md`, `-results.json`, `interaction-run-log.txt`), not in the repo.
+**Snapshot of 2026-11-04, not refreshing.** One run of `npm run perf:interaction` (see [interaction-benchmark.md](../interaction-benchmark.md)); run it again for current figures. It is not a gate. The raw `results.json`, the full `report.md` and the run log are in [verticopolis-benchmarks](https://github.com/maniator/verticopolis-benchmarks/tree/main/results/2026-11-04-156d4bee-vs-b66159d4-interaction) (private repository), not in this repo.
 
 - Arm A: 2.78.11 at `156d4bee`. Arm B: 2.78.12 at `b66159d4`. Both are tooling builds from their own worktrees.
 - Large tower (43,358 units), 6 paired repetitions at 1x and 4x CPU throttle, 20 s per phase with one autosave in the middle, a fresh Chrome 156 per arm, arms alternating.
-- Machine: Windows PC, Ryzen 5 5600X, RTX 3060 through ANGLE (D3D11).
+- Machine: Windows PC, Ryzen 5 5600X, RTX 3060 through ANGLE (D3D11), real Chrome 156.0.8078.80 with the CPU throttle applied through the DevTools protocol.
+- Machine state: ChatGPT closed, idle CPU about 8% before the run, and 6 background Chrome processes that could not be closed, so the numbers carry a little noise from them.
 - Every arm ran clean: 0 page errors and 0 frame errors.
 
 ## Top numbers

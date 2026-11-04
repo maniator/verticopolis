@@ -70,7 +70,7 @@ undo empties the app's own list.
 
 `report.md` and `results.json` land in
 `docs/performance/results/<date>-<commit A>-vs-<commit B>-interaction` (with a
-counter when that folder exists) unless `--out` names a folder; `results.json`
+counter when that folder exists) unless `--out` names a folder (the repository keeps a summary of each run and sends the raw folder to the private verticopolis-benchmarks repository, per `benchmark-protocol.md`); `results.json`
 is rewritten after every arm, so a run that fails late keeps what it measured.
 The report opens with its snapshot date. Frame metrics (p95, p99, 1% low)
 compare as paired ratios, B over A, one per repetition. Blocking and input

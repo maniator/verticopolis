@@ -140,7 +140,7 @@ integer floor keys:
   `accumulate` now computes the same sum one call earlier, so `spawn_step`
   could take it; `crowd/spawn.rs` belongs to the other hotspot lane.
 - The PR also carries the #1051 large-tower fresh-page PC run on 9cd44d1
-  (`docs/performance/results/2026-10-21-9cd44d1-1051-fresh-large`, added in
+  (`docs/performance/results/2026-10-21-9cd44d1-1051-fresh-large.md`, added in
   4b99d9e). It is #1051's evidence and measures nothing in this story.
 
 ## Result
