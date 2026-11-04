@@ -356,7 +356,7 @@ export class OverviewMapWindow {
       this.outsideTouches.add(e.pointerId);
       this.dropStaleTouchPress(e);
     } else {
-      // Any button: the world pans on the middle and right buttons too.
+      // Any button: the world takes the middle button (a pan) and the right (an inspect) too.
       this.worldPress.set(true);
     }
   }

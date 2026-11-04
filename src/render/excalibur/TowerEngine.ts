@@ -102,6 +102,7 @@ export class TowerEngine {
   // Controller-supplied input hooks (the controller owns tool semantics). `picked` is the
   // entity under the pointer (or null); `panKey` is a held pan modifier (Space or Shift).
   classifyDown: ((button: number, touch: boolean, panKey: boolean) => "pan" | "action") | null = null;
+  spacePanKey: ((press?: Event) => boolean) | null = null; // the game's Space hold as `press` went down
   onTap: ((tile: number, floor: number, touch: boolean, picked: Picked | null) => void) | null = null;
   onActionDown: ((tile: number, floor: number, touch: boolean, picked: Picked | null) => void) | null = null;
   onActionMove: ((tile: number, floor: number, picked: Picked | null) => void) | null = null;

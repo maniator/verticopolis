@@ -58,6 +58,8 @@ export function wireEngine(app: GameApp): void {
   // touch, so mobile couldn't paint a run at all. On mouse the pan key
   // (Space or Shift, resolved in towerInputCamera) pans with any tool armed.
   app.engine.classifyDown = (button, touch, panKey) => classifyGesture(catalogOf(app), app.tool, button, touch, panKey);
+  // Space pans only while the game follows it (inputKeys), read per press.
+  app.engine.spacePanKey = (press) => app.spacePanKey(press);
 
   // A press-without-drag: select (inspect) or, on touch, run the tool. The
   // picked entity resolves transports by collider hit-test and units by the

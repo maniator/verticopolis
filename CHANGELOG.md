@@ -21,6 +21,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.84.1
+
+- Holding Space before a mouse drag now pans the view without building or clicking a focused control. Tapping Space acts at the keyboard cursor when you let go.
+- Holding Enter, Delete, Backspace or X at the keyboard cursor acts once instead of repeating.
+- The help no longer says a right-button drag pans: a right-click inspects a room.
+
 ## 2.84.0
 
 - The Undo and Redo buttons gray out when there is nothing to undo or redo.

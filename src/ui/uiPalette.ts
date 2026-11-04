@@ -5,6 +5,7 @@ import type { FacilityCategory, FacilityKind } from "../engine/types";
 import type { Tool, UI } from "./UI";
 import { shortMoney } from "./format";
 import { iconTemplate } from "./icons";
+import { isSpaceKey } from "../shared/inputEvents";
 
 /**
  * Build-palette construction for {@link UI}, as friend functions taking the UI
@@ -200,13 +201,39 @@ function makeActivatable(item: HTMLElement, label: string, onActivate: () => voi
   item.setAttribute("role", "button");
   item.setAttribute("aria-label", label);
   item.addEventListener("click", onActivate);
+  // Native button semantics: Enter acts on the press, Space on the release, and
+  // a held key acts once. Neither key is stopped from bubbling: the world reads
+  // a held Space as its pan key from the window, and the build-cursor handler
+  // leaves Enter and Space to a focused role=button control (inputKeys).
+  let spacePressed = false;
   item.addEventListener("keydown", (e) => {
-    if (e.repeat) return; // a held key must not fire repeatedly (native button semantics)
-    if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+    // Ctrl, Cmd or Alt, alone or with Space, starts a system shortcut (an input
+    // switcher, the window menu): it drops a pending press, as the game drops
+    // its tap, so the chord's release does not pick the tool.
+    const chord = e.ctrlKey || e.metaKey || e.altKey;
+    if (chord) spacePressed = false;
+    if (isSpaceKey(e)) {
+      if (chord) return; // left to the system
+      e.preventDefault(); // repeats too, or a held Space scrolls the palette
+      if (!e.repeat) spacePressed = true;
+      return;
+    }
+    if (e.key === "Enter" && !e.repeat) {
       e.preventDefault();
-      e.stopPropagation(); // don't also reach the global build-cursor handler
       onActivate();
     }
+  });
+  item.addEventListener("keyup", (e) => {
+    if (!isSpaceKey(e)) return;
+    const pressedHere = spacePressed;
+    spacePressed = false;
+    // A Space held as the pan key reaches here already canceled (inputKeys),
+    // so a drag that panned the world does not pick the tool again.
+    const chord = e.ctrlKey || e.metaKey || e.altKey;
+    if (pressedHere && !chord && !e.defaultPrevented) onActivate();
+  });
+  item.addEventListener("blur", () => {
+    spacePressed = false;
   });
 }
 

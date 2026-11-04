@@ -44,7 +44,7 @@ describe("wheel zoom", () => {
     const { e, handlers } = inputEng();
     const z0 = e.cam.zoom;
     handlers.wheel({ deltaY: 0, deltaX: -3, x: 400, y: 300, ev: { shiftKey: false } });
-    handlers.wheel({ deltaY: 0, deltaX: 3, x: 400, y: 300 }); // no native ev at all
+    handlers.wheel({ deltaY: 3, deltaX: 3, x: 400, y: 300, ev: { deltaY: 0, deltaX: 40 } }); // Excalibur's deltaY from wheelDelta
     expect(e.cam.zoom).toBe(z0);
   });
 });
@@ -73,11 +73,12 @@ describe("pointer down routing", () => {
     expect(classifyDown).toHaveBeenCalledWith(0, false, false);
   });
 
-  it("held Space still reaches classifyDown as the pan key (unchanged by Shift support)", () => {
+  it("the game's Space hold reaches classifyDown as the pan key (unchanged by Shift support)", () => {
     const classifyDown = vi.fn(() => "pan");
     const { e, handlers } = inputEng({ classifyDown });
-    e.engine.input.keyboard.isHeld = () => true;
-    handlers.down(ptr({}));
+    const down = ptr({}) as { nativeEvent: Event };
+    e.spacePanKey = (press?: Event) => press === down.nativeEvent; // the hold as this press went down
+    handlers.down(down);
     expect(classifyDown).toHaveBeenCalledWith(0, false, true);
   });
 

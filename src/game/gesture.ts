@@ -44,7 +44,7 @@ export function classifyGesture(
   touch: boolean,
   panKey: boolean,
 ): "pan" | "action" {
-  if (button > 0 || panKey) return "pan"; // middle/right button or held Space/Shift
+  if (button > 0 || panKey) return "pan"; // middle button or held Space/Shift (a right-click inspects before this)
   if (tool.type === "inspect") return "pan"; // inspect: drag pans, tap selects
   // Narrow to the build variant IN the condition so `tool.kind` is unambiguously
   // in scope (a `const build = tool.type === "build"` alias only narrows under TS's

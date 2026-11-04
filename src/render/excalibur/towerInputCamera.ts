@@ -3,6 +3,7 @@ import { viewWorld } from "../../presentation/viewWorld";
 import { findCatalogFacility } from "../../catalog/catalogTypes";
 import type { FacilityKind, SerializedView, WeatherKind } from "../../engine/types";
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../shared/viewZoom";
+import { wheelZoomDelta } from "../../shared/inputEvents";
 import { clampCameraY, fitZoom } from "../cameraBounds";
 import { stablePointerId } from "../pinchTracker";
 import { FLOOR, TILE } from "../scale";
@@ -88,10 +89,9 @@ export function bindInput(engine: TowerEngine): void {
   ptr.on("cancel", (ev) => pointerUp(engine, ev as ex.PointerEvent, "cancel"));
   ptr.on("wheel", (ev) => {
     const w = ev as ex.WheelEvent;
-    // Browsers remap Shift+wheel to horizontal scroll (deltaY 0), so under the
-    // Shift pan key deltaX carries the zoom; ungated sideways swipes still scroll.
-    let d = w.deltaY;
-    if (d === 0) d = (w.ev as { shiftKey?: boolean } | undefined)?.shiftKey ? w.deltaX : 0;
+    // The native deltas, as Excalibur's own deltaY zooms on a sideways swipe; under Shift, deltaX zooms.
+    const n = (w.ev ?? {}) as Partial<WheelEvent>;
+    const d = wheelZoomDelta({ deltaX: n.deltaX ?? w.deltaX, deltaY: n.deltaY ?? w.deltaY, shiftKey: n.shiftKey });
     if (d === 0) return;
     zoomAt(engine, d < 0 ? 1.12 : 0.89, w.x, w.y);
   });
@@ -152,10 +152,10 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
   finishLongPress(engine); // an orphaned peek (lost release) dismisses its card, not just the latch
   const touch = ev.pointerType === "Touch";
   engine.downTouch = touch;
-  // Pan key: Space (Excalibur keyboard) or Shift off the native pointer event.
-  // Down-only, like Space: releasing it mid-drag keeps the pan.
-  const native = ev.nativeEvent as { shiftKey?: boolean } | undefined;
-  const panKey = engine.engine.input.keyboard.isHeld(ex.Keys.Space) || native?.shiftKey === true;
+  // Pan key: the game's Space hold (spacePanKey) as this press went down, or
+  // Shift off the native pointer event. Down-only: releasing it mid-drag keeps the pan.
+  const native = ev.nativeEvent as (Event & { shiftKey?: boolean }) | undefined;
+  const panKey = engine.spacePanKey?.(native) === true || native?.shiftKey === true;
   // Left-click on a selected elevator's extend arrow grows the shaft. A held
   // pan key skips the arrow: the modifier promises the drag only pans.
   if (buttonNum(ev) === 0 && !panKey && engine.onExtendTo) {

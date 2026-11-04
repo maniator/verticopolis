@@ -1,10 +1,14 @@
 /**
  * Keeping the game's keys out of the world while the overview MAP window has
  * focus (#343, CAP-5). The map stops a key's keydown from reaching the game;
- * this keeps the rest of that key's life away from it too, so the world's
- * key tracker (Excalibur's, which names keys by code and, given a release it
- * never saw pressed, drops whichever key it holds last, Space among them)
- * never sees half a press.
+ * this keeps the rest of that key's life away from it too: the key's repeats
+ * after focus leaves the map never reach the game's bubble-phase key handlers
+ * (the build cursor and the speed keys), and its release never reaches the
+ * world's key tracker (Excalibur's, which names keys by code and, given a
+ * release it never saw pressed, drops whichever key it holds last). Nothing
+ * in the game reads that tracker now. The game's Space hold (`bindKeys`), the
+ * camera's pan key, listens on the window in the capture phase, which runs
+ * before this keeper's document listeners, so it sees every key.
  */
 
 /** A physical key, as the world's key tracker names it (the code, which a

@@ -79,12 +79,12 @@ knowing:
 
 | Action | How |
 | --- | --- |
-| Pan | Drag with the Inspect tool, middle/right mouse, or hold Space |
+| Pan | Drag with the Inspect tool, drag with the middle button, or hold Shift or Space and drag |
 | Zoom | Mouse wheel |
 | Build a room | Pick it from the left palette, click on a floor |
 | Build/paint floors | Pick `Floor`/`Lobby`, click-drag |
 | Build an elevator/stairs | Pick it, drag vertically to set the span |
-| Edit a facility | Inspect tool, click a room or shaft → edit panel |
+| Edit a facility | Right-click a room or shaft, or click it with the Inspect tool → edit panel |
 | Bulldoze | Bulldoze tool, click (or drag) |
 | Game speed | Top-right buttons, or number keys `0`–`3` |
 | Undo / Redo | `Ctrl+Z` / `Ctrl+Shift+Z` (`⌘` on Mac), or the ↩ ↪ top-bar buttons |
