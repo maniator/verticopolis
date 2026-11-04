@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { buildProduction, buildTooling, npmEntry, runNodeCli } from "./build";
+import { buildProduction, buildTooling, npmEntry, productionBuildEnv, runNodeCli } from "./build";
 
 const roots: string[] = [];
 function fixture(): string {
@@ -29,6 +29,11 @@ describe("shell-free worker comparison builds", () => {
     // Started the way the owner's Windows run is: `npx vitest` puts npm_lifecycle_event=npx in the environment.
     buildProduction(root, { ...process.env, npm_lifecycle_event: "npx", npm_lifecycle_script: "vitest", VC_TEST_EXPAND: "literal & value" });
     expect(readFileSync(join(root, "lifecycle.txt"), "utf8").split("\n")).toEqual(["prebuild:literal & value", "build:literal & value", "postbuild:literal & value", ""]);
+  });
+
+  it("drops the parent's lifecycle identity and VC_TOOLING whatever case the platform spells them in", () => {
+    const env = { NPM_LIFECYCLE_EVENT: "npx", Npm_Lifecycle_Script: "vitest", npm_lifecycle_event: "npx", vc_tooling: "1", VC_TOOLING: "1", KEEP: "yes" };
+    expect(productionBuildEnv(env)).toEqual({ KEEP: "yes" });
   });
 
   it("resolves the checkout's Vite entry and preserves its build arguments", () => {

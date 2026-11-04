@@ -3,6 +3,8 @@ import { showEngineFailure } from "./bootstrap";
 import { runEngineRepair } from "./engineRepairControl";
 import type { RepairResult } from "./wasmhost/engineRepair";
 
+vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
+
 const mismatch = {
   stage: "load",
   reason: "package-mismatch",
