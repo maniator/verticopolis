@@ -279,6 +279,8 @@ export const BINDING_EXPORT_TIERS = {
   startFire: T3,
   bombThreat: T3,
   evaluateStar: T3,
+  setClock: T3,
+  setUnitState: T3,
   advanceClock: T3,
   seedLoopMemos: T3,
   seedElevatorTelemetry: T3,

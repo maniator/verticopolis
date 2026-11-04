@@ -2,8 +2,12 @@ import { afterEach, describe } from "vitest";
 import { KIND_CODES, VIEW_LAYOUT, codeOf } from "../../engine/port/layout";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { Simulation } from "../../engine/Simulation";
+import { Clock } from "../../engine/Clock";
+import { crowdView } from "../../engine/conformanceView";
+import { markRoom, setRoomState } from "../../engine/tower/rooms";
+import type { Person } from "../../engine/crowd/person";
 import type { Tower } from "../../engine/Tower";
-import type { FacilityKind, SerializedGame, Transport, Unit } from "../../engine/types";
+import { isUnitState, type FacilityKind, type SerializedGame, type Transport, type Unit, type UnitState } from "../../engine/types";
 import type { HeatCell, HeatmapMode } from "../../engine/sim/constants";
 import type { EnginePort } from "../../simport/enginePort";
 import type { StatsReport } from "../../simport/panels";
@@ -60,10 +64,21 @@ interface Leaf {
   bombThreat(): void;
   evaluateStar(): void;
   setMoney(amount: number): void;
+  setClock(minutes: number): boolean;
+  setUnitState(id: number, state: UnitState, occupants?: number): boolean;
+  /** The live crowd as the conformance view writes it. */
+  crowdView(): { people: Person[] };
   /** The hourly utilization average the engine holds for a shaft, if any. */
   elevatorUtilization(id: number): number | undefined;
   free(): void;
 }
+
+/** The tooling setters' bounds, the same on both legs (the Rust members in
+ *  `exports_state.rs` carry the twins): the latest clock in minutes, and the
+ *  states a bare write cannot make because the engine keeps a timer or an
+ *  event record beside them. */
+const MAX_TOOL_CLOCK_MINUTES = 1e9;
+const NEEDS_ITS_OWN_RECORD: ReadonlySet<UnitState> = new Set(["construction", "fire"]);
 
 function makeLeaf(leg: Leg, save: string): Leaf {
   if (leg === "ts") {
@@ -76,6 +91,24 @@ function makeLeaf(leg: Leg, save: string): Leaf {
       setMoney: (amount) => {
         engine.sim.money = amount;
       },
+      // The same refusals as the Rust members, so a test fails alike on both.
+      setClock: (minutes) => {
+        if (!(minutes >= 0 && minutes <= MAX_TOOL_CLOCK_MINUTES)) return false;
+        engine.sim.clock = new Clock(minutes, engine.sim.clock.calendar);
+        return true;
+      },
+      setUnitState: (id, state, occupants) => {
+        const unit = engine.sim.tower.units.find((u) => u.id === id);
+        if (!unit || !isUnitState(state) || NEEDS_ITS_OWN_RECORD.has(state)) return false;
+        if (occupants !== undefined && !(Number.isSafeInteger(occupants) && occupants >= 0)) return false;
+        setRoomState(engine.sim.tower, unit, state);
+        if (occupants !== undefined) {
+          unit.occupants = occupants;
+          markRoom(engine.sim.tower, unit);
+        }
+        return true;
+      },
+      crowdView: () => JSON.parse(JSON.stringify(crowdView(engine.sim))) as { people: Person[] },
       elevatorUtilization: (id) => engine.sim.elevatorUtilization(id),
       free: () => undefined,
     };
@@ -87,6 +120,9 @@ function makeLeaf(leg: Leg, save: string): Leaf {
     bombThreat: () => engine.bombThreat(),
     evaluateStar: () => engine.evaluateStar(),
     setMoney: (amount) => engine.setMoney(amount),
+    setClock: (minutes) => engine.setClock(minutes),
+    setUnitState: (id, state, occupants) => engine.setUnitState(id, state, occupants),
+    crowdView: () => JSON.parse(engine.crowdView()) as { people: Person[] },
     elevatorUtilization: (id) => (JSON.parse(engine.elevatorTelemetry()) as { util: [number, number][] }).util.find(([shaft]) => shaft === id)?.[1],
     free: () => engine.free(),
   };
@@ -375,6 +411,25 @@ export class PortSim {
   setMoney(amount: number): void {
     this.leaf.setMoney(amount);
     this.changed();
+  }
+
+  /** Put the clock at `minutes` (a literal 0 is the founding 07:00), forward
+   *  or back, running nothing: how a test pins an hour once the crowd exists. */
+  setClock(minutes: number): void {
+    if (!this.leaf.setClock(minutes)) throw new Error(`PortSim.setClock: the engine refused ${minutes}`);
+    this.changed();
+  }
+
+  /** Set a unit's state, and its occupants when given, mid-run. */
+  setUnitState(id: number, state: UnitState, occupants?: number): void {
+    if (!this.leaf.setUnitState(id, state, occupants)) throw new Error(`PortSim.setUnitState: the engine refused unit ${id} ${state}${occupants === undefined ? "" : ` x${occupants}`}`);
+    this.changed();
+  }
+
+  /** The live crowd, which no save carries: a copy of each person as the
+   *  conformance crowd view writes it (an unset optional field is absent). */
+  people(): Person[] {
+    return this.leaf.crowdView().people;
   }
 
   /** Free the engine. The kit calls it after each test. */

@@ -411,6 +411,16 @@ export class Engine {
      */
     setCars(id: number, cars: number): boolean;
     /**
+     * Tooling only: put the clock at `minutes`, forward or back, and run
+     * nothing: the TypeScript `sim.clock = new Clock(minutes, calendar)`
+     * that tests use to pin an hour once the crowd exists. The loop's pass
+     * memos stay as they are, as with `advanceClock`, so a pass the move
+     * skips runs once on the next tick. A literal 0 is 07:00 on day 0, as at
+     * founding. False, changing nothing, for a value that is not finite, is
+     * below 0 or is past [`MAX_TOOL_CLOCK_MINUTES`].
+     */
+    setClock(minutes: number): boolean;
+    /**
      * `setExpressStops(id)`: whether the id names a shaft, as TypeScript's
      * answers; a shaft's stops are rebuilt, an unknown id changes nothing.
      */
@@ -449,6 +459,15 @@ export class Engine {
      * leaves the key out of the save.
      */
     setTowerName(name?: string | null): void;
+    /**
+     * Tooling only: set a unit's state by its save name, and its occupants
+     * when given (a test holds a venue open or a condo full). False for an
+     * unknown unit or state, for "construction" and "fire" (each needs its
+     * own timer or event record, which this write cannot make), or for
+     * occupants that are not a whole number from 0 to
+     * [`MAX_TOOL_OCCUPANTS`]; nothing changes then.
+     */
+    setUnitState(id: number, state: string, occupants?: number | null): boolean;
     /**
      * `sim.view = view`, the camera a save carries, as JSON text (null clears).
      */

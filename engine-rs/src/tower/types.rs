@@ -34,6 +34,23 @@ impl UnitState {
             UnitState::Gutted => "gutted",
         }
     }
+
+    /// The state a save names, the inverse of [`UnitState::as_str`].
+    pub fn from_name(name: &str) -> Option<UnitState> {
+        Some(match name {
+            "construction" => UnitState::Construction,
+            "empty" => UnitState::Empty,
+            "occupied" => UnitState::Occupied,
+            "moving_in" => UnitState::MovingIn,
+            "vacating" => UnitState::Vacating,
+            "asleep" => UnitState::Asleep,
+            "dirty" => UnitState::Dirty,
+            "infested" => UnitState::Infested,
+            "fire" => UnitState::Fire,
+            "gutted" => UnitState::Gutted,
+            _ => return None,
+        })
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -78,19 +78,7 @@ pub(super) fn coerce_dirty_days(state: UnitState, kind: Kind, raw: Option<&Value
 }
 
 pub(super) fn parse_state(v: Option<&Value>) -> Option<UnitState> {
-    Some(match v?.as_str()? {
-        "construction" => UnitState::Construction,
-        "empty" => UnitState::Empty,
-        "occupied" => UnitState::Occupied,
-        "moving_in" => UnitState::MovingIn,
-        "vacating" => UnitState::Vacating,
-        "asleep" => UnitState::Asleep,
-        "dirty" => UnitState::Dirty,
-        "infested" => UnitState::Infested,
-        "fire" => UnitState::Fire,
-        "gutted" => UnitState::Gutted,
-        _ => return None,
-    })
+    UnitState::from_name(v?.as_str()?)
 }
 
 pub(super) fn vacate_reason(v: Option<&Value>) -> Option<&'static str> {

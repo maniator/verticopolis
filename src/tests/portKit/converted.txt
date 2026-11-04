@@ -17,3 +17,4 @@ src/tests/integration/storageEngineSave.integration.test.ts
 src/tests/integration/traffic.integration.test.ts
 src/tests/integration/heatmap.integration.test.ts
 src/tests/integration/venueOccupancy.integration.test.ts
+src/tests/integration/segmentRoutingMealRush.integration.test.ts
