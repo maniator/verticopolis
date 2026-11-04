@@ -25,6 +25,13 @@ pub const OFFICE_NOISE_TILES: i64 = 11;
 pub const HOTEL_NOISE_TILES: i64 = 21;
 const GATE_HORIZON_HOURS: i64 = 48;
 
+/// Whether a tenant's satisfaction is low enough for the inspector to name a
+/// main gripe: at or under [`GRIPE_WARN`]. The Map's Eval view reads the same
+/// line, so a room the inspector names a gripe for never reads Excellent.
+pub fn names_gripe(satisfaction: f64) -> bool {
+    satisfaction <= GRIPE_WARN
+}
+
 pub struct SatisfactionContext {
     pub cong_map: Option<IndexMap<i64, f64>>,
     pub global_cong: f64,

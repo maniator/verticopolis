@@ -9,7 +9,8 @@ import { SaveTooLargeError, inflateCapped, parseSaveJson } from "./saveCompressi
  * to inflate to gigabytes, and the plain call allocates the whole output before
  * anyone can object. That is the same posture the browser import path takes.
  *
- * The APP reads tower files through `SaveGame.import`, which is async because it
+ * The app reads tower files through the engine (`loadVctower`). The
+ * TypeScript `SaveGame.import`, which only tests call now, is async because it
  * inflates with the platform `DecompressionStream` and goes on to build a
  * `Simulation`. This is the same container parsed with fflate, for tools that
  * have neither a browser nor a need for a Simulation, notably the `.TDT` harness

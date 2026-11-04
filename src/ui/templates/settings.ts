@@ -22,12 +22,13 @@ import { html, nothing, type TemplateResult } from "lit-html";
  * child, or scrolled content shows in the band under
  * the strip, outside the dialog's footer, on a phone.
  *
- * The Building section is Modern-only: `showBuilding` is true only for a Modern
- * tower, so a Classic tower never renders the "Bridge floors between rooms"
- * switch (bridging is forced on in Classic and can't be toggled). The switch
- * itself is a STATIC structure like the others; `showSettings` reads the live
- * tower state, sets the initial checked value, and disables it when Manual
- * Structure was chosen at founding (which already places every tile by hand).
+ * The Building section shows only where the catalog offers it: `showBuilding` is
+ * the tower catalog's `economy.autoBridgeToggleable` (true in Modern), so a
+ * tower whose catalog withholds it (every Classic tower) never renders the
+ * "Bridge floors between rooms" switch (bridging is forced on in Classic and
+ * can't be toggled). The switch itself is a STATIC structure like the others;
+ * `showSettings` reads the live tower state and sets the initial checked
+ * value.
  */
 export function settingsTemplate(version: string, showBuilding = false, engine = ""): TemplateResult {
   const building = showBuilding

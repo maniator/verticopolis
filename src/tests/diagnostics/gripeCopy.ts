@@ -1,12 +1,12 @@
-import type { Simulation } from "../engine/Simulation";
-import type { Unit, VacateReason } from "../engine/types";
-import { unmetCoverage, dominantGripe, nearNightclub, servingTransportKindsAt, bindingTransportClassAt } from "../engine/sim/gripe";
-import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
-import { unitPrice } from "../ui/catalogPricing";
-import { towerCatalog } from "../catalog/towerCatalog";
-import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../presentation/viewKinds";
-import { isRentalKind } from "../engine/residentialRentals";
-import { gripeCopy as displayGripe, wontLeaseCopy, type GripeCopyFacts } from "../ui/tenantDiagnosticCopy";
+import type { Simulation } from "../../engine/Simulation";
+import type { Unit, VacateReason } from "../../engine/types";
+import { unmetCoverage, dominantGripe, nearNightclub, servingTransportKindsAt, bindingTransportClassAt } from "../../engine/sim/gripe";
+import { buildSatisfactionContext, wouldEvictFreshTenant } from "../../engine/sim/satisfactionStep";
+import { unitPrice } from "../../ui/catalogPricing";
+import { towerCatalog } from "../../catalog/towerCatalog";
+import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../../presentation/viewKinds";
+import { isRentalKind } from "../../engine/residentialRentals";
+import { gripeCopy as displayGripe, wontLeaseCopy, type GripeCopyFacts } from "../../ui/tenantDiagnosticCopy";
 
 /**
  * Legacy TypeScript engine adapter. Read the explanation facts once from the

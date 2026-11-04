@@ -1,5 +1,6 @@
 //! Move-ins: the daily tenant draw and a unit's first lease.
 
+use crate::crowd::fasthash::FastMap;
 use crate::demand::fold_origin_demand;
 use crate::econ::rent_of;
 use crate::facilities::Kind;
@@ -20,7 +21,7 @@ impl Simulation {
             1.0
         };
         let served_set = self.tower.served_floors();
-        let mut reach_memo: std::collections::HashMap<i64, bool> = std::collections::HashMap::new();
+        let mut reach_memo: FastMap<i64, bool> = FastMap::default();
         let mut sat_ctx: Option<SatisfactionContext> = None;
         let evening = self.clock.is_evening();
         for i in self.tower.room_indices() {
@@ -137,7 +138,7 @@ impl Simulation {
                 let u = &self.tower.units[i];
                 rent_of(u.kind, u.rent, u.no_rate)
             };
-            let (price, residents) = if self.mode.is_modern() {
+            let (price, residents) = if self.mode.variant_households() {
                 let r = roll_household(&mut self.rng);
                 (household_price(asking, Some(r)), Some(r))
             } else {

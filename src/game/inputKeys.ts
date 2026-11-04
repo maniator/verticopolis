@@ -55,7 +55,7 @@ function typesSpace(el: Element | null): boolean {
 const KEYS_THAT_KEEP_THE_TAP = new Set(["Shift", "CapsLock", "NumLock", "ScrollLock", "FnLock", "SymbolLock", "Fn"]);
 
 /** Keys that can open a focused dropdown's popup, held or fresh: Alt + Down
- *  or Up and F4 on Windows and Linux, the arrows and Enter on a Mac. */
+ *  or Up, any arrow, F4 or Enter. */
 const KEYS_THAT_OPEN_A_DROPDOWN = new Set(["ArrowDown", "ArrowUp", "F4", "Enter"]);
 
 /** Whether a press or a key on `el` can open a dropdown's popup, which takes
@@ -223,7 +223,7 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
   window.addEventListener("keydown", (e) => {
     // A key on a focused dropdown can open its popup, fresh or repeating, which
     // can take the Space release unseen, as a press on it can.
-    if (space !== "up" && KEYS_THAT_OPEN_A_DROPDOWN.has(e.key) && opensPopup(document.activeElement)) dropSpaceHold();
+    if (space !== "up" && opensPopup(document.activeElement) && (KEYS_THAT_OPEN_A_DROPDOWN.has(e.key) || (e.repeat && isSpaceKey(e)))) dropSpaceHold();
     if (!isSpaceKey(e)) {
       if (!e.repeat) {
         if (worldCovered()) heldUncovered.delete(keyId(e));

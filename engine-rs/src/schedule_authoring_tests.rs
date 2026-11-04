@@ -4,6 +4,7 @@
 use serde_json::json;
 
 use super::*;
+use crate::clock::GameMode;
 use crate::facilities::{Kind, LOT_WIDTH};
 
 pub(crate) const TOP: i64 = 12;

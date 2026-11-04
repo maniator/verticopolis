@@ -6,10 +6,6 @@ import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import { unitInspectorTemplate, transportInspectorTemplate } from "../ui/templates/inspector";
 
-// Re-exported from its shared home so existing importers (and the retail-stats
-// unit tests) keep their `../game/inspector` path.
-export { retailStatsLines } from "./facilityDiagnostics";
-
 /**
  * The hover inspector card: what it shows for a picked facility and the
  * ✕-dismissal latch that keeps a closed card closed while hover picks keep
@@ -74,9 +70,10 @@ export class InspectorController {
       // The card body (title/label/status/census/diagnostics/satisfaction) is
       // the lit template in ui/templates/inspector.ts (E6-S2); the access
       // reachability, placement warnings, on-notice countdown, recycling
-      // capacity, and retail patronage lines all come from facilityDiagnostics
-      // inside it, shared with the mobile editor fold-in so the two surfaces
-      // can't drift.
+      // capacity, and retail patronage lines all come from the card kit's
+      // diagnostics (the engine's facts, worded in portUnitDiagnostics) inside
+      // it, shared with the mobile editor fold-in so the two surfaces can't
+      // drift.
       this.deps.ui.showInspector(unitInspectorTemplate(u, kit.catalog(), clockOf(this.deps.reader().header).hour, kit.diagnostics.unit(u.id, fresh)));
     } else {
       const kit = this.deps.kit();

@@ -5,7 +5,7 @@ import { isCommercialKind, isHotelKind } from "../../presentation/viewKinds";
 import { catalogFacility, catalogHouseholdPrice, catalogOpenAt, catalogResidents, rungFor, type Catalog } from "../../catalog/catalogTypes";
 import type { TransportDetail, UnitDetail } from "../../simport/panels";
 import { priceOptionsFor } from "../catalogPricing";
-import { hasAccessDiagnostic } from "../../game/facilityDiagnostics";
+import { hasAccessDiagnostic } from "../../game/cardLines";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
 import { floorTag } from "../format";
 
@@ -20,12 +20,13 @@ import { floorTag } from "../format";
  * bug). The `data-field` attributes stay on the value cells: tests and tooling
  * read them, and they document which cells carry live values.
  *
- * The mobile diagnostics block folds in `facilityDiagnostics` /
- * `transportDiagnostics` (shared with the desktop inspector card). The caller
- * builds those lit `TemplateResult` lines (on mobile only) and hands them over
- * as `diagnostics`, so the block interpolates them directly; the
- * wrapper renders only when there is at least one line (an empty array leaves no
- * `.ed-diagnostics` box, matching the old empty `:empty { display:none }` div).
+ * The mobile diagnostics block folds in the card's diagnostic lines (the
+ * engine's facts worded by `game/portUnitDiagnostics.ts`, shared with the
+ * desktop inspector card). The caller builds those lit `TemplateResult` lines
+ * (on mobile only) and hands them over as `diagnostics`, so the block
+ * interpolates them directly; the wrapper renders only when there is at least
+ * one line (an empty array leaves no `.ed-diagnostics` box, matching the old
+ * empty `:empty { display:none }` div).
  */
 
 /** The editor card's title bar, one template so the two editors can't drift. */
@@ -206,8 +207,8 @@ export function unitEditorTemplate(
   // the stats and the controls (one panel, no separate card). Desktop leaves
   // them to the hover card, so the block only exists on mobile.
   // Only the mobile fold-in shows the diagnostics, so only the mobile caller
-  // pays for computing them (facilityDiagnostics can run a parking flood-fill
-  // etc.); desktop leaves the block to the hover card.
+  // pays for computing them (the engine's facts query can walk the tower);
+  // desktop leaves the block to the hover card.
   const diagnostics = diag.length ? html`<div class="ed-diagnostics" data-field="diagnostics">${diag}</div>` : nothing;
   // Canon retail variant titles the editor card too, matching the inspector.
   return editorShell(`unit:${u.id}`, u.subtype ?? f.name, rows, actions, diagnostics);

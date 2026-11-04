@@ -86,7 +86,7 @@ Cmd or Alt, the game follows no hold: it neither builds nor pans, since the
 camera reads the game's hold as its pan key. Cmd's release ends the hold,
 since macOS sends no Space release while Cmd is down. So do a native context
 menu, a native drag of selected text or a link, and a press or a key (Alt +
-Down or F4, or an arrow or Enter on a Mac) that can open a dropdown's popup,
+Down or F4, or any arrow or Enter) that can open a dropdown's popup,
 since each can take the release. Space may still be down after any
 of these, so its late release is canceled when the hold was a pan, or when a
 pointer press or a zooming wheel turn since would have made it one. A

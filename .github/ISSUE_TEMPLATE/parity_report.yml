@@ -7,8 +7,9 @@ body:
       value: |
         Verticopolis aims to faithfully recreate **SimTower (1994)**. Use this template when a
         number, rule, or behavior diverges from the original. Canon values (build caps, transport
-        pooling, economy math) live in `src/engine/facilities.ts` and `PARITY.md`. Please cite a
-        source for the original's behavior so we can verify it.
+        pooling, economy math) live in the Rust engine (`engine-rs/src/facilities.rs`,
+        `engine-rs/src/econ.rs`, `engine-rs/src/rules.rs`) and `PARITY.md`. Please cite a source for the original's
+        behavior so we can verify it.
 
         **⚠️ Parity only applies to Classic-mode towers.** Towers can be founded in **Classic**
         (faithful to 1994) or **Modern** (an opt-in "what the original couldn't do" layer).

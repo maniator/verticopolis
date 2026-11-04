@@ -275,3 +275,47 @@ fn the_shaft_card_calls_a_load_near_capacity_only_above_the_cutoff() {
         assert_eq!(r[at("nearCapacity")], want, "load {load}");
     }
 }
+
+#[test]
+fn room_tier_rows_are_the_typed_tiers_under_the_layouts_names() {
+    use crate::panels::room_tiers::{EvalTier, RentTier};
+    let mut e = built();
+    let office = unit(&e, Kind::Office);
+    let u = e.sim.tower.get_unit_mut(office).unwrap();
+    u.state = UnitState::Occupied;
+    u.satisfaction = 0.5;
+    let rows = e.port_room_tiers();
+    let typed: Vec<_> = e.sim.room_tiers().collect();
+    assert_eq!(
+        typed.len(),
+        2,
+        "the office and the hotel room; the cinema has neither tier"
+    );
+    assert_eq!(rows.len(), typed.len() * ROOM_TIER.len());
+    for (row, t) in rows.chunks(ROOM_TIER.len()).zip(&typed) {
+        let want = [
+            t.id as f64,
+            t.floor as f64,
+            t.x as f64,
+            t.eval.code(),
+            t.rent.code(),
+        ];
+        assert_eq!(row, want.as_slice());
+    }
+    let layout = super::super::port::exported_layout();
+    assert_eq!(layout["records"]["roomTier"], serde_json::json!(ROOM_TIER));
+    let eval: Vec<&str> = EvalTier::ALL.iter().map(|t| t.name()).collect();
+    let rent: Vec<&str> = RentTier::ALL.iter().map(|t| t.name()).collect();
+    assert_eq!(layout["evalTiers"], serde_json::json!(eval));
+    assert_eq!(layout["rentTiers"], serde_json::json!(rent));
+    let at = |name: &str| ROOM_TIER.iter().position(|k| *k == name).unwrap();
+    assert_eq!(rows[at("id")], office as f64);
+    assert_eq!(eval[rows[at("evalTier")] as usize], "good");
+    assert_eq!(rent[rows[at("rentTier")] as usize], "average");
+}
+
+#[test]
+fn a_tower_with_no_rated_or_priced_room_answers_no_rows() {
+    let e = Engine::of(Simulation::new_game(7, GameMode::Classic));
+    assert!(e.port_room_tiers().is_empty());
+}

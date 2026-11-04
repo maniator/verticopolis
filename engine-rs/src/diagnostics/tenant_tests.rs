@@ -2,7 +2,7 @@
 //! section's gate and fields on constructed towers and the binding's id
 //! handling. The memos and the read-only proof are in `memo_tests.rs`.
 
-use super::tenant::nearest_buildable_lobby_slot;
+use super::tenant::{has_access_diagnostic, nearest_buildable_lobby_slot};
 use super::{facts_json, DiagnosticFacts};
 use crate::clock::GameMode;
 use crate::facilities::{Kind, LOT_WIDTH};
@@ -435,4 +435,26 @@ fn walkway_bindings_name_their_class_and_the_elevator_stop() {
     assert!(esc.build_transport(Kind::Escalator, C + 40, 2, 3).ok);
     assert!(esc.tower.set_stop(lift, 3, false));
     assert_eq!(probe(&mut esc, 3), (Some("escalator"), Some(false)));
+}
+
+/// The card's access-line gate agrees with the UI's `hasAccessDiagnostic`
+/// (`src/game/cardLines.ts`), restated here on the catalog JSON the UI reads:
+/// `population > 0 || dailyIncome !== null`, where a missing key counts as
+/// not null, as it does in JavaScript.
+#[test]
+fn the_access_line_gate_matches_the_catalog_values() {
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let sim = Simulation::new_game(7, mode);
+        let catalog = crate::catalog::catalog_value(mode);
+        for entry in catalog["facilities"].as_array().unwrap() {
+            let key = entry["key"].as_str().unwrap();
+            let population = entry["population"].as_i64().unwrap();
+            let income_not_null = entry.get("dailyIncome").is_none_or(|d| !d.is_null());
+            assert_eq!(
+                has_access_diagnostic(&sim, Kind::parse(key).unwrap()),
+                population > 0 || income_not_null,
+                "{mode:?} {key}"
+            );
+        }
+    }
 }

@@ -150,10 +150,18 @@ flowchart LR
 ### Classic vs Modern — the rule-set strategy
 
 A tower is founded under an **immutable `GameMode`** (`classic` | `modern`) and
-every behavior the two modes disagree on lives behind a single `GameRules`
-strategy object, resolved once at founding by `makeRules`. Subsystems call
-`this.rules.<x>()` and never re-test the mode string — this is what stops
-mode-specific `if` branches from smearing through the simulation.
+behavior the two modes disagree on belongs behind the mode's rule methods in
+the Rust engine (`impl GameMode` in `engine-rs/src/rules.rs`). A subsystem
+calls `self.mode.<x>()` rather than testing the mode in its own logic, which is
+what stops mode-specific `if` branches from smearing through the simulation.
+Some older subsystems still test the mode inline; CONTRIBUTING.md asks that
+each move behind a rule method when that code next changes.
+The web UI reads the rules it shows from the engine's catalog (its `rules`
+block, a facility's `available`, the economy's `autoBridgeToggleable`), which
+the engine states from the same methods; the few choices the UI still makes on
+the mode's name are tracked on #1621. The TypeScript reference engine keeps the
+same split behind its `GameRules` strategy object, resolved once at founding by
+`makeRules`, as the diagram shows.
 
 ```mermaid
 flowchart TD
@@ -280,6 +288,9 @@ order) is
   quality gates, testing & coverage, the architecture conventions in prose,
   versioning, and code review. Its **Where things live** table is the quick
   index of every `src/` directory.
-- **`src/engine/facilities.ts`** — the single source of truth for build caps,
-  facility sizes, and transport pooling.
-- **`src/engine/Simulation.ts`** — the orchestrator; start here to follow a tick.
+- **`engine-rs/src/facilities.rs`**: the source of truth for build caps,
+  facility sizes, and transport pooling (the Rust engine owns gameplay rules,
+  caps and tuning; `src/engine/facilities.ts` is the reference copy).
+- **`engine-rs/src/sim_loop.rs`**: `Simulation::tick`, the loop the game runs;
+  start here to follow a tick (`src/engine/Simulation.ts` is the TypeScript
+  reference's orchestrator).

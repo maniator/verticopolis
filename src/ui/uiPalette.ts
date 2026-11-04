@@ -276,6 +276,10 @@ export function relabelPalette(ui: UI, catalog: Catalog): void {
     const kind = item.dataset.kind as FacilityKind;
     labelFacility(item, kind, catalogFacility(catalog, kind));
   });
+  // The lock classes follow the catalog's `available` and `minStar`, which a
+  // new catalog may state differently: clear the scan key so the pump's next
+  // pass rewrites them.
+  ui.paletteScanKey = null;
 }
 
 function facilityButton(ui: UI, catalog: Catalog, kind: FacilityKind, group: string, modern = false): HTMLElement {

@@ -69,6 +69,38 @@ impl GameMode {
         self == GameMode::Modern
     }
 
+    /// `hasVariantHouseholds`: Modern sells a condo to a household of 2 to 5
+    /// and prices it by that size; Classic sells every condo to the flat
+    /// family at the asking price and stores no household. The condo sale
+    /// reads it; the save loader still keeps a saved household by the save's
+    /// mode name (#1621).
+    pub fn variant_households(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// Whether the mode builds the kinds marked Modern-only (the Food Hall
+    /// and the other `modern_only` facilities): Modern does; Classic offers
+    /// the 1994 kinds alone. Read through `Facility::available_in`.
+    pub fn builds_modern_only_kinds(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// `showsPreviewReason`: Modern's build preview names the refusal before
+    /// the click; Classic refuses on the click, the 1994 game's way. The
+    /// engine refuses the same builds in both modes, so only the catalog
+    /// states this one.
+    pub fn preview_names_refusal(self) -> bool {
+        self == GameMode::Modern
+    }
+
+    /// `elevatorScheduleUX().presets`: whether the elevator schedule's
+    /// assisted tools answer, the intent presets, auto-tune and the staffing
+    /// advice (Modern). Classic offers the manual grid only, and each assisted
+    /// query answers that the mode has none.
+    pub fn schedule_assist(self) -> bool {
+        self == GameMode::Modern
+    }
+
     /// `operatingOverheadPerUnit()`: Classic charges none.
     pub fn operating_overhead_per_unit(self) -> f64 {
         match self {

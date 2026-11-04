@@ -18,7 +18,6 @@
 use indexmap::IndexMap;
 use serde::Serialize;
 
-use crate::clock::GameMode;
 use crate::schedule::{Schedule, SCHEDULE_HOURS};
 use crate::schedule_geometry::ShaftGeometry;
 use crate::sim::Simulation;
@@ -201,7 +200,7 @@ impl Simulation {
         let (wd, we) = (readiness(&rings.weekday), readiness(&rings.weekend));
         // Readiness is the shaft's, whatever the mode offers: the Classic grid
         // still shows a measured curve, it just gets no proposal.
-        let unavailable = if self.mode != GameMode::Modern {
+        let unavailable = if !self.mode.schedule_assist() {
             Some(ProposalStatus::UnavailableInMode)
         } else if t.cars <= 0 {
             Some(ProposalStatus::NoCars)

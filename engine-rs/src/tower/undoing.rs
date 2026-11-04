@@ -31,6 +31,25 @@ impl Unit {
         }
     }
 
+    /// This unit, with the facts an edit owns (the price, the market flag,
+    /// the name, the variety and the film policy) taken from `found`: the
+    /// unit as it leaves a gesture that changed those facts first, which an
+    /// undo of the gesture puts back.
+    pub(crate) fn with_edit_facts_of(&self, found: &Unit) -> Unit {
+        let mut u = Unit {
+            label: found.label.clone(),
+            subtype: found.subtype,
+            ..self.clone()
+        };
+        // A condo that sold keeps the price it sold at, which no edit can
+        // change any more.
+        let sold_condo = self.kind == Kind::Condo && self.ever_occupied;
+        if !sold_condo {
+            u.take_price_and_policy_from(found);
+        }
+        u
+    }
+
     /// Put the price, the market flag and the film policy back from `other`.
     /// The name and the variety go through the tower's setters
     /// ([`Tower::put_unit_config`]), which log a change.

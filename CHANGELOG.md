@@ -21,11 +21,17 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.84.1
+## 2.85.1
 
 - Holding Space before a mouse drag now pans the view without building or clicking a focused control. Tapping Space acts at the keyboard cursor when you let go.
 - Holding Enter, Delete, Backspace or X at the keyboard cursor acts once instead of repeating.
 - The help no longer says a right-button drag pans: a right-click inspects a room.
+
+## 2.85.0
+
+- Undo gives back a build's full price only until it is used: a room once it opens, floor and lobby (even a room's own) at the next hour, and elevators, stairs and escalators then or once ridden.
+- Undo never takes away floor or lobby that something still stands on, never puts a room back on a lobby floor or under the metro, and never undoes an underground build that dug for treasure.
+- An undo that can no longer be done is dropped, so the next Undo goes on to the edit before it. One that waits only on money or a fire stays for another try.
 
 ## 2.84.0
 

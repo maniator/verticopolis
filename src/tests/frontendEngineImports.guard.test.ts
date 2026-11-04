@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { repoRel, repoRoot, sourceFiles } from "./guardFiles";
-import { isTestFile, resolveRelative, scanRuntimeImports } from "./importScan";
+import { frontendFiles, NOT_FRONTEND } from "./frontendFiles";
+import { repoRoot } from "./guardFiles";
+import { resolveRelative, scanRuntimeImports } from "./importScan";
 
 /**
  * The frontend's runtime imports of the TypeScript engine, held to a ratchet.
@@ -43,11 +44,6 @@ import { isTestFile, resolveRelative, scanRuntimeImports } from "./importScan";
  */
 const here = dirname(fileURLToPath(import.meta.url));
 
-/** What under `src/` is not frontend: the engine itself, the test tree, and
- *  the host and save code (`src/wasmhost/`, `src/dualrun/`, `src/storage/`),
- *  whose engine imports the retirement inventory's own tables cover. */
-const NOT_FRONTEND = ["src/engine/", "src/tests/", "src/wasmhost/", "src/dualrun/", "src/storage/"] as const;
-
 /** The engine module a relative specifier names from `rel`, as its path under
  *  `src/engine/` without query or extension (`index` for the directory
  *  itself), or null for anything else. */
@@ -63,14 +59,6 @@ function runtimeEngineImports(rel: string, text: string): { modules: string[]; u
   const { imports, unreadable } = scanRuntimeImports(rel, text);
   const modules = new Set(imports.map((i) => engineModule(rel, i.spec)).filter((mod): mod is string => mod !== null));
   return { modules: [...modules].sort(), unreadable };
-}
-
-/** Every non-test frontend file under `src/`, repo-relative. */
-function frontendFiles(): string[] {
-  return sourceFiles("src", [".ts", ".tsx"])
-    .map(repoRel)
-    .filter((rel) => !rel.endsWith(".d.ts") && !isTestFile(rel) && !NOT_FRONTEND.some((dir) => rel.startsWith(dir)))
-    .sort();
 }
 
 /** `frontendEngineImports.ratchet.txt`: `<file> <module> <module> ...` per

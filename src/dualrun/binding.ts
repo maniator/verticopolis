@@ -77,6 +77,8 @@ export const INSTANCE_METHODS = [
   "schedulePreset",
   // The recycling card's capacity line.
   "recyclingCapacity", "recyclingDemandMet",
+  // The rooms' evaluation and rent tiers for the Map's Eval and Pricing views (#343 S7).
+  "roomTiers",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 

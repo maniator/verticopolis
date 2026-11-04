@@ -283,6 +283,10 @@ describe("the Space hold the game follows", () => {
       press(key);
       expect(app.spacePanKey!(), `${key} opens no popup`).toBe(true);
     }
+    press(" ", { repeat: true });
+    expect(app.spacePanKey!(), "a repeating Space can open it").toBe(false);
+    press(" ");
+    select.focus();
     press("ArrowDown", { altKey: true });
     expect(app.spacePanKey!(), "Alt + Down opens it").toBe(false);
     select.blur();

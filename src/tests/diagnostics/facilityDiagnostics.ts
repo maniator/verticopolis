@@ -1,20 +1,21 @@
 import { html, type TemplateResult } from "lit-html";
-import type { Simulation } from "../engine/Simulation";
-import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN } from "../engine/Simulation";
-import { SERVED_RECOVERY, isNearCapacity } from "../engine/sim/constants";
-import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
-import { isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } from "../presentation/viewKinds";
-import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
-import { isRentalKind } from "../engine/residentialRentals";
+import type { Simulation } from "../../engine/Simulation";
+import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN } from "../../engine/Simulation";
+import { SERVED_RECOVERY, isNearCapacity } from "../../engine/sim/constants";
+import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../../engine/EconomySystem";
+import { isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } from "../../presentation/viewKinds";
+import { catalogFacility, type Catalog } from "../../catalog/catalogTypes";
+import { isRentalKind } from "../../engine/residentialRentals";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
-import { commercialLobbyLines, hotelRatingLines, parkingDisplayLines, retailDisplayLines } from "./portServiceDiagnostics";
-import { recyclingLines } from "./recyclingDiagnostics";
-import { reachesLobby } from "../engine/sim/gripe";
+import { commercialLobbyLines, hotelRatingLines, parkingDisplayLines, retailDisplayLines } from "../../game/portServiceDiagnostics";
+import { recyclingLinesOf } from "../../game/recyclingDiagnostics";
+import { reachesLobby } from "../../engine/sim/gripe";
 import { gripeLineText, wontLeaseText } from "./gripeCopy";
-import { isOperational, isPresent } from "../engine/types";
-import { FAR_WALK_COPY, accessCopy, noRateCopy, lobbyWarningCopy, noticeCopy } from "../ui/tenantDiagnosticCopy";
-import type { FacilityKind, Transport, Unit } from "../engine/types";
-import { towerCatalog } from "../catalog/towerCatalog";
+import { isOperational, isPresent } from "../../engine/types";
+import { FAR_WALK_COPY, accessCopy, noRateCopy, lobbyWarningCopy, noticeCopy } from "../../ui/tenantDiagnosticCopy";
+import type { FacilityKind, Transport, Unit } from "../../engine/types";
+import { towerCatalog } from "../../catalog/towerCatalog";
+import { hasAccessDiagnostic, transportLoadLines } from "../../game/cardLines";
 
 // The "Main gripe" phrasing lives in gripeCopy.ts (its own leaf: the
 // unmet-demand copy branches on live coverage, and this file sits against the
@@ -119,21 +120,6 @@ export function retailStatsLines(
       : Math.round(Math.max(0, profitYest ?? 0)),
     rainy: isRaining,
   });
-}
-
-/**
- * Whether {@link facilityDiagnostics} emits an access-reachability line for this
- * unit: only kinds that actually draw commuters/visitors (tenants + venues) get
- * one, since parking/service facilities work via ramp-chaining/coverage, not
- * passenger trips, so an access warning on them would be a false alarm. The
- * mobile editor reads this to decide whether its plain "Elevator access" row
- * would just duplicate the diagnostics line (drop it) or is the only
- * connectivity signal for a zero-population service kind (keep it). One source,
- * so the editor and the diagnostics can never disagree on which kinds carry it.
- */
-export function hasAccessDiagnostic(catalog: Catalog, u: Pick<Unit, "kind">): boolean {
-  const f = catalogFacility(catalog, u.kind);
-  return f.population > 0 || f.dailyIncome !== null;
 }
 
 /** The access line, worst condition first. Segment-aware (#647): a unit can sit
@@ -352,19 +338,15 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   return lines;
 }
 
-/** Format a measured passenger-elevator load for the hover card and mobile
- * editor. The engine supplies the load and its near-capacity verdict; the frontend only words them.
- * Staff-only service elevators, stairs and escalators provide no load reading. */
-export function transportLoadLines(util: number | null | undefined, near: boolean): TemplateResult[] {
-  if (util === undefined || util === null || !Number.isFinite(util)) return [];
-  return [
-    html`<div style="color:${near ? "var(--bad)" : "var(--good)"}">Avg load: ${Math.round(util * 100)}% full${near ? ". Near capacity; consider more cars or a parallel shaft." : ""}</div>`,
-  ];
-}
-
 /** TypeScript reference engine adapter, sharing display copy with Rust. */
 export function transportDiagnostics(sim: Simulation, t: Transport): TemplateResult[] {
   if (!isElevatorKind(t.kind)) return [];
   const util = sim.elevatorUtilization(t.id);
   return transportLoadLines(util, isNearCapacity(util));
+}
+
+/** The recycling block off the TypeScript tower, worded by the same
+ *  {@link recyclingLinesOf} the Rust card uses. */
+function recyclingLines(sim: Simulation): TemplateResult[] {
+  return recyclingLinesOf(sim.tower.totalPopulation(), sim.recyclingCapacity(), sim.recyclingFill(), sim.recyclingDemandMet());
 }

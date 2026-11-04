@@ -15,10 +15,11 @@ export function showSettings(ui: UI): void {
   // Same build constant the splash and Help's About line show; masked to a fixed
   // placeholder in screenshots (see pgMaskVersion, which keys on `.app-version`).
   const version = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
-  // The Building section (the bridging toggle) is Modern-only; Classic never
-  // renders it (bridging is forced on and can't be toggled there).
-  const modern = ui.cb.getMode() === "modern";
-  const box = ui.openModalTemplate(settingsTemplate(version, modern, engineSuffix()), { displaceable: true });
+  // The Building section (the bridging toggle) shows only where the tower's
+  // catalog says the player can switch bridging off (Modern); elsewhere
+  // bridging is always on and the section never renders.
+  const bridgingToggleable = ui.cb.getCatalog().economy.autoBridgeToggleable;
+  const box = ui.openModalTemplate(settingsTemplate(version, bridgingToggleable, engineSuffix()), { displaceable: true });
   // Volume sliders: initialize from the live levels, apply on every input tick
   // (persistence is debounced by the onSetVolume handler in main.ts), and keep
   // the percent readout in step. Mute is independent; sliders never touch it.
@@ -51,11 +52,11 @@ export function showSettings(ui: UI): void {
   rm.disabled = osForced;
   if (osForced) rm.closest("label")!.querySelector("span")!.textContent = "Reduced motion (system)";
   rm.addEventListener("change", () => (rm.checked = ui.cb.onToggleReducedMotion()));
-  // Modern-only bridging toggle: it shows the live state and re-reads the
-  // callback's return after every toggle. Always available in Modern (rooms
-  // auto-lay their floor regardless; this only controls the between-things
-  // bridge), whatever was chosen at founding.
-  if (modern) {
+  // The bridging toggle (Modern): it shows the live state and re-reads the
+  // callback's return after every toggle. Always available where the catalog
+  // offers it (rooms auto-lay their floor regardless; this only controls the
+  // between-things bridge), whatever was chosen at founding.
+  if (bridgingToggleable) {
     const ab = box.querySelector<HTMLInputElement>("#set-auto-bridge")!;
     ab.checked = ui.cb.isAutoBridge();
     // The switch shows what the engine answered. On a fault it falls back to

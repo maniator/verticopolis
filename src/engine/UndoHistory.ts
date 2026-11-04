@@ -181,7 +181,8 @@ export class UndoSteps {
    *  and restore it, keeping today's tower as the opposite step once the
    *  restore put the other back. A refused restore leaves the tower and the
    *  opposite stack as they were, and the step goes back where it was, as
-   *  the Rust engine keeps a refused step. */
+   *  the Rust engine keeps a step that can apply later (one the balance
+   *  cannot pay for yet, or one a fire holds up). */
   step(way: "undo" | "redo"): Float64Array {
     this.notice = undefined;
     this.commit();

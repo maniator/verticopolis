@@ -62,17 +62,14 @@ impl Simulation {
 
     pub fn is_unlocked(&self, kind: Kind) -> bool {
         let f = kind.facility();
-        if f.modern_only && self.mode != GameMode::Modern {
-            return false;
-        }
-        self.star >= f.min_star
+        f.available_in(self.mode) && self.star >= f.min_star
     }
 
     pub fn can_build(&self, kind: Kind, floor: i64, x: i64) -> CanBuild {
         let kind = ground_floor_structure_kind(kind, floor);
         let f = kind.facility();
         if !self.is_unlocked(kind) {
-            let reason = if f.modern_only && self.mode != GameMode::Modern {
+            let reason = if !f.available_in(self.mode) {
                 format!("{} is a Modern-only facility.", f.name)
             } else {
                 format!("{} unlocks at {}★.", f.name, f.min_star)
@@ -224,7 +221,7 @@ impl Simulation {
             if self.mode == GameMode::Classic {
                 if let Some(ladder) = crate::econ::classic_ladder(kind) {
                     let cfg = crate::econ::rent_config(kind).unwrap();
-                    let v = ladder[2];
+                    let v = ladder[crate::rent::AVERAGE_RUNG];
                     self.tower.get_unit_mut(id).unwrap().rent =
                         if v == cfg.default { None } else { Some(v) };
                 }
@@ -253,6 +250,10 @@ impl Simulation {
                             self.excavated.push(key);
                         }
                     }
+                }
+                // A search the player could undo would be free.
+                if fresh && self.treasures_found < 3.0 {
+                    self.note_treasure_search();
                 }
                 if fresh && self.treasures_found < 3.0 && self.rng.chance(0.18) {
                     self.treasures_found += 1.0;

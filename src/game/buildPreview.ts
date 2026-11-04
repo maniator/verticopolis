@@ -7,7 +7,6 @@ import { buildRefusalTemplate } from "../ui/templates/inspector";
 import { isPaintKind } from "./gesture";
 import { FLOOR } from "../render/scale";
 import { catalogOf, isUnlocked, quoteBuild, quoteShaft } from "./portAccess";
-import { rulesOf } from "../simport/headerClock";
 
 /**
  * How far above the touch point a room's placement ghost floats, in SCREEN pixels
@@ -137,7 +136,7 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const affordsStrip = app.reader.header.money >= stripCost;
     const valid = can.ok && affordsStrip;
     let reason: string | undefined;
-    if (!valid && rulesOf(app.reader.header).showsPreviewReason) reason = !can.ok ? can.reason : "Not enough money.";
+    if (!valid && catalog.rules.previewNamesRefusal) reason = !can.ok ? can.reason : "Not enough money.";
     app.engine.preview = { kind: ghostKind, floor, x: left, span, valid, reason };
     app.engine.transportPreview = null;
     if (showReasonCard) updateBuildRefusal(app, reason, floor, left + Math.floor(span / 2));
@@ -149,7 +148,8 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const can = quoteBuild(app.enginePort, app.portCodes, kind, floor, x);
     // Modern surfaces the refusal reason on the preview so a hover teaches the
     // rule before the click; Classic keeps the '94 click-to-refuse pedagogy.
-    const reason = !can.ok && rulesOf(app.reader.header).showsPreviewReason ? can.reason : undefined;
+    // The catalog states which (`rules.previewNamesRefusal`).
+    const reason = !can.ok && catalog.rules.previewNamesRefusal ? can.reason : undefined;
     app.engine.preview = { kind, floor, x, valid: can.ok, reason };
     app.engine.transportPreview = null;
     if (showReasonCard) updateBuildRefusal(app, reason, floor, x + Math.floor(catalogFacility(catalog, kind).width / 2));

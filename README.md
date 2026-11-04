@@ -194,9 +194,10 @@ touch pan/pinch (see `docs/screenshots/09-mobile.png`).
 
 ```
 src/
-  engine/      # pure simulation, no DOM
+  engine/      # the TypeScript reference engine (a test referee; the boot catalog check still
+               # runs its catalogFor until #921; the game runs engine-rs/)
     types.ts        shared types
-    facilities.ts   facility catalog, costs, star thresholds, grid constants
+    facilities.ts   reference copy of the Rust facility table (engine-rs/src/facilities.rs)
     Clock.ts        game time (days, weekdays, day phases, quarters)
     rng.ts          deterministic PRNG (mulberry32)
     Tower.ts        spatial model: two-layer grid, placement rules, reachability

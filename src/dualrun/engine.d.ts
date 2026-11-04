@@ -357,6 +357,15 @@ export class Engine {
     resolveChoice(accept: boolean): void;
     restore(text: string): Float64Array;
     /**
+     * The Map's Eval and Pricing read (#343 S7): one `roomTier` row (`id`,
+     * `floor`, `x`, `evalTier`, `rentTier`) for each room that carries an
+     * evaluation or a rent level, in the view's room order, with codes from
+     * the layout's `evalTiers` and `rentTiers`. One pass over the rooms, so
+     * S8 reads it only on the triggers the Map SPEC lists (the Cost bullet of
+     * its S7 section), and not more than once a frame.
+     */
+    roomTiers(): Float64Array;
+    /**
      * What moved in the save since the last sync: `{ units, rest }` as JSON
      * text (the changed unit records, and every other top-level key).
      * `undefined` when units were added, removed or reordered, or no full

@@ -8,16 +8,18 @@ import type { ElevatorSchedule } from "../engine/elevatorSchedule";
  * slots, which {@link scheduleFromSlots} reads back.
  */
 
-const HOURS = 24;
+/** The hours of the day a schedule covers: one per hour, in the port's slots
+ *  and in each day's origin ring. */
+export const SCHEDULE_HOURS = 24;
 const HOMES = 8;
 /** An hour the schedule leaves out: the engine clamps every hour to the
  *  shaft's cars on read, so the most cars a shaft can have means all cars run. */
 const ALL_CARS = 8;
-const LEN = 2 * (1 + HOURS) + 2 + 1 + HOMES;
+const LEN = 2 * (1 + SCHEDULE_HOURS) + 2 + 1 + HOMES;
 
 export function scheduleSlots(schedule: ElevatorSchedule): Float64Array {
   const row = (hours: number[] | undefined): number[] =>
-    hours ? [1, ...Array.from({ length: HOURS }, (_, h) => hours[h] ?? ALL_CARS)] : Array<number>(1 + HOURS).fill(0);
+    hours ? [1, ...Array.from({ length: SCHEDULE_HOURS }, (_, h) => hours[h] ?? ALL_CARS)] : Array<number>(1 + SCHEDULE_HOURS).fill(0);
   const homes = (schedule.homeFloors ?? []).slice(0, HOMES);
   return Float64Array.from([
     ...row(schedule.activeCars?.weekday),
@@ -42,9 +44,9 @@ export function scheduleFromSlots(slots: Float64Array): ElevatorSchedule | undef
     return xs.every((x) => Number.isSafeInteger(x)) ? xs : undefined;
   };
   const activeCars: Record<string, number[]> = {};
-  for (const [name, at] of [["weekday", 0], ["weekend", 1 + HOURS]] as const) {
+  for (const [name, at] of [["weekday", 0], ["weekend", 1 + SCHEDULE_HOURS]] as const) {
     if (slots[at] === 1) {
-      const hours = ints(at + 1, HOURS);
+      const hours = ints(at + 1, SCHEDULE_HOURS);
       if (!hours) return undefined;
       activeCars[name] = hours;
     } else if (slots[at] !== 0) {
@@ -52,7 +54,7 @@ export function scheduleFromSlots(slots: Float64Array): ElevatorSchedule | undef
     }
   }
   const v: ElevatorSchedule & Record<string, unknown> = { activeCars };
-  const timing = 2 * (1 + HOURS);
+  const timing = 2 * (1 + SCHEDULE_HOURS);
   for (const [i, name] of ["waitingCarResponse", "standardFloorDeparture"].entries()) {
     const t = slots[timing + i];
     if (Number.isFinite(t)) v[name] = t;

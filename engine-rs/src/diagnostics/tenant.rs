@@ -13,7 +13,7 @@ use crate::economy::commercial_daily_income;
 use crate::facilities::{is_sky_lobby_floor, Kind, LOBBY_INTERVAL, MAX_FLOOR};
 use crate::presence::CongestionAttribution;
 use crate::satisfaction::{
-    StepResult, GRIPE_WARN, SERVED_RECOVERY, TRANSPORT_FAR_TILES, VACATE_RESCIND,
+    names_gripe, StepResult, GRIPE_WARN, SERVED_RECOVERY, TRANSPORT_FAR_TILES, VACATE_RESCIND,
 };
 use crate::sim::Simulation;
 use crate::tower::{Tower, Unit, UnitState};
@@ -101,7 +101,7 @@ pub struct NoticeFacts {
 /// an access line. These are the sources the catalog's `population` and
 /// `dailyIncome` are built from (`catalog::facility_entry`), which the
 /// catalog lock holds equal to the TypeScript's.
-fn has_access_diagnostic(sim: &Simulation, kind: Kind) -> bool {
+pub(super) fn has_access_diagnostic(sim: &Simulation, kind: Kind) -> bool {
     kind.facility().population > 0 || commercial_daily_income(sim.mode, kind).is_some()
 }
 
@@ -186,7 +186,7 @@ impl Simulation {
         }
         if u.is_present()
             && u.state != UnitState::Vacating
-            && u.satisfaction <= GRIPE_WARN
+            && names_gripe(u.satisfaction)
             && (k == Kind::Office
                 || k == Kind::Condo
                 || k.is_lease_amenity()

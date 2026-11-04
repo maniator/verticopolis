@@ -1,7 +1,7 @@
 import type { Simulation } from "../../engine/Simulation";
 import { VACATE_REASON_TEXT, type Unit } from "../../engine/types";
-import { facilityDiagnostics } from "../../game/facilityDiagnostics";
-import { gripeLineText } from "../../game/gripeCopy";
+import { facilityDiagnostics } from "./facilityDiagnostics";
+import { gripeLineText } from "./gripeCopy";
 import type { DiagnosticFacts, GripeFacts, LobbyFacts, NoticeFacts } from "./tsDiagnosticFacts";
 
 /** A lit template as text: its static parts with each value spliced in. */

@@ -9,6 +9,7 @@
 use super::*;
 use crate::clock::CalendarKind;
 use crate::jsmath;
+use crate::rules::HOUSEHOLD_SIZES;
 use crate::services::ExterminatorRefusal;
 use crate::sim::Simulation;
 use crate::tower::UnitState;
@@ -341,12 +342,13 @@ fn a_condo_sells_once_at_the_quoted_household_price() {
             let sold = sim.money - before;
             match sim.tower.units[i].residents {
                 None => {
-                    assert!(!mode.is_modern());
+                    assert!(!c.rules.variant_households);
                     assert_eq!(sold, price);
                 }
                 Some(residents) => {
-                    assert!(mode.is_modern());
-                    assert!((1..=condo.max_household.unwrap()).contains(&residents));
+                    assert!(c.rules.variant_households);
+                    assert!(HOUSEHOLD_SIZES.contains(&residents));
+                    assert!(residents <= condo.max_household.unwrap());
                     assert_eq!(
                         sold,
                         jsmath::round(price * residents as f64 / condo.population as f64)
