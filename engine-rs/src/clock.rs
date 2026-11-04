@@ -1,4 +1,4 @@
-//! Port of `src/shared/Clock.ts` and `src/shared/calendar.ts`.
+//! Port of `src/engine/Clock.ts` and `src/engine/calendar.ts`.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CalendarKind {
@@ -168,7 +168,7 @@ mod tests {
     use super::*;
 
     /// One reading of the clock on a calendar. The web holds the same rows in
-    /// `src/shared/Clock.test.ts`. Keep the two tables identical.
+    /// `src/engine/clockReadings.test.ts`. Keep the two tables identical.
     struct Row {
         name: &'static str,
         calendar: Calendar,

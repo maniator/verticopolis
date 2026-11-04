@@ -69,6 +69,16 @@ export interface HeaderView {
   /** The game clock in minutes since the start. */
   readonly minutes: number;
   readonly minuteOfDay: number;
+  /** The clock's readings on the tower's calendar, as the engine reports them
+   *  (`headerClock.ts` turns them into dates). All count from 0. */
+  readonly day: number;
+  readonly dayOfWeek: number;
+  readonly isWeekend: boolean;
+  readonly quarter: number;
+  readonly year: number;
+  /** The calendar's week and weekend lengths in days. */
+  readonly weekDays: number;
+  readonly weekendDays: number;
   /** Moves whenever a unit or transport is added or removed. */
   readonly revision: number;
   /** Moves whenever the meal overlay's inputs change. */

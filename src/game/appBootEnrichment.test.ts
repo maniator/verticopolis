@@ -55,7 +55,7 @@ const DAY = 86_400_000;
 /** The reader's header and tower as of the boot, on day `day`. */
 function readerAt(t: { mode: string; star: number; population: number; highestFloor: number; day: number }) {
   return {
-    header: { mode: t.mode, modernCalendar: "realWorld", star: t.star, population: t.population, minutes: t.day * 1440 + 420 },
+    header: { mode: t.mode, modernCalendar: "realWorld", star: t.star, population: t.population, minutes: t.day * 1440 + 420, day: t.day },
     tower: { highestFloor: t.highestFloor },
   };
 }

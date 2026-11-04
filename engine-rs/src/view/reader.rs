@@ -140,8 +140,9 @@ impl ViewReader {
             + transports_len(&tower.transports);
         let mut v = Vec::with_capacity(size);
         let fx = &sim.fx;
+        let clock = &sim.clock;
         v.extend_from_slice(&[
-            sim.clock.minutes,
+            clock.minutes,
             tower.revision as f64,
             tower.meta_revision as f64,
             tower.meal_overlay_revision as f64,
@@ -177,6 +178,13 @@ impl ViewReader {
             people.len() as f64,
             (self.changed.len() / UNIT_RECORD) as f64,
             tower.transports.len() as f64,
+            clock.day() as f64,
+            clock.day_of_week() as f64,
+            if clock.is_weekend() { 1.0 } else { 0.0 },
+            clock.quarter() as f64,
+            clock.year() as f64,
+            clock.calendar.week_days as f64,
+            clock.calendar.weekend_days as f64,
         ]);
         debug_assert_eq!(v.len(), HEADER);
         for p in people {

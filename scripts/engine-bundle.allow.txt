@@ -30,6 +30,7 @@
 
 # The Simulation and the classes it holds
 src/engine/Simulation.ts
+src/engine/Clock.ts
 src/engine/Crowd.ts
 src/engine/EconomySystem.ts
 src/engine/ElevatorDispatch.ts
@@ -110,6 +111,7 @@ src/engine/migrations/v5tov6.ts
 src/engine/migrations/v6tov7.ts
 
 # Reference data, rules and catalog reads (#921)
+src/engine/calendar.ts
 src/engine/catalog.ts
 src/engine/econConfig.ts
 src/engine/elevatorSchedule.ts
