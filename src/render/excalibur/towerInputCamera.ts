@@ -290,9 +290,9 @@ function pointerUp(engine: TowerEngine, ev: ex.PointerEvent, how: "release" | "c
   engine.gesture = null;
 }
 
-/** Camera policy for a swapped-in (or boot-loaded) tower: an undo/redo restore
- *  keeps the camera where the player is looking (keepCamera); a genuine tower
- *  swap restores the save's own view when it carries one, else centers. */
+/** Camera policy for a swapped-in (or boot-loaded) tower. A tooling restore
+ *  keeps the camera (keepCamera), a genuine swap restores the save's own view
+ *  or else centers, and an undo or redo step keeps the scene and skips this. */
 export function adoptCamera(engine: TowerEngine, view: SerializedView | null, keepCamera?: boolean): void {
   if (keepCamera) return;
   if (view) engine.applyView(view);

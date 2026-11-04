@@ -238,8 +238,8 @@ export function pgCheckHosted(before: string): string {
 
 /**
  * In-page: settle the live tower through the app's load path. The page's save
- * is deserialized and adopted with `adoptSim` (undo-restore flavor, so the
- * camera and history stay) and the engine loads it. What a load resets is
+ * is deserialized and adopted with `adoptSim` (the restore flavor, so the
+ * camera stays) and the engine loads it. What a load resets is
  * carried over from the engine: the loop's pass memos and the elevator
  * telemetry. What `adoptSim` resets in the app is put back (speed, pause, the star and win
  * latches, the step accumulator, the meal-rush day, the log cursor and

@@ -7,14 +7,7 @@ import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, tou
 import { runFrame } from "./frameLoop";
 import { noteEngineThrow, watchEngineTraps } from "./engineFault";
 
-/**
- * Headless unit tests for wireEngine. The sibling helpers it delegates to
- * (buildPreview, frameLoop) are mocked so the wiring stays the unit under test;
- * gesture/facilities/placement stay real. After wireEngine(app), each installed
- * callback is invoked to prove the delegation. rebuildEngine is intentionally
- * NOT tested here: it constructs a real WebGL `new TowerEngine` and cannot run
- * headless.
- */
+/** Headless wireEngine callback tests; rebuildEngine has separate tests. */
 
 vi.mock("./buildPreview", () => ({
   placeSimpleBuild: vi.fn(() => ({})),
@@ -72,6 +65,7 @@ function makeApp(toolOver: Record<string, unknown> = {}) {
     reader,
     canvas,
     audio: { start: vi.fn() },
+    keyboard: { pointerDrew: vi.fn(), followTower: vi.fn() },
     tool: { type: "inspect", kind: "office", ...toolOver },
     build: {
       bulldozePicked: vi.fn(async () => {}),
@@ -215,6 +209,15 @@ describe("onHover", () => {
     expect(mockUpdateBuildPreview).toHaveBeenCalledWith(app, 1, 2);
   });
 
+  it("hands the ghost to the pointer on a hover and a press, so an undo does not redraw it at the keyboard cursor", () => {
+    const app = makeApp({ type: "build", kind: "office" });
+    wireEngine(app);
+    app.engine.onHover!(1, 2, null);
+    expect(app.keyboard.pointerDrew, "the hover").toHaveBeenCalledOnce();
+    app.engine.onActionDown!(1, 2, false, null);
+    expect(app.keyboard.pointerDrew, "the press").toHaveBeenCalledTimes(2);
+  });
+
   it("inspect tool inspects the picked entity on desktop", () => {
     const app = makeApp({ type: "inspect" });
     wireEngine(app);
@@ -237,17 +240,13 @@ describe("onLongPress (touch peek)", () => {
   });
 
   it("spends the ✕-dismissal latch: a hold is fresh intent, like a tap (#696)", () => {
-    // Hybrid device: the hover card's ✕ latched inspectDismissed for this
-    // facility. Without the reset, inspectPicked early-returns and the peek
-    // shows nothing while the release is still swallowed.
+    // A hover card's dismissed latch must not swallow the next touch peek.
     const app = makeApp({ type: "inspect" });
     wireEngine(app);
     app.engine.onLongPress!(3, 4, { id: "u5" });
     expect(app.inspector.resetLatch).toHaveBeenCalled();
     expect(app.inspector.inspectPicked).toHaveBeenCalledWith({ id: "u5" });
-    // Order is load-bearing: inspectPicked re-checks the latch internally, so
-    // reset AFTER the pick would reintroduce the eaten-peek bug with both
-    // calls still made. Pin reset-before-pick.
+    // The latch must reset before inspectPicked rechecks it.
     expect(app.inspector.resetLatch.mock.invocationCallOrder[0]).toBeLessThan(
       app.inspector.inspectPicked.mock.invocationCallOrder[0],
     );
@@ -271,9 +270,7 @@ describe("onLongPress (touch peek)", () => {
     expect(app.transportStart).toBeNull();
     expect(app.engine.preview).toBeNull();
     expect(app.build.clearPaint).toHaveBeenCalled();
-    // Discarded, not committed: no build happened, and an income tick during
-    // the 450ms hold moves money (part of the signature), so a commit here
-    // would mint a bogus Build entry whose restore rewinds sim-only state.
+    // Discard, not commit: an income tick during the hold is not a build.
     expect(app.discardUndo).toHaveBeenCalled();
     expect(app.commitUndo).not.toHaveBeenCalled();
     // The now-inert release commits no room.

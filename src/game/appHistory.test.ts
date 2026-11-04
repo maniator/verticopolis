@@ -16,7 +16,7 @@ describe("createAppHistory", () => {
     enginePort.sim.build("lobby", 1, 160);
     hist.commit();
     await hist.undo();
-    expect(followSwap).toHaveBeenCalledWith(true);
+    expect(followSwap, "a step keeps the camera, the scene and the tower's latches").toHaveBeenCalledWith("step");
     expect(toast).toHaveBeenCalledWith("Undid: build", "info");
   });
 

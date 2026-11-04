@@ -87,8 +87,8 @@ describe("the app's history through the port", () => {
   it("steps through the engine and follows the restore, keeping the trail", async () => {
     const enginePort = new TsEngine(Simulation.newGame(1));
     const toasts: string[] = [];
-    const followed: boolean[] = [];
-    const hist = createAppHistory({ enginePort, ui: { toast: (m) => toasts.push(m) }, followSwap: (keep) => followed.push(keep), showSteps: () => {} });
+    const followed: string[] = [];
+    const hist = createAppHistory({ enginePort, ui: { toast: (m) => toasts.push(m) }, followSwap: (follow) => followed.push(follow), showSteps: () => {} });
     await hist.undo();
     expect(toasts).toEqual(["Nothing to undo."]);
     expect(followed, "nothing was swapped").toEqual([]);
@@ -97,7 +97,7 @@ describe("the app's history through the port", () => {
     enginePort.sim.build("lobby", 1, 160);
     hist.commit();
     await hist.undo();
-    expect(followed).toEqual([true]);
+    expect(followed).toEqual(["step"]);
     expect(toasts[toasts.length - 1]).toBe("Undid: build");
     await hist.redo();
     expect(toasts[toasts.length - 1]).toBe("Redid: build");
@@ -109,11 +109,11 @@ describe("the app's history through the port", () => {
       lastReason: () => "no load",
     });
     const toasts: string[] = [];
-    const followed: boolean[] = [];
+    const followed: string[] = [];
     const hist = createAppHistory({
       enginePort,
       ui: { toast: (m: string) => void toasts.push(m) },
-      followSwap: (keep: boolean) => void followed.push(keep),
+      followSwap: (follow: string) => void followed.push(follow),
       showSteps: () => {},
     });
     await expect(hist.undo()).resolves.toBeUndefined();
