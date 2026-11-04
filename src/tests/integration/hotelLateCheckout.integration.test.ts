@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-import { itTypeScriptOnly } from "../parity/typescriptOnly";
 import { Simulation } from "../../engine/Simulation";
 import { Clock } from "../../engine/Clock";
 import { FACILITIES } from "../../engine/facilities";
@@ -27,6 +26,7 @@ const HOTEL_POP = FACILITIES.hotelSingle.population;
 // A hotel wing with N rooms on a served floor, plus a lunch venue. Rooms are set
 // `asleep` directly (as an overnight guest leaves them), reachable so nothing is
 // silently unservable. Money preloaded so no bankruptcy interaction.
+// `hotelLateCheckoutEngine.integration.test.ts` has a copy; change both together.
 function hotelTower(mode: GameMode, rooms: number, seed = 2024): Simulation {
   const sim = new Simulation(seed, mode, "realWorld");
   sim.money = 1_000_000;
@@ -308,25 +308,9 @@ describe("midday census lift is bounded and does not flip a star (Guardrail 5 / 
   });
 });
 
+// The no-maid half of AC8 runs on both engines in
+// `hotelLateCheckoutEngine.integration.test.ts`.
 describe("understaffed housekeeping: late-checkout rooms behave like ordinary dirty rooms (AC8)", () => {
-  itTypeScriptOnly("swaps sim.clock to each afternoon hour and resets lastHour after the crowd exists, and runs economy.hotelCheckout() and hotelLateCheckout() on the instance; no command relays either")("without a maid the afternoon-dirtied rooms stay dirty and are not re-let", () => {
-    const sim = hotelTower("modern", 10); // no housekeeping unit placed
-    sim.economy.hotelCheckout();
-    const deferred = asleepHotelCount(sim);
-    expect(deferred).toBeGreaterThan(0);
-    sim.economy.hotelLateCheckout();
-    expect(dirtyHotelCount(sim)).toBe(10); // every room now dirty
-    // Run the rest of the day with no housekeeping: dirty rooms cannot self-clean
-    // and a dirty room cannot be re-let, exactly like a morning-dirtied room.
-    for (let h = 15; h < 23; h++) {
-      sim.clock = new Clock(h * 60, sim.clock.calendar);
-      sim.lastHour = -1;
-      sim.tick(1);
-    }
-    expect(dirtyHotelCount(sim)).toBe(10); // still dirty, none turned over or re-let
-    expect(asleepHotelCount(sim)).toBe(0); // and none re-filled (dirty blocks evening fill)
-  });
-
   it("with a maid a late-checkout dirty room is turned over like any other", () => {
     // Purpose-built single-floor hotel: 4 rooms (round(0.2*4)=1 late-checked-out)
     // plus a housekeeping unit share floor 2, so the maid walks to every room with
