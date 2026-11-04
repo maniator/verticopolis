@@ -1,5 +1,5 @@
 import type { GameApp } from "../main";
-import { trafficTier, TRAFFIC_BOUNDS, TRAFFIC_LABELS, trafficGlyph } from "../presentation/traffic";
+import { trafficTier, TRAFFIC_BOUNDS, TRAFFIC_LABELS, trafficLevel } from "../presentation/traffic";
 import { floorLabel } from "../ui/floorLabel";
 import { noteFrameError } from "./frameErrors";
 
@@ -11,7 +11,7 @@ import { noteFrameError } from "./frameErrors";
  * the order it was asked and the tier's hysteresis steps from one to the next.
  */
 
-/** Color-blind-safe traffic cue: word + shape-coded bar glyph (never color
+/** Color-blind-safe traffic cue: word + a four-bar meter (never color
  *  alone), driven by the tower's PEAK per-floor congestion, its busiest
  *  populated-and-served floor, so it matches the congestion overlay legend and
  *  moves as real congestion develops. Boundary hysteresis stops flicker; above
@@ -72,7 +72,8 @@ function drawTraffic(app: GameApp, { ratio: cong, floor: hotspot }: { ratio: num
   const labelEl = document.getElementById("traffic-label");
   const floorEl = document.getElementById("traffic-floor");
   const wrapEl = document.getElementById("traffic");
-  if (glyphEl && glyphEl.textContent !== trafficGlyph(tier)) glyphEl.textContent = trafficGlyph(tier);
+  const level = trafficLevel(tier);
+  if (glyphEl && glyphEl.dataset.level !== level) glyphEl.dataset.level = level;
   const labelChanged = labelEl != null && labelEl.textContent !== word;
   const floorChanged = floorEl != null && floorEl.textContent !== floorText;
   if (labelChanged) labelEl!.textContent = word;

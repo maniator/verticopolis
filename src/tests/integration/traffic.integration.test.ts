@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { trafficTier, TRAFFIC_LABELS, trafficGlyph } from "../../presentation/traffic";
+import { trafficTier, TRAFFIC_LABELS, trafficLevel } from "../../presentation/traffic";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
@@ -36,9 +36,9 @@ describe("Traffic tier (color-blind cue)", () => {
     expect(trafficTier(1.51)).toBe(3); // Gridlock
     expect(trafficTier(3.1)).toBe(3); // a severe jam
   });
-  it("glyph is shape-coded (fills to the tier) and grayscale-legible", () => {
-    expect(trafficGlyph(0)).toBe("▮▯▯▯");
-    expect(trafficGlyph(3)).toBe("▮▮▮▮");
+  it("names the meter level the stylesheet fills to (four bars at Gridlock)", () => {
+    expect(trafficLevel(0)).toBe("smooth");
+    expect(trafficLevel(3)).toBe("gridlock");
     expect(TRAFFIC_LABELS[trafficTier(2.0)]).toBe("Gridlock");
   });
 });

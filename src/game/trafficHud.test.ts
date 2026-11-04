@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { refreshTraffic } from "./trafficHud";
-import { TRAFFIC_LABELS, trafficGlyph } from "../presentation/traffic";
+import { TRAFFIC_LABELS } from "../presentation/traffic";
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
@@ -39,7 +39,7 @@ beforeEach(() => {
     </div>`;
 });
 
-const glyph = () => document.getElementById("traffic-glyph")!.textContent;
+const level = () => document.getElementById("traffic-glyph")!.dataset.level;
 const label = () => document.getElementById("traffic-label")!.textContent;
 const floor = () => document.getElementById("traffic-floor")!.textContent;
 const wrap = () => document.getElementById("traffic")!;
@@ -52,7 +52,7 @@ describe("refreshTraffic", () => {
     expect(app.lastTrafficTier).toBe(0);
     expect(label()).toBe("Smooth");
     expect(label()).toBe(TRAFFIC_LABELS[0]);
-    expect(glyph()).toBe(trafficGlyph(0)); // ▮▯▯▯
+    expect(level()).toBe("smooth"); // the stylesheet fills one bar
     // Below Smooth's tier the hotspot floor is suppressed entirely.
     expect(floor()).toBe("");
     expect(wrap().getAttribute("aria-label")).toBe("Traffic: Smooth");
@@ -66,7 +66,7 @@ describe("refreshTraffic", () => {
 
     expect(app.lastTrafficTier).toBe(2);
     expect(label()).toBe("Backed up");
-    expect(glyph()).toBe(trafficGlyph(2)); // ▮▮▮▯
+    expect(level()).toBe("backed-up"); // the stylesheet fills three bars
     expect(floor()).toBe(" · 42F");
     expect(wrap().getAttribute("aria-label")).toBe("Traffic: Backed up, worst on floor 42");
     expect(wrap().classList.contains("traffic-warn")).toBe(true);
