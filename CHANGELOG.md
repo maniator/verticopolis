@@ -21,6 +21,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.82.0
+
+- In a Classic game the Map now shows your rooms in their colors, fitted to your tower, with stairs and escalators drawn too.
+- The Map leaves a little space at each side of the lot, so a tower built edge to edge no longer touches its sides.
+- Stairs and escalators on the Map are a little lighter, so they stand out against the sky.
+
 ## 2.81.0
 
 - Undo and redo no longer turn back the clock: they put back just the edit, and give back or charge exactly what it cost.

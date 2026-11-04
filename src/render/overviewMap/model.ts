@@ -5,8 +5,8 @@
  * DOM, so the rules are unit-tested on their own.
  *
  * - The draw list is rebuilt only when the identity of `structure`, `rooms` or
- *   `tower.transports` changes, or the theme, the box or the extent does (a
- *   Modern band crossed). `tower.revision` alone is not a reason: a host can
+ *   `tower.transports` changes, or the box or the extent does (a band
+ *   crossed). `tower.revision` alone is not a reason: a host can
  *   repeat a revision over other units (#1296).
  *   The band check is constant work on every sync (a couple of small extent
  *   objects and a few comparisons), never a walk.
@@ -22,10 +22,9 @@
  * made per frame, or every sync would rebuild.
  */
 import type { FacilityKind } from "../../engine/types";
-import { buildMapDrawList, shaftLineWidth as normalShaftLine, type MapMark, type MapSource } from "./drawList";
-import { themeExtent, sameExtent, viewPlacement, type BuiltFloors, type ViewPlacement } from "./extent";
+import { buildMapDrawList, type MapMark, type MapSource } from "./drawList";
+import { bandedExtent, sameExtent, viewPlacement, type BuiltFloors, type ViewPlacement } from "./extent";
 import { fitLayout, type MapCamera, type MapLayout, type MapWorld } from "./geometry";
-import type { MapTheme } from "./style";
 
 /** What the map reads from the view on each sync. Only identities and two
  *  numbers are compared, never the arrays' contents. */
@@ -38,23 +37,14 @@ export interface MapViewInput {
 export interface MapFrameInput {
   readonly view: MapViewInput;
   readonly world: MapWorld;
-  readonly theme: MapTheme;
   readonly skyFloors: number;
   /** The drawing box in map (device) pixels: the canvas's backing-store size. */
   readonly boxWidth: number;
   readonly boxHeight: number;
-  /** How wide Classic draws a shaft line, in map (device) pixels; the window
-   *  passes `CLASSIC_SHAFT_LINE_CSS` times the device pixel ratio. Modern
-   *  ignores it. */
-  readonly classicShaftLine: number;
   /** A kind's height in floors. It is not part of the rebuild key: the catalog
    *  is bound per tower, and a new tower comes with new arrays. */
   floorsOf(kind: FacilityKind): number;
 }
-
-/** Classic draws shafts as lines this many CSS pixels wide (one pixel of the
- *  retail map), so a high-density screen still shows them. */
-export const CLASSIC_SHAFT_LINE_CSS = 1;
 
 /** A box size as `fitLayout` reads it: a positive finite number, or 1. */
 function boxSide(n: number): number {
@@ -65,10 +55,8 @@ export class OverviewMapModel {
   private structure: unknown = null;
   private rooms: unknown = null;
   private transports: unknown = null;
-  private theme: MapTheme | null = null;
   private boxWidth = NaN;
   private boxHeight = NaN;
-  private shaftLine = NaN;
   private cam: MapCamera | null = null;
   private placementLayout: MapLayout | null = null;
   layout: MapLayout | null = null;
@@ -79,15 +67,14 @@ export class OverviewMapModel {
    * Bring the layout and draw list up to date. Returns true when the draw list
    * was rebuilt, so the window repaints the tower layer only then. After a
    * rebuild the next `syncCamera` gives the placement again even if the camera
-   * has not moved, so a window that redraws the rectangle with the tower (or
-   * restyles it for a new theme) has it. A new layout clears `placement` until
+   * has not moved, so a window that redraws the rectangle with the tower has
+   * it. A new layout clears `placement` until
    * that call.
    */
   sync(input: MapFrameInput): boolean {
-    const extent = themeExtent(input.theme, input.world, input.view.tower, input.skyFloors);
-    // Keyed on the values the build actually uses, so a NaN box or a line width
-    // that rounds the same never rebuilds on every frame.
-    const line = input.theme === "classic" ? normalShaftLine(input.classicShaftLine) : 0;
+    const extent = bandedExtent(input.world, input.view.tower, input.skyFloors);
+    // Keyed on the values the build actually uses, so a NaN box never rebuilds
+    // on every frame.
     const boxWidth = boxSide(input.boxWidth);
     const boxHeight = boxSide(input.boxHeight);
     const sameGeometry = this.layout !== null && this.boxWidth === boxWidth && this.boxHeight === boxHeight && sameExtent(this.layout.extent, extent);
@@ -95,17 +82,13 @@ export class OverviewMapModel {
       sameGeometry &&
       this.structure === input.view.structure &&
       this.rooms === input.view.rooms &&
-      this.transports === input.view.tower.transports &&
-      this.theme === input.theme &&
-      this.shaftLine === line;
+      this.transports === input.view.tower.transports;
     if (same) return false;
     this.structure = input.view.structure;
     this.rooms = input.view.rooms;
     this.transports = input.view.tower.transports;
-    this.theme = input.theme;
     this.boxWidth = boxWidth;
     this.boxHeight = boxHeight;
-    this.shaftLine = line;
     this.cam = null;
     // A tower edit inside the same geometry keeps the layout object; only the
     // one placement the rebuild re-arms is recomputed for it.
@@ -119,7 +102,7 @@ export class OverviewMapModel {
       transports: input.view.tower.transports,
       floorsOf: (kind) => input.floorsOf(kind),
     };
-    this.marks = buildMapDrawList(this.layout, source, { shaftLineWidth: line });
+    this.marks = buildMapDrawList(this.layout, source);
     return true;
   }
 

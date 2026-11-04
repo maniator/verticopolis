@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { FLOOR, TILE } from "../render/scale";
-import type { MapCamera, MapExtent } from "../render/overviewMap/geometry";
+import { fitLayout, mapPointToCenter, rectContains, tileToMapX, viewportRect, type MapCamera, type MapExtent } from "../render/overviewMap/geometry";
 import { cameraCenter, clientToMap, grabRect, isKeyboardClick, isPrimaryPress, keyTarget, MAP_KEY, MAP_KEY_STEP_SHARE, noButtonHeld, passesMapKey } from "./overviewMapInput";
 
-const EXTENT: MapExtent = { width: 375, topLine: 107, bottomLine: -11 };
+const EXTENT: MapExtent = { leftTile: 0, width: 375, topLine: 107, bottomLine: -11 };
 /** A camera centered on tile 100, floor 20, seeing 80 tiles by 16 floors. */
 const CAM: MapCamera = { posX: 100 * TILE, posY: -20 * FLOOR, zoom: 2, viewWidth: 160 * TILE, viewHeight: 32 * FLOOR };
 
@@ -57,6 +57,46 @@ describe("overview map keys", () => {
 
   it("answers no other key", () => {
     for (const key of ["Enter", " ", "a", "PageUp", "Escape"]) expect(keyTarget(key, false, CAM, EXTENT), key).toBeNull();
+  });
+});
+
+describe("overview map input on a crop with a margin left of the lot", () => {
+  // The banded crop of the 375-tile lot: 15 tiles of margin each side, so tile 0 sits 15 tiles in from the map's left edge.
+  const CROP: MapExtent = { leftTile: -15, width: 405, topLine: 30, bottomLine: -1 };
+  // One backing pixel per tile and ten per floor, shown at a third of that across and half of it down.
+  const layout = fitLayout(CROP, 405, 310);
+  const box = { left: 10, top: 20, width: 135, height: 155 };
+
+  it("turns a pointer at the canvas's left edge into the margin's first tile, and one 15 tiles in into tile 0", () => {
+    const edge = clientToMap(box, layout, 10, 20 + 77.5);
+    expect(edge).toEqual({ x: 0, y: 155 });
+    expect(mapPointToCenter(layout, edge.x, edge.y).tile).toBe(-15);
+    const lotEdge = clientToMap(box, layout, 10 + 5, 20);
+    expect(lotEdge.x).toBe(15);
+    expect(mapPointToCenter(layout, lotEdge.x, lotEdge.y).tile).toBe(0);
+  });
+
+  it("reads a camera centered in the margin as a tile below 0, unclamped", () => {
+    expect(cameraCenter({ ...CAM, posX: -10 * TILE }).tile).toBe(-10);
+  });
+
+  it("steps across the margin's left edge by the visible span, leaving the clamp to the renderer", () => {
+    const atLotEdge = { ...CAM, posX: 0 };
+    expect(keyTarget(MAP_KEY.left, false, atLotEdge, CROP)).toEqual({ tile: -20, floor: 20 });
+    // The horizontal step does not read the extent at all, and Home and End read only its top and bottom.
+    expect(keyTarget(MAP_KEY.left, false, atLotEdge, CROP)).toEqual(keyTarget(MAP_KEY.left, false, atLotEdge, EXTENT));
+    expect(keyTarget(MAP_KEY.top, false, atLotEdge, CROP)).toEqual({ tile: 0, floor: 30 });
+    expect(keyTarget(MAP_KEY.bottom, false, atLotEdge, CROP)).toEqual({ tile: 0, floor: -1 });
+  });
+
+  it("grabs a view mark clipped at the map's left edge by its area in the margin", () => {
+    // A view 20 tiles wide centered on tile -10 reaches 5 tiles past the map's left edge: 15 tiles of it are on the map.
+    const mark = viewportRect(layout, { posX: -10 * TILE, posY: -20 * FLOOR, zoom: 1, viewWidth: 20 * TILE, viewHeight: 4 * FLOOR });
+    expect(mark).toMatchObject({ x: 0, w: 15 });
+    const area = grabRect(mark, 44);
+    expect(area.x + area.w / 2).toBe(mark.x + mark.w / 2);
+    expect(rectContains(area, tileToMapX(layout, -12), mark.y + mark.h / 2)).toBe(true);
+    expect(rectContains(area, tileToMapX(layout, 40), mark.y + mark.h / 2)).toBe(false);
   });
 });
 

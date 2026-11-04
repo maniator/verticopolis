@@ -30,6 +30,7 @@ function layoutFor(world: MapWorld = WORLD, w = 375, h = 330) {
 describe("mapExtent", () => {
   it("spans the lot, the sky headroom above the top floor and the ground below the lowest", () => {
     const e = mapExtent(WORLD, SKY_HEADROOM_FLOORS);
+    expect(e.leftTile).toBe(0);
     expect(e.width).toBe(375);
     expect(e.topLine).toBe(100 + SKY_HEADROOM_FLOORS);
     expect(e.bottomLine).toBe(-9 - MAP_LINES_BELOW_LOWEST_FLOOR);
@@ -64,6 +65,48 @@ describe("fitLayout", () => {
     expect(l.height).toBe(1);
     expect(Number.isFinite(l.pxPerTile) && l.pxPerTile > 0).toBe(true);
     expect(Number.isFinite(l.pxPerFloor) && l.pxPerFloor > 0).toBe(true);
+  });
+});
+
+describe("an extent with a margin beside the lot", () => {
+  // Ten tiles of margin each side of the 375-tile lot, one map pixel per tile.
+  const MARGIN = 10;
+  const whole = mapExtent(WORLD, SKY_HEADROOM_FLOORS);
+  const padded = fitLayout({ ...whole, leftTile: -MARGIN, width: 375 + 2 * MARGIN }, 375 + 2 * MARGIN, 330);
+
+  it("puts the lot's first tile the margin in from the left edge, and maps back exactly", () => {
+    expect(tileToMapX(padded, 0)).toBe(MARGIN);
+    expect(tileToMapX(padded, 375)).toBe(375 + MARGIN);
+    expect(tileToMapX(padded, -MARGIN)).toBe(0);
+    for (const tile of [-MARGIN, -3.5, 0, 187.25, 375, 375 + MARGIN]) expect(mapXToTile(padded, tileToMapX(padded, tile))).toBeCloseTo(tile, 9);
+    expect(blockRect(padded, 0, 9, 1).x).toBe(MARGIN);
+    expect(snappedBlock(padded, 366, 9, 1, 1)!.x + 9).toBe(375 + MARGIN);
+  });
+
+  it("aims a point in the margin at a tile past the lot, and the map's edges at the margin's", () => {
+    expect(mapPointToCenter(padded, 0, 100).tile).toBe(-MARGIN);
+    expect(mapPointToCenter(padded, -50, 100).tile).toBe(-MARGIN);
+    expect(mapPointToCenter(padded, padded.width + 50, 100).tile).toBe(375 + MARGIN);
+    expect(mapPointToCenter(padded, MARGIN, 100).tile).toBe(0);
+  });
+
+  it("draws the part of a view that reaches into the margin, and clips it at the map's edge", () => {
+    // A view 100 tiles wide centered on tile 0 shows 50 tiles of sky left of the lot, 10 of them on the map.
+    const cam: MapCamera = { posX: 0, posY: -20 * FLOOR, zoom: 1, viewWidth: 100 * TILE, viewHeight: 14 * FLOOR };
+    const r = viewportRect(padded, cam);
+    expect(r.x).toBe(0);
+    expect(r.w).toBeCloseTo(50 + MARGIN, 9);
+    const right = viewportRect(padded, { ...cam, posX: 375 * TILE });
+    expect(right.x).toBeCloseTo(375 + MARGIN - 50, 9);
+    expect(right.x + right.w).toBeCloseTo(padded.width, 9);
+  });
+
+  it("lets a drag carry the view into the margin and no further", () => {
+    const start = { tile: 5, floor: 20 };
+    expect(dragCenter(padded, start, { x: 100, y: 100 }, { x: 80, y: 100 }).tile).toBe(-MARGIN);
+    expect(dragCenter(padded, { tile: 370, floor: 20 }, { x: 100, y: 100 }, { x: 130, y: 100 }).tile).toBe(375 + MARGIN);
+    // A start already past the margin is never pushed further out.
+    expect(dragCenter(padded, { tile: -40, floor: 20 }, { x: 100, y: 100 }, { x: 90, y: 100 }).tile).toBe(-40);
   });
 });
 
@@ -328,11 +371,26 @@ describe("snappedBlock", () => {
 
 describe("hardening", () => {
   it("fitLayout reads a hand-built extent with no width or an upside-down span as one unit", () => {
-    const l = fitLayout({ width: 0, topLine: 3, bottomLine: 9 }, 100, 100);
+    const l = fitLayout({ leftTile: 0, width: 0, topLine: 3, bottomLine: 9 }, 100, 100);
     expect(Number.isFinite(l.pxPerTile) && l.pxPerTile > 0).toBe(true);
     expect(Number.isFinite(l.pxPerFloor) && l.pxPerFloor > 0).toBe(true);
-    const nan = fitLayout({ width: Number.NaN, topLine: Number.NaN, bottomLine: 0 }, 100, 100);
+    const nan = fitLayout({ leftTile: Number.NaN, width: Number.NaN, topLine: Number.NaN, bottomLine: 0 }, 100, 100);
     expect(Number.isFinite(nan.pxPerTile) && Number.isFinite(nan.pxPerFloor)).toBe(true);
+    // A left edge that is not a number reads as tile 0, so the transforms stay finite.
+    expect(nan.extent.leftTile).toBe(0);
+    expect(tileToMapX(nan, 0)).toBe(0);
+  });
+
+  it("fitLayout reads a hand-built margin extent with a broken width as one tile from tile 0, never one tile of margin", () => {
+    for (const width of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const l = fitLayout({ leftTile: -15, width, topLine: 30, bottomLine: -1 }, 100, 100);
+      expect(l.extent.leftTile, String(width)).toBe(0);
+      expect(l.extent.width, String(width)).toBe(1);
+      expect(tileToMapX(l, 0), String(width)).toBe(0);
+      expect(tileToMapX(l, 1), String(width)).toBe(100);
+    }
+    // A good width keeps its left edge.
+    expect(fitLayout({ leftTile: -15, width: 405, topLine: 30, bottomLine: -1 }, 405, 31).extent.leftTile).toBe(-15);
   });
 
   it("aims an infinite pointer at the edge it points to, and NaN at the center", () => {

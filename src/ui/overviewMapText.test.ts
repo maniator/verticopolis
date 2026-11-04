@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
 import { FLOOR, TILE } from "../render/scale";
-import { modernExtent, viewPlacement } from "../render/overviewMap/extent";
+import { bandedExtent, viewPlacement } from "../render/overviewMap/extent";
 import { fitLayout } from "../render/overviewMap/geometry";
 import { builtFloorCounts, mapSummary, viewSentence } from "./overviewMapText";
 
@@ -63,9 +63,9 @@ describe("mapSummary", () => {
     expect(mapSummary({ lowestFloor: 1, highestFloor: 5 }, { outside: "none", centerFloor: null })).toBe("Tower map: 5 floors above ground.");
   });
 
-  it("reports the camera's floor from a real placement above a Modern crop", () => {
+  it("reports the camera's floor from a real placement above the crop", () => {
     const built = { lowestFloor: 1, highestFloor: 30 };
-    const layout = fitLayout(modernExtent({ lotWidth: 375, minFloor: -9, maxFloor: 100 }, built, SKY_HEADROOM_FLOORS), 150, 300);
+    const layout = fitLayout(bandedExtent({ lotWidth: 375, minFloor: -9, maxFloor: 100 }, built, SKY_HEADROOM_FLOORS), 150, 300);
     const p = viewPlacement(layout, { posX: 187 * TILE, posY: -95.5 * FLOOR, zoom: 1, viewWidth: 1000, viewHeight: 14 * FLOOR });
     expect(p.outside).toBe("above");
     expect(mapSummary(built, p)).toBe("Tower map: 30 floors above ground. The view is above the top floor, 30, past the top of the map.");

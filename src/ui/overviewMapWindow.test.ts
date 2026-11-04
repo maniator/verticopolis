@@ -1,9 +1,11 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
+import { bandedExtent } from "../render/overviewMap/extent";
 import { FLOOR } from "../render/scale";
 import { MAP_OPEN_STORAGE_KEY, MAP_OPEN_VALUE } from "./overviewMapPrefs";
 import type { OverviewMapDeps } from "./overviewMapWindow";
 import { MAP_DOM_ID } from "./overviewMapDom";
-import { disposeRigs, pointer, rig, rootEl, viewCanvas } from "./overviewMapWindow.fixture";
+import { CROP, disposeRigs, pointer, rig, rootEl, silent2d, towerSource, viewCanvas } from "./overviewMapWindow.fixture";
 
 beforeEach(() => vi.restoreAllMocks());
 afterEach(() => disposeRigs());
@@ -275,9 +277,44 @@ describe("overview map window: focus and keys (CAP-5)", () => {
     expect(summary.getAttribute("aria-live")).toBe("off");
   });
 
-  it("marks the theme for the Classic pen", () => {
-    rig();
-    expect(rootEl().dataset.mapTheme).toBe("classic");
+  it("marks itself drawn once it has painted the tower, for the gallery runner, and unmarks a closed map", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(silent2d());
+    const r = rig();
+    expect(rootEl().dataset.mapDrawn).toBe("true");
+    r.win.setOpen(false, false);
+    expect(rootEl().dataset.mapDrawn).toBeUndefined();
+    r.win.setOpen(true, false);
+    expect(rootEl().dataset.mapDrawn).toBe("true");
+  });
+
+  it("unmarks itself when a new pixel ratio clears its canvases, until the same frame paints them again", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(silent2d());
+    const r = rig();
+    const seen = new MutationObserver(() => {});
+    seen.observe(rootEl(), { attributes: true, attributeFilter: ["data-map-drawn"], attributeOldValue: true });
+    vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+    r.win.frame();
+    // Each record holds the value it replaced: the mark was taken off, then set again once painted.
+    const replaced = seen.takeRecords().map((m) => m.oldValue);
+    seen.disconnect();
+    expect(replaced).toEqual(["true", null]);
+    expect(rootEl().dataset.mapDrawn).toBe("true");
+  });
+
+  it("never marks itself drawn without a 2D context to paint the tower with", () => {
+    // happy-dom's canvases have no 2D context, as a browser that refuses one.
+    expect(document.createElement("canvas").getContext("2d")).toBeNull();
+    const r = rig();
+    expect(r.win.isOpen()).toBe(true);
+    expect(rootEl().dataset.mapDrawn).toBeUndefined();
+    // A new tower rebuilds the draw list (the rebuild sets the body's backdrop
+    // again), and still nothing is painted.
+    const body = viewCanvas().parentElement!;
+    body.style.background = "";
+    r.source.view = { ...r.source.view, rooms: [] };
+    r.win.frame();
+    expect(body.style.background).not.toBe("");
+    expect(rootEl().dataset.mapDrawn).toBeUndefined();
   });
 
   it("keeps the keyup of a kept key from the game too, and lets a passed key's keyup through", () => {
@@ -296,7 +333,13 @@ describe("overview map window: focus and keys (CAP-5)", () => {
     const r = rig();
     viewCanvas().dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true, cancelable: true }));
     viewCanvas().dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true, cancelable: true }));
-    expect(r.moves.map((m) => m.floor)).toEqual([107, -11]);
+    expect(r.moves.map((m) => m.floor)).toEqual([CROP.topLine, CROP.bottomLine]);
+    expect([CROP.topLine, CROP.bottomLine]).toEqual([30, -1]);
+  });
+
+  it("lays the rig's tower out on the crop its tests measure in", () => {
+    const { world, view } = towerSource();
+    expect(bandedExtent(world, view.tower, SKY_HEADROOM_FLOORS)).toEqual(CROP);
   });
 
   it("lets zoom, speed, the Space pan key and shortcuts through to the game", () => {

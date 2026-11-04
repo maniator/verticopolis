@@ -6,8 +6,8 @@
  * panning and pinching there work the same with the window open.
  *
  * The app calls `frame()` once per rendered frame. A closed window returns at
- * once; an open one does constant work unless the tower, the theme, the box
- * or the camera changed (see `OverviewMapModel`). Everything it shows comes
+ * once; an open one does constant work unless the tower, the box or the
+ * camera changed (see `OverviewMapModel`). Everything it shows comes
  * from the view, the bound world and the camera; moves go through the
  * renderer's own clamp (`moveCamera`).
  */
@@ -15,9 +15,8 @@ import type { FacilityKind } from "../engine/types";
 import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
 import type { ViewPlacement } from "../render/overviewMap/extent";
 import { dragCenter, mapPointToCenter, rectContains, type MapCamera, type MapCameraCenter, type MapLayout, type MapRect, type MapWorld } from "../render/overviewMap/geometry";
-import { CLASSIC_SHAFT_LINE_CSS, OverviewMapModel, type MapFrameInput, type MapViewInput } from "../render/overviewMap/model";
+import { OverviewMapModel, type MapFrameInput, type MapViewInput } from "../render/overviewMap/model";
 import { createPatternSource, paintMapMarks, type PatternSource } from "../render/overviewMap/paint";
-import type { MapTheme } from "../render/overviewMap/style";
 import { MAP_BACKDROP, groundShare, paintViewMark, viewMarkBand } from "../render/overviewMap/viewMark";
 import { buildMapDom } from "./overviewMapDom";
 import { MapKeyKeeper, PointerFocusClaim } from "./overviewMapKeys";
@@ -30,7 +29,6 @@ import { mapSummary } from "./overviewMapText";
 export interface OverviewMapSource {
   readonly view: MapViewInput;
   readonly world: MapWorld;
-  readonly theme: MapTheme;
 }
 
 /** The camera fields the window reads, filled in place each frame. */
@@ -128,11 +126,9 @@ export class OverviewMapWindow {
     this.input = {
       view: { structure: [], rooms: [], tower: { lowestFloor: 1, highestFloor: 1, transports: [] } },
       world: { lotWidth: 1, minFloor: 0, maxFloor: 0 },
-      theme: "classic",
       skyFloors: SKY_HEADROOM_FLOORS,
       boxWidth: 1,
       boxHeight: 1,
-      classicShaftLine: CLASSIC_SHAFT_LINE_CSS,
       floorsOf: deps.floorsOf,
     };
     // First in the stage: positioned, it still paints over the world canvas,
@@ -232,7 +228,7 @@ export class OverviewMapWindow {
     this.press = null;
     // A reopened window has missed every change while it was closed.
     this.sizeDirty = true;
-    this.model.reset();
+    this.forgetDrawing();
     if (hadFocus) this.toggle.focus();
     if (open) this.frame();
   }
@@ -249,7 +245,7 @@ export class OverviewMapWindow {
   }
 
   /** Bring the window up to date for this frame. Constant work unless the
-   *  tower, the theme, the box or the camera changed. */
+   *  tower, the box or the camera changed. */
   frame(): void {
     if (!this.open) return;
     const src = this.deps.source();
@@ -260,25 +256,24 @@ export class OverviewMapWindow {
     const input = this.input;
     input.view = src.view;
     input.world = src.world;
-    input.theme = src.theme;
     input.boxWidth = this.towerCanvas.width;
     input.boxHeight = this.towerCanvas.height;
-    input.classicShaftLine = CLASSIC_SHAFT_LINE_CSS * this.px;
     const rebuilt = this.model.sync(input);
     const layout = this.model.layout;
     if (!layout) return;
     if (rebuilt) {
-      if (this.towerCtx && this.patterns) paintMapMarks(this.towerCtx, layout.width, layout.height, this.model.marks, src.theme, this.patterns);
-      const backdrop = MAP_BACKDROP[src.theme] ?? MAP_BACKDROP.modern;
+      // Marked only once painted: the gallery runner reads it (`mapForShot`).
+      if (this.towerCtx && this.patterns) {
+        paintMapMarks(this.towerCtx, layout.width, layout.height, this.model.marks, this.patterns);
+        this.root.dataset.mapDrawn = "true";
+      }
       const ground = `${(groundShare(layout) * 100).toFixed(2)}%`;
-      this.body.style.background = `linear-gradient(to bottom, ${backdrop.sky} ${ground}, ${backdrop.ground} ${ground})`;
-      // The CSS keys Classic's inverting pen on this.
-      this.root.dataset.mapTheme = src.theme;
+      this.body.style.background = `linear-gradient(to bottom, ${MAP_BACKDROP.sky} ${ground}, ${MAP_BACKDROP.ground} ${ground})`;
     }
     this.deps.readCamera(this.cam);
     const placement = this.model.syncCamera(this.cam);
     if (placement) {
-      if (this.viewCtx) paintViewMark(this.viewCtx, layout, placement, src.theme, this.px);
+      if (this.viewCtx) paintViewMark(this.viewCtx, layout, placement, this.px);
       this.writeSummary(mapSummary(src.view.tower, placement));
     }
   }
@@ -300,7 +295,13 @@ export class OverviewMapWindow {
     }
     // The pattern tiles stay valid, but cleared canvases need a full paint
     // (the new box alone would rebuild the tower and leave the view mark blank).
-    if (cleared) this.model.reset();
+    if (cleared) this.forgetDrawing();
+  }
+
+  /** The canvases are blank or stale: unmarked until the next paint. */
+  private forgetDrawing(): void {
+    this.model.reset();
+    delete this.root.dataset.mapDrawn;
   }
 
   /** The device pixel ratio, or 1 where it is missing or not a positive number. */

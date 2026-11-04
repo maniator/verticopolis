@@ -10,17 +10,11 @@
  */
 import { edgeBand, type ViewPlacement } from "./extent";
 import { lineToMapY, type MapLayout, type MapRect } from "./geometry";
-import type { MapTheme } from "./style";
 
-/** The sky and the ground behind the tower, per theme. Classic keeps the
- *  retail window's idea (the main view's sky and earth behind the tower) in a
- *  darker day blue than the main view's sky, so the Classic gray silhouette
- *  stands out against it (the retail sky follows the time of day; v1 keeps a
- *  fixed day color). Modern is darker still, behind its room colors. */
-export const MAP_BACKDROP: Readonly<Record<MapTheme, { readonly sky: string; readonly ground: string }>> = {
-  classic: { sky: "#4a6a9a", ground: "#5a4632" },
-  modern: { sky: "#1d2838", ground: "#2e2418" },
-};
+/** The sky and the ground behind the tower: a dark sky and earth, so the room
+ *  colors read against them (the retail sky follows the time of day; v1 keeps
+ *  one fixed color). */
+export const MAP_BACKDROP = { sky: "#1d2838", ground: "#2e2418" } as const;
 
 /** The floor line the street sits on: floor 1 (the ground floor) stands on it,
  *  and the basements are under it. */
@@ -34,12 +28,8 @@ export function groundShare(layout: MapLayout): number {
   return Number.isFinite(share) ? Math.max(0, Math.min(1, share)) : 1;
 }
 
-/** The view mark's ink. Classic draws the retail map's dotted outline with an
- *  inverting pen: the window gives the mark's canvas a CSS `difference` blend
- *  in Classic (`overview-map.css`), so the white ink reads dark over the light
- *  gray tower and pale over the dark sky. A canvas composite mode would not do
- *  it, since it blends only with the mark canvas's own (cleared) pixels. Modern
- *  draws a solid white outline over a dark halo. */
+/** The view mark's ink: a solid white outline over a dark halo, so it reads
+ *  over the room colors and over the dark sky. */
 export const VIEW_MARK = {
   ink: "#ffffff",
   halo: "rgba(0, 0, 0, 0.65)",
@@ -53,7 +43,6 @@ export interface ViewMarkContext {
   fillStyle: string | CanvasGradient | CanvasPattern;
   strokeStyle: string | CanvasGradient | CanvasPattern;
   lineWidth: number;
-  setLineDash(segments: number[]): void;
   clearRect(x: number, y: number, w: number, h: number): void;
   fillRect(x: number, y: number, w: number, h: number): void;
   strokeRect(x: number, y: number, w: number, h: number): void;
@@ -97,7 +86,6 @@ export function paintViewMark(
   ctx: ViewMarkContext,
   layout: MapLayout,
   placement: ViewPlacement,
-  theme: MapTheme,
   px: number,
 ): "outline" | "band" | "none" {
   ctx.clearRect(0, 0, layout.width, layout.height);
@@ -112,14 +100,8 @@ export function paintViewMark(
   if (!(placement.rect.w > 0) || !(placement.rect.h > 0)) return "none";
   const line = devicePx(VIEW_MARK_CSS.line, px);
   const r = visibleRect(layout, placement.rect, devicePx(VIEW_MARK_CSS.minSide, px));
-  if (theme === "classic") {
-    ctx.setLineDash([line, line]);
-    strokeInside(ctx, r, line, VIEW_MARK.ink);
-    ctx.setLineDash([]);
-  } else {
-    strokeInside(ctx, r, devicePx(VIEW_MARK_CSS.haloLine, px), VIEW_MARK.halo);
-    strokeInside(ctx, r, line, VIEW_MARK.ink);
-  }
+  strokeInside(ctx, r, devicePx(VIEW_MARK_CSS.haloLine, px), VIEW_MARK.halo);
+  strokeInside(ctx, r, line, VIEW_MARK.ink);
   return "outline";
 }
 

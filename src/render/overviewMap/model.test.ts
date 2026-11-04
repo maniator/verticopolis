@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { SKY_HEADROOM_FLOORS } from "../cameraBounds";
 import { FLOOR, TILE } from "../scale";
 import { OverviewMapModel, type MapFrameInput, type MapViewInput } from "./model";
-import { MODERN_BAND_FLOORS } from "./extent";
+import { MAP_BAND_FLOORS, mapSideMarginTiles } from "./extent";
 
 const WORLD = { lotWidth: 375, minFloor: -9, maxFloor: 100 };
 
@@ -16,7 +16,7 @@ function view(highestFloor = 20, over: Partial<MapViewInput> = {}): MapViewInput
 }
 
 function input(v: MapViewInput, over: Partial<MapFrameInput> = {}): MapFrameInput {
-  return { view: v, world: WORLD, theme: "modern", skyFloors: SKY_HEADROOM_FLOORS, boxWidth: 150, boxHeight: 300, classicShaftLine: 1, floorsOf: () => 1, ...over };
+  return { view: v, world: WORLD, skyFloors: SKY_HEADROOM_FLOORS, boxWidth: 150, boxHeight: 300, floorsOf: () => 1, ...over };
 }
 
 const cam = (line = 10) => ({ posX: 187 * TILE, posY: -line * FLOOR, zoom: 1, viewWidth: 1000, viewHeight: 14 * FLOOR });
@@ -62,15 +62,6 @@ describe("OverviewMapModel.sync", () => {
     expect(m.syncCamera(cam())).toBeNull();
   });
 
-  it("gives the placement again after a theme switch that keeps the layout", () => {
-    const m = new OverviewMapModel();
-    const full = view(100, { tower: { lowestFloor: -9, highestFloor: 100, transports: [] } });
-    m.sync(input(full));
-    m.syncCamera(cam());
-    expect(m.sync(input(full, { theme: "classic" }))).toBe(true);
-    expect(m.syncCamera(cam())).not.toBeNull();
-  });
-
   it("clears the placement when the layout changes, until the camera is synced again", () => {
     const m = new OverviewMapModel();
     const v = view();
@@ -94,52 +85,37 @@ describe("OverviewMapModel.sync", () => {
     expect(m.sync(input({ ...x, tower: { ...x.tower, transports: [...x.tower.transports] } }))).toBe(true);
   });
 
-  it("rebuilds on a theme or box change", () => {
+  it("rebuilds on a box change", () => {
     const m = new OverviewMapModel();
     const v = view();
     m.sync(input(v));
-    expect(m.sync(input(v, { theme: "classic" }))).toBe(true);
-    expect(m.sync(input(v, { theme: "classic", boxWidth: 400 }))).toBe(true);
-    expect(m.sync(input(v, { theme: "classic", boxWidth: 400 }))).toBe(false);
+    expect(m.sync(input(v, { boxWidth: 400 }))).toBe(true);
+    expect(m.sync(input(v, { boxWidth: 400 }))).toBe(false);
   });
 
-  it("rebuilds in Modern only when the built top crosses a band, even with the same arrays", () => {
+  it("rebuilds only when the built top crosses a band, even with the same arrays", () => {
     const m = new OverviewMapModel();
     // Pick a top one floor under a band edge, so one more floor stays inside the band.
-    const bandEdge = 6 * MODERN_BAND_FLOORS;
+    const bandEdge = 6 * MAP_BAND_FLOORS;
     const top = bandEdge - SKY_HEADROOM_FLOORS - 1;
     const v = view(top);
     m.sync(input(v));
     expect(m.layout!.extent.topLine).toBe(bandEdge);
     expect(m.sync(input({ ...v, tower: { ...v.tower, highestFloor: top + 1 } }))).toBe(false);
     expect(m.sync(input({ ...v, tower: { ...v.tower, highestFloor: top + 2 } }))).toBe(true);
-    expect(m.layout!.extent.topLine).toBe(bandEdge + MODERN_BAND_FLOORS);
+    expect(m.layout!.extent.topLine).toBe(bandEdge + MAP_BAND_FLOORS);
   });
 
-  it("never rescales Classic as the tower grows", () => {
+  it("lays the map out over the lot and its side margins, and draws shafts as blocks", () => {
     const m = new OverviewMapModel();
-    const v = view(5);
-    m.sync(input(v, { theme: "classic" }));
-    const layout = m.layout;
-    expect(m.sync(input({ ...v, tower: { ...v.tower, highestFloor: 90 } }, { theme: "classic" }))).toBe(false);
-    expect(m.layout).toBe(layout);
-  });
-
-  it("draws Classic shafts as lines of the asked width and Modern shafts as blocks", () => {
-    const m = new OverviewMapModel();
-    const v = view();
-    const classic = (classicShaftLine: number) => input(v, { theme: "classic", boxWidth: 375 * 2, classicShaftLine });
-    m.sync(classic(2));
+    const margin = mapSideMarginTiles(WORLD.lotWidth);
+    // Two map pixels per tile across the lot and its margins.
+    m.sync(input(view(), { boxWidth: (375 + 2 * margin) * 2 }));
+    expect(m.layout!.extent.leftTile).toBe(-margin);
+    expect(m.layout!.pxPerTile).toBe(2);
     const shaft = m.marks.find((k) => k.layer === "transport")!;
-    expect(shaft.rect.w).toBe(2);
-    m.sync(input(v, { boxWidth: 375 * 2, classicShaftLine: 2 }));
-    expect(m.marks.find((k) => k.layer === "transport")!.rect.w).toBe(8);
-    // A new line width on the same Classic layout rebuilds, and draws that width.
-    m.sync(classic(2));
-    expect(m.sync(classic(3))).toBe(true);
-    expect(m.marks.find((k) => k.layer === "transport")!.rect.w).toBe(3);
-    // A width that rounds the same does not.
-    expect(m.sync(classic(3.2))).toBe(false);
+    // The express shaft at tile 120, four tiles wide.
+    expect(shaft.rect).toMatchObject({ x: (120 + margin) * 2, w: 8 });
   });
 });
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { FacilityKind } from "../../engine/types";
 import { SKY_HEADROOM_FLOORS } from "../cameraBounds";
 import { buildMapDrawList, type MapSource } from "./drawList";
+import { bandedExtent, mapSideMarginTiles } from "./extent";
 import { extentFloors, fitLayout, mapExtent } from "./geometry";
 
 const WORLD = { lotWidth: 375, minFloor: -9, maxFloor: 100 };
@@ -46,9 +47,11 @@ describe("buildMapDrawList", () => {
     expect(b10.rect.y + b10.rect.h).toBe(layout.height - 3);
   });
 
-  it("draws a shaft over every floor it serves, bottom to top inclusive", () => {
+  it("draws a shaft as a block as wide as the shaft, over every floor it serves, bottom to top inclusive", () => {
     const [shaft] = buildMapDrawList(layout, source({ transports: [{ kind: "elevatorStandard", x: 10, width: 4, bottom: -2, top: 30 }] }));
     expect(shaft.layer).toBe("transport");
+    expect(shaft.rect.x).toBe(10);
+    expect(shaft.rect.w).toBe(4);
     expect(shaft.rect.h).toBe(33 * 3);
     expect(shaft.rect.y).toBe(yOfLine(30));
   });
@@ -145,29 +148,36 @@ describe("buildMapDrawList", () => {
     expect(m.rect.x + m.rect.w).toBe(layout.width);
   });
 
-  it("draws shafts as lines at their left tile when asked, and leaves rooms and structure alone", () => {
-    const src = source({
-      structure: [{ kind: "floor", floor: 1, x: 0, width: 1, count: 60 }],
-      rooms: [{ kind: "office", floor: 1, x: 10, width: 9 }],
-      transports: [
-        { kind: "elevatorExpress", x: 40, width: 4, bottom: 1, top: 30 },
-        { kind: "elevatorStandard", x: 374, width: 4, bottom: 1, top: 2 },
-      ],
-    });
-    const blocks = buildMapDrawList(layout, src);
-    const lines = buildMapDrawList(layout, src, { shaftLineWidth: 2 });
-    expect(lines[0]).toEqual(blocks[0]);
-    expect(lines[1]).toEqual(blocks[1]);
-    expect(lines[2].rect).toEqual({ ...blocks[2].rect, w: 2 });
-    // A shaft in the last column moves in just enough to keep its whole line on the map.
-    expect(lines[3].rect.w).toBe(2);
-    expect(lines[3].rect.x).toBe(layout.width - 2);
+  it("leaves the margin beside the lot empty on a map that has one", () => {
+    const padded = bandedExtent(WORLD, { lowestFloor: 1, highestFloor: 30 }, SKY_HEADROOM_FLOORS);
+    const wide = fitLayout(padded, padded.width, 300);
+    const margin = mapSideMarginTiles(WORLD.lotWidth);
+    const [first, last] = buildMapDrawList(
+      wide,
+      source({ structure: [{ kind: "floor", floor: 1, x: 0, width: 1, count: 1 }], rooms: [{ kind: "office", floor: 1, x: 366, width: 9 }] }),
+    );
+    // One map pixel per tile: the lot's first tile starts `margin` pixels in, and its last ends as far from the right edge.
+    expect(first.rect.x).toBe(margin);
+    expect(wide.width - (last.rect.x + last.rect.w)).toBe(margin);
   });
 
-  it("draws blocks for a line width that is not a positive number", () => {
-    const src = source({ transports: [{ kind: "elevatorService", x: 40, width: 4, bottom: 1, top: 3 }] });
-    const blocks = buildMapDrawList(layout, src);
-    for (const w of [0, -1, NaN, Infinity]) expect(buildMapDrawList(layout, src, { shaftLineWidth: w })).toEqual(blocks);
-    expect(buildMapDrawList(layout, src, { shaftLineWidth: 0.4 })[0].rect.w).toBe(1);
+  it("gives a shaft or stairway that overhangs the lot's edge its whole rect in the margin", () => {
+    const padded = bandedExtent(WORLD, { lowestFloor: 1, highestFloor: 30 }, SKY_HEADROOM_FLOORS);
+    const wide = fitLayout(padded, padded.width, 300);
+    const margin = mapSideMarginTiles(WORLD.lotWidth);
+    const [right, left] = buildMapDrawList(
+      wide,
+      source({
+        transports: [
+          { kind: "elevatorStandard", x: 374, width: 4, bottom: 1, top: 10 },
+          { kind: "stairs", x: -2, width: 4, bottom: 1, top: 2 },
+        ],
+      }),
+    );
+    // One map pixel per tile: tiles 374 to 378 run three tiles past the lot's last edge (375), all inside the margin.
+    expect(right.rect).toMatchObject({ x: 374 + margin, w: 4 });
+    expect(right.rect.x + right.rect.w).toBe(375 + 3 + margin);
+    expect(right.rect.x + right.rect.w).toBeLessThan(wide.width);
+    expect(left.rect).toMatchObject({ x: margin - 2, w: 4 });
   });
 });

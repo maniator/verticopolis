@@ -14,13 +14,13 @@
  * Map space has its origin at the top-left, x to the right and y downward, and
  * its unit is the DEVICE pixel: the window builds its layout from the canvas's
  * backing-store size (CSS size times `devicePixelRatio`), so snapping to whole
- * map pixels is snapping to whole device pixels at any ratio. The map shows
- * the whole lot across. Vertically, `mapExtent` (Classic) is the same span the
- * camera is allowed to see (sky above the top floor, one floor of ground below
- * the deepest basement), so there a clamped camera rectangle never leaves the
- * map. A Modern crop (`extent.ts`) is shorter, so a camera can sit wholly or
- * partly above or below it: `viewportRect` clips the rectangle to the map and
- * `viewPlacement` says which edge it passed.
+ * map pixels is snapping to whole device pixels at any ratio. `mapExtent` is
+ * the whole world: the lot across, and vertically the same span the camera is
+ * allowed to see (sky above the top floor, one floor of ground below the
+ * deepest basement). The map draws the banded crop (`extent.ts`), which adds a
+ * margin beside the lot (an extent may start left of tile 0) and is shorter, so
+ * a camera can sit wholly or partly above or below it: `viewportRect` clips the
+ * rectangle to the map and `viewPlacement` says which edge it passed.
  */
 import { FLOOR, TILE } from "../scale";
 
@@ -38,9 +38,12 @@ export interface MapWorld {
   readonly maxFloor: number;
 }
 
-/** What the map spans, in world units. `topLine` and `bottomLine` are floor
- *  lines (the top edge of floor `n` is line `n`). */
+/** What the map spans, in world units: `width` tiles across from the tile
+ *  `leftTile` at its left edge (below 0 when the map leaves a margin beside the
+ *  lot), and `topLine` and `bottomLine` are floor lines (the top edge of floor
+ *  `n` is line `n`). */
 export interface MapExtent {
+  readonly leftTile: number;
   readonly width: number;
   readonly topLine: number;
   readonly bottomLine: number;
@@ -100,7 +103,7 @@ export function mapExtent(world: MapWorld, skyFloors: number): MapExtent {
   const minFloor = finite(world.minFloor, 0);
   const maxFloor = Math.max(minFloor, finite(world.maxFloor, minFloor));
   const sky = Math.max(0, finite(skyFloors, 0));
-  return { width, topLine: maxFloor + sky, bottomLine: minFloor - MAP_LINES_BELOW_LOWEST_FLOOR };
+  return { leftTile: 0, width, topLine: maxFloor + sky, bottomLine: minFloor - MAP_LINES_BELOW_LOWEST_FLOOR };
 }
 
 /** Floors the extent spans from top to bottom. Always at least 1. */
@@ -119,11 +122,16 @@ export function fitLayout(extent: MapExtent, boxWidth: number, boxHeight: number
   const width = positive(boxWidth, 1);
   const height = positive(boxHeight, 1);
   // A hand-built extent is trusted no further than `mapExtent` would trust a
-  // world: a non-positive width or an upside-down span reads as one unit.
-  const tiles = positive(extent.width, 1);
+  // world: a width that is not a positive finite number reads as one tile
+  // starting at tile 0 (a left edge set back for a margin would leave that one
+  // tile wholly in the margin), an upside-down span reads as one floor, and a
+  // left edge that is not finite reads as tile 0.
+  const widthOk = Number.isFinite(extent.width) && extent.width > 0;
+  const tiles = widthOk ? extent.width : 1;
+  const leftTile = widthOk ? finite(extent.leftTile, 0) : 0;
   const floors = extentFloors(extent);
   return {
-    extent: { width: tiles, topLine: extent.topLine, bottomLine: extent.bottomLine },
+    extent: { leftTile, width: tiles, topLine: extent.topLine, bottomLine: extent.bottomLine },
     pxPerTile: width / tiles,
     pxPerFloor: height / floors,
     width,
@@ -135,7 +143,7 @@ export function fitLayout(extent: MapExtent, boxWidth: number, boxHeight: number
 
 /** Map x of a tile's left edge (tiles may be fractional: the camera's center is). */
 export function tileToMapX(layout: MapLayout, tile: number): number {
-  return finite(tile, 0) * layout.pxPerTile;
+  return (finite(tile, 0) - layout.extent.leftTile) * layout.pxPerTile;
 }
 
 /** Map y of a floor line: the top edge of floor `line` (a floor's bottom edge is
@@ -146,7 +154,7 @@ export function lineToMapY(layout: MapLayout, line: number): number {
 
 /** The tile a map x falls on, as a fractional tile (not rounded or clamped). */
 export function mapXToTile(layout: MapLayout, x: number): number {
-  return finite(x, 0) / layout.pxPerTile;
+  return layout.extent.leftTile + finite(x, 0) / layout.pxPerTile;
 }
 
 /** The floor line a map y falls on (not rounded or clamped). */
@@ -216,8 +224,9 @@ export function viewportRect(layout: MapLayout, cam: MapCamera): MapRect {
   // Clip in world units, before the transforms: a tiny zoom or a huge viewport
   // can overflow the edges to Infinity, which the transforms would read as 0,
   // and a view taller than a cropped map must still cover all of it.
-  const leftTile = clamp((posX - halfW) / TILE, 0, extent.width);
-  const rightTile = clamp((posX + halfW) / TILE, 0, extent.width);
+  const mapRight = extent.leftTile + extent.width;
+  const leftTile = clamp((posX - halfW) / TILE, extent.leftTile, mapRight);
+  const rightTile = clamp((posX + halfW) / TILE, extent.leftTile, mapRight);
   const topLine = clamp(-(posY - halfH) / FLOOR, extent.bottomLine, extent.topLine);
   const bottomLine = clamp(-(posY + halfH) / FLOOR, extent.bottomLine, extent.topLine);
   const x0 = clamp(tileToMapX(layout, leftTile), 0, layout.width);
@@ -244,9 +253,13 @@ export function sameRect(a: MapRect | null, b: MapRect | null, eps = 0.5): boole
 /**
  * The camera center for a point on the map, in the units `setCamera` and the
  * save use. The point is clamped onto the map first, so a click or drag that
- * leaves the map edge aims at the edge. The renderer's own clamp still
- * applies when the camera moves, and may keep the center further in than the
- * point asks for (the camera cannot show past the sky or the ground).
+ * leaves the map edge aims at the edge. A point in the margin beside the lot
+ * returns a tile in the margin (below 0, or past the lot's width). The
+ * renderer's own clamp still applies when the camera moves, and may keep the
+ * center further in than the point asks for: the camera cannot show past the
+ * sky or the ground, and `clamp` in `towerInputCamera.ts` holds its center
+ * between tile 0 and the lot's width, so a center asked for in the margin
+ * lands on the lot's nearer edge.
  */
 export function mapPointToCenter(layout: MapLayout, mx: number, my: number): MapCameraCenter {
   // NaN has no side to aim at and reads as the map's center; an infinite value
@@ -262,7 +275,7 @@ export function mapPointToCenter(layout: MapLayout, mx: number, my: number): Map
  * clipped to the map), `grab` is where on the map the pointer went
  * down. The center moves by the pointer's travel since then, so the rectangle
  * does not jump to the pointer when the drag starts. The result is kept on the
- * map, except that a start outside it (a camera above a Modern crop) is never
+ * map, except that a start outside it (a camera above the crop) is never
  * pulled in or pushed further out by the drag: it moves only by the travel back
  * toward the map. A non-finite grab or pointer reads as "no travel" on that axis.
  *
@@ -282,11 +295,11 @@ export function dragCenter(
   const { extent } = layout;
   const tile0 = finite(start.tile, 0);
   const floor0 = finite(start.floor, extent.topLine);
-  // A start already past an edge (a camera in the sky above a Modern crop) stays
+  // A start already past an edge (a camera in the sky above the crop) stays
   // where it is: the result may not go further out than the start, and is not
   // pulled onto the map by a move along the other axis.
   return {
-    tile: clamp(tile0 + dx / layout.pxPerTile, Math.min(0, tile0), Math.max(extent.width, tile0)),
+    tile: clamp(tile0 + dx / layout.pxPerTile, Math.min(extent.leftTile, tile0), Math.max(extent.leftTile + extent.width, tile0)),
     floor: clamp(floor0 - dy / layout.pxPerFloor, Math.min(extent.bottomLine, floor0), Math.max(extent.topLine, floor0)),
   };
 }
