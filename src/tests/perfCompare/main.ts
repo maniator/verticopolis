@@ -5,6 +5,7 @@ import { analyzeBundle } from "./bundle";
 import { BASELINE_DIST, buildBaseline, requireBaselineCommit, requireBaselineDist, startArmServers, TS_BASELINE, type BaselineRecord } from "./baseline";
 import { buildTree, collectEnvironment, ENGINE_PACKAGE_FILES, packageState, type Environment, type PackageState } from "./env";
 import { buildLimitations } from "./limitations";
+import { networkFolderProblem, networkMarker, parseNetwork } from "./network";
 import { gateBrowser, probeBrowser, type BrowserProbe } from "./browserProbe";
 import { checkExceptionFolder, exceptionMarker, resolveLaunch } from "./exceptionRegister";
 import { browserName, recordedGpuVerified, type BrowserLaunch } from "./renderer";
@@ -15,7 +16,7 @@ import { comparisonsCsv, markdownReport, rawCsv, summaryCsv } from "./report";
 import { engineOrder, runProcess } from "./runner";
 import { autosaveSeed, checkAutosaveSeeds } from "./savedStart";
 import { SCENARIO_NAMES, buildScenarios, unknownScenarios } from "./scenarios";
-import type { CompareConfig, CompareResults, EngineName, ProcessRun } from "./types";
+import type { CompareConfig, CompareResults, EngineName, NetworkLimit, ProcessRun } from "./types";
 import type { Environment as Env } from "./env";
 import { incompleteTreeError } from "./treeRecord";
 import { validateResults } from "./validate";
@@ -39,12 +40,14 @@ export interface Args {
   resume: string | null;
   scenarios: string[] | null;
   throttles: number[] | null;
+  /** `--network MBPS,LATENCY_MS`: limit the connection for the startup measurements (network.ts). */
+  network: NetworkLimit | null;
   /** `--aa ts|wasm`: an A/A pass, the same engine in both slots. */
   aa: EngineName | null;
 }
 
 export function parseArgs(argv: readonly string[]): Args {
-  const a: Args = { reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, throttles: null, aa: null };
+  const a: Args = { reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, throttles: null, network: null, aa: null };
   let repsSet = false;
   const seen = new Set<string>();
   for (let i = 0; i < argv.length; i++) {
@@ -72,14 +75,16 @@ export function parseArgs(argv: readonly string[]): Args {
       a.throttles = next().split(",").map(Number);
       if (a.throttles.some((t) => !Number.isFinite(t) || t < 1 || t > 20)) throw new Error("--throttles takes rates from 1 to 20, comma separated");
       if (new Set(a.throttles).size !== a.throttles.length) throw new Error("--throttles names a rate twice");
-    } else if (arg === "--aa") {
+    } else if (arg === "--network") a.network = parseNetwork(next());
+    else if (arg === "--aa") {
       const v = next();
       if (v !== "ts" && v !== "wasm") throw new Error("--aa takes the engine to run in both slots: ts or wasm");
       a.aa = v;
-    } else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --throttles 1,4, --aa ts|wasm`);
+    } else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --throttles 1,4, --network 10,40, --aa ts|wasm`);
   }
   if (a.quick && !repsSet) a.reps = 2;
   if (a.resume && a.out) throw new Error("--resume continues its own folder; it takes no --out");
+  if (a.aa && a.network) throw new Error("--network cannot be combined with --aa: an A/A pass feeds perf:calibrate, which leaves a limited pass out");
   return a;
 }
 
@@ -96,6 +101,7 @@ export function makeConfig(args: Args, scenarioNames: string[]): CompareConfig {
     viewport: { width: 1280, height: 720 },
     scenarios: scenarioNames,
     quick: args.quick,
+    ...(args.network ? { network: args.network } : {}),
     aa: args.aa,
   };
 }
@@ -105,9 +111,9 @@ export function makeConfig(args: Args, scenarioNames: string[]): CompareConfig {
 export function writeResultFiles(out: string, results: CompareResults): void {
   const aa = results.config.aa;
   writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 1) + "\n");
-  writeFileSync(join(out, "metrics.csv"), summaryCsv(results.metrics, aa));
-  writeFileSync(join(out, "raw.csv"), rawCsv(results.metrics, aa));
-  writeFileSync(join(out, "comparisons.csv"), comparisonsCsv(results.comparisons, aa));
+  writeFileSync(join(out, "metrics.csv"), summaryCsv(results.metrics, aa, results.config.network));
+  writeFileSync(join(out, "raw.csv"), rawCsv(results.metrics, aa, results.config.network));
+  writeFileSync(join(out, "comparisons.csv"), comparisonsCsv(results.comparisons, aa, results.config.network));
   writeFileSync(join(out, "report.md"), markdownReport(results));
 }
 
@@ -276,7 +282,7 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     metrics,
     comparisons,
     validation,
-    limitations: buildLimitations(config.aa, environment.appVersion, renderers, launch.rendererException, tsBaseline),
+    limitations: buildLimitations(config.aa, environment.appVersion, renderers, launch.rendererException, tsBaseline, config.network ?? null, config.throttles),
   };
 
   writeResultFiles(out, results);
@@ -334,7 +340,7 @@ export function packageErrors(perf: PackageState, prod: PackageState, sourceHash
  * and commit gets -2, -3, and so on, so no result is overwritten. An
  * explicit --out must not exist yet either.
  */
-export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild" | "aa">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync, rendererException: string | null = null): string {
+export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skipBuild" | "aa" | "network">, day: string, env: Pick<Environment, "commitShort" | "dirty">, exists: (p: string) => boolean = existsSync, rendererException: string | null = null): string {
   if (args.out) {
     // Only the folder's own name counts, and in lower case, because the results are written on case-insensitive disks too.
     const name = basename(resolve(repo, args.out));
@@ -345,11 +351,13 @@ export function outputDir(repo: string, args: Pick<Args, "out" | "quick" | "skip
       if (!lower.includes(`aa-${args.aa}`)) throw new Error(`--aa ${args.aa} needs an --out folder name containing aa-${args.aa}, so the folder cannot be mistaken for a comparison`);
       if (lower.includes(`aa-${other}`)) throw new Error(`--aa ${args.aa} cannot write to ${name}, which also names the aa-${other} marker`);
     } else if (/aa-(ts|wasm)/.test(lower)) throw new Error(`--out ${name} names an A/A folder, but this run is a comparison; pass --aa ts|wasm or pick another name`);
+    const networkProblem = networkFolderProblem(name, args.network);
+    if (networkProblem) throw new Error(networkProblem);
     const out = resolve(repo, args.out);
     if (exists(out)) throw new Error(`${out} already exists; results are never overwritten`);
     return out;
   }
-  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${args.skipBuild ? "-skipbuild" : ""}${rendererException ? `-${exceptionMarker(rendererException)}` : ""}${env.dirty ? "-dirty" : ""}`);
+  const base = resolve(repo, "docs/performance/results", `${day}-${env.commitShort}${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${args.network ? `-${networkMarker(args.network)}` : ""}${args.skipBuild ? "-skipbuild" : ""}${rendererException ? `-${exceptionMarker(rendererException)}` : ""}${env.dirty ? "-dirty" : ""}`);
   let out = base;
   for (let n = 2; exists(out); n++) out = `${base}-${n}`;
   return out;

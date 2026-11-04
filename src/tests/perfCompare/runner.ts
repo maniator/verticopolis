@@ -10,6 +10,7 @@ import { launchOptions, type BrowserLaunch } from "./renderer";
 import { autosaveSeed, autosaveState, bootedTower } from "./savedStart";
 import { eachScenarioFresh } from "./scenarioPages";
 import { idleLoad } from "./idleLoad";
+import { assertHeld, limitNetwork } from "./network";
 import type { Scenario } from "./scenarios";
 import { frameStats, quantile } from "./stats";
 import type { CompareConfig, EngineName, FrameSummary, MemorySummary, ProcessRun, SavedStart, StartupSample, StepSummary } from "./types";
@@ -254,12 +255,16 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
     listen(page);
     const cdp = await ctx.newCDPSession(page);
 
+    // --network limits the cold and warm starts, then lifts for the rest.
+    if (config.network) await limitNetwork(cdp, config.network);
     const cold = await startup(page, server, () => page.goto(url, { waitUntil: "commit" }));
     run.cold = cold.sample;
     run.page = { crossOriginIsolated: cold.info.crossOriginIsolated, timerResolutionMs: cold.info.timerResolutionMs, userAgent: cold.info.userAgent, viewport: cold.info.viewport, webgl: await ev(page, "renderer", webglRenderer, undefined) };
     if (cold.sample.engineActive !== engine) throw new Error(`requested the ${engine} engine but ${cold.sample.engineActive} is active (host: ${JSON.stringify(cold.info.host)})`);
+    if (config.network) assertHeld(config.network, cold.info.resources, "cold start", engine);
     const warm = await startup(page, server, () => page.reload({ waitUntil: "commit" }));
     run.warm = warm.sample;
+    if (config.network) await limitNetwork(cdp, null);
     if (warm.sample.engineActive !== engine) throw new Error(`warm start: requested the ${engine} engine but ${warm.sample.engineActive} is active`);
     const unthrottledProbe = await ev(page, "cpu probe", cpuProbe, undefined);
     run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: null, rate: slowRate, timed: {} };
@@ -357,6 +362,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
       const slowPage = await slow.newPage();
       listen(slowPage);
       const slowCdp = await slow.newCDPSession(slowPage);
+      if (config.network) await limitNetwork(slowCdp, config.network);
       await throttle(slowCdp, slowRate);
       const c4 = await startup(slowPage, server, async () => {
         await slowPage.goto(url, { waitUntil: "commit" });
@@ -364,6 +370,10 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
       });
       run.cold4x = c4.sample;
       if (c4.sample.engineActive !== engine) throw new Error(`${slowRate}x cold start: requested the ${engine} engine but ${c4.sample.engineActive} is active`);
+      if (config.network) {
+        assertHeld(config.network, c4.info.resources, `${slowRate}x cold start`, engine);
+        await limitNetwork(slowCdp, null);
+      }
       run.cpuProbe = { unthrottledMs: unthrottledProbe, throttledMs: await ev(slowPage, "cpu probe", cpuProbe, undefined), rate: slowRate, timed: run.cpuProbe?.timed ?? {} };
       run.rendererEndCold = (await ev(slowPage, "renderer after the cold start", webglRenderer, undefined))?.renderer ?? null;
       await slow.close();

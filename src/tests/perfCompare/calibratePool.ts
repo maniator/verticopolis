@@ -108,7 +108,7 @@ export function poolProblems(used: PoolPass[]): string[] {
   sameFields("machine or runtime", { cpuModel: (r) => r.environment.cpuModel, logicalCpus: (r) => r.environment.logicalCpus, totalMemoryBytes: (r) => r.environment.totalMemoryBytes, os: (r) => r.environment.os, kernel: (r) => r.environment.kernel, arch: (r) => r.environment.arch, node: (r) => r.environment.node, rust: (r) => r.environment.rust, playwright: (r) => r.environment.playwright });
   same("browser (executable, channel, switches, version or WebGL renderer)", (r) => [r.browser?.executable, r.browser?.channel, r.browser?.args, r.browser?.version, renderers(r)]);
   same("engine build", (r) => [r.environment.engineBuildHash, r.environment.enginePackage]);
-  same("run parameters (repetitions, scenarios, throttles, steps, step size, frame window, speed, viewport or warm-up)", (r) => ({ ...r.config, aa: null, quick: false, scenarios: [...r.config.scenarios].sort(), throttles: r.config.throttles.map(Number).sort((a, b) => a - b) }));
+  same("run parameters (repetitions, scenarios, throttles, network limit, steps, step size, frame window, speed, viewport or warm-up)", (r) => ({ ...r.config, aa: null, quick: false, scenarios: [...r.config.scenarios].sort(), throttles: r.config.throttles.map(Number).sort((a, b) => a - b) }));
   if (new Set(used.map((u) => u.environment.commit)).size > 1) problems.push(`the passes come from more than one commit (${[...new Set(used.map((u) => u.environment.commit.slice(0, 7)))].join(", ")}); calibrate one commit's passes`);
   return problems;
 }
