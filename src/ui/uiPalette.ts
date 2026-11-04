@@ -147,10 +147,24 @@ export function selectGroup(ui: UI, title: string): void {
   });
   tab.classList.remove("has-new"); // opening a category clears its unlock nudge
   tab.dataset.ucount = String(countUnlocked(ui, title));
-  // Start the newly opened category at its first tile: the horizontal scroll lives
-  // on the `.pal-groups` container (mobile), not the section itself.
+  // Where the tabs are one row that scrolls sideways, bring the open tab into
+  // view, for a category opened in code (the Getting Started steps) too. Only
+  // the strip scrolls; scrollIntoView could also move the page. The step
+  // rounds up to a whole pixel, since WebKit keeps a whole-pixel scroll and
+  // would drop the part pixel, leaving the tab cut at the edge.
+  const strip = bar!.getBoundingClientRect();
+  const box = tab.getBoundingClientRect();
+  const shown = box.width > 0 && strip.width > 0; // a hidden tab or strip has nothing to show
+  if (shown && box.left < strip.left) bar!.scrollLeft -= Math.ceil(strip.left - box.left);
+  else if (shown && box.right > strip.right) bar!.scrollLeft += Math.ceil(box.right - strip.right);
+  // Start the newly opened category at its first tile: the scroll lives on the
+  // `.pal-groups` container (horizontal on a portrait phone, vertical in the
+  // sideways tools column).
   const scroller = ui.el.palette.querySelector<HTMLElement>(".pal-groups");
-  if (scroller) scroller.scrollLeft = 0;
+  if (scroller) {
+    scroller.scrollLeft = 0;
+    scroller.scrollTop = 0;
+  }
 }
 
 /** Unlocked (visible) facility count in a group, read from the classes the lock

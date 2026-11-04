@@ -11,7 +11,8 @@ import { catalogOf } from "./portAccess";
 
 /** Keep the world-attached DOM panels pinned to their facility's on-screen
  *  position. The big editor panel anchors beside its facility on desktop but
- *  keeps the docked CSS layout on mobile (bottom strip + drawer) to clear the
+ *  keeps the docked CSS layout on mobile (beside the bottom tool strip, or the
+ *  tools column on a phone held sideways, with the drawer) to clear the
  *  palette. The small inspector card (desktop hover AND the touch long-press
  *  peek) anchors to its facility on EVERY tier, so a peek tracks the room like
  *  a hover instead of docking in a corner. */

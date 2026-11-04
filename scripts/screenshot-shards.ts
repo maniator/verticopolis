@@ -86,8 +86,9 @@ export const SHARDS: Record<string, string[]> = {
   engine: ["engine", "metro", "first-run", "first-run-mobile", "preview-rooms", "install-affordance"],
   // ~71s: anchored by the tablet shots (the heaviest drawSettle scene) plus the
   // small scenes + the mobile install-affordance shot (its engine-tower sibling)
-  // + the overview Map scenes.
-  misc: ["tablet", "mobile", "construction", "crowd", "fire", "install-affordance-mobile", "overview-map", "overview-map-phone"],
+  // + the overview Map scenes and the landscape phone pair (one built tower,
+  // two shots).
+  misc: ["tablet", "mobile", "mobile-landscape", "construction", "crowd", "fire", "install-affordance-mobile", "overview-map", "overview-map-phone"],
 };
 
 function allSceneIds(): string[] {

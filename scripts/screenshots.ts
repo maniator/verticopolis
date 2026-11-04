@@ -50,7 +50,7 @@
 import { chromium, type Browser, type Page } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
-import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, mapForShot, restoreMapAfterShot, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
+import { DIRS, DESKTOP, EXECUTABLE, PORT, BASE, assertReady, isPhoneViewport, mapForShot, restoreMapAfterShot, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
 import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
 import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
@@ -225,7 +225,7 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
   // A phone-sized scene must also present as a touch device, or `@media (pointer:
   // coarse)` / mobile-only chrome never applies and the "mobile" shot renders the
   // desktop UI. isMobile/hasTouch are Chromium-only (we always launch Chromium).
-  const mobile = vp.width <= PHONE.width;
+  const mobile = isPhoneViewport(vp);
   const page = await browser.newPage({ viewport: vp, deviceScaleFactor: scene.outDir === "screenshots" ? 1 : 2, isMobile: mobile, hasTouch: mobile });
   page.on("pageerror", (e) => console.error("  PAGE ERROR:", e.message));
   try {

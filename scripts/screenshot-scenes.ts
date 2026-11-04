@@ -10,6 +10,8 @@
  * order, into one merged `SCENES` export so the id set and order stay stable:
  *   - scenes/showcase.ts: the docs/screenshots set + the crash-screen card.
  *   - scenes/features.ts: the map-overlay / stats / basement / migration set.
+ *   - scenes/mobileLandscape.ts: a phone held sideways (showcase.ts is near
+ *     the file-size ceiling, so the landscape pair is its own group).
  *   - scenes/pricing.ts: the Classic/Modern mode-fork pricing scenes (#443).
  *   - scenes/schedule.ts: the elevator Schedule dialog scenes (#305 Phase 3).
  *   - scenes/classic-vs-modern.ts: the CAP-8 paired escalator-on-office stills.
@@ -22,6 +24,7 @@ import { type Scene } from "./screenshot-env.ts";
 import { SHOWCASE_SCENES } from "./scenes/showcase.ts";
 import { FEATURE_SCENES } from "./scenes/features.ts";
 import { OVERVIEW_MAP_SCENES } from "./scenes/overviewMap.ts";
+import { MOBILE_LANDSCAPE_SCENES } from "./scenes/mobileLandscape.ts";
 import { PRICING_SCENES } from "./scenes/pricing.ts";
 import { SCHEDULE_SCENES } from "./scenes/schedule.ts";
 import { CLASSIC_VS_MODERN_SCENES } from "./scenes/classic-vs-modern.ts";
@@ -35,6 +38,7 @@ export const SCENES: Scene[] = [
   ...SHOWCASE_SCENES,
   ...FEATURE_SCENES,
   ...OVERVIEW_MAP_SCENES,
+  ...MOBILE_LANDSCAPE_SCENES,
   ...PRICING_SCENES,
   ...SCHEDULE_SCENES,
   ...CLASSIC_VS_MODERN_SCENES,

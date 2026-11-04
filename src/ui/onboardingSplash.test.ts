@@ -274,3 +274,29 @@ describe("a tower swapped in without the player choosing it (#874)", () => {
     expect(opts.pauseForSplash).toHaveBeenCalledWith(true);
   });
 });
+
+describe("Getting Started card across the phone tier", () => {
+  afterEach(() => {
+    document.getElementById("onboard")?.remove();
+    localStorage.clear();
+  });
+
+  it("takes or drops the phone placement when the window crosses the tier", () => {
+    let listener: (() => void) | undefined;
+    const mq = {
+      matches: false,
+      addEventListener: (_: string, fn: () => void) => (listener = fn),
+      removeEventListener: vi.fn(),
+    } as unknown as MediaQueryList & { matches: boolean };
+    const ctl = new OnboardingController({ mq, showHelp: vi.fn(), pauseForSplash: vi.fn(), chime: vi.fn() });
+    expect(ctl.arm({ onboarding: () => 0 })).toBe(true);
+    const card = document.getElementById("onboard")!;
+    expect(card.classList.contains("onboard--mobile")).toBe(false);
+    (mq as { matches: boolean }).matches = true;
+    listener!();
+    expect(card.classList.contains("onboard--mobile")).toBe(true);
+    (mq as { matches: boolean }).matches = false;
+    listener!();
+    expect(card.classList.contains("onboard--mobile")).toBe(false);
+  });
+});

@@ -156,13 +156,13 @@ export class OnboardingController {
   private splashKey: ((e: KeyboardEvent) => void) | null = null;
   private panelEl: HTMLElement | null = null;
   private sendOff: ReturnType<typeof setTimeout> | null = null;
-  private readonly onMq = () => (this.active ? this.applyHintAndPulse() : this.setDefaultHint());
+  private readonly onMq = () => {
+    this.panelEl?.classList.toggle("onboard--mobile", this.opts.mq.matches);
+    return this.active ? this.applyHintAndPulse() : this.setDefaultHint();
+  };
 
   constructor(private opts: OnboardingOpts) {
-    // The controller is the single owner of the #hint bar: seed a device-aware
-    // default immediately (so mobile never shows the hard-coded desktop line) and
-    // keep it correct across rotate/resize. ONE listener for the controller's
-    // life — no per-session add/remove to leak.
+    // The controller owns #hint: seed it, and one listener keeps it and the card in the right tier.
     this.setDefaultHint();
     this.opts.mq.addEventListener("change", this.onMq);
   }
