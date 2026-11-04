@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calibrate as calibrateWith, calibrationMarkdown, coldStartDifference, passesForLimit } from "./calibrate";
-import { halvesProblems, poolIdentity } from "./calibratePool";
+import { halvesProblems, poolIdentity, poolProblems } from "./calibratePool";
 import { fam, many, pass, RTX, SWIFT, type Folder, type Spec } from "./calibrateFixture";
 import type { EngineName } from "./types";
 
@@ -106,6 +106,22 @@ describe("calibrate", () => {
     expect(text).toMatch(/aa-7: it ran on a dirty tree, or does not say it was clean/);
     expect(text).toMatch(/the passes differ in machine or runtime: cpuModel;/);
     expect(c.adoptable).toBe(false);
+  });
+
+  it("leaves out network-limited passes, so they cannot pool into an adoptable tolerance", () => {
+    const limited = many(10).map((f) => ({ ...f, results: { ...f.results, config: { ...f.results.config, network: { mbps: 10, latencyMs: 40 } } } }));
+    const c = calibrate(limited);
+    expect(c.problems.join("\n")).toMatch(/aa-0: it is a --network run, which is not a protocol run/);
+    expect(c.adoptable).toBe(false);
+    // One limited pass among clean ones is left out alone.
+    const mixed = calibrate([...many(9), pass(9, { network: { mbps: 10, latencyMs: 40 } })]);
+    expect(mixed.problems.join("\n")).toMatch(/aa-9: it is a --network run/);
+  });
+
+  it("names the network limit among the run parameters two passes must share", () => {
+    const folders = many(10);
+    (folders[3].results as { config: { network?: unknown } }).config.network = { mbps: 10, latencyMs: 40 };
+    expect(poolProblems(folders.map((f) => f.results) as never).join("\n")).toMatch(/differ in run parameters \(repetitions, scenarios, throttles, network limit,/);
   });
 
   it("names the toolchain field that one pass recorded as unknown", () => {

@@ -76,8 +76,9 @@ switch, so no switch is added.
 
 A run counts only when it used this browser and the renderer check
 (`gpuVerified`, below) passed, and the rest of the protocol held (clean tree,
-10 paired reps, valid folder, no `--quick`, no exception). A run that cannot
-meet all of that is a smoke or a preview and its numbers are not evidence.
+10 paired reps, valid folder, no `--quick`, no `--network`, no exception). A
+run that cannot meet all of that is a smoke or a preview and its numbers are
+not evidence.
 Software-rendered runs are not accepted after the fact: RUN-0a (default
 headless shell, `HeadlessChrome/149.0.7827.55`, ANGLE on Vulkan SwiftShader),
 RUN-0b-prelim (SwiftShader) and every cloud folder stay in the repo as what
@@ -409,7 +410,8 @@ after the first.
 
 Other flags both accept: `--quick` (a 2-rep smoke test that never counts),
 `--resume DIR` (continue a run that stopped; it keeps its own folder, and an A/A folder resumes with `--aa <engine>` repeated),
-`--scenarios a,b`. `perf:compare` also takes `--throttles 1,4` and
+`--scenarios a,b`. `perf:compare` also takes `--throttles 1,4`,
+`--network MBPS,LATENCY_MS` (its own paragraph below) and
 `--aa ts|wasm` (section 6.1);
 `perf:worker` also takes `--aa ts|wasm` (an A/A pass, section 6.1), and with
 `--aa wasm` it takes `--map-ab`: the overview Map closed in slot "ts" and open in
@@ -422,6 +424,37 @@ and `--out`, but not `--resume`: a stopped run starts again in a new folder,
 and its `results.json` keeps the runs it finished. In PowerShell, quote a
 list (`--scenarios "small,large"`): an unquoted comma makes an array, which
 reaches the script as separate arguments.
+
+`perf:compare --network MBPS,LATENCY_MS` (for example `--network 10,40`) runs the
+cold start, the warm start and, when a CPU throttle above 1x is configured, the
+cold start under the heaviest throttle behind a limited connection, through
+Chrome DevTools Protocol network emulation: the same download and upload rate
+and a latency added to every request (it does not emulate DNS, TCP or TLS
+setup). Nothing else is limited; the saved-tower starts, the simulation, frame
+and memory passes run unlimited. It exists because the CPU throttles leave the
+connection at local speed, so the engine package preload of #1777 shows
+nothing without it. Both values are plain decimals with up to three places.
+The rate runs from 1 to 1000 Mbps and the latency from 0 to 2000 ms; those caps
+are heuristics that keep a limited start inside the fixed 120 s startup waits,
+and a start that still times out fails its repetition and says so.
+
+A limited run is not a protocol run, and `--aa` refuses it. Its folder name
+must contain `net-<mbps>x<latency>` as its own part (a decimal point becomes
+`p`, so 1.5 Mbps with 0 ms is `net-1p5x0`; `net-10x400` does not satisfy
+`net-10x40`), the default name adds it, and resuming a limited folder needs
+`--network` repeated. The report's banner, configuration and limitations say
+so, the limited rows are tagged `[network-limited]` and the CSV files carry a
+`network` column that holds the marker on those rows. `perf:calibrate` leaves
+the folder out. Each limited cold start fails its repetition unless the page
+recorded a large transfer (20,000 bytes or more, and the engine package binary
+on a WASM page) and every such transfer lasted at least the added latency plus
+half the time its bytes need at the stated rate. That is a lower bound on each
+transfer's duration: a faster transfer means the emulation did not reach it.
+A limit whose largest checked transfer has a bound under 10 ms (for example
+`1000,0`) is refused as too close to local speed to check, because a local
+fetch takes a few milliseconds. The warm start reloads from a warm HTTP cache,
+so most of its bytes never cross the limit and only the cold starts are
+checked.
 
 A results folder is `docs/performance/results/<date>-<sha>-<label>/` with the
 raw samples and the machine-written `report.md`, its snapshot header on top.
@@ -592,9 +625,9 @@ engine (default 5) and `--exceedance-limit X` the coverage limit (default
 
 It leaves out a folder that is not an A/A pass, failed validation, ran on a
 dirty tree or without a complete working-tree record (section 3 step 5,
-including files git was told to ignore changes in), is a `--quick` run, had
-fewer than 10 repetitions, lacks the medium and large scenarios at 1x and 4x,
-did not render on a verified hardware GPU (the check in "The renderer must be
+including files git was told to ignore changes in), is a `--quick` run, is a
+`--network` run, had fewer than 10 repetitions, lacks the medium and large
+scenarios at 1x and 4x, did not render on a verified hardware GPU (the check in "The renderer must be
 the GPU", at the start and the end of each process run; a declared renderer
 exception also leaves a pass out), or repeats another folder (the same
 `results.json` once parsed and written back with sorted keys, so a re-save
@@ -604,7 +637,7 @@ differ in commit, machine and runtime (CPU, logical CPUs, memory, OS, kernel,
 architecture, Node, Rust, Playwright), browser (executable, channel,
 switches, version, renderers), engine build, or run parameters (the whole
 configuration except the A/A engine and the quick flag: repetitions,
-scenarios, throttles, steps, step size, frame window, speed, viewport and
+scenarios, throttles, network limit, steps, step size, frame window, speed, viewport and
 warm-up).
 
 Per pass it takes each family's value as the largest upper bound across the

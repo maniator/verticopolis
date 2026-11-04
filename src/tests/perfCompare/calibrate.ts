@@ -224,6 +224,7 @@ export function calibrate(folders: { folder: string; results: Pass; sha256?: str
     else if (!results.validation.ok) leave("its validation failed");
     else if (tree) leave(tree);
     else if (results.config.quick) leave("it is a --quick run, which is not a protocol run");
+    else if (results.config.network) leave("it is a --network run, which is not a protocol run");
     else if (results.config.reps !== MIN_REPS) leave(`${results.config.reps} repetitions; the verdict runs use ${MIN_REPS}, and a pass with another count does not pool with them`);
     else if (SCENARIOS.some((s) => !results.config.scenarios.includes(s)) || THROTTLES.some((t) => !results.config.throttles.map(String).includes(t))) leave("it lacks the medium and large scenarios at 1x and 4x");
     else if (renderer) leave(`its renderer is not verified hardware (${renderer})`);

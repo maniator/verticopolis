@@ -32,6 +32,7 @@ export interface Spec {
   contextLost?: string[] | null;
   tree?: unknown;
   throttles?: number[];
+  network?: { mbps: number; latencyMs: number };
   startedAt?: string;
 }
 
@@ -57,7 +58,7 @@ export function pass(i: number, s: Spec = {}): Folder {
     folder: `aa-${i}`,
     results: {
       startedAt: s.startedAt ?? new Date(Date.UTC(2026, 9, 21, 0, i)).toISOString(),
-      config: { aa: s.engine === undefined ? alternate(i) : s.engine, reps, scenarios, throttles: s.throttles ?? [1, 4], quick: s.quick ?? false, dt: 2, steps: 720 },
+      config: { aa: s.engine === undefined ? alternate(i) : s.engine, reps, scenarios, throttles: s.throttles ?? [1, 4], quick: s.quick ?? false, ...(s.network ? { network: s.network } : {}), dt: 2, steps: 720 },
       browser: { version: s.browserVersion ?? "141.0.1", executable: null, channel: s.channel ?? null, args: s.args ?? [], rendererException: s.exception ?? null, gpuVerified: "gpuVerified" in s ? s.gpuVerified : true },
       runs: [{ ok: true, page: { webgl }, rendererEnd: s.rendererEnd === undefined ? renderer : s.rendererEnd, rendererEndCold: "rendererEndCold" in s ? s.rendererEndCold : renderer, ...(s.contextLost === null ? {} : { contextLost: s.contextLost ?? [] }) }],
       comparisons,

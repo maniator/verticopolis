@@ -1,8 +1,9 @@
 import { treeSummary } from "./treeRecord";
 import { browserName, rendererBanners, rendererSummary } from "./renderer";
 import { REPORTED_DIFFERENCES } from "./metrics";
+import { describeNetwork, limitedRow, limitedStarts, networkMarker } from "./network";
 import { MIN_REPS, pairedDifference } from "./stats";
-import type { CompareResults, Comparison, EngineName, MetricRow } from "./types";
+import type { CompareResults, Comparison, EngineName, MetricRow, NetworkLimit } from "./types";
 
 /**
  * The comparison's written outputs (issue #972): a summary CSV (one row per
@@ -23,30 +24,41 @@ export function toCsv(header: string[], rows: unknown[][]): string {
 }
 
 /** An A/A folder's CSVs end in a column naming the engine that ran in both
- *  slots, so a file read apart from results.json still says what it is. */
-function csvOf(header: string[], rows: unknown[][], aa: EngineName | null): string {
-  return aa ? toCsv([...header, "aa"], rows.map((r) => [...r, aa])) : toCsv(header, rows);
+ *  slots, so a file read apart from results.json still says what it is. A
+ *  network-limited run adds a column after it that holds the folder's marker (`net-10x40`) on the rows
+ *  it shaped (`limitedRow`) and leaves the others blank. */
+function csvOf(header: string[], rows: unknown[][], aa: EngineName | null, network: NetworkLimit | null, limited: (row: unknown[]) => boolean): string {
+  const cols = [...(aa ? ["aa"] : []), ...(network ? ["network"] : [])];
+  if (!cols.length) return toCsv(header, rows);
+  return toCsv([...header, ...cols], rows.map((r) => [...r, ...(aa ? [aa] : []), ...(network ? [limited(r) ? networkMarker(network) : ""] : [])]));
 }
 
-export function summaryCsv(rows: readonly MetricRow[], aa: EngineName | null): string {
+/** The first four columns of every CSV are group, scenario, throttle and metric, so one test of the row says whether the limit shaped it. */
+const rowLimited = (r: unknown[]): boolean => limitedRow({ group: String(r[0]), scenario: String(r[1]), metric: String(r[3]) });
+
+export function summaryCsv(rows: readonly MetricRow[], aa: EngineName | null, network: NetworkLimit | null = null): string {
   return csvOf(
     ["group", "scenario", "throttle", "metric", "unit", "engine", "n", "median", "median_ci_low", "median_ci_high", "p95", "mean", "sd", "cv", "min", "max"],
     rows.map((r) => [r.group, r.scenario, r.throttle, r.metric, r.unit, r.engine, r.values.length, r.summary?.median, r.summary?.medianCiLow, r.summary?.medianCiHigh, r.summary?.p95, r.summary?.mean, r.summary?.sd, r.summary?.cv, r.summary?.min, r.summary?.max]),
     aa,
+    network,
+    rowLimited,
   );
 }
 
-export function rawCsv(rows: readonly MetricRow[], aa: EngineName | null): string {
+export function rawCsv(rows: readonly MetricRow[], aa: EngineName | null, network: NetworkLimit | null = null): string {
   const out: unknown[][] = [];
   for (const r of rows) r.values.forEach((v, i) => out.push([r.group, r.scenario, r.throttle, r.metric, r.unit, r.engine, r.reps[i], v]));
-  return csvOf(["group", "scenario", "throttle", "metric", "unit", "engine", "rep", "value"], out, aa);
+  return csvOf(["group", "scenario", "throttle", "metric", "unit", "engine", "rep", "value"], out, aa, network, rowLimited);
 }
 
-export function comparisonsCsv(rows: readonly Comparison[], aa: EngineName | null): string {
+export function comparisonsCsv(rows: readonly Comparison[], aa: EngineName | null, network: NetworkLimit | null = null): string {
   return csvOf(
     ["group", "scenario", "throttle", "metric", "unit", "ts_median", "wasm_median", "wasm_over_ts_paired", "ci_low", "ci_high", "verdict", "n_ts", "n_wasm", "n_pairs"],
     rows.map((c) => [c.group, c.scenario, c.throttle, c.metric, c.unit, c.tsMedian, c.wasmMedian, c.ratio, c.ciLow, c.ciHigh, c.verdict, c.n.ts, c.n.wasm, c.n.pairs]),
     aa,
+    network,
+    rowLimited,
   );
 }
 
@@ -84,7 +96,7 @@ function table(header: string[], rows: string[][]): string {
  * end is the value `perf:calibrate` reads against ε for a pass
  * (`coldStartDifference`); both come from `pairedDifference`.
  */
-export function coldStartDifferenceLines(metrics: readonly MetricRow[], aa: EngineName | null): string[] {
+export function coldStartDifferenceLines(metrics: readonly MetricRow[], aa: EngineName | null, network: NetworkLimit | null = null): string[] {
   const rows = metrics.filter((m) => m.group === "startup" && m.metric === "cold game ready");
   const throttles = [...new Set(rows.map((m) => m.throttle))];
   const lines = throttles.flatMap((t) => {
@@ -97,12 +109,15 @@ export function coldStartDifferenceLines(metrics: readonly MetricRow[], aa: Engi
   });
   if (!lines.length) return [];
   const sign = aa ? "slot wasm minus slot ts" : "WASM minus TypeScript";
-  return ["", `Cold start to ready, paired difference (${sign}; above zero is worse):`, "", table(["CPU", "Median", "95% CI of median", "Pairs"], lines)];
+  return ["", `Cold start to ready, paired difference (${sign}; above zero is worse${network ? `; behind a network limit: ${describeNetwork(network)}` : ""}):`, "", table(["CPU", "Median", "95% CI of median", "Pairs"], lines)];
 }
+
+/** A metric name, marked when a network limit shaped its row. */
+const tagged = (m: { group: string; scenario: string; metric: string }, network: NetworkLimit | null): string => (network && limitedRow(m) ? `${m.metric} [network-limited]` : m.metric);
 
 /** The startup rows printed with the same paired statistic as M5 but outside
  *  any gate (#1254; the list is metrics.ts's `REPORTED_DIFFERENCES`). */
-export function reportedDifferenceLines(metrics: readonly MetricRow[], aa: EngineName | null): string[] {
+export function reportedDifferenceLines(metrics: readonly MetricRow[], aa: EngineName | null, network: NetworkLimit | null = null): string[] {
   const rows = metrics.filter((m) => m.group === "startup" && REPORTED_DIFFERENCES.includes(m.metric));
   const keys = [...new Map(rows.map((m) => [`${m.metric}|${m.scenario}|${m.throttle}`, m])).values()];
   const lines = keys.flatMap((k) => {
@@ -112,7 +127,7 @@ export function reportedDifferenceLines(metrics: readonly MetricRow[], aa: Engin
     const d = wasm && ts ? pairedDifference(wasm, ts) : null;
     if (!d) return [];
     const ci = d.ciLow !== null && d.ciHigh !== null ? `${fmt(d.ciLow, "ms")} to ${fmt(d.ciHigh, "ms")}` : "no interval";
-    return [[k.metric, k.scenario, `${k.throttle}x`, fmt(d.median, "ms"), ci, d.n < MIN_REPS ? `${d.n} (below the gate's minimum of ${MIN_REPS})` : String(d.n)]];
+    return [[tagged(k, network), k.scenario, `${k.throttle}x`, fmt(d.median, "ms"), ci, d.n < MIN_REPS ? `${d.n} (below the gate's minimum of ${MIN_REPS})` : String(d.n)]];
   });
   if (!lines.length) return [];
   const sign = aa ? "slot wasm minus slot ts" : "WASM minus TypeScript";
@@ -122,16 +137,21 @@ export function reportedDifferenceLines(metrics: readonly MetricRow[], aa: Engin
 export function markdownReport(res: CompareResults): string {
   const e = res.environment;
   const aa = res.config.aa;
+  const net = res.config.network ?? null;
+  // The flags that reproduce this run's conditions, for the pointer to the live number.
+  const netFlag = net ? ` --network ${net.mbps},${net.latencyMs}` : "";
+  const rerunFlags = aa || net ? ` --${aa ? ` --aa ${aa}` : ""}${netFlag}` : "";
   const out: string[] = [];
   out.push(`# ${aa ? "A/A pass" : "Engine comparison results"}: ${e.commitShort}`, "");
   out.push(
-    `> **Snapshot, not a live figure.** Measured ${res.startedAt ?? "?"} to ${res.generatedAt} on commit \`${e.commit}\`${e.dirty ? " (dirty tree)" : ""} (app ${e.appVersion}${res.tsBaseline ? `; ${aa ? "both slots" : "the TypeScript arm"} ran the pinned pre-cutover build ${res.tsBaseline.commit.slice(0, 8)}, app ${res.tsBaseline.appVersion}` : ""}), with public main at \`${e.mainCommit ?? "unknown"}\`${e.mainFetched === false ? " as last fetched (the fetch before the run failed)" : ""}.${preThree(e.appVersion) ? " A pre-3.0 baseline of an engine still being cut over (#945), not release performance." : ""} The live number comes from ${aa ? `\`npm run perf:calibrate\` over fresh A/A folders, made by re-running \`npm run perf:compare -- --aa ${aa}\`` : "re-running `npm run perf:compare`"} (src/tests/perfCompare, its tests beside it); this file never refreshes.`,
+    `> **Snapshot, not a live figure.** Measured ${res.startedAt ?? "?"} to ${res.generatedAt} on commit \`${e.commit}\`${e.dirty ? " (dirty tree)" : ""} (app ${e.appVersion}${res.tsBaseline ? `; ${aa ? "both slots" : "the TypeScript arm"} ran the pinned pre-cutover build ${res.tsBaseline.commit.slice(0, 8)}, app ${res.tsBaseline.appVersion}` : ""}), with public main at \`${e.mainCommit ?? "unknown"}\`${e.mainFetched === false ? " as last fetched (the fetch before the run failed)" : ""}.${preThree(e.appVersion) ? " A pre-3.0 baseline of an engine still being cut over (#945), not release performance." : ""} The live number comes from ${aa ? `\`npm run perf:calibrate\` over fresh A/A folders, made by re-running \`npm run perf:compare${rerunFlags}\`` : `re-running \`npm run perf:compare${rerunFlags}\``} (src/tests/perfCompare, its tests beside it); this file never refreshes.`,
     "",
   );
+  if (net) out.push(`> **Network-limited run (\`--network\`).** ${limitedStarts(res.config.throttles).replace(/^the/, "The")} ran behind ${describeNetwork(net)}; rows marked [network-limited] and the \`network\` column of the CSV files show which. This is not a protocol run, and its folder name says so. It is a diagnostic: its startup rows do not count toward M5.`, "");
   if (aa) {
     out.push(`> **A/A pass.** Both slots ran the ${aa === "wasm" ? "WASM" : "TypeScript"} engine. The "ts" and "wasm" labels below name the two slots, and every ratio is slot "wasm" over slot "ts". This folder is one input to \`npm run perf:calibrate\` (docs/performance/benchmark-protocol.md, section 6.1), which derives the candidate tolerances from many passes per engine. No tolerance is read off one folder, and there is no verdict: the intervals are the data. Rows the ${aa === "wasm" ? "TypeScript" : "WASM"} engine alone produces, and the cold WASM load steps, are left out.`, "");
   }
-  out.push(`Generated by \`npm run perf:compare${aa ? ` -- --aa ${aa}` : ""}\` (${res.issue}). Machine-written; ${aa ? "A/A folders are not comparison results, and the engine analysis" : "the analysis"} is in \`docs/performance/ts-vs-wasm.md\`.`, "");
+  out.push(`Generated by \`npm run perf:compare${rerunFlags}\` (${res.issue}). Machine-written; ${aa ? "A/A folders are not comparison results, and the engine analysis" : "the analysis"} is in \`docs/performance/ts-vs-wasm.md\`.`, "");
   for (const banner of rendererBanners(res.browser, res.config.quick)) out.push(banner, "");
   out.push(`**Validation: ${res.validation.ok ? "passed" : "FAILED"}.**`, "");
   for (const err of res.validation.errors) out.push(`- error: ${err}`);
@@ -164,6 +184,7 @@ export function markdownReport(res: CompareResults): string {
   const c = res.config;
   out.push("", "## Configuration", "");
   out.push(`${c.reps} repetitions per ${aa ? "slot" : "engine"}, each in a fresh browser process, ${aa ? "slot" : "engine"} order alternating. Simulation: ${c.steps} steps of ${c.dt} in-game minutes (${(c.steps * c.dt) / 60} in-game hours) after ${c.warmSteps} warmup steps on a throwaway instance. Frames: ${c.frameWindowMs} ms window after ${c.frameWarmMs} ms warmup at speed index ${c.speed}. CPU throttles: ${c.throttles.join("x, ")}x. Viewport ${c.viewport.width}x${c.viewport.height} at DPR 1.${c.quick ? " Quick mode (smoke test)." : ""}`, "");
+  if (c.network) out.push(`Network limit (\`--network\`): ${describeNetwork(c.network)} on ${limitedStarts(c.throttles)}. The saved-tower starts, the simulation, frame and memory passes and every other measurement ran with no network limit. A limited run answers a different question from the protocol runs and is not pooled with them (\`perf:calibrate\` leaves it out).`, "");
   out.push(table(["Scenario", "Source", "Population", "Units", "Transports", "Save", "Save SHA-256"], res.scenarios.map((s) => [s.name, s.description, String(s.population), String(s.units), String(s.transports), fmt(s.saveBytes, "bytes"), `\`${s.sha256.slice(0, 16)}\``])));
   out.push("", "## Outcome checks (Node, conformance digests)", "");
   out.push(table(["Scenario", "Steps", "Start state", "End state", "End crowd", "Match"], res.nodeChecks.map((n) => [n.scenario, String(n.steps), n.start.tsState === n.start.wasmState ? "same" : "DIFFERENT", n.end.tsState === n.end.wasmState ? "same" : "DIFFERENT", n.end.tsCrowd === n.end.wasmCrowd ? "same" : "DIFFERENT", n.match ? "yes" : "NO"])));
@@ -205,12 +226,12 @@ export function markdownReport(res: CompareResults): string {
     const single = res.metrics.filter((m) => m.group === g && !comps.some((x) => x.scenario === m.scenario && x.throttle === m.throttle && x.metric === m.metric));
     if (comps.length) {
       const head = aa ? ['slot "ts" median', 'slot "wasm" median', 'slot wasm / slot ts, paired (95% CI)'] : ["TypeScript median", "WASM median", "WASM / TS, paired (95% CI)"];
-      out.push(table(["Scenario", "CPU", "Metric", ...head, ...(aa ? [] : ["Verdict"]), "n (ts/wasm/pairs)"], comps.map((x) => [x.scenario, `${x.throttle}x`, x.metric, fmt(x.tsMedian, x.unit), fmt(x.wasmMedian, x.unit), ratioText(x), ...(aa ? [] : [x.verdict]), `${x.n.ts}/${x.n.wasm}/${x.n.pairs}`])));
+      out.push(table(["Scenario", "CPU", "Metric", ...head, ...(aa ? [] : ["Verdict"]), "n (ts/wasm/pairs)"], comps.map((x) => [x.scenario, `${x.throttle}x`, tagged(x, net), fmt(x.tsMedian, x.unit), fmt(x.wasmMedian, x.unit), ratioText(x), ...(aa ? [] : [x.verdict]), `${x.n.ts}/${x.n.wasm}/${x.n.pairs}`])));
     }
-    if (g === "startup") out.push(...coldStartDifferenceLines(res.metrics, aa), ...reportedDifferenceLines(res.metrics, aa));
+    if (g === "startup") out.push(...coldStartDifferenceLines(res.metrics, aa, net), ...reportedDifferenceLines(res.metrics, aa, net));
     if (single.length) {
       out.push("");
-      out.push(table(["Scenario", "CPU", "Metric", aa ? "Slot" : "Engine", "Median", "95% CI of median", "p95", "CV", "n"], single.map((m) => [m.scenario, `${m.throttle}x`, m.metric, m.engine, fmt(m.summary?.median, m.unit), m.summary?.medianCiLow != null ? `${fmt(m.summary.medianCiLow, m.unit)} to ${fmt(m.summary.medianCiHigh, m.unit)}` : "n/a", fmt(m.summary?.p95, m.unit), m.summary ? `${(m.summary.cv * 100).toFixed(1)}%` : "n/a", String(m.values.length)])));
+      out.push(table(["Scenario", "CPU", "Metric", aa ? "Slot" : "Engine", "Median", "95% CI of median", "p95", "CV", "n"], single.map((m) => [m.scenario, `${m.throttle}x`, tagged(m, net), m.engine, fmt(m.summary?.median, m.unit), m.summary?.medianCiLow != null ? `${fmt(m.summary.medianCiLow, m.unit)} to ${fmt(m.summary.medianCiHigh, m.unit)}` : "n/a", fmt(m.summary?.p95, m.unit), m.summary ? `${(m.summary.cv * 100).toFixed(1)}%` : "n/a", String(m.values.length)])));
       const reasons = [...new Set(single.flatMap((m) => (m.noVerdict ? [m.noVerdict] : [])))];
       for (const r of reasons) out.push("", `No engine comparison for ${[...new Set(single.filter((m) => m.noVerdict === r).map((m) => m.metric))].join(", ")}: ${r}.`);
     }

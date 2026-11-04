@@ -1,6 +1,7 @@
 import { classifyRenderer } from "./renderer";
 import { preThree } from "./report";
-import type { EngineName } from "./types";
+import { describeNetwork, limitedStarts } from "./network";
+import type { EngineName, NetworkLimit } from "./types";
 
 interface Limitation {
   text: string;
@@ -61,8 +62,13 @@ export function rendererLimitation(renderers: readonly string[], exception: stri
   return out;
 }
 
+/** What a `--network` run cannot be used for. */
+function networkLimitation(network: NetworkLimit, throttles: readonly number[]): string {
+  return `Network-limited run: ${limitedStarts(throttles)} ran behind ${describeNetwork(network)}, through Chrome DevTools Protocol emulation (it adds latency per request but not DNS, TCP or TLS setup, TCP slow start or packet loss, so these startup rows are a lower bound for a real link of that rate). The warm start reloads from a warm HTTP cache, so most of its bytes never cross the limit, and only the cold starts are checked against it. Its cold and warm startup rows and their transfer rows are not comparable with a run that has no limit; the saved-tower rows and every other measurement ran unlimited. It is not a protocol run, and it is not pooled into a calibration.`;
+}
+
 /** The limitations a results folder lists. */
-export function buildLimitations(aa: EngineName | null, appVersion: string, renderers: readonly string[], exception: string | null = null, tsBaseline: { commit: string; appVersion: string } | null = null): string[] {
+export function buildLimitations(aa: EngineName | null, appVersion: string, renderers: readonly string[], exception: string | null = null, tsBaseline: { commit: string; appVersion: string } | null = null, network: NetworkLimit | null = null, throttles: readonly number[] = [1]): string[] {
   const kept = STATIC_LIMITATIONS.filter((l) => !aa || !l.only || (l.only === "wasm" && aa === "wasm")).map((l) => l.text);
-  return [...(aa ? [aaLimitation(aa)] : []), ...(tsBaseline ? [aa === "ts" ? aaBaselineLimitation(tsBaseline) : baselineLimitation(tsBaseline)] : []), ...kept, ...(preThree(appVersion) ? [PRE_THREE_LIMITATION] : []), ...rendererLimitation(renderers, exception)];
+  return [...(network ? [networkLimitation(network, throttles)] : []), ...(aa ? [aaLimitation(aa)] : []), ...(tsBaseline ? [aa === "ts" ? aaBaselineLimitation(tsBaseline) : baselineLimitation(tsBaseline)] : []), ...kept, ...(preThree(appVersion) ? [PRE_THREE_LIMITATION] : []), ...rendererLimitation(renderers, exception)];
 }

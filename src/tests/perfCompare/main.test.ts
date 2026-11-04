@@ -10,7 +10,7 @@ import { engineOrder, frameSummary, stepSummary } from "./runner";
 describe("parseArgs", () => {
   it("defaults to ten repetitions and both throttles", () => {
     const a = parseArgs([]);
-    expect(a).toEqual({ reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, throttles: null, aa: null });
+    expect(a).toEqual({ reps: 10, quick: false, skipBuild: false, out: null, resume: null, scenarios: null, throttles: null, network: null, aa: null });
     expect(makeConfig(a, ["small"])).toMatchObject({ reps: 10, steps: 720, dt: 2, throttles: [1, 4], speed: 3, quick: false });
   });
   it("reads every flag, and --quick lowers the default reps only", () => {
@@ -68,30 +68,30 @@ describe("outputDir", () => {
   const env = { commitShort: "abc1234", dirty: false };
   it("names a new folder by date and commit and never reuses one", () => {
     const taken = new Set([at("docs/performance/results/2026-10-13-abc1234"), at("docs/performance/results/2026-10-13-abc1234-2")]);
-    expect(outputDir(root, { out: null, quick: false, skipBuild: false, aa: null }, "2026-10-14", env, () => false)).toBe(at("docs/performance/results/2026-10-14-abc1234"));
-    expect(outputDir(root, { out: null, quick: false, skipBuild: false, aa: null }, "2026-10-13", env, (p) => taken.has(p))).toBe(at("docs/performance/results/2026-10-13-abc1234-3"));
+    expect(outputDir(root, { out: null, quick: false, skipBuild: false, aa: null, network: null }, "2026-10-14", env, () => false)).toBe(at("docs/performance/results/2026-10-14-abc1234"));
+    expect(outputDir(root, { out: null, quick: false, skipBuild: false, aa: null, network: null }, "2026-10-13", env, (p) => taken.has(p))).toBe(at("docs/performance/results/2026-10-13-abc1234-3"));
   });
   it("marks quick and dirty runs, and refuses an existing --out", () => {
-    expect(outputDir(root, { out: null, quick: true, skipBuild: true, aa: null }, "2026-10-13", { commitShort: "abc1234", dirty: true }, () => false)).toBe(at("docs/performance/results/2026-10-13-abc1234-quick-skipbuild-dirty"));
-    expect(outputDir(root, { out: "x", quick: false, skipBuild: false, aa: null }, "d", env, () => false)).toBe(at("x"));
+    expect(outputDir(root, { out: null, quick: true, skipBuild: true, aa: null, network: null }, "2026-10-13", { commitShort: "abc1234", dirty: true }, () => false)).toBe(at("docs/performance/results/2026-10-13-abc1234-quick-skipbuild-dirty"));
+    expect(outputDir(root, { out: "x", quick: false, skipBuild: false, aa: null, network: null }, "d", env, () => false)).toBe(at("x"));
     // A declared renderer exception marks the folder, so it cannot pass for GPU evidence at a glance.
-    expect(outputDir(root, { out: null, quick: false, skipBuild: false, aa: null }, "2026-10-14", env, () => false, "EX-4")).toBe(at("docs/performance/results/2026-10-14-abc1234-exception-ex-4"));
-    expect(outputDir(root, { out: null, quick: false, skipBuild: false, aa: "wasm" }, "2026-10-14", env, () => false)).toBe(at("docs/performance/results/2026-10-14-abc1234-aa-wasm"));
-    expect(() => outputDir(root, { out: "x", quick: false, skipBuild: false, aa: null }, "d", env, () => true)).toThrow(/never overwritten/);
+    expect(outputDir(root, { out: null, quick: false, skipBuild: false, aa: null, network: null }, "2026-10-14", env, () => false, "EX-4")).toBe(at("docs/performance/results/2026-10-14-abc1234-exception-ex-4"));
+    expect(outputDir(root, { out: null, quick: false, skipBuild: false, aa: "wasm", network: null }, "2026-10-14", env, () => false)).toBe(at("docs/performance/results/2026-10-14-abc1234-aa-wasm"));
+    expect(() => outputDir(root, { out: "x", quick: false, skipBuild: false, aa: null, network: null }, "d", env, () => true)).toThrow(/never overwritten/);
   });
   it("makes an A/A folder's own name say so, even under --out", () => {
-    expect(() => outputDir(root, { out: "x", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/containing aa-ts/);
-    expect(() => outputDir(root, { out: "run-aa-wasm-1", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/containing aa-ts/);
-    expect(outputDir(root, { out: "run-aa-ts-1", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toBe(at("run-aa-ts-1"));
+    expect(() => outputDir(root, { out: "x", quick: false, skipBuild: false, aa: "ts", network: null }, "d", env, () => false)).toThrow(/containing aa-ts/);
+    expect(() => outputDir(root, { out: "run-aa-wasm-1", quick: false, skipBuild: false, aa: "ts", network: null }, "d", env, () => false)).toThrow(/containing aa-ts/);
+    expect(outputDir(root, { out: "run-aa-ts-1", quick: false, skipBuild: false, aa: "ts", network: null }, "d", env, () => false)).toBe(at("run-aa-ts-1"));
   });
   it("checks the folder's own name, and refuses an A/A name for a comparison", () => {
-    expect(() => outputDir(at("aa-ts"), { out: "x", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/containing aa-ts/);
-    expect(() => outputDir(root, { out: "aa-ts/x", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/containing aa-ts/);
-    expect(outputDir(root, { out: "keep/aa-ts-3", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toBe(at("keep/aa-ts-3"));
-    expect(() => outputDir(root, { out: "run-aa-wasm", quick: false, skipBuild: false, aa: null }, "d", env, () => false)).toThrow(/names an A\/A folder/);
-    expect(() => outputDir(root, { out: "run-AA-TS", quick: false, skipBuild: false, aa: null }, "d", env, () => false)).toThrow(/names an A\/A folder/);
-    expect(outputDir(root, { out: "run-AA-TS-1", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toBe(at("run-AA-TS-1"));
-    expect(() => outputDir(root, { out: "x-aa-wasm-aa-ts", quick: false, skipBuild: false, aa: "ts" }, "d", env, () => false)).toThrow(/also names the aa-wasm marker/);
+    expect(() => outputDir(at("aa-ts"), { out: "x", quick: false, skipBuild: false, aa: "ts", network: null }, "d", env, () => false)).toThrow(/containing aa-ts/);
+    expect(() => outputDir(root, { out: "aa-ts/x", quick: false, skipBuild: false, aa: "ts", network: null }, "d", env, () => false)).toThrow(/containing aa-ts/);
+    expect(outputDir(root, { out: "keep/aa-ts-3", quick: false, skipBuild: false, aa: "ts", network: null }, "d", env, () => false)).toBe(at("keep/aa-ts-3"));
+    expect(() => outputDir(root, { out: "run-aa-wasm", quick: false, skipBuild: false, aa: null, network: null }, "d", env, () => false)).toThrow(/names an A\/A folder/);
+    expect(() => outputDir(root, { out: "run-AA-TS", quick: false, skipBuild: false, aa: null, network: null }, "d", env, () => false)).toThrow(/names an A\/A folder/);
+    expect(outputDir(root, { out: "run-AA-TS-1", quick: false, skipBuild: false, aa: "ts", network: null }, "d", env, () => false)).toBe(at("run-AA-TS-1"));
+    expect(() => outputDir(root, { out: "x-aa-wasm-aa-ts", quick: false, skipBuild: false, aa: "ts", network: null }, "d", env, () => false)).toThrow(/also names the aa-wasm marker/);
   });
 });
 

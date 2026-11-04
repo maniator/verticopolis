@@ -10,6 +10,13 @@ import type { Summary } from "./stats";
 
 export type EngineName = "ts" | "wasm";
 
+/** A network limit for the startup measurements (`--network`, network.ts). */
+export interface NetworkLimit {
+  mbps: number;
+  /** The latency added to every request. */
+  latencyMs: number;
+}
+
 export interface CompareConfig {
   reps: number;
   /** In-game minutes per step (the game's own step at the fastest speed
@@ -25,6 +32,8 @@ export interface CompareConfig {
   viewport: { width: number; height: number };
   scenarios: string[];
   quick: boolean;
+  /** `--network`: the cold, warm and throttled cold starts ran behind this limit. Absent for a run with no limit, so older results keep their shape. */
+  network?: NetworkLimit;
   /** An A/A pass (protocol section 6.1): both slots run this engine. The
    *  slot names ("ts" and "wasm") stay the pairing labels, so every ratio
    *  reads slot "wasm" over slot "ts". Null for a comparison run. */
