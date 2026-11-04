@@ -424,8 +424,14 @@ list (`--scenarios "small,large"`): an unquoted comma makes an array, which
 reaches the script as separate arguments.
 
 A results folder is `docs/performance/results/<date>-<sha>-<label>/` with the
-raw samples and the machine-written `report.md`, its snapshot header on top,
-committed through a PR. **A run that is not committed is not evidence.** Not
+raw samples and the machine-written `report.md`, its snapshot header on top.
+The repository keeps only a short summary of each run, in
+`docs/performance/results/<date>-<sha>-<label>.md` (the top numbers and what
+they show, dated at the top, with no local paths), committed through a PR. The
+raw folder goes to the private maniator/verticopolis-benchmarks repository,
+under `results/<date>-<sha>-<label>/`, with home-directory paths replaced by
+`<home>`, and the summary links to it. **A run that is not committed and
+summarized is not evidence.** Not
 yet: the edit scene (M8, PF2) and the stress fixture exist only as plan items.
 
 ### Validation

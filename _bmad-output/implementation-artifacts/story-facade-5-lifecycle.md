@@ -706,7 +706,7 @@ joins `newestSave` on that list's strict-build stay line.
 - [Source: story-facade-6a-engine-view.md on #1213] (`towerSignature()`)
 - [Source: src/main.ts#adoptSim], [Source: src/wasmhost/startWasmHost.ts] (the history wrappers), [Source: src/wasmhost/wasmHost.ts#serializeHosted]
 - [Source: docs/performance/hot-path-review.md] (HP-1 to HP-12)
-- [Source: docs/performance/results/2026-10-21-4fa8072-restore-points/report.md] (save sizes and counts)
+- [Source: docs/performance/results/2026-10-21-4fa8072-restore-points.md] (the saves per command; the raw report with the save sizes is in the private verticopolis-benchmarks repository)
 - [Source: _bmad-output/project-context.md]
 
 ## Dev Agent Record
