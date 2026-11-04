@@ -202,6 +202,7 @@ records under their own names.
 | `recyclingFill` | none | number, 0 to 1 | scene sync |
 | `recyclingCapacity` | none | number, the population the working recycling centers process | recycling card |
 | `recyclingDemandMet` | none | boolean: whether the working recycling centers can process the whole population (the engine's verdict, so the card compares nothing) | recycling card |
+| `roomTiers` | none | record: a `roomTier` row (id, floor, x, then codes from `evalTiers` and `rentTiers`) per room that carries an evaluation or a rent level, in the view's room order; a room with neither has no row. Optional on the port: only the Rust engine answers it, and `RoomTierReader` reads its absence as no rows (overview Map S7, #343) | the Map's Eval or Pricing tab, on the triggers the Map SPEC lists (the Cost bullet of its S7 section): while the Map is open on Eval or Pricing, on opening it there or picking either tab, a change of game hour, a move of the revision or generation, and every applied rent command or emergency answer, and not more than once a frame |
 | `positionReachable` | floor, x | boolean: whether a walker can stand there; a position that is not a whole tile is not one | walker placement |
 
 `towerName()`, `unitLabel(id)`, `logText(seq)` and the other text getters

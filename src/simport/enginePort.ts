@@ -351,6 +351,15 @@ export interface EnginePortQueries {
   unitFacts(id: number): PortRecord;
   /** Low-frequency structured service diagnostics for the inspector. */
   serviceDiagnostics(id: number): ServiceDiagnosticFacts | undefined;
+  /** The Map's Eval and Pricing read (#343 S7): one `roomTier` row (id,
+   *  floor, x, then codes from `evalTiers` and `rentTiers`) per room that
+   *  carries an evaluation or a rent level, in the view's room order. One
+   *  pass over the rooms, read through `RoomTierReader` (`roomTiers.ts`):
+   *  S8 reads only on the triggers the Map SPEC lists (the Cost bullet of its
+   *  S7 section), and not more than once a frame. Only the Rust engine answers it: the
+   *  TypeScript reference has no Map views, and a reader takes its absence
+   *  as no rows. */
+  roomTiers?(): PortRecord;
 }
 
 /** The save files (contract section 2): `.vctower` and the 1994 `.TDT`. */

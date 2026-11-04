@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 12,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -496,6 +496,13 @@
       "lobby",
       "endpoint"
     ],
+    "roomTier": [
+      "id",
+      "floor",
+      "x",
+      "evalTier",
+      "rentTier"
+    ],
     "statsSheet": [
       "ratingPopulation",
       "hotelsCountTowardRating",
@@ -726,6 +733,20 @@
     "lobbyFar",
     "unmetDemand",
     "relocation"
+  ],
+  "evalTiers": [
+    "unrated",
+    "terrible",
+    "good",
+    "excellent"
+  ],
+  "rentTiers": [
+    "unpriced",
+    "noRate",
+    "veryLow",
+    "low",
+    "average",
+    "high"
   ],
   "ledgerCats": [
     "offices",

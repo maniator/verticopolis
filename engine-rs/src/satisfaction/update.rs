@@ -46,7 +46,7 @@ impl Simulation {
                     None
                 };
                 let over_market_rent =
-                    price_cfg.is_some_and(|c| rent_of(u.kind, u.rent, u.no_rate) > c.default);
+                    price_cfg.is_some_and(|c| c.over_neutral(rent_of(u.kind, u.rent, u.no_rate)));
                 let non_noise_problem = !r.served
                     || (u.floor != 1 && r.cong > 1.0)
                     || over_market_rent

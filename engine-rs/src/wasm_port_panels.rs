@@ -7,6 +7,7 @@
 use crate::charges::whole;
 use crate::frame::unit_state_code;
 use crate::panels::heatmap::HeatmapMode;
+use crate::panels::room_tiers::{EvalTier, RentTier};
 use crate::panels::unit_detail::{unit_price, CardFlags};
 use crate::sim::Simulation;
 use crate::telemetry::ORIGIN_HOURS;
@@ -100,6 +101,11 @@ pub(crate) const SHAFT_CARD: [&str; 13] = [
 /// One stop row of `shaftCard`.
 pub(crate) const STOP_ROW: [&str; 4] = ["floor", "served", "lobby", "endpoint"];
 
+/// One row of `roomTiers`, which repeats it for each room that carries an
+/// evaluation or a rent level: the room's id and anchor tile, then its tier
+/// codes from `evalTiers` and `rentTiers`.
+pub(crate) const ROOM_TIER: [&str; 5] = ["id", "floor", "x", "evalTier", "rentTier"];
+
 /// The panel records and codes, beside the port's others in the layout.
 pub(crate) fn add_panel_records(layout: &mut serde_json::Value) {
     let records = &mut layout["records"];
@@ -108,9 +114,12 @@ pub(crate) fn add_panel_records(layout: &mut serde_json::Value) {
     records["unitCard"] = serde_json::json!(UNIT_CARD);
     records["shaftCard"] = serde_json::json!(SHAFT_CARD);
     records["stopRow"] = serde_json::json!(STOP_ROW);
+    records["roomTier"] = serde_json::json!(ROOM_TIER);
     layout["heatModes"] = serde_json::json!(HEAT_MODES);
     layout["heatTints"] = serde_json::json!(HEAT_TINTS);
     layout["vacateReasons"] = serde_json::json!(VACATE_REASONS);
+    layout["evalTiers"] = serde_json::json!(EvalTier::ALL.map(EvalTier::name));
+    layout["rentTiers"] = serde_json::json!(RentTier::ALL.map(RentTier::name));
     super::port_reports::add_report_records(layout);
     super::port_render::add_render_records(layout);
 }
@@ -286,6 +295,24 @@ impl Engine {
         whole(id)
             .and_then(|id| shaft_card(&self.sim, id))
             .unwrap_or_default()
+    }
+
+    /// The rooms' evaluation and rent tiers as [`ROOM_TIER`] rows, in the
+    /// rooms' order (`Simulation::room_tiers`): one pass over the rooms and
+    /// one record, sized for every room up front.
+    pub(crate) fn port_room_tiers(&self) -> Vec<f64> {
+        let rooms = self.sim.tower.room_index().len();
+        let mut r = Vec::with_capacity(rooms * ROOM_TIER.len());
+        for t in self.sim.room_tiers() {
+            r.extend_from_slice(&[
+                t.id as f64,
+                t.floor as f64,
+                t.x as f64,
+                t.eval.code(),
+                t.rent.code(),
+            ]);
+        }
+        r
     }
 }
 
