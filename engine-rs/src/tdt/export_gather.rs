@@ -186,9 +186,10 @@ pub fn gather_units<U: Borrow<Value>>(
                     add_residents(&mut people_pop, &mut class_pop, u);
                 }
             } else if u.kind.is_hotel() {
-                // The format has an infested bit (`HOTEL_INFESTED_FLAG`), but
-                // what the original game means by it is unchecked (#1629), so
-                // an infested room goes out as the dirty room it at least is.
+                // The file's infested bit (`HOTEL_INFESTED_FLAG`) is not our
+                // infested state: the original clears it from a vacant or dirty
+                // room after about a minute of Fast Mode (PC run, #1629), so an infested room
+                // goes out as the dirty room the original can work with.
                 if u.state == "dirty" || u.state == "infested" {
                     status = HOTEL_DIRTY_FLAG;
                 } else if u.state == "asleep" {

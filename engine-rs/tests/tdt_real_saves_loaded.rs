@@ -343,7 +343,7 @@ fn is_known_state_loss(kind: &str, ours: &str, back: &str) -> bool {
     match (kind, ours, back) {
         // An event room that is running has no state in the file (#1500).
         ("cinema" | "partyHall", "occupied", "empty") => true,
-        // An infested room exports as a dirty one until flag 64 is checked (#1629).
+        // An infested room exports as a dirty one (#1629, tdt-format.md 5.1).
         (hotel, "infested", "dirty") => hotel.starts_with("hotel"),
         _ => false,
     }

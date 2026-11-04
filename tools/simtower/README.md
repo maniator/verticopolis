@@ -123,7 +123,7 @@ npx tsx tools/simtower/tdt-to-vctower.ts saves/TSTSAVE.TDT [--diff-empty]
 # was found.
 ```
 
-### Fixtures for the exporter's open fidelity questions (#920, #740, #1629)
+### Fixtures for the exporter's fidelity questions (#920, #740, #1629)
 
 ```bash
 cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin tdt_fixtures -- claim1     tools/simtower/saves/TOWER5.TDT
@@ -137,7 +137,8 @@ Run them from the repository root.
 Each command reads a real save you supply (the ones you made in the game land in `tools/simtower/saves/`), re-exports it through the shipped Rust codec, edits one
 part and writes DOS 8.3-named files into the same folder as the save, so keep the save in `tools/simtower/saves/` (only our own output; the input is not copied and is never overwritten).
 Then `./run.sh load /wine/drive_c/saves/<NAME>.TDT` for each file and report what the command
-prints under "READ".
+prints under "READ". The owner's PC run of 2026-11-04 answered all four questions; the findings are in
+`docs/canon/tdt-format.md` (sections 5.1, 7 and 9). The commands stay for re-checking a later codec change.
 
 | Command | Files | Question |
 | --- | --- | --- |
