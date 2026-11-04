@@ -247,7 +247,8 @@ twins are `conformanceWasm` and the Rust replay test).
 
 Buckets: (a) engine divergence, (b) read-model gap, (c) TypeScript-only,
 (d) un-relayed write after the crowd exists, (cost) merge-per-tick
-timeout, (fixed) a slice 1 row that passes now. Counts are failing tests
+timeout, (fixed) a slice 1 row that passes now, (converted) a row whose
+marked tests have since moved onto both engines through the port kit. Counts are failing tests
 out of the file's total under `integrationWasm` (merge per tick, except
 the rows marked `atEngineFrameCadence`, which run at the host's own
 cadence) or `unitWasm`; "(n marked)" counts the tests the file keeps TypeScript-only
@@ -282,7 +283,7 @@ run records below.
 | `moveInGateLegibility.integration.test.ts` | 0/17 | fixed | the buy-back note is ported (`bindingTransportClassAt`) |
 | `parity.integration.test.ts` | 0/2 (1 marked) | c | `simModel = "v1"` on the TOWER-rating run; the star-gate test sets v1 but never ticks, so it passes on both projects (unmarked in review round 2) |
 | `personCensus.integration.test.ts` | 0/24 | fixed | reads `originUnitId`, which the frame carries now |
-| `personRoundTrip.integration.test.ts` | 0/19 (2 marked) | d | two stamp `customersIn` on the instance (one mid-run, which the frame sync restores every tick; one before the first tick, which the save does not carry); the other four read the routing fields |
+| `personRoundTrip.integration.test.ts` | 0/19 (2 marked at this record) | d, converted | two tests stamped `customersIn` on the instance (one mid-run, which the frame sync restores every tick; one before the first tick, which the save does not carry); the other four read the routing fields. The two stamps now run on both engines in `personRoundTripVenueCap.integration.test.ts` through the `setCustomersIn` tooling member (#1795) |
 | `phase2.integration.test.ts` | 0/14 (2 marked) | c | `simModel = "v1"`; the tower-wide coverage test sets v1 but never ticks (unmarked in review round 2) |
 | `roomCounts.integration.test.ts` (added after the run records below, PR #1340) | 0/1 (1 marked) | d | vacates offices through `sim.vacate` mid-run, which no command relays; the hosts' merge and frame apply have their own cases in `merge.test.ts` and `frameApply.test.ts`, which run on `unitWasm` |
 | `segmentRoutingReachable.integration.test.ts` | 0/11 (3 marked) | d | reads `returning` and the route, which the frame carries now; the three meal-rush tests pin lunch by swapping `sim.clock` and re-force the condo and venue occupancy every tick after the crowd exists, which only the fingerprint check (round 1) sees |
@@ -361,9 +362,10 @@ repeats it.
   the setup file: `callExterminator` hosts the instance first so the relay
   books the same rooms on both engines (the booked room ids have been in the
   save since #902).
-- **TypeScript-only (10 tests, 6 files):** two clock jumps and one direct
-  drive of the event system (`attendanceTripwire`), two `customersIn`
-  stamps (`personRoundTrip`), the weather write (`faqComplete`), the
+- **TypeScript-only (10 tests, 6 files at this record; the test-mapping
+  table's notes say which have since moved onto both engines):** two clock jumps and
+  one direct drive of the event system (`attendanceTripwire`), two
+  `customersIn` stamps (`personRoundTrip`), the weather write (`faqComplete`), the
   `hotelCheckout()` call (`hotelLateCheckout`), the hourly accumulator clear
   (`simulation`), and in `condoModes` the legacy out-of-band price and the
   unpriced band default of a `tower.place`d condo on a never-loaded tower

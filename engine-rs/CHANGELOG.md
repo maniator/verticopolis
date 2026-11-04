@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.17.0 (2026-11-04)
+
+- A tooling-only binding method for tests: `setCustomersIn(id, count)` sets a unit's live customer tally, which no save carries, through the setter that logs the unit for the frame, so a test can fill a venue to capacity mid-run. Like a counted arrival, it then mirrors the tally into an attendance venue's occupants and moves the meal overlay revision. It answers false and changes nothing for an unknown unit or a count that is not a whole number from 0 to 2^53-1. The unit's kind and its venue cap are not checked, so any unit takes any count in that range. No game command reaches it. No saved-game, frame, view layout or catalog change.
+
 ## 1.16.0 (2026-11-04)
 
 - Two tooling-only binding methods for tests: `setClock(minutes)` puts the clock at a minute count, forward or back, and runs nothing (the TypeScript `sim.clock = new Clock(minutes, calendar)`; the loop's pass memos stay, as with `advanceClock`), and `setUnitState(id, state, occupants?)` sets a unit's state by its save name and optionally its occupants, through the setters that log the unit for the frame. Each answers false and changes nothing for input it cannot apply. No game command reaches either. No saved-game, frame, view layout or catalog change.

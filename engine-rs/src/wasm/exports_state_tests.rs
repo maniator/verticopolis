@@ -99,3 +99,67 @@ fn every_state_name_reads_back_as_its_state() {
     }
     assert_eq!(UnitState::from_name("Occupied"), None);
 }
+
+#[test]
+fn set_customers_in_writes_the_tally_and_refuses_what_it_cannot() {
+    let (mut e, id) = with_office();
+    let marks = e.sim.tower.view.marks.position();
+    for (unit, count) in [
+        (9999.0, 1.0),
+        (id as f64 + 0.5, 1.0),
+        (id as f64, -1.0),
+        (id as f64, 2.5),
+        (id as f64, f64::NAN),
+        (id as f64, f64::INFINITY),
+        (id as f64, 1e300),
+        (id as f64, MAX_TOOL_OCCUPANTS + 1.0),
+        (-1.0, 1.0),
+        (f64::NAN, 1.0),
+        (f64::INFINITY, 1.0),
+    ] {
+        assert!(!e.set_customers_in(unit, count), "{unit} {count}");
+    }
+    assert_eq!(e.sim.tower.get_unit(id).unwrap().customers_in, None);
+    assert_eq!(e.sim.tower.view.marks.position(), marks);
+    let occupants = e.sim.tower.get_unit(id).unwrap().occupants;
+    assert!(e.set_customers_in(id as f64, 4.0));
+    assert_eq!(e.sim.tower.get_unit(id).unwrap().customers_in, Some(4));
+    // An office keeps no attendance, so its occupants are not the tally.
+    assert_eq!(e.sim.tower.get_unit(id).unwrap().occupants, occupants);
+    assert!(e.sim.tower.view.marks.position() > marks);
+    // Both ends of the range are taken.
+    assert!(e.set_customers_in(id as f64, 0.0));
+    assert_eq!(e.sim.tower.get_unit(id).unwrap().customers_in, Some(0));
+    assert!(e.set_customers_in(id as f64, MAX_TOOL_OCCUPANTS));
+    assert_eq!(
+        e.sim.tower.get_unit(id).unwrap().customers_in,
+        Some(MAX_TOOL_OCCUPANTS as i64)
+    );
+}
+
+#[test]
+fn set_customers_in_makes_the_follow_ups_a_counted_arrival_makes() {
+    let mut e = Engine::of(Simulation::new_game(7, GameMode::Modern));
+    e.sim.money = 1e9;
+    for x in 150..200 {
+        assert!(e.sim.tower.place(Kind::Lobby, 1, x).ok);
+        assert!(e.sim.tower.place(Kind::Floor, 2, x).ok);
+        assert!(e.sim.tower.place(Kind::Floor, 3, x).ok);
+    }
+    let r = e.sim.tower.place(Kind::PartyHall, 2, 150);
+    assert!(r.ok);
+    let hall = r.unit_id.unwrap();
+    assert!(Kind::PartyHall.attendance_cap().is_some());
+    assert!(e.set_unit_state(hall as f64, "occupied", None));
+    let revision = e.sim.tower.meal_overlay_revision;
+    // A refusal moves neither the mirror nor the revision.
+    assert!(!e.set_customers_in(hall as f64, 2.5));
+    assert_eq!(e.sim.tower.get_unit(hall).unwrap().occupants, 0);
+    assert_eq!(e.sim.tower.meal_overlay_revision, revision);
+    // A stamp mirrors the tally into the attendance venue's occupants and
+    // moves the meal overlay revision by one, as an arrival does.
+    assert!(e.set_customers_in(hall as f64, 5.0));
+    let unit = e.sim.tower.get_unit(hall).unwrap();
+    assert_eq!((unit.customers_in, unit.occupants), (Some(5), 5));
+    assert_eq!(e.sim.tower.meal_overlay_revision, revision + 1);
+}

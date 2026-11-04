@@ -121,6 +121,29 @@ impl Engine {
         true
     }
 
+    /// Tooling only: set a unit's live customer tally (`customersIn`), which
+    /// no save carries, so a test can fill a venue to capacity mid-run, with
+    /// the follow-ups a counted arrival makes (an attendance venue's occupants
+    /// mirror, the meal overlay revision). False for an unknown unit or a
+    /// count that is not a whole number from 0 to [`MAX_TOOL_OCCUPANTS`];
+    /// nothing changes then. The unit's kind and its venue cap are not
+    /// checked: any unit takes the stamp, at any count in that range.
+    #[wasm_bindgen(js_name = setCustomersIn)]
+    pub fn set_customers_in(&mut self, id: f64, count: f64) -> bool {
+        if count.fract() != 0.0 || !(0.0..=MAX_TOOL_OCCUPANTS).contains(&count) {
+            return false;
+        }
+        let Some((unit, at)) = whole_id(id).and_then(|id| self.sim.tower.marked_by_id(id)) else {
+            return false;
+        };
+        // What a counted arrival does after its increment: an attendance
+        // venue mirrors the tally into its occupants, and the meal overlay moves.
+        unit.set_customers_in(at, Some(count as i64));
+        unit.sync_attendance_occupants(at);
+        self.sim.tower.bump_meal_overlay_revision();
+        true
+    }
+
     /// `callExterminator()`: JSON `{ ok, reason?, cost?, rooms? }`, the
     /// TypeScript `ExterminatorResult`: `cost` and `rooms` ride on a booking
     /// and on the "funds" refusal, the other refusals carry the reason alone.
@@ -294,8 +317,9 @@ impl Engine {
 /// any game, and small enough that a tick still moves the clock.
 const MAX_TOOL_CLOCK_MINUTES: f64 = 1e9;
 
-/// The most occupants `setUnitState` writes: the largest whole number a
-/// JavaScript number holds exactly, so both engines store the same count.
+/// The largest count `setUnitState` writes as occupants and `setCustomersIn`
+/// writes as customers: the largest whole number a JavaScript number holds
+/// exactly, so both engines store the same count.
 const MAX_TOOL_OCCUPANTS: f64 = 9_007_199_254_740_991.0;
 
 /// A state the engine enters only alongside a record of its own (a

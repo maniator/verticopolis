@@ -4,6 +4,7 @@ import { TsEngine } from "../../engine/port/tsEngine";
 import { Simulation } from "../../engine/Simulation";
 import { Clock } from "../../engine/Clock";
 import { crowdView } from "../../engine/conformanceView";
+import { syncAttendanceOccupants } from "../../engine/census";
 import { markRoom, setRoomState } from "../../engine/tower/rooms";
 import type { Person } from "../../engine/crowd/person";
 import type { Tower } from "../../engine/Tower";
@@ -66,6 +67,7 @@ interface Leaf {
   setMoney(amount: number): void;
   setClock(minutes: number): boolean;
   setUnitState(id: number, state: UnitState, occupants?: number): boolean;
+  setCustomersIn(id: number, count: number): boolean;
   /** The live crowd as the conformance view writes it. */
   crowdView(): { people: Person[] };
   /** The hourly utilization average the engine holds for a shaft, if any. */
@@ -108,6 +110,15 @@ function makeLeaf(leg: Leg, save: string): Leaf {
         }
         return true;
       },
+      setCustomersIn: (id, count) => {
+        const unit = engine.sim.tower.units.find((u) => u.id === id);
+        if (!unit || !(Number.isSafeInteger(count) && count >= 0)) return false;
+        unit.customersIn = count + 0; // + 0 turns -0 into 0, as the Rust i64 cast does
+        syncAttendanceOccupants(unit);
+        markRoom(engine.sim.tower, unit);
+        engine.sim.tower.bumpMealOverlayRevision();
+        return true;
+      },
       crowdView: () => JSON.parse(JSON.stringify(crowdView(engine.sim))) as { people: Person[] },
       elevatorUtilization: (id) => engine.sim.elevatorUtilization(id),
       free: () => undefined,
@@ -122,6 +133,7 @@ function makeLeaf(leg: Leg, save: string): Leaf {
     setMoney: (amount) => engine.setMoney(amount),
     setClock: (minutes) => engine.setClock(minutes),
     setUnitState: (id, state, occupants) => engine.setUnitState(id, state, occupants),
+    setCustomersIn: (id, count) => engine.setCustomersIn(id, count),
     crowdView: () => JSON.parse(engine.crowdView()) as { people: Person[] },
     elevatorUtilization: (id) => (JSON.parse(engine.elevatorTelemetry()) as { util: [number, number][] }).util.find(([shaft]) => shaft === id)?.[1],
     free: () => engine.free(),
@@ -176,6 +188,8 @@ export class PortSim {
   private leaf: Leaf;
   private cached: Snapshot | undefined;
   private ticked = false;
+  /** A write the save does not carry, which a later `setup` would drop. */
+  private unsavedWrite = false;
 
   /** A simulation on `leg` that starts from `source`: a draft `Simulation`
    *  (a fixture's authoring copy; nothing reads it afterwards) or save text
@@ -303,6 +317,7 @@ export class PortSim {
     if (this.ticked) {
       throw new Error("PortSim.setup runs before the engine's first tick; a mid-run write needs a tooling-only member on the engine");
     }
+    if (this.unsavedWrite) throw new Error("PortSim.setup reloads the engine from its save, which would drop an earlier setCustomersIn; call setup first");
     const draft = Simulation.deserialize(JSON.parse(this.leaf.port.serialize()) as SerializedGame);
     const out = edit(draft);
     const answer = this.leaf.port.loadSave(JSON.stringify(draft.serialize()));
@@ -423,6 +438,18 @@ export class PortSim {
   /** Set a unit's state, and its occupants when given, mid-run. */
   setUnitState(id: number, state: UnitState, occupants?: number): void {
     if (!this.leaf.setUnitState(id, state, occupants)) throw new Error(`PortSim.setUnitState: the engine refused unit ${id} ${state}${occupants === undefined ? "" : ` x${occupants}`}`);
+    this.changed();
+  }
+
+  /** Set a unit's live customer tally (`customersIn`), which lives outside
+   *  the save: how a test fills a venue to capacity. The unit's kind and its
+   *  venue cap are not checked, so any count from 0 to
+   *  `Number.MAX_SAFE_INTEGER` is taken; anything else throws. An attendance
+   *  venue's occupants follow the tally. A later `setup` throws, since its
+   *  reload would drop the stamp. */
+  setCustomersIn(id: number, count: number): void {
+    if (!this.leaf.setCustomersIn(id, count)) throw new Error(`PortSim.setCustomersIn: the engine refused unit ${id} customers ${count}`);
+    this.unsavedWrite = true;
     this.changed();
   }
 

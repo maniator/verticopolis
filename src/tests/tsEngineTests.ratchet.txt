@@ -137,6 +137,7 @@ src/tests/integration/parity.integration.test.ts Simulation
 src/tests/integration/partyHallTwoFloor.integration.test.ts Simulation
 src/tests/integration/personCensus.integration.test.ts Clock Simulation
 src/tests/integration/personRoundTrip.integration.test.ts Clock Crowd Simulation
+src/tests/integration/personRoundTripVenueCap.integration.test.ts Simulation # kit suite: authors its draft on a Simulation
 src/tests/integration/phase2.integration.test.ts Simulation
 src/tests/integration/playthrough.integration.test.ts Simulation
 src/tests/integration/portServiceDiagnostics.integration.test.ts port/tsEngine
@@ -148,7 +149,7 @@ src/tests/integration/reviewFixes.integration.test.ts Clock EconomySystem Simula
 src/tests/integration/roomCounts.integration.test.ts Simulation tower/rooms
 src/tests/integration/saveMetadataLog.integration.test.ts Simulation
 src/tests/integration/segmentRouting.integration.test.ts Crowd Simulation Tower sim/gripe
-src/tests/integration/segmentRoutingMealRush.integration.test.ts Simulation
+src/tests/integration/segmentRoutingMealRush.integration.test.ts Simulation # kit suite: authors its draft on a Simulation
 src/tests/integration/segmentRoutingReachable.integration.test.ts Clock Crowd EconomySystem Simulation Tower sim/demand
 src/tests/integration/simulation.integration.test.ts ElevatorDispatch Simulation
 src/tests/integration/skylobbyTransfer.integration.test.ts Crowd Tower
