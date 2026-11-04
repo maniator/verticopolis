@@ -79,6 +79,33 @@ describe("a failed save reports autosave_failed", () => {
     expect(trackAppActionOnce).toHaveBeenCalledExactlyOnceWith("autosave_failed", "timer");
   });
 
+  it("tells the player once while autosave keeps failing, and again after it worked in between", async () => {
+    const save = vi.spyOn(SaveGame, "saveAsync").mockRejectedValue(new DOMException("quota", "QuotaExceededError"));
+    const { load, ui } = makeLoad();
+    await load.autosave();
+    await load.autosave();
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/^Autosave is not working\. Save failed: storage is full or blocked/), "bad");
+
+    save.mockResolvedValue(undefined);
+    await load.autosave();
+    expect(ui.toast).toHaveBeenCalledTimes(1);
+    save.mockRejectedValue(new DOMException("quota", "QuotaExceededError"));
+    await load.autosave();
+    expect(ui.toast).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the failure notice for when the tab is visible again", async () => {
+    vi.spyOn(SaveGame, "saveAsync").mockRejectedValue(new DOMException("quota", "QuotaExceededError"));
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    const { load, ui } = makeLoad();
+    await load.autosave();
+    expect(ui.toast).not.toHaveBeenCalled();
+    visibility.mockReturnValue("visible");
+    await load.autosave();
+    expect(ui.toast).toHaveBeenCalledTimes(1);
+    visibility.mockRestore();
+  });
+
   it("reports nothing when a periodic autosave works", async () => {
     vi.spyOn(SaveGame, "saveAsync").mockResolvedValue(undefined);
     const { load } = makeLoad();

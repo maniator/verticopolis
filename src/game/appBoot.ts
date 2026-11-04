@@ -8,7 +8,7 @@ import { createCardKit } from "./cardKit";
 import { KeyboardPlay } from "./keyboardPlay";
 import { catalogOf, isUnlocked } from "./portAccess";
 import { attemptContextRecovery } from "./contextRecovery";
-import { isEngineStopped, isSplashUp } from "./interactionState";
+import { autosaveIfLive, startAutosave } from "./autosaveSchedule";
 import { showCrashScreen } from "../ui/crashScreen";
 import { OnboardingController, isOnboarded } from "../ui/Onboarding";
 import { resolveBootScreen } from "../bootScreen";
@@ -434,7 +434,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // Autosave periodically, but never while the first-run splash is up, so an
   // idle first visit can't persist the throwaway boot sim (which would flip
   // hasSave() true for a tower the player never started).
-  window.setInterval(() => autosaveIfLive(app.saveLoad), 30000);
+  startAutosave(app.saveLoad);
 }
 
 /** What the player is told when a stored save could not be read. The corrupt
@@ -461,10 +461,3 @@ export function unreadableSaveNotice(flags: { hadReadableSave: boolean; saveWasN
   return "⚠️ Your saved tower couldn't be read. It may be corrupted. Starting a new tower.";
 }
 
-/** Autosave now, unless the first-run splash is up (see the timer above), or
- *  the game stopped on its engine: the tower is no longer the engine's, and
- *  the save the message points back to must stay. The timer and every tower
- *  swap share these guards. */
-function autosaveIfLive(saveLoad: Pick<SaveLoad, "autosave">): void {
-  if (!isSplashUp() && !isEngineStopped()) void saveLoad.autosave();
-}

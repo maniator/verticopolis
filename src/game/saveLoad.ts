@@ -90,6 +90,9 @@ const GL_LOSS_STAMP_KEY = "vc-gl-lost-reload";
 export class SaveLoad {
   private autosaveRun: Promise<void> | null = null;
   private autosaveQueued = false;
+  /** A failed autosave has told the player; cleared when one works, so a full
+   *  store does not raise the same toast every 30 seconds. */
+  private autosaveFailureShown = false;
   /** In-memory shadow of {@link GL_LOSS_STAMP_KEY}, so the repeat guard still
    *  trips when sessionStorage is unavailable (otherwise a flapping GPU would
    *  loop flush, toast, and rebuild forever without ever reaching the crash
@@ -174,9 +177,14 @@ export class SaveLoad {
         // previous async compression was in flight.
         await SaveGame.saveAsync(this.saveText());
       } while (this.autosaveQueued);
-    } catch {
-      /* periodic autosave is best effort and has no UI surface; manual and pre-reload saves still report errors */
+      this.autosaveFailureShown = false;
+    } catch (err) {
+      // Once per run of failures (#1533), and only where the player can see it: a hidden tab keeps its latch for their return.
       trackAppActionOnce("autosave_failed", "timer");
+      if (!this.autosaveFailureShown && document.visibilityState !== "hidden") {
+        this.autosaveFailureShown = true;
+        this.deps.ui.toast("Autosave is not working. " + saveFailureMessage(err), "bad");
+      }
     }
   }
 
