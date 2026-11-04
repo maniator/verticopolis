@@ -72,6 +72,7 @@ src/tests/fixtures/serviceDiagnostics.fixture.ts Simulation
 src/tests/fixtures/towerFixtures.ts Simulation
 src/tests/fixtures/winningTower.ts Simulation
 src/tests/integration/attendanceTripwire.integration.test.ts Clock Simulation crowd/motion crowd/trips crowd/visits
+src/tests/integration/attendanceTripwireEngine.integration.test.ts Simulation # kit suite: authors its draft on a Simulation
 src/tests/integration/calendar.integration.test.ts Clock EconomySystem Simulation Tower rng
 src/tests/integration/capacityEventMatrix.integration.test.ts Simulation
 src/tests/integration/cardTextParity.integration.test.ts Simulation
