@@ -1,4 +1,5 @@
 import { legacyFilename } from "./tdtFilename";
+import { groupDigits } from "../ui/format";
 
 /** The elevator slots a `.TDT` file holds. */
 const TDT_ELEVATOR_SLOTS = 24;
@@ -81,7 +82,7 @@ export function exportReport(facts: ExportReportFacts): ExportReport {
   const shafts = Math.min(stats.elevatorsLen, TDT_ELEVATOR_SLOTS);
   const flights = stats.walkwaysLen - stats.flightsDropped;
   const comesAlong: string[] = [
-    `${counts.rooms.toLocaleString()} room${counts.rooms === 1 ? "" : "s"} with their occupancy and hotel states.`,
+    `${groupDigits(counts.rooms)} room${counts.rooms === 1 ? "" : "s"} with their occupancy and hotel states.`,
     `${shafts} elevator shaft${shafts === 1 ? "" : "s"} with per-floor stop settings, and ${flights} stairway/escalator flight${flights === 1 ? "" : "s"}.`,
     `Your funds (${fmtMoney(balance * 100)}), star rating, and the clock.`,
   ];
@@ -165,5 +166,5 @@ export function exportReport(facts: ExportReportFacts): ExportReport {
 }
 
 function fmtMoney(n: number): string {
-  return `${n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString()}`;
+  return `${n < 0 ? "-" : ""}$${groupDigits(Math.abs(n))}`;
 }

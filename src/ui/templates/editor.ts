@@ -7,7 +7,7 @@ import type { TransportDetail, UnitDetail } from "../../simport/panels";
 import { priceOptionsFor } from "../catalogPricing";
 import { hasAccessDiagnostic } from "../../game/cardLines";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
-import { floorTag } from "../format";
+import { floorTag, groupDigits } from "../format";
 
 /**
  * The editor card bodies (E6-S1), pure functions of (card, catalog, mobile).
@@ -122,7 +122,7 @@ export function unitEditorTemplate(
     // where the price normally shows for a unit taken off the market.
     const rent = u.noRate
       ? "No Rate"
-      : `$${(u.kind === "condo" ? catalogHouseholdPrice(catalog, u.price, u.residents) : u.price).toLocaleString()}${isHotelKind(u.kind) ? "/night" : ""}`;
+      : `$${groupDigits(u.kind === "condo" ? catalogHouseholdPrice(catalog, u.price, u.residents) : u.price)}${isHotelKind(u.kind) ? "/night" : ""}`;
     rows.push(kv(label, rent, "rent"));
   }
   if (u.kind === "cinema" && isOperational(u)) {
@@ -133,7 +133,7 @@ export function unitEditorTemplate(
     rows.push(kv("Scrap value", "$0"));
     rows.push(kv("⚠", "Gutted: bulldoze and rebuild."));
   } else {
-    rows.push(kv("Resale value", `$${f.resaleRefund.toLocaleString()}`));
+    rows.push(kv("Resale value", `$${groupDigits(f.resaleRefund)}`));
   }
 
   const actions: TemplateResult[] = [];
@@ -241,7 +241,7 @@ export function transportEditorTemplate(t: TransportDetail, catalog: Catalog, td
     }
     rows.push(kv("Stops", stops, "stops"));
   }
-  rows.push(kv("Resale value", `$${f.resaleRefund.toLocaleString()}`));
+  rows.push(kv("Resale value", `$${groupDigits(f.resaleRefund)}`));
 
   const actions: TemplateResult[] = [];
   if (isEl) {

@@ -1,5 +1,6 @@
 import type { VacateReason } from "../engine/types";
 import { VACATE_REASON_TEXT } from "../shared/vacateReasonText";
+import { groupDigits } from "./format";
 
 /**
  * Player-facing language for facts already decided by the active engine.
@@ -115,7 +116,7 @@ export function wontLeaseCopy(cause: string | undefined, carry: number): string 
     ? `Won't lease: ${cause}`
     : "Won't lease: a new tenant here would soon give notice. Fix the flagged problem to fill it.";
   const cost = Number.isFinite(carry) && carry > 0
-    ? ` It still costs about $${carry.toLocaleString()} a month to hold empty, so fix the cause or bulldoze it to stop the loss.`
+    ? ` It still costs about $${groupDigits(carry)} a month to hold empty, so fix the cause or bulldoze it to stop the loss.`
     : "";
   return lead + cost;
 }

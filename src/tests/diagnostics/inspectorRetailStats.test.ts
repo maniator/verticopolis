@@ -4,6 +4,7 @@ import { html, type TemplateResult } from "lit-html";
 import { retailStatsLines } from "./facilityDiagnostics";
 import { retailDisplayLines } from "../../game/portServiceDiagnostics";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
+import { groupDigits } from "../../ui/format";
 
 /** The patronage yardstick: the Modern catalog in both modes (#572). */
 const MODERN = catalogFor("modern");
@@ -99,9 +100,7 @@ describe("retailStatsLines (commercial-venue inspector card)", () => {
   });
 
   it("adds the rain line only when it is raining, and shows yesterday's profit", () => {
-    // Derive the expected thousands separator from the runtime locale so the
-    // assertion doesn't hard-code en-US formatting.
-    const profit = `Yesterday's profit: $${(3210).toLocaleString()}.`;
+    const profit = `Yesterday's profit: $${groupDigits(3210)}.`;
     const dry = render(retailStatsLines(MODERN, "shop", 100, 70, 3210, false));
     expect(dry.textContent).toContain(profit);
     expect(dry.textContent).not.toContain("Rain might cause fewer customers.");

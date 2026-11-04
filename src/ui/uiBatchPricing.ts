@@ -17,6 +17,7 @@ import { syncRungSelects } from "./templates/rungPicker";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/sim/constants";
 import type { PriceOptions, PriceRung } from "../engine/gameRules";
 import type { FacilityKind } from "../engine/types";
+import { groupDigits } from "./format";
 
 /**
  * The batch-pricing dialog controllers, extracted from `uiDialogs.ts` (which
@@ -232,7 +233,7 @@ function showBatchRungDialog(
           const summary =
             choice === "noRate"
               ? `Took ${r.changed} ${noun} off the market (No Rate).`
-              : `Set ${r.changed} ${noun} to ${rungs[choice].label} ($${rungs[choice].value.toLocaleString()}).`;
+              : `Set ${r.changed} ${noun} to ${rungs[choice].label} ($${groupDigits(rungs[choice].value)}).`;
           cb.onApplied(summary);
         })
         .finally(() => box.isConnected && ui.closeModal());

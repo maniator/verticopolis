@@ -8,6 +8,7 @@ import { outcome } from "../simport/portCodes";
 import { statsReport } from "../simport/statsSheet";
 import { catalogOf } from "./portAccess";
 import { NEWER_SAVE_REFUSAL, loadStored, newerSaveRefused, saveText } from "./portLifecycle";
+import { groupDigits } from "../ui/format";
 
 /**
  * The tower-statistics modal, its exterminator action, and the manual save-slot
@@ -86,7 +87,7 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
   const cost = recovery.calloutFee + recovery.perRoomFee * infested;
   app.ui.confirmModal(
     "Call the exterminator?",
-    `Clear ${infested} infested room(s) for $${cost.toLocaleString()}? The crew arrives tomorrow.`,
+    `Clear ${infested} infested room(s) for $${groupDigits(cost)}? The crew arrives tomorrow.`,
     () => {
       // A load while the confirm was open: the quote was for the old tower.
       if (app.enginePort.generation() !== asked) return;
@@ -100,7 +101,7 @@ export async function confirmExterminate(app: GameApp): Promise<void> {
         let why: string;
         switch (res.reason) {
           case "funds":
-            why = `Not enough funds to book the exterminator ($${(app.portCodes.slot(rec, "bookExterminator", "cost") || cost).toLocaleString()}).`;
+            why = `Not enough funds to book the exterminator ($${groupDigits(app.portCodes.slot(rec, "bookExterminator", "cost") || cost)}).`;
             break;
           case "pending":
             why = "An exterminator is already on the way.";

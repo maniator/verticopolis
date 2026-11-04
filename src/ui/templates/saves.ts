@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { SlotInfo } from "../../storage/SaveGame";
+import { groupDigits } from "../format";
 
 /**
  * The Saved Towers slot manager body. Authored to match `savesHtml` structurally
@@ -70,8 +71,8 @@ export function slotDetail(s: SlotInfo): TemplateResult {
     .filter(Boolean)
     .join(" · ");
   // No census yet (the engine package is not installed): say nothing rather than "pop 0".
-  const population = s.population === undefined ? nothing : html` · pop ${s.population.toLocaleString()}`;
-  return html`<div class="slot-detail">${s.towerName ?? "Tower"} ${modeChip} · ${s.star === 6 ? "TOWER" : (s.star ?? 1) + "★"}${population} · $${Math.round(s.funds ?? 0).toLocaleString()}<br /><span class="slot-when">${when}</span></div>`;
+  const population = s.population === undefined ? nothing : html` · pop ${groupDigits(s.population)}`;
+  return html`<div class="slot-detail">${s.towerName ?? "Tower"} ${modeChip} · ${s.star === 6 ? "TOWER" : (s.star ?? 1) + "★"}${population} · $${groupDigits(Math.round(s.funds ?? 0))}<br /><span class="slot-when">${when}</span></div>`;
 }
 
 function slotRow(s: SlotInfo): TemplateResult {

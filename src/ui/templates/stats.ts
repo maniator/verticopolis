@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import type { Catalog } from "../../catalog/catalogTypes";
 import { iconTemplate } from "../icons";
 import { LEDGER_CATS, LEDGER_LABELS, MILESTONE_COPY } from "../../presentation/statsCopy";
-import { floorTag } from "../format";
+import { floorTag, groupDigits } from "../format";
 import { clockOf, type ClockHeader } from "../../simport/headerClock";
 import type { ElevatorStatsRow, NextStarView, StarGateId, StatsReport } from "../../simport/panels";
 import type { HeaderView } from "../../simport/view";
@@ -82,7 +82,7 @@ export function statsTemplate(screen: StatsScreen): TemplateResult {
   const s = report.stats;
   const c = clockOf(screen.header);
   const next = report.nextStarThreshold;
-  const fmt = (n: number) => n.toLocaleString();
+  const fmt = (n: number) => groupDigits(n);
   // Modal-only diagnostics (a full scan and a flood-fill) arrive in the
   // report the modal asks for when it opens, so they never run on the ~6 Hz
   // HUD stats() path.
@@ -246,7 +246,7 @@ export function incomeSection({ averages, hasData }: StatsReport["income"]): Tem
   if (!hasData) return nothing;
   const money = (n: number) => {
     const r = Math.round(n);
-    return `${r < 0 ? "-" : ""}$${Math.abs(r).toLocaleString()}`;
+    return `${r < 0 ? "-" : ""}$${groupDigits(Math.abs(r))}`;
   };
   const rows = LEDGER_CATS.map((cat) => ({ cat, avg: averages[cat] }))
     // Hide lines that never moved (e.g. no condos built), but always show a
@@ -279,7 +279,7 @@ function householdSection({ households, residents, mix: sizes }: StatsReport["ho
   }
   const avg = (residents / households).toFixed(1);
   const mix = sizes.map(([sz, n]) => `${sz}p × ${n}`).join(" · ");
-  return html`${head}<div class="col kv"><span class="k">People housed</span><span class="v">${residents.toLocaleString()}</span><span class="k">Avg household</span><span class="v">${avg}</span></div><div class="col kv"><span class="k">Size mix</span><span class="v">${mix}</span></div>`;
+  return html`${head}<div class="col kv"><span class="k">People housed</span><span class="v">${groupDigits(residents)}</span><span class="k">Avg household</span><span class="v">${avg}</span></div><div class="col kv"><span class="k">Size mix</span><span class="v">${mix}</span></div>`;
 }
 
 /**
@@ -291,7 +291,7 @@ function householdSection({ households, residents, mix: sizes }: StatsReport["ho
  */
 export function nextStarSection(req: NextStarView | null): TemplateResult | typeof nothing {
   if (!req) return nothing;
-  const fmt = (n: number) => n.toLocaleString();
+  const fmt = (n: number) => groupDigits(n);
   const goal = req.isTower ? "TOWER" : `${req.star}★`;
   const mark = (met: boolean) => (met ? "✓" : "·");
   // Coloring rides the shared checklist `ms-done` class (green when met, the

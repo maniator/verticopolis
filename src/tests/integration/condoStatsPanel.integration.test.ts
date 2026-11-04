@@ -6,6 +6,7 @@ import type { Unit } from "../../engine/types";
 import { statsBodyOf } from "../../ui/templates/stats.fixture";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 import { unitEditor } from "../../game/cardKit.fixture";
+import { groupDigits } from "../../ui/format";
 
 /**
  * The stats dialog's Households readout and the sold-condo editor price,
@@ -78,7 +79,7 @@ describe("Stats panel — Households section (Modern only)", () => {
     const condo = servedCondo(sim);
     tickUntil(sim, () => condo.everOccupied);
     const expected = Math.round((rentOf(condo) * condo.residents!) / 3);
-    expect(renderToFragment(unitEditor(sim, condo)).querySelector('[data-field="rent"]')!.textContent).toBe(`$${expected.toLocaleString()}`);
+    expect(renderToFragment(unitEditor(sim, condo)).querySelector('[data-field="rent"]')!.textContent).toBe(`$${groupDigits(expected)}`);
   });
 
   it("keeps 'People housed' equal to the census even when a sold condo lacks residents", async () => {

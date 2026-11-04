@@ -12,6 +12,7 @@ import { clockOf } from "../simport/headerClock";
 import { scheduleDialogUX } from "../ui/scheduleDialogRules";
 import { scheduleSlots } from "../simport/scheduleSlots";
 import type { ViewReader } from "../simport/viewReader";
+import { groupDigits } from "../ui/format";
 import { INVALID_COMMAND, MAX_TEXT, NOT_ENOUGH_MONEY } from "../simport/request";
 import { BATCH_COUNTERS, batchTargetCode, type CardKit } from "./cardKit";
 
@@ -323,7 +324,7 @@ export class EditorActions {
               if (u.kind === "condo") what = "Sale price";
               else if (isHotelKind(u.kind)) what = "Room rate";
               this.deps.audio.sfx("click");
-              this.deps.announce(`${what} set to ${rung.label} ($${rung.value.toLocaleString()}).`);
+              this.deps.announce(`${what} set to ${rung.label} ($${groupDigits(rung.value)}).`);
             }
           }
           // Refresh on the refusal paths too (e.g. a condo that sold between

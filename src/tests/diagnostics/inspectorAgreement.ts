@@ -1,5 +1,6 @@
 import type { Simulation } from "../../engine/Simulation";
 import { VACATE_REASON_TEXT, type Unit } from "../../engine/types";
+import { groupDigits } from "../../ui/format";
 import { facilityDiagnostics } from "./facilityDiagnostics";
 import { gripeLineText } from "./gripeCopy";
 import type { DiagnosticFacts, GripeFacts, LobbyFacts, NoticeFacts } from "./tsDiagnosticFacts";
@@ -113,9 +114,8 @@ export function inspectorDisagreements(sim: Simulation, u: Unit, f: DiagnosticFa
     const g = f.wontLease.gripe;
     const cause = g ? gripeOpening(sim, u, g) : undefined;
     shows("wontLease cause", true, cause ? `Won't lease: ${cause}` : "Won't lease: a new tenant here would soon give notice.");
-    // Formatted as `carryingCostNote` formats it, so the two agree in any locale.
     const carry = f.wontLease.carry;
-    shows("wontLease carry", carry > 0, carry > 0 ? `It still costs about $${carry.toLocaleString()} a month to hold empty` : "a month to hold empty");
+    shows("wontLease carry", carry > 0, carry > 0 ? `It still costs about $${groupDigits(carry)} a month to hold empty` : "a month to hold empty");
   }
   if (f.notice) {
     shows("notice", true, `${VACATE_REASON_TEXT[f.notice.reason]}. Leaves ${leaves(f.notice)}.`);
