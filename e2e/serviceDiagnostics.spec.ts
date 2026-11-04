@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test, expect, type Page } from "@playwright/test";
 import { Simulation } from "../src/engine/Simulation";
-import { serviceDiagnosticsFixture, retailServiceFixture, setFixtureHotelState } from "../src/tests/fixtures/serviceDiagnostics.fixture";
+import { serviceDiagnosticsFixture, retailServiceFixture, underServedRetailFixture, setFixtureHotelState } from "../src/tests/fixtures/serviceDiagnostics.fixture";
 import { expectEngineHosted } from "./helpers";
 
 /**
@@ -160,6 +160,22 @@ test.describe("Rust service diagnostics in the real browser", () => {
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("Business is booming.");
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("Yesterday's profit: $4,800.");
     await expect(page.locator("#editor .ed-diagnostics")).toContainText("Local demand:");
+  });
+
+  test("real Rust under-served retail advice appears on desktop and the mobile editor", async ({ page }) => {
+    const f = underServedRetailFixture("modern");
+    await loadFixture(page, JSON.stringify(f.sim.serialize()));
+    await page.evaluate(({ id, kind }) => {
+      (window as any).game.inspector.inspectPicked({ type: "unit", id, kind });
+    }, { id: f.shop.id, kind: f.shop.kind });
+    await expect(page.locator("#inspector")).toContainText("another venue would still sell");
+    await expect(page.locator("#inspector")).not.toContainText("more retail than its shoppers fill");
+
+    await page.setViewportSize({ width: 390, height: 700 });
+    await page.evaluate(({ id, kind }) => {
+      (window as any).game.selectPicked({ type: "unit", id, kind });
+    }, { id: f.shop.id, kind: f.shop.kind });
+    await expect(page.locator("#editor .ed-diagnostics")).toContainText("another venue would still sell");
   });
 
   test("mobile editor folds in Rust housekeeping and infested-hotel warnings", async ({ page }) => {
