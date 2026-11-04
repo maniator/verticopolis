@@ -19,6 +19,7 @@ import { CLOUD_COUNT, CLOUD_DRIFT, SUN_ARC, cloudFill, cloudMotion, cloudRadius,
 import { disposeRegions } from "./towerRegions";
 import { emptyStructPass } from "./towerStructTiles";
 import { clearLongPress } from "./longPress";
+import { NOT_BAKED } from "./sceneBake";
 import { SHIRTS } from "../pixelSprites";
 import { personFigure } from "../pixelSprites/common";
 import { FLOOR, TILE } from "../scale";
@@ -351,15 +352,10 @@ export function disposeScene(engine: TowerEngine): void {
   crowd.clearMotion(engine);
 }
 
-export function setSim(engine: TowerEngine, sim: RenderSim, opts?: { keepCamera?: boolean }): void {
-  // The scene keeps its size, so the swapped-in tower must state the same
-  // world. Bind first: a refused world throws before anything is torn down.
-  bindSceneWorld(sim);
-  disposeScene(engine);
-  crowd.clearCrowd(engine);
-  // Full input reset: a tower swap (new game / load) must not inherit a
-  // half-finished gesture, and dropping any tracked contacts here is the
-  // recovery path if a browser ever swallows a pointer's up/cancel.
+/** Full input reset: a tower swap (new game / load) or an undo step must not
+ *  inherit a half-finished gesture, and dropping any tracked contacts here is
+ *  the recovery path if a browser ever swallows a pointer's up/cancel. */
+function resetInput(engine: TowerEngine): void {
   engine.tracker.reset();
   engine.gesture = null;
   engine.arrowDrag = null;
@@ -369,6 +365,36 @@ export function setSim(engine: TowerEngine, sim: RenderSim, opts?: { keepCamera?
   // (a stale latch suppresses every pointerMove until the next press).
   clearLongPress(engine);
   engine.longPressFired = false;
+  // The placement ghost and the shaft preview were judged against the tower
+  // as it was; the next pointer move, or the app's keyboard cursor refresh,
+  // draws them again against this one.
+  engine.preview = null;
+  engine.transportPreview = null;
+}
+
+/**
+ * Follow an undo or redo step the engine took on the tower this scene draws.
+ * The step is an edit of that tower, and it moved the tower's revision, so the
+ * scene is kept: the tiles, the room, shaft and crowd actors, the camera and
+ * any effect in flight. The next sync brings the scene up to the changed tower
+ * by its own keys (the revision and unit list for the tiles, each room's and
+ * shaft's signature, each person's id), as it does after a build or a
+ * bulldoze. A swap to another tower goes through {@link setSim} instead. The
+ * input resets, because the engine committed any gesture under way before it
+ * took the step, and an effect drawn on a spot the step emptied ends.
+ */
+export function followStep(engine: TowerEngine): void {
+  resetInput(engine);
+  overlayFx.dropStrandedFx(engine);
+}
+
+export function setSim(engine: TowerEngine, sim: RenderSim, opts?: { keepCamera?: boolean }): void {
+  // The scene keeps its size, so the swapped-in tower must state the same
+  // world. Bind first: a refused world throws before anything is torn down.
+  bindSceneWorld(sim);
+  disposeScene(engine);
+  crowd.clearCrowd(engine);
+  resetInput(engine);
   // Drop any in-flight event visuals and adopt the new sim's fx baselines, so
   // a tower swap neither leaves Santa mid-sky nor re-fires a stale flash.
   engine.santaStart = null;
@@ -384,7 +410,7 @@ export function setSim(engine: TowerEngine, sim: RenderSim, opts?: { keepCamera?
   engine.lastTreasureSeq = sim.treasureFx.seq;
   engine.lastVipSeq = sim.vipFxSeq;
   engine.sim = sim;
-  engine.builtRev = -1;
+  engine.builtRev = NOT_BAKED;
   engine.mealOverlayRev = -1;
   // Invalidate the per-floor occupancy cache so a swapped-in tower (new game /
   // load) can't briefly gate walkers on the previous sim's occupancy even if

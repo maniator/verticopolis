@@ -90,6 +90,7 @@ export function wireEngine(app: GameApp): void {
 
   app.engine.onActionDown = (tile, floor, touch, picked) => {
     app.audio.start();
+    app.keyboard.pointerDrew();
     // A fresh gesture: drop any anchor or run an earlier press left behind, so
     // a new paint drag never extends from an abandoned anchor across the gap.
     // A release or a cancel (onActionCancel) clears them too.
@@ -240,6 +241,7 @@ export function wireEngine(app: GameApp): void {
   };
 
   app.engine.onHover = (tile, floor, picked) => {
+    app.keyboard.pointerDrew();
     if (app.tool.type === "build") {
       updateBuildPreview(app, tile, floor);
     } else {
@@ -337,6 +339,23 @@ export function wireEngine(app: GameApp): void {
   app.engine.onContextLost = () => app.saveLoad.recoverFromContextLoss();
 }
 
+/** Drop the app's half of a gesture its pointer can no longer finish: a lost
+ *  canvas took the release with it, or the tower changed under the press (a
+ *  swap, or an undo or redo step), which resets the engine's input, so the
+ *  release never reaches `onActionUp`. A stale `transportStart` suppresses the
+ *  update prompt session-long, and a stale paint or build anchor would place
+ *  on a later tap or extend the next touch drag across the gap. The refusal
+ *  card a refused drag raised goes too, latch first: hiding the shared card
+ *  leaves `buildRefusalShowing` set, and a leaked latch offsets the next
+ *  card's anchor a floor down (panelAnchoring reads it). */
+export function dropSeveredGesture(app: GameApp): void {
+  app.paintAnchor = null;
+  app.buildAnchor = null;
+  app.transportStart = null;
+  app.build.clearPaint();
+  clearBuildRefusal(app);
+}
+
 /**
  * Swap in a fresh renderer after a WebGL context loss, once the browser has
  * restored GPU access (see attemptContextRecovery). The simulation and the
@@ -383,17 +402,9 @@ export function rebuildEngine(app: GameApp): Promise<void> {
     /* best effort; some drivers refuse the extension */
   }
   // The loss severed any in-flight gesture (the old canvas's pointerup
-  // died with it), so drop gesture state that would otherwise linger: a
-  // stale transportStart suppresses the update prompt session-long, and a
-  // stale paint anchor would extend the next touch drag across the gap.
-  app.paintAnchor = null;
-  app.buildAnchor = null;
-  app.transportStart = null;
-  app.build.clearPaint();
-  // Release the refusal card's ownership latch BEFORE the blanket hide: hide()
-  // clears the shared card but not buildRefusalShowing, and a leaked latch
-  // offsets the next card's anchor a floor down (panelAnchoring reads it).
-  clearBuildRefusal(app);
+  // died with it). This releases the refusal card's latch before the
+  // blanket hide below.
+  dropSeveredGesture(app);
   app.inspector.hide(); // drop a peek card the severed touch can no longer dismiss
   app.commitUndo(); // close the severed gesture's pending capture (no-op when clean)
   app.canvas = fresh;
@@ -406,6 +417,8 @@ export function rebuildEngine(app: GameApp): Promise<void> {
     throw new Error("webgl unavailable after context restore");
   }
   wireEngine(app);
+  // The fresh renderer starts with no ghost; one the keyboard drew comes back.
+  app.keyboard.followTower("same tower");
   applyReducedMotion(app);
   app.engine.paused = SPEEDS[app.speed] === 0;
   app.engine.overlayMode = overlay;

@@ -378,14 +378,13 @@ export class OnboardingController {
     return true;
   }
 
-  /** Retarget a live session at a swapped-in sim (GameApp.adoptSim: New Tower,
-   *  Load, Import, undo/redo restore). Without this the checklist keeps ticking
+  /** Retarget a live session at a swapped-in sim (GameApp.followSwap: New
+   *  Tower, Load, Import, an undo or redo step, a tooling restore). Without this the checklist keeps ticking
    *  the abandoned instance: progress on the live tower never advances it, and
    *  since founding went mode-split its card can even teach the wrong first
    *  step. No-ops when no session is active, so it never raises the panel.
-   *  `keepSplash`: an undo restore, or the WASM engine's fallback (#874),
-   *  swaps the tower without the player choosing one, so a title screen
-   *  still up stays up. */
+   *  `keepSplash`: an undo or redo step or a tooling restore follows a tower
+   *  the player did not choose, so a title screen still up stays up. */
   adoptSim(port: OnboardingPort, keepSplash = false): void {
     // Runs BEFORE the `active` guard: a returning player has no live onboarding
     // session, but their title screen is still up and this tower is what takes

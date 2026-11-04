@@ -21,6 +21,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.86.0
+
+- Undo and Redo keep the tower scene in place instead of rebuilding it, so the view responds faster without a visual reset.
+- Undo and Redo no longer repeat the "TOWER achieved!" message for a tower that has already earned it.
+
 ## 2.85.1
 
 - Holding Space before a mouse drag now pans the view without building or clicking a focused control. Tapping Space acts at the keyboard cursor when you let go.

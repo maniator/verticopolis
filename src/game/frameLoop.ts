@@ -77,8 +77,8 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // and paceFactor is normalized so a full day costs the same real time, so
   // the speed buttons keep their meaning.
   const steadyClock = app.prefs.steadyClock === true;
-  // The clock as the last frame left it. A swap since then (a load, an undo)
-  // is a different clock, and no meal rush is judged across it.
+  // The clock as the last frame left it. A swap (another tower) or an undo or
+  // redo step since then moves the generation, and no meal rush is judged across it.
   const minutesBeforeTicks = app.reader.generation === app.enginePort.generation() ? app.reader.header.minutes : NaN;
   try {
     app.accMinutes = app.enginePort.advance(app.accMinutes, dtMs, minutesPerSecond, steadyClock, true)[1];
