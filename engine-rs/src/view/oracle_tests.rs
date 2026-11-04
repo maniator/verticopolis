@@ -44,8 +44,9 @@ fn apply_meta(meta: &mut Meta, doc: &serde_json::Value) {
     }
 }
 
-/// A view kept between reads, as a host keeps it, and how many of its reads
-/// took the incremental paths.
+/// A view kept between reads, as a host keeps it, with how many of its frame
+/// and metadata reads took the incremental paths, and the inspector's census
+/// tally with what it last counted (`tally_tests.rs` checks its paths).
 struct Kept {
     structure: Vec<f64>,
     reader: ViewReader,
@@ -56,6 +57,8 @@ struct Kept {
     delta_frames: usize,
     meta_deltas: usize,
     population: f64,
+    tally: CensusTally,
+    tallied: RecyclingCounts,
 }
 
 impl Kept {
@@ -71,6 +74,8 @@ impl Kept {
             delta_frames: 0,
             meta_deltas: 0,
             population: f64::NAN,
+            tally: CensusTally::default(),
+            tallied: RecyclingCounts::default(),
         };
         kept.read(sim);
         kept
@@ -82,6 +87,7 @@ impl Kept {
         assert_eq!(frame[header::FRAME_SEQ], self.seq + 1.0, "frames count up");
         self.seq += 1.0;
         self.population = frame[header::POPULATION];
+        self.tallied = self.tally.counts(&sim.tower);
         if frame[header::TOWER_REVISION] != self.structure[structure::REVISION] {
             self.structure = structure_view(sim);
             decode_structure(sim, &self.structure, "a refetched structure");
@@ -153,6 +159,12 @@ impl Kept {
             sim.population() as f64,
             "{what}: kept population"
         );
+        let (centers, population) = (sim.recycling_centers(), sim.tower.total_population());
+        let counted = RecyclingCounts {
+            centers,
+            population,
+        };
+        assert_eq!(self.tallied, counted, "{what}: kept census tally");
         let tail = at + rooms.len() * UNIT_RECORD;
         assert_eq!(
             fresh.len() - tail,

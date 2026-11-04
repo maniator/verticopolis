@@ -5,6 +5,7 @@
 //! `parkingUsage` and `recyclingFill`, and the walker placement reads
 //! `positionReachable`. The overlay's peak is `hotspot`'s ratio.
 use crate::charges::whole;
+use crate::services::{recycling_capacity_of, recycling_demand_met_of};
 
 use super::Engine;
 
@@ -162,19 +163,26 @@ impl Engine {
         self.sim.parking_usage(spots)
     }
 
-    pub(crate) fn port_recycling_fill(&self) -> f64 {
-        self.sim.recycling_fill()
+    /// How full the bins are, 0 to 1. These three reads answer from the
+    /// inspector's kept counts (`inspector_recycling`): the recycling card asks
+    /// for all three on every hover and phone refresh, and the scene sync
+    /// asks for the fill (`towerReconcile.ts`).
+    pub(crate) fn port_recycling_fill(&mut self) -> f64 {
+        let counts = self.sim.inspector_recycling();
+        self.sim
+            .recycling_fill_of(counts.population, recycling_capacity_of(counts.centers))
     }
 
     /// The population the working recycling centers can process.
-    pub(crate) fn port_recycling_capacity(&self) -> f64 {
-        self.sim.recycling_capacity()
+    pub(crate) fn port_recycling_capacity(&mut self) -> f64 {
+        recycling_capacity_of(self.sim.inspector_recycling().centers)
     }
 
     /// Whether the working recycling centers can process the whole population
     /// (the 4-star demand check).
-    pub(crate) fn port_recycling_demand_met(&self) -> bool {
-        self.sim.recycling_demand_met()
+    pub(crate) fn port_recycling_demand_met(&mut self) -> bool {
+        let counts = self.sim.inspector_recycling();
+        recycling_demand_met_of(counts.population, recycling_capacity_of(counts.centers))
     }
 
     /// Whether a walker can stand at `floor`, `x`; a position that is not a
@@ -191,3 +199,7 @@ impl Engine {
 #[cfg(test)]
 #[path = "wasm_port_render_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "wasm_port_recycling_tests.rs"]
+mod recycling_tests;

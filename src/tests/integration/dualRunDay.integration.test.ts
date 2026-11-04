@@ -57,4 +57,21 @@ describe.skipIf(!hasWasmPackage())("dual run: a day at the game's own cadence", 
     expect(report.checkpoints).toBe(24);
   }, 60_000);
   it("the steady clock pacing on tower-one", () => day(loadFixture("conformance/fixtures/towerone_6.vctower"), 3, true), 120_000);
+  // A built Modern tower on the canon calendar (a three-day week of two
+  // weekdays and a weekend day, three-day quarters) across a quarter's end:
+  // the founded case above runs one empty day.
+  it("split-tower on the canon calendar across a quarter", () => {
+    const sim = loadFixture("conformance/fixtures/split-tower.vctower", (raw) => ({ ...raw, modernCalendar: "canon" }));
+    expect([sim.mode, sim.modernCalendar]).toEqual(["modern", "canon"]);
+    const quarter = sim.clock.quarter;
+    const run = new DualRun().follow(sim);
+    const from = sim.clock.minutes;
+    new FrameDriver(sim, 3).run(4 * DAY);
+    const report = run.stop();
+    expect(report.divergences).toEqual([]);
+    expect(report.eventDivergences).toEqual([]);
+    expect(report.checkpoints).toBe(hoursCrossed(from, sim.clock.minutes));
+    expect(report.checkpoints).toBeGreaterThanOrEqual(96);
+    expect(sim.clock.quarter, "the run crossed a quarter's end").not.toBe(quarter);
+  }, 120_000);
 });

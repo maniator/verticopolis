@@ -47,8 +47,17 @@ impl Simulation {
         if cap == 0.0 {
             return 0.0;
         }
+        self.recycling_fill_of(self.tower.total_population(), cap)
+    }
+
+    /// The fill for `population` against `capacity` at this minute of the
+    /// day; empty bins when there is no capacity, as `recycling_fill` says.
+    pub(crate) fn recycling_fill_of(&self, population: i64, capacity: f64) -> f64 {
+        if capacity == 0.0 {
+            return 0.0;
+        }
         let since = (self.clock.minute_of_day() - GARBAGE_COLLECT_HOUR * 60.0 + 1440.0) % 1440.0;
-        (self.tower.total_population() as f64 / cap * (since / 1440.0)).min(1.0)
+        (population as f64 / capacity * (since / 1440.0)).min(1.0)
     }
 
     /// `parkingUsage(spots)`: the share of `spots` working spaces taken, 0

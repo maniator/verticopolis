@@ -68,7 +68,7 @@ approves an exception.
     that costs about 1.5 times as much per call (24 ms to 36 ms on
     `split-tower-4`, measured by the independent reviewer in Node), and
     `serialize()` is on the hosted merge path every revision change
-    (`wasmHost.ts:286`, `workerCore.ts:133`, the #1051 frame path). Every
+    (`wasmHost.ts:286`, the since-retired workerCore.ts at line 133 in the #1051 frame path). Every
     consumer of that text runs `JSON.parse` on it, so nothing reads the form.
     I tried it and reverted it for that reason.
   - **Key order:** not without a data-model change. No fixed Rust order

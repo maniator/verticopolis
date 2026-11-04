@@ -11,7 +11,7 @@ import type { EnginePort } from "../simport/enginePort";
 import type { ViewReader } from "../simport/viewReader";
 import { transportLoadLines } from "./cardLines";
 import { recyclingLinesOf } from "./recyclingDiagnostics";
-import { createPortUnitDiagnostics, type SupplementalLines } from "./portUnitDiagnostics";
+import { createPortUnitParts, joinParts, type PortUnitParts, type SupplementalLines } from "./portUnitDiagnostics";
 import { portServiceSections } from "./portServiceDiagnostics";
 
 /**
@@ -65,7 +65,7 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
   const port = app.enginePort;
   const codes = new PortCodes(port);
   const cards = new Cards(app.enginePort, app.reader);
-  const tenantLines = createPortUnitDiagnostics(port, (id) => {
+  const tenantParts = createPortUnitParts(port, (id) => {
     const facts = port.serviceDiagnostics(id);
     return facts ? portServiceSections(facts) : NO_SERVICE_LINES;
   });
@@ -75,7 +75,7 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
   // per-revision contract as the inspector's demand memo, plus the current
   // unit card, population and stars. A user command explicitly requests a
   // fresh reading; a notice countdown stays live, minute by minute.
-  let diagnosticCache: { id: number; key: string; lines: TemplateResult[] } | undefined;
+  let diagnosticCache: { id: number; key: string; parts: PortUnitParts } | undefined;
   const portUnitLines = (id: number, fresh = false): TemplateResult[] => {
     const u = cards.unit(id);
     if (!u) {
@@ -90,20 +90,27 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
       u.occupants, u.residents, u.served, u.reachable, u.vacateReason,
       u.floorHasLobby,
     ]);
-    // The notice deadline is an exact live countdown, not an hourly fact.
-    const liveNotice = u.state === "vacating";
-    let lines: TemplateResult[];
-    if (!fresh && !liveNotice && diagnosticCache?.id === id && diagnosticCache.key === key) {
-      lines = diagnosticCache.lines;
+    // Recycling fill can change between hours, so these lines are never
+    // stored; each read puts them between the kept halves, after the lobby
+    // advice and above any gripe or notice.
+    const recycling = u.kind === "recycling" && !INERT_STATES.has(u.state)
+      ? () => recyclingLinesOf(header.population, port.recyclingCapacity(), port.recyclingFill(), port.recyclingDemandMet())
+      : undefined;
+    // The notice deadline counts down minute by minute while the key moves
+    // hourly, so a card with a notice is read whole each time. Only a
+    // hand-edited save can put a recycling center on notice.
+    if (u.state === "vacating") {
+      diagnosticCache = undefined;
+      return joinParts(tenantParts(id), recycling);
+    }
+    let parts: PortUnitParts;
+    if (!fresh && diagnosticCache?.id === id && diagnosticCache.key === key) {
+      parts = diagnosticCache.parts;
     } else {
-      lines = tenantLines(id);
-      diagnosticCache = liveNotice ? undefined : { id, key, lines };
+      parts = tenantParts(id);
+      diagnosticCache = { id, key, parts };
     }
-    if (u.kind === "recycling" && !INERT_STATES.has(u.state)) {
-      // Recycling fill can change between hours; do not store these lines.
-      return [...lines, ...recyclingLinesOf(header.population, port.recyclingCapacity(), port.recyclingFill(), port.recyclingDemandMet())];
-    }
-    return lines;
+    return joinParts(parts, recycling);
   };
   return {
     cards,

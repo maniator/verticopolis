@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { CONFORMANCE_DIR, firstDivergence, loadScenario, runScenario, type Checkpoint } from "../conformance/scenario";
-import { hasWasmPackage, startWasmEngine, wasm, wasmRequired } from "../conformance/wasmEngine";
+import { CONFORMANCE_DIR, firstDivergence, loadScenario, runScenario, type Checkpoint, type EngineStart } from "../conformance/scenario";
+import { hasWasmPackage, startWasmEngine, startWasmHandle, wasm, wasmEngine, wasmRequired } from "../conformance/wasmEngine";
 import { CATALOG_VERSION, catalogFor } from "../../engine/catalog";
 import { readCatalog } from "../../dualrun/catalog";
 import { catalogLockView } from "../../engine/catalogLockView";
 import { canonicalJson, digest } from "../conformance/canonical";
+import { done } from "../../simport/engineSubject.fixture";
 
 /**
  * The conformance referee through the WASM binding: every scenario runs on
@@ -30,6 +31,30 @@ describe.skipIf(!hasWasmPackage())("engine conformance through the WASM binding"
       const want = lock.scenarios[scenario.id];
       if (!want) throw new Error(`${scenario.id} is not in the lock; regenerate it with the TypeScript run first`);
       expect(firstDivergence(runScenario(scenario, startWasmEngine), want)).toBeNull();
+    }, 60_000);
+  }
+
+  // The emergency dialog answers through the port's `answerChoice`. The runner
+  // answers through `resolveChoice`, so the two scenarios that answer a choice
+  // run again with the answer given through the port, and must land on the
+  // same checkpoints.
+  for (const id of ["fire-rescue-paid-modern", "ransom-paid-modern"]) {
+    it(`${id} matches its pinned checkpoints when answered through answerChoice`, () => {
+      const scenario = loadScenario(resolve(SCENARIO_DIR, `${id}.json`));
+      const answers = scenario.commands.filter((c) => c.op === "resolveChoice").length;
+      expect(answers, `${id} no longer answers a choice`).toBeGreaterThan(0);
+      expect(scenario.commands.some((c) => c.op === "reload"), `${id} reloads, which would drop the override`).toBe(false);
+      let answered = 0;
+      const throughPort: EngineStart = (start) => {
+        const handle = startWasmHandle(start);
+        const resolveChoice = (accept: boolean): void => {
+          answered++;
+          expect(done(handle.answerChoice(accept)), `answerChoice(${accept}): ${handle.lastReason()}`).toBe(true);
+        };
+        return { ...wasmEngine(handle), resolveChoice };
+      };
+      expect(firstDivergence(runScenario(scenario, throughPort), lock.scenarios[id])).toBeNull();
+      expect(answered, `${id}: every answer went through answerChoice`).toBe(answers);
     }, 60_000);
   }
 

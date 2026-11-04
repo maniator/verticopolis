@@ -188,15 +188,15 @@ impl Engine {
         self.port_parking_usage(spots)
     }
     #[wasm_bindgen(js_name = recyclingFill)]
-    pub fn recycling_fill(&self) -> f64 {
+    pub fn recycling_fill(&mut self) -> f64 {
         self.port_recycling_fill()
     }
     #[wasm_bindgen(js_name = recyclingCapacity)]
-    pub fn recycling_capacity(&self) -> f64 {
+    pub fn recycling_capacity(&mut self) -> f64 {
         self.port_recycling_capacity()
     }
     #[wasm_bindgen(js_name = recyclingDemandMet)]
-    pub fn recycling_demand_met(&self) -> bool {
+    pub fn recycling_demand_met(&mut self) -> bool {
         self.port_recycling_demand_met()
     }
     /// The raw congestion ratio of one floor (0 for a floor with no reading
