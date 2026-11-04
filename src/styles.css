@@ -2288,7 +2288,7 @@ body.splash-up #toast-wrap { z-index: 45; }
      view and make an open Map rebuild from scratch, up to six times a second
      while the traffic floor flickers. Each width fits its longest value
      ("Backed up · 100F", "WD2 00:00", "2nd WD/4Q/122nd Year",
-     "$-999,999,999", "99,999") in the widest common UI font, DejaVu Sans
+     "$-1,000,000,000", "100,000") in the widest common UI font, DejaVu Sans
      (measured in Chrome, within about half a pixel on the tightest), so
      only a still longer value is trimmed with an ellipsis. The rating is
      always five stars or the shorter TOWER, so it needs none. */
@@ -2331,8 +2331,8 @@ body.splash-up #toast-wrap { z-index: 45; }
   #traffic { width: 10.8em; }
   #stat-time { width: 6.2em; }
   #stat-date { width: 13.1em; }
-  #stat-money { width: 8.2em; }
-  #stat-pop { width: 4em; }
+  #stat-money { width: 9.5em; }
+  #stat-pop { width: 4.8em; }
   #speed {
     gap: 3px;
   }
@@ -2494,16 +2494,16 @@ body.splash-up #toast-wrap { z-index: 45; }
   /* The first-run checklist sits right of the tools column instead of over
      it, at most 300px wide, so the tab and tiles it points at stay visible
      and tappable and most of the world view stays clear. Its top
-     clears a top bar wrapped to three lines (71 to 73px tall from 568 to
-     740px wide, by font), and on a very short screen its step list scrolls
-     under the title bar, which stays put. */
+     tracks the real top bar height (set on --topbar-h from Onboarding),
+     and on a very short screen its step list scrolls under the title bar,
+     which stays put. */
   /* The stage starts at 180px (the column and its margins), so the card
      sits 2px inside it and keeps 8px clear on the right. */
   #onboard.onboard--mobile {
     left: calc(182px + env(safe-area-inset-left, 0px));
     right: auto;
     width: min(300px, calc(100vw - 190px - env(safe-area-inset-left, 0px)));
-    top: 76px;
+    top: calc(var(--topbar-h, 76px) + 2px);
   }
   /* The card would otherwise cover the title bar and close button of an
      editor or inspector card opened under it, so those and the toasts paint
@@ -2531,7 +2531,7 @@ body.splash-up #toast-wrap { z-index: 45; }
   body:has(.overview-map:not([hidden])) #onboard.onboard--mobile {
     left: auto;
     right: 8px;
-    width: max(180px, min(300px, calc(100vw - 360px - env(safe-area-inset-left, 0px))));
+    width: max(200px, min(300px, calc(100vw - 360px - env(safe-area-inset-left, 0px))));
   }
 }
 
