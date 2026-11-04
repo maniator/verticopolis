@@ -94,16 +94,50 @@ if [ "${1:-}" = "--classify" ]; then
   exit 0
 fi
 
+# Fetches one commit and its trees (no file contents) from the GitHub repo
+# Vercel cloned, so a previous deploy outside the shallow clone can still be
+# diffed: one a force-push removed from the branch (GitHub still serves it by
+# SHA), or an ancestor older than the clone depth. The fetch leaves the clone a
+# partial clone (it registers the URL as a promisor remote and adds a shallow
+# boundary); the build only runs `git rev-parse HEAD`, which that does not
+# affect. Prints why and returns non-zero when it cannot fetch.
+fetch_commit() {
+  if [ "${VERCEL_GIT_PROVIDER:-}" != "github" ] || [ -z "${VERCEL_GIT_REPO_OWNER:-}" ] || [ -z "${VERCEL_GIT_REPO_SLUG:-}" ]; then
+    echo "vercel-ignore-build: no GitHub repo to fetch from."
+    return 1
+  fi
+  local url="https://github.com/${VERCEL_GIT_REPO_OWNER}/${VERCEL_GIT_REPO_SLUG}.git"
+  # No credential prompt: a repo that needs one fails at once and builds.
+  local fetch=(env GIT_TERMINAL_PROMPT=0 git fetch --quiet --no-tags --no-write-fetch-head --depth=1 --filter=blob:none "$url" "$1")
+  local err
+  if command -v timeout >/dev/null 2>&1; then fetch=(timeout 60 "${fetch[@]}"); fi
+  if ! err="$("${fetch[@]}" 2>&1 >/dev/null)"; then
+    echo "vercel-ignore-build: fetching ${1} failed: ${err:-timed out or no message}"
+    return 1
+  fi
+  git cat-file -e "${1}^{commit}" 2>/dev/null
+}
+
 # Diff base: the previously deployed commit when Vercel provides it, else this
-# commit's parent. A previous deploy that does not resolve (a shallow clone
-# without it) builds, since falling back to the parent would compare only the
-# last commit. With neither a previous deploy nor a parent (first deploy), build
-# to be safe.
+# commit's parent. A previous deploy missing from the clone is fetched; if that
+# fails it builds, since falling back to the parent would compare only the last
+# commit. With neither a previous deploy nor a parent (first deploy), build to
+# be safe.
 base="${VERCEL_GIT_PREVIOUS_SHA:-}"
 if [ -n "$base" ]; then
-  if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
-    echo "vercel-ignore-build: previous deploy ${base} is not in this clone; building."
+  # Only a full SHA (in either case): a name like HEAD would diff against
+  # itself, and a value starting with "-" would read as a git option.
+  base="$(printf '%s' "$base" | tr 'A-F' 'a-f')"
+  if ! [[ "$base" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "vercel-ignore-build: previous deploy ${base} is not a full commit SHA; building."
     exit 1
+  fi
+  if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+    if ! fetch_commit "$base"; then
+      echo "vercel-ignore-build: previous deploy ${base} is not in this clone and could not be fetched; building."
+      exit 1
+    fi
+    echo "vercel-ignore-build: fetched previous deploy ${base}, which was not in this clone."
   fi
 else
   base="$(git rev-parse --verify --quiet 'HEAD^' || true)"
