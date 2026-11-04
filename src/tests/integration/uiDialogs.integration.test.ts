@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { referenceEngine } from "../fixtures/autoTuneDouble";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import { pump, rebaseLog } from "../../ui/hud.fixture";
 import { towerCatalog, useTowerCatalogSource } from "../../catalog/towerCatalog";
 import { catalogFor } from "../../engine/catalog";
@@ -16,6 +16,35 @@ import type { Unit } from "../../engine/types";
 import { toggleMute } from "../../game/audioPrefs";
 import { loadPrefs } from "../../storage/Prefs";
 import { unitEditor } from "../../game/cardKit.fixture";
+
+// Every toast in this file passes through here; see the hooks below the
+// file-level beforeEach for why a toast on the real clock fails its test.
+const toastClock = vi.hoisted(() => ({ realSetTimeout: globalThis.setTimeout, raised: [] as string[] }));
+vi.mock("../../ui/uiStatus", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../ui/uiStatus")>();
+  return {
+    ...actual,
+    toast: (...args: Parameters<typeof actual.toast>): void => {
+      // A spy or stub over setTimeout is not a fake clock, so ask both.
+      const clockFaked = vi.isFakeTimers() && globalThis.setTimeout !== toastClock.realSetTimeout;
+      if (clockFaked) return actual.toast(...args);
+      toastClock.raised.push(args[1]);
+      // Still raise it, so the test sees the same rail, but on a throwaway
+      // fake clock whose timers are dropped at once, so its timers cannot fire
+      // after teardown. The one exception is a clock the test has partly
+      // faked itself (vi.useFakeTimers with toFake): that install is the
+      // test's own, so leave it alone and only record the toast.
+      if (vi.isFakeTimers()) return actual.toast(...args);
+      vi.useFakeTimers();
+      try {
+        actual.toast(...args);
+      } finally {
+        vi.clearAllTimers();
+        vi.useRealTimers();
+      }
+    },
+  };
+});
 
 /**
  * Pins the dialog/window wiring contracts in src/ui/UI.ts — the layer where
@@ -63,6 +92,30 @@ const openImportPicker = (ui: UI): void => {
 
 beforeEach(() => {
   mountAppDom();
+});
+
+// A toast arms its self-removal timers (toast() in src/ui/uiStatus.ts) on
+// Node's own setTimeout, which happy-dom's teardown cannot cancel. One still
+// pending when this file ends fires after the environment has deleted the
+// `window` global, and the run fails with an unhandled ReferenceError even
+// though every test passed. So every test that toasts fakes the clock first.
+// The mock above records each toast raised on the real clock (and drops its
+// timers), and the hooks below fail the test that raised it, or the file when
+// a toast lands after the last test's hooks. The clock is read when the toast
+// is raised, so the check holds whatever the test later does to the rail or
+// the clock.
+const REAL_CLOCK_TOAST = "toasted on the real clock; call vi.useFakeTimers() before this test toasts";
+beforeEach(() => {
+  toastClock.raised.length = 0; // a test whose own teardown threw never reached the check below
+});
+afterEach(() => {
+  expect(toastClock.raised.splice(0), REAL_CLOCK_TOAST).toEqual([]);
+});
+afterAll(async () => {
+  // Let a callback the last test queued run first, on the real clock even if
+  // that test left a fake one installed.
+  await new Promise((settle) => toastClock.realSetTimeout(settle, 0));
+  expect(toastClock.raised.splice(0), REAL_CLOCK_TOAST).toEqual([]);
 });
 
 describe("wireActions — the anti-dead-button contract", () => {
@@ -683,8 +736,8 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
 
 describe("export/import — file downloads and the file picker, no copy-paste path", () => {
   afterEach(() => {
-    // The download queues a 60s revoke timer; fake timers in each test keep it
-    // from firing after the URL stubs below are removed.
+    // The download queues a 60s revoke timer, and a failed download toasts;
+    // fake timers in each test keep both from firing after teardown.
     vi.useRealTimers();
     vi.restoreAllMocks();
     delete (URL as { createObjectURL?: unknown }).createObjectURL;
@@ -747,6 +800,7 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
   });
 
   it("downloadFile never throws past the caller: a failed download toasts instead", () => {
+    vi.useFakeTimers();
     vi.spyOn(console, "error").mockImplementation(() => {});
     (URL as { createObjectURL?: unknown }).createObjectURL = vi.fn(() => {
       throw new Error("blocked");
@@ -1374,8 +1428,18 @@ describe("newTowerModal — the rule-set picker", () => {
 
 describe("event-log toast/bulletin pump (regression: froze at the cap; now a bounded rolling window)", () => {
   const LOG_DOM_CAP = 300; // mirror of the private cap in UI.ts
-  beforeEach(() => mountAppDom());
-  afterEach(() => vi.restoreAllMocks());
+  // The pump raises real toasts, so fake the clock as the toast suite does.
+  // Every assertion here is synchronous, so the fake clock changes nothing
+  // they observe.
+  beforeEach(() => {
+    mountAppDom();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   it("keeps toasting and appending the bulletin past the log cap — never freezes", () => {
     const { ui } = makeUI();
