@@ -65,7 +65,7 @@ export const INSTANCE_METHODS = [
   "statsSheet", "unitFacts", "serviceDiagnostics", "loadVctower", "exportVctower", "loadTdt", "tdtNote", "tdtTowerName",
   "adoptTdt", "tdtExport", "tdtFile",
   // PR 5's frame step and render queries.
-  "advance", "congestion", "queueView", "parkingSet", "parkingUsage", "recyclingFill", "positionReachable",
+  "advance", "congestion", "floorCongestion", "queueView", "parkingSet", "parkingUsage", "recyclingFill", "positionReachable",
   // PR 5e's tile bulldoze, rent batch quote, schedule read and founder mark.
   "demolishTile", "quoteRentBatch", "shaftSchedule", "founder",
   // The read-only Auto-tune proposal (#1550).

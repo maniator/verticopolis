@@ -66,6 +66,16 @@ impl Engine {
         c
     }
 
+    /// One floor's raw congestion ratio, 0 for a floor with no reading or a
+    /// floor that is not a whole number. It builds the spatial map, one pass
+    /// over the rooms, so it is a read for tests and tools (the frame uses
+    /// `port_congestion` and `port_hotspot`, which are kept).
+    pub(crate) fn port_floor_congestion(&self, floor: f64) -> f64 {
+        whole(floor)
+            .and_then(|f| self.sim.spatial_congestion_by_floor().get(&f).copied())
+            .unwrap_or(0.0)
+    }
+
     /// What the congestion answers read: the tower, the crowd step, the
     /// revision, the clock's minutes and the mark log's position.
     fn congestion_key(&self) -> CongestionKey {

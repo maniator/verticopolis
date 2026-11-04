@@ -188,6 +188,13 @@ impl Engine {
     pub fn recycling_demand_met(&self) -> bool {
         self.port_recycling_demand_met()
     }
+    /// The raw congestion ratio of one floor (0 for a floor with no reading
+    /// or one that is not a whole number): the value `hotspot` takes its peak
+    /// from.
+    #[wasm_bindgen(js_name = floorCongestion)]
+    pub fn floor_congestion(&self, floor: f64) -> f64 {
+        self.port_floor_congestion(floor)
+    }
     #[wasm_bindgen(js_name = positionReachable)]
     pub fn position_reachable(&mut self, floor: f64, x: f64) -> bool {
         self.port_position_reachable(floor, x)

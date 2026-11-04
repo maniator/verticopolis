@@ -205,6 +205,18 @@ export class PortSim {
     return this.leaf.elevatorUtilization(id);
   }
 
+  /** The raw congestion ratio of one floor, as the engine reports it. */
+  floorCongestion(floor: number): number {
+    return this.leaf.port.floorCongestion(floor);
+  }
+
+  /** The busiest floor's raw ratio and which floor it is (undefined when no
+   *  floor has a reading). */
+  hotspot(): { ratio: number; floor: number | undefined } {
+    const [ratio, floor] = this.leaf.port.hotspot();
+    return { ratio, floor: Number.isNaN(floor) ? undefined : floor };
+  }
+
   /** The engine's save text. */
   save(): string {
     return this.leaf.port.serialize();

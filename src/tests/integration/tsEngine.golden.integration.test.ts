@@ -12,6 +12,7 @@ import { MAX_SAVE_INFLATED_BYTES, TOWER_FILE_MAGIC, toBase64 } from "../../stora
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import { installTdtCodec } from "../conformance/tdtWasm";
 import { createPortUnitDiagnostics } from "../../game/portUnitDiagnostics";
+import { sameFloorCongestion } from "./goldenFloorCongestion";
 
 /**
  * The golden arrays (facade slice 7, PR 3): the Rust `Engine` and `TsEngine`
@@ -101,7 +102,7 @@ function sameReads(p: [EnginePort, EnginePort]): void {
   same(p, (e) => e.crewCoverage(), "crewCoverage");
   for (let m = 0; m < VIEW_LAYOUT.heatModes.length; m++) same(p, (e) => e.heatCells(m), `heat ${m}`);
   same(p, (e) => e.statsSheet(), "statsSheet");
-  same(p, (e) => e.congestion(), "congestion");
+  same(p, (e) => e.congestion(), "congestion"); sameFloorCongestion(p);
   same(p, (e) => e.queueView(), "queueView");
   same(p, (e) => e.parkingSet(), "parkingSet");
   for (const spots of [0, 3, 40, -1, NaN]) same(p, (e) => e.parkingUsage(spots), `parkingUsage ${spots}`);

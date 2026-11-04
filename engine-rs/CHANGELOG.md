@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.13.0 (2026-11-04)
+
+- New port query and binding method `floorCongestion(floor)`: the raw congestion ratio of one floor, the same value `hotspot` takes its peak from. A floor with no reading (empty, stranded, off the tower) and a floor that is not a whole number answer 0. It walks the rooms once per call, so it is a read for tests and tools; the frame keeps using `congestion` and `hotspot`, which are kept per step. The TypeScript engine answers it through `Simulation.congestionAt`. No saved-game, frame, view layout or catalog change.
+
 ## 1.12.0 (2026-11-04)
 
 - Two card verdicts now come from the engine. The `shaftCard` record gains a `nearCapacity` slot (1 when the shaft's average car load is above 85%, else 0; a shaft with no reading is 0), placed right after `utilization`, so the slots after it move up by one. A new read-only `recyclingDemandMet()` on the port and the binding answers whether the working recycling centers can process the whole population. The host used to compare the load with 0.85 and the population with the capacity itself. The transport detail the stats and inspector read also carries `nearCapacity`. The view layout is now version 11; the save and frame layouts and the catalog are unchanged.
