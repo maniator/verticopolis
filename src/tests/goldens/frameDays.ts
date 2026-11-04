@@ -141,7 +141,9 @@ export const FRAME_DAY_CASES: readonly FrameDayCase[] = [
   { id: "towerone_6 at speed 3 on the steady clock", start: { kind: "fixture", file: "towerone_6.vctower" }, speed: 3, steadyClock: true, frameTimes: FRAME_TIMES_MS },
 ];
 
-function begin(port: EnginePort, start: FrameDayStart): void {
+/** Load or found a case's tower the way the game does, over whatever tower
+ *  the port holds. The port-edit golden starts its cases the same way. */
+export function startTower(port: EnginePort, start: FrameDayStart): void {
   if (start.kind === "fixture") {
     swapDone(port, port.loadVctower(readFileSync(resolve(FIXTURE_DIR, start.file), "utf8")));
     return;
@@ -177,7 +179,7 @@ export function runFrameDay(leg: FrameDayLeg, c: FrameDayCase, afterStart?: () =
   // The placeholder tower the engine was made with is not the case's: its
   // events go, and the batch starts with the load's or the founding's own.
   drain([]);
-  begin(port, c.start);
+  startTower(port, c.start);
   const header = (JSON.parse(port.viewLayout()) as { header: Record<string, number> }).header;
   if (!Number.isInteger(header.minutes)) throw new Error(`${c.id}: the frame layout has no minutes slot`);
   // The frame loop reads a frame that is not full (only the rooms that

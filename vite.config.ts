@@ -264,6 +264,10 @@ function wasmParityProjects() {
     // Rust leg in the host suites, the TypeScript referee in the plain run.
     "**/conformanceWasmFrameDays.integration.test.ts",
     "**/frameDaysReferee.integration.test.ts",
+    // The port-edit golden, the same way: the Rust leg in the host suites,
+    // the TypeScript referee in the plain run.
+    "**/conformanceWasmPortEdits.integration.test.ts",
+    "**/portEditsReferee.integration.test.ts",
     // The card-text golden: the sweep loads each tower into the Rust engine
     // itself (in the host suites), and the TypeScript referee builds them on
     // the TypeScript engine on purpose (in the plain run).
