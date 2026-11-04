@@ -1,201 +1,65 @@
 # Copilot Instructions
 
-## Use BMAD-METHOD
+Verticopolis is a browser-native clone of SimTower (1994): a TypeScript app
+(Excalibur.js, Vite, Vitest) over a Rust/WASM simulation engine (`engine-rs/`),
+which is the engine the shipped game runs on.
+[`CONTRIBUTING.md`](../CONTRIBUTING.md) is the contributor guide and
+[`AGENTS.md`](../AGENTS.md) adds the agent layer. When this file disagrees with
+them, they win.
 
-This repo ships **BMAD-METHOD** skills and agents that are available to you,
-GitHub Copilot, under `.agents/skills/` (89 skills) and `.github/agents/*.agent.md`
-(custom agents for BMM, CIS, and BMGD). **Default to BMAD for non-trivial work**
-(planning, design, building, and review) instead of ad-hoc edits. The full
-routing guide (which skill/agent for which phase, and the BMGD game-dev flow that
-fits this project) lives in [`AGENTS.md`](../AGENTS.md) under "Use BMAD-METHOD for
-non-trivial work." Start with the `bmad-help` agent if you're unsure where to begin.
+## Reviewing a pull request
 
-## Project Context
+This file is the review method. Do these steps on every PR, in order:
 
-This is **Verticopolis**: a from-scratch, browser-native clone of the classic
-**SimTower** (1994). Build a high-rise floor by floor, wire it with elevators,
-attract tenants, keep them happy, and climb the star ratings to a **TOWER**.
+1. **Activate one review skill first, before any other tool call.** Use
+   `gds-code-review` when the diff touches gameplay or engine code
+   (`engine-rs/`, `src/engine/`, `src/render/`, `conformance/`, `src/storage/tdt*`,
+   economy, ratings, events, elevators, facilities, RNG). Use `bmad-code-review`
+   for everything else (other storage, tooling, build/CI, UI plumbing, docs). A mixed
+   diff uses `gds-code-review`. Both are in `.agents/skills/`.
+2. **Then, only if the diff touches `src/engine/`, `engine-rs/`, `conformance/`
+   or the save loaders (`src/storage/`), also activate `engine-parity-review`** (`.github/skills/`)
+   as a checklist. So a review activates one skill, or two when this step
+   applies, and never any other skill.
+3. **Run the skill's layers inline.** Read its `SKILL.md` and `steps/*.md` from
+   the checkout (`.agents/skills/<skill>/`). You cannot spawn subagents or run a
+   skill's scripts, so skip those steps and do the Blind Hunter, Edge Case Hunter
+   and Acceptance Auditor passes yourself. The review rules in
+   [`AGENTS.md`](../AGENTS.md) (Review guidelines) apply too.
+4. **Hot-path diff:** if it touches a surface in section 1 of
+   [`docs/performance/hot-path-review.md`](../docs/performance/hot-path-review.md),
+   apply items HP-1 to HP-12, trace callers in the repo, and print the section 6
+   table with one row per item. Mark each finding `patch` or `defer` (section 7),
+   pre-existing ones too. Review ported and moved code as new. Flag any dropped
+   or bypassed cache, index or counter (HP-8).
+5. **Check these dimensions,** with a few high-signal findings over filler:
+   correctness and edge cases (floor ranges, basements, null guards); engine
+   purity and determinism (no DOM, `Date.now` or `Math.random` in the sim;
+   rendering never mutates engine state); gameplay balance against the SimTower
+   model; untrusted saves and imports degrading gracefully; hot-path cost.
+6. **End the review with this exact line:**
+   `Reviewed against Verticopolis conventions (.github/copilot-instructions.md).`
 
-It is a single **TypeScript** application (not multiple implementations) built on
-the **[Excalibur.js](https://excaliburjs.com/)** game engine, bundled with
-**Vite**, and tested with **Vitest**. Every sprite is drawn procedurally in code
-(there are no external art assets), and the soundtrack is generated via WebAudio.
-
-## Architecture
-
-The codebase is layered, and the layering is load-bearing. Keep it intact:
-
-- `src/engine/`: **pure game simulation, no DOM or rendering.** Deterministic and
-  unit-tested. `Simulation` is the orchestrator; cohesive subsystems live in their
-  own modules (`ElevatorDispatch`, `EventSystem`, `EconomySystem`, `Crowd`,
-  `Tower`, `Clock`) and depend on the narrow `SimContext` interface so each is
-  testable in isolation. Facilities are defined in `facilities.ts`; the RNG
-  (`rng.ts`) is seeded for determinism, so don't reach for `Math.random()` here.
-- `src/render/`: canvas rendering and pixel-art sprites (incl. `render/excalibur/`).
-  Reads engine state, **never mutates it.**
-- `src/ui/`: DOM controls (palette, status bar, dialogs); uses native `<dialog>`.
-- `src/audio/`, `src/storage/`: sound and save/load, independent of rendering.
-- `src/main.ts`: wires everything together (input, game loop).
-- `src/tests/`: Vitest fixtures and integration suites (`*.integration.test.ts`);
-  unit tests colocate next to their source (`foo.ts` + `foo.test.ts`).
-
-**Golden rule:** keep `src/engine/` free of DOM/rendering concerns so it stays
-deterministic and testable. Rendering and UI read engine state; they don't drive it.
-
-## Scripts
-
-```bash
-npm run dev          # Vite dev server
-npm run build        # production build to dist/ (needs the engine package; see below)
-npm test             # Vitest suite
-npm run typecheck    # tsc --noEmit
-npm run lint         # eslint
-npm run screenshots  # build + headless screenshot capture into docs/screenshots
-```
-
-## Quality gates (run before pushing)
+## Rules for code you write or review
 
 ```bash
 npm run typecheck && npm run lint && npm test && npm run build
 ```
 
-`npm run build` refuses a build without the WASM engine package
-(`src/public/engine/`, built by `npm run wasm:build`). When the setup steps
-could not build it, they set `VC_ALLOW_NO_ENGINE=1` for the setup build. If
-your own `npm run build` stops for the missing engine, run it as
-`VC_ALLOW_NO_ENGINE=1 npm run build` (a deliberate build without the engine, which cannot run the game);
-see CONTRIBUTING.md.
+All four pass before pushing. `npm run build` needs the engine package
+(`npm run wasm:build`), or `VC_ALLOW_NO_ENGINE=1` for a build that cannot run the
+game. Copilot reviews are one-shot snapshots, so re-request one after pushing
+fixes for its findings.
 
-CI (`.github/workflows/test.yml`) runs all of the above on every PR. When you push
-new commits to a PR, **re-request a Copilot review**. Copilot reviews are one-shot
-snapshots and won't pick up later commits on their own.
-
-**CI/test configuration testing policy:** Do not add test files or assertions
-that read workflow YAML, `playwright.config.ts`, Vitest config, or other test
-configuration to match exact source text, flags or steps. Do not relocate a
-text-matching guard to another file. Validate the actual runner configuration
-and CI results, and correct an overstated PR description rather than adding a
-decorative guard. See `CONTRIBUTING.md` → **Quality gates** for the full rule.
-
-## GitHub PR Review: BMGD/BMAD review method
-
-Run this repo's mandatory deep review on **every** PR. GitHub always applies this
-file (`.github/copilot-instructions.md`) to Copilot code review, so this overlay
-**is** the review method. Reproduce the behavior of the BMGD/BMAD review skills;
-don't claim a skill was invoked:
-
-- **Route by changed files:** apply the `gds-code-review` lens to gameplay/engine
-  work (`src/engine/`, `src/render/`, mechanics, economy, ratings, events,
-  elevators, facilities, RNG) and the `bmad-code-review` lens to everything else
-  (storage/persistence, tooling, build/CI, UI plumbing, docs). A
-  **mixed diff** runs both, each scoped to the files it owns; when one judgment is
-  needed, default to the gameplay/engine lens if any such file is touched.
-- **Run the adversarial layers:** Blind Hunter → Edge Case Hunter → Acceptance
-  Auditor, then a `bmad-party-mode` synthesis over only the personas the diff
-  implicates.
-- **Deepen from the real skill when useful.** The repo is checked out, so you can
-  read the full method even though the loader dropped it (see the maintainer note
-  below): open `.agents/skills/gds-code-review/SKILL.md` for a gameplay/engine
-  diff, or `.agents/skills/bmad-code-review/SKILL.md` otherwise, plus their
-  `steps/*.md`, and follow them. You **cannot** run their scripts (no shell) or
-  spawn their subagents (you are a single, read-only agent), so apply the steps
-  inline yourself rather than invoking anything.
-- **Apply the review dimensions in the “Code review” section below,** scoped to
-  the implicated lenses. Prefer a few high-signal findings over filler.
-- **On a hot-path diff, run the hot-path checklist**: a diff that touches any
-  surface section 1 of
-  [`docs/performance/hot-path-review.md`](../docs/performance/hot-path-review.md)
-  lists.
-  Apply items HP-1 to HP-12 inline, as the skills' Hot-Path Auditor layer
-  would, reading callers in the checked-out repository, and print the section
-  6 table with one row per item. See the Performance dimension below.
-- **Include in every review (ideally as the last line) the exact marker**
-  `Reviewed against Verticopolis conventions (.github/copilot-instructions.md).`
-  so it stays reliably searchable as confirmation this overlay was applied, even
-  if a template or postamble appends text after it.
-
-> **Maintainer note on agent skills.** Copilot code review loads this repo's
-> skills from `.agents/skills/` (the run log for #861 on 2026-10-08 reports
-> `catalogEntries=89`, and the reviewer invoked `gds-code-review` and
-> `bmad-code-review` from there). An earlier note here said the loader's
-> file budget dropped every skill; that was true on 2026-07-06 and is not
-> anymore. `.github/skills/engine-parity-review/SKILL.md` adds the
-> repo-specific checklist for a change on the TypeScript and Rust engine
-> seam (the two-engine rule, the lock, the loader table, the canon caps);
-> the overlay above stays the review method either way.
-
-## Code review
-
-Reviews here are expected to be **deep, not a surface skim**. A green pipeline is
-never enough to merge. On every review, look across *all* of these dimensions, not
-just the obvious lines in the diff, and flag anything CI wouldn't catch:
-
-- **Correctness & edge cases:** wrong conditions, off-by-one, null/undefined,
-  floor/boundary ranges, missing guards, broken call sites, multi-floor/basement
-  edge placements.
-- **Engine purity & determinism:** `src/engine/` must stay DOM/render-free and
-  deterministic (no `Date.now`/`Math.random`/wall-clock in the sim); rendering
-  reads engine state and never mutates it.
-- **Gameplay balance & player-feel:** economy, ratings, and emergency tuning
-  (fires, bombs, events) should be fair across the star curve and match the
-  SimTower parity model; watch for dead spots and exploits.
-- **Security:** untrusted input (saves, persistence) must degrade
-  gracefully and never crash or trust foreign data.
-- **Performance on hot paths:** apply the same checklist to every surface its
-  section 1 lists (the app shell included). Flag whole-collection walks, route
-  searches, clones, sorts, rebuilt maps and id scans under any HP-2
-  multiplier, in either language and inside helpers. Review ported, rewritten,
-  moved and inherited code as new. Flag a change that drops, removes or
-  bypasses a cache, index or counter either engine has, and check a port
-  against the TypeScript's caches (HP-8). Report each finding for resolution under section 7, marked `patch`
-  or `defer`, pre-existing ones too (naming the open issue that lists one, if
-  any).
-
-See [`CONTRIBUTING.md`](../CONTRIBUTING.md) → "Code review" for the
-deep-review-before-merge policy every change must meet;
-[`AGENTS.md`](../AGENTS.md) → "Code review: the agent workflow" adds the
-BMAD/BMGD review skill plus the relevant architect / designer / UX / security
-agents, convened as a party for larger changes.
-
-## Conventions
-
-- **American English everywhere:** code, comments, identifiers, strings, commit
-  messages, UI copy. Note: `story`/`stories` for floors (not `storey`/`storeys`).
-- **No em-dashes in prose** (player-facing copy, docs, comments, commit and PR
-  text) in anything new you write. Use commas, colons, parentheses, or separate
-  sentences instead. Two standing exceptions: en-dashes in numeric ranges
-  (`2–5`, floors `30–60`), and the standalone "—" empty-value placeholder glyphs
-  in the stats/editor panels. Existing `src/` code comments are grandfathered;
-  don't sweep them, but don't add new em-dashes either. Skip the "X, not Y"
-  emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
-  robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
-  human, and grammatically correct.
-- Match the surrounding code's formatting, naming, and comment density.
-- **Readable conditions and semantic flags:** at gameplay, UI, and feature
-  call sites, spell out the domain meaning. Reject opaque replacements such as
-  `done: bit(0)`, `if (flags & 4)`, and `check(2)` when the number is a
-  hidden domain fact. Prefer `facts.lobbyBuilt` or
-  `hasOnboardingFact(bits, "lobbyBuilt")` with one named, tested mapping to
-  the wire layout. Numeric positions are appropriate inside codecs,
-  serialization, dispatch bitsets, and deliberately low-level tests, but
-  should not leak into player-facing decisions. During review, compare the
-  changed call site to the old one and flag any loss of readable intent.
-  See `AGENTS.md` for the full rule.
-- **A published analytics number comes from a governed definition, or from
-  reviewed code that a test binds to one.** What is banned is improvising a
-  measure in a session and publishing it. The governed sources are the
-  "Verticopolis: Gameplay Analytics" dashboard, the `session_lengths` view, its
-  saved insights, and the PostHog data catalog; check the catalog first.
-  `scripts/posthog-report.mjs` is the worked example of the second clause: it
-  writes its own HogQL, and `src/posthog-report.test.ts` pins its page-life walk
-  against the view's copy so the two cannot drift. A published snapshot states
-  its window above the figures, not in a footer. Full rule and the incident
-  behind it: [`CLAUDE.md`](../CLAUDE.md) non-negotiables.
-- Adding a facility/room type? Start in `src/engine/facilities.ts`, then thread it
-  through rendering and UI. Don't special-case it in the render layer.
-
-[`CONTRIBUTING.md`](../CONTRIBUTING.md) is the canonical contributor guide (dev
-setup, quality gates, architecture, versioning, merge policy, code-review
-expectations); [`AGENTS.md`](../AGENTS.md) adds the agent layer on top (BMAD
-workflow, gameplay model, the mandatory review skill). When this file and those
-disagree, **they win**. Prefer updating them over duplicating detail here.
+- Do not add tests that match workflow YAML, Playwright or Vitest config text
+  (`CONTRIBUTING.md` → Quality gates).
+- American English everywhere. No new em-dashes in prose, no "X, not Y"
+  restatements, no AI marketing vocabulary. Keep copy plain.
+- Keep gameplay and UI conditions readable: reject `done: bit(0)` or
+  `flags & 4` where the number hides a domain fact. Use one named flag or
+  predicate per fact. Numeric positions are fine inside codecs, serialization,
+  dispatch bitsets and deliberately low-level tests (`AGENTS.md`).
+- A published analytics number comes from a governed definition or from tested
+  code bound to one (`CLAUDE.md` non-negotiables).
+- A new facility starts in `src/engine/facilities.ts` (and the Rust catalog),
+  never as a render-layer special case.
