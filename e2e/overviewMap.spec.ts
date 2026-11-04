@@ -170,6 +170,53 @@ test.describe("overview map on the desktop", () => {
     await expect.poll(cursor).not.toBeNull();
   });
 
+  test("on a narrow desktop the hint sits above the open map, clear of the Getting Started card (#1735)", async ({ page }) => {
+    for (const size of [
+      { width: 768, height: 600 },
+      { width: 1050, height: 700 },
+      // Wider, the hint moves only while the card is up, where a long step
+      // still wraps to two lines.
+      { width: 1280, height: 720 },
+    ]) {
+      await page.setViewportSize(size);
+      await boot(page);
+      await page.evaluate(() => {
+        const g = (window as any).game;
+        g.onboarding.arm(g.enginePort);
+        // The longest step's hint, so the check covers the most lines.
+        document.getElementById("hint")!.textContent = "x ".repeat(82);
+      });
+      await expect(page.locator("#onboard")).toBeVisible();
+      await expect(page.locator("#overview-map")).toBeVisible();
+      const box = await page.evaluate(() => {
+        const r = (id: string) => document.getElementById(id)!.getBoundingClientRect().toJSON();
+        return { hint: r("hint"), map: r("overview-map"), card: r("onboard"), stage: r("stage") };
+      });
+      const at = `${size.width}x${size.height}`;
+      const hit = (a: DOMRect, b: DOMRect) => a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
+      expect(box.hint.height, at).toBeGreaterThan(0);
+      expect(hit(box.hint, box.card), at).toBe(false);
+      expect(hit(box.hint, box.map), at).toBe(false);
+      // Just above the map and lined up with it, inside the world view.
+      expect(box.hint.bottom, at).toBeLessThanOrEqual(box.map.top);
+      expect(box.map.top - box.hint.bottom, at).toBeLessThan(16);
+      expect(Math.abs(box.hint.right - box.map.right), at).toBeLessThan(2);
+      expect(box.hint.top, at).toBeGreaterThan(box.stage.top);
+    }
+  });
+
+  test("on a short desktop window the hint stays at the bottom, inside the world view", async ({ page }) => {
+    await page.setViewportSize({ width: 1100, height: 450 });
+    await boot(page);
+    await expect(page.locator("#overview-map")).toBeVisible();
+    const box = await page.evaluate(() => {
+      const r = (id: string) => document.getElementById(id)!.getBoundingClientRect().toJSON();
+      return { hint: r("hint"), stage: r("stage") };
+    });
+    expect(box.hint.top).toBeGreaterThanOrEqual(box.stage.top);
+    expect(box.stage.bottom - box.hint.bottom).toBeLessThan(16);
+  });
+
   test("the open map clears the sidebar, the palette and the heatmap control and legend", async ({ page }) => {
     // The smallest desktop layout (narrower is the phone layout) and 1280 by 720.
     for (const size of [
