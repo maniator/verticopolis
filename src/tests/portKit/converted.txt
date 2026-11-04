@@ -13,6 +13,7 @@ src/tests/integration/elevatorStats.integration.test.ts
 src/tests/integration/trafficTeeth.integration.test.ts
 src/tests/integration/onboarding.integration.test.ts
 src/tests/integration/cardVerdicts.integration.test.ts
+src/tests/integration/storageEngineSave.integration.test.ts
 src/tests/integration/traffic.integration.test.ts
 src/tests/integration/heatmap.integration.test.ts
 src/tests/integration/venueOccupancy.integration.test.ts

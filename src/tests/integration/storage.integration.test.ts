@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { deflateSync } from "fflate";
-import { SAVE_VERSION, Simulation, ECON } from "../../engine/Simulation";
+import { SAVE_VERSION, Simulation } from "../../engine/Simulation";
 import { SaveGame } from "../../storage/SaveGame";
 import { toBase64, deflate } from "../../storage/saveCompression";
 import { FACILITIES, GRID } from "../../engine/facilities";
 import { UNIT_CAP } from "../../engine/sim/deserializeGuards";
-import { itTypeScriptOnly } from "../parity/typescriptOnly";
 import { saveOf, loadAuto, loadResultSim, loadSlotSim } from "../fixtures/saveText";
 
 describe("SaveGame", () => {
@@ -26,44 +25,6 @@ describe("SaveGame", () => {
     return sim;
   }
 
-  itTypeScriptOnly("writes vipVisitDay on the instance after the ticks and reads serialize(), which is the engine's save while hosted")("persists the pending VIP inspection day across save/load", () => {
-    const sim = sampleGame();
-    // Simulate a Wedding Hall having scheduled the VIP a few days out.
-    (sim as unknown as { vipVisitDay: number }).vipVisitDay = sim.clock.day + 3;
-    const expected = (sim as unknown as { vipVisitDay: number }).vipVisitDay;
-    const loaded = Simulation.deserialize(sim.serialize());
-    expect((loaded as unknown as { vipVisitDay: number }).vipVisitDay).toBe(expected);
-  });
-
-  itTypeScriptOnly("writes vipVisits and vipFavorable on the instance after the ticks and reads serialize(), which is the engine's save while hosted")("persists the VIP visit counter, hardens forged values, and adopts visits for legacy saves", () => {
-    const sim = sampleGame();
-    sim.vipVisits = 3;
-    sim.vipFavorable = true;
-    expect(Simulation.deserialize(sim.serialize()).vipVisits).toBe(3);
-    // Forged counter: negative / non-finite / absurd values clamp. A PRESENT
-    // field never triggers the legacy adopt, so serialize -> deserialize stays
-    // idempotent even for a hand-set favorable-with-zero state.
-    const data = sim.serialize();
-    (data as { vipVisits: unknown }).vipVisits = -5;
-    expect(Simulation.deserialize(data).vipVisits).toBe(0);
-    (data as { vipVisits: unknown }).vipVisits = NaN;
-    expect(Simulation.deserialize(data).vipVisits).toBe(0);
-    (data as { vipVisits: unknown }).vipVisits = 1e300;
-    expect(Simulation.deserialize(data).vipVisits).toBe(1_000_000);
-    (data as { vipVisits: unknown }).vipVisits = 0;
-    expect(Simulation.deserialize(data).vipVisits).toBe(0);
-    // A save written before the counter existed: the favorable review proves
-    // one visit, a won tower two (its winning TOWER inspection also counted)...
-    delete (data as { vipVisits?: unknown }).vipVisits;
-    expect(Simulation.deserialize(data).vipVisits).toBe(1);
-    (data as { evaluatedTower: unknown }).evaluatedTower = true;
-    expect(Simulation.deserialize(data).vipVisits).toBe(2);
-    // ...and with neither flag it stays at 0.
-    (data as { evaluatedTower: unknown }).evaluatedTower = false;
-    (data as { vipFavorable: unknown }).vipFavorable = false;
-    expect(Simulation.deserialize(data).vipVisits).toBe(0);
-  });
-
   it("coerces non-finite unit fields from a tampered save to safe values", () => {
     const sim = sampleGame();
     const data = sim.serialize();
@@ -76,73 +37,6 @@ describe("SaveGame", () => {
     expect(u.satisfaction).toBeGreaterThanOrEqual(0);
     expect(u.satisfaction).toBeLessThanOrEqual(1);
     expect(Number.isFinite(u.occupants)).toBe(true);
-  });
-
-  itTypeScriptOnly("writes star on the instance after the ticks and reads serialize(), which is the engine's save while hosted")("coerces forged top-level scalars (star, money, clock) from a tampered save to sane bounded values", () => {
-    const sim = sampleGame();
-    sim.star = 3;
-    sim.money = 1_234_567;
-    const goodMinutes = sim.clock.minutes;
-    // A valid save round-trips these scalars untouched (coercion is a no-op on
-    // legal values, so idempotence and the golden master stay intact).
-    const clean = Simulation.deserialize(sim.serialize());
-    expect(clean.star).toBe(3);
-    expect(clean.money).toBe(1_234_567);
-    expect(clean.clock.minutes).toBe(goodMinutes);
-
-    // star: a forged NaN / out-of-range value clamps to the real ladder (1..6).
-    for (const [bad, want] of [
-      [NaN, 1],
-      [0, 1],
-      [99, 6],
-      [-4, 1],
-      ["5" as unknown as number, 1],
-    ] as const) {
-      const data = sim.serialize();
-      (data as { star: unknown }).star = bad;
-      const loaded = Simulation.deserialize(data);
-      expect(Number.isFinite(loaded.star)).toBe(true);
-      expect(loaded.star).toBe(want);
-    }
-
-    // money: a forged non-finite / non-number never poisons the bank with NaN;
-    // it falls back to the constructor's starting balance (pins the fallback so
-    // a mutation to `: 0` is caught, not just "finite"). The expected value is
-    // the live constructor default (ECON.startingMoney), so a retune of the
-    // starting balance can never leave a stale literal passing for the wrong
-    // reason.
-    for (const bad of [NaN, Infinity, -Infinity, "1000" as unknown as number, undefined as unknown as number]) {
-      const data = sim.serialize();
-      (data as { money: unknown }).money = bad;
-      const loaded = Simulation.deserialize(data);
-      expect(Number.isFinite(loaded.money)).toBe(true);
-      expect(loaded.money).toBe(ECON.startingMoney); // constructor default
-    }
-    {
-      const data = sim.serialize();
-      (data as { money: unknown }).money = -50_000; // legal debt (the sign) round-trips intact
-      expect(Simulation.deserialize(data).money).toBe(-50_000);
-    }
-
-    // clock: a forged NaN / negative / Infinity / non-number falls back to 0,
-    // which the Clock ctor maps to the 07:00 founding time (pins the fallback).
-    for (const bad of [NaN, -100, Infinity, -Infinity, "600" as unknown as number, undefined as unknown as number]) {
-      const data = sim.serialize();
-      (data as { minutes: unknown }).minutes = bad;
-      const loaded = Simulation.deserialize(data);
-      expect(Number.isFinite(loaded.clock.minutes)).toBe(true);
-      expect(loaded.clock.minutes).toBeGreaterThanOrEqual(0);
-      expect(loaded.clock.minutes).toBe(7 * 60); // fallback 0 -> 07:00 founding
-      // A ticked-forward load must not throw on any clock consumer.
-      expect(() => loaded.tick(60)).not.toThrow();
-    }
-    // A legitimate fractional minute count round-trips exactly: real play
-    // accumulates sub-minute steps, so the coercion must not floor a valid save.
-    {
-      const data = sim.serialize();
-      (data as { minutes: unknown }).minutes = 420.5;
-      expect(Simulation.deserialize(data).clock.minutes).toBe(420.5);
-    }
   });
 
   it("drops null/malformed unit and transport entries from a corrupt save without throwing", () => {
@@ -1019,23 +913,6 @@ describe("SaveGame", () => {
     expect(loaded.serialize().version).toBe(SAVE_VERSION);
   });
 
-  itTypeScriptOnly("compares the units JSON bytes of the engine's save (the hosted serialize()) with the TypeScript serializer's, which orders a unit's keys differently")("migrates a v3 save up the ladder (venue-census bump): re-stamps version, tower intact", () => {
-    // v3 -> v4 is additive/no-op data-wise: the meal-customer census reads a
-    // transient overlay that is never serialized, so a v3 save is already valid
-    // v4 data. The migration only re-stamps the version; the tower round-trips
-    // unchanged and does not fall through the "newer than this build" path.
-    const sim = sampleGame();
-    const data = sim.serialize();
-    (data as { version: number }).version = 3;
-    const beforeUnits = JSON.stringify(data.units);
-    const loaded = Simulation.deserialize(data);
-    expect(loaded.serialize().version).toBe(SAVE_VERSION);
-    expect(loaded.money).toBe(sim.money);
-    expect(loaded.tower.totalPopulation()).toBe(sim.tower.totalPopulation());
-    // Units survive the hop byte-for-byte (only the version stamp changed).
-    expect(JSON.stringify(loaded.serialize().units)).toBe(beforeUnits);
-  });
-
   it("drops units with an unrecognized kind on load", () => {
     const sim = sampleGame();
     const data = sim.serialize();
@@ -1118,8 +995,8 @@ describe("SaveGame", () => {
     // the provenance-stamp -> detection wiring is exercised end-to-end via the
     // real import path (which calls markFounderFromLoadedFile), not a hand-stamped
     // object handed straight to deserialize().
-    async function importWith(sim: Simulation, appVersion?: string): Promise<Simulation> {
-      const data = sim.serialize() as unknown as Record<string, unknown>;
+    async function importWith(sim: Simulation, appVersion?: string, fields: Record<string, unknown> = {}): Promise<Simulation> {
+      const data = { ...(sim.serialize() as unknown as Record<string, unknown>), ...fields };
       if (appVersion === undefined) delete data.appVersion;
       else data.appVersion = appVersion;
       const text = "VCTOWER1\n" + toBase64(await deflate(new TextEncoder().encode(JSON.stringify(data)))) + "\n";
@@ -1138,10 +1015,9 @@ describe("SaveGame", () => {
       expect((await importWith(sampleGame(), "2.4.1")).founder).toBe(false);
     });
 
-    itTypeScriptOnly("writes founder on the instance after the ticks and reads serialize(), which is the engine's save while hosted")("keeps Founder on an imported 2.0+ save that carries the earned flag", async () => {
-      const sim = sampleGame();
-      sim.founder = true; // a pre-2.0 tower re-saved in 2.0: stamp is 2.x but the flag persists
-      expect((await importWith(sim, "2.4.1")).founder).toBe(true);
+    it("keeps Founder on an imported 2.0+ save that carries the earned flag", async () => {
+      // A pre-2.0 tower re-saved in 2.0: the stamp is 2.x but the flag persists.
+      expect((await importWith(sampleGame(), "2.4.1", { founder: true })).founder).toBe(true);
     });
   });
 });
