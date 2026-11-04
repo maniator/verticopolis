@@ -1,6 +1,10 @@
 # Story: facade slice 6c, the engine's diagnostics facts (#1215)
 
-Status: in-progress (PR 1 of 4, the tenant family)
+Status: done with #1811 (2026-11-04). PR 1 (#1255) moved the tenant family;
+families 2 to 4 landed as their own reads (the service facts, #1564 and #1569,
+the retail block's catalog match, #1616, the card verdicts, #1756, and the
+port's `shaftCard`), and #1811's corpus differential below compares them
+(closes #1215).
 
 Tracking: #1207 (the Rust-backed facade, AD-9), parent #945. Plan: `slice-plan.md`
 and `ARCHITECTURE-REVIEW.md` in
@@ -22,7 +26,11 @@ shows the same facts the healthy path does.
 The facts behind `src/game/facilityDiagnostics.ts`, `src/game/gripeCopy.ts` and
 `src/game/housekeepingDiagnostics.ts` (786 lines, the "790" of the plan) move
 into a new engine module, `engine-rs/src/diagnostics/`, behind one binding
-getter. The TypeScript keeps the wording. This slice changes no wording, no
+getter. The TypeScript keeps the wording. That held for PR 1
+(`diagnosticFacts`). Families 2 to 4 did not extend it: each PR that moved one
+shipped its own read (the keyed `serviceDiagnostics` facts, the port's
+`shaftCard` and the three recycling reads), and this story records what
+landed in its completion notes. This slice changes no wording, no
 simulation behavior and no conformance hash; moving the panel onto the getter is
 slice 4's (panels through the port) and slice 7's (`RustSim`).
 
@@ -50,7 +58,11 @@ crate minor bump and review:
    engine helpers `facilityDiagnostics` calls, with its gating) for every room on
    every checkpoint of every conformance scenario, run on each engine in turn
    and compared read by read, plus targeted constructed towers for the
-   branches the corpus does not reach. Floats compare exactly.
+   branches the corpus does not reach. Floats compare exactly. Families 2
+   to 4 shipped their own reads (see Scope), so their reference is the
+   TypeScript port's `serviceDiagnostics` (`src/engine/port/reports.ts`), its
+   `shaftCard` (`src/engine/port/queries.ts`) and the `Simulation`'s three
+   recycling reads; `tsDiagnosticFacts` and `inspectorAgreement` are PR 1's.
 3. The story records the branch coverage the corpus and the targeted towers
    reach in the compared TypeScript reference, and names any branch left out.
 4. The getter is read-only for the simulation: every conformance scenario run
@@ -97,9 +109,8 @@ tenant here would soon give notice" for the rest.
 | `notice` | vacating with a reason | `reason`, `minutesLeft` (never negative), `satisfaction`, `keepAt` (`VACATE_RESCIND`) |
 
 The getter decides the facts; `gripeCopy`'s table, the sky lobby phrasing, the
-countdown's rounding and every color stay in TypeScript. The later families add
-`shoppers`, `retail`, `hotel`, `housekeeping`, `parking`, `recycling` and a
-transport getter, each specified in its PR.
+countdown's rounding and every color stay in TypeScript. The later families did not add sections here; they landed as
+their own reads (see the completion notes).
 
 ## Design notes
 
@@ -239,6 +250,24 @@ TypeScript adapter can adopt when slice 4 needs a facts query on the fallback.
   `VC_REQUIRE_WASM=1 npx vitest run --project integration conformanceWasmDiagnostics --coverage --coverage.include=<file> --coverage.exclude=nothing --coverage.reporter=text`
   (thresholds set to 0 for the run).
 
+
+- Families 2 to 4 (#1811), TypeScript
+  (`src/tests/integration/conformanceWasmDiagnosticsServices.integration.test.ts`,
+  matched by `test:wasm`'s `conformanceWasm` filter): every scenario runs on
+  each engine with every room's `serviceDiagnostics`, the first floor tile's
+  and the first lobby tile's, every shaft's `shaftCard` and the tower's three
+  recycling reads taken before each checkpoint hash and on both sides of each
+  reload; the two runs must agree read for read, and both must still match
+  the lock. A read that raises a gameplay event no later hash would see fails
+  the run. A last test fails if the corpus reaches a section it did not reach
+  when this was recorded, or stops reaching one.
+- Families 2 to 4, constructed towers
+  (`src/tests/integration/portServiceDiagnostics.integration.test.ts`): fixture
+  saves loaded into both ports for what the corpus lacks, compared side by
+  side: a parking stall exactly covering the offices' cars and one office
+  past it (the ramp too), an excluded hotel that is infested, a recycling
+  center over capacity (capacity, fill and verdict), and ids that name no
+  unit.
 ## Hot-path plan (HP-7)
 
 Entry point: the inspector and the mobile editor panel, refreshed about every
@@ -280,15 +309,19 @@ record has no live caller to trace. Two items carry to the slices that wire it:
   #1246 (#1143 item 2).
   Beyond those, the getter adds call sites of one walk, where the TypeScript
   inspector makes the same one: the nightclub halo (`gripeCopy`'s
-  `nearNightclub`), which A13's per-pass list answers too. The backlog's
-  #1237 row carries the gate: no PR gives the getter a production caller
-  until #1158's A13, A14 and A33 are on `main`, or the owner accepts the
-  deferral on that PR.
+  `nearNightclub`), which A13's per-pass list answers too. The gate this
+  section set (no production caller until #1158's A13, A14 and A33 are on
+  `main`, or the owner accepts the deferral on that PR) sat on the backlog's
+  #1237 row, which is done (2026-11-03). The card has since read the tenant
+  facts in production through the port's `unitFacts` (built from
+  `diagnostic_facts`, `engine-rs/src/wasm_port_reports.rs`), while A13, A14
+  and A33 are still open on #1158, so the gate no longer holds as written;
+  the walks it named stay deferred by reference there.
 
 ## Coordination
 
-- Slice 6b owns `housekeeping_coverage` and any elevator utilization read; PR 3
-  and PR 4 call them.
+- Slice 6b owns `housekeeping_coverage` and any elevator utilization read; the
+  service facts (#1564) and the port's `shaftCard` call them.
 - The step-hotspot lane owns `sim.rs` reachability, `tower_query.rs` and
   `housekeeping.rs`; this slice only adds a memo field to `Simulation` (told to
   that lane) and makes `near_nightclub` crate-visible in `satisfaction.rs`.
@@ -346,8 +379,9 @@ PR 1 (tenants):
     floors from the nearest lobby, past the capped band in both modes) and
     the sinking copy with no slot, which the card itself calls unreachable at
     the current geometry. The other misses are lines of the later families:
-    the parking demand line (line 40, PR 4), recycling capacity (PR 4), the
-    retail block (PR 2) and the transport load line (PR 4).
+    the parking demand line (line 40, family 4), recycling capacity (family
+    4), the retail block (family 2) and the transport load line (family 4),
+    which landed as their own reads (below).
 - The card check (`inspectorAgreement`) finds no disagreement on any read of
   the corpus or the towers, with each line's copy checked against the fields
   that choose it.
@@ -358,6 +392,81 @@ PR 1 (tenants):
 - Not compared by the differential: the escalator and walkway congestion
   bindings (a full floor of offices does not crowd an escalator), which share
   the binding name mapping with the stairs and elevator cases.
+
+Families 2 to 4 (venues, hotels and housekeeping, services and transport):
+
+- They landed outside this slice's PR order, as the typed service facts
+  (`serviceDiagnostics`, `engine-rs/src/diagnostics/service.rs`, #1564: hotel,
+  parking and housekeeping), the retail block matched to the catalog with the
+  venue's lobby distance restored (#1616, for #1614 and #1615), the retail
+  facts themselves (#1569, for #1568), the recycling and near-capacity
+  verdicts (#1756, for #1420) and the port's `shaftCard` (the elevator load,
+  from 6b's utilization read). The TypeScript keeps the wording
+  (`src/game/portServiceDiagnostics.ts`, `src/game/recyclingDiagnostics.ts`).
+- AC 7 is unmet for two of them. #1564 and #1569 were merged by the owner
+  with no `/gds-code-review` run and no HP-1 to HP-12 record posted on
+  either PR. #1569 has an independent review's GO and a Copilot review on
+  it; #1564 has neither, since Copilot and Codex were rate limited that day.
+  #1215 closes on the owner's acceptance of that. #1811's own review covers
+  the comparison it adds and none of the engine code those two PRs shipped.
+- `src/tests/integration/conformanceWasmDiagnosticsServices.integration.test.ts`
+  is their corpus differential, the counterpart of PR 1's: on all 25
+  scenarios, at each of the 611 checkpoints and on both sides of each of the
+  8 reloads (627 reads per engine), every room's `serviceDiagnostics`, the
+  first floor tile's and the first lobby tile's, every shaft's `shaftCard`
+  and the tower's three recycling reads equal the TypeScript reference's
+  (`serviceDiagnostics` in `src/engine/port/reports.ts`, `shaftCard` in
+  `src/engine/port/queries.ts` and the `Simulation` recycling reads), with
+  every pinned hash unchanged on both engines. The figures below are the
+  test's `afterAll` line on the final branch (a snapshot of 2026-11-04; the
+  test prints the live ones). By section, the corpus compared hotels
+  (counting toward the rating: 48,631 neither dirty nor infested, 16,137
+  dirty, 3,856 infested; excluded: 27,473 neither dirty nor infested, 13,765
+  dirty), parking (40,753 connected, 785 disconnected, 1,605 ramps),
+  housekeeping (4,853 adequate, 142 observed shortfalls, 2 nominal
+  shortfalls), retail (6,307 active reads: tiers 1,301 no data, 1,270 low,
+  787 average, 2,949 booming; advice 2,054 none, 4,091 under-served, 162
+  over-built; 627 in rain), the venue's lobby distance (2,069 too far, 5,639
+  near), the shafts (10,216 cards: 2,284 with a load reading, 2 of them near
+  capacity, 32 idle, and 7,900 with no load reading, which stairs and
+  escalators give),
+  recycling (317 reads with a center built, all with demand met and the bins
+  filling) and service rooms in a fire, gutted or under construction (103:
+  20 parking, 61 fast food, 4 cinemas, 4 shops and 2 each of amusements,
+  boutique bays, daycares, food halls, nightclubs, sky bars and spas), whose
+  service sections read as not applicable on both engines.
+- What the corpus does not reach, and where it is checked instead, all on
+  fixture saves loaded into both ports and compared side by side in
+  `src/tests/integration/portServiceDiagnostics.integration.test.ts`: a
+  parking shortage (pinned at its threshold: one stall exactly covering the
+  offices' cars, then one office more, for the stall and the ramp); an
+  excluded hotel that is infested; recycling over capacity (24 floors of
+  offices on one center, in each mode: capacity, fill and verdict); and ids
+  that name no unit (missing, negative, fractional, not finite, out of range
+  and past 2^32), which both engines answer with `undefined` and an empty
+  shaft card. The binding
+  turns any JavaScript value into a number before the engine sees it, so a
+  string or an object cannot be asked of the Rust port apart from the number
+  it becomes; the port's type keeps one out. Not reached anywhere: an inert
+  ramp or housekeeping station (its section reads as not applicable by the
+  same gate the corpus does reach for parking).
+- Not measured on the corpus: the card's printed lines for these families.
+  The corpus differential compares the facts the card words; the wording
+  itself is compared on constructed towers by the card-text sweep
+  (`src/tests/integration/cardTextParity.integration.test.ts`).
+- Branch coverage of the reference (v8 branch counts, measured on the final
+  branch with the command under Tests and `--coverage.include` on the three
+  reference files), the corpus differential alone and then with
+  `portServiceDiagnostics`: `serviceDiagnostics` 75 of 80, then 77 of 80;
+  `shaftCard` 16 of 18, then 18 of 18; `commercialFacts` 5 of 5 and
+  `recyclingFill` 2 of 2 both times. The fixtures add the malformed-id guard
+  of each. The capacity and demand reads have no branch, and the
+  `countOperational` walk they share takes 5 of 6: its other arm is for a
+  floor or lobby kind, and recycling is a room. Left in `serviceDiagnostics`:
+  the two `baseline > 0` fallbacks (a priced venue's baseline is always
+  positive: the guard above requires a positive spend and a daily income,
+  and no catalog entry has a daily income of 0) and a profit recorded with
+  no patronage, which no write produces.
 
 ### File list
 
@@ -374,3 +483,8 @@ the floor bounds row naming the inspector's read) and
 `_bmad-output/implementation-artifacts/backlog.md` (the #1237 gate, the A33
 note on the #1158 row, and the hover re-render split from the #1170 row into
 its own row, #1287).
+
+#1811 (families 2 to 4): the two integration tests above and this story.
+`vite.config.ts` needs no change: its `conformanceWasmDiagnostics*` pattern
+already keeps the corpus file, which runs each engine itself, off the hosted
+WASM project.
