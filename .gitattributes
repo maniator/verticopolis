@@ -1,0 +1,28 @@
+# Text files are LF in every checkout, whatever core.autocrlf says. A Windows
+# checkout used to turn them into CRLF, which broke tests that read generated
+# files and the backlog table (see the Windows smoke workflow).
+* text=auto eol=lf
+
+# Binary files are never converted. Git detects most of these on its own, but
+# a byte-pinned fixture should not depend on a guess.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.mp3 binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.wasm binary
+*.gz binary
+*.zip binary
+*.TDT binary
+*.tdt binary
+
+# Save fixtures are single-line text (a VCTOWER1 header and base64), but the
+# conformance digests pin their exact bytes, so git must never rewrite their
+# line endings, in either direction. -text keeps them diffable.
+*.vctower -text
