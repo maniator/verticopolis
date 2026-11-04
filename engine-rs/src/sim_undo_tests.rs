@@ -34,7 +34,7 @@ pub(super) fn tower() -> Simulation {
     tower_in(GameMode::Modern)
 }
 
-fn tower_in(mode: GameMode) -> Simulation {
+pub(super) fn tower_in(mode: GameMode) -> Simulation {
     let mut sim = Simulation::new_game(1, mode);
     sim.money = 1e9;
     sim.star = 5;
@@ -330,25 +330,29 @@ fn cycling_an_edit_nets_exactly_zero() {
 #[test]
 fn undo_returns_the_cash_the_edit_recorded_whatever_time_has_done() {
     let mut sim = tower();
+    // A sale, since time leaves a build in use and an undo would not take
+    // it out.
+    assert!(sim.build_transport(Kind::ElevatorStandard, 15, 1, 4).ok);
+    let id = sim.tower.transports[0].id;
     let start = sim.money;
     let step = gesture(&mut sim, |s| {
-        let _ = office(s, 2, 12);
+        assert!(s.remove_facility(id, RemovalMethod::Sell).ok)
     })
     .unwrap();
-    let paid = start - sim.money;
-    assert!(paid > 0.0);
+    let refund = sim.money - start;
+    assert!(refund > 0.0);
     sim.tick(60.0 * 24.0 * 3.0);
     let before_undo = sim.money;
     let redo = sim.apply_undo_step(&step).unwrap();
     assert_eq!(
         sim.money,
-        before_undo + paid,
-        "exactly what was paid, no more"
+        before_undo - refund,
+        "exactly the refund, no more"
     );
     sim.tick(60.0);
     let again = sim.money;
     sim.apply_undo_step(&redo).unwrap();
-    assert_eq!(sim.money, again - paid, "and the redo charges it again");
+    assert_eq!(sim.money, again + refund, "and the redo pays it again");
 }
 
 #[test]

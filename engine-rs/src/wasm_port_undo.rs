@@ -29,6 +29,9 @@ pub(crate) const NOTHING_TO_UNDO: &str = "Nothing to undo.";
 /// The message when the redo stack is empty.
 pub(crate) const NOTHING_TO_REDO: &str = "Nothing to redo.";
 
+/// Added to a refusal when the undo step was dropped and older ones remain.
+pub(crate) const UNDO_GOES_ON: &str = " Undo again for the edit before it.";
+
 /// Which way a step goes.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Way {
@@ -95,10 +98,13 @@ impl Engine {
 
     /// An undo or a redo. A gesture under way is closed first, so a step
     /// taken mid-drag undoes the drag. The opposite step is kept only once
-    /// this one has applied. A step that is refused (the balance cannot pay
-    /// for it, a room it would take out has been used or is burning, or the
-    /// tower is not the one it expects) changes nothing and stays where it
-    /// was.
+    /// this one has applied. A step that is refused changes nothing. One
+    /// that time can make apply (the balance cannot pay for it yet, or a
+    /// room it takes out is burning) stays where it was, for another try.
+    /// One that can never apply again (a build in use, something in its
+    /// way, a tower that changed) is dropped, so it does not block the steps
+    /// behind it: an undo goes on to the edit before it, and a redo ends the
+    /// redo trail, whose later steps were made on top of it.
     fn step(&mut self, way: Way) -> Vec<f64> {
         self.undo_notice = None;
         self.port_undo_commit();
@@ -136,17 +142,28 @@ impl Engine {
                 self.swap_record(true)
             }
             Err(why) => {
+                let keep = !why.is_lasting();
                 let verb = match way {
                     Way::Undo => {
-                        self.undo.push_undo(step);
+                        if keep {
+                            self.undo.push_undo(step);
+                        }
                         "undo"
                     }
                     Way::Redo => {
-                        self.undo.push_redo(step);
+                        if keep {
+                            self.undo.push_redo(step);
+                        } else {
+                            self.undo.clear_redo();
+                        }
                         "redo"
                     }
                 };
-                self.refuse_swap(refusal(why, verb))
+                let mut said = refusal(why, verb);
+                if !keep && way == Way::Undo && self.undo.depths().0 > 0 {
+                    said.push_str(UNDO_GOES_ON);
+                }
+                self.refuse_swap(said)
             }
         }
     }
@@ -154,13 +171,45 @@ impl Engine {
 
 /// What the player reads when a step is refused; `verb` is "undo" or "redo".
 pub(crate) fn refusal(why: StepRefused, verb: &str) -> String {
+    let sell = |sellable: bool| if sellable { " Sell it instead." } else { "" };
     match why {
         StepRefused::NotEnoughMoney => format!("Not enough money to {verb} that."),
-        StepRefused::InUse => {
-            format!("Can't {verb} that: the room has been in use since. Sell it instead.")
+        StepRefused::InUse { sellable } => {
+            format!(
+                "Can't {verb} that: it has been in use since.{}",
+                sell(sellable)
+            )
+        }
+        StepRefused::GroundUsed { sellable } => {
+            format!(
+                "Can't {verb} that: its floor has been in use since the clock passed the hour.{}",
+                sell(sellable)
+            )
+        }
+        StepRefused::Opened { sellable } => {
+            format!(
+                "Can't {verb} that: the room has opened since.{}",
+                sell(sellable)
+            )
+        }
+        StepRefused::ShaftUsed => {
+            format!("Can't {verb} that: it has been in use since. Sell it instead.")
+        }
+        StepRefused::UsedThenSold => {
+            format!("Can't {verb} that: it was in use before it was sold.")
+        }
+        StepRefused::SearchedForTreasure { sellable } => {
+            format!(
+                "Can't {verb} that: building it dug for treasure.{}",
+                sell(sellable)
+            )
         }
         StepRefused::OnFire => format!("Can't {verb} that while the room is on fire."),
         StepRefused::PriceFixed => format!("Can't {verb} that: a sold condo keeps its price."),
+        StepRefused::UseChanged => format!("Can't {verb} that: the room has changed since."),
+        StepRefused::Blocked => {
+            format!("Can't {verb} that: something in the tower stands in the way.")
+        }
         StepRefused::Stale => format!("Can't {verb} that: the tower has changed since."),
     }
 }
@@ -168,3 +217,7 @@ pub(crate) fn refusal(why: StepRefused, verb: &str) -> String {
 #[cfg(test)]
 #[path = "wasm_port_undo_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "wasm_port_undo_refusal_tests.rs"]
+mod refusal_tests;

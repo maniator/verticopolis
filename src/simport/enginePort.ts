@@ -228,13 +228,26 @@ export interface EnginePortLifecycle {
    *  `UNDO_NOTHING_TO_STEP` as the status when there is no step. A done step
    *  has already changed the tower and moved the generation, as a done swap
    *  does, and the host then follows it. Time is not rewound: the cash a step
-   *  moves is exactly what its edit moved, so a step the balance cannot pay
-   *  for is refused (status 0, `lastReason()` says why) and stays available.
-   *  So is a step that would take out a room used or burning since the step
-   *  was made, reprice a condo sold since, or meets a tower it does not
-   *  expect (a unit or shaft it would take out or restore gone or changed,
-   *  or one it would put back already there or its place taken). A gesture
-   *  under way is committed first. */
+   *  moves is exactly what its edit moved. A step that time can make apply
+   *  is refused (status 0, `lastReason()` says why) and stays available:
+   *  the balance cannot pay for it yet, or a room it would take out is
+   *  burning. A step that can never apply again is refused and dropped, so
+   *  an undo goes on to the edit before it and a redo ends the redo trail:
+   *  it would take back a build in use since the step was made (a room that
+   *  opened, or that a tenant, income or a fire used; a floor or lobby
+   *  tile, or a shaft, that stood through an hourly pass, floor a room's
+   *  build laid under it included, or a shaft anyone rode), or one used
+   *  inside its own gesture before the gesture sold it, it would undo a dig
+   *  that searched for treasure, reprice a condo that has sold, or sell
+   *  again a room whose tenants changed, or something stands in its way (a
+   *  room or shaft in the place of one it would put back, no floor under
+   *  it, a lobby on its floor or the metro above it, a cap that is full, or
+   *  a room, a shaft, the story above or a basement hanging from nothing
+   *  else on a floor or lobby tile it would take out), or it meets a tower
+   *  it does not expect (a unit or shaft it would take out or restore gone
+   *  or changed, or one it would put back already there). Only an edit
+   *  clears what stands in the way, and undoing that edit puts it back. A
+   *  gesture under way is committed first. */
   undo(): PortRecord;
   redo(): PortRecord;
   /** What the last `undo` or `redo` says to the player ("Undid: Bulldoze",

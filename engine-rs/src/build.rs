@@ -251,6 +251,10 @@ impl Simulation {
                         }
                     }
                 }
+                // A search the player could undo would be free.
+                if fresh && self.treasures_found < 3.0 {
+                    self.note_treasure_search();
+                }
                 if fresh && self.treasures_found < 3.0 && self.rng.chance(0.18) {
                     self.treasures_found += 1.0;
                     let gold = 400_000.0 + self.rng.int(0, 200_000) as f64;

@@ -253,6 +253,7 @@ pub(crate) fn assemble(
                     && bottom < 0
                     && t.get("preserveBasementStops").and_then(Value::as_bool) == Some(true),
                 schedule: Schedule::coerce(t.get("schedule"), cars, bottom, top),
+                rides: 0,
             };
             mapped.push((tr, sane_id(t.get("id"))));
         }
