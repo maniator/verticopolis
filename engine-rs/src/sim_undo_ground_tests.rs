@@ -3,7 +3,7 @@
 //! never does. A tile, like a shaft, is in use once an hourly pass has run
 //! with it standing, and a build the gesture took out again keeps the use
 //! it had: neither goes back at its full price.
-use std::collections::HashSet;
+use crate::crowd::fasthash::FastSet;
 
 use super::check_tests::{lift, meanwhile, refused, sell};
 use super::tests::{gesture, office, tower};
@@ -426,7 +426,7 @@ fn the_column_search_answers_as_a_walk_over_the_taken_tiles() {
     .unwrap();
     let id = lift(&mut sim);
     let mut t = sim.tower.get_transport(id).unwrap().clone();
-    let leaving: HashSet<i64> = lay.units.iter().map(|img| img.id).collect();
+    let leaving: FastSet<i64> = lay.units.iter().map(|img| img.id).collect();
     let ground = Ground::of(&sim.tower, &lay, &leaving);
     let holds = |f: i64, x: i64| {
         sim.tower

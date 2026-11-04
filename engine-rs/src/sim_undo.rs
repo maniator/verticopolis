@@ -18,11 +18,26 @@
 //! Anything else refuses the step, which changes nothing, so the cash it
 //! carries never moves for an edit that is no longer there to reverse, and
 //! undoing a build never sells a used room or shaft back at its full price.
+//!
+//! Around the images, a step does what the edit commands do around theirs.
+//! Taking out the last Wedding Hall calls off the VIP's visit, as a sale of
+//! it does (`Simulation::remove_facility`). A shaft comes back with its cars
+//! empty ([`Transport::returning`]). The people riding a shaft or a car a
+//! step takes away, and those waiting on floors a shorter span no longer
+//! serves, are settled on the next step of the crowd, as after the edit
+//! commands that sell a car or shrink a span: a rider whose shaft or car is
+//! gone gets off, and a wait no car can end runs out. A step sends no
+//! gameplay event: the analytics leave undo and redo untracked
+//! (`src/analyticsCore.ts`), so the build an undo takes back still counts as
+//! built, and no undo reads as a sale.
 #![cfg_attr(not(feature = "wasm"), allow(dead_code))]
+use crate::facilities::Kind;
 use crate::sim::Simulation;
 use crate::sim_undo_check::caps_held;
 use crate::tower::{Transport, UnitState};
-use crate::undo::{Step, Swap, TransportChange, TransportImage, UnitChange, UnitImage, UnitUse};
+use crate::undo::{
+    Step, Swap, TransportChange, TransportImage, UnitChange, UnitFacts, UnitImage, UnitUse,
+};
 use crate::undo_journal::Before;
 
 pub(crate) use crate::sim_undo_check::StepRefused;
@@ -33,7 +48,6 @@ impl Simulation {
     pub(crate) fn begin_undo_journal(&mut self, label: &str) {
         self.tower.journal = Some(Box::new(crate::undo_journal::Journal::new(
             label,
-            self.vip_visit_day,
             self.on_hour_runs,
         )));
     }
@@ -51,6 +65,28 @@ impl Simulation {
         if let Some(journal) = self.tower.journal.as_mut() {
             journal.paid(amount);
         }
+    }
+
+    /// An edit command sets the VIP visit day (a Wedding Hall built, the
+    /// last one sold): the open gesture's step puts it back. The day time
+    /// moves (`Simulation::check_vip`) is set directly and is no part of
+    /// a step, so an undo never brings the VIP back early.
+    pub(crate) fn edit_vip_visit_day(&mut self, day: f64) {
+        if let Some(journal) = self.tower.journal.as_mut() {
+            journal.vip_day_moved(self.vip_visit_day, day);
+        }
+        self.vip_visit_day = day;
+    }
+
+    /// Run `f`, which is no edit (the player's answer to an emergency, a
+    /// fire started by hand), with the open gesture's journal off the
+    /// tower, as it is while the simulation advances: what it does to the
+    /// tower is time's doing and no part of the gesture's step.
+    pub(crate) fn outside_the_gesture<R>(&mut self, f: impl FnOnce(&mut Simulation) -> R) -> R {
+        let paused = self.pause_undo_journal();
+        let done = f(self);
+        self.resume_undo_journal(paused);
+        done
     }
 
     /// A build dug new ground that could hold treasure: the open gesture's
@@ -76,7 +112,10 @@ impl Simulation {
                         if now.config_eq(&before) {
                             return None;
                         }
-                        UnitChange::Restore(before)
+                        UnitChange::Restore {
+                            want: UnitFacts::of(&before),
+                            left: UnitFacts::of(now),
+                        }
                     }
                     (Before::Was(before), None) => UnitChange::PutBack(before),
                     // The undo takes the unit out while its use is the use
@@ -145,10 +184,7 @@ impl Simulation {
         let mut step = Step {
             label: closed.label,
             money: -closed.money,
-            vip_visit_day: (closed.vip_visit_day != self.vip_visit_day).then_some(Swap {
-                expect: self.vip_visit_day,
-                set: closed.vip_visit_day,
-            }),
+            vip_visit_day: closed.vip_visit_day,
             units,
             transports,
             caps_held: Vec::new(),
@@ -189,12 +225,13 @@ impl Simulation {
             "a step applies outside a gesture"
         );
         self.check_undo_step(step)?;
+        let day_found = self.vip_visit_day;
         let mut back = Step {
             label: step.label.clone(),
             units: Vec::new(),
             transports: Vec::new(),
             money: -step.money,
-            vip_visit_day: step.vip_visit_day.map(Swap::reversed),
+            vip_visit_day: None,
             caps_held: Vec::new(),
             // A step that searched, or whose builds were used inside their
             // gesture, is refused, so it never reaches here.
@@ -213,7 +250,7 @@ impl Simulation {
                 None => (img.at, None),
             })
             .collect();
-        self.apply_unit_images(step, &mut back);
+        let took_out_a_hall = self.apply_unit_images(step, &mut back);
         self.apply_transport_images(step, shafts_now, &mut back);
         self.money += step.money;
         if let Some(swap) = step
@@ -222,6 +259,17 @@ impl Simulation {
         {
             self.vip_visit_day = swap.set;
         }
+        if took_out_a_hall
+            && self.tower.built_wedding_hall != Some(true)
+            && self.evaluated_tower != Some(true)
+        {
+            self.vip_visit_day = -1.0;
+        }
+        // The opposite step puts back exactly what this one did to the day.
+        back.vip_visit_day = (self.vip_visit_day != day_found).then_some(Swap {
+            expect: self.vip_visit_day,
+            set: day_found,
+        });
         // An elevator's extend gesture bills each floor once against its
         // high-water mark; a step moves the span, so the mark goes with it.
         self.end_extend();
@@ -232,11 +280,12 @@ impl Simulation {
     }
 
     /// Apply the unit images: every unit a check found where the step
-    /// expects it.
-    fn apply_unit_images(&mut self, step: &Step, back: &mut Step) {
+    /// expects it. Answers whether a Wedding Hall went.
+    fn apply_unit_images(&mut self, step: &Step, back: &mut Step) -> bool {
         let mut out = Vec::new();
         let mut put = Vec::new();
         let mut inserts = Vec::new();
+        let mut took_out_a_hall = false;
         for img in &step.units {
             let now = self
                 .tower
@@ -246,11 +295,20 @@ impl Simulation {
             let (change, at) = match (&img.change, now) {
                 (UnitChange::TakeOut(_), Some((at, now))) => {
                     out.push(img.id);
+                    took_out_a_hall |= now.kind == Kind::WeddingHall;
                     (UnitChange::PutBack(now), at)
                 }
-                (UnitChange::Restore(want), Some((at, now))) => {
-                    put.push(want);
-                    (UnitChange::Restore(now), at)
+                (UnitChange::Restore { want, left }, Some((at, now))) => {
+                    put.push((back.units.len(), img.id, want, left));
+                    // `left` is the unit once `want` is on it, read below.
+                    let found = UnitFacts::of(&now);
+                    (
+                        UnitChange::Restore {
+                            want: found.clone(),
+                            left: found,
+                        },
+                        at,
+                    )
                 }
                 (UnitChange::PutBack(want), None) => {
                     let unit = want.returning();
@@ -268,8 +326,13 @@ impl Simulation {
             });
         }
         self.tower.remove_units(&out);
-        for want in put {
-            self.tower.put_unit_config(want.id, want);
+        for (k, id, want, left) in put {
+            self.tower.put_unit_facts(id, want, left);
+            if let (Some(u), UnitChange::Restore { left, .. }) =
+                (self.tower.get_unit(id), &mut back.units[k].change)
+            {
+                *left = UnitFacts::of(u);
+            }
         }
         self.tower.insert_units_at(inserts);
         for img in &step.units {
@@ -282,6 +345,7 @@ impl Simulation {
                 }
             }
         }
+        took_out_a_hall
     }
 
     /// Apply the shaft images. `now` is each image's shaft as the step found
@@ -310,8 +374,10 @@ impl Simulation {
                     }
                 }
                 (TransportChange::PutBack(want), None) => {
-                    inserts.push((at, want));
-                    TransportChange::TakeOut { left: want.clone() }
+                    let shaft = want.returning();
+                    let left = Box::new(shaft.clone());
+                    inserts.push((at, shaft));
+                    TransportChange::TakeOut { left }
                 }
                 _ => unreachable!("the step was checked against the tower"),
             };
@@ -341,8 +407,8 @@ impl Simulation {
             }
         }
         inserts.sort_by_key(|&(at, _)| at);
-        for (at, want) in inserts {
-            self.tower.insert_transport_at(at, Transport::clone(want));
+        for (at, shaft) in inserts {
+            self.tower.insert_transport_at(at, shaft);
         }
     }
 }
@@ -374,3 +440,7 @@ mod ground_tests;
 #[cfg(test)]
 #[path = "sim_undo_hour_tests.rs"]
 mod hour_tests;
+
+#[cfg(test)]
+#[path = "sim_undo_cleanup_tests.rs"]
+mod cleanup_tests;

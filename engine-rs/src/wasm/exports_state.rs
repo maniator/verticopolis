@@ -63,14 +63,17 @@ impl Engine {
         Ok(())
     }
 
+    /// Tooling: a fire, which is no edit, so it is no part of an open
+    /// gesture's undo step.
     #[wasm_bindgen(js_name = startFire)]
     pub fn start_fire(&mut self) {
-        self.sim.start_fire();
+        self.sim.outside_the_gesture(|s| s.start_fire());
     }
 
+    /// Tooling: a bomb threat, outside an open gesture as a fire is.
     #[wasm_bindgen(js_name = bombThreat)]
     pub fn bomb_threat(&mut self) {
-        self.sim.bomb_threat();
+        self.sim.outside_the_gesture(|s| s.bomb_threat());
     }
 
     #[wasm_bindgen(js_name = evaluateStar)]

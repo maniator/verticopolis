@@ -238,7 +238,7 @@ impl Simulation {
                     "Wedding Hall built! A VIP will inspect your tower soon.",
                     LogKind::Good,
                 );
-                self.vip_visit_day = (self.clock.day() + 3) as f64;
+                self.edit_vip_visit_day((self.clock.day() + 3) as f64);
             }
             if floor <= 0 && kind.is_room() {
                 let mut fresh = false;

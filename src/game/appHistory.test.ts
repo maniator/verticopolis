@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
-import { UNDO_REFUSED } from "../simport/enginePort";
+import { UNDO_DONE, UNDO_NOTHING_TO_STEP, UNDO_REFUSED } from "../simport/enginePort";
 import { createAppHistory, NO_GESTURE } from "./appHistory";
 
 describe("createAppHistory", () => {
@@ -102,5 +102,17 @@ describe("createAppHistory", () => {
     expect(followSwap).not.toHaveBeenCalled();
     // An undo may close an open gesture before it is refused, so the depths can move.
     expect(showSteps, "the refused step still shows the steps").toHaveBeenCalledOnce();
+  });
+
+  it("rejects a status the port does not name, and follows no tower", async () => {
+    const enginePort = new TsEngine(Simulation.newGame(1));
+    const followSwap = vi.fn();
+    const toast = vi.fn();
+    const hist = createAppHistory({ enginePort, ui: { toast }, followSwap, showSteps: () => {} });
+    const unnamed = Math.max(UNDO_DONE, UNDO_NOTHING_TO_STEP, UNDO_REFUSED) + 1;
+    vi.spyOn(enginePort, "redo").mockReturnValue(Float64Array.of(unnamed, enginePort.generation()));
+    await expect(hist.redo()).rejects.toThrow(`status ${unnamed}`);
+    expect(followSwap).not.toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
   });
 });
