@@ -28,16 +28,21 @@ export function runNodeCli(entry: string, args: string[], cwd: string, env: Node
   execFileSync(process.execPath, [entry, ...args], { cwd, stdio: "inherit", env });
 }
 
-export function buildProduction(repo: string, env: NodeJS.ProcessEnv = process.env): void {
+/** The environment for a fresh `npm run build`. Windows spells environment
+ * variable names in whatever case its parent used, and a copy of `process.env`
+ * is a plain object that compares names exactly, so a name is matched without
+ * regard to case. */
+export function productionBuildEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   // A VC_TOOLING left in the shell would turn this into a tooling build.
-  const clean = { ...env };
-  delete clean.VC_TOOLING;
   // This is a new npm run, not a step of the one that started the harness. Left
   // in, the parent's lifecycle identity ("npx" under `npx vitest`, "perf:worker"
   // under npm run) can reach the prebuild, build and postbuild hooks on Windows.
-  delete clean.npm_lifecycle_event;
-  delete clean.npm_lifecycle_script;
-  runNodeCli(npmEntry(env), ["run", "build"], repo, clean);
+  const inherited = /^(VC_TOOLING|npm_lifecycle_event|npm_lifecycle_script)$/i;
+  return Object.fromEntries(Object.entries(env).filter(([name]) => !inherited.test(name)));
+}
+
+export function buildProduction(repo: string, env: NodeJS.ProcessEnv = process.env): void {
+  runNodeCli(npmEntry(env), ["run", "build"], repo, productionBuildEnv(env));
 }
 
 export function buildTooling(repo: string, outDir: string, env: NodeJS.ProcessEnv = process.env): void {

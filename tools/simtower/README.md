@@ -123,6 +123,29 @@ npx tsx tools/simtower/tdt-to-vctower.ts saves/TSTSAVE.TDT [--diff-empty]
 # was found.
 ```
 
+### Fixtures for the exporter's open fidelity questions (#920, #740)
+
+```bash
+cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin tdt_fixtures -- claim1     tools/simtower/saves/TOWER5.TDT
+cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin tdt_fixtures -- claim7     tools/simtower/saves/TOWER4.TDT
+cargo run --release --manifest-path engine-rs/Cargo.toml --features conformance --bin tdt_fixtures -- express740 tools/simtower/saves/TOWER2.TDT
+```
+
+Run them from the repository root.
+
+Each command reads a real save you supply (the ones you made in the game land in `tools/simtower/saves/`), re-exports it through the shipped Rust codec, edits one
+part and writes DOS 8.3-named files into the same folder as the save, so keep the save in `tools/simtower/saves/` (only our own output; the input is not copied and is never overwritten).
+Then `./run.sh load /wine/drive_c/saves/<NAME>.TDT` for each file and report what the command
+prints under "READ".
+
+| Command | Files | Question |
+| --- | --- | --- |
+| `claim1` | `OVLAPCTL`, `OVLAP1`, `OVLAPFUL` | What does the game do with two shafts whose footprints overlap (none, one tile column, all columns)? |
+| `claim7` | `PERS0`, `PERSCUR`, `PERS15K` | Do the all-zero person records we write matter (none, our count, the 15,000 maximum)? |
+| `express740` | `EXPLAST`, `EXPFIRST` | Does the game keep every shaft when an express shaft is written first, as our exporter never does? |
+
+The edits live in `engine-rs/src/tdt/fixtures.rs`, next to the encoder, and reuse its layout constants. The byte positions they rely on are pinned by `engine-rs/src/tdt/fixtures_tests.rs`, so an encoder change fails a `cargo test` and not a run on the PC.
+
 ### Independently verify a `.TDT`
 
 ```bash

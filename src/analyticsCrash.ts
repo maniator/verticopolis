@@ -30,6 +30,19 @@ const MAX_CRASHES_PER_PAGE_LIFE = 10;
  *  a new measurement window; see {@link releaseCrashThrottle}. */
 const crashes = createEventThrottle(MAX_CRASHES_PER_PAGE_LIFE);
 
+/** Every crash screen shown since the last {@link takeCrashCount}, counted BEFORE
+ *  the throttle so the cap and dedup cannot hide a loop's size (#841). It is
+ *  only a number, so it costs no request: the page life's summary sends it. */
+let crashesSeen = 0;
+
+/** Hand back the crash screens counted so far and start again from zero, so a
+ *  second summary in one page life (a bfcache restore) reports only new ones. */
+export function takeCrashCount(): number {
+  const n = crashesSeen;
+  crashesSeen = 0;
+  return n;
+}
+
 /**
  * Report a crash (crash-screen moment) with its flattened description, capped
  * and deduplicated per PAGE LIFE (see {@link MAX_CRASHES_PER_PAGE_LIFE}).
@@ -67,12 +80,13 @@ const crashes = createEventThrottle(MAX_CRASHES_PER_PAGE_LIFE);
  * successful one shows no screen at all (three tuples, not four). Add a fifth
  * flag or a second `kind` and re-derive this before assuming it still holds.
  *
- * What is still lost, deliberately: HOW MANY times each shape recurred. A
- * two-loss blip and an 8,269-loss catastrophe now look identical, which the
- * cap's whole purpose makes unavoidable here and which is tracked as its own
- * backlog item rather than smuggled into this event.
+ * What this event still cannot say is HOW MANY times each shape recurred: a
+ * two-loss blip and an 8,269-loss catastrophe look identical here, which the
+ * cap's whole purpose makes unavoidable. The page life's total rides the
+ * `session_crashes` summary instead (#841), counted before the cap.
  */
 export function noteCrash(info: GameplayEvents["crash"]): void {
+  crashesSeen++;
   const fingerprint = `${info.kind}|${info.repeat}|${info.recoveryFailed}|${info.behindSplash}|${info.saveFlushed}`;
   if (!crashes.allow(fingerprint)) return;
   trackEvent("crash", info);
@@ -82,4 +96,5 @@ export function noteCrash(info: GameplayEvents["crash"]): void {
  *  calls this so each test starts with a full budget. */
 export function releaseCrashThrottle(): void {
   crashes.reset();
+  crashesSeen = 0;
 }

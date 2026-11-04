@@ -11,3 +11,4 @@ src/tests/integration/milestones.integration.test.ts
 src/tests/integration/nextStarRequirements.integration.test.ts
 src/tests/integration/elevatorStats.integration.test.ts
 src/tests/integration/trafficTeeth.integration.test.ts
+src/tests/integration/onboarding.integration.test.ts

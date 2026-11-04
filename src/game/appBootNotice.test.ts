@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { unreadableSaveNotice } from "./appBoot";
+
+vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 
 describe("unreadableSaveNotice", () => {
   const flags = { hadReadableSave: false, saveWasNewer: false, unreadableKept: false };

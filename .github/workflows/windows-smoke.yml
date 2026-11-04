@@ -1,0 +1,64 @@
+name: Windows smoke
+
+# A check on Windows for what Linux cannot see: path separators, line endings
+# and shell differences in the scripts and tests. It is not a required check
+# and builds no engine package, so it covers the TypeScript side only: no
+# build, since a build without the engine could not run the game.
+# A public repository pays nothing for a standard Windows runner.
+#
+# Only changes that can reach those files run it.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "api/**"
+      - "scripts/**"
+      - "e2e/**"
+      - "conformance/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".nvmrc"
+      - "*.config.ts"
+      - "tsconfig*.json"
+      - ".gitattributes"
+      - ".github/workflows/windows-smoke.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npx vitest run --project unit

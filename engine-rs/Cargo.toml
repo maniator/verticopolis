@@ -37,6 +37,11 @@ name = "tdt"
 path = "src/bin/tdt.rs"
 required-features = ["conformance"]
 
+[[bin]]
+name = "tdt_fixtures"
+path = "src/bin/tdt_fixtures.rs"
+required-features = ["conformance"]
+
 [dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.151", features = ["float_roundtrip", "preserve_order"] }

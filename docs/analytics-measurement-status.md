@@ -66,7 +66,7 @@ telemetry and context.
 | 9 | Load failures | `boot` `reason=corrupt` (autosave at boot) and `app_action` `load_failed` (slot loads) | `boot` rows; sessions | Since the build that ships the code | `load_failed` cannot tell an empty slot from an unreadable one. Older builds have the boot reason only. Attempts are `load_slot` plus `load_failed`. Quick Load ("No saved tower found") is outside this measure | Count: lower bound from that build. Rate: coverage-limited, per attempt, printed with its bound | Yes, for builds that carry it |
 | 10 | Import failures (`.vctower`, `.TDT`) | `app_action` `import_failed`, `detail` `save` or `tdt` | Import attempts (`import_save`, `import_tdt`) | Since the build that ships the code | A refusal is counted once per attempt; a file the picker never hands over is not seen. Attempts are the `import_save` and `import_tdt` rows, sent when the file is handed over | Count: lower bound from that build. Rate: coverage-limited, per attempt, printed with its bound | Yes, for builds that carry it |
 | 11 | Save and load usage | `app_action` `save_slot`, `quick_save`, `load_slot`, `export_save` | Sessions | Any | Successes only, with no attempt count, so it is not a success rate | Approximation (usage), never an outcome rate | No |
-| 12 | Crash screens (lost WebGL context) | `crash` | Crash rows | Any | Capped and deduplicated per page life, so the count of repeats is lost (#841). This is a renderer failure, not an engine fault | Incomplete (magnitude) | Reported separately from row 1 |
+| 12 | Crash screens (lost WebGL context) | `crash`, `session_crashes` | Crash rows | Any | `crash` rows are capped and deduplicated per page life, so they cannot say how many times a loop ran. `session_crashes` (#841) carries the page life's total, counted before the cap, sent only at the terminal page hide and only when a crash screen showed, so a tab killed outright, the worst loop, can be missing. Builds before it have no magnitude and read Not measurable. This is a renderer failure, not an engine fault | Lower bound (magnitude, from the build that ships `session_crashes`) | Reported separately from row 1 |
 | 13 | `$exception` counts | `$exception` | Rows | Any | Raw counts, capped at 10 per page life, not classified by origin (#1090). Never present a raw count as engine failures | Approximation | Only once classified (#1090) |
 | 14 | Engaged sessions | `engine_status` `engaged` rows, `engaged_by` | Sessions | Since 2026-10-29 | Lower bound on real play; a boot fault cannot engage, so engagement must never be the fault-rate denominator | Lower bound | Reported beside N, not as N |
 | 15 | Sessions (per tab) | `session_lengths` view | Sessions that sent `session_end` | Any | `session_end` re-fires on every hide, so only the view is governed; a tab killed without a hide sends none | Lower bound | Context only |
@@ -163,7 +163,6 @@ code, not as a substitute for the script run with the API key.
 - Save, load and import failure events: #1533 (the three `app_action` codes
   were approved 2026-11-03 and ship with this page's change).
 - Trap during attach and older restore points: #1204.
-- Crash loop magnitude: #841.
 - `$exception` origin classification and the "no data" reading for builds
   with no eligible sessions: #1090.
 - Derived coverage and recovery outcome: `scripts/reliability-coverage.mjs`
