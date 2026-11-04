@@ -60,7 +60,7 @@ headless shell:
 | Setting | Value |
 | --- | --- |
 | Product and version | Chromium 149.0.7827.55 (Playwright's `chromium-1228` revision) |
-| Executable | `<ms-playwright>/chromium-1228/chrome-win64/chrome.exe`, reached through `PW_CHROMIUM_PATH` (on the owner's PC `C:\Users\nafta\AppData\Local\ms-playwright\chromium-1228\chrome-win64\chrome.exe`) |
+| Executable | `<ms-playwright>/chromium-1228/chrome-win64/chrome.exe`, reached through `PW_CHROMIUM_PATH` (on the owner's PC `<home>\AppData\Local\ms-playwright\chromium-1228\chrome-win64\chrome.exe`) |
 | Channel | none (`PW_CHROMIUM_CHANNEL` unset) |
 | Mode | headless; the user agent reads `HeadlessChrome/149.0.0.0` |
 | Launch switches | the harness's own two, `--autoplay-policy=no-user-gesture-required` and `--js-flags=--expose-gc`; no `PW_CHROMIUM_ARGS`, no GPU-selection switch |
@@ -873,8 +873,8 @@ engine source, so the engine source hash must still equal `b2786beb…`. No hand
 editing is needed: the commands below apply it with `git apply`.
 
 ```powershell
-git -c core.autocrlf=false clone https://github.com/maniator/verticopolis.git "C:\Users\nafta\projects\vc-run0a"
-cd "C:\Users\nafta\projects\vc-run0a"
+git -c core.autocrlf=false clone https://github.com/maniator/verticopolis.git "<home>\projects\vc-run0a"
+cd "<home>\projects\vc-run0a"
 git checkout e25ec01
 git status --porcelain            # must print nothing
 # Fetch the declared patch from the protocol's branch (or main, once #1099 merges).
@@ -908,8 +908,8 @@ Run it after #1124 (the harness with the cost split) is merged. A/A mode has
 landed. The shape:
 
 ```powershell
-git -c core.autocrlf=false clone https://github.com/maniator/verticopolis.git "C:\Users\nafta\projects\vc-run0b"
-cd "C:\Users\nafta\projects\vc-run0b"
+git -c core.autocrlf=false clone https://github.com/maniator/verticopolis.git "<home>\projects\vc-run0b"
+cd "<home>\projects\vc-run0b"
 git checkout <main-sha>
 git status --porcelain
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
