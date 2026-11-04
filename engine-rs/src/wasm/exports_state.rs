@@ -71,6 +71,17 @@ impl Engine {
     }
 
     /// Tooling: a bomb threat, outside an open gesture as a fire is.
+    /// Tooling only: the daily roll's fire outbreak in room `id`, with the
+    /// paid-rescue offer it raises, so a test can set a chosen room ablaze
+    /// mid-run (`startFire` picks a room at random and offers nothing). It
+    /// draws nothing from the random stream. False, changing nothing, while
+    /// a fire burns or a choice is pending, or when `id` names no room that
+    /// can catch fire. Like `startFire`, this is not part of an open undo step.
+    #[wasm_bindgen(js_name = startFireAt)]
+    pub fn start_fire_at(&mut self, id: f64) -> bool {
+        whole_id(id).is_some_and(|id| self.sim.outside_the_gesture(|s| s.start_fire_at(id)))
+    }
+
     #[wasm_bindgen(js_name = bombThreat)]
     pub fn bomb_threat(&mut self) {
         self.sim.outside_the_gesture(|s| s.bomb_threat());

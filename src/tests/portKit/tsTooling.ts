@@ -12,6 +12,7 @@ export interface ToolingSetters {
   setCustomersIn(id: number, count: number): boolean;
   setWeather(weather: WeatherKind): boolean;
   clearRetailTallies(): void;
+  startFireAt(id: number): boolean;
 }
 
 /** The setters' bounds, the same on both legs (the Rust members in
@@ -55,6 +56,15 @@ export function tsTooling(engine: TsEngine): ToolingSetters {
     setWeather: (weather) => {
       if (!WEATHER_KINDS.has(weather)) return false;
       engine.sim.weather = weather;
+      return true;
+    },
+    startFireAt: (id) => {
+      const events = engine.sim.events;
+      if (events.pending !== null || events.count > 0) return false;
+      const unit = events.flammableUnits().find((u) => u.id === id);
+      if (!unit) return false;
+      events.startFireOn(unit);
+      events.offerFireRescue();
       return true;
     },
     clearRetailTallies: () => {

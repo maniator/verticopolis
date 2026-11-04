@@ -514,6 +514,13 @@ export class Engine {
      * Tooling: a fire, which is no edit, so it is no part of an open
      * gesture's undo step.
      */
+    /**
+     * Tooling only: the daily roll's fire outbreak in room `id`, with the
+     * paid-rescue offer it raises. It uses no random draws and refuses a
+     * nonflammable/missing room or an already-active fire/choice.
+     * Like startFire, it does not join an open undo step.
+     */
+    startFireAt(id: number): boolean;
     startFire(): void;
     /**
      * The state view's hash, as the lock records it.

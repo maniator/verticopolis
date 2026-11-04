@@ -102,24 +102,7 @@ export class EventSystem {
     const fireChance = this.fireChance();
     if (this.active.size === 0 && roll < fireChance) {
       this.startFire();
-      // Canon: Security fights fires for free; the fire-rescue helicopter puts it
-      // out instantly for a fee. That fee scales with the tower so it's payable
-      // early (~$150k at 2★) and reaches the original's $500k for a 5★ skyscraper.
-      if (this.active.size > 0) {
-        const cost = this.fireRescueCost();
-        this.pending = {
-          kind: "fireRescue",
-          cost,
-          message: `🚒 Fire rescue available for $${cost.toLocaleString("en-US")}. Pay to stop the spread and save the tower now, or decline and fight it the slow way. Either way the rooms already ablaze burn down to gutted shells you'll rebuild; the fee just limits how far the fire spreads.`,
-        };
-        this.sim.emit(this.pending.message, "bad");
-        // Telegraph the free defense to a player who hasn't built one yet. Use
-        // "bad" so it surfaces as a toast during the emergency — the UI only
-        // pops toasts for good/bad log entries, and "info" would hide in the log.
-        if (!this.sim.hasAny("security")) {
-          this.sim.emit("Tip: a Security office fights fires for free. Build one to defend your tower.", "bad");
-        }
-      }
+      if (this.active.size > 0) this.offerFireRescue();
       return;
     }
     // Bomb threats target prestigious towers (4★ and up): pay the ransom or
@@ -263,8 +246,23 @@ export class EventSystem {
     return Math.min(500_000, 150_000 + Math.max(0, this.sim.star - 2) * 120_000);
   }
 
-  /** Rooms that can catch fire (real, finished rooms — not structure). */
-  private flammableUnits(): Unit[] {
+  /** The paid rescue a new outbreak offers. Canon: Security fights fires for
+   *  free; the helicopter's fee scales from ~$150k at 2★ to the original's
+   *  $500k for a 5★ skyscraper. */
+  offerFireRescue(): void {
+    const cost = this.fireRescueCost();
+    this.pending = {
+      kind: "fireRescue",
+      cost,
+      message: `🚒 Fire rescue available for $${cost.toLocaleString("en-US")}. Pay to stop the spread and save the tower now, or decline and fight it the slow way. Either way the rooms already ablaze burn down to gutted shells you'll rebuild; the fee just limits how far the fire spreads.`,
+    };
+    this.sim.emit(this.pending.message, "bad");
+    // The free-defense tip for a tower without one, as "bad" so it toasts (the UI hides "info").
+    if (!this.sim.hasAny("security")) this.sim.emit("Tip: a Security office fights fires for free. Build one to defend your tower.", "bad");
+  }
+
+  /** Rooms that can catch fire: real, finished rooms (no floor or lobby tile). */
+  flammableUnits(): Unit[] {
     return this.sim.tower.units.filter(
       (u) =>
         u.kind !== "floor" &&
@@ -278,13 +276,15 @@ export class EventSystem {
   /** Ignite a random room. */
   startFire(): void {
     const candidates = this.flammableUnits();
-    if (candidates.length === 0) return;
-    const u = this.sim.rng.pick(candidates);
+    if (candidates.length > 0) this.startFireOn(this.sim.rng.pick(candidates));
+  }
+
+  /** Set one room ablaze as a new outbreak. A blaze spreading to neighbors
+   *  (spreadFireTo) is the same fire, so only an ignition is tallied. */
+  startFireOn(u: Unit): void {
     setRoomState(this.sim.tower, u, "fire");
     u.occupants = 0;
     this.active.add(u.id);
-    // A new fire outbreak. A blaze SPREADING to neighbors (spreadFireTo) is the
-    // same fire, not a new one, so only the initial ignition is tallied.
     this.firesStartedCount++;
     this.sim.gameplayEvents?.push("fire_started", {});
     this.sim.emit(`🔥 Fire broke out in ${FACILITIES[u.kind].name} on ${this.sim.floorLabel(u.floor)}!`, "bad");

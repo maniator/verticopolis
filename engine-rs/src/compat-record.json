@@ -1,5 +1,5 @@
 {
-  "crateVersion": "1.21.0",
+  "crateVersion": "1.21.1",
   "lockDigest": "59c16c386672abea",
   "saveVersion": 7,
   "oldestSaveVersion": 1,
@@ -7,5 +7,5 @@
   "viewLayoutVersion": 12,
   "catalogVersion": 6,
   "identitySchema": 1,
-  "interfaceDigest": "925670f2945640e0"
+  "interfaceDigest": "6604f9dd3d88f2c6"
 }

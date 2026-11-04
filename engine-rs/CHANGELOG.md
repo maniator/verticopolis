@@ -15,6 +15,11 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.21.1 (2026-11-04)
+
+- The tooling-only WASM binding gains `startFireAt(id)`: it starts a chosen flammable room's fire through the normal outbreak and paid-rescue path, without consuming random draws. It refuses while a fire or emergency choice is active and does not join a pending undo gesture. The TypeScript reference exposes the same test hook so conformance can run a mid-visit fire on both engines.
+- No saved-game, frame, view-layout or catalog format changes. The public binding interface digest moves.
+
 ## 1.21.0 (2026-11-04)
 
 - An undo hands back a build's price only while the build is unused, and that use now lasts. A room the gesture built is in use once it opens (its state leaves construction, which it never goes back to), whatever a move-out or a collection does to it after ("Can't undo that: the room has opened since. Sell it instead.").
