@@ -35,6 +35,11 @@ const GROUPS: { title: string; cats: FacilityCategory[] }[] = [
   { title: "Special", cats: ["special"] },
 ];
 
+const ONE_ROW_TAB_LAYOUT_MQ = "(max-width: 1023px) and (max-height: 339.98px) and (orientation: landscape), (max-width: 539.98px) and (orientation: landscape)";
+
+type TabLayoutWatch = { mq: MediaQueryList; onChange: () => void };
+const tabLayoutWatch = new WeakMap<UI, TabLayoutWatch>();
+
 export function buildPalette(ui: UI): void {
   buildPaletteFrom(ui, ui.cb.getCatalog());
 }
@@ -131,6 +136,7 @@ function buildTabs(ui: UI, bar: HTMLElement): void {
     tab.addEventListener("click", () => selectGroup(ui, group.title));
     bar.appendChild(tab);
   }
+  watchOneRowTabLayout(ui, bar);
 }
 
 /** Make the named group the visible one on mobile: mark its section `.tab-active`,
@@ -152,11 +158,7 @@ export function selectGroup(ui: UI, title: string): void {
   // the strip scrolls; scrollIntoView could also move the page. The step
   // rounds up to a whole pixel, since WebKit keeps a whole-pixel scroll and
   // would drop the part pixel, leaving the tab cut at the edge.
-  const strip = bar!.getBoundingClientRect();
-  const box = tab.getBoundingClientRect();
-  const shown = box.width > 0 && strip.width > 0; // a hidden tab or strip has nothing to show
-  if (shown && box.left < strip.left) bar!.scrollLeft -= Math.ceil(strip.left - box.left);
-  else if (shown && box.right > strip.right) bar!.scrollLeft += Math.ceil(box.right - strip.right);
+  revealTabInStrip(bar!, tab);
   // Start the newly opened category at its first tile: the scroll lives on the
   // `.pal-groups` container (horizontal on a portrait phone, vertical in the
   // sideways tools column).
@@ -165,6 +167,29 @@ export function selectGroup(ui: UI, title: string): void {
     scroller.scrollLeft = 0;
     scroller.scrollTop = 0;
   }
+}
+
+function revealTabInStrip(bar: HTMLElement, tab: HTMLElement): void {
+  const strip = bar.getBoundingClientRect();
+  const box = tab.getBoundingClientRect();
+  const shown = box.width > 0 && strip.width > 0; // a hidden tab or strip has nothing to show
+  if (shown && box.left < strip.left) bar.scrollLeft -= Math.ceil(strip.left - box.left);
+  else if (shown && box.right > strip.right) bar.scrollLeft += Math.ceil(box.right - strip.right);
+}
+
+function watchOneRowTabLayout(ui: UI, bar: HTMLElement): void {
+  const prev = tabLayoutWatch.get(ui);
+  if (prev) prev.mq.removeEventListener("change", prev.onChange);
+  if (typeof window.matchMedia !== "function") return;
+  const mq = window.matchMedia(ONE_ROW_TAB_LAYOUT_MQ);
+  const onChange = () => {
+    if (!mq.matches) return;
+    const selected = bar.querySelector<HTMLElement>('.pal-tab[aria-selected="true"]');
+    if (selected) revealTabInStrip(bar, selected);
+  };
+  mq.addEventListener("change", onChange);
+  tabLayoutWatch.set(ui, { mq, onChange });
+  onChange();
 }
 
 /** Unlocked (visible) facility count in a group, read from the classes the lock

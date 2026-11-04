@@ -299,4 +299,5 @@ describe("Getting Started card across the phone tier", () => {
     listener!();
     expect(card.classList.contains("onboard--mobile")).toBe(false);
   });
+
 });

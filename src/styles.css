@@ -2288,7 +2288,7 @@ body.splash-up #toast-wrap { z-index: 45; }
      view and make an open Map rebuild from scratch, up to six times a second
      while the traffic floor flickers. Each width fits its longest value
      ("Backed up · 100F", "WD2 00:00", "2nd WD/4Q/122nd Year",
-     "$-999,999,999", "99,999") in the widest common UI font, DejaVu Sans
+     "$-1,000,000,000", "100,000") in the widest common UI font, DejaVu Sans
      (measured in Chrome, within about half a pixel on the tightest), so
      only a still longer value is trimmed with an ellipsis. The rating is
      always five stars or the shorter TOWER, so it needs none. */
@@ -2331,8 +2331,8 @@ body.splash-up #toast-wrap { z-index: 45; }
   #traffic { width: 10.8em; }
   #stat-time { width: 6.2em; }
   #stat-date { width: 13.1em; }
-  #stat-money { width: 8.2em; }
-  #stat-pop { width: 4em; }
+  #stat-money { width: 9.5em; }
+  #stat-pop { width: 4.8em; }
   #speed {
     gap: 3px;
   }
@@ -2531,7 +2531,7 @@ body.splash-up #toast-wrap { z-index: 45; }
   body:has(.overview-map:not([hidden])) #onboard.onboard--mobile {
     left: auto;
     right: 8px;
-    width: max(180px, min(300px, calc(100vw - 360px - env(safe-area-inset-left, 0px))));
+    width: max(200px, min(300px, calc(100vw - 360px - env(safe-area-inset-left, 0px))));
   }
 }
 
@@ -2544,6 +2544,11 @@ body.splash-up #toast-wrap { z-index: 45; }
    reads only from 16.4. */
 @media (max-width: 1023px) and (max-height: 339.98px) and (orientation: landscape),
   (max-width: 539.98px) and (orientation: landscape) {
+  /* Split-screen widths can wrap the top bar to five lines (about 116px high);
+     lift the card below it so the last stat row stays visible. */
+  #onboard.onboard--mobile {
+    top: 118px;
+  }
   #palette-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;

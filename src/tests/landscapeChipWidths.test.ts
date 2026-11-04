@@ -17,8 +17,8 @@ const MEASURED_PX = {
   trafficFloor: 33.8, // " · 100F", the floor suffix's smaller medium face
   time: 73.92, // "WD2 00:00"
   date: 156.28, // "2nd WD/4Q/122nd Year"
-  money: 97.59, // "$-999,999,999"
-  pop: 46.31, // "99,999"
+  money: 110.4, // "$-1,000,000,000"
+  pop: 54.2, // "100,000"
 };
 const GLYPH_PX = 18; // the traffic meter
 const GLYPH_GAP_EM = 0.3; // the meter's margin before the tier word
@@ -70,5 +70,10 @@ describe("sideways stat chip widths", () => {
     expect(px("stat-date")).toBeGreaterThanOrEqual(MEASURED_PX.date);
     expect(px("stat-money")).toBeGreaterThanOrEqual(MEASURED_PX.money);
     expect(px("stat-pop")).toBeGreaterThanOrEqual(MEASURED_PX.pop);
+  });
+
+  it("keep extra room for billion funds and six-digit population values", () => {
+    expect(widthEm("stat-money")).toBeGreaterThanOrEqual(9);
+    expect(widthEm("stat-pop")).toBeGreaterThanOrEqual(4.5);
   });
 });

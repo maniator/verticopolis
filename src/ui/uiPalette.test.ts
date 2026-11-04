@@ -278,6 +278,32 @@ describe("category tabs", () => {
     expect(scroller.scrollTop).toBe(0);
   });
 
+  it("brings the open tab back into view when the layout switches to one-row tabs", () => {
+    let onChange: (() => void) | undefined;
+    const mq = {
+      matches: false,
+      addEventListener: (_: string, fn: () => void) => (onChange = fn),
+      removeEventListener: vi.fn(),
+    };
+    const matchMedia = vi
+      .spyOn(window, "matchMedia")
+      .mockImplementation(() => mq as unknown as MediaQueryList);
+    const { ui, tabs } = stubUI();
+    buildPalette(ui);
+    const rect = (left: number, width: number) => ({ left, right: left + width, top: 0, bottom: 20, width, height: 20 }) as DOMRect;
+    vi.spyOn(tabs, "getBoundingClientRect").mockReturnValue(rect(0, 200));
+    const leisure = tabs.querySelector<HTMLElement>('.pal-tab[data-group="Leisure"]')!;
+    vi.spyOn(leisure, "getBoundingClientRect").mockReturnValue(rect(260, 60));
+    selectGroup(ui, "Leisure");
+    expect(tabs.scrollLeft).toBe(120);
+    tabs.scrollLeft = 0;
+    vi.mocked(leisure.getBoundingClientRect).mockReturnValue(rect(260, 60));
+    mq.matches = true;
+    onChange!();
+    expect(tabs.scrollLeft).toBe(120);
+    matchMedia.mockRestore();
+  });
+
   it("clicking a tab button activates its group (the path onboarding uses to reveal a hidden tool)", () => {
     const { ui, palette, tabs } = stubUI();
     buildPalette(ui);

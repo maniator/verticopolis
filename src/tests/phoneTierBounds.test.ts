@@ -41,4 +41,10 @@ describe("phone tier bounds", () => {
     expect(isPhoneViewport({ width: 1024, height: 599 })).toBe(false);
     expect(isPhoneViewport({ width: 1023, height: 600 })).toBe(false);
   });
+
+  it("keeps the landscape onboarding card clear and readable on split-screen widths", () => {
+    const css = read("src/styles.css");
+    expect(css).toContain("#onboard.onboard--mobile {\n    top: 118px;\n  }");
+    expect(css).toContain("width: max(200px, min(300px, calc(100vw - 360px - env(safe-area-inset-left, 0px))));");
+  });
 });
