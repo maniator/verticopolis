@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { itTypeScriptOnly } from "../parity/typescriptOnly";
 import { Simulation } from "../../engine/Simulation";
 import { Clock } from "../../engine/Clock";
 import { visibleOccupants, CROWD_SECONDS_PER_MINUTE, EAT_SECONDS_MIN, EAT_SECONDS_MAX } from "../../engine/Crowd";
@@ -414,6 +413,8 @@ describe("dwelling customers attach to the venue they were sent to (census attri
   });
 });
 
+// The two cases that stamp customersIn (arrival clamp, spawn-side filter) run
+// on both engines in personRoundTripVenueCap.integration.test.ts.
 describe("venue customer capacity: customersIn never exceeds the catalog population", () => {
   it("a heavy lunch crowd against one fastFood caps at FACILITIES.fastFood.population", () => {
     const sim = new Simulation(2024, "modern", "realWorld");
@@ -448,45 +449,9 @@ describe("venue customer capacity: customersIn never exceeds the catalog populat
       expect(ffUnit.customersIn ?? 0).toBeLessThanOrEqual(cap);
     }
     // The crowd genuinely used the venue. Spawn pacing keeps the peak a bit
-    // under the cap in this fixture; the two surgical tests below exercise
-    // the cap mechanics directly.
+    // under the cap in this fixture; the two surgical tests in
+    // personRoundTripVenueCap.integration.test.ts exercise the cap mechanics
+    // directly.
     expect(peak).toBeGreaterThan(0);
-  });
-
-  itTypeScriptOnly("stamps customersIn on the instance mid-run; the frame sync restores the engine's tally every tick")("an en-route eater arriving at a just-filled venue eats uncounted (arrival clamp)", () => {
-    const sim = officeAndFastFood();
-    setHour(sim, 12);
-    const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
-    const cap = FACILITIES.fastFood.population;
-    // Wait for one meal round-tripper to be en route to the venue.
-    let traveler;
-    for (let m = 0; m < 30 && !traveler; m++) {
-      sim.tick(1);
-      traveler = sim.crowd.people.find((p) => p.mealVenueId === ff.id && p.state !== "dwelling");
-    }
-    expect(traveler).toBeDefined();
-    // The venue fills while they travel (stamp the count at capacity, standing
-    // in for other arrivals), so their arrival must NOT push past the cap.
-    ff.customersIn = cap;
-    for (let m = 0; m < 90; m++) {
-      sim.tick(1);
-      expect(ff.customersIn).toBe(cap);
-      if (traveler!.state === "dwelling") break;
-    }
-    // Whether they made it to the table or gave up en route, they were never
-    // counted: venueUnitId unset means finish() will not decrement either, so
-    // the balanced-accounting contract holds around the clamp.
-    expect(traveler!.venueUnitId).toBeUndefined();
-  });
-
-  itTypeScriptOnly("stamps customersIn before the first tick; the save does not carry the live tally, so the engine starts from an empty venue")("a full venue attracts no new meal trips (spawn-side filter)", () => {
-    const sim = officeAndFastFood();
-    const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
-    ff.customersIn = FACILITIES.fastFood.population; // full before lunch begins
-    setHour(sim, 12);
-    for (let m = 0; m < 60; m++) {
-      sim.tick(1);
-      expect(sim.crowd.people.some((p) => p.mealVenueId === ff.id)).toBe(false);
-    }
   });
 });
