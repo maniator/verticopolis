@@ -98,7 +98,7 @@ describeEngines("Onboarding — steps advance on real progress", (leg: Leg) => {
   });
 });
 
-describe("Onboarding — step copy", () => {
+describe("Onboarding: step copy", () => {
   it("lists the steps in the order of the layout's onboarding bits", () => {
     expect(ONBOARD_STEPS.map((s) => s.id)).toEqual(VIEW_LAYOUT.onboarding);
     expect(VIEW_LAYOUT.onboarding.map((id) => ONBOARDING_FLAG[id as keyof typeof ONBOARDING_FLAG])).toEqual([1, 2, 4, 8, 16]);
