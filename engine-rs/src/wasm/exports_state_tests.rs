@@ -163,3 +163,55 @@ fn set_customers_in_makes_the_follow_ups_a_counted_arrival_makes() {
     assert_eq!((unit.customers_in, unit.occupants), (Some(5), 5));
     assert_eq!(e.sim.tower.meal_overlay_revision, revision + 1);
 }
+
+#[test]
+fn set_weather_takes_the_three_save_names_and_refuses_the_rest() {
+    use crate::sim_loop::Weather;
+    let (mut e, _) = with_office();
+    for (name, want) in [
+        ("rain", Weather::Rain),
+        ("cloudy", Weather::Cloudy),
+        ("clear", Weather::Clear),
+    ] {
+        assert!(e.set_weather(name), "{name}");
+        assert_eq!(e.sim.weather, want, "{name}");
+    }
+    assert!(e.set_weather("rain"));
+    for bad in ["", "Rain", "snow"] {
+        assert!(!e.set_weather(bad), "{bad:?}");
+        assert_eq!(e.sim.weather, Weather::Rain, "{bad:?} changed the weather");
+    }
+}
+
+#[test]
+fn clear_retail_tallies_unsets_all_four_and_nothing_else() {
+    let (mut e, office) = with_office();
+    let r = e.sim.tower.place(Kind::Shop, 2, 180);
+    assert!(r.ok);
+    let shop = r.unit_id.unwrap();
+    {
+        let i = e.sim.tower.by_id[&shop];
+        let mut t = e.sim.tower.units[i].extras_mut();
+        t.patronage_today = Some(3.0);
+        t.patronage_yest = Some(4.0);
+        t.profit_today = Some(50.0);
+        t.profit_yest = Some(60.0);
+        t.dirty_days = Some(1);
+    }
+    let money = e.sim.money;
+    e.clear_retail_tallies();
+    let t = e.sim.tower.get_unit(shop).unwrap().extras().clone();
+    assert_eq!(
+        (
+            t.patronage_today,
+            t.patronage_yest,
+            t.profit_today,
+            t.profit_yest
+        ),
+        (None, None, None, None)
+    );
+    assert_eq!(t.dirty_days, Some(1), "the other extras stay");
+    assert_eq!(e.sim.money, money);
+    // A unit with no tally ends with no extras record.
+    assert!(e.sim.tower.get_unit(office).unwrap().extras.is_none());
+}

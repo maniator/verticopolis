@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.18.0 (2026-11-04)
+
+- Two tooling-only binding methods for tests. `setWeather(name)` sets today's weather ("clear", "cloudy" or "rain"), which no save carries; the next day's roll replaces it, and so does a load, and any other name answers false and changes nothing. `clearRetailTallies()` clears every unit's patronage and profit tallies, today and yesterday, the render-only fields no economy path reads. No game command reaches them. No saved-game, frame, view layout or catalog change.
+
 ## 1.17.0 (2026-11-04)
 
 - A tooling-only binding method for tests: `setCustomersIn(id, count)` sets a unit's live customer tally, which no save carries, through the setter that logs the unit for the frame, so a test can fill a venue to capacity mid-run. Like a counted arrival, it then mirrors the tally into an attendance venue's occupants and moves the meal overlay revision. It answers false and changes nothing for an unknown unit or a count that is not a whole number from 0 to 2^53-1. The unit's kind and its venue cap are not checked, so any unit takes any count in that range. No game command reaches it. No saved-game, frame, view layout or catalog change.

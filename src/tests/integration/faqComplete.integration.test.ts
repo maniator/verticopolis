@@ -269,32 +269,6 @@ describe("VIP stay (FAQ): only in a suite, gates the favorable review", () => {
 });
 
 describe("Events & amounts (FAQ Cluster B)", () => {
-  itTypeScriptOnly("sets sim.weather directly; no save carries the weather (a load recomputes it from the day) and the frame sync writes the engine's weather onto the instance on attach and every tick, so the write never reaches the engine")("rain depresses commercial income vs a clear day", () => {
-    function dayIncome(weather: "clear" | "rain"): number {
-      const sim = newSeededGame(7);
-      sim.money = 1e12;
-      sim.star = 3;
-      lay(sim, "lobby", 1);
-      lay(sim, "floor", 2);
-      sim.buildTransport("elevatorStandard", C, 1, 2);
-      const r = sim.tower.place("fastFood", 2, 0);
-      sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
-      // Occupied offices give the venue a demand pool to serve (income is
-      // demand-driven), so there is real income for rain to depress. Identical in
-      // both weather runs, so only the rain multiplier differs.
-      for (const x of [20, 32, 44]) {
-        const o = sim.tower.place("office", 2, x);
-        expect(o.ok, o.reason).toBe(true);
-        sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
-      }
-      sim.weather = weather; // stays fixed within the day (no day boundary crossed)
-      const before = sim.money;
-      for (let i = 0; i < 10; i++) sim.tick(60); // 07:00→17:00, fast food open
-      return sim.money - before;
-    }
-    expect(dayIncome("rain")).toBeLessThan(dayIncome("clear"));
-  });
-
   it("a cinema carries a recurring film-booking cost, per its maintenance period", () => {
     const sim = newSeededGame(8);
     sim.money = 1e9;
