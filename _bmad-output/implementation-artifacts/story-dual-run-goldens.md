@@ -52,9 +52,9 @@ retires the mirror harness (#1421).
    catalog, as the game does, and holds the shipped card to those lines, and
    also checks that the engine holds exactly the rooms (with their floors) and
    shafts (with their kinds) the golden names. It has no direct import from
-   `src/engine/` or `src/game/facilityDiagnostics.ts` (the shipped card kit
-   still reaches the reference through `facilityDiagnostics.ts`, the frontend
-   ratchet's). The TypeScript referee
+   `src/engine/` or the TypeScript reference card
+   (`src/tests/diagnostics/facilityDiagnostics.ts`, which #1813 took off the
+   shipped card kit). The TypeScript referee
    (`cardTextReferee.integration.test.ts`) builds each case as the sweep did,
    loads the save into the TypeScript engine and holds the golden to it, the
    packed tower byte for byte and lines in order, until `src/engine/` goes. Both cards
@@ -121,17 +121,26 @@ retires the mirror harness (#1421).
   - the sweep sets the catalog through `src/catalog/towerCatalog.ts`
     (`useTowerCatalogSource`), which imports `engine/catalog` and is on the
     frontend ratchet;
-  - `src/game/frameLoop.ts` (where the golden reads `SPEEDS`) re-exports
-    `engine/sim/frameStep`;
-  - the shipped card kit (`src/game/cardKit.ts`) still imports
-    `facilityDiagnostics.ts`;
+  - `src/game/frameLoop.ts`, where the golden reads `SPEEDS`, reaches the
+    TypeScript `Simulation` through `src/game/engineFault.ts`, then
+    `src/wasmhost/hostFault.ts`, and through `src/game/installAffordance.ts`,
+    then `src/ui/uiDialogs.ts`, `src/ui/templates/reports.ts` and
+    `src/storage/SaveGame.ts`, and reaches `engine/catalog` through
+    `src/game/panelAnchoring.ts`, then `src/game/portAccess.ts` and
+    `towerCatalog` (the entry above);
+    `hostFault.ts` and `SaveGame.ts` are on `simulationReach.ratchet.txt` and
+    leave with #921;
   - the Rust suites import from `src/dualrun/`: `binding.ts` (the binding's
     types and `checkBinding`, through `wasmEngine.ts`) and `catalog.ts`
     (`readCatalog`, which the sweep sets the catalog with), so #1421 keeps or
     moves those two when it deletes `mirror.ts` and `shadow.ts`.
 
   Each needs a home outside the deleted code before it goes; the retirement
-  story's list names them. When the referee goes, `VC_CARD_TEXT_UPDATE`
-  loses its `typescript` value and the sweep is the card-text golden's only
-  writer.
+  story's list names them. #1813 removed two direct paths: the frame loop no
+  longer re-exports `engine/sim/frameStep`, and the shipped card kit no
+  longer imports the TypeScript reference card, which only tests read now
+  (the card kit still reaches `engine/catalog` through `towerCatalog`, the
+  entry above). When the
+  referee goes, `VC_CARD_TEXT_UPDATE` loses its `typescript` value and the
+  sweep is the card-text golden's only writer.
 - Review: `/gds-code-review` (engine data fidelity).

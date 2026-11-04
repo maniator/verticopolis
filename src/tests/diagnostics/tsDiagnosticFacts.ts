@@ -6,7 +6,7 @@ import { towerCatalog } from "../../catalog/towerCatalog";
 import { bindingTransportClassAt, dominantGripe, nearNightclub, reachesLobby, servingTransportKindsAt, unmetCoverage } from "../../engine/sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../../engine/sim/satisfactionStep";
 import { isPresent, type Unit, type VacateReason } from "../../engine/types";
-import { hasAccessDiagnostic } from "../../game/facilityDiagnostics";
+import { hasAccessDiagnostic } from "../../game/cardLines";
 import { unitPrice } from "../../ui/catalogPricing";
 
 /**

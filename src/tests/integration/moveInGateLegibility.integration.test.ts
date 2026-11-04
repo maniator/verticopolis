@@ -3,7 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import type { VacateReason } from "../../engine/types";
 import { vacate } from "../../engine/sim/churn";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../../engine/sim/satisfactionStep";
-import { wontLeaseText } from "../../game/gripeCopy";
+import { wontLeaseText } from "../diagnostics/gripeCopy";
 import { W, C, DAY, servedTower, place, placeRental, seat } from "./moveInGateHelpers";
 
 /**

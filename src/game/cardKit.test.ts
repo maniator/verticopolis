@@ -38,14 +38,23 @@ function withoutTower(engine: TsEngine): EnginePort {
 }
 
 describe("the card kit's unit lines on an engine with no TypeScript tower", () => {
-  it("show a recycling center's fill and capacity lines, the same as the TypeScript tower's", () => {
-    const { sim, centerId } = tower();
+  it("show a recycling center's fill and capacity lines without ever reading a TypeScript tower", () => {
+    const { sim, centerId, officeId } = tower();
     const engine = new TsEngine(sim);
-    const reader = new ViewReader(engine, facilityFloors);
-    const own = createCardKit({ enginePort: engine, reader }).diagnostics.unit(centerId);
-    const hosted = createCardKit({ enginePort: withoutTower(engine), reader }).diagnostics.unit(centerId);
-    expect(own).toHaveLength(2);
-    expect(hosted).toEqual(own);
+    const sealed = new Proxy(engine, {
+      get: (target, key) => {
+        if (key === "sim") throw new Error("the card kit read the TypeScript tower");
+        return Reflect.get(target, key, target);
+      },
+    }) as unknown as EnginePort;
+    // The reader decodes from the same sealed port, so neither the kit nor
+    // the view it reads can reach the TypeScript tower.
+    const reader = new ViewReader(sealed, facilityFloors);
+    const kit = createCardKit({ enginePort: sealed, reader });
+    const center = kit.diagnostics.unit(centerId);
+    expect(center).toHaveLength(2);
+    expect(center.map((l) => l.values.join("|")).join("\n")).toContain((2500).toLocaleString());
+    expect(kit.diagnostics.unit(officeId).length).toBeGreaterThan(0);
   });
 
   it("read the capacity from the port", () => {

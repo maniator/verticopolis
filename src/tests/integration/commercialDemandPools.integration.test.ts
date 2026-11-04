@@ -10,7 +10,7 @@ import { CLASSIC_RULES } from "../../engine/gameRules";
 import { ECON } from "../../engine/econConfig";
 import { GRID, FACILITIES } from "../../engine/facilities";
 import type { FacilityKind, GameMode, Unit } from "../../engine/types";
-import { facilityDiagnostics } from "../../game/facilityDiagnostics";
+import { facilityDiagnostics } from "../diagnostics/facilityDiagnostics";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 
 /**

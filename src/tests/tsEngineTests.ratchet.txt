@@ -26,9 +26,7 @@ src/game/cardKit.fixture.ts port/tsEngine
 src/game/cardKit.test.ts Simulation port/tsEngine
 src/game/engineWiring.test.ts Simulation
 src/game/exportFlow.test.ts Simulation
-src/game/facilityDiagnostics.test.ts Simulation
 src/game/frameLoop.fixture.ts Simulation port/tsEngine sim/frameStep
-src/game/frameLoop.test.ts sim/fixedStep
 src/game/portAccess.test.ts Simulation
 src/game/portDeps.fixture.ts port/tsEngine
 src/game/portLifecycle.test.ts Simulation port/tsEngine
@@ -62,10 +60,15 @@ src/storage/towerFileCodec.test.ts sim/founderStatus
 src/storage/vctowerWriter.test.ts Simulation
 src/tests/barrelSurface.test.ts Crowd EconomySystem Simulation Tower
 src/tests/conformance/checkpointDetail.test.ts Simulation
+src/tests/conformance/fixedStepCases.ts sim/frameStep # writes the fixed-step cases the Rust step driver replays; reached through the shipped frameLoop re-export until #921 took it out of the game
 src/tests/conformance/panelProbe.ts Simulation sim/founderStatus
 src/tests/conformance/scenario.ts Simulation sim/coerce sim/founderStatus
+src/tests/diagnostics/facilityDiagnostics.test.ts Simulation # moved from src/game with the file it tests (#921)
+src/tests/diagnostics/facilityDiagnostics.ts EconomySystem Simulation sim/constants sim/gripe # moved from src/game with the TypeScript reference card (#921): the card the card-text referee holds the golden to (#1809) until src/engine/ goes
+src/tests/diagnostics/gripeCopy.ts sim/gripe sim/satisfactionStep # moved from src/game with the TypeScript reference card (#921): the card the card-text referee holds the golden to (#1809) until src/engine/ goes
+src/tests/diagnostics/housekeepingDiagnostics.ts economy/housekeeping # moved from src/game with the TypeScript reference card (#921): the card the card-text referee holds the golden to (#1809) until src/engine/ goes
 src/tests/diagnostics/tsDiagnosticFacts.ts sim/constants sim/gripe sim/satisfactionStep
-src/tests/dualrun/dualRunHarness.ts Simulation sim/founderStatus
+src/tests/dualrun/dualRunHarness.ts Simulation sim/founderStatus sim/frameStep # sim/frameStep was reached through the shipped frameLoop re-export until #921 took it out of the game
 src/tests/fixtures/saveText.ts Simulation port/tsEngine
 src/tests/fixtures/scheduleTower.ts Simulation
 src/tests/fixtures/serviceDiagnostics.fixture.ts Simulation

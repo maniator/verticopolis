@@ -21,10 +21,20 @@
 #   4. A bundler keeps a class's methods whole, so the classes the read model
 #      constructs (Crowd, EconomySystem, EventSystem, ElevatorDispatch, Tower)
 #      carry their step-time code even though nothing calls it here.
-#   5. Reference data and rules the UI reads (catalog, prices, caps) move to
-#      the engine's catalog through #921.
+#   5. Reference data and rules (catalog, prices, caps). The UI reads these
+#      from the engine's catalog. The boot catalog check
+#      (src/wasmhost/catalogCheck.ts) still runs the TypeScript `catalogFor`,
+#      and code the game ships but never runs (the `towerCatalog` default
+#      source, `SaveGame.import`, the WASM host's restore points) still
+#      imports the TypeScript tables; all of it leaves with the TypeScript
+#      engine (#921).
 #   6. The host-side step driver (fixedStep, timePacing) feeds the engine's
 #      tick; it moves into the crate with #867 (cutover AD-2).
+# Items 1 to 3 were written for the hosted build (`attachWasmHost`), which
+# only tests run now; the Rust-only build does not run that code. The
+# modules still ship because shipped files import them (`SaveGame.ts` and
+# `hostFault.ts` import `Simulation`, `catalogCheck.ts` the catalog), and
+# this header is rewritten when the TypeScript engine is deleted (#921).
 # The measured breakdown and the follow-up plan are in
 # docs/performance/wasm-only-bundle.md.
 
@@ -110,7 +120,8 @@ src/engine/migrations/v4tov5.ts
 src/engine/migrations/v5tov6.ts
 src/engine/migrations/v6tov7.ts
 
-# Reference data, rules and catalog reads (#921)
+# Reference data and rules behind the boot catalog check and the modules
+# that still import them (#921)
 src/engine/calendar.ts
 src/engine/catalog.ts
 src/engine/econConfig.ts

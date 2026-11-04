@@ -4,7 +4,7 @@ import { Simulation } from "../../engine/Simulation";
 import { dominantGripe, vacateCause } from "../../engine/sim/gripe";
 import { GRID } from "../../engine/facilities";
 import type { FacilityKind, Unit } from "../../engine/types";
-import { gripeLineText } from "../../game/gripeCopy";
+import { gripeLineText } from "../diagnostics/gripeCopy";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 
 /**

@@ -1909,11 +1909,24 @@ describe("showSettings: the Settings dialog", () => {
     expect(dialog().querySelector("#set-auto-bridge")).toBeNull();
   });
 
+  it("omits the bridging switch where the catalog withholds it, whatever the mode's name says", () => {
+    const { ui } = makeUI({ getMode: () => "modern" as const, getCatalog: () => catalogFor("classic") });
+    ui.showSettings();
+    expect(dialog().querySelector("#set-auto-bridge")).toBeNull();
+  });
+
+  it("shows the bridging switch where the catalog offers it, whatever the mode's name says", () => {
+    const { ui } = makeUI({ getMode: () => "classic" as const, getCatalog: () => catalogFor("modern") });
+    ui.showSettings();
+    expect(dialog().querySelector("#set-auto-bridge")).not.toBeNull();
+  });
+
   it("follows the callback across toggles for the Modern bridging switch", async () => {
     let on = true;
     const toggle = vi.fn(async () => (on = !on));
     const { ui, cb } = makeUI({
       getMode: () => "modern" as const,
+      getCatalog: () => catalogFor("modern"),
       isAutoBridge: vi.fn(() => on),
       onToggleAutoBridge: toggle,
     });
@@ -1933,7 +1946,7 @@ describe("showSettings: the Settings dialog", () => {
     // The engine kept bridging on (a refused toggle): the click's own uncheck
     // must not stick once the answer arrives.
     const toggle = vi.fn(async () => true);
-    const { ui } = makeUI({ getMode: () => "modern" as const, isAutoBridge: vi.fn(() => true), onToggleAutoBridge: toggle });
+    const { ui } = makeUI({ getMode: () => "modern" as const, getCatalog: () => catalogFor("modern"), isAutoBridge: vi.fn(() => true), onToggleAutoBridge: toggle });
     ui.showSettings();
     const sw = dialog().querySelector<HTMLInputElement>("#set-auto-bridge")!;
     sw.click();
@@ -1946,7 +1959,7 @@ describe("showSettings: the Settings dialog", () => {
   it("puts the Modern bridging switch back on the live preference when the toggle fails, and reports the fault", async () => {
     const fault = new Error("engine fault");
     const toggle = vi.fn(() => Promise.reject(fault));
-    const { ui } = makeUI({ getMode: () => "modern" as const, isAutoBridge: vi.fn(() => true), onToggleAutoBridge: toggle });
+    const { ui } = makeUI({ getMode: () => "modern" as const, getCatalog: () => catalogFor("modern"), isAutoBridge: vi.fn(() => true), onToggleAutoBridge: toggle });
     ui.showSettings();
     const sw = dialog().querySelector<HTMLInputElement>("#set-auto-bridge")!;
     const seen = await unhandled(async () => {
