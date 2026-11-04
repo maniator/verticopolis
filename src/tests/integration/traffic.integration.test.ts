@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { trafficTier, TRAFFIC_LABELS, trafficGlyph } from "../../presentation/traffic";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
+import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 const W = GRID.width;
 const C = Math.floor(W / 2);
@@ -42,11 +43,12 @@ describe("Traffic tier (color-blind cue)", () => {
   });
 });
 
-describe("Traffic signal is peak-driven and points at the hotspot", () => {
+describeEngines("Traffic signal is peak-driven and points at the hotspot", (leg: Leg) => {
   /** A tower with 8 lightly-loaded floors served by a strong shaft (zone A) plus
    *  3 floors packed onto a single weak shaft (zone B), transferring at floor 10.
-   *  Zone B is a real jam; zone A dilutes the average but not the peak. */
-  function hotspotTower(): Simulation {
+   *  Zone B is a real jam; zone A dilutes the average but not the peak. The
+   *  draft is the fixture's authoring copy; the engine starts from its save. */
+  function hotspotTower(): PortSim {
     const sim = Simulation.newGame(1);
     sim.simModel = "v2";
     sim.money = 1e12;
@@ -58,26 +60,26 @@ describe("Traffic signal is peak-driven and points at the hotspot", () => {
     sim.tower.setCars(sim.tower.transports[1].id, 1); // weak shaft, high zone
     for (let f = 2; f <= 9; f++) fillFloor(sim, f, 12); // healthy zone A
     for (const f of [11, 12, 13]) fillFloor(sim, f, 30); // jammed zone B
-    return sim;
+    return new PortSim(leg, sim);
   }
 
   it("a localized jam reads as a high tier on PEAK where the AVERAGE would understate it", () => {
     const sim = hotspotTower();
     const avg = sim.congestion();
-    const peak = sim.peakCongestion();
+    const peak = sim.hotspot().ratio;
     expect(peak).toBeGreaterThan(avg); // the jam is hidden in the mean
     // The chip (peak) flags the jam; feeding the average would report a lower tier.
     expect(trafficTier(peak)).toBeGreaterThanOrEqual(2); // Backed up or Gridlock
     expect(trafficTier(peak)).toBeGreaterThan(trafficTier(avg));
   });
 
-  it("names the busiest floor — the argmax of the per-floor congestion map", () => {
+  it("names the busiest floor: the argmax of the per-floor congestion map", () => {
     const sim = hotspotTower();
-    const floor = sim.peakCongestionFloor();
-    expect(floor).not.toBeNull();
+    const { ratio, floor } = sim.hotspot();
+    expect(floor).toBeDefined();
     expect([11, 12, 13]).toContain(floor); // the jam is in zone B
     // It is exactly the floor whose congestion equals the peak.
-    expect(sim.congestionAt(floor!)).toBeCloseTo(sim.peakCongestion(), 5);
+    expect(sim.floorCongestion(floor!)).toBeCloseTo(ratio, 5);
   });
 
   it("names the ground lobby (1F) when a lobby-served bank is the bottleneck", () => {
@@ -85,53 +87,56 @@ describe("Traffic signal is peak-driven and points at the hotspot", () => {
     // from the lobby. Every floor it serves shares that one bottleneck, so they
     // all tie, and the lobby is where riders board it. The hotspot must be floor
     // 1 (the "1F" the player sees backed up), not the first office floor above.
-    const sim = Simulation.newGame(7);
-    sim.simModel = "v2";
-    sim.money = 1e12;
-    lay(sim, "lobby", 1);
-    for (let f = 2; f <= 10; f++) lay(sim, "floor", f);
-    expect(sim.buildTransport("elevatorStandard", W - 6, 1, 10).ok).toBe(true);
-    sim.tower.setCars(sim.tower.transports[0].id, 1); // one weak shaft, lobby-served
-    for (let f = 2; f <= 10; f++) fillFloor(sim, f, 30); // a heavy office stack
-    expect(sim.peakCongestionFloor()).toBe(1); // the lobby, not 2F
+    const draft = Simulation.newGame(7);
+    draft.simModel = "v2";
+    draft.money = 1e12;
+    lay(draft, "lobby", 1);
+    for (let f = 2; f <= 10; f++) lay(draft, "floor", f);
+    expect(draft.buildTransport("elevatorStandard", W - 6, 1, 10).ok).toBe(true);
+    draft.tower.setCars(draft.tower.transports[0].id, 1); // one weak shaft, lobby-served
+    for (let f = 2; f <= 10; f++) fillFloor(draft, f, 30); // a heavy office stack
+    const sim = new PortSim(leg, draft);
+    const { ratio, floor } = sim.hotspot();
+    expect(floor).toBe(1); // the lobby, not 2F
     // The lobby's reading is the true per-floor max, and it carries the boarding
     // pressure the office floors above share, not a signal of its own residents.
-    expect(sim.congestionAt(1)).toBeCloseTo(sim.peakCongestion(), 10);
-    expect(trafficTier(sim.peakCongestion())).toBeGreaterThanOrEqual(2);
+    expect(sim.floorCongestion(1)).toBeCloseTo(ratio, 10);
+    expect(trafficTier(ratio)).toBeGreaterThanOrEqual(2);
   });
 
   it("a well-built tower stays Smooth and names no floor (peak below the first boundary)", () => {
-    const sim = Simulation.newGame(2);
-    sim.simModel = "v2";
-    sim.money = 1e12;
-    lay(sim, "lobby", 1);
-    for (let f = 2; f <= 12; f++) lay(sim, "floor", f);
+    const draft = Simulation.newGame(2);
+    draft.simModel = "v2";
+    draft.money = 1e12;
+    lay(draft, "lobby", 1);
+    for (let f = 2; f <= 12; f++) lay(draft, "floor", f);
     for (let i = 0; i < 4; i++) {
-      const r = sim.buildTransport("elevatorStandard", W - 6 - i * 6, 1, 12);
-      if (r.ok) sim.tower.setCars(sim.tower.transports[i].id, 8);
+      const r = draft.buildTransport("elevatorStandard", W - 6 - i * 6, 1, 12);
+      if (r.ok) draft.tower.setCars(draft.tower.transports[i].id, 8);
     }
-    for (let f = 2; f <= 12; f++) fillFloor(sim, f, 12);
-    expect(trafficTier(sim.peakCongestion())).toBe(0); // Smooth
+    for (let f = 2; f <= 12; f++) fillFloor(draft, f, 12);
+    expect(trafficTier(new PortSim(leg, draft).hotspot().ratio)).toBe(0); // Smooth
   });
 
-  it("peakCongestionFloor is null (not 0 — a real floor) when nothing is congested", () => {
-    const sim = Simulation.newGame(3);
-    sim.simModel = "v2";
-    sim.money = 1e12;
-    lay(sim, "lobby", 1);
-    expect(sim.peakCongestion()).toBe(0);
-    expect(sim.peakCongestionFloor()).toBeNull(); // null, so it never collides with floor 0 (B1)
+  it("the hotspot names no floor (not 0, a real floor) when nothing is congested", () => {
+    const draft = Simulation.newGame(3);
+    draft.simModel = "v2";
+    draft.money = 1e12;
+    lay(draft, "lobby", 1);
+    const { ratio, floor } = new PortSim(leg, draft).hotspot();
+    expect(ratio).toBe(0);
+    expect(floor).toBeUndefined(); // no floor, so it never collides with floor 0 (B1)
   });
 
-  it("chip and overlay legend read the same signal — peakCongestion is the true per-floor max", () => {
-    // Both consumers read sim.peakCongestion(): the HUD chip tiers on it, the
+  it("chip and overlay legend read the same signal: the hotspot ratio is the true per-floor max", () => {
+    // Both consumers read the hotspot ratio: the HUD chip tiers on it, the
     // congestion overlay legend reports it. It must equal the worst floor's
-    // congestion and dominate every other floor — the one value both surface.
+    // congestion and dominate every other floor, the one value both surface.
     const sim = hotspotTower();
-    const floor = sim.peakCongestionFloor()!;
-    expect(sim.peakCongestion()).toBeCloseTo(sim.congestionAt(floor), 10);
+    const { ratio, floor } = sim.hotspot();
+    expect(ratio).toBeCloseTo(sim.floorCongestion(floor!), 10);
     for (let f = 2; f <= 20; f++) {
-      expect(sim.congestionAt(f)).toBeLessThanOrEqual(sim.peakCongestion() + 1e-9);
+      expect(sim.floorCongestion(f)).toBeLessThanOrEqual(ratio + 1e-9);
     }
   });
 });

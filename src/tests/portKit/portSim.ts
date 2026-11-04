@@ -4,6 +4,7 @@ import { TsEngine } from "../../engine/port/tsEngine";
 import { Simulation } from "../../engine/Simulation";
 import type { Tower } from "../../engine/Tower";
 import type { FacilityKind, SerializedGame, Transport, Unit } from "../../engine/types";
+import type { HeatCell, HeatmapMode } from "../../engine/sim/constants";
 import type { EnginePort } from "../../simport/enginePort";
 import type { StatsReport } from "../../simport/panels";
 import { PortCodes } from "../../simport/portCodes";
@@ -203,6 +204,37 @@ export class PortSim {
    *  undefined when it holds none (a shaft it never sampled or has dropped). */
   elevatorUtilization(id: number): number | undefined {
     return this.leaf.elevatorUtilization(id);
+  }
+
+  /** The overlay cells for `mode`, decoded from the port's `heatCells`
+   *  record by the `heatCell` slot names of the port's own layout. */
+  heatCells(mode: HeatmapMode): HeatCell[] {
+    const layout = JSON.parse(this.leaf.port.viewLayout()) as { heatModes: HeatmapMode[]; heatTints: string[]; records: Record<string, string[]> };
+    const modeIndex = layout.heatModes.indexOf(mode);
+    if (modeIndex < 0) throw new Error(`PortSim.heatCells: the engine's layout has no heat mode "${mode}"`);
+    const slots = layout.records.heatCell ?? [];
+    const slot = (name: string): number => {
+      const at = slots.indexOf(name);
+      if (at < 0) throw new Error(`PortSim.heatCells: the engine's heatCell record has no "${name}" slot`);
+      return at;
+    };
+    const [floor, minX, maxX, severity, tint] = ["floor", "minX", "maxX", "severity", "tint"].map(slot);
+    const r = this.leaf.port.heatCells(modeIndex);
+    if (r.length % slots.length !== 0) throw new Error(`PortSim.heatCells: ${r.length} values is not a whole number of ${slots.length}-slot cells`);
+    const cells: HeatCell[] = [];
+    for (let i = 0; i < r.length; i += slots.length) {
+      const cell: HeatCell = { floor: r[i + floor], minX: r[i + minX], maxX: r[i + maxX], severity: r[i + severity] };
+      const code = r[i + tint];
+      if (!Number.isInteger(code) || code < 0 || code >= layout.heatTints.length) throw new Error(`PortSim.heatCells: tint code ${code} is not in the layout's heatTints`);
+      if (code > 0) cell.tint = layout.heatTints[code] as HeatCell["tint"];
+      cells.push(cell);
+    }
+    return cells;
+  }
+
+  /** The mean congestion over populated floors (the lobby left out). */
+  congestion(): number {
+    return this.leaf.port.congestion();
   }
 
   /** The raw congestion ratio of one floor, as the engine reports it. */
