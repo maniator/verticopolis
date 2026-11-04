@@ -317,6 +317,19 @@ command runs `conformanceWasmTdt`, the `.TDT` differential test, whose
 `VC_TDT_DIFF_*` switches are described in the `.TDT` section above, and
 `conformanceWasmVctower`, the `.vctower` writer test).
 
+The same day gate is pinned in the frame-day golden
+(`src/tests/goldens/frame-days.json`): the engine plays each case through its
+own `advance`, as the game's frame loop calls it, and must reproduce every
+checkpoint (the start, the first frame, each hour and the end of the day), and
+the TypeScript engine is held to the same file until it is deleted. It is
+the proposed replacement for the dual run when the mirror goes (#1421; owner
+sign-off pending on #945). `VC_FRAME_DAYS_UPDATE=1` rewrites it from this
+engine. To find the field behind a
+moved hash, `VC_FRAME_DAYS_DUMP=<dir> VC_FRAME_DAYS_CASE=<case id>` writes the
+case's canonical views at each checkpoint under `<dir>/rust/` (and
+`<dir>/typescript/` from the referee), to diff against a run of the build
+before the change.
+
 The referee prints one line per scenario: `ok`, the first divergent
 checkpoint with both hashes, or the first command the port cannot run. It
 exits non-zero unless every scenario matches. When a checkpoint diverges,

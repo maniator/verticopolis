@@ -25,9 +25,23 @@ TypeScript engine is the default; the Rust engine answers twice, natively
 through `cargo run --release --features conformance --bin conformance` and through its WASM binding
 from Node (`npm run wasm:build && npm run test:wasm`, see
 `engine-rs/README.md`), where the same TypeScript runner replays every
-scenario against this lock. Beyond the scripted scenarios, the dual run
-(`src/dualrun/`, `npm run test:wasm`) compares the two engines every hour
-under the web frame loop's own cadence, for a day on every fixture.
+scenario against this lock. Beyond the scripted scenarios, the frame-day
+golden (`src/tests/goldens/frame-days.json`, built by
+`src/tests/goldens/frameDays.ts`) pins a day on every fixture at every speed,
+played through the port's `advance` as the web frame loop plays it, as
+hashes of the same two views and of the gameplay events at the start, after
+the first frame, every hour and at the end of the day. The Rust engine is
+checked against it in `npm run test:wasm`
+(`conformanceWasmFrameDays.integration.test.ts`), and the TypeScript engine
+is checked against the same file (`frameDaysReferee.integration.test.ts`)
+until it is deleted, so the two engines agree through it. It is written by
+the Rust run under its own switch (`VC_FRAME_DAYS_UPDATE=1 npx vitest run
+--project integration conformanceWasmFrameDays`, with the engine package
+built), on purpose and in the same pull request as the change that moves it,
+like the lock. It is not
+one of the lock files below, so a refresh of it alone does not move the crate
+version. The dual run (`src/dualrun/`) still compares the two engines through
+the mirror until #1421 retires it.
 
 ## When a hash moves
 
@@ -39,7 +53,11 @@ VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration conformance
 ```
 
 An update writes the lock only when every test in the run passes and every
-scenario finishes, and it refuses to run in CI.
+scenario finishes, and it refuses to run in CI. With the engine package built,
+the same command also matches `conformanceWasmFrameDays`, which checks the
+frame-day golden and never writes it. A simulation change that moves the lock
+usually moves that golden too, so that run fails there until the golden is
+refreshed with its own switch (above); both go in the diff.
 
 A change to any of the five lock files (`catalog-digests.json`,
 `events/catalog.json`, `expected.json`, `loader-cases.json`, `tdt-cases.json`)

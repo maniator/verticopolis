@@ -75,7 +75,7 @@ src/tests/integration/attendanceTripwire.integration.test.ts Clock Simulation cr
 src/tests/integration/attendanceTripwireEngine.integration.test.ts Simulation # kit suite: authors its draft on a Simulation
 src/tests/integration/calendar.integration.test.ts Clock EconomySystem Simulation Tower rng
 src/tests/integration/capacityEventMatrix.integration.test.ts Simulation
-src/tests/integration/cardTextParity.integration.test.ts Simulation
+src/tests/integration/cardTextReferee.integration.test.ts Simulation port/tsEngine # the TypeScript referee for the card-text golden (#1806): it builds the sweep's towers and holds the golden to the reference card, and goes with src/engine/
 src/tests/integration/chargeBindingRaw.integration.test.ts Simulation sim/charges
 src/tests/integration/cockroachInfestation.integration.test.ts Simulation economy/housekeeping
 src/tests/integration/commercialDemandPools.integration.test.ts Clock EconomySystem Simulation Tower rng sim/demand
@@ -109,6 +109,7 @@ src/tests/integration/engineView.integration.test.ts Simulation UndoHistory towe
 src/tests/integration/eventSprites.integration.test.ts Simulation
 src/tests/integration/faqComplete.integration.test.ts Simulation
 src/tests/integration/fixedStep.integration.test.ts Simulation sim/fixedStep
+src/tests/integration/frameDaysReferee.integration.test.ts port/tsEngine # the TypeScript referee for the frame-day golden (#945 Dual run row): it holds the golden equal to the engine the dual run compared, and goes with src/engine/
 src/tests/integration/gameControllers.integration.test.ts Simulation
 src/tests/integration/gameControllersCoverage.integration.test.ts Simulation port/tsEngine
 src/tests/integration/gameEvents.integration.test.ts Clock EventSystem Tower rng
