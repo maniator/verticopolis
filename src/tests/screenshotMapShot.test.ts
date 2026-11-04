@@ -100,7 +100,10 @@ describe("mapForShot", () => {
     await expect(mapForShot(page, "scene/pill", "#btn-map")).rejects.toThrow("scene/pill: the Map crop is hidden");
   });
 
-  it("reads an empty crop as a full-page shot, and names a crop that is no CSS selector", async () => {
+  it("reads an empty crop as a full-page shot, and names a crop that is not a CSS selector", async () => {
+    // A full-page shot still needs a Map that has drawn its tower.
+    await expect(mapForShot(page, "scene/blank", "")).rejects.toThrow("scene/blank: the Map is open but has not drawn the tower yet");
+    expect(open).toBe(true);
     map().dataset.mapDrawn = "true";
     await mapForShot(page, "scene/full", "");
     expect(open).toBe(true);

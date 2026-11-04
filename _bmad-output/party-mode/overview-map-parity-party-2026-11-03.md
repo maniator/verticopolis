@@ -58,6 +58,7 @@ What exists:
 
 1. **v1 is unchanged and ships first.** S5 removes `?map` and ships the Edit view: the rename, Help, the gallery, the paired perf pass (the owner later chose to merge S5 first and run it on the PC before the RC, #1726) and the S4 follow-ups. The view tabs never hold v1 back.
 2. **The view tabs ship together or not at all.** They are built behind a second preview flag, `?mapviews`, and one slice flips it. If any tab misses the RC freeze, the whole set moves to 3.1.0.
+   - **Owner update (2026-11-04):** no URL flag. The tabs are always built, and the tab slices wait unmerged in one stack of pull requests and merge together, so S9 has no flag to remove.
 3. **Slices**, each a single PR:
    - **S6:** the tab row (Edit, Eval, Pricing, Hotel) and the Hotel view (#1617), using existing data.
    - **S7:** a Rust export with per-room rating and per-room rent level in one batch read. Crate bump, CHANGELOG, `engine:compat`, the conformance lock and the binding declaration.

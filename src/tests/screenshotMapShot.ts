@@ -29,7 +29,7 @@ export async function mapForShot(page: Page, where: string, crop: string | undef
     try {
       target = selector === null ? null : document.querySelector(selector);
     } catch {
-      // Playwright-only syntax (`>> nth=0`, `text=`) is no CSS selector.
+      // Playwright-only syntax (`>> nth=0`, `text=`) is not a CSS selector.
       return "bad crop";
     }
     const mapCrop = target !== null && (!!map?.contains(target) || !!pill?.contains(target));
