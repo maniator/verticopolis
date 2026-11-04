@@ -444,3 +444,6 @@ pub fn catalog_digest(mode: GameMode) -> String {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod charge_tests;
