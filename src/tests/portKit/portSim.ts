@@ -2,13 +2,10 @@ import { afterEach, describe } from "vitest";
 import { KIND_CODES, VIEW_LAYOUT, codeOf } from "../../engine/port/layout";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { Simulation } from "../../engine/Simulation";
-import { Clock } from "../../engine/Clock";
 import { crowdView } from "../../engine/conformanceView";
-import { syncAttendanceOccupants } from "../../engine/census";
-import { markRoom, setRoomState } from "../../engine/tower/rooms";
 import type { Person } from "../../engine/crowd/person";
 import type { Tower } from "../../engine/Tower";
-import { isUnitState, type FacilityKind, type SerializedGame, type Transport, type Unit, type UnitState } from "../../engine/types";
+import type { FacilityKind, SerializedGame, Transport, Unit, UnitState, WeatherKind } from "../../engine/types";
 import type { HeatCell, HeatmapMode } from "../../engine/sim/constants";
 import type { EnginePort } from "../../simport/enginePort";
 import type { StatsReport } from "../../simport/panels";
@@ -16,6 +13,7 @@ import { PortCodes } from "../../simport/portCodes";
 import { statsReport } from "../../simport/statsSheet";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
+import { tsTooling, type ToolingSetters } from "./tsTooling";
 
 /**
  * The test kit for suites that run on the engine port (#878, #1421; PR 7 of
@@ -58,29 +56,20 @@ export type TowerView = Readonly<Omit<Tower, TowerWrites | "units" | "transports
 /** A read-only copy of the engine's save, as a `Simulation`. */
 export type Snapshot = Readonly<Omit<Simulation, SimulationWrites | "tower">> & { readonly tower: TowerView };
 
-interface Leaf {
+interface Leaf extends ToolingSetters {
   readonly port: EnginePort;
-  /** The tooling-only members (binding tier 3), the same on both engines. */
+  /** The tooling-only members (binding tier 3), the same on both engines;
+   *  the mid-run setters come from {@link ToolingSetters}. */
   startFire(): void;
   bombThreat(): void;
   evaluateStar(): void;
   setMoney(amount: number): void;
-  setClock(minutes: number): boolean;
-  setUnitState(id: number, state: UnitState, occupants?: number): boolean;
-  setCustomersIn(id: number, count: number): boolean;
   /** The live crowd as the conformance view writes it. */
   crowdView(): { people: Person[] };
   /** The hourly utilization average the engine holds for a shaft, if any. */
   elevatorUtilization(id: number): number | undefined;
   free(): void;
 }
-
-/** The tooling setters' bounds, the same on both legs (the Rust members in
- *  `exports_state.rs` carry the twins): the latest clock in minutes, and the
- *  states a bare write cannot make because the engine keeps a timer or an
- *  event record beside them. */
-const MAX_TOOL_CLOCK_MINUTES = 1e9;
-const NEEDS_ITS_OWN_RECORD: ReadonlySet<UnitState> = new Set(["construction", "fire"]);
 
 function makeLeaf(leg: Leg, save: string): Leaf {
   if (leg === "ts") {
@@ -93,32 +82,7 @@ function makeLeaf(leg: Leg, save: string): Leaf {
       setMoney: (amount) => {
         engine.sim.money = amount;
       },
-      // The same refusals as the Rust members, so a test fails alike on both.
-      setClock: (minutes) => {
-        if (!(minutes >= 0 && minutes <= MAX_TOOL_CLOCK_MINUTES)) return false;
-        engine.sim.clock = new Clock(minutes, engine.sim.clock.calendar);
-        return true;
-      },
-      setUnitState: (id, state, occupants) => {
-        const unit = engine.sim.tower.units.find((u) => u.id === id);
-        if (!unit || !isUnitState(state) || NEEDS_ITS_OWN_RECORD.has(state)) return false;
-        if (occupants !== undefined && !(Number.isSafeInteger(occupants) && occupants >= 0)) return false;
-        setRoomState(engine.sim.tower, unit, state);
-        if (occupants !== undefined) {
-          unit.occupants = occupants;
-          markRoom(engine.sim.tower, unit);
-        }
-        return true;
-      },
-      setCustomersIn: (id, count) => {
-        const unit = engine.sim.tower.units.find((u) => u.id === id);
-        if (!unit || !(Number.isSafeInteger(count) && count >= 0)) return false;
-        unit.customersIn = count + 0; // + 0 turns -0 into 0, as the Rust i64 cast does
-        syncAttendanceOccupants(unit);
-        markRoom(engine.sim.tower, unit);
-        engine.sim.tower.bumpMealOverlayRevision();
-        return true;
-      },
+      ...tsTooling(engine),
       crowdView: () => JSON.parse(JSON.stringify(crowdView(engine.sim))) as { people: Person[] },
       elevatorUtilization: (id) => engine.sim.elevatorUtilization(id),
       free: () => undefined,
@@ -134,6 +98,8 @@ function makeLeaf(leg: Leg, save: string): Leaf {
     setClock: (minutes) => engine.setClock(minutes),
     setUnitState: (id, state, occupants) => engine.setUnitState(id, state, occupants),
     setCustomersIn: (id, count) => engine.setCustomersIn(id, count),
+    setWeather: (weather) => engine.setWeather(weather),
+    clearRetailTallies: () => engine.clearRetailTallies(),
     crowdView: () => JSON.parse(engine.crowdView()) as { people: Person[] },
     elevatorUtilization: (id) => (JSON.parse(engine.elevatorTelemetry()) as { util: [number, number][] }).util.find(([shaft]) => shaft === id)?.[1],
     free: () => engine.free(),
@@ -317,7 +283,7 @@ export class PortSim {
     if (this.ticked) {
       throw new Error("PortSim.setup runs before the engine's first tick; a mid-run write needs a tooling-only member on the engine");
     }
-    if (this.unsavedWrite) throw new Error("PortSim.setup reloads the engine from its save, which would drop an earlier setCustomersIn; call setup first");
+    if (this.unsavedWrite) throw new Error("PortSim.setup reloads the engine from its save, which would drop an earlier setCustomersIn or setWeather; call setup first");
     const draft = Simulation.deserialize(JSON.parse(this.leaf.port.serialize()) as SerializedGame);
     const out = edit(draft);
     const answer = this.leaf.port.loadSave(JSON.stringify(draft.serialize()));
@@ -450,6 +416,22 @@ export class PortSim {
   setCustomersIn(id: number, count: number): void {
     if (!this.leaf.setCustomersIn(id, count)) throw new Error(`PortSim.setCustomersIn: the engine refused unit ${id} customers ${count}`);
     this.unsavedWrite = true;
+    this.changed();
+  }
+
+  /** Set today's weather mid-run, which no save carries: the next day's roll
+   *  replaces it, and so does a load, so call it after {@link setup}. The
+   *  `state` snapshot is a save, so its `weather` is the day's computed one. */
+  setWeather(weather: WeatherKind): void {
+    if (!this.leaf.setWeather(weather)) throw new Error(`PortSim.setWeather: the engine refused ${weather}`);
+    this.unsavedWrite = true;
+    this.changed();
+  }
+
+  /** Clear every unit's patronage and profit tallies (today and yesterday),
+   *  the render-only fields no economy path reads. */
+  clearRetailTallies(): void {
+    this.leaf.clearRetailTallies();
     this.changed();
   }
 

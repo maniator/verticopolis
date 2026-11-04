@@ -144,6 +144,46 @@ impl Engine {
         true
     }
 
+    /// Tooling only: set today's weather by its save name ("clear",
+    /// "cloudy" or "rain"), the TypeScript `sim.weather = w`. No save carries
+    /// it, and the next day's roll replaces it. False, changing nothing, for
+    /// any other name.
+    #[wasm_bindgen(js_name = setWeather)]
+    pub fn set_weather(&mut self, name: &str) -> bool {
+        use crate::sim_loop::Weather;
+        self.sim.weather = match name {
+            "clear" => Weather::Clear,
+            "cloudy" => Weather::Cloudy,
+            "rain" => Weather::Rain,
+            _ => return false,
+        };
+        true
+    }
+
+    /// Tooling only: clear every unit's four retail tallies (patronage and
+    /// profit, today and yesterday), the render-only fields no economy path
+    /// reads, so a test can show that clearing them changes no money.
+    #[wasm_bindgen(js_name = clearRetailTallies)]
+    pub fn clear_retail_tallies(&mut self) {
+        for u in self.sim.tower.units.iter_mut() {
+            let t = u.extras();
+            let tallied = t.patronage_today.is_some()
+                || t.patronage_yest.is_some()
+                || t.profit_today.is_some()
+                || t.profit_yest.is_some();
+            // Only a unit with a tally opens its extras: a write through
+            // `extras_mut` on a unit without any boxes a record just to drop it.
+            if !tallied {
+                continue;
+            }
+            let mut tally = u.extras_mut();
+            tally.patronage_today = None;
+            tally.patronage_yest = None;
+            tally.profit_today = None;
+            tally.profit_yest = None;
+        }
+    }
+
     /// `callExterminator()`: JSON `{ ok, reason?, cost?, rooms? }`, the
     /// TypeScript `ExterminatorResult`: `cost` and `rooms` ride on a booking
     /// and on the "funds" refusal, the other refusals carry the reason alone.

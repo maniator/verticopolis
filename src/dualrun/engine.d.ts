@@ -92,6 +92,12 @@ export class Engine {
     canBuild(kind: string, floor: number, x: number): string;
     changeCars(id: number, add: boolean): Float64Array;
     chooseAutoBridge(value: boolean): Float64Array;
+    /**
+     * Tooling only: clear every unit's four retail tallies (patronage and
+     * profit, today and yesterday), the render-only fields no economy path
+     * reads, so a test can show that clearing them changes no money.
+     */
+    clearRetailTallies(): void;
     clearStops(id: number): boolean;
     /**
      * Changes whenever a completed trip contributes a commute sample.
@@ -482,6 +488,13 @@ export class Engine {
      * `sim.view = view`, the camera a save carries, as JSON text (null clears).
      */
     setView(view?: string | null): void;
+    /**
+     * Tooling only: set today's weather by its save name ("clear",
+     * "cloudy" or "rain"), the TypeScript `sim.weather = w`. No save carries
+     * it, and the next day's roll replaces it. False, changing nothing, for
+     * any other name.
+     */
+    setWeather(name: string): boolean;
     shaftCard(id: number): Float64Array;
     shaftSchedule(id: number): Float64Array;
     startExtend(id: number): Float64Array;

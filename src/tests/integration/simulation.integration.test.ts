@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { itTypeScriptOnly } from "../parity/typescriptOnly";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation, ECON, VACATE_RESCIND } from "../../engine/Simulation";
 import { rentOf } from "../../engine/econConfig";
@@ -1708,35 +1707,6 @@ describe("Commercial-venue inspector: patronage/profit accumulation, rollover, s
     // 00:00 rollover and 15:00 the next day fills it partially, but it must
     // be strictly less than a full trading day's yesterday.
     expect(shop.patronageToday ?? 0).toBeLessThan(shop.patronageYest ?? 0);
-  });
-
-  itTypeScriptOnly("clears the render-only patronage and profit accumulators on the instance every hour mid-run, a write no command relays")("cosmetic invariant: money + pendingIncome unchanged when patronage/profit are read only from render", () => {
-    // Two towers, identical seed and script. One runs on the shipped code
-    // (accumulators active); the other has its accumulators forcibly cleared
-    // every hour. If any economy path READ the accumulators, this would drift.
-    const drive = (clearEveryHour: boolean): { money: number; pending: number[] } => {
-      const sim = builtTower(11);
-      const x0 = Math.floor(GRID.width / 2) - 20;
-      buildOne(sim, "office", x0);
-      buildOne(sim, "shop", x0 + 12);
-      for (let i = 0; i < 24 * 7; i++) {
-        sim.tick(60);
-        if (clearEveryHour) {
-          for (const u of sim.tower.units) {
-            u.patronageToday = undefined;
-            u.patronageYest = undefined;
-            u.profitToday = undefined;
-            u.profitYest = undefined;
-          }
-        }
-      }
-      const pending = sim.tower.units.map((u) => u.pendingIncome ?? 0);
-      return { money: sim.money, pending };
-    };
-    const withAccum = drive(false);
-    const cleared = drive(true);
-    expect(cleared.money).toBe(withAccum.money);
-    expect(cleared.pending).toEqual(withAccum.pending);
   });
 
   it("round-trip: patronage/profit fields survive serialize + deserialize", () => {
