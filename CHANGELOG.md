@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.78.17
+
+- A hotel room that was rented and is now empty and clean exports to a SimTower file as an empty clean room, so the original game no longer shows it as a sleeping guest.
+
 ## 2.78.16
 
 - Your tower now saves when you switch to another tab or app, so less of your last half minute is lost if the tab never comes back.

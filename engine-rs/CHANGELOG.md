@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.11.1 (2026-11-04)
+
+- The `.TDT` export writes a hotel room that has been rented and now sits clean and empty with the vacant-and-clean stay state (24, `0x18`), the byte the original game's own saves hold for such a room. It used to write a bare 1, which has no stay state, so the original read the room as a sleeping guest and rewrote it as `0x10` when it saved (found by the infested-room round trip on the PC, #1629). Importing either byte gives the same empty room that has been rented, so a round trip through our own importer is unchanged. Seven export digests in the conformance lock move. No saved-game, frame, view layout or catalog change.
+
 ## 1.11.0 (2026-11-03)
 
 - The view's frame header (`VIEW_LAYOUT_VERSION` 10) gains seven slots after `transports`: `day`, `dayOfWeek`, `isWeekend` (0 or 1), `quarter` and `year`, all counted from 0 on the tower's calendar, then `weekDays` and `weekendDays`, the calendar's week and weekend lengths in days. A host shows dates from them and no longer does the date arithmetic itself. The header is 39 slots wide (it was 32), so every record after it moves; read the offsets from `viewLayout()`. No saved-game, catalog or rule change.
