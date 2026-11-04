@@ -1,5 +1,6 @@
 import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright";
 import { processTreePss } from "./env";
+import { expectEngine, freshPage } from "./freshPage";
 import { adoptScenario, cpuProbe, digestStashed, installEngineBootProbe, installProbes, pageInfo, prepareLiveApp, stashSave, wasmColdLoad, wasmMemoryBytes, watchContextLoss, webglRenderer, type PageInfo } from "./page";
 import { trackContextLoss } from "./contextLoss";
 import { audioStatus, measureFrames, startAudio, type FrameRun } from "./pageFrames";
@@ -160,19 +161,6 @@ async function newContext(browser: Browser, config: CompareConfig, serviceWorker
   return ctx;
 }
 
-async function expectEngine(page: Page, engine: EngineName, where: string): Promise<void> {
-  const info = await page.evaluate(pageInfo);
-  if (info.engineActive !== engine) throw new Error(`${where}: requested the ${engine} engine but ${info.engineActive} is active (host: ${JSON.stringify(info.host)})`);
-}
-
-async function freshPage(page: Page, engine: EngineName, where: string): Promise<void> {
-  await page.reload({ waitUntil: "commit" });
-  await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game), undefined, { timeout: 120_000 });
-  await page.waitForLoadState("networkidle", { timeout: 120_000 });
-  await expectEngine(page, engine, where);
-  await page.evaluate(prepareLiveApp);
-}
-
 /** The memory pass: each scenario in a fresh page, so no scenario's WASM
  *  memory or heap carries another's (or a bare engine's) high-water mark. */
 async function memoryPass(page: Page, cdp: CDPSession, opts: RunnerOptions, engine: EngineName): Promise<Record<string, { adoptMs: number; memory: MemorySummary }>> {
@@ -252,7 +240,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
   // The CPU probe under a throttle, kept by "<where>:<rate>".
   const probe = async (page: Page, key: string): Promise<void> => {
     const ms = await ev(page, "cpu probe", cpuProbe, undefined);
-    run.cpuProbe = { unthrottledMs: run.cpuProbe?.unthrottledMs ?? NaN, throttledMs: run.cpuProbe?.throttledMs ?? null, rate: slowRate, timed: { ...(run.cpuProbe?.timed ?? {}), [key]: ms } };
+    run.cpuProbe = { unthrottledMs: run.cpuProbe?.unthrottledMs ?? NaN, throttledMs: run.cpuProbe?.throttledMs ?? null, rate: slowRate, timed: { ...(run.cpuProbe?.timed ?? {}), [key]: Math.min(ms, run.cpuProbe?.timed[key] ?? ms) } };
   };
   let browser: Browser | null = null;
   try {
@@ -343,7 +331,7 @@ export async function runProcess(opts: RunnerOptions, rep: number, slot: EngineN
           await ev(page, "prepare", prepareLiveApp, undefined);
           await throttle(cdp, rate);
           try {
-            if (rate > 1 && sc === scenarios[0]) await probe(page, `frames-${block}:${rate}`);
+            if (rate > 1) await probe(page, `frames-${block}:${rate}`);
             const f = frameSummary(await ev(page, `${sc.name} frames (audio ${block})`, measureFrames, { windowMs: config.frameWindowMs, warmMs: config.frameWarmMs, speed: config.speed }));
             (block === "on" ? run.scenarios[sc.name].framesAudio : run.scenarios[sc.name].frames)[String(rate)] = f;
             log(`  rep ${rep} ${slot} ${sc.name} ${rate}x audio ${block}: frames median ${f.medianMs.toFixed(1)} ms (${f.frames} frames, ${f.clampedFrames} over ${CLAMP_FRAME_MS} ms, ${f.simMinutesPerSecond.toFixed(1)} sim-min/s)`);
