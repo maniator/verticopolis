@@ -1,5 +1,4 @@
 import type { TemplateResult } from "lit-html";
-import type { Simulation } from "../engine/Simulation";
 import type { Catalog } from "../catalog/catalogTypes";
 import type { ElevatorSchedule } from "../engine/elevatorSchedule";
 import type { BatchRentOptions, BatchRentResult, BatchTarget } from "../engine/sim/constants";
@@ -10,16 +9,18 @@ import { PortCodes } from "../simport/portCodes";
 import { scheduleFromSlots } from "../simport/scheduleSlots";
 import type { EnginePort } from "../simport/enginePort";
 import type { ViewReader } from "../simport/viewReader";
-import { facilityDiagnostics, transportDiagnostics, transportLoadLines } from "./facilityDiagnostics";
+import { transportLoadLines } from "./cardLines";
 import { recyclingLinesOf } from "./recyclingDiagnostics";
 import { createPortUnitDiagnostics, type SupplementalLines } from "./portUnitDiagnostics";
 import { portServiceSections } from "./portServiceDiagnostics";
 
 /**
- * Shared card data for the inspector and editor. The TypeScript engine uses
- * its existing Simulation-backed diagnostics; Rust renders the already-ported
- * unitFacts, elevator utilization and recycling records without a TypeScript
- * tower mirror. Additional report categories without port reads are tracked by #1420.
+ * Shared card data for the inspector and editor, read from the engine port:
+ * the unit facts, the elevator load and the recycling records the engine
+ * reports, worded by the frontend. The same lines come from either engine's
+ * port, and no TypeScript tower or rule is read. The TypeScript reference
+ * card the Rust card is checked against lives in `src/tests/diagnostics/`.
+ * Additional report categories without port reads are tracked by #1420.
  */
 export interface CardKit {
   readonly cards: Cards;
@@ -63,9 +64,6 @@ const NO_SERVICE_LINES: SupplementalLines = Object.freeze({ lines: [], trailing:
 export function createCardKit(app: { readonly enginePort: EnginePort; readonly reader: ViewReader }): CardKit {
   const port = app.enginePort;
   const codes = new PortCodes(port);
-  // Read TypeScript's own simulation only on the TypeScript engine. The Rust
-  // path uses facts from EnginePort and never rebuilds a mirror from a save.
-  const tsTower = (): Simulation | undefined => (app.enginePort as { readonly sim?: Simulation }).sim;
   const cards = new Cards(app.enginePort, app.reader);
   const tenantLines = createPortUnitDiagnostics(port, (id) => {
     const facts = port.serviceDiagnostics(id);
@@ -112,20 +110,10 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
     catalog: () => catalogOf(app),
     diagnostics: {
       invalidate: () => { diagnosticCache = undefined; },
-      unit: (id, fresh = false) => {
-        const sim = tsTower();
-        if (!sim) return portUnitLines(id, fresh);
-        const u = sim.tower.getUnit(id);
-        return u ? facilityDiagnostics(sim, u) : [];
-      },
+      unit: (id, fresh = false) => portUnitLines(id, fresh),
       transport: (id) => {
-        const sim = tsTower();
-        if (!sim) {
-          const shaft = cards.shaft(id);
-          return transportLoadLines(shaft?.utilization, shaft?.nearCapacity === true);
-        }
-        const t = sim.tower.getTransport(id);
-        return t ? transportDiagnostics(sim, t) : [];
+        const shaft = cards.shaft(id);
+        return transportLoadLines(shaft?.utilization, shaft?.nearCapacity === true);
       },
     },
     currentSchedule: (id) => scheduleFromSlots(port.shaftSchedule(id)),

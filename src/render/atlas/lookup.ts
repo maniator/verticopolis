@@ -9,9 +9,9 @@ import { findViewKind, isElevatorKind, isOpenAt } from "../../presentation/viewK
 
 /**
  * The reference reader: how a frontend maps a live unit and scene to atlas
- * frames, following the manifest's `signature.rules`. The comparison test
- * runs it against the web's own bake; a frontend in another language ports
- * these few lines.
+ * frames, following the rules in the manifest's `signature`. The comparison
+ * test runs it against the web's own bake; a frontend in another language
+ * ports these few lines.
  */
 
 export interface LiveUnit {

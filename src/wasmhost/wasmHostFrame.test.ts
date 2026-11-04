@@ -3,7 +3,6 @@ import { Simulation } from "../engine/Simulation";
 import { attachWasmHost } from "./wasmHost";
 import { stepGate } from "./stepGate";
 import { fakeModule } from "./fakeEngine.fixture";
-import { advanceOwedMinutes } from "../game/frameLoop";
 import { engineSuffix } from "./engineLabel";
 
 describe("the attach", () => {
@@ -122,19 +121,6 @@ describe("the coalesced main-thread host (sync: frame)", () => {
     const host = attachWasmHost(sim, fakeModule());
     expect(stepGate(sim)).toBeUndefined();
     host.detach();
-  });
-});
-
-describe("advanceOwedMinutes with the steps held back", () => {
-  it("owes the minutes under the cap and steps nothing", () => {
-    const ticks: number[] = [];
-    const host = { sim: { tick: (dt: number) => { ticks.push(dt); }, clock: { minuteOfDay: 600 } }, accMinutes: 0 };
-    const debt = { minutes: 0 };
-    advanceOwedMinutes(host, debt, 1000, 120, true, false);
-    expect(ticks).toEqual([]);
-    expect(host.accMinutes).toBe(30);
-    advanceOwedMinutes(host, debt, 16, 120, true, true);
-    expect(ticks.length).toBe(4);
   });
 });
 

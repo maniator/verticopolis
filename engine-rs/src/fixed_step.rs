@@ -1,5 +1,8 @@
-//! The engine-owned fixed time step (`src/engine/sim/fixedStep.ts`) and the
-//! host half that feeds it (`advanceOwedMinutes` in `src/game/frameLoop.ts`).
+//! The engine-owned fixed time step and the host half that feeds it, ported
+//! from the TypeScript reference (`src/engine/sim/fixedStep.ts`, and
+//! `advanceOwedMinutes` in `src/engine/sim/frameStep.ts`). The shipped game
+//! runs this one: its frame loop calls `EnginePort.advance`, which lands in
+//! `FrameStepper::advance` through `port_advance` in `src/wasm_port_life.rs`.
 //!
 //! A host owes the sim some game minutes each frame; this cuts them into whole
 //! quanta sized from the sim's own clock, so a tower comes out the same at any

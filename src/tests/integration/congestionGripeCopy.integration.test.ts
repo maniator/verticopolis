@@ -3,7 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import type { FacilityKind, Unit } from "../../engine/types";
 import { spatialCongestionAttributionByFloor } from "../../engine/sim/congestion";
-import { gripeLineText } from "../../game/gripeCopy";
+import { gripeLineText } from "../diagnostics/gripeCopy";
 
 /**
  * The congestion gripe names the transport that is actually crowded (#699).

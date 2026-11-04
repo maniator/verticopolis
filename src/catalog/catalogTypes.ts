@@ -10,7 +10,7 @@ import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 5;
+export const CATALOG_VERSION = 6;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -20,6 +20,7 @@ export interface Catalog {
   readonly mode: GameMode;
   readonly world: CatalogWorld;
   readonly economy: CatalogEconomy;
+  readonly rules: CatalogRules;
   /** The caps several kinds share, in the engine's order. */
   readonly pools: readonly CatalogPool[];
   /** One entry per facility kind in the engine's catalog order, the kinds this
@@ -85,6 +86,23 @@ export interface CatalogEconomy {
    *  founded unbridged, and the live setting is per tower (the engine's
    *  `autoBridge()`, the save's `autoBridge`). */
   readonly autoBridgeToggleable: boolean;
+}
+
+/** Mode rules a frontend shows the player, each stated from the engine's own
+ *  rule method, so a frontend reads them here instead of deciding them from
+ *  the mode's name. */
+export interface CatalogRules {
+  /** Whether a sold condo carries its own household of 2 to 5 that prices
+   *  the sale and counts its residents. When false every condo houses the
+   *  flat family and stores no household. */
+  readonly variantHouseholds: boolean;
+  /** Whether the build preview names the engine's refusal before the click.
+   *  When false the refusal shows only once a click is refused. */
+  readonly previewNamesRefusal: boolean;
+  /** Whether the elevator schedule's assisted tools answer: the intent
+   *  presets, auto-tune and the staffing advice. When false the schedule is
+   *  the manual grid only and each assisted query is refused. */
+  readonly scheduleAssist: boolean;
 }
 
 /** One calendar a tower can run and how it scales the quoted figures. */

@@ -101,7 +101,7 @@ pub struct NoticeFacts {
 /// an access line. These are the sources the catalog's `population` and
 /// `dailyIncome` are built from (`catalog::facility_entry`), which the
 /// catalog lock holds equal to the TypeScript's.
-fn has_access_diagnostic(sim: &Simulation, kind: Kind) -> bool {
+pub(super) fn has_access_diagnostic(sim: &Simulation, kind: Kind) -> bool {
     kind.facility().population > 0 || commercial_daily_income(sim.mode, kind).is_some()
 }
 

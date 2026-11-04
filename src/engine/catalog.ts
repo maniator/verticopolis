@@ -182,6 +182,13 @@ export function catalogFor(mode: GameMode): Catalog {
       exterminator: exterminator ? { calloutFee: exterminator.calloutFee, perRoomFee: exterminator.perRoomFee } : null,
       autoBridgeToggleable: rules.bridgingToggleable(),
     },
+    rules: {
+      variantHouseholds: rules.hasVariantHouseholds,
+      previewNamesRefusal: rules.showsPreviewReason,
+      // The schedule dialog's presets, auto-tune and advice come and go
+      // together in each mode, as the Rust engine's one gate has them.
+      scheduleAssist: rules.elevatorScheduleUX().presets,
+    },
     pools: POOLED_CAPS.map((p, i) => ({ key: POOL_KEYS[i], label: p.label, cap: p.cap, kinds: [...p.kinds] })),
     facilities: ALL_KINDS.map((kind) => facilityEntry(mode, rules, kind)),
   };

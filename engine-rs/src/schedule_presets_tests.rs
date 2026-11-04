@@ -2,6 +2,7 @@
 //! and the proof that asking changes nothing.
 
 use super::*;
+use crate::clock::GameMode;
 use crate::schedule_authoring::tests::{sky_tower, tower, SKY, SKY_TOP, TOP};
 
 fn ask(sim: &Simulation, id: i64, name: &str) -> PresetProposal {

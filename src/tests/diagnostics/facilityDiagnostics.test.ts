@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { html, type TemplateResult } from "lit-html";
-import { Simulation } from "../engine/Simulation";
-import type { Unit } from "../engine/types";
+import { Simulation } from "../../engine/Simulation";
+import type { Unit } from "../../engine/types";
 import { facilityDiagnostics } from "./facilityDiagnostics";
-import { renderToFragment } from "../ui/testing/litTestUtils";
+import { renderToFragment } from "../../ui/testing/litTestUtils";
 
 /**
  * The shared diagnostic lines, now lit `TemplateResult` arrays (no `unsafeHTML`

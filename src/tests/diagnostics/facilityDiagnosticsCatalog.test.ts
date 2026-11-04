@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { catalogFor } from "../engine/catalog";
-import { catalogFacility } from "../catalog/catalogTypes";
-import { ECON } from "../engine/econConfig";
-import { ALL_KINDS, FACILITIES } from "../engine/facilities";
-import { subtypeListFor } from "../engine/retailSubtypes";
-import type { Unit } from "../engine/types";
-import { hasAccessDiagnostic } from "./facilityDiagnostics";
+import { catalogFor } from "../../engine/catalog";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { ECON } from "../../engine/econConfig";
+import { ALL_KINDS, FACILITIES } from "../../engine/facilities";
+import { subtypeListFor } from "../../engine/retailSubtypes";
+import type { Unit } from "../../engine/types";
+import { hasAccessDiagnostic } from "../../game/cardLines";
 
 /**
  * #921 moved these readouts from the engine tables to the catalog with no

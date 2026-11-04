@@ -3,7 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { FACILITIES } from "../../engine/facilities";
 import type { FacilityKind, GameMode, UnitState } from "../../engine/types";
-import { facilityDiagnostics, transportDiagnostics } from "../../game/facilityDiagnostics";
+import { facilityDiagnostics, transportDiagnostics } from "../diagnostics/facilityDiagnostics";
 import { swapDone } from "../../game/portLifecycle";
 import { lobbyDistanceFixture, retailServiceFixture, serviceDiagnosticsFixture } from "../fixtures/serviceDiagnostics.fixture";
 import { buildWinningTower } from "../fixtures/winningTower";

@@ -3,7 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import type { GameMode, Unit } from "../../engine/types";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../../engine/sim/satisfactionStep";
 import { computeDemandMap } from "../../engine/sim/demand";
-import { wontLeaseText } from "../../game/gripeCopy";
+import { wontLeaseText } from "../diagnostics/gripeCopy";
 import { W, C, DAY, servedTower, place, seat } from "./moveInGateHelpers";
 
 /**

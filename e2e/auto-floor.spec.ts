@@ -247,7 +247,7 @@ test.describe("sky-lobby canon (e2e)", () => {
     expect(out.kindAfter).toBe("lobby");
   });
 
-  test("gates the preview-reason hover surface by mode", async ({ page }) => {
+  test("the default Classic tower's catalog withholds the preview reason", async ({ page }) => {
     await page.goto("/");
     await page.waitForFunction(() => {
       const g = (window as any).game;
@@ -255,8 +255,8 @@ test.describe("sky-lobby canon (e2e)", () => {
     });
     await page.evaluate(() => document.getElementById("splash")?.remove());
 
-    // Default new tower is Classic, so showsPreviewReason should be false.
-    const classic = await page.evaluate(() => (window as any).game.sim.rules.showsPreviewReason);
+    // Default new tower is Classic, so the catalog the preview reads names no refusal.
+    const classic = await page.evaluate(() => (window as any).game.getCatalog().rules.previewNamesRefusal);
     expect(classic).toBe(false);
   });
 });

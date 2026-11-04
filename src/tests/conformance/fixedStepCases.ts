@@ -1,4 +1,4 @@
-import { advanceOwedMinutes } from "../../game/frameLoop";
+import { advanceOwedMinutes } from "../../engine/sim/frameStep";
 import type { StepDebt } from "../../engine/sim/fixedStep";
 
 /**

@@ -7,7 +7,7 @@ import { computeDemandMap } from "../../engine/sim/demand";
 import { unmetCoverage, dominantGripe } from "../../engine/sim/gripe";
 import { serialize, deserialize } from "../../engine/sim/serialization";
 import { VACATE_REASON_TEXT } from "../../engine/types";
-import { wontLeaseText } from "../../game/gripeCopy";
+import { wontLeaseText } from "../diagnostics/gripeCopy";
 
 /**
  * Unmet local-demand satisfaction pressure (#395): a served office/condo/hotel

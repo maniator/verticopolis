@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { SPEEDS, MAX_CATCHUP_MINUTES, runFrame, emitMealRushes, applySpeed } from "./frameLoop";
-import { MAX_QUANTUM_MINUTES } from "../engine/sim/fixedStep";
+import { SPEEDS, runFrame, emitMealRushes, applySpeed } from "./frameLoop";
 import { decideMealRush } from "./mealRush";
 import { gameplaySession } from "../analytics";
 import * as analyticsActions from "../analyticsActions";
@@ -214,10 +213,6 @@ describe("runFrame simulation stepping", () => {
     raw.reader.generation = -1; // the view was read in the tower before a load
     runFrame(app, 1000 / 60);
     expect(decideMealRush).not.toHaveBeenCalled();
-  });
-
-  it("keeps the engine's largest step under the catch-up cap, so a capped debt can always cover one", () => {
-    expect(MAX_QUANTUM_MINUTES).toBeLessThan(MAX_CATCHUP_MINUTES);
   });
 
   it("spends no carried time once paused (speed 0)", () => {

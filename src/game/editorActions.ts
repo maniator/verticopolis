@@ -8,7 +8,8 @@ import type { AudioEngine } from "../audio/Audio";
 import type { BuildActions } from "./buildActions";
 import type { EnginePort } from "../simport/enginePort";
 import { outcome, type PortCodes } from "../simport/portCodes";
-import { clockOf, rulesOf } from "../simport/headerClock";
+import { clockOf } from "../simport/headerClock";
+import { scheduleDialogUX } from "../ui/scheduleDialogRules";
 import { scheduleSlots } from "../simport/scheduleSlots";
 import type { ViewReader } from "../simport/viewReader";
 import { INVALID_COMMAND, MAX_TEXT, NOT_ENOUGH_MONEY } from "../simport/request";
@@ -125,7 +126,7 @@ export class EditorActions {
     this.deps.ui.showElevatorScheduleDialog(
       {
         title: `Schedule: ${catalogFacility(kit.catalog(), t.kind).name} (floors ${t.bottom}-${t.top})`,
-        ux: rulesOf(header).elevatorScheduleUX(),
+        ux: scheduleDialogUX(kit.catalog().rules),
         isExpress: t.kind === "elevatorExpress",
         cars: t.cars,
         bottom: t.bottom,

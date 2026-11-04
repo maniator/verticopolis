@@ -4,7 +4,7 @@ import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { rentConfig } from "../../engine/econConfig";
 import type { FacilityKind, Unit } from "../../engine/types";
-import { facilityDiagnostics } from "../../game/facilityDiagnostics";
+import { facilityDiagnostics } from "../diagnostics/facilityDiagnostics";
 import { attemptMoveIns } from "../../engine/sim/churn";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 

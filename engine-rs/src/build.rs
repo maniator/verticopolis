@@ -62,17 +62,14 @@ impl Simulation {
 
     pub fn is_unlocked(&self, kind: Kind) -> bool {
         let f = kind.facility();
-        if f.modern_only && self.mode != GameMode::Modern {
-            return false;
-        }
-        self.star >= f.min_star
+        f.available_in(self.mode) && self.star >= f.min_star
     }
 
     pub fn can_build(&self, kind: Kind, floor: i64, x: i64) -> CanBuild {
         let kind = ground_floor_structure_kind(kind, floor);
         let f = kind.facility();
         if !self.is_unlocked(kind) {
-            let reason = if f.modern_only && self.mode != GameMode::Modern {
+            let reason = if !f.available_in(self.mode) {
                 format!("{} is a Modern-only facility.", f.name)
             } else {
                 format!("{} unlocks at {}★.", f.name, f.min_star)
