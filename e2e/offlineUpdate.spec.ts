@@ -108,15 +108,26 @@ async function updateTo(page: Page, which: Deployment, named: string | null): Pr
 }
 
 /** Fetch `path` from the page and require that the service worker answered it. */
-async function servedByWorker(page: Page, path: string): Promise<string> {
+async function servedByWorker(page: Page, browserName: string, path: string): Promise<string> {
+  // `cache: "no-store"` keeps the HTTP cache out of it. Firefox fails a no-store
+  // fetch with a network error while the page is offline even though the worker
+  // holds the file (its offline cold start works, so this looks like a quirk of
+  // that fetch mode and its cause was not traced), so Firefox takes the default
+  // mode. The default mode can fall through to the HTTP cache on a precache
+  // miss, so there the text must also equal the worker's precache entry.
+  const cache = browserName === "firefox" ? "default" : "no-store";
   const response = page.waitForResponse((r) => new URL(r.url()).pathname === `/${path}`, { timeout: 30_000 });
-  const text = await page.evaluate((p) => fetch(new URL(p, document.baseURI), { cache: "no-store" }).then((r) => r.text()), path);
+  const text = await page.evaluate((args) => fetch(new URL(args.path, document.baseURI), { cache: args.cache }).then((r) => r.text()), { path, cache } as const);
   expect((await response).fromServiceWorker(), `${path} is answered by the service worker`).toBe(true);
+  if (cache === "default") {
+    const cached = await page.evaluate((p) => caches.match(new URL(p, document.baseURI).href, { ignoreSearch: true }).then((r) => r?.text()), path);
+    expect(text, `${path} equals the worker's precache entry`).toBe(cached);
+  }
   return text;
 }
 
 /** The glue the page would load, as the worker answers it. */
-const servedGlue = (page: Page): Promise<string> => servedByWorker(page, "engine/verticopolis_engine.js");
+const servedGlue = (page: Page, browserName: string): Promise<string> => servedByWorker(page, browserName, "engine/verticopolis_engine.js");
 
 /** The requests the browser itself makes to check for a new worker: the worker
  *  script and the scripts it imports. They are not the game's or the worker's
@@ -133,20 +144,20 @@ test.afterAll(async () => {
   await deployments?.close();
 });
 
-test("an update replaces the engine files in the cache, and the updated game plays with no network", async ({ browser }) => {
+test("an update replaces the engine files in the cache, and the updated game plays with no network", async ({ browser, browserName }) => {
   let context: BrowserContext | undefined;
   try {
     const first = await installedFirst(browser);
     const { page } = first;
     context = first.context;
     await expectCacheIs(page, "A");
-    expect(await servedGlue(page)).not.toContain("deployment B");
+    expect(await servedGlue(page, browserName)).not.toContain("deployment B");
 
     await test.step("an update moves the engine files to the new build and leaves no old engine entry", async () => {
       await updateTo(page, "B", "999.0.0");
       await expectCacheIs(page, "B");
-      expect(await servedGlue(page), "the page now gets the second build's glue").toContain("deployment B");
-      const record = JSON.parse(await servedByWorker(page, "engine/BUILD.json"));
+      expect(await servedGlue(page, browserName), "the page now gets the second build's glue").toContain("deployment B");
+      const record = JSON.parse(await servedByWorker(page, browserName, "engine/BUILD.json"));
       expect(record.package, "and the second build's record").toBe(deployments.packageId.B);
       await expectEngineHosted(page);
     });
@@ -165,7 +176,7 @@ test("an update replaces the engine files in the cache, and the updated game pla
       await page.reload();
       await expectControlledWithEngine(page);
       await hostedGame(page);
-      expect(await servedGlue(page), "the offline start runs the second build's glue from the cache").toContain("deployment B");
+      expect(await servedGlue(page, browserName), "the offline start runs the second build's glue from the cache").toContain("deployment B");
       await page.evaluate(() => (window as any).game.setSpeed(1));
       const minutes = await page.evaluate(() => (window as any).game.sim.clock.minutes as number);
       await page.waitForFunction((m) => (window as any).game.sim.clock.minutes > m + 5, minutes, { timeout: 30_000 });
@@ -185,7 +196,7 @@ test("an update replaces the engine files in the cache, and the updated game pla
       await updateTo(page, "A", null);
       expect(deployments.requests.filter((r) => r.path === "/version.json").length, "the page did ask for it").toBeGreaterThan(asked);
       await expectCacheIs(page, "A");
-      expect(await servedGlue(page)).not.toContain("deployment B");
+      expect(await servedGlue(page, browserName)).not.toContain("deployment B");
       await expectEngineHosted(page);
     });
   } finally {

@@ -20,6 +20,13 @@ import { expectControlledWithEngine, hostedGame, installWorker } from "./offline
  */
 test.setTimeout(240_000);
 
+declare global {
+  interface Window {
+    /** Every state of every worker the page's registration started (the install test's init script). */
+    __vcWorkerStates?: string[];
+  }
+}
+
 let deployments: Deployments;
 
 // The second deployment is a full `vite build`, with a budget of its own.
@@ -109,10 +116,50 @@ test("a first install whose engine files come from another build never activates
     deployments.serve("A");
     deployments.engineFrom("B");
     // The page registers its worker after it boots, so the install is observed
-    // from the browser's side: a worker that starts is the install attempt.
-    const started = context.waitForEvent("serviceworker", { timeout: 90_000 });
+    // from the page: it records the worker its registration starts and the
+    // states that worker reaches (the context's `serviceworker` event is
+    // Chromium only). A worker that starts is the install attempt, one that
+    // turns redundant is the install failing, and one that activates is the
+    // regression this test exists to catch. A register() that rejects or yields
+    // no worker is recorded too, so it fails here and not by timeout.
+    await page.addInitScript(() => {
+      const states: string[] = [];
+      window.__vcWorkerStates = states;
+      if (!navigator.serviceWorker) {
+        states.push("no-service-worker");
+        return;
+      }
+      const register = navigator.serviceWorker.register.bind(navigator.serviceWorker);
+      navigator.serviceWorker.register = async (...args: Parameters<typeof register>) => {
+        let registration: ServiceWorkerRegistration;
+        try {
+          registration = await register(...args);
+        } catch (error) {
+          states.push("register-failed");
+          throw error;
+        }
+        const worker = registration.installing ?? registration.waiting ?? registration.active;
+        if (!worker) states.push("no-worker");
+        else {
+          states.push(worker.state);
+          worker.addEventListener("statechange", () => states.push(worker.state));
+        }
+        return registration;
+      };
+    });
     await page.goto("/");
-    await started;
+    const END_STATES = ["redundant", "activated", "register-failed", "no-worker", "no-service-worker"];
+    await page.waitForFunction((ends) => window.__vcWorkerStates?.some((s) => ends.includes(s)), END_STATES, { timeout: 90_000 }).catch(async (error: Error) => {
+      // A stall names the states it saw instead of a bare timeout.
+      const seen = await page.evaluate(() => window.__vcWorkerStates).catch(() => undefined);
+      throw new Error(`no worker reached an end state in 90 s; states seen: ${JSON.stringify(seen ?? null)}`, { cause: error });
+    });
+    const states = await page.evaluate(() => window.__vcWorkerStates);
+    expect(states, "the failed install never activates").not.toContain("activated");
+    expect(states, "the page has service workers").not.toContain("no-service-worker");
+    expect(states, "the page registered a worker").not.toContain("register-failed");
+    expect(states, "the registration started a worker").not.toContain("no-worker");
+    expect(states, "the worker was refused").toContain("redundant");
     // A failed first install leaves no registration with a worker in it.
     await expect
       .poll(
