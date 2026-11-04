@@ -1,14 +1,14 @@
 import { dayName, formatClock, formatRetroDate } from "../presentation/clockText";
-import { makeRules, type GameRules } from "../engine/gameRules";
 import { ClockReads } from "./clockView";
 import type { HeaderView } from "./view";
 
 /**
  * What a panel derives from the view's header instead of reading it off a
- * `Simulation` (facade slice 4, #1211): the clock's day, hour and names, and
- * the tower's rule set. The engine reports the date numbers in the header
- * (day, day of the week, weekend flag, quarter, year, the calendar's week
- * lengths); the names come from `presentation/clockText.ts`.
+ * `Simulation` (facade slice 4, #1211): the clock's day, hour and names. The
+ * engine reports the date numbers in the header (day, day of the week,
+ * weekend flag, quarter, year, the calendar's week lengths); the names come
+ * from `presentation/clockText.ts`. The mode's rules a panel shows come from
+ * the tower's catalog (`catalog.rules`).
  */
 
 /** The fields of the header a clock reading needs. */
@@ -63,9 +63,4 @@ export function clockOf(h: ClockHeader): ClockView {
 /** The tower's calendar lengths, as the engine reports them. */
 export function calendarOf(h: Pick<HeaderView, "weekDays" | "weekendDays">): Pick<HeaderView, "weekDays" | "weekendDays"> {
   return h;
-}
-
-/** The tower's rule set (a static singleton per mode). */
-export function rulesOf(h: Pick<HeaderView, "mode">): GameRules {
-  return makeRules(h.mode);
 }

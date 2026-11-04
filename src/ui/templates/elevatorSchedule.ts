@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
-import type { ElevatorSchedule, ElevatorScheduleUX } from "../../engine/elevatorSchedule";
+import type { ElevatorSchedule } from "../../engine/elevatorSchedule";
+import type { ElevatorScheduleUX } from "../scheduleDialogRules";
 import type { AssistedPreset, AutoTuneStatus } from "../../simport/enginePort";
 // floorLabel is a DOM-free pure helper in its own module (so the schedule
 // formatter can reuse it without pulling in lit-html); re-exported here so
@@ -12,9 +13,10 @@ export { floorLabel };
  * The per-shaft elevator Schedule dialog (elevator-scheduling #305 Phase 3, floors
  * fold-in #464), a pure function of local dialog `state` re-rendered by the
  * controller on every input, in the `batchPricing` mold. Renders Classic vs Modern
- * off the `elevatorScheduleUX` flags (never the mode string): Classic shows the raw
- * manual grid with no presets or advice; Modern leads with presets, Auto-tune, and
- * advice, with the count grid behind an Advanced disclosure.
+ * off the `ElevatorScheduleUX` flags the catalog's rules give (never the mode
+ * string): Classic shows the raw manual grid with no presets or advice; Modern
+ * leads with presets, Auto-tune, and advice, with the count grid behind an
+ * Advanced disclosure.
  *
  * The primary surface is the FLOORS GRID (spec §4 as amended §16): one row per span
  * floor, descending, carrying the Serve stop toggle (the old `Configure stops…`
