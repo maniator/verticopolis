@@ -572,9 +572,10 @@ workload is the owner's rapid-edit check.
 ### The owner's PC run
 
 > **Snapshot of one run on 2026-10-21 (03:17 to 03:59 UTC), commit
-> `4fa8072`, not refreshing.** The run's own files are in
-> `docs/performance/results/2026-10-21-4fa8072-restore-points/`
-> (`report.md`, `results.json`, `NOTES.md`). To refresh, run
+> `4fa8072`, not refreshing.** The run is summarized in
+> `docs/performance/results/2026-10-21-4fa8072-restore-points.md`; its raw files
+> (`report.md`, `results.json`, `NOTES.md`) are in the private
+> verticopolis-benchmarks repository. To refresh, run
 > `npm run perf:restore` (`scripts/perf-restore-points.ts`);
 > `src/tests/perfRestore/report.test.ts` pins how the figures are computed.
 
