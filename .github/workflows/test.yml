@@ -124,6 +124,38 @@ jobs:
         with:
           artifact-name: engine-wasm
 
+      # Build the tooling app once and share it with both browser jobs.
+      # This artifact carries checksums and source SHA so consumers verify
+      # they are testing an immutable build from this exact commit.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build tooling app
+        run: npm run build
+        env:
+          VC_TOOLING: "1"
+
+      - name: Pack tooling app
+        shell: bash
+        run: |
+          tar -C dist -czf "$RUNNER_TEMP/tooling-dist.tgz" .
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum tooling-dist.tgz > tooling-dist.tgz.sha256
+          )
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/tooling-dist.source-sha"
+
+      - name: Upload tooling app artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tooling-dist
+          overwrite: true
+          path: |
+            ${{ runner.temp }}/tooling-dist.tgz
+            ${{ runner.temp }}/tooling-dist.tgz.sha256
+            ${{ runner.temp }}/tooling-dist.source-sha
+          if-no-files-found: error
+
   test:
     needs: changes
     # Even a failed classifier must not silently suppress this required check.
@@ -297,18 +329,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The engine's WASM package is build output, not checked in; the
-      # engine-wasm job restored it from the cache (or built it) and uploaded it.
-      - uses: ./.github/actions/engine-wasm-download
+      - name: Download tooling app artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-name: engine-wasm
+          name: tooling-dist
+          path: ${{ runner.temp }}/tooling-dist
 
-      # A tooling build: e2e drives the app through `window.game`, which only
-      # VC_TOOLING=1 builds publish (production builds compile it away).
-      - name: Build
-        run: npm run build
-        env:
-          VC_TOOLING: "1"
+      - name: Verify and unpack tooling app
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/tooling-dist"
+          sha256sum -c tooling-dist.tgz.sha256
+          test "$(< tooling-dist.source-sha)" = "$GITHUB_SHA"
+          rm -rf "$GITHUB_WORKSPACE/dist"
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          tar -C "$GITHUB_WORKSPACE/dist" -xzf tooling-dist.tgz
 
       - name: Run end-to-end tests
         run: npm run e2e -- --project=chromium-serial
@@ -346,6 +381,8 @@ jobs:
   # project) on a tooling build. The `e2e` job above runs the
   # serial project: pixel baselines, the perf gate and the engine-status specs.
   e2e-wasm-only:
+    # Keep this job id/check name stable for required-check safety until branch
+    # protection is explicitly migrated to a renamed status.
     needs: [changes, resolve-image, engine-wasm]
     # As the e2e job: skipped only for a prose-only change.
     if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
@@ -394,10 +431,21 @@ jobs:
           fi
           grep -F "carries the TypeScript step loop (src/engine/sim/loop.ts)" canary.log
 
-      - name: Build (tooling)
-        run: npm run build
-        env:
-          VC_TOOLING: "1"
+      - name: Download tooling app artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: tooling-dist
+          path: ${{ runner.temp }}/tooling-dist
+
+      - name: Verify and unpack tooling app
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/tooling-dist"
+          sha256sum -c tooling-dist.tgz.sha256
+          test "$(< tooling-dist.source-sha)" = "$GITHUB_SHA"
+          rm -rf "$GITHUB_WORKSPACE/dist"
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          tar -C "$GITHUB_WORKSPACE/dist" -xzf tooling-dist.tgz
 
       - name: Run end-to-end tests (general suite)
         run: npx playwright test --project=chromium --grep-invert @perf
