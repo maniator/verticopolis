@@ -13,6 +13,14 @@ relates_to:
 
 # Party Findings: Reliability gate decisions
 
+> **Addendum, 2026-11-04 (UTC): decision 1 is superseded.** The owner dropped
+> the Reliability row as a release gate ("I don't think we need a post-hoc
+> threshold. We don't have that many users yet, and we won't really get that
+> many users until this gets popular"). The thresholds below are the roundtable's
+> recommendation only and do not gate 3.0.0; #945 records the decision. The
+> forced-trap recovery and Rollback rows stay as gates, and PostHog reliability
+> reporting stays as post-launch monitoring. Decisions 2 and 3 stand.
+
 > **Snapshot, 2026-11-03, against `main` after #1624, #1650 and #1660.** It does
 > not refresh. No figure here is release evidence. The live numbers come from
 > `scripts/engine-reliability.mjs` (which prints `scripts/persistence-failures.mjs`
