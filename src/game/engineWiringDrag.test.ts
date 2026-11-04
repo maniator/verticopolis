@@ -121,6 +121,31 @@ describe("a drag whose undo gesture closed", () => {
     expect(hooks.transportPreview).toBeNull();
   });
 
+  it("drops the elevator ghost on the first move after an undo, and teaches nothing on release", () => {
+    vi.mocked(placeSimpleBuild).mockReturnValue(null);
+    vi.mocked(isTransportTool).mockReturnValue(true);
+    const { app, undo, hooks } = makeApp({ type: "build", kind: "elevatorStandard" });
+    hooks.onActionDown!(10, 1, false, null);
+    hooks.transportPreview = { kind: "elevatorStandard", x: 10, bottom: 1, top: 3, valid: true };
+    undo.gesture = NO_GESTURE; // Ctrl+Z mid-press
+    hooks.onActionMove!(10, 4, null);
+    expect([hooks.transportPreview, app.transportStart]).toEqual([null, null]);
+    hooks.onActionUp!();
+    expect(app.build.tryBuildTransport).not.toHaveBeenCalled();
+    expect(app.ui.toast, "no drag-to-size hint").not.toHaveBeenCalled();
+  });
+
+  it("drops a touch room's ghost once the gesture closed, and places nothing", () => {
+    const { app, undo, hooks } = makeApp({ type: "build", kind: "office" });
+    hooks.onActionDown!(10, 5, true, null);
+    hooks.preview = { kind: "office", floor: 5, x: 10, valid: true };
+    undo.gesture = NO_GESTURE;
+    hooks.onActionMove!(14, 6, null);
+    expect([hooks.preview, app.buildAnchor]).toEqual([null, null]);
+    hooks.onActionUp!();
+    expect(placeSimpleBuild).not.toHaveBeenCalled();
+  });
+
   it("leaves a gesture opened over it for that gesture to close", () => {
     const { app, undo, hooks } = makeApp({ type: "bulldoze" });
     hooks.onActionDown!(5, 2, false, { id: 1 });

@@ -62,9 +62,42 @@ pub(crate) enum UnitChange {
     /// Put the unit back with this record. It must be out of the tower, and
     /// its tiles free.
     PutBack(Unit),
-    /// Put the facts an edit owns (the price, the name, the variety, the
-    /// film policy) back from this record. The unit must be in the tower.
-    Restore(Unit),
+    /// Put back the facts an edit owns that the edit changed, from `want`
+    /// as the edit found them, where `left` has them as the edit left them.
+    /// The unit must be in the tower. A fact that has changed since the
+    /// edit stays as it is: the simulation names an office for the company
+    /// that moves in and a burned-out room for its kind, and an undo of a
+    /// price change keeps those names.
+    Restore { want: UnitFacts, left: UnitFacts },
+}
+
+/// The facts of a unit an edit owns: the price, the market flag, the name,
+/// the variety and the film policy (`Unit::config_eq`).
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct UnitFacts {
+    pub(crate) rent: Option<f64>,
+    pub(crate) no_rate: bool,
+    pub(crate) label: String,
+    pub(crate) subtype: Option<&'static str>,
+    pub(crate) film_policy: Option<&'static str>,
+}
+
+impl UnitFacts {
+    pub(crate) fn of(u: &Unit) -> UnitFacts {
+        UnitFacts {
+            rent: u.rent,
+            no_rate: u.no_rate,
+            label: u.label.clone(),
+            subtype: u.subtype,
+            film_policy: u.extras().film_policy,
+        }
+    }
+}
+
+/// Whether a restore puts a fact back: the edit changed it (`want` is not
+/// `left`) and nothing has changed it since (`now` is still `left`).
+pub(crate) fn puts_back<T: PartialEq>(want: &T, left: &T, now: &T) -> bool {
+    want != left && now == left
 }
 
 /// What the simulation has done with a room: whether it is still being
@@ -167,16 +200,6 @@ pub(crate) enum TransportChange {
 pub(crate) struct Swap {
     pub(crate) expect: f64,
     pub(crate) set: f64,
-}
-
-impl Swap {
-    /// The same fact seen from the other side of the step.
-    pub(crate) fn reversed(self) -> Swap {
-        Swap {
-            expect: self.set,
-            set: self.expect,
-        }
-    }
 }
 
 /// One step: the images that undo an edit (or, applied again, redo it), the

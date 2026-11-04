@@ -59,6 +59,9 @@ export class Engine {
      * JS number or names no elevator. The id is read raw, as for `addCar`.
      */
     beginExtend(id: number): boolean;
+    /**
+     * Tooling: a bomb threat, outside an open gesture as a fire is.
+     */
     bombThreat(): void;
     bookExterminator(): Float64Array;
     buildAt(kind: number, floor: number, x: number): Float64Array;
@@ -507,6 +510,10 @@ export class Engine {
     shaftCard(id: number): Float64Array;
     shaftSchedule(id: number): Float64Array;
     startExtend(id: number): Float64Array;
+    /**
+     * Tooling: a fire, which is no edit, so it is no part of an open
+     * gesture's undo step.
+     */
     startFire(): void;
     /**
      * The state view's hash, as the lock records it.

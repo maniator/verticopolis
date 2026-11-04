@@ -195,15 +195,19 @@ fn place_before(code: &str, end: usize) -> &str {
     &code[start..end]
 }
 
-/// `writes` without the three list writes no reader can miss: the loader's
+/// `writes` without the four list writes no reader can miss: the loader's
 /// one assignment of a new tower's unit list, `sim.tower.units = units;` in
 /// `load/assemble.rs`, where `sim` is the `Simulation::new` that `assemble` has just
 /// made, with its own mark log (`the_loader_fills_only_a_new_tower` pins
-/// that); a list lent out of a tower and put straight back (`lent`); and the
+/// that); a list lent out of a tower and put straight back (`lent`); the
 /// lobby brush's one slot fill, `self.units[idx] = unit;` in
 /// `tower_removal.rs`, a new unit laid where `take_floor_slot` has just
 /// settled a floor tile's removal, which moved the revision
-/// (`the_brush_fills_only_an_emptied_slot` pins that).
+/// (`the_brush_fills_only_an_emptied_slot` pins that); and the undo's one
+/// merge, `merge_appended(&mut self.units, old_len, &lands);` in
+/// `tower/undoing.rs`, which moves the units a step puts back into their
+/// places in `insert_units_at`, a function that moves the revision after it
+/// (`the_undo_merge_moves_the_revision` pins that).
 pub(super) fn new_list_aside(rel: &str, code: &str, writes: Vec<usize>) -> Vec<usize> {
     let filled = |at: usize| {
         rel == "load/assemble.rs"
@@ -215,10 +219,15 @@ pub(super) fn new_list_aside(rel: &str, code: &str, writes: Vec<usize>) -> Vec<u
             && code[..at].ends_with("Some(idx)=>{self.")
             && code[at..].starts_with("units[idx]=unit;")
     };
+    let merged = |at: usize| {
+        rel == "tower/undoing.rs"
+            && code[..at].ends_with("merge_appended(&mut self.")
+            && code[at..].starts_with("units,old_len,&lands);")
+    };
     let lent = lent(code);
     writes
         .into_iter()
-        .filter(|&at| !filled(at) && !slot(at))
+        .filter(|&at| !filled(at) && !slot(at) && !merged(at))
         .filter(|&at| !lent.iter().any(|&(start, end)| start <= at && at < end))
         .collect()
 }

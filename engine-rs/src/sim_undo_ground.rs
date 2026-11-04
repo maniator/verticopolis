@@ -3,30 +3,29 @@
 //! the units it puts back. A room, a shaft or a story the step puts back
 //! must stand where building it could, and one it leaves standing must keep
 //! standing.
-use std::collections::{HashMap, HashSet};
-
+use crate::crowd::fasthash::{FastMap, FastSet};
 use crate::facilities::{is_sky_lobby_floor, Kind, MAX_FLOOR};
 use crate::tower::{Tower, Transport, Unit};
 use crate::undo::{Step, UnitChange};
 
 pub(crate) struct Ground<'a> {
     tower: &'a Tower,
-    leaving: &'a HashSet<i64>,
+    leaving: &'a FastSet<i64>,
     /// The floor and lobby tiles the step puts back.
-    laid: HashSet<(i64, i64)>,
+    laid: FastSet<(i64, i64)>,
     /// The floor and lobby tiles the step takes out and does not lay again,
     /// as (x, floor) in order, so a shaft finds those in its column with a
     /// search.
     taken: Vec<(i64, i64)>,
     /// The lobby tiles the step adds to each floor, less those it takes out.
-    lobbies_added: HashMap<i64, i64>,
+    lobbies_added: FastMap<i64, i64>,
     /// The floor the tower's metro station stands on, unless the step takes
     /// it out.
     station: Option<i64>,
 }
 
 impl<'a> Ground<'a> {
-    pub(crate) fn of(tower: &'a Tower, step: &Step, leaving: &'a HashSet<i64>) -> Self {
+    pub(crate) fn of(tower: &'a Tower, step: &Step, leaving: &'a FastSet<i64>) -> Self {
         let put_back = || {
             step.units.iter().filter_map(|img| match &img.change {
                 UnitChange::PutBack(u) => Some(u),
@@ -39,7 +38,7 @@ impl<'a> Ground<'a> {
                 .filter(|img| matches!(img.change, UnitChange::TakeOut(_)))
                 .filter_map(|img| tower.get_unit(img.id))
         };
-        let laid: HashSet<(i64, i64)> = put_back()
+        let laid: FastSet<(i64, i64)> = put_back()
             .filter(|u| u.kind.is_structural())
             .flat_map(tiles_of)
             .collect();
@@ -50,13 +49,13 @@ impl<'a> Ground<'a> {
             .map(|(floor, x)| (x, floor))
             .collect();
         taken.sort_unstable();
-        let mut lobbies_added = HashMap::new();
+        let mut lobbies_added = FastMap::default();
         let lobbies = |u: &Unit| (u.kind == Kind::Lobby).then_some((u.floor, u.width));
         for (floor, n) in put_back().filter_map(lobbies) {
-            *lobbies_added.entry(floor).or_insert(0) += n;
+            *lobbies_added.get_or_insert_with(floor, || 0) += n;
         }
         for (floor, n) in taken_out().filter_map(lobbies) {
-            *lobbies_added.entry(floor).or_insert(0) -= n;
+            *lobbies_added.get_or_insert_with(floor, || 0) -= n;
         }
         let station = tower
             .metro_floor()
