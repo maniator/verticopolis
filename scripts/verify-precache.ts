@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { AUDIO_ENGINE_CHUNK, AUDIO_RUNTIME_FILES } from "../src/audio/audioAssets.ts";
 import { engineDistProblems, manifestIntegrityProblems, shellProblems, shellRevisionProblems } from "../src/build/enginePackageBuild.ts";
+import { enginePreloadProblems } from "../src/build/enginePreload.ts";
 import { ALLOW_NO_ENGINE, missingEngine, precacheFile } from "../src/precacheEntry.ts";
 import { ENGINE_BUILD_ONLY_FILES, ENGINE_DIR, ENGINE_GLUE, ENGINE_RUNTIME_FILES, ENGINE_WASM, glueLoads } from "../src/wasmhost/engineAssets.ts";
 
@@ -144,6 +145,9 @@ if (builtEngine) {
   // body from another build out of the precache.
   const unsound = engineDistProblems(DIST, manifest);
   if (unsound.length > 0) fail(`the engine package in dist/ is not one consistent set: ${unsound.join("; ")}`);
+  // The game page starts the three downloads early (#1254); the loader claims them.
+  const preload = enginePreloadProblems(readFileSync(resolve(DIST, "index.html"), "utf8"));
+  if (preload.length > 0) fail(`the game page's engine preloads are wrong: ${preload.join("; ")}`);
 }
 // Every entry carries the integrity of its file (#1345), engine or not: a miss
 // is stored only for an entry with one, so the shell refills after the
