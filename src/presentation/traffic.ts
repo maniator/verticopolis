@@ -35,10 +35,11 @@ export function trafficTier(congestion: number): TrafficTier {
 
 export const TRAFFIC_LABELS = ["Smooth", "Busy", "Backed up", "Gridlock"] as const;
 
-/** A shape-coded 4-step bar glyph — filled cells (▮) up to the tier, empty (▯)
- *  after — legible in grayscale, so the cue never depends on color alone. */
-export function trafficGlyph(tier: TrafficTier): string {
-  const on = "▮";
-  const off = "▯";
-  return on.repeat(tier + 1) + off.repeat(3 - tier);
+/** Each tier's name as the HUD's meter carries it (`data-level`), in tier
+ *  order: the stylesheet fills the meter's bars from it. */
+export const TRAFFIC_LEVELS = ["smooth", "busy", "backed-up", "gridlock"] as const;
+export type TrafficLevel = (typeof TRAFFIC_LEVELS)[number];
+
+export function trafficLevel(tier: TrafficTier): TrafficLevel {
+  return TRAFFIC_LEVELS[tier];
 }

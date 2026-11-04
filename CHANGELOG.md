@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.83.0
+
+- The traffic meter in the top bar is now four rising bars, drawn the same on every phone and computer instead of with font symbols that some phones showed as empty boxes.
+
 ## 2.82.0
 
 - In a Classic game the Map now shows your rooms in their colors, fitted to your tower, with stairs and escalators drawn too.
