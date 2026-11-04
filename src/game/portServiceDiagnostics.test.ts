@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { html } from "lit-html";
 import type { ServiceDiagnosticFacts } from "../simport/enginePort";
 import { renderToFragment } from "../ui/testing/litTestUtils";
-import { portServiceLines } from "./portServiceDiagnostics";
+import { portServiceSections } from "./portServiceDiagnostics";
 
 const base: ServiceDiagnosticFacts = {
   hotel: { rating: "notApplicable", condition: "other", infestDays: null, recovery: null },
@@ -32,7 +32,8 @@ function printed(parts: {
     retail: { ...base.retail, ...parts.retail },
     commercial: { ...base.commercial, ...parts.commercial },
   };
-  return renderToFragment(html`${portServiceLines(facts)}`).textContent ?? "";
+  const { lines, trailing } = portServiceSections(facts);
+  return renderToFragment(html`${[...lines, ...trailing]}`).textContent ?? "";
 }
 
 describe("engine-owned keyed service diagnostic presentation", () => {

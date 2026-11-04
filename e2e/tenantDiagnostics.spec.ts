@@ -1,0 +1,154 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { readFileSync } from "node:fs";
+import { test, expect, type Page } from "@playwright/test";
+import { lobbyDistanceFixture } from "../src/tests/fixtures/serviceDiagnostics.fixture";
+import { placeUnit } from "../src/tests/fixtures/towerFixtures";
+import { expectEngineHosted } from "./helpers";
+
+/**
+ * The tenant explanations on the real Rust engine, in the browser (#1561's
+ * canary). A saved tower with unhappy tenants (the unmodified `split-tower-4`
+ * fixture) is imported the way a player imports a file; the engine's own
+ * `unitFacts` picks the rooms whose cards owe a "Main gripe" or "Won't lease"
+ * line, and the desktop inspector (the card a hover opens) and the 390px
+ * editor must both print it. The missing "Main gripe" line is the regression
+ * #1559 fixed, and this spec keeps it under a real page as well as the unit
+ * tests. A second, built tower covers the No Rate, shoppers-too-far and
+ * notice lines.
+ */
+const TOWER = readFileSync(new URL("../conformance/fixtures/split-tower-4.vctower", import.meta.url), "utf8");
+const PHONE = { width: 390, height: 844 };
+
+// A 75-floor tower on a software-rendered page draws slowly.
+test.setTimeout(120_000);
+test.afterEach(async ({ page }) => expectEngineHosted(page));
+
+type Section = "gripe" | "wontLease" | "notice";
+
+interface Room {
+  id: number;
+  kind: string;
+  sections: Section[];
+}
+
+/** The first room whose engine facts carry each section, grouped by room. */
+async function roomsWithSections(page: Page): Promise<Room[]> {
+  return page.evaluate(() => {
+    const g = (window as any).game;
+    const slots: string[] = JSON.parse(g.enginePort.viewLayout()).records.unitFacts;
+    const sections = ["gripe", "wontLease", "notice"] as const;
+    const at = Object.fromEntries(sections.map((s) => {
+      const i = slots.indexOf(s);
+      if (i < 0) throw new Error(`the unitFacts layout has no "${s}" slot`);
+      return [s, i];
+    }));
+    const isSet = (facts: Float64Array, s: string): boolean => facts[at[s]] === 1;
+    const rooms = new Map<number, { id: number; kind: string; sections: string[] }>();
+    const taken = new Set<string>();
+    for (const u of g.sim.tower.units) {
+      const facts = g.enginePort.unitFacts(u.id) as Float64Array;
+      for (const s of sections) {
+        if (taken.has(s) || !isSet(facts, s)) continue;
+        taken.add(s);
+        const room = rooms.get(u.id) ?? { id: u.id, kind: u.kind, sections: [] };
+        room.sections.push(s);
+        rooms.set(u.id, room);
+      }
+      if (taken.size === sections.length) break;
+    }
+    return [...rooms.values()] as Room[];
+  });
+}
+
+const COPY: Record<Section, string> = { gripe: "Main gripe:", wontLease: "Won't lease:", notice: "Giving notice:" };
+
+/** Open `room` on the desktop inspector or, on a phone, in the editor, and
+ *  return the block its diagnostics print in. */
+async function open(page: Page, room: { id: number; kind: string }, phone: boolean) {
+  await page.evaluate(({ id, kind, phone }) => {
+    const g = (window as any).game;
+    if (phone) g.selectPicked({ type: "unit", id, kind });
+    else g.inspector.inspectPicked({ type: "unit", id, kind });
+  }, { id: room.id, kind: room.kind, phone });
+  const surface = page.locator(phone ? "#editor .ed-diagnostics" : "#inspector");
+  await expect(surface).toBeVisible();
+  return surface;
+}
+
+/** `copy` appears in the block exactly once. */
+async function expectOnce(surface: ReturnType<Page["locator"]>, copy: string, what: string): Promise<void> {
+  await expect(surface).toContainText(copy);
+  const count = await surface.evaluate((el, c) => el.textContent!.split(c).length - 1, copy);
+  expect(count, `${what}: "${copy}" printed more than once`).toBe(1);
+}
+
+test("an imported tower's unhappy tenants explain themselves on the desktop card and the phone editor", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => Boolean((window as any).__vcEngine?.status?.hosted && (window as any).game), undefined, { timeout: 30_000 });
+  await page.evaluate((text) => {
+    const g = (window as any).game;
+    g.onboarding.dismissSplash();
+    return g.saveLoad.importGame(text);
+  }, TOWER);
+  await expect(page.getByText("Tower imported.")).toBeVisible();
+  // Hold the clock after the import, so no tenant's state moves while it is read.
+  await page.evaluate(() => (window as any).game.setSpeed(0));
+
+  const rooms = await roomsWithSections(page);
+  const present = rooms.flatMap((r) => r.sections);
+  test.info().annotations.push({ type: "sections", description: present.join(", ") });
+  // The canary: split-tower-4 holds tenants with a main gripe and a room that won't lease.
+  expect(present, "split-tower-4 must hold a tenant with a main gripe").toContain("gripe");
+  expect(present, "split-tower-4 must hold a room that won't lease").toContain("wontLease");
+
+  for (const phone of [false, true]) {
+    if (phone) await page.setViewportSize(PHONE);
+    for (const room of rooms) {
+      const surface = await open(page, room, phone);
+      for (const section of room.sections) await expectOnce(surface, COPY[section], phone ? "editor" : "card");
+    }
+  }
+});
+
+/** Restore a built save on the hosted engine and follow the swap, as the
+ *  app's history restore does, so the reader, card cache and panels refresh. */
+async function loadSave(page: Page, save: string): Promise<void> {
+  const ok = await page.evaluate((json) => {
+    const g = (window as any).game;
+    const answer = g.enginePort.restore(json);
+    const RESTORED = 1;
+    if (answer[0] !== RESTORED) throw new Error(`Rust rejected the fixture: ${g.enginePort.lastReason()}`);
+    g.followSwap();
+    g.setSpeed(0);
+    return g.enginePort === (window as any).__vcEngine.port;
+  }, save);
+  expect(ok).toBe(true);
+}
+
+test("No Rate, shoppers too far and a notice show on both surfaces", async ({ page }) => {
+  // Classic: Modern never holds the No Rate state, and both engines drop it on load there.
+  const f = lobbyDistanceFixture("classic");
+  f.office.noRate = true;
+  // An office on notice (only lease tenants such as offices and condos ever give notice).
+  const leaving = placeUnit(f.sim, "office", 4, 235);
+  leaving.state = "vacating";
+  leaving.vacateReason = "rent";
+  leaving.vacateAt = f.sim.clock.minutes + 600;
+  await page.goto("/");
+  await page.waitForFunction(() => Boolean((window as any).__vcEngine?.status?.hosted && (window as any).game), undefined, { timeout: 30_000 });
+  await page.evaluate(() => (window as any).game.onboarding.dismissSplash());
+  await loadSave(page, JSON.stringify(f.sim.serialize()));
+
+  const checks: ReadonlyArray<readonly [{ id: number; kind: string }, string]> = [
+    [f.office, "No Rate: the tenant stays"],
+    [f.far, "Shoppers: too far from a lobby"],
+    [leaving, "Giving notice:"],
+  ];
+  for (const phone of [false, true]) {
+    if (phone) await page.setViewportSize(PHONE);
+    for (const [room, copy] of checks) {
+      const surface = await open(page, room, phone);
+      await expectOnce(surface, copy, phone ? "editor" : "card");
+    }
+  }
+});

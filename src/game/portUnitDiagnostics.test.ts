@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { TemplateResult } from "lit-html";
+import { html, type TemplateResult } from "lit-html";
 import { VIEW_LAYOUT } from "../engine/port/layout";
-import { createPortUnitDiagnostics } from "./portUnitDiagnostics";
+import { createPortUnitDiagnostics, type SupplementalLines } from "./portUnitDiagnostics";
 
 const slots = VIEW_LAYOUT.records.unitFacts;
 function facts(changes: Record<string, number>): Float64Array {
@@ -20,11 +20,11 @@ function code(table: "vacateReasons" | "bindings" | "accessLines" | "modes" | "n
 function text(lines: TemplateResult[]): string {
   return lines.map(({ strings, values }) => strings.map((part, i) => part + (i < values.length ? String(values[i]) : "")).join("")).join("\n");
 }
-function render(record: Float64Array, id = 73): string {
+function render(record: Float64Array, id = 73, supplemental?: () => SupplementalLines): string {
   const diag = createPortUnitDiagnostics({
     viewLayout: () => JSON.stringify(VIEW_LAYOUT),
     unitFacts: () => record,
-  });
+  }, supplemental);
   return text(diag(id));
 }
 
@@ -122,5 +122,26 @@ describe("Rust port tenant explanations", () => {
     expect(rendered).toContain("any moment now");
     expect(rendered).toContain("A life event, so you cannot keep them.");
     expect(rendered).not.toContain("Fix the cause");
+  });
+
+  it("stacks service lines after No Rate and closes the card with the business block, below any notice", () => {
+    const supplemental = () => ({ lines: [html`<div>SERVICE</div>`], trailing: [html`<div>RETAIL</div>`] });
+    const inOrder = (rendered: string, marks: readonly string[]): void => {
+      const order = marks.map((mark) => rendered.indexOf(mark));
+      expect(order.every((at) => at >= 0), rendered).toBe(true);
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+    };
+    const onNotice = render(facts({
+      access: code("accessLines", "reachable"),
+      noRate: code("noRateLines", "occupied"),
+      notice: 1,
+      noticeReason: code("vacateReasons", "rent"),
+      minutesLeft: 600,
+      noticeSatisfaction: 0.25,
+      keepAt: 0.4,
+    }), 73, supplemental);
+    inOrder(onNotice, ["Access:", "No Rate:", "SERVICE", "Giving notice:", "Fix the cause", "RETAIL"]);
+    const noNotice = render(facts({ access: code("accessLines", "reachable") }), 73, supplemental);
+    inOrder(noNotice, ["Access:", "SERVICE", "RETAIL"]);
   });
 });
