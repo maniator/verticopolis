@@ -595,7 +595,7 @@ fixes `patch` findings as it goes, halts for the human first instead (section
   keep its classify steps from rejecting a hot-path finding that is not a
   false positive, and make it stop for the owner, without reverting code, when
   the author wants to defer an always-`patch` finding.
-- **Copilot and Codex** apply the same items inline (the Performance dimension
+- **Copilot and Codex** apply the same items inline (the hot-path step
   of `.github/copilot-instructions.md`, and the `## Review guidelines` section
   of `AGENTS.md`, which Codex reads) and are asked to print the section 6
   table.
