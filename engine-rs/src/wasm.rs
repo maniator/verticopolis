@@ -294,6 +294,10 @@ pub struct Engine {
     stepper: crate::fixed_step::FrameStepper,
     /// The last `queueView` and `congestion` answers and their keys.
     render_memo: port_render::RenderMemo,
+    /// The undo and redo steps of the current tower (`wasm_port_undo.rs`).
+    undo: crate::undo::UndoHistory,
+    /// The message the last undo or redo gave the player.
+    undo_notice: Option<String>,
 }
 
 /// `importTdt(bytes, filename)`: a 1994 `.TDT` file as JSON text
@@ -362,6 +366,9 @@ mod port_files;
 
 #[path = "wasm_port_render.rs"]
 mod port_render;
+
+#[path = "wasm_port_undo.rs"]
+mod port_undo;
 
 // The exported members of `Engine`, grouped by what they do. Each file holds
 // plain `#[wasm_bindgen] impl Engine` blocks; the logic they forward to is in

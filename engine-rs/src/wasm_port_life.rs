@@ -151,6 +151,8 @@ impl Engine {
         self.staged_tdt = None;
         self.tdt_file = None;
         self.backdrop = false;
+        // Another tower: the steps back belong to the one it replaced.
+        self.undo.clear();
         self.generation += 1;
     }
 
@@ -195,11 +197,11 @@ impl Engine {
         vec![f64::from(steps), self.stepper.acc_minutes]
     }
 
-    /// Load an undo or redo snapshot (the `history` source), keeping the
-    /// live camera and auto-bridge preference, as the approved contract
-    /// says and as the app's history adoption does (`keepCamera`): the view
-    /// the host last stamped with `setCamera` stays, so a reader that rebuilds
-    /// on the generation move reads the camera under the player.
+    /// Load a snapshot (the `history` source), keeping the live camera and
+    /// auto-bridge preference, as the approved contract says (`keepCamera`):
+    /// the view the host last stamped with `setCamera` stays, so a reader
+    /// that rebuilds on the generation move reads the camera under the
+    /// player. Like any adopted tower it forgets the undo steps.
     pub(crate) fn port_restore(&mut self, text: &str) -> Vec<f64> {
         self.reason = None;
         match crate::load_stream::load_save_text(text.as_bytes()) {

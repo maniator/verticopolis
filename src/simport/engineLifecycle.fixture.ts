@@ -3,7 +3,7 @@ import { Simulation } from "../engine/Simulation";
 import { towerStateSig } from "../engine/UndoHistory";
 import type { SerializedGame } from "../engine/types";
 import { MID, newSeededGame } from "../tests/fixtures/towerFixtures";
-import type { EnginePort, PortRecord } from "./enginePort";
+import { UNDO_NOTHING_TO_STEP, type EnginePort, type PortRecord } from "./enginePort";
 import {
   type MakeEngine,
   type Subject,
@@ -58,6 +58,101 @@ export function describeEngineLifecycle(name: string, make: MakeEngine): void {
       expect(saved(s).autoBridge, "the live bridging setting").toBe(false);
       must(s, (p) => p.buildAt(kind("office"), 3, mid - 4), "office on 3 again");
       expect(mustFind(s.reader.tower.units, (u) => u.kind === "office" && u.floor === 3).floor).toBe(3);
+    });
+
+    /** An edit apart from the office: three floor tiles on 2 from `x`. */
+    const paintFloor = (s: Subject, x: number, label: string): void => {
+      const tiles = Float64Array.from({ length: 3 }, (_, i) => x + i);
+      must(s, (p) => p.paintTiles(kind("floor"), 2, tiles), label);
+    };
+
+    it("keeps the undo and redo steps itself: a gesture is a step only if the tower changed, a step back puts the tower back, and a redo puts the edit back", () => {
+      const s = subject(make);
+      const mid = lobbyCenter(s);
+      const offices = () => s.port.serialize().split('"kind":"office"').length - 1;
+      expect(Array.from(s.port.undoDepths())).toEqual([0, 0]);
+      s.port.undoCapture("Nothing");
+      expect(s.port.undoCommit(), "an empty gesture").toBe(false);
+      s.port.undoCapture("Build Office");
+      must(s, (p) => p.buildAt(kind("office"), 2, mid - 4), "office on 2");
+      expect(s.port.undoCommit()).toBe(true);
+      expect(Array.from(s.port.undoDepths())).toEqual([1, 0]);
+      const built = s.port.serialize();
+      const generation = s.port.generation();
+
+      const back = s.port.undo();
+      expect([back[0], back[1]]).toEqual([1, generation + 1]);
+      expect(s.port.undoNotice()).toBe("Undid: Build Office");
+      expect(Array.from(s.port.undoDepths())).toEqual([0, 1]);
+      expect(offices()).toBe(0);
+
+      expect(done(s.port.redo())).toBe(true);
+      expect(s.port.undoNotice()).toBe("Redid: Build Office");
+      expect(s.port.serialize()).toBe(built);
+    });
+
+    it("says there is nothing to undo or redo without touching the tower", () => {
+      const s = subject(make);
+      const save = s.port.serialize();
+      const generation = s.port.generation();
+      for (const [step, notice] of [
+        [() => s.port.undo(), "Nothing to undo."],
+        [() => s.port.redo(), "Nothing to redo."],
+      ] as const) {
+        const rec = step();
+        expect([rec[0], rec[1]]).toEqual([UNDO_NOTHING_TO_STEP, generation]);
+        expect(s.port.undoNotice()).toBe(notice);
+      }
+      expect(s.port.serialize()).toBe(save);
+    });
+
+    it("closes a gesture under way before a step, keeps a dropped one that changed the tower, and a new edit ends the redo trail", () => {
+      const s = subject(make);
+      const mid = lobbyCenter(s);
+      s.port.undoCapture("Build Office");
+      must(s, (p) => p.buildAt(kind("office"), 2, mid - 4), "office on 2");
+      expect(done(s.port.undo()), "the drag under way is the step").toBe(true);
+      expect(s.port.undoNotice()).toBe("Undid: Build Office");
+      expect(Array.from(s.port.undoDepths())).toEqual([0, 1]);
+
+      s.port.undoCapture("Peek");
+      s.port.undoDiscard();
+      expect(s.port.undoCommit(), "a dropped gesture that changed nothing").toBe(false);
+      expect(Array.from(s.port.undoDepths())).toEqual([0, 1]);
+
+      s.port.undoCapture("Build Office");
+      paintFloor(s, mid + 5, "second edit");
+      s.port.undoDiscard();
+      expect(Array.from(s.port.undoDepths()), "a dropped edit is still a step").toEqual([1, 0]);
+
+      s.port.undoCapture("Build Office");
+      paintFloor(s, mid + 9, "third edit");
+      s.port.undoCapture("Build Office");
+      expect(s.port.undoCommit(), "the capture over it kept the third edit").toBe(false);
+      expect(Array.from(s.port.undoDepths())).toEqual([2, 0]);
+    });
+
+    it("forgets the steps when another tower is adopted, a restore included", () => {
+      const s = subject(make);
+      const mid = lobbyCenter(s);
+      s.port.undoCapture("Build Office");
+      must(s, (p) => p.buildAt(kind("office"), 2, mid - 4), "office on 2");
+      s.port.undoCommit();
+      const text = s.port.serialize();
+      expect(done(s.port.restore(text))).toBe(true);
+      expect(Array.from(s.port.undoDepths())).toEqual([0, 0]);
+
+      s.port.undoCapture("Build Office");
+      paintFloor(s, mid + 9, "another edit");
+      s.port.undoCommit();
+      expect(done(s.port.loadSave(text))).toBe(true);
+      expect(Array.from(s.port.undoDepths())).toEqual([0, 0]);
+
+      s.port.undoCapture("Build Office");
+      paintFloor(s, mid + 5, "second edit");
+      s.port.undoCommit();
+      s.port.undoClear();
+      expect(Array.from(s.port.undoDepths())).toEqual([0, 0]);
     });
 
     it("loads a stored save with the founder rule, and a restore never applies it", () => {

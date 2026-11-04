@@ -21,6 +21,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.81.0
+
+- Undo and redo no longer turn back the clock: they put back just the edit, and give back or charge exactly what it cost.
+- Undo says why when it can't help: not enough money, a room that has been used since you built it (sell it instead), or a condo that has sold and keeps its price.
+- Pressing Undo or Redo partway through a drag ends the drag, so nothing more is built or bulldozed until you press again.
+
 ## 2.79.2
 
 - On a narrower desktop screen, or while the Getting Started card is up, the hint bar now sits just above the open Map, so the card no longer covers it.

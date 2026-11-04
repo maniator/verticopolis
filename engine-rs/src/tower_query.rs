@@ -26,7 +26,11 @@ impl Tower {
     }
 
     pub fn get_transport_mut(&mut self, id: i64) -> Option<&mut Transport> {
-        self.transport_index(id).map(|i| &mut self.transports[i])
+        let i = self.transport_index(id)?;
+        if let Some(j) = self.journal.as_mut() {
+            j.transport_edit(i, &self.transports[i]);
+        }
+        Some(&mut self.transports[i])
     }
 
     /// `roomAt`: the room covering a tile, structure excluded.

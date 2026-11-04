@@ -33,7 +33,23 @@ function commitAfter(app: GameApp, pending: Promise<unknown> | null): Promise<vo
   return pending.then(() => app.commitUndo());
 }
 
+/** The gesture a build or bulldoze drag's press opened, and the tower it
+ *  opened on. */
+interface DragGesture {
+  gesture: number;
+  generation: number;
+}
+
 export function wireEngine(app: GameApp): void {
+  // A drag changes the tower only inside the gesture its press opened. An
+  // undo or a redo taken mid-drag closes that gesture, and so does another
+  // gesture opened over it (keyboard play) or a tower swapped in; the engine
+  // records an edit only while its gesture is open, so from then on the drag
+  // stops changing the tower until its release.
+  let drag: DragGesture | null = null;
+  const dragActs = (): boolean =>
+    drag !== null && app.undoGesture() === drag.gesture && app.enginePort.generation() === drag.generation;
+
   // Decide whether a press pans the camera or performs the active tool.
   // Pan vs act is pure routing in ./game/gesture (unit-tested). On touch a
   // paint tool (floor/lobby/parking) owns the one-finger drag so mobile can
@@ -78,8 +94,10 @@ export function wireEngine(app: GameApp): void {
     app.paintAnchor = null;
     app.buildAnchor = null;
     app.build.clearPaint();
+    drag = null;
     if (app.tool.type === "bulldoze" || app.tool.type === "build") {
       app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${catalogFacility(catalogOf(app), app.tool.kind).name}`);
+      drag = { gesture: app.undoGesture(), generation: app.enginePort.generation() };
     }
     if (app.tool.type === "bulldoze") {
       app.build.bulldozePicked(picked);
@@ -106,7 +124,7 @@ export function wireEngine(app: GameApp): void {
 
   app.engine.onActionMove = (tile, floor, picked) => {
     if (app.tool.type === "bulldoze") {
-      app.build.bulldozePicked(picked, true); // drag: blocked tiles fail silently
+      if (dragActs()) app.build.bulldozePicked(picked, true); // drag: blocked tiles fail silently
       return;
     }
     if (app.tool.type !== "build") return;
@@ -119,6 +137,7 @@ export function wireEngine(app: GameApp): void {
       app.engine.transportPreview = { kind, x, bottom, top, valid };
       app.engine.preview = null;
     } else if (isPaintKind(kind)) {
+      if (!dragActs()) return;
       if (app.paintAnchor) {
         // First move of a deferred touch paint: stamp the same brush strip a
         // desktop press lays at the press point, then extend from it.
@@ -142,11 +161,15 @@ export function wireEngine(app: GameApp): void {
   };
 
   app.engine.onActionUp = () => {
+    const acts = dragActs();
+    // Another gesture opened over the drag is that gesture's to close.
+    const closes = drag === null || app.undoGesture() === drag.gesture;
+    drag = null;
     // A deferred touch paint that never moved is a TAP: lay the same brush
     // strip a desktop click lays (a drag already laid its run via
     // onActionMove and cleared the anchor).
     if (app.paintAnchor) {
-      if (app.tool.type === "build") app.build.seedPaint(app.tool.kind, app.paintAnchor.tile, app.paintAnchor.floor);
+      if (acts && app.tool.type === "build") app.build.seedPaint(app.tool.kind, app.paintAnchor.tile, app.paintAnchor.floor);
       app.paintAnchor = null;
     }
     // Touch room-build release: commit the room where the ghost sits (the lifted
@@ -157,7 +180,7 @@ export function wireEngine(app: GameApp): void {
       const valid = app.engine.preview?.valid ?? false;
       app.buildAnchor = null;
       app.engine.preview = null;
-      if (valid && app.tool.type === "build") placeSimpleBuild(app, app.tool.kind, a.tile, a.floor);
+      if (acts && valid && app.tool.type === "build") placeSimpleBuild(app, app.tool.kind, a.tile, a.floor);
     }
     app.build.clearPaint();
     // Only drag-sized transports (elevators) commit on release. Stairs and
@@ -169,7 +192,7 @@ export function wireEngine(app: GameApp): void {
       if (tp) {
         // The helper explains failures (invalid spot, not enough money)
         // instead of failing silently.
-        app.build.tryBuildTransport(tp.kind, tp.x, tp.bottom, tp.top);
+        if (acts) app.build.tryBuildTransport(tp.kind, tp.x, tp.bottom, tp.top);
         app.engine.transportPreview = null;
       } else if (app.transportStart) {
         // Pressed without dragging, teach the drag-to-size gesture.
@@ -178,7 +201,7 @@ export function wireEngine(app: GameApp): void {
     }
     app.transportStart = null;
     // Every command this release issued is answered, so the step holds them.
-    app.commitUndo();
+    if (closes) app.commitUndo();
   };
 
   app.engine.onHover = (tile, floor, picked) => {

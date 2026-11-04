@@ -310,6 +310,7 @@ export class Engine {
     recyclingCapacity(): number;
     recyclingDemandMet(): boolean;
     recyclingFill(): number;
+    redo(): Float64Array;
     /**
      * `removeCar(id)`: JSON `{ ok, reason?, delta }` with the half-back refund.
      * The id is read raw, as for `addCar` (#923).
@@ -514,7 +515,14 @@ export class Engine {
      * The transport inspector and editor card for shaft `id`, as JSON, or null.
      */
     transportDetail(id: number): string | undefined;
+    undoCapture(label: string): void;
+    undoClear(): void;
+    undoCommit(): boolean;
+    undoDepths(): Float64Array;
+    undoDiscard(): void;
+    undoNotice(): string | undefined;
     undoSignature(): string;
+    undo(): Float64Array;
     /**
      * The unit covering a tile, serialized as the save would, or null.
      */

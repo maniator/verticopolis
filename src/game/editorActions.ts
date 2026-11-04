@@ -54,17 +54,20 @@ export interface EditorActionsDeps {
   refreshEditor(): void;
   captureUndo(label: string): void;
   commitUndo(): void;
+  /** The gesture under way (`AppHistory.gesture`). */
+  undoGesture(): number;
   announce(msg: string): void;
 }
 
 export class EditorActions {
-  /** The shaft, tower generation and ends of the extend-arrow drag in
-   *  progress. The engine holds the gesture's high-water mark (`startExtend`,
-   *  #990), so a back-and-forth wiggle is billed once; a tower swapped in
-   *  mid-drag (a load, an undo) has no gesture open, so the drag begins a new
-   *  one on it. The ends follow each step's record, so a pointer move asks
-   *  the port for no card. */
-  private extendDrag: { id: number; generation: number; bottom: number; top: number } | null = null;
+  /** The shaft, tower generation, undo gesture and ends of the extend-arrow
+   *  drag in progress. The engine holds the gesture's high-water mark
+   *  (`startExtend`, #990), so a back-and-forth wiggle is billed once; a
+   *  tower swapped in mid-drag (a load, an undo) or another gesture opened
+   *  over this one (keyboard play) leaves the drag no gesture of its own, so
+   *  it begins a new one. The ends follow each step's record, so a pointer
+   *  move asks the port for no card. */
+  private extendDrag: { id: number; generation: number; gesture: number; bottom: number; top: number } | null = null;
 
   constructor(private readonly deps: EditorActionsDeps) {}
 
@@ -179,14 +182,18 @@ export class EditorActions {
     if (!selected || selected.type !== "transport") return;
     const engine = this.deps.engine();
     const generation = engine.generation();
-    if (!this.extendDrag || this.extendDrag.id !== selected.id || this.extendDrag.generation !== generation) {
+    const held = this.extendDrag;
+    const stillOpen =
+      held !== null && held.id === selected.id && held.generation === generation && held.gesture === this.deps.undoGesture();
+    if (!stillOpen) {
       const t = this.deps.kit().cards.shaft(selected.id);
       if (!t || !isElevatorKind(t.kind)) return; // only lifts have extend handles / billing
-      this.extendDrag = { id: t.id, generation, bottom: t.bottom, top: t.top };
       this.deps.captureUndo("Extend");
+      this.extendDrag = { id: t.id, generation, gesture: this.deps.undoGesture(), bottom: t.bottom, top: t.top };
       engine.startExtend(t.id);
     }
     const drag = this.extendDrag;
+    if (!drag) return;
     const rec = engine.extendShaft(drag.id, end === "up", targetFloor);
     const res = outcome(engine, rec);
     const bottom = this.deps.codes().slot(rec, "extendShaft", "bottom");

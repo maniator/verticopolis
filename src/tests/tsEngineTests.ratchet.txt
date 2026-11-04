@@ -163,7 +163,6 @@ src/tests/integration/trafficTeeth.integration.test.ts Simulation
 src/tests/integration/tsEngine.golden.integration.test.ts Simulation port/tsEngine
 src/tests/integration/uiDialogs.integration.test.ts Simulation
 src/tests/integration/undoHistory.integration.test.ts Simulation UndoHistory port/tsEngine
-src/tests/integration/undoHistoryRestore.integration.test.ts Simulation UndoHistory port/tsEngine
 src/tests/integration/unmetDemand.integration.test.ts Simulation sim/constants sim/demand sim/gripe sim/serialization
 src/tests/integration/venueAttendance.integration.test.ts Clock Crowd Simulation crowd/person crowd/spawn crowd/visits
 src/tests/integration/venueOccupancy.integration.test.ts Clock Simulation
@@ -202,7 +201,7 @@ src/ui/templates/stats.fixture.ts port/tsEngine
 src/ui/templates/stats.test.ts Simulation sim/star tower/rooms
 src/ui/uiStatus.test.ts Simulation port/tsEngine
 src/wasmhost/frameApply.test.ts Simulation port/tsEngine tower/rooms
-src/wasmhost/hostFault.test.ts Simulation UndoHistory
+src/wasmhost/hostFault.test.ts Simulation
 src/wasmhost/merge.test.ts Simulation port/tsEngine tower/rooms
 src/wasmhost/stepLoopAbsent.test.ts Simulation
 src/wasmhost/wasmHostFrame.test.ts Simulation

@@ -86,12 +86,16 @@ pub mod star;
 pub mod suite;
 pub mod tdt;
 pub use tdt::{export_tdt, import_tdt};
+mod sim_undo;
+mod sim_undo_check;
 pub mod telemetry;
 pub mod tower;
 mod tower_index;
 pub mod tower_query;
 mod tower_query_state;
 mod tower_removal;
+mod undo;
+mod undo_journal;
 pub mod view;
 #[cfg(feature = "wasm")]
 pub mod wasm;

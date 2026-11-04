@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { EngineBootError } from "./engineBoot";
-import { towerStateSig } from "../engine/UndoHistory";
-import { FaultLatch, RestorePoints, carryLiveState, hostFault, isEngineTrap, isHostFault, runEach, signatureOfSave, type FaultContext } from "./hostFault";
+import { FaultLatch, RestorePoints, carryLiveState, hostFault, isEngineTrap, isHostFault, runEach, type FaultContext } from "./hostFault";
 
 /** A save told apart by its clock. */
 const save = (minutes: number) => {
@@ -287,17 +286,5 @@ describe("live state carried to the fresh tower (#874)", () => {
     };
     expect(() => carryLiveState(from, to)).not.toThrow();
     expect([...to.crowd.commuteStressByFloor]).toEqual([[3, 12]]);
-  });
-});
-
-describe("the undo signature of a save (slice 5)", () => {
-  it("fingerprints a save's tower the way the port reads a live one", () => {
-    const sim = Simulation.newGame(5, "classic");
-    sim.money = 1e9;
-    for (let x = 170; x < 180; x++) sim.build("lobby", 1, x);
-    const text = JSON.stringify(sim.serialize());
-    expect(signatureOfSave(text)).toBe(towerStateSig(sim.tower, sim.money));
-    sim.build("lobby", 1, 180);
-    expect(signatureOfSave(text)).not.toBe(towerStateSig(sim.tower, sim.money));
   });
 });

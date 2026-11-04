@@ -342,6 +342,36 @@ impl Engine {
     pub fn undo_signature(&self) -> String {
         self.port_undo_signature()
     }
+    #[wasm_bindgen(js_name = undoCapture)]
+    pub fn undo_capture(&mut self, label: &str) {
+        self.port_undo_capture(label)
+    }
+    #[wasm_bindgen(js_name = undoCommit)]
+    pub fn undo_commit(&mut self) -> bool {
+        self.port_undo_commit()
+    }
+    #[wasm_bindgen(js_name = undoDiscard)]
+    pub fn undo_discard(&mut self) {
+        self.port_undo_discard()
+    }
+    #[wasm_bindgen(js_name = undoClear)]
+    pub fn undo_clear(&mut self) {
+        self.port_undo_clear()
+    }
+    pub fn undo(&mut self) -> Vec<f64> {
+        self.port_undo()
+    }
+    pub fn redo(&mut self) -> Vec<f64> {
+        self.port_redo()
+    }
+    #[wasm_bindgen(js_name = undoNotice)]
+    pub fn undo_notice(&self) -> Option<String> {
+        self.port_undo_notice()
+    }
+    #[wasm_bindgen(js_name = undoDepths)]
+    pub fn undo_depths(&self) -> Vec<f64> {
+        self.port_undo_depths()
+    }
     #[wasm_bindgen(js_name = drainEvents)]
     pub fn drain_events(&mut self) -> Vec<f64> {
         self.port_drain_events()

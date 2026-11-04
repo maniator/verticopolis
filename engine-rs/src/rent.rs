@@ -130,6 +130,9 @@ impl Simulation {
                     r.changed += 1;
                 }
                 if mutate {
+                    if let Some(j) = self.tower.journal.as_mut() {
+                        j.unit_edit(i, u);
+                    }
                     u.no_rate = true;
                 }
                 continue;
@@ -155,6 +158,9 @@ impl Simulation {
                 r.changed += 1;
             }
             if mutate {
+                if let Some(j) = self.tower.journal.as_mut() {
+                    j.unit_edit(i, u);
+                }
                 // `storeRent`: the default is stored as no override; an
                 // explicit reprice returns a No Rate unit to the market.
                 u.rent = if value == cfg.default {

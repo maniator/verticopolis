@@ -91,6 +91,7 @@ function makeApp(toolOver: Record<string, unknown> = {}) {
     captureUndo: vi.fn(),
     commitUndo: vi.fn(),
     discardUndo: vi.fn(),
+    undoGesture: vi.fn(() => 1),
     mobileMq: { matches: false },
     paintAnchor: null as unknown,
     buildAnchor: null as unknown,

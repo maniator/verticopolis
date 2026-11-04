@@ -14,11 +14,11 @@ function schedSig(s: ElevatorSchedule | undefined): string {
  * labels, rents, the No Rate flag, cinema booking policy, retail subtype, and money. It
  * deliberately omits the clock/time fields, so the sub-second time delta
  * *within a single gesture* isn't mistaken for a change when {@link UndoHistory}
- * compares capture-vs-commit to drop no-op gestures. (Money IS included; over
- * long spans income can move it, but a gesture is far too short for that to
- * matter.)
+ * compares capture-vs-commit to drop no-op gestures. `money` is part of it
+ * when given; a gesture's comparison leaves it out, since income during a
+ * held press is time passing, not an edit.
  */
-export function towerStateSig(tower: Tower, money: number): string {
+export function towerStateSig(tower: Tower, money?: number): string {
   const u = tower.units
     .map(
       // noRate must be part of the signature: taking a unit off the market can
@@ -38,211 +38,167 @@ export function towerStateSig(tower: Tower, money: number): string {
         `${x.kind}@${x.x}:${x.bottom}-${x.top}:${x.cars}:${(x.skipFloors ?? []).join(".")}:${schedSig(x.schedule)}`,
     )
     .join(";");
-  return `${money}|${u}|${r}`;
+  return `${money ?? ""}|${u}|${r}`;
+}
+
+/** Most steps each stack keeps before the oldest is dropped. */
+export const UNDO_CAP = 50;
+
+/** One step: a save of the tower before the edit, and the edit's name. */
+export interface UndoStep {
+  readonly snap: string;
+  readonly label: string;
 }
 
 /**
- * Ports that connect the (otherwise domain-agnostic) history to the game:
- * how to take/restore an opaque snapshot, how to fingerprint the current
- * player-mutable state, and where to send the "Undid: …" messages.
- */
-export interface UndoPorts {
-  /** Serialize the current state to an opaque string (e.g. the saved game). */
-  snapshot(): string;
-  /** Restore a snapshot previously returned by {@link snapshot}. The tower
-   *  changes before this returns; the promise settles once the restore is
-   *  done, and rejects when it failed. */
-  restore(snap: string): Promise<void>;
-  /** Fingerprint the current player-mutable state (see {@link towerStateSig}). */
-  signature(): string;
-  /** Which tower is live (`EnginePort.generation`), read around a restore to
-   *  tell whether it swapped the tower before it failed. Without it a failed
-   *  restore is taken to have left the tower as it was. */
-  generation?(): number;
-  /** Surface a short user-facing message ("Undid: Bulldoze", "Nothing to undo."). */
-  notify(message: string): void;
-}
-
-interface Entry {
-  snap: string;
-  label: string;
-  /** The redo steps this step's commit cleared, kept while
-   *  {@link UndoHistory.holdClearedRedo} is on (temporary, #874). */
-  cleared?: Entry[];
-}
-
-/** Most snapshots we keep on each stack before the oldest is dropped. */
-const UNDO_CAP = 40;
-
-/**
- * Snapshot-based undo/redo with per-gesture coalescing. A gesture calls
- * {@link capture} on its first mutation and {@link commit} on its end; the
- * snapshot is only kept if the {@link UndoPorts.signature} actually changed, so
- * a misfired or empty gesture leaves no step. Restores go through the ports, so
- * this class knows nothing about the simulation itself.
+ * The reference engine's undo stacks: the two stacks and the rules for them,
+ * with no knowledge of the tower. `TsEngine` takes the saves and fingerprints
+ * and puts a step back (the port's `undo` and `redo`). A gesture calls
+ * {@link capture} on its first change and {@link commit} on its end; the
+ * capture is kept only when the tower's fingerprint changed, so a misfired or
+ * empty gesture leaves no step. The steps here are whole saves; the Rust
+ * engine the game runs keeps only what each edit changed
+ * (`engine-rs/src/undo.rs`). Both keep 50 steps a stack and pass the shared
+ * lifecycle fixture; this copy goes with the reference engine.
  */
 export class UndoHistory {
-  private undoStack: Entry[] = [];
-  private redoStack: Entry[] = [];
-  private pending: { snap: string; sig: string; label: string } | null = null;
-  private hold = false;
+  private undoStack: UndoStep[] = [];
+  private redoStack: UndoStep[] = [];
+  private pending: { step: UndoStep; sig: string } | null = null;
 
-  constructor(private readonly ports: UndoPorts) {}
-
-  /** While on, a commit keeps the redo steps it clears with its own undo
-   *  step, and {@link dropUnchanged} puts them back when it drops that step:
-   *  an edit the WASM engine's fallback takes away leaves the redo trail as
-   *  it was. One step holds a trail at a time: a later commit that clears a
-   *  trail lets the older one go (an undo since then read a restore point
-   *  after that step, so no fallback can drop it), and so does turning the
-   *  hold off. So the history keeps at most one redo trail beyond what it
-   *  keeps with the hold off. The host turns it on while it can fall back.
-   *  Temporary, with the fallback (#874). */
-  get holdClearedRedo(): boolean {
-    return this.hold;
+  /** Capture the tower before a gesture's first change. It replaces any
+   *  earlier capture on purpose: a gesture that captured but bailed before
+   *  committing (an early return) must not anchor the next one to its stale
+   *  save. */
+  capture(snap: string, sig: string, label: string): void {
+    this.pending = { step: { snap, label }, sig };
   }
 
-  set holdClearedRedo(on: boolean) {
-    this.hold = on;
-    if (!on) this.letHeldGo();
-  }
-
-  private letHeldGo(): void {
-    for (const entry of this.undoStack) delete entry.cleared;
-  }
-
-  /**
-   * Capture the pre-action snapshot at the start of a gesture. Called exactly
-   * once per gesture (a drag's first mutation, or a discrete edit click), and it
-   * deliberately *overwrites* any prior pending: gesture-start hooks fire once,
-   * and overwriting self-heals a gesture that captured but bailed before
-   * committing (e.g. an edit that hit an early return). A "capture only if empty"
-   * guard would instead strand that stale snapshot and mis-anchor the next
-   * gesture, so overwrite is intentional here.
-   */
-  capture(label: string): void {
-    this.pending = { snap: this.ports.snapshot(), sig: this.ports.signature(), label };
-  }
-
-  /** Drop a pending capture without committing it. For a gesture that was
-   *  CANCELED into pure inspection (a touch hold becoming a peek): commit()'s
-   *  no-op check compares signatures, and the signature includes money, so a
-   *  sim income tick during the canceled gesture's window would otherwise mint
-   *  a misleading entry whose restore rewinds sim-only state. */
+  /** Drop a capture without committing it: a gesture canceled into pure
+   *  inspection (a touch hold that became a peek). Its fingerprint holds the
+   *  balance, so an income tick inside the window would otherwise make a step
+   *  whose restore rewinds sim-only state. */
   discard(): void {
     this.pending = null;
   }
 
-  /** Finalize the captured snapshot — but only if something actually changed. */
-  commit(): void {
+  /** Whether a gesture's capture waits for its commit. */
+  hasPending(): boolean {
+    return this.pending !== null;
+  }
+
+  /** Close the gesture under way. The capture becomes the newest undo step
+   *  when `sigNow`, the tower's fingerprint now, differs from the one it was
+   *  captured with, and the redo steps go (a fresh edit ends that trail).
+   *  Answers whether a step was kept. */
+  commit(sigNow: string): boolean {
     const p = this.pending;
     this.pending = null;
-    if (!p || this.ports.signature() === p.sig) return;
-    // A fresh action invalidates the redo trail.
-    const cleared = this.redoStack.splice(0);
-    const entry: Entry = { snap: p.snap, label: p.label };
-    if (this.hold && cleared.length > 0) {
-      this.letHeldGo();
-      entry.cleared = cleared;
-    }
-    this.undoStack.push(entry);
+    if (!p || p.sig === sigNow) return false;
+    this.redoStack.length = 0;
+    this.undoStack.push(p.step);
     if (this.undoStack.length > UNDO_CAP) this.undoStack.shift();
+    return true;
   }
 
-  /** Undo the newest step. The commit, the pop, the redo step's snapshot
-   *  and the restore's start all happen before this returns, so two undos in
-   *  one task pop two steps in order. The "Undid:" notice follows the
-   *  settled restore; a failure gives none and rejects (see {@link step}). */
-  undo(): Promise<void> {
-    this.commit(); // finalize any in-flight gesture first
-    const entry = this.undoStack.pop();
-    if (!entry) return this.say("Nothing to undo.");
-    return this.step(entry, "undo");
+  popUndo(): UndoStep | undefined {
+    return this.undoStack.pop();
   }
 
-  /** Redo the newest undone step, in the same order as {@link undo}. */
-  redo(): Promise<void> {
-    this.commit(); // finalize any in-flight gesture first (matches undo)
-    const entry = this.redoStack.pop();
-    if (!entry) return this.say("Nothing to redo.");
-    return this.step(entry, "redo");
+  popRedo(): UndoStep | undefined {
+    return this.redoStack.pop();
   }
 
-  /** Restore `entry`, just popped by an undo or a redo, keeping today's
-   *  state as the opposite step. When the snapshot fails, `entry` goes back
-   *  where it was. When the restore fails, `entry` stays dropped: its save
-   *  would fail again and, kept on top, would block every older step. The
-   *  opposite step stays only when the restore swapped the tower before it
-   *  failed (it is then the way back); otherwise it holds the tower as it
-   *  still is and would change nothing, so it comes off wherever it now
-   *  sits. That trail is read again then, as the WASM fallback's tidy may
-   *  have replaced it. */
-  private step(entry: Entry, kind: "undo" | "redo"): Promise<void> {
-    const opposite = () => (kind === "undo" ? this.redoStack : this.undoStack);
-    let back: Entry;
-    try {
-      back = { snap: this.ports.snapshot(), label: entry.label };
-    } catch (e) {
-      (kind === "undo" ? this.undoStack : this.redoStack).push(entry);
-      return Promise.reject(e);
-    }
-    opposite().push(back);
-    const before = this.ports.generation?.();
-    let restored: Promise<void>;
-    try {
-      restored = this.ports.restore(entry.snap);
-    } catch (e) {
-      restored = Promise.reject(e);
-    }
-    const swapped = this.ports.generation?.() !== before;
-    return restored.then(
-      () => this.ports.notify(`${kind === "undo" ? "Undid" : "Redid"}: ${entry.label}`),
-      (e: unknown) => {
-        const trail = opposite();
-        const at = trail.lastIndexOf(back);
-        if (!swapped && at >= 0) trail.splice(at, 1);
-        throw e;
-      },
-    );
+  pushUndo(step: UndoStep): void {
+    this.undoStack.push(step);
   }
 
-  private say(message: string): Promise<void> {
-    this.ports.notify(message);
-    return Promise.resolve();
+  pushRedo(step: UndoStep): void {
+    this.redoStack.push(step);
   }
 
-  /** Drop the newest undo and redo steps that would change nothing now, and
-   *  answer how many went. The WASM engine's fallback (#874) can put the
-   *  tower back to the state an undo capture read, before the edit it
-   *  captured, so that edit's step would undo nothing (the redo steps its
-   *  commit cleared come back); and an undo whose own snapshot trapped keeps,
-   *  as its redo step, the state it went back to, which would redo nothing.
-   *  Both go. A gesture under way keeps its capture, fingerprinted again from
-   *  its own snapshot: a capture whose save trapped took the newest restore
-   *  point, which is where the fallback went, so a release with nothing done
-   *  since leaves no step. `sigOf` fingerprints a snapshot the way
-   *  {@link UndoPorts.signature} reads the live state; the host that falls
-   *  back passes it. Temporary, with the fallback. */
-  dropUnchanged(sigOf: (snap: string) => string): number {
-    const now = this.ports.signature();
-    let dropped = 0;
-    while (this.undoStack.length > 0 && sigOf(this.undoStack[this.undoStack.length - 1].snap) === now) {
-      const entry = this.undoStack.pop()!;
-      if (entry.cleared) this.redoStack = [...entry.cleared, ...this.redoStack];
-      dropped++;
-    }
-    while (this.redoStack.length > 0 && sigOf(this.redoStack[this.redoStack.length - 1].snap) === now) {
-      this.redoStack.pop();
-      dropped++;
-    }
-    if (this.pending) this.pending.sig = sigOf(this.pending.snap);
-    return dropped;
-  }
-
-  /** Drop the whole trail — e.g. when a *different* tower is adopted. */
+  /** Forget every step and the gesture under way: another tower was adopted. */
   clear(): void {
     this.undoStack.length = 0;
     this.redoStack.length = 0;
     this.pending = null;
+  }
+
+  /** How many steps each stack holds. */
+  depths(): { undo: number; redo: number } {
+    return { undo: this.undoStack.length, redo: this.redoStack.length };
+  }
+}
+
+/** What `undo` and `redo` answer when there is no step to take
+ *  (`NOTHING_TO_STEP` in `engine-rs/src/wasm_port_undo.rs`, and
+ *  `UNDO_NOTHING_TO_STEP` on the port). */
+const NOTHING_TO_STEP = 2;
+
+/** What the reference engine's undo steps need of the engine. */
+export interface UndoHost {
+  /** The tower's save, and its undo signature. */
+  serialize(): string;
+  undoSignature(): string;
+  /** Put a save in place of the tower, keeping the live camera and bridging
+   *  setting and the steps: `restore`. Answers `[status, generation]`. */
+  restore(text: string): Float64Array;
+  generation(): number;
+  /** Forget the refusal text of the last call. */
+  clearReason(): void;
+}
+
+/**
+ * The reference engine's undo and redo: the steps (`UndoHistory`), the
+ * gesture's capture and commit over the tower's save and signature, and a step
+ * back or forward as a restore. The port behavior matches the Rust engine's
+ * `wasm_port_undo.rs` where the shared lifecycle fixture pins it.
+ */
+export class UndoSteps {
+  readonly history = new UndoHistory();
+  notice: string | undefined;
+
+  constructor(private readonly host: UndoHost) {}
+
+  /** A gesture already open is closed first and kept if it changed the
+   *  tower, as the Rust engine keeps it. */
+  capture(label: string): void {
+    this.commit();
+    this.history.capture(this.host.serialize(), this.host.undoSignature(), label);
+  }
+
+  commit(): boolean {
+    if (!this.history.hasPending()) return false;
+    return this.history.commit(this.host.undoSignature());
+  }
+
+  depths(): Float64Array {
+    const { undo, redo } = this.history.depths();
+    return Float64Array.of(undo, redo);
+  }
+
+  /** An undo or a redo: close the gesture under way, take the newest step
+   *  and restore it, keeping today's tower as the opposite step once the
+   *  restore put the other back. A refused restore leaves the tower and the
+   *  opposite stack as they were, and the step goes back where it was, as
+   *  the Rust engine keeps a refused step. */
+  step(way: "undo" | "redo"): Float64Array {
+    this.notice = undefined;
+    this.commit();
+    const step = way === "undo" ? this.history.popUndo() : this.history.popRedo();
+    if (!step) {
+      this.host.clearReason();
+      this.notice = way === "undo" ? "Nothing to undo." : "Nothing to redo.";
+      return Float64Array.of(NOTHING_TO_STEP, this.host.generation());
+    }
+    const back = { snap: this.host.serialize(), label: step.label };
+    const record = this.host.restore(step.snap);
+    if (record[0] === 1) {
+      if (way === "undo") this.history.pushRedo(back);
+      else this.history.pushUndo(back);
+      this.notice = `${way === "undo" ? "Undid" : "Redid"}: ${step.label}`;
+    } else if (way === "undo") this.history.pushUndo(step);
+    else this.history.pushRedo(step);
+    return record;
   }
 }

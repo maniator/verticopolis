@@ -224,6 +224,7 @@ describe("EditorActions (editor-card money paths)", () => {
       refreshEditor: () => {},
       captureUndo: (label) => undo.captures.push(label),
       commitUndo: () => undo.commits++,
+      undoGesture: () => undo.captures.length,
       announce: () => {},
     });
   });
