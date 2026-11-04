@@ -57,9 +57,17 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   stays `web`.
 
 ## Where the truth lives (engine)
-- `src/engine/facilities.ts`: **the tuning source of truth**: `GRID` (lot 375 wide, floors
-  −9…100), `STAR_THRESHOLDS`, `TOWER_POPULATION`, per-facility cost/width/minStar/population,
-  build caps. Quote numbers from here, never hard-code duplicates.
+- **The Rust engine (`engine-rs/`) is the source of truth for gameplay rules, caps and
+  tuning**: `engine-rs/src/facilities.rs` (lot 375 wide, floors −9…100, per-facility
+  cost/width/minStar/population, build caps), `engine-rs/src/star.rs` (`STAR_THRESHOLDS`,
+  `TOWER_POPULATION`) and `engine-rs/src/rules.rs` (the Classic and Modern rule values).
+  The web UI reads them through the engine's catalog. Quote numbers from there, never
+  hard-code duplicates.
+- The `src/engine/` paths below are the TypeScript reference engine, kept as a test
+  referee until it is deleted. Until the deletion, the shipped bundle still carries
+  part of it, and the boot catalog check (`src/wasmhost/catalogCheck.ts`) runs its
+  `catalogFor` (#921). `src/engine/facilities.ts` holds a copy the catalog digest
+  pins to the Rust tables; change the Rust side first.
 - `src/engine/Simulation.ts`: clock/tick, star evaluation, VIP, congestion (v1 + v2 spatial).
 - `src/engine/Tower.ts`: placement/geometry, served-floor reachability, parking chains,
   structural support (`isSupported`, `removalReason`), staff connectivity (`staffConnected`).
@@ -68,7 +76,8 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   `EconomySystem.ts`.
 - `src/engine/ElevatorDispatch.ts`: SCAN car controller; consumes `Crowd.elevatorCalls(tower)`
   (per-shaft **hall** calls + per-car **cab** calls). Transport-kind predicates
-  (`isStaffOnlyTransport`, `isStaffTransportKind`, `isFixedSpanTransport`) live in `facilities.ts`.
+  (`isStaffOnlyTransport`, `isStaffTransportKind`, `isFixedSpanTransport`) live in the
+  reference `facilities.ts`; the Rust engine's are on `Kind` in `engine-rs/src/facilities.rs`.
 - `simModel` defaults to **`"v2"`** (hourly sub-stepping + spatial per-floor congestion).
 
 ## Canon rules that are easy to get wrong
@@ -78,8 +87,9 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   customers. Commercial counts LIVE customers (`Unit.customersIn`, whoever is
   eating right now, often 0); the catalog values (fast food 25 / restaurant 35 /
   shop 20, chosen per footprint) are what TDT export writes, not a flat census
-  add. `censusCount()` in `facilities.ts` owns the rule. **Hotel guests count
-  while climbing up through 4★, then drop out** (`ratingPopulation()`).
+  add. `Unit::census_count` (`engine-rs/src/tower_query_state.rs`) owns the rule.
+  **Hotel guests count while climbing up through 4★, then drop out**
+  (`rating_population`, `engine-rs/src/star.rs`).
 - **Two-ride rule:** a trip uses at most **two** transport rides (one sky-lobby transfer);
   floors reachable only via 3+ rides draw no commuters. Sky lobbies go every ~15 floors.
 - **Parking** has a **Ramp** + **Spaces**; a space only functions when chained (contiguous

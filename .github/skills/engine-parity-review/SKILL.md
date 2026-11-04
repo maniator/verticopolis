@@ -53,8 +53,9 @@ not replace it.
 8. **Canon caps come from one place.** Per-tower build caps, the single
    24-shaft elevator pool (express included), the 64-link stair and
    escalator pool, 8 cars per shaft and the span rules live in
-   `src/engine/facilities.ts` and `engine-rs/src/facilities.rs`, pinned by
-   the `canon_caps_and_pools` test. Do not accept a "fix" that moves express
+   `engine-rs/src/facilities.rs`, the source of truth, pinned by the
+   `canon_caps_and_pools` test; the reference copy in
+   `src/engine/facilities.ts` follows it under the catalog digest. Do not accept a "fix" that moves express
    out of the elevator pool.
 9. **Scenario descriptions claim only what the commands do.** Read a new or
    edited scenario against its commands: the fixture it starts from (and

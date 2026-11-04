@@ -227,13 +227,18 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   `npm run engine:compat`; a guard fails the PR otherwise. Steps and limits are
   in CONTRIBUTING.md → Versioning → The engine crate version.
 
-- **Per-tower build caps live in `src/engine/facilities.ts`** (`BUILD_CAPS`,
-  `POOLED_CAPS`, `MAX_CARS`, `maxSpanFor`) and are enforced in one place,
-  `Tower.capReason`. That file is the single source of truth; mirror the 1994
-  original there, not from recollection. The Rust catalog
-  (`engine-rs/src/catalog.rs`) carries the same tables, the engine the game
-  runs enforces them, and `conformance/catalog-digests.json` pins the two
-  together, so a changed cap moves the digest in both.
+- **The Rust engine (`engine-rs/`) is the source of truth for gameplay rules,
+  caps and tuning.** Per-tower build caps live in `engine-rs/src/facilities.rs`
+  (`build_cap`, `POOLED_CAPS`, `Kind::max_cars`, `Kind::max_span`) and are
+  enforced in one place, `Tower::cap_reason` (`engine-rs/src/tower.rs`). Mirror
+  the 1994 original there, checking each value against it. The engine
+  publishes them, with every price, size and mode rule a frontend shows,
+  through the catalog (`engine-rs/src/catalog.rs`); the web UI reads that
+  catalog and no TypeScript table (the mode-name choices the UI still makes
+  are tracked on #1621). Until the TypeScript reference engine is deleted,
+  `src/engine/facilities.ts` keeps a copy that
+  `conformance/catalog-digests.json` pins to the Rust one, so a changed cap
+  moves the digest in both: change the Rust side first, then the copy.
 - **Transport pooling matches the original and is deliberate:** all three
   elevator kinds (standard + service + express) share **one 24-shaft pool**, and
   express is **not** counted separately. Stairs + escalators share a separate

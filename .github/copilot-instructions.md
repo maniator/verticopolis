@@ -61,5 +61,8 @@ fixes for its findings.
   dispatch bitsets and deliberately low-level tests (`AGENTS.md`).
 - A published analytics number comes from a governed definition or from tested
   code bound to one (`CLAUDE.md` non-negotiables).
-- A new facility starts in `src/engine/facilities.ts` (and the Rust catalog),
-  never as a render-layer special case.
+- A new facility starts in the Rust engine (`engine-rs/src/facilities.rs` and
+  its catalog), never as a render-layer special case. The Rust engine is the
+  source of truth for gameplay rules, caps and tuning; until the TypeScript
+  reference engine is deleted, `src/engine/facilities.ts` follows it under the
+  catalog digest.

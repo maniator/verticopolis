@@ -415,13 +415,19 @@ For a visual tour (layer diagram, the frame loop, the engine subsystems, input
 flow, and persistence) see **[ARCHITECTURE.md](./ARCHITECTURE.md)** (Mermaid
 diagrams). The prose conventions below are the source of truth.
 
-- **`src/engine/`**: pure game simulation (no DOM). Deterministic and heavily
-  unit-tested. `Simulation` is the orchestrator; cohesive subsystems live in
+- **`src/engine/`**: the TypeScript reference engine (no DOM), kept as a test
+  referee until it is deleted; the game runs the Rust engine. Until the deletion,
+  the shipped bundle still carries part of it, and the boot catalog check
+  (`src/wasmhost/catalogCheck.ts`) runs its `catalogFor` (#921). Deterministic and
+  heavily unit-tested. `Simulation` is the orchestrator; cohesive subsystems live in
   their own modules (`ElevatorDispatch`, `EventSystem`, `EconomySystem`, `Crowd`).
   The extracted `EventSystem` and `EconomySystem` depend only on the narrow
   `SimContext` interface, so each is testable on its own; `ElevatorDispatch` and
   `Crowd` operate on `Tower` directly. Per-tower build caps and rule-sets live
-  here (`facilities.ts`, `gameRules.ts`).
+  in the Rust engine (`engine-rs/src/facilities.rs`, `engine-rs/src/rules.rs`),
+  the source of truth for gameplay rules, caps and tuning; `facilities.ts` and
+  `gameRules.ts` here keep the TypeScript copy, and the catalog digest holds
+  what the catalog publishes equal in both.
 - **`src/render/`**: canvas rendering and pixel-art sprites. Reads engine state,
   never mutates it.
 - **`src/ui/`**: DOM controls (palette, status bar, dialogs), using native
@@ -457,24 +463,33 @@ A type-only import is not counted, so import a name you use only as a type with
 The tower grid is **two-layered**: a structural layer (floor/lobby) with a room
 layer sitting on top, exactly like the original SimTower corridor model.
 
-### Classic vs Modern rule-sets (`src/engine/gameRules.ts`)
+### Classic vs Modern rule-sets (`engine-rs/src/rules.rs`)
 
 A tower is founded under an immutable `GameMode` (`classic` | `modern`), chosen
-once at creation and persisted. **All** behavior the two modes disagree on lives
-behind the `GameRules` strategy object (`CLASSIC_RULES` / `MODERN_RULES`); the
-`Simulation` holds a `readonly rules` and calls `this.rules.<x>()`.
+once at creation and persisted. Behavior the two modes disagree on belongs
+behind the mode's rule methods in the Rust engine (`impl GameMode` in
+`engine-rs/src/rules.rs`), which the simulation calls (`self.mode.<x>()`). Some
+older Rust subsystems still test the mode inline (`self.mode.is_modern()`, a
+comparison with `GameMode::Classic`); move such a test behind a rule method
+when you change that code. The TypeScript reference engine keeps its copy
+behind the `GameRules` strategy object (`src/engine/gameRules.ts`,
+`CLASSIC_RULES` / `MODERN_RULES`) until it is deleted.
 
-**Tripwire: don't let mode logic smear.** The mode string is mapped to behavior
-in exactly one place (`makeRules`). Never write mode-specific *logic* inline
-(`if (sim.mode === "modern") { …compute… }`) in a subsystem. Add a method to
-`GameRules` and implement it in both rule-sets instead. Reading `sim.mode` /
-`sim.rules.hasVariantHouseholds` for pure **presentation** (a toast string, a UI
-section toggle) is fine; branching **engine logic** on it is the smell. Name new
+**Tripwire: don't let mode logic smear.** Map the mode to behavior in one
+place, a rule method (`makeRules` in the TypeScript copy). Never write
+mode-specific *logic* inline (an `if` on the mode that computes something) in a
+subsystem. Add a rule method instead. The web UI does not decide a mode rule
+from the mode's name either: when it needs one (whether the stats panel shows
+households, whether the build preview names a refusal), the engine states it in
+the catalog, from the engine's own rule method, and the UI reads it there. A
+few UI choices still key on the mode's name; #1621 tracks them, and each moves
+to the catalog when it next changes. Showing the mode's own name (the tower
+badge, a save slot's chip) is presentation and fine. Name new
 rule-driven modules after the **mechanic** (e.g. condo households), never after
 the mode, so a future feature isn't forced into the wrong drawer. Data-driven
 reads that already return the right value in both modes (e.g. `residentCount`,
 which reads a unit's stored household) stay plain accessors. They're not
-decisions, so they don't belong in `GameRules`.
+decisions, so they don't need a rule method.
 
 ## Versioning
 
@@ -737,7 +752,7 @@ alone.
 
 | Path | What |
 | --- | --- |
-| `src/engine/` | Pure game simulation: no DOM, deterministic, heavily unit-tested. `Simulation` orchestrates subsystems (`ElevatorDispatch`, `EventSystem`, `EconomySystem`, `Crowd`). Build caps and rule-sets live here (`facilities.ts`, `gameRules.ts`). |
+| `src/engine/` | The TypeScript reference engine, a test referee until it is deleted (until the deletion, the shipped bundle still carries part of it, and the boot catalog check runs its `catalogFor`, #921): no DOM, deterministic, heavily unit-tested. `Simulation` orchestrates subsystems (`ElevatorDispatch`, `EventSystem`, `EconomySystem`, `Crowd`). Build caps and rule-sets live in the Rust engine (`engine-rs/src/facilities.rs`, `engine-rs/src/rules.rs`); `facilities.ts` and `gameRules.ts` keep the TypeScript copy, and the catalog digest holds what the catalog publishes equal in both. |
 | `src/game/` | Game controllers: the testable logic behind the composition root. |
 | `src/render/` | Canvas rendering and pixel-art sprites (`sprites.ts`, `sprites/**`, `pixelSprites.ts`). Reads engine state, never mutates it. |
 | `src/render/excalibur/` | The Excalibur/WebGL engine wrapper (unit-exempt, e2e-covered). |
