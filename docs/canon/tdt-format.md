@@ -152,9 +152,9 @@ infested flag, bits 0 and 1 the number of guests inside right now.
 | --- | --- | --- |
 | `0x08` to `0x0A` | Checked in (stay state 1); low bits = guests currently inside, 0 to 2 | High |
 | `0x10` to `0x13` | Asleep (stay state 2); low bits = guests inside | High |
-| `0x18` (24) | Clean and vacant; no guests counted. Every room of TOWER1, TOWER7 and MYTOWER | High |
-| `0x20`, `0x28`, `0x30` | Dirty, awaiting housekeeping (32, 40, 48 seen); no guests counted | High |
-| `0x40` | Bug-infested [TD]. Not seen in the nine saves, in a TOWER2 run of about four game days in the original, or in the game's re-saves of our exports. Whether the game stores infestation at all is open (#1629) | Low |
+| `0x18` (24) | Clean and vacant; no guests counted. Every room in TOWER1 and MYTOWER, and every TOWER7 room but the 29 dirty ones. Housekeeping also writes it when it cleans a dirty room | High |
+| `0x20`, `0x28`, `0x30`, `0x38` | Dirty, awaiting housekeeping (32, 40, 48 seen in saves; 56 written by the game after it cleared the `0x40` flag); no guests counted | High |
+| `0x40` | Called bug-infested in [TD]. Never found in a save of a tower played in the game. The game keeps it when it loads a file that has it, but clears it from a room that is also vacant or dirty, and no infestation was seen on screen (#1629, below) | Low |
 
 What the original does to these bytes when it saves [RE]. A file we exported was
 loaded in the retail game and saved again:
@@ -169,8 +169,26 @@ loaded in the retail game and saved again:
   cleaned all of them and the game wrote `0x18`. A file with dirty rooms
   therefore reads back dirty only if it is saved again before the cleaners reach
   them.
-- No `0x40` was written by us or by the game, so no infested state was observed
-  in either direction. Our export writes an infested room as dirty (`0x20`).
+- A room we write as `0x18` can come back `0x20` (dirty) from a save made right
+  after the load. The game does the same to its own file: TOWER1's 310 rooms, all
+  `0x18` in the game's save, came back 211 `0x20`, 91 `0x08` and 8 `0x09` when it
+  was loaded and saved at once. MYTOWER and TOWER7 kept theirs. So `0x18` is the
+  game's own byte for a clean vacant room, and what happens to it next depends on
+  the tower and the hour, not on who wrote the file.
+- The `0x40` flag (owner's PC run, 2026-11-04, three TOWER2 rooms on floor 16).
+  Each status was its own file and its own run. The game loaded `0x40`, `0x58`
+  and `0x60` and kept them in a save made at once. Saves made after about a
+  minute of Fast Mode differ by run:
+  - `0x58` and `0x60` runs: housekeeping had cleaned the tower's 96 other dirty
+    rooms to `0x18`, and the three flagged rooms had become `0x38`, the flag gone
+    and the room still dirty. So the flag cost one more step before a clean room.
+  - `0x40` run and the `0x18` control run: housekeeping had not cleaned any room
+    yet, and `0x40` was unchanged.
+
+  No cockroaches or other sign of infestation showed on those rooms on screen.
+  The flag is therefore not our engine's infested state, which Classic never
+  clears. Our export writes an infested room as dirty (`0x20`), and the importer
+  reads any room with `0x40` as dirty and counts it in the infested line.
 
 The finance block's hotel guest lines count exactly the rooms in stay state 1 or
 2 at full complement (1 in a single room, 2 in a twin and 2 in a suite), whatever
@@ -256,6 +274,12 @@ but a populated tower must carry a nonzero N or the game faults ("file is alread
 open, or damaged"). An empty tower may carry 0. Our exporter writes the census
 as N zero-filled records. We do not import the roster.
 
+The zero-filled records are inert (owner's PC run, 2026-11-04, TOWER4, #920
+claim 7). With our count (4,173) and with 15,000, the game loaded the tower, ran
+it with the same population (3,293), kept the pool size in its own save and
+filled 6 of the records as people appeared. With 0 records it never showed the
+tower in four tries.
+
 ## 8. Retail table and variants
 
 The retail table is 512 slots of 18 bytes
@@ -287,8 +311,20 @@ how the file is read:
   multiple of 15. That matches all 21 express shafts in the nine real saves, and
   it includes every basement floor. The serviced bitmap does not size the record.
 - The game keeps all express shafts when the sizes are right (checked on re-saves
-  of TOWER2 and TOWER5, two express each). Swapping two standard shafts is
-  harmless: the table needs no global order.
+  of TOWER2 and TOWER5, two express each). The table needs no global order:
+  swapping two standard shafts is harmless.
+- Express shafts (#740). The exporter writes express shafts after the others.
+  In August 2026 the game lost the shafts behind an express one written early,
+  and later the second of two express shafts written last. The owner's PC run of
+  2026-11-04 did not reproduce either loss with today's encoder: a TOWER2 export
+  holding 24 shafts, two of them express, kept all 24 in the game's re-save both
+  with the express shafts written last and with them written first. The cause of
+  the August loss was never pinned down, so the express-last order stays. It
+  costs nothing, because the game keeps whatever order it is given.
+- Two shaft records on the same columns load, and the game's re-save keeps both
+  (the same run, #920 claim 1). Neither the original's build tool nor ours makes
+  such a tower, so a file with them is malformed: the importer keeps the first and
+  drops the later one with a warning, and the export warns about any it writes.
 
 Our loader does not yet keep those basement stops on a Classic tower loaded from a
 `.TDT`: it re-asserts a lobby-only express rule and drops them (#1532, with the
@@ -421,7 +457,7 @@ point after the first import. Known canonical forms:
 - A room the file's flags mark occupied but whose people the finance lines do not
   count comes back vacant and never lived in.
 - An infested hotel room is written as a dirty room (`0x20`) and comes back
-  dirty; the file has no infested state we can confirm (section 5.1).
+  dirty. The file's `0x40` flag is not the same state (section 5.1).
 - A hotel room that was rented and is now empty is written `0x18` and comes back
   the same. Exports before this fix wrote `0x01` there, which the original
   reads as a sleeping guest.

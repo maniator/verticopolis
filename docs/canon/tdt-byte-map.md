@@ -138,7 +138,7 @@ and the game loads that fine; the game's own re-saves rebuild it.
 | 0 | u16 | left | First tile | Known |
 | 2 | u16 | right | End tile, half open | Known |
 | 4 | u8 | type | Section 6 of `tdt-format.md`. As a signed byte, negative = under construction: 226 and 227 are a Party Hall under construction (-30, -29) in TOWER3 | Known |
-| 5 | u8 | state | Hotels: bits 3 and 4 stay state (1 checked in, 2 asleep, 3 vacant and clean; 0 is never written by the game), 0x20 dirty, 0x40 infested (never seen written), low 2 bits guests inside now, which the game resets on load; the finance guest lines count rooms in stay state 1 or 2 at full complement (section 7.2). Offices and condos carry a nonzero value while occupied | Known for hotels |
+| 5 | u8 | state | Hotels: bits 3 and 4 stay state (1 checked in, 2 asleep, 3 vacant and clean; 0 is never written by the game), 0x20 dirty, 0x40 a flag the game keeps when it loads a file that has it but clears it from a vacant or dirty room (never found in a save of a tower played in the game; tdt-format.md section 5.1), low 2 bits guests inside now, which the game resets on load; the finance guest lines count rooms in stay state 1 or 2 at full complement (section 7.2). Offices and condos carry a nonzero value while occupied | Known for hotels |
 | 6 | u8 | variant | Shop, restaurant and fast-food style | Known |
 | 7 | u8 | unknown | 0 everywhere except parking stalls (0 or 1) | Unknown |
 | 8 | u32 | counter | High 16 bits always 0; values up to about 9,500; per-unit counter or timer | Unknown |
