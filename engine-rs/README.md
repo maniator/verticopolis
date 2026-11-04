@@ -330,6 +330,17 @@ case's canonical views at each checkpoint under `<dir>/rust/` (and
 `<dir>/typescript/` from the referee), to diff against a run of the build
 before the change.
 
+The player's edits the mirror relays (`dualRunEdits`, `dualRunBrush`) are
+pinned the same way in the port-edit golden
+(`src/tests/goldens/port-edits.json`): each case sends the same edits as the
+game's port commands and pins every answer, with the hashes of the two views
+and the events after each step and at every hour of play between them
+(`conformanceWasmPortEdits` here, `portEditsReferee` on the TypeScript
+engine). It also steps the game's undo trail and restores an earlier save.
+`VC_PORT_EDITS_UPDATE=1` rewrites it from this engine, and
+`VC_PORT_EDITS_DUMP=<dir> VC_PORT_EDITS_CASE=<case id>` dumps a case's views
+at each line the same way.
+
 The referee prints one line per scenario: `ok`, the first divergent
 checkpoint with both hashes, or the first command the port cannot run. It
 exits non-zero unless every scenario matches. When a checkpoint diverges,

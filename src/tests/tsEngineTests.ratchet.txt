@@ -146,6 +146,7 @@ src/tests/integration/personRoundTrip.integration.test.ts Clock Crowd Simulation
 src/tests/integration/personRoundTripVenueCap.integration.test.ts Simulation # kit suite: authors its draft on a Simulation
 src/tests/integration/phase2.integration.test.ts Simulation
 src/tests/integration/playthrough.integration.test.ts Simulation
+src/tests/integration/portEditsReferee.integration.test.ts port/tsEngine # the TypeScript referee for the port-edit golden (#1421): it holds the golden equal to the engine the dual run's edit checks compared, and goes with src/engine/
 src/tests/integration/portServiceDiagnostics.integration.test.ts port/tsEngine
 src/tests/integration/pricingSplit.integration.test.ts Simulation
 src/tests/integration/reflowMigration.integration.test.ts Simulation

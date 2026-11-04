@@ -40,7 +40,12 @@ the Rust run under its own switch (`VC_FRAME_DAYS_UPDATE=1 npx vitest run
 built), on purpose and in the same pull request as the change that moves it,
 like the lock. It is not
 one of the lock files below, so a refresh of it alone does not move the crate
-version. The dual run (`src/dualrun/`) still compares the two engines through
+version. The port-edit golden (`src/tests/goldens/port-edits.json`, built by
+`src/tests/goldens/portEdits.ts`) does the same for the player's edits: the
+mirror's edit and brush checks sent as the game's port commands, and the
+game's undo and redo, with every answer and the same hashes after each step
+(`conformanceWasmPortEdits`, written under `VC_PORT_EDITS_UPDATE=1`, and
+`portEditsReferee` on the TypeScript engine). The dual run (`src/dualrun/`) still compares the two engines through
 the mirror until #1421 retires it.
 
 ## When a hash moves
@@ -54,10 +59,10 @@ VC_CONFORMANCE_UPDATE=1 npx vitest run --project integration conformance
 
 An update writes the lock only when every test in the run passes and every
 scenario finishes, and it refuses to run in CI. With the engine package built,
-the same command also matches `conformanceWasmFrameDays`, which checks the
-frame-day golden and never writes it. A simulation change that moves the lock
-usually moves that golden too, so that run fails there until the golden is
-refreshed with its own switch (above); both go in the diff.
+the same command also matches `conformanceWasmFrameDays` and
+`conformanceWasmPortEdits`, which check their goldens and never write them. A simulation change that moves the lock
+usually moves those goldens too, so that run fails there until each is
+refreshed with its own switch (above); all of them go in the diff.
 
 A change to any of the five lock files (`catalog-digests.json`,
 `events/catalog.json`, `expected.json`, `loader-cases.json`, `tdt-cases.json`)
