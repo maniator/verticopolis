@@ -31,14 +31,15 @@ import type { Unit } from "../../engine/types";
  *
  * The "mid-visit teardown paths" block below walks the despawn-adjacent
  * structural changes the issue names, each of which could strand or leak a
- * tally if a future change routed around `finish()`: the venue bulldozed
- * under counted visitors (with the return elevator severed, so the
- * unreachable-return and shaft-vanished branches fire too), the venue
+ * tally if a future change routed around `finish()`: the venue
  * burning and gutting mid-show through the real EventSystem paths, the
  * hotel-origin split with the venue bulldozed mid-meal, and a save/load
  * round-trip taken mid-visit (the one legitimate wholesale crowd teardown:
  * the load rebuilds a fresh sim, so every transient tally must restore to
- * zero, forged saves included).
+ * zero, forged saves included). The venue bulldozed under counted visitors
+ * (with the return elevator severed), the bulldozed hotel origin and the
+ * full-day reconcile run on both engines in
+ * `attendanceTripwireEngine.integration.test.ts`.
  */
 
 const CROWD_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../engine/crowd");
@@ -53,6 +54,8 @@ function setClock(sim: Simulation, hour: number, day = 0): void {
  *  census, outForMeal, and the hotel-origin split) is reachable in one
  *  fixture. Simulation seeds its RNG from the year argument, so every run
  *  of these must-happen searches is deterministic. */
+// `mixedTower` and `reconcile` have copies in
+// `attendanceTripwireEngine.integration.test.ts`; change both together.
 function mixedTower(): Simulation {
   const sim = new Simulation(2024, "modern", "realWorld");
   sim.money = 10_000_000;
@@ -105,6 +108,8 @@ function reconcile(sim: Simulation): void {
   }
 }
 
+// The full-day reconcile, the bulldozed-origin drain and the venue-bulldoze
+// teardown run on both engines in attendanceTripwireEngine.integration.test.ts.
 describe("attendance tally tripwire", () => {
   it("the only crowd despawn is finish(): one state = done assignment, inside finish", () => {
     // Every crowd module is enumerated (plus Crowd.ts, the spawn owner one
@@ -140,25 +145,6 @@ describe("attendance tally tripwire", () => {
     expect(finishBody.match(donePattern)).not.toBeNull();
   });
 
-  itTypeScriptOnly("jumps the clock after the crowd exists (setClock to day 1, 18:00); no command relays a clock write")("tallies reconcile against live people across a full mixed day", () => {
-    const sim = mixedTower();
-    // Lunch window through the evening attendance window: meal round trips,
-    // office matinees, hotel mingles, and street visitors all fire.
-    setClock(sim, 11);
-    for (let m = 0; m < 480; m++) {
-      sim.tick(1);
-      if (m % 10 === 0) reconcile(sim);
-    }
-    setClock(sim, 18, 1);
-    let sawAnyTally = false;
-    for (let m = 0; m < 480; m++) {
-      sim.tick(1);
-      sawAnyTally ||= sim.tower.units.some((u) => (u.customersIn ?? 0) > 0);
-      if (m % 10 === 0) reconcile(sim);
-    }
-    expect(sawAnyTally).toBe(true);
-  });
-
   it("every tally drains to zero once the tower quiets down", () => {
     const sim = mixedTower();
     setClock(sim, 18);
@@ -182,34 +168,6 @@ describe("attendance tally tripwire", () => {
       expect(u.hotelCustomersIn ?? 0).toBe(0);
       expect(u.outForMeal ?? 0).toBe(0);
     }
-    reconcile(sim);
-  });
-
-  itTypeScriptOnly("jumps the clock after the crowd exists; no command relays a clock write")("mid-stay despawn paths keep the balance: bulldozed origin and severed return", () => {
-    const sim = mixedTower();
-    setClock(sim, 18);
-    const hall = sim.tower.units.find((u) => u.kind === "partyHall" && u.floor === 2)!;
-    const room = sim.tower.units.find((u) => u.kind === "hotelSingle")!;
-    // Wait for a hotel-origin dweller counted at the hall, then bulldoze the
-    // room: the ghost-origin path must still route through finish() and the
-    // hall tally must drain without the room's outForMeal ever going negative.
-    let sawMingle = false;
-    // Capped at 02:00 next day so the drain below never rewinds the clock.
-    for (let m = 0; m < 480 && !sawMingle; m++) {
-      sim.tick(1);
-      sawMingle = sim.crowd.people.some(
-        (p) => p.originUnitId === room.id && p.venueUnitId === hall.id && p.state === "dwelling",
-      );
-    }
-    expect(sawMingle).toBe(true);
-    sim.tower.removeUnit(room.id);
-    // Jump to the quiet night (02:00 is at or after every point the capped
-    // search can reach, so the clock never rewinds). The hall is closed, so
-    // no fresh attendee holds the tally up; the ghost-origin dwellers wind
-    // down through finish() inside the bounded window, before breakfast.
-    setClock(sim, 2, 1);
-    for (let m = 0; m < 240 && (hall.customersIn ?? 0) > 0; m++) sim.tick(1);
-    expect(hall.customersIn ?? 0).toBe(0);
     reconcile(sim);
   });
 });
@@ -292,46 +250,6 @@ describe("mid-visit teardown paths (issue #302 scenario walk)", () => {
     expect(liveWith(sim, (p) => p.venueUnitId === hall.id)).toBe(hall.customersIn ?? 0);
     return { sim, hall };
   }
-
-  itTypeScriptOnly("rebuilds the venue through an un-relayed sim.tower.place(\"fastFood\", ...) and jumps the clock after the crowd exists; no command relays either")("bulldozing the venue mid-visit: the tally dies with the unit and a rebuilt unit takes no ghost decrement", () => {
-    const { sim, hall } = withCountedAttendees();
-    const hallFloor = hall.floor;
-    const hallX = hall.x;
-    expect(sim.tower.removeUnit(hall.id)).toBeDefined();
-    expect(sim.tower.getUnit(hall.id)).toBeUndefined();
-    // The surviving units stay balanced the instant the venue vanishes.
-    reconcile(sim);
-    // Rebuild on the hall's own tiles (same floor, same left edge), bound by
-    // the returned id, never by a lookup that could match the fixture's other
-    // fastFood on floor 4. `Tower.nextId` is monotonic, so the ghost
-    // visitors' venue stamp can never resolve to the new unit.
-    const rebuilt = sim.tower.place("fastFood", hallFloor, hallX);
-    expect(rebuilt.ok).toBe(true);
-    const fresh = sim.tower.getUnit(rebuilt.unitId!)!;
-    expect(fresh.floor).toBe(hallFloor);
-    expect(fresh.x).toBe(hallX);
-    expect(fresh.id).not.toBe(hall.id);
-    // Sever the return path too: bulldozing the only elevator while ghost
-    // visitors are dwelling or riding forces the unreachable-return and
-    // shaft-vanished despawn branches, which must also route through
-    // finish() (a rider's seat is released, nothing decrements twice).
-    const shaft = sim.tower.transports[0]!;
-    expect(sim.tower.removeTransport(shaft.id)).toBeDefined();
-    // Quiet night, before the 06:00 breakfast window: the ghost visitors
-    // drain through finish() with no venue left to decrement. The rebuilt
-    // unit's counters are watched EVERY tick, so even a transient ghost
-    // decrement (a dip to -1 later compensated) trips the guard.
-    setClock(sim, 2, 1);
-    let freshTouched = false;
-    for (let m = 0; m < 220 && liveWith(sim, (p) => p.venueUnitId === hall.id) > 0; m++) {
-      sim.tick(1);
-      freshTouched ||=
-        (fresh.customersIn ?? 0) !== 0 || (fresh.hotelCustomersIn ?? 0) !== 0 || (fresh.outForMeal ?? 0) !== 0;
-    }
-    expect(liveWith(sim, (p) => p.venueUnitId === hall.id)).toBe(0);
-    expect(freshTouched, "the rebuilt unit's counters moved during the ghost drain").toBe(false);
-    reconcile(sim);
-  });
 
   itTypeScriptOnly("drives the event system directly (a unit set on fire, events.restore, events.pending) mid-run")("a fire mid-visit guts the venue through the real event system without touching the tally", () => {
     const { sim, hall } = withCountedAttendees();
