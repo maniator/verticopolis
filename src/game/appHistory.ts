@@ -1,4 +1,4 @@
-import { UNDO_NOTHING_TO_STEP, UNDO_REFUSED, type EnginePort } from "../simport/enginePort";
+import { UNDO_DONE, UNDO_NOTHING_TO_STEP, UNDO_REFUSED, type EnginePort } from "../simport/enginePort";
 
 interface HistoryApp {
   readonly enginePort: Pick<
@@ -20,7 +20,8 @@ interface HistoryApp {
  *  left, so the Undo and Redo buttons never wait for the HUD pump. The
  *  engine words the notice ("Undid: Bulldoze", "Nothing to undo.") and the
  *  reason it refused a step ("Not enough money to undo that."); both reach
- *  the player as a toast. Only an engine fault rejects. */
+ *  the player as a toast. Only an engine fault rejects, a status the port
+ *  does not name included: the host follows no tower it cannot account for. */
 export interface AppHistory {
   capture(label: string): void;
   commit(): void;
@@ -45,13 +46,15 @@ const STEP_REFUSED_TEXT = "That step can't be taken right now.";
 export function createAppHistory(app: HistoryApp): AppHistory {
   const step = (take: () => ReturnType<EnginePort["undo"]>): Promise<void> => {
     try {
-      const rec = take();
-      if (rec[0] === UNDO_REFUSED) {
+      const status = take()[0];
+      if (status === UNDO_REFUSED) {
         app.ui.toast(app.enginePort.lastReason() ?? STEP_REFUSED_TEXT, "info");
-      } else {
-        if (rec[0] !== UNDO_NOTHING_TO_STEP) app.followSwap(true);
+      } else if (status === UNDO_DONE || status === UNDO_NOTHING_TO_STEP) {
+        if (status === UNDO_DONE) app.followSwap(true);
         const notice = app.enginePort.undoNotice();
         if (notice !== undefined) app.ui.toast(notice, "info");
+      } else {
+        throw new Error(`The engine answered a step with status ${status}, which it does not name.`);
       }
       // Last, once the host follows the step, so the buttons read the tower
       // the player sees.

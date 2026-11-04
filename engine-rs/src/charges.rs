@@ -347,7 +347,7 @@ impl Simulation {
                 && self.tower.built_wedding_hall != Some(true)
                 && self.evaluated_tower != Some(true)
             {
-                self.vip_visit_day = -1.0;
+                self.edit_vip_visit_day(-1.0);
             }
             self.gameplay
                 .push(GameplayEvent::FacilityRemoved { kind, method });

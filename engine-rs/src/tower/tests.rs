@@ -236,3 +236,49 @@ fn a_unit_holds_extras_only_while_one_is_set() {
     assert!(unit.extras.is_none());
     assert_eq!(unit, first);
 }
+
+/// The list `insert_units_at` built before it merged in place: split the
+/// tail off, then push each insert once the list reaches its index.
+fn merged_by_splitting(mut list: Vec<u32>, inserts: &[(usize, u32)]) -> Vec<u32> {
+    let first = inserts[0].0.min(list.len());
+    let mut tail = list.split_off(first).into_iter();
+    for &(at, item) in inserts {
+        while list.len() < at {
+            let Some(next) = tail.next() else {
+                break;
+            };
+            list.push(next);
+        }
+        list.push(item);
+    }
+    list.extend(tail);
+    list
+}
+
+#[test]
+fn merging_in_place_puts_each_insert_where_splitting_the_list_did() {
+    // A fixed linear congruential sequence, so the run is the same each time.
+    let mut seed: u64 = 0x9e37_79b9_7f4a_7c15;
+    let mut next = |below: usize| {
+        seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+        (seed >> 33) as usize % below
+    };
+    for _ in 0..2000 {
+        let old_len = next(30);
+        let list: Vec<u32> = (0..old_len as u32).collect();
+        let n = next(12) + 1;
+        let mut inserts: Vec<(usize, u32)> = (0..n)
+            .map(|k| (next(old_len + n + 4), 1000 + k as u32))
+            .collect();
+        inserts.sort_by_key(|&(at, _)| at);
+        let want = merged_by_splitting(list.clone(), &inserts);
+        let lands = super::undoing::landing_places(inserts.iter().map(|&(at, _)| at), old_len);
+        let mut got = list;
+        got.extend(inserts.iter().map(|&(_, item)| item));
+        super::undoing::merge_appended(&mut got, old_len, &lands);
+        assert_eq!(got, want, "{inserts:?} into {old_len}");
+        for (&at, &(_, item)) in lands.iter().zip(&inserts) {
+            assert_eq!(got[at], item, "insert {item} lands at {at}");
+        }
+    }
+}

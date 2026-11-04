@@ -975,7 +975,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(before - sim.money).toBe(5 * ECON.transportFloorCost);
   });
 
-  it("a tower swapped in mid-drag starts a fresh high-water mark, so nothing grows unbilled", async () => {
+  it("a tower swapped in mid-drag ends the drag, and the next drag bills from a fresh high-water mark", async () => {
     sel = { type: "transport", id: lift.id };
     await editor.extendSelectedTo("up", 4); // the old tower's drag reaches floor 4
     expect(lift.top).toBe(4);
@@ -986,18 +986,26 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     sim = snapshot;
     ports.tsEngine.take(snapshot); // adoptSim hands the swapped-in tower to the engine
     const before = sim.money;
-    await editor.extendSelectedTo("up", 4); // the stale mark (top 4) must not make this free
+    await editor.extendSelectedTo("up", 4); // the drag goes on over the swapped-in tower
+    expect(sim.tower.transportById(lift.id)!.top, "nothing more grows").toBe(2);
+    expect(sim.money).toBe(before);
+    expect(editor.endExtend(), "the release closes no gesture").toBe(false);
+    await editor.extendSelectedTo("up", 4); // the next drag: the stale mark (top 4) must not make this free
     expect(sim.tower.transportById(lift.id)!.top).toBe(4);
     expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
   });
 
-  it("a gesture opened over the drag (keyboard play) leaves the drag to open a fresh one", async () => {
+  it("a gesture opened over the drag (keyboard play) ends the drag until the arrow is let go", async () => {
     sel = { type: "transport", id: lift.id };
     await editor.extendSelectedTo("up", 3);
     undo.captures.push("Build Office"); // closes the drag's gesture in the engine
     await editor.extendSelectedTo("up", 4);
+    expect(lift.top).toBe(3);
+    expect(editor.endExtend()).toBe(false);
+    await editor.extendSelectedTo("up", 4);
     expect(undo.captures).toEqual(["Extend", "Build Office", "Extend"]);
     expect(lift.top).toBe(4);
+    expect(editor.endExtend(), "a drag that kept its gesture closes it").toBe(true);
   });
 
   it("extendSelectedTo guards: no selection, a unit, and a stairway (no extend handles) all bail", async () => {

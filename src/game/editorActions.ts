@@ -63,22 +63,26 @@ export interface EditorActionsDeps {
 export class EditorActions {
   /** The shaft, tower generation, undo gesture and ends of the extend-arrow
    *  drag in progress. The engine holds the gesture's high-water mark
-   *  (`startExtend`, #990), so a back-and-forth wiggle is billed once; a
-   *  tower swapped in mid-drag (a load, an undo) or another gesture opened
-   *  over this one (keyboard play) leaves the drag no gesture of its own, so
-   *  it begins a new one. The ends follow each step's record, so a pointer
-   *  move asks the port for no card. */
+   *  (`startExtend`, #990), so a back-and-forth wiggle is billed once. A
+   *  tower swapped in mid-drag (a load, an undo, a redo) or another gesture
+   *  opened over this one (keyboard play) ends the drag, as it ends a build
+   *  drag: it extends nothing more until the arrow is let go. The ends follow
+   *  each step's record, so a pointer move asks the port for no card. */
   private extendDrag: { id: number; generation: number; gesture: number; bottom: number; top: number } | null = null;
 
   constructor(private readonly deps: EditorActionsDeps) {}
 
-  /** Close the extend gesture (the extend-arrow drag ended). Closes it on the
-   *  live tower: one swapped in mid-drag either has no gesture open or one
-   *  this drag began on it (see {@link extendSelectedTo}). */
-  endExtend(): void {
-    if (!this.extendDrag) return;
+  /** The extend-arrow drag was let go: stop the engine's extend on the live
+   *  tower and answer whether the release closes the open undo gesture. It
+   *  does unless something ended the drag first (see {@link extendDrag}),
+   *  which leaves a gesture opened over the drag to its own close. */
+  endExtend(): boolean {
+    const held = this.extendDrag;
+    if (!held) return true;
     this.extendDrag = null;
-    this.deps.engine().stopExtend();
+    const engine = this.deps.engine();
+    engine.stopExtend();
+    return held.generation === engine.generation() && held.gesture === this.deps.undoGesture();
   }
 
   /** Open the per-shaft elevator Schedule dialog for the selected elevator
@@ -183,10 +187,10 @@ export class EditorActions {
     if (!selected || selected.type !== "transport") return;
     const engine = this.deps.engine();
     const generation = engine.generation();
-    const held = this.extendDrag;
-    const stillOpen =
-      held !== null && held.id === selected.id && held.generation === generation && held.gesture === this.deps.undoGesture();
-    if (!stillOpen) {
+    // A drag held for another shaft lost its release: this is a new drag.
+    const held = this.extendDrag?.id === selected.id ? this.extendDrag : null;
+    if (held && (held.generation !== generation || held.gesture !== this.deps.undoGesture())) return;
+    if (!held) {
       const t = this.deps.kit().cards.shaft(selected.id);
       if (!t || !isElevatorKind(t.kind)) return; // only lifts have extend handles / billing
       this.deps.captureUndo("Extend");

@@ -130,6 +130,17 @@ export function wireEngine(app: GameApp): void {
   };
 
   app.engine.onActionMove = (tile, floor, picked) => {
+    // A drag whose gesture closed under it (an undo, a redo, another gesture,
+    // a tower swapped in) builds nothing more, so it drops the anchors and
+    // the ghosts of what its release would have built.
+    if (drag !== null && !dragActs()) {
+      app.paintAnchor = null;
+      app.buildAnchor = null;
+      app.transportStart = null;
+      app.engine.preview = null;
+      app.engine.transportPreview = null;
+      return;
+    }
     if (app.tool.type === "bulldoze") {
       if (dragActs()) app.build.bulldozePicked(picked, true); // drag: blocked tiles fail silently
       return;
@@ -286,7 +297,8 @@ export function wireEngine(app: GameApp): void {
   // shrink the shaft floor-by-floor.
   app.engine.onExtendTo = (end, target) => app.editor.extendSelectedTo(end, target);
   app.engine.onExtendEnd = () => {
-    app.editor.endExtend();
+    // An undo, a redo or another gesture that ended the drag closed its step.
+    if (!app.editor.endExtend()) return undefined;
     return commitAfter(app, null);
   };
   // Suppress the browser context menu so right-click is ours to use.

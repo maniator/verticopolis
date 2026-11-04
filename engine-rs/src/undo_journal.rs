@@ -29,11 +29,10 @@
 //! (`Journal::used_then_taken`): a room by its use, a shaft by its rides,
 //! and a floor or lobby tile, or a shaft, by an hourly pass run while the
 //! gesture was open (`Closed::hour_passes`).
-use std::collections::HashMap;
-
+use crate::crowd::fasthash::FastMap;
 use crate::sim_undo_check::takes_cars_or_floors;
 use crate::tower::{Transport, Unit};
-use crate::undo::{Step, UnitUse};
+use crate::undo::{Step, Swap, UnitUse};
 
 /// A unit the gesture touched, and its index in the list as the gesture
 /// found it.
@@ -65,25 +64,27 @@ pub(crate) struct TouchedShaft {
     pub(crate) before: Option<Transport>,
 }
 
-/// What an open gesture has seen so far.
-#[derive(Debug)]
+/// What an open gesture has seen so far. The maps from an id to its record
+/// are only written and looked up (`FastMap`).
 pub(crate) struct Journal {
     label: String,
     units: Vec<TouchedUnit>,
-    unit_seen: HashMap<i64, usize>,
+    unit_seen: FastMap<i64, usize>,
     /// Original indexes of the units the gesture took out, ascending.
     gone: Vec<usize>,
     /// Original indexes of the floor tiles a lobby took the slot of, until
     /// the brush settles.
     slots: Vec<usize>,
     transports: Vec<TouchedShaft>,
-    transport_seen: HashMap<i64, usize>,
+    transport_seen: FastMap<i64, usize>,
     transports_gone: Vec<usize>,
     /// The net cash the gesture's edits moved: what they paid back less what
     /// they charged.
     cash: f64,
-    /// The VIP visit day, as the gesture found it.
-    vip_visit_day: f64,
+    /// The VIP visit day the gesture's edits moved, as the undo sees it: the
+    /// day the last edit set (`expect`) and the day before the first
+    /// (`set`). The day time moves is not here.
+    vip_visit_day: Option<Swap>,
     /// Whether a build dug new ground that could hold treasure.
     searched_for_treasure: bool,
     /// How many hourly passes the simulation had run when the gesture
@@ -105,7 +106,8 @@ pub(crate) struct Closed {
     pub(crate) transports: Vec<TouchedShaft>,
     /// The net cash the gesture's edits moved.
     pub(crate) money: f64,
-    pub(crate) vip_visit_day: f64,
+    /// The VIP visit day the edits moved, when they left it moved.
+    pub(crate) vip_visit_day: Option<Swap>,
     pub(crate) searched_for_treasure: bool,
     /// The hourly passes the simulation had run when the gesture opened.
     pub(crate) hour_passes: i64,
@@ -149,18 +151,18 @@ fn note_gone(gone: &mut Vec<usize>, at: usize) {
 }
 
 impl Journal {
-    pub(crate) fn new(label: &str, vip_visit_day: f64, hour_passes: i64) -> Journal {
+    pub(crate) fn new(label: &str, hour_passes: i64) -> Journal {
         Journal {
             label: label.to_owned(),
             units: Vec::new(),
-            unit_seen: HashMap::new(),
+            unit_seen: FastMap::default(),
             gone: Vec::new(),
             slots: Vec::new(),
             transports: Vec::new(),
-            transport_seen: HashMap::new(),
+            transport_seen: FastMap::default(),
             transports_gone: Vec::new(),
             cash: 0.0,
-            vip_visit_day,
+            vip_visit_day: None,
             searched_for_treasure: false,
             hour_passes,
             took_own_build: false,
@@ -337,6 +339,19 @@ impl Journal {
         self.searched_for_treasure = true;
     }
 
+    /// An edit command moved the VIP visit day from `was` to `day`.
+    pub(crate) fn vip_day_moved(&mut self, was: f64, day: f64) {
+        match &mut self.vip_visit_day {
+            Some(moved) => moved.expect = day,
+            None => {
+                self.vip_visit_day = Some(Swap {
+                    expect: day,
+                    set: was,
+                })
+            }
+        }
+    }
+
     /// Close the journal.
     pub(crate) fn close(self) -> Closed {
         Closed {
@@ -344,7 +359,7 @@ impl Journal {
             label: self.label,
             units: self.units,
             transports: self.transports,
-            vip_visit_day: self.vip_visit_day,
+            vip_visit_day: self.vip_visit_day.filter(|moved| moved.expect != moved.set),
             searched_for_treasure: self.searched_for_treasure,
             hour_passes: self.hour_passes,
             took_own_build: self.took_own_build,
@@ -354,7 +369,9 @@ impl Journal {
 }
 
 impl Step {
-    /// Whether this step carries nothing to apply.
+    /// Whether this step carries nothing to apply. A gesture that built a
+    /// room and sold it again leaves the cash it lost, which its undo
+    /// hands back unless the room was used meanwhile.
     pub(crate) fn is_empty(&self) -> bool {
         self.units.is_empty()
             && self.transports.is_empty()

@@ -85,7 +85,7 @@ function makeApp(toolOver: Record<string, unknown> = {}) {
       isUnlocked: vi.fn(() => true),
     },
     ui: { toast: vi.fn(), setInspectorPeek: vi.fn() },
-    editor: { extendSelectedTo: vi.fn(), endExtend: vi.fn() },
+    editor: { extendSelectedTo: vi.fn(), endExtend: vi.fn(() => true) },
     inspector: { inspectPicked: vi.fn(), hide: vi.fn(), resetLatch: vi.fn() },
     saveLoad: { recoverFromContextLoss: vi.fn() },
     selectPicked: vi.fn(),
@@ -319,8 +319,12 @@ describe("secondary + extend", () => {
     expect(app.editor.endExtend).toHaveBeenCalled();
     expect(app.commitUndo).toHaveBeenCalledTimes(1);
   });
-});
 
+  it("onExtendEnd leaves the open gesture alone when something ended the drag first", () => {
+    const app = makeApp(); wireEngine(app); vi.mocked(app.editor.endExtend).mockReturnValue(false);
+    app.engine.onExtendEnd!(); expect(app.commitUndo).not.toHaveBeenCalled();
+  });
+});
 describe("onUpdate", () => {
   it("runs the frame each tick", () => {
     const app = makeApp();
