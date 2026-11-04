@@ -79,6 +79,7 @@ an event sent before boot carries `version` only.
 | `economy_action` | `action`, `detail` | Demolish, price or capacity tuning | The removal and tuning side of play |
 | `emergency_choice` | `kind`, `decision` | An answered emergency prompt | Accept and decline split |
 | `session_emergencies` | `fires`, `firesGutRooms`, `bombs` | Session end | How often emergencies happen |
+| `session_crashes` | `crashes` | Terminal page hide, only when a crash screen showed (approved 2026-11-03, #841) | How many crash screens a page life showed, which the capped `crash` rows cannot say |
 | `engine_status` | see below | See below | Engine reliability for the 3.0 release |
 
 The fields of each event are documented where they are declared

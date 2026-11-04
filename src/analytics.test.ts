@@ -394,6 +394,7 @@ const EVERY_EVENT: { [K in keyof GameplayEvents]: GameplayEvents[K] } = {
   economy_action: { action: "demolish", detail: "sell" },
   emergency_choice: { kind: "fireRescue", decision: "accept" },
   session_emergencies: { fires: 1, firesGutRooms: 2, bombs: 0 },
+  session_crashes: { crashes: 3 },
   engine_status: {
     trigger: "settle",
     engine_requested: "wasm",
