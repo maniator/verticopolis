@@ -4,8 +4,9 @@
    clear of the sidebar, the palette, the toasts (top-right) and the Floor
    heatmap legend (drawn at the canvas's top-left). On a phone it is a card
    at the top-left of the world view, inside the safe-area insets, about
-   150 px wide and never taller than half the world view; its Map pill stays
-   at the bottom-right. The window is placed before #view, so the inspector
+   150 px wide and never taller than half the world view (a phone held
+   sideways lets it take about two thirds, keeping its shape: the landscape
+   block in styles.css); its Map pill stays at the bottom-right. The window is placed before #view, so the inspector
    and editor cards paint over it. */
 .overview-map {
   position: absolute;

@@ -9,6 +9,7 @@ import { onHistoryClick, setHistoryButtons, toast, update, type HudSource } from
 import type { Catalog } from "../catalog/catalogTypes";
 import type { GameMode } from "../engine/types";
 import type { UI } from "./UI";
+import { useGermanDefaultLocale } from "../tests/localeStub";
 
 /**
  * Toast-rail timer lifecycle. `toast()` only touches `ui.el.toast`, so a bare
@@ -130,6 +131,10 @@ function hud(sim: Simulation) {
 }
 
 describe("update", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("reads stats() once and labels the population from it", () => {
     const sim = Simulation.newGame(3, "classic");
     sim.money = 1e9;
@@ -139,14 +144,35 @@ describe("update", () => {
     const want = sim.stats().population;
     expect(want).toBeGreaterThan(0);
     const { ui, el, src } = hud(sim);
-    const reads = vi.spyOn(sim, "stats");
+    // A population big enough to need a separator, so the grouping shows.
+    const strip = { ...sim.stats(), population: 12_345 };
+    const reads = vi.spyOn(sim, "stats").mockReturnValue(strip);
     const population = vi.spyOn(sim, "population", "get");
     const census = vi.spyOn(sim.tower, "totalPopulation");
+    // A German default would group with dots; the English UI groups the US way.
+    useGermanDefaultLocale();
     update(ui, src);
     expect(reads).toHaveBeenCalledTimes(1);
     expect(population).not.toHaveBeenCalled();
     expect(census).not.toHaveBeenCalled();
-    expect(el.pop.textContent).toBe(want.toLocaleString());
+    expect(el.pop.textContent).toBe("12,345");
+    // Funds are in the hundreds of millions here, so they carry separators.
+    expect(el.money.textContent).toBe(`$${String(Math.round(sim.money)).replace(/\B(?=(\d{3})+$)/g, ",")}`);
+    expect(el.money.textContent).toMatch(/^\$\d{3},\d{3},\d{3}$/);
+  });
+
+  it("shows funds that round to zero as $0 in the funds color, and a bad value as NaN", () => {
+    const sim = Simulation.newGame(3, "classic");
+    // A fresh HUD per value, so the reader takes the new funds.
+    const shown = (money: number) => {
+      sim.money = money;
+      const { ui, el, src } = hud(sim);
+      update(ui, src);
+      return { text: el.money.textContent, color: el.money.style.color };
+    };
+    expect(shown(-0.3)).toEqual({ text: "$0", color: "var(--money)" });
+    expect(shown(-0.6)).toEqual({ text: "$-1", color: "var(--bad)" });
+    expect(shown(NaN).text).toBe("$NaN");
   });
 
   it("grays out Undo and Redo from the engine's steps on every pump", () => {

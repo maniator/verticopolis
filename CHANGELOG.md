@@ -29,6 +29,9 @@ notes, never a past version's.
 
 ## 2.85.0
 
+- On a phone held sideways, the tools sit in a column on the left (tabs in one sliding row on a very short or narrow window) and the stats take one line each, so the tower view is almost twice as tall.
+- On a phone held sideways, the Map keeps your tower's shape, a long facility card scrolls instead of hiding its close button, and the checklist sits beside the tools, clear of the tiles it points at.
+- The top bar always shows funds and population with commas between thousands (12,345), whatever your browser's language.
 - Undo gives back a build's full price only until it is used: a room once it opens, floor and lobby (even a room's own) at the next hour, and elevators, stairs and escalators then or once ridden.
 - Undo never takes away floor or lobby that something still stands on, never puts a room back on a lobby floor or under the metro, and never undoes an underground build that dug for treasure.
 - An undo that can no longer be done is dropped, so the next Undo goes on to the edit before it. One that waits only on money or a fire stays for another try.

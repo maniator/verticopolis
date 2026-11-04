@@ -69,7 +69,7 @@ tower (three office floors slammed onto one weak elevator, peak congestion 2.07)
 | Screenshot | Shows |
 |---|---|
 | `traffic-chip.png` | **Gridlock · 11F**: the chip tiers on peak per-floor congestion (matching the overlay legend) and names the hotspot floor on one line, tier word bold and the floor a lighter footnote. |
-| `traffic-chip-mobile.png` | The same state at phone width: the HUD wraps its stats onto rows and the chip (glyph + tier + floor) reads cleanly there too. |
+| `traffic-chip-mobile.png` | The same state at phone width: the HUD wraps its stats onto rows and the chip (bars + tier + floor) reads cleanly there too. |
 
 ## Tablet responsive breakpoint
 

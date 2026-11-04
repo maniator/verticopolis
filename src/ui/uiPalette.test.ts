@@ -124,6 +124,61 @@ describe("category tabs", () => {
     expect(palette.querySelectorAll(".pal-group.tab-active").length).toBe(1);
   });
 
+  it("selectGroup opens the new category at its first tile, in either scroll direction", () => {
+    // The list scrolls sideways on a portrait phone and down in the landscape
+    // tools column; a category opened partway down would hide its first tiles.
+    const { ui, palette } = stubUI();
+    buildPalette(ui);
+    const scroller = palette.querySelector<HTMLElement>(".pal-groups")!;
+    scroller.scrollLeft = 120;
+    scroller.scrollTop = 240;
+    selectGroup(ui, "Commercial");
+    expect(scroller.scrollLeft).toBe(0);
+    expect(scroller.scrollTop).toBe(0);
+  });
+
+  it("selectGroup scrolls a one-row tab strip to bring the open tab into view", () => {
+    // Where the tabs are one sideways row, a category opened in code (the
+    // Getting Started steps) must not leave its tab off the strip's edge.
+    const { ui, tabs } = stubUI();
+    buildPalette(ui);
+    const rect = (left: number, width: number) => ({ left, right: left + width, top: 0, bottom: 20, width, height: 20 }) as DOMRect;
+    vi.spyOn(tabs, "getBoundingClientRect").mockReturnValue(rect(0, 200));
+    const tab = (group: string) => tabs.querySelector<HTMLElement>(`.pal-tab[data-group="${group}"]`)!;
+    vi.spyOn(tab("Leisure"), "getBoundingClientRect").mockReturnValue(rect(260, 60));
+    selectGroup(ui, "Leisure");
+    expect(tabs.scrollLeft).toBe(120);
+    vi.spyOn(tab("Commercial"), "getBoundingClientRect").mockReturnValue(rect(-40, 60));
+    selectGroup(ui, "Commercial");
+    expect(tabs.scrollLeft).toBe(80);
+    // A part pixel past either edge scrolls a whole pixel, so a whole-pixel
+    // scroll (WebKit's) still shows the tab entire.
+    vi.mocked(tab("Leisure").getBoundingClientRect).mockReturnValue(rect(190.25, 20));
+    selectGroup(ui, "Leisure");
+    expect(tabs.scrollLeft).toBe(91);
+    vi.mocked(tab("Commercial").getBoundingClientRect).mockReturnValue(rect(-5.5, 20));
+    selectGroup(ui, "Commercial");
+    expect(tabs.scrollLeft).toBe(85);
+    tabs.scrollLeft = 80;
+    // A tab already in view leaves it alone.
+    vi.spyOn(tab("Structure"), "getBoundingClientRect").mockReturnValue(rect(40, 60));
+    selectGroup(ui, "Structure");
+    expect(tabs.scrollLeft).toBe(80);
+    // So does a hidden tab (an all-zero box) beside a strip set in from the
+    // edge, which would otherwise look off its left side.
+    vi.mocked(tabs.getBoundingClientRect).mockReturnValue(rect(10, 200));
+    vi.spyOn(tab("Transport"), "getBoundingClientRect").mockReturnValue(rect(0, 0));
+    selectGroup(ui, "Transport");
+    expect(tabs.scrollLeft).toBe(80);
+    // And a hidden strip, though the list still starts at its first tile.
+    const scroller = ui.el.palette.querySelector<HTMLElement>(".pal-groups")!;
+    scroller.scrollTop = 240;
+    vi.mocked(tabs.getBoundingClientRect).mockReturnValue(rect(0, 0));
+    selectGroup(ui, "Leisure");
+    expect(tabs.scrollLeft).toBe(80);
+    expect(scroller.scrollTop).toBe(0);
+  });
+
   it("clicking a tab button activates its group (the path onboarding uses to reveal a hidden tool)", () => {
     const { ui, palette, tabs } = stubUI();
     buildPalette(ui);

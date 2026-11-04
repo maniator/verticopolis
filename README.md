@@ -188,7 +188,8 @@ and covered by the Vitest suite and/or the captured screenshots.
 
 **Desktop vs. mobile:** the desktop layout mirrors the original's dollhouse
 cross-section; mobile gets a responsive portrait layout with an icon toolbar and
-touch pan/pinch (see `docs/screenshots/09-mobile.png`).
+touch pan/pinch (see `docs/screenshots/09-mobile.png`), and a phone held sideways
+docks the tools in a column on the left (`docs/screenshots/09d-mobile-landscape-palette.png`).
 
 ## Architecture
 
