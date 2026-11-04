@@ -37,7 +37,7 @@ Order: 0, then A (independent of builds, can run any time), then C and D on the 
 **Steps (PowerShell).**
 
 ```powershell
-cd <home>\projects\verticopolis
+cd "<home>\projects\verticopolis"
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 cargo --version; wasm-bindgen --version      # wasm-bindgen must match engine-rs/Cargo.toml
 git fetch origin
