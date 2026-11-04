@@ -139,13 +139,17 @@ jobs:
         shell: bash
         run: |
           tar -C dist -czf "$RUNNER_TEMP/tooling-dist.tgz" .
-          sha256sum "$RUNNER_TEMP/tooling-dist.tgz" > "$RUNNER_TEMP/tooling-dist.tgz.sha256"
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum tooling-dist.tgz > tooling-dist.tgz.sha256
+          )
           printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/tooling-dist.source-sha"
 
       - name: Upload tooling app artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: tooling-dist
+          overwrite: true
           path: |
             ${{ runner.temp }}/tooling-dist.tgz
             ${{ runner.temp }}/tooling-dist.tgz.sha256
