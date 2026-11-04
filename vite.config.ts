@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin, type HtmlTagDescriptor } from "vite";
 import { configDefaults } from "vitest/config";
 import { resolve } from "node:path";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
 import { notesForVersion } from "./src/changelog";
@@ -9,6 +9,8 @@ import { PACKAGE_STYLESHEET, isPackagePath } from "./src/build/thirdPartyNotices
 import { entryWithIntegrity, precacheIntegrityTransform, readExpectedPackage } from "./src/build/enginePackageBuild";
 import type { BuildFingerprint } from "./src/pwaUpdateInfo";
 import { tsEngineSourceHash } from "./src/build/tsEngineSources";
+import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePreload";
+import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "./src/wasmhost/enginePackageNames";
 import { buildFingerprint } from "./src/build/buildFingerprint";
 import { convertedSuites } from "./src/tests/portKit/convertedList";
 
@@ -215,6 +217,34 @@ function sharedHead(): Plugin {
   };
 }
 
+/** Start the engine package's three files downloading while the main bundle is
+ *  still arriving, so a slow connection fetches them side by side rather than
+ *  one after the other (#1254). The loader's own `fetch` calls
+ *  (src/wasmhost/loadEngineModule.ts) claim these responses when the request
+ *  matches the preload's URL, mode and credentials mode (see
+ *  enginePreloadAttrs in src/build/enginePreload.ts). The bytes are still checked against the
+ *  digests this build carries before anything runs, so an early fetch changes
+ *  when the bytes arrive and nothing about whether they are trusted. The game
+ *  page in a build only: a development serve loads the glue through `import()`,
+ *  which would not claim them. */
+function enginePreload(): Plugin {
+  return {
+    name: "engine-preload",
+    apply: "build",
+    transformIndexHtml: {
+      order: "pre",
+      handler(_html, ctx) {
+        const base = (ctx.path.split("?")[0].replace(/\\/g, "/").split("/").pop() ?? "").toLowerCase();
+        if (base !== "index.html") return [];
+        // A build without the engine package (VC_ALLOW_NO_ENGINE=1, which cannot run
+        // the game) has nothing to preload; the links would be three 404s.
+        if (!existsSync(resolve(publicDir(), ENGINE_DIR, ENGINE_BUILD_RECORD))) return [];
+        return ENGINE_PRELOAD_FILES.map((file) => ({ tag: "link", attrs: enginePreloadAttrs(file), injectTo: "head-prepend" as const }));
+      },
+    },
+  };
+}
+
 /** The vitest projects that run the suites on the WASM engine; see the
  *  `projects` list below. Empty unless `VC_REQUIRE_WASM=1`. */
 function wasmParityProjects() {
@@ -344,6 +374,7 @@ export default defineConfig(({ command }) => ({
     emitVersionJson(fingerprintOf(command)),
     noUnlistedPackageFiles(),
     sharedHead(),
+    enginePreload(),
     // Installable PWA via Workbox (vite-plugin-pwa) — no hand-rolled service
     // worker. Registration is NOT auto-injected (`injectRegister: false`);
     // only the game entry (main.ts → src/pwa.ts) registers, so the tooling
