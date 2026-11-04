@@ -20,3 +20,4 @@ src/tests/integration/venueOccupancy.integration.test.ts
 src/tests/integration/segmentRoutingMealRush.integration.test.ts
 src/tests/integration/personRoundTripVenueCap.integration.test.ts
 src/tests/integration/attendanceTripwireEngine.integration.test.ts
+src/tests/integration/hotelLateCheckoutEngine.integration.test.ts

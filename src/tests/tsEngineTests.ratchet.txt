@@ -116,6 +116,7 @@ src/tests/integration/gameEvents.integration.test.ts Clock EventSystem Tower rng
 src/tests/integration/goldenMaster.integration.test.ts Simulation
 src/tests/integration/heatmap.integration.test.ts Simulation
 src/tests/integration/hotelLateCheckout.integration.test.ts Clock EconomySystem Simulation
+src/tests/integration/hotelLateCheckoutEngine.integration.test.ts EconomySystem Simulation # kit suite: authors its draft on a Simulation and reads the checkout hours
 src/tests/integration/hourCost.bench.integration.test.ts Simulation
 src/tests/integration/housekeepingLegibility.integration.test.ts Simulation economy/housekeeping
 src/tests/integration/housekeepingMaids.integration.test.ts Crowd Simulation crowd/spawn economy/housekeeping
