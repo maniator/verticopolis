@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { catalogFor } from "../engine/catalog";
 import type { GameMode } from "../engine/types";
 import { createUICallbacks, type GameAppPorts } from "./uiCallbacks";
+import { NO_GESTURE } from "./appHistory";
 import { Simulation } from "../engine/Simulation";
 import type { EnginePort } from "../simport/enginePort";
 import { TsEngine } from "../engine/port/tsEngine";
@@ -42,6 +43,7 @@ function makePorts() {
     getSpeed: vi.fn(() => 1),
     undo: vi.fn(),
     redo: vi.fn(),
+    undoGesture: vi.fn(() => NO_GESTURE),
     setOverlay: vi.fn(),
     toggleMute: vi.fn(() => false),
     setVolume: vi.fn(),
@@ -76,6 +78,9 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(ports.undo).toHaveBeenCalledTimes(1);
     cb.onRedo();
     expect(ports.redo).toHaveBeenCalledTimes(1);
+    expect(cb.undoUnderWay()).toBe(false);
+    vi.mocked(ports.undoGesture).mockReturnValue(3);
+    expect(cb.undoUnderWay(), "a press still held").toBe(true);
     cb.onSetOverlay("congestion");
     expect(ports.setOverlay).toHaveBeenCalledExactlyOnceWith("congestion");
   });

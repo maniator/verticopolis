@@ -8,14 +8,19 @@ interface HistoryApp {
   readonly ui: { toast(message: string, kind: "info"): void };
   /** Follow the restored tower, keeping the camera and the undo trail. */
   followSwap(keepHistory: boolean): void;
+  /** Show how many steps the engine holds each way (the Undo and Redo
+   *  buttons), after a call that may have changed them. */
+  showSteps(): void;
 }
 
 /** The app's undo/redo history. The engine keeps the steps (the Rust engine's
  *  `undo.rs`); this forwards a gesture's capture, commit and discard, and
  *  follows a step the engine took the way the app follows any swap, keeping
- *  the trail. The engine words the notice ("Undid: Bulldoze", "Nothing to
- *  undo.") and the reason it refused a step ("Not enough money to undo
- *  that."); both reach the player as a toast. Only an engine fault rejects. */
+ *  the trail. After each call that reaches the engine it shows the steps
+ *  left, so the Undo and Redo buttons never wait for the HUD pump. The
+ *  engine words the notice ("Undid: Bulldoze", "Nothing to undo.") and the
+ *  reason it refused a step ("Not enough money to undo that."); both reach
+ *  the player as a toast. Only an engine fault rejects. */
 export interface AppHistory {
   capture(label: string): void;
   commit(): void;
@@ -43,11 +48,14 @@ export function createAppHistory(app: HistoryApp): AppHistory {
       const rec = take();
       if (rec[0] === UNDO_REFUSED) {
         app.ui.toast(app.enginePort.lastReason() ?? STEP_REFUSED_TEXT, "info");
-        return Promise.resolve();
+      } else {
+        if (rec[0] !== UNDO_NOTHING_TO_STEP) app.followSwap(true);
+        const notice = app.enginePort.undoNotice();
+        if (notice !== undefined) app.ui.toast(notice, "info");
       }
-      if (rec[0] !== UNDO_NOTHING_TO_STEP) app.followSwap(true);
-      const notice = app.enginePort.undoNotice();
-      if (notice !== undefined) app.ui.toast(notice, "info");
+      // Last, once the host follows the step, so the buttons read the tower
+      // the player sees.
+      app.showSteps();
       return Promise.resolve();
     } catch (e) {
       return Promise.reject(e);
@@ -59,15 +67,22 @@ export function createAppHistory(app: HistoryApp): AppHistory {
     open = NO_GESTURE;
     return close();
   };
+  /** Run the engine call `call`, then show the steps it left. */
+  const shown = (call: () => unknown): void => {
+    call();
+    app.showSteps();
+  };
   return {
     capture: (label) => {
+      // A capture over a gesture still open keeps that gesture's step.
       app.enginePort.undoCapture(label);
       captures += 1;
       open = captures;
+      app.showSteps();
     },
-    commit: () => closing(() => void app.enginePort.undoCommit()),
-    discard: () => closing(() => app.enginePort.undoDiscard()),
-    clear: () => closing(() => app.enginePort.undoClear()),
+    commit: () => closing(() => shown(() => app.enginePort.undoCommit())),
+    discard: () => closing(() => shown(() => app.enginePort.undoDiscard())),
+    clear: () => closing(() => shown(() => app.enginePort.undoClear())),
     undo: () => closing(() => step(() => app.enginePort.undo())),
     redo: () => closing(() => step(() => app.enginePort.redo())),
     gesture: () => open,

@@ -9,6 +9,7 @@ import type { AudioEngine } from "../audio/Audio";
 import type { SaveLoad } from "./saveLoad";
 import type { EditorActions } from "./editorActions";
 import type { InspectorController } from "./inspector";
+import { NO_GESTURE } from "./appHistory";
 
 /**
  * The narrow slice of `GameApp` that {@link createUICallbacks} wires the UI to.
@@ -51,6 +52,8 @@ export interface GameAppPorts {
   getSpeed(): number;
   undo(): Promise<void>;
   redo(): Promise<void>;
+  /** The open undo gesture's number, or `NO_GESTURE`. */
+  undoGesture(): number;
   setOverlay(mode: string): void;
   toggleMute(): boolean;
   setVolume(kind: "music" | "ambience" | "sfx", value: number): void;
@@ -119,6 +122,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     }),
     onUndo: () => void app.undo(),
     onRedo: () => void app.redo(),
+    undoUnderWay: () => app.undoGesture() !== NO_GESTURE,
     onEditAction: (action, root) => app.editor.handleEditAction(action, root),
     onToggleReducedMotion: () => app.toggleReducedMotion(),
     onToggleSteadyClock: () => app.toggleSteadyClock(),

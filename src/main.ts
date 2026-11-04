@@ -8,6 +8,7 @@ import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, type Prefs } from "./storage/Prefs";
 import { type TrafficTier } from "./presentation/traffic";
 import { UI, type Tool } from "./ui/UI";
+import { setHistoryButtons } from "./ui/uiStatus";
 import { refreshEditorCard } from "./game/editorCard";
 import { type PlaceOutcome } from "./ui/placement";
 import { OnboardingController } from "./ui/Onboarding";
@@ -483,6 +484,7 @@ class GameApp implements GameAppPorts {
   /** @internal */ commitUndo(): void { this.history.commit(); }
   /** @internal */ discardUndo(): void { this.history.discard(); }
   /** @internal */ undoGesture(): number { return this.history.gesture(); }
+  /** @internal */ showSteps(): void { setHistoryButtons(this.ui, this.enginePort); }
   undo(): Promise<void> { return this.history.undo(); }
   redo(): Promise<void> { return this.history.redo(); }
 }

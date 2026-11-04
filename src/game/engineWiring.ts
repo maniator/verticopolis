@@ -88,9 +88,9 @@ export function wireEngine(app: GameApp): void {
 
   app.engine.onActionDown = (tile, floor, touch, picked) => {
     app.audio.start();
-    // A fresh gesture: drop any anchor/run a cancelled pinch left behind. The
-    // pinch-cancel path skips onActionUp (which clears these), so without this
-    // a resumed paint drag would extend from the abandoned anchor across the gap.
+    // A fresh gesture: drop any anchor or run an earlier press left behind, so
+    // a new paint drag never extends from an abandoned anchor across the gap.
+    // A release or a cancel (onActionCancel) clears them too.
     app.paintAnchor = null;
     app.buildAnchor = null;
     app.build.clearPaint();
@@ -116,8 +116,13 @@ export function wireEngine(app: GameApp): void {
         updateBuildPreview(app, tile, floor, false); // false: red ghost carries validity, no DOM reason card on touch
       } else {
         // A drag-sized shaft anchors here; anything else places on the press.
+        // A fresh anchor drops the ghost an earlier press left (a release the
+        // canvas never saw), so this press builds only what it sizes.
         const placing = placeSimpleBuild(app, app.tool.kind, tile, floor);
-        if (!placing) app.transportStart = { x: snapX(catalogOf(app), app.tool.kind, tile), floor };
+        if (!placing) {
+          app.transportStart = { x: snapX(catalogOf(app), app.tool.kind, tile), floor };
+          app.engine.transportPreview = null;
+        }
       }
     }
   };
@@ -204,6 +209,23 @@ export function wireEngine(app: GameApp): void {
     if (closes) app.commitUndo();
   };
 
+  // The press was cut off without a release (a second finger turned it into
+  // a pinch, or the browser canceled the pointer): close the step its drag
+  // built so far, as a release would, and drop the anchors, the run and the
+  // ghosts it left, so a later press that never moves builds no stale shaft.
+  // Nothing is placed.
+  app.engine.onActionCancel = () => {
+    const closes = drag === null || app.undoGesture() === drag.gesture;
+    drag = null;
+    app.paintAnchor = null;
+    app.buildAnchor = null;
+    app.transportStart = null;
+    app.engine.preview = null;
+    app.engine.transportPreview = null;
+    app.build.clearPaint();
+    if (closes) app.commitUndo();
+  };
+
   app.engine.onHover = (tile, floor, picked) => {
     if (app.tool.type === "build") {
       updateBuildPreview(app, tile, floor);
@@ -228,10 +250,9 @@ export function wireEngine(app: GameApp): void {
     // capture. Nothing legitimate can be pending here: on touch, only build
     // tools capture at the press (onActionDown), and their mutations happen at
     // the release the peek swallows; bulldoze and inspect are pan gestures that
-    // act on the tap, which the peek also swallows. A commit instead would mint
-    // a bogus entry whenever a sim income tick moved money during the 450ms
-    // hold (money is in the signature), or resurrect a stale capture a
-    // pinch-canceled gesture left behind (pinch-start skips onActionUp).
+    // act on the tap, which the peek also swallows. So the discarded gesture
+    // changed nothing and leaves no step (time passing during the hold is
+    // never part of one).
     app.paintAnchor = null;
     app.buildAnchor = null;
     app.transportStart = null;

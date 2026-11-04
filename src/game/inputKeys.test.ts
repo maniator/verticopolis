@@ -3,6 +3,7 @@ import type { GameApp } from "../main";
 import { bindKeys } from "./inputKeys";
 import { flushPrefsSave } from "./audioPrefs";
 import { CRASH_SCREEN_ID } from "../ui/crashScreen";
+import { setHistoryButtons } from "../ui/uiStatus";
 
 /**
  * These pin the keyboard-play / audio-kick / pagehide wiring installed by
@@ -248,6 +249,17 @@ describe("commit / bulldoze", () => {
     press("Enter");
     expect(app.keyboard.commitCursor).not.toHaveBeenCalled();
     map.remove();
+  });
+
+  it("Enter and Space on a grayed-out Undo never commit the cursor", () => {
+    const app = makeApp();
+    const undo = document.body.appendChild(document.createElement("button"));
+    undo.focus();
+    setHistoryButtons({ el: { undo, redo: null } } as never, { undoDepths: () => Float64Array.of(0, 0) });
+    expect([document.activeElement, undo.getAttribute("aria-disabled")], "gray and still focused").toEqual([undo, "true"]);
+    press("Enter");
+    press(" ");
+    expect(app.keyboard.commitCursor).not.toHaveBeenCalled();
   });
 
   it("Delete / x bulldoze the cursor", () => {

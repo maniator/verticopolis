@@ -1,99 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as ex from "excalibur";
-import { PinchTracker } from "../pinchTracker";
-import { FLOOR, TILE } from "../scale";
-import { bindInput } from "./towerInputCamera";
+import { inputEng, ptr } from "./towerInputCamera.fixture";
 
 /**
  * The Excalibur pointer gesture handlers registered by bindInput, exercised
  * through the real handlers it binds (captured from a fake pointer bus) with a
- * real {@link PinchTracker}. These pin the tap/pan/action/hover routing, the
+ * real `PinchTracker`. These pin the tap/pan/action/hover routing, the
  * in-world extend-arrow drag, the right-click inspect, and the pinch handoff,
  * asserting the exact controller hook that fires and its tile/floor arguments,
  * not just that nothing threw.
  */
-
-type Handlers = Record<string, (ev: unknown) => void>;
-
-/** A fake engine plus the captured pointer handlers. The tracker is real; the
- *  camera transform is the standard centered-camera affine so wheel-zoom and
- *  the coordinate reads behave like the real getters. */
-function inputEng(over: Record<string, unknown> = {}) {
-  const handlers: Handlers = {};
-
-  const e: any = {
-    cam: { pos: ex.vec(1000, -1000), zoom: 1 },
-    viewWidth: 800,
-    viewHeight: 600,
-    tracker: new PinchTracker(),
-    gesture: null,
-    moved: 0,
-    downTouch: false,
-    lastSx: 0,
-    lastSy: 0,
-    downSx: 0,
-    downSy: 0,
-    longPressTimer: null,
-    longPressFired: false,
-    arrowDrag: null,
-    arrowHit: {},
-    selectedId: null,
-    preview: { kind: "office" },
-    transportPreview: { kind: "elevatorStandard" },
-    classifyDown: () => "pan",
-    onTap: vi.fn(),
-    onActionDown: vi.fn(),
-    onActionMove: vi.fn(),
-    onActionUp: vi.fn(),
-    onHover: vi.fn(),
-    onLongPress: vi.fn(),
-    onLongPressEnd: vi.fn(),
-    onSecondary: vi.fn(),
-    onExtendTo: vi.fn(),
-    onExtendEnd: vi.fn(),
-    transportActors: new Map(),
-    sim: { tower: { getTransport: () => undefined, unitAt: () => undefined } },
-    engine: {
-      input: {
-        pointers: { on: (name: string, cb: (ev: unknown) => void) => (handlers[name] = cb) },
-        keyboard: { isHeld: () => false },
-      },
-    },
-    screenToWorld(sx: number, sy: number) {
-      return ex.vec((sx - e.viewWidth / 2) / e.cam.zoom + e.cam.pos.x, (sy - e.viewHeight / 2) / e.cam.zoom + e.cam.pos.y);
-    },
-    screenToFloor(sy: number) {
-      return Math.ceil(-e.screenToWorld(e.viewWidth / 2, sy).y / FLOOR);
-    },
-    ...over,
-  };
-  bindInput(e);
-  return { e, handlers };
-}
-
-/** A fake Excalibur PointerEvent. worldPos is chosen so tf() resolves to the
- *  requested tile/floor: worldToCell floors x/TILE and ceils -y/FLOOR. */
-function ptr(opts: {
-  tile?: number;
-  floor?: number;
-  sx?: number;
-  sy?: number;
-  button?: ex.PointerButton;
-  touch?: boolean;
-  pointerId?: number;
-  shift?: boolean;
-}): unknown {
-  const tile = opts.tile ?? 10;
-  const floor = opts.floor ?? 5;
-  return {
-    button: opts.button ?? ex.PointerButton.Left,
-    pointerType: opts.touch ? "Touch" : "Mouse",
-    pointerId: opts.pointerId ?? 1,
-    nativeEvent: { pointerId: opts.pointerId ?? 1, shiftKey: opts.shift ?? false },
-    worldPos: ex.vec(tile * TILE, -floor * FLOOR),
-    screenPos: { x: opts.sx ?? 400, y: opts.sy ?? 300 },
-  };
-}
 
 describe("wheel zoom", () => {
   it("scrolls up to zoom in and down to zoom out", () => {
@@ -196,15 +112,28 @@ describe("pointer down routing", () => {
     expect(e.onExtendTo).not.toHaveBeenCalled();
   });
 
-  it("a second finger forming a pinch cancels a live arrow drag and clears previews", () => {
+  it("a second finger forming a pinch ends a live arrow drag and clears previews", () => {
     const { e, handlers } = inputEng({ onExtendEnd: vi.fn() });
     handlers.down(ptr({ pointerId: 1, sx: 100, sy: 100 })); // single
     e.arrowDrag = { end: "down" };
     handlers.down(ptr({ pointerId: 2, sx: 300, sy: 300 })); // pinch-start
     expect(e.onExtendEnd).toHaveBeenCalledTimes(1);
     expect(e.arrowDrag).toBeNull();
-    expect(e.preview).toBeNull();
-    expect(e.transportPreview).toBeNull();
+    expect([e.preview, e.transportPreview]).toEqual([null, null]);
+  });
+
+  it("a second finger forming a pinch cancels the tool press", () => {
+    const { e, handlers } = inputEng({ onActionCancel: vi.fn(), classifyDown: () => "action" });
+    handlers.down(ptr({ pointerId: 1, sx: 100, sy: 100 })); // single
+    handlers.down(ptr({ pointerId: 2, sx: 300, sy: 300 })); // pinch-start
+    expect(e.onActionCancel, "the press never gets its release").toHaveBeenCalledOnce();
+  });
+
+  it("a second finger over a pan press cancels no tool press", () => {
+    const { e, handlers } = inputEng({ classifyDown: () => "pan" });
+    handlers.down(ptr({ pointerId: 1, sx: 100, sy: 100, touch: true }));
+    handlers.down(ptr({ pointerId: 2, sx: 300, sy: 300, touch: true })); // pinch-start
+    expect(e.onActionCancel).not.toHaveBeenCalled();
   });
 });
 
@@ -295,11 +224,32 @@ describe("pointer up routing", () => {
     expect(e.arrowDrag).toBeNull();
   });
 
-  it("cancel routes through the up handler", () => {
+  it("a canceled tool press is canceled, never released", () => {
     const { e, handlers } = inputEng({ classifyDown: () => "action" });
-    handlers.down(ptr({ tile: 1, floor: 1 }));
-    handlers.cancel(ptr({ tile: 1, floor: 1 }));
-    expect(e.onActionUp).toHaveBeenCalledTimes(1);
+    handlers.down(ptr({ tile: 1, floor: 1, touch: true }));
+    handlers.cancel(ptr({ tile: 1, floor: 1, touch: true }));
+    expect([e.onActionUp.mock.calls.length, e.onActionCancel.mock.calls.length]).toEqual([0, 1]);
+    expect(e.gesture).toBeNull();
+  });
+
+  it("a canceled short pan is no tap", () => {
+    const { e, handlers } = inputEng();
+    handlers.down(ptr({ sx: 400, sy: 300, touch: true }));
+    handlers.cancel(ptr({ sx: 400, sy: 300, touch: true }));
+    expect([e.onTap.mock.calls.length, e.onActionCancel.mock.calls.length]).toEqual([0, 0]);
+  });
+
+  it("a canceled arrow press ends the extend drag without its one-floor extend", () => {
+    const { e, handlers } = inputEng({
+      selectedId: 5,
+      sim: { tower: { getTransport: () => ({ top: 20, bottom: 4 }), unitAt: () => undefined } },
+      arrowHit: { up: { x: 380, y: 280, w: 40, h: 40 } },
+    });
+    handlers.down(ptr({ sx: 400, sy: 300, touch: true }));
+    expect(e.arrowDrag, "the touch landed on the arrow").toEqual({ end: "up" });
+    handlers.cancel(ptr({ sx: 400, sy: 300, touch: true }));
+    expect([e.onExtendTo.mock.calls.length, e.onExtendEnd.mock.calls.length]).toEqual([0, 1]);
+    expect(e.arrowDrag).toBeNull();
   });
 
   it("a pinch that ends with a surviving finger hands it a pan continuation", () => {

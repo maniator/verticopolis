@@ -51,6 +51,12 @@ export interface UICallbacks {
   getVolumes(): { music: number; ambience: number; sfx: number };
   onUndo(): void;
   onRedo(): void;
+  /** Whether an edit gesture is still open. A release the canvas never saw
+   *  can leave one open with nothing on the stacks yet, so a click on a gray
+   *  Undo still closes and undoes it. Redo takes no such check: closing a
+   *  gesture adds an undo step and leaves no redo step, so a gray Redo has
+   *  nothing to run. */
+  undoUnderWay(): boolean;
   onEditAction(action: string, root: HTMLElement): void;
   /** Toggle reduced motion; returns the new effective state. */
   onToggleReducedMotion(): boolean;
@@ -111,6 +117,8 @@ export class UI {
     audioToggle: document.getElementById("audio-toggle")!,
     towerName: document.getElementById("tower-name") as HTMLInputElement,
     modeBadge: document.getElementById("btn-mode")!,
+    undo: document.getElementById("btn-undo") as HTMLButtonElement | null,
+    redo: document.getElementById("btn-redo") as HTMLButtonElement | null,
   };
 
   /** True while the user is pressing something inside the editor card. */
@@ -182,8 +190,8 @@ export class UI {
     this.setAudioGlyph(this.cb.isMuted());
     this.el.audioToggle.addEventListener("click", () => this.cb.onToggleAudio());
     mountToolbarIcons();
-    document.getElementById("btn-undo")?.addEventListener("click", () => this.cb.onUndo());
-    document.getElementById("btn-redo")?.addEventListener("click", () => this.cb.onRedo());
+    status.onHistoryClick(this.el.undo, () => this.cb.onUndo(), () => this.cb.undoUnderWay());
+    status.onHistoryClick(this.el.redo, () => this.cb.onRedo());
 
     document.getElementById("panel-toggle")?.addEventListener("click", () => document.body.classList.toggle("panels-open"));
     const closePanels = () => document.body.classList.remove("panels-open");
