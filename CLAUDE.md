@@ -182,7 +182,10 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   stay down once the change is clean, stop and ask the user rather than loop
   forever or merge on your own. Note on the PR that the reviewers were down and
   how many rounds ran. Re-request Copilot/Codex and hold merge as usual the
-  moment they are back.
+  moment they are back. Whenever Copilot's review is down, every reviewer (any
+  thread or agent) also runs `.claude/skills/stand-in-pr-review/` alongside
+  the BMGD/BMAD skill; it reports the review the way Copilot's does and never
+  replaces the BMGD/BMAD run.
 - **A published analytics number is either computed by a governed definition,
   or by reviewed code that a test binds to one.** What is banned is the third
   case: a measure improvised in a session and published. A readout may narrate,
