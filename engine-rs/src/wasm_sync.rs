@@ -19,6 +19,8 @@ impl Engine {
             tdt_file: None,
             stepper: Default::default(),
             render_memo: Default::default(),
+            undo: Default::default(),
+            undo_notice: None,
         }
     }
 }

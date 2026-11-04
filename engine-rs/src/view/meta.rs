@@ -72,10 +72,13 @@ impl Tower {
     /// `place`, which gives a new unit its catalog name. Returns whether the
     /// label changed; only a change bumps `meta_revision` and logs the unit.
     pub(crate) fn set_unit_label_at(&mut self, i: usize, label: String) -> bool {
-        let u = &mut self.units[i];
-        if u.label == label {
+        if self.units[i].label == label {
             return false;
         }
+        if let Some(j) = self.journal.as_mut() {
+            j.unit_edit(i, &self.units[i]);
+        }
+        let u = &mut self.units[i];
         u.label = label;
         let id = u.id;
         self.note_meta(id);
@@ -90,10 +93,13 @@ impl Tower {
         let Some(&i) = self.by_id.get(&id) else {
             return false;
         };
-        let u = &mut self.units[i];
-        if u.subtype == subtype {
+        if self.units[i].subtype == subtype {
             return false;
         }
+        if let Some(j) = self.journal.as_mut() {
+            j.unit_edit(i, &self.units[i]);
+        }
+        let u = &mut self.units[i];
         u.subtype = subtype;
         self.note_meta(id);
         true

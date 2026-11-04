@@ -342,8 +342,9 @@ export function syncToolingSim(app: ToolingApp): void {
 
 /** Swap in a tower a harness built by hand, on either engine: the
  *  TypeScript engine takes the instance, the Rust engine loads its save.
- *  `preserveHistory` is an undo or redo style swap, which keeps the camera
- *  and the undo trail. */
+ *  `preserveHistory` keeps the camera, as a step back through the same
+ *  tower does. Either way the engine forgets its undo steps: they belong to
+ *  the tower it replaced. */
 export function adoptToolingSim(app: ToolingApp, built: Simulation, preserveHistory: boolean): void {
   if (!(import.meta.env.DEV || __TOOLING_BUILD__)) throw new Error("adoptSim is for tooling builds only");
   const held = viewed.get(built);

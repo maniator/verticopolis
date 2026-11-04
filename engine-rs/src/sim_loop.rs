@@ -46,7 +46,15 @@ impl Simulation {
         }
     }
 
+    /// One simulation step. An open undo gesture is paused around it, so
+    /// what time does to the tower is never part of an undo step.
     pub fn advance_step(&mut self, dt_minutes: f64) {
+        let paused = self.pause_undo_journal();
+        self.advance_step_inner(dt_minutes);
+        self.resume_undo_journal(paused);
+    }
+
+    fn advance_step_inner(&mut self, dt_minutes: f64) {
         self.clock.advance(dt_minutes);
         let rush = self.rush_factor();
         let population = self.elevators.accumulate(&self.tower, dt_minutes, rush);

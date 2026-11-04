@@ -1,5 +1,4 @@
 import { Simulation } from "../engine/Simulation";
-import { towerStateSig } from "../engine/UndoHistory";
 
 /**
  * The runtime fallback's state (#874; spec-874-runtime-fallback.md): what a
@@ -316,13 +315,4 @@ export function carryLiveState(from: Simulation, to: Simulation): void {
       // The fresh tower keeps its own.
     }
   }
-}
-
-/** The undo signature of a save's tower, the way the port's
- *  `undoSignature` reads a live TypeScript tower, for the recovery's tidy of
- *  the undo trail (`UndoHistory.dropUnchanged`). Temporary, with the
- *  fallback. */
-export function signatureOfSave(text: string): string {
-  const sim = Simulation.deserialize(JSON.parse(text));
-  return towerStateSig(sim.tower, sim.money);
 }

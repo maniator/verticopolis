@@ -103,6 +103,7 @@ export function wireControllers(app: GameApp): void {
     refreshEditor: () => app.refreshEditor(),
     captureUndo: (label) => app.captureUndo(label),
     commitUndo: () => app.commitUndo(),
+    undoGesture: () => app.undoGesture(),
     announce: (msg) => app.announce(msg),
   });
   app.scheduleReview = new ScheduleReview({

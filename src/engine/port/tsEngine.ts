@@ -1,5 +1,5 @@
 import { Simulation } from "../Simulation";
-import { towerStateSig } from "../UndoHistory";
+import { UndoSteps, towerStateSig } from "../UndoHistory";
 import type { StepDebt } from "../sim/fixedStep";
 import { advanceOwedMinutes } from "../sim/frameStep";
 import type { GameplayEvent } from "../gameplayEventBuffer";
@@ -57,6 +57,20 @@ export class TsEngine implements PortState {
   private readonly meta = new MetaLog();
   private staged: StagedTdt | undefined;
   private tdtBytes: Uint8Array | undefined;
+  /** The undo and redo steps of the current tower: any adopted tower forgets
+   *  them (a restore included), as the Rust engine's do. The reference engine
+   *  keeps whole-tower snapshots; the Rust engine keeps only what each edit
+   *  changed (engine-rs/src/undo.rs). */
+  private readonly undoSteps = new UndoSteps({
+    serialize: () => this.serialize(),
+    // The tower alone: income while a press is held is time, not an edit.
+    undoSignature: () => towerStateSig(this.current.tower),
+    restore: (text) => this.swap(text, true, true),
+    generation: () => this.gen,
+    clearReason: () => {
+      this.reason = undefined;
+    },
+  });
   /** The step mode `advance` last stepped under, which outlives a swap as
    *  the web host's step debt outlives an adopted tower. */
   private readonly debt: StepDebt = { minutes: 0 };
@@ -95,7 +109,8 @@ export class TsEngine implements PortState {
 
   /** Take over a tower a tooling scene built by hand (`GameApp.adoptSim`,
    *  in tooling builds only). The replaced tower's events go ahead of the new
-   *  tower's own, as a swap's do. Not on the port. */
+   *  tower's own, as a swap's do, and the undo steps go with the tower they
+   *  belonged to. Not on the port. */
   take(next: Simulation): void {
     if (next === this.current) return;
     this.adopt(next);
@@ -125,9 +140,10 @@ export class TsEngine implements PortState {
     return this.swap(text, false);
   }
 
-  /** An undo or redo snapshot: keeps the live camera and auto-bridge. */
+  /** A snapshot swap: keeps the live camera and auto-bridge, and forgets the
+   *  undo steps like any adopted tower. */
   restore(text: string): Float64Array {
-    return this.swap(text, true);
+    return this.swap(text, true, false);
   }
 
   foundTower(seed: number, modeCode: number, calendarCode: number, unbridged: boolean): Float64Array {
@@ -150,6 +166,38 @@ export class TsEngine implements PortState {
     return towerStateSig(this.current.tower, this.current.money);
   }
 
+  undoCapture(label: string): void {
+    this.undoSteps.capture(label);
+  }
+
+  undoCommit(): boolean {
+    return this.undoSteps.commit();
+  }
+
+  undoDiscard(): void {
+    this.undoSteps.commit();
+  }
+
+  undoClear(): void {
+    this.undoSteps.history.clear();
+  }
+
+  undo(): Float64Array {
+    return this.undoSteps.step("undo");
+  }
+
+  redo(): Float64Array {
+    return this.undoSteps.step("redo");
+  }
+
+  undoNotice(): string | undefined {
+    return this.undoSteps.notice;
+  }
+
+  undoDepths(): Float64Array {
+    return this.undoSteps.depths();
+  }
+
   drainEvents(): Float64Array {
     this.drained = this.current.drainGameplayEvents();
     return Float64Array.of(this.current.gameplayEventsDropped, this.drained.length);
@@ -168,7 +216,7 @@ export class TsEngine implements PortState {
     return Float64Array.of(flag(done), this.gen);
   }
 
-  private swap(text: string, keepLive: boolean): Float64Array {
+  private swap(text: string, keepLive: boolean, keepHistory = false): Float64Array {
     this.reason = undefined;
     let next: Simulation;
     try {
@@ -183,11 +231,12 @@ export class TsEngine implements PortState {
       next.autoBridge = this.current.autoBridge;
       next.view = this.current.view;
     }
-    this.adopt(next);
+    this.adopt(next, keepHistory);
     return this.swapRecord(true);
   }
 
-  private adopt(next: Simulation): void {
+  private adopt(next: Simulation, keepHistory = false): void {
+    if (!keepHistory) this.undoSteps.history.clear();
     const prev = this.current.gameplayEvents;
     prev.discardOnHandOff = this.backdrop;
     next.gameplayEvents.inherit(prev);

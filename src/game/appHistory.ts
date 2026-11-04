@@ -1,32 +1,75 @@
-import { UndoHistory } from "../engine/UndoHistory";
-import type { EnginePort } from "../simport/enginePort";
-import { swapDone } from "./portLifecycle";
+import { UNDO_NOTHING_TO_STEP, UNDO_REFUSED, type EnginePort } from "../simport/enginePort";
 
 interface HistoryApp {
-  readonly enginePort: Pick<EnginePort, "serialize" | "restore" | "undoSignature" | "generation" | "lastReason">;
+  readonly enginePort: Pick<
+    EnginePort,
+    "undoCapture" | "undoCommit" | "undoDiscard" | "undoClear" | "undo" | "redo" | "undoNotice" | "lastReason"
+  >;
   readonly ui: { toast(message: string, kind: "info"): void };
   /** Follow the restored tower, keeping the camera and the undo trail. */
   followSwap(keepHistory: boolean): void;
 }
 
-/** The app's undo/redo history, through the engine port alone: a step is the
- *  port's save of the tower as it stood, kept in memory, and a restore is the
- *  port's `restore`, which keeps the live bridging setting and camera. The
- *  app follows the restore as it follows any swap, keeping the trail. */
-export function createAppHistory(app: HistoryApp): UndoHistory {
-  return new UndoHistory({
-    snapshot: () => app.enginePort.serialize(),
-    restore: (text) => {
-      try {
-        swapDone(app.enginePort, app.enginePort.restore(text));
-        app.followSwap(true);
+/** The app's undo/redo history. The engine keeps the steps (the Rust engine's
+ *  `undo.rs`); this forwards a gesture's capture, commit and discard, and
+ *  follows a step the engine took the way the app follows any swap, keeping
+ *  the trail. The engine words the notice ("Undid: Bulldoze", "Nothing to
+ *  undo.") and the reason it refused a step ("Not enough money to undo
+ *  that."); both reach the player as a toast. Only an engine fault rejects. */
+export interface AppHistory {
+  capture(label: string): void;
+  commit(): void;
+  discard(): void;
+  clear(): void;
+  undo(): Promise<void>;
+  redo(): Promise<void>;
+  /** The gesture under way: the number its capture gave it, or
+   *  `NO_GESTURE` once it closed (a commit, a discard, a clear, an undo or
+   *  a redo, or another capture over it). A drag keeps the number its press
+   *  got and stops changing the tower when it no longer matches, since the
+   *  engine records an edit only while its gesture is open. */
+  gesture(): number;
+}
+
+/** What `gesture()` answers while no gesture is open. Captures count from 1. */
+export const NO_GESTURE = 0;
+
+/** What the toast says when the engine refused a step and gave no reason. */
+const STEP_REFUSED_TEXT = "That step can't be taken right now.";
+
+export function createAppHistory(app: HistoryApp): AppHistory {
+  const step = (take: () => ReturnType<EnginePort["undo"]>): Promise<void> => {
+    try {
+      const rec = take();
+      if (rec[0] === UNDO_REFUSED) {
+        app.ui.toast(app.enginePort.lastReason() ?? STEP_REFUSED_TEXT, "info");
         return Promise.resolve();
-      } catch (e) {
-        return Promise.reject(e);
       }
+      if (rec[0] !== UNDO_NOTHING_TO_STEP) app.followSwap(true);
+      const notice = app.enginePort.undoNotice();
+      if (notice !== undefined) app.ui.toast(notice, "info");
+      return Promise.resolve();
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  };
+  let captures = 0;
+  let open = NO_GESTURE;
+  const closing = <T>(close: () => T): T => {
+    open = NO_GESTURE;
+    return close();
+  };
+  return {
+    capture: (label) => {
+      app.enginePort.undoCapture(label);
+      captures += 1;
+      open = captures;
     },
-    signature: () => app.enginePort.undoSignature(),
-    generation: () => app.enginePort.generation(),
-    notify: (msg) => app.ui.toast(msg, "info"),
-  });
+    commit: () => closing(() => void app.enginePort.undoCommit()),
+    discard: () => closing(() => app.enginePort.undoDiscard()),
+    clear: () => closing(() => app.enginePort.undoClear()),
+    undo: () => closing(() => step(() => app.enginePort.undo())),
+    redo: () => closing(() => step(() => app.enginePort.redo())),
+    gesture: () => open,
+  };
 }

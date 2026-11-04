@@ -187,6 +187,7 @@ impl Simulation {
             return ChargeResult::refuse(CAR_LIMIT);
         }
         self.money -= ADD_CAR_COST;
+        self.note_edit_cash(-ADD_CAR_COST);
         ChargeResult::paid(-ADD_CAR_COST)
     }
 
@@ -202,6 +203,7 @@ impl Simulation {
         }
         let refund = car_resale_refund();
         self.money += refund;
+        self.note_edit_cash(refund);
         ChargeResult::paid(refund)
     }
 
@@ -299,6 +301,7 @@ impl Simulation {
         }
         let cost = added as f64 * TRANSPORT_FLOOR_COST;
         self.money -= cost;
+        self.note_edit_cash(-cost);
         if gesture.is_some() {
             self.extend_gesture = Some((id, mark.0.min(nb), mark.1.max(nt)));
         }
@@ -339,6 +342,7 @@ impl Simulation {
                 kind.resale_refund()
             };
             self.money += refund;
+            self.note_edit_cash(refund);
             if kind == Kind::WeddingHall
                 && self.tower.built_wedding_hall != Some(true)
                 && self.evaluated_tower != Some(true)
@@ -355,6 +359,7 @@ impl Simulation {
         self.tower.remove_transport(id);
         let refund = kind.resale_refund();
         self.money += refund;
+        self.note_edit_cash(refund);
         self.gameplay
             .push(GameplayEvent::FacilityRemoved { kind, method });
         ChargeResult::paid(refund)

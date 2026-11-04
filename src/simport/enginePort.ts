@@ -166,6 +166,13 @@ export interface ScheduleFacts {
 /** A `Float64Array` record whose slots `viewLayout().records` names. */
 export type PortRecord = Float64Array;
 
+/** `undo` and `redo` answer this status when there is no step to take. A done
+ *  step is `1` and a refused one `0`, as for any swap. */
+export const UNDO_NOTHING_TO_STEP = 2;
+
+/** The status of a step the engine refused; `lastReason()` says why. */
+export const UNDO_REFUSED = 0;
+
 /** Time, lifecycle and saves (contract section 2). */
 export interface EnginePortLifecycle {
   /** The frame loop's step; `dtMinutes` is a finite real, 0 or more. */
@@ -200,6 +207,41 @@ export interface EnginePortLifecycle {
   /** Moves on every done swap; the reader rebuilds on a move. */
   generation(): number;
   undoSignature(): string;
+  /** The engine keeps the undo and redo steps of the tower it runs. A gesture
+   *  calls `undoCapture(label)` before its first change and `undoCommit()` at
+   *  its end, which keeps the capture as a step only if the tower changed
+   *  (true when it did); `undoDiscard()` drops a capture for a gesture
+   *  canceled into inspection. A gesture that did change the tower is kept
+   *  as a step all the same, by `undoDiscard()` and by a capture over it, so
+   *  no gesture's edit is left out of the steps. An edit made with no
+   *  gesture open is in no step, so a host stops a drag whose gesture an
+   *  undo, a redo or another capture closed. A step holds only what the edit changed
+   *  (the units and shafts it touched and the cash the edit commands moved),
+   *  up to 50 steps each way; any adopted tower, `restore` included, forgets
+   *  them, and `undoClear()` forgets them for a tooling swap that bypassed
+   *  the port. */
+  undoCapture(label: string): void;
+  undoCommit(): boolean;
+  undoDiscard(): void;
+  undoClear(): void;
+  /** Step back or forward: `[status, generation]` as `restore` answers, with
+   *  `UNDO_NOTHING_TO_STEP` as the status when there is no step. A done step
+   *  has already changed the tower and moved the generation, as a done swap
+   *  does, and the host then follows it. Time is not rewound: the cash a step
+   *  moves is exactly what its edit moved, so a step the balance cannot pay
+   *  for is refused (status 0, `lastReason()` says why) and stays available.
+   *  So is a step that would take out a room used or burning since the step
+   *  was made, reprice a condo sold since, or meets a tower it does not
+   *  expect (a unit or shaft it would take out or restore gone or changed,
+   *  or one it would put back already there or its place taken). A gesture
+   *  under way is committed first. */
+  undo(): PortRecord;
+  redo(): PortRecord;
+  /** What the last `undo` or `redo` says to the player ("Undid: Bulldoze",
+   *  "Nothing to undo."); undefined after a refused step. */
+  undoNotice(): string | undefined;
+  /** `[undo, redo]`: how many steps each stack holds. */
+  undoDepths(): PortRecord;
   /** Takes the events since the last drain: `[dropped, count]`. */
   drainEvents(): PortRecord;
   /** Event `i` of the last drained batch, as `{ name, payload }` JSON. */

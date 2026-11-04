@@ -1,6 +1,5 @@
 import type { HeatmapMode, Simulation } from "./engine/Simulation";
-import type { UndoHistory } from "./engine/UndoHistory";
-import { createAppHistory } from "./game/appHistory";
+import { createAppHistory, type AppHistory } from "./game/appHistory";
 import type { FacilityKind } from "./engine/types";
 import type { TransportView, UnitView } from "./simport/view";
 import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/TowerEngine";
@@ -198,7 +197,7 @@ class GameApp implements GameAppPorts {
 
   /** Undo/redo through the port (see {@link UndoHistory}), built in the
    *  constructor once `ui` exists. */
-  private history!: UndoHistory;
+  private history!: AppHistory;
 
   constructor(tower: BootTower) {
     this.canvas = document.getElementById("view") as HTMLCanvasElement;
@@ -464,9 +463,8 @@ class GameApp implements GameAppPorts {
     this.ui.update(hudSource(this));
     if (!keepHistory) {
       // A *different* tower (New Tower / Load / a slot / Import) invalidates the
-      // undo trail; otherwise Undo could resurrect an unrelated old tower and a
-      // later autosave persist it. Undo/redo restores keep it.
-      this.history.clear();
+      // undo trail; the engine forgets it when it adopts that tower, so Undo
+      // cannot resurrect an unrelated old tower. Undo/redo restores keep it.
       this.lastTrafficTier = 0; // the chip's hysteresis starts over on another tower
     }
   }
@@ -478,15 +476,13 @@ class GameApp implements GameAppPorts {
   /** Tooling: draw the engine again after a hand edit on `sim` reached it. */
   followEdit(shown?: Simulation): void { followToolingEdit(this, shown); }
 
-  // ---- Undo / redo (state + logic live in engine/UndoHistory) -------------
+  // ---- Undo / redo (the steps live in the engine; see game/appHistory) ----
   // Thin delegators kept so the many gesture call sites read unchanged.
 
   /** @internal */ captureUndo(label: string): void { this.history.capture(label); }
   /** @internal */ commitUndo(): void { this.history.commit(); }
   /** @internal */ discardUndo(): void { this.history.discard(); }
-  /** @internal Temporary, with the WASM engine's fallback (#874). */ dropEmptyUndo(sigOf: (snap: string) => string): number { return this.history.dropUnchanged(sigOf); }
-  /** @internal Temporary, with the WASM engine's fallback (#874). */ holdClearedRedo(on: boolean): void { this.history.holdClearedRedo = on; }
-  /** @internal Temporary, with the WASM engine's fallback (#1126). */ clearUndo(): void { this.history.clear(); }
+  /** @internal */ undoGesture(): number { return this.history.gesture(); }
   undo(): Promise<void> { return this.history.undo(); }
   redo(): Promise<void> { return this.history.redo(); }
 }

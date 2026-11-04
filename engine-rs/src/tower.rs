@@ -11,6 +11,7 @@ use crate::facilities::*;
 mod placement;
 mod transports;
 mod types;
+mod undoing;
 
 pub use types::{Extras, ExtrasMut, PlaceResult, ResizeResult, Transport, Unit, UnitState};
 
@@ -50,6 +51,8 @@ pub struct Tower {
     pub(crate) view: crate::view::ViewState,
     /// The lobby brush's batch while it runs (`tower_removal.rs`).
     pub(crate) lobby_upgrades: Option<crate::tower_removal::LobbyUpgrades>,
+    /// The open undo gesture's journal, while one is open (`undo_journal.rs`).
+    pub(crate) journal: Option<Box<crate::undo_journal::Journal>>,
 }
 
 /// The room a loaded game's unit list keeps past its units. A list with no
@@ -85,6 +88,7 @@ impl Tower {
             meta_revision: crate::view::FIRST_META_REVISION,
             view: Default::default(),
             lobby_upgrades: None,
+            journal: None,
         }
     }
 
@@ -96,7 +100,12 @@ impl Tower {
 
     pub fn get_unit_mut(&mut self, id: i64) -> Option<&mut Unit> {
         match self.by_id.get(&id) {
-            Some(&i) => Some(&mut self.units[i]),
+            Some(&i) => {
+                if let Some(j) = self.journal.as_mut() {
+                    j.unit_edit(i, &self.units[i]);
+                }
+                Some(&mut self.units[i])
+            }
             None => None,
         }
     }
@@ -186,7 +195,7 @@ impl Tower {
 
     // ---- registration ----------------------------------------------------
 
-    fn register(&mut self, idx: usize) {
+    pub(crate) fn register(&mut self, idx: usize) {
         let u = self.units[idx].clone();
         self.by_id.insert(u.id, idx);
         let hgt = u.kind.floors();

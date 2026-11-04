@@ -444,6 +444,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
       refreshEditor: () => refreshed++,
       captureUndo: (label) => undo.captures.push(label),
       commitUndo: () => undo.commits++,
+      undoGesture: () => undo.captures.length,
       announce: (msg) => announced.push(msg),
     });
   });
@@ -959,6 +960,15 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     await editor.extendSelectedTo("up", 4); // the stale mark (top 4) must not make this free
     expect(sim.tower.transportById(lift.id)!.top).toBe(4);
     expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
+  });
+
+  it("a gesture opened over the drag (keyboard play) leaves the drag to open a fresh one", async () => {
+    sel = { type: "transport", id: lift.id };
+    await editor.extendSelectedTo("up", 3);
+    undo.captures.push("Build Office"); // closes the drag's gesture in the engine
+    await editor.extendSelectedTo("up", 4);
+    expect(undo.captures).toEqual(["Extend", "Build Office", "Extend"]);
+    expect(lift.top).toBe(4);
   });
 
   it("extendSelectedTo guards: no selection, a unit, and a stairway (no extend handles) all bail", async () => {

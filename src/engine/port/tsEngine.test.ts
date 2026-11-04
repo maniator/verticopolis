@@ -217,14 +217,29 @@ describe("TsEngine.take", () => {
     expect(e.generation(), "the same tower is no swap").toBe(gen);
     const old = e.sim;
     old.gameplayEvents.drain();
+    e.undoCapture("Build Lobby");
     old.build("lobby", 1, 160);
+    expect(e.undoCommit()).toBe(true);
     const left = old.gameplayEvents.length;
     const next = Simulation.newGame(9, "classic");
     const own = next.gameplayEvents.length;
+    e.undoCapture("Peek");
     e.take(next);
     expect([e.sim, e.generation()]).toEqual([next, gen + 1]);
+    expect(Array.from(e.undoDepths()), "the steps go with the tower they belonged to").toEqual([0, 0]);
+    expect(e.undoCommit(), "and so does the gesture under way").toBe(false);
     expect(e.viewFrame(true)[JSON.parse(e.viewLayout()).header.frameSeq]).toBe(1);
     expect(next.gameplayEvents.length, "the replaced tower's events go ahead of the new tower's own").toBe(left + own);
+  });
+});
+
+describe("TsEngine undo", () => {
+  it("keeps no step for a gesture in which only time moved the money", () => {
+    const e = engine();
+    e.undoCapture("Hold");
+    e.sim.money += 5_000; // income while a press is held
+    e.undoDiscard();
+    expect(Array.from(e.undoDepths())).toEqual([0, 0]);
   });
 });
 

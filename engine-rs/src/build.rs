@@ -213,7 +213,9 @@ impl Simulation {
                 reason: res.reason,
             };
         }
-        self.money -= can.cost - (quoted_bridge - laid_bridge.len() as f64) * substrate_cost(kind);
+        let price = can.cost - (quoted_bridge - laid_bridge.len() as f64) * substrate_cost(kind);
+        self.money -= price;
+        self.note_edit_cash(-price);
         if let Some(id) = res.unit_id {
             if let Some(list) = kind.subtype_list() {
                 let name = *self.rng.pick(list);
@@ -344,6 +346,7 @@ impl Simulation {
             };
         }
         self.money -= quote.cost;
+        self.note_edit_cash(-quote.cost);
         self.gameplay.push(GameplayEvent::FacilityPlaced {
             kind,
             floor: top,

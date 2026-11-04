@@ -10,7 +10,8 @@ import type { TrafficTier } from "../presentation/traffic";
  * `GameApp.followSwap` restarts the traffic chip's hysteresis on a different
  * tower (a load, a new tower, a slot, an import) and keeps it on an undo or
  * redo restore of the same tower (`preserveHistory`), which also keeps the
- * camera and the undo trail. We call the real method on a stand-in app that
+ * camera. The engine keeps the undo trail across a restore and forgets it on any
+ * other swap. We call the real method on a stand-in app that
  * carries only the members it touches.
  */
 
@@ -27,7 +28,6 @@ function standIn(tier: TrafficTier) {
     enginePort: { viewLayout: () => JSON.stringify({ heatModes: [], heatTints: [] }) },
     reader: { update: vi.fn(), tower: {}, crowd: { people: [] }, header: { star: 1 } },
     ui: { resetLog: vi.fn(), update: vi.fn() },
-    history: { clear: vi.fn() },
   };
 }
 
@@ -36,7 +36,6 @@ describe("followSwap and the traffic chip", () => {
     const app = standIn(2);
     GameApp.prototype.followSwap.call(app as unknown as GameApp);
     expect(app.lastTrafficTier).toBe(0);
-    expect(app.history.clear).toHaveBeenCalledTimes(1);
     expect(app.frameErrors).toEqual([]);
   });
 
@@ -44,6 +43,5 @@ describe("followSwap and the traffic chip", () => {
     const app = standIn(2);
     GameApp.prototype.followSwap.call(app as unknown as GameApp, true);
     expect(app.lastTrafficTier).toBe(2);
-    expect(app.history.clear).not.toHaveBeenCalled();
   });
 });

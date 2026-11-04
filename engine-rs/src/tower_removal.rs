@@ -25,6 +25,9 @@ impl Tower {
     /// `removeUnit`: remove one unit by id, or `None` when no unit has it.
     pub fn remove_unit(&mut self, id: i64) -> Option<Unit> {
         let idx = self.index_of(id)?;
+        if let Some(j) = self.journal.as_mut() {
+            j.unit_out(idx, &self.units[idx]);
+        }
         let u = self.units.remove(idx);
         self.reindex_from(idx);
         self.settle_removals(std::slice::from_ref(&u));
@@ -106,6 +109,15 @@ impl Tower {
             return (self.units.len(), Vec::new());
         };
         debug_assert!(at.last().is_some_and(|&(idx, _)| idx < self.units.len()));
+        // The journal counts each index as one left after the removals it
+        // already knows of. The whole batch is still in the list, so it goes
+        // to the journal last index first: taking a later unit out never
+        // moves an earlier one.
+        if let Some(j) = self.journal.as_mut() {
+            for &(idx, _) in at.iter().rev() {
+                j.unit_out(idx, &self.units[idx]);
+            }
+        }
         let (mut i, mut next) = (first, 0);
         let taken: Vec<Unit> = self
             .units
@@ -125,7 +137,7 @@ impl Tower {
     }
 
     /// Point `by_id` at the units from `from` to the end of the list.
-    fn reindex_from(&mut self, from: usize) {
+    pub(crate) fn reindex_from(&mut self, from: usize) {
         for (i, u) in self.units.iter().enumerate().skip(from) {
             self.by_id.insert(u.id, i);
         }
@@ -147,6 +159,9 @@ impl Tower {
         let (first, moved) = self.take_out(at);
         self.units.extend(moved);
         self.reindex_from(first);
+        if let Some(j) = self.journal.as_mut() {
+            j.slots_settled();
+        }
         self.revision += 1;
     }
 
@@ -162,6 +177,9 @@ impl Tower {
             return None;
         }
         let u = self.units[idx].clone();
+        if let Some(j) = self.journal.as_mut() {
+            j.unit_slot(idx, &u);
+        }
         self.settle_removals(std::slice::from_ref(&u));
         Some(idx)
     }
@@ -171,6 +189,9 @@ impl Tower {
     /// lobby brush notes it for the move.
     pub(crate) fn add_unit(&mut self, unit: Unit, slot: Option<usize>) -> usize {
         let id = unit.id;
+        if let Some(j) = self.journal.as_mut() {
+            j.unit_in(&unit);
+        }
         let idx = match slot {
             Some(idx) => {
                 self.units[idx] = unit;

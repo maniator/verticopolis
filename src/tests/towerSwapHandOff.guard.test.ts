@@ -33,7 +33,7 @@ function shellFiles(dir: string): string[] {
 
 describe("a tower swap hands the replaced tower's gameplay events on", () => {
   it("inherits the replaced tower's buffer in TsEngine.adopt, before the swap", () => {
-    const start = tsEngine.indexOf("  private adopt(next: Simulation)");
+    const start = tsEngine.indexOf("  private adopt(next: Simulation");
     expect(start).toBeGreaterThan(-1);
     const body = tsEngine.slice(start, tsEngine.indexOf("\n  }\n", start));
     // A plain statement of its own (not commented out, not behind a branch).

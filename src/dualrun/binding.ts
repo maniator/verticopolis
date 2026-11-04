@@ -56,7 +56,8 @@ export const INSTANCE_METHODS = [
   "expressStops", "dropStops", "stepRent", "noRate", "setRent", "rentBatch", "rerollUnit",
   "flipAutoBridge", "startExtend", "stopExtend", "labelUnit", "nameTower",
   // PR 1b's lifecycle, events, log and text getters.
-  "loadSave", "restore", "foundTower", "generation", "undoSignature", "drainEvents", "eventText",
+  "loadSave", "restore", "foundTower", "generation", "undoSignature", "undoCapture", "undoCommit", "undoDiscard", "undoClear",
+  "undo", "redo", "undoNotice", "undoDepths", "drainEvents", "eventText",
   "setBackdrop", "unitMetaChanged", "unitLabel", "unitSubtype", "logAfter", "logText", "logLine",
   "scheduleShaft",
   // PR 1c's panel queries.

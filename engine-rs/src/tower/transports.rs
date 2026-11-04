@@ -23,6 +23,16 @@ impl Tower {
         Some(i)
     }
 
+    /// The index of shaft `id` that the caller is about to write, noted for
+    /// the open undo gesture.
+    fn transport_index_edit(&mut self, id: i64) -> Option<usize> {
+        let i = self.transport_index(id)?;
+        if let Some(j) = self.journal.as_mut() {
+            j.transport_edit(i, &self.transports[i]);
+        }
+        Some(i)
+    }
+
     /// Rebuild `transport_by_id`. `Vec::remove` shifts every later index,
     /// so a removal (called from player edits and from load today) rebuilds the
     /// map where the TypeScript `Map.delete` is O(1).
@@ -136,6 +146,9 @@ impl Tower {
             schedule: None,
         };
         self.transport_by_id.insert(id, self.transports.len());
+        if let Some(j) = self.journal.as_mut() {
+            j.transport_in(t.id);
+        }
         self.transports.push(t);
         if kind == Kind::ElevatorExpress {
             self.set_express_stops(id);
@@ -151,7 +164,7 @@ impl Tower {
     /// `setExpressStops`: skip every non-lobby floor strictly inside the span.
     pub fn set_express_stops(&mut self, id: i64) {
         let lobbies = self.lobby_floors();
-        let Some(i) = self.transport_index(id) else {
+        let Some(i) = self.transport_index_edit(id) else {
             return;
         };
         let (bottom, top) = (self.transports[i].bottom, self.transports[i].top);
@@ -182,7 +195,7 @@ impl Tower {
     }
 
     pub fn set_stop(&mut self, id: i64, floor: i64, stop: bool) -> bool {
-        let Some(i) = self.transport_index(id) else {
+        let Some(i) = self.transport_index_edit(id) else {
             return false;
         };
         let t = &self.transports[i];
@@ -251,7 +264,7 @@ impl Tower {
     /// served range, laying plain floor behind newly served floors. Returns
     /// the floors added (negative for a shrink) and the floor tiles laid.
     pub fn resize_transport(&mut self, id: i64, new_bottom: i64, new_top: i64) -> ResizeResult {
-        let Some(i) = self.transport_index(id) else {
+        let Some(i) = self.transport_index_edit(id) else {
             return ResizeResult::fail("No such transport.");
         };
         if new_top <= new_bottom {
@@ -348,7 +361,7 @@ impl Tower {
     /// `clearStops(id)`: every floor stops again (an express keeps its
     /// lobby-only rule).
     pub fn clear_stops(&mut self, id: i64) -> bool {
-        let Some(i) = self.transport_index(id) else {
+        let Some(i) = self.transport_index_edit(id) else {
             return false;
         };
         if self.transports[i].kind == Kind::ElevatorExpress {
@@ -362,6 +375,9 @@ impl Tower {
 
     pub fn remove_transport(&mut self, id: i64) -> Option<Transport> {
         let i = self.transport_index(id)?;
+        if let Some(j) = self.journal.as_mut() {
+            j.transport_out(i, &self.transports[i]);
+        }
         let t = self.transports.remove(i);
         self.reindex_transports();
         self.revision += 1;
@@ -373,7 +389,7 @@ impl Tower {
     /// changed staging homes snap to stops, but editing shift counts must not
     /// move unchanged legacy homes (#1557). False for a non-elevator id.
     pub fn set_schedule(&mut self, id: i64, raw: &Value) -> bool {
-        let Some(i) = self.transport_index(id) else {
+        let Some(i) = self.transport_index_edit(id) else {
             return false;
         };
         if !self.transports[i].kind.is_elevator() {
@@ -403,7 +419,7 @@ impl Tower {
     }
 
     pub fn set_cars(&mut self, id: i64, cars: i64) -> bool {
-        let Some(i) = self.transport_index(id) else {
+        let Some(i) = self.transport_index_edit(id) else {
             return false;
         };
         let t = &mut self.transports[i];
