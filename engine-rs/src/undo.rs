@@ -22,10 +22,16 @@
 //! expect is refused and changes nothing, so its cash never moves for an
 //! edit that is not there to reverse.
 //!
-//! Time keeps moving, so a step can meet a room the simulation has used since
-//! the step was made: a tenant moved in, it earned, it burned. A step takes a
-//! room out only while its use is as the step found it ([`UnitUse`]), so an
-//! undo is never a way to sell a used room back at its full price.
+//! Time keeps moving, so a step can meet a build the simulation has used
+//! since the step was made. A step takes a room out only while its use is as
+//! the step found it ([`UnitUse`]): a room the edit built is in use once it
+//! opens, and a room that was already open once anyone moved in, earned or
+//! it burned. A floor or lobby tile, or a shaft, is in use once an hourly
+//! pass has run with it standing ([`Step::hour_passes`]), since that pass
+//! moves tenants in over the floors the tower reaches and shares the crowd
+//! out among the shafts; a shaft also once anyone rides it
+//! (`Transport::rides`). So an undo is never a way to sell a used build
+//! back at its full price.
 #![cfg_attr(not(feature = "wasm"), allow(dead_code))]
 use crate::sim_undo_check::CapHeld;
 use crate::tower::{Transport, Unit, UnitState};
@@ -35,12 +41,16 @@ pub(crate) const UNDO_CAP: usize = 50;
 
 /// What a step does to one unit. `at` is the unit's place in the unit list
 /// on the side where it is present, so a removed unit goes back where it
-/// stood.
+/// stood. `built` says the step's edit built the unit, so the step takes it
+/// out at its full price or builds it again: a room it takes out must not
+/// have opened since, nor a floor or lobby tile have stood through an hourly
+/// pass. A sold unit put back and sold again is not built.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct UnitImage {
     pub(crate) id: i64,
     pub(crate) at: usize,
     pub(crate) change: UnitChange,
+    pub(crate) built: bool,
 }
 
 /// What a step does to a unit, and what it expects to find there.
@@ -57,9 +67,12 @@ pub(crate) enum UnitChange {
     Restore(Unit),
 }
 
-/// What the simulation has done with a room: whether it is idle, on fire or
-/// otherwise in use, who is in it, whether anyone ever moved in, and the
-/// income it holds. A room still being built and an empty one are both idle.
+/// What the simulation has done with a room: whether it is still being
+/// built, idle, on fire or otherwise in use, who is in it, whether anyone
+/// ever moved in, and the income it holds. A room leaves construction once,
+/// when it opens, and nothing puts it back, so a room the step found being
+/// built and finds open has been in use since, whatever a move-out or a
+/// collection reset after.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct UnitUse {
     pub(crate) state: UnitState,
@@ -71,24 +84,61 @@ pub(crate) struct UnitUse {
 impl UnitUse {
     pub(crate) fn of(u: &Unit) -> UnitUse {
         UnitUse {
-            state: match u.state {
-                UnitState::Construction => UnitState::Empty,
-                state => state,
-            },
+            state: u.state,
             occupants: u.occupants,
             ever_occupied: u.ever_occupied,
             pending_income: u.pending_income,
         }
     }
+
+    /// The use a unit a gesture places comes in with: a room is placed to
+    /// be built (`Simulation::build` starts its construction straight
+    /// after), and floor and lobby tiles are placed as they stay.
+    pub(crate) fn placed(u: &Unit) -> UnitUse {
+        let placed = UnitUse::of(u);
+        if u.kind.build_minutes() > 0.0 {
+            UnitUse {
+                state: UnitState::Construction,
+                ..placed
+            }
+        } else {
+            placed
+        }
+    }
+
+    /// Whether a room the step found being built has only opened since: it
+    /// is idle, nobody has moved in and it holds no income.
+    pub(crate) fn only_opened(self, now: UnitUse) -> bool {
+        self.state == UnitState::Construction && now == self.as_sold()
+    }
+
+    /// The use as a sale prices it: a room still being built sells as an
+    /// idle one does, so a step that sells a room again (a sale's redo) does
+    /// not mind that it opened.
+    pub(crate) fn as_sold(self) -> UnitUse {
+        match self.state {
+            UnitState::Construction => UnitUse {
+                state: UnitState::Empty,
+                ..self
+            },
+            _ => self,
+        }
+    }
 }
 
 /// What a step does to one shaft, with its place in the shaft list as
-/// [`UnitImage`] has it.
+/// [`UnitImage`] has it. `built` says the step takes away what the edit
+/// bought, at the price paid: the shaft it built, or, on a restore, the cars
+/// and floors the edit added, since an undo restores the shaft as the edit
+/// found it. A shaft it takes them from must not have been used since. The
+/// opposite of a restore replays the edit, and what it takes away is what
+/// the edit sold, so it is not built.
 #[derive(Clone, Debug)]
 pub(crate) struct TransportImage {
     pub(crate) id: i64,
     pub(crate) at: usize,
     pub(crate) change: TransportChange,
+    pub(crate) built: bool,
 }
 
 /// What a step does to a shaft, and what it expects to find there. The
@@ -142,6 +192,21 @@ pub(crate) struct Step {
     pub(crate) money: f64,
     /// The VIP inspection day, when the edit moved it.
     pub(crate) vip_visit_day: Option<Swap>,
+    /// Whether the edit dug new ground that could hold treasure. The dig and
+    /// its luck stay, so undoing the edit would make every search free: the
+    /// step is refused (`sim_undo_check.rs`).
+    pub(crate) searched_for_treasure: bool,
+    /// Whether a floor or lobby tile the edit laid, or a shaft it built or
+    /// bought cars or floors for, was used and then sold again inside the
+    /// same gesture, so no image is left to show the use: the step's cash
+    /// would make the use free, and the step is refused
+    /// (`sim_undo_check.rs`).
+    pub(crate) used_in_gesture: bool,
+    /// How many hourly passes the simulation had run when the step's edit
+    /// began (`Simulation::on_hour_runs`): a floor or lobby tile, or a
+    /// shaft, the step takes away at its full price must not have stood
+    /// through one since.
+    pub(crate) hour_passes: i64,
     /// How many units and shafts the tower held under each cap the step
     /// adds under, when it was made: a tower that came in over a cap may be
     /// left as far over as the edit found it (`sim_undo_check.rs`).
@@ -200,6 +265,12 @@ impl UndoHistory {
         if self.redo.len() > UNDO_CAP {
             self.redo.remove(0);
         }
+    }
+
+    /// Forget the redo steps: one could never apply again, and those after
+    /// it were made on top of it.
+    pub(crate) fn clear_redo(&mut self) {
+        self.redo.clear();
     }
 
     /// Forget every step: another tower was adopted.

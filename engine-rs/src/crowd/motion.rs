@@ -75,7 +75,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
                 return finish(crowd, i, tower);
             };
             let target_x = shaft.x as f64 + shaft.width as f64 / 2.0;
-            let is_elevator = shaft.kind.is_elevator();
+            let (shaft_id, is_elevator) = (shaft.id, shaft.kind.is_elevator());
             let p = &mut crowd.people[i];
             if walk_to(p, target_x, dt, tower) {
                 if is_elevator {
@@ -84,6 +84,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
                 } else {
                     p.state = PState::Climbing;
                     p.wait = 0.0;
+                    tower.note_ride(shaft_id);
                 }
             }
         }
@@ -151,6 +152,7 @@ fn step(crowd: &mut Crowd, i: usize, dt: f64, tower: &mut Tower, slots: &HashMap
                     continue;
                 }
                 crowd.car_riders.insert(key, n + 1);
+                tower.note_ride(shaft.id);
                 let p = &mut crowd.people[i];
                 p.car_index = Some(ci as i64);
                 p.state = PState::Riding;

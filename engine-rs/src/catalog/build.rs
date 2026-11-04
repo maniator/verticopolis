@@ -34,6 +34,11 @@ pub fn catalog(mode: GameMode) -> Catalog {
                 }),
             auto_bridge_toggleable: mode.bridging_toggleable(),
         },
+        rules: Rules {
+            variant_households: mode.variant_households(),
+            preview_names_refusal: mode.preview_names_refusal(),
+            schedule_assist: mode.schedule_assist(),
+        },
         pools: POOLED_CAPS
             .iter()
             .zip(POOL_KEYS)

@@ -3,6 +3,8 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../../engine/Simulation";
 import { FACILITIES, GRID, maxCarsFor } from "../../engine/facilities";
+import { catalogFor } from "../../engine/catalog";
+import { useTowerCatalogSource } from "../../catalog/towerCatalog";
 import { ECON, rentOf, resaleRefund } from "../../engine/econConfig";
 import type { PriceOptions } from "../../engine/gameRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
@@ -669,6 +671,33 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(last(f.sfx)).toBe("error");
     expect(last(f.toasts)).toEqual({ text: INVALID_COMMAND, kind: "bad" });
     expect(announced.length).toBe(spoken);
+  });
+
+  it("the schedule dialog's tools follow the catalog's scheduleAssist rule, whatever the mode's name", async () => {
+    sel = { type: "transport", id: lift.id };
+    render(transportEditor(sim, lift), root);
+    const ownMode = Object.getOwnPropertyDescriptor(sim, "mode");
+    try {
+      // Each mode with the rule on and off, so neither mode's name can stand
+      // in. This suite's tower is Classic; the Modern leg relabels it.
+      for (const mode of ["classic", "modern"] as const) {
+        Object.defineProperty(sim, "mode", { value: mode, configurable: true });
+        // The reader takes the mode with the structure, so move the structure.
+        expect(sim.tower.place("floor", 5, mode === "classic" ? 5 : 6).ok).toBe(true);
+        ports.viewReader.update();
+        expect(ports.viewReader.header.mode).toBe(mode);
+        for (const scheduleAssist of [true, false]) {
+          useTowerCatalogSource(ports.tsEngine, (m) => ({ ...catalogFor(m), rules: { ...catalogFor(m).rules, scheduleAssist } }));
+          scheduleDlg = null;
+          await editor.handleEditAction("schedule", root);
+          expect(scheduleDlg!.ctx.ux, `${mode}, scheduleAssist ${scheduleAssist}`).toEqual({ presets: scheduleAssist, autoTune: scheduleAssist, advice: scheduleAssist, rawGridDefault: !scheduleAssist });
+        }
+      }
+    } finally {
+      useTowerCatalogSource(ports.tsEngine, null);
+      if (ownMode) Object.defineProperty(sim, "mode", ownMode);
+      else delete (sim as { mode?: unknown }).mode;
+    }
   });
 
   it("the schedule dialog's Auto-tune asks the engine live: a preview writes nothing and Save is the one undo step", async () => {

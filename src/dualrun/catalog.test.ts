@@ -26,7 +26,10 @@ describe("readCatalog", () => {
     expect(() => readCatalog(refusing, "classic")).toThrow(/returned no classic catalog: mode must be/);
     const { facilities: _f, ...partial } = catalogFor("classic");
     void _f;
-    expect(() => readCatalog(reply(JSON.stringify(partial)), "classic")).toThrow(/without its world, economy, pools or facilities/);
+    expect(() => readCatalog(reply(JSON.stringify(partial)), "classic")).toThrow(/without its world, economy, rules, pools or facilities/);
+    const { rules: _r, ...ruleless } = catalogFor("modern");
+    void _r;
+    expect(() => readCatalog(reply(JSON.stringify(ruleless)), "modern")).toThrow(/without its world, economy, rules, pools or facilities/);
   });
 
   it("refuses another shape version or another mode", () => {
@@ -72,6 +75,8 @@ describe("readCatalog", () => {
       ["a half-stated exterminator", "modern", (c) => delete (economy(c).exterminator as Json).perRoomFee, /missing economy\.exterminator\.perRoomFee/],
       ["a ground floor structure that is not a kind", "classic", (c) => ((c.world as Json).groundFloorStructure = "plaza"), /plaza is not a listed facility/],
       ["a ground floor outside the floor range", "classic", (c) => ((c.world as Json).groundFloor = 999), /ground floor lies outside the floor range/],
+      ["a missing mode rule", "modern", (c) => delete (c.rules as Json).scheduleAssist, /missing rules\.scheduleAssist/],
+      ["a mode rule given as a number", "classic", (c) => ((c.rules as Json).previewNamesRefusal = 0), /invalid rules\.previewNamesRefusal: 0/],
     ];
     for (const [name, mode, damage, message] of cases) {
       it(name, () => {

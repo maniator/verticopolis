@@ -3,24 +3,24 @@ use crate::clock::GameMode;
 use crate::facilities::{Kind, FACILITIES};
 use crate::sim::Simulation;
 
-fn code(kind: Kind) -> f64 {
+pub(super) fn code(kind: Kind) -> f64 {
     FACILITIES.iter().position(|f| f.kind == kind).unwrap() as f64
 }
 
-fn engine() -> Engine {
+pub(super) fn engine() -> Engine {
     let mut e = Engine::of(Simulation::new_game(7, GameMode::Modern));
     e.sim.money = 1e9;
     e
 }
 
 /// One edit as a gesture: capture, build a lobby at `x`, commit.
-fn gesture(e: &mut Engine, label: &str, x: f64) {
+pub(super) fn gesture(e: &mut Engine, label: &str, x: f64) {
     e.port_undo_capture(label);
     e.port_build(code(Kind::Lobby), 1.0, x);
     e.port_undo_commit();
 }
 
-fn units(e: &Engine) -> usize {
+pub(super) fn units(e: &Engine) -> usize {
     e.sim.tower.units.len()
 }
 
@@ -103,49 +103,6 @@ fn a_dropped_gesture_leaves_no_step_unless_it_changed_the_tower() {
     e.port_undo_capture("Build Lobby");
     assert!(!e.port_undo_commit());
     assert_eq!(e.port_undo_depths(), vec![2.0, 0.0]);
-}
-
-#[test]
-fn a_step_on_a_room_used_since_is_refused_with_the_reason() {
-    let mut e = engine();
-    for x in 100..140 {
-        assert!(e.sim.tower.place(Kind::Lobby, 1, x).ok);
-        assert!(e.sim.tower.place(Kind::Floor, 2, x).ok);
-    }
-    e.port_undo_capture("Build Office");
-    e.port_build(code(Kind::Office), 2.0, 110.0);
-    e.port_undo_commit();
-    let id = e.sim.tower.unit_at(2, 110).unwrap().id;
-    e.sim.tower.get_unit_mut(id).unwrap().ever_occupied = true;
-    assert_eq!(e.port_undo()[0], 0.0);
-    assert_eq!(
-        e.last_reason_text().as_deref(),
-        Some("Can't undo that: the room has been in use since. Sell it instead.")
-    );
-    assert_eq!(e.port_undo_depths(), vec![1.0, 0.0], "the step stays");
-    e.sim.tower.get_unit_mut(id).unwrap().state = crate::tower::UnitState::Fire;
-    assert_eq!(e.port_undo()[0], 0.0);
-    assert_eq!(
-        e.last_reason_text().as_deref(),
-        Some("Can't undo that while the room is on fire.")
-    );
-}
-
-#[test]
-fn a_step_that_meets_a_tower_it_does_not_expect_says_so() {
-    let mut e = engine();
-    gesture(&mut e, "Build Lobby", 100.0);
-    assert_eq!(e.port_undo()[0], 1.0);
-    // An edit with no gesture open lays a lobby where the undone one stood.
-    e.port_build(code(Kind::Lobby), 1.0, 100.0);
-    let before = (e.sim.save_text(), e.sim.money);
-    assert_eq!(e.port_redo()[0], 0.0);
-    assert_eq!(
-        e.last_reason_text().as_deref(),
-        Some("Can't redo that: the tower has changed since.")
-    );
-    assert_eq!((e.sim.save_text(), e.sim.money), before);
-    assert_eq!(e.port_undo_depths(), vec![0.0, 1.0], "the step stays");
 }
 
 #[test]
@@ -241,28 +198,28 @@ fn each_stack_holds_the_last_fifty_edits() {
     assert_eq!(e.port_undo_depths(), vec![0.0, 50.0]);
 }
 
+/// Each way a host swaps a tower in forgets the steps, so the rides and the
+/// hourly passes a step compares, which a new tower starts again from zero,
+/// never meet a step made on another tower. A tower file and a `.TDT`
+/// file are in `a_tower_file_forgets_the_steps_and_a_refused_load_keeps_them`.
 #[test]
-fn an_undo_the_balance_cannot_pay_for_is_refused_and_stays_available() {
-    let mut e = engine();
-    let start = units(&e);
-    gesture(&mut e, "Build Lobby", 100.0);
-    e.port_undo();
-    // The redo charges the lobby again.
-    e.sim.money = 0.0;
-    let before = e.sim.save_text();
-    assert_eq!(e.port_redo()[0], 0.0);
-    assert_eq!(
-        e.last_reason_text().as_deref(),
-        Some("Not enough money to redo that.")
-    );
-    assert!(e.port_undo_notice().is_none());
-    assert_eq!(e.sim.save_text(), before);
-    assert_eq!(
-        e.port_undo_depths(),
-        vec![0.0, 1.0],
-        "the redo step was kept"
-    );
-    e.sim.money = 1e9;
-    assert_eq!(e.port_redo()[0], 1.0);
-    assert_eq!(units(&e), start + 1);
+fn every_tower_swap_forgets_the_steps() {
+    let with_steps = || {
+        let mut e = engine();
+        gesture(&mut e, "First", 100.0);
+        gesture(&mut e, "Second", 120.0);
+        e.port_undo();
+        assert_eq!(e.port_undo_depths(), vec![1.0, 1.0]);
+        e
+    };
+    let mut e = with_steps();
+    let save = e.sim.save_text();
+    assert_eq!(e.port_load_save(&save)[0], 1.0);
+    assert_eq!(e.port_undo_depths(), vec![0.0, 0.0], "a load");
+    let mut e = with_steps();
+    assert_eq!(e.port_restore(&save)[0], 1.0);
+    assert_eq!(e.port_undo_depths(), vec![0.0, 0.0], "a restore");
+    let mut e = with_steps();
+    assert_eq!(e.port_found(7.0, 0.0, 0.0, false)[0], 1.0);
+    assert_eq!(e.port_undo_depths(), vec![0.0, 0.0], "a new tower");
 }

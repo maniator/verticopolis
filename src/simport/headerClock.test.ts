@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import type { SerializedGame } from "../engine/serializedGame";
 import { decodeVctower } from "../storage/vctowerContainer";
-import { calendarOf, clockOf, rulesOf, type ClockView } from "./headerClock";
+import { calendarOf, clockOf, type ClockView } from "./headerClock";
 import { facilityFloors } from "../engine/facilities";
 import { TsEngine } from "../engine/port/tsEngine";
 import { ViewReader } from "./viewReader";
@@ -60,11 +60,6 @@ describe("headerClock", () => {
       }
     });
 
-    it(`${name}: the header's rule set is the engine's`, () => {
-      const sim = found();
-      expect(rulesOf(headerOf(sim))).toBe(sim.rules);
-    });
-
     it(`${name}: the header's calendar is the engine's`, () => {
       const sim = found();
       const { weekDays, weekendDays } = sim.clock.calendar;
@@ -81,7 +76,6 @@ describe("headerClock", () => {
       const sim = Simulation.deserialize(decodeVctower(readFileSync(resolve(dir, f), "utf8"), f) as SerializedGame);
       const header = headerOf(sim);
       expect(readings(clockOf(header)), f).toEqual(readings(sim.clock));
-      expect(rulesOf(header), f).toBe(sim.rules);
     }
   });
 

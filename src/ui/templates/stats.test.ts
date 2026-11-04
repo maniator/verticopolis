@@ -4,7 +4,7 @@ import { GRID } from "../../engine/facilities";
 import { cumulativeStarGates, nextStarRequirements } from "../../engine/sim/star";
 import { markRoom } from "../../engine/tower/rooms";
 import { nothing } from "lit-html";
-import { incomeSection, milestonesSection, nextStarSection, statsModalTemplate, canCallExterminator, STAR_GATE_LABELS } from "./stats";
+import { incomeSection, milestonesSection, nextStarSection, statsModalTemplate, statsTemplate, canCallExterminator, STAR_GATE_LABELS } from "./stats";
 import { statsBodyOf, statsScreenOf } from "./stats.fixture";
 import { renderToFragment } from "../testing/litTestUtils";
 import type { StarGateId } from "../../simport/panels";
@@ -183,6 +183,19 @@ describe("statsTemplate sections across fixture towers", () => {
     expect(renderToFragment(await statsBodyOf(new Simulation())).querySelector(".stats-grid")).not.toBeNull();
     expect(renderToFragment(await statsBodyOf(Simulation.newGame(3, "classic"))).textContent).not.toContain("Households");
     expect(renderToFragment(await statsBodyOf(Simulation.newGame(3, "modern"))).textContent).toContain("Households");
+  });
+
+  it("the catalog's variantHouseholds rule decides the Households section, whatever the mode's name", async () => {
+    // Each mode with the rule on and off, so neither mode's name can stand in.
+    for (const mode of ["classic", "modern"] as const) {
+      const screen = await statsScreenOf(Simulation.newGame(3, mode));
+      for (const variantHouseholds of [true, false]) {
+        const catalog = { ...screen.catalog, rules: { ...screen.catalog.rules, variantHouseholds } };
+        const text = renderToFragment(statsTemplate({ ...screen, catalog })).textContent;
+        if (variantHouseholds) expect(text, `${mode}, variantHouseholds on`).toContain("Households");
+        else expect(text, `${mode}, variantHouseholds off`).not.toContain("Households");
+      }
+    }
   });
 
   it("a sold Modern household renders the multi-size mix", async () => {

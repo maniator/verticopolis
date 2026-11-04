@@ -6,6 +6,8 @@ import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
 import { ViewReader } from "../simport/viewReader";
 import { onHistoryClick, setHistoryButtons, toast, update, type HudSource } from "./uiStatus";
+import type { Catalog } from "../catalog/catalogTypes";
+import type { GameMode } from "../engine/types";
 import type { UI } from "./UI";
 import { useGermanDefaultLocale } from "../tests/localeStub";
 
@@ -269,5 +271,82 @@ describe("the Undo and Redo buttons", () => {
     const ui = { el: { undo: null, redo: null } } as unknown as UI;
     expect(() => setHistoryButtons(ui, holding([1, 1]))).not.toThrow();
     expect(() => onHistoryClick(null, () => {})).not.toThrow();
+  });
+});
+
+describe("the palette's lock scan", () => {
+  // The catalog's `available` decides whether the tower's mode builds a kind,
+  // the engine's own rule, so a Modern-only venue stays hidden in Classic at
+  // any star and shows in Modern once the star allows it.
+  const lockScan = (mode: GameMode, edit: (catalog: Catalog) => Catalog = (c) => c) => {
+    const sim = Simulation.newGame(3, mode);
+    sim.star = 5;
+    const base = towerCatalog(sim);
+    let catalog = edit(base);
+    const palette = document.createElement("div");
+    for (const kind of ["foodHall", "office"]) {
+      const item = document.createElement("button");
+      item.className = "pal-item";
+      item.dataset.kind = kind;
+      palette.append(item);
+    }
+    const el = new Proxy({ palette } as Record<string, HTMLElement>, {
+      get: (made, key: string) => (made[key] ??= document.createElement("div")),
+    });
+    const ui = { el, cb: { getCatalog: () => catalog }, paletteCatalog: catalog, paletteScanKey: "", lastLogSeq: sim.logSeq, tool: { type: "inspect" }, setTowerName: () => {} } as unknown as UI;
+    ui.selectTool = (tool) => { ui.tool = tool; };
+    const port = new TsEngine(sim);
+    const pump = () => update(ui, { reader: new ViewReader(port, facilityFloors), port, codes: new PortCodes(port) });
+    pump();
+    return {
+      ui,
+      node: (kind: string) => palette.querySelector(`[data-kind="${kind}"]`),
+      locked: (kind: string) => palette.querySelector(`[data-kind="${kind}"]`)!.classList.contains("locked"),
+      /** Hand the UI a new catalog, then pump again. */
+      swap: (next: (catalog: Catalog) => Catalog) => {
+        catalog = next(base);
+        pump();
+      },
+    };
+  };
+  const withoutOffice = (c: Catalog): Catalog => ({ ...c, facilities: c.facilities.map((f) => (f.key === "office" ? { ...f, available: false } : f)) });
+
+  for (const mode of ["classic", "modern"] as const) {
+    it(`${mode}: the Food Hall is ${mode === "classic" ? "locked" : "unlocked"} at five stars`, () => {
+      const { locked } = lockScan(mode);
+      expect(locked("foodHall")).toBe(mode === "classic");
+      expect(locked("office")).toBe(false);
+    });
+  }
+
+  it("locks a kind the catalog says the mode does not build, whatever the kind's own flags", () => {
+    const { locked } = lockScan("modern", withoutOffice);
+    expect(locked("office")).toBe(true);
+    expect(locked("foodHall")).toBe(false);
+  });
+
+  it("rewrites the locks whenever a new catalog arrives, whether it rebuilds the palette or relabels it", () => {
+    const { node, locked, swap } = lockScan("modern");
+    // The first swap lays the palette out from the catalog (a rebuild).
+    const handMade = node("office");
+    swap(withoutOffice);
+    expect(node("office")).not.toBe(handMade);
+    expect(locked("office")).toBe(true);
+    // Later swaps keep the layout, so they relabel the same buttons.
+    const office = node("office");
+    swap((c) => ({ ...c }));
+    expect(node("office")).toBe(office);
+    expect(locked("office")).toBe(false);
+    swap(withoutOffice);
+    expect(node("office")).toBe(office);
+    expect(locked("office")).toBe(true);
+  });
+
+  it("drops a build tool whose kind a new catalog withholds", () => {
+    const { ui, swap } = lockScan("modern");
+    swap((c) => ({ ...c }));
+    ui.tool = { type: "build", kind: "office" };
+    swap(withoutOffice);
+    expect(ui.tool).toEqual({ type: "inspect" });
   });
 });

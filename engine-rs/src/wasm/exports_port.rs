@@ -102,8 +102,9 @@ impl Engine {
         self.port_evaluated_tower()
     }
     // The panel queries (`wasm_port_panels.rs`): the overlay's cells, the
-    // crew coverage and the unit and shaft cards, each a record the layout
-    // names.
+    // crew coverage, the unit and shaft cards and the rooms' evaluation and
+    // rent tiers (the Map's Eval and Pricing views), each a record the
+    // layout names.
     #[wasm_bindgen(js_name = heatCells)]
     pub fn heat_cells(&self, mode: f64) -> Vec<f64> {
         self.port_heat_cells(mode)
@@ -119,6 +120,16 @@ impl Engine {
     #[wasm_bindgen(js_name = shaftCard)]
     pub fn shaft_card(&self, id: f64) -> Vec<f64> {
         self.port_shaft_card(id)
+    }
+    /// The Map's Eval and Pricing read (#343 S7): one `roomTier` row (`id`,
+    /// `floor`, `x`, `evalTier`, `rentTier`) for each room that carries an
+    /// evaluation or a rent level, in the view's room order, with codes from
+    /// the layout's `evalTiers` and `rentTiers`. One pass over the rooms, so
+    /// S8 reads it only on the triggers the Map SPEC lists (the Cost bullet of
+    /// its S7 section), and not more than once a frame.
+    #[wasm_bindgen(js_name = roomTiers)]
+    pub fn room_tiers(&self) -> Vec<f64> {
+        self.port_room_tiers()
     }
     #[wasm_bindgen(js_name = statsSheet)]
     pub fn stats_sheet(&mut self) -> Vec<f64> {

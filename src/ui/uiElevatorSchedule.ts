@@ -1,8 +1,10 @@
 import type { UI } from "./UI";
 import { render } from "lit-html";
 import { elevatorScheduleTemplate, floorLabel, type FloorRow, type SchedCtx, type SchedState, type SchedHandlers } from "./templates/elevatorSchedule";
-import { SCHEDULE_HOURS, type ElevatorSchedule, type ElevatorScheduleUX } from "../engine/elevatorSchedule";
-import { ORIGIN_HOURS, topOriginFloors, type OriginRings } from "../engine/scheduleOrigins";
+import type { ElevatorSchedule } from "../engine/elevatorSchedule";
+import type { OriginRings } from "../engine/scheduleOrigins";
+import { SCHEDULE_HOURS } from "../simport/scheduleSlots";
+import { hotspotFloors, type ElevatorScheduleUX } from "./scheduleDialogRules";
 import type { AssistedPreset, AutoTuneProposal, PresetProposal, ScheduleFacts, SchedulePresetName } from "../simport/enginePort";
 import { hh, fmtHours, originClause } from "./scheduleFormat";
 
@@ -103,7 +105,7 @@ export function showElevatorScheduleDialog(
   const dayOriginsAt = (h: number): ReadonlyMap<number, number> | undefined => {
     if (!ctx.origins || !dayWarmed()) return undefined;
     const ring = state.day === "weekend" ? ctx.origins.weekend : ctx.origins.weekday;
-    return ring[((h % ORIGIN_HOURS) + ORIGIN_HOURS) % ORIGIN_HOURS];
+    return ring[((h % SCHEDULE_HOURS) + SCHEDULE_HOURS) % SCHEDULE_HOURS];
   };
   // A stored home floor may sit on a stop the shaft no longer serves. The
   // engine answers the homes it would hold (each on the nearest served floor, a
@@ -227,13 +229,13 @@ export function showElevatorScheduleDialog(
       : `No measured ${state.day} peak yet; at the ${hh(sum.peakHour)} down-rush`;
     // Origin readouts (#465): hotspot markers for the visible day's peak hour,
     // and a trailing boarding clause. Both empty until origins warm.
-    // Filter the slot to served floors BEFORE ranking: topOriginFloors takes its
+    // Filter the slot to served floors BEFORE ranking: hotspotFloors takes its
     // share threshold against the slot total, so a skipped floor's stale EMA mass
     // would otherwise push every served floor below threshold and blank the markers.
     const servedNow = new Set(servedFloorsAsc(state.floors));
     const peakSlot = dayOriginsAt(sum.peakHour);
     const servedSlot = peakSlot && new Map([...peakSlot].filter(([f]) => servedNow.has(f)));
-    state.originFloors = topOriginFloors(servedSlot || undefined);
+    state.originFloors = hotspotFloors(servedSlot || undefined);
     state.simMsg =
       `${peakClause}: ${sum.upTowerCars} staged up-tower, ` +
       `${sum.lobbyCars} ${baseClause}, ${sum.activeAtPeak} of ${ctx.cars} cars on shift.` +

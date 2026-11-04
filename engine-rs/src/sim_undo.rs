@@ -14,10 +14,10 @@
 //!
 //! A step applies only to the tower it expects (`sim_undo_check.rs`): what
 //! it takes out or restores is there, what it puts back is not and has room,
-//! and a room it takes out is in the use the step found it in. Anything else
-//! refuses the step, which changes nothing and stays, so the cash it carries
-//! never moves for an edit that is no longer there to reverse, and undoing a
-//! build never sells a used room back at its full price.
+//! and a room or a shaft it takes out is in the use the step found it in.
+//! Anything else refuses the step, which changes nothing, so the cash it
+//! carries never moves for an edit that is no longer there to reverse, and
+//! undoing a build never sells a used room or shaft back at its full price.
 #![cfg_attr(not(feature = "wasm"), allow(dead_code))]
 use crate::sim::Simulation;
 use crate::sim_undo_check::caps_held;
@@ -34,6 +34,7 @@ impl Simulation {
         self.tower.journal = Some(Box::new(crate::undo_journal::Journal::new(
             label,
             self.vip_visit_day,
+            self.on_hour_runs,
         )));
     }
 
@@ -52,6 +53,14 @@ impl Simulation {
         }
     }
 
+    /// A build dug new ground that could hold treasure: the open gesture's
+    /// step can never be undone.
+    pub(crate) fn note_treasure_search(&mut self) {
+        if let Some(journal) = self.tower.journal.as_mut() {
+            journal.searched_for_treasure();
+        }
+    }
+
     /// Close the open journal into a step, or `None` when no journal was
     /// open or the gesture changed nothing.
     pub(crate) fn end_undo_journal(&mut self) -> Option<Step> {
@@ -61,6 +70,7 @@ impl Simulation {
             .into_iter()
             .filter_map(|seen| {
                 let now = self.tower.get_unit(seen.id);
+                let built = !matches!(seen.before, Before::Was(_));
                 let change = match (seen.before, now) {
                     (Before::Was(before), Some(now)) => {
                         if now.config_eq(&before) {
@@ -83,6 +93,7 @@ impl Simulation {
                     id: seen.id,
                     at: seen.at,
                     change,
+                    built,
                 })
             })
             .collect();
@@ -91,26 +102,43 @@ impl Simulation {
             .into_iter()
             .filter_map(|seen| {
                 let now = self.tower.get_transport(seen.id);
-                let change = match (seen.before, now) {
+                // The rides a shaft had when the gesture found it (none, for
+                // one it built), so a ride while the gesture was open counts
+                // as use too. An undo takes away what the edit bought: the
+                // shaft it built, or the cars and floors a restore takes back
+                // (`TransportImage::built`), but not a sold shaft it puts back.
+                let (change, built) = match (seen.before, now) {
                     (Some(before), Some(now)) => {
                         if now.config_eq(&before) {
                             return None;
                         }
-                        TransportChange::Restore {
+                        let rides = before.rides;
+                        let restore = TransportChange::Restore {
                             want: Box::new(before),
-                            left: Box::new(now.clone()),
-                        }
+                            left: Box::new(Transport {
+                                rides,
+                                ..now.clone()
+                            }),
+                        };
+                        (restore, true)
                     }
-                    (Some(before), None) => TransportChange::PutBack(Box::new(before)),
-                    (None, Some(now)) => TransportChange::TakeOut {
-                        left: Box::new(now.clone()),
-                    },
+                    (Some(before), None) => (TransportChange::PutBack(Box::new(before)), false),
+                    (None, Some(now)) => {
+                        let take_out = TransportChange::TakeOut {
+                            left: Box::new(Transport {
+                                rides: 0,
+                                ..now.clone()
+                            }),
+                        };
+                        (take_out, true)
+                    }
                     (None, None) => return None,
                 };
                 Some(TransportImage {
                     id: seen.id,
                     at: seen.at,
                     change,
+                    built,
                 })
             })
             .collect();
@@ -124,6 +152,12 @@ impl Simulation {
             units,
             transports,
             caps_held: Vec::new(),
+            searched_for_treasure: closed.searched_for_treasure,
+            // A build the gesture took out again was used while it stood:
+            // by a ride, or by an hourly pass run since the gesture opened.
+            used_in_gesture: closed.used_then_taken
+                || (closed.took_own_build && self.on_hour_runs != closed.hour_passes),
+            hour_passes: closed.hour_passes,
         };
         if step.is_empty() {
             return None;
@@ -162,6 +196,11 @@ impl Simulation {
             money: -step.money,
             vip_visit_day: step.vip_visit_day.map(Swap::reversed),
             caps_held: Vec::new(),
+            // A step that searched, or whose builds were used inside their
+            // gesture, is refused, so it never reaches here.
+            searched_for_treasure: false,
+            used_in_gesture: false,
+            hour_passes: self.on_hour_runs,
         };
         // The shafts as they are now, before the units: putting a lobby back
         // syncs the express stops, and the opposite step must hold each shaft
@@ -225,6 +264,7 @@ impl Simulation {
                 id: img.id,
                 at,
                 change,
+                built: img.built,
             });
         }
         self.tower.remove_units(&out);
@@ -275,10 +315,18 @@ impl Simulation {
                 }
                 _ => unreachable!("the step was checked against the tower"),
             };
+            // The opposite of a restore runs the edit the other way: an
+            // undo's takes back what the edit sold, at the sale's price, and
+            // a redo's what it bought.
+            let built = match change {
+                TransportChange::Restore { .. } => !img.built,
+                _ => img.built,
+            };
             back.transports.push(TransportImage {
                 id: img.id,
                 at,
                 change,
+                built,
             });
         }
         for id in out {
@@ -314,3 +362,15 @@ mod guard_tests;
 #[cfg(test)]
 #[path = "sim_undo_check_tests.rs"]
 mod check_tests;
+
+#[cfg(test)]
+#[path = "sim_undo_use_tests.rs"]
+mod use_tests;
+
+#[cfg(test)]
+#[path = "sim_undo_ground_tests.rs"]
+mod ground_tests;
+
+#[cfg(test)]
+#[path = "sim_undo_hour_tests.rs"]
+mod hour_tests;

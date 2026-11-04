@@ -56,12 +56,12 @@ function logKinds(codes: HudSource["codes"]): LogKind[] {
   return k;
 }
 
-/** Whether a kind can be built at this star and mode: the star gate, plus
- *  Modern-only kinds never unlock in a Classic tower. Reads the catalog, which
- *  gives the same answer as the engine's `isUnlocked`. */
-function unlocked(catalog: Catalog, kind: FacilityKind, star: number, mode: GameMode): boolean {
+/** Whether a kind can be built at this star: the tower's catalog says whether
+ *  its mode builds the kind at all (`available`, the engine's own rule), and
+ *  the star gate does the rest, the same answer as the engine's `isUnlocked`. */
+function unlocked(catalog: Catalog, kind: FacilityKind, star: number): boolean {
   const f = catalogFacility(catalog, kind);
-  return !(f.modernOnly && mode !== "modern") && star >= f.minStar;
+  return f.available && star >= f.minStar;
 }
 
 /** Hard ceiling on rendered bulletin lines. The DOM node count is held CONSTANT
@@ -112,11 +112,13 @@ export function update(ui: UI, src: HudSource): void {
   }
 
   // Dirty-gate the palette lock/afford scan (E5-S3): its DOM pass depends on the
-  // star and the mode (isUnlocked is star-vs-minStar, plus a Modern-only gate for
-  // modernOnly kinds like the Food Hall) and on which kinds the current funds can
-  // afford, so it reruns only when the star, the mode, or an affordability
-  // boundary crossed since the last scan. Mode is founded-once but a New Tower
-  // swap can flip it under an identical star/money, so it must be in the key.
+  // star, the catalog (`unlocked` is star-vs-minStar plus the catalog's
+  // `available`, which keeps a Modern-only kind like the Food Hall out of
+  // Classic) and on which kinds the current funds can afford, so it reruns only
+  // when the star, the catalog or an affordability boundary changed since the
+  // last scan. A new catalog clears the key in `relabelPalette`. The mode in the
+  // key is redundant with that (a New Tower swap brings the other mode's
+  // catalog) and stays as a cheap guard.
   // Money moves every pump; the bitmask below changes only at a crossing, so the
   // ~6 Hz pump skips the two querySelectorAll walks and the class writes almost
   // always. The key is a cheap string over engine data (no DOM reads).
@@ -130,7 +132,7 @@ export function update(ui: UI, src: HudSource): void {
     // (`.unaffordable`); an unlocked-but-unaffordable tool stays visible.
     ui.el.palette.querySelectorAll<HTMLElement>(".pal-item[data-kind]").forEach((item) => {
       const kind = item.dataset.kind as FacilityKind;
-      const locked = !unlocked(catalog, kind, star, mode);
+      const locked = !unlocked(catalog, kind, star);
       const affordable = money >= catalogFacility(catalog, kind).cost;
       item.classList.toggle("locked", locked);
       item.classList.toggle("unaffordable", !locked && !affordable);
@@ -146,9 +148,9 @@ export function update(ui: UI, src: HudSource): void {
     // button is now hidden, leaving no visible active tool while canvas clicks
     // still attempt the locked facility. Fall back to Inspect so the selection
     // matches what the palette shows. (Fires once: the tool is Inspect afterward.)
-    // Gated with the scan: the tool can only BECOME locked when the star drops,
-    // which is always a key change.
-    if (ui.tool.type === "build" && !unlocked(catalog, ui.tool.kind, star, mode)) {
+    // Gated with the scan: the tool can only BECOME locked when the star drops
+    // (a key change) or a new catalog withholds its kind (which clears the key).
+    if (ui.tool.type === "build" && !unlocked(catalog, ui.tool.kind, star)) {
       ui.selectTool({ type: "inspect" });
     }
   }

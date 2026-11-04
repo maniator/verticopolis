@@ -332,7 +332,7 @@ consequence for parking reachability in
 [classic-parking-audit.md](./classic-parking-audit.md)).
 
 Canon car capacities (not read from the file): express 42, standard 21, service 17 (the Windows Help file). The exporter still writes 10 in a service shaft's header byte, because that byte is unreliable (one PC save showed 21) and the referee pins the bytes.
-Limits: 24 shafts, 8 cars, spans in `src/engine/facilities.ts`.
+Limits: 24 shafts, 8 cars, spans in `engine-rs/src/facilities.rs` (`POOLED_CAPS`, `Kind::max_cars`, `Kind::max_span`).
 
 ## 10. Stairs and escalators
 

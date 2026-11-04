@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { catalogFor } from "../engine/catalog";
+import { catalogFor } from "../../engine/catalog";
 import { html, type TemplateResult } from "lit-html";
-import { retailStatsLines } from "./inspector";
-import { retailDisplayLines } from "./portServiceDiagnostics";
-import { renderToFragment } from "../ui/testing/litTestUtils";
+import { retailStatsLines } from "./facilityDiagnostics";
+import { retailDisplayLines } from "../../game/portServiceDiagnostics";
+import { renderToFragment } from "../../ui/testing/litTestUtils";
 
 /** The patronage yardstick: the Modern catalog in both modes (#572). */
 const MODERN = catalogFor("modern");

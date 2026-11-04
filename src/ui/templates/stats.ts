@@ -3,7 +3,7 @@ import type { Catalog } from "../../catalog/catalogTypes";
 import { iconTemplate } from "../icons";
 import { LEDGER_CATS, LEDGER_LABELS, MILESTONE_COPY } from "../../presentation/statsCopy";
 import { floorTag } from "../format";
-import { clockOf, rulesOf, type ClockHeader } from "../../simport/headerClock";
+import { clockOf, type ClockHeader } from "../../simport/headerClock";
 import type { ElevatorStatsRow, NextStarView, StarGateId, StatsReport } from "../../simport/panels";
 import type { HeaderView } from "../../simport/view";
 
@@ -175,7 +175,7 @@ export function statsTemplate(screen: StatsScreen): TemplateResult {
         <span class="k">On fire</span><span class="v" style="color:${s.fires ? "var(--bad)" : "var(--good)"}">${s.fires || "None"}</span>
       </div>
       ${extermRow}
-      ${rulesOf(screen.header).hasVariantHouseholds ? householdSection(report.households) : nothing}
+      ${catalog.rules.variantHouseholds ? householdSection(report.households) : nothing}
       <div class="stats-section win-title sm">Transport &amp; access</div>
       <div class="col kv">
         <span class="k">Stranded floors</span><span class="v" style="color:${stranded ? "var(--bad)" : "var(--good)"}">${stranded || "None"}</span>

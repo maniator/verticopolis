@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { drainFixedSteps, quantumFor, syncStepMode, MAX_STEPS_PER_FRAME, MAX_QUANTUM_MINUTES, OWED_EPSILON } from "./fixedStep";
 import { paceFactor } from "../timePacing";
+import { MAX_CATCHUP_MINUTES, advanceOwedMinutes } from "./frameStep";
 
 /**
  * Unit guards for the engine-owned fixed step, against a fake host. The
@@ -161,5 +162,25 @@ describe("engine fixed time step (unit)", () => {
     // A much faster speed is capped (the frame loop's test pins the cap under
     // the host's catch-up cap).
     expect(quantumFor(6000, 180)).toBe(MAX_QUANTUM_MINUTES);
+  });
+});
+
+// Moved here from the web host's tests when the frame loop stopped
+// re-exporting the TypeScript step driver: the host advances the Rust engine
+// through `EnginePort.advance`, so these pin only the TypeScript reference.
+describe("the TypeScript frame step", () => {
+  it("keeps the engine's largest step under the catch-up cap, so a capped debt can always cover one", () => {
+    expect(MAX_QUANTUM_MINUTES).toBeLessThan(MAX_CATCHUP_MINUTES);
+  });
+
+  it("owes minutes up to the catch-up cap while the steps are held back, then steps them", () => {
+    const ticks: number[] = [];
+    const host = { sim: { tick: (dt: number) => { ticks.push(dt); }, clock: { minuteOfDay: 600 } }, accMinutes: 0 };
+    const debt = { minutes: 0 };
+    advanceOwedMinutes(host, debt, 1000, 120, true, false);
+    expect(ticks).toEqual([]);
+    expect(host.accMinutes).toBe(MAX_CATCHUP_MINUTES);
+    advanceOwedMinutes(host, debt, 16, 120, true, true);
+    expect(ticks.length).toBe(4);
   });
 });

@@ -7,10 +7,16 @@ use crate::gameplay::GameplayEvent;
 use crate::sim::Simulation;
 use crate::tower::Unit;
 
+/// The Average rung of a Classic price ladder (four rungs: Very Low, Low,
+/// Average, High): the Classic catalog's default price (`catalog_rent_default`),
+/// the mode's neutral price, and where the editor's picker puts a price that
+/// is not a finite number.
+pub(crate) const AVERAGE_RUNG: usize = 2;
+
 /// `snapToLadder`: ties go to the later rung.
 pub fn snap_to_ladder(rungs: &[f64; 4], value: f64) -> f64 {
     if !value.is_finite() {
-        return rungs[2];
+        return rungs[AVERAGE_RUNG];
     }
     let mut best = rungs[0];
     let mut best_dist = f64::INFINITY;
@@ -25,14 +31,17 @@ pub fn snap_to_ladder(rungs: &[f64; 4], value: f64) -> f64 {
 }
 
 /// `ladderRungFor(...).level`.
-fn ladder_level(rungs: &[f64; 4], value: f64) -> usize {
+pub(crate) fn ladder_level(rungs: &[f64; 4], value: f64) -> usize {
     let snapped = snap_to_ladder(rungs, value);
-    rungs.iter().position(|&r| r == snapped).unwrap_or(2)
+    rungs
+        .iter()
+        .position(|&r| r == snapped)
+        .unwrap_or(AVERAGE_RUNG)
 }
 
 /// `priceOptions(kind)`: `Some(Some(ladder))` in Classic for the canon kinds,
 /// `Some(None)` for a Modern band, `None` for an unpriced kind.
-fn price_options(mode: GameMode, kind: Kind) -> Option<Option<[f64; 4]>> {
+pub(crate) fn price_options(mode: GameMode, kind: Kind) -> Option<Option<[f64; 4]>> {
     match mode {
         GameMode::Classic => classic_ladder(kind).map(Some),
         GameMode::Modern => rent_config(kind).map(|_| None),
@@ -41,9 +50,16 @@ fn price_options(mode: GameMode, kind: Kind) -> Option<Option<[f64; 4]>> {
 
 fn price_neutral(mode: GameMode, kind: Kind) -> Option<f64> {
     match price_options(mode, kind)? {
-        Some(l) => Some(l[2]),
+        Some(l) => Some(l[AVERAGE_RUNG]),
         None => Some(rent_config(kind)?.default),
     }
+}
+
+/// Whether an effective price is the neutral price: an exact match, the test
+/// the batch reprice's "on the default" makes and the Map's Average band tier
+/// shares. A price off the neutral price by any amount is not neutral.
+pub(crate) fn is_neutral_price(price: f64, neutral: f64) -> bool {
+    price == neutral
 }
 
 /// `BatchTarget`: a price, the mode's neutral anchor, or off the market.
@@ -119,7 +135,8 @@ impl Simulation {
             // On the default means the effective price is the neutral anchor,
             // read through the same fallback `rentOf` applies, and never off
             // the market.
-            let neutral_priced = !u.no_rate && u.rent.unwrap_or(cfg.default) == neutral;
+            let neutral_priced =
+                !u.no_rate && is_neutral_price(u.rent.unwrap_or(cfg.default), neutral);
             if only_default_priced && !neutral_priced {
                 r.skipped_custom += 1;
                 continue;

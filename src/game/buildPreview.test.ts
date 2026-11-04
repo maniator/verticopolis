@@ -282,6 +282,58 @@ describe("updateBuildPreview", () => {
     expect((raw.engine.preview as { valid: boolean }).valid).toBe(true);
   });
 
+  it("floor brush: the catalog's previewNamesRefusal rule decides whether a refused strip says why, whatever the mode's name", () => {
+    // Each mode with the rule on and off, so neither mode's name can stand in.
+    // Three strips: one the player cannot afford, one they can, and one whose
+    // anchor the engine refuses, which names the engine's own reason.
+    for (const mode of ["classic", "modern"] as const) {
+      for (const previewNamesRefusal of [true, false]) {
+        const label = `${mode}, previewNamesRefusal ${previewNamesRefusal}`;
+        const { sim } = fixture(mode); // lobby spans x=10..29 on floor 1
+        const { app, raw } = makeApp(sim, buildTool("floor"));
+        useTowerCatalogSource(app.enginePort, (m) => {
+          const base = catalogFor(m);
+          return { ...base, rules: { ...base.rules, previewNamesRefusal } };
+        });
+        try {
+          sim.money = catalogFor(mode).facilities.find((f) => f.key === "lobby")!.cost; // one tile, not the strip
+          app.reader.update();
+          updateBuildPreview(app, 30, 1);
+          const preview = raw.engine.preview as { kind: string; valid: boolean; reason?: string };
+          expect(preview.kind, label).toBe("lobby");
+          expect(preview.valid, label).toBe(false);
+          expect(preview.reason, label).toBe(previewNamesRefusal ? "Not enough money." : undefined);
+          sim.money = 1_000_000_000;
+          app.reader.update();
+          updateBuildPreview(app, 30, 1);
+          const affordable = raw.engine.preview as { valid: boolean; reason?: string };
+          expect(affordable.valid, label).toBe(true);
+          expect(affordable.reason, label).toBeUndefined();
+          // Floor 6 has no structure, so the engine refuses the anchor for a
+          // reason of its own, with money to spare.
+          const can = sim.canBuild("floor", 6, snapX(CAT, "floor", 21));
+          expect(typeof can.reason, label).toBe("string");
+          expect(can.reason, label).not.toBe("Not enough money.");
+          updateBuildPreview(app, 21, 6);
+          const refused = raw.engine.preview as { kind: string; valid: boolean; reason?: string };
+          expect(refused.kind, label).toBe("floor");
+          expect(refused.valid, label).toBe(false);
+          expect(refused.reason, label).toBe(previewNamesRefusal ? can.reason : undefined);
+          // Structural rejection wins over insufficient money: a broke player
+          // still needs the engine's explanation for an unsupported floor.
+          sim.money = 1;
+          app.reader.update();
+          updateBuildPreview(app, 21, 6);
+          const brokeAndUnsupported = raw.engine.preview as { valid: boolean; reason?: string };
+          expect(brokeAndUnsupported.valid, label).toBe(false);
+          expect(brokeAndUnsupported.reason, label).toBe(previewNamesRefusal ? can.reason : undefined);
+        } finally {
+          useTowerCatalogSource(app.enginePort, null);
+        }
+      }
+    }
+  });
+
   it("counts the auto-bridge gap-fill in the ground-floor ghost affordability (detached click)", () => {
     const { sim } = fixture(); // lobby spans x=10..29 on floor 1; autoBridge on (classic)
     const { app, raw } = makeApp(sim, buildTool("floor"));
@@ -327,6 +379,33 @@ describe("updateBuildPreview", () => {
       floor: 6,
     });
     expect(showInspector).toHaveBeenCalledWith(expect.anything());
+  });
+
+  it("room: the catalog's previewNamesRefusal rule decides whether the reason shows, whatever the mode's name", () => {
+    // Each mode with the rule on and off, so neither mode's name can stand in.
+    for (const mode of ["classic", "modern"] as const) {
+      for (const previewNamesRefusal of [true, false]) {
+        const label = `${mode}, previewNamesRefusal ${previewNamesRefusal}`;
+        const { sim } = fixture(mode);
+        const { app, raw } = makeApp(sim, buildTool("office"));
+        useTowerCatalogSource(app.enginePort, (m) => {
+          const base = catalogFor(m);
+          return { ...base, rules: { ...base.rules, previewNamesRefusal } };
+        });
+        try {
+          const can = sim.canBuild("office", 6, snapX(CAT, "office", 21));
+          // A refusal with a reason, so the rule-on case cannot pass on two
+          // undefined values.
+          expect(typeof can.reason, label).toBe("string");
+          updateBuildPreview(app, 21, 6);
+          const preview = raw.engine.preview as { valid: boolean; reason?: string };
+          expect(preview.valid, label).toBe(false);
+          expect(preview.reason, label).toBe(previewNamesRefusal ? can.reason : undefined);
+        } finally {
+          useTowerCatalogSource(app.enginePort, null);
+        }
+      }
+    }
   });
 
   it("room (Classic): an invalid cell previews invalid but withholds the reason and the card", () => {

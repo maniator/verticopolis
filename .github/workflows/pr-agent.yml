@@ -1,0 +1,55 @@
+# PR-Agent uses the GitHub API. Never checkout or execute PR code in this
+# secrets-bearing pull_request_target / issue_comment workflow.
+name: PR Agent (OpenAI)
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  pr-agent:
+    name: Review and requested code suggestions
+    if: >-
+      github.event.sender.type != 'Bot' &&
+      (
+        (github.event_name == 'pull_request_target' && github.event.pull_request.draft == false) ||
+        (
+          github.event_name == 'issue_comment' &&
+          github.event.issue.pull_request &&
+          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+          (
+            startsWith(github.event.comment.body, '/review') ||
+            startsWith(github.event.comment.body, '/improve') ||
+            startsWith(github.event.comment.body, '/ask') ||
+            startsWith(github.event.comment.body, '/describe') ||
+            startsWith(github.event.comment.body, '/help') ||
+            startsWith(github.event.comment.body, '/config')
+          )
+        )
+      )
+    # Job-level concurrency is evaluated only for an eligible command/PR.
+    # Ordinary or unauthorized issue comments must never cancel a review.
+    concurrency:
+      group: pr-agent-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # v0.49.0 GitHub Actions runtime: immutable versioned Docker image.
+      - name: PR-Agent
+        uses: docker://pragent/pr-agent:0.49.0-github_action
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github_action_config.auto_review: 'true'
+          github_action_config.auto_describe: 'false'
+          github_action_config.auto_improve: 'false'
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "synchronize"]'
+          config.restricted_mode: 'true'

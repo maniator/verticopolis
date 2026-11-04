@@ -13,11 +13,11 @@ import { floorTag } from "../format";
  * equivalence tests). The card re-renders on every hover pick; lit patches
  * the changed text in place. The title/label/subtype copy auto-escapes
  * through lit (the legacy code used escapeHtml; the subtype is additionally
- * whitelist-coerced on load). The diagnostics blocks (`facilityDiagnostics` /
- * `transportDiagnostics`, shared with the mobile editor fold-in) return lit
+ * whitelist-coerced on load). The diagnostics blocks (the card's diagnostic
+ * lines, shared with the mobile editor fold-in) return lit
  * `TemplateResult` lines and are interpolated directly; an empty array renders
- * nothing. The caller hands them over as `diagnostics`, built from the
- * simulation, which the cards do not carry yet.
+ * nothing. The caller hands them over as `diagnostics`, which the card kit
+ * builds from the engine port's reads.
  *
  * The mobile-only ✕ is NOT part of these templates: `showInspector` appends
  * it from the one shared `titleBarClose` recipe after the h4's lit-managed
@@ -75,7 +75,7 @@ export function transportInspectorTemplate(t: TransportDetail, catalog: Catalog,
   const f = catalogFacility(catalog, t.kind);
   // Passenger elevators report how full their cars run on average (staff-only
   // service elevators carry no passenger load, so they show none). Shared
-  // with the mobile transport editor via transportDiagnostics.
+  // with the mobile transport editor via transportLoadLines (game/cardLines.ts).
   return html`<h4 class="win-title">${f.name}</h4><div>Serves floors ${floorTag(t.bottom)}–${floorTag(t.top)}</div>${
     isElevatorKind(t.kind) ? html`<div>Cars: ${t.cars}</div>` : nothing
   }${diagnostics}`;

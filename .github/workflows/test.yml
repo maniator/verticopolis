@@ -28,15 +28,12 @@ permissions:
   contents: read
 
 jobs:
-  # Whether this change can reach the engine package, the built game or the
-  # browser suites. A pull request that touches only prose (the docs folder
-  # apart from its screenshot gallery, the BMAD notes, and Markdown files at
-  # the repository root) skips the jobs that build and drive the game; the
-  # test job still runs, since the unit tests read some of those files
-  # (the backlog, the README, the changelog). Every doubt answers true: a
-  # push, a failed lookup, or a path outside that list runs everything. The
-  # changed files come from the pull request files API, as in the Rust engine
-  # and drift-check workflows, so this job needs no checkout.
+  # Two tiers: the WASM/browser checks need application inputs (code), while
+  # lint/unit/build also cover README, changelog and backlog inputs (tests).
+  # CI-only automation/config/docs do not need either tier. The required job
+  # names remain visible via no-op successes, never missing statuses.
+  # Unknown paths, main pushes, and failed file lookups run full validation.
+  # Process old rename paths too, so moving code cannot bypass these gates.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -45,6 +42,7 @@ jobs:
       pull-requests: read
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      tests: ${{ steps.filter.outputs.tests }}
     steps:
       - id: filter
         env:
@@ -55,6 +53,7 @@ jobs:
         run: |
           if [ "$EVENT" != "pull_request" ] || [ -z "$PR_NUMBER" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "tests=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # Each line is "F <path>" for a changed file or "P <path>" for the old
@@ -65,27 +64,37 @@ jobs:
             > "$list"; then
             echo "::warning::could not list the changed files; running every job"
             echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "tests=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # The API stops listing at 3000 files; a PR that large runs everything.
           if [ "$(grep -c '^F ' "$list" || true)" -ge 3000 ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "tests=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           code=false
+          tests=false
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             case "$f" in
               docs/screenshots/*) code=true ;; # the help media the app builds in
               docs/* | _bmad-output/*) ;;
+              .github/workflows/test.yml) code=true ;; # exercise changes to this CI gate
+              .github/workflows/* | .github/ISSUE_TEMPLATE/* | .github/dependabot.yml | .pr_agent.toml) ;;
               */*) code=true ;;
               *.md) ;;
               *) code=true ;;
             esac
-            [ "$code" = true ] && break
+            case "$f" in
+              .github/workflows/test.yml) tests=true ;;
+              .github/workflows/* | .github/ISSUE_TEMPLATE/* | .github/dependabot.yml | .pr_agent.toml | docs/ci/*) ;;
+              *) tests=true ;;
+            esac
           done < <(sed 's/^[FP] //' "$list")
           echo "code=$code" >> "$GITHUB_OUTPUT"
-          echo "code paths changed: $code"
+          echo "tests=$tests" >> "$GITHUB_OUTPUT"
+          echo "application paths changed: $code; lint/unit/build inputs changed: $tests"
 
   # The Rust engine's WASM package (src/public/engine/, engine-rs/pkg/) is build
   # output and is not checked in. This job restores it from the Actions cache,
@@ -116,26 +125,38 @@ jobs:
           artifact-name: engine-wasm
 
   test:
+    needs: changes
+    # Even a failed classifier must not silently suppress this required check.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     # About ten minutes at the slowest in the last two days.
     timeout-minutes: 30
 
     steps:
+      - name: No test-relevant files changed
+        if: ${{ needs.changes.outputs.tests == 'false' }}
+        run: echo "Only unrelated CI metadata/docs changed; lint, unit tests and build skipped."
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.changes.outputs.tests != 'false' }}
 
       - name: Use Node.js (from .nvmrc)
+        if: ${{ needs.changes.outputs.tests != 'false' }}
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ".nvmrc"
           cache: "npm"
 
       - name: Install dependencies
+        if: ${{ needs.changes.outputs.tests != 'false' }}
         run: npm ci
 
       - name: Lint
+        if: ${{ needs.changes.outputs.tests != 'false' }}
         run: npm run lint
 
       - name: Typecheck
+        if: ${{ needs.changes.outputs.tests != 'false' }}
         run: npm run typecheck
 
       # engine conformance (holidays-classic runs 720 in-game hours of a large
@@ -144,16 +165,18 @@ jobs:
       # 61 s against its 60 s limit and failed unrelated PRs. Keep the scenario
       # in the separate no-coverage step, which CI executes directly.
       - name: Run tests
+        if: ${{ needs.changes.outputs.tests != 'false' }}
         run: npm run test:coverage -- --run --exclude '**/conformance.integration.test.ts'
 
       - name: Engine conformance (no coverage)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.tests != 'false' }}
         run: npm exec --no -- vitest run --project integration conformance.integration
 
       # This job only proves the bundle builds, with no engine package (the e2e
       # job below builds with one), so it opts out of the engine requirement
       # scripts/verify-precache.ts puts on every build.
       - name: Build
+        if: ${{ needs.changes.outputs.tests != 'false' }}
         run: npm run build
         env:
           VC_ALLOW_NO_ENGINE: "1"

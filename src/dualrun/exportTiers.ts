@@ -226,6 +226,9 @@ export const BINDING_EXPORT_TIERS = {
   crewCoverage: T2,
   unitCard: T2,
   shaftCard: T2,
+  // Tier 2, the rooms' evaluation and rent tiers the Map's Eval and Pricing
+  // views read (#343 S7).
+  roomTiers: T2,
   // Tier 2, the port's report queries and file members (facade slice 7, PR
   // 1d): the stats screen and diagnostics records in place of the JSON
   // getters, the .vctower and .TDT files in and out, and the staged .TDT

@@ -66,7 +66,7 @@ impl Simulation {
             )
         };
         let over_rent = |kind: Kind| {
-            rent_config(kind).is_some_and(|cfg| rent_of(kind, u.rent, u.no_rate) > cfg.default)
+            rent_config(kind).is_some_and(|cfg| cfg.over_neutral(rent_of(kind, u.rent, u.no_rate)))
         };
         if u.kind == Kind::Office {
             if over_rent(Kind::Office) {

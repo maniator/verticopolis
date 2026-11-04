@@ -12,8 +12,6 @@ import { drainEngineEvents } from "../analyticsEngineBridge";
 import { hudSource } from "./hudSource";
 import { calendarOf } from "../simport/headerClock";
 
-export { MAX_CATCHUP_MINUTES, advanceOwedMinutes } from "../engine/sim/frameStep";
-
 /**
  * The per-frame simulation + throttled UI/audio refresh, split out of the
  * `GameApp` class. `runFrame(app, dtMs)` is called from the engine's `onUpdate`

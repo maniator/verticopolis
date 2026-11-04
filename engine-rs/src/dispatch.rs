@@ -325,6 +325,7 @@ impl ElevatorDispatch {
                     };
                     if board > 0.0 {
                         car_load[i] += board;
+                        t.rides += 1;
                         if !staff_only {
                             self.waiting.insert(tf, (w - board).max(0.0));
                         }

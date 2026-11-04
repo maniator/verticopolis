@@ -239,11 +239,13 @@ describe("relabelPalette (#921)", () => {
     buildPalette(ui);
     selectGroup(ui, "Commercial");
     const office = palette.querySelector('.pal-item[data-kind="office"]');
-    // Same layout, new prices: the same nodes are relabeled.
+    // Same layout, new prices: the same nodes are relabeled, and the lock scan
+    // runs again, since a new catalog may state `available` or `minStar`
+    // differently.
     relabelPalette(ui, { ...base, facilities: base.facilities.map((f) => (f.key === "office" ? { ...f, cost: 12_345 } : f)) });
     expect(palette.querySelector('.pal-item[data-kind="office"]')).toBe(office);
     expect(office?.querySelector(".pal-cost")?.textContent).toContain("12");
-    expect((ui as unknown as { paletteScanKey: string | null }).paletteScanKey).toBe("scanned");
+    expect((ui as unknown as { paletteScanKey: string | null }).paletteScanKey).toBeNull();
     // A catalog that moves the office to another group lays the palette out
     // differently: the buttons are rebuilt, the open tab and the active tool
     // survive, and the lock scan is asked to run again.
@@ -252,6 +254,7 @@ describe("relabelPalette (#921)", () => {
     document.body.appendChild(palette);
     office!.classList.add("tt-pulse");
     (office as HTMLElement).focus();
+    (ui as unknown as { paletteScanKey: string | null }).paletteScanKey = "scanned";
     relabelPalette(ui, moved);
     const rebuilt = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
     expect(rebuilt).not.toBe(office);
