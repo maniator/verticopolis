@@ -10,8 +10,9 @@ refs: 1005, 1183, 1185, 1207, 1225, 900, 932, 945
 > **Snapshot.** Written 2026-10-21 between 02:15 and 03:00 UTC, on `main` at
 > `272e0e1` and then `4b1e440`. Every figure here is dated and none refreshes.
 > The PC figures are Naftali's PC run of commit `a532572`, measured 2026-10-20
-> 18:55 to 20:28 UTC, committed in
-> `docs/performance/results/2026-10-20-a532572-1051-after/`. The cloud figures
+> 18:55 to 20:28 UTC, summarized in
+> `docs/performance/results/2026-10-20-a532572-1051-after.md`, with the raw files
+> in the private verticopolis-benchmarks repository. The cloud figures
 > are diagnostics from this lane's container (headless Chromium, 5 pairs at
 > 1x), measured 2026-10-20 about 23:20 UTC to 2026-10-21 about 01:55 UTC on
 > `main` at `d06e2a6` and, for the variant table, on the open #1183 and #1185

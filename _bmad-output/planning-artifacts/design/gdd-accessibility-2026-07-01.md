@@ -194,16 +194,16 @@ motion communicated (rain→overcast+log; night→lights; walkers→still crowd 
 
 ## Touch points (dev handoff, absolute paths)
 
-- `/home/naftali/projects/simtower-llm-style/src/render/excalibur/TowerEngine.ts` — `d.stress`,
+- `<home>/projects/simtower-llm-style/src/render/excalibur/TowerEngine.ts` — `d.stress`,
   crowd/red draw loop, rain, day/night, elevator cars, camera follow; add `reducedMotion` flag,
   per-walker glyph, X halo.
-- `/home/naftali/projects/simtower-llm-style/src/ui/UI.ts` — `makeActivatable`, `showEditor`/
+- `<home>/projects/simtower-llm-style/src/ui/UI.ts` — `makeActivatable`, `showEditor`/
   `[data-edit]` for Extend buttons, `toast` → announcer; HUD Traffic readout + aria-live region.
-- `/home/naftali/projects/simtower-llm-style/src/main.ts` — `bindKeys`, `updateBuildPreview`
+- `<home>/projects/simtower-llm-style/src/main.ts` — `bindKeys`, `updateBuildPreview`
   reused by cursor; cursor/pan/zoom/place keys; reduced-motion wiring.
-- `/home/naftali/projects/simtower-llm-style/src/render/pixelSprites.ts` — `person()` tint path
+- `<home>/projects/simtower-llm-style/src/render/pixelSprites.ts` — `person()` tint path
   for the fed-up glyph.
-- `/home/naftali/projects/simtower-llm-style/src/styles.css` — reduced-motion block;
+- `<home>/projects/simtower-llm-style/src/styles.css` — reduced-motion block;
   `html.reduce-motion` mirror; `#traffic` chip states; `.sr-only`; `:focus-visible`.
-- `/home/naftali/projects/simtower-llm-style/src/engine/Simulation.ts` — `congestion()` /
+- `<home>/projects/simtower-llm-style/src/engine/Simulation.ts` — `congestion()` /
   `congestionAt()` for tiering (read-only).

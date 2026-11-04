@@ -4,11 +4,12 @@
 > (app 2.32.0).** This is one run on one cloud container, and it is not a live
 > figure. The live numbers come from re-running `npm run perf:worker`
 > (`src/tests/perfWorker/`, its arithmetic pinned by
-> `src/tests/perfWorker/analysis.test.ts`). Every figure here is in
-> [`results/2026-10-14-c80416c-worker/`](results/2026-10-14-c80416c-worker/)
-> (`results.json` with every run, `metrics.csv`, `ratios.csv`, and the
-> machine-written `report.md`). The command-to-visible-frame rows in that
-> folder are wrong and are not used here (see "Command latency").
+> `src/tests/perfWorker/analysis.test.ts`). The run is summarized in
+> [`results/2026-10-14-c80416c-worker.md`](results/2026-10-14-c80416c-worker.md)
+> and its raw files (`results.json` with every run, `metrics.csv`, `ratios.csv`,
+> and the machine-written `report.md`) are in the private
+> verticopolis-benchmarks repository. The command-to-visible-frame rows in that
+> run are wrong and are not used here (see "Command latency").
 
 Design: [`docs/architecture/wasm-worker-host.md`](../architecture/wasm-worker-host.md).
 The earlier TypeScript-against-WASM baseline is [`ts-vs-wasm.md`](ts-vs-wasm.md).
@@ -274,9 +275,9 @@ No rayon, atomics, shared memory or simulation change was added.
 > desktop: AMD Ryzen 5 5600X, NVIDIA RTX 3060 (ANGLE D3D11), Windows, full
 > Chromium 149.** Two runs, identical except for the viewport, both with
 > validation passed:
-> [`results/2026-10-15-e25ec01c-worker-1280x720/`](results/2026-10-15-e25ec01c-worker-1280x720/)
+> [`results/2026-10-15-e25ec01c-worker-1280x720.md`](results/2026-10-15-e25ec01c-worker-1280x720.md)
 > at 1280x720 (14:55 to 16:44 UTC) and
-> [`results/2026-10-15-e25ec01-worker/`](results/2026-10-15-e25ec01-worker/)
+> [`results/2026-10-15-e25ec01-worker.md`](results/2026-10-15-e25ec01-worker.md)
 > at 640x360 (16:45 to 18:33 UTC). These figures are from that machine only.
 > They are not mixed with the container run above, which is a different
 > machine, commit and renderer. The live numbers come from re-running

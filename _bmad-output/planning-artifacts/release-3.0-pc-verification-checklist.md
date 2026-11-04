@@ -2,7 +2,7 @@
 
 > **Snapshot, written 2026-11-03 against main at app 2.77.5 (engine crate 1.5.2). This is a plan, not a result: nothing in it has been run and no number in it is evidence.** The live state of every item is on its issue, in the `3.0.0` milestone and in #945, #1104 and #1561. A measurement counts only when a local session on the owner's PC ran it and a results folder or kept file exists (benchmark protocol, `docs/performance/benchmark-protocol.md`).
 
-Everything that needs the owner's PC is grouped into six sessions, so each environment is set up once. The PC is `C:\Users\nafta\projects\verticopolis` (Ryzen 5 5600X, RTX 3060, Windows 11, Docker with WSL for the original game). "Naftali" means the owner. Cloud work that unblocks a session is listed under **Before the session**, so the PC time goes only to what a cloud container cannot do.
+Everything that needs the owner's PC is grouped into six sessions, so each environment is set up once. The PC is `<home>\projects\verticopolis` (Ryzen 5 5600X, RTX 3060, Windows 11, Docker with WSL for the original game). "Naftali" means the owner. Cloud work that unblocks a session is listed under **Before the session**, so the PC time goes only to what a cloud container cannot do.
 
 ## What does not need the PC (corrections to the lane list)
 
@@ -37,7 +37,7 @@ Order: 0, then A (independent of builds, can run any time), then C and D on the 
 **Steps (PowerShell).**
 
 ```powershell
-cd C:\Users\nafta\projects\verticopolis
+cd <home>\projects\verticopolis
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 cargo --version; wasm-bindgen --version      # wasm-bindgen must match engine-rs/Cargo.toml
 git fetch origin
