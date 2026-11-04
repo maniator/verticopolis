@@ -116,7 +116,7 @@ splash. It shares interaction grammar only: bevel press states and a visible
   splash (navy vanishes on the night sky).
 - Reduced motion (OS preference or the in-game toggle) disables all decorative
   CSS animation; the engine freezes canvas ambience separately.
-- The traffic cue carries its level in glyph shape, not color alone.
+- The traffic cue carries its level in how many bars are filled, so color is never its only cue.
 
 ## 6. Rules of engagement
 
@@ -136,3 +136,8 @@ splash. It shares interaction grammar only: bevel press states and a visible
    max-height: 599px`), a tablet block (`768–1023px` wide and `min-height: 600px`,
    docked layout), and desktop (`≥1024px`). Add responsive tweaks to the matching
    block. The JS `mobileMq` in `main.ts` mirrors the phone query. Keep them in sync.
+   A landscape block after the phone block covers a phone held sideways (the
+   short half of the phone query plus `orientation: landscape`). It docks the
+   tools as a column on the left instead of the bottom strip and stays inside
+   the phone tier; under 340px tall, or under 540px wide where the top bar
+   wraps further, a further block puts the category tabs back on one row.

@@ -95,6 +95,15 @@ export { mapForShot, restoreMapAfterShot } from "../src/tests/screenshotMapShot.
 
 export const DESKTOP: Viewport = { width: 1280, height: 800 };
 export const PHONE: Viewport = { width: 390, height: 844 };
+/** A phone held sideways: the CSS viewport of the Pixel landscape report
+ *  (2410 by 1080 at a 2.625 ratio, less the system bars and the camera
+ *  cutout), which takes the styles.css landscape phone block. */
+export const PHONE_LANDSCAPE: Viewport = { width: 852, height: 352 };
+
+/** Whether a scene's viewport takes the phone layout, in either orientation,
+ *  so the page presents as a touch device and the coarse-pointer rules apply.
+ *  The bounds live in src/tests/phoneTier.ts, tested against the page's query. */
+export { isPhoneViewport } from "../src/tests/phoneTier.ts";
 
 /** Assert the page finished staging: the splash is gone and (optionally) the
  *  tower has at least `minUnits` units. Shared by the runner and by the few

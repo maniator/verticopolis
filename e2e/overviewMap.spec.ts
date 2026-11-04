@@ -342,28 +342,235 @@ test.describe("overview map on a phone", () => {
   });
 
   test("the open card sits at the world's top-left, about 150 px wide and at most half its height", async ({ page }) => {
-    // Portrait, and landscape (a short screen counts as a phone too).
-    for (const size of [PHONE, { width: PHONE.height, height: PHONE.width }]) {
+    // Portrait. A phone held sideways has its own sizing (the next test).
+    const size = PHONE;
+    await page.setViewportSize(size);
+    await boot(page);
+    // The phone layout remembers the open card across the reload.
+    if (await page.locator("#overview-map").isHidden()) await page.locator("#btn-map").tap();
+    await expect(page.locator("#overview-map")).toBeVisible();
+    const card = await page.evaluate(() => {
+      const map = document.getElementById("overview-map")!.getBoundingClientRect();
+      const stage = document.getElementById("stage")!.getBoundingClientRect();
+      return { left: map.left - stage.left, top: map.top - stage.top, width: map.width, height: map.height, stageHeight: stage.height };
+    });
+    const at = `${size.width}x${size.height}`;
+    // The 8 px inset (no safe-area insets in the test browser).
+    expect(card.left, at).toBeGreaterThanOrEqual(8);
+    expect(card.left, at).toBeLessThan(16);
+    expect(card.top, at).toBeGreaterThanOrEqual(8);
+    expect(card.top, at).toBeLessThan(16);
+    expect(card.width, at).toBeGreaterThan(140);
+    expect(card.width, at).toBeLessThan(170);
+    expect(card.height, at).toBeLessThanOrEqual(card.stageHeight / 2 + 1);
+  });
+
+  test("held sideways, the card keeps the map's 150:216 shape and takes at most two thirds of the view", async ({ page }) => {
+    // A short screen counts as a phone too, but half its height would leave
+    // a map too thin to read, so the landscape block sizes it by shape.
+    await page.setViewportSize({ width: PHONE.height, height: PHONE.width });
+    await boot(page);
+    if (await page.locator("#overview-map").isHidden()) await page.locator("#btn-map").tap();
+    await expect(page.locator("#overview-map")).toBeVisible();
+    const card = await page.evaluate(() => {
+      const map = document.getElementById("overview-map")!.getBoundingClientRect();
+      const body = document.querySelector(".overview-map-body")!.getBoundingClientRect();
+      const stage = document.getElementById("stage")!.getBoundingClientRect();
+      return { left: map.left - stage.left, top: map.top - stage.top, height: map.height, bodyWidth: body.width, bodyHeight: body.height, stageHeight: stage.height };
+    });
+    expect(card.left).toBeGreaterThanOrEqual(8);
+    expect(card.left).toBeLessThan(16);
+    expect(card.top).toBeGreaterThanOrEqual(8);
+    expect(card.top).toBeLessThan(16);
+    expect(card.height).toBeLessThanOrEqual(card.stageHeight * 0.66 + 1);
+    expect(card.bodyHeight).toBeGreaterThan(card.stageHeight / 2 - 30);
+    expect(card.bodyWidth / card.bodyHeight).toBeCloseTo(150 / 216, 2);
+    // Never wider than the map's native 150 px.
+    expect(card.bodyWidth).toBeLessThanOrEqual(150.5);
+  });
+
+  test("held sideways, the stat chips show every value whole and keep their size", async ({ page }) => {
+    // The Pixel 11 Pro held sideways. Each changing chip has a fixed width,
+    // so a value that grows (the traffic floor, the funds) never moves the
+    // chips after it or rewraps the bar, which would resize the view and
+    // rebuild an open Map. The widths fit the longest values whole.
+    await page.setViewportSize({ width: 852, height: 352 });
+    await boot(page);
+    const values = {
+      shortest: ["Smooth", "", "Mon 07:00", "1st WD/1Q/1st Year", "$0", "0"],
+      typical: ["Busy", " · 12F", "Mon 07:00", "3rd WD/2Q/4th Year", "$2,000,000", "12,345"],
+      longest: ["Backed up", " · 100F", "WD2 00:00", "2nd WD/4Q/122nd Year", "$-999,999,999", "99,999"],
+    };
+    await page.evaluate(() => document.fonts.ready);
+    // Whether DejaVu Sans is installed: a face that is missing falls back to
+    // monospace here and measures the same.
+    const hasDejaVu = await page.evaluate(() => {
+      const c = document.createElement("canvas").getContext("2d")!;
+      c.font = "12px monospace";
+      const fallback = c.measureText("WD2 00:00").width;
+      c.font = '12px "DejaVu Sans", monospace';
+      return c.measureText("WD2 00:00").width !== fallback;
+    });
+    // In the page's own font, then in DejaVu Sans, the widest common UI font.
+    // The pinned CI image has no DejaVu Sans (and adding it would change the
+    // default sans font under the visual baselines), so CI skips that pass;
+    // src/tests/landscapeChipWidths.test.ts pins its measured widths instead.
+    for (const font of ["", '"DejaVu Sans"']) {
+      if (font && !hasDejaVu) {
+        test.info().annotations.push({ type: "skipped pass", description: "DejaVu Sans is not installed" });
+        continue;
+      }
+      const sizes = await page.evaluate(({ values, font }) => {
+        if (font) {
+          const style = document.createElement("style");
+          style.textContent = `#status .stat .value, #status .stat .label { font-family: ${font}; }`;
+          document.head.appendChild(style);
+        }
+        const ids = ["traffic-label", "traffic-floor", "stat-time", "stat-date", "stat-money", "stat-pop"];
+        const show = (texts: string[]) => {
+          ids.forEach((id, i) => (document.getElementById(id)!.textContent = texts[i]));
+          const bar = document.getElementById("topbar")!.getBoundingClientRect();
+          const stage = document.getElementById("stage")!.getBoundingClientRect();
+          const chips = ["traffic", "stat-time", "stat-date", "stat-money", "stat-pop"].map(
+            (id) => document.getElementById(id)!.closest(".stat")!.getBoundingClientRect().width,
+          );
+          // A value cut short by its chip scrolls wider than it shows. The
+          // floor never shrinks, so the traffic chip itself stands in for it.
+          const clipped = [...ids.filter((id) => id !== "traffic-floor"), "traffic"].filter((id) => {
+            const el = document.getElementById(id)!;
+            return el.scrollWidth > el.clientWidth;
+          });
+          return { bar: bar.height, stageWidth: stage.width, stageHeight: stage.height, chips, clipped };
+        };
+        return { shortest: show(values.shortest), typical: show(values.typical), longest: show(values.longest) };
+      }, { values, font });
+      expect(sizes.typical, font).toEqual(sizes.shortest);
+      expect(sizes.longest, font).toEqual(sizes.shortest);
+      expect(sizes.shortest.clipped, font).toEqual([]);
+      // Two rows: the buttons, then the chips.
+      expect(sizes.shortest.bar, font).toBeLessThan(60);
+    }
+    // A tier word too wide for its chip is trimmed on its one line, and the
+    // floor still shows whole.
+    const trimmed = await page.evaluate(() => {
+      const label = document.getElementById("traffic-label")!;
+      const floor = document.getElementById("traffic-floor")!;
+      const chip = document.getElementById("traffic")!;
+      label.textContent = "Backed up";
+      floor.textContent = " · 100F";
+      const bar = () => document.getElementById("topbar")!.getBoundingClientRect().height;
+      const before = { bar: bar(), line: label.getBoundingClientRect().height };
+      label.style.letterSpacing = "0.3em";
+      return {
+        before,
+        after: { bar: bar(), line: label.getBoundingClientRect().height },
+        labelClipped: label.scrollWidth > label.clientWidth,
+        // Trimmed by its own box, so the cut text cannot spill over the floor.
+        labelHidden: getComputedStyle(label).overflowX === "hidden",
+        // The floor never shrinks, so only the chip can cut it: it must end
+        // inside the chip, and the chip must not overflow.
+        floorWhole:
+          floor.getBoundingClientRect().right <= chip.getBoundingClientRect().right + 0.5 && chip.scrollWidth <= chip.clientWidth,
+      };
+    });
+    expect(trimmed.labelClipped).toBe(true);
+    expect(trimmed.labelHidden).toBe(true);
+    expect(trimmed.floorWhole).toBe(true);
+    expect(trimmed.after).toEqual(trimmed.before);
+  });
+
+  // Under 340px tall, or under 540px wide where the top bar wraps to more
+  // lines, the tabs go to one sideways row, so the open category keeps room
+  // to scroll. Each bound is checked just inside and just outside.
+  for (const size of [
+    { width: 568, height: 320 },
+    { width: 700, height: 250 },
+    { width: 480, height: 340 },
+    { width: 420, height: 340 },
+    { width: 568, height: 339 },
+    { width: 539, height: 340 },
+    // Just outside both bounds, the tabs sit two wide again.
+    { width: 568, height: 340 },
+    { width: 540, height: 340 },
+  ]) {
+    const at = `${size.width}x${size.height}`;
+    test(`on a ${at} sideways window, every category opens in view and its last tool can be reached`, async ({ page }) => {
+      test.setTimeout(60_000);
       await page.setViewportSize(size);
       await boot(page);
-      // The phone layout remembers the open card across the reload.
-      if (await page.locator("#overview-map").isHidden()) await page.locator("#btn-map").tap();
-      await expect(page.locator("#overview-map")).toBeVisible();
-      const card = await page.evaluate(() => {
-        const map = document.getElementById("overview-map")!.getBoundingClientRect();
-        const stage = document.getElementById("stage")!.getBoundingClientRect();
-        return { left: map.left - stage.left, top: map.top - stage.top, width: map.width, height: map.height, stageHeight: stage.height };
-      });
-      const at = `${size.width}x${size.height}`;
-      // The 8 px inset (no safe-area insets in the test browser).
-      expect(card.left, at).toBeGreaterThanOrEqual(8);
-      expect(card.left, at).toBeLessThan(16);
-      expect(card.top, at).toBeGreaterThanOrEqual(8);
-      expect(card.top, at).toBeLessThan(16);
-      expect(card.width, at).toBeGreaterThan(140);
-      expect(card.width, at).toBeLessThan(170);
-      expect(card.height, at).toBeLessThanOrEqual(card.stageHeight / 2 + 1);
-    }
+      // Every category unlocked, so all seven tabs show.
+      await page.evaluate(buildToStar, 5);
+      // One sideways row inside the bounds, two wide just outside them.
+      const oneRow = size.height < 340 || size.width < 540;
+      expect(await page.locator("#palette-tabs").evaluate((t) => getComputedStyle(t).flexWrap), at).toBe(oneRow ? "nowrap" : "wrap");
+      const groups = await page.$$eval(".pal-tab:not([hidden])", (tabs) => tabs.map((t) => (t as HTMLElement).dataset.group!));
+      expect(groups.length, at).toBeGreaterThan(4);
+      for (const group of groups) {
+        const list = await page.evaluate((group) => {
+          // A click from the page itself, so the browser does not scroll the
+          // tab into view first: opening a tab must bring it into the row.
+          const tab = document.querySelector<HTMLElement>(`.pal-tab[data-group="${group}"]`)!;
+          tab.click();
+          const row = document.getElementById("palette-tabs")!.getBoundingClientRect();
+          const box = tab.getBoundingClientRect();
+          const tabInView = box.left >= row.left - 0.5 && box.right <= row.right + 0.5;
+          const tiles = [...document.querySelectorAll<HTMLElement>(".pal-group.tab-active .pal-item")].filter((t) => t.getClientRects().length > 0);
+          const last = tiles[tiles.length - 1];
+          last.scrollIntoView({ block: "end" });
+          const tile = last.getBoundingClientRect();
+          return {
+            tabInView,
+            height: document.querySelector(".pal-groups")!.clientHeight,
+            reached: document.elementFromPoint(tile.left + tile.width / 2, tile.top + tile.height / 2)?.closest(".pal-item") === last,
+          };
+        }, group);
+        expect(list.tabInView, `${at} ${group}`).toBe(true);
+        // Room for at least two 32px tiles at a time.
+        expect(list.height, `${at} ${group}`).toBeGreaterThanOrEqual(64);
+        expect(list.reached, `${at} ${group}`).toBe(true);
+      }
+    });
+  }
+
+  test("held sideways with the Map open and no Getting Started card, a toast shows over the editor's title", async ({ page }) => {
+    // The editor's sticky title has a z-index. With no card up the editor has
+    // none of its own, and with the Map open (so no pill) neither do the
+    // toasts, so without the editor's own stacking context the title would
+    // paint over a toast that sits above it.
+    await page.setViewportSize({ width: PHONE.height, height: PHONE.width });
+    await boot(page);
+    if (await page.locator("#overview-map").isHidden()) await page.locator("#btn-map").tap();
+    await expect(page.locator("#btn-map")).toBeHidden();
+    await page.evaluate(() => {
+      const g = (window as any).game;
+      const unit = g.sim.tower.units.find((u: { kind: string }) => u.kind === "office");
+      g.selectPicked({ type: "unit", id: unit.id, kind: unit.kind });
+    });
+    await expect(page.locator("#editor .win-title")).toBeVisible();
+    const onTop = await page.evaluate(() => {
+      // The title screen is gone in play, and with it the toasts' raised layer.
+      document.body.classList.remove("splash-up");
+      const title = document.querySelector("#editor > .win-title")!.getBoundingClientRect();
+      const wrap = document.getElementById("toast-wrap")!;
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.textContent = "Test toast";
+      wrap.appendChild(toast);
+      // Move the toasts over the title, in the stage's own coordinates.
+      const stage = (wrap.offsetParent ?? document.body).getBoundingClientRect();
+      Object.assign(wrap.style, { left: `${title.left - stage.left}px`, top: `${title.top - stage.top}px`, right: "auto", bottom: "auto", width: `${title.width}px`, transform: "none" });
+      const box = toast.getBoundingClientRect();
+      const x = Math.max(box.left, title.left) + 4;
+      const y = (Math.max(box.top, title.top) + Math.min(box.bottom, title.bottom)) / 2;
+      return {
+        layer: getComputedStyle(wrap).zIndex,
+        overlap: box.top < title.bottom && box.bottom > title.top && box.left < title.right && box.right > title.left && x < Math.min(box.right, title.right),
+        hit: !!document.elementFromPoint(x, y)?.closest(".toast"),
+      };
+    });
+    expect(onTop.layer).toBe("auto");
+    expect(onTop.overlap).toBe(true);
+    expect(onTop.hit).toBe(true);
   });
 
   test("with a heatmap on, the card moves below the heatmap legend and stays clear of the build controls", async ({ page }) => {
@@ -508,11 +715,65 @@ test.describe("overview map on a phone", () => {
     expect(box.y + box.height / 2).toBeGreaterThan(card.y);
     expect(box.y + box.height / 2).toBeLessThan(card.y + card.height);
     const onTop = await page.evaluate(
-      ({ x, y }) => document.elementFromPoint(x, y)?.closest(".overview-map-close") !== null,
+      ({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".overview-map-close"),
       { x: box.x + box.width / 2, y: box.y + box.height / 2 },
     );
     expect(onTop).toBe(true);
     await close.tap();
     await expect(page.locator("#overview-map")).toBeHidden();
+  });
+
+  test("held sideways, the Getting Started card clears the tools column, and the Map when it opens", async ({ page }) => {
+    await page.setViewportSize({ width: PHONE.height, height: PHONE.width });
+    await boot(page);
+    await page.evaluate(() => {
+      const g = (window as any).game;
+      g.onboarding.arm(g.enginePort);
+    });
+    await expect(page.locator("#onboard")).toBeVisible();
+    const overlaps = (a: { x: number; y: number; width: number; height: number }, b: typeof a) =>
+      a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+    const palette = (await page.locator("#palette").boundingBox())!;
+    if (await page.locator("#overview-map").isVisible()) await page.locator("#overview-map .overview-map-close").tap();
+    await expect(page.locator("#overview-map")).toBeHidden();
+    const closed = (await page.locator("#onboard").boundingBox())!;
+    expect(overlaps(closed, palette)).toBe(false);
+    // It leaves most of the world view clear.
+    expect(closed.width).toBeLessThanOrEqual(300);
+    // An editor card opened under it keeps its close button on top.
+    await page.evaluate(() => {
+      const g = (window as any).game;
+      const office = g.sim.tower.units.find((u: { kind: string }) => u.kind === "office");
+      g.selectPicked({ type: "unit", id: office.id, kind: office.kind });
+    });
+    await expect(page.locator("#editor")).toBeVisible();
+    const editorClose = page.locator("#editor .ed-close");
+    const closeBox = (await editorClose.boundingBox())!;
+    expect(overlaps(closeBox, (await page.locator("#onboard").boundingBox())!)).toBe(true);
+    const closeOnTop = await page.evaluate(
+      ({ x, y }) => !!document.elementFromPoint(x, y)?.closest("#editor"),
+      { x: closeBox.x + closeBox.width / 2, y: closeBox.y + closeBox.height / 2 },
+    );
+    expect(closeOnTop).toBe(true);
+    // With the Map pill showing beside the open editor, the inspector, the
+    // toasts and the pill stay above the card too.
+    await expect(page.locator("#btn-map")).toBeVisible();
+    const layers = await page.evaluate(() => {
+      const z = (id: string) => Number(getComputedStyle(document.getElementById(id)!).zIndex);
+      return { card: z("onboard"), editor: z("editor"), inspector: z("inspector"), toasts: z("toast-wrap"), pill: z("btn-map") };
+    });
+    expect(layers.inspector).toBeGreaterThan(layers.card);
+    expect(layers.toasts).toBeGreaterThan(layers.card);
+    expect(layers.pill).toBeGreaterThan(layers.card);
+    // The pill comes first in the stage, so it needs a higher layer than the
+    // editor to paint above it.
+    expect(layers.pill).toBeGreaterThan(layers.editor);
+    await editorClose.tap();
+    await expect(page.locator("#editor")).toBeHidden();
+    await page.locator("#btn-map").tap();
+    await expect(page.locator("#overview-map")).toBeVisible();
+    const card = (await page.locator("#onboard").boundingBox())!;
+    expect(overlaps(card, palette)).toBe(false);
+    expect(overlaps(card, (await page.locator("#overview-map").boundingBox())!)).toBe(false);
   });
 });

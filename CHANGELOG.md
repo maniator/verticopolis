@@ -21,6 +21,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.85.0
+
+- On a phone held sideways, the tools sit in a column on the left (tabs in one sliding row on a very short or narrow window) and the stats take one line each, so the tower view is almost twice as tall.
+- On a phone held sideways, the Map keeps your tower's shape, a long facility card scrolls instead of hiding its close button, and the checklist sits beside the tools, clear of the tiles it points at.
+- The top bar always shows funds and population with commas between thousands (12,345), whatever your browser's language.
+
 ## 2.84.0
 
 - The Undo and Redo buttons gray out when there is nothing to undo or redo.

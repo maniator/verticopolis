@@ -8,6 +8,7 @@ import type { SimView } from "../simport/view";
 import type { UI } from "./UI";
 import { render } from "lit-html";
 import { appendMessageWithIcons } from "./icons";
+import { groupDigits } from "./format";
 import { relabelPalette, syncPaletteTabs } from "./uiPalette";
 import { toolInfoFor } from "./templates/toolInfo";
 import { towerStatsTemplate, type TowerStatsSnapshot } from "./templates/towerStats";
@@ -86,9 +87,12 @@ export function update(ui: UI, src: HudSource): void {
   const { money, star, mode } = header;
   // One strip read gives the population label and the stats grid.
   const stats = readStrip(src);
-  ui.el.money.textContent = `$${Math.round(money).toLocaleString()}`;
-  ui.el.money.style.color = money < 0 ? "var(--bad)" : "var(--money)";
-  ui.el.pop.textContent = stats.population.toLocaleString();
+  // Whole dollars; a rounded -0 shows as 0 (never "$-0"), in the color of the
+  // value shown, and a bad value still shows as NaN.
+  const funds = Math.round(money);
+  ui.el.money.textContent = `$${groupDigits(funds === 0 ? 0 : funds)}`;
+  ui.el.money.style.color = funds < 0 ? "var(--bad)" : "var(--money)";
+  ui.el.pop.textContent = groupDigits(stats.population);
   ui.el.star.textContent = star >= 6 ? "TOWER" : "★".repeat(star) + "☆".repeat(5 - star);
   const clock = clockOf(header);
   ui.el.time.textContent = clock.format();
