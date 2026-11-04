@@ -1,0 +1,209 @@
+# The tests outside src/engine/ that run the TypeScript engine, one line per
+# file: the file, then each simulation module under src/engine/ it imports at
+# runtime (its path there, without the extension). A "# reason" may follow on
+# the same line.
+#
+# tsEngineTests.guard.test.ts scans every test file under src/ outside the
+# engine, plus all of src/tests/. It fails when a file imports a simulation
+# module at runtime that its line does not name, and when a line names a module
+# its file no longer imports. The list only shrinks: convert the test to the
+# port kit (src/tests/portKit/) or retire it on evidence, then delete its line.
+# Adding a line needs a reason the PR states and a reviewer accepts.
+#
+# src/tests/portKit/portSim.ts is the kit itself: it builds the TypeScript leg on
+# purpose and stays until src/engine/ is deleted.
+
+src/analyticsEngineBridge.test.ts Simulation
+src/bootstrapEngine.test.ts Simulation
+src/catalog/towerCatalog.test.ts Simulation
+src/dualrun/mirror.test.ts Simulation
+src/dualrun/mirrorPort.test.ts Simulation port/tsEngine
+src/game/appBootBackdrop.test.ts Simulation port/tsEngine
+src/game/appHistory.test.ts Simulation port/tsEngine
+src/game/appModals.fixture.ts Simulation port/tsEngine
+src/game/buildPreview.test.ts Simulation
+src/game/cardKit.fixture.ts port/tsEngine
+src/game/cardKit.test.ts Simulation port/tsEngine
+src/game/engineWiring.test.ts Simulation
+src/game/exportFlow.test.ts Simulation
+src/game/facilityDiagnostics.test.ts Simulation
+src/game/frameLoop.fixture.ts Simulation port/tsEngine sim/frameStep
+src/game/frameLoop.test.ts sim/fixedStep
+src/game/portAccess.test.ts Simulation
+src/game/portDeps.fixture.ts port/tsEngine
+src/game/portLifecycle.test.ts Simulation port/tsEngine
+src/game/scheduleRecovery.test.ts Simulation port/tsEngine
+src/game/scheduleReview.test.ts Simulation port/tsEngine
+src/game/serviceDiagnosticsCards.test.ts port/tsEngine
+src/game/toolingSim.test.ts Simulation port/tsEngine
+src/game/trafficHud.test.ts Simulation port/tsEngine
+src/game/trafficHudPort.test.ts Simulation port/tsEngine
+src/game/uiCallbacks.test.ts Simulation port/tsEngine
+src/presentation/statsCopy.test.ts Ledger
+src/render/excalibur/heatColor.test.ts Simulation
+src/render/excalibur/towerInputCamera.test.ts Tower
+src/render/excalibur/towerScenery.test.ts Simulation
+src/render/excalibur/towerWalkerBuild.test.ts Tower tower/segments tower/towerTopology
+src/simport/cards.test.ts Simulation port/tsEngine
+src/simport/clockView.test.ts Clock
+src/simport/engineContract.test.ts port/tsEngine
+src/simport/engineLifecycle.fixture.ts Simulation UndoHistory
+src/simport/engineSubject.fixture.ts Simulation
+src/simport/headerClock.test.ts Simulation port/tsEngine
+src/simport/portCodes.test.ts Simulation port/tsEngine
+src/simport/portEvents.test.ts Simulation port/tsEngine
+src/simport/portRenderSim.test.ts Simulation port/tsEngine
+src/simport/tsPanels.test.ts Simulation port/tsEngine sim/star
+src/simport/viewReader.test.ts Simulation port/tsEngine tower/rooms
+src/storage/saveCompression.test.ts Simulation
+src/storage/saveRehydrate.test.ts Simulation sim/founderStatus
+src/storage/saveText.test.ts Simulation port/tsEngine
+src/storage/towerFileCodec.test.ts sim/founderStatus
+src/storage/vctowerWriter.test.ts Simulation
+src/tests/barrelSurface.test.ts Crowd EconomySystem Simulation Tower
+src/tests/conformance/checkpointDetail.test.ts Simulation
+src/tests/conformance/panelProbe.ts Simulation sim/founderStatus
+src/tests/conformance/scenario.ts Simulation sim/coerce sim/founderStatus
+src/tests/diagnostics/tsDiagnosticFacts.ts sim/constants sim/gripe sim/satisfactionStep
+src/tests/dualrun/dualRunHarness.ts Simulation sim/founderStatus
+src/tests/fixtures/saveText.ts Simulation port/tsEngine
+src/tests/fixtures/scheduleTower.ts Simulation
+src/tests/fixtures/serviceDiagnostics.fixture.ts Simulation
+src/tests/fixtures/towerFixtures.ts Simulation
+src/tests/fixtures/winningTower.ts Simulation
+src/tests/integration/attendanceTripwire.integration.test.ts Clock Simulation crowd/motion crowd/trips crowd/visits
+src/tests/integration/calendar.integration.test.ts Clock EconomySystem Simulation Tower rng
+src/tests/integration/capacityEventMatrix.integration.test.ts Simulation
+src/tests/integration/cardTextParity.integration.test.ts Simulation
+src/tests/integration/chargeBindingRaw.integration.test.ts Simulation sim/charges
+src/tests/integration/cockroachInfestation.integration.test.ts Simulation economy/housekeeping
+src/tests/integration/commercialDemandPools.integration.test.ts Clock EconomySystem Simulation Tower rng sim/demand
+src/tests/integration/commuteStress.integration.test.ts Crowd Simulation Tower crowd/motion sim/satisfaction
+src/tests/integration/condoModes.integration.test.ts Simulation
+src/tests/integration/condoRelocation.integration.test.ts Simulation
+src/tests/integration/condoStatsPanel.integration.test.ts Simulation
+src/tests/integration/conformanceWasmCanBuild.integration.test.ts Simulation sim/founderStatus
+src/tests/integration/conformanceWasmDiagnosticsTowers.integration.test.ts Simulation
+src/tests/integration/conformanceWasmFacadeCommands.integration.test.ts Simulation sim/founderStatus
+src/tests/integration/conformanceWasmLoadFidelity.integration.test.ts Simulation
+src/tests/integration/conformanceWasmSaveHandoff.integration.test.ts Simulation
+src/tests/integration/conformanceWasmSaves.integration.test.ts Simulation
+src/tests/integration/conformanceWasmSlotCensus.integration.test.ts Simulation
+src/tests/integration/congestionGripeCopy.integration.test.ts Simulation sim/congestion
+src/tests/integration/crashReport.integration.test.ts Simulation port/tsEngine
+src/tests/integration/crashScreen.integration.test.ts Simulation port/tsEngine
+src/tests/integration/crowd.integration.test.ts Clock Crowd ElevatorDispatch Simulation Tower
+src/tests/integration/demographicRoutines.integration.test.ts Clock Crowd Simulation sim/constants
+src/tests/integration/dominantGripe.integration.test.ts Simulation sim/constants sim/gripe
+src/tests/integration/dualRunBrush.integration.test.ts Simulation
+src/tests/integration/dualRunEdits.integration.test.ts Simulation sim/charges
+src/tests/integration/economyDepth.integration.test.ts Simulation
+src/tests/integration/elevatorDispatchBalancing.integration.test.ts Crowd Tower crowd/routing tower/segments
+src/tests/integration/elevatorSchedule.integration.test.ts Simulation
+src/tests/integration/elevatorScheduling.integration.test.ts ElevatorDispatch Tower
+src/tests/integration/elevatorStats.integration.test.ts Simulation
+src/tests/integration/elevatorWidthMigration.integration.test.ts Simulation
+src/tests/integration/engagementParity.integration.test.ts port/tsEngine
+src/tests/integration/engineView.integration.test.ts Simulation UndoHistory tower/towerTopology
+src/tests/integration/eventSprites.integration.test.ts Simulation
+src/tests/integration/faqComplete.integration.test.ts Simulation
+src/tests/integration/fixedStep.integration.test.ts Simulation sim/fixedStep
+src/tests/integration/gameControllers.integration.test.ts Simulation
+src/tests/integration/gameControllersCoverage.integration.test.ts Simulation port/tsEngine
+src/tests/integration/gameEvents.integration.test.ts Clock EventSystem Tower rng
+src/tests/integration/goldenMaster.integration.test.ts Simulation
+src/tests/integration/heatmap.integration.test.ts Simulation
+src/tests/integration/hotelLateCheckout.integration.test.ts Clock EconomySystem Simulation
+src/tests/integration/hourCost.bench.integration.test.ts Simulation
+src/tests/integration/housekeepingLegibility.integration.test.ts Simulation economy/housekeeping
+src/tests/integration/housekeepingMaids.integration.test.ts Crowd Simulation crowd/spawn economy/housekeeping
+src/tests/integration/housekeepingTriage.integration.test.ts Simulation
+src/tests/integration/leaseAmenityGripe.integration.test.ts Simulation sim/churn
+src/tests/integration/ledger.integration.test.ts Ledger Simulation
+src/tests/integration/legibility.integration.test.ts Simulation
+src/tests/integration/loaderCases.integration.test.ts Simulation
+src/tests/integration/mealCadence.integration.test.ts Clock Crowd EconomySystem Simulation Tower rng
+src/tests/integration/milestones.integration.test.ts Simulation
+src/tests/integration/modernEconomy.integration.test.ts Simulation
+src/tests/integration/moveInGateHelpers.ts Simulation
+src/tests/integration/moveInGateLegibility.integration.test.ts Simulation sim/churn sim/satisfactionStep
+src/tests/integration/moveInGateRentals.integration.test.ts Simulation sim/gripe sim/satisfactionStep
+src/tests/integration/moveInSustainabilityGate.integration.test.ts Simulation sim/demand sim/satisfactionStep
+src/tests/integration/nextStarRequirements.integration.test.ts Simulation
+src/tests/integration/noiseMemo.integration.test.ts Simulation UndoHistory sim/constants sim/satisfaction
+src/tests/integration/onboarding.integration.test.ts Simulation
+src/tests/integration/paintPersistence.integration.test.ts Simulation
+src/tests/integration/parity.integration.test.ts Simulation
+src/tests/integration/partyHallTwoFloor.integration.test.ts Simulation
+src/tests/integration/personCensus.integration.test.ts Clock Simulation
+src/tests/integration/personRoundTrip.integration.test.ts Clock Crowd Simulation
+src/tests/integration/phase2.integration.test.ts Simulation
+src/tests/integration/playthrough.integration.test.ts Simulation
+src/tests/integration/portServiceDiagnostics.integration.test.ts port/tsEngine
+src/tests/integration/pricingSplit.integration.test.ts Simulation
+src/tests/integration/reflowMigration.integration.test.ts Simulation
+src/tests/integration/relayedCommandRaw.integration.test.ts Simulation
+src/tests/integration/rentalNightclubGripe.integration.test.ts Simulation sim/gripe
+src/tests/integration/reviewFixes.integration.test.ts Clock EconomySystem Simulation Tower rng
+src/tests/integration/roomCounts.integration.test.ts Simulation tower/rooms
+src/tests/integration/saveMetadataLog.integration.test.ts Simulation
+src/tests/integration/segmentRouting.integration.test.ts Crowd Simulation Tower sim/gripe
+src/tests/integration/segmentRoutingReachable.integration.test.ts Clock Crowd EconomySystem Simulation Tower sim/demand
+src/tests/integration/simulation.integration.test.ts ElevatorDispatch Simulation
+src/tests/integration/skylobbyTransfer.integration.test.ts Crowd Tower
+src/tests/integration/sparseSave.integration.test.ts Simulation
+src/tests/integration/storage.integration.test.ts Simulation sim/deserializeGuards
+src/tests/integration/subsystems.integration.test.ts Clock EconomySystem ElevatorDispatch Tower rng
+src/tests/integration/subtypeVisuals.integration.test.ts Simulation
+src/tests/integration/tdtImport.integration.test.ts Simulation
+src/tests/integration/towerCongratsDialogs.integration.test.ts Simulation port/tsEngine
+src/tests/integration/towerStateSig.integration.test.ts UndoHistory
+src/tests/integration/traffic.integration.test.ts Simulation
+src/tests/integration/trafficTeeth.integration.test.ts Simulation
+src/tests/integration/tsEngine.golden.integration.test.ts Simulation port/tsEngine
+src/tests/integration/uiDialogs.integration.test.ts Simulation
+src/tests/integration/undoHistory.integration.test.ts Simulation UndoHistory port/tsEngine
+src/tests/integration/undoHistoryRestore.integration.test.ts Simulation UndoHistory port/tsEngine
+src/tests/integration/unmetDemand.integration.test.ts Simulation sim/constants sim/demand sim/gripe sim/serialization
+src/tests/integration/venueAttendance.integration.test.ts Clock Crowd Simulation crowd/person crowd/spawn crowd/visits
+src/tests/integration/venueOccupancy.integration.test.ts Clock Simulation
+src/tests/integration/venueOrigins.integration.test.ts Clock Simulation crowd/spawn crowd/visits
+src/tests/integration/viewReader.integration.test.ts Simulation port/tsEngine tower/rooms
+src/tests/integration/viewReaderHall.integration.test.ts Simulation
+src/tests/integration/viewStateParity.integration.test.ts Simulation
+src/tests/integration/walkingPenalties.integration.test.ts Simulation sim/constants
+src/tests/integration/walkwayWillingness.integration.test.ts Crowd Tower
+src/tests/integration/wasmHost.integration.test.ts Simulation
+src/tests/integration/wasmHostCatalog.integration.test.ts Simulation
+src/tests/integration/wasmHostTelemetry.integration.test.ts Simulation
+src/tests/integration/wasteAndParking.integration.test.ts Simulation
+src/tests/integration/weatherCrowd.integration.test.ts Clock EconomySystem Simulation Tower rng
+src/tests/integration/weatherEvents.integration.test.ts Clock EventSystem Simulation Tower rng
+src/tests/integration/weekendPatronage.integration.test.ts Simulation
+src/tests/parity/wasmHostSetup.integration.test.ts Simulation
+src/tests/parity/wasmHostSetup.ts Simulation sim/coerce sim/constants
+src/tests/perfCompare/fixtureHotelTower.test.ts Simulation
+src/tests/perfCompare/fixtureHotelTower.ts Simulation
+src/tests/perfCompare/fixtureTowers.test.ts Simulation
+src/tests/perfCompare/fixtureTowers.ts Simulation tower/towerTopology
+src/tests/perfCompare/nodeCheck.ts Simulation
+src/tests/perfCompare/page.integration.test.ts Simulation port/tsEngine
+src/tests/perfCompare/savedStart.ts Simulation
+src/tests/perfCompare/scenarios.test.ts Simulation
+src/tests/perfCompare/scenarios.ts Simulation
+src/tests/portKit/portSim.ts Simulation port/tsEngine # the kit builds the TypeScript leg on purpose
+src/tests/roomCountsWriters.guard.test.ts tower/rooms
+src/ui/catalogPricing.test.ts Simulation
+src/ui/editorPatch.test.ts Simulation
+src/ui/hud.fixture.ts port/tsEngine
+src/ui/templates/editor.test.ts Simulation
+src/ui/templates/inspector.test.ts Simulation
+src/ui/templates/stats.fixture.ts port/tsEngine
+src/ui/templates/stats.test.ts Simulation sim/star tower/rooms
+src/ui/uiStatus.test.ts Simulation port/tsEngine
+src/wasmhost/frameApply.test.ts Simulation port/tsEngine tower/rooms
+src/wasmhost/hostFault.test.ts Simulation UndoHistory
+src/wasmhost/merge.test.ts Simulation port/tsEngine tower/rooms
+src/wasmhost/stepLoopAbsent.test.ts Simulation
+src/wasmhost/wasmHostFrame.test.ts Simulation
+src/wasmhost/wasmHostPoints.test.ts Simulation

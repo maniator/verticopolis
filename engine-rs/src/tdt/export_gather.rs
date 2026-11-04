@@ -44,6 +44,7 @@ use super::format::{
 };
 use super::tables::{
     is_priced, rent_from_class, HOTEL_ASLEEP_FLAG, HOTEL_DIRTY_FLAG, HOTEL_OCCUPANT_MASK,
+    HOTEL_STAY_VACANT,
 };
 use super::LegacyExportError;
 use crate::econ::rent_config;
@@ -194,7 +195,11 @@ pub fn gather_units<U: Borrow<Value>>(
                     let guests = js_min(js_max(u.occupants, 1.0), HOTEL_OCCUPANT_MASK as f64);
                     status = HOTEL_ASLEEP_FLAG | super::byte_writer::to_int32(guests);
                 } else if tenanted || u.ever_occupied {
-                    status = 1;
+                    // A room that has been rented and sits clean and empty.
+                    // The original's own saves write it as stay state 3; a
+                    // bare 1 (no stay state) is read as a sleeping guest and
+                    // rewritten to 0x10 when the game saves.
+                    status = HOTEL_STAY_VACANT;
                 }
                 if status != 0 {
                     counts.hotel_states += 1;

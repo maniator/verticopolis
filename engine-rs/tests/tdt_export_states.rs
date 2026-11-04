@@ -4,6 +4,9 @@
 
 use serde_json::{json, Value};
 use verticopolis_engine::tdt::export::build_tdt;
+use verticopolis_engine::tdt::format::{TDT_FLOOR_OFFSET, TDT_HEADER_SIZE};
+use verticopolis_engine::tdt::parse::parse_tdt;
+use verticopolis_engine::tdt::tables::HOTEL_STAY_VACANT;
 
 fn unit(id: u32, kind: &str, floor: i32, x: i32, width: i32) -> Value {
     json!({ "id": id, "kind": kind, "floor": floor, "x": x, "width": width, "state": "occupied" })
@@ -179,4 +182,42 @@ fn an_infested_hotel_room_exports_the_way_a_dirty_one_does() {
     let infested = room("infested");
     assert_eq!(infested.bytes, dirty.bytes);
     assert_eq!(infested.counts.hotel_states, 1);
+}
+
+#[test]
+fn a_rented_hotel_room_that_stands_clean_and_empty_exports_as_vacant_and_clean() {
+    // The original's own saves hold stay state 3 (0x18) for such a room. A
+    // bare 1 has no stay state, and the game reads that as a sleeping guest
+    // and rewrites it as 0x10 (#1629).
+    let room = |ever_occupied: bool| {
+        let mut hotel = unit(2, "hotelDouble", 2, 0, 6);
+        hotel["state"] = json!("empty");
+        hotel["everOccupied"] = json!(ever_occupied);
+        build_tdt(&tower(vec![unit(1, "lobby", 1, 0, 1), hotel], vec![]))
+            .expect("builds")
+            .bytes
+    };
+    let status_at = |bytes: &[u8]| {
+        // Walk the floor records to floor 2 (file floor 11): six bytes, the
+        // tenants at 18 bytes each, then the 94-entry index.
+        let mut at = TDT_HEADER_SIZE;
+        for _ in 0..(2 + TDT_FLOOR_OFFSET) {
+            at += 6 + usize::from(u16_at(bytes, at)) * 18 + 94 * 2;
+        }
+        assert_eq!(u16_at(bytes, at), 1, "one tenant on floor 2");
+        bytes[at + 6 + 5]
+    };
+    let (never, rented) = (room(false), room(true));
+    assert_eq!(status_at(&rented), HOTEL_STAY_VACANT as u8);
+    assert_ne!(status_at(&never), status_at(&rented));
+    // Reading the byte back gives the same rented, empty room.
+    let back = parse_tdt(&rented, "RENTED.TDT").expect("imports");
+    let hotel = back.save["units"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["kind"] == "hotelDouble")
+        .expect("the room comes back");
+    assert_eq!(hotel["state"], json!("empty"));
+    assert_eq!(hotel["everOccupied"], json!(true));
 }
