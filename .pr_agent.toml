@@ -10,6 +10,10 @@ output_run_cost = true
 restricted_mode = true
 repo_context_files = ["AGENTS.md"]
 repo_context_from_default_branch = true
+# Count only explicit completion links as tickets for compliance review.
+# Bare references (e.g. "deferred to #1788") are context, not acceptance criteria.
+# TOML single quotes keep the regex backslashes intact.
+description_issue_regex = '(?i)(?:fixes|closes|resolves)\s+#(\d+)'
 
 [pr_reviewer]
 # Process larger PRs in multiple calls to reduce omitted files.
