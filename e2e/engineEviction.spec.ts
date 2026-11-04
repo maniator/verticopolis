@@ -160,7 +160,7 @@ test("an evicted binary is never refilled with another build's bytes while the f
   }
 });
 
-test("with the whole precache gone and no network the page does not load, and an online visit recovers", async ({ browser }) => {
+test("with the whole precache gone and no network the page does not load, and an online visit recovers", async ({ browser, browserName }) => {
   const context = await newContext(browser, deployments);
   try {
     const page = await context.newPage();
@@ -173,7 +173,12 @@ test("with the whole precache gone and no network the page does not load, and an
       (response) => `loaded ${response?.status()}`,
       (error: Error) => error.message.split("\n")[0],
     );
-    expect(outcome, "the browser's unavailable-page outcome").toMatch(/^page\.reload: net::ERR_/);
+    // The page did not load. Each engine words that its own way, so each one's
+    // text is pinned, and a timeout, a crash or a closed target never passes.
+    expect(outcome, "the reload fails on the network").toMatch(/^page\.reload: /);
+    expect(outcome, "the reload failed for a reason other than a hang or a dead page").not.toMatch(/Timeout \d+ms exceeded|crashed|closed/);
+    const unavailable = { chromium: /^page\.reload: net::ERR_/, firefox: /^page\.reload: NS_ERROR_/, webkit: /^page\.reload: FetchEvent\.respondWith/ }[browserName];
+    expect(outcome, "the browser's unavailable-page outcome").toMatch(unavailable);
 
     deployments.failNetwork(null);
     await page.close();
