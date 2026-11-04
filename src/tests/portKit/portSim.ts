@@ -220,10 +220,13 @@ export class PortSim {
     };
     const [floor, minX, maxX, severity, tint] = ["floor", "minX", "maxX", "severity", "tint"].map(slot);
     const r = this.leaf.port.heatCells(modeIndex);
+    if (r.length % slots.length !== 0) throw new Error(`PortSim.heatCells: ${r.length} values is not a whole number of ${slots.length}-slot cells`);
     const cells: HeatCell[] = [];
-    for (let i = 0; i + slots.length <= r.length; i += slots.length) {
+    for (let i = 0; i < r.length; i += slots.length) {
       const cell: HeatCell = { floor: r[i + floor], minX: r[i + minX], maxX: r[i + maxX], severity: r[i + severity] };
-      if (r[i + tint] > 0) cell.tint = layout.heatTints[r[i + tint]] as HeatCell["tint"];
+      const code = r[i + tint];
+      if (!Number.isInteger(code) || code < 0 || code >= layout.heatTints.length) throw new Error(`PortSim.heatCells: tint code ${code} is not in the layout's heatTints`);
+      if (code > 0) cell.tint = layout.heatTints[code] as HeatCell["tint"];
       cells.push(cell);
     }
     return cells;
