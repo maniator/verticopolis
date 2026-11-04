@@ -3,6 +3,7 @@ import { catalogBuildKind, catalogFacility, type Catalog } from "../../catalog/c
 import { isCommercialKind } from "../../presentation/viewKinds";
 import { facilityDescription } from "../../presentation/facilityPresentation";
 import type { FacilityKind } from "../../engine/types";
+import { groupDigits } from "../format";
 
 /**
  * The tool-info panel bodies (E5-S2). `UI.selectTool` renders one of these
@@ -26,13 +27,13 @@ export function toolInfoTemplate(
   // Commercial venues never hold a flat population: they add however many
   // customers are eating right now, up to the catalog value. "Capacity"
   // stays for the kinds where it is literally the head count.
-  return html`<div class="ti-name">${f.name}</div><div>Cost: $${f.cost.toLocaleString()}</div>${
+  return html`<div class="ti-name">${f.name}</div><div>Cost: $${groupDigits(f.cost)}</div>${
     f.population
       ? html`<div>${isCommercial ? `Customers: up to ${f.population}` : `Capacity: ${f.population}`}</div>`
       : nothing
   }<p style="margin-top:6px;color:var(--muted)">${f.description}</p>${
     groundFloorLobbyCost !== undefined
-      ? html`<p style="margin-top:6px;color:var(--muted)">On the ground floor (level 1) this lays a lobby, $${groundFloorLobbyCost.toLocaleString()} per tile.</p>`
+      ? html`<p style="margin-top:6px;color:var(--muted)">On the ground floor (level 1) this lays a lobby, $${groupDigits(groundFloorLobbyCost)} per tile.</p>`
       : nothing
   }`;
 }

@@ -2,6 +2,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { TOWER_FILE_EXT } from "../../storage/SaveGame";
 import type { ImportReport } from "../../storage/tdtImportReport";
 import type { ExportReport } from "../../storage/tdtExportReport";
+import { groupDigits } from "../format";
 
 /**
  * The TDT import/export report dialogs plus the export-choice modal. Authored to
@@ -45,13 +46,13 @@ export function importReportTemplate(report: ImportReport): TemplateResult {
   // Minus before the dollar sign, same as the stats panel (legacy imports
   // can legitimately arrive in the red).
   const money = Math.round(report.money);
-  const funds = `${money < 0 ? "-" : ""}$${Math.abs(money).toLocaleString()}`;
+  const funds = `${money < 0 ? "-" : ""}$${groupDigits(Math.abs(money))}`;
   return html`
       <h2>Import from SimTower (1994)</h2>
       <div class="import-facts well">
         <b>${report.towerName}</b> · ${stars} · ${funds}
         · ${report.floors} floor${report.floors === 1 ? "" : "s"}${report.basements ? ` / B${report.basements}` : ""}
-        · ${report.unitsImported.toLocaleString()} rooms
+        · ${groupDigits(report.unitsImported)} rooms
       </div>
       <h3>Brought over</h3>
       <ul class="import-list">${listItems(report.broughtOver)}</ul>
@@ -67,14 +68,14 @@ export function importReportTemplate(report: ImportReport): TemplateResult {
 /** The reverse-fidelity legacy (.TDT) export report modal body. */
 export function exportReportTemplate(report: ExportReport): TemplateResult {
   const stars = starLabel(report.star);
-  const funds = `${report.money < 0 ? "-" : ""}$${Math.abs(report.money).toLocaleString()}`;
+  const funds = `${report.money < 0 ? "-" : ""}$${groupDigits(Math.abs(report.money))}`;
   return html`
       <h2>Export for SimTower (1994)</h2>
       <p style="color:var(--muted);font-size:12px"><b>Work in progress.</b> Exporting to the original 1994 format is still experimental. It has been verified to load and play in the real game for smaller Classic towers; a large or complex tower may not load correctly yet. Your tower here is never changed.</p>
       <div class="import-facts well">
         <b>${report.towerName}</b> · ${stars} · ${funds}
         · ${report.floors} floor${report.floors === 1 ? "" : "s"}${report.basements ? ` / B${report.basements}` : ""}
-        · ${report.roomsExported.toLocaleString()} rooms
+        · ${groupDigits(report.roomsExported)} rooms
       </div>
       <h3>Comes along</h3>
       <ul class="import-list">${listItems(report.comesAlong)}</ul>

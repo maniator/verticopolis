@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { toolInfoTemplate } from "./toolInfo";
 import { renderToFragment } from "../testing/litTestUtils";
+import { groupDigits } from "../format";
 
 /**
  * The tool-info panel bodies (E5-S2, event-driven). Package: the build-kind
@@ -19,8 +20,7 @@ describe("toolInfoTemplate rows", () => {
   it("renders name, formatted cost, capacity, and description for a residential kind", () => {
     const frag = renderToFragment(toolInfoTemplate(office, false));
     expect(frag.querySelector(".ti-name")!.textContent).toBe("Office");
-    // Locale-agnostic: compare against the same toLocaleString the template uses.
-    expect(frag.textContent).toContain(`Cost: $${office.cost.toLocaleString()}`);
+    expect(frag.textContent).toContain(`Cost: $${groupDigits(office.cost)}`);
     expect(frag.textContent).toContain("Capacity: 6");
     expect(frag.querySelector("p")!.textContent).toBe(office.description);
   });
@@ -42,7 +42,7 @@ describe("toolInfoTemplate rows", () => {
     const floorTool = { name: "Floor", cost: 500, population: 0, description: "Structural floor space." };
     const frag = renderToFragment(toolInfoTemplate(floorTool, false, 5000));
     expect(frag.textContent).toContain("ground floor");
-    expect(frag.textContent).toContain(`$${(5000).toLocaleString()} per tile`);
+    expect(frag.textContent).toContain(`$${groupDigits(5000)} per tile`);
   });
 
   it("omits the ground-floor note when no lobby cost is passed", () => {

@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { PriceRung } from "../../engine/gameRules";
+import { groupDigits } from "../format";
 
 /**
  * The shared Classic rung picker row: a color chip plus a native `<select>` of
@@ -17,7 +18,7 @@ export type RungChoice = 0 | 1 | 2 | 3 | "noRate";
  *  billing period is NOT repeated here; the card's kv label already says
  *  Quarterly rent / Sale price / Room rate (one statement per card). */
 export function rungOptionLabel(r: PriceRung): string {
-  return `${r.label}  $${r.value.toLocaleString()}`;
+  return `${r.label}  $${groupDigits(r.value)}`;
 }
 
 /** The disabled divider between the ladder and the off switch, so No Rate

@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { ServiceDiagnosticFacts } from "../simport/enginePort";
 import type { SupplementalLines } from "./portUnitDiagnostics";
+import { groupDigits } from "../ui/format";
 
 /**
  * Sole source of player-facing service diagnostic copy for both engines.
@@ -91,7 +92,7 @@ export function retailDisplayLines(c: ServiceDiagnosticFacts["retail"]): Lines {
   if (!c.active) return [];
   const today = c.today ?? 0;
   const out: Lines = [
-    html`<div>Today's patronage: ${today.toLocaleString()} customer${today === 1 ? "" : "s"} <span class="evalbar"><span style="width:${c.barWidth ?? 0}%"></span></span></div>`,
+    html`<div>Today's patronage: ${groupDigits(today)} customer${today === 1 ? "" : "s"} <span class="evalbar"><span style="width:${c.barWidth ?? 0}%"></span></span></div>`,
   ];
   if (c.localDemandPct !== null) {
     out.push(html`<div>Local demand: ${c.localDemandPct}% of capacity.</div>`);
@@ -114,7 +115,7 @@ export function retailDisplayLines(c: ServiceDiagnosticFacts["retail"]): Lines {
     else if (c.tier === "booming") style = `color:${good}`;
     out.push(html`<div style=${style}>${verdict[c.tier]}</div>`);
   }
-  if (c.profitYest !== null) out.push(html`<div>Yesterday's profit: $${c.profitYest.toLocaleString()}.</div>`);
+  if (c.profitYest !== null) out.push(html`<div>Yesterday's profit: $${groupDigits(c.profitYest)}.</div>`);
   if (c.rainy) out.push(html`<div>Rain might cause fewer customers.</div>`);
   return out;
 }

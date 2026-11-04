@@ -3,6 +3,7 @@
  * {@link ImportReport} shown before the tower is adopted, built from the
  * numbers the Rust codec counts while it decodes (the `loadTdt` record).
  */
+import { groupDigits } from "../ui/format";
 
 /** What the fidelity-report modal shows before the player adopts the tower. */
 export interface ImportReport {
@@ -89,7 +90,7 @@ export function importReport(facts: ImportReportFacts): ImportReport {
   const broughtOver: string[] = [];
   const rating = facts.star >= 6 ? "the TOWER rating" : `your ${facts.star}-star rating`;
   // Minus before the dollar sign, matching the stats panel's money formatting.
-  const funds = `${facts.money < 0 ? "-" : ""}$${Math.abs(facts.money).toLocaleString()}`;
+  const funds = `${facts.money < 0 ? "-" : ""}$${groupDigits(Math.abs(facts.money))}`;
   broughtOver.push(`${funds} in funds and ${rating}.`);
   broughtOver.push(
     `${floors} floor${floors === 1 ? "" : "s"} of structure` +
@@ -221,14 +222,14 @@ export function importReport(facts: ImportReportFacts): ImportReport {
   }
   if (counts.residentsSeeded > 0) {
     couldNotBring.push(
-      `${counts.residentsSeeded.toLocaleString()} office workers and condo residents are here now, matching the save's counts; shoppers, diners and moviegoers return as the tower runs.`,
+      `${groupDigits(counts.residentsSeeded)} office workers and condo residents are here now, matching the save's counts; shoppers, diners and moviegoers return as the tower runs.`,
     );
   } else if (counts.occupiedOffices + counts.soldCondos > 0) {
     couldNotBring.push("Occupancy is approximate: any office or condo with people recorded imports as occupied.");
   }
   if (facts.peopleCount !== null && facts.peopleCount > 0) {
     couldNotBring.push(
-      `The ${facts.peopleCount.toLocaleString()} people on the save's roster aren't carried over one by one; your tower re-populates as it runs.`,
+      `The ${groupDigits(facts.peopleCount)} people on the save's roster aren't carried over one by one; your tower re-populates as it runs.`,
     );
   }
   couldNotBring.push("Tenant names and finance history aren't imported yet.");

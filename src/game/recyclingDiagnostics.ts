@@ -1,4 +1,5 @@
 import { html, type TemplateResult } from "lit-html";
+import { groupDigits } from "../ui/format";
 
 /**
  * The recycling card's lines: current fill and the capacity/demand verdict.
@@ -15,7 +16,7 @@ export function recyclingLinesOf(pop: number, cap: number, fill: number, demandM
   return [
     html`<div>Fill: ${fillPct}%. Truck collects each morning.</div>`,
     demandMet
-      ? html`<div style="color:var(--good)">Capacity: ${pop.toLocaleString()}/${cap.toLocaleString()} population; demand met.</div>`
-      : html`<div style="color:var(--bad)">Over capacity: ${pop.toLocaleString()} population vs ${cap.toLocaleString()} processed. Build another center (4★ requires demand met).</div>`,
+      ? html`<div style="color:var(--good)">Capacity: ${groupDigits(pop)}/${groupDigits(cap)} population; demand met.</div>`
+      : html`<div style="color:var(--bad)">Over capacity: ${groupDigits(pop)} population vs ${groupDigits(cap)} processed. Build another center (4★ requires demand met).</div>`,
   ];
 }

@@ -11,6 +11,7 @@ import { gameplaySession } from "../analytics";
 import { drainEngineEvents } from "../analyticsEngineBridge";
 import { hudSource } from "./hudSource";
 import { calendarOf } from "../simport/headerClock";
+import { groupDigits } from "../ui/format";
 
 /**
  * The per-frame simulation + throttled UI/audio refresh, split out of the
@@ -135,7 +136,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
     if (pc && !hasBlockingModal(app) && !splashUp) {
       app.shownChoice = true;
       app.audio.sfx("error");
-      app.ui.showEventChoice(pc.message, `$${pc.cost.toLocaleString()}`, (opt) => {
+      app.ui.showEventChoice(pc.message, `$${groupDigits(pc.cost)}`, (opt) => {
         // The player answered (accept/decline). The engine reports the
         // resolution (emergency_resolved, source player) and the bridge sends
         // emergency_choice from it; a timed-out auto-decline carries source

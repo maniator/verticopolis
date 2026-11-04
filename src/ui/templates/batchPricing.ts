@@ -3,6 +3,7 @@ import { live } from "lit-html/directives/live.js";
 import type { BatchTarget, BatchRentResult } from "../../engine/sim/constants";
 import type { PriceRung } from "../../engine/gameRules";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
+import { groupDigits } from "../format";
 
 /**
  * The batch-pricing dialog (E4, the interactive stateful dialog). This is a pure
@@ -56,7 +57,7 @@ export interface BatchPricingHandlers {
   onCancel: () => void;
 }
 
-const money = (n: number): string => `$${n.toLocaleString()}`;
+const money = (n: number): string => `$${groupDigits(n)}`;
 
 /** How a batch target reads in a sentence: the labelled default, or the amount. */
 export function batchPriceText(ctx: BatchPricingCtx, target: BatchTarget): string {

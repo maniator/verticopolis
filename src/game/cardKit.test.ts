@@ -11,6 +11,7 @@ import { VIEW_LAYOUT } from "../engine/port/layout";
 import { renderToFragment } from "../ui/testing/litTestUtils";
 import { unitEditorTemplate } from "../ui/templates/editor";
 import { unitInspectorTemplate } from "../ui/templates/inspector";
+import { groupDigits } from "../ui/format";
 
 /** A tower with a recycling center in the basement and an occupied office. */
 function tower(): { sim: Simulation; centerId: number; officeId: number } {
@@ -53,7 +54,7 @@ describe("the card kit's unit lines on an engine with no TypeScript tower", () =
     const kit = createCardKit({ enginePort: sealed, reader });
     const center = kit.diagnostics.unit(centerId);
     expect(center).toHaveLength(2);
-    expect(center.map((l) => l.values.join("|")).join("\n")).toContain((2500).toLocaleString());
+    expect(center.map((l) => l.values.join("|")).join("\n")).toContain(groupDigits(2500));
     expect(kit.diagnostics.unit(officeId).length).toBeGreaterThan(0);
   });
 

@@ -8,6 +8,7 @@ import { outcome, type PortCodes } from "../simport/portCodes";
 import type { BrushKind } from "../simport/commands";
 import type { ViewReader } from "../simport/viewReader";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
+import { groupDigits } from "../ui/format";
 import { quoteShaft } from "./portAccess";
 
 /**
@@ -119,7 +120,7 @@ export class BuildActions {
     if (placed > 0 && laid !== kind) {
       const f = catalogFacility(catalog, laid);
       this.deps.ui.toast(
-        `The ground floor is a ${f.name.toLowerCase()}, so a ${f.name.toLowerCase()} ($${f.cost.toLocaleString()}/tile) went here.`,
+        `The ground floor is a ${f.name.toLowerCase()}, so a ${f.name.toLowerCase()} ($${groupDigits(f.cost)}/tile) went here.`,
         "info",
       );
     }
