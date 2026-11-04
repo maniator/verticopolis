@@ -7,6 +7,7 @@ import {
   type HeatCell,
 } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
+import { PortSim, describeEngines, type Leg } from "../portKit/portSim";
 
 const W = GRID.width;
 const C = Math.floor(W / 2);
@@ -24,7 +25,19 @@ function cellOn(map: HeatCell[], floor: number): HeatCell | undefined {
   return map.find((c) => c.floor === floor);
 }
 
-describe("floorHeatmap (stats overlay data)", () => {
+/** The engine on `leg`, loaded once per draft from the draft's save; the
+ *  draft is the fixture's authoring copy, read only after it is built. */
+function loader(leg: Leg): (draft: Simulation) => PortSim {
+  const engines = new WeakMap<Simulation, PortSim>();
+  return (draft) => {
+    let e = engines.get(draft);
+    if (!e) engines.set(draft, (e = new PortSim(leg, draft)));
+    return e;
+  };
+}
+
+describeEngines("floorHeatmap (stats overlay data)", (leg: Leg) => {
+  const loaded = loader(leg);
   it("occupancy: a fully-vacant office floor is redder than a fully-leased one", () => {
     const sim = Simulation.newGame(51);
     sim.money = 1e12;
@@ -38,7 +51,7 @@ describe("floorHeatmap (stats overlay data)", () => {
       sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
     }
     for (const x of [0, 9]) sim.tower.place("office", 3, x);
-    const map = sim.floorHeatmap("occupancy");
+    const map = loaded(sim).heatCells("occupancy");
     expect(cellOn(map, 2)!.severity).toBe(0); // fully leased → green
     expect(cellOn(map, 3)!.severity).toBe(1); // fully vacant → red
   });
@@ -50,7 +63,7 @@ describe("floorHeatmap (stats overlay data)", () => {
     lay(sim, "floor", 2);
     const r = sim.tower.place("office", 2, 40); // width 9 → tiles 40..48
     sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
-    const cell = cellOn(sim.floorHeatmap("occupancy"), 2)!;
+    const cell = cellOn(loaded(sim).heatCells("occupancy"), 2)!;
     expect(cell.minX).toBeLessThanOrEqual(40);
     expect(cell.maxX).toBeGreaterThanOrEqual(48);
   });
@@ -69,7 +82,7 @@ describe("floorHeatmap (stats overlay data)", () => {
     hu.satisfaction = 1;
     su.state = "occupied";
     su.satisfaction = 0.2;
-    const map = sim.floorHeatmap("satisfaction");
+    const map = loaded(sim).heatCells("satisfaction");
     expect(cellOn(map, 3)!.severity).toBeGreaterThan(cellOn(map, 2)!.severity);
   });
 
@@ -95,7 +108,7 @@ describe("floorHeatmap (stats overlay data)", () => {
       u.state = "occupied";
       u.satisfaction = 1;
     }
-    const cells = cellsOn(sim.floorHeatmap("satisfaction"), 2);
+    const cells = cellsOn(loaded(sim).heatCells("satisfaction"), 2);
     const sadCell = cells.find((c) => c.minX <= sadX && c.maxX >= sadX)!;
     expect(sadCell.severity).toBe(1); // the miserable suite is fully red
     // The happy suites stay green regardless of their unhappy neighbor.
@@ -109,8 +122,8 @@ describe("floorHeatmap (stats overlay data)", () => {
     const sim = Simulation.newGame(54);
     sim.money = 1e12;
     lay(sim, "lobby", 1); // structural only, no rentable units
-    expect(cellOn(sim.floorHeatmap("occupancy"), 1)).toBeUndefined(); // no tenancy → untinted
-    expect(cellOn(sim.floorHeatmap("congestion"), 1)).toBeDefined(); // congestion tints built floors
+    expect(cellOn(loaded(sim).heatCells("occupancy"), 1)).toBeUndefined(); // no tenancy → untinted
+    expect(cellOn(loaded(sim).heatCells("congestion"), 1)).toBeDefined(); // congestion tints built floors
   });
 
   it("satisfaction skips a leased-but-empty floor (no one present to judge), occupancy flags it", () => {
@@ -121,8 +134,8 @@ describe("floorHeatmap (stats overlay data)", () => {
     sim.tower.place("office", 2, 0); // built, but vacant (nobody present)
     // Occupancy sees a vacant office (red); satisfaction has no present tenant
     // to judge, so it leaves the floor untinted rather than falsely flagging it.
-    expect(cellOn(sim.floorHeatmap("occupancy"), 2)!.severity).toBe(1);
-    expect(cellOn(sim.floorHeatmap("satisfaction"), 2)).toBeUndefined();
+    expect(cellOn(loaded(sim).heatCells("occupancy"), 2)!.severity).toBe(1);
+    expect(cellOn(loaded(sim).heatCells("satisfaction"), 2)).toBeUndefined();
   });
 
   it("cleanliness: tints hotel rooms by staff reach and dirty state; offices emit nothing, condos read n/a", () => {
@@ -166,7 +179,7 @@ describe("floorHeatmap (stats overlay data)", () => {
     const buildingUnit = sim.tower.units.find((u) => u.id === building.unitId)!;
     buildingUnit.state = "construction";
 
-    const map = sim.floorHeatmap("cleanliness");
+    const map = loaded(sim).heatCells("cleanliness");
     expect(cellOn(map, 3)!.severity).toBe(0); // reachable, clean → green
     expect(cellOn(map, 4)!.severity).toBeCloseTo(0.6, 6); // reachable, dirty → amber
     const infestedCell = map.find((h) => h.floor === 5)!;
@@ -193,7 +206,7 @@ describe("floorHeatmap (stats overlay data)", () => {
     expect(r.ok).toBe(true);
     sim.tower.units.find((u) => u.id === r.unitId)!.state = "asleep";
     // No housekeeping unit exists, so no crew can reach any room: worst case.
-    expect(cellOn(sim.floorHeatmap("cleanliness"), 2)!.severity).toBe(1);
+    expect(cellOn(loaded(sim).heatCells("cleanliness"), 2)!.severity).toBe(1);
   });
 });
 
@@ -248,8 +261,12 @@ describe("congestionSeverity (overlay ramp, sim-anchored)", () => {
     expect(busyButFine - low).toBeGreaterThan(0.1); // a real, visible gap
     expect(busyButFine).toBeLessThan(AMBER); // …yet honestly still below "straining"
   });
+});
 
-  it("peakCongestion reports the busiest floor's ratio for the legend", () => {
+describeEngines("congestion overlay reads the engine's per-floor congestion", (leg: Leg) => {
+  const loaded = loader(leg);
+
+  it("the hotspot ratio reports the busiest floor's ratio for the legend", () => {
     const sim = Simulation.newGame(60);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
@@ -262,17 +279,17 @@ describe("congestionSeverity (overlay ramp, sim-anchored)", () => {
         if (r.ok) sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
       }
     }
-    const peak = sim.peakCongestion();
+    const peak = loaded(sim).hotspot().ratio;
     let maxFloor = 0;
-    for (let f = 2; f <= 6; f++) maxFloor = Math.max(maxFloor, sim.congestionAt(f));
+    for (let f = 2; f <= 6; f++) maxFloor = Math.max(maxFloor, loaded(sim).floorCongestion(f));
     expect(peak).toBeCloseTo(maxFloor, 5); // the max across floors
     expect(peak).toBeGreaterThan(0);
   });
 
-  it("floorHeatmap builds the congestion map once but matches per-floor congestionAt", () => {
-    // Guards the O(F²)→O(F) refactor: computing the spatial map once and reading
-    // each floor from it must produce exactly what calling congestionAt(floor)
-    // per floor would (each of which rebuilds the map). Same values, no drift.
+  it("the congestion cells match each floor's raw congestion through the severity ramp", () => {
+    // The overlay builds the spatial map once and reads each floor from it; that
+    // must give exactly what the per-floor read (which rebuilds the map) gives,
+    // put through the severity ramp. Same values, no drift.
     const sim = Simulation.newGame(61);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
@@ -285,10 +302,10 @@ describe("congestionSeverity (overlay ramp, sim-anchored)", () => {
         if (r.ok) sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
       }
     }
-    const cells = sim.floorHeatmap("congestion");
+    const cells = loaded(sim).heatCells("congestion");
     expect(cells.length).toBeGreaterThan(0);
     for (const cell of cells) {
-      expect(cell.severity).toBeCloseTo(congestionSeverity(sim.congestionAt(cell.floor)), 10);
+      expect(cell.severity).toBeCloseTo(congestionSeverity(loaded(sim).floorCongestion(cell.floor)), 10);
     }
   });
 });

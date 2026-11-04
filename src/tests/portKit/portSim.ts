@@ -4,6 +4,7 @@ import { TsEngine } from "../../engine/port/tsEngine";
 import { Simulation } from "../../engine/Simulation";
 import type { Tower } from "../../engine/Tower";
 import type { FacilityKind, SerializedGame, Transport, Unit } from "../../engine/types";
+import type { HeatCell, HeatmapMode } from "../../engine/sim/constants";
 import type { EnginePort } from "../../simport/enginePort";
 import type { StatsReport } from "../../simport/panels";
 import { PortCodes } from "../../simport/portCodes";
@@ -203,6 +204,28 @@ export class PortSim {
    *  undefined when it holds none (a shaft it never sampled or has dropped). */
   elevatorUtilization(id: number): number | undefined {
     return this.leaf.elevatorUtilization(id);
+  }
+
+  /** The overlay cells for `mode`, decoded from the port's `heatCells`
+   *  record by the layout's `heatCell` slot names. */
+  heatCells(mode: HeatmapMode): HeatCell[] {
+    const layout = JSON.parse(this.leaf.port.viewLayout()) as { heatModes: HeatmapMode[]; heatTints: string[] };
+    const r = this.leaf.port.heatCells(layout.heatModes.indexOf(mode));
+    const slots = VIEW_LAYOUT.records.heatCell;
+    const at = (name: string) => slots.indexOf(name);
+    const cells: HeatCell[] = [];
+    for (let i = 0; i + slots.length <= r.length; i += slots.length) {
+      const cell: HeatCell = { floor: r[i + at("floor")], minX: r[i + at("minX")], maxX: r[i + at("maxX")], severity: r[i + at("severity")] };
+      const tint = r[i + at("tint")];
+      if (tint > 0) cell.tint = layout.heatTints[tint] as HeatCell["tint"];
+      cells.push(cell);
+    }
+    return cells;
+  }
+
+  /** The mean congestion over populated floors (the lobby left out). */
+  congestion(): number {
+    return this.leaf.port.congestion();
   }
 
   /** The raw congestion ratio of one floor, as the engine reports it. */
