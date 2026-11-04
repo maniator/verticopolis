@@ -9,10 +9,20 @@
 export type SlotPopulationReader = (text: string) => number;
 
 let reader: SlotPopulationReader | null = null;
+let readerEpoch = 0;
 
 /** Count populations through `next` from now on, or (with null) not at all. */
 export function setSlotPopulationReader(next: SlotPopulationReader | null): void {
   reader = next;
+  readerEpoch++;
+}
+
+/** Goes up on every {@link setSlotPopulationReader} call (an install, a
+ *  removal, or the same reader set again), so a cache of what the census said
+ *  (`slotInfoMemo.ts`) knows to ask again. A repeated call costs that cache one
+ *  extra read per slot; the game calls it only at boot and on a trap. */
+export function slotCensusEpoch(): number {
+  return readerEpoch;
 }
 
 /**

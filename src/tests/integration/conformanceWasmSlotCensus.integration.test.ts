@@ -54,4 +54,17 @@ describe.skipIf(!run)("slot rows count their population through the engine", () 
     expect(row.population).toBeUndefined();
     expect(row.towerName).toBe(JSON.parse(saveOf(sim)).towerName);
   });
+
+  it("does not read a slot again on a reopen, and does after the slot is rewritten", () => {
+    const inner = populationReaderFromModule(wasm());
+    let reads = 0;
+    setSlotPopulationReader((text) => (reads++, inner(text)));
+    SaveGame.saveSlot(1, saveOf(Simulation.newGame(7)));
+    const first = SaveGame.listSlots().find((s) => s.slot === 1)!;
+    expect(SaveGame.listSlots().find((s) => s.slot === 1)).toEqual(first);
+    expect(reads).toBe(1);
+    SaveGame.saveSlot(1, saveOf(Simulation.newGame(8)));
+    expect(SaveGame.listSlots().find((s) => s.slot === 1)!.exists).toBe(true);
+    expect(reads).toBe(2);
+  });
 });

@@ -27,6 +27,7 @@ import { stashedText, stashUnreadable } from "./unreadableStash";
 import { stampText } from "./saveStamp";
 import { engineSaveText, importObjection, looksLikeTowerSave, readSavedAt } from "./saveTextRead";
 import { slotPopulation } from "./slotCensus";
+import { rememberedSlotInfo } from "./slotInfoMemo";
 
 /**
  * Persistence. Games are stored in localStorage: one auto-save slot plus a
@@ -82,7 +83,11 @@ export type TryLoad = (text: SaveText) => boolean;
  *  null for an absent or undecodable slot. Nothing parses the tower here: the
  *  engine does, once. */
 function readSlotText(key: string): SaveText | null {
-  const raw = localStorage.getItem(key);
+  return decodeSlotText(localStorage.getItem(key));
+}
+
+/** {@link readSlotText} on a value already read from storage. */
+function decodeSlotText(raw: string | null): SaveText | null {
   if (!raw) return null;
   try {
     // Compressed values carry STORE_MAGIC; anything else is a legacy raw-JSON
@@ -122,9 +127,9 @@ function parseSavedAt(value: unknown): number | undefined {
 /**
  * Slot metadata for the saves manager and the title screen's picker.
  *
- * Takes the key LIST that slot's loader would walk, so the row describes what
- * loading would actually do. The autosave passes both keys, mirroring
- * {@link SaveGame.loadResult}'s fallback: a partial migration or multi-tab
+ * Takes the stored values of the keys that slot's loader would walk, in order,
+ * so the row describes what loading would do. The autosave passes both keys'
+ * values, mirroring {@link SaveGame.loadResult}'s fallback: a partial migration or multi-tab
  * divergence can leave `verticopolis-save` undecodable beside a healthy legacy
  * save, and reading only the first would call that row unreadable while
  * `load()` opens it fine and the splash offers Continue for it.
@@ -135,12 +140,12 @@ function parseSavedAt(value: unknown): number | undefined {
  * the package loads, or after a tick trap) a parseable save still reads as
  * existing and its row carries no population.
  */
-function infoFrom(slot: number | "auto", ...keys: string[]): SlotInfo {
-  // From the RAW keys, before any parse: readSlotText returns null for an
+function infoFrom(slot: number | "auto", raws: readonly (string | null)[]): SlotInfo {
+  // From the RAW values, before any parse: decodeSlotText returns null for an
   // absent key and an undecodable one alike (see SlotInfo.present).
-  const present = keys.some((k) => localStorage.getItem(k) !== null);
-  for (const key of keys) {
-    const text = readSlotText(key);
+  const present = raws.some((raw) => raw !== null);
+  for (const raw of raws) {
+    const text = decodeSlotText(raw);
     if (text === null) continue;
     let data: SerializedGame, population: number | undefined;
     try {
@@ -280,10 +285,12 @@ export const SaveGame = {
     localStorage.removeItem(SLOT_KEY(n));
   },
 
-  /** Metadata for every slot, for the saves manager UI. */
+  /** Metadata for every slot, for the saves manager UI. A loaded or empty slot
+   *  whose stored values and census reader hold reuses its last row. */
   listSlots(): SlotInfo[] {
-    const slots: SlotInfo[] = [infoFrom("auto", AUTO_KEY, LEGACY_AUTO_KEY)];
-    for (let n = 1; n <= SLOT_COUNT; n++) slots.push(infoFrom(n, SLOT_KEY(n)));
+    const row = (slot: SlotInfo["slot"], ...keys: string[]) => rememberedSlotInfo(slot, keys, (raws) => infoFrom(slot, raws));
+    const slots: SlotInfo[] = [row("auto", AUTO_KEY, LEGACY_AUTO_KEY)];
+    for (let n = 1; n <= SLOT_COUNT; n++) slots.push(row(n, SLOT_KEY(n)));
     return slots;
   },
 
