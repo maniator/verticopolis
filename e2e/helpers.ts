@@ -13,8 +13,32 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
+import { MAP_OPEN_STORAGE_KEY, MAP_OPEN_VALUE } from "../src/ui/overviewMapPrefs";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+/**
+ * For a test about something else: store an explicit Map close (#343) before
+ * the page's scripts run, and hide the Map button, so the open-by-default
+ * desktop Map and its button stay out of the test's pixels.
+ */
+export async function hideMapBeforeLoad(page: Page): Promise<void> {
+  await page.addInitScript(
+    ({ keys, value }) => {
+      try {
+        for (const key of keys) localStorage.setItem(key, value);
+      } catch {
+        // No storage: the Map may open, and the style below still hides it.
+      }
+      document.addEventListener("DOMContentLoaded", () => {
+        const style = document.createElement("style");
+        style.textContent = ".overview-map, .overview-map-toggle { display: none !important; }";
+        document.head.append(style);
+      });
+    },
+    { keys: Object.values(MAP_OPEN_STORAGE_KEY), value: MAP_OPEN_VALUE.closed },
+  );
+}
 
 /**
  * Fail a test unless the live tower runs on the engine: the Rust engine is

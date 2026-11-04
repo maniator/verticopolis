@@ -228,7 +228,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // during initial load, so its capture must be in place before then. The chip
   // stays hidden until the play-gate trips (see tickInstallAffordance).
   initInstallAffordance(app);
-  // The overview map window (shown only behind its preview flag until it ships).
+  // The overview Map window (#343): open by default on desktop, closed on a phone.
   wireOverviewMap(app);
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({

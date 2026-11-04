@@ -57,9 +57,9 @@ export { WORLD_PRESS_CLASS } from "./overviewMapWorldPress";
 
 export { MAP_DOM_ID } from "./overviewMapDom";
 
-/** A press on the map. One that travels past the tap slop on the view mark
- *  drags the view by the pointer's travel; one that never travels, on the
- *  mark or off it, is a tap that centers the view where it lifts. */
+/** A press on the map. Past the tap slop, one on the view mark drags the view
+ *  by its travel and one elsewhere keeps the view centered under it; one that
+ *  never travels is a tap that centers the view where it lifts. */
 interface Press {
   readonly pointerId: number;
   readonly pointerType: string;
@@ -436,7 +436,7 @@ export class OverviewMapWindow {
       // straight back off the edge.
       this.deps.readCamera(this.cam);
       this.deps.moveCamera(dragCenter(layout, cameraCenter(this.cam), press.last, p));
-    }
+    } else this.deps.moveCamera(mapPointToCenter(layout, p.x, p.y));
     press.last = p;
   }
 

@@ -3,12 +3,8 @@
  * feeds it the view, the bound world and the camera, moves the camera through
  * the renderer's own clamp (`applyView`, which keeps the zoom), and follows the
  * phone breakpoint. The window lives beside the app in a weak map, so the app
- * class carries no field for it.
- *
- * Players do not see it yet: until the last slice ships (SPEC, Constraints),
- * the window is built only in a dev serve, a tooling build or a Vercel preview
- * deploy, and only when the page's address carries `?map`. In the production
- * deploy the gate is always false, so no player page ever builds the window.
+ * class carries no field for it. Every page builds it (SPEC, CAP-1): it opens
+ * by default on desktop and starts closed behind the Map pill on a phone.
  */
 import type { GameApp } from "../main";
 import type { FacilityKind } from "../engine/types";
@@ -19,28 +15,17 @@ import { browserStorage } from "../ui/overviewMapPrefs";
 import { OverviewMapWindow, type MutableMapCamera, type OverviewMapSource } from "../ui/overviewMapWindow";
 import { viewWorld, viewWorldBound } from "../presentation/viewWorld";
 
-/** The address flag that shows the window before it ships. */
-export const MAP_PREVIEW_FLAG = "map";
-
 const windows = new WeakMap<GameApp, OverviewMapWindow>();
-
-/** Whether this page shows the window: a dev serve, a tooling build or a
- *  Vercel preview deploy whose address carries the preview flag, with any
- *  value or none. */
-export function mapPreviewOn(search: string): boolean {
-  if (!(import.meta.env.DEV || __TOOLING_BUILD__ || __PREVIEW_DEPLOY__)) return false;
-  return new URLSearchParams(search).has(MAP_PREVIEW_FLAG);
-}
 
 /** A kind's height in floors from the catalog the view binds (CAP-7). */
 function floorsOf(kind: FacilityKind): number {
   return findViewKind(kind)?.floors ?? 1;
 }
 
-/** Build the window for `app` when the page shows it, once (a second call
- *  does nothing). Call after the engine exists. */
+/** Build the window for `app`, once (a second call does nothing). Call after
+ *  the engine exists. */
 export function wireOverviewMap(app: GameApp): void {
-  if (windows.has(app) || !mapPreviewOn(window.location.search)) return;
+  if (windows.has(app)) return;
   const stage = document.getElementById("stage");
   if (!stage) return;
   // One source object, refilled each frame, so reading the tower allocates
@@ -77,8 +62,7 @@ export function wireOverviewMap(app: GameApp): void {
   app.mobileMq.addEventListener("change", () => win.layoutChanged());
   windows.set(app, win);
   // The browser perf test reaches the window here (`e2e/overviewMapPerf.spec.ts`), in
-  // a dev serve or a tooling build only, like the `window.game` handle. The
-  // check stays when the preview flag goes.
+  // a dev serve or a tooling build only, like the `window.game` handle.
   if (import.meta.env.DEV || __TOOLING_BUILD__) (window as unknown as { overviewMap?: OverviewMapWindow }).overviewMap = win;
 }
 

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { buildToStar, expectEngineHosted } from "./helpers";
+import { buildToStar, hideMapBeforeLoad, expectEngineHosted } from "./helpers";
 
 // Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
@@ -38,6 +38,8 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
 test.describe("dialog chrome", () => {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   test.beforeEach(async ({ page }) => {
+    // These shots are of the dialogs. The Map (#343) opens by default on desktop, so hide it first.
+    await hideMapBeforeLoad(page);
     await page.goto("/");
     await page.waitForFunction(() => Boolean((window as any).game));
     // Same setup as the milestones progression: drop the splash overlay
@@ -229,6 +231,8 @@ test.describe("tower scene (region-composition tripwire)", () => {
   // invisible to single-unit shots). Day and night both: the night sparkle is
   // per-room-unique and exercises the lit path the rushes run in.
   test.beforeEach(async ({ page }) => {
+    // The Map (#343) opens by default on desktop and would cover the scene's corner.
+    await hideMapBeforeLoad(page);
     await page.goto("/");
     await page.waitForFunction(() => Boolean((window as any).game));
     await page.evaluate(() => document.getElementById("splash")?.remove());
@@ -305,13 +309,12 @@ test.describe("tower scene (region-composition tripwire)", () => {
   });
 });
 
-// The overview MAP window (#343), behind its `?map` preview flag until S5. The
-// shots are of the window alone: its two canvases redraw only when the tower
+// The overview MAP window (#343). The shots are of the window alone: its two canvases redraw only when the tower
 // or the camera changes, so a paused tower at a pinned camera is still.
 test.describe("overview map", () => {
   /** Boot with the map, grow the 3-star Classic tower and pin the camera. */
   async function classicMap(page: import("@playwright/test").Page): Promise<void> {
-    await page.goto("/?map");
+    await page.goto("/");
     await page.waitForFunction(() => Boolean((window as any).game));
     await page.evaluate(() => document.getElementById("splash")?.remove());
     expect(await page.evaluate(buildToStar, 3)).toBe(3);
@@ -346,7 +349,7 @@ test.describe("overview map", () => {
     });
 
     test("Modern map matches baseline", async ({ page }) => {
-      await page.goto("/?map");
+      await page.goto("/");
       await page.waitForFunction(() => Boolean((window as any).game));
       await page.evaluate(() => document.getElementById("splash")?.remove());
       await page.evaluate(() => {

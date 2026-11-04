@@ -25,8 +25,8 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * tripping on a slow runner. The measured numbers are printed for the PR.
  *
  * This is the map's own cost. The paired whole-frame run, map open against
- * map closed on the `large` fixture through the perf harness, comes in S5
- * before the preview flag comes off (SPEC CAP-6).
+ * map closed on the `large` fixture, goes through the perf harness
+ * (`npm run perf:worker -- --aa wasm --map-ab`, SPEC CAP-6).
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -44,7 +44,7 @@ test.use({ viewport: { width: 1280, height: 800 } });
 
 test("the map's cost on a large tower stays within its ceilings", async ({ page }) => {
   test.setTimeout(180_000);
-  await page.goto("/?map");
+  await page.goto("/");
   await page.waitForFunction(() => Boolean((window as any).game && (window as any).overviewMap));
   await page.evaluate(() => document.getElementById("splash")?.remove());
   // The 5-star rung: 62 floors of offices across the lot, the deep basement,
@@ -100,8 +100,18 @@ test("the map's cost on a large tower stays within its ceilings", async ({ page 
     }
     win.setOpen(true, false);
 
+    // The tower bitmap must hold the tower, so the timings above are of a
+    // real paint. The canvas starts each paint transparent (the sky and the
+    // ground are the body's CSS background), so count the painted pixels.
+    const bitmap = document.querySelector("#overview-map .overview-map-tower") as HTMLCanvasElement;
+    const pixels = bitmap.getContext("2d")!.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    let towerPixels = 0;
+    for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 0) towerPixels++;
+
     return {
       rooms: g.reader.rooms.length,
+      towerPixels,
+      bitmapPixels: bitmap.width * bitmap.height,
       openMs: median(open),
       steadyMs: median(steady),
       cameraMs: median(camera),
@@ -111,6 +121,9 @@ test("the map's cost on a large tower stays within its ceilings", async ({ page 
 
   console.log(`overview map perf: ${JSON.stringify(result)}`);
   expect(result.rooms).toBeGreaterThan(1000);
+  // A 5-star tower fills a good share of the map; an empty paint is a few
+  // stray pixels at most.
+  expect(result.towerPixels).toBeGreaterThan(result.bitmapPixels / 20);
   expect(result.openMs).toBeLessThan(OPEN_CEILING_MS);
   expect(result.steadyMs).toBeLessThan(STEADY_CEILING_MS);
   expect(result.cameraMs).toBeLessThan(CAMERA_CEILING_MS);

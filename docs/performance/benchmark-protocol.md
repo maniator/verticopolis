@@ -411,7 +411,12 @@ Other flags both accept: `--quick` (a 2-rep smoke test that never counts),
 `--resume DIR` (continue a run that stopped; it keeps its own folder, and an A/A folder resumes with `--aa <engine>` repeated),
 `--scenarios a,b`. `perf:compare` also takes `--throttles 1,4` and
 `--aa ts|wasm` (section 6.1);
-`perf:worker` also takes `--aa ts|wasm` (an A/A pass, section 6.1).
+`perf:worker` also takes `--aa ts|wasm` (an A/A pass, section 6.1), and with
+`--aa wasm` it takes `--map-ab`: the overview Map closed in slot "ts" and open in
+slot "wasm", on one build (SPEC-overview-map CAP-6). It renders at 1280x800
+unless `--viewport` is given, so the open Map is the desktop window (a phone-sized
+viewport measures the phone card). Its folder names `map-ab`, M4 calibration
+leaves it out, and a stopped pass resumes with `--aa wasm --map-ab` repeated.
 `perf:restore` takes `--quick`, `--scenarios`, `--throttles`, `--skip-build`
 and `--out`, but not `--resume`: a stopped run starts again in a new folder,
 and its `results.json` keeps the runs it finished. In PowerShell, quote a

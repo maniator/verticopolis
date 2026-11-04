@@ -9,8 +9,6 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * (CAP-3), the keys, focus and layout checks (CAP-5), the defaults (CAP-1),
  * and that the world behind it builds, inspects, pans and pinches the same
  * with the map open.
- * The window is built only behind the `?map` preview flag until S5, so every
- * page here opens with it.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -18,10 +16,10 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
 
-/** Boot the page with the map flag, drop the title screen and grow a 3-star
- *  tower (paused), so the map has rooms to draw and the camera room to move. */
+/** Boot the page, drop the title screen and grow a 3-star tower (paused), so
+ *  the map has rooms to draw and the camera room to move. */
 async function boot(page: Page): Promise<void> {
-  await page.goto("/?map");
+  await page.goto("/");
   await page.waitForFunction(() => Boolean((window as any).game));
   await page.evaluate(() => document.getElementById("splash")?.remove());
   await page.evaluate(buildToStar, 3);
@@ -80,10 +78,7 @@ async function mapBox(page: Page): Promise<{ x: number; y: number; width: number
 test.describe("overview map on the desktop", () => {
   test.use({ viewport: DESKTOP });
 
-  test("is built only with the preview flag, and opens by default", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForFunction(() => Boolean((window as any).game));
-    await expect(page.locator("#overview-map")).toHaveCount(0);
+  test("is on every page, and opens by default", async ({ page }) => {
     await boot(page);
     await expect(page.locator("#overview-map")).toBeVisible();
     await expect(page.locator("#btn-map")).toBeHidden();
@@ -118,6 +113,24 @@ test.describe("overview map on the desktop", () => {
     expect(Math.abs(moved - travel)).toBeLessThan(2);
     // A mouse press never takes keyboard focus off the world.
     expect(await page.evaluate(() => document.activeElement?.closest("#overview-map") ?? null)).toBeNull();
+  });
+
+  test("a drag that starts away from the view mark brings the view to the pointer", async ({ page }) => {
+    await boot(page);
+    const box = await mapBox(page);
+    const x = box.x + box.width / 2;
+    const target = box.y + box.height * 0.75;
+    // Learn the floor at the drag's end, then move the view well away from it.
+    const there = await floorAfterClickAt(page, x, target);
+    const away = await floorAfterClickAt(page, x, box.y + box.height * 0.3);
+    expect(away).toBeGreaterThan(there + 5);
+    // Press far from the view mark and drag to the target: the view follows the pointer there.
+    await page.mouse.move(x, box.y + box.height * 0.9);
+    await page.mouse.down();
+    await page.mouse.move(x, target, { steps: 6 });
+    await page.mouse.up();
+    const floor = await cameraFloorSettles(page, (f) => Math.abs(f - there) < 1);
+    expect(Math.abs(floor - there)).toBeLessThan(1);
   });
 
   test("keys move the view while the map has focus, and Escape closes it", async ({ page }) => {
@@ -173,14 +186,14 @@ test.describe("overview map on the desktop", () => {
         // inset, 150 by up to 62 px (towerOverlay.ts, drawHeatLegend).
         const legend = new DOMRect(view.left + 12, view.top + 12, 150, 62);
         const others: Record<string, DOMRect> = { legend };
-        for (const id of ["sidebar", "palette", "overlay-mode"]) {
+        for (const id of ["sidebar", "palette", "overlay-mode", "hint"]) {
           const r = document.getElementById(id)?.getBoundingClientRect();
           if (r && r.width > 0 && r.height > 0) others[id] = r;
         }
         const hit = (r: DOMRect) => r.right > map.left && r.left < map.right && r.bottom > map.top && r.top < map.bottom;
         return { checked: Object.keys(others), overlapping: Object.keys(others).filter((k) => hit(others[k])) };
       });
-      expect(overlaps.checked, `${size.width}x${size.height}`).toEqual(expect.arrayContaining(["legend", "sidebar", "palette"]));
+      expect(overlaps.checked, `${size.width}x${size.height}`).toEqual(expect.arrayContaining(["legend", "sidebar", "palette", "hint"]));
       expect(overlaps.overlapping, `${size.width}x${size.height}`).toEqual([]);
     }
   });
@@ -231,7 +244,8 @@ test.describe("overview map on the desktop", () => {
     // Bare floor on floor 4, left of the offices (which start at tile 34) and
     // clear of the map window.
     await page.evaluate(() => (window as any).game.engine.setCamera(20, 4, 1));
-    // The camera moves on the next frame.
+    // setCamera moves the camera at once; the frames let the renderer draw
+    // the new view before the click below lands on it.
     await nextFrames(page);
     const at = await page.evaluate(() => {
       const g = (window as any).game;
@@ -250,6 +264,17 @@ test.describe("overview map on the desktop", () => {
     await expect(page.locator("#overview-map")).toBeHidden();
     await page.reload();
     await page.waitForFunction(() => Boolean((window as any).game));
+    await expect(page.locator("#btn-map")).toBeVisible();
+    await expect(page.locator("#overview-map")).toBeHidden();
+  });
+
+  test("a closed map stays closed on a new tower", async ({ page }) => {
+    await boot(page);
+    await page.click("#overview-map .overview-map-close");
+    await expect(page.locator("#overview-map")).toBeHidden();
+    await page.evaluate(() => (window as any).game.saveLoad.newGame("modern"));
+    await page.waitForFunction(() => (window as any).game.reader.header.mode === "modern");
+    await nextFrames(page);
     await expect(page.locator("#btn-map")).toBeVisible();
     await expect(page.locator("#overview-map")).toBeHidden();
   });
@@ -291,6 +316,43 @@ test.describe("overview map on a phone", () => {
       expect(card.width, at).toBeGreaterThan(140);
       expect(card.width, at).toBeLessThan(170);
       expect(card.height, at).toBeLessThanOrEqual(card.stageHeight / 2 + 1);
+    }
+  });
+
+  test("with a heatmap on, the card moves below the heatmap legend and stays clear of the build controls", async ({ page }) => {
+    // Two boots, each growing a 3-star tower.
+    test.setTimeout(90_000);
+    // The picker sits in the closed phone drawer, so the test sets it directly.
+    const pick = (mode: string) =>
+      page.evaluate((m) => {
+        const select = document.getElementById("overlay-mode") as HTMLSelectElement;
+        select.value = m;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      }, mode);
+    const place = () =>
+      page.evaluate(() => {
+        const map = document.getElementById("overview-map")!.getBoundingClientRect();
+        const view = document.getElementById("view")!.getBoundingClientRect();
+        const stage = document.getElementById("stage")!.getBoundingClientRect();
+        const palette = document.getElementById("palette")!.getBoundingClientRect();
+        const overlapsPalette = palette.width > 0 && map.left < palette.right && map.right > palette.left && map.top < palette.bottom && map.bottom > palette.top;
+        return { top: map.top - view.top, bottom: map.bottom, stageBottom: stage.bottom, overlapsPalette };
+      });
+    // Portrait, and landscape (a short screen counts as a phone too).
+    for (const size of [PHONE, { width: PHONE.height, height: PHONE.width }]) {
+      await page.setViewportSize(size);
+      await boot(page);
+      if (await page.locator("#overview-map").isHidden()) await page.locator("#btn-map").tap();
+      await expect(page.locator("#overview-map")).toBeVisible();
+      const at = `${size.width}x${size.height}`;
+      // The Housekeeping legend is the tallest: 62 px, drawn 12 px in.
+      await pick("cleanliness");
+      const on = await place();
+      expect(on.top, at).toBeGreaterThanOrEqual(12 + 62);
+      expect(on.bottom, at).toBeLessThanOrEqual(on.stageBottom);
+      expect(on.overlapsPalette, at).toBe(false);
+      await pick("");
+      await expect.poll(async () => (await place()).top, { message: at }).toBeLessThan(16);
     }
   });
 
@@ -377,5 +439,33 @@ test.describe("overview map on a phone", () => {
     expect(layout.leftEdge).toBe("btn-map");
     expect(layout.rightEdge).toBe("btn-map");
     expect(layout.coveredControls).toBe(0);
+  });
+
+  test("a Map opened during onboarding sits above the Getting Started card and still closes", async ({ page }) => {
+    await boot(page);
+    await page.evaluate(() => {
+      const g = (window as any).game;
+      g.onboarding.arm(g.enginePort);
+      // With a heatmap on, the card moves down to where the Getting Started card is.
+      const pick = document.getElementById("overlay-mode") as HTMLSelectElement;
+      pick.value = "congestion";
+      pick.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await expect(page.locator("#onboard")).toBeVisible();
+    await page.locator("#btn-map").tap();
+    await expect(page.locator("#overview-map")).toBeVisible();
+    const close = page.locator("#overview-map .overview-map-close");
+    const box = (await close.boundingBox())!;
+    // The close button lies inside the Getting Started card's box, so only the stacking keeps it reachable.
+    const card = (await page.locator("#onboard").boundingBox())!;
+    expect(box.y + box.height / 2).toBeGreaterThan(card.y);
+    expect(box.y + box.height / 2).toBeLessThan(card.y + card.height);
+    const onTop = await page.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.closest(".overview-map-close") !== null,
+      { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+    );
+    expect(onTop).toBe(true);
+    await close.tap();
+    await expect(page.locator("#overview-map")).toBeHidden();
   });
 });

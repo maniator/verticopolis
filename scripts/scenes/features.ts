@@ -1,5 +1,5 @@
 /**
- * Feature scenes (map overlays, basement, stats, traffic HUD, lobby awnings,
+ * Feature scenes (Floor heatmaps, basement, stats, traffic HUD, lobby awnings,
  * responsive layout). Part of the SCENES manifest; concatenated in order by
  * `screenshot-scenes.ts`. Each `build`/`setup` that runs in the page references
  * an injected builder by identity. Keep ERASABLE.
@@ -22,7 +22,7 @@ import {
 
 export const FEATURE_SCENES: Scene[] = [
   // ======================= FEATURES =======================
-  // --- Map overlays -----------------------------------------------------------
+  // --- Floor heatmaps ---------------------------------------------------------
   {
     id: "overlays",
     outDir: "features",

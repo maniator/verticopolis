@@ -21,6 +21,7 @@
 import { type Scene } from "./screenshot-env.ts";
 import { SHOWCASE_SCENES } from "./scenes/showcase.ts";
 import { FEATURE_SCENES } from "./scenes/features.ts";
+import { OVERVIEW_MAP_SCENES } from "./scenes/overviewMap.ts";
 import { PRICING_SCENES } from "./scenes/pricing.ts";
 import { SCHEDULE_SCENES } from "./scenes/schedule.ts";
 import { CLASSIC_VS_MODERN_SCENES } from "./scenes/classic-vs-modern.ts";
@@ -33,6 +34,7 @@ import { FOUNDER_SCENES } from "./scenes/founder.ts";
 export const SCENES: Scene[] = [
   ...SHOWCASE_SCENES,
   ...FEATURE_SCENES,
+  ...OVERVIEW_MAP_SCENES,
   ...PRICING_SCENES,
   ...SCHEDULE_SCENES,
   ...CLASSIC_VS_MODERN_SCENES,

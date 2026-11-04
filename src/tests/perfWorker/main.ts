@@ -18,6 +18,7 @@ import { modeOrder, runMode, type ModeRun, type WorkerConfig } from "./runner";
 import { markdown } from "./report";
 import { buildProduction, buildTooling } from "./build";
 import { AA_SLOTS, aaLimitation, checkAaFolder, parseAa, type AaMode } from "./aa";
+import { checkMapAb, checkMapAbFolder, MAP_AB_LIMITATION, MAP_AB_VIEWPORT } from "./mapAb";
 
 /**
  * `npm run perf:worker`: the engine-host comparison, now the `ts` and `wasm`
@@ -43,11 +44,14 @@ export interface Args {
   viewport: { width: number; height: number };
   /** `--aa ts|wasm`: an A/A pass, the same mode in both slots (aa.ts). */
   aa: AaMode | null;
+  /** `--map-ab` (with `--aa wasm`): the Map closed in slot "ts" and open in slot "wasm" (mapAb.ts). */
+  mapAb: boolean;
 }
 
 export function parseArgs(argv: readonly string[]): Args {
-  const a: Args = { reps: 10, quick: false, skipBuild: false, aa: null, out: null, resume: null, scenarios: null, viewport: { ...DEFAULT_VIEWPORT } };
+  const a: Args = { reps: 10, quick: false, skipBuild: false, aa: null, mapAb: false, out: null, resume: null, scenarios: null, viewport: { ...DEFAULT_VIEWPORT } };
   let repsSet = false;
+  let viewportSet = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const next = (): string => {
@@ -57,6 +61,7 @@ export function parseArgs(argv: readonly string[]): Args {
     };
     if (arg === "--quick") a.quick = true;
     else if (arg === "--aa") a.aa = parseAa(next());
+    else if (arg === "--map-ab") a.mapAb = true;
     else if (arg === "--skip-build") a.skipBuild = true;
     else if (arg === "--reps") {
       a.reps = Number(next());
@@ -74,11 +79,14 @@ export function parseArgs(argv: readonly string[]): Args {
       const height = m ? Number(m[2]) : 0;
       if (width < 320 || height < 240 || width > 7680 || height > 4320) throw new Error("--viewport needs WIDTHxHEIGHT in CSS pixels, from 320x240 to 7680x4320 (for example 1280x720)");
       a.viewport = { width, height };
+      viewportSet = true;
     }
-    else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --viewport WxH, --aa ts|wasm`);
+    else throw new Error(`unknown argument ${arg}; expected --reps N, --quick, --skip-build, --out DIR, --resume DIR, --scenarios a,b, --viewport WxH, --aa ts|wasm, --map-ab`);
   }
   if (a.quick && !repsSet) a.reps = 2;
   if (a.resume && a.out) throw new Error("--resume continues its own folder; it takes no --out");
+  checkMapAb(a.mapAb, a.aa);
+  if (a.mapAb && !viewportSet) a.viewport = { ...MAP_AB_VIEWPORT };
   return a;
 }
 
@@ -110,8 +118,12 @@ export function makeConfig(args: Args, scenarios: string[]): WorkerConfig {
     modes: args.aa ? [...AA_SLOTS] : [...MODES],
     quick: args.quick,
     aa: args.aa,
+    ...(args.mapAb ? { mapAb: true } : {}),
   };
 }
+
+/** Where a non-default viewport came from, for the frames limitation. */
+const viewportSource = (config: WorkerConfig): string => (config.mapAb ? " (the Map A/B pass's desktop default, or --viewport)" : " (set with --viewport)");
 
 /** The report's limitations, worded from the run's own configuration. */
 export function limitations(config: WorkerConfig, renderers: readonly string[] = [], exception: string | null = null, tsBaseline: BaselineRecord | null = null): string[] {
@@ -120,6 +132,7 @@ export function limitations(config: WorkerConfig, renderers: readonly string[] =
   const firstText = firsts.every((n) => n === firsts[0]) ? `each mode first ${firsts[0]} time(s)` : `modes first between ${Math.min(...firsts)} and ${Math.max(...firsts)} times`;
   return [
   ...(config.aa ? [aaLimitation(config.aa)] : []),
+  ...(config.mapAb ? [MAP_AB_LIMITATION] : []),
   ...(tsBaseline ? [config.aa === "ts" ? aaBaselineLimitation(tsBaseline) : baselineLimitation(tsBaseline)] : []),
   "One machine and one headless browser (its name and version are in the Browser row). The renderer line says whether the page used the GPU; a software rasterizer fails validation in a protocol run, because render cost then dominates every frame and the FPS rows say more about the CPU than about GPU-backed frame rates.",
   "CPU throttling is DevTools emulation of the page's main thread. Chromium refuses it on worker targets and a page-level throttle leaves a dedicated worker nearly unthrottled (probed on Chromium 141: a busy loop took 41 ms at 1x and 44 to 58 ms with the page at 4x, 7 to 41% slower against about 4x on the main thread). So at a throttle above 1x the worker host's main thread ran throttled and its engine thread did not; its rows are marked † and carry an `unthrottled` column in the CSVs. A comparison of the worker host with a main-thread host at that throttle favors the worker. Two runs of the same mode are comparable with each other.",
@@ -127,7 +140,7 @@ export function limitations(config: WorkerConfig, renderers: readonly string[] =
   "The worker host keeps one batch in flight. A frame that finds a batch still out takes no steps (the frame loop banks its minutes under the 30-minute cap), so on a tower the engine cannot step in real time the worker host simulates fewer minutes per second rather than queueing work; the sim-minutes-per-second row shows it.",
   "Command latency times a tower rename (relayed by every host, read by nothing in the simulation) from the call to the clock inside the first frame callback that runs once the engine's answer is in the read model. The main-thread hosts answer in the call, so their figure is the wait for the next frame callback. One command is in flight at a time, one per second. A negative sample fails validation.",
   `Memory is measured after ${config.memorySteps} steps on a freshly loaded page, after a forced GC. The harness keeps the scenario saves it loads from in the page for every mode (the same text in every mode's JS heap rows); its own stashed start and end saves are dropped before the read. WASM linear memory only grows, so it is a high-water mark that includes the boot tower. The worker's JS heap is read through the DevTools target protocol; when that is unavailable the combined row has no worker sample. Process PSS sums the browser's processes (Linux).`,
-  `Frames render at a ${config.viewport.width}x${config.viewport.height} CSS viewport${config.viewport.width === DEFAULT_VIEWPORT.width && config.viewport.height === DEFAULT_VIEWPORT.height ? " (the default, a common phone size), smaller than perf:compare's 1280x720: on the 4-CPU container with software WebGL the harness was built on, a 1280x720 frame took about 250 ms, past Excalibur's 200 ms clamp, so at that size the modes simulated almost nothing in their frames" : " (set with --viewport)"}. A frame longer than 200 ms is handed 1 ms of game time, so rows with clamped frames understate the simulation work; the clamped-frame row counts them.`,
+  `Frames render at a ${config.viewport.width}x${config.viewport.height} CSS viewport${!config.mapAb && config.viewport.width === DEFAULT_VIEWPORT.width && config.viewport.height === DEFAULT_VIEWPORT.height ? " (the default, a common phone size), smaller than perf:compare's 1280x720: on the 4-CPU container with software WebGL the harness was built on, a 1280x720 frame took about 250 ms, past Excalibur's 200 ms clamp, so at that size the modes simulated almost nothing in their frames" : viewportSource(config)}. A frame longer than 200 ms is handed 1 ms of game time, so rows with clamped frames understate the simulation work; the clamped-frame row counts them.`,
   "Message sizes are counted on the way in (frame views, full saves, events, log and pending text at two bytes a character); the way out (steps and commands, a few numbers each) is not measured, so as not to serialize every message twice on the measured thread.",
   "The serialize and deserialize halves of the full save are split only on the worker host (the worker's reply time includes the serialize, the main thread's merge time the parse and merge). The main-thread hosts' read-model sync is split in perf:compare's attribution pass.",
   `Throttles run in a fixed order (${config.throttles.map((t) => `${t}x`).join(" then ")}) in each process. The mode order rotates by repetition (${config.reps} repetitions over ${k} modes: ${firstText}). The throttled cold start throttles before the navigation and again at commit; its CPU probe runs after startup, so a throttle gap at navigation would not show.`,
@@ -265,14 +278,15 @@ export async function main(argv: readonly string[], repo: string): Promise<numbe
     if (args.out) {
       checkExceptionFolder(basename(resolve(repo, args.out)), launch.rendererException);
       checkAaFolder(basename(resolve(repo, args.out)), args.aa);
+      checkMapAbFolder(basename(resolve(repo, args.out)), args.mapAb);
     }
-    out = args.out ? resolve(repo, args.out) : resolve(repo, "docs/performance/results", `${day}-${environment.commitShort}-worker${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${launch.rendererException ? `-${exceptionMarker(launch.rendererException)}` : ""}${environment.dirty ? "-dirty" : ""}`);
+    out = args.out ? resolve(repo, args.out) : resolve(repo, "docs/performance/results", `${day}-${environment.commitShort}-worker${args.quick ? "-quick" : ""}${args.aa ? `-aa-${args.aa}` : ""}${args.mapAb ? "-map-ab" : ""}${launch.rendererException ? `-${exceptionMarker(launch.rendererException)}` : ""}${environment.dirty ? "-dirty" : ""}`);
     if (existsSync(out)) throw new Error(`${out} already exists; results are never overwritten`);
     mkdirSync(out, { recursive: true });
     writeFileSync(join(out, "checkpoint.json"), JSON.stringify({ ...meta, startedAt }, null, 1) + "\n");
     writeFileSync(join(out, "runs.jsonl"), "");
   }
-  log(`perf:worker: measuring ${environment.commit}${environment.dirty ? " (dirty)" : ""}, ${config.reps} reps of ${config.aa ? `${config.aa} in both slots (A/A)` : config.modes.join(", ")}`);
+  log(`perf:worker: measuring ${environment.commit}${environment.dirty ? " (dirty)" : ""}, ${config.reps} reps of ${config.aa ? `${config.aa} in both slots (A/A${config.mapAb ? ", the Map closed in slot ts and open in slot wasm" : ""})` : config.modes.join(", ")}`);
   const servers = await startArmServers(distPerf, distTs, needsBaseline);
   try {
     for (let rep = 0; rep < config.reps; rep++) {

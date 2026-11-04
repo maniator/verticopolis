@@ -10,11 +10,6 @@ declare const __TS_ENGINE_SOURCES__: string;
  *  and perf pipelines). Gates the `window.game` handle: a production build
  *  compiles the publish away entirely (see bootstrap.ts). */
 declare const __TOOLING_BUILD__: boolean;
-/** True only in a Vercel preview deploy (`isPreviewDeploy` in
- *  src/build/previewDeploy.ts). Lets an
- *  address-flagged preview such as `?map` build there; the production deploy
- *  gets false. It never publishes the `window.game` handle. */
-declare const __PREVIEW_DEPLOY__: boolean;
 /** The engine package this shell was built with: its package id and the
  *  digests of the glue and the binary, from src/public/engine/BUILD.json
  *  (see src/wasmhost/enginePackageRecord.ts). Null when the build carries no

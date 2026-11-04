@@ -87,6 +87,7 @@ describe("calibrateM4", () => {
       workerPass(27, { gpuVerified: null }),
       workerPass(28, { contextLost: null }),
       workerPass(29, { contextLost: ["webglcontextlost at 12 ms"] }),
+      workerPass(30, { aa: "wasm", mapAb: true }),
     ];
     const c = calibrate(folders);
     expect(c.passes).toHaveLength(10);
@@ -101,6 +102,7 @@ describe("calibrateM4", () => {
     expect(reason("aa-worker-27")).toMatch(/gpuVerified/);
     expect(reason("aa-worker-28")).toMatch(/no WebGL context-loss record/);
     expect(reason("aa-worker-29")).toMatch(/lost its WebGL context/);
+    expect(reason("aa-worker-30")).toMatch(/Map A\/B pass/);
   });
 
   it("reads the context-loss record of every process run, not the first or any one", () => {

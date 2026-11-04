@@ -5,6 +5,7 @@ import type { Metric, Ratio } from "./analysis";
 import type { WorkerResults } from "./main";
 import type { ModeName } from "./pageWorker";
 import { aaBanner } from "./aa";
+import { mapAbBanner } from "./mapAb";
 
 /** report.md for a `perf:worker` run: the snapshot header, the medians per
  *  mode with their intervals, and the paired ratios against the shipped
@@ -56,10 +57,12 @@ export function markdown(res: WorkerResults): string {
   const env = res.environment;
   const lines: string[] = [];
   const aa = res.config.aa ?? null;
-  lines.push(aa ? `# Worker host A/A pass (npm run perf:worker -- --aa ${aa})` : "# Worker host benchmark (npm run perf:worker)");
+  const aaTitle = aa ? `# Worker host A/A pass (npm run perf:worker -- --aa ${aa})` : "# Worker host benchmark (npm run perf:worker)";
+  lines.push(res.config.mapAb ? "# Map A/B pass (npm run perf:worker -- --aa wasm --map-ab)" : aaTitle);
   lines.push("");
   lines.push(`> **Snapshot, measured ${res.startedAt} to ${res.generatedAt} on commit \`${env.commitShort}\` (app ${env.appVersion})${env.dirty ? ", dirty tree" : ""}.** Live numbers: re-run \`npm run perf:worker\` (src/tests/perfWorker/, its arithmetic pinned by src/tests/perfWorker/analysis.test.ts). ${res.validation.ok ? "Validation passed." : "VALIDATION FAILED: see the end of this report."}`);
-  if (aa) lines.push("", aaBanner(aa));
+  // A Map A/B pass is no A/A input, so its own banner replaces the A/A one.
+  if (aa) lines.push("", res.config.mapAb ? mapAbBanner : aaBanner(aa));
   for (const banner of rendererBanners(res.browser, res.config.quick)) lines.push("", banner);
   lines.push("");
   if (treeSummary(env.tree, env.dirty)) lines.push(`- Working tree: ${treeSummary(env.tree, env.dirty)}`);

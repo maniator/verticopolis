@@ -92,6 +92,12 @@
   right: 10px;
   bottom: 10px;
 }
+/* The desktop hint bar (bottom center, hidden on a phone) centers in the room
+   left of the open Map and wraps there, so it never runs under the window. */
+#stage:has(> .overview-map:not([hidden])) > #hint {
+  left: calc((100% - 226px) / 2);
+  max-width: calc(100% - 246px);
+}
 
 /* Phone tier: the same query as `mobileMq` in src/main.ts. */
 @media (max-width: 767px), (max-width: 1023px) and (max-height: 599px) {
@@ -102,9 +108,24 @@
     bottom: auto;
     max-height: 50%;
   }
+  /* While the Getting Started card (z 25, across the top of a phone) is up
+     and the Map is open, the Map card sits above it and keeps its close button.
+     The inspector, the editor and the toasts come later in the stage at the
+     same level, so they still paint over the card, and the drawer stays above
+     them all. With the Map closed nothing changes. */
+  body:has(> #onboard.onboard--mobile) #stage:has(> .overview-map:not([hidden])) > :is(.overview-map, #inspector, #editor, #toast-wrap) {
+    z-index: 26;
+  }
   .overview-map-body {
     width: 150px;
     height: 216px;
+  }
+  /* The renderer draws the Floor heatmap legend at the world view's top-left
+     (12 px in, up to 62 px tall), the corner the card takes. While a heatmap
+     is on, the card moves down below the legend so both stay readable. */
+  body:has(#overlay-mode option:checked:not([value=""])) .overview-map {
+    top: max(82px, env(safe-area-inset-top));
+    max-height: min(50%, calc(100% - 92px));
   }
   /* The pill keeps the bottom-right corner, clear of the Floor heatmap
      legend at the top-left, at 44 px wide. On a 320 px phone the open editor

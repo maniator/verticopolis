@@ -125,7 +125,7 @@ export async function expectSoundsAfterGesture(page: Page): Promise<void> {
 
   // The first gesture starts the audio (src/game/inputKeys.ts's kick). A
   // click is a real user activation; a modifier-only key press is not.
-  const box = await page.locator("canvas").first().boundingBox();
+  const box = await page.locator("#view").boundingBox();
   expect(box, "the tower canvas is on screen").not.toBeNull();
   await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
   await page.waitForFunction(() => !!(window as any).game.audio.impl?.started, undefined, { timeout: 30_000 });
