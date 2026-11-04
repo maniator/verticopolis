@@ -201,6 +201,7 @@ fn read_elevator_table(r: &mut ByteReader, layout: PayloadLayout, resync: bool) 
             bottom_floor,
             serviced,
             car_homes,
+            record: header_at..r.offset(),
         });
     }
     TableWalk {
@@ -302,6 +303,7 @@ pub fn walk_tolerant_tail(r: &mut ByteReader) -> TdtTail {
         );
         return tail;
     }
+    tail.people_at = Some(r.offset());
     let people_count = r.u32().expect("four bytes remain");
     if people_count > TDT_MAX_PEOPLE {
         tail.warnings.push(

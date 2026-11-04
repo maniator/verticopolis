@@ -14,6 +14,10 @@ pub mod export_gather;
 pub mod export_parking;
 pub mod export_report;
 pub mod export_tables;
+#[cfg(any(test, feature = "conformance"))]
+pub mod fixtures;
+#[cfg(test)]
+mod fixtures_tests;
 pub mod format;
 pub mod import;
 pub mod import_report;
