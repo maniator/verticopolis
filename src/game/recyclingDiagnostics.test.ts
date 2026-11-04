@@ -18,7 +18,7 @@ describe("the recycling card lines", () => {
     expect(out).toContain("100");
   });
 
-  it("word the engine's verdict, not a comparison of the numbers", () => {
+  it("follow the engine's verdict even when the numbers disagree with it", () => {
     expect(text(recyclingLinesOf(9000, 2500, 1, true))).toContain("demand met");
     expect(text(recyclingLinesOf(100, 2500, 0.1, false))).toContain("Over capacity");
   });

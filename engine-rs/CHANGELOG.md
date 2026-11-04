@@ -17,7 +17,7 @@ existed as a step inside a stacked branch.
 
 ## 1.11.0 (2026-11-03)
 
-- Two card verdicts now come from the engine. The `shaftCard` record gains a `nearCapacity` slot (1 when the shaft's average car load is above 85%, else 0; a shaft with no reading is 0), placed right after `utilization`, so the slots after it move up by one. A new read-only `recyclingDemandMet()` on the port and the binding answers whether the working recycling centers can process the whole population. The host used to compare the load with 0.85 and the population with the capacity itself. The transport detail the stats and inspector read also carries `nearCapacity`. No saved-game, frame, catalog or identity change.
+- Two card verdicts now come from the engine. The `shaftCard` record gains a `nearCapacity` slot (1 when the shaft's average car load is above 85%, else 0; a shaft with no reading is 0), placed right after `utilization`, so the slots after it move up by one. A new read-only `recyclingDemandMet()` on the port and the binding answers whether the working recycling centers can process the whole population. The host used to compare the load with 0.85 and the population with the capacity itself. The transport detail the stats and inspector read also carries `nearCapacity`. The view layout is now version 10; the save and frame layouts and the catalog are unchanged.
 
 ## 1.10.1 (2026-11-03)
 
