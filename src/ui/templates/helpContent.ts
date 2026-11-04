@@ -29,7 +29,7 @@ export interface HelpSection {
 export function helpLede(): TemplateResult {
   return html`
     <p>Build a thriving high-rise and earn your way to a coveted <b>TOWER</b> rating.</p>
-    <p style="color:var(--muted)">Mouse: drag to pan with the Inspect tool; with a build tool, hold <b>Shift</b> (or Space) and drag to pan, and a middle or right button drag pans too. Scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the Undo button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
+    <p style="color:var(--muted)">Mouse: drag to pan with the Inspect tool; with a build tool, hold <b>Shift</b> (or Space) and drag to pan, and a middle-button drag pans too. Scroll to zoom, click to build, right-click or the Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the Undo button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
     <p style="color:var(--muted)">Touch: press and drag on the tower to build (a ghost shows where the room lands), two fingers to pan, pinch to zoom, tap a room with Inspect to edit it. Full guide under <b>Playing on a phone</b> below.</p>
   `;
 }

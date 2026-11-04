@@ -23,9 +23,9 @@ notes, never a past version's.
 
 ## 2.85.1
 
-- Undo no longer brings the VIP back early after a visit, and undoing the last Wedding Hall calls off the VIP's visit, as selling it does.
-- Undo no longer renames a room that has taken a new name since, such as an office named for the company that moved in.
-- Pressing Undo partway through dragging an elevator's end arrow ends the drag, as it ends every other drag.
+- Holding Space before a mouse drag now pans the view without building or clicking a focused control. Tapping Space acts at the keyboard cursor when you let go.
+- Holding Enter, Delete, Backspace or X at the keyboard cursor acts once instead of repeating.
+- The help no longer says a right-button drag pans: a right-click inspects a room.
 
 ## 2.85.0
 

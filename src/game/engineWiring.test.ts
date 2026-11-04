@@ -39,6 +39,7 @@ const mockRunFrame = vi.mocked(runFrame);
 
 interface FakeEngine {
   classifyDown?: (...a: unknown[]) => unknown;
+  spacePanKey?: (press?: Event) => boolean;
   onTap?: (tile: number, floor: number, touch: boolean, picked: unknown) => void;
   onActionDown?: (tile: number, floor: number, touch: boolean, picked: unknown) => void;
   onActionMove?: (tile: number, floor: number, picked: unknown) => void;
@@ -120,6 +121,7 @@ describe("wireEngine installs all engine callbacks", () => {
     wireEngine(app);
     for (const hook of [
       "classifyDown",
+      "spacePanKey",
       "onTap",
       "onActionDown",
       "onActionMove",
@@ -138,6 +140,12 @@ describe("wireEngine installs all engine callbacks", () => {
     }
     // classifyDown routes through the real gesture classifier without throwing.
     expect(() => app.engine.classifyDown!(0, false, { x: 0, y: 0 })).not.toThrow();
+    // The camera's pan key is the game's Space hold as the press went down,
+    // read per call (the hold is installed after the engine is wired).
+    const press = new Event("pointerdown");
+    app.spacePanKey = (p) => p === press;
+    expect(app.engine.spacePanKey!(press)).toBe(true);
+    expect(app.engine.spacePanKey!()).toBe(false);
   });
 });
 
@@ -313,14 +321,10 @@ describe("secondary + extend", () => {
   });
 
   it("onExtendEnd leaves the open gesture alone when something ended the drag first", () => {
-    const app = makeApp();
-    wireEngine(app);
-    vi.mocked(app.editor.endExtend).mockReturnValue(false);
-    app.engine.onExtendEnd!();
-    expect(app.commitUndo).not.toHaveBeenCalled();
+    const app = makeApp(); wireEngine(app); vi.mocked(app.editor.endExtend).mockReturnValue(false);
+    app.engine.onExtendEnd!(); expect(app.commitUndo).not.toHaveBeenCalled();
   });
 });
-
 describe("onUpdate", () => {
   it("runs the frame each tick", () => {
     const app = makeApp();

@@ -46,7 +46,7 @@ describe("classifyGesture — the pan-vs-act routing matrix", () => {
   it("inspect always pans; a non-left button or held pan key always pans", () => {
     expect(classifyGesture(CAT, { type: "inspect" }, 0, TOUCH, false)).toBe("pan");
     expect(classifyGesture(CAT, { type: "inspect" }, 0, MOUSE, false)).toBe("pan");
-    expect(classifyGesture(CAT, build("floor"), 1, TOUCH, false)).toBe("pan"); // middle/right button
+    expect(classifyGesture(CAT, build("floor"), 1, TOUCH, false)).toBe("pan"); // middle button
     expect(classifyGesture(CAT, build("floor"), 0, MOUSE, true)).toBe("pan"); // Space/Shift held
   });
 

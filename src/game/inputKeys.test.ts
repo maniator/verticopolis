@@ -1,20 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { GameApp } from "../main";
-import { bindKeys } from "./inputKeys";
 import { flushPrefsSave } from "./audioPrefs";
 import { CRASH_SCREEN_ID } from "../ui/crashScreen";
 import { setHistoryButtons } from "../ui/uiStatus";
+import { makeApp, press, tap } from "./inputKeys.fixture";
 
 /**
  * These pin the keyboard-play / audio-kick / pagehide wiring installed by
  * `bindKeys(app)`. Each call reaches the LIVE `app.engine`/`app.keyboard`/etc.
- * per event, so a hand-built fake app of `vi.fn()` stubs is enough. `bindKeys`
- * adds its listeners to `window`, and those listeners accumulate across calls
- * within this file (happy-dom shares one window). We lean into that: every test
- * builds a FRESH app and calls `bindKeys` once for it, then asserts only on
- * THAT app's stubs. Older listeners still fire against their own (discarded)
- * apps, which is harmless because the current app's stub is driven by exactly
- * one listener (its own), so per-test call counts stay exact.
+ * per event, so a hand-built fake app of `vi.fn()` stubs is enough. Every test
+ * builds a FRESH app (`makeApp` in `inputKeys.fixture.ts`), which takes the
+ * previous app's window listeners down first, so only the current app hears a
+ * key and per-test call counts stay exact.
  *
  * `flushPrefsSave` is mocked so the pagehide wiring can be asserted without
  * reaching storage; `CRASH_SCREEN_ID` is the real constant so the crash-guard
@@ -22,60 +18,6 @@ import { setHistoryButtons } from "../ui/uiStatus";
  */
 
 vi.mock("./audioPrefs", () => ({ flushPrefsSave: vi.fn() }));
-
-interface FakeApp {
-  undo: ReturnType<typeof vi.fn>;
-  redo: ReturnType<typeof vi.fn>;
-  setSpeed: ReturnType<typeof vi.fn>;
-  announce: ReturnType<typeof vi.fn>;
-  engine: {
-    zoomBy: ReturnType<typeof vi.fn>;
-    ensureVisible: ReturnType<typeof vi.fn>;
-    center: ReturnType<typeof vi.fn>;
-    transportPreview: unknown;
-  };
-  keyboard: {
-    moveCursor: ReturnType<typeof vi.fn>;
-    commitCursor: ReturnType<typeof vi.fn>;
-    bulldozeCursor: ReturnType<typeof vi.fn>;
-    cursor: ReturnType<typeof vi.fn>;
-    resetAnchor: ReturnType<typeof vi.fn>;
-    refreshCursorPreview: ReturnType<typeof vi.fn>;
-  };
-  audio: { start: ReturnType<typeof vi.fn> };
-}
-
-function makeApp(cursorValue: { tile: number; floor: number } | null = null) {
-  const app: FakeApp = {
-    undo: vi.fn(),
-    redo: vi.fn(),
-    setSpeed: vi.fn(),
-    announce: vi.fn(),
-    engine: {
-      zoomBy: vi.fn(),
-      ensureVisible: vi.fn(),
-      center: vi.fn(),
-      transportPreview: { anything: true },
-    },
-    keyboard: {
-      moveCursor: vi.fn(),
-      commitCursor: vi.fn(),
-      bulldozeCursor: vi.fn(),
-      cursor: vi.fn(() => cursorValue),
-      resetAnchor: vi.fn(),
-      refreshCursorPreview: vi.fn(),
-    },
-    audio: { start: vi.fn() },
-  };
-  // bindKeys installs once against this app; return both the typed handle and
-  // the raw fake so assertions can reach the stubs.
-  bindKeys(app as unknown as GameApp);
-  return app;
-}
-
-function press(key: string, opts: Partial<KeyboardEventInit> = {}): void {
-  window.dispatchEvent(new KeyboardEvent("keydown", { key, ...opts }));
-}
 
 beforeEach(() => {
   vi.mocked(flushPrefsSave).mockClear();
@@ -233,9 +175,23 @@ describe("cursor movement (arrows / WASD)", () => {
 describe("commit / bulldoze", () => {
   it("Enter and Space commit the cursor", () => {
     const app = makeApp();
-    press("Enter");
-    press(" ");
-    expect(app.keyboard.commitCursor).toHaveBeenCalledTimes(2);
+    tap("Enter");
+    tap(" ");
+    tap("Spacebar");
+    expect(app.keyboard.commitCursor).toHaveBeenCalledTimes(3);
+  });
+
+  it("a held Enter, Delete, Backspace or X acts once, and its repeats still keep the page still", () => {
+    const app = makeApp();
+    const keys = ["Enter", "Delete", "Backspace", "x"];
+    for (const key of keys) press(key);
+    for (const key of keys) {
+      const repeat = new KeyboardEvent("keydown", { key, repeat: true, cancelable: true });
+      window.dispatchEvent(repeat);
+      expect(repeat.defaultPrevented, `${key} repeat`).toBe(true);
+    }
+    expect(app.keyboard.commitCursor).toHaveBeenCalledTimes(1);
+    expect(app.keyboard.bulldozeCursor).toHaveBeenCalledTimes(3);
   });
 
   it("Space and Enter on the Map window's canvas (role application) never commit the cursor", () => {
@@ -245,8 +201,8 @@ describe("commit / bulldoze", () => {
     map.setAttribute("role", "application");
     document.body.appendChild(map);
     map.focus();
-    press(" ");
-    press("Enter");
+    tap(" ");
+    tap("Enter");
     expect(app.keyboard.commitCursor).not.toHaveBeenCalled();
     map.remove();
   });

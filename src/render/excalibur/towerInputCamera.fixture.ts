@@ -55,7 +55,6 @@ export function inputEng(over: Record<string, unknown> = {}) {
     engine: {
       input: {
         pointers: { on: (name: string, cb: (ev: unknown) => void) => (handlers[name] = cb) },
-        keyboard: { isHeld: () => false },
       },
     },
     screenToWorld(sx: number, sy: number) {

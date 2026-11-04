@@ -77,6 +77,105 @@ describe("buildPalette", () => {
     expect(selectTool).toHaveBeenCalledTimes(2);
   });
 
+  it("activates on the Space release, letting the key reach the window, where the world reads it as the pan key", () => {
+    const { ui, palette, selectTool } = stubUI();
+    buildPalette(ui);
+    document.body.appendChild(palette);
+    const office = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
+    const key = (type: string, init: KeyboardEventInit = {}): KeyboardEvent => {
+      const event = new KeyboardEvent(type, { key: " ", bubbles: true, cancelable: true, ...init });
+      office.dispatchEvent(event);
+      return event;
+    };
+    const seen = vi.fn();
+    window.addEventListener("keydown", seen);
+    try {
+      expect(key("keydown").defaultPrevented, "the press keeps the palette from scrolling").toBe(true);
+      expect(key("keydown", { repeat: true }).defaultPrevented, "and so do its repeats").toBe(true);
+      expect(selectTool).not.toHaveBeenCalled();
+      key("keyup");
+      expect(selectTool).toHaveBeenLastCalledWith({ type: "build", kind: "office" } as Tool);
+      expect(seen).toHaveBeenCalledTimes(2);
+    } finally {
+      window.removeEventListener("keydown", seen);
+      palette.remove();
+    }
+  });
+
+  it("does not activate on the release of a Space held as the pan key", () => {
+    const { ui, palette, selectTool } = stubUI();
+    buildPalette(ui);
+    document.body.appendChild(palette);
+    const office = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
+    // inputKeys stops the release of a pan-key hold in the capture phase.
+    const stopPan = (e: KeyboardEvent): void => e.preventDefault();
+    window.addEventListener("keyup", stopPan, true);
+    try {
+      office.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true }));
+      office.dispatchEvent(new KeyboardEvent("keyup", { key: " ", bubbles: true, cancelable: true }));
+    } finally {
+      window.removeEventListener("keyup", stopPan, true);
+      palette.remove();
+    }
+    expect(selectTool).not.toHaveBeenCalled();
+  });
+
+  it("ignores a Space release whose press it never saw, and a held Enter's repeats", () => {
+    const { ui, palette, selectTool } = stubUI();
+    buildPalette(ui);
+    const office = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
+    office.dispatchEvent(new KeyboardEvent("keyup", { key: " ", bubbles: true, cancelable: true }));
+    office.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    office.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", repeat: true, bubbles: true, cancelable: true }));
+    expect(selectTool).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves Ctrl, Cmd or Alt + Space to the system, picking nothing", () => {
+    const { ui, palette, selectTool } = stubUI();
+    buildPalette(ui);
+    const office = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
+    for (const mod of ["ctrlKey", "metaKey", "altKey"] as const) {
+      const down = new KeyboardEvent("keydown", { key: " ", [mod]: true, bubbles: true, cancelable: true });
+      office.dispatchEvent(down);
+      expect(down.defaultPrevented, `${mod} + Space reaches the system`).toBe(false);
+      office.dispatchEvent(new KeyboardEvent("keyup", { key: " ", bubbles: true, cancelable: true }));
+    }
+    expect(selectTool).not.toHaveBeenCalled();
+  });
+
+  it("drops a Space press whose release was lost when a chord with Space comes next", () => {
+    const { ui, palette, selectTool } = stubUI();
+    buildPalette(ui);
+    const office = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
+    // A plain press whose release never came (Cmd went down while it was held).
+    office.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true }));
+    office.dispatchEvent(new KeyboardEvent("keydown", { key: " ", ctrlKey: true, bubbles: true, cancelable: true }));
+    office.dispatchEvent(new KeyboardEvent("keyup", { key: " ", ctrlKey: true, bubbles: true, cancelable: true }));
+    expect(selectTool, "the chord's release picks nothing").not.toHaveBeenCalled();
+  });
+
+  it("drops a Space press when Ctrl, Cmd or Alt goes down, or comes with the release", () => {
+    const { ui, palette, selectTool } = stubUI();
+    buildPalette(ui);
+    const office = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
+    const key = (type: string, init: KeyboardEventInit): void => {
+      office.dispatchEvent(new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init }));
+    };
+    for (const [mod, name] of [["ctrlKey", "Control"], ["metaKey", "Meta"], ["altKey", "Alt"]] as const) {
+      key("keydown", { key: " " });
+      key("keydown", { key: name, [mod]: true });
+      key("keyup", { key: name });
+      key("keyup", { key: " " });
+    }
+    expect(selectTool, "a modifier pressed mid-hold drops the press").not.toHaveBeenCalled();
+    // With Option held, macOS reports the release as a no-break space: it still
+    // ends the press, so a stray plain release after it picks nothing either.
+    key("keydown", { key: " " });
+    key("keyup", { key: "\u00a0", code: "Space", altKey: true });
+    key("keyup", { key: " " });
+    expect(selectTool, "the Option release ends the press").not.toHaveBeenCalled();
+  });
+
   it("wraps each group in a section carrying its data-group so the scan can hide empty ones", () => {
     const { ui, palette } = stubUI();
     buildPalette(ui);

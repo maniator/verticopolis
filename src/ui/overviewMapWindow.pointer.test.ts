@@ -137,7 +137,7 @@ describe("overview map window: camera binding (CAP-3)", () => {
     expect(worldPressed()).toBe(false);
   });
 
-  it("lets pointers through for a middle or right world press (both pan), never for a touch or a press on the Map button", () => {
+  it("lets pointers through for a middle or right world press (a pan or an inspect), never for a touch or a press on the Map button", () => {
     rig({ phone: true });
     const world = document.getElementById("view")!;
     world.dispatchEvent(pointer("pointerdown", 10, 10, "touch", 3));
