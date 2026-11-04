@@ -14,6 +14,8 @@ pub struct TdtTenant {
     pub type_id: i64,
     /// Status/flags byte at offset 5.
     pub status: i64,
+    /// Where that status byte sits in the file.
+    pub status_at: usize,
     /// Retail variant ordinal at offset 6.
     pub variant: i64,
     /// Rent/lease rate byte at offset 16.
