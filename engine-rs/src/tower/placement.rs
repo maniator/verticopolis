@@ -1,7 +1,5 @@
 //! Placing rooms and structure, and the support rules behind it.
 
-use std::collections::HashMap;
-
 use super::{PlaceResult, Tower, Unit, UnitState};
 use crate::facilities::*;
 
@@ -402,11 +400,14 @@ impl Tower {
         if kind.is_transport() {
             return Vec::new();
         }
-        // A footprint off the lot or outside the floor range has no bridge:
-        // every caller refuses it on those rules before the plan can count,
-        // so skipping the scan changes no answer, and an x far off the lot no
-        // longer scans one tile at a time back to it (#1003).
+        // A footprint off the lot, empty, or outside the floor range has no bridge:
+        // every caller refuses it on those rules before the plan can count
+        // (no caller passes a width under 1 today; the `w < 1` check keeps
+        // every index into the `below` and `here` flags on the lot if one ever
+        // does), so skipping the scan changes no answer, and an x far off the
+        // lot no longer scans one tile at a time back to it (#1003).
         if x < 0
+            || w < 1
             || x.saturating_add(w) > LOT_WIDTH
             || floor < MIN_FLOOR
             || floor.saturating_add(hgt - 1) > kind.highest_story()
@@ -419,23 +420,25 @@ impl Tower {
             Kind::Floor
         };
         let mut plan: Vec<(i64, i64)> = Vec::new();
-        let mut planned: HashMap<i64, Vec<i64>> = HashMap::new();
+        // The tiles planned on the story below and on this one, one flag per
+        // x on the lot, on the stack so a hover that plans nothing allocates
+        // nothing: a tile is supportable over structure or over a tile the
+        // story below plans, so only the previous story is ever read. Every
+        // gap tile sits on the lot (x, w and the walls are checked above).
+        let mut below = [false; LOT_WIDTH as usize];
+        let mut here = [false; LOT_WIDTH as usize];
         for fl in floor..(floor + hgt).min(MAX_FLOOR + 1) {
-            let supportable = |tx: i64, planned: &HashMap<i64, Vec<i64>>| -> bool {
-                if fl < 2 {
-                    return true;
-                }
-                self.structure.contains_key(&(fl - 1, tx))
-                    || planned.get(&(fl - 1)).is_some_and(|v| v.contains(&tx))
+            let supportable = |tx: i64, below: &[bool]| -> bool {
+                fl < 2 || self.structure.contains_key(&(fl - 1, tx)) || below[tx as usize]
             };
             let mut tx = x - 1;
             while tx >= 0 {
                 if let Some(k) = self.struct_kind.get(&(fl, tx)) {
                     if *k == substrate {
                         for g in tx + 1..x {
-                            if supportable(g, &planned) {
+                            if supportable(g, &below) {
                                 plan.push((fl, g));
-                                planned.entry(fl).or_default().push(g);
+                                here[g as usize] = true;
                             }
                         }
                     }
@@ -449,9 +452,9 @@ impl Tower {
                     if *k == substrate {
                         let mut g = tx - 1;
                         while g >= x + w {
-                            if supportable(g, &planned) {
+                            if supportable(g, &below) {
                                 plan.push((fl, g));
-                                planned.entry(fl).or_default().push(g);
+                                here[g as usize] = true;
                             }
                             g -= 1;
                         }
@@ -460,6 +463,8 @@ impl Tower {
                 }
                 tx += 1;
             }
+            std::mem::swap(&mut below, &mut here);
+            here.fill(false);
         }
         plan
     }

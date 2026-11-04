@@ -15,7 +15,6 @@
 
 use serde::Serialize;
 
-use crate::clock::GameMode;
 use crate::jsmath;
 use crate::schedule::{Schedule, SCHEDULE_HOURS};
 use crate::schedule_authoring::warm_curve;
@@ -241,13 +240,13 @@ impl Simulation {
                 d.weekday.as_ref()
             }
         });
-        let assisted = self.mode == GameMode::Modern && geo.cars > 0;
+        let assisted = self.mode.schedule_assist() && geo.cars > 0;
         let no_advice = |status| Advice {
             status,
             over: Vec::new(),
             short: Vec::new(),
         };
-        let advice = if self.mode != GameMode::Modern {
+        let advice = if !self.mode.schedule_assist() {
             no_advice(AdviceStatus::UnavailableInMode)
         } else if geo.cars <= 0 {
             no_advice(AdviceStatus::NoCars)

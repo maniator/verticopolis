@@ -15,7 +15,6 @@ use std::ops::Range;
 
 use serde::Serialize;
 
-use crate::clock::GameMode;
 use crate::facilities::Kind;
 use crate::schedule::SCHEDULE_HOURS;
 use crate::schedule_geometry::ShaftGeometry;
@@ -208,7 +207,7 @@ impl Simulation {
         let Some(preset) = Preset::from_name(preset) else {
             return PresetProposal::refused(PresetStatus::UnknownPreset);
         };
-        if preset.is_assisted() && self.mode != GameMode::Modern {
+        if preset.is_assisted() && !self.mode.schedule_assist() {
             return PresetProposal::refused(PresetStatus::UnavailableInMode);
         }
         if t.cars <= 0 {

@@ -3,6 +3,7 @@
 //! that asking changes nothing.
 
 use super::*;
+use crate::clock::GameMode;
 use crate::facilities::Kind;
 use crate::schedule_authoring::tests::{
     draft, ring, seed, sky_tower, tower, warm_ring, SKY, SKY_TOP,

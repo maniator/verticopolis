@@ -20,6 +20,7 @@ export type {
   CatalogRent,
   CatalogWorld,
   CatalogRentCadence,
+  CatalogRules,
 } from "../catalog/catalogTypes";
 
 /** The catalog for `mode`, parsed and checked. Refuses, by name, a binding
@@ -43,8 +44,8 @@ export function readCatalog(mod: Pick<WasmModule, "catalog">, mode: GameMode, ve
   if (!isRecord(c)) throw new Error("the engine returned no catalog");
   if (c.version !== version) throw new Error(`the engine's catalog is version ${String(c.version)}; expected version ${version}`);
   if (c.mode !== mode) throw new Error(`asked for the ${mode} catalog, got ${String(c.mode)}`);
-  if (!isRecord(c.world) || !isRecord(c.economy) || !Array.isArray(c.pools) || !Array.isArray(c.facilities)) {
-    throw new Error("the engine returned a catalog without its world, economy, pools or facilities");
+  if (!isRecord(c.world) || !isRecord(c.economy) || !isRecord(c.rules) || !Array.isArray(c.pools) || !Array.isArray(c.facilities)) {
+    throw new Error("the engine returned a catalog without its world, economy, rules, pools or facilities");
   }
   checkCatalog(c);
   return c as unknown as Catalog;
@@ -92,6 +93,7 @@ const ECONOMY: Shape = {
   exterminator: (v) => v === null || isRecord(v),
   autoBridgeToggleable: bool,
 };
+const RULES: Shape = { variantHouseholds: bool, previewNamesRefusal: bool, scheduleAssist: bool };
 const EXTERMINATOR: Shape = { calloutFee: amount, perRoomFee: amount };
 const CALENDAR: Shape = {
   key: oneOf("realWorld", "canon"),
@@ -183,6 +185,7 @@ function checkCatalog(c: Record<string, unknown>): void {
   const calendars = economy.calendars as unknown[];
   if (calendars.length === 0) refuse("economy.calendars", "no calendar");
   calendars.forEach((cal, i) => checkShape(cal, CALENDAR, `economy.calendars[${i}]`));
+  checkShape(c.rules, RULES, "rules");
 
   const facilities = c.facilities as unknown[];
   if (facilities.length === 0) refuse("facilities", "no facility");

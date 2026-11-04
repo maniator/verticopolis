@@ -313,3 +313,42 @@ fn a_bridge_is_still_planned_at_each_bound() {
         [98, 99]
     );
 }
+
+/// A two-story room bridges its upper story over the tiles its lower story
+/// plans: the upper gap has no structure under it until the plan is built, so
+/// only the story below's planned tiles support it, tile by tile.
+#[test]
+fn an_upper_story_bridges_over_the_tiles_the_story_below_plans() {
+    let cinema = Kind::Cinema.facility().width;
+    let tower = |supported: &[i64]| {
+        let mut t = Tower::new();
+        for fl in [5, 6] {
+            t.struct_kind.insert((fl, 95), Kind::Floor);
+        }
+        for &x in supported {
+            t.structure.insert((4, x), 0);
+        }
+        t
+    };
+    let plan = tower(&[96, 97, 98, 99]).bridge_fill_plan(Kind::Cinema, 5, 100, cinema, 2);
+    let both: Vec<_> = [5, 6]
+        .into_iter()
+        .flat_map(|fl| (96..=99).map(move |x| (fl, x)))
+        .collect();
+    assert_eq!(plan, both);
+    // Support under part of the gap carries up the same tiles and no others.
+    let plan = tower(&[98, 99]).bridge_fill_plan(Kind::Cinema, 5, 100, cinema, 2);
+    assert_eq!(plan, [(5, 98), (5, 99), (6, 98), (6, 99)]);
+    // With nothing under the lower story, neither story bridges.
+    assert!(tower(&[])
+        .bridge_fill_plan(Kind::Cinema, 5, 100, cinema, 2)
+        .is_empty());
+    // An empty or negative footprint plans nothing and indexes no flag, even
+    // one whose right edge lies left of the lot (x + w < 0), where the scan
+    // right would reach a negative tile.
+    for (x, w) in [(100, 0), (100, -3), (1, -3)] {
+        assert!(tower(&[96, 97, 98, 99])
+            .bridge_fill_plan(Kind::Cinema, 5, x, w, 2)
+            .is_empty());
+    }
+}

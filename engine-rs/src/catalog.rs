@@ -37,7 +37,7 @@ pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 5;
+pub const CATALOG_VERSION: u32 = 6;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -49,6 +49,7 @@ pub struct Catalog {
     pub mode: &'static str,
     pub world: World,
     pub economy: Economy,
+    pub rules: Rules,
     /// The caps several kinds share, in the engine's order.
     pub pools: Vec<PoolEntry>,
     /// One entry per facility kind, in the engine's catalog order, the
@@ -119,6 +120,25 @@ pub struct Economy {
     /// was founded unbridged, and the live setting is per tower (the
     /// engine's `autoBridge()`, the save's `autoBridge`).
     pub auto_bridge_toggleable: bool,
+}
+
+/// Mode rules a frontend shows the player, each stated from the engine's own
+/// rule method, so a frontend reads them here instead of deciding them from
+/// the mode's name.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Rules {
+    /// Whether a sold condo carries its own household of 2 to 5 that prices
+    /// the sale and counts its residents. When false every condo houses the
+    /// flat family and stores no household.
+    pub variant_households: bool,
+    /// Whether the build preview names the engine's refusal before the
+    /// click. When false the refusal shows only once a click is refused.
+    pub preview_names_refusal: bool,
+    /// Whether the elevator schedule's assisted tools answer: the intent
+    /// presets, auto-tune and the staffing advice. When false the schedule
+    /// is the manual grid only and each assisted query is refused.
+    pub schedule_assist: bool,
 }
 
 /// One calendar a tower can run and how it scales the quoted figures.
@@ -399,7 +419,7 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
         staff_only: f.staff_only,
         basement: f.basement,
         no_basement: no_basement(kind),
-        available: !f.modern_only || mode.is_modern(),
+        available: f.available_in(mode),
         build_minutes: if transport { 0.0 } else { kind.build_minutes() },
         resale_refund: kind.resale_refund(),
         build_cap: build_cap(kind),
@@ -447,3 +467,6 @@ mod tests;
 
 #[cfg(test)]
 mod charge_tests;
+
+#[cfg(test)]
+mod rules_tests;

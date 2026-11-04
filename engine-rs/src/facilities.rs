@@ -83,6 +83,16 @@ pub struct Facility {
     pub basement: bool,
 }
 
+impl Facility {
+    /// Whether a tower of `mode` builds this kind at all, the star gate
+    /// aside: a Modern-only kind is built only where the mode's rule
+    /// (`GameMode::builds_modern_only_kinds`) allows it. The build gate
+    /// (`is_unlocked`) and the catalog's `available` both read it.
+    pub fn available_in(&self, mode: crate::clock::GameMode) -> bool {
+        !self.modern_only || mode.builds_modern_only_kinds()
+    }
+}
+
 mod table;
 pub use table::FACILITIES;
 
