@@ -44,7 +44,7 @@ describe("phone tier bounds", () => {
 
   it("keeps the landscape onboarding card clear and readable on split-screen widths", () => {
     const css = read("src/styles.css");
-    expect(css).toContain("top: calc(var(--topbar-h, 76px) + 2px);");
+    expect(css).toContain("#onboard.onboard--mobile {\n    top: 118px;\n  }");
     expect(css).toContain("width: max(200px, min(300px, calc(100vw - 360px - env(safe-area-inset-left, 0px))));");
   });
 });

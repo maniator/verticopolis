@@ -51,7 +51,6 @@ function mountSplash(o: {
 afterEach(() => {
   document.getElementById("splash")?.remove();
   document.body.innerHTML = "";
-  document.documentElement.style.removeProperty("--topbar-h");
 });
 
 /**
@@ -301,23 +300,4 @@ describe("Getting Started card across the phone tier", () => {
     expect(card.classList.contains("onboard--mobile")).toBe(false);
   });
 
-  it("tracks the top bar's height in --topbar-h for mobile card placement", () => {
-    const topbar = document.createElement("div");
-    topbar.id = "topbar";
-    document.body.appendChild(topbar);
-    let listener: (() => void) | undefined;
-    const mq = {
-      matches: true,
-      addEventListener: (_: string, fn: () => void) => (listener = fn),
-      removeEventListener: vi.fn(),
-    } as unknown as MediaQueryList & { matches: boolean };
-    const rect = vi.spyOn(topbar, "getBoundingClientRect");
-    rect.mockReturnValue({ left: 0, right: 0, top: 0, bottom: 94, width: 0, height: 94 } as DOMRect);
-    const ctl = new OnboardingController({ mq, showHelp: vi.fn(), pauseForSplash: vi.fn(), chime: vi.fn() });
-    expect(ctl.arm({ onboarding: () => 0 })).toBe(true);
-    expect(document.documentElement.style.getPropertyValue("--topbar-h")).toBe("94px");
-    rect.mockReturnValue({ left: 0, right: 0, top: 0, bottom: 116, width: 0, height: 116 } as DOMRect);
-    listener!();
-    expect(document.documentElement.style.getPropertyValue("--topbar-h")).toBe("116px");
-  });
 });

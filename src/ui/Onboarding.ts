@@ -156,17 +156,7 @@ export class OnboardingController {
   private splashKey: ((e: KeyboardEvent) => void) | null = null;
   private panelEl: HTMLElement | null = null;
   private sendOff: ReturnType<typeof setTimeout> | null = null;
-  private topbarObserver: ResizeObserver | null = null;
-  private readonly syncTopbarHeight = () => {
-    const topbar = document.getElementById("topbar");
-    if (!topbar) {
-      document.documentElement.style.removeProperty("--topbar-h");
-      return;
-    }
-    document.documentElement.style.setProperty("--topbar-h", `${Math.ceil(topbar.getBoundingClientRect().height)}px`);
-  };
   private readonly onMq = () => {
-    this.syncTopbarHeight();
     this.panelEl?.classList.toggle("onboard--mobile", this.opts.mq.matches);
     return this.active ? this.applyHintAndPulse() : this.setDefaultHint();
   };
@@ -174,12 +164,6 @@ export class OnboardingController {
   constructor(private opts: OnboardingOpts) {
     // The controller owns #hint: seed it, and one listener keeps it and the card in the right tier.
     this.setDefaultHint();
-    this.syncTopbarHeight();
-    const topbar = document.getElementById("topbar");
-    if (topbar && typeof ResizeObserver !== "undefined") {
-      this.topbarObserver = new ResizeObserver(this.syncTopbarHeight);
-      this.topbarObserver.observe(topbar);
-    }
     this.opts.mq.addEventListener("change", this.onMq);
   }
 

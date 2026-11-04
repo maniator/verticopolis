@@ -2494,16 +2494,16 @@ body.splash-up #toast-wrap { z-index: 45; }
   /* The first-run checklist sits right of the tools column instead of over
      it, at most 300px wide, so the tab and tiles it points at stay visible
      and tappable and most of the world view stays clear. Its top
-     tracks the real top bar height (set on --topbar-h from Onboarding),
-     and on a very short screen its step list scrolls under the title bar,
-     which stays put. */
+     clears a top bar wrapped to three lines (71 to 73px tall from 568 to
+     740px wide, by font), and on a very short screen its step list scrolls
+     under the title bar, which stays put. */
   /* The stage starts at 180px (the column and its margins), so the card
      sits 2px inside it and keeps 8px clear on the right. */
   #onboard.onboard--mobile {
     left: calc(182px + env(safe-area-inset-left, 0px));
     right: auto;
     width: min(300px, calc(100vw - 190px - env(safe-area-inset-left, 0px)));
-    top: calc(var(--topbar-h, 76px) + 2px);
+    top: 76px;
   }
   /* The card would otherwise cover the title bar and close button of an
      editor or inspector card opened under it, so those and the toasts paint
@@ -2544,6 +2544,11 @@ body.splash-up #toast-wrap { z-index: 45; }
    reads only from 16.4. */
 @media (max-width: 1023px) and (max-height: 339.98px) and (orientation: landscape),
   (max-width: 539.98px) and (orientation: landscape) {
+  /* Split-screen widths can wrap the top bar to five lines (about 116px high);
+     lift the card below it so the last stat row stays visible. */
+  #onboard.onboard--mobile {
+    top: 118px;
+  }
   #palette-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;
