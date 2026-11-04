@@ -10,5 +10,11 @@ export { canonicalJson };
 
 /** First 16 hex digits of the SHA-256 of the canonical JSON's UTF-8 bytes. */
 export function digest(value: unknown): string {
-  return createHash("sha256").update(canonicalJson(value), "utf8").digest("hex").slice(0, 16);
+  return digestText(canonicalJson(value));
+}
+
+/** The same digest of text that is canonical JSON already, without parsing
+ *  it again. */
+export function digestText(canonical: string): string {
+  return createHash("sha256").update(canonical, "utf8").digest("hex").slice(0, 16);
 }

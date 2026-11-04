@@ -99,8 +99,11 @@ Verticopolis has **two test tiers**:
     engine is held to the same lock by its own referee
     (`cargo run --release --features conformance --bin conformance`, and again through the WASM
     binding from Node with `npm run wasm:build && npm run test:wasm`, which
-    also runs the dual run's day gate: both engines driven by the frame
-    loop's own step math and compared every hour). The `.TDT` codec has one
+    also holds the Rust engine to the frame-day golden: a day on every
+    fixture at every speed, played through the engine's own step driver,
+    pinned every hour; `npm test` holds the TypeScript engine to the same
+    file, and the mirror-based dual run still runs beside it until #1421).
+    The `.TDT` codec has one
     implementation, `engine-rs/src/tdt/`, and the TypeScript engine reads and
     writes `.TDT` files through the WASM package
     (`src/engine/port/tdtCodec.ts`). The same command runs the `.vctower`

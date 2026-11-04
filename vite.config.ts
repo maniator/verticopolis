@@ -260,6 +260,10 @@ function wasmParityProjects() {
     "**/conformanceWasmDiagnostics*.integration.test.ts",
     "**/dualRunDay.integration.test.ts",
     "**/dualRunEdits.integration.test.ts",
+    // The frame-day golden plays each engine through the port itself: the
+    // Rust leg in the host suites, the TypeScript referee in the plain run.
+    "**/conformanceWasmFrameDays.integration.test.ts",
+    "**/frameDaysReferee.integration.test.ts",
     "**/loaderCases.integration.test.ts",
     // They run each engine themselves, like the conformance suites above.
     "**/panelGettersWasm.integration.test.ts",
