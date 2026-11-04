@@ -1,0 +1,15 @@
+{
+  "case": "service rooms, unhappy",
+  "mode": "classic",
+  "units": [
+    {"id":376,"kind":"office","floor":2,"lines":["Access: not connected. No elevator or stair reaches this floor."]},
+    {"id":377,"kind":"hotelSingle","floor":2,"lines":["Access: not connected. No elevator or stair reaches this floor.","Counts toward stars: yes."]},
+    {"id":378,"kind":"housekeeping","floor":2,"lines":["Fields 6 maids, each cleaning up to ~19 rooms a day when travel is short. Tower: 1 crew (6 maids) for 1 hotel room(s)."]},
+    {"id":379,"kind":"parkingRamp","floor":0,"lines":["Parking demand: 1 needed / 1 available (1 for offices, 0 for suites)."]},
+    {"id":380,"kind":"parking","floor":0,"lines":["Ramp access: connected.","Parking demand: 1 needed / 1 available (1 for offices, 0 for suites)."]},
+    {"id":381,"kind":"parking","floor":0,"lines":["Ramp access: none. This space is dead (no relief). Chain it to a Parking Ramp."]}
+  ],
+  "transports": [
+
+  ]
+}

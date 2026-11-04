@@ -1,0 +1,13 @@
+{
+  "case": "lobby distance, unhappy",
+  "mode": "classic",
+  "units": [
+    {"id":1002,"kind":"shop","floor":3,"lines":["Access: reachable from the lobby.","Today's patronage: 0 customers","Local demand: 0% of capacity.","Just opened, no data yet."]},
+    {"id":1003,"kind":"shop","floor":7,"lines":["Access: reachable from the lobby.","Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor).","Today's patronage: 0 customers","Local demand: 0% of capacity.","Just opened, no data yet."]},
+    {"id":1004,"kind":"skyBar","floor":8,"lines":["Access: reachable from the lobby."]},
+    {"id":1005,"kind":"office","floor":7,"lines":["Access: reachable from the lobby."]}
+  ],
+  "transports": [
+    {"id":1001,"kind":"elevatorStandard","lines":[]}
+  ]
+}

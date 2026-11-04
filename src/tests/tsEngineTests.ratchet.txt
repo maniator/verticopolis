@@ -74,7 +74,7 @@ src/tests/fixtures/winningTower.ts Simulation
 src/tests/integration/attendanceTripwire.integration.test.ts Clock Simulation crowd/motion crowd/trips crowd/visits
 src/tests/integration/calendar.integration.test.ts Clock EconomySystem Simulation Tower rng
 src/tests/integration/capacityEventMatrix.integration.test.ts Simulation
-src/tests/integration/cardTextParity.integration.test.ts Simulation
+src/tests/integration/cardTextReferee.integration.test.ts Simulation port/tsEngine # the TypeScript referee for the card-text golden (#1806): it builds the sweep's towers and holds the golden to the reference card, and goes with src/engine/
 src/tests/integration/chargeBindingRaw.integration.test.ts Simulation sim/charges
 src/tests/integration/cockroachInfestation.integration.test.ts Simulation economy/housekeeping
 src/tests/integration/commercialDemandPools.integration.test.ts Clock EconomySystem Simulation Tower rng sim/demand

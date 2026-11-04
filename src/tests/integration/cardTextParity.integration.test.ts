@@ -1,167 +1,126 @@
+import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { html } from "lit-html";
-import { Simulation } from "../../engine/Simulation";
-import { FACILITIES, facilityFloors } from "../../engine/facilities";
-import type { FacilityKind, GameMode, UnitState } from "../../engine/types";
-import { facilityDiagnostics, transportDiagnostics } from "../../game/facilityDiagnostics";
+import { useTowerCatalogSource } from "../../catalog/towerCatalog";
+import { readCatalog } from "../../dualrun/catalog";
 import { createCardKit } from "../../game/cardKit";
+import { newViewReader } from "../../game/portAccess";
+import { swapDone } from "../../game/portLifecycle";
 import type { EnginePort } from "../../simport/enginePort";
-import { ViewReader } from "../../simport/viewReader";
-import { renderToFragment } from "../../ui/testing/litTestUtils";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
-import { lobbyDistanceFixture, retailServiceFixture, serviceDiagnosticsFixture } from "../fixtures/serviceDiagnostics.fixture";
-import { buildWinningTower } from "../fixtures/winningTower";
+import {
+  CARD_TEXT_CASES,
+  CARD_TEXT_DIR,
+  CARD_TEXT_MODES,
+  cardTextFiles,
+  expectRealLines,
+  playCardTextCase,
+  readCardTextFile,
+  readCardTextGolden,
+  textOf,
+  writeCardTextGolden,
+  type CardTextGolden,
+} from "../goldens/cardText";
+import { CARD_TEXT_WRITER, writeAfterPassingRun } from "../goldens/updateGate";
 
 /**
  * The card-text sweep (#1561's canary): the inspector and editor lines the
- * TypeScript reference printed for a room, against the lines the shipped
- * Rust-backed card prints for the same saved tower, room by room. The facts
- * tests (`conformanceWasmDiagnostics`) only check lines a fact section names,
- * so a line the reference drew with no fact behind it (the shoppers-too-far
- * line) slipped through; this compares the text itself, in card order. A
- * comparison as a set missed that the Rust card put a venue's business block
- * above its notice (the every-kind case puts a shop on notice, a state only a
- * save can hold, since play gives notice to lease tenants alone).
+ * shipped Rust-backed card prints for every room and shaft of a saved tower,
+ * against the lines the TypeScript reference card printed for the same tower,
+ * pinned in the card-text golden (`src/tests/goldens/cardText.ts`, #1806), room
+ * by room, in card order. The facts tests (`conformanceWasmDiagnostics`) only
+ * check lines a fact section names, so a line the reference drew with no fact
+ * behind it (the shoppers-too-far line) slipped through; this compares the
+ * text itself. A comparison as a set missed that the Rust card put a venue's
+ * business block above its notice (the every-kind case puts a shop on notice,
+ * a state only a save can hold, since play gives notice to lease tenants
+ * alone).
+ *
+ * The engine, its catalog and the card are set up as the game sets them up:
+ * the tower file goes through the engine's own `.vctower` loader, the catalog
+ * is read from the engine with `readCatalog` (as `src/wasmhost/rustEngine.ts`
+ * sets it), and the reader and card kit are the game's. Both cards read the
+ * tower after the same play (`CARD_TEXT_PLAY_MINUTES`). It runs in
+ * `npm run test:wasm`.
+ *
+ * The golden's lines came from the reference card, and while the TypeScript
+ * engine exists `cardTextReferee.integration.test.ts` holds them to it. A
+ * deliberate change to a card line is a golden refresh, reviewed in the diff:
+ * `VC_CARD_TEXT_UPDATE=rust npx vitest run --project integration cardTextParity`
+ * rewrites the lines from the Rust card (the towers stay), only from a run in
+ * which every test in this file ran and passed (the referee skips in that
+ * run). The referee
+ * must then pass on them too, or name the line the two cards print
+ * differently on purpose (`cardText.ts` says how).
  */
 
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but the engine's WASM package was not built");
+const WRITING = CARD_TEXT_WRITER === "rust";
+if ((wasmRequired() || WRITING) && !hasWasmPackage()) throw new Error("the card-text sweep needs the engine package (VC_REQUIRE_WASM=1 or VC_CARD_TEXT_UPDATE=rust); run npm run wasm:build");
+
+/** A run in which the referee writes the golden skips the sweep, which would
+ *  read the files it is replacing; run it on the new files afterwards. */
+const REFEREE_WRITING = CARD_TEXT_WRITER === "typescript";
+
+const fresh: CardTextGolden[] = [];
+writeAfterPassingRun(
+  "card-text lines",
+  WRITING,
+  () => CARD_TEXT_MODES.flatMap((m) => CARD_TEXT_CASES.filter((n) => !fresh.some((g) => g.mode === m && g.case === n)).map((n) => `${m}: ${n}`)),
+  () => fresh.forEach(writeCardTextGolden),
+);
 
 type RustPort = EnginePort & { free(): void };
 
-const textOf = (parts: readonly unknown[]): string[] =>
-  parts.map((p) => (renderToFragment(html`${p}`).textContent ?? "").trim()).filter(Boolean);
+const roomsOf = (units: CardTextGolden["units"]) => units.map((u) => `${u.kind} #${u.id} on floor ${u.floor}`).sort();
+const shaftsOf = (transports: readonly { readonly kind: string; readonly id: number }[]) => transports.map((t) => `${t.kind} #${t.id}`).sort();
 
-function winning(mode: GameMode): Simulation {
-  const sim = Simulation.newGame(5, mode);
-  buildWinningTower(sim, { officeTop: 12 });
-  return sim;
-}
+describe.skipIf(REFEREE_WRITING)("the card-text golden's files", () => {
+  it("are a tower and its lines for every case and mode, and nothing else", () => {
+    const want = cardTextFiles();
+    expect(new Set(want).size, "two cases share a file name").toBe(want.length);
+    expect(readdirSync(CARD_TEXT_DIR).sort()).toEqual([...want].sort());
+  });
+});
 
-/** A tower with every rentable room made unhappy, so the gripe, notice and
- *  won't-lease branches have something to say. */
-function unhappy(sim: Simulation): Simulation {
-  for (const u of sim.tower.units) {
-    if (u.state === "occupied" || u.state === "asleep") u.satisfaction = 0.2;
-  }
-  return sim;
-}
-
-/** One of every room kind the lot accepts, each on its own stretch of a tall
- *  slab tower, all put in `state`. Kinds that need special ground (basement,
- *  rooftop, transport) are skipped when the tower refuses them. */
-function everyKind(mode: GameMode, state: UnitState): Simulation {
-  const sim = Simulation.newGame(9, mode);
-  sim.money = 1e12;
-  sim.star = 5;
-  const W = 250;
-  const slab = (kind: "lobby" | "floor", f: number, x: number) => {
-    const r = sim.tower.place(kind, f, x);
-    if (!r.ok) throw new Error(`${kind} at floor ${f}, x ${x}: ${r.reason}`);
-  };
-  for (let x = 0; x < W; x++) slab("lobby", 1, x);
-  for (let f = 2; f <= 40; f++) for (let x = 0; x < W; x++) slab("floor", f, x);
-  const kinds = (Object.keys(FACILITIES) as FacilityKind[]).filter((k) => !FACILITIES[k].transport && k !== "floor" && k !== "lobby");
-  let floor = 3;
-  let x = 2;
-  const skipped: FacilityKind[] = [];
-  for (const k of kinds) {
-    const width = FACILITIES[k].width;
-    if (x + width > W) { x = 2; floor += 4; }
-    if (floor > 38) throw new Error(`no room left for ${k}; widen the fixture`);
-    const r = sim.tower.place(k, floor, x);
-    if (r.ok) x += width + 1;
-    else skipped.push(k);
-  }
-  // Only kinds that need ground the slab tower lacks may be refused: the
-  // basement kinds, and the wedding hall (it sits in a fixed 100-104 floor
-  // band no slab tower here reaches).
-  const unexpected = skipped.filter((k) => !FACILITIES[k].basement && k !== "weddingHall");
-  if (unexpected.length > 0) throw new Error(`refused placements: ${unexpected.join(", ")}`);
-  for (const u of sim.tower.units) {
-    if (u.kind === "floor" || u.kind === "lobby") continue;
-    u.state = state;
-    u.satisfaction = 0.25;
-    if (state !== "empty" && state !== "construction") u.everOccupied = true;
-    if (state === "vacating") { u.vacateReason = "rent"; u.vacateAt = sim.clock.minutes + 600; }
-    u.patronageToday = 12;
-    u.patronageYest = 30;
-    u.profitYest = 400;
-  }
-  return sim;
-}
-
-/** Every passenger and service transport, with car counts that put some shafts
- *  past the near-capacity line once the sim has run a few hours. */
-function everyTransport(mode: GameMode): Simulation {
-  const sim = Simulation.newGame(4, mode);
-  sim.money = 1e12;
-  sim.star = 5;
-  for (let x = 0; x < 200; x++) sim.tower.place("lobby", 1, x);
-  for (let f = 2; f <= 30; f++) for (let x = 0; x < 200; x++) sim.tower.place("floor", f, x);
-  let x = 4;
-  for (const [kind, top] of [
-    ["elevatorStandard", 20], ["elevatorService", 12], ["elevatorExpress", 28], ["stairs", 2], ["escalator", 2],
-  ] as const) {
-    const r = sim.tower.placeTransport(kind, x, 1, top);
-    if (!r.ok) throw new Error(`${kind}: ${r.reason}`);
-    x += FACILITIES[kind].width + 2;
-  }
-  for (let i = 0; i < 48; i++) sim.tick(10);
-  return sim;
-}
-
-const STATES: readonly UnitState[] = ["empty", "occupied", "vacating", "construction", "fire", "gutted", "dirty"];
-
-const CASES: ReadonlyArray<readonly [string, (mode: GameMode) => Simulation]> = [
-  ["service rooms", (m) => serviceDiagnosticsFixture(m).sim],
-  ["service rooms, unhappy", (m) => unhappy(serviceDiagnosticsFixture(m).sim)],
-  ["retail venues", (m) => retailServiceFixture(m).sim],
-  ["lobby distance", (m) => lobbyDistanceFixture(m).sim],
-  ["lobby distance, unhappy", (m) => unhappy(lobbyDistanceFixture(m).sim)],
-  ...STATES.map((st) => [`every kind, ${st}`, (m: GameMode) => everyKind(m, st)] as const),
-  ["every transport", everyTransport],
-  ["winning tower", winning],
-  ["winning tower, unhappy", (m) => unhappy(winning(m))],
-];
-
-describe.skipIf(!hasWasmPackage())("the Rust card prints the lines the TypeScript card did", () => {
-  for (const mode of ["classic", "modern"] as const) {
-    for (const [name, build] of CASES) {
+describe.skipIf(!hasWasmPackage() || REFEREE_WRITING)("the Rust card prints the lines the TypeScript card did", () => {
+  for (const mode of CARD_TEXT_MODES) {
+    for (const name of CARD_TEXT_CASES) {
       it(`${mode}: ${name}`, () => {
-        const sim = build(mode);
-        const rust = wasm().Engine.fromSave(JSON.stringify(sim.serialize())) as unknown as RustPort;
+        const golden = readCardTextGolden(mode, name);
+        expect([golden.mode, golden.case]).toEqual([mode, name]);
+        const rust = wasm().Engine.newGame(1, "classic") as unknown as RustPort;
         try {
-          const kit = createCardKit({ enginePort: rust, reader: new ViewReader(rust, facilityFloors) });
+          useTowerCatalogSource(rust, (m) => readCatalog(wasm(), m));
+          swapDone(rust, rust.loadVctower(readCardTextFile(mode, name)));
+          playCardTextCase(name, (minutes) => rust.tick(minutes));
+          const reader = newViewReader(rust);
+          reader.update();
+          const kit = createCardKit({ enginePort: rust, reader });
+          // The engine holds the rooms and shafts the golden names, where it
+          // names them, and no more.
+          const live = reader.rooms.filter((r) => r.kind !== "floor" && r.kind !== "lobby");
+          expect(live.map((r) => `${r.kind} #${r.id} on floor ${r.floor}`).sort()).toEqual(roomsOf(golden.units));
+          expect(shaftsOf(reader.tower.transports)).toEqual(shaftsOf(golden.transports));
+
           const misses: string[] = [];
-          let compared = 0;
-          let shoppers = 0;
-          for (const u of sim.tower.units) {
-            if (u.kind === "floor" || u.kind === "lobby") continue;
-            const want = textOf(facilityDiagnostics(sim, u));
+          const units = golden.units.map((u) => {
             const got = textOf(kit.diagnostics.unit(u.id, true));
-            compared += want.length;
-            shoppers += want.filter((l) => l.startsWith("Shoppers:")).length;
-            if (JSON.stringify(want) !== JSON.stringify(got)) {
-              misses.push(`${u.kind} #${u.id} floor ${u.floor}\n  TS:   ${JSON.stringify(want)}\n  Rust: ${JSON.stringify(got)}`);
+            if (JSON.stringify(u.lines) !== JSON.stringify(got)) {
+              misses.push(`${u.kind} #${u.id} floor ${u.floor}\n  golden: ${JSON.stringify(u.lines)}\n  Rust:   ${JSON.stringify(got)}`);
             }
-          }
-          for (const t of sim.tower.transports) {
-            if (!FACILITIES[t.kind]) continue;
-            // A shaft with no measured trip yet read "Avg load: 0% full" on the
-            // TypeScript card; the Rust card prints no load line until the
-            // engine has a measurement. A deliberate, harmless difference.
-            const want = textOf(transportDiagnostics(sim, t)).filter((l) => l !== "Avg load: 0% full");
+            return { ...u, lines: got };
+          });
+          const transports = golden.transports.map((t) => {
             const got = textOf(kit.diagnostics.transport(t.id));
-            if (JSON.stringify(want) !== JSON.stringify(got)) misses.push(`${t.kind} #${t.id}\n  TS:   ${JSON.stringify(want)}\n  Rust: ${JSON.stringify(got)}`);
+            if (JSON.stringify(t.lines) !== JSON.stringify(got)) misses.push(`${t.kind} #${t.id}\n  golden: ${JSON.stringify(t.lines)}\n  Rust:   ${JSON.stringify(got)}`);
+            return { ...t, lines: got };
+          });
+          const printed: CardTextGolden = { case: name, mode, units, transports };
+          expectRealLines(printed);
+          if (WRITING) {
+            fresh.push(printed);
+            return;
           }
           expect(misses.slice(0, 6).join("\n")).toBe("");
-          // Both sides printing nothing would also agree, so insist the sweep read real lines.
-          if (name !== "every transport") expect(compared, `${mode}: ${name} compared no lines`).toBeGreaterThan(0);
-          if (name === "lobby distance") expect(shoppers, `${mode}: the far shop must carry the warning`).toBe(1);
-          if (name.startsWith("every kind")) {
-            const kinds = new Set(sim.tower.units.map((q) => q.kind));
-            expect(kinds.size, `${mode}: ${name} placed too few kinds`).toBeGreaterThan(25);
-          }
         } finally {
           rust.free();
         }

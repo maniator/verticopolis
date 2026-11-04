@@ -65,6 +65,28 @@ own line: the PR, the files, and why the fallback needs them):
 - **Benchmark parity tooling that runs the TypeScript engine** (#1124, the cost-split, churn and calibration PR, with #1108's A/A mode): `perf:compare --aa ts` and the TypeScript slot of every `perf:compare` run (`src/tests/perfCompare/{runner,validate,metrics,limitations}.ts`), the TypeScript side of the Node check (`nodeCheck.ts`), `perf:calibrate`'s `ts` passes and cold-start cap, and the `perf:worker` `ts` mode and its gate column (`src/tests/perfWorker/`). The WASM-only parts (the export cost split, hourly churn, the working-tree record, calibration of WASM A/A passes) stay as permanent benchmark infrastructure. Removing the TypeScript engine retires the comparison, so these go with it or collapse to WASM-only runs.
 - **#985 slice 2a (the verified engine load, PR linked on #985).** The switchable build's branch that leaves the game on the TypeScript engine after a refused engine package: `loadBootEngine`'s `!wasmOnly` path in `src/wasmhost/engineBoot.ts` (the `engine: "ts"` result for a refused package, with its tests in `engineBoot.test.ts` and `bootstrapEngine.test.ts`) and the `chromium-wasm` assertions in `e2e/engineIntegrity.spec.ts` that expect the game on TypeScript (`expectRefused`'s non-wasm-only branch), plus the `!__WASM_ONLY__` worker-host branch in `src/bootstrap.ts` that gives a refused first tower its catalog verdict with its `workerCatalogs` cases in `src/bootstrapEngine.test.ts` (`catalogVerdict` itself stays: the main-thread host uses it too). Nothing else in the slice depends on the TypeScript engine: the loader (`loadEngineModule.ts`), the failure detail, the shell id check and the loading line stay.
 - PR #831 (room occupant seats): `roomOccupants` in `src/render/pixelSprites/common.ts` imports `visibleOccupants` from the TypeScript engine (through `engine/Crowd`), and `residential.ts`, `food.ts`, `clinic.ts` and `sprites/facilities/venue.ts` import it directly. After the removal, each reads the engine read model's visible-occupant count instead (backlog row `room-painters-read-ts-engine`, #1106). The PR cuts the render importers of `visibleOccupants` from 11 files on main to these five.
+- **#1809 (the dual run's Rust goldens, #945 Dual run row, #1806).** The two
+  TypeScript referees go with the engine: `frameDaysReferee.integration.test.ts`
+  and `cardTextReferee.integration.test.ts`, with their lines in
+  `src/tests/tsEngineTests.ratchet.txt`. The goldens they referee
+  (`src/tests/goldens/`) and their Rust suites stay, and need these moved out of
+  the deleted code first:
+  - the `canonicalJson` that `src/tests/conformance/canonical.ts` re-exports;
+  - what `src/tests/conformance/wasmEngine.ts` reads: `engine/econConfig`,
+    `REPO_ROOT` and the scenario types from `scenario.ts` (which imports
+    `Simulation`), and the `CheckpointDetail`, `FxSlot` and `ChargeOutcome`
+    types from `checkpointDetail.ts` and `chargeOps.ts` (which import
+    `Simulation` as a type, so only `npm run typecheck` breaks without them);
+  - `src/catalog/towerCatalog.ts` (`useTowerCatalogSource`), which imports
+    `engine/catalog` and is on the frontend ratchet;
+  - the `engine/sim/frameStep` re-export in `src/game/frameLoop.ts` (the
+    golden reads `SPEEDS` there).
+
+  The Rust suites also import `src/dualrun/binding.ts` and
+  `src/dualrun/catalog.ts`, which #1421 keeps or moves when it deletes the
+  mirror. The shipped card kit's import of `facilityDiagnostics.ts` is the
+  frontend ratchet's. With the referee gone, `VC_CARD_TEXT_UPDATE`
+  (`src/tests/goldens/updateGate.ts`) drops its `typescript` value.
 - **Slice 5a (#1212, PR #1294): the host's save text for undo copies.**
   `setSaveText` and `saveText` in `src/wasmhost/stepGate.ts`, and the
   registration in `attachWasmHost` (`src/wasmhost/wasmHost.ts`). They let

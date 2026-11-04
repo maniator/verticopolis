@@ -1,0 +1,12 @@
+{
+  "case": "retail venues",
+  "mode": "classic",
+  "units": [
+    {"id":252,"kind":"shop","floor":2,"lines":["Access: reachable from the lobby.","Today's patronage: 40 customers","Local demand: 0% of capacity.","Very few customers.","Yesterday's profit: $200."]},
+    {"id":253,"kind":"fastFood","floor":2,"lines":["Access: reachable from the lobby.","Today's patronage: 3 customers","Local demand: 0% of capacity.","Just opened, no data yet."]},
+    {"id":254,"kind":"restaurant","floor":2,"lines":["Access: reachable from the lobby.","Today's patronage: 120 customers","Local demand: 0% of capacity.","Business is booming.","Yesterday's profit: $4,800."]}
+  ],
+  "transports": [
+    {"id":251,"kind":"elevatorStandard","lines":[]}
+  ]
+}

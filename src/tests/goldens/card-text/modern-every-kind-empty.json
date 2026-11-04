@@ -1,0 +1,34 @@
+{
+  "case": "every kind, empty",
+  "mode": "modern",
+  "units": [
+    {"id":10001,"kind":"office","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor."]},
+    {"id":10002,"kind":"condo","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor."]},
+    {"id":10003,"kind":"hotelSingle","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor.","Counts toward stars: no. Hotel guests stop counting at 4★ (they still earn income)."]},
+    {"id":10004,"kind":"hotelDouble","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor.","Counts toward stars: no. Hotel guests stop counting at 4★ (they still earn income)."]},
+    {"id":10005,"kind":"hotelSuite","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor.","Counts toward stars: no. Hotel guests stop counting at 4★ (they still earn income)."]},
+    {"id":10006,"kind":"fastFood","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor.","Today's patronage: 12 customers","Very few customers.","Yesterday's profit: $400."]},
+    {"id":10007,"kind":"restaurant","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor.","Today's patronage: 12 customers","Very few customers.","Yesterday's profit: $400."]},
+    {"id":10008,"kind":"foodHall","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor.","Today's patronage: 12 customers","Very few customers.","Yesterday's profit: $400."]},
+    {"id":10009,"kind":"shop","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor.","Today's patronage: 12 customers","Very few customers.","Yesterday's profit: $400."]},
+    {"id":10010,"kind":"cinema","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor."]},
+    {"id":10011,"kind":"partyHall","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor."]},
+    {"id":10012,"kind":"amusements","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor.","Today's patronage: 12 customers","Very few customers.","Yesterday's profit: $400."]},
+    {"id":10013,"kind":"boutiqueBay","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor.","Today's patronage: 12 customers","Very few customers.","Yesterday's profit: $400."]},
+    {"id":10014,"kind":"fitnessClub","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor."]},
+    {"id":10015,"kind":"clinic","floor":3,"lines":["Access: not connected. No elevator or stair reaches this floor."]},
+    {"id":10016,"kind":"nightclub","floor":7,"lines":["Access: not connected. No elevator or stair reaches this floor.","Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor)."]},
+    {"id":10017,"kind":"spa","floor":7,"lines":["Access: not connected. No elevator or stair reaches this floor.","Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor)."]},
+    {"id":10018,"kind":"skyBar","floor":7,"lines":["Access: not connected. No elevator or stair reaches this floor."]},
+    {"id":10019,"kind":"aquaticCenter","floor":7,"lines":["Access: not connected. No elevator or stair reaches this floor."]},
+    {"id":10020,"kind":"daycare","floor":7,"lines":["Access: not connected. No elevator or stair reaches this floor.","Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor)."]},
+    {"id":10021,"kind":"security","floor":7,"lines":[]},
+    {"id":10022,"kind":"medical","floor":7,"lines":[]},
+    {"id":10023,"kind":"housekeeping","floor":7,"lines":["Fields 6 maids, each cleaning up to ~19 rooms a day when travel is short. Tower: 1 crew (6 maids) for 3 hotel room(s).","3 room(s) are out of staff reach and can never be cleaned. Extend a service elevator or stairs to their floors."]},
+    {"id":10024,"kind":"rentalStudio","floor":7,"lines":["Access: not connected. No elevator or stair reaches this floor."]},
+    {"id":10025,"kind":"rentalApartment","floor":7,"lines":["Access: not connected. No elevator or stair reaches this floor."]}
+  ],
+  "transports": [
+
+  ]
+}
