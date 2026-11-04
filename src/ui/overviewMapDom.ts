@@ -1,7 +1,8 @@
 /**
  * The overview MAP window's elements (#343): the window with its title bar,
  * the two stacked canvases and the text summary, plus the Map button that
- * opens it. Building them is all this does; `OverviewMapWindow` wires them.
+ * opens it, plus `ContextWatch`, which tracks whether the canvases' 2D
+ * contexts are lost. `OverviewMapWindow` wires them.
  */
 
 /** The ids of the window's parts, which the CSS and the tests name. */
@@ -69,4 +70,74 @@ export function buildMapDom(doc: Document): MapDom {
   toggle.title = "Show the tower map";
   toggle.setAttribute("aria-controls", MAP_DOM_ID.window);
   return { root, close, body, towerCanvas, viewCanvas, summary, toggle };
+}
+
+/** What a frame finds of the canvases' 2D contexts (see `ContextWatch.poll`). */
+export type MapContextState = "ready" | "lost" | "restored";
+
+/**
+ * Whether either canvas has lost its 2D context. The `contextlost` and
+ * `contextrestored` events count where the browser fires them, and each frame
+ * also asks each context `isContextLost()` (at most two calls), since a
+ * browser may blank a canvas without the events. A lost context blanks its
+ * canvas, and a restored one starts blank at its default state.
+ */
+export class ContextWatch {
+  /** Canvases a `contextlost` event reported and no `contextrestored` has. */
+  private readonly lostByEvent = new Set<HTMLCanvasElement>();
+  /** The last poll found a context lost. */
+  private lost = false;
+  /** A restore came since the last poll: a `contextrestored` fired, or every
+   *  context answered `isContextLost()` with false while a loss event was
+   *  still open (a loss and its restore can both fall between two frames). */
+  private restoredByEvent = false;
+
+  /** `changed` hears each event at once, before the next frame polls. */
+  constructor(
+    private readonly canvases: ReadonlyArray<HTMLCanvasElement>,
+    private readonly contexts: ReadonlyArray<CanvasRenderingContext2D | null>,
+    changed: () => void,
+  ) {
+    for (const canvas of canvases) {
+      canvas.addEventListener("contextlost", () => {
+        this.lostByEvent.add(canvas);
+        changed();
+      });
+      canvas.addEventListener("contextrestored", () => {
+        this.lostByEvent.delete(canvas);
+        this.restoredByEvent = true;
+        changed();
+      });
+    }
+  }
+
+  /** Read once per open frame: "lost" while any context is lost, "restored"
+   *  on the first frame they are all back, and "ready" otherwise. */
+  poll(): MapContextState {
+    // Where every context answers `isContextLost()`, its answer wins, so a
+    // context given back without a `contextrestored` event still counts as
+    // back. An engine without the method (older browsers) has the events.
+    let answers = true;
+    let lostNow = false;
+    for (const ctx of this.contexts) {
+      if (ctx === null) continue;
+      if (typeof ctx.isContextLost !== "function") answers = false;
+      else if (ctx.isContextLost()) lostNow = true;
+    }
+    if (answers && !lostNow && this.lostByEvent.size > 0) {
+      this.lostByEvent.clear();
+      this.restoredByEvent = true;
+    }
+    const lost = lostNow || this.lostByEvent.size > 0;
+    const restored = !lost && (this.lost || this.restoredByEvent);
+    this.lost = lost;
+    if (!lost) this.restoredByEvent = false;
+    if (lost) return "lost";
+    return restored ? "restored" : "ready";
+  }
+
+  /** Clear every canvas whose context is there. */
+  clear(): void {
+    this.canvases.forEach((c, i) => this.contexts[i]?.clearRect(0, 0, c.width, c.height));
+  }
 }

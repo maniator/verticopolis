@@ -3,6 +3,7 @@ import * as ex from "excalibur";
 import { GRID } from "../../engine/facilities";
 import { Tower } from "../../engine/Tower";
 import { FLOOR, TILE } from "../scale";
+import { mapSideMarginTiles } from "../overviewMap/extent";
 import {
   MIN_ZOOM,
   MAX_ZOOM,
@@ -98,6 +99,18 @@ describe("setCamera / viewState / applyView are exact inverses on the same devic
     const e = eng();
     applyView(e, { tile: 100, floor: 20, zoom: 99 });
     expect(e.cam.zoom).toBe(MAX_ZOOM);
+  });
+
+  it("holds a center aimed into the Map's side margins on the lot's edges (#343)", () => {
+    // The overview Map's crop runs past each side of the lot, and a click
+    // there moves the camera through applyView, which keeps it on the lot.
+    const margin = mapSideMarginTiles(GRID.width);
+    expect(margin).toBeGreaterThan(0);
+    const e = eng();
+    applyView(e, { tile: -margin, floor: 20 });
+    expect(viewState(e).tile).toBe(0);
+    applyView(e, { tile: GRID.width + margin, floor: 20 });
+    expect(viewState(e).tile).toBe(GRID.width);
   });
 });
 

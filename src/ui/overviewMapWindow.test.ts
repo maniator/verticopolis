@@ -301,6 +301,122 @@ describe("overview map window: focus and keys (CAP-5)", () => {
     expect(rootEl().dataset.mapDrawn).toBe("true");
   });
 
+  it("unmarks itself while there is no tower, and when a canvas loses or regains its context", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(silent2d());
+    const r = rig();
+    const deps = (r.win as unknown as { deps: OverviewMapDeps }).deps;
+    deps.source = () => null;
+    r.win.frame();
+    expect(rootEl().dataset.mapDrawn).toBeUndefined();
+    // The next tower repaints from scratch, so the mark comes back with it.
+    deps.source = () => r.source;
+    r.win.frame();
+    expect(rootEl().dataset.mapDrawn).toBe("true");
+    const canvases = [...rootEl().querySelectorAll("canvas")];
+    expect(canvases).toHaveLength(2);
+    for (const canvas of canvases) {
+      // Nothing painted into a lost context shows, so it stays unmarked
+      // until the context is back and the next frame repaints in full.
+      canvas.dispatchEvent(new Event("contextlost"));
+      r.win.frame();
+      expect(rootEl().dataset.mapDrawn).toBeUndefined();
+      canvas.dispatchEvent(new Event("contextrestored"));
+      expect(rootEl().dataset.mapDrawn).toBeUndefined();
+      r.win.frame();
+      expect(rootEl().dataset.mapDrawn).toBe("true");
+    }
+    // Both lost: the first restore alone does not mark the map drawn.
+    for (const canvas of canvases) canvas.dispatchEvent(new Event("contextlost"));
+    canvases[0].dispatchEvent(new Event("contextrestored"));
+    r.win.frame();
+    expect(rootEl().dataset.mapDrawn).toBeUndefined();
+    canvases[1].dispatchEvent(new Event("contextrestored"));
+    r.win.frame();
+    expect(rootEl().dataset.mapDrawn).toBe("true");
+  });
+
+  it("clears a lost picture once, and after a restore starts its size, patterns and paint again", () => {
+    let lost = false;
+    const ctx = Object.assign(silent2d(), { fillRect: vi.fn(), clearRect: vi.fn(), isContextLost: () => lost });
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(ctx);
+    const r = rig();
+    const held = r.win as unknown as { patterns: unknown; resize(): void };
+    const resize = vi.spyOn(held, "resize");
+    const summary = document.getElementById(MAP_DOM_ID.summary)!;
+    expect(summary.textContent).not.toBe("");
+    // A context lost without its event: the frame asks, then clears both
+    // canvases and the summary once, and paints nothing into it.
+    lost = true;
+    ctx.fillRect.mockClear();
+    ctx.clearRect.mockClear();
+    r.win.frame();
+    r.win.frame();
+    expect(ctx.clearRect).toHaveBeenCalledTimes(2);
+    expect(ctx.fillRect).not.toHaveBeenCalled();
+    expect(summary.textContent).toBe("");
+    expect(rootEl().dataset.mapDrawn).toBeUndefined();
+    // Back: new pattern tiles, a fresh size and a full paint, then constant.
+    const before = held.patterns;
+    lost = false;
+    r.win.frame();
+    expect(held.patterns).not.toBe(before);
+    expect(resize).toHaveBeenCalledTimes(1);
+    expect(ctx.fillRect).toHaveBeenCalled();
+    expect(rootEl().dataset.mapDrawn).toBe("true");
+    expect(summary.textContent).not.toBe("");
+    const painted = ctx.fillRect.mock.calls.length;
+    r.win.frame();
+    expect(ctx.fillRect).toHaveBeenCalledTimes(painted);
+    // A loss and its restore both between two frames start over the same way.
+    const canvas = rootEl().querySelector("canvas")!;
+    canvas.dispatchEvent(new Event("contextlost"));
+    canvas.dispatchEvent(new Event("contextrestored"));
+    const restored = held.patterns;
+    r.win.frame();
+    expect(held.patterns).not.toBe(restored);
+    expect(resize).toHaveBeenCalledTimes(2);
+    expect(ctx.fillRect.mock.calls.length).toBeGreaterThan(painted);
+    expect(rootEl().dataset.mapDrawn).toBe("true");
+    // A restore that lands on a frame with no tower still starts over.
+    const deps = (r.win as unknown as { deps: OverviewMapDeps }).deps;
+    lost = true;
+    r.win.frame();
+    deps.source = () => null;
+    lost = false;
+    const beforeNoTower = held.patterns;
+    r.win.frame();
+    expect(held.patterns).not.toBe(beforeNoTower);
+    deps.source = () => r.source;
+    r.win.frame();
+    expect(resize).toHaveBeenCalledTimes(3);
+    expect(rootEl().dataset.mapDrawn).toBe("true");
+  });
+
+  it("trusts isContextLost over a loss event that never gets its restore event", () => {
+    let lost = false;
+    const ctx = Object.assign(silent2d(), { isContextLost: () => lost });
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(ctx);
+    const r = rig();
+    lost = true;
+    rootEl().querySelector("canvas")!.dispatchEvent(new Event("contextlost"));
+    r.win.frame();
+    expect(rootEl().dataset.mapDrawn).toBeUndefined();
+    // The browser gives the context back and fires no event.
+    lost = false;
+    r.win.frame();
+    expect(rootEl().dataset.mapDrawn).toBe("true");
+  });
+
+  it("starts new pattern tiles each time it opens", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(silent2d());
+    const r = rig();
+    const held = r.win as unknown as { patterns: unknown };
+    r.win.setOpen(false, false);
+    const closed = held.patterns;
+    r.win.setOpen(true, false);
+    expect(held.patterns).not.toBe(closed);
+  });
+
   it("never marks itself drawn without a 2D context to paint the tower with", () => {
     // happy-dom's canvases have no 2D context, as a browser that refuses one.
     expect(document.createElement("canvas").getContext("2d")).toBeNull();
