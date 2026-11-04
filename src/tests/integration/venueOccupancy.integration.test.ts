@@ -28,8 +28,9 @@ function venueDraft(kind: "fastFood" | "restaurant" | "shop"): { draft: Simulati
   draft.money = 5_000_000;
   for (let x = 0; x < 40; x++) draft.tower.place("lobby", 1, x);
   for (let f = 2; f <= 5; f++) for (let x = 0; x < 40; x++) draft.tower.place("floor", f, x);
-  draft.tower.placeTransport("elevatorStandard", 4, 1, 5);
+  expect(draft.tower.placeTransport("elevatorStandard", 4, 1, 5).ok).toBe(true);
   const result = draft.tower.place(kind, 3, 0);
+  expect(result.ok, result.reason).toBe(true);
   draft.tower.units.find((u) => u.id === result.unitId)!.state = "occupied";
   return { draft, id: result.unitId! };
 }

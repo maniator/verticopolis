@@ -207,17 +207,23 @@ export class PortSim {
   }
 
   /** The overlay cells for `mode`, decoded from the port's `heatCells`
-   *  record by the layout's `heatCell` slot names. */
+   *  record by the `heatCell` slot names of the port's own layout. */
   heatCells(mode: HeatmapMode): HeatCell[] {
-    const layout = JSON.parse(this.leaf.port.viewLayout()) as { heatModes: HeatmapMode[]; heatTints: string[] };
-    const r = this.leaf.port.heatCells(layout.heatModes.indexOf(mode));
-    const slots = VIEW_LAYOUT.records.heatCell;
-    const at = (name: string) => slots.indexOf(name);
+    const layout = JSON.parse(this.leaf.port.viewLayout()) as { heatModes: HeatmapMode[]; heatTints: string[]; records: Record<string, string[]> };
+    const modeIndex = layout.heatModes.indexOf(mode);
+    if (modeIndex < 0) throw new Error(`PortSim.heatCells: the engine's layout has no heat mode "${mode}"`);
+    const slots = layout.records.heatCell ?? [];
+    const slot = (name: string): number => {
+      const at = slots.indexOf(name);
+      if (at < 0) throw new Error(`PortSim.heatCells: the engine's heatCell record has no "${name}" slot`);
+      return at;
+    };
+    const [floor, minX, maxX, severity, tint] = ["floor", "minX", "maxX", "severity", "tint"].map(slot);
+    const r = this.leaf.port.heatCells(modeIndex);
     const cells: HeatCell[] = [];
     for (let i = 0; i + slots.length <= r.length; i += slots.length) {
-      const cell: HeatCell = { floor: r[i + at("floor")], minX: r[i + at("minX")], maxX: r[i + at("maxX")], severity: r[i + at("severity")] };
-      const tint = r[i + at("tint")];
-      if (tint > 0) cell.tint = layout.heatTints[tint] as HeatCell["tint"];
+      const cell: HeatCell = { floor: r[i + floor], minX: r[i + minX], maxX: r[i + maxX], severity: r[i + severity] };
+      if (r[i + tint] > 0) cell.tint = layout.heatTints[r[i + tint]] as HeatCell["tint"];
       cells.push(cell);
     }
     return cells;
