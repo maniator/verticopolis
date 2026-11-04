@@ -6,9 +6,9 @@ import { Simulation } from "./Simulation";
 import { canonicalJson } from "./canonicalJson";
 import { crowdView, stateView } from "./conformanceView";
 import { GAMEPLAY_RING_CAP, GameplayEventBuffer } from "./gameplayEventBuffer";
-import { checkCatalog, checkEvent } from "./gameplayCatalog";
+import { checkCatalog, checkEvent } from "../events/gameplayCatalog";
 import { noteStars } from "./sim/star";
-import type { GameplayEvent } from "./gameplayEvents";
+import type { GameplayEvent } from "../events/gameplayEvents";
 import type { SerializedGame } from "./serializedGame";
 import { decodeVctower } from "../storage/vctowerContainer";
 

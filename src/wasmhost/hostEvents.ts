@@ -1,4 +1,4 @@
-import type { GameplayEvent } from "../engine/gameplayEvents";
+import type { GameplayEvent } from "../events/gameplayEvents";
 
 /** One read of the engine's pending events: the batch, the events lost to
  *  a record the host could not read (#907), and the engine's drop count. */

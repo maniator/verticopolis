@@ -7,8 +7,8 @@
  * engine, the declaration wasm-bindgen writes is copied to
  * src/dualrun/engine.d.ts, the one checked-in file, so the TypeScript side
  * types against the binding as the Rust source declares it (CI fails when the
- * copy is stale). The engine build also refreshes src/engine/gameplayEvents.d.ts
- * (and the bridge's rules beside it, src/engine/gameplayEventRules.ts)
+ * copy is stale). The engine build also refreshes src/events/gameplayEvents.d.ts
+ * (and the bridge's rules beside it, src/events/gameplayEventRules.ts)
  * from conformance/events/catalog.json (the same as `npm run gen:events`).
  * The browser target lands in src/public/engine/ with a BUILD.json naming the
  * sources it came from (see src/wasmhost/packageHash.ts) and the digests of
@@ -31,7 +31,7 @@ import { BUILD_SECTION, customSectionsOf, parseBuildMetadata, stampBuildSection 
 import { cargoPackage } from "../src/build/engineCompat.ts";
 import { ENGINE_BUILD_RECORD, ENGINE_GLUE, ENGINE_PACKAGE, ENGINE_WASM } from "../src/wasmhost/engineAssets.ts";
 import { ENGINE_THIRD_PARTY, checkToolchain, engineThirdParty } from "./engine-third-party.ts";
-import { checkCatalog, renderGameplayEventRules, renderGameplayEventsDts } from "../src/engine/gameplayCatalog.ts";
+import { checkCatalog, renderGameplayEventRules, renderGameplayEventsDts } from "../src/events/gameplayCatalog.ts";
 
 const CRATES: Record<string, { dir: string; lib: string }> = {
   engine: { dir: "engine-rs", lib: "verticopolis_engine" },
@@ -153,8 +153,8 @@ if (which === "engine") {
   // catalog both engines are held to, so they are refreshed with the
   // binding's own declaration.
   const catalog = checkCatalog(JSON.parse(readFileSync(resolve(crate, "../conformance/events/catalog.json"), "utf8")));
-  writeFileSync(resolve(crate, "../src/engine/gameplayEvents.d.ts"), renderGameplayEventsDts(catalog));
-  writeFileSync(resolve(crate, "../src/engine/gameplayEventRules.ts"), renderGameplayEventRules(catalog));
+  writeFileSync(resolve(crate, "../src/events/gameplayEvents.d.ts"), renderGameplayEventsDts(catalog));
+  writeFileSync(resolve(crate, "../src/events/gameplayEventRules.ts"), renderGameplayEventRules(catalog));
   // The port's layout (slots, widths, code tables and records) as the Rust
   // engine hands it over, so the TypeScript engine (`src/engine/tsEngine.ts`)
   // answers the same `viewLayout()` without a hand copy of the tables.
@@ -162,7 +162,7 @@ if (which === "engine") {
   const probe = Engine.newGame(1, "modern");
   writeFileSync(resolve(crate, "../src/engine/viewLayout.json"), `${JSON.stringify(JSON.parse(probe.viewLayout()), null, 2)}\n`);
   probe.free();
-  console.log("engine-rs/pkg and src/public/engine: built; src/dualrun/engine.d.ts, src/engine/gameplayEvents.d.ts, gameplayEventRules.ts and viewLayout.json refreshed");
+  console.log("engine-rs/pkg and src/public/engine: built; src/dualrun/engine.d.ts, src/events/gameplayEvents.d.ts, gameplayEventRules.ts and viewLayout.json refreshed");
 } else {
   console.log(`${target.dir}/pkg: built`);
 }

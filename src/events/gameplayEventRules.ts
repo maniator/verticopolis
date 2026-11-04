@@ -1,5 +1,5 @@
 // Generated from conformance/events/catalog.json by `npm run gen:events`.
-// Do not edit: change the catalog and regenerate (src/engine/gameplayCatalog.test.ts fails while this is stale).
+// Do not edit: change the catalog and regenerate (src/events/gameplayCatalog.test.ts fails while this is stale).
 import type { GameplayEventRules } from "./gameplayCatalog";
 
 /** The catalog's enums and payload fields, without its prose: what the

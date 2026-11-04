@@ -1,5 +1,5 @@
 import { telemetryHostAllowed } from "./telemetry";
-import type { GameplayMilestoneId } from "./engine/gameplayEvents";
+import type { GameplayMilestoneId } from "./events/gameplayEvents";
 import { trackEvent, setCommonProps, type GameplayEvents } from "./analyticsCore";
 import { clearActionLatches } from "./analyticsActions";
 import { noteCrash as reportCrash, releaseCrashThrottle as releaseCrashSlots, takeCrashCount } from "./analyticsCrash";

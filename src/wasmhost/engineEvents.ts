@@ -1,4 +1,4 @@
-import type { GameplayEvent } from "../engine/gameplayEvents";
+import type { GameplayEvent } from "../events/gameplayEvents";
 import type { WasmEngine } from "../dualrun/binding";
 
 /** One batch drained from the engine: the events read, and how many were

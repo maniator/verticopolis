@@ -2,7 +2,7 @@ import type { Simulation } from "../Simulation";
 
 import { ECON, carResaleRefund, extendBill, resaleRefund } from "../econConfig";
 import { isElevatorKind, maxCarsFor } from "../facilities";
-import type { GameplayRemovalMethod } from "../gameplayEvents";
+import type { GameplayRemovalMethod } from "../../events/gameplayEvents";
 import { INVALID_REQUEST, whole } from "../request";
 import type { Transport } from "../types";
 

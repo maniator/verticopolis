@@ -1,6 +1,6 @@
-import { checkEvent } from "./engine/gameplayCatalog";
-import { GAMEPLAY_EVENT_RULES } from "./engine/gameplayEventRules";
-import type { GameplayEvent } from "./engine/gameplayEvents";
+import { checkEvent } from "./events/gameplayCatalog";
+import { GAMEPLAY_EVENT_RULES } from "./events/gameplayEventRules";
+import type { GameplayEvent } from "./events/gameplayEvents";
 import { RateLimiter } from "./analyticsRateLimit";
 import { gameplaySession } from "./analyticsSession";
 import { trackEconomyAction, trackEconomyActionOnce, trackEmergencyChoice } from "./analyticsActions";

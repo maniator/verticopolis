@@ -3,7 +3,7 @@ import { APP_VERSION } from "./appVersion";
 import { telemetryHostAllowed } from "./telemetry";
 import type { EngagedBy } from "./analyticsEngagement";
 import type { EngineBuild, EngineKind, EngineStatusReason, EngineStatusTrigger } from "./analyticsEngineStatus";
-import type { GameplayMilestoneId } from "./engine/gameplayEvents";
+import type { GameplayMilestoneId } from "./events/gameplayEvents";
 import type { FallbackStage } from "./wasmhost/engineBoot";
 import type { EngineChoice } from "./wasmhost/engineChoice";
 

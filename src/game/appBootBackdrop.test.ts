@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
-import type { GameplayEvent } from "../engine/gameplayEvents";
+import type { GameplayEvent } from "../events/gameplayEvents";
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
 import { PortCodes } from "../simport/portCodes";
