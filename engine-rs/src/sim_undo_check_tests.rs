@@ -1,7 +1,8 @@
 //! A step against a tower it does not expect: an edit made with no gesture
 //! open, a room used while its gesture was still open, and a sold condo's
 //! price. Each refusal changes nothing, so no cash moves for an edit that is
-//! not there to reverse.
+//! not there to reverse. A unit or shaft time moved on while its gesture
+//! was open goes back as it left.
 use super::tests::{gesture, office, tower};
 use super::StepRefused;
 use crate::facilities::Kind;
@@ -12,19 +13,19 @@ use crate::undo::Step;
 
 /// Apply `step` and check it was refused for `why` and changed nothing.
 #[track_caller]
-fn refused(sim: &mut Simulation, step: &Step, why: StepRefused) {
+pub(super) fn refused(sim: &mut Simulation, step: &Step, why: StepRefused) {
     let before = (sim.save_text(), sim.money);
     assert_eq!(sim.apply_undo_step(step).unwrap_err(), why);
     assert_eq!((sim.save_text(), sim.money), before, "nothing changed");
 }
 
-fn sell(sim: &mut Simulation, id: i64) {
+pub(super) fn sell(sim: &mut Simulation, id: i64) {
     assert!(sim.remove_facility(id, RemovalMethod::Sell).ok);
 }
 
 /// What time does to a room while a gesture is open: the journal is off
 /// the tower while the simulation advances.
-fn meanwhile(sim: &mut Simulation, f: impl FnOnce(&mut Simulation)) {
+pub(super) fn meanwhile(sim: &mut Simulation, f: impl FnOnce(&mut Simulation)) {
     let paused = sim.pause_undo_journal();
     f(sim);
     sim.resume_undo_journal(paused);
@@ -59,7 +60,7 @@ fn a_room_is_never_put_back_onto_one_built_in_its_place() {
     .unwrap();
     let redo = sim.apply_undo_step(&step).unwrap();
     let other = office(&mut sim, 2, 12);
-    refused(&mut sim, &redo, StepRefused::Stale);
+    refused(&mut sim, &redo, StepRefused::Blocked);
     assert_eq!(sim.tower.unit_at(2, 12).unwrap().id, other);
 }
 
@@ -77,7 +78,7 @@ fn restoring_a_price_on_a_room_sold_since_never_brings_the_room_back() {
 }
 
 /// A standard elevator from floor 1 to 3 at x 15, and its id.
-fn lift(sim: &mut Simulation) -> i64 {
+pub(super) fn lift(sim: &mut Simulation) -> i64 {
     assert!(sim.build_transport(Kind::ElevatorStandard, 15, 1, 3).ok);
     sim.tower.transport_at(1, 15).unwrap().id
 }
@@ -109,7 +110,7 @@ fn a_shaft_is_never_put_back_into_a_column_taken_since() {
     })
     .unwrap();
     lift(&mut sim);
-    refused(&mut sim, &sale, StepRefused::Stale);
+    refused(&mut sim, &sale, StepRefused::Blocked);
     assert_eq!(sim.tower.transports.len(), 1);
 }
 
@@ -126,7 +127,7 @@ fn a_room_used_while_its_gesture_was_open_is_not_undone() {
         });
     })
     .unwrap();
-    refused(&mut sim, &step, StepRefused::InUse);
+    refused(&mut sim, &step, StepRefused::InUse { sellable: true });
 }
 
 #[test]
@@ -179,6 +180,84 @@ fn a_sold_condo_keeps_its_price_and_its_name_can_still_go_back() {
     assert_eq!(sim.tower.get_unit(id).unwrap().rent, rent);
 }
 
+#[test]
+fn a_unit_time_moved_on_in_its_gesture_goes_back_as_it_left() {
+    // Touched early in a drag, gutted while the drag is held, then cleared:
+    // the undo puts back the shell with the old price, never the room as it
+    // stood before the fire.
+    let mut sim = tower();
+    let id = office(&mut sim, 2, 12);
+    let rent = sim.tower.get_unit(id).unwrap().rent;
+    let step = gesture(&mut sim, |s| {
+        assert!(s.price_unit(id, 20_000.0).is_some());
+        meanwhile(s, |s| {
+            s.tower.get_unit_mut(id).unwrap().state = UnitState::Gutted
+        });
+        sell(s, id);
+    })
+    .unwrap();
+    assert_eq!(step.money, 0.0, "a gutted shell pays nothing back");
+    sim.apply_undo_step(&step).unwrap();
+    let u = sim.tower.get_unit(id).unwrap();
+    assert_eq!((u.state, u.rent), (UnitState::Gutted, rent));
+
+    // A condo that sold while the drag was held comes back sold, so it
+    // never sells to a second household.
+    let mut sim = tower();
+    let id = condo(&mut sim);
+    let step = gesture(&mut sim, |s| {
+        assert!(s.tower.set_label(id, "Penthouse"));
+        meanwhile(s, |s| {
+            s.tower.get_unit_mut(id).unwrap().ever_occupied = true
+        });
+        sell(s, id);
+    })
+    .unwrap();
+    sim.apply_undo_step(&step).unwrap();
+    let u = sim.tower.get_unit(id).unwrap();
+    assert!(u.ever_occupied, "still sold");
+    assert_eq!(u.label, Kind::Condo.facility().name, "the old name");
+
+    // Income collected while the drag was held is not paid again.
+    let mut sim = tower();
+    let id = office(&mut sim, 3, 12);
+    sim.tower.get_unit_mut(id).unwrap().pending_income = 900.0;
+    let step = gesture(&mut sim, |s| {
+        assert!(s.tower.set_label(id, "Annex"));
+        meanwhile(s, |s| {
+            s.tower.get_unit_mut(id).unwrap().pending_income = 0.0
+        });
+        sell(s, id);
+    })
+    .unwrap();
+    sim.apply_undo_step(&step).unwrap();
+    assert_eq!(sim.tower.get_unit(id).unwrap().pending_income, 0.0);
+}
+
+#[test]
+fn a_shaft_time_moved_on_in_its_gesture_goes_back_as_it_left() {
+    let mut sim = tower();
+    let id = lift(&mut sim);
+    let stops = sim.tower.get_transport(id).unwrap().skip_floors.clone();
+    let step = gesture(&mut sim, |s| {
+        assert!(s.tower.set_stop(id, 2, false));
+        meanwhile(s, |s| {
+            for _ in 0..3 {
+                s.tower.note_ride(id);
+            }
+        });
+        sell(s, id);
+    })
+    .unwrap();
+    sim.apply_undo_step(&step).unwrap();
+    let t = sim.tower.get_transport(id).unwrap();
+    assert_eq!(
+        t.skip_floors, stops,
+        "the stop the gesture changed goes back"
+    );
+    assert_eq!(t.rides, 3, "and the rides stay as they were when it left");
+}
+
 /// Take away the floor tiles under `floor` from `x` for `width` tiles, as an
 /// edit made outside every gesture would.
 fn take_floor(sim: &mut Simulation, floor: i64, x: i64, width: i64) {
@@ -199,7 +278,7 @@ fn a_room_is_never_put_back_where_its_floor_was_taken_away() {
     .unwrap();
     let redo = sim.apply_undo_step(&step).unwrap();
     take_floor(&mut sim, 2, 14, 1);
-    refused(&mut sim, &redo, StepRefused::Stale);
+    refused(&mut sim, &redo, StepRefused::Blocked);
     assert!(sim
         .tower
         .unit_at(2, 12)
@@ -216,14 +295,14 @@ fn a_shaft_is_never_put_back_or_stretched_over_missing_floor() {
     })
     .unwrap();
     take_floor(&mut sim, 2, 15, width);
-    refused(&mut sim, &sale, StepRefused::Stale);
+    refused(&mut sim, &sale, StepRefused::Blocked);
 
     // A shorter shaft whose undo would stretch it back over the gap.
     let mut sim = tower();
     let id = lift(&mut sim);
     let shrink = gesture(&mut sim, |s| assert!(s.resize_transport(id, 1, 2).ok)).unwrap();
     take_floor(&mut sim, 3, 15, width);
-    refused(&mut sim, &shrink, StepRefused::Stale);
+    refused(&mut sim, &shrink, StepRefused::Blocked);
 }
 
 #[test]
@@ -232,7 +311,7 @@ fn a_shaft_is_never_stretched_back_into_one_built_above_it() {
     let id = lift(&mut sim);
     let shrink = gesture(&mut sim, |s| assert!(s.resize_transport(id, 1, 2).ok)).unwrap();
     assert!(sim.build_transport(Kind::ElevatorStandard, 15, 3, 4).ok);
-    refused(&mut sim, &shrink, StepRefused::Stale);
+    refused(&mut sim, &shrink, StepRefused::Blocked);
 }
 
 /// Floor for more security offices than the cap allows, the spots for one
@@ -269,7 +348,7 @@ fn a_room_is_never_put_back_past_its_kind_cap() {
         sim.build(Kind::Security, floor, x).ok,
         "the cap has room again"
     );
-    refused(&mut sim, &sale, StepRefused::Stale);
+    refused(&mut sim, &sale, StepRefused::Blocked);
 }
 
 #[test]

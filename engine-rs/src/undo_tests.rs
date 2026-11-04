@@ -8,6 +8,9 @@ fn step(label: &str) -> Step {
         money: 0.0,
         vip_visit_day: None,
         caps_held: Vec::new(),
+        searched_for_treasure: false,
+        used_in_gesture: false,
+        hour_passes: 0,
     }
 }
 

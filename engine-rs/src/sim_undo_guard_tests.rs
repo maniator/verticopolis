@@ -1,7 +1,7 @@
 //! Undo against what time and the rest of the game do: cash that is not an
 //! edit's stays out of a step, a room used since its step is not taken out,
-//! and a step leaves no gesture, counter or id behind that a later edit
-//! could reuse.
+//! a dig's luck is never undone, and a step leaves no gesture, counter or id
+//! behind that a later edit could reuse.
 use super::tests::{gesture, office, tower};
 use super::StepRefused;
 use crate::charges::{ExtendEnd, TRANSPORT_FLOOR_COST};
@@ -33,34 +33,50 @@ fn a_payment_that_is_not_an_edit_is_no_part_of_the_step() {
     assert!(sim.money < start, "the fee and the ransom stay paid");
 }
 
+/// Build fast food on floor 0 at `x` as one gesture: the step, and whether
+/// the dig found treasure.
+fn dig(sim: &mut Simulation, x: i64) -> (crate::undo::Step, bool) {
+    let found = sim.treasures_found;
+    let step = gesture(sim, |s| assert!(s.build(Kind::FastFood, 0, x).ok)).unwrap();
+    (step, sim.treasures_found > found)
+}
+
 #[test]
-fn a_treasure_found_by_a_build_stays_found_and_out_of_the_step() {
+fn a_build_whose_dig_searched_for_treasure_is_never_undone() {
+    // The dig stays dug and its luck stays drawn, so an undo would make
+    // every search free: kept the room when it hit, handed back the price
+    // when it missed. Hit or miss, the build stays.
+    let (mut hit, mut miss) = (false, false);
     for seed in 0..400 {
         let mut sim = tower();
         sim.rng = crate::rng::Rng::new(seed);
-        let quote = sim.can_build(Kind::FastFood, 0, 30);
-        assert!(quote.ok, "{:?}", quote.reason);
-        let found = sim.treasures_found;
-        let step = gesture(&mut sim, |s| assert!(s.build(Kind::FastFood, 0, 30).ok)).unwrap();
-        if sim.treasures_found == found {
-            continue;
+        let (step, found) = dig(&mut sim, 30);
+        assert!(step.searched_for_treasure);
+        let before = (sim.save_text(), sim.money);
+        let why = sim.apply_undo_step(&step).unwrap_err();
+        assert_eq!(why, StepRefused::SearchedForTreasure { sellable: true });
+        assert_eq!((sim.save_text(), sim.money), before, "nothing changed");
+        hit |= found;
+        miss |= !found;
+        if hit && miss {
+            break;
         }
-        assert_eq!(step.money, quote.cost, "the step carries the price alone");
-        let rich = sim.money;
-        sim.apply_undo_step(&step).unwrap();
-        assert_eq!(
-            sim.money,
-            rich + quote.cost,
-            "the gold stays with the player"
-        );
-        assert_eq!(
-            sim.treasures_found,
-            found + 1.0,
-            "and the treasure stays found"
-        );
-        return;
     }
-    panic!("no seed found a treasure");
+    assert!(hit && miss, "the seeds hit and missed");
+
+    // Ground dug before, or a tower whose three treasures are all found,
+    // holds no luck: the build undoes.
+    let mut sim = tower();
+    sim.treasures_found = 3.0;
+    let (step, _) = dig(&mut sim, 30);
+    sim.apply_undo_step(&step).unwrap();
+    let mut sim = tower();
+    let (_, _) = dig(&mut sim, 30);
+    let id = sim.tower.unit_at(0, 30).unwrap().id;
+    assert!(sim.remove_facility(id, RemovalMethod::Sell).ok);
+    let (step, found) = dig(&mut sim, 30);
+    assert!(!found && !step.searched_for_treasure, "the same dug ground");
+    sim.apply_undo_step(&step).unwrap();
 }
 
 /// A room a gesture built, and that gesture's step.
@@ -73,8 +89,8 @@ fn built_office(sim: &mut Simulation) -> (i64, crate::undo::Step) {
 #[test]
 fn a_room_used_since_its_build_is_not_taken_out_by_an_undo() {
     for (state, why) in [
-        (UnitState::Occupied, StepRefused::InUse),
-        (UnitState::Gutted, StepRefused::InUse),
+        (UnitState::Occupied, StepRefused::InUse { sellable: true }),
+        (UnitState::Gutted, StepRefused::InUse { sellable: true }),
         (UnitState::Fire, StepRefused::OnFire),
     ] {
         let mut sim = tower();
@@ -88,25 +104,17 @@ fn a_room_used_since_its_build_is_not_taken_out_by_an_undo() {
     let mut sim = tower();
     let (id, step) = built_office(&mut sim);
     sim.tower.get_unit_mut(id).unwrap().ever_occupied = true;
-    assert_eq!(sim.apply_undo_step(&step).unwrap_err(), StepRefused::InUse);
+    assert_eq!(
+        sim.apply_undo_step(&step).unwrap_err(),
+        StepRefused::InUse { sellable: true }
+    );
     let mut sim = tower();
     let (id, step) = built_office(&mut sim);
     sim.tower.get_unit_mut(id).unwrap().pending_income = 1.0;
-    assert_eq!(sim.apply_undo_step(&step).unwrap_err(), StepRefused::InUse);
-}
-
-#[test]
-fn a_room_that_only_finished_building_can_still_be_undone() {
-    let mut sim = tower();
-    let start = sim.money;
-    let (id, step) = built_office(&mut sim);
-    // No shaft reaches floor 2, so nobody moves in while it is built.
-    sim.tick(60.0 * 24.0 * 2.0);
-    assert_eq!(sim.tower.get_unit(id).unwrap().state, UnitState::Empty);
-    let earned = sim.money - (start - Kind::Office.facility().cost);
-    sim.apply_undo_step(&step).unwrap();
-    assert!(sim.tower.get_unit(id).is_none());
-    assert_eq!(sim.money, start + earned);
+    assert_eq!(
+        sim.apply_undo_step(&step).unwrap_err(),
+        StepRefused::InUse { sellable: true }
+    );
 }
 
 #[test]
@@ -129,7 +137,10 @@ fn a_sale_undone_and_redone_at_once_works_on_an_occupied_room() {
     let redo = sim.apply_undo_step(&undo).unwrap();
     // Time moves the tenants on: the redo would sell a room that changed.
     sim.tower.get_unit_mut(id).unwrap().occupants = 5;
-    assert_eq!(sim.apply_undo_step(&redo).unwrap_err(), StepRefused::InUse);
+    assert_eq!(
+        sim.apply_undo_step(&redo).unwrap_err(),
+        StepRefused::UseChanged
+    );
     assert!(sim.tower.get_unit(id).is_some());
 }
 

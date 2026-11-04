@@ -262,6 +262,13 @@ pub struct Transport {
     /// True only for imported Classic PC TDT express shafts; persisted in saves.
     pub preserve_basement_stops: bool,
     pub schedule: Option<Schedule>,
+    /// How many times anyone has gotten on: a car's boarding, a rider stepping
+    /// into a car, a walker starting up the stairs or an escalator. It only
+    /// counts up, and only an undo reads it: a shaft ridden since a step was
+    /// made has been in use, so the step does not take it out or take its
+    /// cars or floors away at their full price. Never saved: a load starts
+    /// it at zero, and forgets the steps that read it.
+    pub rides: u64,
 }
 
 impl Transport {

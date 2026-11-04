@@ -33,6 +33,13 @@ impl Tower {
         Some(i)
     }
 
+    /// Someone got on shaft `id` ([`Transport::rides`]).
+    pub(crate) fn note_ride(&mut self, id: i64) {
+        if let Some(i) = self.transport_index(id) {
+            self.transports[i].rides += 1;
+        }
+    }
+
     /// Rebuild `transport_by_id`. `Vec::remove` shifts every later index,
     /// so a removal (called from player edits and from load today) rebuilds the
     /// map where the TypeScript `Map.delete` is O(1).
@@ -144,6 +151,7 @@ impl Tower {
             skip_floors: None,
             preserve_basement_stops: false,
             schedule: None,
+            rides: 0,
         };
         self.transport_by_id.insert(id, self.transports.len());
         if let Some(j) = self.journal.as_mut() {
