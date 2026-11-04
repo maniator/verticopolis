@@ -7,11 +7,6 @@ import { EconomySystem } from "../../engine/EconomySystem";
 import { computeDemandMap } from "../../engine/sim/demand";
 import { FACILITIES } from "../../engine/facilities";
 import type { Unit } from "../../engine/types";
-import type { Person } from "../../engine/Crowd";
-import { itTypeScriptOnly } from "../parity/typescriptOnly";
-
-/** The parity projects skip these (story-engine-test-parity, #878). */
-const PINNED_LUNCH = "pins lunch by swapping sim.clock and re-forces the condo and venue occupancy every tick after the crowd exists; no command relays a clock or unit-state write";
 
 /**
  * Segment routing on a REACHABLE split floor (#647 fix round).
@@ -19,156 +14,17 @@ const PINNED_LUNCH = "pins lunch by swapping sim.clock and re-forces the condo a
  * The stranded-segment cases live in `segmentRouting.integration.test.ts`. These
  * cover the harder case the reviewers flagged: a floor whose BOTH runs reach the
  * lobby, so a trip is legal, yet a naive path could still alight on the wrong run
- * and interpolate destX across the gap. They pin that meal, return-leg, and
- * housekeeper trips route to the destination's OWN run (no gap cross), that a
- * stranded venue on a partially-reachable split floor earns nothing, and that
- * shaft balancing never re-picks a rider onto a wing it cannot reach.
+ * and interpolate destX across the gap. They pin that housekeeper trips route
+ * to the room's OWN run (no gap cross), that a stranded venue on a
+ * partially-reachable split floor earns nothing, and that shaft balancing never
+ * re-picks a rider onto a wing it cannot reach. The meal and return-leg trips
+ * on the same floor run on both engines in
+ * `segmentRoutingMealRush.integration.test.ts`.
  */
 
-/** A split floor 2: LEFT run [0..24], RIGHT run [35..59], open gap [25..34]. The
- *  ground lobby is contiguous [0..59]. A standard elevator on EACH run links it to
- *  the lobby, so both runs reach the lobby but a person on one run can only cross
- *  to the other by riding down to the lobby and back up. `condoRun`/`venueRun`
- *  choose which run carries the meal origin and which the venue. */
+/** The open gap of the split floor 2: LEFT run [0..24], RIGHT run [35..59]. */
 const GAP_LO = 25;
 const GAP_HI = 34;
-
-function reachableSplitSim(condoRun: "left" | "right", venueRun: "left" | "right"): {
-  sim: Simulation;
-  condo: Unit;
-  venue: Unit;
-} {
-  const sim = new Simulation(4242, "modern", "realWorld");
-  sim.money = 5_000_000;
-  sim.star = 1;
-  for (let x = 0; x <= 59; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-  for (let x = 0; x <= 24; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true); // LEFT run
-  for (let x = 35; x <= 59; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true); // RIGHT run
-  // A passenger elevator inside each run, so both reach the lobby.
-  expect(sim.tower.placeTransport("elevatorStandard", 0, 1, 2).ok).toBe(true); // LEFT
-  expect(sim.tower.placeTransport("elevatorStandard", 56, 1, 2).ok).toBe(true); // RIGHT
-  const condoX = condoRun === "left" ? 6 : 38;
-  const venueX = venueRun === "left" ? 6 : 38;
-  const condoRes = sim.tower.place("condo", 2, condoX);
-  const venueRes = sim.tower.place("fastFood", 2, venueX);
-  expect(condoRes.ok, "condo placed").toBe(true);
-  expect(venueRes.ok, "venue placed").toBe(true);
-  const condo = sim.tower.units.find((u) => u.id === condoRes.unitId)!;
-  const venue = sim.tower.units.find((u) => u.id === venueRes.unitId)!;
-  // Occupy them: the condo houses meal-goers, the venue is open for business.
-  condo.state = "occupied";
-  condo.occupants = FACILITIES.condo.population;
-  venue.state = "occupied";
-  return { sim, condo, venue };
-}
-
-/** Drive a lunch meal rush with real elevator dispatch (only `sim.tick` moves the
- *  cars). The clock is pinned to lunch and occupancy re-forced each tick so the
- *  window never closes and the condo keeps sending diners; `onHour` never fires,
- *  so no economy churn perturbs the run. Returns whether any person ever stood in
- *  the gap, plus a per-person visitor to inspect. */
-function driveMealRush(sim: Simulation, condo: Unit, venue: Unit, ticks: number, visit: (p: Person) => void): boolean {
-  let sawGap = false;
-  for (let i = 0; i < ticks; i++) {
-    condo.state = "occupied";
-    condo.occupants = FACILITIES.condo.population;
-    venue.state = "occupied";
-    sim.clock = new Clock(12 * 60, sim.clock.calendar); // pin lunch: dispatch + crowd only
-    sim.tick(1);
-    for (const p of sim.crowd.people) {
-      if (p.floor >= 2 && Math.round(p.x) >= GAP_LO && Math.round(p.x) <= GAP_HI) sawGap = true;
-      visit(p);
-    }
-  }
-  return sawGap;
-}
-
-describe("reachable split floor: meal outbound routes to the venue's own run", () => {
-  itTypeScriptOnly(PINNED_LUNCH)("a meal venue on the NON-representative (right) run draws routed diners, none in the gap", () => {
-    const { sim, condo, venue } = reachableSplitSim("left", "right");
-    let sawDinerAtRightVenue = false;
-    let sawOutboundStuckOnLeft = false;
-    const sawGap = driveMealRush(sim, condo, venue, 300, (p) => {
-      if (p.mealVenueId !== venue.id) return;
-      // A genuinely routed patron: DWELLING at this venue, standing on the venue's
-      // own RIGHT run (x >= 35), reached by riding down and back up, not teleported.
-      if (p.state === "dwelling" && p.floor === 2 && Math.round(p.x) >= 35) sawDinerAtRightVenue = true;
-      // The bug: an OUTBOUND diner that routed to the floor's representative (left)
-      // run and then tried to slide destX to the right venue would end its stroll
-      // stuck on the LEFT run. With the fix the outbound leg lands on the venue's
-      // own run, so no non-returning diner ever strolls the venue floor's left run.
-      if (!p.returning && p.state === "toDest" && p.floor === 2 && Math.round(p.x) <= 24) {
-        sawOutboundStuckOnLeft = true;
-      }
-    });
-    expect(sawGap, "no person ever stands in the gap columns").toBe(false);
-    expect(sawDinerAtRightVenue, "the right-run venue drew a routed diner onto its own run").toBe(true);
-    expect(sawOutboundStuckOnLeft, "no outbound diner strolls the wrong (left) run toward the venue").toBe(false);
-  });
-});
-
-describe("reachable split floor: a diner spawns on its origin run, never boards across the gap", () => {
-  itTypeScriptOnly(PINNED_LUNCH)("a left-run condo's diners (venue also left) never appear on the right run", () => {
-    // Both the condo and its venue sit on the LEFT run, so a left-run diner has no
-    // legitimate business on the RIGHT run at any point of the trip. Before the
-    // sprite-origin fix, `makePerson` placed the figure at a whole-floor `pickX`
-    // tile, so ~half the diners spawned on the RIGHT run, were edge-clamped by the
-    // walk guard at x=35, and boarded the LEFT elevator from across the gap: a
-    // board-teleport the plain gap-column check ([25..34]) never catches. This pins
-    // that every meal-goer stays on its origin run (x <= 24) while on floor 2.
-    // A WIDE left run [0..39] holds both the condo and its (width-16) food venue;
-    // gap [40..49]; a separate right run [50..59]. So a diner wrongly placed at a
-    // whole-floor `pickX` tile could land on the right run (x >= 50).
-    const sim = new Simulation(4242, "modern", "realWorld");
-    sim.money = 5_000_000;
-    sim.star = 1;
-    for (let x = 0; x <= 59; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-    for (let x = 0; x <= 39; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true); // LEFT run
-    for (let x = 50; x <= 59; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true); // RIGHT run
-    expect(sim.tower.placeTransport("elevatorStandard", 38, 1, 2).ok).toBe(true); // LEFT
-    expect(sim.tower.placeTransport("elevatorStandard", 52, 1, 2).ok).toBe(true); // RIGHT
-    const condoRes = sim.tower.place("condo", 2, 2); // LEFT run [2..17]
-    const venueRes = sim.tower.place("fastFood", 2, 20); // LEFT run [20..35]
-    expect(condoRes.ok && venueRes.ok).toBe(true);
-    const condo = sim.tower.units.find((u) => u.id === condoRes.unitId)!;
-    const venue = sim.tower.units.find((u) => u.id === venueRes.unitId)!;
-    condo.state = "occupied";
-    condo.occupants = FACILITIES.condo.population;
-    venue.state = "occupied";
-
-    let sawDiner = false;
-    let sawDinerOnRightRun = false;
-    driveMealRush(sim, condo, venue, 300, (p) => {
-      if (p.mealVenueId !== venue.id) return;
-      sawDiner = true;
-      if (p.floor === 2 && Math.round(p.x) >= 50) sawDinerOnRightRun = true;
-    });
-    expect(sawDiner, "the left-run venue actually drew diners (test is non-vacuous)").toBe(true);
-    expect(sawDinerOnRightRun, "no left-run diner ever appears on the right run").toBe(false);
-  });
-});
-
-describe("reachable split floor: return leg lands on the tenant's own run", () => {
-  itTypeScriptOnly(PINNED_LUNCH)("a right-run tenant rides out and returns to the right run without crossing the gap", () => {
-    const { sim, condo, venue } = reachableSplitSim("right", "left");
-    let sawReturnOnRightRun = false;
-    let sawReturnStuckOnLeft = false;
-    const sawGap = driveMealRush(sim, condo, venue, 400, (p) => {
-      if (!(p.returning && p.originUnitId === condo.id)) return;
-      // Home again on the right run: the return leg routed to the tenant's own
-      // segment, never across the gap.
-      if (p.state === "toDest" && p.floor === 2 && Math.round(p.x) >= 35) sawReturnOnRightRun = true;
-      // The bug: a return routed to the floor's representative (left) run would
-      // land the tenant on the wrong run, stranding them away from home. With the
-      // fix the return leg reaches the origin's own run, so a returning right-run
-      // tenant never ends its stroll on the left run.
-      if (p.state === "toDest" && p.floor === 2 && Math.round(p.x) <= 24) sawReturnStuckOnLeft = true;
-    });
-    expect(sawGap, "no person ever stands in the gap columns").toBe(false);
-    expect(sawReturnOnRightRun, "a right-run tenant returned to its own run").toBe(true);
-    expect(sawReturnStuckOnLeft, "no returning right-run tenant ends up stranded on the left run").toBe(false);
-  });
-});
 
 describe("reachable split floor: housekeeper routes to the room's own run", () => {
   it("a maid sent to a room on the non-representative run never crosses the gap and finishes the job", () => {

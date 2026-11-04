@@ -148,6 +148,7 @@ src/tests/integration/reviewFixes.integration.test.ts Clock EconomySystem Simula
 src/tests/integration/roomCounts.integration.test.ts Simulation tower/rooms
 src/tests/integration/saveMetadataLog.integration.test.ts Simulation
 src/tests/integration/segmentRouting.integration.test.ts Crowd Simulation Tower sim/gripe
+src/tests/integration/segmentRoutingMealRush.integration.test.ts Simulation
 src/tests/integration/segmentRoutingReachable.integration.test.ts Clock Crowd EconomySystem Simulation Tower sim/demand
 src/tests/integration/simulation.integration.test.ts ElevatorDispatch Simulation
 src/tests/integration/skylobbyTransfer.integration.test.ts Crowd Tower
@@ -190,7 +191,7 @@ src/tests/perfCompare/page.integration.test.ts Simulation port/tsEngine
 src/tests/perfCompare/savedStart.ts Simulation
 src/tests/perfCompare/scenarios.test.ts Simulation
 src/tests/perfCompare/scenarios.ts Simulation
-src/tests/portKit/portSim.ts Simulation port/tsEngine # the kit builds the TypeScript leg on purpose
+src/tests/portKit/portSim.ts Clock Simulation port/tsEngine tower/rooms # the kit builds the TypeScript leg on purpose
 src/tests/roomCountsWriters.guard.test.ts tower/rooms
 src/ui/catalogPricing.test.ts Simulation
 src/ui/editorPatch.test.ts Simulation

@@ -78,6 +78,49 @@ impl Engine {
         self.sim.evaluate_star();
     }
 
+    /// Tooling only: put the clock at `minutes`, forward or back, and run
+    /// nothing: the TypeScript `sim.clock = new Clock(minutes, calendar)`
+    /// that tests use to pin an hour once the crowd exists. The loop's pass
+    /// memos stay as they are, as with `advanceClock`, so a pass the move
+    /// skips runs once on the next tick. A literal 0 is 07:00 on day 0, as at
+    /// founding. False, changing nothing, for a value that is not finite, is
+    /// below 0 or is past [`MAX_TOOL_CLOCK_MINUTES`].
+    #[wasm_bindgen(js_name = setClock)]
+    pub fn set_clock(&mut self, minutes: f64) -> bool {
+        if !minutes.is_finite() || !(0.0..=MAX_TOOL_CLOCK_MINUTES).contains(&minutes) {
+            return false;
+        }
+        self.sim.clock = crate::clock::Clock::new(minutes, self.sim.clock.calendar);
+        true
+    }
+
+    /// Tooling only: set a unit's state by its save name, and its occupants
+    /// when given (a test holds a venue open or a condo full). False for an
+    /// unknown unit or state, for "construction" and "fire" (each needs its
+    /// own timer or event record, which this write cannot make), or for
+    /// occupants that are not a whole number from 0 to
+    /// [`MAX_TOOL_OCCUPANTS`]; nothing changes then.
+    #[wasm_bindgen(js_name = setUnitState)]
+    pub fn set_unit_state(&mut self, id: f64, state: &str, occupants: Option<f64>) -> bool {
+        let Some(state) = crate::tower::UnitState::from_name(state) else {
+            return false;
+        };
+        if needs_its_own_record(state) {
+            return false;
+        }
+        if occupants.is_some_and(|n| n.fract() != 0.0 || !(0.0..=MAX_TOOL_OCCUPANTS).contains(&n)) {
+            return false;
+        }
+        let Some((unit, at)) = whole_id(id).and_then(|id| self.sim.tower.marked_by_id(id)) else {
+            return false;
+        };
+        unit.set_state(at, state);
+        if let Some(n) = occupants {
+            unit.set_occupants(at, n as i64);
+        }
+        true
+    }
+
     /// `callExterminator()`: JSON `{ ok, reason?, cost?, rooms? }`, the
     /// TypeScript `ExterminatorResult`: `cost` and `rooms` ride on a booking
     /// and on the "funds" refusal, the other refusals carry the reason alone.
@@ -246,3 +289,29 @@ impl Engine {
         self.sim.gameplay.dropped as f64
     }
 }
+
+/// The latest clock `setClock` takes, in minutes (about 1,900 years): far past
+/// any game, and small enough that a tick still moves the clock.
+const MAX_TOOL_CLOCK_MINUTES: f64 = 1e9;
+
+/// The most occupants `setUnitState` writes: the largest whole number a
+/// JavaScript number holds exactly, so both engines store the same count.
+const MAX_TOOL_OCCUPANTS: f64 = 9_007_199_254_740_991.0;
+
+/// A state the engine enters only alongside a record of its own (a
+/// construction timer, an active fire), which a bare state write cannot make.
+fn needs_its_own_record(state: crate::tower::UnitState) -> bool {
+    matches!(
+        state,
+        crate::tower::UnitState::Construction | crate::tower::UnitState::Fire
+    )
+}
+
+/// A unit id the binding was handed as a number: whole and in range.
+fn whole_id(id: f64) -> Option<i64> {
+    (id.fract() == 0.0 && id.abs() < 9007199254740992.0).then_some(id as i64)
+}
+
+#[cfg(test)]
+#[path = "exports_state_tests.rs"]
+mod tests;
