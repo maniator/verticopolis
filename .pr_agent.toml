@@ -14,6 +14,9 @@ repo_context_from_default_branch = true
 # PR titles for bare #N issue links, independent of this regex.
 # TOML single quotes keep the regex backslashes intact.
 description_issue_regex = '(?i)(?:fixes|closes|resolves)\s+#(\d+)'
+# A numbered source branch may reference a tracking issue without completing it.
+# Do not infer tickets from branch names, including in opt-in ticket reviews.
+extract_issue_from_branch = false
 
 [pr_reviewer]
 # Allow more chunks to review large source/test diffs; this can cost more.
@@ -38,7 +41,7 @@ persistent_finding_state = true
 extra_instructions = """
 Focus on correctness, Rust/WASM engine authority, save compatibility, deterministic behavior, simulation hot-path performance, meaningful regression tests, and CI coverage. For parity PRs, prioritize the register, guards, engine implementation, and conformance tests.
 Assess the intended scope of THIS PR. A linked parent issue or planned follow-up is context, not a promise to finish the whole issue.
-An unread or omitted patch is not evidence that a changed file, golden, or test is absent. State incomplete coverage explicitly, rather than inventing missing work or repeating generic verification demands.
+An unread or omitted patch is not evidence that a changed file, golden, or test is absent. Cross-check GitHub's complete changed-file list before declaring a file absent; state incomplete coverage explicitly rather than inventing missing work or repeating generic verification demands.
 Only report actionable code findings with concrete file/line evidence. Do not treat pending CI as failed CI, or a test wired into CI as an executed passing test.
 Reserve 'changes required' for actual blocking defects; use 'needs review' only for a specific risk or incomplete inspection, and explain which. No defects found is not a claim CI passed or a merge approval.
 The review is from PR-Agent, not the repository owner.
@@ -65,5 +68,6 @@ glob = [
   "src/tests/goldens/card-text/*.json",
   # Generated golden data is validated by the Rust and TypeScript tests.
   # Review the generator and test logic instead of spending context on JSON.
+  "src/tests/goldens/frame-days.json",
   "src/tests/goldens/port-edits.json",
 ]
