@@ -5,6 +5,7 @@ import {
   serviceDiagnosticsFixture,
   lobbyDistanceFixture,
   retailServiceFixture,
+  underServedRetailFixture,
   setFixtureHotelState,
 } from "../fixtures/serviceDiagnostics.fixture";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
@@ -104,6 +105,20 @@ describe.skipIf(!hasWasmPackage())("real Rust/WASM keyed service diagnostics fro
         expect(rust.serviceDiagnostics(f.fastFood.id)?.retail.tier).toBe("noData");
         expect(rust.serviceDiagnostics(f.restaurant.id)?.retail.tier).toBe("booming");
         expect(rust.serviceDiagnostics(f.shop.id)?.retail.advice).toBe(mode === "modern" ? "overBuilt" : "none");
+      } finally {
+        rust.free();
+      }
+    });
+  }
+
+  for (const mode of ["classic", "modern"] as const) {
+    it(`${mode}: a tower whose shoppers outstrip its retail reads under-served in Modern, through real WASM`, () => {
+      const f = underServedRetailFixture(mode);
+      const rust = fromFixture(f.sim);
+      try {
+        const actual = rust.serviceDiagnostics(f.shop.id);
+        expect(actual).toEqual(new TsEngine(f.sim).serviceDiagnostics(f.shop.id));
+        expect(actual?.retail.advice).toBe(mode === "modern" ? "underServed" : "none");
       } finally {
         rust.free();
       }

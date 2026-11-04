@@ -13,7 +13,6 @@ import {
   drawCrane,
   drawTransport,
   ESCAPE_W,
-  lobbyVariant,
 } from "../sprites";
 import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
 import { paintAnimatedUnit } from "../regionPaint";
@@ -21,6 +20,7 @@ import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "../scale";
 import { isDeadParking, roomSignature } from "./roomSignature";
 import { reap } from "./towerCrowd";
 import { dropRegionUnit, markRegionUnit } from "./towerRegions";
+import { syncStructureTiles } from "./towerStructTiles";
 import { syncScenery } from "./towerScenery";
 import type { TowerEngine } from "./TowerEngine";
 
@@ -49,19 +49,13 @@ export function syncScene(engine: TowerEngine): void {
   // over, a swapped-in tower re-derives its seed-driven skyline and greenery).
   syncScenery(engine);
   // The floor and lobby tiles draw from the layout, the lobby lighting and the
-  // sim alone, so the tile pass runs only when one of those moved. Every other
+  // sim alone, so the full tile pass runs only when the layout or the sim
+  // moved, and a lighting-only flip repaints just the lobby cells. Every other
   // sync (the hour, the meal overlay) skips the tiles, which make up most of a
-  // big tower's units. The unit list identity rides along with the revision:
-  // the view rebuilds both together, and a fresh list always walks.
-  const pass = engine.structPass;
-  const units = tower.units;
-  const tilesStale =
-    pass.sim !== engine.sim || pass.units !== units || pass.revision !== tower.revision || pass.lit !== engine.litState;
-  // Refresh the floor-1 entrance map BEFORE the unit loop that will call
-  // addStruct / lobbyTileGfx: those consumers need to see a map as fresh as
-  // the tiles they're about to bake, so a newly-placed leftmost tile picks
-  // up the grand-entrance graphic on the same frame it's added.
-  if (tilesStale) refreshFloor1EntranceMap(engine);
+  // big tower's units, and walks only the rooms the last full pass kept. The
+  // unit list identity rides along with the revision: the view rebuilds both
+  // together, and a fresh list always walks.
+  const rooms = syncStructureTiles(engine);
   // Fresh flood-fill (not cached, it depends on unit state); read ONCE here
   // per sync. A parking space absent from this set is "dead" and gets a red X.
   // The dead-bit joins the room signature, so a connectivity flip triggers a
@@ -83,7 +77,7 @@ export function syncScene(engine: TowerEngine): void {
   // `state` at `occupied` around the clock (`updatePresence` cycles `occupants`,
   // never `state`), so this is stable for offices, condos and shops alike.
   // Structural tiles never qualify: floors and lobbies are placed `empty` and
-  // stay there.
+  // stay there, so the room loop below answers it for the whole tower.
   //
   // The rule this lands on is "somebody holds space in this building right now."
   // A shop or office keeps its lease overnight, so its tower stays staffed at
@@ -93,76 +87,50 @@ export function syncScene(engine: TowerEngine): void {
   // leases rather than second-guessing them, and the alternative (latching on
   // `everOccupied`) would keep staff in a tower everyone has left. Revisit if
   // the daily flip reads badly on a real hotel tower.
-  // Set here rather than in the per-frame tick because the scan walks every unit.
-  engine.d.staffed = tower.units.some((u) => isPresent(u));
-  const seenS = new Set<ex.Tile>();
+  // Set here rather than in the per-frame tick because it needs every room.
+  let staffed = false;
   const seenR = new Set<number>();
   // Rebuilt fresh each sync from the one flood-fill read above; the region
   // draw closures read it live at raster time (dead spaces get the red X).
   const deadNow = new Set<number>();
-  for (const u of units) {
-    if (u.kind === "floor" || u.kind === "lobby") {
-      if (!tilesStale) continue;
-      // Floor/lobby units are one tile wide, so a unit maps to one cell.
-      const cell = engine.structTileMap.getTile(u.x, viewWorld().maxFloor - u.floor);
-      if (!cell) continue; // outside the grid; the engine never places there
-      seenS.add(cell);
-      engine.structTiles.add(cell);
-      // Lobby tiles swap their shared graphic when the evening lights come
-      // on (chandeliers/sconces glow), and a lobby built over bare floor
-      // takes the cell over. Guarded: clearing and re-adding a cell graphic
-      // dirties the TileMap's cached geometry, so skip when the cell already
-      // shows the right canvas.
-      const gfx = u.kind === "lobby" ? lobbyTileGfx(engine, u) : engine.floorGfx;
-      if (cell.getGraphics()[0] !== gfx) {
-        cell.clearGraphics();
-        cell.addGraphic(gfx);
-      }
-    } else {
-      seenR.add(u.id);
-      const unchained = !parkingOK.has(u.id);
-      // Every input the room sprite draws from, hour-dependent bits included
-      // (see roomSignature), so the room re-bakes exactly when its look changes.
-      const sig = roomSignature(u, {
-        hour: engine.d.hour,
-        lit: engine.litState,
-        unchained,
-        parkingUse: engine.d.parkingUse ?? 0,
-        recycleFill: engine.d.recycleFill ?? 0,
-      });
-      if (isDeadParking(u, unchained)) deadNow.add(u.id);
-      const animated = u.state === "fire" || u.state === "construction";
-      const wasAnimated = engine.animatedRooms.has(u.id);
-      if (animated && !wasAnimated) {
-        // Settled -> animated (ignition, construction start): pull the unit
-        // out of its region THIS frame so nothing stays baked under the
-        // flames, and stand up the private per-frame actor.
-        dropRegionUnit(engine, u.id, true);
-        addRoom(engine, u);
-      } else if (!animated && wasAnimated) {
-        // Animated -> settled (extinguish, build done): retire the private
-        // actor and bake into the region THIS frame, so there is never a
-        // one-frame hole where the room existed in neither layer.
-        engine.animatedRooms.get(u.id)?.kill();
-        engine.animatedRooms.delete(u.id);
-        markRegionUnit(engine, u, true);
-      } else if (!animated && (engine.roomSig.get(u.id) !== sig || !engine.regionUnits.has(u.id))) {
-        // Settled look change (or first sight): membership is idempotent and
-        // the repaint rides the budgeted drain (towerRegions).
-        markRegionUnit(engine, u);
-      }
-      engine.roomSig.set(u.id, sig);
+  for (const u of rooms) {
+    if (!staffed && isPresent(u)) staffed = true;
+    seenR.add(u.id);
+    const unchained = !parkingOK.has(u.id);
+    // Every input the room sprite draws from, hour-dependent bits included
+    // (see roomSignature), so the room re-bakes exactly when its look changes.
+    const sig = roomSignature(u, {
+      hour: engine.d.hour,
+      lit: engine.litState,
+      unchained,
+      parkingUse: engine.d.parkingUse ?? 0,
+      recycleFill: engine.d.recycleFill ?? 0,
+    });
+    if (isDeadParking(u, unchained)) deadNow.add(u.id);
+    const animated = u.state === "fire" || u.state === "construction";
+    const wasAnimated = engine.animatedRooms.has(u.id);
+    if (animated && !wasAnimated) {
+      // Settled -> animated (ignition, construction start): pull the unit
+      // out of its region THIS frame so nothing stays baked under the
+      // flames, and stand up the private per-frame actor.
+      dropRegionUnit(engine, u.id, true);
+      addRoom(engine, u);
+    } else if (!animated && wasAnimated) {
+      // Animated -> settled (extinguish, build done): retire the private
+      // actor and bake into the region THIS frame, so there is never a
+      // one-frame hole where the room existed in neither layer.
+      engine.animatedRooms.get(u.id)?.kill();
+      engine.animatedRooms.delete(u.id);
+      markRegionUnit(engine, u, true);
+    } else if (!animated && (engine.roomSig.get(u.id) !== sig || !engine.regionUnits.has(u.id))) {
+      // Settled look change (or first sight): membership is idempotent and
+      // the repaint rides the budgeted drain (towerRegions).
+      markRegionUnit(engine, u);
     }
+    engine.roomSig.set(u.id, sig);
   }
+  engine.d.staffed = staffed;
   engine.deadParking = deadNow;
-  if (tilesStale) {
-    for (const cell of engine.structTiles) {
-      if (seenS.has(cell)) continue;
-      cell.clearGraphics();
-      engine.structTiles.delete(cell);
-    }
-    engine.structPass = { sim: engine.sim, units, revision: tower.revision, lit: engine.litState };
-  }
   reap(engine.animatedRooms, seenR, (a, id) => {
     a.kill();
     engine.roomSig.delete(id);
@@ -307,95 +275,6 @@ function addBoxActor(engine: TowerEngine, pos: ex.Vector, w: number, h: number, 
   a.collider.set(ex.Shape.Box(w, h, ex.vec(0, 0)));
   engine.engine.add(a);
   return a;
-}
-
-/** The shared lobby tile graphic for this unit's lighting, style and slot.
- *  For floor-1 lobby tiles the frontage-edge predicate can override the
- *  variant to a wide-storefront grand slice, a compact grand fallback, or
- *  a service entrance; see {@link floor1EntranceKind}. */
-function lobbyTileGfx(engine: TowerEngine, u: UnitView): ex.Canvas {
-  const lit = engine.litState ? 1 : 0;
-  if (u.floor === 1) {
-    const kind = floor1EntranceKind(engine, u.x);
-    switch (kind) {
-      case "grand-left": return engine.entranceGrandLeftGfx[lit];
-      case "grand-right": return engine.entranceGrandRightGfx[lit];
-      case "grand-solo": return engine.entranceGrandSoloGfx[lit];
-      case "service": return engine.entranceServiceGfx[lit];
-    }
-    return engine.lobbyGfx[lit][1][lobbyVariant(u.x)];
-  }
-  return engine.lobbyGfx[lit][0][lobbyVariant(u.x)];
-}
-
-/** Which entrance (if any) the floor-1 lobby tile at grid `x` should render
- *  as. A plain lookup in the per-tile map computed by
- *  {@link refreshFloor1EntranceMap} at the top of each syncScene that walks
- *  the tiles (the only syncs that read it). */
-function floor1EntranceKind(engine: TowerEngine, x: number): "grand-left" | "grand-right" | "grand-solo" | "service" | "none" {
-  return engine.floor1EntranceMap.get(x) ?? "none";
-}
-
-/** Walk the tower's floor-1 lobby tiles, group them into contiguous runs,
- *  and stamp the grand entrance onto the LEFTMOST run and the service door
- *  onto the RIGHTMOST run. Populating a per-tile map (rather than checking
- *  global min/max) keeps every entrance sprite anchored to real neighboring
- *  tiles, so a gap in the middle of the lobby (mid-remodel bulldoze) cannot
- *  produce an orphan grand-left half-facade with nothing next to it.
- *
- *  Rules:
- *    - Leftmost run of width ≥ 2: `runStart` -> grand-left, `runStart+1` -> grand-right.
- *    - Leftmost run of width 1 (toy tower): `runStart` -> grand-solo.
- *    - Rightmost run's rightmost tile -> service, IFF that tile is not
- *      already claimed by the grand entrance AND there is room past the
- *      grand span. When the rightmost run is the SAME as the leftmost run,
- *      "room past the grand span" means the run has more tiles than the
- *      grand takes (so 1/2-tile lobbies are all grand, no service). When
- *      the rightmost run is DIFFERENT from the leftmost run, it always has
- *      room by construction, so any distinct rightmost run gets service on
- *      its rightmost tile (even width 1). */
-function refreshFloor1EntranceMap(engine: TowerEngine): void {
-  engine.floor1EntranceMap.clear();
-  // Collect every floor-1 lobby tile position (lobby units are always
-  // width 1 in the sim, but reading u.width for defense costs nothing).
-  const tiles: number[] = [];
-  for (const u of engine.sim.tower.units) {
-    if (u.kind === "lobby" && u.floor === 1) {
-      for (let dx = 0; dx < u.width; dx++) tiles.push(u.x + dx);
-    }
-  }
-  if (tiles.length === 0) return;
-  tiles.sort((a, b) => a - b);
-  // Find the leftmost and rightmost contiguous runs. Both come from the same
-  // sorted list; a single pass locates the first run's end and the last
-  // run's start.
-  let firstRunEnd = 0;
-  while (firstRunEnd + 1 < tiles.length && tiles[firstRunEnd + 1] === tiles[firstRunEnd] + 1) {
-    firstRunEnd++;
-  }
-  let lastRunStart = tiles.length - 1;
-  while (lastRunStart > 0 && tiles[lastRunStart - 1] === tiles[lastRunStart] - 1) {
-    lastRunStart--;
-  }
-  const firstStart = tiles[0];
-  const firstEnd = tiles[firstRunEnd] + 1; // exclusive
-  const firstWidth = firstEnd - firstStart;
-  // Grand entrance on the leftmost run.
-  if (firstWidth >= 2) {
-    engine.floor1EntranceMap.set(firstStart, "grand-left");
-    engine.floor1EntranceMap.set(firstStart + 1, "grand-right");
-  } else {
-    engine.floor1EntranceMap.set(firstStart, "grand-solo");
-  }
-  // Service door on the rightmost run's rightmost tile, but only if that
-  // tile isn't already claimed by the grand entrance.
-  const lastRightX = tiles[tiles.length - 1];
-  const grandSpan = firstWidth >= 2 ? 2 : 1;
-  const sameRunAsFirst = lastRunStart <= firstRunEnd;
-  const roomPastGrand = sameRunAsFirst ? firstWidth > grandSpan : true;
-  if (roomPastGrand && !engine.floor1EntranceMap.has(lastRightX)) {
-    engine.floor1EntranceMap.set(lastRightX, "service");
-  }
 }
 
 /** Build and retain the private actor for an ANIMATED room (fire, under

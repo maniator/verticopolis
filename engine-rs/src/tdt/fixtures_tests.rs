@@ -12,17 +12,22 @@ use super::fixtures::*;
 use super::format::TDT_PERSON_RECORD_SIZE;
 use super::parse::parse_tdt;
 use super::referee::read_lock;
+use super::tables::{HOTEL_INFESTED_FLAG, HOTEL_STAY_VACANT};
 use super::types::TdtElevator;
 
 /// A locked export case with standard, service and express shafts and rooms.
 fn lock_save() -> Value {
+    lock_case("export-transports")
+}
+
+fn lock_case(id: &str) -> Value {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../conformance/tdt-cases.json");
     let lock = read_lock(&path).expect("the lock reads");
     lock.export
         .into_iter()
-        .find(|c| c.id == "export-transports")
+        .find(|c| c.id == id)
         .and_then(|c| c.save)
-        .expect("the lock has an export-transports case that embeds its save")
+        .unwrap_or_else(|| panic!("the lock has an {id} case that embeds its save"))
 }
 
 fn export_of(save: &Value) -> Vec<u8> {
@@ -162,4 +167,49 @@ fn each_builder_names_its_files_and_carries_the_edit() {
         ["EXPLAST.TDT", "EXPFIRST.TDT"]
     );
     assert!(express_count >= 1 && built > express_count);
+}
+
+#[test]
+fn the_infested_files_rewrite_only_the_status_byte_of_three_hotel_rooms() {
+    let save = lock_case("export-rent-classes");
+    let (files, rooms) = infested1629_fixtures(&save).unwrap();
+    assert_eq!(rooms.len(), INFESTED_TEST_ROOMS);
+    let names: Vec<_> = files.iter().map(|f| f.name).collect();
+    assert_eq!(
+        names,
+        ["INFCTL.TDT", "INFFLAG.TDT", "INFVAC.TDT", "INFDIRTY.TDT"]
+    );
+    let control = &files[0].bytes;
+    let at: Vec<_> = rooms.iter().map(|r| r.status_at).collect();
+    for file in &files[1..] {
+        assert_eq!(file.bytes.len(), control.len());
+        let differing: Vec<_> = (0..control.len())
+            .filter(|&i| file.bytes[i] != control[i])
+            .collect();
+        assert_eq!(differing, at, "{}", file.name);
+    }
+    // The decoder reads each rewritten byte back as the status the file holds.
+    let rewritten = hotel_rooms(control).unwrap();
+    assert!(rewritten
+        .iter()
+        .take(INFESTED_TEST_ROOMS)
+        .map(|r| r.status_at)
+        .eq(at.iter().copied()));
+    let status = |bytes: &[u8]| at.iter().map(|&i| bytes[i]).collect::<Vec<_>>();
+    assert_eq!(
+        status(control),
+        [HOTEL_STAY_VACANT as u8; INFESTED_TEST_ROOMS]
+    );
+    assert_eq!(
+        status(&files[1].bytes),
+        [HOTEL_INFESTED_FLAG as u8; INFESTED_TEST_ROOMS]
+    );
+    // The importer reads the infested flag back as an infested count.
+    assert!(
+        parse_tdt(&files[1].bytes, "INFFLAG.TDT")
+            .unwrap()
+            .counts
+            .infested
+            >= INFESTED_TEST_ROOMS as i64
+    );
 }

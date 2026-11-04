@@ -8,7 +8,7 @@
 //!
 //!   cargo run --release --manifest-path engine-rs/Cargo.toml \
 //!       --features conformance --bin tdt_fixtures -- \
-//!       claim1|claim7|express740 tools/simtower/saves/TOWERx.TDT
+//!       claim1|claim7|express740|infested1629 tools/simtower/saves/TOWERx.TDT
 //!
 //! Then load each file with `tools/simtower/run.sh load
 //! /wine/drive_c/saves/<NAME>.TDT` and read what the command prints under
@@ -19,11 +19,12 @@ use std::process::exit;
 
 use serde_json::Value;
 use verticopolis_engine::tdt::fixtures::{
-    claim1_fixtures, claim7_fixtures, express740_fixtures, Fixture, MAX_PERSON_RECORDS,
+    claim1_fixtures, claim7_fixtures, express740_fixtures, infested1629_fixtures, Fixture,
+    MAX_PERSON_RECORDS,
 };
 use verticopolis_engine::tdt::parse::parse_tdt;
 
-const USAGE: &str = "usage: tdt_fixtures <claim1|claim7|express740> <real-save.TDT>";
+const USAGE: &str = "usage: tdt_fixtures <claim1|claim7|express740|infested1629> <real-save.TDT>";
 
 fn read_save(path: &Path) -> Result<Value, String> {
     let bytes = std::fs::read(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
@@ -136,6 +137,37 @@ shafts written last. EXPFIRST has the express shaft(s) written first.
     Ok(())
 }
 
+fn infested1629(save: &Value, out: &Output) -> Result<(), String> {
+    let (files, rooms) = infested1629_fixtures(save)?;
+    println!(
+        "  {} hotel rooms are rewritten in every file except where noted:",
+        rooms.len()
+    );
+    for room in &rooms {
+        println!("    floor {} at x={}", room.floor, room.x);
+    }
+    for file in &files {
+        out.write(file)?;
+    }
+    println!(
+        "
+READ (#1629): the four files differ only in the status byte of the three rooms listed above.
+  INFCTL    vacant and clean (0x18): the control.
+  INFFLAG   the infested flag alone (0x40).
+  INFVAC    the infested flag on a vacant, clean room (0x58).
+  INFDIRTY  the infested flag with the dirty flag (0x60).
+  Load each and look at the three rooms (zoom in on them). Report for each file:
+  - are cockroaches or any other infested sign drawn on those rooms, or do they look dirty or clean?
+  - does the game load and run without a crash or a message?
+  - File > Save after a minute of Fast Mode, then import the saved file with
+    tools/simtower/tdt-to-vctower.ts and report how the three rooms read back (infested,
+    dirty, vacant) and the import warnings.
+  The flag is infestation -> the rooms show it, and it survives the save.
+  It is only dirty, or ignored -> the rooms look dirty or clean, and the saved byte changes."
+    );
+    Ok(())
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let [command, input] = args.as_slice() else {
@@ -146,6 +178,7 @@ fn main() {
         "claim1" => claim1,
         "claim7" => claim7,
         "express740" => express740,
+        "infested1629" => infested1629,
         _ => {
             eprintln!("{USAGE}");
             exit(2);

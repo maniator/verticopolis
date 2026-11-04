@@ -80,6 +80,29 @@ export function retailServiceFixture(mode: GameMode = "modern") {
   return { sim, shop, fastFood, restaurant };
 }
 
+/** One shop among many occupied offices on the same reachable floor: the
+ * tower's shoppers outstrip its retail space, the Modern "another venue would
+ * still sell" case. The engine calculates the demand; nothing is written in. */
+export function underServedRetailFixture(mode: GameMode = "modern") {
+  const sim = Simulation.newGame(75, mode);
+  sim.money = 1e9;
+  sim.star = 5;
+  for (let x = 150; x < 275; x++) {
+    sim.tower.place("lobby", 1, x);
+    for (let floor = 2; floor <= 5; floor++) sim.tower.place("floor", floor, x);
+  }
+  mustBuild(sim, "elevatorStandard", 153, 1, 5);
+  const shop = placeUnit(sim, "shop", 2, 165);
+  const offices: Unit[] = [];
+  for (let floor = 2; floor <= 5; floor++) {
+    for (let i = 0; i < 10; i++) {
+      offices.push(placeUnit(sim, "office", floor, 183 + i * 9));
+    }
+  }
+  for (const u of [shop, ...offices]) u.state = "occupied";
+  return { sim, shop, offices };
+}
+
 /** Shops at three heights over one lobby, plus a sky bar and an office on the
  * far floor: the W3 placement fixture. Floors 2 to 8 are slabs, so a shop on
  * floor 3 is 2 floors from the ground lobby and one on floor 7 is 6 away. */

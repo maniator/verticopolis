@@ -12,8 +12,10 @@ use serde_json::Value;
 
 use super::export::build_tdt;
 use super::format::{
-    parse_tdt_binary, TDT_ELEVATOR_TYPE_EXPRESS, TDT_MAX_CENSUS, TDT_PERSON_RECORD_SIZE,
+    parse_tdt_binary, TDT_ELEVATOR_TYPE_EXPRESS, TDT_FLOOR_OFFSET, TDT_MAX_CENSUS,
+    TDT_PERSON_RECORD_SIZE,
 };
+use super::tables::{tenant_kind, HOTEL_DIRTY_FLAG, HOTEL_INFESTED_FLAG, HOTEL_STAY_VACANT};
 use super::types::TdtElevator;
 use crate::facilities::Kind;
 
@@ -262,4 +264,69 @@ pub fn express740_fixtures(save: &Value) -> Result<(Vec<Fixture>, usize, usize),
         },
     ];
     Ok((files, shafts.len(), express))
+}
+
+/// A hotel room in a finished export: where it stands and where its status
+/// byte sits in the file.
+#[derive(Debug, PartialEq, Eq)]
+pub struct HotelRoom {
+    /// Our floor number (the file's index less the floor offset).
+    pub floor: i64,
+    /// Left edge in tiles.
+    pub x: i64,
+    pub status_at: usize,
+}
+
+/// The hotel rooms of a finished export, in file order.
+pub fn hotel_rooms(bytes: &[u8]) -> Result<Vec<HotelRoom>, String> {
+    let tower = parse_tdt_binary(bytes).map_err(|e| e.0)?;
+    Ok(tower
+        .floors
+        .iter()
+        .flat_map(|floor| {
+            floor
+                .tenants
+                .iter()
+                .filter(|t| tenant_kind(t.type_id).is_some_and(|k| k.is_hotel()))
+                .map(move |t| HotelRoom {
+                    floor: floor.index - TDT_FLOOR_OFFSET,
+                    x: t.left,
+                    status_at: t.status_at,
+                })
+        })
+        .collect())
+}
+
+/// How many hotel rooms the infested-flag files rewrite.
+pub const INFESTED_TEST_ROOMS: usize = 3;
+
+/// #1629: the same export with the first three hotel rooms each holding one
+/// status the game's own saves never showed us, next to a control. The bytes
+/// are set directly, since our exporter never writes the infested flag.
+/// Returns the files and the rooms that were rewritten.
+pub fn infested1629_fixtures(save: &Value) -> Result<(Vec<Fixture>, Vec<HotelRoom>), String> {
+    let base = export(save)?;
+    let rooms: Vec<_> = hotel_rooms(&base)?
+        .into_iter()
+        .take(INFESTED_TEST_ROOMS)
+        .collect();
+    if rooms.len() < INFESTED_TEST_ROOMS {
+        return Err(format!(
+            "the test needs {INFESTED_TEST_ROOMS} hotel rooms in the tower; use a save that has them (TOWER2)"
+        ));
+    }
+    let with_status = |name, status: i64| {
+        let mut bytes = base.clone();
+        for room in &rooms {
+            bytes[room.status_at] = status as u8;
+        }
+        Fixture { name, bytes }
+    };
+    let files = vec![
+        with_status("INFCTL.TDT", HOTEL_STAY_VACANT),
+        with_status("INFFLAG.TDT", HOTEL_INFESTED_FLAG),
+        with_status("INFVAC.TDT", HOTEL_INFESTED_FLAG | HOTEL_STAY_VACANT),
+        with_status("INFDIRTY.TDT", HOTEL_INFESTED_FLAG | HOTEL_DIRTY_FLAG),
+    ];
+    Ok((files, rooms))
 }
