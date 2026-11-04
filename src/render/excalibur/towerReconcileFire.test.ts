@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { UnitView } from "../../simport/view";
 import type { TowerEngine } from "./TowerEngine";
 import { syncScene } from "./towerReconcile";
+import { emptyStructPass } from "./towerStructTiles";
 
 // The reconcile is driven with a hand-built engine: no canvas bakes here. The
 // region functions are stubs that keep `regionUnits` the way the real ones do
@@ -44,15 +45,19 @@ function office(state: UnitView["state"]): UnitView {
   return { id: 7, kind: "office", floor: 3, x: 4, width: 6, state, occupants: 0 } as unknown as UnitView;
 }
 
-/** Just the engine surface `syncScene` reads for a tower of one office. */
-function fakeEngine(unit: { current: UnitView }): TowerEngine {
+/** Just the engine surface `syncScene` reads for a tower of one office. The
+ *  unit list and revision hold still, and a fire or a finished build patches
+ *  the room in place, as the view does with a frame (no revision move). So
+ *  every sync after the first takes the kept-rooms path, the one a running
+ *  tower takes. */
+function fakeEngine(unit: UnitView): TowerEngine {
   const add = vi.fn();
+  const units = [unit];
   return {
     sim: {
       tower: {
-        get units() {
-          return [unit.current];
-        },
+        units,
+        revision: 1,
         transports: [],
         functionalParkingSet: () => new Set<number>(),
       },
@@ -64,7 +69,7 @@ function fakeEngine(unit: { current: UnitView }): TowerEngine {
     litState: false,
     floor1EntranceMap: new Map(),
     structTiles: new Set(),
-    structPass: { sim: null, units: null, revision: -1, lit: false },
+    structPass: emptyStructPass(),
     animatedRooms: new Map(),
     roomSig: new Map(),
     regionUnits: new Map(),
@@ -77,21 +82,24 @@ function fakeEngine(unit: { current: UnitView }): TowerEngine {
 
 describe("a burning room leaves its region for a private actor and returns when the fire is out", () => {
   it("moves a settled room to a private animated actor when it ignites", () => {
-    const unit = { current: office("occupied") };
+    const unit = office("occupied");
     const engine = fakeEngine(unit);
     syncScene(engine);
     expect(engine.regionUnits.has(7)).toBe(true);
     expect(engine.animatedRooms.has(7)).toBe(false);
+    const pass = engine.structPass;
 
-    unit.current = office("fire");
+    (unit as { state: UnitView["state"] }).state = "fire";
     syncScene(engine);
+    // A full pass writes a new record; the kept-rooms path leaves this one.
+    expect(engine.structPass).toBe(pass);
     expect(engine.regionUnits.has(7)).toBe(false); // nothing stays baked under the flames
     expect(engine.animatedRooms.has(7)).toBe(true);
     expect(engine.engine.add).toHaveBeenCalledTimes(1);
   });
 
   it("keeps one private actor while the fire burns, and none in the region", () => {
-    const unit = { current: office("fire") };
+    const unit = office("fire");
     const engine = fakeEngine(unit);
     syncScene(engine);
     const actor = engine.animatedRooms.get(7);
@@ -103,13 +111,13 @@ describe("a burning room leaves its region for a private actor and returns when 
   });
 
   it("retires the actor and bakes the room into its region again once the fire is out", () => {
-    const unit = { current: office("fire") };
+    const unit = office("fire");
     const engine = fakeEngine(unit);
     syncScene(engine);
     const actor = engine.animatedRooms.get(7);
     const kill = actor!.kill as unknown as ReturnType<typeof vi.fn>;
 
-    unit.current = office("occupied");
+    (unit as { state: UnitView["state"] }).state = "occupied";
     syncScene(engine);
     expect(kill).toHaveBeenCalledTimes(1);
     expect(engine.animatedRooms.has(7)).toBe(false);
@@ -117,7 +125,7 @@ describe("a burning room leaves its region for a private actor and returns when 
   });
 
   it("treats a room under construction the same way", () => {
-    const unit = { current: office("construction") };
+    const unit = office("construction");
     const engine = fakeEngine(unit);
     syncScene(engine);
     expect(engine.animatedRooms.has(7)).toBe(true);
