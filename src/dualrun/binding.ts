@@ -73,7 +73,7 @@ export const INSTANCE_METHODS = [
   "scheduleFacts",
   "schedulePreset",
   // The recycling card's capacity line.
-  "recyclingCapacity",
+  "recyclingCapacity", "recyclingDemandMet",
 ] as const satisfies readonly (keyof WasmEngine)[];
 export const STATIC_METHODS = ["newGame", "fromSave", "fromVctower"] as const satisfies readonly (keyof typeof Engine)[];
 

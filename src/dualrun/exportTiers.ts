@@ -239,6 +239,7 @@ export const BINDING_EXPORT_TIERS = {
   parkingUsage: T2,
   recyclingFill: T2,
   recyclingCapacity: T2,
+  recyclingDemandMet: T2,
   positionReachable: T2,
   // Tier 2, the host loop and the engine's lifetime.
   tick: LOOP,

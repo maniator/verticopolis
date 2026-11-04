@@ -392,3 +392,12 @@ export interface BatchRentResult {
  * Simulation drives time, money, population and ratings. The renderer and UI
  * read its state; they never mutate the model directly except via build/sell.
  */
+
+/** A passenger shaft whose average load is above this share reads as near
+ *  capacity. Mirrors the Rust engine's `NEAR_CAPACITY_UTILIZATION`. */
+export const NEAR_CAPACITY_UTILIZATION = 0.85;
+
+/** Whether an average load (or none) is near capacity. */
+export function isNearCapacity(utilization: number | undefined): boolean {
+  return utilization !== undefined && utilization > NEAR_CAPACITY_UTILIZATION;
+}

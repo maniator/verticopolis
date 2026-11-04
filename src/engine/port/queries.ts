@@ -2,7 +2,7 @@ import { catalogFacility } from "../../catalog/catalogTypes";
 import { isElevatorKind } from "../facilities";
 import { INVALID_REQUEST, UNKNOWN_FACILITY } from "../request";
 import type { Simulation } from "../Simulation";
-import type { HeatmapMode } from "../sim/constants";
+import { isNearCapacity, type HeatmapMode } from "../sim/constants";
 import { towerCatalog } from "../../catalog/towerCatalog";
 import { roomUnits } from "../tower/rooms";
 import type { Transport, Unit } from "../types";
@@ -208,6 +208,7 @@ export function shaftCard(sim: Simulation, id: number): Float64Array {
     t.cars,
     sim.transportCapacity(t),
     elevator ? nan(sim.elevatorUtilization(id)) : NaN,
+    flag(elevator && isNearCapacity(sim.elevatorUtilization(id))),
     flag(hourly !== undefined),
     stops,
     flag(origins !== undefined),

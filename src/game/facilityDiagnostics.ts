@@ -1,7 +1,7 @@
 import { html, type TemplateResult } from "lit-html";
 import type { Simulation } from "../engine/Simulation";
 import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN } from "../engine/Simulation";
-import { SERVED_RECOVERY } from "../engine/sim/constants";
+import { SERVED_RECOVERY, isNearCapacity } from "../engine/sim/constants";
 import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
 import { isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } from "../presentation/viewKinds";
 import { catalogFacility, type Catalog } from "../catalog/catalogTypes";
@@ -353,11 +353,10 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
 }
 
 /** Format a measured passenger-elevator load for the hover card and mobile
- * editor. The engine supplies utilization; the frontend only renders its value.
+ * editor. The engine supplies the load and its near-capacity verdict; the frontend only words them.
  * Staff-only service elevators, stairs and escalators provide no load reading. */
-export function transportLoadLines(util: number | null | undefined): TemplateResult[] {
+export function transportLoadLines(util: number | null | undefined, near: boolean): TemplateResult[] {
   if (util === undefined || util === null || !Number.isFinite(util)) return [];
-  const near = util > 0.85;
   return [
     html`<div style="color:${near ? "var(--bad)" : "var(--good)"}">Avg load: ${Math.round(util * 100)}% full${near ? ". Near capacity; consider more cars or a parallel shaft." : ""}</div>`,
   ];
@@ -365,5 +364,7 @@ export function transportLoadLines(util: number | null | undefined): TemplateRes
 
 /** TypeScript reference engine adapter, sharing display copy with Rust. */
 export function transportDiagnostics(sim: Simulation, t: Transport): TemplateResult[] {
-  return transportLoadLines(isElevatorKind(t.kind) ? sim.elevatorUtilization(t.id) : undefined);
+  if (!isElevatorKind(t.kind)) return [];
+  const util = sim.elevatorUtilization(t.id);
+  return transportLoadLines(util, isNearCapacity(util));
 }

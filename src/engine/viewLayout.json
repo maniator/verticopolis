@@ -1,5 +1,5 @@
 {
-  "version": 10,
+  "version": 11,
   "header": {
     "minutes": 0,
     "towerRevision": 1,
@@ -485,6 +485,7 @@
       "cars",
       "capacity",
       "utilization",
+      "nearCapacity",
       "hourly",
       "stops",
       "origins"

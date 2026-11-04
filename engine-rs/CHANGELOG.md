@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.12.0 (2026-11-04)
+
+- Two card verdicts now come from the engine. The `shaftCard` record gains a `nearCapacity` slot (1 when the shaft's average car load is above 85%, else 0; a shaft with no reading is 0), placed right after `utilization`, so the slots after it move up by one. A new read-only `recyclingDemandMet()` on the port and the binding answers whether the working recycling centers can process the whole population. The host used to compare the load with 0.85 and the population with the capacity itself. The transport detail the stats and inspector read also carries `nearCapacity`. The view layout is now version 11; the save and frame layouts and the catalog are unchanged.
+
 ## 1.11.1 (2026-11-04)
 
 - The `.TDT` export writes a hotel room that has been rented and now sits clean and empty with the vacant-and-clean stay state (24, `0x18`), the byte the original game's own saves hold for such a room. It used to write a bare 1, which has no stay state, so the original read the room as a sleeping guest and rewrote it as `0x10` when it saved (found by the infested-room round trip on the PC, #1629). Importing either byte gives the same empty room that has been rented, so a round trip through our own importer is unchanged. Seven export digests in the conformance lock move. No saved-game, frame, view layout or catalog change.

@@ -147,6 +147,7 @@ export class Cards {
       cars: r[at.cars],
       capacity: r[at.capacity],
       utilization: nullable(r[at.utilization]),
+      nearCapacity: r[at.nearCapacity] === 1,
       hourly,
       origins,
       stops,

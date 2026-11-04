@@ -442,6 +442,7 @@ export class TsEngine implements PortState {
   parkingUsage = (spots: number) => draw.parkingUsage(this.current, spots);
   recyclingFill = () => this.current.recyclingFill();
   recyclingCapacity = () => this.current.recyclingCapacity();
+  recyclingDemandMet = () => this.current.recyclingDemandMet();
   positionReachable = (floor: number, x: number) => draw.positionReachable(this.current, floor, x);
   statsSheet = () => statsSheet(this.current);
   unitFacts = (id: number) => unitFacts(this.current, id);

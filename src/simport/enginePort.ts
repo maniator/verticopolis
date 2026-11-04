@@ -352,6 +352,8 @@ export interface EnginePortRender {
   recyclingFill(): number;
   /** The population the working recycling centers can process. */
   recyclingCapacity(): number;
+  /** Whether the working recycling centers can process the whole population. */
+  recyclingDemandMet(): boolean;
   /** Whether a walker can stand at `floor`, `x`; false off a whole tile. */
   positionReachable(floor: number, x: number): boolean;
 }

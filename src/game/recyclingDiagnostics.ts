@@ -10,13 +10,13 @@ import type { Simulation } from "../engine/Simulation";
  */
 
 /** The lines for `pop` population against `cap` processed, with the bins
- *  `fill` full (0 to 1). The demand-met check is `pop <= cap`, exactly
- *  `Simulation.recyclingDemandMet`. */
-export function recyclingLinesOf(pop: number, cap: number, fill: number): TemplateResult[] {
+ *  `fill` full (0 to 1). `demandMet` is the engine's verdict
+ *  (`recyclingDemandMet`); the card only words it. */
+export function recyclingLinesOf(pop: number, cap: number, fill: number, demandMet: boolean): TemplateResult[] {
   const fillPct = Math.round(fill * 100);
   return [
     html`<div>Fill: ${fillPct}%. Truck collects each morning.</div>`,
-    pop <= cap
+    demandMet
       ? html`<div style="color:var(--good)">Capacity: ${pop.toLocaleString()}/${cap.toLocaleString()} population; demand met.</div>`
       : html`<div style="color:var(--bad)">Over capacity: ${pop.toLocaleString()} population vs ${cap.toLocaleString()} processed. Build another center (4★ requires demand met).</div>`,
   ];
@@ -26,5 +26,5 @@ export function recyclingLinesOf(pop: number, cap: number, fill: number): Templa
  *  each scanned once and reused across the lines, so a hover doesn't rescan
  *  the unit list several times over. */
 export function recyclingLines(sim: Simulation): TemplateResult[] {
-  return recyclingLinesOf(sim.tower.totalPopulation(), sim.recyclingCapacity(), sim.recyclingFill());
+  return recyclingLinesOf(sim.tower.totalPopulation(), sim.recyclingCapacity(), sim.recyclingFill(), sim.recyclingDemandMet());
 }
