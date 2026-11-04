@@ -12,8 +12,8 @@ import type { EnginePort } from "../simport/enginePort";
 import type { ViewReader } from "../simport/viewReader";
 import { facilityDiagnostics, transportDiagnostics, transportLoadLines } from "./facilityDiagnostics";
 import { recyclingLinesOf } from "./recyclingDiagnostics";
-import { createPortUnitDiagnostics } from "./portUnitDiagnostics";
-import { portServiceLines } from "./portServiceDiagnostics";
+import { createPortUnitDiagnostics, type SupplementalLines } from "./portUnitDiagnostics";
+import { portServiceSections } from "./portServiceDiagnostics";
 
 /**
  * Shared card data for the inspector and editor. The TypeScript engine uses
@@ -57,6 +57,9 @@ export const BATCH_COUNTERS = [
  *  import of the engine is off limits to this file; a test pins the two). */
 export const INERT_STATES: ReadonlySet<UnitState> = new Set<UnitState>(["construction", "fire", "gutted"]);
 
+/** A unit with no service facts adds no lines. */
+const NO_SERVICE_LINES: SupplementalLines = Object.freeze({ lines: [], trailing: [] });
+
 export function createCardKit(app: { readonly enginePort: EnginePort; readonly reader: ViewReader }): CardKit {
   const port = app.enginePort;
   const codes = new PortCodes(port);
@@ -66,7 +69,7 @@ export function createCardKit(app: { readonly enginePort: EnginePort; readonly r
   const cards = new Cards(app.enginePort, app.reader);
   const tenantLines = createPortUnitDiagnostics(port, (id) => {
     const facts = port.serviceDiagnostics(id);
-    return facts ? portServiceLines(facts) : [];
+    return facts ? portServiceSections(facts) : NO_SERVICE_LINES;
   });
   // The editor's 160ms UI refresh must not run the Rust engine's full
   // congestion attribution each time. This keeps only the last unit's

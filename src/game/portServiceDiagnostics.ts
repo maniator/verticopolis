@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { ServiceDiagnosticFacts } from "../simport/enginePort";
+import type { SupplementalLines } from "./portUnitDiagnostics";
 
 /**
  * Sole source of player-facing service diagnostic copy for both engines.
@@ -125,9 +126,13 @@ export function commercialLobbyLines(c: ServiceDiagnosticFacts["commercial"]): L
   return [html`<div style="color:${bad}">Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor).</div>`];
 }
 
+/** The service lines split by where the card puts them (see
+ *  `SupplementalLines`): the retail patronage block is `trailing`. */
+export type ServiceSections = SupplementalLines;
+
 /** The WASM export returns a keyed object from Rust's typed struct.
  * This adapter does not know about slots, status code integers or thresholds. */
-export function portServiceLines(facts: ServiceDiagnosticFacts): Lines {
+export function portServiceSections(facts: ServiceDiagnosticFacts): ServiceSections {
   const out: Lines = [
     ...hotelRatingLines(facts.hotel.rating),
     ...hotelConditionLines(
@@ -152,6 +157,5 @@ export function portServiceLines(facts: ServiceDiagnosticFacts): Lines {
     offices: p.offices ?? NaN, suites: p.suites ?? NaN,
   }));
   out.push(...commercialLobbyLines(facts.commercial));
-  out.push(...retailDisplayLines(facts.retail));
-  return out;
+  return { lines: out, trailing: retailDisplayLines(facts.retail) };
 }

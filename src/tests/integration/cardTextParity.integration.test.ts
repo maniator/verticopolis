@@ -18,8 +18,10 @@ import { buildWinningTower } from "../fixtures/winningTower";
  * Rust-backed card prints for the same saved tower, room by room. The facts
  * tests (`conformanceWasmDiagnostics`) only check lines a fact section names,
  * so a line the reference drew with no fact behind it (the shoppers-too-far
- * line) slipped through; this compares the text itself. Lines compare as a
- * set per room, since the two cards stack the same lines in a different order.
+ * line) slipped through; this compares the text itself, in card order. A
+ * comparison as a set missed that the Rust card put a venue's business block
+ * above its notice (the every-kind case puts a shop on notice, a state only a
+ * save can hold, since play gives notice to lease tenants alone).
  */
 
 if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but the engine's WASM package was not built");
@@ -27,7 +29,7 @@ if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but 
 type RustPort = EnginePort & { free(): void };
 
 const textOf = (parts: readonly unknown[]): string[] =>
-  parts.map((p) => (renderToFragment(html`${p}`).textContent ?? "").trim()).filter(Boolean).sort();
+  parts.map((p) => (renderToFragment(html`${p}`).textContent ?? "").trim()).filter(Boolean);
 
 function winning(mode: GameMode): Simulation {
   const sim = Simulation.newGame(5, mode);

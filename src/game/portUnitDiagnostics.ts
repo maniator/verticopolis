@@ -36,9 +36,17 @@ function line(copy: string, color?: string): TemplateResult {
     : html`<div>${copy}</div>`;
 }
 
+/** Lines from another fact record and where the card puts them: `lines`
+ *  after the access and No Rate lines, `trailing` (a venue's business block)
+ *  last, below any notice, so a warning reads before the figures. */
+export interface SupplementalLines {
+  readonly lines: readonly TemplateResult[];
+  readonly trailing: readonly TemplateResult[];
+}
+
 export function createPortUnitDiagnostics(
   port: Pick<EnginePort, "viewLayout" | "unitFacts">,
-  supplemental?: (id: number) => TemplateResult[],
+  supplemental?: (id: number) => SupplementalLines,
 ): (id: number) => TemplateResult[] {
   const layout = JSON.parse(port.viewLayout()) as Layout;
   const slots = new Map(layout.records.unitFacts.map((name, i) => [name, i]));
@@ -73,7 +81,8 @@ export function createPortUnitDiagnostics(
     if (access) out.push(line(access.text, access.bad ? bad : good));
     const rate = noRateCopy(named(layout.noRateLines, at(r, "noRate")) ?? "");
     if (rate) out.push(line(rate));
-    if (supplemental) out.push(...supplemental(id));
+    const extra = supplemental?.(id);
+    if (extra) out.push(...extra.lines);
     if (flag(r, "farWalk")) out.push(line(FAR_WALK_COPY, bad));
 
     if (flag(r, "lobby")) {
@@ -110,6 +119,8 @@ export function createPortUnitDiagnostics(
         lines.forEach((copy, index) => out.push(line(copy, index === 0 ? bad : undefined)));
       }
     }
+    // The business block closes the card, below any notice.
+    if (extra) out.push(...extra.trailing);
     return out;
   };
 }
