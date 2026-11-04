@@ -10,6 +10,9 @@ use crate::services::with_thousands;
 use crate::sim::{LogKind, PointFx, Simulation, ThiefFx};
 use crate::tower::UnitState;
 
+#[path = "events_fire.rs"]
+mod fire;
+
 #[derive(Clone, Debug)]
 pub struct PendingChoice {
     pub kind: &'static str,
@@ -103,17 +106,7 @@ impl Simulation {
         if self.events.active.is_empty() && roll < fire_chance {
             self.start_fire();
             if !self.events.active.is_empty() {
-                let cost = self.fire_rescue_cost();
-                let message = format!("🚒 Fire rescue available for ${}. Pay to stop the spread and save the tower now, or decline and fight it the slow way. Either way the rooms already ablaze burn down to gutted shells you'll rebuild; the fee just limits how far the fire spreads.", with_thousands(cost));
-                self.events.pending = Some(PendingChoice {
-                    kind: "fireRescue",
-                    cost,
-                    message: message.clone(),
-                });
-                self.emit(&message, LogKind::Bad);
-                if !self.has_any(Kind::Security) {
-                    self.emit("Tip: a Security office fights fires for free. Build one to defend your tower.", LogKind::Bad);
-                }
+                self.offer_fire_rescue();
             }
             return;
         }
@@ -267,19 +260,7 @@ impl Simulation {
             return;
         }
         let i = *self.rng.pick(&candidates);
-        let (u, at) = self.tower.marked(i);
-        u.set_state(at, UnitState::Fire);
-        u.set_occupants(at, 0);
-        let (id, name, floor) = (u.id, u.kind.facility().name, u.floor);
-        self.events.active.insert(id);
-        self.events.fires_started += 1;
-        self.gameplay.push(GameplayEvent::FireStarted);
-        let msg = format!(
-            "🔥 Fire broke out in {} on {}!",
-            name,
-            self.floor_label(floor)
-        );
-        self.emit(&msg, LogKind::Bad);
+        self.ignite(i);
     }
 
     fn service_within(&self, kind: Kind, floor: i64, radius: i64) -> bool {
