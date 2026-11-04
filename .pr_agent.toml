@@ -2,11 +2,19 @@
 [config]
 model = "gpt-6.1-sol"
 fallback_models = ["gpt-6-luna"]
+# Allow larger per-call review context.
+max_model_tokens = 64000
+# Include token usage and estimated API cost in review comments.
+output_run_details = true
+output_run_cost = true
 restricted_mode = true
 repo_context_files = ["AGENTS.md"]
 repo_context_from_default_branch = true
 
 [pr_reviewer]
+# Process larger PRs in multiple calls to reduce omitted files.
+enable_large_pr_chunking = true
+max_number_of_calls = 3
 require_tests_review = true
 require_security_review = true
 require_merge_recommendation = true
