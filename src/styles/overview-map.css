@@ -98,6 +98,40 @@
   left: calc((100% - 226px) / 2);
   max-width: calc(100% - 246px);
 }
+/* On a narrower desktop that room is too small: the hint wraps to several
+   lines there, and the Getting Started card (fixed at the bottom-left) covers
+   their left part (#1735). The hint then sits just above the open Map,
+   right-aligned with it and as wide as it: always under 1200 px, and up to
+   1600 px while the card is up, where a long step still wraps to two lines.
+   A window under 500 px tall keeps the hint at the bottom, since above the
+   Map it would leave the world view. --overview-map-height is the desktop
+   window's height (frame, title bar and the 288 px body); the Playwright
+   check in e2e/overviewMap.spec.ts fails if it drifts. */
+#stage {
+  --overview-map-height: 314px;
+}
+@media (min-width: 768px) and (max-width: 1199px) and (min-height: 500px) {
+  #stage:has(> .overview-map:not([hidden])) > #hint {
+    left: auto;
+    right: 10px;
+    bottom: calc(10px + var(--overview-map-height) + 6px);
+    transform: none;
+    width: 204px;
+    max-width: none;
+    box-sizing: border-box;
+  }
+}
+@media (min-width: 1200px) and (max-width: 1599px) and (min-height: 500px) {
+  body:has(> #onboard:not(.onboard--mobile):not([hidden])) #stage:has(> .overview-map:not([hidden])) > #hint {
+    left: auto;
+    right: 10px;
+    bottom: calc(10px + var(--overview-map-height) + 6px);
+    transform: none;
+    width: 204px;
+    max-width: none;
+    box-sizing: border-box;
+  }
+}
 
 /* Phone tier: the same query as `mobileMq` in src/main.ts. */
 @media (max-width: 767px), (max-width: 1023px) and (max-height: 599px) {

@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.79.2
+
+- On a narrower desktop screen, or while the Getting Started card is up, the hint bar now sits just above the open Map, so the card no longer covers it.
+
 ## 2.79.0
 
 - A new Map window shows your whole tower and opens by itself on a desktop; click or tap a spot on it, or drag anywhere on it, to move the view.
