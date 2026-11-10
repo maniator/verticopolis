@@ -9,8 +9,13 @@ Measurements and the recommendation are in
 
 `?engine=`, `localStorage["vc.engine"]` and the `wasm-frame` and `wasm-worker`
 values used to pick a host. Boot ignores them now and always starts the Rust
-engine on the main thread (`src/wasmhost/wasmHost.ts`). The worker host's code
-stays for the measurements; nothing in the game starts it.
+engine on the main thread, behind the engine port (`src/wasmhost/rustEngine.ts`).
+The worker host's code stayed for the measurements; nothing in the game starts it.
+
+The main-thread mirror host the next section describes (`src/wasmhost/wasmHost.ts`,
+its frame apply and save merge, and the `ShadowCommand` relay in
+`src/dualrun/`) was deleted with #1421. The section is kept as the baseline
+the measurements were taken against.
 
 ## How the main-thread host works today (the baseline)
 
@@ -362,7 +367,7 @@ fan-out, and an event is never handed out twice.
   `workerHostEdges.test.ts` (among others, a fresh reply that does not parse
   or is not the engine's shape fails before any write),
   `workerController.test.ts`, `wasmHostFrame.test.ts` and
-  `frameApply.test.ts`.
+  `frameApply.test.ts` (the last two went with the mirror host in #1421).
 - `e2e/wasmWorker.spec.ts` (gone with the worker host) ran in a real browser:
   - the main thread fetches no `.wasm`;
   - the clock advances;

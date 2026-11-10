@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Simulation } from "../../engine/Simulation";
-import { loadCommand } from "../../dualrun/mirror";
-import { ShadowEngine } from "../../dualrun/shadow";
 import type { WasmEngine } from "../../dualrun/binding";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
-import { FIXTURES, loadFixture } from "../dualrun/dualRunHarness";
+import { FIXTURES, loadFixture } from "../conformance/fixtureSim";
 
 /**
  * The log's prose on both engines. The conformance view drops log text (it
@@ -41,9 +39,7 @@ function jumpBefore(sim: Simulation, engine: WasmEngine, period: number): void {
 /** One fixture's run; returns every line the two engines agreed on. */
 function compare(fixture: string): string[] {
   const sim = loadFixture(fixture);
-  const shadow = new ShadowEngine(wasm());
-  shadow.apply(loadCommand(sim, 0));
-  const engine = shadow.handle();
+  const engine = wasm().Engine.fromSave(JSON.stringify(sim.serialize()));
   try {
     run(sim, engine, 24);
     expect(engineLog(engine), `${fixture}: the first day`).toEqual(texts(sim.log));
@@ -56,7 +52,7 @@ function compare(fixture: string): string[] {
     expect(engineLog(engine), `${fixture}: across a maintenance period`).toEqual(texts(sim.log));
     return texts(sim.log);
   } finally {
-    shadow.free();
+    engine.free();
   }
 }
 

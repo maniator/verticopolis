@@ -4,11 +4,8 @@ import type { FacilityKind, LogEntry, SerializedView } from "../engine/types";
 /**
  * The player commands the game sends through the port, one member per
  * command the consumer inventory's 1C table lists. `op` names the command,
- * as it does in `ShadowCommand` (`src/dualrun/commands.ts`), so the fields
- * keep the names today's calls use (`kind` is a facility kind, as in
- * `sim.build(kind, floor, x)`). `view.types.test.ts` pins this list against
- * `ShadowCommand`'s player ops, so a command added to one is classified in
- * the other.
+ * and the fields keep the names today's calls use (`kind` is a facility
+ * kind, as in `sim.build(kind, floor, x)`).
  *
  * Left out on purpose: `sellAt`, `setCars`, `resizeTransport` and the
  * tower's resize and car setters (no production caller); `removeUnit` and

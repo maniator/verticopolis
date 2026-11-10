@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WasmEngine } from "../../dualrun/binding";
+import { readCatalog } from "../../dualrun/catalog";
 import type { EnginePort } from "../../simport/enginePort";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
@@ -8,10 +9,12 @@ import {
   FIRST_FRAME_CHECKPOINT,
   FRAME_DAY_CASES,
   FRAME_DAY_FIXTURES,
+  caseDays,
   firstFrameDayDifference,
   frameDayProblems,
   readFrameDays,
   runFrameDay,
+  startTower,
   writeFrameDays,
   type FrameDayCase,
   type FrameDayCheckpoint,
@@ -83,6 +86,21 @@ describe.skipIf(!hasWasmPackage())("the frame-day golden on the Rust engine", ()
     // The event check names its fixture, so a refresh refuses when it is gone.
     expect(FRAME_DAY_FIXTURES, "the event day's fixture").toContain(EVENT_DAY_FIXTURE);
     if (!UPDATE) expect(Object.keys(pinned.cases)).toEqual(ids);
+  });
+
+  it("starts the canon calendar case as a Modern tower on that calendar, which plays past a quarter's end", () => {
+    const c = FRAME_DAY_CASES.find((x) => x.start.kind === "fixture" && x.start.calendar === "canon");
+    if (!c) throw new Error("no case starts a fixture on the canon calendar");
+    const leg = rustLeg();
+    try {
+      startTower(leg.port, c.start);
+      const save = JSON.parse(leg.engine.stateView()) as { mode?: string; modernCalendar?: string };
+      expect([save.mode, save.modernCalendar]).toEqual(["modern", "canon"]);
+    } finally {
+      leg.free();
+    }
+    const canon = readCatalog(wasm(), "modern").economy.calendars.find((k) => k.key === "canon");
+    expect(canon?.quarterDays).toBeLessThan(caseDays(c));
   });
 
   for (const c of FRAME_DAY_CASES) {

@@ -4,7 +4,7 @@ import { dirname, posix, resolve } from "node:path";
 import ts from "typescript";
 import { repoRel, repoRoot, sourceFiles } from "./guardFiles";
 import { NOT_FRONTEND, isTestFile, resolveRelative, scanRuntimeImports } from "./importScan";
-import { SEVEN_COUNTS, markedStems, sevenCounts, type SevenCounts, type WasmMapping } from "./wasmMapping";
+import { SEVEN_COUNTS, markedStems, sevenCounts, type SevenCounts } from "./sevenCounts";
 
 /**
  * The 3.0 feature parity register (#1561) stays tied to the code. The register
@@ -21,11 +21,9 @@ import { SEVEN_COUNTS, markedStems, sevenCounts, type SevenCounts, type WasmMapp
  *   has no row for a file that no longer does; an import there that the scan
  *   cannot read (a computed specifier) fails unless {@link URL_LOADERS}
  *   names its file and how many it has, since it could hide one;
- * - section 7 counts the test files the hosted WASM projects leave out, as
- *   Vitest resolves them (`integrationWasm` and `unitWasm`; see
- *   `wasmMapping`), and what the exclusion lists hold
- *   (the TypeScript-only marks, cadence calls and branches, the TypeScript
- *   engine ratchet and the converted suites), as {@link SEVEN_COUNTS} lists,
+ * - section 7 counts what the exclusion lists hold (the TypeScript-only
+ *   marks, cadence calls and branches, the TypeScript engine ratchet and the
+ *   converted suites), as {@link SEVEN_COUNTS} lists (see `sevenCounts`),
  *   so none of them changes unseen, and its two groups of marks name exactly
  *   the files that hold them;
  * - sections 1, 3, 4, 5, 6 and 8 each carry a Class column, sections 1, 3, 4,
@@ -479,9 +477,8 @@ function repoBasenames(): Set<string> {
   return new Set(out.split("\0").filter((f) => f !== "" && existsSync(resolve(repoRoot, f))).map((f) => posix.basename(f)));
 }
 
-/** The register, the exception register and the code as they stand, with the
- *  hosted WASM projects' counts from the projects Vitest resolves. */
-export const live = (mapping: WasmMapping): AuditInput => {
+/** The register, the exception register and the code as they stand. */
+export const live = (): AuditInput => {
   const host = hostEngineImports();
   return {
     register: read(REGISTER),
@@ -490,7 +487,7 @@ export const live = (mapping: WasmMapping): AuditInput => {
     ratchet: ratchetFiles(read(IMPORT_RATCHET)),
     hostImporters: host.importers,
     hostUnreadable: host.unreadable,
-    sevenCounts: sevenCounts(read, mapping),
+    sevenCounts: sevenCounts(read),
     markedStems: markedStems(read),
     basenames: repoBasenames(),
     scenarios: readdirSync(resolve(repoRoot, "conformance/scenarios")).filter((f) => f.endsWith(".json")).map((f) => f.slice(0, -".json".length)),
