@@ -5,10 +5,10 @@ import { SaveGame } from "./SaveGame";
 import { deflateSync } from "fflate";
 import { fromBase64, inflateCapped, STORE_MAGIC, toBase64, TOWER_FILE_MAGIC } from "./saveCompression";
 import { fromTowerFile, toTowerFile } from "./towerFileCodec";
-import { saveOf } from "../tests/fixtures/saveText";
+import { saveOf, importTower } from "../tests/fixtures/saveText";
 
 /** A tower as an OLD build wrote it: no appVersion, plus the two fields
- *  `SaveGame.import` insists on. */
+ *  `SaveGame.importText` insists on. */
 const PRE_2_0_SAVE = { minutes: 4321, units: [{ t: "office" }], towerName: "Old Guard", money: 500 };
 
 /** Packs a value exactly as `SaveGame.saveTo` writes it into localStorage. */
@@ -135,7 +135,7 @@ describe("a CompressionStream-written tower reads back through fflate", () => {
 
   it("and the tower still loads through the real reader", async () => {
     // End to end on the codec: export with the stream API, convert back, then
-    // load through `SaveGame.import`, which is the production reader.
+    // load through `SaveGame.importText`, which is the production reader.
     const sim = Simulation.newGame(4242);
     const exported = await SaveGame.export(saveOf(sim));
     const back = fromTowerFile(exported);
@@ -146,7 +146,7 @@ describe("a CompressionStream-written tower reads back through fflate", () => {
     const forward = toTowerFile(back.value);
     expect(forward.ok).toBe(true);
     if (!forward.ok) return;
-    const loaded = await SaveGame.import(forward.text);
+    const loaded = await importTower(forward.text);
     expect(loaded.population).toBe(sim.population);
     expect(loaded.tower.towerName).toBe(sim.tower.towerName);
   });

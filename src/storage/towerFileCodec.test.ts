@@ -11,7 +11,7 @@ import { toTowerFile } from "./towerFileCodec";
  */
 
 /** A tower as an OLD build wrote it: no appVersion, which is the whole point.
- *  Carries the two fields `SaveGame.import` insists on. */
+ *  Carries the two fields `SaveGame.importText` insists on. */
 const PRE_2_0_SAVE = { minutes: 4321, units: [{ t: "office" }], towerName: "Old Guard", money: 500 };
 
 /** Packs a value exactly as `SaveGame.saveTo` writes it into localStorage. */
@@ -19,7 +19,7 @@ function storeValue(obj: unknown): string {
   return STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(obj)), { level: 1 }));
 }
 
-/** Decode `.vctower` text the way `SaveGame.import` would. */
+/** Decode `.vctower` text the way `SaveGame.importText` would. */
 function decodeTowerFile(text: string): Record<string, unknown> {
   const trimmed = text.trim();
   expect(trimmed.startsWith(TOWER_FILE_MAGIC + "\n")).toBe(true);
@@ -152,7 +152,7 @@ describe("the two containers wrap the same bytes", () => {
     const json = JSON.stringify(PRE_2_0_SAVE);
     const packed = deflateSync(new TextEncoder().encode(json), { level: 1 });
     // `inflate` is DecompressionStream("deflate-raw"), the exact call
-    // SaveGame.import makes. Feeding it fflate's output is the compatibility
+    // SaveGame.importText makes. Feeding it fflate's output is the compatibility
     // claim, stated directly.
     expect(new TextDecoder().decode(await inflate(packed))).toBe(json);
   });
@@ -222,7 +222,7 @@ describe("preserve mode, every combination", () => {
   it("passes a preserved payload through without normalizing its whitespace", () => {
     // A value that reached the preserve destination is by definition one this
     // build could not read, so it is the last place to assume the contents
-    // follow the usual rules. SaveGame.import strips whitespace when reading.
+    // follow the usual rules. SaveGame.importText strips whitespace when reading.
     const spaced = "AAAA\nBBBB";
     const preserved = toTowerFile(STORE_MAGIC + spaced, true);
     expect(preserved.ok).toBe(true);

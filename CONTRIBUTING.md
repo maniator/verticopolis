@@ -128,9 +128,11 @@ Verticopolis has **two test tiers**:
     TypeScript step loop is swapped out (Vitest keeps the real loop), and an
     engine that cannot start stops the game with a message instead of
     falling back. Its postbuild check (`scripts/verify-engine-bundle.ts`)
-    reads the emitted sourcemaps and fails when a TypeScript engine module
-    that `scripts/engine-bundle.allow.txt` does not list ships, or when a
-    listed one no longer does (delete its line: the list only shrinks).
+    reads the emitted sourcemaps and fails a production build that ships any
+    TypeScript engine module (#921). A `VC_TOOLING=1` build may ship only the
+    modules `scripts/engine-bundle.allow.txt` lists, for the harnesses'
+    hand-built tower, and fails when a listed one no longer ships (delete its
+    line: the list only shrinks).
     `?engine=` and `vc.engine` are ignored. The WASM test lanes use
     `VC_REQUIRE_WASM=1`. See
     `docs/performance/wasm-only-bundle.md` for what still ships and why. A simulation change lands in the
@@ -440,16 +442,21 @@ diagrams). The prose conventions below are the source of truth.
 - **`src/main.ts`**: the composition root that wires input, engine, and the
   game loop together.
 
-New frontend code adds no runtime import of `src/engine/`, because retiring the
-TypeScript engine deletes that directory. It reads the catalog through the
+No shipped file imports `src/engine/` at run time (#921): an ESLint rule
+(`eslint.config.js`) refuses it everywhere outside the engine, the tests and
+the tooling files it names, because the shipped game runs the Rust engine only
+and retiring the TypeScript engine deletes that directory. Code reads the
+catalog through the
 catalog handle (`towerCatalog`, `catalogTypes`, which live in `src/catalog/` and
 are not counted), the frame view (`src/wasmhost/frameView.ts`) or an
 engine query (#868) instead. `src/tests/frontendEngineImports.guard.test.ts`
 scans every non-test file under `src/` except the engine, the tests, and the
 host and save code (`src/wasmhost/`, `src/dualrun/`, `src/storage/`), and pins
-each file's other runtime engine imports in `frontendEngineImports.ratchet.txt`.
-The list shrinks: delete a module from a file's line when the file stops
-importing it. It grows only with a reason the PR states and a reviewer accepts.
+each file's other runtime engine imports in `frontendEngineImports.ratchet.txt`,
+which holds only the tooling files the lint exempts; it also sees what the lint
+cannot (a dynamic `import()`, a URL, a glob). The list shrinks: delete a module
+from a file's line when the file stops importing it. It grows only with a
+reason the PR states and a reviewer accepts.
 A type-only import is not counted, so import a name you use only as a type with
 `import type`.
 

@@ -9,11 +9,10 @@ import { SaveTooLargeError, inflateCapped, parseSaveJson } from "./saveCompressi
  * to inflate to gigabytes, and the plain call allocates the whole output before
  * anyone can object. That is the same posture the browser import path takes.
  *
- * The app reads tower files through the engine (`loadVctower`). The
- * TypeScript `SaveGame.import`, which only tests call now, is async because it
- * inflates with the platform `DecompressionStream` and goes on to build a
- * `Simulation`. This is the same container parsed with fflate, for tools that
- * have neither a browser nor a need for a Simulation, notably the `.TDT` harness
+ * The app reads tower files through the engine (`loadVctower`), behind
+ * `SaveGame.importText`'s checks, which are async because they inflate with the
+ * platform `DecompressionStream`. This is the same container parsed with
+ * fflate, for tools that have no browser, notably the `.TDT` harness
  * converter in `tools/simtower/`. It lives beside the format it decodes rather
  * than inside that tool so the unit suite covers it, and so the
  * magic-and-payload split has one home instead of a tool-local copy.
@@ -27,7 +26,7 @@ import { SaveTooLargeError, inflateCapped, parseSaveJson } from "./saveCompressi
  * still loads in the game. With no separator "VCTOWER1" + "7Zt..." is equally
  * "VCTOWER17" + "Zt...", and base64 starts with a digit often enough that a
  * greedy `VCTOWER(\d+)` rejects roughly one separator-less v1 file in six as a
- * version from the future (`SaveGame.import` has that quirk; saveMigrationRun
+ * version from the future (`SaveGame.importText` has that quirk; saveMigrationRun
  * .test.ts pins it). So DECODE to disambiguate: try v1, and only if those bytes
  * are not a v1 payload fall back to the version the digits claim.
  *

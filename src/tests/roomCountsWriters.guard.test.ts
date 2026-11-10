@@ -173,7 +173,7 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   // Errors and a sprite canvas.
   "src/dualrun/catalog.ts": { bulk: 1 },
   "src/render/pixelSprites/food.kit.ts": { bulk: 1 },
-  "src/wasmhost/hostFault.ts": { bulk: 2 },
+  "src/wasmhost/hostFault.ts": { bulk: 1 },
   // The sprite atlas's tables and a canvas context's method.
   "src/render/atlas/bake.ts": { bulk: 4 },
   "src/render/atlas/bakeAdditions.ts": { bulk: 1 },

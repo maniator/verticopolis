@@ -71,11 +71,19 @@ const TOOLING_BUILD = toolingBuild();
  *     WASM host replaces `tick` on every tower it holds. Vitest keeps the real
  *     loop: the TypeScript engine's own tests, and the ones that read it as a
  *     reference, run it until the engine's code is deleted.
+ *   - `main.ts`'s tooling tower (`src/game/toolingSim.ts`, a TypeScript
+ *     `Simulation` the e2e and screenshot harnesses edit by hand) becomes a
+ *     stand-in in every build but a `VC_TOOLING=1` one, so a production build
+ *     ships none of the TypeScript engine (#921). A dev serve keeps the real
+ *     module, as its `window.game` does.
  */
-function engineAliases(): { find: RegExp; replacement: string }[] {
+function engineAliases(command: "build" | "serve"): { find: RegExp; replacement: string }[] {
   const aliases: { find: RegExp; replacement: string }[] = [];
   if (!process.env.VITEST) {
     aliases.push({ find: /^\.\/sim\/loop$/, replacement: resolve(__dirname, "src/wasmhost/stepLoopAbsent.ts") });
+  }
+  if (!process.env.VITEST && command === "build" && !TOOLING_BUILD) {
+    aliases.push({ find: /^\.\/game\/toolingSim$/, replacement: resolve(__dirname, "src/game/toolingSimAbsent.ts") });
   }
   return aliases;
 }
@@ -250,7 +258,7 @@ const fingerprintOf = (command: "build" | "serve") => buildFingerprint(resolve(_
 export default defineConfig(({ command }) => ({
   root: "src",
   publicDir: publicDir(),
-  resolve: { alias: engineAliases() },
+  resolve: { alias: engineAliases(command) },
   base: "./",
   // Compile-time app version, shown on the splash. (package.json isn't importable
   // in the browser bundle.)

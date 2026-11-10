@@ -1,6 +1,8 @@
 import { Simulation } from "../../engine/Simulation";
 import { facilityFloors } from "../../engine/facilities";
 import { TsEngine } from "../../engine/port/tsEngine";
+import { markFounderFromLoadedFile } from "../../engine/sim/founderStatus";
+import type { SerializedGame } from "../../engine/types";
 import { SaveGame } from "../../storage/SaveGame";
 import { loadStored } from "../../game/portLifecycle";
 import type { SaveLoadDeps } from "../../game/saveLoad";
@@ -15,6 +17,16 @@ import { ViewReader } from "../../simport/viewReader";
  */
 
 /** The save text of a tower, as `EnginePort.serialize()` writes it. */
+/** A `.vctower` file read into a TypeScript tower, the way the shipped
+ *  `SaveGame.importText` read it before the TypeScript engine left the bundle
+ *  (#921): `SaveGame.importText`'s checks, then the TypeScript load. */
+export async function importTower(text: string): Promise<Simulation> {
+  const data = JSON.parse(await SaveGame.importText(text)) as SerializedGame;
+  const sim = Simulation.deserialize(data);
+  markFounderFromLoadedFile(sim, data); // an unstamped imported tower predates the appVersion stamp (pre-2.0)
+  return sim;
+}
+
 export const saveOf = (sim: { serialize(): unknown }): string => JSON.stringify(sim.serialize());
 
 /** The tower the autosave loads into a fresh engine, with the read's flags. */

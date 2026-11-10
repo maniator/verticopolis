@@ -12,7 +12,7 @@ import { SaveGame } from "../../storage/SaveGame";
 import { setSlotPopulationReader } from "../../storage/slotCensus";
 import { populationReaderFromModule } from "../../wasmhost/slotPopulation";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
-import { saveOf } from "../fixtures/saveText";
+import { saveOf, importTower } from "../fixtures/saveText";
 
 const run = hasWasmPackage() || wasmRequired();
 
@@ -27,7 +27,7 @@ describe.skipIf(!run)("slot rows count their population through the engine", () 
   });
 
   it("matches the TypeScript engine's census for a populated tower", async () => {
-    const sim = await SaveGame.import(towerFile);
+    const sim = await importTower(towerFile);
     expect(sim.population).toBeGreaterThan(0);
     SaveGame.saveSlot(1, saveOf(sim));
     const row = SaveGame.listSlots().find((s) => s.slot === 1)!;

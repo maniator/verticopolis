@@ -1,10 +1,10 @@
-import { isNearCapacity, type HeatmapMode } from "../engine/sim/constants";
-import type { Simulation } from "../engine/Simulation";
-import { catalogFacility } from "../catalog/catalogTypes";
-import { householdMix } from "../engine/households";
-import { MILESTONES } from "../engine/milestones";
-import { towerCatalog } from "../catalog/towerCatalog";
-import { unitPrice } from "../ui/catalogPricing";
+import { isNearCapacity, type HeatmapMode } from "../../engine/sim/constants";
+import type { Simulation } from "../../engine/Simulation";
+import { catalogFacility } from "../../catalog/catalogTypes";
+import { householdMix } from "../../engine/households";
+import { MILESTONES } from "../../engine/milestones";
+import { towerCatalog } from "../../catalog/towerCatalog";
+import { unitPrice } from "../../ui/catalogPricing";
 import type {
   CongestionHotspot,
   HeatCellView,
@@ -15,7 +15,7 @@ import type {
   TowerStats,
   TransportDetail,
   UnitDetail,
-} from "./panels";
+} from "../../simport/panels";
 
 /**
  * The TypeScript adapter's panel answers (facade slice 4, #1211): each built

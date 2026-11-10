@@ -17,7 +17,7 @@ import {
   tsTowerStats,
   tsTransportDetail,
   tsUnitDetail,
-} from "../../simport/tsPanels";
+} from "./tsPanels";
 
 /**
  * The harness behind the panel-getter differential (facade slice 6b, #1214).

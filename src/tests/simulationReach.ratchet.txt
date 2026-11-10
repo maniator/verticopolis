@@ -5,5 +5,3 @@
 # facade's slices (#1207) move each consumer behind the port; a new line needs
 # a reason the PR states and a reviewer accepts.
 src/game/toolingSim.ts Simulation port/tsEngine # the tooling harnesses' hand-built towers on either engine, moved from src/main.ts (PR 5e); tooling builds only past the TsEngine check
-src/storage/SaveGame.ts Simulation # import() deserializes a save into a Simulation; only tests call it (the player's import goes through loadVctower and loadTdt), and it leaves with #921
-src/wasmhost/hostFault.ts Simulation # the fallback deserializes the Simulation the TypeScript engine resumes on; reached only through attachWasmHost, which only tests run, and it leaves with #921

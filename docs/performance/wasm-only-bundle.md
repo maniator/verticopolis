@@ -1,5 +1,14 @@
 # The wasm-only build: what leaves the bundle, and what does not
 
+> **The TypeScript engine has left the production bundle (#921, 2026-11-10).**
+> A production build now ships no `src/engine/` module: the boot catalog check
+> reads what the UI draws, saves are read through the engine, and the tooling
+> harnesses' hand-built tower (`src/game/toolingSim.ts`) is swapped for a
+> stand-in in every build but a `VC_TOOLING=1` one. The postbuild guard fails a
+> production build that carries any engine module, and
+> `scripts/engine-bundle.allow.txt` now lists what a tooling build carries.
+> The module counts and byte figures below are the 2026-10-14 snapshot.
+
 > **The switchable build described below no longer exists.** Slice 4b of the
 > Rust-only work (#1595) retired `VC_ENGINE`: every build is now the wasm-only
 > build, and the postbuild guard checks it without a mode. The sections on
@@ -141,7 +150,9 @@ every build:
 - **The bundle:**
   - The bundle has no step loop.
   - The engine glue and binary are precached (when `dist/` holds the engine package; a `VC_ALLOW_NO_ENGINE=1` build has none, and `scripts/verify-precache.ts` allows that only off a deploy).
-  - Every `src/engine/` module that ships is listed in
+  - A production build ships no `src/engine/` module and not the
+    harnesses' tower (`src/game/toolingSim.ts`). In a `VC_TOOLING=1` build,
+    every `src/engine/` module that ships is listed in
     `scripts/engine-bundle.allow.txt`, and every listed module ships.
 
 When this was written, a one-off comparison (not part of the guard) found
@@ -150,8 +161,9 @@ the build (modules with `renderedLength` above zero). The `e2e-wasm-only`
 CI job adds a step-loop import to `src/bootstrap.ts` and checks that the
 build fails with the guard's message.
 `src/build/engineAliases.test.ts` pins that only `Simulation.ts` imports
-`./sim/loop`, and that no other import, re-export or dynamic import in `src/`
-reaches that module, since a specifier alias matches the text from any importer.
+`./sim/loop` and only `main.ts` imports `./game/toolingSim`, and that no other
+import, re-export or dynamic import in `src/` reaches either module, since a
+specifier alias matches the text from any importer.
 
 ## Offline and fallback behavior
 

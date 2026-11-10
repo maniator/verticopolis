@@ -2,7 +2,9 @@
  * The emitted-bundle guard for the engine build.
  *
  * Every build is **wasm-only**: the Rust/WASM engine is the only engine the
- * game runs, and the TypeScript step loop is not in the bundle.
+ * game runs, and the TypeScript step loop is not in the bundle. A production
+ * build carries none of the TypeScript engine (#921); only a `VC_TOOLING=1`
+ * build does, for the harnesses' hand-built tower (`src/game/toolingSim.ts`).
  * `scripts/verify-engine-bundle.ts` runs after every build and checks the
  * emitted sourcemaps and the service-worker precache with
  * {@link checkEngineBundle}, so the result is proven from what the bundler
@@ -19,6 +21,11 @@ export const TS_STEP_LOOP = "src/engine/sim/loop.ts";
 
 /** The TypeScript simulation's source tree. */
 export const TS_ENGINE_DIR = "src/engine/";
+
+/** The tooling harnesses' hand-built tower, which carries the TypeScript
+ *  engine; every build but a tooling one swaps it for
+ *  `src/game/toolingSimAbsent.ts`. */
+export const TOOLING_SIM = "src/game/toolingSim.ts";
 
 /** The engine package files the precache must carry. */
 export const ENGINE_PACKAGE_FILES: readonly string[] = ["engine/verticopolis_engine.js", "engine/verticopolis_engine_bg.wasm"];
@@ -42,8 +49,8 @@ export interface EngineBundleInput {
    *  `scripts/verify-precache.ts` has already allowed or stopped, so the
    *  engine's precache entries are only required when the package is there. */
   enginePackageBuilt: boolean;
-  /** The TypeScript engine modules the bundle may still carry
-   *  (`scripts/engine-bundle.allow.txt`). */
+  /** The TypeScript engine modules a tooling build carries
+   *  (`scripts/engine-bundle.allow.txt`). A production build may carry none. */
   allowed: readonly string[];
 }
 
@@ -79,20 +86,30 @@ export function checkEngineBundle(input: EngineBundleInput): EngineBundleResult 
       if (testWhy) errors.push(`${chunk.file} carries ${testWhy} (${s})`);
       const loopWhy = FORBIDDEN.get(s);
       if (loopWhy) errors.push(`${chunk.file} carries ${loopWhy} (${s})`);
+      if (!input.tooling && s === TOOLING_SIM) errors.push(`${chunk.file} carries the tooling harnesses' tower (${s}), which only a VC_TOOLING=1 build may ship`);
     }
   }
   const engineModules = [...engine].sort();
-  const allowed = new Set(input.allowed);
-  const unlisted = engineModules.filter((m) => !allowed.has(m));
-  if (unlisted.length > 0) {
-    errors.push(
-      `the bundle gained TypeScript engine modules that scripts/engine-bundle.allow.txt does not list: ${unlisted.join(", ")}. ` +
-        "Reach the engine through the WASM host or the catalog instead; list a module only with the reason it must ship",
-    );
-  }
-  const gone = input.allowed.filter((m) => !engine.has(m));
-  if (gone.length > 0) {
-    errors.push(`these TypeScript engine modules no longer ship in the bundle; remove them from scripts/engine-bundle.allow.txt so the list only shrinks: ${gone.join(", ")}`);
+  if (!input.tooling) {
+    if (engineModules.length > 0) {
+      errors.push(
+        `the production bundle carries TypeScript engine modules: ${engineModules.join(", ")}. ` +
+          "The shipped game runs the Rust engine only (#921): reach it through the WASM host, the catalog or an engine query",
+      );
+    }
+  } else {
+    const allowed = new Set(input.allowed);
+    const unlisted = engineModules.filter((m) => !allowed.has(m));
+    if (unlisted.length > 0) {
+      errors.push(
+        `the tooling bundle gained TypeScript engine modules that scripts/engine-bundle.allow.txt does not list: ${unlisted.join(", ")}. ` +
+          "Reach the engine through the WASM host or the catalog instead; list a module only with the reason the harnesses need it",
+      );
+    }
+    const gone = input.allowed.filter((m) => !engine.has(m));
+    if (gone.length > 0) {
+      errors.push(`these TypeScript engine modules no longer ship in the tooling bundle; remove them from scripts/engine-bundle.allow.txt so the list only shrinks: ${gone.join(", ")}`);
+    }
   }
   const pre = new Set(input.precache);
   const absent = input.enginePackageBuilt ? ENGINE_PACKAGE_FILES.filter((f) => !pre.has(f)) : [];

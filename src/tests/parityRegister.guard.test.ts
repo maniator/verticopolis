@@ -45,13 +45,16 @@ describe("the parity register audit catches a stale register", () => {
   });
 
   it("a host or save file with a runtime engine import that section 2c does not name, and a 2c row for one that has none", () => {
-    expect(base.hostImporters).toEqual(expect.arrayContaining(["src/storage/SaveGame.ts"]));
     expect(problems({ hostImporters: [...base.hostImporters, "src/storage/newLoader.ts"] })).toContain(
       "section 2c: src/storage/newLoader.ts imports the TypeScript engine at run time and is not named",
     );
-    expect(problems({ hostImporters: base.hostImporters.filter((f) => f !== "src/storage/SaveGame.ts") })).toContain(
-      "section 2c: a row for src/storage/SaveGame.ts, which imports no engine module at run time",
-    );
+    // Since #921 no host or save file imports the engine, so the table is
+    // empty; a row for one that does not is stale.
+    const hosts = base.register.indexOf("### 2c.");
+    const rule = base.register.indexOf("| --- |", hosts);
+    const end = base.register.indexOf("\n", rule) + 1;
+    const register = `${base.register.slice(0, end)}| \`src/storage/SaveGame.ts\` | yes | no | move to Rust | #921 |\n${base.register.slice(end)}`;
+    expect(problems({ register })).toContain("section 2c: a row for src/storage/SaveGame.ts, which imports no engine module at run time");
   });
 
   it("a host import the scan cannot read, unless a listed loader makes it, and a listed loader that makes none", () => {

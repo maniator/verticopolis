@@ -1,7 +1,4 @@
-import { Simulation } from "../engine/Simulation";
-import { markFounderFromLoadedFile } from "../engine/sim/founderStatus";
-import type { SerializedGame } from "../engine/types";
-import { isGameMode } from "../engine/types";
+import type { GameMode, SerializedGame } from "../engine/types";
 import type { SlotInfo } from "./slotInfo";
 
 // The slot-metadata shape lives in its own module (pure types, no runtime), and
@@ -167,10 +164,9 @@ function infoFrom(slot: number | "auto", raws: readonly (string | null)[]): Slot
       // instead of "Invalid Date". Absent, not clamped: a clamped forgery would
       // display a confidently wrong date.
       savedAt: parseSavedAt(data.savedAt),
-      // Founded mode, run through the same isGameMode coercion deserialize
-      // uses (absent/forged = classic), so the chip can never carry a raw file
-      // string.
-      mode: isGameMode(data.mode) ? data.mode : "classic",
+      // Founded mode, coerced the way a load reads it (absent/forged = classic),
+      // so the chip can never carry a raw file string.
+      mode: foundedMode(data.mode),
       // 1-indexed in-game day, matching the TDT import report's convention. A
       // day is 1440 minutes in EVERY calendar (see src/engine/calendar.ts), so
       // this cannot disagree with the in-game date for either mode. Same
@@ -195,6 +191,12 @@ function infoFrom(slot: number | "auto", raws: readonly (string | null)[]): Slot
  *  minutes beyond the ceiling would render a screen-wide number and reads as
  *  absent instead. */
 const MAX_SLOT_DAY = 360_000;
+
+/** A save's founded mode: Modern only when the file says so, Classic for an
+ *  absent or unknown value, as a load reads it. */
+function foundedMode(mode: unknown): GameMode {
+  return mode === "modern" ? "modern" : "classic";
+}
 
 export const SaveGame = {
   // ---- Auto-save slot (used on startup) --------------------------------
@@ -355,14 +357,6 @@ export const SaveGame = {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
     return (slug || "tower") + TOWER_FILE_EXT;
-  },
-
-  /** Parse a `.vctower` tower file into a tower (tests and tools). */
-  async import(text: string): Promise<Simulation> {
-    const data = JSON.parse(await this.importText(text)) as SerializedGame;
-    const sim = Simulation.deserialize(data);
-    markFounderFromLoadedFile(sim, data); // an unstamped imported tower predates the appVersion stamp (pre-2.0)
-    return sim;
   },
 
   /** Read a `.vctower` file into save text for the engine's `loadSave`. The

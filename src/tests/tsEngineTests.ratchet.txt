@@ -62,12 +62,13 @@ src/tests/conformance/fixedStepCases.ts sim/frameStep # writes the fixed-step ca
 src/tests/conformance/fixtureSim.ts Simulation sim/founderStatus # the fixture loader, moved from src/tests/dualrun/dualRunHarness.ts when #1421 deleted it (that line goes)
 src/tests/conformance/panelProbe.ts Simulation sim/founderStatus
 src/tests/conformance/scenario.ts Simulation sim/coerce sim/founderStatus
+src/tests/conformance/tsPanels.ts sim/constants # the TypeScript adapter's panel answers (facade slice 4, #1211), moved from src/simport/ with no new engine import when #921 took the TypeScript engine out of the bundle (its line in frontendEngineImports.ratchet.txt goes)
 src/tests/diagnostics/facilityDiagnostics.test.ts Simulation # moved from src/game with the file it tests (#921)
 src/tests/diagnostics/facilityDiagnostics.ts EconomySystem Simulation sim/constants sim/gripe # moved from src/game with the TypeScript reference card (#921): the card the card-text referee holds the golden to (#1809) until src/engine/ goes
 src/tests/diagnostics/gripeCopy.ts sim/gripe sim/satisfactionStep # moved from src/game with the TypeScript reference card (#921): the card the card-text referee holds the golden to (#1809) until src/engine/ goes
 src/tests/diagnostics/housekeepingDiagnostics.ts economy/housekeeping # moved from src/game with the TypeScript reference card (#921): the card the card-text referee holds the golden to (#1809) until src/engine/ goes
 src/tests/diagnostics/tsDiagnosticFacts.ts sim/constants sim/gripe sim/satisfactionStep
-src/tests/fixtures/saveText.ts Simulation port/tsEngine
+src/tests/fixtures/saveText.ts Simulation port/tsEngine sim/founderStatus # importTower: the tower read SaveGame.import did, moved here from the shipped SaveGame (#921)
 src/tests/fixtures/scheduleTower.ts Simulation
 src/tests/fixtures/serviceDiagnostics.fixture.ts Simulation
 src/tests/fixtures/towerFixtures.ts Simulation
@@ -199,5 +200,4 @@ src/ui/templates/inspector.test.ts Simulation
 src/ui/templates/stats.fixture.ts port/tsEngine
 src/ui/templates/stats.test.ts Simulation sim/star tower/rooms
 src/ui/uiStatus.test.ts Simulation port/tsEngine
-src/wasmhost/hostFault.test.ts Simulation
 src/wasmhost/stepLoopAbsent.test.ts Simulation

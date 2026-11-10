@@ -8,11 +8,11 @@
  * Every `.vctower` fixture the web game wrote is loaded the way an import
  * loads it, serialized, then stamped and written by the engine, and read back
  * by each web reader: `decodeVctower` (the Node container decoder),
- * `fromTowerFile` (the byte-preserving re-header), and `SaveGame.import` (the
+ * `fromTowerFile` (the byte-preserving re-header), and `SaveGame.importText` (the
  * player's import). The engine's file must be the web game's file of the
  * same save, stamp and time, byte for byte (#939): the JSON is
  * `JSON.stringify`'s text in the web's key order, and the compressor is a
- * port of the web's (fflate at level 1). The tower `SaveGame.import`
+ * port of the web's (fflate at level 1). The tower `SaveGame.importText`
  * builds must hash to the same state, with the same Founder status, as the
  * one built from the original file. A loaded tower that is no founder's, and
  * a new game, written by the engine must open as no founder's tower, and the
@@ -32,7 +32,7 @@ import { setEngineWriter } from "../../storage/vctowerWriter";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { tsEngine } from "../conformance/scenario";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
-import { saveOf } from "../fixtures/saveText";
+import { saveOf, importTower } from "../fixtures/saveText";
 
 const FIXTURES = resolve(__dirname, "../../../conformance/fixtures");
 const fixtures = readdirSync(FIXTURES)
@@ -64,7 +64,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
   it.each(fixtures)("%s: loaded by the web game, written by the engine, read back by every web reader", async (name) => {
     const original = readFileSync(resolve(FIXTURES, name), "utf8");
     // What SaveGame.export hands its writer: the loaded tower's serialization.
-    const fromWeb = await SaveGame.import(original);
+    const fromWeb = await importTower(original);
     const json = JSON.stringify(fromWeb.serialize());
     const text = rust().encodeVctower(json, VERSION, SAVED_AT);
     const stamped = { ...(JSON.parse(json) as Record<string, unknown>), savedAt: SAVED_AT, appVersion: VERSION };
@@ -78,7 +78,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     expect(decodeVctower(text, name)).toEqual(stamped);
     expect(payloadText(text)).toBe(JSON.stringify(stamped));
 
-    const fromEngine = await SaveGame.import(text);
+    const fromEngine = await importTower(text);
     expect(fromEngine.founder).toBe(fromWeb.founder);
     expect(tsEngine(fromEngine).stateDigest()).toBe(tsEngine(fromWeb).stateDigest());
   });
@@ -87,7 +87,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
   // engine, handed the same, writes the same file (#939).
   it.each(fixtures)("%s: the engine writes the web game's export byte for byte", async (name) => {
     const original = readFileSync(resolve(FIXTURES, name), "utf8");
-    const sim = await SaveGame.import(original);
+    const sim = await importTower(original);
     vi.useFakeTimers({ now: SAVED_AT, toFake: ["Date"] });
     try {
       const webFile = await SaveGame.export(saveOf(sim));
@@ -103,7 +103,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
   // With the engine running, the web game writes its saves through the
   // engine's writer (#935); the files stay the bytes it wrote on its own.
   it.each(fixtures)("%s: the game's writers through the engine write what they write alone", async (name) => {
-    const sim = await SaveGame.import(readFileSync(resolve(FIXTURES, name), "utf8"));
+    const sim = await importTower(readFileSync(resolve(FIXTURES, name), "utf8"));
     vi.useFakeTimers({ now: SAVED_AT, toFake: ["Date"] });
     const error = vi.spyOn(console, "error");
     try {
@@ -166,7 +166,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     try {
       const json = engine.serialize();
       const text = rust().encodeVctower(json, VERSION, SAVED_AT);
-      const sim = await SaveGame.import(text);
+      const sim = await importTower(text);
       expect(sim.founder).toBe(false);
       expect(payloadText(text)).toBe(JSON.stringify({ ...JSON.parse(json), savedAt: SAVED_AT, appVersion: VERSION }));
       expect(tsEngine(sim).stateDigest()).toBe(engine.stateDigest());
@@ -191,10 +191,10 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     const later = toTowerFile(JSON.stringify({ ...raw, appVersion: "2.5.0" }));
     expect(later.ok).toBe(true);
     if (!later.ok) return;
-    const fromWeb = await SaveGame.import(later.text);
+    const fromWeb = await importTower(later.text);
     expect(fromWeb.founder).toBe(false);
     const text = rust().encodeVctower(JSON.stringify(fromWeb.serialize()), VERSION, SAVED_AT);
-    const fromEngine = await SaveGame.import(text);
+    const fromEngine = await importTower(text);
     expect(fromEngine.founder).toBe(false);
     expect(tsEngine(fromEngine).stateDigest()).toBe(tsEngine(fromWeb).stateDigest());
   });
@@ -204,7 +204,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
   it.each(["", "dev"])("a stamp named %j opens as no founder's tower", async (version) => {
     const engine = rust().Engine.newGame(20261011, "classic");
     try {
-      const sim = await SaveGame.import(rust().encodeVctower(engine.serialize(), version, SAVED_AT));
+      const sim = await importTower(rust().encodeVctower(engine.serialize(), version, SAVED_AT));
       expect(sim.founder).toBe(false);
     } finally {
       engine.free();
@@ -218,7 +218,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     const raw = decodeVctower(readFileSync(resolve(FIXTURES, name), "utf8"), name) as Record<string, unknown>;
     expect(raw.appVersion).toBe("1.100.0");
     const text = rust().encodeVctower(JSON.stringify(raw), VERSION, SAVED_AT);
-    expect((await SaveGame.import(text)).founder).toBe(true);
+    expect((await importTower(text)).founder).toBe(true);
   });
 
   // A name cut through an emoji (the rename box counts UTF-16 units) leaves
@@ -230,7 +230,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     const first = fixtures[0];
     expect(first).toBeDefined();
     if (first === undefined) return;
-    const sim = await SaveGame.import(readFileSync(resolve(FIXTURES, first), "utf8"));
+    const sim = await importTower(readFileSync(resolve(FIXTURES, first), "utf8"));
     sim.tower.towerName = "Sky \ud83c";
     const webFile = await SaveGame.export(saveOf(sim));
     const json = JSON.stringify(sim.serialize());
@@ -249,7 +249,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
 
     // The web loader repairs the same string the same way, so both engines
     // hold one tower and the dual run sees no divergence (#936).
-    const webLoaded = await SaveGame.import(webFile);
+    const webLoaded = await importTower(webFile);
     expect(webLoaded.tower.towerName).toBe("Sky \uFFFD");
     // The Node decoder the dual-run and conformance harnesses load with too.
     expect((decodeVctower(webFile) as { towerName?: unknown }).towerName).toBe("Sky \uFFFD");
@@ -261,7 +261,7 @@ describe.runIf(run)("the engine's .vctower writer opens in the web game", () => 
     }
 
     const written = rust().encodeVctower(json, VERSION, SAVED_AT);
-    expect((await SaveGame.import(written)).tower.towerName).toBe("Sky \uFFFD");
+    expect((await importTower(written)).tower.towerName).toBe("Sky \uFFFD");
     expect(rust().exportTdt(json).length).toBeGreaterThan(0);
   });
 
