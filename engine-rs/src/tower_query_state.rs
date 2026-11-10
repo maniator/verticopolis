@@ -22,7 +22,11 @@ pub struct Memo {
         crate::tower_index::IndexKey,
         std::sync::Arc<[(i64, i64, i64)]>,
     )>,
-    pub metro_floor: Option<(crate::tower_index::IndexKey, Option<i64>)>,
+    /// The metro station's floor, keyed on `metro_changes` when it was found.
+    pub metro_floor: Option<(u64, Option<i64>)>,
+    /// Raised each time a station registers or unregisters, so placing any
+    /// other unit leaves `metro_floor` standing.
+    pub metro_changes: u64,
     /// Whether a floor tile sits above the lobby, per revision (#1237).
     pub floor_above_lobby: Option<(crate::tower_index::IndexKey, bool)>,
     pub rooms: Option<(crate::tower_index::IndexKey, std::sync::Arc<[usize]>)>,
