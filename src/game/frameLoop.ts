@@ -5,7 +5,7 @@ import { tickInstallAffordance } from "./installAffordance";
 import { hasBlockingModal, isEditorBusy, isEngineStopped, isSplashUp } from "./interactionState";
 import { engineTrapped } from "./engineFault";
 import { positionPanels } from "./panelAnchoring";
-import { tickOverviewMap } from "./overviewMapWiring";
+import { tickOverviewMap, touchOverviewMap } from "./overviewMapWiring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
 import { gameplaySession } from "../analytics";
 import { drainEngineEvents } from "../analyticsEngineBridge";
@@ -144,6 +144,9 @@ export function runFrame(app: GameApp, dtMs: number): void {
         // has answered (the port answers at once), so no frame sees the choice still pending and asks again.
         try {
           app.enginePort.answerChoice(opt === "accept");
+          // A declined bomb threat guts rooms at once, with no move of the
+          // rooms, so the Map's Eval and Pricing views read again.
+          touchOverviewMap(app);
           // Refresh the header now: the reader fetches the choice text only
           // when the pending flag rises, so a second choice raised before the
           // next update would otherwise show this one's text.

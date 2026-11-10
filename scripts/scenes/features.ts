@@ -5,6 +5,7 @@
  * an injected builder by identity. Keep ERASABLE.
  */
 import { type Scene, PHONE } from "../screenshot-env.ts";
+import type { Page } from "playwright";
 import {
   buildBasement,
   buildCanonTower,
@@ -39,6 +40,16 @@ export const FEATURE_SCENES: Scene[] = [
       // uniform to read), written into docs/screenshots/.
       { name: "15-congestion", outDir: "screenshots", overlay: "congestion", frame: { floor: 15, zoom: 0.4 } },
       { name: "23-occupancy", outDir: "screenshots", overlay: "occupancy", frame: { floor: 15, zoom: 0.4 } },
+      // The Map's Eval and Pricing tabs (#1618, #1619) on the same varied tower.
+      ...(["eval", "pricing"] as const).map((view) => ({
+        name: `map-${view}-view`,
+        crop: "#overview-map",
+        frame: { floor: 15, zoom: 0.4 },
+        setup: async (page: Page) => {
+          await page.click(`#overview-map-tab-${view}`);
+          await page.waitForSelector(`#overview-map-tab-${view}[aria-selected="true"]`);
+        },
+      })),
     ],
   },
   // --- Housekeeping-coverage overlay (#401) -----------------------------------

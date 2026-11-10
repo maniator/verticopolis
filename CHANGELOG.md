@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.89.0
+
+- The Map's Eval tab now colors each rated room by how its tenants or guests rate it, and the Pricing tab each priced room by its rent, each with a legend that counts them.
+
 ## 2.88.0
 
 - The Map now has Edit, Eval, Pricing and Hotel tabs. Hotel highlights rooms that need cleaning or have cockroaches, with a separate pattern and count for each.

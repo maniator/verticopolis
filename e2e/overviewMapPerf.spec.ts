@@ -26,7 +26,10 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  *
  * The second test does the same for the Hotel view (S6):
  * a steady frame, a frame on which the game hour turns with nothing changed,
- * and an hourly repaint with every hotel room changed.
+ * and an hourly repaint with every hotel room changed. The third does it for
+ * the Pricing view (S8): a steady frame, which reads no tiers, a frame on
+ * which the game hour turns, which reads them, and a frame that places the
+ * rows again and repaints.
  *
  * This is the map's own cost. The paired whole-frame run, map open against
  * map closed on the `large` fixture, goes through the perf harness
@@ -226,4 +229,81 @@ test("the Hotel view's hourly repaint on a large tower stays within its ceilings
   expect(result.steadyMs).toBeLessThan(STEADY_CEILING_MS);
   expect(result.hourMs).toBeLessThan(HOTEL_HOUR_CEILING_MS);
   expect(result.repaintMs).toBeLessThan(HOTEL_REPAINT_CEILING_MS);
+});
+
+/** Ceiling for an Eval or Pricing frame on the large tower that reads the
+ *  engine's tiers (one call and one pass over the rooms in the engine), or
+ *  places the rows again (one pass over the rooms) and repaints the tower
+ *  layer with the tier colors over it. */
+const TIER_READ_CEILING_MS = 30;
+
+test("the Pricing view's reads on a large tower stay within their ceilings", async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto("/");
+  await page.waitForFunction(() => Boolean((window as any).game && (window as any).overviewMap));
+  await page.evaluate(() => document.getElementById("splash")?.remove());
+  expect(await page.evaluate(buildToStar, 5)).toBe(5);
+  await page.evaluate(() => ((window as any).game.speed = 0));
+  await page.getByRole("tab", { name: "Pricing" }).click();
+
+  const result = await page.evaluate(() => {
+    const win = (window as any).overviewMap;
+    const g = (window as any).game;
+    const views = win.deps.views;
+    const median = (xs: number[]) => {
+      const s = [...xs].sort((a, b) => a - b);
+      return s[Math.floor(s.length / 2)];
+    };
+    // The game is paused: the views read a clock this test turns by hand.
+    let minutes = g.reader.header.minutes;
+    views.deps.minutes = () => minutes;
+    let reads = 0;
+    const tiers = views.deps.tiers;
+    const read = tiers.read.bind(tiers);
+    tiers.read = () => {
+      reads++;
+      return read();
+    };
+    win.frame();
+    const rows = views.tierMarks.rowCount;
+
+    const BATCH = 200;
+    const before = reads;
+    const steady: number[] = [];
+    for (let b = 0; b < 15; b++) {
+      const t0 = performance.now();
+      for (let i = 0; i < BATCH; i++) win.frame();
+      steady.push((performance.now() - t0) / BATCH);
+    }
+    const steadyReads = reads - before;
+
+    // Each sample turns the hour, so the frame reads the tiers; the paused
+    // tower's tiers do not move, so it repaints nothing.
+    const hour: number[] = [];
+    const beforeHours = reads;
+    for (let b = 0; b < 15; b++) {
+      minutes += 60;
+      const t0 = performance.now();
+      win.frame();
+      hour.push(performance.now() - t0);
+    }
+    const hourReads = reads - beforeHours;
+    // A layout change places the rows again and repaints, with no read.
+    const repaint: number[] = [];
+    for (let b = 0; b < 15; b++) {
+      views.tierLayout = null;
+      const t0 = performance.now();
+      win.frame();
+      repaint.push(performance.now() - t0);
+    }
+    return { rooms: g.reader.rooms.length, rows, steadyReads, hourReads, steadyMs: median(steady), hourMs: median(hour), repaintMs: median(repaint) };
+  });
+
+  console.log(`overview map pricing perf: ${JSON.stringify(result)}`);
+  expect(result.rows).toBeGreaterThan(1000);
+  expect(result.steadyReads).toBe(0);
+  expect(result.hourReads).toBe(15);
+  expect(result.steadyMs).toBeLessThan(STEADY_CEILING_MS);
+  expect(result.hourMs).toBeLessThan(TIER_READ_CEILING_MS);
+  expect(result.repaintMs).toBeLessThan(TIER_READ_CEILING_MS);
 });
