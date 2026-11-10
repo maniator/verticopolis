@@ -82,31 +82,38 @@ retires the mirror harness (#1421).
    `src/dualrun/mirror.ts`, `shadow.ts`, `src/tests/dualrun/`, the `dualRun*`
    suites and the `src/wasmhost/` mirror code go, after #878's evidence is
    recorded (the `unitWasm` and `integrationWasm` lanes stay until then).
-   The edit golden is done in the second PR: `src/tests/goldens/port-edits.json`
-   (built by `portEdits.ts`, its lines read, checked and compared in
-   `portEditLines.ts`, cases in `portEditCases.ts`) holds seven cases
-   for the two suites' nine tests (the coverage map names which). Each case
+   The edit golden is done in the second PR: `port-edits.json` in
+   `src/tests/goldens/` (built by `portEdits.ts`, its lines read, checked
+   and compared in `portEditLines.ts`, its crowd view read in
+   `portEditCrowd.ts`, cases in `portEditCases.ts`) holds seven cases for
+   the two suites' nine tests (the coverage map names which). Each case
    starts its tower as the frame-day golden does, and its script says at
    every command whether the engine must do it or refuse it, so a script
    that stops doing what it says fails before anything is pinned. After
    every step a line pins the command's answer by the record's slot names
    (the generation left out) with any refusal text, the clock, and the
    hashes of the state view, the crowd view and the events since the last
-   step, and each line names its kind (the start, a command, a swap, an
-   undo or redo, an undo step opened or closed, a read, a tooling write, a
-   tick or play). Play runs whole frames through `advance`, draining events
-   every frame, with a line after the case's first frame, at every hour,
-   and at the end of a play whose last frame wrote no line. After a swap it
-   starts owing no minutes, as the game's `followSwap` drops them for
-   another tower; after an undo or a redo it keeps them, as the game does
-   for a step of the same tower. Each drag checks from its answer that it
-   reached its floor and was billed or free. The four-star case also sells
-   a room and bulldozes another outside any undo step and plays the hour
-   after them, runs the game's undo trail (a sale and a bulldoze, each its
-   own step, undone and redone with the notice the game shows) and restores
-   an earlier save, which brings its clock back and keeps the live camera.
-   The Rust engine
-   is held to it in `conformanceWasmPortEdits.integration.test.ts` (in
+   step, and each line names its kind (the start, a command, a swap, an undo
+   or redo, an undo step opened or closed, a read, a tooling write, a tick
+   or play). Play runs whole frames through `advance`, draining events every
+   frame, with a line after the case's first frame, at every hour, and at
+   the end of a play whose last frame wrote no line. After a swap it starts
+   owing no minutes, as the game's `followSwap` drops them for another
+   tower; after an undo or a redo it keeps them, as the game does for a step
+   of the same tower. Each drag checks from its answer that it reached its
+   floor and was billed or free. The four-star case also sells a room and
+   bulldozes another room and an escalator the crowd rides, outside any undo
+   step, and plays the hour after them. Both engines drop a person whose
+   shaft goes from under them, so the first frame of the hour's play that
+   moves the clock drops the people walking to the escalator, while the
+   people midway on a route that never takes it (two or more legs ahead)
+   stay. Of the people who set out after the bulldoze and are still in the
+   crowd at the hour's end, some go between its floors, each by a link that
+   stops at both floors and none by the escalator. It also runs the game's
+   undo trail (a sale and a bulldoze, each its own step, undone and redone
+   with the notice the game shows) and restores an earlier save, which
+   brings its clock back and keeps the live camera. The Rust engine is held
+   to it in `conformanceWasmPortEdits.integration.test.ts` (in
    `npm run test:wasm`, written under `VC_PORT_EDITS_UPDATE=1`), the
    TypeScript engine in `portEditsReferee.integration.test.ts` (the plain
    integration run, with a ratchet line, gone with `src/engine/`). The
@@ -117,20 +124,21 @@ retires the mirror harness (#1421).
    its state after the hour played there. The answers, the clock and the
    events match on every line, and the referee checks that each allowance is
    still needed on every line it covers. The writer, both suites and the
-   golden's own tests hold each line to its kind: only the first line is
-   the start; every command, swap and undo or redo answers a status its
-   kind can (only an undo or redo has nothing to step, and a swap lands),
-   and a command's money is a number; a refused command (which also moves
-   no money), a refused undo or one with nothing to step, a read and an
-   undo step opened or closed move nothing and drain no event; a command
-   that moved money, and an undo or redo taken, moved the state; each case
-   plays an hour; and the fixture case's crowd moves during play.
-   A teeth test shows a tower changed between steps is caught at the next
-   line, in the state hash. A moved hash names the step; the field takes a
-   dump: `VC_PORT_EDITS_DUMP=<dir> VC_PORT_EDITS_CASE=<case id>` writes each
+   golden's own tests hold each line to its kind: only the first line is the
+   start; every command, swap and undo or redo answers a status its kind can
+   (only an undo or redo has nothing to step, and a swap lands), and a
+   command's money, when it answers one, is a number; a refused command
+   (which also moves no money), a refused undo or one with nothing to step,
+   a read and an undo step opened or closed keep the clock, move nothing and
+   drain no event; a command that moved money, and an undo or redo taken,
+   moved the state; each case plays an hour; and the fixture case's crowd
+   moves during play. A teeth test shows a tower changed between steps is
+   caught at the next line, in the state hash. A moved hash names the step;
+   the field takes a dump:
+   `VC_PORT_EDITS_DUMP=<dir> VC_PORT_EDITS_CASE=<case id>` writes each
    line's step, kind, answer and canonical views under `<dir>/<engine>/`,
    which has to be new or empty (a run that plays its case again in the same
-   process empties its own). The mirror's deletion is the third PR.
+   test file empties its own). The mirror's deletion is the third PR.
 
 ## Coverage map
 
@@ -148,8 +156,9 @@ retires the mirror harness (#1421).
 | `dualRunEdits`: a caller's inflated drag mark buys nothing | the port's `extendShaft` takes no mark, so a caller has none to pass; the golden's drags pin the engine-held one |
 | `dualRunEdits`: a bad direction or removal word (`"sideways"`, `"burn"`) and other non-number arguments through the mirror's relay | the port takes booleans and typed numbers, so the golden pins the numeric refusals (fractional, NaN, 2^53); the raw binding's type checks stay in `chargeBindingRaw` and `relayedCommandRaw`, which import `Simulation` and are on the TypeScript-engine ratchet, so they move to the Rust engine alone before `src/engine/` goes (the retirement story lists them) |
 | `dualRunEdits`: the shadow attached after the edits or in the middle of a drag, and a drifting shadow caught at the next hour with the path | mirror-only, so they go with it; the teeth test shows the golden catches a change between steps at the next line, and `VC_PORT_EDITS_DUMP` finds the field |
+| The card's express stops, which no dual-run test sends | new: the four-star case sets them on the standard shaft once its top moves to floor 47, which is no lobby, past lobby 45, then clears them, and checks the floors it skips after each: every floor between the ends but the lobbies, then none |
 | The game's undo and redo, which no dual-run test steps | new: the four-star case's sale and bulldoze steps, undone and redone, and a restore of an earlier save |
-| `dualRunEdits`: the hour played after the four-star tower's removals, compared | the four-star case's sale and bulldoze outside any undo step and the hour after them, which the referee compares in full (the undo trail's hours sit in its named window) |
+| `dualRunEdits`: the hour played after the four-star tower's removals, compared | the four-star case's sale and bulldozes (a room, and an escalator the crowd rides: the script checks that people are walking to it before the bulldoze and still there after the command, that the first frame of the hour's play that moves the clock drops them and keeps the people midway on a route that never takes it, and that some of the people who set out after the bulldoze and are still in the crowd at the hour's end go between its floors, each by a link that stops at both floors and none by the escalator) outside any undo step and the hour after them, which the referee compares in full (the undo trail's hours sit in its named window) |
 | `wasmHost*`, `capacityEventMatrix`, `conformanceWasmSaveHandoff`, the parity lanes | AC5, after #878 |
 
 ## Dev notes

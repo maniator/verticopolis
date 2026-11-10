@@ -5,7 +5,8 @@ import type { EnginePort, EnginePortCommands, PortRecord } from "../../simport/e
 import { PortCodes, type CodeTable } from "../../simport/portCodes";
 import { canonicalJson, digestText } from "../conformance/canonical";
 import { FRAME_TIMES_MS, freshDumpDir, startTower, type FrameDayStart } from "./frameDays";
-import { answerNumber, outcomeOf, type AnswerValue, type LineKind, type Outcome, type PortEditLine } from "./portEditLines";
+import { crowdProblem, midRouteAvoiding, shaftsBetween, walkingTo, type CrowdView } from "./portEditCrowd";
+import { answerNumber, outcomeOf, STATUS_SLOT, type AnswerValue, type LineKind, type Outcome, type PortEditLine } from "./portEditLines";
 
 /**
  * The port-edit golden: the player's edits the dual run mirrored
@@ -23,8 +24,9 @@ import { answerNumber, outcomeOf, type AnswerValue, type LineKind, type Outcome,
  * frame a case plays (a new game's founding pass), at every hour, and at the
  * end of a play whose last frame wrote no line. Each line names its kind (a
  * command, a read, an undo step and so on), and the thin checks
- * (`portEditProblems`) hold the commands, swaps, undo and redo steps, undo
- * steps opened or closed, and reads to what each may move.
+ * (`portEditProblems`) hold each command, swap and undo or redo to a status
+ * its kind can answer, and each of those, each read and each undo step
+ * opened or closed to what it may move.
  *
  * `port-edits.json` holds the lines (`portEditLines.ts` reads, writes,
  * checks and compares them). The Rust engine is checked against it in
@@ -52,9 +54,6 @@ const STEADY_CLOCK_OFF = false;
 /** `viewFrame`'s `full`, off: the light frame, whose header holds the
  *  clock. */
 const FULL_FRAME_OFF = false;
-
-/** The record slot every command and swap answers its status in. */
-const STATUS_SLOT = "status";
 
 /** The kinds a save's structure tiles have; they carry no width, and a room
  *  lookup passes over them. */
@@ -103,6 +102,17 @@ export interface SavedTransport {
   readonly width: number;
   readonly bottom: number;
   readonly top: number;
+  /** The floors the shaft skips, when it skips any. */
+  readonly skipFloors?: readonly number[];
+}
+
+/** A mark the people who set out after it are told apart by: the id the
+ *  crowd's next person takes at the mark, and the engine's generation,
+ *  which a done swap, undo or redo moves (each can start the crowd's ids
+ *  again from 1). */
+export interface PeopleMark {
+  readonly nextId: number;
+  readonly generation: number;
 }
 
 /**
@@ -252,6 +262,46 @@ export class PortEditSession {
     return parsed;
   }
 
+  /** The crowd view's people and the id its next person takes; a view the
+   *  scripts cannot read throws, saying why. */
+  private crowd(): CrowdView {
+    const view: unknown = JSON.parse(this.leg.crowdView());
+    const problem = crowdProblem(view);
+    if (problem !== undefined) throw new Error(`${this.caseId}: the crowd view ${problem}`);
+    return view as CrowdView;
+  }
+
+  /** The ids of the people walking to the shaft their current leg takes. */
+  walkingTo(id: number): number[] {
+    return walkingTo(this.crowd(), id);
+  }
+
+  /** The ids of the people midway on a route that never takes the shaft
+   *  (`MIDWAY_LEGS_AHEAD`). */
+  midRouteAvoiding(id: number): number[] {
+    return midRouteAvoiding(this.crowd(), id);
+  }
+
+  /** The ids of the people in the crowd. */
+  personIds(): Set<number> {
+    return new Set(this.crowd().people.map((p) => p.id));
+  }
+
+  /** Mark the crowd, to tell the people who set out after this apart. */
+  markPeople(): PeopleMark {
+    return { nextId: this.crowd().nextId, generation: this.port.generation() };
+  }
+
+  /** The shafts of the route legs between two floors, either way, of the
+   *  people who set out after the mark. A swap, undo or redo since it
+   *  throws, as the ids can start again. */
+  shaftsBetween(a: number, b: number, since: PeopleMark): number[] {
+    if (this.port.generation() !== since.generation) throw new Error(`${this.caseId}: a swap, undo or redo since the mark can start the crowd's ids again`);
+    const view = this.crowd();
+    if (view.nextId < since.nextId) throw new Error(`${this.caseId}: the crowd's next person id went from ${since.nextId} to ${view.nextId} with no swap, undo or redo`);
+    return shaftsBetween(view, a, b, since.nextId);
+  }
+
   /** Stop the run when what a step must have done did not happen. */
   require(what: string, ok: boolean): void {
     if (!ok) throw new Error(`${this.caseId}: ${what}`);
@@ -307,6 +357,16 @@ export class PortEditSession {
     return u.id;
   }
 
+  /** The shaft with an id, if the tower has one. */
+  shaftById(id: number): SavedTransport | undefined {
+    return this.save().transports.find((t) => t.id === id);
+  }
+
+  /** The floors that hold a lobby tile. */
+  lobbyFloors(): ReadonlySet<number> {
+    return new Set(this.save().units.flatMap((u) => (u.kind === "lobby" ? [u.floor] : [])));
+  }
+
   /** The shaft covering a cell, if any. */
   findShaft(floor: number, x: number): SavedTransport | undefined {
     return this.save().transports.find((s) => floor >= s.bottom && floor <= s.top && x >= s.x && x < s.x + s.width);
@@ -324,6 +384,24 @@ export class PortEditSession {
    *  after each frame that crosses an hour, and one at the end when the
    *  last frame wrote none. */
   play(minutes: number): void {
+    this.playFrames(minutes);
+  }
+
+  /** Play as `play` does, and answer the ids of the people in the crowd
+   *  after its first frame that moves the clock. The session reads them
+   *  itself, so no script code runs inside a play. */
+  playReadingFirstMove(minutes: number): Set<number> {
+    const read: { crowd?: Set<number> } = {};
+    this.playFrames(minutes, () => {
+      read.crowd ??= this.personIds();
+    });
+    if (read.crowd === undefined) throw new Error(`${this.caseId}: play ${minutes} minutes: the clock never moved`);
+    return read.crowd;
+  }
+
+  /** `play`'s frames; `onMove` runs after each frame that moves the clock. */
+  private playFrames(minutes: number, onMove?: () => void): void {
+    if (!(Number.isFinite(minutes) && minutes > 0)) throw new Error(`${this.caseId}: play needs a positive number of minutes, and got ${minutes}`);
     const mps = SPEEDS[PLAY_SPEED];
     const step = `play ${minutes} minutes`;
     const from = this.minute();
@@ -351,6 +429,7 @@ export class PortEditSession {
       lastWasLine = first || nowHour !== hour;
       if (lastWasLine) this.line(step, "play", first && nowHour === hour ? "first frame" : { hour: nowHour });
       hour = nowHour;
+      if (now > before) onMove?.();
     }
     if (!lastWasLine) this.line(step, "play", "end");
   }

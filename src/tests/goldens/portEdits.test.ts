@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FrameDayStart } from "./frameDays";
 import { PORT_EDIT_CASES } from "./portEditCases";
+import { crowdProblem, isCrowdPerson, midRouteAvoiding, shaftsBetween, stopsAtBoth, walkingTo, WALKING_TO_SHAFT } from "./portEditCrowd";
 import { answerNumber, firstPortEditDifference, portEditProblems, readPortEdits, STATUS, type AnswerValue, type LineKind, type PortEditLine } from "./portEditLines";
 
 /** A line whose kind follows from its step: "start", "play ...", and the
@@ -89,6 +90,11 @@ describe("the port-edit golden's answers and comparison", () => {
     expect(portEditProblems(FOUND, [start, line("undo with nothing left", { status: NOTHING_TO_STEP, notice: "Nothing to undo." }, "s0", 1), played])).toEqual([
       "line 1 (undo with nothing left): nothing to step, but it moved the tower or drained an event",
     ]);
+    expect(portEditProblems(FOUND, [start, line("undo a refused step", { status: REFUSED, notice: "" }, "s1"), played])).toEqual([
+      "line 1 (undo a refused step): refused, but it moved the tower or drained an event",
+    ]);
+    // Moving nothing keeps the clock too.
+    expect(portEditProblems(FOUND, [start, { ...line("read the name", "Tower", "s0"), minute: 1 }, played])).toEqual(["line 1 (read the name): a read moved the tower or drained an event"]);
   });
 
   it("holds each line to a status its kind can answer, and a kind the golden names", () => {
@@ -117,6 +123,68 @@ describe("the port-edit golden's answers and comparison", () => {
       "the crowd never moves during play",
     ]);
     expect(portEditProblems(FIXTURE, [start, line("play 60 minutes", { hour: 8 }, "s1", 0, "c1")])).toEqual([]);
+  });
+});
+
+describe("the crowd view reader", () => {
+  const person = { id: 7, floors: [1, 0], shafts: [4631], leg: 0, state: WALKING_TO_SHAFT };
+
+  it("reads a person on a route, at its end, on a trip on one floor, or with no route", () => {
+    expect(isCrowdPerson(person)).toBe(true);
+    expect(isCrowdPerson({ ...person, leg: 1 })).toBe(true);
+    expect(isCrowdPerson({ ...person, floors: [5], shafts: [] })).toBe(true);
+    expect(isCrowdPerson({ ...person, floors: [], shafts: [] })).toBe(true);
+  });
+
+  it("refuses an entry the scripts would misread", () => {
+    expect(isCrowdPerson(null)).toBe(false);
+    expect(isCrowdPerson({ ...person, id: 7.5 })).toBe(false);
+    expect(isCrowdPerson({ ...person, floors: [1] })).toBe(false);
+    expect(isCrowdPerson({ ...person, shafts: ["4631"] })).toBe(false);
+    expect(isCrowdPerson({ ...person, floors: [1, 0, 2] })).toBe(false);
+    expect(isCrowdPerson({ ...person, floors: [] })).toBe(false);
+    expect(isCrowdPerson({ ...person, floors: [], shafts: [], leg: 1 })).toBe(false);
+    expect(isCrowdPerson({ ...person, leg: -1 })).toBe(false);
+    expect(isCrowdPerson({ ...person, leg: 2 })).toBe(false);
+    expect(isCrowdPerson({ ...person, state: 3 })).toBe(false);
+  });
+
+  it("reads a view whose next person id is above every person's, and says why it cannot read another", () => {
+    expect(crowdProblem({ nextId: 8, people: [person] })).toBeUndefined();
+    expect(crowdProblem(null)).toBe("is not an object");
+    expect(crowdProblem({ people: [person] })).toBe("has a next person id of undefined");
+    expect(crowdProblem({ nextId: 8 })).toBe("has no list of people");
+    expect(crowdProblem({ nextId: 8, people: [person, { ...person, leg: 2 }] })).toBe("has a person at index 1 the scripts cannot read");
+    expect(crowdProblem({ nextId: 7, people: [person] })).toBe("has person 7, at or above the next person id 7");
+    expect(crowdProblem({ nextId: 8, people: [person, { ...person, shafts: [99] }] })).toBe("has person 7 twice");
+  });
+
+  it("picks the people walking to a shaft, the people midway on a route that never takes it, and the new people's legs between two floors", () => {
+    const view = {
+      nextId: 20,
+      people: [
+        person,
+        { ...person, id: 8, state: "climbing" },
+        { ...person, id: 9, floors: [2, 1, 0], shafts: [50, 4631] },
+        { ...person, id: 10, floors: [3, 2, 1], shafts: [50, 51] },
+        { ...person, id: 11, floors: [3, 2, 1], shafts: [50, 51], leg: 1 },
+        { ...person, id: 12, floors: [0, 1], shafts: [4479] },
+      ],
+    };
+    expect(walkingTo(view, 4631)).toEqual([7]);
+    expect(midRouteAvoiding(view, 4631)).toEqual([10]);
+    expect(shaftsBetween(view, 1, 0, 9)).toEqual([4631, 4479]);
+  });
+
+  it("says whether a shaft stops at both of a leg's floors, as the engines decide a stop", () => {
+    const shaft = { bottom: 0, top: 3 };
+    expect(stopsAtBoth(shaft, 0, 1)).toBe(true);
+    expect(stopsAtBoth({ ...shaft, skipFloors: [1, 2] }, 0, 3)).toBe(true);
+    expect(stopsAtBoth({ ...shaft, skipFloors: [0] }, 0, 1)).toBe(false);
+    expect(stopsAtBoth({ ...shaft, skipFloors: [1] }, 0, 1)).toBe(false);
+    expect(stopsAtBoth({ ...shaft, bottom: 1 }, 0, 1)).toBe(false);
+    expect(stopsAtBoth({ ...shaft, top: 0 }, 0, 1)).toBe(false);
+    expect(stopsAtBoth(undefined, 0, 1)).toBe(false);
   });
 });
 

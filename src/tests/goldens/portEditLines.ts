@@ -55,6 +55,13 @@ export function answerNumber(v: number): number | string {
   return Number.isFinite(v) ? v + 0 : String(v);
 }
 
+/** The record slot every command, swap, undo and redo answers its status
+ *  in. */
+export const STATUS_SLOT = "status";
+
+/** The record slot a command answers the money it moved in. */
+const DELTA_SLOT = "delta";
+
 /** A slot of a line's answer, when the answer is a record. */
 function slotOf(l: PortEditLine, slot: string): AnswerValue | undefined {
   const a = l.answer;
@@ -63,7 +70,7 @@ function slotOf(l: PortEditLine, slot: string): AnswerValue | undefined {
 
 /** A line's status slot, when its answer is a record with one. */
 function statusOf(l: PortEditLine): number | undefined {
-  const status = slotOf(l, "status");
+  const status = slotOf(l, STATUS_SLOT);
   return typeof status === "number" ? status : undefined;
 }
 
@@ -82,11 +89,12 @@ function statusProblem(l: PortEditLine, status: number | undefined): string | un
 /** Why a case's lines are too thin to pin, or nothing, by each line's kind:
  *  - the first line, and only it, is the start, and every line has a kind;
  *  - every command, swap and undo or redo answers a status its kind can
- *    (`statusProblem`), and a command's money is a number;
+ *    (`statusProblem`), and a command's money, when it answers one, is a
+ *    number;
  *  - a refused command (#923, #996), a refused undo or one with nothing to
  *    step, a read and an undo step opened or closed move nothing, so they
- *    keep the state and crowd hashes of the line before and drain no event,
- *    and a refused command moves no money;
+ *    keep the clock and the state and crowd hashes of the line before and
+ *    drain no event, and a refused command moves no money;
  *  - a command that moved money, and an undo or redo taken, moved the state;
  *  - the case plays at least one hour, so the commands are pinned against a
  *    running tower, and a tower loaded from a fixture has people, so its
@@ -114,12 +122,12 @@ export function portEditProblems(start: FrameDayStart, lines: readonly PortEditL
       problems.push(`${at}: ${wrongStatus}`);
       return;
     }
-    const delta = l.kind === "command" ? slotOf(l, "delta") : undefined;
+    const delta = l.kind === "command" ? slotOf(l, DELTA_SLOT) : undefined;
     if (delta !== undefined && typeof delta !== "number") {
       problems.push(`${at}: moved ${String(delta)} in money, which is no number`);
       return;
     }
-    const still = l.state === before.state && l.crowd === before.crowd && l.count === 0;
+    const still = l.minute === before.minute && l.state === before.state && l.crowd === before.crowd && l.count === 0;
     if (answered && status !== STATUS.done) {
       if (!still) problems.push(`${at}: ${status === STATUS.nothingToStep ? "nothing to step" : "refused"}, but it moved the tower or drained an event`);
       if (delta !== undefined && delta !== 0) problems.push(`${at}: refused, but it moved ${delta} in money`);
