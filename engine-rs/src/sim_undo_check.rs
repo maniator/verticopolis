@@ -1,13 +1,20 @@
 //! Whether a step meets the tower it expects (`undo.rs`), checked before it
 //! changes anything. The steps apply one after another, so the tower a step
 //! meets is the one its edit left, moved on only by time; a step that finds
-//! anything else (an edit made outside every gesture) is refused, so its
-//! cash never moves for an edit that is not there to reverse, nothing it
-//! puts back lands on a room or a shaft that took its place, hangs where its
-//! floor was taken away, sits on a lobby or below the metro, or goes past a
-//! cap its build kept to (`sim_undo_ground.rs`). Nor does a
-//! floor or lobby tile it takes out leave a room, a shaft or the story above
-//! hanging, as a sale never does (`Tower::removal_reason`).
+//! anything else (an edit made outside every gesture) is refused, so its cash
+//! never moves for an edit that is not there to reverse, nothing it puts back
+//! lands on a room or a shaft that took its place, hangs where its floor was
+//! taken away, breaks a rule of the lobbies or the metro station, or goes past
+//! a cap its build kept to (`sim_undo_ground.rs`, `sim_undo_caps.rs`). Nor does
+//! a floor or lobby tile it takes out leave a room, a shaft or the story above
+//! hanging, as a sale never does (`Tower::removal_reason`), or a ground-floor
+//! lobby tile cut a run of ground-floor or basement tiles laid in part after it
+//! off from the oldest ground-floor tile of the part it stood in (in play the
+//! tower's first lobby tile, unless a sale parted the ground floor), though one
+//! such run with a lobby tile may stand on its own, as a tower's first lobby
+//! tile does, where no older ground-floor tile of that part stays or comes back
+//! with the step outside it (`Ground::lobbies_leave_nothing_hanging` says which
+//! tiles count).
 //!
 //! Time moves a build on without any edit, and the owner's rule for that is
 //! that a step takes a build back at its full price only while nobody has
@@ -22,15 +29,17 @@
 //! would cost nothing.
 #![cfg_attr(not(feature = "wasm"), allow(dead_code))]
 use crate::crowd::fasthash::FastSet;
-use crate::facilities::{build_cap, Kind, FACILITIES, POOLED_CAPS};
+use crate::facilities::Kind;
 use crate::sim::Simulation;
+use crate::sim_undo_caps::within_caps;
 use crate::sim_undo_ground::Ground;
-use crate::tower::{Tower, Transport, Unit, UnitState};
+use crate::tower::{Transport, Unit, UnitState};
 use crate::undo::{puts_back, Step, TransportChange, UnitChange, UnitFacts, UnitUse};
 
 /// Why a step was not applied. Nothing changed. `sellable` says the player
-/// can sell the build instead, which a Classic permanent room and a lobby
-/// tile never allow.
+/// can sell the build instead, which a lobby tile and a Classic permanent
+/// room no fire gutted never allow, and a burning room allows only once the
+/// fire is out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum StepRefused {
     /// The step needs more cash than the tower has.
@@ -42,7 +51,14 @@ pub(crate) enum StepRefused {
     /// stood through an hourly pass since the step was made, which moves
     /// tenants in over the floors the tower reaches. Floor a room's build
     /// laid under it is held to this too, while the room is still being
-    /// built. `sellable` is false while something stands on the tile.
+    /// built; once the room opens, the room's own reason is the one given,
+    /// though a fire, which waits, gives way to this one. `sellable` says
+    /// the player could sell everything the step takes out instead: it is
+    /// false for a lobby tile, a burning room or a Classic room that stays
+    /// for good, a tile the step lays again, and while anything but a room
+    /// or shaft the step takes out stands on one of the step's tiles, a
+    /// shaft would be left with no floor on a story it spans once they are
+    /// sold, or something the step takes out is gone since.
     GroundUsed { sellable: bool },
     /// A room the step would take out was being built when the step was made
     /// and has opened since.
@@ -53,7 +69,9 @@ pub(crate) enum StepRefused {
     /// A build the edit took out again inside its own gesture had been used
     /// by then (`Step::used_in_gesture`).
     UsedThenSold,
-    /// The edit dug new ground that could hold treasure.
+    /// The edit dug new ground that could hold treasure. `sellable` is as
+    /// for `GroundUsed`, and false when the step takes nothing out: a build
+    /// its own gesture sold again leaves nothing to sell.
     SearchedForTreasure { sellable: bool },
     /// A room the step would take out is burning.
     OnFire,
@@ -63,12 +81,18 @@ pub(crate) enum StepRefused {
     /// A sale the step would make again meets a room in another use than
     /// the one it was sold in: a tenant moved in or out since.
     UseChanged,
-    /// Something stands in the way: a room or shaft the step would put back
-    /// has no room, no floor under it, a lobby or the metro where building
-    /// it is refused, or no place under its cap, or a floor or lobby tile it
-    /// would take out holds up a room, a shaft, the story above or, on the
-    /// ground floor, a basement that hangs from it. Only an edit clears it, and undoing that edit puts the block back, so the
-    /// step never applies.
+    /// The tower around the step has changed: a unit or shaft the step would
+    /// put back has no space, no floor under it, a lobby, a room or the metro
+    /// station where the build rules refuse it, or no place under its cap, or a
+    /// floor or lobby tile it would take out holds up a room, a shaft or the
+    /// story above, or taking out a ground-floor lobby tile, with the tiles
+    /// there it takes with it, cuts a run of ground-floor or basement tiles
+    /// laid in part after it off from the oldest ground-floor tile of the part
+    /// it stood in (in play the tower's first lobby tile; one run with a lobby
+    /// tile may stand on its own where no older ground-floor tile of that part
+    /// stays or comes back with the step outside it). Only an edit clears it
+    /// (time alone takes no unit out), and undoing that edit puts the block
+    /// back, so the step never applies.
     Blocked,
     /// The tower is not the one the step expects: something it would take
     /// out or restore is gone or has changed, or something it would put back
@@ -77,14 +101,60 @@ pub(crate) enum StepRefused {
 }
 
 impl StepRefused {
-    /// Whether the step can never apply again. Only time can make a step
-    /// apply, and time does not run back: a build in use stays in use, a
-    /// sold condo seldom empties, a room's tenants and income do not go back
-    /// to what a sale found, and a tower an edit changed under the step
-    /// changes back only by another edit, whose own step sits above this
-    /// one. Time does bring in money and put a fire out.
+    /// Whether a step refused for this is dropped, as one that will not
+    /// apply again. Only time can make a step apply, and time does not run
+    /// back: a build in use stays in use, a sold condo seldom empties, a
+    /// room's tenants and income seldom go back to just what a sale found,
+    /// and a tower an edit changed under the step changes back only by
+    /// another edit, whose own step sits above this one. Time does bring in
+    /// money and put a fire out.
     pub(crate) fn is_lasting(self) -> bool {
         !matches!(self, StepRefused::NotEnoughMoney | StepRefused::OnFire)
+    }
+}
+
+/// What a check found of the floor and lobby tiles a step would take out.
+#[derive(Default)]
+struct Tiles {
+    /// One the step built has stood through an hourly pass.
+    used: bool,
+    /// One holds up something the step leaves.
+    blocked: bool,
+}
+
+/// Whether the player could sell instead everything a step would take out:
+/// a room that is not burning, of a kind that can be sold, and a floor tile
+/// once the rooms on it are sold, when it holds up nothing else. Only a
+/// refusal that gives advice reads it, so a check that can give none asks
+/// nothing (`asked`).
+struct Sale {
+    asked: bool,
+    takes_any: bool,
+    sellable: bool,
+}
+
+impl Sale {
+    fn new(asked: bool) -> Sale {
+        Sale {
+            asked,
+            takes_any: false,
+            sellable: true,
+        }
+    }
+
+    /// Note a build the step takes out, which the player could sell first
+    /// when `sells` says so. It is asked only while the rest could be.
+    fn note(&mut self, sells: impl FnOnce() -> bool) {
+        if self.asked {
+            self.takes_any = true;
+            self.sellable = self.sellable && sells();
+        }
+    }
+
+    /// Whether the step takes anything out and the player could sell it
+    /// all: a build its own gesture sold again leaves nothing to sell.
+    fn works(&self) -> bool {
+        self.takes_any && self.sellable
     }
 }
 
@@ -107,6 +177,17 @@ impl Found {
         slot.get_or_insert(why);
     }
 
+    /// Whether a lasting reason is found, which only the dig's displaces.
+    fn has_lasting(&self) -> bool {
+        self.lasting.is_some()
+    }
+
+    /// Report lasting reason `why` before anything found so far.
+    fn put_first(&mut self, why: StepRefused) {
+        debug_assert!(why.is_lasting());
+        self.lasting = Some(why);
+    }
+
     fn verdict(self) -> Result<(), StepRefused> {
         match self.lasting.or(self.passing) {
             Some(why) => Err(why),
@@ -120,10 +201,6 @@ impl Simulation {
     /// can pay for it.
     pub(crate) fn check_undo_step(&self, step: &Step) -> Result<(), StepRefused> {
         let mut found = Found::default();
-        if step.searched_for_treasure {
-            let sellable = self.sells_what_it_takes(step);
-            found.add(StepRefused::SearchedForTreasure { sellable });
-        }
         let leaving_units: FastSet<i64> = step
             .units
             .iter()
@@ -132,15 +209,28 @@ impl Simulation {
             .collect();
         let ground = Ground::of(&self.tower, step, &leaving_units);
         let hour_passed = self.on_hour_runs != step.hour_passes;
+        // The tiles' reasons come after the rooms', which say more.
+        let mut tiles = Tiles::default();
+        // Of the refusals, only a floor's use and a dig give advice for the
+        // whole step.
+        let mut sale = Sale::new(hour_passed || step.searched_for_treasure);
         for img in &step.units {
             match (&img.change, self.tower.get_unit(img.id)) {
-                (UnitChange::TakeOut(held), Some(now)) => {
-                    let hangs =
-                        now.kind.is_structural() && !ground.leaves_nothing_hanging_from(now);
-                    self.check_take_out(&mut found, img.built, held, now, hour_passed, !hangs);
-                    if hangs {
-                        found.add(StepRefused::Blocked);
+                (UnitChange::TakeOut(held), Some(now)) if now.kind.is_structural() => {
+                    let hangs = !ground.leaves_nothing_hanging_from(now);
+                    sale.note(|| !hangs && !ground.lays_again(now) && self.sells(now));
+                    if now.state == UnitState::Fire {
+                        found.add(StepRefused::OnFire);
+                    } else if !img.built {
+                        self.check_take_out(&mut found, false, held, now);
+                    } else {
+                        tiles.used |= hour_passed;
                     }
+                    tiles.blocked |= hangs;
+                }
+                (UnitChange::TakeOut(held), Some(now)) => {
+                    sale.note(|| self.sells(now));
+                    self.check_take_out(&mut found, img.built, held, now);
                 }
                 (UnitChange::PutBack(want), None) => {
                     if !self
@@ -156,15 +246,60 @@ impl Simulation {
                         found.add(StepRefused::PriceFixed);
                     }
                 }
+                (UnitChange::TakeOut(_), None) => {
+                    sale.note(|| false);
+                    found.add(StepRefused::Stale);
+                }
                 _ => found.add(StepRefused::Stale),
             }
         }
-        self.check_shafts(&mut found, step, &ground, hour_passed);
-        if !ground.leaves_no_basement_hanging() {
-            found.add(StepRefused::Blocked);
+        for img in &step.transports {
+            if matches!(img.change, TransportChange::TakeOut { .. }) {
+                // A shaft can be sold while it stands.
+                sale.note(|| self.tower.get_transport(img.id).is_some());
+            }
         }
-        if !within_caps(&self.tower, step) {
-            found.add(StepRefused::Blocked);
+        let named: FastSet<i64> = step.transports.iter().map(|img| img.id).collect();
+        // Selling the step's tiles from under a shaft would leave it over
+        // nothing, so the advice holds only while each shaft the step does
+        // not take out keeps its floor as it stands now. A sale lays no
+        // tile, so the tiles the step lays hold up no shaft here. Only a
+        // floor's use and a dig that takes something out read it, and only
+        // while the rest could be sold.
+        let advised = (tiles.used && sale.sellable) || (step.searched_for_treasure && sale.works());
+        let shafts_keep_floor = advised
+            && self
+                .tower
+                .transports
+                .iter()
+                .filter(|t| !named.contains(&t.id))
+                .all(|t| ground.still_under_shaft_once_sold(t))
+            && self.restored_shafts_stand(step, &ground);
+        if tiles.used {
+            found.add(StepRefused::GroundUsed {
+                sellable: sale.sellable && shafts_keep_floor,
+            });
+        }
+        self.check_shafts(&mut found, step, &named, &ground, hour_passed);
+        // What the step's tiles hold up, and its caps, come after the
+        // builds' own reasons. Each is lasting, so it is asked only while it
+        // could be the reason given: no lasting reason is found yet, and no
+        // dig will be put first.
+        if !found.has_lasting() && !step.searched_for_treasure {
+            // A shaft the step leaves alone keeps its floor.
+            let shafts_stand = self
+                .tower
+                .transports
+                .iter()
+                .filter(|t| !named.contains(&t.id))
+                .all(|t| ground.still_under_shaft(t));
+            if tiles.blocked
+                || !shafts_stand
+                || !ground.lobbies_leave_nothing_hanging()
+                || !within_caps(&self.tower, step)
+            {
+                found.add(StepRefused::Blocked);
+            }
         }
         // After the builds' own reasons, which say more.
         if step.used_in_gesture {
@@ -173,37 +308,30 @@ impl Simulation {
         if step.money < 0.0 && self.money + step.money < 0.0 {
             found.add(StepRefused::NotEnoughMoney);
         }
+        // The dig and its luck stay whatever else the check found.
+        if step.searched_for_treasure {
+            found.put_first(StepRefused::SearchedForTreasure {
+                sellable: sale.works() && shafts_keep_floor,
+            });
+        }
         found.verdict()
     }
 
     /// Check a unit `now` that a step would take out, which the step found
-    /// in use `held`; `built` as [`crate::undo::UnitImage`] has it, and
-    /// `free` when nothing the step leaves stands on it.
-    fn check_take_out(
-        &self,
-        found: &mut Found,
-        built: bool,
-        held: &UnitUse,
-        now: &Unit,
-        hour_passed: bool,
-        free: bool,
-    ) {
+    /// in use `held`; `built` as [`crate::undo::UnitImage`] has it. A floor
+    /// or lobby tile the step built is checked by the hour instead.
+    fn check_take_out(&self, found: &mut Found, built: bool, held: &UnitUse, now: &Unit) {
         if now.state == UnitState::Fire {
             // Its use shows once the fire is out.
             found.add(StepRefused::OnFire);
             return;
         }
-        let sellable = self.can_sell(now.kind) && free;
+        let sellable = self.sells(now);
         let use_now = UnitUse::of(now);
         if !built {
             // A sale made again prices the room by its use as sold.
             if use_now.as_sold() != held.as_sold() {
                 found.add(StepRefused::UseChanged);
-            }
-        } else if now.kind.is_structural() {
-            // A tile's use shows only in the hours it stood.
-            if hour_passed {
-                found.add(StepRefused::GroundUsed { sellable });
             }
         } else if held.only_opened(use_now) {
             found.add(StepRefused::Opened { sellable });
@@ -214,15 +342,23 @@ impl Simulation {
 
     /// Check the shafts a step names, and the shafts it leaves standing on
     /// the floor and lobby tiles it takes out.
-    fn check_shafts(&self, found: &mut Found, step: &Step, ground: &Ground, hour_passed: bool) {
-        // The shafts the step names. Each one's image is a shaft as it stood
-        // beside the others when the step was made, so they never clash
-        // with each other: one shrunk by the step makes room for another it
-        // puts back.
-        let named: FastSet<i64> = step.transports.iter().map(|img| img.id).collect();
+    fn check_shafts(
+        &self,
+        found: &mut Found,
+        step: &Step,
+        named: &FastSet<i64>,
+        ground: &Ground,
+        hour_passed: bool,
+    ) {
+        // `named` holds the shafts the step names. Each one's image is a
+        // shaft as it stood beside the others when the step was made, so
+        // they never clash with each other: one shrunk by the step makes
+        // room for another it puts back.
         // A shaft the step puts back or gives its old span needs floor in
         // its column on each story of that span and no other shaft there,
-        // as building it did.
+        // as building it did. Classic's rule that keeps an escalator off an
+        // office floor is not asked: an office may go in beside one, so a
+        // tower with both is one that building could make.
         let fits = |want: &Transport| {
             ground.under_shaft(want)
                 && self
@@ -255,33 +391,25 @@ impl Simulation {
                 found.add(StepRefused::ShaftUsed);
             }
         }
-        // A shaft the step leaves alone keeps its floor.
-        let stands = self
-            .tower
-            .transports
+    }
+
+    /// Whether the player could sell unit `u` instead of undoing its build,
+    /// as `Simulation::remove_facility` lets them: a lobby tile stays for
+    /// good, a burning unit waits for the fire, and a Classic permanent
+    /// room stays unless a fire gutted it.
+    fn sells(&self, u: &Unit) -> bool {
+        u.kind != Kind::Lobby && u.state != UnitState::Fire && !self.stays_for_good(u.kind, u.state)
+    }
+
+    /// Whether each shaft `step` gives another span or other cars still
+    /// has floor where the step takes it from, as the shaft stands now and
+    /// a sale of what the step takes out would leave it.
+    fn restored_shafts_stand(&self, step: &Step, ground: &Ground) -> bool {
+        step.transports
             .iter()
-            .filter(|t| !named.contains(&t.id))
-            .all(|t| ground.still_under_shaft(t));
-        if !stands {
-            found.add(StepRefused::Blocked);
-        }
-    }
-
-    /// Whether the player could sell a room of `kind` instead of undoing its
-    /// build: a lobby tile and a Classic permanent room stay for good.
-    fn can_sell(&self, kind: Kind) -> bool {
-        kind != Kind::Lobby && !self.mode.room_is_permanent(kind)
-    }
-
-    /// Whether the player could sell every unit `step` would take out.
-    fn sells_what_it_takes(&self, step: &Step) -> bool {
-        step.units.iter().all(|img| {
-            !matches!(img.change, UnitChange::TakeOut(_))
-                || self
-                    .tower
-                    .get_unit(img.id)
-                    .is_none_or(|u| self.can_sell(u.kind))
-        })
+            .filter(|img| matches!(img.change, TransportChange::Restore { .. }))
+            .filter_map(|img| self.tower.get_transport(img.id))
+            .all(|t| ground.still_under_shaft_once_sold(t))
     }
 }
 
@@ -309,103 +437,4 @@ fn reprices_a_sold_condo(now: &Unit, want: &UnitFacts, left: &UnitFacts) -> bool
         && now.ever_occupied
         && (puts_back(&want.rent, &left.rent, &now.rent)
             || puts_back(&want.no_rate, &left.no_rate, &now.no_rate))
-}
-
-/// A cap a step can take the tower up against: one kind's own (`build_cap`)
-/// or a shared pool's (`POOLED_CAPS`, by its place in that list).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum CapKey {
-    Kind(Kind),
-    Pool(usize),
-}
-
-/// How many units and shafts under one cap the tower held when a step was
-/// made (`Step::caps_held`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct CapHeld {
-    pub(crate) cap: CapKey,
-    pub(crate) count: i64,
-}
-
-/// A cap applying a step adds units or shafts under: its limit, how many
-/// the tower holds under it now and how many the step adds.
-struct Raised {
-    cap: CapKey,
-    limit: i64,
-    now: i64,
-    added: i64,
-}
-
-/// How many units and shafts of each kind applying `step` adds to `tower`,
-/// by `Kind`: one it takes out counts against its kind.
-fn kinds_added(tower: &Tower, step: &Step) -> Vec<i64> {
-    let mut added = vec![0; FACILITIES.len()];
-    for img in &step.units {
-        match &img.change {
-            UnitChange::PutBack(u) => added[u.kind as usize] += 1,
-            UnitChange::TakeOut(_) => {
-                if let Some(u) = tower.get_unit(img.id) {
-                    added[u.kind as usize] -= 1;
-                }
-            }
-            UnitChange::Restore { .. } => {}
-        }
-    }
-    for img in &step.transports {
-        match &img.change {
-            TransportChange::PutBack(t) => added[t.kind as usize] += 1,
-            TransportChange::TakeOut { left } => added[left.kind as usize] -= 1,
-            TransportChange::Restore { .. } => {}
-        }
-    }
-    added
-}
-
-/// The caps applying `step` to `tower` adds under (`Tower::cap_reason`).
-fn caps_raised(tower: &Tower, step: &Step) -> Vec<Raised> {
-    let added = kinds_added(tower, step);
-    let own = FACILITIES.iter().filter_map(|f| {
-        let n = added[f.kind as usize];
-        let limit = build_cap(f.kind).filter(|_| n > 0)?;
-        Some(Raised {
-            cap: CapKey::Kind(f.kind),
-            limit,
-            now: tower.count_kind(f.kind),
-            added: n,
-        })
-    });
-    let pooled = POOLED_CAPS.iter().enumerate().filter_map(|(i, pool)| {
-        let n: i64 = pool.kinds.iter().map(|&k| added[k as usize]).sum();
-        (n > 0).then(|| Raised {
-            cap: CapKey::Pool(i),
-            limit: pool.cap,
-            now: pool.kinds.iter().map(|&k| tower.count_kind(k)).sum(),
-            added: n,
-        })
-    });
-    own.chain(pooled).collect()
-}
-
-/// What `step`, made on `tower` as it is now, records of the caps it adds
-/// under.
-pub(crate) fn caps_held(tower: &Tower, step: &Step) -> Vec<CapHeld> {
-    caps_raised(tower, step)
-        .into_iter()
-        .map(|r| CapHeld {
-            cap: r.cap,
-            count: r.now,
-        })
-        .collect()
-}
-
-/// Whether the units and shafts `step` puts back keep the tower within its
-/// caps, as building them again would. A tower can hold more than a cap
-/// (an older save): a step may then leave it as far over as the edit found
-/// it, and is refused only when the tower has gained under that cap since
-/// the step was made.
-fn within_caps(tower: &Tower, step: &Step) -> bool {
-    caps_raised(tower, step).iter().all(|r| {
-        let held = step.caps_held.iter().find(|h| h.cap == r.cap);
-        r.now + r.added <= r.limit || held.is_some_and(|h| r.now <= h.count)
-    })
 }

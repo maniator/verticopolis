@@ -21,6 +21,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.87.1
+
+- Undo now checks more build rules before putting something back (around the metro station and sky lobbies), and never takes away a ground-floor lobby that newer floors or basement hang from.
+- When Undo can't take something back, it now says if the tower around it has changed since, and suggests selling it only when all of it can be sold without leaving anything hanging.
+
 ## 2.87.0
 
 - A lobby built where there is no floor yet also pays for that floor ($500 per tile), as in the original. Turning a floor into a lobby costs the lobby's price alone; the Lobby card shows both.

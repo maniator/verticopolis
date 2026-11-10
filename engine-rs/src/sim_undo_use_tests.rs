@@ -105,6 +105,9 @@ fn a_classic_room_that_stays_for_good_is_undone_only_before_it_opens() {
     until_open(&mut sim, Kind::Security);
     refused(&mut sim, &step, StepRefused::Opened { sellable: false });
     assert!(sim.tower.get_unit(id).is_some(), "it stays for good");
+    // Unless a fire guts it: the shell can be cleared.
+    sim.tower.get_unit_mut(id).unwrap().state = UnitState::Gutted;
+    refused(&mut sim, &step, StepRefused::InUse { sellable: true });
 }
 
 #[test]

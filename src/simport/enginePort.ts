@@ -246,16 +246,27 @@ export interface EnginePortLifecycle {
    *  inside its own gesture before the gesture sold it, it would undo a dig
    *  that searched for treasure, reprice a condo that has sold, or sell
    *  again a room whose tenants changed, or something stands in its way (a
-   *  room or shaft in the place of one it would put back, no floor under
-   *  it, a lobby on its floor or the metro above it, a cap that is full, or
-   *  a room, a shaft, the story above or a basement hanging from nothing
-   *  else on a floor or lobby tile it would take out), or it meets a tower
-   *  it does not expect (a unit or shaft it would take out or restore gone
-   *  or changed, or one it would put back already there). Only an edit
-   *  clears what stands in the way, and undoing that edit puts it back. A
-   *  gesture under way is committed first. A done step on the Rust engine
-   *  raises the tower revision above earlier values; the renderer retains
-   *  its scene after such a step and detects the change by that revision.
+   *  room or shaft in the place of one it would put back, no floor under it
+   *  or no story under a floor or lobby tile above the ground floor, a room
+   *  on a sky lobby floor that keeps a lobby or a lobby on one that keeps a
+   *  room, a room on the metro's row or below it, a tile below that row, a
+   *  station it would put back over a tile below its row or onto a room on
+   *  it, a cap that is full, a room on a floor or lobby tile it would take
+   *  out or, from the ground floor up, the story above one, a shaft left
+   *  with no floor on a story it spans, or ground-floor or basement tiles
+   *  cut off from the oldest ground-floor tile of the part they stood in (in
+   *  play the tower's first lobby tile, unless a sale parted the ground
+   *  floor) once the ground-floor lobby tiles it would take out, and the
+   *  tiles there it takes with them, are gone, unless each such run was all
+   *  there before those lobby tiles or is the one run with a lobby tile that
+   *  stands on its own, where no older ground-floor tile of that part stays
+   *  or comes back with the step outside it), or it meets a tower it does
+   *  not expect (a unit or shaft it would take out or restore gone or
+   *  changed, or one it would put back already there). Only an edit clears
+   *  what stands in the way, and undoing that edit puts it back. A gesture
+   *  under way is committed first. A done step on the Rust engine raises the
+   *  tower revision above earlier values; the renderer retains its scene
+   *  after such a step and detects the change by that revision.
    *  The test-only TypeScript reference rebuilds a Simulation and resets its
    *  revision, so the host uses a full redraw if the revision did not advance. */
   undo(): PortRecord;

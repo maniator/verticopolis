@@ -110,13 +110,10 @@ impl Tower {
         };
         debug_assert!(at.last().is_some_and(|&(idx, _)| idx < self.units.len()));
         // The journal counts each index as one left after the removals it
-        // already knows of. The whole batch is still in the list, so it goes
-        // to the journal last index first: taking a later unit out never
-        // moves an earlier one.
+        // already knows of, and the whole batch is still in the list. It
+        // goes last index first, the order the journal has always noted.
         if let Some(j) = self.journal.as_mut() {
-            for &(idx, _) in at.iter().rev() {
-                j.unit_out(idx, &self.units[idx]);
-            }
+            j.units_out(at.iter().rev().map(|&(idx, _)| (idx, &self.units[idx])));
         }
         let (mut i, mut next) = (first, 0);
         let taken: Vec<Unit> = self

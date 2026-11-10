@@ -302,6 +302,13 @@ fn tiles_taken_on_several_floors_are_found_under_a_shaft() {
         let mut sim = tower();
         // The shaft's last column keeps its tiles when `kept`.
         let to = if kept { last } else { 85 };
+        if kept {
+            // The kept column's stories go in after the gesture, and hang
+            // from this basement, which runs on from under the old lobby.
+            for x in 69..85 {
+                assert!(sim.tower.place(Kind::Floor, 0, x).ok);
+            }
+        }
         let ground = gesture(&mut sim, |s| stories(s, 75..to)).unwrap();
         if kept {
             stories(&mut sim, last..85);
@@ -326,6 +333,8 @@ fn a_floor_tile_is_never_put_back_over_nothing() {
     refused(&mut sim, &redo, StepRefused::Blocked);
 }
 
+/// A room and a sky lobby share no floor: a room goes back only where no
+/// lobby stays, and a lobby the same step takes the room from goes back.
 #[test]
 fn a_room_is_never_put_back_on_a_floor_that_holds_a_lobby() {
     let mut sim = tower();
@@ -352,8 +361,13 @@ fn a_room_is_never_put_back_on_a_floor_that_holds_a_lobby() {
         assert!(s.build(Kind::Lobby, 15, 30).ok);
     })
     .unwrap();
-    sim.apply_undo_step(&step).unwrap();
+    let redo = sim.apply_undo_step(&step).unwrap();
     assert!(sim.tower.get_unit(id).is_some());
+    // And a room the same step takes out leaves it free for the lobby.
+    sim.apply_undo_step(&redo)
+        .expect("the redo sells the office and lays the lobby again");
+    assert!(sim.tower.get_unit(id).is_none());
+    assert_eq!(sim.tower.unit_at(15, 30).unwrap().kind, Kind::Lobby);
 }
 
 #[test]
@@ -453,4 +467,12 @@ fn the_column_search_answers_as_a_walk_over_the_taken_tiles() {
             }
         }
     }
+    // A span that runs backward finds no tiles, where a slice would panic:
+    // its column holds taken tiles between its ends, which the span the
+    // right way round finds.
+    assert!(taken.contains(&(2, 80)) && taken.contains(&(3, 80)));
+    (t.x, t.bottom, t.top) = (80, 1, 4);
+    assert!(!ground.still_under_shaft(&t));
+    (t.x, t.bottom, t.top) = (80, 4, 1);
+    assert!(ground.still_under_shaft(&t));
 }

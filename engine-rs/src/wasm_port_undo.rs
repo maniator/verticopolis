@@ -208,7 +208,7 @@ pub(crate) fn refusal(why: StepRefused, verb: &str) -> String {
         StepRefused::PriceFixed => format!("Can't {verb} that: a sold condo keeps its price."),
         StepRefused::UseChanged => format!("Can't {verb} that: the room has changed since."),
         StepRefused::Blocked => {
-            format!("Can't {verb} that: something in the tower stands in the way.")
+            format!("Can't {verb} that: the tower around it has changed since.")
         }
         StepRefused::Stale => format!("Can't {verb} that: the tower has changed since."),
     }
