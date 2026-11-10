@@ -11,8 +11,8 @@ use super::write_cases_tests::{MORE_WRITES, WRITES};
 use crate::frame::unit_fields;
 use crate::tower::{Extras, Unit};
 
-/// The frame fields and the census share read no field but the six the
-/// setters mark and the kind, which no engine code writes in place
+/// The frame fields, the census share and `is_operational` read no field but
+/// the six the setters mark and the kind, which no engine code writes in place
 /// (`no_engine_code_writes_a_kind`). Every other field is bound by name and
 /// changed from its own value through its binding, so a new `Unit` field
 /// fails to compile here until it is named, and an unused binding fails
@@ -76,6 +76,9 @@ fn the_frame_and_the_census_read_only_marked_fields() {
         let bits = |u: &Unit| unit_fields(u).map(f64::to_bits);
         assert_eq!(bits(&v), bits(u), "unit {}", u.id);
         assert_eq!(v.census_share(), u.census_share(), "unit {}", u.id);
+        // The census tally counts a working recycling center by its kind and
+        // this predicate, so it must read marked fields only too.
+        assert_eq!(v.is_operational(), u.is_operational(), "unit {}", u.id);
     }
     // The pattern names every field, with no `..`; the ones it leaves
     // unchanged (`_`) are exactly the marked ones and the kind; and every
@@ -108,7 +111,7 @@ fn the_frame_and_the_census_read_only_marked_fields() {
 }
 
 /// The fields the setters in `view/marks.rs` write.
-const FIELDS: [&str; 6] = [
+pub(super) const FIELDS: [&str; 6] = [
     "state",
     "occupants",
     "customers_in",

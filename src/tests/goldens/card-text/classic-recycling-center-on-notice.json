@@ -1,0 +1,10 @@
+{
+  "case": "recycling center on notice",
+  "mode": "classic",
+  "units": [
+    {"id":802,"kind":"recycling","floor":-1,"lines":["Fill: 0%. Truck collects each morning.","Capacity: 0/2,500 population; demand met.","Giving notice: rent set too high. Leaves in under 10 hour(s).","Fix the cause and get satisfaction to 40% to keep them (now 25%)."]}
+  ],
+  "transports": [
+    {"id":801,"kind":"elevatorStandard","lines":[]}
+  ]
+}

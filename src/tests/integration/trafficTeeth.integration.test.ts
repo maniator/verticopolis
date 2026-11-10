@@ -22,8 +22,8 @@ function layStrip(sim: Simulation, kind: "floor" | "lobby", floor: number): void
  * is uncapped now (#503), so a too-long stair climb is what strands it. A shop
  * sits on floor 40. Narrow, tick-cheap footprint.
  */
-function strandedShopTower(seed: number): { draft: Simulation; shopId: number } {
-  const sim = Simulation.newGame(seed);
+function strandedShopTower(seed: number, mode: "classic" | "modern" = "classic"): { draft: Simulation; shopId: number } {
+  const sim = Simulation.newGame(seed, mode);
   sim.money = 1e12;
   layStrip(sim, "lobby", 1);
   for (let f = 2; f <= 45; f++) layStrip(sim, "floor", f);
@@ -70,6 +70,14 @@ describeEngines("Reachability teeth: stranded commercial earns no visitor income
     for (let d = 0; d < 4; d++) sim.tick(DAY);
     expect(retailAverage(sim)).toBeGreaterThan(strandedRetail);
   }, 60000);
+
+  it("strands the shop only under Classic's climb limit; Modern reaches it up the same stairs", () => {
+    for (const mode of ["classic", "modern"] as const) {
+      const { draft, shopId } = strandedShopTower(21, mode);
+      const card = new PortSim(leg, draft).unitCard(shopId);
+      expect([card.served, card.reachable], mode).toEqual([1, mode === "modern" ? 1 : 0]);
+    }
+  });
 
   it("a stranded shop earns strictly less than the identical shop made reachable", () => {
     // Same seed ⇒ same everything except reachability, isolating the teeth.
