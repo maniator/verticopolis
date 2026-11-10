@@ -435,7 +435,7 @@ TypeScript tooling, `src/tests/portKit/tsTooling.ts`, and #1809 the two
 golden referees), and `src/tests/portKit/converted.txt` lists 19 suites
 already on the port kit. The hosted WASM projects also leave out the test files that run
 each engine themselves or never touch the engine: `wasmParityProjects` leaves
-33 of them out of its `integrationWasm` project, by patterns in `vite.config.ts` with
+34 of them out of its `integrationWasm` project, by patterns in `vite.config.ts` with
 comments that give the reasons, and its `unitWasm` project leaves
 out 4 unit test files of its own, with the reason beside them; the guard
 holds the counts to the projects and test files Vitest resolves. The card-text sweep is one of the files the hosted projects leave out,
