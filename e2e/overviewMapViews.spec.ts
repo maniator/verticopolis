@@ -220,7 +220,7 @@ test.describe("map view tabs on a phone", () => {
         tabs: [...document.querySelectorAll("#overview-map [role=tab]")].map((el) => el.getBoundingClientRect().toJSON()),
         body: document.querySelector("#overview-map .overview-map-body")!.getBoundingClientRect().toJSON(),
         map: document.getElementById("overview-map")!.getBoundingClientRect().height,
-        half: document.getElementById("stage")!.getBoundingClientRect().height / 2,
+        stageHeight: document.getElementById("stage")!.getBoundingClientRect().height,
       }));
       const at = `${size.width}x${size.height}`;
       expect(got.tabs, at).toHaveLength(4);
@@ -231,7 +231,9 @@ test.describe("map view tabs on a phone", () => {
         expect(b.height, at).toBeLessThan(34);
         expect(b.width, at).toBeGreaterThanOrEqual(24);
       }
-      expect(got.map, at).toBeLessThanOrEqual(got.half + 1);
+      // The landscape Map keeps its S5 two-thirds allowance; upright it stays within half the view.
+      const maxHeight = size.width > size.height ? got.stageHeight * 0.66 : got.stageHeight / 2;
+      expect(got.map, at).toBeLessThanOrEqual(maxHeight + 1);
       // Upright, the map body keeps its full 150 by 216 card.
       if (size.height > size.width) expect(got.body.height, at).toBeGreaterThanOrEqual(214);
     }
