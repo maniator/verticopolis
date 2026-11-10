@@ -68,14 +68,14 @@ A change to any of the five lock files (`catalog-digests.json`,
 `events/catalog.json`, `expected.json`, `loader-cases.json`, `tdt-cases.json`)
 also moves the engine crate version, and the steps do not stop at the lock:
 
-1. Bump `version` in `engine-rs/Cargo.toml`, then `engine-rs/Cargo.lock` and
-   `engine-rs/consumer/Cargo.lock` to match (a patch bump for a lock change on
-   its own, while the crate is 0.x).
+1. Set `crate:` in the PR's `.changes` note (a patch level for a lock change on
+   its own) and add an Engine line saying what moved.
 2. Run `npm run engine:compat` to rewrite `engine-rs/src/compat-record.json`.
-3. Commit the lock, the version files and the record together.
+3. Commit the lock, the note and the record together.
 
-Without them `engine-rs` and `test` fail on the record, and `consumer` fails on
-its `--locked` build. The rule is in `CONTRIBUTING.md` under Versioning.
+Without them `test` fails on the record and on the version check. The release
+PR raises the version in `engine-rs/Cargo.toml` and both `Cargo.lock` files.
+The rule is in `CONTRIBUTING.md` under Versioning.
 
 A refactor that claims to change nothing must not touch `expected.json`.
 

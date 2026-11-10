@@ -9,6 +9,9 @@
 #   exit 1  -> BUILD  (something that affects the deployed app changed)
 #   exit 0  -> SKIP   (nothing that reaches the deployed app changed)
 #
+# A production deploy is also held (skipped) while a pending change note in
+# .changes/ asks for an app or crate release; see held_notes below.
+#
 # A deploy is skipped when every changed file is one that never reaches the
 # deployed app, its WASM engine package or the build checks that gate them.
 # This is a denylist on purpose: a path nobody listed builds, so a forgotten
@@ -20,7 +23,8 @@
 #   - unit and integration test files, and src/tests
 #   - the engine's Rust tests and consumer crate, and its markdown
 #   - the conformance suite, except the files the engine crate compiles in
-#   - standalone dev scripts (screenshots, perf, fuzz, PostHog, rollback)
+#   - standalone dev scripts (screenshots, perf, fuzz, PostHog, rollback,
+#     release and version check)
 #
 # What always builds, so do not add it above:
 #   - .gitattributes: it sets line endings and the binary list for Vercel's own
@@ -31,6 +35,8 @@
 #   - the conformance lock files (catalog-digests, events/, expected,
 #     loader-cases, tdt-cases): the engine crate includes some with
 #     include_str!, and src/build/engineCompat.ts digests all five
+#   - .changes/: the release PR deletes the notes, and the production deploy
+#     that lifts the hold must see that diff and build
 #   - everything else, including api/, scripts the build runs, package files
 #     and configs
 #
@@ -75,6 +81,7 @@ affects_deploy() {
     scripts/screenshot* | scripts/scenes/*) return 1 ;;
     scripts/perf-* | scripts/fuzz-* | scripts/posthog-* | scripts/rollback-*) return 1 ;;
     scripts/test-port.ts | scripts/derive-fixture.ts | scripts/loader-case-dump.ts) return 1 ;;
+    scripts/release.ts | scripts/version-check.ts) return 1 ;;
     scripts/engine-bundle-size.ts | scripts/engine-compat.ts | scripts/export-atlas.ts | scripts/atlas-bundle.ts) return 1 ;;
     scripts/persistence-failures.* | scripts/reliability-coverage.* | scripts/engine-reliability.* | scripts/backlog-priority-labels.*) return 1 ;;
   esac
@@ -89,6 +96,38 @@ if [ "${1:-}" = "--classify" ]; then
     if affects_deploy "$path"; then echo "build $path"; else echo "skip $path"; fi
   done
   exit 0
+fi
+
+# The pending change notes whose app or crate level is not `none`, one path per
+# line. A merged feature PR leaves its note in .changes/ (src/build/changeNotes.ts)
+# and the release PR raises the versions and deletes the notes. Until then a
+# production build would ship the new behavior under the old version and the old
+# "What's new" notes, and report the old crate version beside a new lock, so
+# production waits for the release PR. Previews still build.
+held_notes() {
+  local note
+  for note in .changes/*.md; do
+    [ -f "$note" ] || continue
+    [ "${note##*/}" = README.md ] && continue
+    # Reads the front matter the way parseNote does: each line trimmed, and
+    # a "# ..." comment dropped.
+    awk '{ sub(/\r$/, "") }
+      NR == 1 && $0 != "---" { exit }
+      NR > 1 && $0 == "---" { exit }
+      { v = $0; sub(/[ \t]*#.*$/, "", v); sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v) }
+      v ~ /^(app|crate):/ {
+        sub(/^[a-z]+:[ \t]*/, "", v)
+        if (v != "none") { print FILENAME; exit }
+      }' "$note"
+  done
+}
+
+if [ "${VERCEL_ENV:-}" = "production" ]; then
+  held="$(held_notes)"
+  if [ -n "$held" ]; then
+    echo "vercel-ignore-build: holding production until the release PR; pending notes ask for a release: $(printf '%s' "$held" | tr '\n' ' ')"
+    exit 0
+  fi
 fi
 
 # Fetches one commit and its trees (no file contents) from the GitHub repo

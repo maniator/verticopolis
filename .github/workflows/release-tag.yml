@@ -1,0 +1,188 @@
+name: Release tags
+
+# Tags each release when its release PR merges (CONTRIBUTING.md "Change notes
+# and the release PR"), so every app and crate version gets a GitHub release
+# without a maintainer pushing a tag:
+#
+# - an app version change in package.json tags v<version> on the merge commit
+#   and dispatches atlas-release.yml for it, which publishes the release with
+#   the version's player notes and the sprite atlas. A tag created with the
+#   workflow token does not start a tag-push workflow, so this dispatches the
+#   run itself (a workflow_dispatch from the workflow token does run);
+# - a crate version change in engine-rs/Cargo.toml publishes engine-v<version>
+#   as its own release with that version's engine-rs/CHANGELOG.md section. It
+#   is never marked Latest, so the app release stays the repo's Latest. It
+#   carries the built WASM package (Node and browser builds) and its checksum,
+#   the same build goes to GitHub Packages as @<owner>/verticopolis-engine, and
+#   a frontend can depend on the crate at that tag through git. GitHub Packages
+#   has no Cargo registry; publishing to crates.io or npmjs is #893.
+#
+# A tag or release that already exists is left alone, so a re-run is safe.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# No concurrency group on purpose: GitHub keeps one pending run per group, so a
+# later push to main could replace a queued release merge's run, and that run
+# would never be tagged. Each run acts only on its own push's version change and
+# skips a tag or release that exists, so two runs at once cannot collide.
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read the versions before and after the push
+        id: versions
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          read_app() { node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version)'; }
+          read_crate() { awk '/^\[package\]/ { p = 1; next } /^\[/ { p = 0 } p && /^version *=/ { gsub(/.*= *"|".*/, ""); print; exit }'; }
+          echo "app=$(read_app < package.json)" >> "$GITHUB_OUTPUT"
+          echo "crate=$(read_crate < engine-rs/Cargo.toml)" >> "$GITHUB_OUTPUT"
+          # A new branch or a force-push has no usable "before"; tag nothing then.
+          if ! printf '%s' "$BEFORE" | grep -Eq '^[0-9a-f]{40}$' || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+            || ! git fetch --no-tags --quiet --depth=1 origin "$BEFORE"; then
+            echo "No previous main commit to compare with; tagging nothing."
+            echo "compare=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "compare=true" >> "$GITHUB_OUTPUT"
+          echo "app_was=$(git show "$BEFORE:package.json" | read_app)" >> "$GITHUB_OUTPUT"
+          echo "crate_was=$(git show "$BEFORE:engine-rs/Cargo.toml" | read_crate)" >> "$GITHUB_OUTPUT"
+
+      - name: Tag the app version and publish its release
+        if: ${{ steps.versions.outputs.compare == 'true' && steps.versions.outputs.app != steps.versions.outputs.app_was }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.versions.outputs.app }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then echo "::error::App version $VERSION is not a plain x.y.z."; exit 1; fi
+          tag="v$VERSION"
+          if gh api "repos/$GH_REPO/git/ref/tags/$tag" > /dev/null 2>&1; then
+            echo "$tag already exists; leaving it."
+          else
+            gh api "repos/$GH_REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" > /dev/null
+            echo "Tagged $tag at $GITHUB_SHA."
+          fi
+          gh workflow run atlas-release.yml --ref main -f tag="$tag"
+          echo "Dispatched the atlas release for $tag."
+
+      # The crate release carries the built WASM package. These steps run only
+      # for a crate version change, and the package usually comes from the
+      # cache the test runs already filled for this engine source.
+      - name: Use Node.js (from .nvmrc)
+        if: ${{ steps.versions.outputs.compare == 'true' && steps.versions.outputs.crate != steps.versions.outputs.crate_was }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        if: ${{ steps.versions.outputs.compare == 'true' && steps.versions.outputs.crate != steps.versions.outputs.crate_was }}
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+      - name: Engine WASM package
+        if: ${{ steps.versions.outputs.compare == 'true' && steps.versions.outputs.crate != steps.versions.outputs.crate_was }}
+        uses: ./.github/actions/engine-wasm
+
+      # The built package: engine-rs/pkg (Node) and src/public/engine
+      # (browser), with their third-party records, as a zip with a checksum
+      # for the release and as an npm package for GitHub Packages.
+      - name: Pack the engine
+        id: pack
+        if: ${{ steps.versions.outputs.compare == 'true' && steps.versions.outputs.crate != steps.versions.outputs.crate_was }}
+        env:
+          GH_REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          VERSION: ${{ steps.versions.outputs.crate }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then echo "::error::Crate version $VERSION is not a plain x.y.z."; exit 1; fi
+          mkdir -p npm/node npm/web
+          cp -R engine-rs/pkg/. npm/node/
+          cp -R src/public/engine/. npm/web/
+          zip="verticopolis-engine-wasm-$VERSION.zip"
+          (cd npm && zip -qr "../$zip" node web)
+          sha256sum "$zip" > "$zip.sha256"
+          scope="$(printf '%s' "$OWNER" | tr 'A-Z' 'a-z')"
+          SCOPE="$scope" node -e '
+            const e = process.env;
+            const pkg = {
+              name: `@${e.SCOPE}/verticopolis-engine`,
+              version: e.VERSION,
+              description: "The Verticopolis simulation engine as WebAssembly: node/ for Node, web/ for the browser.",
+              license: "MIT",
+              repository: { type: "git", url: `git+https://github.com/${e.GH_REPO}.git`, directory: "engine-rs" },
+              main: "node/verticopolis_engine.js",
+              files: ["node", "web"],
+              publishConfig: { registry: "https://npm.pkg.github.com" },
+            };
+            require("fs").writeFileSync("npm/package.json", JSON.stringify(pkg, null, 2) + "\n");'
+          echo "zip=$zip" >> "$GITHUB_OUTPUT"
+          echo "npm=@$scope/verticopolis-engine" >> "$GITHUB_OUTPUT"
+
+      - name: Tag the crate version and publish its release
+        if: ${{ steps.pack.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.versions.outputs.crate }}
+          ZIP: ${{ steps.pack.outputs.zip }}
+          NPM_NAME: ${{ steps.pack.outputs.npm }}
+        run: |
+          set -euo pipefail
+          tag="engine-v$VERSION"
+          # A published release is left alone; a draft from a failed run is redone.
+          if draft="$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [ "$draft" != "true" ]; then echo "$tag already has a release; leaving it."; exit 0; fi
+            gh release delete "$tag" --yes
+          fi
+          # The version's section of the engine changelog, heading excluded.
+          awk -v v="$VERSION" '/^## / { if (on) exit; if ($2 == v) { on = 1; next } } on' engine-rs/CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then echo "::error::engine-rs/CHANGELOG.md has no $VERSION section."; exit 1; fi
+          {
+            printf '\nDepend on the crate at this version with `verticopolis-engine = { git = "https://github.com/%s", tag = "%s" }`.\n' "$GH_REPO" "$tag"
+            printf '\n`%s` holds the built WASM package (`node/` for Node, `web/` for the browser) with its SHA-256 checksum beside it. The same build is `%s@%s` on GitHub Packages.\n' "$ZIP" "$NPM_NAME" "$VERSION"
+          } >> notes.md
+          # Attach while a draft, then publish, so a published release is never edited.
+          gh release create "$tag" --target "$GITHUB_SHA" --title "Engine crate $VERSION" --notes-file notes.md --latest=false --draft
+          gh release upload "$tag" "$ZIP" "$ZIP.sha256"
+          gh release edit "$tag" --draft=false --latest=false
+          echo "Published $tag with $ZIP."
+
+      # GitHub Packages has an npm registry but no Cargo one, so the crate
+      # itself ships through the git tag; this is the built WASM package.
+      # Installing from it needs a GitHub token, even for a public package.
+      - name: Publish the engine package to GitHub Packages
+        if: ${{ steps.pack.outcome == 'success' }}
+        working-directory: npm
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+          NPM_NAME: ${{ steps.pack.outputs.npm }}
+          VERSION: ${{ steps.versions.outputs.crate }}
+        run: |
+          set -euo pipefail
+          printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' > .npmrc
+          if npm view "$NPM_NAME@$VERSION" version --registry https://npm.pkg.github.com > /dev/null 2>&1; then
+            echo "$NPM_NAME@$VERSION is already published; leaving it."
+            exit 0
+          fi
+          npm publish --registry https://npm.pkg.github.com
+          echo "Published $NPM_NAME@$VERSION."

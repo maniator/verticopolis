@@ -217,6 +217,18 @@ jobs:
         env:
           VC_ALLOW_NO_ENGINE: "1"
 
+      # Versions move only in a release PR; a feature PR adds a .changes note
+      # instead (CONTRIBUTING.md "Versioning"). The checkout is the PR's merge
+      # commit, so its first parent is main as the PR would merge into it. It runs
+      # last and after a failed step too, so a missing note never hides a test result.
+      - name: Versions and change notes
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.changes.outputs.tests != 'false' }}
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git fetch --no-tags --quiet --depth=2 origin "$GITHUB_SHA"
+          node scripts/version-check.ts --base HEAD^1 --branch "$HEAD_REF"
+
   # The suites that need the Rust/WASM engine package, with the package
   # required (VC_REQUIRE_WASM=1), so a missing one fails instead of skipping.
   # Until #1421 these legs ran the unit and integration suites again with

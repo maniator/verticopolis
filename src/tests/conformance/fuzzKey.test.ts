@@ -141,6 +141,41 @@ describe("the differential's window key", () => {
     expect(keyOf(root)).toBe(base);
   });
 
+  it("leaves a crate release alone and still sees the rest of the manifest and lockfiles", () => {
+    const root = tree();
+    const manifest = (version: string, extra = "") =>
+      `[package]\nname = "verticopolis-engine"\nversion = "${version}"\nedition = "2021"\n\n[dependencies]\nserde = { version = "1" }\n${extra}`;
+    const lockfile = (version: string, dep = "1.0.0") =>
+      `[[package]]\nname = "serde"\nversion = "${dep}"\n\n[[package]]\nname = "verticopolis-engine"\nversion = "${version}"\n`;
+    const record = (version: string) => `{"crateVersion":"${version}","lockDigest":"abc"}\n`;
+    const release = (version: string) => {
+      edit(root, "engine-rs/Cargo.toml", manifest(version));
+      edit(root, "engine-rs/Cargo.lock", lockfile(version));
+      mkdirSync(join(root, "engine-rs/consumer"), { recursive: true });
+      edit(root, "engine-rs/consumer/Cargo.lock", lockfile(version));
+      edit(root, "engine-rs/src/compat-record.json", record(version));
+    };
+    release("1.22.0");
+    const base = keyOf(root);
+    // What `npm run release` writes for a crate bump: the three versions, the record and the changelog.
+    release("1.23.0");
+    edit(root, "engine-rs/CHANGELOG.md", "## 1.23.0\n\n- Changed.\n");
+    expect(keyOf(root)).toBe(base);
+    // Anything else in those files still moves it.
+    edit(root, "engine-rs/Cargo.toml", manifest("1.23.0").replace("2021", "2024"));
+    expect(keyOf(root)).not.toBe(base);
+    edit(root, "engine-rs/Cargo.toml", manifest("1.23.0", '[features]\nx = []\n'));
+    expect(keyOf(root)).not.toBe(base);
+    edit(root, "engine-rs/Cargo.toml", manifest("1.23.0"));
+    edit(root, "engine-rs/Cargo.lock", lockfile("1.23.0", "1.0.1"));
+    expect(keyOf(root)).not.toBe(base);
+    edit(root, "engine-rs/Cargo.lock", lockfile("1.23.0"));
+    edit(root, "engine-rs/consumer/Cargo.lock", lockfile("1.23.0", "1.0.1"));
+    expect(keyOf(root)).not.toBe(base);
+    edit(root, "engine-rs/consumer/Cargo.lock", lockfile("1.23.0"));
+    expect(keyOf(root)).toBe(base);
+  });
+
   it("follows every relative import form, skips prose that shows one, and fails closed on a missing file", () => {
     const root = tree();
     for (const f of ["a", "b", "c", "d", "e"]) writeFileSync(join(root, `src/tests/${f}.ts`), "export {};\n");
