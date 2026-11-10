@@ -311,7 +311,7 @@ describe("Space builds on release, never as the pan key", () => {
     expect(app.keyboard.commitCursor).not.toHaveBeenCalled();
   });
 
-  it("lifts the pressed look only from a native button, checkbox or radio, never from what the mouse holds", () => {
+  it("lifts the pressed look only from a native control Space presses, never from what the mouse holds", () => {
     makeApp();
     const panOver = (el: HTMLElement): ReturnType<typeof vi.fn> => {
       document.body.appendChild(el);
@@ -335,6 +335,10 @@ describe("Space builds on release, never as the pan key", () => {
     map.tabIndex = 0;
     map.setAttribute("role", "application");
     expect(panOver(map), "the Map keeps its drag").not.toHaveBeenCalled();
+    const item = document.createElement("div");
+    item.tabIndex = 0;
+    item.setAttribute("role", "button"); // a palette item, whose mouse press a blur would end
+    expect(panOver(item), "a palette item the mouse holds keeps its press").not.toHaveBeenCalled();
     // A text field clicked into while Space is held keeps its edit.
     const field = document.body.appendChild(document.createElement("input"));
     press(" ");

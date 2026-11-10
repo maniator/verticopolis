@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.86.1
+
+- Releasing a held Space no longer presses a button or toggles a checkbox that got focus while Space was down, such as the Map's button when a narrower window closes the Map.
+
 ## 2.86.0
 
 - Undo and Redo keep the tower scene in place instead of rebuilding it, so the view responds faster without a visual reset.

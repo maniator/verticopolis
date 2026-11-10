@@ -214,7 +214,7 @@ describe("commit / bulldoze", () => {
     setHistoryButtons({ el: { undo, redo: null } } as never, { undoDepths: () => Float64Array.of(0, 0) });
     expect([document.activeElement, undo.getAttribute("aria-disabled")], "gray and still focused").toEqual([undo, "true"]);
     press("Enter");
-    press(" ");
+    tap(" ");
     expect(app.keyboard.commitCursor).not.toHaveBeenCalled();
   });
 

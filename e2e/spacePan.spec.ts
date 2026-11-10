@@ -169,6 +169,37 @@ for (const type of ["checkbox", "radio"] as const) {
   });
 }
 
+for (const control of ["button", "checkbox"] as const) {
+  test(`a ${control} that a script focuses while Space is held is not pressed by its repeats or release`, async ({ page }) => {
+    await boot(page);
+    await page.click('.pal-item[data-kind="lobby"]');
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press("ArrowUp"); // reveal the cursor
+    await page.keyboard.press("ArrowDown"); // back to the ground floor
+    await page.evaluate((kind) => {
+      const el = kind === "button" ? document.createElement("button") : Object.assign(document.createElement("input"), { type: "checkbox" });
+      el.id = "space-focus-control";
+      (window as any).__controlClicks = 0;
+      el.addEventListener("click", () => (window as any).__controlClicks++);
+      document.body.appendChild(el);
+    }, control);
+    await page.keyboard.down("Space");
+    // Focus moves mid-press with no key or pointer press, as when a narrower
+    // window closes the Map and the Map gives its button focus.
+    await page.evaluate(() => document.getElementById("space-focus-control")!.focus());
+    for (let i = 0; i < 3; i++) await page.keyboard.down("Space");
+    await page.keyboard.up("Space");
+    await settle(page);
+    await page.waitForTimeout(300); // a late build would land well within this
+    expect(await page.evaluate(() => (window as any).__controlClicks), `the ${control} was not pressed`).toBe(0);
+    if (control === "checkbox") expect(await page.locator("#space-focus-control").isChecked(), "the checkbox kept its state").toBe(false);
+    // The focus rule returns before the build, and without it blocksGameKey
+    // (its focused-control or typing-target rule) would keep the build out.
+    // This check fails only if both break.
+    expect((await snapshot(page)).units, "the release built nothing").toBe(0);
+  });
+}
+
 test("a wheel over the world during a Space hold makes it a pan; one over the palette leaves the tap", async ({ page }) => {
   await boot(page);
   await page.click('.pal-item[data-kind="lobby"]');
