@@ -35,7 +35,7 @@ export const INSTANCE_METHODS = [
   "setSchedule", "setStop", "setExpressStops", "clearStops", "resizeTransport", "removeUnit",
   "removeTransport", "setLabel", "setTowerName", "setView", "setAutoBridge", "emit", "startFire",
   "fires", "bombThreat", "evaluateStar", "setClock", "setUnitState", "setCustomersIn", "setWeather",
-  "clearRetailTallies", "startFireAt",
+  "clearRetailTallies", "startFireAt", "vacateUnit", "setUnitRent",
   "callExterminator", "autoBridge", "toggleAutoBridge", "setFilmPolicy", "rerollSubtype", "applyRentBatch",
   "pendingChoice", "resolveChoice", "tick",
   "serialize", "stateView", "crowdView", "stateDigest", "crowdDigest", "frameView", "logSince",

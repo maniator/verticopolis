@@ -376,7 +376,7 @@ included. One row per rule the game's comparison dialog
 
 | Rule (Modern, against Classic) | Class | Evidence |
 | --- | --- | --- |
-| Variant households set a condo's price and size | proven same | `src/tests/integration/condoModes.integration.test.ts` (on the Rust engine but for its marked tests, section 7), the `amenities-modern` and `player-edits-*` scenarios |
+| Variant households set a condo's price and size | proven same | `src/tests/integration/condoModes.integration.test.ts` (on the Rust engine), `src/tests/integration/condoModesEngine.integration.test.ts` (the prices written mid-run, on both engines), the `amenities-modern` and `player-edits-*` scenarios |
 | Households move out on their own | proven same | `src/tests/integration/condoRelocationEngine.integration.test.ts` (`describeEngines`): the Modern move-out and buy-back, Classic over thirty years, the RNG draw, the same month from the same seed, and the notice that does not rescind |
 | Overhead, the unsold-condo tax, noise and shop-access notices | proven same | the Modern scenarios' checkpoints, `src/tests/integration/conformanceWasmDiagnostics.integration.test.ts` (the notice reasons) |
 | A rent slider against Classic's four rungs and No Rate | proven same | `src/tests/integration/batchPricing.integration.test.ts` (`describeEngines`), the `player-edits-*` scenarios |
@@ -393,8 +393,8 @@ included. One row per rule the game's comparison dialog
 
 ## 7. Test exclusions
 
-On this commit `src/tests/parity/exclusions.ratchet.txt` holds 8
-`itTypeScriptOnly` marks in 5 files and 9 `atEngineFrameCadence` calls in 4
+On this commit `src/tests/parity/exclusions.ratchet.txt` holds 5
+`itTypeScriptOnly` marks in 3 files and 9 `atEngineFrameCadence` calls in 4
 files, with no `onWasmParityProject` branches;
 `src/tests/parity/exclusions.guard.test.ts` pins each count to the source in
 both directions, and the test-mapping table in
@@ -404,34 +404,35 @@ run on Rust at the host's own cadence and are a cost exemption. No mark is
 left that a save edit before the first tick would convert (`storage`
 converted its five that way in #1779, the meal-rush routing tests moved
 to the port kit in #1792, and the venue-capacity round trips in #1795). The
-ratchet's marks fall in two groups, which the
-test-conversion lane takes in this order under #878:
+ratchet's marks fell in two groups, which the test-conversion lane took in
+this order under #878:
 
-- **3 tests** need a write or a reading no command or save carries (a
-  vacate or rent write, a direct drive of the event system, or a
-  never-loaded tower's default): `roomCounts`, `condoModes`. #1792 added the clock and unit-state writes to the port kit
-  (`setClock`, `setUnitState`), #1795 the customer write (`setCustomersIn`)
-  and #1805 the weather and retail-tally writes (`setWeather`,
-  `clearRetailTallies`), so a test that only needs one of those can convert
-  with it, as three attendance tests did in #1797, the understaffed late
-  checkout in #1800, and the rain and retail-tally tests in #1805; the
-  others need one more tooling-only engine member each.
+- **0 tests** are left that need a write or a reading no command or save
+  carries. #1792 added the clock and unit-state writes to the port kit
+  (`setClock`, `setUnitState`), #1795 the customer write (`setCustomersIn`),
+  #1805 the weather and retail-tally writes (`setWeather`,
+  `clearRetailTallies`), and the engine's tooling-only `vacateUnit` and
+  `setUnitRent` moved the room-count walk and the two Classic condo price
+  tests onto both engines
+  (`src/tests/integration/roomCountsEngine.integration.test.ts`,
+  `src/tests/integration/condoModesEngine.integration.test.ts`).
 - **5 tests** pin the retired `v1` sampled model or the TypeScript save hash
-  (`phase2`, `parity`, `goldenMaster`) and retire with the TypeScript engine.
-  `phase2`'s two test the `v1` model itself and `goldenMaster`'s two hash the
-  TypeScript serializer's bytes. The `parity` one wins TOWER in a built tower
-  with no transport, which only the sampled model keeps occupied; the
-  served, hourly-model win is `phase2`'s Step 5 test, which carries no mark. The tests that pinned `v1` for a rule the
-  game still runs moved onto the hourly model, on both engines: the FAQ
-  cinema booking and film-policy tests
+  (`phase2`, `parity`, `goldenMaster`) and retire with the TypeScript engine
+  (#1421). `phase2`'s two test the `v1` model itself and `goldenMaster`'s two
+  hash the TypeScript serializer's bytes. The `parity` one wins TOWER in a
+  built tower with no transport, which only the sampled model keeps
+  occupied; the served, hourly-model win is `phase2`'s Step 5 test, which
+  carries no mark. The tests that pinned `v1` for a rule the game still runs
+  moved onto the hourly model, on both engines: the FAQ cinema booking and
+  film-policy tests
   (`src/tests/integration/cinemaBookingEngine.integration.test.ts`), the
   Modern overhead, condo-tax and overhead-RNG tests
   (`src/tests/integration/overheadEngine.integration.test.ts`) and the condo
   relocation tests
   (`src/tests/integration/condoRelocationEngine.integration.test.ts`).
 
-`src/tests/tsEngineTests.ratchet.txt` lists 202 files that still drive the
-TypeScript engine directly (172 test files and 30 fixtures and helpers; the
+`src/tests/tsEngineTests.ratchet.txt` lists 201 files that still drive the
+TypeScript engine directly (171 test files and 30 fixtures and helpers; the
 list shrinks as tests convert and grows only with a reason the PR states, as
 when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/segmentRoutingMealRush.integration.test.ts`,
@@ -440,7 +441,7 @@ when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/hotelLateCheckoutEngine.integration.test.ts`, port kit
 suites that author their towers on a `Simulation`, #1805 the port kit's
 TypeScript tooling, `src/tests/portKit/tsTooling.ts`, and #1809 the two
-golden referees), and `src/tests/portKit/converted.txt` lists 22 suites
+golden referees), and `src/tests/portKit/converted.txt` lists 24 suites
 already on the port kit. The hosted WASM projects also leave out the test files that run
 each engine themselves or never touch the engine: `wasmParityProjects` leaves
 34 of them out of its `integrationWasm` project, by patterns in `vite.config.ts` with

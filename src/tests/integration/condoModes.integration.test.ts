@@ -3,7 +3,6 @@ import { Simulation } from "../../engine/Simulation";
 import { ECON, rentOf } from "../../engine/econConfig";
 import { FACILITIES, GRID, residentCount } from "../../engine/facilities";
 import type { GameMode, Unit } from "../../engine/types";
-import { itTypeScriptOnly } from "../parity/typescriptOnly";
 
 /**
  * Condo rule-sets: the Classic price/buy-back parity fixes (all towers) and the
@@ -27,8 +26,8 @@ const CLASSIC_ASKING = 150_000;
 /** A single, served condo on floor 2, finished and open for sale.
  *  Built through the command surface (`sim.build`), so the condo asks the
  *  ladder's Average rung on every engine; {@link placedCondo} is the
- *  `tower.place` shape for the unpriced default and the never-ticked
- *  load-clamp tests. `beforeOpening` runs while it is under construction. */
+ *  `tower.place` shape for the never-ticked load-clamp tests.
+ *  `beforeOpening` runs while it is under construction. */
 function servedCondo(sim: Simulation, beforeOpening?: (condo: Unit) => void): Unit {
   sim.money = 1e9;
   sim.star = 1; // no random fire/bomb events to perturb the run
@@ -194,21 +193,6 @@ describe("Buy-back on an evicted owner (Classic canon, all towers)", () => {
     expect(condo.everOccupied).toBe(false);
     expect(condo.residents).toBeUndefined();
     expect(sim.log.some((e) => /owner left .*bought it back for/.test(e.text))).toBe(true);
-  });
-
-  itTypeScriptOnly("writes condo.rent = 240_000 after the sale while the crowd is still empty, so the next tick re-hosts (minute 720 under VC_PARITY_TRACE) and that load snaps the off-ladder 240,000 onto the Classic ladder, so the buy-back charges the snapped $200,000")("re-lists a bought-back condo in the current band, dropping a legacy out-of-band price", () => {
-    const sim = Simulation.newGame(3, "classic");
-    const condo = servedCondo(sim);
-    tickUntil(sim, () => condo.everOccupied);
-    condo.rent = 240_000; // a legacy sold price above the current $200k max
-    sim.money = 1e9;
-    const before = sim.money;
-    for (const t of [...sim.tower.transports]) sim.tower.removeTransport(t.id);
-    expect(tickUntil(sim, () => !condo.everOccupied)).toBe(true);
-    // Buy-back still charged the historical price it sold for …
-    expect(before - sim.money).toBe(240_000);
-    // … but the returned-to-market asking price is clamped into the current band.
-    expect(rentOf(condo)).toBe(200_000);
   });
 
   it("mirrors the size-scaled price in Modern", () => {
@@ -412,16 +396,6 @@ describe("Save hardening at the trust boundary", () => {
     const reloaded = Simulation.deserialize(raw);
     const rc = reloaded.tower.units.find((u) => u.kind === "condo")!;
     expect(rc.residents).toBeUndefined(); // no stale household leaks into the census/UI
-  });
-
-  itTypeScriptOnly("asserts the unpriced band default of a tower.placed condo on a never-loaded tower; the host loads, and the load snaps it to the ladder")("stamps the asking price on sale so buy-back survives a later default change", () => {
-    const sim = Simulation.newGame(3, "classic");
-    const condo = placedCondo(sim);
-    expect(condo.rent).toBeUndefined(); // placed, so unpriced until the sale
-    tickUntil(sim, () => condo.everOccupied);
-    // The sale records its asking price on the unit, so rentOf no longer depends
-    // on the kind default (which a future build could move).
-    expect(condo.rent).toBe(ECON.rent.condo.default);
   });
 
   it("backfills a legacy sold condo's price to the pre-re-anchor default", () => {

@@ -279,3 +279,66 @@ fn start_fire_at_refuses_without_changing_anything() {
     assert!(e.start_fire_at(other as f64));
     assert_eq!(e.sim.events.fires_started, 2);
 }
+
+#[test]
+fn vacate_unit_empties_the_room_and_buys_back_a_sold_condo() {
+    let (mut e, office) = with_office();
+    assert!(e.set_unit_state(office as f64, "occupied", Some(6.0)));
+    assert!(e.vacate_unit(office as f64, "access"));
+    let unit = e.sim.tower.get_unit(office).unwrap();
+    assert_eq!((unit.state, unit.occupants), (UnitState::Empty, 0));
+    // A sold condo leaves through the buy-back, at its recorded price.
+    let r = e.sim.tower.place(Kind::Condo, 2, 180);
+    let condo = r.unit_id.unwrap();
+    assert!(e.set_unit_state(condo as f64, "occupied", None));
+    e.sim.tower.get_unit_mut(condo).unwrap().ever_occupied = true;
+    assert!(e.set_unit_rent(condo as f64, Some(150_000.0)));
+    let money = e.sim.money;
+    assert!(e.vacate_unit(condo as f64, "relocation"));
+    let unit = e.sim.tower.get_unit(condo).unwrap();
+    assert_eq!((unit.state, unit.ever_occupied), (UnitState::Empty, false));
+    assert!(e.sim.money < money, "the buy-back was charged");
+}
+
+#[test]
+fn vacate_unit_refuses_an_unknown_unit_or_cause() {
+    let (mut e, office) = with_office();
+    assert!(e.set_unit_state(office as f64, "occupied", Some(6.0)));
+    for (unit, reason) in [
+        (office as f64, "boredom"),
+        (office as f64, ""),
+        (9999.0, "access"),
+        (0.5, "access"),
+    ] {
+        assert!(!e.vacate_unit(unit, reason), "{unit} {reason}");
+        assert_eq!(
+            e.sim.tower.get_unit(office).unwrap().state,
+            UnitState::Occupied,
+            "{unit} {reason}"
+        );
+    }
+}
+
+#[test]
+fn set_unit_rent_writes_the_price_as_given_and_refuses_a_bad_one() {
+    let (mut e, office) = with_office();
+    // An off-ladder price stays as written, and null clears it.
+    assert!(e.set_unit_rent(office as f64, Some(12_345.0)));
+    assert_eq!(e.sim.tower.get_unit(office).unwrap().rent, Some(12_345.0));
+    assert!(e.set_unit_rent(office as f64, None));
+    assert_eq!(e.sim.tower.get_unit(office).unwrap().rent, None);
+    assert!(e.set_unit_rent(office as f64, Some(9_000.0)));
+    for (unit, rent) in [
+        (office as f64, Some(-1.0)),
+        (office as f64, Some(f64::NAN)),
+        (office as f64, Some(f64::INFINITY)),
+        (9999.0, Some(1.0)),
+    ] {
+        assert!(!e.set_unit_rent(unit, rent), "{unit} {rent:?}");
+        assert_eq!(
+            e.sim.tower.get_unit(office).unwrap().rent,
+            Some(9_000.0),
+            "{unit} {rent:?}"
+        );
+    }
+}

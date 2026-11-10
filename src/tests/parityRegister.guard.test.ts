@@ -211,11 +211,11 @@ describe("the parity register audit catches a stale register", () => {
     // The two groups name exactly the files that hold marks.
     expect(base.markedStems).toHaveLength(base.sevenCounts.markFiles);
     expect(problems({ markedStems: [...base.markedStems, "fooBar"] })).toContain("section 7: neither group names `fooBar`, which has TypeScript-only marks");
-    expect(problems({ markedStems: base.markedStems.filter((s) => s !== "roomCounts") })).toContain(
-      "section 7: a group names `roomCounts`, which has no TypeScript-only marks",
+    expect(problems({ markedStems: base.markedStems.filter((s) => s !== "phase2") })).toContain(
+      "section 7: a group names `phase2`, which has no TypeScript-only marks",
     );
     // A unit test on the ratchet with cadence calls only, and a CRLF register.
-    expect(problems({ register: base.register.replace("`roomCounts`", "`rentalCrowd`") })).toContain(
+    expect(problems({ register: base.register.replace("`phase2`", "`rentalCrowd`") })).toContain(
       "section 7: a group names `rentalCrowd`, which has no TypeScript-only marks",
     );
     expect(problems({ register: base.register.replace(/\n/g, "\r\n") }).filter((p) => p.includes("group"))).toEqual([]);

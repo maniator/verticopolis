@@ -152,7 +152,6 @@ src/tests/integration/reflowMigration.integration.test.ts Simulation
 src/tests/integration/relayedCommandRaw.integration.test.ts Simulation
 src/tests/integration/rentalNightclubGripe.integration.test.ts Simulation sim/gripe
 src/tests/integration/reviewFixes.integration.test.ts Clock EconomySystem Simulation Tower rng
-src/tests/integration/roomCounts.integration.test.ts Simulation tower/rooms
 src/tests/integration/saveMetadataLog.integration.test.ts Simulation
 src/tests/integration/segmentRouting.integration.test.ts Crowd Simulation Tower sim/gripe
 src/tests/integration/segmentRoutingMealRush.integration.test.ts Simulation # kit suite: authors its draft on a Simulation
