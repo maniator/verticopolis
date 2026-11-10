@@ -37,6 +37,10 @@ on:
   # it did. See the `changes` job for the exact path rules.
   pull_request:
     types: [opened, synchronize, reopened]
+  # The merge queue (test.yml says why) needs drift-gate to report. A queue run
+  # does not render: the pull request's own run already checked the gallery on
+  # the same change, and the capture is the costliest job in CI.
+  merge_group:
 
 # One run per PR; a new push supersedes the previous run. This cancels THIS
 # workflow's own jobs (verify-drift, and a commit-on-approval still waiting at the
@@ -47,7 +51,7 @@ on:
 # expensive Playwright captures on a new push. The two groups are deliberately
 # distinct (`pr-drift-*` vs `screenshot-capture-*`) so they never deadlock.
 concurrency:
-  group: pr-drift-${{ github.event.pull_request.number }}
+  group: pr-drift-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 # Default read-only; the two downstream jobs request the narrow write they need.
@@ -92,10 +96,16 @@ jobs:
       # path filter.
       - id: filter
         env:
+          EVENT: ${{ github.event_name }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          if [ "$EVENT" = "merge_group" ]; then
+            echo "render=false" >> "$GITHUB_OUTPUT"
+            echo "A merge queue run: the pull request's own run checked the gallery; not rendering again."
+            exit 0
+          fi
           [ -n "$PR_NUMBER" ] || { echo "::error::missing PR number"; exit 1; }
           # Each line is "F <path>" for a changed file or "P <path>" for the old
           # path of a rename, so a file moved out of a render path still counts.
@@ -401,6 +411,7 @@ jobs:
       - name: Report the determinism and drift result
         env:
           CHANGES: ${{ needs.changes.result }}
+          EVENT: ${{ github.event_name }}
           RENDER: ${{ needs.changes.outputs.render }}
           CAPTURE: ${{ needs.capture.result }}
           VERIFY_DRIFT: ${{ needs.verify-drift.result }}
@@ -411,6 +422,10 @@ jobs:
           if [ "$CHANGES" != "success" ]; then
             echo "::error::the changes-detection job did not succeed ($CHANGES); cannot tell whether render paths changed, so failing closed rather than passing a possibly-unchecked PR."
             exit 1
+          fi
+          if [ "$EVENT" = "merge_group" ]; then
+            echo "A merge queue run: the pull request's own drift-gate checked the gallery. ✅"
+            exit 0
           fi
           if [ "$RENDER" != "true" ]; then
             echo "No render-affecting paths changed; the screenshot determinism check is not required for this PR. ✅"

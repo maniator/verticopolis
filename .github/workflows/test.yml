@@ -10,6 +10,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The merge queue tests each pull request on top of the latest main before it
+  # lands, so a merge cannot turn main red. These runs report the same required
+  # checks as the pull request run.
+  merge_group:
 
 # The default job (lint/typecheck/tests/build) needs no browser, and the e2e job
 # runs inside the pinned Playwright image whose Chromium is already bundled, so
@@ -50,25 +54,33 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          QUEUE_BASE: ${{ github.event.merge_group.base_sha }}
+          QUEUE_HEAD: ${{ github.event.merge_group.head_sha }}
         run: |
-          if [ "$EVENT" != "pull_request" ] || [ -z "$PR_NUMBER" ]; then
+          # Each line is "F <path>" for a changed file or "P <path>" for the old
+          # path of a rename, so a file moved out of a code path still counts.
+          # A pull request lists its own files; a merge queue entry lists what
+          # it adds to main (the compare API, which stops at 300 files).
+          list="$RUNNER_TEMP/changed-files"
+          if [ "$EVENT" = "pull_request" ] && [ -n "$PR_NUMBER" ]; then
+            limit=3000
+            listed() { gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --jq ".[] | $1"; }
+          elif [ "$EVENT" = "merge_group" ] && [ -n "$QUEUE_BASE" ] && [ -n "$QUEUE_HEAD" ]; then
+            limit=300
+            listed() { gh api "repos/$REPO/compare/$QUEUE_BASE...$QUEUE_HEAD" --jq ".files[]? | $1"; }
+          else
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "tests=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Each line is "F <path>" for a changed file or "P <path>" for the old
-          # path of a rename, so a file moved out of a code path still counts.
-          list="$RUNNER_TEMP/changed-files"
-          if ! gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" \
-            --jq '.[] | "F " + .filename, (if .previous_filename then "P " + .previous_filename else empty end)' \
-            > "$list"; then
+          if ! listed '"F " + .filename, (if .previous_filename then "P " + .previous_filename else empty end)' > "$list"; then
             echo "::warning::could not list the changed files; running every job"
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "tests=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # The API stops listing at 3000 files; a PR that large runs everything.
-          if [ "$(grep -c '^F ' "$list" || true)" -ge 3000 ]; then
+          # Past the API's listing limit, the change runs everything.
+          if [ "$(grep -c '^F ' "$list" || true)" -ge "$limit" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "tests=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -405,8 +417,10 @@ jobs:
     # Keep this job id/check name stable for required-check safety until branch
     # protection is explicitly migrated to a renamed status.
     needs: [changes, resolve-image, engine-wasm]
-    # As the e2e job: skipped only for a prose-only change.
-    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
+    # As the e2e job: skipped only for a prose-only change. It is not a
+    # required check, so a merge queue run skips it; the pull request's own run
+    # already ran it on the same change.
+    if: ${{ !cancelled() && github.event_name != 'merge_group' && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
