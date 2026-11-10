@@ -26,7 +26,11 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   This holds **even for small or test-only changes** that touch engine/gameplay
   invariants (e.g. build caps, transport pooling, economy math). Green quality
   gates are **not** a substitute for the review skill, and "the diff is tiny" is
-  not an exemption.
+  not an exemption. To save Claude tokens (owner, 2026-11-10), PR-Agent carries
+  the heavy pass: comment `/review` and `/improve` on the PR, then run the
+  skill's layers in one lean pass without a subagent per layer, and triage
+  PR-Agent's findings with the skill's own
+  ([`docs/ci/pr-agent.md`](./docs/ci/pr-agent.md) → "Heavy review on request").
 - **Hot paths get the complexity checklist,
   [`docs/performance/hot-path-review.md`](./docs/performance/hot-path-review.md),**
   in Rust, TypeScript, the WASM binding, the hosts, ticks, rendering and the

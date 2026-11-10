@@ -36,8 +36,11 @@ jobs:
       )
     # Job-level concurrency is evaluated only for an eligible command/PR.
     # Ordinary or unauthorized issue comments must never cancel a review.
+    # A push cancels the PR's older automatic review only. Each command
+    # comment gets its own group, so `/review` and `/improve` posted together
+    # both finish, and a later push never cancels a requested review.
     concurrency:
-      group: pr-agent-${{ github.event.pull_request.number || github.event.issue.number }}
+      group: pr-agent-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id || 'auto' }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
