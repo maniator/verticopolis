@@ -27,7 +27,7 @@
 @import "./styles/retro-tokens.css";
 @import "./styles/retro-components.css";
 @import "./styles/overview-map.css";
-@import "./styles/overview-map-tabs.css";
+@import "./styles/overview-map-views.css";
 
 /* ---- 2. BASE --------------------------------------------------------- */
 * {
@@ -614,24 +614,6 @@ html.reduce-motion *::after {
 }
 .mode-badge.is-classic {
   color: #5a3d00;
-}
-/* Stats-overlay picker: a labeled dropdown so every map mode is visible and
- *  directly selectable (no hidden cycle). */
-.overlay-picker {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--r-ink);
-}
-.overlay-picker > span {
-  white-space: nowrap;
-}
-.overlay-picker .field {
-  flex: 1;
-  padding: 3px 4px;
-  font-size: 12px;
 }
 #tower-stats {
   font-size: 12px;
@@ -2475,15 +2457,6 @@ body.splash-up #toast-wrap { z-index: 45; }
     height: min(216px, calc(66dvh - 70px));
     height: min(216px, calc(66cqh - 30px));
     aspect-ratio: 150 / 216;
-  }
-  /* With a Floor heatmap on, the card starts below the legend (82px down),
-     so it gets the rest of the view under the legend at most. */
-  body:has(#overlay-mode option:checked:not([value=""])) .overview-map {
-    max-height: calc(100% - 92px);
-  }
-  body:has(#overlay-mode option:checked:not([value=""])) .overview-map-body {
-    height: min(216px, calc(66dvh - 70px), calc(100dvh - 196px));
-    height: min(216px, calc(66cqh - 30px), calc(100cqh - 122px));
   }
 
   /* On a narrow sideways view (split screen, say) the stage can be thinner

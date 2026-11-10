@@ -1,5 +1,4 @@
 import * as ex from "excalibur";
-import type { HeatmapMode, HeatCell } from "../../engine/sim/constants";
 import type { FacilityKind, SerializedView } from "../../engine/types";
 import type { SimView, UnitView, TransportView } from "../../simport/view";
 import type { RenderSim } from "../renderSim";
@@ -24,11 +23,10 @@ import type { Walker } from "./towerCrowd";
 import type { ViewFocus, Picked, ScreenRect } from "./towerInputCamera";
 
 export { FLOOR, TILE };
-// The camera zoom range and heatmap palette live in their friend-modules now;
-// re-exported here so every existing consumer keeps importing them from this
-// file. The exported `ViewFocus`/`Picked` shapes and `heatColor` are unchanged.
+// The camera zoom range lives in its friend-module now; re-exported here so
+// every existing consumer keeps importing it from this file. The exported
+// `ViewFocus`/`Picked` shapes are unchanged.
 export { MIN_ZOOM, MAX_ZOOM } from "./towerInputCamera";
-export { HEATMAP_LABELS, HEATMAP_MODES, HEAT_STOPS, heatColor } from "./towerOverlay";
 export type { ViewFocus, Picked } from "./towerInputCamera";
 
 /**
@@ -195,21 +193,6 @@ export class TowerEngine {
   garageCars: { actor: ex.Actor; floor: number; x0w: number; x1w: number; seed: number }[] = [];
   walkers: Walker[] = [];
   crowdCulled = false; // zoom-cull latch: crowd per-frame work skipped (crowdCull.ts)
-  /** Active colored stats overlay (congestion / occupancy / satisfaction), or
-   *  null for off. Set from a UI toggle; drawn as a per-floor heatmap + legend. */
-  overlayMode: HeatmapMode | null = null;
-  /** Cached heatmap for the active overlay, refreshed on the hour, on a layout
-   *  change, or when the mode flips, never per frame (it scans the unit list).
-   *  @internal friend-module access (towerOverlay). */
-  heatmap: HeatCell[] = [];
-  heatmapHour = -1;
-  heatmapTowerRev = -1;
-  heatmapMealRev = -1;
-  heatmapMode: HeatmapMode | null = null;
-  /** The busiest floor's raw congestion ratio when the congestion overlay was
-   *  last (re)built, surfaced in the legend so an all-green map still reports
-   *  its headroom. 0 for the other overlays. Refreshed with the cache. */
-  heatmapPeakCongestion = 0;
   /** Garage/waste display fractions (parking-in-use, recycling-fill), computed
    *  once per syncScene (reusing sync's parking flood-fill), so they are as
    *  fresh as the sprites that consume them and never run per frame.

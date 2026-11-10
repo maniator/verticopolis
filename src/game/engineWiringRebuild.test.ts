@@ -35,7 +35,6 @@ function appUnderContextLoss() {
   const app = {
     engine: {
       viewState: () => ({ tile: 1, floor: 2, zoom: 1 }),
-      overlayMode: "none",
       dispose: vi.fn(),
       onContextLost: null,
       onContextRestored: null,

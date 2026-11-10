@@ -114,12 +114,11 @@ export function makeSky(engine: TowerEngine): void {
 export function makeOverlay(engine: TowerEngine): void {
   // cache:false is deliberate: this full-viewport screen layer changes every
   // frame, the ruler always draws, the build-preview ghost tracks the cursor,
-  // rain animates, and the stats heatmap's tints follow the camera (their
-  // screen coords come from worldToScreen). Nothing here is stable across
-  // frames, so a cached canvas would need a per-frame flagDirty() that
-  // re-rasterizes and re-uploads the whole texture regardless, equal cost to
-  // cache:false, plus extra plumbing and a staleness-bug risk. The *expensive*
-  // input (the per-hour heatmap scan) is cached separately in drawStatsMap.
+  // rain animates, and the event visuals follow the camera (their screen
+  // coords come from worldToScreen). Nothing here is stable across frames,
+  // so a cached canvas would need a per-frame flagDirty() that re-rasterizes
+  // and re-uploads the whole texture regardless, equal cost to cache:false,
+  // plus extra plumbing and a staleness-bug risk.
   engine.overlayCanvas = new ex.Canvas({
     width: engine.viewWidth,
     height: engine.viewHeight,

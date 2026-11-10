@@ -7,11 +7,13 @@ import { MAP_BAND_FLOORS } from "../src/render/overviewMap/extent";
 test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
- * The overview MAP window's view tabs and its Hotel, Eval and Pricing views
- * (#343 S6 and S8, #1617 to #1619) in the real browser: the tab row on a
- * desktop and a phone, the tab keys, each view's legend, the Hotel view
- * marking a room the engine turned dirty within a game hour with no tower
- * edit, and the Pricing view following a rent command at once.
+ * The overview MAP window's View dropdown and its Hotel, Eval, Pricing,
+ * Traffic and Occupancy views (#343 S6, S8 and S9, #1617 to #1619, #1727) in
+ * the real browser: the dropdown on a desktop and a phone, its keys, each
+ * view's legend, the Hotel view marking a room the engine turned dirty
+ * within a game hour with no tower edit, the Pricing view following a rent
+ * command at once, and the Traffic and Occupancy views counting the floors,
+ * with the sidebar's Floor heatmap and its main-view tint gone.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -117,7 +119,7 @@ async function nextFrames(page: Page): Promise<void> {
 }
 
 /** The open map at 768 by 600 and 1280 by 720 overlaps none of the sidebar,
- *  the palette, the Floor heatmap picker, the hint or the heatmap legend. */
+ *  the palette or the hint. */
 async function expectMapClear(page: Page): Promise<void> {
   for (const size of [
     { width: 768, height: 600 },
@@ -125,12 +127,11 @@ async function expectMapClear(page: Page): Promise<void> {
   ]) {
     await page.setViewportSize(size);
     await boot(page);
-    await expect(page.getByRole("tablist", { name: "Map views" })).toBeVisible();
+    await expect(picker(page)).toBeVisible();
     const overlapping = await page.evaluate(() => {
       const map = document.getElementById("overview-map")!.getBoundingClientRect();
-      const view = document.getElementById("view")!.getBoundingClientRect();
-      const others: Record<string, DOMRect> = { legend: new DOMRect(view.left + 12, view.top + 12, 150, 62) };
-      for (const id of ["sidebar", "palette", "overlay-mode", "hint"]) {
+      const others: Record<string, DOMRect> = {};
+      for (const id of ["sidebar", "palette", "hint"]) {
         const r = document.getElementById(id)?.getBoundingClientRect();
         if (r && r.width > 0 && r.height > 0) others[id] = r;
       }
@@ -141,97 +142,92 @@ async function expectMapClear(page: Page): Promise<void> {
   }
 }
 
-test.describe("map view tabs on the desktop", () => {
+/** The Map's View dropdown. */
+function picker(page: Page) {
+  return page.getByRole("combobox", { name: "View" });
+}
+
+/** The legend's counts, summed. */
+async function legendTotal(page: Page, view: string): Promise<number> {
+  const text = (await page.locator(`#overview-map .overview-map-legend[data-view="${view}"]`).textContent()) ?? "";
+  return (text.match(/\d+/g) ?? []).reduce((sum, n) => sum + Number(n), 0);
+}
+
+test.describe("the map's View dropdown on the desktop", () => {
   test.use({ viewport: DESKTOP });
 
-  test("sit in one row under the title bar, a real tab control", async ({ page }) => {
+  test("sits under the title bar, named View, listing the six views with Edit chosen", async ({ page }) => {
     await boot(page);
-    const list = page.getByRole("tablist", { name: "Map views" });
-    await expect(list).toBeVisible();
-    await expect(list.getByRole("tab")).toHaveText(["Edit", "Eval", "Pricing", "Hotel"]);
-    const edit = list.getByRole("tab", { name: "Edit" });
-    const hotel = list.getByRole("tab", { name: "Hotel" });
-    await expect(edit).toHaveAttribute("aria-selected", "true");
-    await expect(hotel).toHaveAttribute("aria-selected", "false");
+    const select = picker(page);
+    await expect(select).toBeVisible();
+    await expect(select.locator("option")).toHaveText(["Edit", "Eval", "Pricing", "Hotel", "Traffic", "Occupancy"]);
+    await expect(select).toHaveValue("edit");
     const layout = await page.evaluate(() => {
       const box = (el: Element | null) => el!.getBoundingClientRect();
-      const tabs = [...document.querySelectorAll("#overview-map [role=tab]")].map(box);
       return {
         title: box(document.querySelector("#overview-map .win-title")),
         body: box(document.querySelector("#overview-map .overview-map-body")),
-        tabs: tabs.map((r) => ({ top: r.top, bottom: r.bottom, left: r.left, right: r.right })),
+        select: box(document.getElementById("overview-map-picker")),
       };
     });
-    // One row: every tab on the same line, between the title bar and the body.
-    expect(layout.tabs).toHaveLength(4);
-    for (const [i, t] of layout.tabs.entries()) {
-      expect(t.top).toBe(layout.tabs[0].top);
-      expect(t.top).toBeGreaterThanOrEqual(layout.title.bottom);
-      expect(t.bottom).toBeLessThanOrEqual(layout.body.top);
-      if (i > 0) expect(t.left).toBeGreaterThan(layout.tabs[i - 1].right - 1);
-    }
-    // The panel is the map body, named by the selected tab.
-    const panel = page.getByRole("tabpanel");
-    await expect(panel).toHaveAttribute("aria-labelledby", (await edit.getAttribute("id"))!);
+    expect(layout.select.top).toBeGreaterThanOrEqual(layout.title.bottom);
+    expect(layout.select.bottom).toBeLessThanOrEqual(layout.body.top);
+    expect(layout.select.right).toBeLessThanOrEqual(layout.body.right + 1);
+    // The sidebar's Floor heatmap is gone: the Map has its views now.
+    await expect(page.locator("#overlay-mode")).toHaveCount(0);
   });
 
-  test("move with the arrow keys, keep the game's keys, and leave a focused map's keys alone", async ({ page }) => {
+  test("changes view from the keyboard, keeps the game's keys, and hands a focused map its keys back", async ({ page }) => {
     await boot(page);
     await page.evaluate(buildToStar, 2);
-    const edit = page.getByRole("tab", { name: "Edit" });
-    const hotel = page.getByRole("tab", { name: "Hotel" });
-    const evalTab = page.getByRole("tab", { name: "Eval" });
-    const legend = page.locator('#overview-map .overview-map-legend[data-view="hotel"]');
-    const evalLegend = page.locator('#overview-map .overview-map-legend[data-view="eval"]');
-    const pricingLegend = page.locator('#overview-map .overview-map-legend[data-view="pricing"]');
-    await edit.focus();
-    await page.keyboard.press("ArrowRight");
-    await expect(evalTab).toBeFocused();
-    await expect(evalTab).toHaveAttribute("aria-selected", "true");
+    const select = picker(page);
+    const legend = (view: string) => page.locator(`#overview-map .overview-map-legend[data-view="${view}"]`);
+    await select.focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(select).toHaveValue("eval");
     // Each view shows its own legend over the map.
-    await expect(evalLegend).toBeVisible();
-    await expect(legend).toBeHidden();
-    await page.keyboard.press("ArrowRight");
-    await expect(pricingLegend).toBeVisible();
-    await expect(evalLegend).toBeHidden();
+    await expect(legend("eval")).toBeVisible();
+    await expect(legend("hotel")).toBeHidden();
+    await page.keyboard.press("ArrowDown");
+    await expect(legend("pricing")).toBeVisible();
+    await expect(legend("eval")).toBeHidden();
     await page.keyboard.press("End");
-    await expect(hotel).toBeFocused();
-    await expect(hotel).toHaveAttribute("aria-selected", "true");
-    await expect(legend).toBeVisible();
-    await expect(pricingLegend).toBeHidden();
-    // The focus ring shows on a keyboard-focused tab.
-    expect(await hotel.evaluate((el) => getComputedStyle(el).outlineStyle)).not.toBe("none");
+    await expect(select).toHaveValue("occupancy");
+    await expect(legend("occupancy")).toBeVisible();
+    await expect(select).toBeFocused();
+    // The focus ring shows on the keyboard-focused dropdown.
+    expect(await select.evaluate((el) => getComputedStyle(el).outlineStyle)).not.toBe("none");
     await page.keyboard.press("Home");
-    await expect(edit).toBeFocused();
-    await expect(legend).toBeHidden();
+    await expect(select).toHaveValue("edit");
     await expect(page.locator("#overview-map .overview-map-legend:visible")).toHaveCount(0);
-    // A build key on a focused tab stays out of the world.
+    // A build key on the focused dropdown stays out of the world.
     const cursor = () => page.evaluate(() => (window as any).game.keyboard.cursor());
     await page.click('.pal-item[data-kind="office"]');
-    await edit.focus();
+    await select.focus();
     await page.keyboard.press("d");
     await nextFrames(page);
     expect(await cursor()).toBeNull();
-    // A click on a tab leaves a focused map focused, so its arrow keys still
-    // move the view.
+    // A choice made with a pointer gives focus back to a focused map, so its
+    // arrow keys still move the view.
     const map = page.locator("#overview-map .overview-map-view");
     await map.focus();
-    await hotel.click();
-    await expect(hotel).toHaveAttribute("aria-selected", "true");
+    await select.dispatchEvent("pointerdown");
+    await select.selectOption("hotel");
+    await expect(legend("hotel")).toBeVisible();
     await expect(map).toBeFocused();
     const before = await page.evaluate(() => (window as any).game.engine.viewState().floor);
     await page.keyboard.press("ArrowUp");
     await expect.poll(() => page.evaluate(() => (window as any).game.engine.viewState().floor)).toBeGreaterThan(before);
   });
 
-  test("with the tabs, the open map still clears the sidebar, the palette and the heatmap legend", async ({ page }) => {
+  test("with the dropdown, the open map still clears the sidebar, the palette and the hint", async ({ page }) => {
     await expectMapClear(page);
   });
 
   test("the Hotel view marks the rooms the engine turned dirty within a game hour", async ({ page }) => {
     await boot(page);
     await page.evaluate(foundHotelTower, HOTEL_ROOMS);
-    await page.getByRole("tab", { name: "Hotel" }).click();
+    await picker(page).selectOption("hotel");
     await nextFrames(page);
     const legend = page.locator('#overview-map .overview-map-legend[data-view="hotel"]');
     await expect(legend).toHaveText("Dirty: 0Infested: 0");
@@ -249,13 +245,14 @@ test.describe("map view tabs on the desktop", () => {
     await expect(legend).toHaveText(`Dirty: ${HOTEL_ROOMS}Infested: 0`);
     await expect.poll(() => redPixels(page)).toBeGreaterThan(HOTEL_ROOMS);
     // The Edit view draws no red rooms (the tower has no service elevator).
-    await page.getByRole("tab", { name: "Edit" }).click();
+    await picker(page).selectOption("edit");
     await expect.poll(() => redPixels(page)).toBe(0);
   });
+
   test("the Pricing view colors the rooms by the engine's rent tiers and follows a rent command at once", async ({ page }) => {
     await boot(page);
     await page.evaluate(foundHotelTower, HOTEL_ROOMS);
-    await page.getByRole("tab", { name: "Pricing" }).click();
+    await picker(page).selectOption("pricing");
     await nextFrames(page);
     const legend = page.locator('#overview-map .overview-map-legend[data-view="pricing"]');
     // Default prices read Average.
@@ -270,60 +267,70 @@ test.describe("map view tabs on the desktop", () => {
     });
     await expect(legend).toHaveText(`High: 1Average: ${HOTEL_ROOMS - 1}Low: 0Very Low: 0`);
     // The guests asleep in their rooms rate them on the Eval view.
-    await page.getByRole("tab", { name: "Eval" }).click();
+    await picker(page).selectOption("eval");
     const evalLegend = page.locator('#overview-map .overview-map-legend[data-view="eval"]');
     await expect(evalLegend).toBeVisible();
     await expect(evalLegend).toHaveText(/^Excellent: \d+Good: \d+Terrible: \d+$/);
-    const rated = (await evalLegend.textContent())!.match(/\d+/g)!.reduce((sum, n) => sum + Number(n), 0);
-    expect(rated).toBeGreaterThan(0);
+    expect(await legendTotal(page, "eval")).toBeGreaterThan(0);
+  });
+
+  test("the Traffic and Occupancy views count the floors from the engine's heat cells", async ({ page }) => {
+    await boot(page);
+    await page.evaluate(foundHotelTower, HOTEL_ROOMS);
+    await picker(page).selectOption("traffic");
+    await nextFrames(page);
+    const traffic = page.locator('#overview-map .overview-map-legend[data-view="traffic"]');
+    await expect(traffic).toHaveText(/^Clear: \d+Busy: \d+Jammed: \d+$/);
+    // The lobby and the hotel floor are built, so both get a band.
+    await expect.poll(() => legendTotal(page, "traffic")).toBe(2);
+    await picker(page).selectOption("occupancy");
+    const occupancy = page.locator('#overview-map .overview-map-legend[data-view="occupancy"]');
+    await expect(occupancy).toBeVisible();
+    await expect(traffic).toBeHidden();
+    // Every guest is in: the one floor with rooms reads mostly full.
+    await expect(occupancy).toHaveText("Mostly full: 1Half full: 0Mostly empty: 0");
   });
 });
 
-test.describe("map view tabs on a touch screen at desktop sizes", () => {
+test.describe("the map's View dropdown on a touch screen at desktop sizes", () => {
   test.use({ viewport: DESKTOP, hasTouch: true });
 
-  test("with a coarse pointer's taller tabs, the open map still clears the sidebar, the palette and the heatmap legend (#1769)", async ({ page }) => {
+  test("with a coarse pointer's taller dropdown, the open map still clears the sidebar, the palette and the hint (#1769)", async ({ page }) => {
     await boot(page);
     expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
     await expectMapClear(page);
   });
 });
 
-test.describe("map view tabs on a phone", () => {
+test.describe("the map's View dropdown on a phone", () => {
   test.use({ viewport: PHONE, isMobile: true, hasTouch: true });
 
-  test("are one slim row of tabs, so the map keeps its size, upright and on its side", async ({ page }) => {
+  test("is one slim dropdown, so the map keeps its size, upright and on its side", async ({ page }) => {
     for (const size of [PHONE, { width: PHONE.height, height: PHONE.width }]) {
       await page.setViewportSize(size);
       await boot(page);
       if (await page.locator("#overview-map").isHidden()) await page.locator("#btn-map").tap();
-      const list = page.getByRole("tablist", { name: "Map views" });
-      await expect(list).toBeVisible();
+      await expect(picker(page)).toBeVisible();
       const got = await page.evaluate(() => ({
-        tabs: [...document.querySelectorAll("#overview-map [role=tab]")].map((el) => el.getBoundingClientRect().toJSON()),
+        select: document.getElementById("overview-map-picker")!.getBoundingClientRect().toJSON(),
         body: document.querySelector("#overview-map .overview-map-body")!.getBoundingClientRect().toJSON(),
         map: document.getElementById("overview-map")!.getBoundingClientRect().height,
         stageHeight: document.getElementById("stage")!.getBoundingClientRect().height,
       }));
       const at = `${size.width}x${size.height}`;
-      expect(got.tabs, at).toHaveLength(4);
-      for (const b of got.tabs) {
-        // One row of targets past WCAG 2.5.8's 24 px minimum, and no taller.
-        expect(b.top, at).toBe(got.tabs[0].top);
-        expect(b.height, at).toBeGreaterThanOrEqual(28);
-        expect(b.height, at).toBeLessThan(34);
-        expect(b.width, at).toBeGreaterThanOrEqual(24);
-      }
+      // A target past WCAG 2.5.8's 24 px minimum, and no taller.
+      expect(got.select.height, at).toBeGreaterThanOrEqual(28);
+      expect(got.select.height, at).toBeLessThan(34);
+      expect(got.select.width, at).toBeGreaterThanOrEqual(24);
       // The landscape Map keeps its S5 two-thirds allowance; upright it stays within half the view.
       const maxHeight = size.width > size.height ? got.stageHeight * 0.66 : got.stageHeight / 2;
       expect(got.map, at).toBeLessThanOrEqual(maxHeight + 1);
       // Upright, the map body keeps its full 150 by 216 card.
       if (size.height > size.width) expect(got.body.height, at).toBeGreaterThanOrEqual(214);
-      // On its side, the body is far more than a strip under the tabs (#1769).
+      // On its side, the body is far more than a strip under the dropdown (#1769).
       else expect(got.body.height, at).toBeGreaterThanOrEqual(100);
     }
-    await page.getByRole("tab", { name: "Hotel" }).tap();
-    await expect(page.getByRole("tab", { name: "Hotel" })).toHaveAttribute("aria-selected", "true");
+    await picker(page).selectOption("hotel");
     await expect(page.locator('#overview-map .overview-map-legend[data-view="hotel"]')).toBeVisible();
   });
 
@@ -333,8 +340,8 @@ test.describe("map view tabs on a phone", () => {
       await boot(page);
       await page.evaluate(foundTallTower, TALL_FLOORS);
       if (await page.locator("#overview-map").isHidden()) await page.locator("#btn-map").tap();
-      for (const view of ["Eval", "Pricing", "Hotel"]) {
-        await page.getByRole("tab", { name: view }).tap();
+      for (const view of ["eval", "pricing", "hotel", "traffic", "occupancy"]) {
+        await picker(page).selectOption(view);
         await nextFrames(page);
         await nextFrames(page);
         expect(await legendOverTower(page), `${view} at ${size.width}x${size.height}`).toBeLessThanOrEqual(0.5);

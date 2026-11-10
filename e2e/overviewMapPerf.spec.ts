@@ -167,7 +167,7 @@ test("the Hotel view's hourly repaint on a large tower stays within its ceilings
   await page.evaluate(() => document.getElementById("splash")?.remove());
   expect(await page.evaluate(buildToStar, 5)).toBe(5);
   expect(await page.evaluate(addHotelRooms)).toBeGreaterThan(300);
-  await page.getByRole("tab", { name: "Hotel" }).click();
+  await page.locator("#overview-map-picker").selectOption("hotel");
 
   const result = await page.evaluate(() => {
     const win = (window as any).overviewMap;
@@ -244,7 +244,7 @@ test("the Pricing view's reads on a large tower stay within their ceilings", asy
   await page.evaluate(() => document.getElementById("splash")?.remove());
   expect(await page.evaluate(buildToStar, 5)).toBe(5);
   await page.evaluate(() => ((window as any).game.speed = 0));
-  await page.getByRole("tab", { name: "Pricing" }).click();
+  await page.locator("#overview-map-picker").selectOption("pricing");
 
   const result = await page.evaluate(() => {
     const win = (window as any).overviewMap;

@@ -113,8 +113,9 @@ export class OverviewMapWindow {
     this.root.addEventListener("contextmenu", (e) => e.preventDefault());
     // A mouse press never focuses the map, so a click on it leaves the game's
     // keys with the world. Buttons keep their default (a mouse close blurs the
-    // close button), so their pressed look still shows in every browser.
-    this.root.addEventListener("mousedown", (e) => e.target instanceof HTMLButtonElement || e.preventDefault());
+    // close button), so their pressed look still shows in every browser, and
+    // the View dropdown keeps it so it opens (it hands focus back itself).
+    this.root.addEventListener("mousedown", (e) => e.target instanceof HTMLButtonElement || e.target instanceof HTMLSelectElement || e.preventDefault());
     // A pinch or Ctrl+wheel over the window never zooms the page.
     this.root.addEventListener("wheel", (e) => e.ctrlKey && e.preventDefault(), { passive: false });
     this.viewCanvas.addEventListener("focus", () => {

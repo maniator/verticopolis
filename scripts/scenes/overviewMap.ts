@@ -35,10 +35,10 @@ export const OVERVIEW_MAP_SCENES: Scene[] = [
           await page.waitForSelector("#overview-map:not([hidden])");
         },
       },
-      // With a Floor heatmap on, the card sits below the heatmap legend.
+      // The open card on its Traffic view, with the view's legend.
       {
-        name: "map-phone-heatmap",
-        overlay: "congestion",
+        name: "map-phone-traffic",
+        mapView: "traffic",
         frame: { floor: 10, zoom: 0.5 },
         setup: async (page) => {
           if (await page.locator("#overview-map").isHidden()) await page.click("#btn-map");

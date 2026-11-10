@@ -433,8 +433,8 @@ this order under #878:
   relocation tests
   (`src/tests/integration/condoRelocationEngine.integration.test.ts`).
 
-`src/tests/tsEngineTests.ratchet.txt` lists 188 files that still drive the
-TypeScript engine directly (158 test files and 30 fixtures and helpers; the
+`src/tests/tsEngineTests.ratchet.txt` lists 187 files that still drive the
+TypeScript engine directly (157 test files and 30 fixtures and helpers; the
 list shrinks as tests convert and grows only with a reason the PR states, as
 when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/segmentRoutingMealRush.integration.test.ts`,

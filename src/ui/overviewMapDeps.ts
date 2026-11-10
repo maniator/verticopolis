@@ -1,6 +1,6 @@
 /**
  * What the overview MAP window (`overviewMapWindow.ts`) is given: the tower
- * it draws, the camera it reads and moves, and the view tabs.
+ * it draws, the camera it reads and moves, and the views with their View dropdown.
  */
 import type { FacilityKind } from "../engine/types";
 import type { MapCamera, MapCameraCenter, MapWorld } from "../render/overviewMap/geometry";
@@ -31,7 +31,7 @@ export interface OverviewMapDeps {
   isPhone(): boolean;
   /** Where the open or closed choice is kept, or null without storage. */
   readonly storage: Storage | null;
-  /** The view tabs (the game always passes them); without them the window
+  /** The views and their dropdown (the game always passes them); without them the window
    *  draws the Edit view alone. */
   readonly views?: OverviewMapViews | null;
 }

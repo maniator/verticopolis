@@ -6,9 +6,8 @@ import { extentFloors, fitLayout, mapExtent } from "../render/overviewMap/geomet
 import type { MapPaintContext, PatternSource } from "../render/overviewMap/paint";
 import { tiersOf } from "../render/overviewMap/tierView.fixture";
 import type { MapViewId } from "../render/overviewMap/views";
-import { tabId } from "./overviewMapTabs";
 import { MINUTES_PER_GAME_HOUR, OverviewMapViews, type MapViewRoom } from "./overviewMapViews";
-import { disposeRigs, rig } from "./overviewMapWindow.fixture";
+import { disposeRigs, pickView, rig } from "./overviewMapWindow.fixture";
 
 const EXTENT = mapExtent({ lotWidth: 375, minFloor: -9, maxFloor: 100 }, SKY_HEADROOM_FLOORS);
 const layout = fitLayout(EXTENT, 375, extentFloors(EXTENT) * 5);
@@ -32,7 +31,7 @@ function onTab(view: MapViewId, rows: Array<[number, EvalTier, RentTier]> = [[1,
     gesture: () => engine.gesture,
   });
   const r = rig({ views: v });
-  const pick = (id: MapViewId) => (document.getElementById(tabId(id)) as HTMLButtonElement).click();
+  const pick = (id: MapViewId) => pickView(id);
   pick(view);
   return { v, r, clock, tower, engine, tiers, pick };
 }
@@ -177,7 +176,7 @@ describe("the Eval and Pricing views", () => {
   it("paint nothing without a tier reader", () => {
     const v = new OverviewMapViews({ rooms: () => [office(1)], roomById: () => undefined, minutes: () => 0, floorsOf: () => 1 });
     rig({ views: v });
-    (document.getElementById(tabId("eval")) as HTMLButtonElement).click();
+    pickView("eval");
     expect(v.due(layout, false)).toBe(true);
     const ctx = fakeCtx();
     v.paintOver(ctx, plain);

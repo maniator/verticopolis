@@ -70,9 +70,6 @@ export interface UICallbacks {
   onReplayOnboarding(): void;
   onRenameTower(name: string): void;
   onShowStats(): void;
-  /** Set the colored stats overlay to a mode by its select value ("congestion"
-   *  / "occupancy" / "satisfaction" / "cleanliness", or "" for off). */
-  onSetOverlay(mode: string): void;
   onShowSaves(): void;
   /** The inspector card's ✕ was clicked — dismiss it and latch it closed. */
   onInspectorClose(): void;
@@ -206,9 +203,6 @@ export class UI {
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());
     this.el.modeBadge.addEventListener("click", () => this.showCompare()); // "tell me more"
     document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
-    document.getElementById("overlay-mode")?.addEventListener("change", (e) => {
-      this.cb.onSetOverlay((e.currentTarget as HTMLSelectElement).value);
-    });
 
     this.el.towerName.addEventListener("change", () => {
       this.cb.onRenameTower(this.el.towerName.value.trim() || "Tower One");

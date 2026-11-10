@@ -44,7 +44,6 @@ function makePorts() {
     undo: vi.fn(),
     redo: vi.fn(),
     undoGesture: vi.fn(() => NO_GESTURE),
-    setOverlay: vi.fn(),
     toggleMute: vi.fn(() => false),
     setVolume: vi.fn(),
     toggleReducedMotion: vi.fn(() => true),
@@ -81,8 +80,6 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(cb.undoUnderWay()).toBe(false);
     vi.mocked(ports.undoGesture).mockReturnValue(3);
     expect(cb.undoUnderWay(), "a press still held").toBe(true);
-    cb.onSetOverlay("congestion");
-    expect(ports.setOverlay).toHaveBeenCalledExactlyOnceWith("congestion");
   });
 
   it("save/load/export/import via the saveLoad port", () => {

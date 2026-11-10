@@ -259,7 +259,7 @@ export function buildHotspotTower(): void {
   g.engine.paused = false;
 }
 
-/** A deliberately IMPERFECT tower for the Floor heatmap shots. The showcase hero is
+/** A deliberately IMPERFECT tower for the Map view shots. The showcase hero is
  *  fully healthy, so its overlays read as a flat green wash; this tower has vacant
  *  bands (occupancy contrast), an under-carred upper local that jams at the rush
  *  (congestion), and a block far from transport (satisfaction). It runs a FIXED

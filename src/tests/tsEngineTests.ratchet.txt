@@ -36,7 +36,6 @@ src/game/trafficHud.test.ts Simulation port/tsEngine
 src/game/trafficHudPort.test.ts Simulation port/tsEngine
 src/game/uiCallbacks.test.ts Simulation port/tsEngine
 src/presentation/statsCopy.test.ts Ledger
-src/render/excalibur/heatColor.test.ts Simulation
 src/render/excalibur/towerInputCamera.test.ts Tower
 src/render/excalibur/towerScenery.test.ts Simulation
 src/render/excalibur/towerWalkerBuild.test.ts Tower tower/segments tower/towerTopology

@@ -228,19 +228,15 @@ test.describe("overview map on the desktop", () => {
       await expect(page.locator("#overview-map")).toBeVisible();
       const overlaps = await page.evaluate(() => {
         const map = document.getElementById("overview-map")!.getBoundingClientRect();
-        const view = document.getElementById("view")!.getBoundingClientRect();
-        // The heatmap legend is drawn on the world canvas at a fixed 12 px
-        // inset, 150 by up to 62 px (towerOverlay.ts, drawHeatLegend).
-        const legend = new DOMRect(view.left + 12, view.top + 12, 150, 62);
-        const others: Record<string, DOMRect> = { legend };
-        for (const id of ["sidebar", "palette", "overlay-mode", "hint"]) {
+        const others: Record<string, DOMRect> = {};
+        for (const id of ["sidebar", "palette", "hint"]) {
           const r = document.getElementById(id)?.getBoundingClientRect();
           if (r && r.width > 0 && r.height > 0) others[id] = r;
         }
         const hit = (r: DOMRect) => r.right > map.left && r.left < map.right && r.bottom > map.top && r.top < map.bottom;
         return { checked: Object.keys(others), overlapping: Object.keys(others).filter((k) => hit(others[k])) };
       });
-      expect(overlaps.checked, `${size.width}x${size.height}`).toEqual(expect.arrayContaining(["legend", "sidebar", "palette", "hint"]));
+      expect(overlaps.checked, `${size.width}x${size.height}`).toEqual(expect.arrayContaining(["sidebar", "palette", "hint"]));
       expect(overlaps.overlapping, `${size.width}x${size.height}`).toEqual([]);
     }
   });
@@ -573,16 +569,10 @@ test.describe("overview map on a phone", () => {
     expect(onTop.hit).toBe(true);
   });
 
-  test("with a heatmap on, the card moves below the heatmap legend and stays clear of the build controls", async ({ page }) => {
+  test("on every view the card keeps the top-left corner and stays clear of the build controls", async ({ page }) => {
     // Two boots, each growing a 3-star tower.
     test.setTimeout(90_000);
-    // The picker sits in the closed phone drawer, so the test sets it directly.
-    const pick = (mode: string) =>
-      page.evaluate((m) => {
-        const select = document.getElementById("overlay-mode") as HTMLSelectElement;
-        select.value = m;
-        select.dispatchEvent(new Event("change", { bubbles: true }));
-      }, mode);
+    const pick = (view: string) => page.locator("#overview-map-picker").selectOption(view);
     const place = () =>
       page.evaluate(() => {
         const map = document.getElementById("overview-map")!.getBoundingClientRect();
@@ -599,14 +589,13 @@ test.describe("overview map on a phone", () => {
       if (await page.locator("#overview-map").isHidden()) await page.locator("#btn-map").tap();
       await expect(page.locator("#overview-map")).toBeVisible();
       const at = `${size.width}x${size.height}`;
-      // The Housekeeping legend is the tallest: 62 px, drawn 12 px in.
-      await pick("cleanliness");
-      const on = await place();
-      expect(on.top, at).toBeGreaterThanOrEqual(12 + 62);
-      expect(on.bottom, at).toBeLessThanOrEqual(on.stageBottom);
-      expect(on.overlapsPalette, at).toBe(false);
-      await pick("");
-      await expect.poll(async () => (await place()).top, { message: at }).toBeLessThan(16);
+      for (const view of ["edit", "traffic", "occupancy"]) {
+        await pick(view);
+        const on = await place();
+        expect(on.top, `${at} ${view}`).toBeLessThan(16);
+        expect(on.bottom, `${at} ${view}`).toBeLessThanOrEqual(on.stageBottom);
+        expect(on.overlapsPalette, `${at} ${view}`).toBe(false);
+      }
     }
   });
 
@@ -700,10 +689,6 @@ test.describe("overview map on a phone", () => {
     await page.evaluate(() => {
       const g = (window as any).game;
       g.onboarding.arm(g.enginePort);
-      // With a heatmap on, the card moves down to where the Getting Started card is.
-      const pick = document.getElementById("overlay-mode") as HTMLSelectElement;
-      pick.value = "congestion";
-      pick.dispatchEvent(new Event("change", { bubbles: true }));
     });
     await expect(page.locator("#onboard")).toBeVisible();
     await page.locator("#btn-map").tap();

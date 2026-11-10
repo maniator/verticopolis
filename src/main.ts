@@ -1,8 +1,8 @@
-import type { HeatmapMode, Simulation } from "./engine/Simulation";
+import type { Simulation } from "./engine/Simulation";
 import { createAppHistory, type AppHistory } from "./game/appHistory";
 import type { FacilityKind } from "./engine/types";
 import type { TransportView, UnitView } from "./simport/view";
-import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/TowerEngine";
+import { TowerEngine, type Picked } from "./render/excalibur/TowerEngine";
 import { AudioEngine } from "./audio/Audio";
 import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, type Prefs } from "./storage/Prefs";
@@ -357,13 +357,6 @@ class GameApp implements GameAppPorts {
    *  and later restore the player's prior speed. */
   getSpeed(): number {
     return this.speed;
-  }
-
-  /** Set the colored stats overlay from the picker value ("" = off). An
-   *  unrecognized value falls back to off, so a stale/forged value can't push a
-   *  bad mode into the renderer. */
-  setOverlay(mode: string): void {
-    this.engine.overlayMode = (HEATMAP_MODES as readonly string[]).includes(mode) ? (mode as HeatmapMode) : null;
   }
 
   /** Announce to the screen-reader live region. @internal */

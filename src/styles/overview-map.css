@@ -1,8 +1,7 @@
 /* ---- Overview MAP window (#343) ----
    A small window in #stage: the desktop body is 200 by 288 CSS px, the
    retail map's size. On desktop it sits at the stage's bottom-right corner,
-   clear of the sidebar, the palette, the toasts (top-right) and the Floor
-   heatmap legend (drawn at the canvas's top-left). On a phone it is a card
+   clear of the sidebar, the palette and the toasts (top-right). On a phone it is a card
    at the top-left of the world view, inside the safe-area insets, about
    150 px wide and never taller than half the world view (a phone held
    sideways lets it take about two thirds, keeping its shape: the landscape
@@ -100,11 +99,11 @@
    1600 px while the card is up, where a long step still wraps to two lines.
    A window under 500 px tall keeps the hint at the bottom, since above the
    Map it would leave the world view. --overview-map-height is the desktop
-   window's height (frame, title bar, view tabs and the 288 px body), taller
-   with a coarse pointer's 28 px tabs; the overlap checks in
+   window's height (frame, title bar, View dropdown and the 288 px body), taller
+   with a coarse pointer's 28 px dropdown; the overlap checks in
    e2e/overviewMapViews.spec.ts fail if either drifts (#1769). */
 #stage {
-  --overview-map-height: 331px;
+  --overview-map-height: 330px;
 }
 @media (pointer: coarse) {
   #stage {
@@ -155,15 +154,7 @@
     width: 150px;
     height: 216px;
   }
-  /* The renderer draws the Floor heatmap legend at the world view's top-left
-     (12 px in, up to 62 px tall), the corner the card takes. While a heatmap
-     is on, the card moves down below the legend so both stay readable. */
-  body:has(#overlay-mode option:checked:not([value=""])) .overview-map {
-    top: max(82px, env(safe-area-inset-top));
-    max-height: min(50%, calc(100% - 92px));
-  }
-  /* The pill keeps the bottom-right corner, clear of the Floor heatmap
-     legend at the top-left, at 44 px wide. On a 320 px phone the open editor
+  /* The pill keeps the bottom-right corner, at 44 px wide. On a 320 px phone the open editor
      card at the bottom-left reaches it, so the pill then sits above the card,
      over part of the card's 12 px right padding and no control, and keeps its
      full touch target. The inspector card and the toasts, which may land in
@@ -188,8 +179,8 @@
     min-height: 44px;
   }
   /* Raised over the map body, which comes later and would otherwise take
-     the halo's lower part: a tap just under the close button closes. The tab
-     row sits over the halo in turn (overview-map-tabs.css). */
+     the halo's lower part: a tap just under the close button closes. The View
+     dropdown sits over the halo in turn (overview-map-views.css). */
   .overview-map .win-title .overview-map-close::after {
     inset: -13px;
     z-index: 1;

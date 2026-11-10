@@ -1,11 +1,10 @@
 /**
- * Feature scenes (Floor heatmaps, basement, stats, traffic HUD, lobby awnings,
+ * Feature scenes (the Map's views, basement, stats, traffic HUD, lobby awnings,
  * responsive layout). Part of the SCENES manifest; concatenated in order by
  * `screenshot-scenes.ts`. Each `build`/`setup` that runs in the page references
  * an injected builder by identity. Keep ERASABLE.
  */
 import { type Scene, PHONE } from "../screenshot-env.ts";
-import type { Page } from "playwright";
 import {
   buildBasement,
   buildCanonTower,
@@ -16,64 +15,43 @@ import {
   buildTabletTower,
   pgClearTransients,
   pgSetClock,
-  pgSetOverlay,
   pgStep,
   pgStepNoDraw,
 } from "../screenshot-builders.ts";
 
 export const FEATURE_SCENES: Scene[] = [
   // ======================= FEATURES =======================
-  // --- Floor heatmaps ---------------------------------------------------------
+  // --- The Map's views on a varied tower ---------------------------------------
   {
     id: "overlays",
     outDir: "features",
     build: buildOverlayTower,
     assertUnits: 200,
     shots: [
-      // Frame the whole height (floor ~15, wide zoom) so the vacant bands and the
-      // jammed upper zone are both in the picture.
-      { name: "overlay-congestion", overlay: "congestion", frame: { floor: 15, zoom: 0.4 } },
-      { name: "overlay-occupancy", overlay: "occupancy", frame: { floor: 15, zoom: 0.4 } },
-      { name: "overlay-satisfaction", overlay: "satisfaction", frame: { floor: 15, zoom: 0.4 } },
-      { name: "overlay-picker-ui", crop: ".overlay-picker", setup: async (page) => void (await page.evaluate(pgSetOverlay, "congestion")) },
-      // Showcase copies of two overlays, off the SAME varied tower (the hero is too
-      // uniform to read), written into docs/screenshots/.
-      { name: "15-congestion", outDir: "screenshots", overlay: "congestion", frame: { floor: 15, zoom: 0.4 } },
-      { name: "23-occupancy", outDir: "screenshots", overlay: "occupancy", frame: { floor: 15, zoom: 0.4 } },
-      // The Map's Eval and Pricing tabs (#1618, #1619) on the same varied tower.
-      ...(["eval", "pricing"] as const).map((view) => ({
+      // The Map's Eval, Pricing, Traffic and Occupancy views (#1618, #1619,
+      // #1727) on a deliberately varied tower, framed on its whole height.
+      ...(["eval", "pricing", "traffic", "occupancy"] as const).map((view) => ({
         name: `map-${view}-view`,
         crop: "#overview-map",
         frame: { floor: 15, zoom: 0.4 },
-        setup: async (page: Page) => {
-          await page.click(`#overview-map-tab-${view}`);
-          await page.waitForSelector(`#overview-map-tab-${view}[aria-selected="true"]`);
-        },
+        mapView: view,
       })),
+      // Showcase shots of the Traffic and Occupancy views, off the SAME varied
+      // tower (the hero is too uniform to read), written into docs/screenshots/.
+      { name: "15-congestion", outDir: "screenshots", mapView: "traffic", frame: { floor: 15, zoom: 0.4 } },
+      { name: "23-occupancy", outDir: "screenshots", mapView: "occupancy", frame: { floor: 15, zoom: 0.4 } },
     ],
   },
-  // --- Housekeeping-coverage overlay (#401) -----------------------------------
+  // --- Housekeeping (#401) ---------------------------------------------------
   {
     id: "cleanliness-overlay",
     outDir: "features",
     build: buildCleanlinessTower,
     assertUnits: 100,
     shots: [
-      // The service elevator (right) reaches floors 1..8; the upper hotel floors
-      // are guest-reachable but have no staff route, so they read red. A few dirty
-      // rooms in the covered zone read amber.
-      { name: "overlay-cleanliness", overlay: "cleanliness", frame: { floor: 7, zoom: 0.45 } },
-      // The Map's Hotel tab (#1617) on the same tower: the rooms that need
-      // cleaning are picked out on the Map.
-      {
-        name: "map-hotel-view",
-        crop: "#overview-map",
-        frame: { floor: 7, zoom: 0.45 },
-        setup: async (page) => {
-          await page.click("#overview-map-tab-hotel");
-          await page.waitForSelector('#overview-map-tab-hotel[aria-selected="true"]');
-        },
-      },
+      // The Map's Hotel view (#1617): the rooms that need cleaning are picked
+      // out on the Map.
+      { name: "map-hotel-view", crop: "#overview-map", frame: { floor: 7, zoom: 0.45 }, mapView: "hotel" },
     ],
   },
   // --- Basement: parking garage, recycling, garbage truck, inspector ----------
