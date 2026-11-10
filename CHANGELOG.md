@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.85.2
+
+- On a phone held sideways, the funds and population stats stay on one row without cutting off their values.
+
 ## 2.85.1
 
 - Holding Space before a mouse drag now pans the view without building or clicking a focused control. Tapping Space acts at the keyboard cursor when you let go.

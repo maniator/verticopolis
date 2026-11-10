@@ -2535,6 +2535,25 @@ body.splash-up #toast-wrap { z-index: 45; }
   }
 }
 
+/* At Pixel-class landscape widths the larger funds/population chips from
+   #1830 can make #status wrap into a third line (71px top bar at 852×352).
+   Keep the buttons and stats on their own rows without clipping values. The
+   narrower split-screen tier below 820px still wraps naturally, as designed.
+   Tighten only the labels and in-chip spacing, not the pinned value widths. */
+@media (min-width: 820px) and (max-width: 1023px) and (max-height: 599px) and (orientation: landscape) {
+  #status {
+    flex-wrap: nowrap;
+    gap: 2px;
+  }
+  .stat {
+    padding: 2px 2px;
+    gap: 2px;
+  }
+  .stat .label {
+    letter-spacing: 0;
+  }
+}
+
 /* A sideways window under 340px tall (split screen, a short desktop window),
    or one under 540px wide whose top bar wraps to four or five lines, would
    wrap the seven category tabs into four rows and leave the open category
