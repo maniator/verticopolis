@@ -377,7 +377,7 @@ included. One row per rule the game's comparison dialog
 | Rule (Modern, against Classic) | Class | Evidence |
 | --- | --- | --- |
 | Variant households set a condo's price and size | proven same | `src/tests/integration/condoModes.integration.test.ts` (on the Rust engine but for its marked tests, section 7), the `amenities-modern` and `player-edits-*` scenarios |
-| Households move out on their own | untested | no test runs a move-out on Rust: the `src/tests/integration/condoRelocation.integration.test.ts` tests outside the marks read the rule tables only, and its marked tests are re-proven under #878 (section 7) |
+| Households move out on their own | proven same | `src/tests/integration/condoRelocationEngine.integration.test.ts` (`describeEngines`): the Modern move-out and buy-back, Classic over thirty years, the RNG draw, the same month from the same seed, and the notice that does not rescind |
 | Overhead, the unsold-condo tax, noise and shop-access notices | proven same | the Modern scenarios' checkpoints, `src/tests/integration/conformanceWasmDiagnostics.integration.test.ts` (the notice reasons) |
 | A rent slider against Classic's four rungs and No Rate | proven same | `src/tests/integration/batchPricing.integration.test.ts` (`describeEngines`), the `player-edits-*` scenarios |
 | Escalators may serve office floors | proven same | `src/tests/integration/engineContract.integration.test.ts` (through `src/simport/engineLifecycle.fixture.ts`, which `src/simport/engineContract.test.ts` runs on the TypeScript port: Classic refuses with the reference's reason and changes nothing, Modern builds) |
@@ -393,8 +393,8 @@ included. One row per rule the game's comparison dialog
 
 ## 7. Test exclusions
 
-On this commit `src/tests/parity/exclusions.ratchet.txt` holds 17
-`itTypeScriptOnly` marks in 7 files and 9 `atEngineFrameCadence` calls in 4
+On this commit `src/tests/parity/exclusions.ratchet.txt` holds 8
+`itTypeScriptOnly` marks in 5 files and 9 `atEngineFrameCadence` calls in 4
 files, with no `onWasmParityProject` branches;
 `src/tests/parity/exclusions.guard.test.ts` pins each count to the source in
 both directions, and the test-mapping table in
@@ -416,19 +416,19 @@ test-conversion lane takes in this order under #878:
   with it, as three attendance tests did in #1797, the understaffed late
   checkout in #1800, and the rain and retail-tally tests in #1805; the
   others need one more tooling-only engine member each.
-- **14 tests** pin the retired `v1` sampled model or the TypeScript save hash
-  (`economyDepth`, `condoRelocation`, `phase2`, `parity`, `goldenMaster`).
-  The first to move onto the hourly model, on both engines, were the FAQ
-  cinema booking test
-  (`src/tests/integration/cinemaBookingEngine.integration.test.ts`) and the
-  Modern overhead and condo-tax tests
-  (`src/tests/integration/overheadEngine.integration.test.ts`), two of them
-  from `economyDepth` and two from the Modern economy suite. What each pins is re-proven on the
-  model the game runs before the TypeScript engine goes; the `v1` tests retire
-  with it.
+- **5 tests** pin the retired `v1` sampled model or the TypeScript save hash
+  (`phase2`, `parity`, `goldenMaster`). They test the TypeScript engine's own
+  internals and retire with it. The tests that pinned `v1` for a rule the
+  game still runs moved onto the hourly model, on both engines: the FAQ
+  cinema booking and film-policy tests
+  (`src/tests/integration/cinemaBookingEngine.integration.test.ts`), the
+  Modern overhead, condo-tax and overhead-RNG tests
+  (`src/tests/integration/overheadEngine.integration.test.ts`) and the condo
+  relocation tests
+  (`src/tests/integration/condoRelocationEngine.integration.test.ts`).
 
-`src/tests/tsEngineTests.ratchet.txt` lists 203 files that still drive the
-TypeScript engine directly (173 test files and 30 fixtures and helpers; the
+`src/tests/tsEngineTests.ratchet.txt` lists 202 files that still drive the
+TypeScript engine directly (172 test files and 30 fixtures and helpers; the
 list shrinks as tests convert and grows only with a reason the PR states, as
 when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/segmentRoutingMealRush.integration.test.ts`,
@@ -437,7 +437,7 @@ when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/hotelLateCheckoutEngine.integration.test.ts`, port kit
 suites that author their towers on a `Simulation`, #1805 the port kit's
 TypeScript tooling, `src/tests/portKit/tsTooling.ts`, and #1809 the two
-golden referees), and `src/tests/portKit/converted.txt` lists 21 suites
+golden referees), and `src/tests/portKit/converted.txt` lists 22 suites
 already on the port kit. The hosted WASM projects also leave out the test files that run
 each engine themselves or never touch the engine: `wasmParityProjects` leaves
 34 of them out of its `integrationWasm` project, by patterns in `vite.config.ts` with
@@ -457,7 +457,6 @@ TypeScript card while that engine exists, so the canary outlives the referee.
 | The engine's raw save text form and a transport's key order | known divergence | EX-2 |
 | A number past the double range in a save | known divergence | EX-3 |
 | Undo and redo keep change-only steps, where the reference restores the whole save | intentionally different (approved) | section 4; #1754 |
-| Households moving out on their own | untested | #878 (the marked `src/tests/integration/condoRelocation.integration.test.ts` tests, section 7) |
 | Sound effects, music and ambience | untested | the host picks each cue from a port fact that section 3 compares (section 5), and no test plays the cues on both engines; #965 (4.x) moves the cues onto engine events, where that check belongs, and new cues are #967 |
 | Real Safari and a phone, the OS-installed app window, the WebKit offline start and update, and Firefox's manual half (the nine real 1997 saves and five hand-played game days), on the Rust build | untested | #1522, release checks for the candidate: the 2026-11-04 run found the state and crowd digests the same in Chromium, Firefox and WebKit, and the update rehearsal passing in Chrome ([summary](../../docs/performance/results/2026-11-04-55052113-cross-browser-1522.md)); #1815 then made the specs pass in Firefox (35 of 35 on the Windows PC), and WebKit's four failures left are its offline reloads, so this row's WebKit offline start and update stay unverified |
 | 14 report-only screenshots where the Rust leg differed from the TypeScript leg | known divergence | #1425: 13 are put down to the harness and no player path reaches them. For 4 (the star bulletins) #1425 traces the cause, the bulletin's cursor skipping the tooling copy's lines; for the other 9 it gives a working explanation, not yet confirmed shot by shot (a hand edit through the tooling handle reaches the engine as a load, which starts the crowd afresh); the 14th, `features/inspector-recycling`, was the card's missing recycling lines, which #1441 fixed. The comparison leg no longer runs in CI |

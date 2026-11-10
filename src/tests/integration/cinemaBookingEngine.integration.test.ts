@@ -44,3 +44,38 @@ describeEngines("Cinema film booking (FAQ)", (leg: Leg) => {
     expect(bookings.has(Math.round(ECON.cinemaBookingMonthly * scale)), "some average periods").toBe(true);
   }, 60_000);
 });
+
+/** Blockbuster as a choice (economy depth #5), on both engines. Moved from
+ *  economyDepth.integration.test.ts, where it ran on the sampled v1 model. The
+ *  policy is set on the draft (the save carries it) and the engine's unit card
+ *  answers whether the cinema is showing a blockbuster. */
+describeEngines("Cinema film policy (economy depth #5)", (leg: Leg) => {
+  const MONTH = 60 * 24 * 31;
+
+  function cinemaSim(seed: number, policy: "feature" | "blockbuster"): { sim: PortSim; id: number } {
+    const draft = newSeededGame(seed);
+    draft.money = 1e9;
+    draft.star = 1;
+    for (const [kind, floor] of [["lobby", 1], ["floor", 2], ["floor", 3]] as const) {
+      for (let x = C; x < W; x++) draft.tower.place(kind, floor, x);
+      for (let x = C - 1; x >= 0; x--) draft.tower.place(kind, floor, x);
+    }
+    const id = draft.tower.place("cinema", 2, 0).unitId!;
+    expect(draft.setFilmPolicy(id, policy)).toBe(policy);
+    return { sim: new PortSim(leg, draft), id };
+  }
+
+  it("policy 'feature' never books a blockbuster", () => {
+    const { sim, id } = cinemaSim(3, "feature");
+    for (let m = 0; m < 12; m++) {
+      sim.tick(MONTH);
+      expect(sim.unitCard(id).blockbuster).not.toBe(1);
+    }
+  }, 60_000);
+
+  it("policy 'blockbuster' always books one", () => {
+    const { sim, id } = cinemaSim(4, "blockbuster");
+    sim.tick(MONTH);
+    expect(sim.unitCard(id).blockbuster).toBe(1);
+  });
+});

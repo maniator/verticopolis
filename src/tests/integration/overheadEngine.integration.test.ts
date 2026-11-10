@@ -92,3 +92,27 @@ describeEngines(
     });
   },
 );
+
+describeEngines("operating overhead consumes no RNG (F3)", (leg: Leg) => {
+  it("the shared stream is untouched by it", () => {
+    // Two seed-identical towers with no cinema, commercial or events (star 1):
+    // nothing in the tick touches the RNG. The only difference is that A holds
+    // overhead-bearing (empty, unserved) offices and B is bare. If overhead
+    // consumed RNG, A's stream would diverge; it must not. Moved from
+    // economyDepth.integration.test.ts with the v1 model dropped; the RNG
+    // position is read from the engine's save.
+    const build = (withOverhead: boolean): number => {
+      const draft = newSeededGame(123);
+      draft.money = 1e9;
+      draft.star = 1;
+      lay(draft, "lobby", 1);
+      lay(draft, "floor", 2);
+      if (withOverhead)
+        for (let i = 0; i < 10; i++) draft.tower.place("office", 2, i * 9);
+      const sim = new PortSim(leg, draft);
+      for (let m = 0; m < 3; m++) sim.tick(MONTH_31_DAYS); // 3 monthly maintenance runs
+      return sim.state.rng.seed;
+    };
+    expect(build(true)).toBe(build(false)); // identical stream position: overhead is RNG-free
+  });
+});

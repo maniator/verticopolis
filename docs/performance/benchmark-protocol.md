@@ -20,7 +20,7 @@ motivated it.
 | --- | --- |
 | CPU, memory | Ryzen 5 5600X, 31.9 GB |
 | OS | Windows 11 Pro, build 26200 |
-| Node | 22.22 (`.nvmrc`) |
+| Node | 26.13 (`.nvmrc`) |
 | Browser | see "Which browser counts" |
 
 ### Setup (PowerShell)

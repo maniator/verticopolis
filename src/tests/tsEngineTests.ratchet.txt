@@ -84,7 +84,6 @@ src/tests/integration/cockroachInfestation.integration.test.ts Simulation econom
 src/tests/integration/commercialDemandPools.integration.test.ts Clock EconomySystem Simulation Tower rng sim/demand
 src/tests/integration/commuteStress.integration.test.ts Crowd Simulation Tower crowd/motion sim/satisfaction
 src/tests/integration/condoModes.integration.test.ts Simulation
-src/tests/integration/condoRelocation.integration.test.ts Simulation
 src/tests/integration/condoStatsPanel.integration.test.ts Simulation
 src/tests/integration/conformanceWasmCanBuild.integration.test.ts Simulation sim/founderStatus
 src/tests/integration/conformanceWasmDiagnosticsTowers.integration.test.ts Simulation
