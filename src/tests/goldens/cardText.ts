@@ -63,10 +63,14 @@ export const CARD_TEXT_CASES: readonly string[] = [
   "service rooms",
   "service rooms, unhappy",
   "retail venues",
+  "retail venues, rainy day",
   "lobby distance",
   "lobby distance, unhappy",
   ...CARD_TEXT_STATES.map((st) => `every kind, ${st}`),
   "every transport",
+  "crowded lift",
+  "recycling center on notice",
+  "recycling over capacity",
   "winning tower",
   "winning tower, unhappy",
 ];
@@ -74,8 +78,12 @@ export const CARD_TEXT_CASES: readonly string[] = [
 /** In-game minutes each card's engine plays after loading a case's tower and
  *  before the cards are read, in 10-minute ticks. A shaft's load line needs
  *  riders measured over time, and a save does not carry that measurement, so
- *  the every-transport case plays a morning on the loaded tower. */
-export const CARD_TEXT_PLAY_MINUTES: ReadonlyMap<string, number> = new Map([["every transport", 8 * 60]]);
+ *  the every-transport case plays a morning on the loaded tower, and the
+ *  crowded lift a day and a half, past the near-capacity line. */
+export const CARD_TEXT_PLAY_MINUTES: ReadonlyMap<string, number> = new Map([
+  ["every transport", 8 * 60],
+  ["crowded lift", 36 * 60],
+]);
 export const CARD_TEXT_TICK_MINUTES = 10;
 
 /** Play a case's minutes on an engine that has just loaded its tower. */
@@ -121,20 +129,60 @@ export const cardTextFiles = (): string[] =>
  *  real lines; this checks the lines a run is about to compare or write. */
 export function expectRealLines(g: CardTextGolden): void {
   const label = `${g.mode}: ${g.case}`;
-  const roomLines = g.units.reduce((n, u) => n + u.lines.length, 0);
-  if (g.case !== "every transport") expect(roomLines, `${label} compared no room lines`).toBeGreaterThan(0);
-  if (g.case === "lobby distance") {
-    const shoppers = g.units.flatMap((u) => u.lines).filter((l) => l.startsWith("Shoppers:")).length;
-    expect(shoppers, `${label}: the far shop must carry the warning`).toBe(1);
+  // A check names each of its cases, so a renamed case fails here instead of
+  // going unchecked.
+  const is = (name: string): boolean => {
+    if (!CARD_TEXT_CASES.includes(name)) throw new Error(`expectRealLines checks "${name}", which is not a card-text case`);
+    return g.case === name;
+  };
+  const isOneOf = (names: readonly string[]): boolean => names.map(is).some(Boolean);
+  const roomLines = g.units.flatMap((u) => u.lines);
+  const starting = (prefix: string): number => roomLines.filter((l) => l.startsWith(prefix)).length;
+  if (!is("every transport")) expect(roomLines.length, `${label} compared no room lines`).toBeGreaterThan(0);
+  if (is("lobby distance")) expect(starting("Shoppers:"), `${label}: the far shop must carry the warning`).toBe(1);
+  if (is("retail venues, rainy day")) expect(starting("Rain might"), `${label}: no venue printed the rain line`).toBeGreaterThan(0);
+  // The unhappy towers charge a top rent, so a tenant has a cause to gripe
+  // about even where no worse cause (crowded elevators) comes first. The
+  // unhappy service-room tower's office is unserved, so its gripe is access,
+  // which its own line says, and both cards leave "Main gripe" out.
+  if (is("service rooms, unhappy")) expect(starting("Main gripe:"), `${label}: the unserved office printed a gripe`).toBe(0);
+  else if (isOneOf(["lobby distance, unhappy", "winning tower, unhappy"])) expect(starting("Main gripe:"), `${label}: no tenant printed a gripe`).toBeGreaterThan(0);
+  if (is("crowded lift")) {
+    const near = g.transports.flatMap((t) => t.lines).filter((l) => l.includes("Near capacity")).length;
+    expect(near, `${label}: the crowded lift never read near capacity`).toBe(1);
   }
-  if (g.case.startsWith("every kind")) {
+  const centers = g.units.filter((u) => u.kind === "recycling").map((u) => u.lines);
+  const fillOf = (lines: readonly string[]): number =>
+    Number(/^Fill: (\d+)%/.exec(lines.find((l) => l.startsWith("Fill:")) ?? "")?.[1] ?? Number.NaN);
+  // Capacity is the tower's verdict, so every center prints it: each center
+  // as [its over-capacity lines, its demand-met lines, filling].
+  const expectCenters = (over: number, what: string): void => {
+    const count = (lines: readonly string[], line: RegExp): number => lines.filter((l) => line.test(l)).length;
+    const seen = centers.map((lines) => [count(lines, /^Over capacity:/), count(lines, /^Capacity: .*; demand met\.$/), fillOf(lines) > 0]);
+    expect([centers.length > 0, seen], `${label}: ${what}, ${JSON.stringify(centers)}`).toEqual([true, centers.map(() => [over, 1 - over, true])]);
+  };
+  if (is("recycling center on notice")) {
+    // The order under test: the reference card puts the recycling block above the notice.
+    const center = centers.find((lines) => lines.some((l) => l.startsWith("Giving notice:"))) ?? [];
+    const [block, notice] = [center.findIndex((l) => l.startsWith("Fill:")), center.findIndex((l) => l.startsWith("Giving notice:"))];
+    expect([block >= 0, block < notice], `${label}: ${JSON.stringify(centers)}`).toEqual([true, true]);
+  }
+  if (is("recycling over capacity")) expectCenters(1, "over capacity and filling");
+  if (is("winning tower")) expectCenters(0, "within capacity and filling");
+  if (isOneOf(CARD_TEXT_STATES.map((st) => `every kind, ${st}`))) {
     // Room kinds only: the floor and lobby tiles are not cards.
     expect(new Set(g.units.map((u) => u.kind)).size, `${label} placed too few kinds`).toBeGreaterThanOrEqual(25);
   }
-  if (g.case === "every transport") {
+  if (is("every transport")) {
     expect(g.transports.length, `${label}: too few shafts`).toBeGreaterThanOrEqual(5);
-    const shaftLines = g.transports.reduce((n, t) => n + t.lines.length, 0);
-    expect(shaftLines, `${label}: no shaft printed a line`).toBeGreaterThan(0);
+    // After the morning's play each passenger elevator (standard and
+    // express) prints one reading and one of them carried riders; the service
+    // elevator, the stairs and the escalator print none.
+    const loads = g.transports.flatMap((t) => t.lines.flatMap((l) => /^Avg load: (\d+)%/.exec(l)?.[1] ?? []).map((n) => ({ kind: t.kind, load: Number(n) })));
+    expect(
+      [loads.map((l) => l.kind).sort(), loads.some((l) => l.load > 0)],
+      `${label}: the elevators' load lines, ${JSON.stringify(loads)}`,
+    ).toEqual([["elevatorExpress", "elevatorStandard"], true]);
   }
 }
 

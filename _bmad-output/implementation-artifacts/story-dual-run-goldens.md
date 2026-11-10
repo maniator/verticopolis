@@ -121,7 +121,7 @@ retires the mirror harness (#1421).
 | Dual-run coverage today | Replacement |
 | --- | --- |
 | `dualRunDay`: 29 day cases, hourly state and crowd views and event batches | AC1 and AC2, the same 29 cases |
-| `cardTextParity`: Rust card against the TypeScript card, 15 cases a mode | AC3 |
+| `cardTextParity`: Rust card against the TypeScript card, 19 cases a mode (#1780 added four to the 15 this golden first pinned) | AC3 |
 | `dualRunEdits`' four-star test, its founded-game test, its Modern bridging test, its malformed charge test (#923) and its malformed edit test (#996) | AC5, `port-edits.json`: one case each |
 | `dualRunEdits`: the drag mark taken over mid-drag (#990) | the malformed charge case drags inside the engine-held mark (a regrow inside it is free, and once the drag closes a shrink and regrow is billed), and so does the four-star case; a shadow attached mid-drag is mirror-only |
 | `dualRunBrush`: the relayed brush, its lobby upgrades and refusals | AC5: the floor and lobby brush case, and the brush on a loaded tower (a tower loaded from its save, then brushed, as the raw test set up) |

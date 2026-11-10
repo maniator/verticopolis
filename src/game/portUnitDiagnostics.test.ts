@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { html, type TemplateResult } from "lit-html";
 import { VIEW_LAYOUT } from "../engine/port/layout";
-import { createPortUnitDiagnostics, type SupplementalLines } from "./portUnitDiagnostics";
+import { createPortUnitDiagnostics, createPortUnitParts, joinParts, type SupplementalLines } from "./portUnitDiagnostics";
 
 const slots = VIEW_LAYOUT.records.unitFacts;
 function facts(changes: Record<string, number>): Float64Array {
@@ -143,5 +143,44 @@ describe("Rust port tenant explanations", () => {
     inOrder(onNotice, ["Access:", "No Rate:", "SERVICE", "Giving notice:", "Fix the cause", "RETAIL"]);
     const noNotice = render(facts({ access: code("accessLines", "reachable") }), 73, supplemental);
     inOrder(noNotice, ["Access:", "SERVICE", "RETAIL"]);
+    // A recycling center's block reads above the notice, as on the reference
+    // card (only a hand-edited save can put one on notice), and after the
+    // unit's facts.
+    const reads: string[] = [];
+    const recycling = () => {
+      reads.push("recycling");
+      return [html`<div>RECYCLING</div>`];
+    };
+    const recycler = createPortUnitDiagnostics({
+      viewLayout: () => JSON.stringify(VIEW_LAYOUT),
+      unitFacts: () => {
+        reads.push("unitFacts");
+        return facts({ access: code("accessLines", "reachable"), notice: 1, noticeReason: code("vacateReasons", "rent"), minutesLeft: 600, noticeSatisfaction: 0.25, keepAt: 0.4 });
+      },
+    }, supplemental);
+    inOrder(text(recycler(73, recycling)), ["Access:", "SERVICE", "RECYCLING", "Giving notice:", "RETAIL"]);
+    expect(reads).toEqual(["unitFacts", "recycling"]);
+  });
+
+  it("keeps a card's halves so a block read later lands in the same place, and keeps the block for a short record", () => {
+    const inOrder = (rendered: string, marks: readonly string[]): void => {
+      const order = marks.map((mark) => rendered.indexOf(mark));
+      expect(order.every((at) => at >= 0), rendered).toBe(true);
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+    };
+    const block = () => [html`<div>RECYCLING</div>`];
+    const supplemental = (): SupplementalLines => ({ lines: [html`<div>SERVICE</div>`], trailing: [html`<div>RETAIL</div>`] });
+    let record = facts({ access: code("accessLines", "reachable"), gripe: 1, gripeCause: code("vacateReasons", "rent") });
+    const parts = createPortUnitParts({ viewLayout: () => JSON.stringify(VIEW_LAYOUT), unitFacts: () => record }, supplemental);
+    const kept = parts(73);
+    // The same kept halves place the block above the gripe on every read,
+    // and with no block the card is the kept lines themselves, with no copy made.
+    inOrder(text(joinParts(kept, block)), ["Access:", "SERVICE", "RECYCLING", "Main gripe:", "RETAIL"]);
+    inOrder(text(joinParts(kept, block)), ["Access:", "SERVICE", "RECYCLING", "Main gripe:", "RETAIL"]);
+    expect(joinParts(kept)).toBe(kept.lines);
+    inOrder(text(kept.lines), ["Access:", "SERVICE", "Main gripe:", "RETAIL"]);
+    expect(text(kept.lines)).not.toContain("RECYCLING");
+    record = new Float64Array(2);
+    expect(text(joinParts(parts(73), block))).toBe("<div>RECYCLING</div>");
   });
 });

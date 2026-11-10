@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { FACILITIES } from "../../engine/facilities";
+import { rentConfig } from "../../engine/econConfig";
 import type { FacilityKind, GameMode, UnitState } from "../../engine/types";
 import { facilityDiagnostics, transportDiagnostics } from "../diagnostics/facilityDiagnostics";
 import { swapDone } from "../../game/portLifecycle";
 import { lobbyDistanceFixture, retailServiceFixture, serviceDiagnosticsFixture } from "../fixtures/serviceDiagnostics.fixture";
+import { layTile, placeUnit } from "../fixtures/towerFixtures";
 import { buildWinningTower } from "../fixtures/winningTower";
 import {
   CARD_TEXT_CASES,
@@ -49,12 +51,32 @@ function winning(mode: GameMode): Simulation {
   return sim;
 }
 
-/** A tower with every rentable room made unhappy, so the gripe, notice and
- *  won't-lease branches have something to say. */
+/** A tower with every tenant made unhappy and each priced one charged its
+ *  kind's top rent, so the "Main gripe" line has a cause to name (an
+ *  over-market rent is the first cause an office, a rental or a lease amenity
+ *  feels once it can reach the lobby and its elevators are not crowded). */
 function unhappy(sim: Simulation): Simulation {
   for (const u of sim.tower.units) {
-    if (u.state === "occupied" || u.state === "asleep") u.satisfaction = 0.2;
+    if (u.state !== "occupied" && u.state !== "asleep") continue;
+    u.satisfaction = 0.2;
+    const rent = rentConfig(u.kind);
+    if (rent) u.rent = rent.max;
   }
+  return sim;
+}
+
+/** The same tower moved on to the first rainy day at the same hour. The save
+ *  carries the clock, and each engine derives the day's weather from it on
+ *  load; the built tower is given the same weather. */
+function rainy(sim: Simulation): Simulation {
+  const MINUTES_PER_DAY = 1440;
+  const LAST_DAY = sim.clock.day + 400;
+  let day = sim.clock.day;
+  while (Simulation.weatherFor(day) !== "rain") {
+    if (++day > LAST_DAY) throw new Error("no rainy day in 400 days");
+  }
+  sim.clock.minutes += (day - sim.clock.day) * MINUTES_PER_DAY;
+  sim.weather = "rain";
   return sim;
 }
 
@@ -134,14 +156,89 @@ function everyTransport(mode: GameMode): Simulation {
   return sim;
 }
 
+const floors = (from: number, to: number): number[] => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+/** Each fixture below claims its rooms' floors are served; a floor no
+ *  passenger shaft reaches would print a different card. */
+function expectServed(sim: Simulation, want: readonly number[], what: string): void {
+  const served = sim.tower.servedFloors();
+  const missing = want.filter((f) => !served.has(f));
+  if (missing.length > 0) throw new Error(`${what}: floor ${missing.join(", ")} is not served`);
+}
+
+/** One single-car lift serving fifteen floors of occupied offices: after a
+ *  day and a half of rides (`CARD_TEXT_PLAY_MINUTES`) its average load passes
+ *  the near-capacity line. */
+function crowdedLift(mode: GameMode): Simulation {
+  const sim = Simulation.newGame(11, mode);
+  sim.money = 1e9;
+  sim.star = 5;
+  for (let x = 150; x < 240; x++) {
+    layTile(sim, "lobby", 1, x);
+    for (let f = 2; f <= 16; f++) layTile(sim, "floor", f, x);
+  }
+  const shaft = sim.tower.placeTransport("elevatorStandard", 165, 1, 16);
+  if (!shaft.ok || shaft.transportId === undefined) throw new Error(`lift: ${shaft.reason}`);
+  if (!sim.tower.setCars(shaft.transportId, 1)) throw new Error("lift: could not set one car");
+  expectServed(sim, floors(2, 16), "crowded lift");
+  for (let f = 2; f <= 16; f++) {
+    for (let x = 150; x < 240; x += FACILITIES.office.width) placeUnit(sim, "office", f, x).state = "occupied";
+  }
+  return sim;
+}
+
+/** A recycling center on notice in a served basement. Only a hand-edited
+ *  save can hold that state, since play gives notice to lease tenants alone;
+ *  the every-kind cases leave basement kinds out. */
+function recyclingOnNotice(mode: GameMode): Simulation {
+  const sim = Simulation.newGame(9, mode);
+  sim.money = 1e12;
+  sim.star = 5;
+  for (let x = 100; x < 300; x++) {
+    layTile(sim, "lobby", 1, x);
+    for (const f of [0, -1, -2]) layTile(sim, "floor", f, x);
+  }
+  const lift = sim.tower.placeTransport("elevatorStandard", 102, -2, 1);
+  if (!lift.ok) throw new Error(`basement lift: ${lift.reason}`);
+  expectServed(sim, [0, -1, -2], "recycling center on notice");
+  const center = placeUnit(sim, "recycling", -1, 150);
+  Object.assign(center, { state: "vacating", everOccupied: true, satisfaction: 0.25, vacateReason: "rent", vacateAt: sim.clock.minutes + 600 });
+  return sim;
+}
+
+/** One recycling center under 24 floors of occupied offices (2,592 people,
+ *  more than one center's 2,500), so the card gives the over-capacity verdict. */
+function recyclingOverCapacity(mode: GameMode): Simulation {
+  const sim = Simulation.newGame(13, mode);
+  sim.money = 1e12;
+  sim.star = 5;
+  for (let x = 100; x < 280; x++) {
+    layTile(sim, "lobby", 1, x);
+    for (const f of [0, -1]) layTile(sim, "floor", f, x);
+    for (let f = 2; f <= 25; f++) layTile(sim, "floor", f, x);
+  }
+  const lift = sim.tower.placeTransport("elevatorStandard", 102, -1, 25);
+  if (!lift.ok) throw new Error(`lift: ${lift.reason}`);
+  expectServed(sim, [0, -1, ...floors(2, 25)], "recycling over capacity");
+  placeUnit(sim, "recycling", -1, 150);
+  for (let f = 2; f <= 25; f++) {
+    for (let x = 110; x + FACILITIES.office.width <= 280; x += FACILITIES.office.width) placeUnit(sim, "office", f, x).state = "occupied";
+  }
+  return sim;
+}
+
 const BUILDERS: ReadonlyMap<string, (mode: GameMode) => Simulation> = new Map<string, (mode: GameMode) => Simulation>([
   ["service rooms", (m) => serviceDiagnosticsFixture(m).sim],
   ["service rooms, unhappy", (m) => unhappy(serviceDiagnosticsFixture(m).sim)],
   ["retail venues", (m) => retailServiceFixture(m).sim],
+  ["retail venues, rainy day", (m) => rainy(retailServiceFixture(m).sim)],
   ["lobby distance", (m) => lobbyDistanceFixture(m).sim],
   ["lobby distance, unhappy", (m) => unhappy(lobbyDistanceFixture(m).sim)],
   ...CARD_TEXT_STATES.map((st) => [`every kind, ${st}`, (m: GameMode) => everyKind(m, st)] as const),
   ["every transport", everyTransport],
+  ["crowded lift", crowdedLift],
+  ["recycling center on notice", recyclingOnNotice],
+  ["recycling over capacity", recyclingOverCapacity],
   ["winning tower", winning],
   ["winning tower, unhappy", (m) => unhappy(winning(m))],
 ]);

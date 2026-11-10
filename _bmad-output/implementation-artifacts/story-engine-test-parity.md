@@ -286,13 +286,12 @@ run records below.
 | `personRoundTrip.integration.test.ts` | 0/19 (2 marked at this record) | d, converted | two tests stamped `customersIn` on the instance (one mid-run, which the frame sync restores every tick; one before the first tick, which the save does not carry); the other four read the routing fields. The two stamps now run on both engines in `personRoundTripVenueCap.integration.test.ts` through the `setCustomersIn` tooling member (#1795) |
 | `phase2.integration.test.ts` | 0/14 (2 marked) | c | `simModel = "v1"`; the tower-wide coverage test sets v1 but never ticks (unmarked in review round 2) |
 | `roomCounts.integration.test.ts` (added after the run records below, PR #1340) | 0/1 (1 marked) | d | vacates offices through `sim.vacate` mid-run, which no command relays; the hosts' merge and frame apply have their own cases in `merge.test.ts` and `frameApply.test.ts`, which run on `unitWasm` |
-| `segmentRoutingReachable.integration.test.ts` | 0/11 (3 marked) | d | reads `returning` and the route, which the frame carries now; the three meal-rush tests pin lunch by swapping `sim.clock` and re-force the condo and venue occupancy every tick after the crowd exists, which only the fingerprint check (round 1) sees |
+| `segmentRoutingReachable.integration.test.ts` | 0/11 (3 marked at this record) | d, converted | reads `returning` and the route, which the frame carries now; at this record the three meal-rush tests pinned lunch by swapping `sim.clock` and re-forced the condo and venue occupancy every tick after the crowd existed, which only the fingerprint check (round 1) saw. They now run on both engines in `segmentRoutingMealRush.integration.test.ts` through the `setClock` and `setUnitState` tooling members (#1792) |
 | `simulation.integration.test.ts` | 0/107 (1 marked at this record) | d, converted | at this record it cleared the render-only patronage and profit accumulators (today and yesterday) on units every hour mid-run. It now runs on both engines in `retailTalliesEngine.integration.test.ts` through the `clearRetailTallies` tooling member (#1805) |
-| `storage.integration.test.ts` | 0/66 (5 marked) | c | the TypeScript serializer's own round-trip and hardening tests: four write instance fields after the ticks and read `serialize()`, which is the engine's while hosted, and one compares the engine save's unit JSON bytes with the TypeScript serializer's key order |
+| `storage.integration.test.ts` | 0/66 (5 marked at this record) | c, converted | the TypeScript serializer's own round-trip and hardening tests: at this record four wrote instance fields after the ticks and read `serialize()`, which is the engine's while hosted, and one compared the engine save's unit JSON bytes with the TypeScript serializer's key order. #1779 moved three of the field writers and the key-order test to `storageEngineSave.integration.test.ts`, which runs them on both engines through the port kit, and unmarked the fourth field writer, the Founder import test, in place, since the flag now travels in the save JSON |
 | `venueAttendance.integration.test.ts` | 0/21 | fixed | reads `mealVenueId`, which the frame carries now |
 | `venueOrigins.integration.test.ts` | 0/9 | fixed | reads `mealVenueId` and `originUnitId`, which the frame carries now |
-| `src/engine/aquaticCenter.test.ts` (unit) | 0/6 | fixed | reads `mealVenueId`, which the frame carries now |
-| `src/engine/rentalCrowd.test.ts` (unit) | 0/5 | cost, fixed | three tests at the host's own cadence (`atEngineFrameCadence`, slice 3): minute-tick runs of one to three days that read the crowd, which the frame carries |
+| `src/engine/aquaticCenter.test.ts` (unit) | 0/6 | fixed | reads `mealVenueId`, which the frame carries now || `src/engine/rentalCrowd.test.ts` (unit) | 0/5 | cost, fixed | three tests at the host's own cadence (`atEngineFrameCadence`, slice 3): minute-tick runs of one to three days that read the crowd, which the frame carries |
 | `src/engine/tower/rooms.test.ts` (unit) | 0/8 | cost, fixed | one test at the host's own cadence (`atEngineFrameCadence`, slice 3), which calls `refreshFromEngine` before each assertion: 360 ticks on a 12,000-unit fixture, with a merge before each census check |
 | `src/tests/perfCompare/fixtureHotelTower.test.ts` (unit) | 0/6 | cost, fixed | two tests at the host's own cadence (`atEngineFrameCadence`, slice 3): one and two-day minute-tick runs on a large hotel fixture that assert frame-carried dirty-room state counts |
 | `conformance.integration.test.ts` (left out) | 24 | c | the TypeScript side of the referee and the scenario lock writer; its engine twin is `conformanceWasm` |
@@ -305,16 +304,16 @@ run records below.
 | `perfCompare/*.integration.test.ts` (left out) | 6 | c | the engine comparison's checks (`page`, `scenarios`) run each engine themselves (#972) |
 | `fuzzWasmLeg.integration.test.ts` (left out, #1085) | 7 | c | runs the TypeScript engine and the shipped build side by side through the scenario runner, as the nightly's WASM leg does |
 | `fxSequences.integration.test.ts` (left out, #879) | 9 | c | runs the TypeScript engine and the shipped build side by side and pins the fx sequences and emergency counters |
+| `cardTextParity.integration.test.ts`, `cardTextReferee.integration.test.ts` (left out, #1809) | 39 each | c | the sweep loads each golden tower into the Rust engine itself and holds its card to the golden's lines (19 cases per mode and the files check), in `npm run test:wasm`; the referee builds the towers on the TypeScript engine on purpose and holds the golden to the reference card, in the plain integration run |
 | `conformanceWasm.integration.test.ts` (left out) | 26 | c | drives the binding directly through its own engine instances (the raw binding suites that build no host of their own, `chargeBindingRaw` and the like, stay in the project and pass) |
 | `src/dualrun/mirror.test.ts` (left out) | 12 | c | attaches the relay itself |
-| `hourCost.bench.integration.test.ts` | opt-in | n/a | skipped everywhere unless `RUN_HOUR_BENCH=1`; not a parity exclusion, listed so the 39 skips reconcile (38 marks plus this) |
+| `hourCost.bench.integration.test.ts` | opt-in | n/a | skipped everywhere unless `RUN_HOUR_BENCH=1`; not a parity exclusion, listed so the skip count reconciles (the ratchet's `itTypeScriptOnly` marks, 23 on 2026-11-04 after #1805, plus this) |
 | `src/dualrun/dualRun.test.ts` (left out) | 6 | c | attaches the dual run's relay itself |
-| `e2e/regions.spec.ts` (Playwright, `chromium-wasm`) | skipped (1 test) | c | toggles a unit between fire and empty in place; see the e2e slice |
-| `e2e/perf.spec.ts` (Playwright, `chromium-wasm`) | skipped (1 test) | c | the perf baseline is the TypeScript engine's (#900) |
+| `e2e/regions.spec.ts` (Playwright) | none skipped (2026-11-04) | n/a | the region test runs on the Rust engine; the fire half it could not drive moved to the unit test `src/render/excalibur/towerReconcileFire.test.ts` |
+| `e2e/perf.spec.ts` (Playwright) | none skipped (2026-11-04) | n/a | runs on the Rust engine like every other spec, against `e2e/perf/baseline.json`, which `update-perf-baseline.yml` mints on Rust; the `chromium-wasm` project is gone, and both remaining projects (`chromium`, `chromium-serial`) run the Rust engine |
 
 Tests that never tick (the construction and command-surface tests) pass
 on both projects without the engine; a later slice can count them apart.
-
 ## Slice 2: the routing fields, the un-relayed writes, the two (a) items (2026-10-09)
 
 ### The person record
@@ -693,10 +692,15 @@ relayed commands or `itTypeScriptOnly` in slice 2; this slice touches no
 
 ### TypeScript-only on `chromium-wasm`
 
+> **Superseded (2026-11-04, #878 check).** Playwright has no `chromium-wasm`
+> project anymore and `tsOnlyOnWasm` is gone: every spec runs on the Rust
+> engine. `e2e/regions.spec.ts` runs there, with its fire half moved to
+> `src/render/excalibur/towerReconcileFire.test.ts`, and `e2e/perf.spec.ts`
+> runs there too. The table below is the slice's record as it merged.
+
 Every skip goes through `tsOnlyOnWasm(reason)` (grep `tsOnlyOnWasm(`).
 
-| Spec | Test | Reason |
-| --- | --- | --- |
+| Spec | Test | Reason || --- | --- | --- |
 | `e2e/regions.spec.ts` | regions compose settled rooms, animate fires privately, and drain on budget | It toggles one office between fire and empty in place to pin the per-sync region move; no relayed command douses a fire, and a load would rebuild every region instead. The renderer mechanism it pins does not depend on the engine. |
 | `e2e/perf.spec.ts` | ui.update cost, end-to-end speed, and node identity clear the committed baseline | `e2e/perf/baseline.json` was measured on the TypeScript engine, so the WASM engine has no baseline to clear yet (`wasm-perf-baseline`, #900). |
 
