@@ -1,13 +1,13 @@
 # Story: facade slice 6c, the engine's diagnostics facts (#1215)
 
-Status: review (2026-11-10). PR 1 (#1255) moved the tenant family;
+Status: done (2026-11-10). PR 1 (#1255) moved the tenant family;
 families 2 to 4 landed as their own reads (the service facts, #1564 and
 #1569; the retail block's catalog match and the venue's lobby distance,
 #1616; the recycling and near-capacity verdicts, #1756; and the port's
-`shaftCard`), and #1811's corpus differential below compares them. #1215
-closes once the owner settles the four items the completion notes list: AC 7
-for #1564 and #1569, AC 6 for the families' own reads, the HP-7 gate and the
-amended AC 2.
+`shaftCard`), and #1811's corpus differential below compares them. On
+2026-11-10 the owner accepted the four items the completion notes list as
+recommended (AC 7 for #1564 and #1569, AC 6 for the families' own reads,
+the HP-7 gate and the amended AC 2), and #1215 closed.
 
 Tracking: #1207 (the Rust-backed facade, AD-9), parent #945. Plan: `slice-plan.md`
 and `ARCHITECTURE-REVIEW.md` in
@@ -338,8 +338,10 @@ it, and a third records the gate this section set:
   fresh read when a new room is picked or hovered or the tower is edited,
   and leaves the cost to an independent review; no owner acceptance of the
   deferral is on record there or on the #1237 row, which was closed as done
-  on 2026-11-03 with the gate still in its text. This goes to the owner with AC 7 (completion notes): accept the
-  deferral in their own words, or have A13, A14 and A33 fixed first.
+  on 2026-11-03 with the gate still in its text. This went to the owner with AC 7 (completion notes): accept the
+  deferral in their own words, or have A13, A14 and A33 fixed first. On
+  2026-11-10 the owner accepted the deferral, and the PC performance run
+  checks the cost of the three (#1215).
 
 ## Coordination
 
@@ -426,8 +428,9 @@ Families 2 to 4 (venues, hotels and housekeeping, services and transport):
   (#1756, for #1420) and the port's `shaftCard` (the elevator load, from 6b's
   utilization read). The TypeScript keeps the wording
   (`src/game/portServiceDiagnostics.ts`, `src/game/recyclingDiagnostics.ts`).
-- Four items wait on the owner, posted on #1215, which closes once they are
-  settled:
+- Four items went to the owner, posted on #1215. On 2026-11-10 the owner
+  accepted all four as recommended ("Confirmed", recorded on #945 and on
+  #1215), and #1215 closed:
   - AC 7 is unmet for #1564 and #1569. The owner merged both with no
     `/gds-code-review` run and no HP-1 to HP-12 record posted on either PR.
     #1564 has no outside review, since Copilot and Codex were rate limited
@@ -440,7 +443,7 @@ Families 2 to 4 (venues, hotels and housekeeping, services and transport):
     engine's retail baseline and not the other's. #1845 (merged on
     2026-11-10) derives it in Rust with the same value, which closed that
     thread. The call: review those two PRs' engine code now, or accept them
-    as merged.
+    as merged. Outcome: accepted as merged.
     #1811's own review covers the comparison it adds and none of the engine
     code those two PRs shipped.
   - AC 6 holds for PR 1's getter and not for the families' own reads.
@@ -451,15 +454,18 @@ Families 2 to 4 (venues, hotels and housekeeping, services and transport):
     empty shaft card). The port declares the id a number
     (`src/dualrun/engine.d.ts`), so a typed caller cannot pass one. The
     call: accept the difference, or have the binding refuse a non-number,
-    which changes the binding and takes a crate bump. #1215 tracks the call
-    until it is made.
+    which changes the binding and takes a crate bump. Outcome: accepted as
+    a known difference, with no binding change; the parity register's
+    section 8 lists it.
   - The HP-7 gate was not met (see the hot-path plan above): the getter has
     a production caller since #1560, while #1158's A13, A14 and A33 are
-    still open, and no owner acceptance of that deferral is on record.
+    still open, and no owner acceptance of that deferral was on record.
+    Outcome: the deferral is accepted, and the PC performance run checks
+    the cost of A13, A14 and A33.
   - #1811 amends AC 2 to name the families 2 to 4 reference (the port's
     `serviceDiagnostics` and `shaftCard` and the `Simulation`'s recycling
     reads), since those families shipped their own reads rather than PR 1's
-    getter. The call: accept the amended criterion.
+    getter. The call: accept the amended criterion. Outcome: accepted.
 - `src/tests/integration/conformanceWasmDiagnosticsServices.integration.test.ts`
   is their corpus differential, the counterpart of PR 1's. The figures in
   this bullet are a snapshot of the test's `afterAll` line, run on #1811 on
