@@ -4,7 +4,8 @@ import type { EnginePort } from "../../simport/enginePort";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import { PORT_EDIT_CASES, runPortEditCase, type PortEditCase } from "../goldens/portEditCases";
-import { firstPortEditDifference, portEditProblems, readPortEdits, writePortEdits, type PortEditGolden, type PortEditLeg, type PortEditLine } from "../goldens/portEdits";
+import { firstPortEditDifference, portEditProblems, readPortEdits, writePortEdits, type PortEditGolden, type PortEditLine } from "../goldens/portEditLines";
+import type { PortEditLeg } from "../goldens/portEdits";
 import { PORT_EDITS_UPDATE as UPDATE, writeAfterPassingRun } from "../goldens/updateGate";
 
 /**

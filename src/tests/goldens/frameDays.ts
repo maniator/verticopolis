@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SPEEDS } from "../../game/frameLoop";
@@ -141,6 +141,35 @@ export const FRAME_DAY_CASES: readonly FrameDayCase[] = [
   { id: "towerone_6 at speed 3 on the steady clock", start: { kind: "fixture", file: "towerone_6.vctower" }, speed: 3, steadyClock: true, frameTimes: FRAME_TIMES_MS },
 ];
 
+/** The folders this test file has opened for a dump (Vitest gives each file
+ *  its own copy of this module). Each was new or empty when it opened, so
+ *  every file in it is this file's own. */
+const openedDumps = new Set<string>();
+
+/** One engine's dump folder, `<root>/<engine>/`, empty, so no file of an
+ *  earlier, longer run sits beside the new ones. A folder this test file did
+ *  not open must already be new or empty; one it opened before (a run that
+ *  plays its case again, as the same-twice test does) is emptied of its own
+ *  files. The port-edit golden dumps the same way, so dump one suite at a
+ *  time. */
+export function freshDumpDir(root: string, engine: string): string {
+  const dir = resolve(root, engine);
+  if (openedDumps.has(dir)) {
+    for (const name of readdirSync(dir)) rmSync(resolve(dir, name), { recursive: true });
+  } else if (existsSync(dir) && readdirSync(dir).length > 0) {
+    throw new Error(`the dump folder ${dir} already holds files; dump into a new or empty folder`);
+  }
+  mkdirSync(dir, { recursive: true });
+  openedDumps.add(dir);
+  return dir;
+}
+
+/** A dump variable's folder: unset, empty or blank is no folder, so a dump
+ *  never lands in the working directory. */
+export function dumpRoot(value: string | undefined): string | undefined {
+  return value?.trim() || undefined;
+}
+
 /** Load or found a case's tower the way the game does, over whatever tower
  *  the port holds. The port-edit golden starts its cases the same way. */
 export function startTower(port: EnginePort, start: FrameDayStart): void {
@@ -152,7 +181,7 @@ export function startTower(port: EnginePort, start: FrameDayStart): void {
   swapDone(port, port.foundTower(start.seed, codes.code("modes", start.mode), codes.code("calendars", start.calendar), start.unbridged));
 }
 
-const dumpDir = process.env.VC_FRAME_DAYS_DUMP;
+const dumpDir = dumpRoot(process.env.VC_FRAME_DAYS_DUMP);
 const dumpCase = process.env.VC_FRAME_DAYS_CASE;
 if (dumpDir && !FRAME_DAY_CASES.some((c) => c.id === dumpCase)) {
   throw new Error(`VC_FRAME_DAYS_DUMP needs VC_FRAME_DAYS_CASE set to a case id; ${JSON.stringify(dumpCase)} names none`);
@@ -190,16 +219,14 @@ export function runFrameDay(leg: FrameDayLeg, c: FrameDayCase, afterStart?: () =
   // The port answers with the choice's text while one is open.
   const choiceOpen = () => typeof port.pendingChoice() === "string";
   if (choiceOpen()) throw new Error(`${c.id}: the tower starts with a choice open; the golden plays no choices`);
-  const dumping = dumpDir !== undefined && dumpCase === c.id && afterStart === undefined;
+  const dumpTo = dumpDir !== undefined && dumpCase === c.id && afterStart === undefined ? freshDumpDir(dumpDir, leg.name) : undefined;
   const out: FrameDayCheckpoint[] = [];
   let batch: unknown[] = [];
   const checkpoint = (minute: number) => {
     const state = leg.stateView();
     const crowd = leg.crowdView();
-    if (dumping) {
-      const dir = resolve(dumpDir, leg.name);
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(resolve(dir, `${String(out.length).padStart(2, "0")}-${minute}.json`), `${JSON.stringify({ state: JSON.parse(state), crowd: JSON.parse(crowd), events: batch }, null, 1)}\n`);
+    if (dumpTo !== undefined) {
+      writeFileSync(resolve(dumpTo, `${String(out.length).padStart(2, "0")}-${minute}.json`), `${JSON.stringify({ state: JSON.parse(state), crowd: JSON.parse(crowd), events: batch }, null, 1)}\n`);
     }
     out.push({ minute, state: digestText(state), crowd: digestText(crowd), events: digestText(canonicalJson(batch)), count: batch.length });
     batch = [];
