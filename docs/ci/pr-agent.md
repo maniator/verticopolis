@@ -27,6 +27,20 @@ ChatGPT subscription. No OpenAI organization ID or other variable is required.
 - PR-Agent complements, and does not replace, Rust/test/coverage CI,
   independent reviews, Copilot or Codex.
 
+## Heavy review on request
+
+PR-Agent carries the heavy review pass, so Claude sessions spend fewer tokens
+on it (owner, 2026-11-10). For a non-trivial PR, the author or reviewer
+comments `/review` and `/improve` on the PR as two separate comments. Each
+command runs in its own concurrency group, so both finish, and a later push
+cancels only the automatic review. The review skill then runs one lean pass
+of its layers in the same session, without a subagent per layer, and triages
+PR-Agent's findings with its own: `patch` findings get fixed and `defer`
+findings go to the backlog, as before. Request the pair once per review round,
+on the head under review, and wait for the workflow run instead of polling.
+The workflow matches the command at the start of the comment, so a Claude
+comment keeps its attribution footer after it.
+
 ## Review scope, evidence and generated test data
 
 Routine reviews assess the **deliverables of each PR**, not the entire parent
