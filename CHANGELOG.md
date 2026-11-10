@@ -21,6 +21,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.89.2
+
+- On the Map, parking ramps, security offices, stairs and service elevators stand out more clearly from the sky, the ground and each other.
+
 ## 2.89.1
 
 - The Map's legend no longer covers the top floors of a tall tower.
