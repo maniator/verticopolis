@@ -24,7 +24,7 @@ notes, never a past version's.
 ## 2.88.0
 
 - The Map now has Edit, Eval, Pricing and Hotel tabs. Hotel highlights rooms that need cleaning or have cockroaches, with a separate pattern and count for each.
-- Eval and Pricing tabs show their upcoming views while their painters are being built.
+- The Eval and Pricing tabs show the plain map for now, with a note that their views are coming soon.
 
 ## 2.87.1
 
