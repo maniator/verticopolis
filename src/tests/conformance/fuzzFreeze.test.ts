@@ -80,9 +80,14 @@ describe("parseMarker", () => {
 });
 
 describe("the repository's marker", () => {
-  it("parses, and no window is open yet (the owner opens it at the freeze)", () => {
+  it("parses, and holds the 3.0.0 window the owner opened at the freeze (2026-11-10)", () => {
     const marker = parseMarker(readFileSync(resolve(REPO_ROOT, FREEZE_MARKER_PATH), "utf8"));
-    expect(marker).toEqual(closed);
+    // A reset or a closed window changes this on purpose, in the same PR.
+    expect(marker).toEqual({
+      open: true,
+      key: "ecadbdf6ab8149c42c0ba567d3a7e56ef0e48ab9bcca5f0b9e2a99dd1bd6bc56",
+      resets: [],
+    });
   });
 
   it("is not part of the key, so recording a window never moves it", () => {
