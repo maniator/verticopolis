@@ -146,6 +146,7 @@ describe("helpTemplate structure and a11y", () => {
     viewPremium: null, // Modern sky bar height-scaled income; covered by the "new places" copy, no dedicated seam line
     daycareFamilyBonus: null, // Modern daycare family-scaled condo halo; covered by the "new places" copy, no dedicated seam line
     bridgingToggleable: null, // Modern build affordance surfaced in New Tower + Settings, not a "Classic vs Modern" compare bullet
+    roomIsPermanent: null, // the reference's copy of Rust's Classic permanent rooms; the refusal names the rule where it applies, with no compare bullet
   };
 
   it("classifies every MODERN_RULES member for Help copy (test-path backstop only)", () => {

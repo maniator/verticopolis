@@ -3,7 +3,7 @@ import { Simulation } from "../Simulation";
 import { ECON, carResaleRefund, extendBill, resaleRefund } from "../econConfig";
 import { GRID, maxCarsFor } from "../facilities";
 import { stateView } from "../conformanceView";
-import type { Transport, Unit } from "../types";
+import type { FacilityKind, GameMode, Transport, Unit } from "../types";
 import { CAR_LIMIT, ELEVATOR_GONE, FACILITY_GONE, INVALID_REQUEST, LAST_CAR, NOT_ENOUGH_MONEY, ONLY_ELEVATOR_CARS, ONLY_ELEVATOR_EXTEND } from "./charges";
 
 /**
@@ -13,8 +13,8 @@ import { CAR_LIMIT, ELEVATOR_GONE, FACILITY_GONE, INVALID_REQUEST, LAST_CAR, NOT
 
 /** A lobby, a floor with an office over it, an elevator on 1..2 and stairs,
  *  every placement asserted so a silent fixture failure can't pass a test. */
-function fixture() {
-  const sim = new Simulation();
+function fixture(mode: GameMode = "classic") {
+  const sim = new Simulation(12345, mode);
   for (let x = 10; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
   for (let fl = 2; fl <= 4; fl++) for (let x = 10; x < 40; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
   const r = sim.tower.place("office", 2, 20);
@@ -295,7 +295,8 @@ describe("removeFacility", () => {
   });
 
   it("cancels the pending VIP inspection with the last Wedding Hall", () => {
-    const { sim } = fixture();
+    // Classic never removes the hall (below), so this is Modern, as in Rust.
+    const { sim } = fixture("modern");
     sim.star = 5;
     sim.money = 10_000_000;
     // The hall only goes on the top floor: stack floor up to it under its footprint.
@@ -316,6 +317,60 @@ describe("removeFacility", () => {
     expect(sim.sellAt(1, 30)).toBe(true);
     expect(sim.money).toBe(1_000_000 + resaleRefund(shaft.kind));
     expect(sim.sellAt(1, 20)).toBe(false); // lobby tiles are permanent
+  });
+});
+
+describe("the rooms Classic keeps (engine-rs/src/charges_removal_tests.rs carries the same)", () => {
+  /** A lobby on floor 1, floor tiles on 2..4 and the two basement levels, in `mode`. */
+  function towerIn(mode: GameMode) {
+    const sim = new Simulation(1, mode);
+    for (let x = 10; x < 120; x++) {
+      expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+      for (let fl = 2; fl <= 4; fl++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
+      sim.tower.place("floor", 0, x);
+      sim.tower.place("floor", -1, x);
+    }
+    sim.money = 1_000_000;
+    return sim;
+  }
+  const rooms: [FacilityKind, number, number, string][] = [
+    ["housekeeping", 2, 20, "Housekeeping rooms are permanent. The 1994 game does not let you remove them."],
+    ["security", 2, 12, "Security offices are permanent. The 1994 game does not let you remove them."],
+    ["recycling", -1, 22, "Recycling centers are permanent. The 1994 game does not let you remove them."],
+    ["cinema", 2, 60, "Movie theaters are permanent. The 1994 game does not let you remove them."],
+  ];
+
+  it("refuses to sell or bulldoze one in Classic, until a fire guts it", () => {
+    for (const [kind, floor, x, reason] of rooms) {
+      const sim = towerIn("classic");
+      const placed = sim.tower.place(kind, floor, x);
+      expect(placed.ok, `${kind}: ${placed.reason}`).toBe(true);
+      const room = sim.tower.getUnit(placed.unitId!)!;
+      expect(sim.removeFacility(room.id, "bulldoze"), kind).toEqual({ ok: false, reason, delta: 0 });
+      expect(sim.sellAt(floor, x), kind).toBe(false);
+      expect(sim.money, kind).toBe(1_000_000);
+      room.state = "gutted";
+      expect(sim.removeFacility(room.id, "bulldoze").ok, `${kind} shell`).toBe(true);
+    }
+  });
+
+  it("sells each one in Modern", () => {
+    for (const [kind, floor, x] of rooms) {
+      const sim = towerIn("modern");
+      const placed = sim.tower.place(kind, floor, x);
+      expect(placed.ok, `${kind}: ${placed.reason}`).toBe(true);
+      expect(sim.removeFacility(placed.unitId!, "sell").ok, kind).toBe(true);
+    }
+  });
+
+  it("keeps the Wedding Hall in Classic", () => {
+    const { sim } = fixture();
+    sim.star = 5;
+    sim.money = 10_000_000;
+    for (let fl = 5; fl <= GRID.maxFloor; fl++) for (let x = 10; x < 26; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
+    expect(sim.build("weddingHall", GRID.maxFloor, 10).ok).toBe(true);
+    const hall = sim.tower.unitAt(GRID.maxFloor, 10)!;
+    expect(sim.removeFacility(hall.id, "sell")).toEqual({ ok: false, reason: "The wedding hall can't be removed.", delta: 0 });
   });
 });
 

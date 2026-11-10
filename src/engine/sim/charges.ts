@@ -4,7 +4,7 @@ import { ECON, carResaleRefund, extendBill, resaleRefund } from "../econConfig";
 import { isElevatorKind, maxCarsFor } from "../facilities";
 import type { GameplayRemovalMethod } from "../../events/gameplayEvents";
 import { INVALID_REQUEST, whole } from "../request";
-import type { Transport } from "../types";
+import type { FacilityKind, Transport, UnitState } from "../types";
 
 /**
  * The engine-owned charges for the editor and the bulldozer (#914): adding
@@ -51,6 +51,28 @@ export const ONLY_ELEVATOR_EXTEND = "Only elevators can be extended.";
 export const CAR_LIMIT = "This elevator has all the cars it can hold.";
 export const LAST_CAR = "An elevator needs at least one car.";
 export const FACILITY_GONE = "That facility is gone.";
+
+/**
+ * The refusal for each room a rule set keeps for good
+ * (`GameRules.roomIsPermanent`), the Rust engine's `permanent_room_refusal`.
+ * The game runs the Rust rule; this reference carries it only so the fuzz
+ * referee and the conformance runner agree with Rust on a refused sale.
+ */
+const PERMANENT_ROOM_REFUSALS: Partial<Record<FacilityKind, string>> = {
+  housekeeping: "Housekeeping rooms are permanent. The 1994 game does not let you remove them.",
+  security: "Security offices are permanent. The 1994 game does not let you remove them.",
+  recycling: "Recycling centers are permanent. The 1994 game does not let you remove them.",
+  cinema: "Movie theaters are permanent. The 1994 game does not let you remove them.",
+  weddingHall: "The wedding hall can't be removed.",
+};
+
+/** Why the tower keeps a room of `kind` in `state` for good, or null: a
+ *  permanent room stays unless a fire gutted it, since a burned-out shell can
+ *  still be cleared (Rust `stays_for_good`). */
+function permanentRoomRefusal(sim: Simulation, kind: FacilityKind, state: UnitState): string | null {
+  if (state === "gutted" || !sim.rules.roomIsPermanent(kind)) return null;
+  return PERMANENT_ROOM_REFUSALS[kind] ?? PERMANENT_ROOM_REFUSALS.housekeeping!;
+}
 /** The one refusal for a malformed command (#923), shared with the other
  *  relayed commands (#996) from `../request`. */
 export { INVALID_REQUEST };
@@ -186,7 +208,8 @@ export function extendTransport(sim: Simulation, id: number, end: "up" | "down",
  * The player's removal of a unit or a shaft by id (the editor's Sell and the
  * bulldozer), paying the resale refund: half the build cost
  * ({@link resaleRefund}), nothing for a gutted unit. Refused for a burning
- * unit and for structure the tower must keep (`Tower.removalReason`). Removing
+ * unit, for structure the tower must keep (`Tower.removalReason`) and for a
+ * room the rule set keeps for good ({@link permanentRoomRefusal}). Removing
  * the last Wedding Hall before the VIP's inspection cancels the visit. Units
  * and shafts share one id counter, so `id` names exactly one of them. An id
  * that is not a whole number, or an unknown method, is refused with
@@ -200,6 +223,8 @@ export function removeFacility(sim: Simulation, id: number, method: RemovalMetho
     const blocked = sim.tower.removalReason(id);
     if (blocked) return refuse(blocked);
     const { kind, state } = u; // read before the removal, as the Rust port does
+    const kept = permanentRoomRefusal(sim, kind, state);
+    if (kept) return refuse(kept);
     sim.tower.removeUnit(id);
     const refund = state === "gutted" ? 0 : resaleRefund(kind);
     sim.money += refund;

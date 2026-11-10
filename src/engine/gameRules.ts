@@ -1,7 +1,7 @@
 import type { PriceOptions } from "./pricing";
 import type { ElevatorScheduleUX } from "./elevatorSchedule";
 import type { RNG } from "./rng";
-import type { GameMode } from "./types";
+import type { FacilityKind, GameMode } from "./types";
 
 // The pricing SHAPE layer (canon ladders, PriceOptions, snap helpers) lives in
 // ./pricing; re-exported here so consumers keep one import path for the seam.
@@ -82,6 +82,12 @@ export interface GameRules {
    *  the mid-game toggle and its founding default, so mode-specific bridging
    *  behavior stays in the rule-set, not smeared across the engine. */
   bridgingToggleable(): boolean;
+  /** Whether the tower keeps a room of `kind` for good, so neither Sell nor
+   *  the bulldozer removes it (a fire-gutted shell still clears). Classic keeps
+   *  housekeeping, security, recycling, the movie theater and the wedding hall,
+   *  which the 1994 game's Windows Read Me lists as undeletable; Modern keeps
+   *  none. The Rust engine's `GameMode::room_is_permanent`. */
+  roomIsPermanent(kind: FacilityKind): boolean;
   /** The Classic/Modern authoring-affordance split for the per-shaft schedule
    *  dialog (#305 Phase 3). UI-only; the sim never reads it. The flag semantics
    *  live on {@link ElevatorScheduleUX} in `elevatorSchedule.ts`. */

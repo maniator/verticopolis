@@ -7,7 +7,7 @@ import { Clock } from "../../engine/Clock";
 import { RNG } from "../../engine/rng";
 import { CLASSIC_RULES } from "../../engine/gameRules";
 import { FACILITIES, GRID } from "../../engine/facilities";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind, GameMode } from "../../engine/types";
 
 /**
  * Regression tests for the BMAD-review findings fixed in this PR. Each `it` pins
@@ -25,8 +25,8 @@ function layFloor(sim: Simulation, kind: "floor" | "lobby", floor: number): void
 }
 
 /** A full-width ground lobby + floors 2..top, no transport. */
-function structuredTower(seed: number, top: number, money = 100_000_000, halfWidth?: number): Simulation {
-  const sim = newSeededGame(seed);
+function structuredTower(seed: number, top: number, money = 100_000_000, halfWidth?: number, mode: GameMode = "classic"): Simulation {
+  const sim = newSeededGame(seed, mode);
   sim.money = money;
   // Optionally build only a centered strip (much cheaper to tick over on the
   // wide 375-tile lot) when a test doesn't need the full width.
@@ -121,7 +121,8 @@ describe("F18 — 1994 build caps & wedding-hall accounting", () => {
   });
 
   it("allows only one wedding hall and derives builtWeddingHall from what stands", () => {
-    const sim = structuredTower(5, GRID.maxFloor, 1_000_000_000);
+    // Classic keeps the hall for good (`removeFacility`), so the sale runs in Modern, as in Rust.
+    const sim = structuredTower(5, GRID.maxFloor, 1_000_000_000, undefined, "modern");
     sim.star = 5;
     expect(sim.build("weddingHall", GRID.maxFloor, C).ok).toBe(true);
     expect(sim.tower.builtWeddingHall).toBe(true);
@@ -185,7 +186,8 @@ describe("F18 — 1994 build caps & wedding-hall accounting", () => {
 
 describe("F31 — selling the Wedding Hall cancels a pending VIP inspection", () => {
   it("does not keep re-failing the inspection after the hall is gone", () => {
-    const sim = structuredTower(6, GRID.maxFloor, 1_000_000_000, 30);
+    // Classic keeps the hall for good (`removeFacility`), so the sale runs in Modern, as in Rust.
+    const sim = structuredTower(6, GRID.maxFloor, 1_000_000_000, 30, "modern");
     sim.star = 5;
     expect(sim.build("weddingHall", GRID.maxFloor, C).ok).toBe(true);
     sim.sellAt(GRID.maxFloor, C);
