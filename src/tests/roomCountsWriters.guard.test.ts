@@ -18,7 +18,7 @@ import { COUNTED_FIELDS, VIEW_FIELDS } from "../engine/tower/rooms";
  * so its author has to mark the room and update the table. It does not prove
  * that the mark is there or that it follows the write; the table's notes say
  * where each file marks, and the behavior is checked by the seeded run
- * (`src/tests/integration/roomCounts.integration.test.ts`) and the cases in
+ * (`src/tests/integration/roomCountsEngine.integration.test.ts`) and the cases in
  * `src/engine/tower/roomCounts.test.ts`, against the walk over every unit.
  * Comments are left out of the scan, so prose cannot stand in for a write.
  *

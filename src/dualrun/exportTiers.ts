@@ -288,6 +288,8 @@ export const BINDING_EXPORT_TIERS = {
   setWeather: T3,
   clearRetailTallies: T3,
   startFireAt: T3,
+  vacateUnit: T3,
+  setUnitRent: T3,
   advanceClock: T3,
   seedLoopMemos: T3,
   seedElevatorTelemetry: T3,

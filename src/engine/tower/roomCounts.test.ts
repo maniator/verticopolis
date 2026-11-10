@@ -10,11 +10,11 @@ import { walkedStats } from "../../tests/fixtures/walkedStats";
  * Single writes of a field the HUD's kept room counts read, each driven once
  * after the counts are kept and held to the walk over every unit. The first
  * case issues the rent commands and a vacate one at a time, so a failure names
- * the command; the seeded run (`roomCounts.integration.test.ts`) issues them
- * too, mixed with the steps. The others are the paths 30 game hours on the
- * fixtures do not reach, or reach only where the write leaves every count
- * where it was. The last case holds the counts to reading a room's kind and
- * `COUNTED_FIELDS` only.
+ * the command; the seeded run (`roomCountsEngine.integration.test.ts`, on
+ * both engines) issues them too, mixed with the steps. The others are the
+ * paths 30 game hours on the fixtures do not reach, or reach only where the
+ * write leaves every count where it was. The last case holds the counts to
+ * reading a room's kind and `COUNTED_FIELDS` only.
  */
 
 /** A Classic tower: a lobby, two floors over it and stairs, with `rooms`. */

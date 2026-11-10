@@ -489,6 +489,14 @@ export class Engine {
      */
     setTowerName(name?: string | null): void;
     /**
+     * Tooling only: write unit `id`'s price as given, with no ladder snap
+     * or band clamp, or clear it with null, the TypeScript `u.rent = value`.
+     * A test uses it for a legacy off-ladder price or an unpriced room,
+     * which a load would snap onto the ladder. False, changing nothing, for
+     * an unknown unit or a price that is not finite or is below 0.
+     */
+    setUnitRent(id: number, rent?: number | null): boolean;
+    /**
      * Tooling only: set a unit's state by its save name, and its occupants
      * when given (a test holds a venue open or a condo full). False for an
      * unknown unit or state, for "construction" and "fire" (each needs its
@@ -605,6 +613,15 @@ export class Engine {
     unitMetaChanged(since: number): Float64Array;
     unitMetaSince(since: number): string;
     unitSubtype(id: number): string | undefined;
+    /**
+     * Tooling only: a tenant leaves unit `id` for `reason` (a departure
+     * cause's save name), the TypeScript `sim.vacate(u, reason)`, so a test
+     * can empty a chosen room mid-run. It is the churn pass's departure, so
+     * a sold condo is bought back. Like a fire, it is not part of an open
+     * undo step. The unit's kind is not checked. False, changing nothing,
+     * for an unknown unit or cause.
+     */
+    vacateUnit(id: number, reason: string): boolean;
     /**
      * `tower.validateTransport(kind, x, bottom, top)`: JSON `{ ok, reason? }`,
      * nothing written. An unknown kind is refused with "Unknown facility."; a

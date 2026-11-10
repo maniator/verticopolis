@@ -15,6 +15,11 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.22.1 (2026-11-10)
+
+- The tooling-only WASM binding gains `vacateUnit(id, reason)` and `setUnitRent(id, rent)`. `vacateUnit` runs the churn pass's departure on a chosen room for a named cause, buying back a sold condo, outside any open undo step. `setUnitRent` writes a room's price as given, with no ladder snap or band clamp, or clears it with null. Each refuses an unknown unit, an unknown cause, or a price that is not finite or is below 0, and changes nothing then. The TypeScript reference exposes the same test hooks, so the last write-only tests (condo re-listing and price stamping, and the HUD's kept room counts) run on both engines.
+- No saved-game, frame, view-layout or catalog format changes. The public binding interface digest moves.
+
 ## 1.22.0 (2026-11-10)
 
 - A lobby tile placed where there is no floor yet pays the floor's price on top of the lobby's, as the original charges a $500 floor tile with each $5,000 lobby tile placed where there is no floor yet. This covers a lobby placement, the Floor tool on the ground floor (which lays a lobby) and every gap tile a lobby bridge fills, so `quoteBuild` and `canBuild` quote, and `buildAt`, `build`, `paintTiles` and `paintBrush` charge, $5,500 for each such tile. A lobby placed over a floor tile still pays the lobby's price alone.

@@ -26,3 +26,5 @@ src/tests/integration/retailTalliesEngine.integration.test.ts
 src/tests/integration/cinemaBookingEngine.integration.test.ts
 src/tests/integration/overheadEngine.integration.test.ts
 src/tests/integration/condoRelocationEngine.integration.test.ts
+src/tests/integration/condoModesEngine.integration.test.ts
+src/tests/integration/roomCountsEngine.integration.test.ts

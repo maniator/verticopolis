@@ -135,6 +135,47 @@ impl Engine {
         true
     }
 
+    /// Tooling only: a tenant leaves unit `id` for `reason` (a departure
+    /// cause's save name), the TypeScript `sim.vacate(u, reason)`, so a test
+    /// can empty a chosen room mid-run. It is the churn pass's departure, so
+    /// a sold condo is bought back. Like a fire, it is not part of an open
+    /// undo step. The unit's kind is not checked. False, changing nothing,
+    /// for an unknown unit or cause.
+    #[wasm_bindgen(js_name = vacateUnit)]
+    pub fn vacate_unit(&mut self, id: f64, reason: &str) -> bool {
+        let Some(reason) = super::port_panels::VACATE_REASONS
+            .iter()
+            .copied()
+            .find(|known| *known == reason)
+        else {
+            return false;
+        };
+        let Some(i) =
+            whole_id(id).and_then(|id| self.sim.tower.units.iter().position(|u| u.id == id))
+        else {
+            return false;
+        };
+        self.sim.outside_the_gesture(|s| s.vacate(i, reason));
+        true
+    }
+
+    /// Tooling only: write unit `id`'s price as given, with no ladder snap
+    /// or band clamp, or clear it with null, the TypeScript `u.rent = value`.
+    /// A test uses it for a legacy off-ladder price or an unpriced room,
+    /// which a load would snap onto the ladder. False, changing nothing, for
+    /// an unknown unit or a price that is not finite or is below 0.
+    #[wasm_bindgen(js_name = setUnitRent)]
+    pub fn set_unit_rent(&mut self, id: f64, rent: Option<f64>) -> bool {
+        if rent.is_some_and(|r| !r.is_finite() || r < 0.0) {
+            return false;
+        }
+        let Some((unit, _)) = whole_id(id).and_then(|id| self.sim.tower.marked_by_id(id)) else {
+            return false;
+        };
+        unit.rent = rent;
+        true
+    }
+
     /// Tooling only: set a unit's live customer tally (`customersIn`), which
     /// no save carries, so a test can fill a venue to capacity mid-run, with
     /// the follow-ups a counted arrival makes (an attendance venue's occupants

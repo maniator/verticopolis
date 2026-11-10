@@ -1,12 +1,12 @@
 import { censusCount } from "../../engine/census";
 import { isHotelKind } from "../../engine/facilities";
-import type { Simulation } from "../../engine/Simulation";
-import { isPresent, isTenanted } from "../../engine/types";
+import { isPresent, isTenanted, type Unit } from "../../engine/types";
 
 /** The HUD's room counts as `stats()` computed them before it read the rooms
  *  list or kept counts: a walk over every unit, the population summed over
- *  every unit as well, so no memoized list or kept count stands behind it. */
-export function walkedStats(sim: Simulation) {
+ *  every unit as well, so no memoized list or kept count stands behind it.
+ *  Any holder of the units will do: a `Simulation`, or an engine's save. */
+export function walkedStats(sim: { tower: { units: readonly Unit[] } }) {
   const c = { offices: 0, occupiedOffices: 0, condos: 0, soldCondos: 0, hotelRooms: 0, occupiedHotel: 0, dirty: 0, shops: 0, restaurants: 0, vacant: 0, vacantNoRate: 0, parkingSpaces: 0, population: 0 };
   for (const u of sim.tower.units) {
     if (isPresent(u)) c.population += censusCount(u);

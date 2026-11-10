@@ -5,7 +5,7 @@ import { Simulation } from "../../engine/Simulation";
 import { crowdView } from "../../engine/conformanceView";
 import type { Person } from "../../engine/crowd/person";
 import type { Tower } from "../../engine/Tower";
-import type { FacilityKind, SerializedGame, Transport, Unit, UnitState, WeatherKind } from "../../engine/types";
+import type { FacilityKind, SerializedGame, Transport, Unit, UnitState, VacateReason, WeatherKind } from "../../engine/types";
 import type { HeatCell, HeatmapMode } from "../../engine/sim/constants";
 import type { EnginePort } from "../../simport/enginePort";
 import type { StatsReport } from "../../simport/panels";
@@ -13,7 +13,7 @@ import { PortCodes } from "../../simport/portCodes";
 import { statsReport } from "../../simport/statsSheet";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 import type { WasmEngine } from "../../dualrun/binding";
-import { tsTooling, type ToolingSetters } from "./tsTooling";
+import { rustTooling, tsTooling, type ToolingSetters } from "./tsTooling";
 
 /**
  * The test kit for suites that run on the engine port (#878, #1421; PR 7 of
@@ -58,8 +58,7 @@ export type Snapshot = Readonly<Omit<Simulation, SimulationWrites | "tower">> & 
 
 interface Leaf extends ToolingSetters {
   readonly port: EnginePort;
-  /** The tooling-only members (binding tier 3), the same on both engines;
-   *  the mid-run setters come from {@link ToolingSetters}. */
+  /** The tooling-only members (binding tier 3); the setters are {@link ToolingSetters}. */
   startFire(): void;
   bombThreat(): void;
   evaluateStar(): void;
@@ -95,12 +94,7 @@ function makeLeaf(leg: Leg, save: string): Leaf {
     bombThreat: () => engine.bombThreat(),
     evaluateStar: () => engine.evaluateStar(),
     setMoney: (amount) => engine.setMoney(amount),
-    setClock: (minutes) => engine.setClock(minutes),
-    setUnitState: (id, state, occupants) => engine.setUnitState(id, state, occupants),
-    setCustomersIn: (id, count) => engine.setCustomersIn(id, count),
-    setWeather: (weather) => engine.setWeather(weather),
-    clearRetailTallies: () => engine.clearRetailTallies(),
-    startFireAt: (id) => engine.startFireAt(id),
+    ...rustTooling(engine),
     crowdView: () => JSON.parse(engine.crowdView()) as { people: Person[] },
     elevatorUtilization: (id) => (JSON.parse(engine.elevatorTelemetry()) as { util: [number, number][] }).util.find(([shaft]) => shaft === id)?.[1],
     free: () => engine.free(),
@@ -438,6 +432,18 @@ export class PortSim {
   setWeather(weather: WeatherKind): void {
     if (!this.leaf.setWeather(weather)) throw new Error(`PortSim.setWeather: the engine refused ${weather}`);
     this.unsavedWrite = true;
+    this.changed();
+  }
+
+  /** A tenant leaves unit `id` for `reason` mid-run (a sold condo is bought back). */
+  vacateUnit(id: number, reason: VacateReason): void {
+    if (!this.leaf.vacateUnit(id, reason)) throw new Error(`PortSim.vacateUnit: the engine refused unit ${id} ${reason}`);
+    this.changed();
+  }
+
+  /** Write unit `id`'s price mid-run as given (no ladder snap), or clear it with null. */
+  setUnitRent(id: number, rent: number | null): void {
+    if (!this.leaf.setUnitRent(id, rent)) throw new Error(`PortSim.setUnitRent: the engine refused unit ${id} rent ${rent}`);
     this.changed();
   }
 
