@@ -21,6 +21,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.87.0
+
+- The Map now has Edit, Eval, Pricing and Hotel tabs. Hotel highlights rooms that need cleaning or have cockroaches, with a separate pattern and count for each.
+- Eval and Pricing tabs show their upcoming views while their painters are being built.
+
 ## 2.85.2
 
 - On a phone held sideways, the funds and population stats stay on one row without cutting off their values.

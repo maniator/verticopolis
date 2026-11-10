@@ -24,6 +24,10 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
  * change in kind (a per-frame rebuild, a per-frame scan of the rooms) without
  * tripping on a slow runner. The measured numbers are printed for the PR.
  *
+ * The second test does the same for the Hotel view (S6):
+ * a steady frame, a frame on which the game hour turns with nothing changed,
+ * and an hourly repaint with every hotel room changed.
+ *
  * This is the map's own cost. The paired whole-frame run, map open against
  * map closed on the `large` fixture, goes through the perf harness
  * (`npm run perf:worker -- --aa wasm --map-ab`, SPEC CAP-6).
@@ -128,4 +132,98 @@ test("the map's cost on a large tower stays within its ceilings", async ({ page 
   expect(result.steadyMs).toBeLessThan(STEADY_CEILING_MS);
   expect(result.cameraMs).toBeLessThan(CAMERA_CEILING_MS);
   expect(result.closedMs).toBeLessThan(CLOSED_CEILING_MS);
+});
+
+/** Ceiling for an hourly Hotel view repaint on the large tower: one read of
+ *  every hotel room, a full tower repaint and the red rooms over it. */
+const HOTEL_REPAINT_CEILING_MS = 30;
+/** Ceiling for a frame on which the game hour turns and no room changed:
+ *  one read of every hotel room, no paint. */
+const HOTEL_HOUR_CEILING_MS = 0.5;
+
+/**
+ * Add hotel singles in the free strip left of the offices on floors 3 to 62
+ * of the 5-star rung (six a floor, about 360 rooms), so the Hotel view has
+ * rooms to read. Runs in the page.
+ */
+function addHotelRooms(): number {
+  const g = (window as any).game;
+  const s = g.sim.constructor.deserialize(JSON.parse(JSON.stringify(g.sim.serialize())));
+  s.money = 1e9;
+  let placed = 0;
+  for (let f = 3; f <= 62; f++) for (let x = 5; x + 4 <= 29; x += 4) if (s.tower.place("hotelSingle", f, x).ok) placed++;
+  g.adoptSim(s, true);
+  g.speed = 0;
+  return placed;
+}
+
+test("the Hotel view's hourly repaint on a large tower stays within its ceilings", async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto("/");
+  await page.waitForFunction(() => Boolean((window as any).game && (window as any).overviewMap));
+  await page.evaluate(() => document.getElementById("splash")?.remove());
+  expect(await page.evaluate(buildToStar, 5)).toBe(5);
+  expect(await page.evaluate(addHotelRooms)).toBeGreaterThan(300);
+  await page.getByRole("tab", { name: "Hotel" }).click();
+
+  const result = await page.evaluate(() => {
+    const win = (window as any).overviewMap;
+    const g = (window as any).game;
+    const views = win.deps.views;
+    const median = (xs: number[]) => {
+      const s = [...xs].sort((a, b) => a - b);
+      return s[Math.floor(s.length / 2)];
+    };
+    // The game is paused: the views read a clock this test turns by hand.
+    let minutes = g.reader.header.minutes;
+    views.deps.minutes = () => minutes;
+    win.frame();
+    const hotels = (g.reader.rooms as any[]).filter((r) => r.kind === "hotelSingle");
+
+    const BATCH = 200;
+    const steady: number[] = [];
+    for (let b = 0; b < 15; b++) {
+      const t0 = performance.now();
+      for (let i = 0; i < BATCH; i++) win.frame();
+      steady.push((performance.now() - t0) / BATCH);
+    }
+
+    const hour: number[] = [];
+    for (let b = 0; b < 15; b++) {
+      const t0 = performance.now();
+      for (let i = 0; i < 20; i++) {
+        minutes += 60;
+        win.frame();
+      }
+      hour.push((performance.now() - t0) / 20);
+    }
+
+    // Each sample turns the hour with every hotel room's state flipped, so
+    // the frame reads them all and repaints the tower layer.
+    const repaint: number[] = [];
+    for (let b = 0; b < 15; b++) {
+      const state = b % 2 === 0 ? "dirty" : "empty";
+      for (const r of hotels) r.state = state;
+      minutes += 60;
+      const t0 = performance.now();
+      win.frame();
+      repaint.push(performance.now() - t0);
+    }
+    // End with the rooms dirty, so the bitmap shows the red rooms.
+    for (const r of hotels) r.state = "dirty";
+    minutes += 60;
+    win.frame();
+    const bitmap = document.querySelector("#overview-map .overview-map-tower") as HTMLCanvasElement;
+    const px = bitmap.getContext("2d")!.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    let red = 0;
+    for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 0 && px[i] > 150 && px[i + 1] < 70 && px[i + 2] < 70) red++;
+    return { hotelRooms: hotels.length, red, steadyMs: median(steady), hourMs: median(hour), repaintMs: median(repaint) };
+  });
+
+  console.log(`overview map hotel perf: ${JSON.stringify(result)}`);
+  expect(result.hotelRooms).toBeGreaterThan(300);
+  expect(result.red).toBeGreaterThan(result.hotelRooms);
+  expect(result.steadyMs).toBeLessThan(STEADY_CEILING_MS);
+  expect(result.hourMs).toBeLessThan(HOTEL_HOUR_CEILING_MS);
+  expect(result.repaintMs).toBeLessThan(HOTEL_REPAINT_CEILING_MS);
 });

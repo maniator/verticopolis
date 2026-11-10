@@ -52,6 +52,17 @@ export const FEATURE_SCENES: Scene[] = [
       // are guest-reachable but have no staff route, so they read red. A few dirty
       // rooms in the covered zone read amber.
       { name: "overlay-cleanliness", overlay: "cleanliness", frame: { floor: 7, zoom: 0.45 } },
+      // The Map's Hotel tab (#1617) on the same tower: the rooms that need
+      // cleaning are picked out on the Map.
+      {
+        name: "map-hotel-view",
+        crop: "#overview-map",
+        frame: { floor: 7, zoom: 0.45 },
+        setup: async (page) => {
+          await page.click("#overview-map-tab-hotel");
+          await page.waitForSelector('#overview-map-tab-hotel[aria-selected="true"]');
+        },
+      },
     ],
   },
   // --- Basement: parking garage, recycling, garbage truck, inspector ----------

@@ -11,11 +11,10 @@
  * from the view, the bound world and the camera; moves go through the
  * renderer's own clamp (`moveCamera`).
  */
-import type { FacilityKind } from "../engine/types";
 import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
 import type { ViewPlacement } from "../render/overviewMap/extent";
-import { dragCenter, mapPointToCenter, rectContains, type MapCamera, type MapCameraCenter, type MapLayout, type MapRect, type MapWorld } from "../render/overviewMap/geometry";
-import { OverviewMapModel, type MapFrameInput, type MapViewInput } from "../render/overviewMap/model";
+import { dragCenter, mapPointToCenter, rectContains, type MapLayout, type MapRect } from "../render/overviewMap/geometry";
+import { OverviewMapModel, type MapFrameInput } from "../render/overviewMap/model";
 import { createPatternSource, paintMapMarks, type PatternSource } from "../render/overviewMap/paint";
 import { MAP_BACKDROP, groundShare, paintViewMark, viewMarkBand } from "../render/overviewMap/viewMark";
 import { buildMapDom, ContextWatch } from "./overviewMapDom";
@@ -24,33 +23,9 @@ import { WorldPress } from "./overviewMapWorldPress";
 import { cameraCenter, clientToMap, grabRect, isKeyboardClick, isPrimaryPress, keyTarget, MAP_KEY, type MapPress, MAP_MOUSE_TARGET_CSS, MAP_TOUCH_TARGET_CSS, noButtonHeld, passesMapKey, pastTapSlop, pixelRatio } from "./overviewMapInput";
 import { mapStartsOpen, rememberMapOpen, type MapLayoutClass } from "./overviewMapPrefs";
 import { mapSummary } from "./overviewMapText";
+import type { MutableMapCamera, OverviewMapDeps } from "./overviewMapDeps";
 
-/** What the window draws each frame. */
-export interface OverviewMapSource {
-  readonly view: MapViewInput;
-  readonly world: MapWorld;
-}
-
-/** The camera fields the window reads, filled in place each frame. */
-export type MutableMapCamera = { -readonly [K in keyof MapCamera]: MapCamera[K] };
-
-export interface OverviewMapDeps {
-  /** The element the window and its button go in (`#stage`). */
-  readonly stage: HTMLElement;
-  /** The tower to draw, or null while there is none. */
-  source(): OverviewMapSource | null;
-  /** Fill `out` with the camera as the renderer holds it. */
-  readCamera(out: MutableMapCamera): void;
-  /** Move the camera's center at its current zoom; the renderer clamps it. */
-  moveCamera(center: MapCameraCenter): void;
-  /** A kind's height in floors (the catalog the view binds). */
-  floorsOf(kind: FacilityKind): number;
-  /** Whether the phone layout applies now. */
-  isPhone(): boolean;
-  /** Where the open or closed choice is kept, or null without storage. */
-  readonly storage: Storage | null;
-}
-
+export type { MutableMapCamera, OverviewMapDeps, OverviewMapSource } from "./overviewMapDeps";
 export { WORLD_PRESS_CLASS } from "./overviewMapWorldPress";
 export { MAP_DOM_ID } from "./overviewMapDom";
 
@@ -109,6 +84,7 @@ export class OverviewMapWindow {
     this.viewCanvas = dom.viewCanvas;
     this.summary = dom.summary;
     this.toggle = dom.toggle;
+    deps.views?.mount(dom);
     this.worldPress = new WorldPress([this.root, this.toggle]);
     this.input = {
       view: { structure: [], rooms: [], tower: { lowestFloor: 1, highestFloor: 1, transports: [] } },
@@ -213,6 +189,7 @@ export class OverviewMapWindow {
     this.toggle.hidden = open;
     this.press = null;
     this.forgetDrawing();
+    if (!open) this.deps.views?.release();
     if (hadFocus) this.toggle.focus();
     // A reopened window has missed every change while it was closed, a loss
     // and restore of a context that left nothing for a poll to see included.
@@ -256,10 +233,12 @@ export class OverviewMapWindow {
     const rebuilt = this.model.sync(input);
     const layout = this.model.layout;
     if (!layout) return;
-    if (rebuilt) {
+    // The selected view may repaint without a rebuild (the Hotel view, hourly).
+    if (this.deps.views?.due(layout, rebuilt) || rebuilt) {
       // Marked only once painted: the gallery runner reads it (`mapForShot`).
       if (this.towerCtx && this.patterns) {
         paintMapMarks(this.towerCtx, layout.width, layout.height, this.model.marks, this.patterns);
+        this.deps.views?.paintOver(this.towerCtx, this.patterns);
         this.root.dataset.mapDrawn = "true";
       }
       const ground = `${(groundShare(layout) * 100).toFixed(2)}%`;
