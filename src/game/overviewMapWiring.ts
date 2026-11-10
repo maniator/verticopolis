@@ -5,9 +5,10 @@
  * phone breakpoint. The window lives beside the app in a weak map, so the app
  * class carries no field for it. Every page builds it (SPEC, CAP-1): it opens
  * by default on desktop and starts closed behind the Map pill on a phone.
- * The window always carries its view tabs (S6 to S9). The Eval and Pricing
- * views read the engine's room tiers through one reader built on the app's
- * port, which stays the same engine object for the page life.
+ * The window always carries its View dropdown (S6 to S9). The Eval and
+ * Pricing views read the engine's room tiers through one reader built on the
+ * app's port, which stays the same engine object for the page life, and the
+ * Traffic and Occupancy views read its heat cells through the renderer's sim.
  */
 import type { GameApp } from "../main";
 import type { FacilityKind } from "../engine/types";
@@ -16,7 +17,7 @@ import { NO_ROOM_TIERS, RoomTierReader, type RoomTiers } from "../simport/roomTi
 import { FLOOR, TILE } from "../render/scale";
 import { browserStorage } from "../ui/overviewMapPrefs";
 import { OverviewMapWindow, type MutableMapCamera, type OverviewMapSource } from "../ui/overviewMapWindow";
-import { OverviewMapViews } from "../ui/overviewMapViews";
+import { OverviewMapViews, type MapHeatSource } from "../ui/overviewMapViews";
 import { viewWorld, viewWorldBound } from "../presentation/viewWorld";
 import { engineTrapped, noteEngineThrow } from "./engineFault";
 import { isEngineStopped } from "./interactionState";
@@ -30,7 +31,7 @@ function floorsOf(kind: FacilityKind): number {
 }
 
 /** The tier read with the frame loop's engine guards, since the window can
- *  also read from a click (opening it, picking a tab): no read once the
+ *  also read from a click (opening it, picking a view): no read once the
  *  engine stopped or trapped, and a trap the read hits is reported as one. */
 function guardedTiers(reader: RoomTierReader): { read(): RoomTiers } {
   return {
@@ -43,6 +44,25 @@ function guardedTiers(reader: RoomTierReader): { read(): RoomTiers } {
         throw error;
       }
     },
+  };
+}
+
+/** The heat cells with the same engine guards as the tier read: no read once
+ *  the engine stopped or trapped (the views then show no floors), and a trap
+ *  the read hits is reported as one. */
+function guardedHeat(app: GameApp): MapHeatSource {
+  return {
+    cells: (mode) => {
+      if (engineTrapped() || isEngineStopped()) return [];
+      try {
+        return app.engine.sim.floorHeatmap(mode);
+      } catch (error) {
+        if (noteEngineThrow(error)) return [];
+        throw error;
+      }
+    },
+    towerRevision: () => app.reader.header.revision,
+    mealRevision: () => app.reader.header.mealOverlayRevision,
   };
 }
 
@@ -64,6 +84,7 @@ export function wireOverviewMap(app: GameApp): void {
     floorsOf,
     roomById: (id) => app.reader.tower.getUnit(id),
     tiers: guardedTiers(new RoomTierReader(app.enginePort)),
+    heat: guardedHeat(app),
     gesture: () => app.undoGesture(),
   });
   mapViews.set(app, views);

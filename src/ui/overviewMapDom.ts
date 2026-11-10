@@ -15,7 +15,7 @@ export const MAP_DOM_ID = {
 
 export interface MapDom {
   readonly root: HTMLElement;
-  /** The title bar; the view tabs go right after it. */
+  /** The title bar; the View dropdown goes right after it. */
   readonly title: HTMLElement;
   readonly close: HTMLButtonElement;
   readonly body: HTMLElement;

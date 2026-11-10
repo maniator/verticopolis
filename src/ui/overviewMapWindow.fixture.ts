@@ -9,6 +9,8 @@ import type { MapCameraCenter, MapExtent } from "../render/overviewMap/geometry"
 import { MAP_OPEN_STORAGE_KEY } from "./overviewMapPrefs";
 import { MAP_DOM_ID, OverviewMapWindow, WORLD_PRESS_CLASS, type MutableMapCamera, type OverviewMapDeps, type OverviewMapSource } from "./overviewMapWindow";
 import type { OverviewMapViews } from "./overviewMapViews";
+import type { MapViewId } from "../render/overviewMap/views";
+import { MAP_PICKER_DOM } from "./overviewMapPicker";
 
 /** A fake world: a 375-tile lot, floors -9 to 100, a ten-floor tower. */
 export function towerSource(): OverviewMapSource & { view: { tower: { transports: unknown[] } } } {
@@ -132,3 +134,11 @@ export const CROP: MapExtent = { leftTile: -15, width: 405, topLine: 30, bottomL
 /** The map x and y of a tile and floor line in the rig's layout. */
 export const mapX = (tile: number) => ((tile - CROP.leftTile) * 200) / CROP.width;
 export const mapY = (line: number) => ((CROP.topLine - line) * 288) / (CROP.topLine - CROP.bottomLine);
+
+/** Choose a view in the mounted View dropdown, as a key or a screen reader
+ *  does (no pointer press). */
+export function pickView(view: MapViewId): void {
+  const select = document.getElementById(MAP_PICKER_DOM.select) as HTMLSelectElement;
+  select.value = view;
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+}

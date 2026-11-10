@@ -5,9 +5,9 @@ import { extentFloors, fitLayout, mapExtent } from "../render/overviewMap/geomet
 import { HOTEL_VIEW_STYLE } from "../render/overviewMap/hotelView";
 import type { MapPaintContext, PatternSource } from "../render/overviewMap/paint";
 import { MAP_DOM_ID } from "./overviewMapDom";
-import { MAP_TABS_DOM, tabId } from "./overviewMapTabs";
+import { MAP_PICKER_DOM } from "./overviewMapPicker";
 import { gameHour, MINUTES_PER_GAME_HOUR, OverviewMapViews, type MapViewRoom } from "./overviewMapViews";
-import { disposeRigs, rig, rootEl } from "./overviewMapWindow.fixture";
+import { disposeRigs, pickView, rig, rootEl } from "./overviewMapWindow.fixture";
 
 const EXTENT = mapExtent({ lotWidth: 375, minFloor: -9, maxFloor: 100 }, SKY_HEADROOM_FLOORS);
 const layout = fitLayout(EXTENT, 375, extentFloors(EXTENT) * 5);
@@ -57,21 +57,21 @@ describe("gameHour", () => {
 });
 
 describe("the map's views in the window", () => {
-  it("puts the tab row right under the title bar and the legends in the body, hidden", () => {
+  it("puts the View dropdown right under the title bar and the legends in the body, hidden", () => {
     mounted();
     const root = rootEl();
-    const list = document.getElementById(MAP_TABS_DOM.list)!;
-    expect(list.previousElementSibling?.classList.contains("win-title")).toBe(true);
-    expect(list.nextElementSibling?.classList.contains("overview-map-body")).toBe(true);
+    const picker = document.getElementById(MAP_PICKER_DOM.root)!;
+    expect(picker.previousElementSibling?.classList.contains("win-title")).toBe(true);
+    expect(picker.nextElementSibling?.classList.contains("overview-map-body")).toBe(true);
     const legends = [...root.querySelectorAll<HTMLElement>(".overview-map-body .overview-map-legend")];
-    expect(legends.map((l) => l.dataset.view)).toEqual(["eval", "pricing", "hotel"]);
+    expect(legends.map((l) => l.dataset.view)).toEqual(["eval", "pricing", "hotel", "traffic", "occupancy"]);
     expect(legends.every((l) => l.hidden)).toBe(true);
     expect(document.getElementById(MAP_DOM_ID.summary)).not.toBeNull();
   });
 
-  it("builds no tab row without the views", () => {
+  it("builds no dropdown without the views", () => {
     rig();
-    expect(document.getElementById(MAP_TABS_DOM.list)).toBeNull();
+    expect(document.getElementById(MAP_PICKER_DOM.root)).toBeNull();
     expect(document.querySelector(".overview-map-legend")).toBeNull();
   });
 
@@ -85,18 +85,25 @@ describe("the map's views in the window", () => {
     expect(due).toHaveBeenCalledTimes(1);
   });
 
-  it("lets Escape on a tab close the map, and keeps the arrows from the game", () => {
+  it("lets Escape on the dropdown close the map, and keeps a build key from the game", () => {
     const { r } = mounted();
-    const tab = document.getElementById(tabId("edit")) as HTMLButtonElement;
-    tab.focus();
+    const select = document.getElementById(MAP_PICKER_DOM.select) as HTMLSelectElement;
+    select.focus();
     const seen = vi.fn();
     document.addEventListener("keydown", seen);
-    tab.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+    select.dispatchEvent(new KeyboardEvent("keydown", { key: "b", bubbles: true, cancelable: true }));
     expect(seen).not.toHaveBeenCalled();
     document.removeEventListener("keydown", seen);
-    expect(document.activeElement?.id).toBe(tabId("eval"));
-    document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    select.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     expect(r.win.isOpen()).toBe(false);
+  });
+
+  it("lets a mouse press reach the dropdown, so it opens", () => {
+    mounted();
+    const select = document.getElementById(MAP_PICKER_DOM.select) as HTMLSelectElement;
+    const press = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    select.dispatchEvent(press);
+    expect(press.defaultPrevented).toBe(false);
   });
 });
 
@@ -117,7 +124,7 @@ describe("the Edit view", () => {
 describe("the Hotel view's throttle", () => {
   function onHotel() {
     const made = mounted();
-    (document.getElementById(tabId("hotel")) as HTMLButtonElement).click();
+    pickView("hotel");
     return made;
   }
 
@@ -184,7 +191,7 @@ describe("the Hotel view's throttle", () => {
     clock.minutes += MINUTES_PER_GAME_HOUR;
     v.due(layout, false);
     expect(legend.textContent).toBe("Dirty: 1Infested: 0");
-    (document.getElementById(tabId("edit")) as HTMLButtonElement).click();
+    pickView("edit");
     expect(legend.hidden).toBe(true);
     // Back on Edit, one repaint drops the red, and the hotel rooms are let go.
     expect(v.due(layout, false)).toBe(true);
