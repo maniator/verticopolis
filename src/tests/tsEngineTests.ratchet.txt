@@ -16,8 +16,6 @@
 src/analyticsEngineBridge.test.ts Simulation
 src/bootstrapEngine.test.ts Simulation
 src/catalog/towerCatalog.test.ts Simulation
-src/dualrun/mirror.test.ts Simulation
-src/dualrun/mirrorPort.test.ts Simulation port/tsEngine
 src/game/appBootBackdrop.test.ts Simulation port/tsEngine
 src/game/appHistory.test.ts Simulation port/tsEngine
 src/game/appModals.fixture.ts Simulation port/tsEngine
@@ -61,6 +59,7 @@ src/storage/vctowerWriter.test.ts Simulation
 src/tests/barrelSurface.test.ts Crowd EconomySystem Simulation Tower
 src/tests/conformance/checkpointDetail.test.ts Simulation
 src/tests/conformance/fixedStepCases.ts sim/frameStep # writes the fixed-step cases the Rust step driver replays; reached through the shipped frameLoop re-export until #921 took it out of the game
+src/tests/conformance/fixtureSim.ts Simulation sim/founderStatus # the fixture loader, moved from src/tests/dualrun/dualRunHarness.ts when #1421 deleted it (that line goes)
 src/tests/conformance/panelProbe.ts Simulation sim/founderStatus
 src/tests/conformance/scenario.ts Simulation sim/coerce sim/founderStatus
 src/tests/diagnostics/facilityDiagnostics.test.ts Simulation # moved from src/game with the file it tests (#921)
@@ -68,7 +67,6 @@ src/tests/diagnostics/facilityDiagnostics.ts EconomySystem Simulation sim/consta
 src/tests/diagnostics/gripeCopy.ts sim/gripe sim/satisfactionStep # moved from src/game with the TypeScript reference card (#921): the card the card-text referee holds the golden to (#1809) until src/engine/ goes
 src/tests/diagnostics/housekeepingDiagnostics.ts economy/housekeeping # moved from src/game with the TypeScript reference card (#921): the card the card-text referee holds the golden to (#1809) until src/engine/ goes
 src/tests/diagnostics/tsDiagnosticFacts.ts sim/constants sim/gripe sim/satisfactionStep
-src/tests/dualrun/dualRunHarness.ts Simulation sim/founderStatus sim/frameStep # sim/frameStep was reached through the shipped frameLoop re-export until #921 took it out of the game
 src/tests/fixtures/saveText.ts Simulation port/tsEngine
 src/tests/fixtures/scheduleTower.ts Simulation
 src/tests/fixtures/serviceDiagnostics.fixture.ts Simulation
@@ -98,8 +96,6 @@ src/tests/integration/crashScreen.integration.test.ts Simulation port/tsEngine
 src/tests/integration/crowd.integration.test.ts Clock Crowd ElevatorDispatch Simulation Tower
 src/tests/integration/demographicRoutines.integration.test.ts Clock Crowd Simulation sim/constants
 src/tests/integration/dominantGripe.integration.test.ts Simulation sim/constants sim/gripe
-src/tests/integration/dualRunBrush.integration.test.ts Simulation
-src/tests/integration/dualRunEdits.integration.test.ts Simulation sim/charges
 src/tests/integration/economyDepth.integration.test.ts Simulation
 src/tests/integration/elevatorDispatchBalancing.integration.test.ts Crowd Tower crowd/routing tower/segments
 src/tests/integration/elevatorSchedule.integration.test.ts Simulation
@@ -179,15 +175,10 @@ src/tests/integration/viewReaderHall.integration.test.ts Simulation
 src/tests/integration/viewStateParity.integration.test.ts Simulation
 src/tests/integration/walkingPenalties.integration.test.ts Simulation sim/constants
 src/tests/integration/walkwayWillingness.integration.test.ts Crowd Tower
-src/tests/integration/wasmHost.integration.test.ts Simulation
-src/tests/integration/wasmHostCatalog.integration.test.ts Simulation
-src/tests/integration/wasmHostTelemetry.integration.test.ts Simulation
 src/tests/integration/wasteAndParking.integration.test.ts Simulation
 src/tests/integration/weatherCrowd.integration.test.ts Clock EconomySystem Simulation Tower rng
 src/tests/integration/weatherEvents.integration.test.ts Clock EventSystem Simulation Tower rng
 src/tests/integration/weekendPatronage.integration.test.ts Simulation
-src/tests/parity/wasmHostSetup.integration.test.ts Simulation
-src/tests/parity/wasmHostSetup.ts Simulation sim/coerce sim/constants
 src/tests/perfCompare/fixtureHotelTower.test.ts Simulation
 src/tests/perfCompare/fixtureHotelTower.ts Simulation
 src/tests/perfCompare/fixtureTowers.test.ts Simulation
@@ -208,9 +199,5 @@ src/ui/templates/inspector.test.ts Simulation
 src/ui/templates/stats.fixture.ts port/tsEngine
 src/ui/templates/stats.test.ts Simulation sim/star tower/rooms
 src/ui/uiStatus.test.ts Simulation port/tsEngine
-src/wasmhost/frameApply.test.ts Simulation port/tsEngine tower/rooms
 src/wasmhost/hostFault.test.ts Simulation
-src/wasmhost/merge.test.ts Simulation port/tsEngine tower/rooms
 src/wasmhost/stepLoopAbsent.test.ts Simulation
-src/wasmhost/wasmHostFrame.test.ts Simulation
-src/wasmhost/wasmHostPoints.test.ts Simulation

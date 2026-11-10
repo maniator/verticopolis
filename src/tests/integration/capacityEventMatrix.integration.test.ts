@@ -4,19 +4,18 @@ import { MAX_CARS } from "../../engine/facilities";
 const CAR_LIMIT = MAX_CARS.elevatorStandard!;
 import type { GameplayEvent } from "../../events/gameplayEvents";
 import { Simulation } from "../../engine/Simulation";
-import { attachWasmHost, type WasmHost } from "../../wasmhost/wasmHost";
-import { DualRun } from "../dualrun/dualRunHarness";
-import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
 
 /**
  * Every way a shaft's capacity can change, on each engine (#906): each
  * mutation reports `capacity_changed` exactly once, with the shaft's kind; a
  * refusal or a no-op reports nothing; the bare tower edits report nothing; and
- * a tower that is swapped (a load, an undo restore) or merged (the WASM
- * host's hour pass) never reports into a buffer it no longer belongs to.
+ * a tower that is swapped (a load, an undo restore) never reports into a
+ * buffer it no longer belongs to. The Rust engine's own tests hold the same
+ * rules (`price_and_capacity_edits_report_changes_and_not_no_ops` in
+ * `engine-rs/src/gameplay/tests.rs`, and
+ * `paid_edits_report_capacity_changed_and_refusals_report_nothing` in
+ * `engine-rs/src/charges_tests.rs`).
  */
-
-if (wasmRequired() && !hasWasmPackage()) throw new Error("VC_REQUIRE_WASM=1 but engine-rs/pkg/ is not built; run npm run wasm:build");
 
 type Step = (sim: Simulation, shaft: number) => unknown;
 /** What the case does, how many capacity_changed it must report, and the
@@ -35,14 +34,6 @@ function tower(seed = 51): { sim: Simulation; shaft: number } {
 }
 
 const capacity = (events: GameplayEvent[]) => events.filter((e) => e.name === "capacity_changed");
-
-/** The hosted tower's events once a restore point covers them: the WASM
- *  host holds a command's events until one does (#874), and a hosted save
- *  (an undo capture, an autosave) is one. */
-const covered = (sim: Simulation): GameplayEvent[] => {
-  sim.serialize();
-  return sim.drainGameplayEvents();
-};
 
 const EDITS: Edit[] = [
   ["setCars to a new count", 1, (sim, id) => sim.setCars(id, 2)],
@@ -113,65 +104,5 @@ describe("capacity_changed on the TypeScript engine", () => {
     expect(sim.setCars(shaft, 2)).toBe(true);
     expect(capacity(sim.drainGameplayEvents())).toHaveLength(1);
     expect(capacity(donor.drainGameplayEvents())).toHaveLength(0);
-  });
-});
-
-describe.skipIf(!hasWasmPackage())("capacity_changed on the WASM host and in the dual run", () => {
-  for (const [what, expected, run, setup] of EDITS) {
-    it(`${what}: ${expected} event on the hosted engine`, () => {
-      const { sim, shaft } = tower();
-      let host: WasmHost | null = attachWasmHost(sim, wasm());
-      try {
-        setup?.(sim, shaft);
-        covered(sim);
-        run(sim, shaft);
-        const got = capacity(covered(sim));
-        expect(got).toHaveLength(expected);
-        for (const e of got) expect(e.payload).toEqual({ kind: "elevatorStandard" });
-        // Nothing is owed at detach, so nothing is reported twice.
-        host.detach();
-        host = null;
-        expect(capacity(sim.drainGameplayEvents())).toHaveLength(0);
-      } finally {
-        host?.detach();
-      }
-    });
-  }
-
-  it("reports once across the host's hour merge into the instance", () => {
-    const { sim, shaft } = tower();
-    const host = attachWasmHost(sim, wasm());
-    try {
-      const merges = host.merges;
-      sim.tick(60); // an hour pass: the host merges the engine's save into the instance
-      sim.drainGameplayEvents();
-      expect(host.merges).toBeGreaterThan(merges);
-      expect(sim.setCars(shaft, 2)).toBe(true);
-      expect(capacity(covered(sim))).toHaveLength(1);
-      expect(sim.addCar(shaft).ok).toBe(true);
-      expect(capacity(covered(sim))).toHaveLength(1);
-    } finally {
-      host.detach();
-    }
-  });
-
-  it("the dual run agrees on every edit, event for event", () => {
-    const { sim, shaft } = tower();
-    const run = new DualRun().follow(sim);
-    // No drain here: the harness compares every event both engines report,
-    // setups and resets included, at the next checkpoint.
-    let want = 0;
-    for (const [, expected, edit, setup] of EDITS) {
-      setup?.(sim, shaft);
-      edit(sim, shaft);
-      want += expected;
-      sim.setCars(shaft, 1); // back to one car for the next edit
-      sim.resizeTransport(shaft, 1, 2); // and back to the starting span
-    }
-    sim.tick(60);
-    const report = run.stop();
-    expect(report.divergences).toEqual([]);
-    expect(report.eventDivergences).toEqual([]);
-    expect(want).toBeGreaterThan(0);
   });
 });

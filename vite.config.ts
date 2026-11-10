@@ -12,7 +12,6 @@ import { tsEngineSourceHash } from "./src/build/tsEngineSources";
 import { ENGINE_PRELOAD_FILES, enginePreloadAttrs } from "./src/build/enginePreload";
 import { ENGINE_BUILD_RECORD, ENGINE_DIR } from "./src/wasmhost/enginePackageNames";
 import { buildFingerprint } from "./src/build/buildFingerprint";
-import { convertedSuites } from "./src/tests/portKit/convertedList";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
 
@@ -243,101 +242,6 @@ function enginePreload(): Plugin {
       },
     },
   };
-}
-
-/** The vitest projects that run the suites on the WASM engine; see the
- *  `projects` list below. Empty unless `VC_REQUIRE_WASM=1`. */
-function wasmParityProjects() {
-  if (process.env.VC_REQUIRE_WASM !== "1") return [];
-  const typescriptSide = [
-    // The conformance, dual-run and loader suites run each engine themselves.
-    "**/conformance.integration.test.ts",
-    "**/conformanceWasm.integration.test.ts",
-    "**/conformanceWasmLoadFidelity.integration.test.ts",
-    "**/conformanceWasmCanBuild.integration.test.ts",
-    "**/conformanceWasmVctower.integration.test.ts",
-    "**/conformanceWasmSaves.integration.test.ts",
-    "**/conformanceWasmSaveHandoff.integration.test.ts",
-    "**/conformanceWasmDiagnostics*.integration.test.ts",
-    "**/dualRunDay.integration.test.ts",
-    "**/dualRunEdits.integration.test.ts",
-    "**/loaderCases.integration.test.ts",
-    // The frame-day golden plays each engine through the port itself: the
-    // Rust leg in the host suites, the TypeScript referee in the plain run.
-    "**/conformanceWasmFrameDays.integration.test.ts",
-    "**/frameDaysReferee.integration.test.ts",
-    // The port-edit golden, the same way: the Rust leg in the host suites,
-    // the TypeScript referee in the plain run.
-    "**/conformanceWasmPortEdits.integration.test.ts",
-    "**/portEditsReferee.integration.test.ts",
-    // The card-text golden: the sweep loads each tower into the Rust engine
-    // itself (in the host suites), and the TypeScript referee builds them on
-    // the TypeScript engine on purpose (in the plain run).
-    "**/cardTextParity.integration.test.ts",
-    "**/cardTextReferee.integration.test.ts",
-    // They run each engine themselves, like the conformance suites above.
-    "**/panelGettersWasm.integration.test.ts",
-    "**/panelGettersCost.integration.test.ts",
-    "**/engineView.integration.test.ts",
-    // The engine port's side-by-side tests (facade slice 7) run both
-    // engines themselves.
-    "**/tsEngine.golden.integration.test.ts",
-    "**/viewReader.integration.test.ts",
-    "**/viewLayoutJson.integration.test.ts",
-    // The nightly's WASM leg runs the TypeScript engine and the shipped build
-    // side by side itself (#1085).
-    "**/fuzzWasmLeg.integration.test.ts",
-    // The fx pins run the TypeScript engine and the shipped build side by side (#879).
-    "**/fxSequences.integration.test.ts",
-    // The engine comparison's own checks run each engine themselves (#972).
-    "**/perfCompare/*.integration.test.ts",
-    // Pure render: it paints in a software raster and never touches the engine,
-    // so the WASM project would only repeat the TypeScript run.
-    "**/originSeedsSweep.integration.test.ts",
-    // The WASM host suites start their own host/engine, so do not repeat them.
-    "**/wasmHost.integration.test.ts",
-    "**/wasmHostCatalog.integration.test.ts",
-    "**/wasmHostLogText.integration.test.ts",
-    "**/wasmHostTelemetry.integration.test.ts",
-  ];
-  // The suites converted to the engine port start both engines themselves
-  // (src/tests/portKit/converted.txt), so hosting their simulations here would
-  // run them on the mirror a second time.
-  const portSuites = convertedSuites();
-  const setupFiles = ["src/tests/viewWorldSetup.ts", "src/tests/parity/wasmHostSetup.ts", "src/tests/ci/testStartLogSetup.ts"];
-  // Every hosted tick also syncs the engine's frame (and in tick mode merges
-  // its save), so a fixture-driven test runs several times slower here.
-  const testTimeout = 120_000;
-  return [
-    {
-      extends: true,
-      test: {
-        name: "unitWasm",
-        include: ["src/**/*.test.ts"],
-        // The mirror's and the dual run's own unit tests attach a relay
-        // themselves. `TsEngine`'s own tests and the shared reader's over
-        // it, and the port contract's TypeScript run, cover the TypeScript
-        // engine behind the port, which the parity setup would host on the
-        // Rust engine; the golden, reader and port contract integration
-        // tests hold the two engines together.
-        exclude: [...configDefaults.exclude, ...portSuites, "**/*.integration.test.ts", "**/dualrun/mirror.test.ts", "**/engine/port/tsEngine.test.ts", "**/simport/viewReader.test.ts", "**/simport/engineContract.test.ts"],
-        setupFiles,
-        testTimeout,
-        hookTimeout: testTimeout,
-      },
-    },
-    {
-      extends: true,
-      test: {
-        name: "integrationWasm",
-        include: ["src/**/*.integration.test.ts"],
-        exclude: [...configDefaults.exclude, ...typescriptSide, ...portSuites],
-        setupFiles,
-        testTimeout,
-        hookTimeout: testTimeout,
-      },
-    },
-  ];
 }
 
 const expectedPackage = (command: "build" | "serve") => readExpectedPackage(publicDir(), command === "build" ? "build" : "other");
@@ -674,17 +578,6 @@ export default defineConfig(({ command }) => ({
           setupFiles: ["src/tests/viewWorldSetup.ts", "src/tests/ci/testStartLogSetup.ts"],
         },
       },
-      // The parity projects (story-engine-test-parity, #878): the same two
-      // tiers, with every `Simulation` a test ticks hosted on the WASM engine
-      // by the setup file. They exist only under `VC_REQUIRE_WASM=1` (the
-      // switch `npm run test:wasm` sets), so `npm test` and the coverage
-      // gate run the TypeScript tiers exactly as before; `npm run
-      // test:wasm:parity` runs them. The suites that attach a mirror or a
-      // host themselves (the dual run, the host fidelity gate) and the
-      // TypeScript side of the referee (the scenario and loader-case lock
-      // writers, whose engine twins are `conformanceWasm` and the Rust
-      // replay) are left out; see the story's test-mapping table.
-      ...wasmParityProjects(),
     ],
     coverage: {
       provider: "v8",

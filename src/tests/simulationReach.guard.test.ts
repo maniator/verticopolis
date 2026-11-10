@@ -231,7 +231,7 @@ describe("where production code crosses into the TypeScript Simulation", () => {
   it("scans all of src/, the engine, host and save code included, and leaves out the tests", () => {
     // A scan that silently found nothing would pass forever.
     expect(files.length).toBeGreaterThan(300);
-    for (const rel of [SIMULATION, "src/main.ts", "src/storage/SaveGame.ts", "src/wasmhost/wasmHost.ts", "src/dualrun/mirror.ts", "src/engine/port/tsEngine.ts"]) expect(files).toContain(rel);
+    for (const rel of [SIMULATION, "src/main.ts", "src/storage/SaveGame.ts", "src/wasmhost/hostFault.ts", "src/dualrun/binding.ts", "src/engine/port/tsEngine.ts"]) expect(files).toContain(rel);
     expect(files.some((rel) => rel.startsWith("src/tests/") || isTestFile(rel))).toBe(false);
     expect(graph.edges.length).toBeGreaterThan(1000);
   });

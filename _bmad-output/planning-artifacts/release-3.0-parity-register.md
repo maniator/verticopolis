@@ -47,10 +47,16 @@ Classic rules issues); it appears here only where a row depends on it.
 A blank cell never counts as a pass.
 
 **Evidence.** Test files run in these CI jobs: `test-wasm-parity
-(integrationWasm)` and `(unitWasm)` (with `VC_REQUIRE_WASM=1`, so a missing
-engine package fails instead of skipping), `npm run test:wasm` on the same
-leg, `e2e` (Playwright on the Rust engine), the `engine-rs` workflow (native
-Rust tests, clippy, fmt) and the build job's `verify-engine-bundle` step.
+(integrationWasm)`, which runs `npm run test:wasm` (the suites that start the
+Rust engine themselves, with `VC_REQUIRE_WASM=1`, so a missing engine package
+fails instead of skipping), and `(unitWasm)`, which runs the unit tests with
+the package required; `e2e` (Playwright on the Rust engine), the `engine-rs`
+workflow (native Rust tests, clippy, fmt) and the build job's
+`verify-engine-bundle` step. Until #1421 the two `test-wasm-parity` legs also
+ran the unit and integration suites with every `Simulation` hosted on the Rust
+engine. #1421 waits for #878, whose test-mapping table
+(`_bmad-output/implementation-artifacts/story-engine-test-parity.md`) records
+where each of those suites' Rust evidence lives now.
 "Browser" means a Playwright spec; "native" means a Rust `#[test]`.
 
 **Fields.** #1561 lists the fields an entry records. Here they sit as
@@ -101,9 +107,8 @@ committed tower file, and the referee loads the save it builds and checks
 that the save packs to that file byte for byte. A save holds no elevator readings, so both engines play the same minutes
 before the cards are read: a morning for every transport kind, and a day
 and a half for a single-car lift until it passes the near-capacity line.
-The hosted WASM projects leave both suites out, since each starts its engine
-itself: the sweep runs in `npm run test:wasm` and the referee in the plain
-integration run. A row
+Each suite starts its engine itself: the sweep runs in `npm run test:wasm`
+and the referee in the plain integration run. A row
 that names other evidence covers a state the sweep's towers do not reach.
 
 | Line | TypeScript reference | Rust source | Modes | Class | Evidence |
@@ -180,17 +185,15 @@ rewrites it with #1421.
 
 The import ratchet leaves out `src/wasmhost/`, `src/dualrun/` and
 `src/storage/`. These are the files there that ship (by the same sourcemap
-read) and import the TypeScript engine at run time. Five more import it at
-run time and ship only to tests: `src/wasmhost/wasmHost.ts`, the retired
-TypeScript host, and the modules only it reaches, `src/wasmhost/frameApply.ts`,
-`src/wasmhost/frameSync.ts`, `src/wasmhost/merge.ts` and
-`src/dualrun/mirror.ts`. The rest import its types only. The guard fails when
+read) and import the TypeScript engine at run time. The retired TypeScript
+host and the mirror modules only it reached, which imported it too and shipped
+only to tests, went with #1421. The rest import its types only. The guard fails when
 a file there gains a runtime import and this section does not name it.
 
 | File | Runs in the shipped game | Decides gameplay | Disposition | Owner |
 | --- | --- | --- | --- | --- |
 | `src/wasmhost/catalogCheck.ts` | yes, at every boot: `refuseForeignCatalog` compares each Rust catalog's world fields and facility kinds with the TypeScript tables (`catalogFor`), and a difference refuses the package as a mismatched build | no; it accepts or refuses an engine package, and no rule is read from the tables | move to Rust | #921, #926 (Rust-only lane): compare against the build's own drawing tables once the TypeScript tables go |
-| `src/wasmhost/hostFault.ts` | partly: `isEngineTrap` (from `src/game/engineFault.ts`) and `runEach` run; `RestorePoints.restore`, which loads a save into a TypeScript tower, is called only by `src/wasmhost/wasmHost.ts` | no | delete with the TypeScript engine | #1421 (Rust-only lane), after the shipped helpers move out in the 2b slice |
+| `src/wasmhost/hostFault.ts` | partly: `isEngineTrap` (from `src/game/engineFault.ts`) and `runEach` run; `RestorePoints.restore`, which loads a save into a TypeScript tower, has had no caller but its unit test since #1421 deleted the TypeScript host | no | delete with the TypeScript engine | #1421 (Rust-only lane), after the shipped helpers move out in the 2b slice |
 | `src/storage/SaveGame.ts` | partly: the save store and `.vctower` checks run; `SaveGame.import`, which builds a TypeScript tower, is for tests and tools | no | delete with the TypeScript engine | #1421 (`SaveGame.import` only; the store stays) |
 
 **Verdict for the "TypeScript decides nothing in production" criterion:** at
@@ -376,7 +379,7 @@ included. One row per rule the game's comparison dialog
 
 | Rule (Modern, against Classic) | Class | Evidence |
 | --- | --- | --- |
-| Variant households set a condo's price and size | proven same | `src/tests/integration/condoModes.integration.test.ts` (on the Rust engine), `src/tests/integration/condoModesEngine.integration.test.ts` (the prices written mid-run, on both engines), the `amenities-modern` and `player-edits-*` scenarios |
+| Variant households set a condo's price and size | proven same | `src/tests/integration/condoModesEngine.integration.test.ts` (the prices written mid-run, on both engines), the `amenities-modern` and `player-edits-*` scenarios; `src/tests/integration/condoModes.integration.test.ts` ran on the Rust engine too until #1421 deleted the hosted projects, and runs on the TypeScript engine only now |
 | Households move out on their own | proven same | `src/tests/integration/condoRelocationEngine.integration.test.ts` (`describeEngines`): the Modern move-out and buy-back, Classic over thirty years, the RNG draw, the same month from the same seed, and the notice that does not rescind |
 | Overhead, the unsold-condo tax, noise and shop-access notices | proven same | the Modern scenarios' checkpoints, `src/tests/integration/conformanceWasmDiagnostics.integration.test.ts` (the notice reasons) |
 | A rent slider against Classic's four rungs and No Rate | proven same | `src/tests/integration/batchPricing.integration.test.ts` (`describeEngines`), the `player-edits-*` scenarios |
@@ -388,7 +391,7 @@ included. One row per rule the game's comparison dialog
 | The paid exterminator | proven same | the `hotel-exterminator-modern` and `hotel-exterminator-reload-modern` scenarios, `bookExterminator` in section 3 |
 | Build hints before the click | proven same | `quoteBuild`, `quoteShaft` and `lastReason` in section 3 |
 | A livelier day (school runs, errands, late checkout, gentler rain) | proven same | the Modern scenarios' checkpoints, which hash every person's state; `src/tests/integration/hotelLateCheckoutEngine.integration.test.ts` (the understaffed late checkout on both engines, since #1800) |
-| Calendar pace (real-world or compressed) | proven same | the Modern scenarios run the real-world calendar; `src/tests/integration/dualRunDay.integration.test.ts` runs the compressed one on a new Modern game for a day and on `conformance/fixtures/split-tower.vctower` for four days across a quarter's end ("split-tower on the canon calendar across a quarter") |
+| Calendar pace (real-world or compressed) | proven same | the Modern scenarios run the real-world calendar; `src/tests/integration/conformanceWasmFrameDays.integration.test.ts` holds the Rust engine to the frame-day golden, which runs the compressed one on a new Modern game for a day and on `conformance/fixtures/split-tower.vctower` for four days across a quarter's end ("split-tower on the canon calendar across a quarter, at speed 3"), and `src/tests/integration/frameDaysReferee.integration.test.ts` holds the TypeScript engine to the same golden |
 | Office rent smoothed over the calendar | proven same | the Modern scenarios' checkpoints, `src/tests/integration/ledger.integration.test.ts` (`describeEngines`) |
 
 ## 7. Test exclusions
@@ -400,7 +403,9 @@ files, with no `onWasmParityProject` branches;
 both directions, and the test-mapping table in
 `_bmad-output/implementation-artifacts/story-engine-test-parity.md` gives each
 file's reason (checked row by row for #878 on this commit). The cadence calls
-run on Rust at the host's own cadence and are a cost exemption. No mark is
+ran on Rust at the host's own cadence, a cost exemption, until #1421 deleted
+the hosted projects; since then the marked tests and the cadence calls run on
+the TypeScript engine only, and the marks change nothing. No mark is
 left that a save edit before the first tick would convert (`storage`
 converted its five that way in #1779, the meal-rush routing tests moved
 to the port kit in #1792, and the venue-capacity round trips in #1795). The
@@ -431,8 +436,8 @@ this order under #878:
   relocation tests
   (`src/tests/integration/condoRelocationEngine.integration.test.ts`).
 
-`src/tests/tsEngineTests.ratchet.txt` lists 201 files that still drive the
-TypeScript engine directly (171 test files and 30 fixtures and helpers; the
+`src/tests/tsEngineTests.ratchet.txt` lists 188 files that still drive the
+TypeScript engine directly (159 test files and 29 fixtures and helpers; the
 list shrinks as tests convert and grows only with a reason the PR states, as
 when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/segmentRoutingMealRush.integration.test.ts`,
@@ -440,14 +445,13 @@ when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/attendanceTripwireEngine.integration.test.ts` and
 `src/tests/integration/hotelLateCheckoutEngine.integration.test.ts`, port kit
 suites that author their towers on a `Simulation`, #1805 the port kit's
-TypeScript tooling, `src/tests/portKit/tsTooling.ts`, and #1809 the two
-golden referees), and `src/tests/portKit/converted.txt` lists 24 suites
-already on the port kit. The hosted WASM projects also leave out the test files that run
-each engine themselves or never touch the engine: `wasmParityProjects` leaves
-34 of them out of its `integrationWasm` project, by patterns in `vite.config.ts` with
-comments that give the reasons, and its `unitWasm` project leaves
-out 4 unit test files of its own, with the reason beside them; the guard
-holds the counts to the projects and test files Vitest resolves. The card-text sweep is one of the files the hosted projects leave out,
+TypeScript tooling, `src/tests/portKit/tsTooling.ts`, #1809 the two
+golden referees, and #1421 the fixture loader `src/tests/conformance/fixtureSim.ts`,
+moved out of the deleted dual-run harness), and `src/tests/portKit/converted.txt` lists 24 suites
+already on the port kit. #1421 deleted the hosted WASM projects
+(`integrationWasm` and `unitWasm`), so no suite runs on a hosted `Simulation`
+any more; the suites that start the Rust engine themselves run in
+`npm run test:wasm`. The card-text sweep is one of them,
 and since #1809 (#1806) it holds the Rust card to a committed golden of the
 reference card's lines (`src/tests/goldens/card-text/`), which
 `src/tests/integration/cardTextReferee.integration.test.ts` holds to the

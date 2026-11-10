@@ -5,6 +5,7 @@ import { SPEEDS } from "../../game/frameLoop";
 import { swapDone } from "../../game/portLifecycle";
 import type { EnginePort } from "../../simport/enginePort";
 import { PortCodes } from "../../simport/portCodes";
+import { decodeVctower } from "../../storage/vctowerContainer";
 import { canonicalJson, digestText } from "../conformance/canonical";
 import { writeGoldenFile } from "./updateGate";
 
@@ -16,7 +17,8 @@ import { writeGoldenFile } from "./updateGate";
  *
  * Each case loads a tower the way the game does (a fixture through
  * `loadVctower`, a new game through `foundTower`) and plays one game day
- * through `advance`, the call the game's frame loop makes every frame. The
+ * through `advance`, the call the game's frame loop makes every frame (one
+ * case plays four days, to cross a quarter's end on the canon calendar). The
  * frame times are the dual run's cycle, from a 120 Hz device to a 3-second
  * pause, so frames carry owed minutes between them, run several steps at once
  * and meet the 30-minute catch-up cap. Between frames it drains the gameplay
@@ -78,9 +80,12 @@ const MAX_STILL_FRAMES = 10_000;
  *  steps the minutes it owes (`false` would owe them without stepping). */
 const STEP_OWED_MINUTES = true;
 
-/** Where a case's tower comes from. */
+/** Where a case's tower comes from. A fixture with a `calendar` has its
+ *  Modern calendar set to that one in its save before it loads, so it loads
+ *  as a save (`loadSave`) and not as a file: a tower takes its calendar at
+ *  founding, and no command changes it. */
 export type FrameDayStart =
-  | { readonly kind: "fixture"; readonly file: string }
+  | { readonly kind: "fixture"; readonly file: string; readonly calendar?: "canon" }
   | { readonly kind: "found"; readonly seed: number; readonly mode: "classic" | "modern"; readonly calendar: "realWorld" | "canon"; readonly unbridged: boolean };
 
 export interface FrameDayCase {
@@ -90,7 +95,16 @@ export interface FrameDayCase {
   readonly speed: number;
   readonly steadyClock: boolean;
   readonly frameTimes: readonly number[];
+  /** Game days the case plays; one when left out. */
+  readonly days?: number;
 }
+
+/** The game days a case plays. */
+export const caseDays = (c: FrameDayCase): number => c.days ?? 1;
+
+/** The checkpoints a case takes at least: {@link MIN_DAY_CHECKPOINTS} for a
+ *  day, and 24 more for each day past the first. */
+export const minCheckpoints = (c: FrameDayCase): number => MIN_DAY_CHECKPOINTS + 24 * (caseDays(c) - 1);
 
 export interface FrameDayCheckpoint {
   /** The clock's minutes when the checkpoint was taken. */
@@ -139,6 +153,17 @@ export const FRAME_DAY_CASES: readonly FrameDayCase[] = [
   { id: "new Modern game on the canon calendar, unbridged, at speed 2", start: found(99, "modern", "canon", true), speed: 2, steadyClock: false, frameTimes: FRAME_TIMES_MS },
   { id: "split-tower at speed 3, one steady frame rate", start: { kind: "fixture", file: "split-tower.vctower" }, speed: 3, steadyClock: false, frameTimes: [1000 / 60] },
   { id: "towerone_6 at speed 3 on the steady clock", start: { kind: "fixture", file: "towerone_6.vctower" }, speed: 3, steadyClock: true, frameTimes: FRAME_TIMES_MS },
+  // A built Modern tower on the canon calendar (three-day quarters) for four
+  // days, so it crosses a quarter's end; the founded canon case above runs
+  // one empty day. The dual run's day suite had it beside its day gate.
+  {
+    id: "split-tower on the canon calendar across a quarter, at speed 3",
+    start: { kind: "fixture", file: "split-tower.vctower", calendar: "canon" },
+    speed: 3,
+    steadyClock: false,
+    frameTimes: FRAME_TIMES_MS,
+    days: 4,
+  },
 ];
 
 /** The folders this test file has opened for a dump (Vitest gives each file
@@ -174,7 +199,13 @@ export function dumpRoot(value: string | undefined): string | undefined {
  *  the port holds. The port-edit golden starts its cases the same way. */
 export function startTower(port: EnginePort, start: FrameDayStart): void {
   if (start.kind === "fixture") {
-    swapDone(port, port.loadVctower(readFileSync(resolve(FIXTURE_DIR, start.file), "utf8")));
+    const text = readFileSync(resolve(FIXTURE_DIR, start.file), "utf8");
+    if (start.calendar === undefined) {
+      swapDone(port, port.loadVctower(text));
+      return;
+    }
+    const save = decodeVctower(text, start.file) as Record<string, unknown>;
+    swapDone(port, port.loadSave(JSON.stringify({ ...save, modernCalendar: start.calendar })));
     return;
   }
   const codes = new PortCodes(port);
@@ -241,7 +272,7 @@ export function runFrameDay(leg: FrameDayLeg, c: FrameDayCase, afterStart?: () =
   let hour = Math.floor(from / 60);
   let now = from;
   let tookCheckpoint = true;
-  while (now < from + DAY) {
+  while (now < from + caseDays(c) * DAY) {
     const dtMs = c.frameTimes[frames % c.frameTimes.length];
     // The answer is `[steps, owed]`.
     [, owed] = port.advance(owed, dtMs, minutesPerSecond, c.steadyClock, STEP_OWED_MINUTES);
@@ -274,9 +305,10 @@ export function runFrameDay(leg: FrameDayLeg, c: FrameDayCase, afterStart?: () =
  *  with this before it writes, and the golden's tests check the file. */
 export function frameDayProblems(c: FrameDayCase, points: readonly FrameDayCheckpoint[]): string[] {
   const problems: string[] = [];
-  if (points.length < MIN_DAY_CHECKPOINTS) problems.push(`${points.length} checkpoints, fewer than ${MIN_DAY_CHECKPOINTS}`);
+  const [least, days] = [minCheckpoints(c), caseDays(c)];
+  if (points.length < least) problems.push(`${points.length} checkpoints, fewer than ${least}`);
   const span = points.length > 0 ? points[points.length - 1].minute - points[0].minute : 0;
-  if (span < DAY) problems.push(`spans ${span} minutes, less than a day`);
+  if (span < days * DAY) problems.push(`spans ${span} minutes, less than ${days === 1 ? "a day" : `${days} days`}`);
   if (c.start.kind === "fixture") {
     for (const view of ["state", "crowd"] as const) {
       const distinct = new Set(points.map((p) => p[view])).size;

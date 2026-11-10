@@ -213,11 +213,15 @@ jobs:
         env:
           VC_ALLOW_NO_ENGINE: "1"
 
-  # The unit and integration suites again, on the Rust/WASM engine (#878,
-  # story-engine-test-parity): every Simulation a test ticks is hosted on the
-  # engine, and a test that cannot run there is skipped by name with its
-  # reason (src/tests/parity/). One job per project so they run side by side.
-  # Runs after engine-wasm, so the package comes from the cache it filled.
+  # The suites that need the Rust/WASM engine package, with the package
+  # required (VC_REQUIRE_WASM=1), so a missing one fails instead of skipping.
+  # Until #1421 these legs ran the unit and integration suites again with
+  # every Simulation hosted on the engine (the unitWasm and integrationWasm
+  # Vitest projects); the legs keep those names because the two checks are
+  # required for merging. The unitWasm leg runs the unit tests, which include
+  # the engine package's own (they skip in the plain unit job); the
+  # integrationWasm leg runs the host suites below. Runs after engine-wasm,
+  # so the package comes from the cache it filled.
   test-wasm-parity:
     needs: [changes, engine-wasm]
     # A matrix job that is skipped as a whole reports under its unexpanded
@@ -235,7 +239,7 @@ jobs:
     steps:
       - name: No code changed, nothing to run
         if: ${{ needs.changes.outputs.code == 'false' }}
-        run: echo "Only prose changed; the WASM parity suites are skipped."
+        run: echo "Only prose changed; the WASM engine suites are skipped."
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ needs.changes.outputs.code != 'false' }}
@@ -256,18 +260,16 @@ jobs:
       - uses: ./.github/actions/engine-wasm
         if: ${{ needs.changes.outputs.code != 'false' }}
 
-      - name: Run ${{ matrix.project }} on the WASM engine
-        if: ${{ needs.changes.outputs.code != 'false' }}
+      - name: Unit tests with the engine package required
+        if: ${{ needs.changes.outputs.code != 'false' && matrix.project == 'unitWasm' }}
         env:
           VC_REQUIRE_WASM: "1"
           VC_LOG_TEST_STARTS: "1"
-        run: npx vitest run --project ${{ matrix.project }}
+        run: npx vitest run --project unit
 
-      # The integrationWasm project hands host-driven suites to the plain
-      # TypeScript-side project (mirror host, perf comparison, conformance).
-      # Run them exactly once, on the required integrationWasm matrix leg.
-      # Both matrix check names remain present and required for merging,
-      # while the Rust workflow no longer repeats this same test:wasm script.
+      # The suites that start the Rust engine themselves (conformance, the
+      # goldens, perf comparison), run once, on the integrationWasm leg; the
+      # Rust workflow does not repeat this test:wasm script.
       # This step has its own timeout and logs each test start (#1152). With
       # both diagnostics corpus differentials in it (#1811), the step takes
       # 4.5 to 8.5 minutes, depending on the runner, so the timeout leaves

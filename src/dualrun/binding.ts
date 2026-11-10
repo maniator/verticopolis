@@ -25,11 +25,10 @@ export interface WasmModule {
 
 /** Every method the adapters call on an instance, and on the class. Each
  *  one's tier is in `exportTiers.ts`; `towerSetCars` and
- *  `towerResizeTransport` are relay-only (the mirror's bare tower edits; see
- *  `towerRelayOps.guard.test.ts`). */
+ *  `towerResizeTransport` are relay-only (the retired mirror's bare tower
+ *  edits, which only tests name now; see `towerRelayOps.guard.test.ts`). */
 export const INSTANCE_METHODS = [
-  // The legacy commands, reads and host plumbing the conformance suites and the
-  // mirror host call.
+  // The legacy commands, reads and host plumbing the conformance suites call.
   "free", "mode", "money", "setMoney", "build", "paintBrush", "canBuild", "buildTransport",
   "sellAt", "unitAt", "transportAt", "adjustRent", "setNoRate", "priceUnit", "setCars",
   "setSchedule", "setStop", "setExpressStops", "clearStops", "resizeTransport", "removeUnit",

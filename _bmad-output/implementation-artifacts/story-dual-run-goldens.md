@@ -36,7 +36,12 @@ retires the mirror harness (#1421).
    events drained since the last one. The run stops on a dropped event, a
    choice the player would have to answer (at the start or during the day), a
    frame that crosses two hours, or a clock that stands still or goes back.
-   Done in the first PR.
+   Done in the first PR. The third PR adds a thirtieth case, which the dual
+   run's day suite ran beside its gate: `split-tower` on the canon calendar
+   for four days at speed 3, across a quarter's end (the save's calendar is
+   set before it loads, so it loads through `loadSave`; the Rust leg checks
+   the tower is Modern on the canon calendar, whose quarter is shorter than
+   the four days).
 2. **AC2 Both engines equal the golden.** The Rust engine reproduces every
    checkpoint (`conformanceWasmFrameDays.integration.test.ts`, in
    `npm run test:wasm`), and the TypeScript engine reproduces the same file
@@ -133,18 +138,26 @@ retires the mirror harness (#1421).
    drain no event; a command that moved money, and an undo or redo taken,
    moved the state; each case plays an hour; and the fixture case's crowd
    moves during play. A teeth test shows a tower changed between steps is
-   caught at the next line, in the state hash. A moved hash names the step;
-   the field takes a dump:
-   `VC_PORT_EDITS_DUMP=<dir> VC_PORT_EDITS_CASE=<case id>` writes each
-   line's step, kind, answer and canonical views under `<dir>/<engine>/`,
-   which has to be new or empty (a run that plays its case again in the same
-   test file empties its own). The mirror's deletion is the third PR.
+   caught at the next line, in the state hash. A moved hash names the step,
+   and a dump finds the field: running with `VC_PORT_EDITS_DUMP=<dir>` and
+   `VC_PORT_EDITS_CASE=<case id>` writes each line's step, kind, answer and
+   canonical views under `<dir>/<engine>/`, which has to be new or empty (a
+   run that plays its case again in the same test file empties its own). The
+   mirror's deletion is the third PR (#1421): it deletes
+   `src/dualrun/mirror.ts`, `shadow.ts` and `commands.ts`,
+   `src/tests/dualrun/`, the `dualRun*` and `wasmHost*` suites but
+   `wasmHostLogText` and `wasmHostTelemetry`'s first case, the
+   `src/wasmhost/` mirror modules, the parity setup and the `unitWasm` and
+   `integrationWasm` projects, and names each one's replacement in its
+   description. It merges only after #878 is done and the owner approves the
+   Dual run restatement on #945.
 
 ## Coverage map
 
 | Dual-run coverage today | Replacement |
 | --- | --- |
 | `dualRunDay`: 29 day cases, hourly state and crowd views and event batches | AC1 and AC2, the same 29 cases |
+| `dualRunDay`: `split-tower` on the canon calendar for four days, across a quarter's end | AC1's thirtieth case, added in the third PR |
 | `cardTextParity`: Rust card against the TypeScript card, 19 cases a mode (#1780 added four to the 15 this golden first pinned) | AC3 |
 | `dualRunEdits`' four-star test, its founded-game test, its Modern bridging test, its malformed charge test (#923) and its malformed edit test (#996) | AC5, `port-edits.json`: one case each |
 | `dualRunEdits`: the drag mark taken over mid-drag (#990) | the malformed charge case drags inside the engine-held mark (a regrow inside it is free, and once the drag closes, or a refused start drops it, a shrink and regrow is billed), and the four-star case's drag is free inside the mark; each drag's answer is checked for the floor it reached and the money it moved; a shadow attached mid-drag is mirror-only |
@@ -159,7 +172,7 @@ retires the mirror harness (#1421).
 | The card's express stops, which no dual-run test sends | new: the four-star case sets them on the standard shaft once its top moves to floor 47, which is no lobby, past lobby 45, then clears them, and checks the floors it skips after each: every floor between the ends but the lobbies, then none |
 | The game's undo and redo, which no dual-run test steps | new: the four-star case's sale and bulldoze steps, undone and redone, and a restore of an earlier save |
 | `dualRunEdits`: the hour played after the four-star tower's removals, compared | the four-star case's sale and bulldozes (a room, and an escalator the crowd rides: the script checks that people are walking to it before the bulldoze and still there after the command, that the first frame of the hour's play that moves the clock drops them and keeps the people midway on a route that never takes it, and that some of the people who set out after the bulldoze and are still in the crowd at the hour's end go between its floors, each by a link that stops at both floors and none by the escalator) outside any undo step and the hour after them, which the referee compares in full (the undo trail's hours sit in its named window) |
-| `wasmHost*`, `capacityEventMatrix`, `conformanceWasmSaveHandoff`, the parity lanes | AC5, after #878 |
+| `wasmHost*`, `capacityEventMatrix`, `conformanceWasmSaveHandoff`, the parity lanes | the third PR, after #878: `wasmHostLogText`, `wasmHostTelemetry` (its first case, the hourly telemetry the save does not carry) and `conformanceWasmSaveHandoff` start the Rust engine from the TypeScript save themselves (`Engine.fromSave`); `capacityEventMatrix` keeps its TypeScript half, and the Rust rules are the engine's own tests (`price_and_capacity_edits_report_changes_and_not_no_ops`, `paid_edits_report_capacity_changed_and_refusals_report_nothing`); the day runs of `wasmHost` are the frame-day golden's, and the hosted read-model cases of both suites tested the mirror host only; the lanes' Rust coverage of each suite is #878's test-mapping table |
 
 ## Dev notes
 

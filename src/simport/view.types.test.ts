@@ -5,30 +5,9 @@ import type { Simulation } from "../engine/Simulation";
 import type { Tower } from "../engine/Tower";
 import type { roomUnits, StructureRun, structureRuns } from "../engine/tower/rooms";
 import type { Transport, Unit } from "../engine/types";
-import type { ShadowCommand } from "../dualrun/commands";
 import type { Command, CommandResults } from "./commands";
 import type { Query, QueryResults } from "./queries";
 import type { CrowdView, FxView, HeaderView, PersonView, SimView, StructureRunView, TowerView, TransportView, UnitView } from "./view";
-
-/** The relay's ops that are not player commands: the shadow's own plumbing,
- *  edits no production code makes, and test and tooling hooks. A new
- *  `ShadowCommand` op fails the drift check below until it is listed here
- *  or given a `Command` member. */
-type NotPlayerCommand =
-  | "load"
-  | "tick"
-  | "checkpoint"
-  | "sellAt"
-  | "removeUnit"
-  | "removeTransport"
-  | "resizeTransport"
-  | "setCars"
-  | "towerResizeTransport"
-  | "towerSetCars"
-  | "setMoney"
-  | "startFire"
-  | "bombThreat"
-  | "evaluateStar";
 
 describe("the port's types", () => {
   it("the live TypeScript objects are views, so the adapter copies nothing", () => {
@@ -55,12 +34,6 @@ describe("the port's types", () => {
     expectTypeOf<SimView["structure"]>().toEqualTypeOf<ReadonlyArray<StructureRunView>>();
     expectTypeOf<CrowdView["people"]>().toEqualTypeOf<ReadonlyArray<PersonView>>();
     expectTypeOf<TransportView["carPositions"]>().toEqualTypeOf<ReadonlyArray<number>>();
-  });
-
-  it("every player op the relay carries has a command, and no command lacks one", () => {
-    expectTypeOf<Command["op"]>().toEqualTypeOf<Exclude<ShadowCommand["op"], NotPlayerCommand>>();
-    // A renamed or removed relay op leaves no stale name in the list above.
-    expectTypeOf<NotPlayerCommand>().toExtend<ShadowCommand["op"]>();
   });
 
   it("every command and query has a result type", () => {
