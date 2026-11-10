@@ -4,7 +4,7 @@ import towerFile from "../../../conformance/fixtures/towerone_6.vctower?raw";
 import { LOG_SAVE_CAP, Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../engine/types";
 import { SaveGame } from "../../storage/SaveGame";
-import { saveOf, loadResultSim, loadSlotSim } from "../fixtures/saveText";
+import { saveOf, loadResultSim, loadSlotSim, importTower } from "../fixtures/saveText";
 
 /**
  * Save metadata stamps (savedAt + appVersion on every write, including
@@ -182,7 +182,7 @@ describe("bulletin-log persistence", () => {
       "Recycling is overdue.",
     ]);
     const file = await SaveGame.export(saveOf(sim));
-    const imported = await SaveGame.import(file);
+    const imported = await importTower(file);
     expect(imported.log.map((e) => `${e.kind}:${e.text}`)).toEqual([
       "good:Metro line opened.",
       "bad:Recycling is overdue.",

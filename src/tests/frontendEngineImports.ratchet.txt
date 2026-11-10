@@ -24,9 +24,6 @@
 # the 17 that import only the catalog handle, plus src/main.ts, src/gallery.ts,
 # src/preview.ts and src/analyticsEngineBridge.ts. src/presentation/ and
 # src/audio/ import the engine for types only; the scan keeps them that way.
-src/catalog/towerCatalog.ts catalog # the default source for a tower that has none set; it goes with the TypeScript engine's tables
-src/game/toolingSim.ts Simulation port/tsEngine # moved from src/main.ts with the tooling harnesses' hand-built towers (PR 5e): no new engine import
-src/preview.ts catalog
+src/game/toolingSim.ts Simulation catalog port/tsEngine # the tooling harnesses' hand-built towers (PR 5e), swapped out of production builds (vite.config.ts); catalog came from the tower catalog's old default, which tests and these towers now set (#921)
 src/render/atlas/archive.ts catalog # archive records atlas metadata from the same engine-authored catalog as atlas runtime reads
 src/render/atlas/browserEntry.ts catalog
-src/simport/tsPanels.ts households milestones sim/constants # the TypeScript adapter's panel answers (facade slice 4, #1211), built from the TypeScript engine's own functions; they leave with it

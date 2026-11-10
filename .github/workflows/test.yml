@@ -394,8 +394,8 @@ jobs:
           if-no-files-found: ignore
 
   # The player build, the one every deploy makes (src/build/engineBundle.ts):
-  # the Rust/WASM engine is the only engine, with no runtime switch, no
-  # TypeScript step loop and no fallback. Its postbuild guard
+  # the Rust/WASM engine is the only engine, with no runtime switch, none of
+  # the TypeScript engine and no fallback. Its postbuild guard
   # (scripts/verify-engine-bundle.ts) reads the emitted sourcemaps and the
   # precache; this job also proves that guard fails when app code imports the
   # TypeScript step loop, then runs the general e2e suite (the `chromium`

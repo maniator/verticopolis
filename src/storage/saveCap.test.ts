@@ -14,7 +14,7 @@ import {
   toBase64,
 } from "./saveCompression";
 import { toTowerFile } from "./towerFileCodec";
-import { saveOf, loadResultSim } from "../tests/fixtures/saveText";
+import { saveOf, loadResultSim, importTower } from "../tests/fixtures/saveText";
 
 /**
  * The one 32 MiB cap at its edge, on a real tower: a save whose JSON is
@@ -36,7 +36,7 @@ function jsonOf(packed: string): string {
 
 /** The fixture tower, renamed so its stamped save is exactly `bytes` long. */
 async function towerOf(bytes: number): Promise<Simulation> {
-  const sim = await SaveGame.import(readFileSync(FIXTURE, "utf8"));
+  const sim = await importTower(readFileSync(FIXTURE, "utf8"));
   const base = new TextEncoder().encode(jsonOf(SaveGame.packSync(saveOf(sim)))).length;
   sim.tower.towerName = sim.tower.towerName + "x".repeat(bytes - base);
   return sim;
@@ -88,11 +88,11 @@ describe("a save of exactly 32 MiB", () => {
 
     const file = await SaveGame.export(saveOf(sim));
     expect(new TextEncoder().encode(jsonOf(file)).length).toBe(CAP);
-    expect((await SaveGame.import(file)).tower.towerName).toBe(name);
+    expect((await importTower(file)).tower.towerName).toBe(name);
 
     const reheadered = toTowerFile(json);
     expect(reheadered.ok).toBe(true);
-    if (reheadered.ok) expect((await SaveGame.import(reheadered.text)).tower.towerName).toBe(name);
+    if (reheadered.ok) expect((await importTower(reheadered.text)).tower.towerName).toBe(name);
   }, 60_000);
 });
 
@@ -115,7 +115,7 @@ describe("a save one byte past 32 MiB", () => {
     expect(stored.sim).toBeNull();
     expect(stored.corrupt).toBe(true);
 
-    await expect(SaveGame.import(TOWER_FILE_MAGIC + "\n" + b64 + "\n")).rejects.toThrow(/too large/);
+    await expect(importTower(TOWER_FILE_MAGIC + "\n" + b64 + "\n")).rejects.toThrow(/too large/);
     // The byte-preserving re-header refuses it too.
     expect(toTowerFile(json).ok).toBe(false);
   }, 60_000);

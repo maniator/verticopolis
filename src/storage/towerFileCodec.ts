@@ -29,7 +29,7 @@ function hasLoneSurrogate(s: string): boolean {
 }
 
 /**
- * The shape `SaveGame.import` demands before it will accept a tower. Applied
+ * The shape `SaveGame.importText` demands before it will accept a tower. Applied
  * here so a value that is merely valid JSON (`null`, `42`, `[]`, `"hi"`) cannot
  * be dressed up as a `.vctower` and written into durable storage, which is the
  * exact outcome the validation exists to prevent.
@@ -69,7 +69,7 @@ export function toTowerFile(raw: string, preserve = false): ConversionResult {
     // internal whitespace is a normalization, and a value that reached the
     // preserve destination is by definition one this build could not read, so
     // it is the last place to assume the contents follow the usual rules.
-    // `SaveGame.import` strips whitespace itself when reading, so nothing is
+    // `SaveGame.importText` strips whitespace itself when reading, so nothing is
     // lost by leaving it in.
     const payload = preserve ? body : body.replace(/\s+/g, "");
     // A header with no payload is not a rescue, it is an empty file that would
@@ -92,7 +92,7 @@ export function toTowerFile(raw: string, preserve = false): ConversionResult {
     //
     // Validated to the SAME bar the load path applies (fatal UTF-8, then JSON,
     // then the tower shape). Checking only that it inflates would pass values
-    // `SaveGame.import` goes on to reject, which is the failure this prevents.
+    // `SaveGame.importText` goes on to reject, which is the failure this prevents.
     try {
       const json = new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(fromBase64(payload)));
       if (!looksLikeTower(JSON.parse(json))) return { ok: false, reason: "unreadable" };
@@ -132,7 +132,7 @@ export function toTowerFile(raw: string, preserve = false): ConversionResult {
  * `readSlot` expects.
  *
  * THREE-WAY, and that is the whole point of putting it here rather than
- * reaching for `SaveGame.import`. Import handles a newer container correctly
+ * reaching for `SaveGame.importText`. Import handles a newer container correctly
  * ("made by a newer version, update the game to load it") and it also
  * deserializes, which would burn Founder status on the way (see this module's
  * header). This has to preserve the same distinction WITHOUT
@@ -157,7 +157,7 @@ export type FromTowerFileResult =
 
 export function fromTowerFile(text: string, preserve = false): FromTowerFileResult {
   const trimmed = text.trim();
-  // Matches the whole VCTOWER family, exactly as `SaveGame.import` does, so a
+  // Matches the whole VCTOWER family, exactly as `SaveGame.importText` does, so a
   // newer container is RECOGNIZED before it is refused.
   const magic = /^VCTOWER(\d+)/.exec(trimmed);
   if (!magic) return { ok: false, reason: "unreadable" };
@@ -178,7 +178,7 @@ export function fromTowerFile(text: string, preserve = false): FromTowerFileResu
   }
 
   // Whitespace-stripped, because `readSlot` does NOT strip it: it hands the
-  // payload straight to `fromBase64`. `SaveGame.import` strips because a file
+  // payload straight to `fromBase64`. `SaveGame.importText` strips because a file
   // can be re-wrapped in transit, and a store is entitled to normalize line
   // endings on the way through (see `sameTowerFile`), so the same tolerance has
   // to be applied HERE rather than relied on downstream.
@@ -208,7 +208,7 @@ export function fromTowerFile(text: string, preserve = false): FromTowerFileResu
 /**
  * Whether a read-back is the file we wrote.
  *
- * Compares the way `SaveGame.import` READS rather than byte for byte, because
+ * Compares the way `SaveGame.importText` READS rather than byte for byte, because
  * a store is entitled to normalize line endings or trailing whitespace on the
  * way through, and a strict comparison would call every one of those a failed
  * write, forever, on every boot. What has to match is the payload the reader
@@ -221,7 +221,7 @@ export function fromTowerFile(text: string, preserve = false): FromTowerFileResu
  * why that is wrong.
  */
 export function sameTowerFile(a: string, b: string): boolean {
-  // The two halves are normalized SEPARATELY, because `SaveGame.import` anchors
+  // The two halves are normalized SEPARATELY, because `SaveGame.importText` anchors
   // on /^VCTOWER(\d+)/ first and only strips whitespace after that anchor.
   // Stripping across the boundary erases it, and `\d+` is greedy, so a payload
   // whose first base64 character is a digit gets swallowed into the version

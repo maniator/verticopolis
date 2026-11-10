@@ -2,14 +2,10 @@ import type { FacilityKind, Unit, UnitState } from "./engine/types";
 import { fitAtGameScale } from "./render/catalogScale";
 import { FLOOR, TILE } from "./render/scale";
 import { drawRoom, type RoomCtx } from "./render/pixelSprites";
-import { catalogFor } from "./engine/catalog";
 import { bindViewWorld } from "./presentation/viewWorld";
 import { bindViewKinds, findViewKind } from "./presentation/viewKinds";
-
-// A tooling page draws sprites without a tower, so it binds the Modern
-// catalog's world for the view (the lot geometry the sprites hash on).
-bindViewWorld(catalogFor("modern").world);
-bindViewKinds(catalogFor("modern"));
+import { readCatalog } from "./dualrun/catalog";
+import { loadWasmEngine } from "./wasmhost/rustEngine";
 
 interface Entry {
   label: string;
@@ -142,5 +138,23 @@ function frame() {
   });
   requestAnimationFrame(frame);
 }
-frame();
-(window as unknown as { previewReady: boolean }).previewReady = true;
+
+/** Read the Rust engine's Modern catalog, then draw, as the sprite gallery
+ *  does. A tooling page draws sprites without a tower, so it binds the
+ *  catalog's world for the view (the lot geometry the sprites hash on). A
+ *  package that cannot be loaded leaves the page saying so and never signals
+ *  readiness: there is no second source for the sizes. */
+async function start(): Promise<void> {
+  try {
+    const catalog = readCatalog(await loadWasmEngine(), "modern");
+    bindViewWorld(catalog.world);
+    bindViewKinds(catalog);
+  } catch (e) {
+    console.error("Room preview: the Rust engine's catalog is unavailable.", e);
+    canvas.replaceWith("The room preview needs the game engine, and it did not load. Reload the page to try again.");
+    return;
+  }
+  frame();
+  (window as unknown as { previewReady: boolean }).previewReady = true;
+}
+void start();

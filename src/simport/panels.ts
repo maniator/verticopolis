@@ -7,8 +7,8 @@ import type { FacilityKind, UnitState, VacateReason } from "../engine/types";
  * What the panels ask the engine and what it answers (facade slice 4, #1211).
  * Each answer is the JSON the Rust panel getter returns (slice 6b, #1214), so
  * the Rust adapter parses the engine's text into these types and the
- * TypeScript adapter (`tsPanels.ts`) builds the same objects from today's
- * functions. Plain JSON throughout: a field the TypeScript leaves undefined is
+ * TypeScript adapter (`src/tests/conformance/tsPanels.ts`, a test reference)
+ * builds the same objects from the TypeScript functions. Plain JSON throughout: a field the TypeScript leaves undefined is
  * `null` here, since JSON has none, and a heat cell's `tint` is left out when
  * it has none, as the getter leaves it out.
  */

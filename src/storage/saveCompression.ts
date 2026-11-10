@@ -11,7 +11,7 @@ import { wellFormed } from "../shared/wellFormed";
  * `.vctower` export uses the same so the engine's writer can match its bits.
  * `saveToAsync` compresses with the native CompressionStream, off the main
  * thread. Reading
- * a `.vctower` file (`SaveGame.import`) inflates with the native
+ * a `.vctower` file (`SaveGame.importText`) inflates with the native
  * DecompressionStream. Untrusted input is always inflated behind a size cap so a
  * decompression bomb can't hang the tab.
  */

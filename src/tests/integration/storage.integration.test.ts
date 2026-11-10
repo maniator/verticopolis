@@ -6,7 +6,7 @@ import { SaveGame } from "../../storage/SaveGame";
 import { toBase64, deflate } from "../../storage/saveCompression";
 import { FACILITIES, GRID } from "../../engine/facilities";
 import { UNIT_CAP } from "../../engine/sim/deserializeGuards";
-import { saveOf, loadAuto, loadResultSim, loadSlotSim } from "../fixtures/saveText";
+import { saveOf, loadAuto, loadResultSim, loadSlotSim, importTower } from "../fixtures/saveText";
 
 describe("SaveGame", () => {
   beforeEach(() => localStorage.clear());
@@ -582,7 +582,7 @@ describe("SaveGame", () => {
     const file = SaveGame.unreadableBackup()!;
     expect(file.startsWith("VCTOWER1\n")).toBe(true);
     expect(file.endsWith("\n")).toBe(true);
-    expect((await SaveGame.import(file)).money).toBe(424_242);
+    expect((await importTower(file)).money).toBe(424_242);
     // Text that is not a compressed store value comes back as stored.
     localStorage.setItem("simtower-clone-unreadable", "plain text");
     expect(SaveGame.unreadableBackup()).toBe("plain text");
@@ -761,7 +761,7 @@ describe("SaveGame", () => {
     // copy-paste JSON anymore.
     expect(file.startsWith("VCTOWER1\n")).toBe(true);
     expect(() => JSON.parse(file)).toThrow();
-    const loaded = await SaveGame.import(file);
+    const loaded = await importTower(file);
     expect(loaded.money).toBe(sim.money);
     expect(loaded.star).toBe(sim.star);
   });
@@ -785,28 +785,28 @@ describe("SaveGame", () => {
 
   it("rejects a raw-JSON tower export — only .vctower containers import now", async () => {
     const sim = sampleGame();
-    await expect(SaveGame.import(JSON.stringify(sim.serialize(), null, 2))).rejects.toThrow(/not a verticopolis tower file/i);
+    await expect(importTower(JSON.stringify(sim.serialize(), null, 2))).rejects.toThrow(/not a verticopolis tower file/i);
   });
 
   it("rejects malformed imports", async () => {
-    await expect(SaveGame.import("{}")).rejects.toThrow();
-    await expect(SaveGame.import("not json")).rejects.toThrow();
-    await expect(SaveGame.import("[1,2,3]")).rejects.toThrow(); // no VCTOWER magic → not a tower file
+    await expect(importTower("{}")).rejects.toThrow();
+    await expect(importTower("not json")).rejects.toThrow();
+    await expect(importTower("[1,2,3]")).rejects.toThrow(); // no VCTOWER magic → not a tower file
     // A magic line over a garbage body must fail loudly, not half-load.
-    await expect(SaveGame.import("VCTOWER1\n@@not base64@@")).rejects.toThrow();
-    await expect(SaveGame.import("VCTOWER1\n" + btoa("[1,2,3]"))).rejects.toThrow();
+    await expect(importTower("VCTOWER1\n@@not base64@@")).rejects.toThrow();
+    await expect(importTower("VCTOWER1\n" + btoa("[1,2,3]"))).rejects.toThrow();
   });
 
   it("reports a recognized-but-broken tower file as damaged, not as 'not a tower file'", async () => {
     // Valid base64 over bytes that are not a deflate stream.
-    await expect(SaveGame.import("VCTOWER1\n" + btoa('{"minutes":'))).rejects.toThrow(/damaged/);
+    await expect(importTower("VCTOWER1\n" + btoa('{"minutes":'))).rejects.toThrow(/damaged/);
     // A truncated real export: recognized container, broken payload.
     const file = await SaveGame.export(saveOf(sampleGame()));
-    await expect(SaveGame.import(file.slice(0, Math.floor(file.length / 2)))).rejects.toThrow(/damaged/);
+    await expect(importTower(file.slice(0, Math.floor(file.length / 2)))).rejects.toThrow(/damaged/);
   });
 
   it("tells the player to update when the file comes from a newer container version", async () => {
-    await expect(SaveGame.import("VCTOWER2\n" + btoa("{}"))).rejects.toThrow(/newer version/);
+    await expect(importTower("VCTOWER2\n" + btoa("{}"))).rejects.toThrow(/newer version/);
   });
 
   it("rejects a decompression bomb with a 'too large' message, not 'damaged'", async () => {
@@ -830,7 +830,7 @@ describe("SaveGame", () => {
     // Chunked btoa (matches SaveGame's own encoder — no node Buffer in the browser).
     let bin = "";
     for (let i = 0; i < packed.length; i += 0x8000) bin += String.fromCharCode(...packed.subarray(i, i + 0x8000));
-    await expect(SaveGame.import("VCTOWER1\n" + btoa(bin))).rejects.toThrow(/too large/);
+    await expect(importTower("VCTOWER1\n" + btoa(bin))).rejects.toThrow(/too large/);
   });
 
   describe("when the browser lacks the compression API", () => {
@@ -853,20 +853,20 @@ describe("SaveGame", () => {
       breakDecode();
       const file = await SaveGame.export(saveOf(sampleGame()));
       vi.unstubAllGlobals();
-      expect((await SaveGame.import(file)).money).toBe(sampleGame().money);
+      expect((await importTower(file)).money).toBe(sampleGame().money);
     });
 
     it("importing a compressed file reports the browser is too old, not 'damaged'", async () => {
       // A real, healthy container built while compression WAS available.
       const file = await SaveGame.export(saveOf(sampleGame()));
       breakDecode();
-      await expect(SaveGame.import(file)).rejects.toThrow(/too old to open/);
+      await expect(importTower(file)).rejects.toThrow(/too old to open/);
     });
 
     it("a decoder-only browser can still import, and an encoder-only browser can still export", async () => {
       const file = await SaveGame.export(saveOf(sampleGame()));
       breakEncode(); // decoder-only browser
-      expect((await SaveGame.import(file)).money).toBe(sampleGame().money);
+      expect((await importTower(file)).money).toBe(sampleGame().money);
       vi.unstubAllGlobals();
       breakDecode(); // encoder-only browser
       await expect(SaveGame.export(saveOf(sampleGame()))).resolves.toMatch(/^VCTOWER1\n/);
@@ -991,7 +991,7 @@ describe("SaveGame", () => {
 
   describe("Ground-floor recognition through the real file-load path", () => {
     // Build a genuine .vctower container (magic + base64 of the async-deflated
-    // JSON, the exact shape SaveGame.import parses) with a chosen appVersion, so
+    // JSON, the exact shape SaveGame.importText parses) with a chosen appVersion, so
     // the provenance-stamp -> detection wiring is exercised end-to-end via the
     // real import path (which calls markFounderFromLoadedFile), not a hand-stamped
     // object handed straight to deserialize().
@@ -1000,7 +1000,7 @@ describe("SaveGame", () => {
       if (appVersion === undefined) delete data.appVersion;
       else data.appVersion = appVersion;
       const text = "VCTOWER1\n" + toBase64(await deflate(new TextEncoder().encode(JSON.stringify(data)))) + "\n";
-      return SaveGame.import(text);
+      return importTower(text);
     }
 
     it("recognizes a genuine pre-stamp save (no appVersion) as a Founder on import", async () => {

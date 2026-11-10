@@ -4,7 +4,8 @@ import { join, relative, resolve } from "node:path";
 
 /**
  * vite.config.ts swaps a module by import specifier (`engineAliases`):
- * `./sim/loop` (outside Vitest).
+ * `./sim/loop` (outside Vitest) and `./game/toolingSim` (in a production
+ * build).
  * A specifier alias matches the text from any importer, so these pin that
  * exactly the intended file uses each one, and that the real modules are not
  * reached by another specifier the alias would miss. The postbuild guard
@@ -51,6 +52,12 @@ describe("the engine aliases' specifiers", () => {
   it("only Simulation.ts imports ./sim/loop, and no app code reaches the loop another way", () => {
     expect(files.filter((f) => f.specs.includes("./sim/loop")).map((f) => f.file)).toEqual(["src/engine/Simulation.ts"]);
     const other = files.filter((f) => f.specs.some((s) => names(f.file, s, "src/engine/sim/loop") && !(f.file === "src/engine/Simulation.ts" && s === "./sim/loop")));
+    expect(other.map((f) => f.file)).toEqual([]);
+  });
+
+  it("only main.ts imports ./game/toolingSim, and no app code reaches the tooling tower another way", () => {
+    expect(files.filter((f) => f.specs.includes("./game/toolingSim")).map((f) => f.file)).toEqual(["src/main.ts"]);
+    const other = files.filter((f) => f.specs.some((s) => names(f.file, s, "src/game/toolingSim") && !(f.file === "src/main.ts" && s === "./game/toolingSim")));
     expect(other.map((f) => f.file)).toEqual([]);
   });
 });

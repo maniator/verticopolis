@@ -1,5 +1,7 @@
 import { Simulation } from "../engine/Simulation";
 import { TsEngine } from "../engine/port/tsEngine";
+import { catalogFor } from "../engine/catalog";
+import { useTowerCatalogSource } from "../catalog/towerCatalog";
 import type { FacilityKind } from "../engine/types";
 import type { EnginePort, PortRecord } from "../simport/enginePort";
 import type { PortRenderSim } from "../simport/portRenderSim";
@@ -108,9 +110,17 @@ function stampOf(port: EnginePort): string {
   return tooling.stateDigest ? tooling.stateDigest() : port.serialize();
 }
 
+/** A TypeScript tower of the harness's, reading the TypeScript engine's own
+ *  tables: no engine host sets its catalog source, and the TypeScript engine's
+ *  queries on it (`TsEngine`) read the tower catalog (towerCatalog.ts). */
+function withTables(sim: Simulation): Simulation {
+  useTowerCatalogSource(sim, catalogFor);
+  return sim;
+}
+
 /** The engine's tower as a TypeScript instance, its telemetry and memos too. */
 function copyOf(port: EnginePort): Simulation {
-  const sim = Simulation.deserialize(JSON.parse(port.serialize()));
+  const sim = withTables(Simulation.deserialize(JSON.parse(port.serialize())));
   const tooling = port as RustTooling;
   const doc: unknown = tooling.elevatorTelemetry ? JSON.parse(tooling.elevatorTelemetry()) : null;
   if (isTelemetryDocument(doc)) adoptTelemetry(sim, doc);
@@ -359,7 +369,7 @@ export function adoptToolingSim(app: ToolingApp, built: Simulation, keepCamera: 
   // The bulletin shows the swapped-in tower's log as the TypeScript engine
   // shows it: a load numbers the engine's log from nothing, which the
   // bulletin reads as no lines, so they are read from the tower handed in.
-  app.ui.resetLog({ reader: app.reader, codes: app.portCodes, port: new TsEngine(sim) });
+  app.ui.resetLog({ reader: app.reader, codes: app.portCodes, port: new TsEngine(withTables(sim)) });
   app.ui.lastLogSeq = app.reader.header.logSeq;
 }
 
@@ -387,6 +397,6 @@ export function followToolingEdit(
   app.reader.update();
   app.renderSim = newRenderSim(app.enginePort, app.reader);
   app.engine.setSim(app.renderSim, { keepCamera: true });
-  if (shown) app.ui.resetLog({ reader: app.reader, codes: app.portCodes, port: new TsEngine(shown) });
+  if (shown) app.ui.resetLog({ reader: app.reader, codes: app.portCodes, port: new TsEngine(withTables(shown)) });
   app.ui.lastLogSeq = app.reader.header.logSeq;
 }

@@ -37,8 +37,8 @@ export function stats(sim: Simulation) {
     // A kept count only. The modal-only diagnostics that need a full scan or
     // flood fill (ratingPopulation, the functional parking count) are
     // computed for the stats report when the modal opens
-    // (`src/simport/tsPanels.ts`), since stats() runs on the ~6 Hz HUD refresh
-    // (UI.update).
+    // (`src/tests/conformance/tsPanels.ts`), since stats() runs on the ~6 Hz
+    // HUD refresh (UI.update).
     parkingSpaces,
     money: sim.money,
     star: sim.star,

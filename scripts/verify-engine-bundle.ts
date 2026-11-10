@@ -5,11 +5,13 @@
  * the service worker's precache list, so every `npm run build` proves its own
  * output:
  *   - no build ships test code;
- *   - the build ships no TypeScript step loop, precaches the engine package
- *     whenever dist/ holds one (a VC_ALLOW_NO_ENGINE=1 build has none), and
- *     carries only the TypeScript engine modules
- *     scripts/engine-bundle.allow.txt lists (and all of them, so the list
- *     only shrinks).
+ *   - the build ships no TypeScript step loop and precaches the engine
+ *     package whenever dist/ holds one (a VC_ALLOW_NO_ENGINE=1 build has
+ *     none);
+ *   - a production build carries no TypeScript engine module and not the
+ *     harnesses' tower (#921), and a VC_TOOLING=1 build carries only the
+ *     modules scripts/engine-bundle.allow.txt lists (and all of them, so the
+ *     list only shrinks).
  * `VC_ENGINE_REPORT=<file>` also writes the engine modules found as JSON.
  *
  * Keep this file ERASABLE (see screenshot-env.ts) so `node` runs it directly.
@@ -96,5 +98,6 @@ if (process.env.VC_ENGINE_REPORT) {
 if (result.errors.length > 0) fail(`\n  - ${result.errors.join("\n  - ")}`);
 console.log(
   `verify-engine-bundle: ${tooling ? "tooling " : ""}build, ${chunks.length} scripts checked; ` +
-    `${result.engineModules.length} TypeScript engine modules ship (all listed in scripts/engine-bundle.allow.txt), no step loop, no runtime engine switch`,
+    (tooling ? `${result.engineModules.length} TypeScript engine modules ship (all listed in scripts/engine-bundle.allow.txt)` : "no TypeScript engine module ships") +
+    ", no step loop, no runtime engine switch",
 );

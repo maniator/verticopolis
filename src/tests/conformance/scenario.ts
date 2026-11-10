@@ -269,7 +269,7 @@ export function startTsSim(start: Start): Simulation {
   }
   const raw = decodeVctower(readFileSync(resolve(REPO_ROOT, start.fixture), "utf8"), start.fixture) as SerializedGame;
   if (start.mode) raw.mode = start.mode;
-  // The import path's steps after decoding (SaveGame.import).
+  // The import path's steps after decoding (SaveGame.importText).
   const sim = Simulation.deserialize(raw);
   markFounderFromLoadedFile(sim, raw);
   if (start.mode && sim.mode !== start.mode) throw new Error(`${start.fixture} loaded as ${sim.mode}, not ${start.mode}`);

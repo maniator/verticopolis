@@ -14,7 +14,7 @@ import {
   tsTowerStats,
   tsTransportDetail,
   tsUnitDetail,
-} from "./tsPanels";
+} from "../tests/conformance/tsPanels";
 import { facilityFloors } from "../engine/facilities";
 import { TsEngine } from "../engine/port/tsEngine";
 import { ViewReader } from "./viewReader";

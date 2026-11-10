@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { checkEngineBundle, ENGINE_PACKAGE_FILES, parseAllowList, precacheManifest, repoRelativeSource, TS_STEP_LOOP, type EngineBundleInput } from "./engineBundle";
+import { checkEngineBundle, ENGINE_PACKAGE_FILES, parseAllowList, precacheManifest, repoRelativeSource, TOOLING_SIM, TS_STEP_LOOP, type EngineBundleInput } from "./engineBundle";
 
 const ROOT = resolve(__dirname, "..", "..");
 
-/** A build that passes: the host, one allowed engine module, and the engine
- *  package precached. */
+/** A tooling build that passes: the host, the harnesses' tower with one
+ *  listed engine module, and the engine package precached. */
 function bundle(over: Partial<EngineBundleInput> = {}): EngineBundleInput {
   return {
-    tooling: false,
-    chunks: [{ file: "assets/main-abc.js", sources: ["src/main.ts", "src/wasmhost/wasmHost.ts", "src/engine/Simulation.ts", "node_modules/lit-html/lit-html.js"] }],
+    tooling: true,
+    chunks: [{ file: "assets/main-abc.js", sources: ["src/main.ts", TOOLING_SIM, "src/engine/Simulation.ts", "node_modules/lit-html/lit-html.js"] }],
     precache: ["index.html", "assets/main-abc.js", ...ENGINE_PACKAGE_FILES],
     enginePackageBuilt: true,
     allowed: ["src/engine/Simulation.ts"],
@@ -18,9 +18,26 @@ function bundle(over: Partial<EngineBundleInput> = {}): EngineBundleInput {
   };
 }
 
+/** A production build that passes: the host and the stand-in, no engine. */
+function production(over: Partial<EngineBundleInput> = {}): EngineBundleInput {
+  return bundle({ tooling: false, chunks: [{ file: "assets/main-abc.js", sources: ["src/main.ts", "src/game/toolingSimAbsent.ts", "node_modules/lit-html/lit-html.js"] }], ...over });
+}
+
 describe("checkEngineBundle", () => {
-  it("passes a bundle that carries only listed engine modules", () => {
+  it("passes a tooling bundle that carries only listed engine modules", () => {
     expect(checkEngineBundle(bundle())).toEqual({ errors: [], engineModules: ["src/engine/Simulation.ts"] });
+  });
+
+  it("passes a production bundle that carries no engine module, whatever the list names (#921)", () => {
+    expect(checkEngineBundle(production())).toEqual({ errors: [], engineModules: [] });
+  });
+
+  it("fails a production bundle that carries any engine module or the harnesses' tower", () => {
+    const chunks = [{ file: "assets/main-abc.js", sources: ["src/main.ts", TOOLING_SIM, "src/engine/Simulation.ts", "src/engine/catalog.ts"] }];
+    expect(checkEngineBundle(production({ chunks })).errors).toEqual([
+      `assets/main-abc.js carries the tooling harnesses' tower (${TOOLING_SIM}), which only a VC_TOOLING=1 build may ship`,
+      expect.stringContaining("the production bundle carries TypeScript engine modules: src/engine/Simulation.ts, src/engine/catalog.ts."),
+    ]);
   });
 
   it("fails when a legacy engine import puts the TypeScript step loop back", () => {
@@ -32,21 +49,21 @@ describe("checkEngineBundle", () => {
     expect(errors.some((e) => e.includes("does not list: src/engine/sim/loop.ts"))).toBe(true);
   });
 
-  it("fails on any engine module the allowlist does not name", () => {
+  it("fails a tooling bundle on any engine module the allowlist does not name", () => {
     const chunks = [{ file: "assets/lazy-1.js", sources: ["src/engine/Simulation.ts", "src/engine/crowd/motion.ts"] }];
     expect(checkEngineBundle(bundle({ chunks })).errors).toEqual([expect.stringContaining("does not list: src/engine/crowd/motion.ts")]);
   });
 
-  it("fails when a listed module no longer ships, so the list only shrinks", () => {
-    expect(checkEngineBundle(bundle({ allowed: ["src/engine/Simulation.ts", "src/engine/Tower.ts"] })).errors).toEqual([expect.stringContaining("no longer ship in the bundle; remove them from scripts/engine-bundle.allow.txt so the list only shrinks: src/engine/Tower.ts")]);
+  it("fails when a listed module no longer ships in a tooling bundle, so the list only shrinks", () => {
+    expect(checkEngineBundle(bundle({ allowed: ["src/engine/Simulation.ts", "src/engine/Tower.ts"] })).errors).toEqual([expect.stringContaining("no longer ship in the tooling bundle; remove them from scripts/engine-bundle.allow.txt so the list only shrinks: src/engine/Tower.ts")]);
   });
 
   it("fails a build that does not precache the engine package", () => {
-    expect(checkEngineBundle(bundle({ precache: ["index.html", "engine/verticopolis_engine.js"] })).errors).toEqual([expect.stringContaining("does not precache the engine package (engine/verticopolis_engine_bg.wasm)")]);
+    expect(checkEngineBundle(production({ precache: ["index.html", "engine/verticopolis_engine.js"] })).errors).toEqual([expect.stringContaining("does not precache the engine package (engine/verticopolis_engine_bg.wasm)")]);
   });
 
   it("does not ask a build with no engine package to precache one", () => {
-    expect(checkEngineBundle(bundle({ precache: ["index.html"], enginePackageBuilt: false })).errors).toEqual([]);
+    expect(checkEngineBundle(production({ precache: ["index.html"], enginePackageBuilt: false })).errors).toEqual([]);
   });
 
   it("fails when nothing was read", () => {

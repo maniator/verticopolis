@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
-import { saveOf } from "../tests/fixtures/saveText";
+import { saveOf, importTower } from "../tests/fixtures/saveText";
 import { runExportFlow, runLegacyDownload, resetExportFlowForTests, EXPORT_WATCHDOG_MS } from "./exportFlow";
 
 /**
@@ -85,7 +85,7 @@ describe("export single-flight latch (GH #760)", () => {
     const text = downloads[0]!.contents as string;
     expect(typeof text).toBe("string");
     // The file reads back as the same tower.
-    const back = await SaveGame.import(text);
+    const back = await importTower(text);
     expect(back.tower.towerName).toBe(sim.tower.towerName);
     expect(toasts).toHaveLength(1);
     expect(toasts[0]!.kind).toBe("good");

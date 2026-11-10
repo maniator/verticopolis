@@ -16,7 +16,7 @@
  * from the TypeScript save, up to each transport's key order.
  *
  * - Every `.vctower` fixture, loaded the way an import loads it (`fromVctower`
- *   against `SaveGame.import`).
+ *   against `SaveGame.importText`).
  * - Every loader-table case (`conformance/loader-cases.json`: forged and
  *   hand-edited saves), `fromSave` against `Simulation.deserialize`. A case
  *   marked `knownDivergence` is pinned as still different, so a fix flips it
@@ -36,7 +36,7 @@ import { describe, expect, it } from "vitest";
 import type { Engine, encodeVctower } from "../../dualrun/engine";
 import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../engine/types";
-import { SaveGame } from "../../storage/SaveGame";
+import { importTower } from "../fixtures/saveText";
 import { MAX_SAVE_INFLATED_BYTES, STORE_MAGIC, TOWER_FILE_MAGIC, fromBase64, inflateCapped, parseSaveJson } from "../../storage/saveCompression";
 import { decodeVctower } from "../../storage/vctowerContainer";
 import { canonicalJson } from "../conformance/canonical";
@@ -99,9 +99,9 @@ describe.runIf(run)("saves audit: the Rust engine loads what the web loads, byte
     expect(cases.length).toBeGreaterThan(50);
   });
 
-  it.each(fixtures)("%s: fromVctower serializes the bytes SaveGame.import does", async (name) => {
+  it.each(fixtures)("%s: fromVctower serializes the bytes SaveGame.importText does", async (name) => {
     const text = readFileSync(resolve(FIXTURES, name), "utf8");
-    const web = JSON.stringify((await SaveGame.import(text)).serialize());
+    const web = JSON.stringify((await importTower(text)).serialize());
     const engine = wasm().Engine.fromVctower(text);
     try {
       const rust = engine.serialize();
@@ -129,7 +129,7 @@ describe.runIf(run)("saves audit: the Rust engine loads what the web loads, byte
 
   it.each(fixtures)("%s: the written file is the TypeScript writer's text up to a transport's key order, and the binding text only adds .0", async (name) => {
     const text = readFileSync(resolve(FIXTURES, name), "utf8");
-    const ts = JSON.stringify((await SaveGame.import(text)).serialize());
+    const ts = JSON.stringify((await importTower(text)).serialize());
     const engine = wasm().Engine.fromVctower(text);
     try {
       const rust = engine.serialize();
@@ -213,7 +213,7 @@ describe.runIf(run)("saves audit: text and size edges through the engine", () =>
     const engine = rust.Engine.fromVctower(file);
     const fromEngine = engine.serialize();
     engine.free();
-    const fromWeb = JSON.stringify((await SaveGame.import(file)).serialize());
+    const fromWeb = JSON.stringify((await importTower(file)).serialize());
     expect(canonical(fromEngine)).toBe(canonical(fromWeb));
   }, 120_000);
 
@@ -228,7 +228,7 @@ describe.runIf(run)("saves audit: text and size edges through the engine", () =>
     const { toBase64 } = await import("../../storage/saveCompression");
     const file = `${TOWER_FILE_MAGIC}\n${toBase64(deflateSync(new TextEncoder().encode(grown), { level: 1 }))}\n`;
     expect(() => rust.Engine.fromVctower(file)).toThrow();
-    await expect(SaveGame.import(file)).rejects.toThrow(/too large/);
+    await expect(importTower(file)).rejects.toThrow(/too large/);
     expect(STORE_MAGIC.length).toBeGreaterThan(0);
   }, 120_000);
 });

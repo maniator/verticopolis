@@ -149,61 +149,58 @@ One row per file on `src/tests/frontendEngineImports.ratchet.txt`. The
 **Disposition** column uses its own words: `keep (presentation)`, `move to
 Rust`, `delete with the TypeScript engine`, or `tooling only`.
 `src/game/appHistory.ts` left the list with #1754, which moved undo and redo
-into the engine: it now only drives the port's undo members.
+into the engine: it now only drives the port's undo members. With #921 the
+catalog handle (`src/catalog/towerCatalog.ts`) lost its TypeScript default
+(tests and the tooling tower set the tables themselves), the room preview
+(`src/preview.ts`) reads the engine's catalog as the sprite gallery does, and
+the TypeScript panel adapter moved to `src/tests/conformance/tsPanels.ts`. An
+ESLint rule (`eslint.config.js`) now refuses a runtime import of the engine in
+any shipped file, so the files left are tooling.
 
 | File | Runs in the shipped game | Decides gameplay | Disposition | Owner |
 | --- | --- | --- | --- | --- |
-| `src/catalog/towerCatalog.ts` | yes, as the catalog handle every read goes through; its default source, the TypeScript tables, answers no gameplay read in the shipped game (one boot-time package check compares the engine's world fields and facility kinds with them, 2c), because `src/wasmhost/rustEngine.ts` points the port at the engine's catalog when it starts and `newRenderSim` points the render tower at the port | no; the tables are a default no gameplay read reaches, and stale where the engine moved on (the wedding hall is five stories in Rust, one in the tables) | move to Rust | #921, #926 (Rust-only lane) |
-| `src/game/toolingSim.ts` | no: behind `import.meta.env.DEV` or `__TOOLING_BUILD__` | no | tooling only | #1421 (it constructs the TypeScript port, 2b) |
-| `src/preview.ts` | only on the screenshot harness page | no | tooling only | #921 |
+| `src/game/toolingSim.ts` | no: `vite.config.ts` swaps it for `src/game/toolingSimAbsent.ts` in every build but a `VC_TOOLING=1` one (#921) | no | tooling only | #1421 (it constructs the TypeScript port, 2b) |
 | `src/render/atlas/archive.ts` | only when the sprite atlas is built | no | tooling only | #921 |
 | `src/render/atlas/browserEntry.ts` | only on the atlas page | no | tooling only | #921 |
-| `src/simport/tsPanels.ts` | no: the TypeScript adapter's panel answers | no | delete with the TypeScript engine | #1421 |
 
 ### 2b. The shipped bundle
 
 `scripts/verify-engine-bundle.ts` reads every emitted sourcemap after each
-build and holds the list of `src/engine/` modules the bundle may carry
-(`scripts/engine-bundle.allow.txt`, 93 modules on this commit, shrink-only).
-The step loop (`src/engine/sim/loop.ts`) is absent, and the CI step "The
-bundle guard catches a TypeScript step loop import" (`.github/workflows/test.yml`)
-proves the check would catch it. Grouped by why the modules shipped in the 837575f audit. The live
-bundle allowlist and emitted sourcemap are authoritative for current counts:
+build. A production build carries no `src/engine/` module (#921), and the guard
+fails one that does. A `VC_TOOLING=1` build carries the modules
+`scripts/engine-bundle.allow.txt` lists (93 on this commit, shrink-only), all
+for the harnesses' hand-built tower (`src/game/toolingSim.ts`), which is a
+TypeScript `Simulation` with the `TsEngine` port over it. The step loop
+(`src/engine/sim/loop.ts`) is absent from both, and the CI step "The bundle
+guard catches a TypeScript step loop import" (`.github/workflows/test.yml`)
+proves the check would catch it. Grouped by what the tooling build carries:
 
 | Group | Modules | Why it ships | Runs in the shipped game | Owner |
 | --- | --- | --- | --- | --- |
-| The simulation (`Simulation`, `Tower`, `Crowd`, `EconomySystem`, `EventSystem`, `sim/*`, `tower/*`, migrations, `elevatorSchedule`, `scheduleOrigins`) | 60 in the 837575f bundle audit | Residual TypeScript imports come via `src/game/engineFault.ts`/`src/wasmhost/hostFault.ts`, `src/storage/SaveGame.ts`, `src/main.ts`/`src/game/toolingSim.ts`, and the boot-time catalog check. Since #921, `src/game/cardKit.ts` is port-only through `src/game/cardLines.ts`; the TypeScript reference card and its gripe/housekeeping helpers now live under `src/tests/diagnostics/` and are not imported by the shipped card. This grouping describes the historical snapshot: `scripts/verify-engine-bundle.ts` and its allowlist check the current shipped bundle. | partly: no shipped game runs `Simulation` or the TypeScript step loop; tests and tooling retain the reference | #921, #926, #1421; read the emitted sourcemap for a current count |
+| The simulation (`Simulation`, `Tower`, `Crowd`, `EconomySystem`, `EventSystem`, `sim/*`, `tower/*`, migrations, `elevatorSchedule`, `scheduleOrigins`) | most of the list | the harnesses' tower is a `Simulation` | no: tooling builds only | #1421 |
 | The TypeScript port and step driver (`port/*`, `sim/frameStep`, `sim/fixedStep`, `timePacing`, `scheduleAuthoring`) | 15 | `src/game/toolingSim.ts` constructs a `TsEngine` | no: tooling builds only | #1421 |
-| `UndoHistory` | 1 | the TypeScript port's own undo (`UndoSteps`, from `src/engine/port/tsEngine.ts`); `src/game/appHistory.ts` stopped importing it with #1754 | no: the shipped undo runs in the engine | #1421 |
-| Rules and reference tables (`catalog`, `facilitiesData`, `pricing`, `ruleSets`, `gameRules`, `households`, `census`, `residentialRentals`, `retailSubtypes`, `calendar`, `econConfig`, `facilityCaps`, `facilityPredicates`, `sim/constants`, `tower/rooms`, `tower/towerTopology`, `types`) | 17 | the catalog handle's default source and the mode flags (2a), and the boot-time package check (`src/wasmhost/catalogCheck.ts`, 2c) | partly: as UI flags and shared constants; the tables answer no gameplay read in the shipped game (the boot check only compares the engine's catalog with them), and nothing here steps the tower | #921, #926 |
-
-The allowlist's header still explains the list in pre-Rust-only terms (the
-`app.sim` read model, commands running on the instance first); its owner
-rewrites it with #1421.
+| `UndoHistory` | 1 | the TypeScript port's own undo (`UndoSteps`, from `src/engine/port/tsEngine.ts`) | no: tooling builds only | #1421 |
+| Rules and reference tables (`catalog`, `facilitiesData`, `pricing`, `ruleSets`, `gameRules`, `households`, `census`, `residentialRentals`, `retailSubtypes`, `calendar`, `econConfig`, `facilityCaps`, `facilityPredicates`, `sim/constants`, `tower/rooms`, `tower/towerTopology`, `types`) | 17 | the tooling tower's catalog source and the TypeScript engine's own reads | no: tooling builds only | #1421 |
 
 ### 2c. Host and save code
 
 The import ratchet leaves out `src/wasmhost/`, `src/dualrun/` and
-`src/storage/`. These are the files there that ship (by the same sourcemap
-read) and import the TypeScript engine at run time. The retired TypeScript
-host and the mirror modules only it reached, which imported it too and shipped
-only to tests, went with #1421. The rest import its types only. The guard fails when
-a file there gains a runtime import and this section does not name it.
+`src/storage/`. Since #921 no file there imports the TypeScript engine at run
+time: the boot catalog check (`src/wasmhost/catalogCheck.ts`) holds the
+engine's catalogs to the kinds the UI draws and to one world for both modes,
+`SaveGame.import` moved to the test tree (`importTower` in
+`src/tests/fixtures/saveText.ts`), and `src/wasmhost/hostFault.ts` kept only
+`isEngineTrap` and `runEach`. The guard fails when a file there gains a
+runtime import and this table does not name it.
 
 | File | Runs in the shipped game | Decides gameplay | Disposition | Owner |
 | --- | --- | --- | --- | --- |
-| `src/wasmhost/catalogCheck.ts` | yes, at every boot: `refuseForeignCatalog` compares each Rust catalog's world fields and facility kinds with the TypeScript tables (`catalogFor`), and a difference refuses the package as a mismatched build | no; it accepts or refuses an engine package, and no rule is read from the tables | move to Rust | #921, #926 (Rust-only lane): compare against the build's own drawing tables once the TypeScript tables go |
-| `src/wasmhost/hostFault.ts` | partly: `isEngineTrap` (from `src/game/engineFault.ts`) and `runEach` run; `RestorePoints.restore`, which loads a save into a TypeScript tower, has had no caller but its unit test since #1421 deleted the TypeScript host | no | delete with the TypeScript engine | #1421 (Rust-only lane), after the shipped helpers move out in the 2b slice |
-| `src/storage/SaveGame.ts` | partly: the save store and `.vctower` checks run; `SaveGame.import`, which builds a TypeScript tower, is for tests and tools | no | delete with the TypeScript engine | #1421 (`SaveGame.import` only; the store stays) |
 
-**Verdict for the "TypeScript decides nothing in production" criterion:** at
-run time, nothing remains since #1754 moved undo and redo into the engine,
-which keeps each edit's steps itself. The TypeScript tables still ship as
-the catalog handle's default source. No gameplay read reaches them; one
-boot-time package check reads them, and it only accepts or refuses an engine
-package (`src/wasmhost/catalogCheck.ts`). #921 and #926 remove them. Everything else in the bundle is presentation over engine
-facts or code the shipped game never runs; the Rust-only lane's bundle slice
-and #1421 remove that code.
+**Verdict for the "TypeScript decides nothing in production" criterion:**
+nothing remains. #1754 moved undo and redo into the engine, and #921 took the
+TypeScript engine out of the production bundle, which the postbuild guard
+proves on every build. What is left of it ships only in tooling builds (2b)
+and leaves with #1421.
 
 ## 3. Engine reads and commands
 
@@ -437,7 +434,7 @@ this order under #878:
   (`src/tests/integration/condoRelocationEngine.integration.test.ts`).
 
 `src/tests/tsEngineTests.ratchet.txt` lists 188 files that still drive the
-TypeScript engine directly (159 test files and 29 fixtures and helpers; the
+TypeScript engine directly (158 test files and 30 fixtures and helpers; the
 list shrinks as tests convert and grows only with a reason the PR states, as
 when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/segmentRoutingMealRush.integration.test.ts`,

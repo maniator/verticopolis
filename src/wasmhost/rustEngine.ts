@@ -3,7 +3,7 @@ import { readCatalog } from "../dualrun/catalog";
 import { useTowerCatalogSource } from "../catalog/towerCatalog";
 import { BOOT_SEED, bootTower, type BootTower } from "../game/bootTower";
 import type { EnginePort } from "../simport/enginePort";
-import { refuseForeignCatalog } from "./catalogCheck";
+import { refuseForeignCatalogs } from "./catalogCheck";
 import { EngineBootError } from "./engineBoot";
 import { ENGINE_DIR, ENGINE_GLUE } from "./enginePackageNames";
 import { loadEngineModule, type LoadEngineOptions } from "./loadEngineModule";
@@ -38,15 +38,15 @@ export async function loadWasmEngine(url = enginePackageUrl(), signal?: AbortSig
 
 /** A fresh Rust engine with the stored tower loaded into it. Prices, sizes
  *  and build rules come from the engine's own catalogs, read first: a package
- *  whose catalogs this build cannot read, or that states another world or
- *  other kinds than this build draws, is a mismatched package and is refused
- *  before an engine is built. */
+ *  whose catalogs this build cannot read, that list other kinds than this
+ *  build draws, or whose two modes state different worlds, is a mismatched
+ *  package and is refused before an engine is built. */
 export function rustBootTower(mod: WasmModule): BootTower {
   let catalogs: Record<"classic" | "modern", ReturnType<typeof readCatalog>>;
   try {
     // Both modes: a Classic tower's patronage readout uses the Modern yardstick.
     catalogs = { classic: readCatalog(mod, "classic"), modern: readCatalog(mod, "modern") };
-    for (const c of Object.values(catalogs)) refuseForeignCatalog(c);
+    refuseForeignCatalogs(catalogs);
   } catch (e) {
     throw new EngineBootError("package-mismatch", e instanceof Error ? e.message : String(e));
   }
