@@ -21,6 +21,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.90.0
+
+- The Map has two new views, Traffic and Occupancy, that color each floor by how crowded or how full it is, in both game modes.
+- The Map's views are now picked from one View menu at the top of the window.
+- The Floor heatmap picker in the sidebar is gone, and the tower view no longer tints floors: every heatmap now lives on the Map (Satisfaction is the Eval view and Housekeeping the Hotel view).
+
 ## 2.89.2
 
 - On the Map, parking ramps, security offices, stairs and service elevators stand out more clearly from the sky, the ground and each other.
