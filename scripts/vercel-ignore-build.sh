@@ -20,8 +20,7 @@
 # What is skipped (see affects_deploy below for the exact patterns):
 #   - docs, skills, bmad artifacts, workflows, e2e, and the tools/ folder
 #   - the root doc markdown and the lint and Playwright configs
-#   - unit and integration test files, and src/tests except portKit, which
-#     vite.config.ts imports
+#   - unit and integration test files, and src/tests
 #   - the engine's Rust tests and consumer crate, and its markdown
 #   - the conformance suite, except the files the engine crate compiles in
 #   - standalone dev scripts (screenshots, perf, fuzz, PostHog, rollback,
@@ -36,7 +35,6 @@
 #   - the conformance lock files (catalog-digests, events/, expected,
 #     loader-cases, tdt-cases): the engine crate includes some with
 #     include_str!, and src/build/engineCompat.ts digests all five
-#   - src/tests/portKit: vite.config.ts imports it
 #   - .changes/: the release PR deletes the notes, and the production deploy
 #     that lifts the hold must see that diff and build
 #   - everything else, including api/, scripts the build runs, package files
@@ -66,7 +64,6 @@ affects_deploy() {
 
     # Test files. The case patterns match across folders.
     src/*.test.ts | src/*.test.tsx) return 1 ;;
-    src/tests/portKit/*) return 0 ;;
     src/tests/*) return 1 ;;
 
     # The engine crate's Rust tests, consumer crate and markdown. Its src/,

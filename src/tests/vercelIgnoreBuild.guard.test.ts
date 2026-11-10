@@ -58,7 +58,6 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       "src/main.ts",
       "src/public/sw-navigation-fallback.js",
       "src/engine/facilities.ts",
-      "src/tests/portKit/convertedList.ts",
       "engine-rs/src/lib.rs",
       "engine-rs/Cargo.toml",
       "engine-rs/Cargo.lock",
@@ -99,6 +98,7 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       "src/ui/Menu.test.tsx",
       "src/tests/namedFlags.guard.test.ts",
       "src/tests/guardFiles.ts",
+      "src/tests/portKit/convertedList.ts",
       "engine-rs/tests/api.rs",
       "engine-rs/consumer/src/main.rs",
       "engine-rs/API.md",
@@ -385,7 +385,6 @@ describe.skipIf(process.platform === "win32")("scripts/vercel-ignore-build.sh", 
       const reached = reachedByBuild();
       // A sanity floor: a broken scan would reach nothing and pass.
       expect(reached.length).toBeGreaterThan(200);
-      expect(reached).toContain("src/tests/portKit/convertedList.ts");
       expect(reached).toContain("docs/screenshots/00b-onboarding-modern.png");
       const got = classify(reached);
       expect(reached.filter((p) => got.get(p) !== "build")).toEqual([]);

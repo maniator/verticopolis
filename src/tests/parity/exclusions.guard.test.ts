@@ -33,9 +33,9 @@ type Key = (typeof KEYS)[number];
 type Counts = Record<Key, number>;
 const zero = (): Counts => ({ itTypeScriptOnly: 0, atEngineFrameCadence: 0, onWasmParityProject: 0 });
 
-/** The marker's own module and the setup's spec of it, which call the markers
- *  to test them. Everything else under `src/` is counted. */
-const OWN_FILES = new Set(["src/tests/parity/typescriptOnly.ts", "src/tests/parity/wasmHostSetup.integration.test.ts"]);
+/** The marker's own module, which calls the markers to define them.
+ *  Everything else under `src/` is counted. */
+const OWN_FILES = new Set(["src/tests/parity/typescriptOnly.ts"]);
 
 function parseRatchet(): Map<string, Counts> {
   const out = new Map<string, Counts>();

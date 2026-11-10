@@ -195,31 +195,24 @@ Verticopolis has **two test tiers**:
     The same body runs on the Rust engine and on `TsEngine`, so the Rust
     engine is the authority and the TypeScript reference keeps its coverage.
     List a converted file in `src/tests/portKit/converted.txt` (a guard checks
-    the list): the WASM parity projects then leave it out, and
-    `npm run test:port` (part of `npm run test:wasm`) runs it with the Rust
-    leg required. Without the engine package the Rust leg skips.
+    the list), and `npm run test:port` (part of `npm run test:wasm`) runs it
+    with the Rust leg required. Without the engine package the Rust leg skips.
 
-    **The vitest tiers on the WASM engine.** `npm run test:wasm:parity` runs
-    the `integrationWasm` and `unitWasm` projects, whose setup file hosts
-    every `Simulation` a test ticks on the engine
-    (story-engine-test-parity, #878). A test that cannot run there is marked
-    with `itTypeScriptOnly(reason)`; a test that reads only what the
-    engine's frame carries but ticks too often for a full merge after every
-    tick calls `atEngineFrameCadence(reason)` and runs at the host's own
-    cadence. The story's test-mapping table names each one with the same
-    reason, and `src/tests/parity/exclusions.ratchet.txt` pins how many each
-    file holds. CI runs both projects on every PR (`test-wasm-parity` in
-    `test.yml`). The required `integrationWasm` leg also runs
-    `npm run test:wasm` once for the host-driven suites (including `wasmHost`,
-    `wasmWorker` and perf-compare); the `unitWasm` leg does not duplicate it.
-    The Rust workflow uses its own `on.push.paths` list to select PR engine
-    jobs, so there is no second independent list or YAML snapshot test.
-    Knobs: `VC_WASM_SYNC=hour` runs every test at the host's own
-    cadence, `VC_PARITY_DUMP=<dir>` writes both views where the instance
-    and the engine depart, `VC_PARITY_TRACE=1` logs each re-host (see the header of
-    `src/tests/parity/wasmHostSetup.ts`). The projects run with a 120 s test
-    timeout, so a test with its own shorter timeout can still time out on a
-    slow machine.
+    **The suites on the WASM engine.** `npm run test:wasm` runs the suites
+    that start the Rust engine themselves (conformance, the goldens' Rust
+    legs, the telemetry and log-text comparisons, perf comparison) with the
+    engine package required. CI runs it
+    once per PR on the required `test-wasm-parity (integrationWasm)` leg; the
+    `test-wasm-parity (unitWasm)` leg runs the unit tests with the package
+    required, so the package's own tests run instead of skipping. Until
+    #1421 those legs also ran every suite with each `Simulation` hosted on
+    the engine (story-engine-test-parity, #878); the hosted projects and the
+    mirror host behind them are gone, and a test that still marks itself
+    `itTypeScriptOnly(reason)` or calls `atEngineFrameCadence(reason)` runs
+    as a plain test (`src/tests/parity/exclusions.ratchet.txt` still pins the
+    marks until the marked suites go with the TypeScript engine). The Rust
+    workflow uses its own `on.push.paths` list to select PR engine jobs, so
+    there is no second independent list or YAML snapshot test.
 
   `npm test` (`vitest run`) runs **both** projects and is the CI gate. Coverage
   stays a single root-level measurement across both projects (see Coverage

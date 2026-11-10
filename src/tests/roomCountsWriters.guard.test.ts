@@ -121,11 +121,6 @@ const RAW_WRITES: Record<string, Record<string, number>> = {
   "src/engine/sim/services.ts": { occupants: 1 },
   // setRoomState itself.
   "src/engine/tower/rooms.ts": { state: 1 },
-  // The hosts' unit records: markRoom when any of the five fields moves, as
-  // the app's TsEngine watches the read model on the Rust path until port
-  // PR 5 deletes it (frameApply.test.ts holds a reader over it to a walk).
-  "src/wasmhost/frameApply.ts": { state: 1, customersIn: 1, occupants: 1, hotelCustomersIn: 1, outForMeal: 1 },
-  "src/wasmhost/frameSync.ts": { state: 1, customersIn: 1, occupants: 1, hotelCustomersIn: 1, outForMeal: 1 },
   // The shared reader's own decoded rooms, never an engine unit: it keeps
   // no counts.
   "src/simport/viewReader.ts": { state: 2, customersIn: 1, occupants: 1, hotelCustomersIn: 1, outForMeal: 1, label: 2, subtype: 3 },
@@ -135,7 +130,7 @@ const RAW_WRITES: Record<string, Record<string, number>> = {
 };
 
 /** Writes through a person's or a class's own name, per file: the crowd's
- *  people (`motion.ts`, `visits.ts`, the hosts' crowd apply), the generator's
+ *  people (`motion.ts`, `visits.ts`), the generator's
  *  own `this.state` (`rng.ts`) and the shared reader's room view's own
  *  `this.label`. */
 const NAMED_WRITES: Record<string, Record<string, number>> = {
@@ -143,8 +138,6 @@ const NAMED_WRITES: Record<string, Record<string, number>> = {
   "src/engine/crowd/visits.ts": { state: 1 },
   "src/engine/rng.ts": { state: 4 },
   "src/simport/viewReader.ts": { label: 1 },
-  "src/wasmhost/frameApply.ts": { state: 1 },
-  "src/wasmhost/frameSync.ts": { state: 1 },
 };
 
 /** A computed key: anything but a plain string or a number, with one level
@@ -177,19 +170,6 @@ interface OpaqueWrites {
   marks?: number;
 }
 const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
-  // assignRecord() rewrites a unit or a transport in place (a delete pass
-  // and an Object.assign), for both unit writers: mergeTower marks the rooms
-  // whose counted fields differ or drops the rooms list when units moved, and
-  // mergeSimulationDelta marks every unit it rewrites (and drops the list
-  // when a record moved). The keyed writes copy the Simulation's and the
-  // Tower's own fields.
-  "src/wasmhost/merge.ts": { bulk: 2, keyed: 2, marks: 2 },
-  // A person's fields through their key; the other keyed writes are a
-  // route's legs and the cars' positions, loads and directions. The unit
-  // records are written by name and marked (RAW_WRITES).
-  "src/wasmhost/frameApply.ts": { bulk: 1, keyed: 5, marks: 1 },
-  "src/wasmhost/frameSync.ts": { bulk: 1, keyed: 1, marks: 1 },
-  "src/wasmhost/personFields.ts": { bulk: 2, keyed: 1 },
   // Errors and a sprite canvas.
   "src/dualrun/catalog.ts": { bulk: 1 },
   "src/render/pixelSprites/food.kit.ts": { bulk: 1 },
@@ -198,10 +178,6 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
   "src/render/atlas/bake.ts": { bulk: 4 },
   "src/render/atlas/bakeAdditions.ts": { bulk: 1 },
   "src/render/atlas/browserEntry.ts": { bulk: 1 },
-  // The app's hooks, and the simulation's and tower's relayed methods and
-  // fields (money, view, the tower's name).
-  "src/dualrun/mirror.ts": { bulk: 5 },
-  "src/wasmhost/wasmHost.ts": { bulk: 7 },
   // The port contract's grown-tower setup (the star and the balance) on a
   // tower that reaches the engine only through its save: no live unit.
   "src/simport/engineLifecycle.fixture.ts": { bulk: 5 },
@@ -223,9 +199,8 @@ const OPAQUE_WRITES: Record<string, OpaqueWrites> = {
 };
 
 /** A write of a unit's kind. The kept counts move a kind's count only when
- *  the rooms list is rebuilt, so the engine never rewrites a kind in place;
- *  the hosts' merges, which rewrite units wholesale, drop the list when a
- *  kind moves. A type's indexed access (`LogEntry["kind"] = "info"`, a
+ *  the rooms list is rebuilt, so the engine never rewrites a kind in place.
+ *  A type's indexed access (`LogEntry["kind"] = "info"`, a
  *  default parameter) is not a write. */
 const KIND_WRITE = new RegExp(String.raw`(?:\.kind\b|(?<!\b[A-Z][\w$]*)\[\s*(["'\`])kind\1\s*\])\s*${OPERATOR}`, "g");
 

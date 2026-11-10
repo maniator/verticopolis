@@ -8,17 +8,16 @@ import { dirname, resolve } from "node:path";
  * Relay-only binding ops guard (#906, under the #923 boundary row).
  *
  * The WASM binding's `towerSetCars` and `towerResizeTransport` edit the Rust
- * tower directly and emit no `capacity_changed`. They exist only so the
- * dual-run mirror can replay a bare TypeScript tower edit (tests, fixtures,
- * tooling) the way the TypeScript engine applied it. A UI path or player
+ * tower directly and emit no `capacity_changed`. They existed so the dual-run
+ * mirror could replay a bare TypeScript tower edit the way the TypeScript
+ * engine applied it; the mirror is gone (#1421). A UI path or player
  * command that reached them would skip the simulation layer and its event.
  * Player edits go through the charged commands (`addCar`, `removeCar`,
  * `extendTransport`); `setCars` and `resizeTransport` are the uncharged
  * simulation-layer edits.
  *
- * Who may name them: the relay's own files (the command type, the mirror that
- * emits the command, the shadow that applies it, the binding's method list,
- * its tier table and generated declaration), and test files (`*.test.*`). Every other
+ * Who may name them: the binding's method list, its tier table and generated
+ * declaration, and test files (`*.test.*`). Every other
  * tracked source under src/, scripts/, api/, tools/ and e2e/ is scanned, in
  * any JS or TS flavor; src/public/ (the built WASM glue, which defines the
  * ops, and static assets) is skipped. The file list comes from `git ls-files`,
@@ -32,11 +31,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..");
 const ALLOWED = new Set([
   "src/dualrun/binding.ts",
-  "src/dualrun/commands.ts",
   "src/dualrun/engine.d.ts",
   "src/dualrun/exportTiers.ts",
-  "src/dualrun/mirror.ts",
-  "src/dualrun/shadow.ts",
 ]);
 const SCANNED_TREES = ["src", "scripts", "api", "tools", "e2e"];
 const SOURCE = /\.(m|c)?[jt]sx?$/;
@@ -54,7 +50,7 @@ function scanned(): string[] {
 describe("relay-only tower ops stay in the relay", () => {
   const files = scanned();
 
-  it("no source outside the dual-run relay names towerSetCars or towerResizeTransport", () => {
+  it("no source outside the binding's own files names towerSetCars or towerResizeTransport", () => {
     const offenders = files
       .filter((file) => !ALLOWED.has(file))
       .filter((file) => NAMES_RELAY_OP.test(readFileSync(resolve(root, file), "utf8")));

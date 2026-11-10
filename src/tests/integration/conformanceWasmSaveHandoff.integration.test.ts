@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { firstDifference } from "../../dualrun/shadow";
 import { Simulation } from "../../engine/Simulation";
 import type { SerializedGame } from "../../engine/types";
 import { parseSaveJson } from "../../storage/saveCompression";
 import { canonicalJson } from "../conformance/canonical";
 import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
-import { loadFixture } from "../dualrun/dualRunHarness";
+import { loadFixture } from "../conformance/fixtureSim";
 
 /**
  * Save integrity across the engines (gate 1, the 3.0 priorities plan's layer 2):
@@ -57,7 +56,7 @@ describe.runIf(hasWasmPackage() || wasmRequired())("save handoff: a played tower
       engine.free();
     }
     const reopened = tsResave(saved);
-    expect(firstDifference(JSON.parse(saved), JSON.parse(reopened)), name).toBeNull();
+    expect(JSON.parse(reopened), name).toEqual(JSON.parse(saved));
     expect(canonical(reopened)).toBe(canonical(saved));
   });
 
@@ -66,7 +65,7 @@ describe.runIf(hasWasmPackage() || wasmRequired())("save handoff: a played tower
     for (let m = 0; m < DAY_MINUTES; m++) sim.tick(1);
     const saved = JSON.stringify(sim.serialize());
     const reopened = rustResave(saved);
-    expect(firstDifference(JSON.parse(saved), JSON.parse(reopened)), name).toBeNull();
+    expect(JSON.parse(reopened), name).toEqual(JSON.parse(saved));
     expect(canonical(reopened)).toBe(canonical(saved));
   });
 });

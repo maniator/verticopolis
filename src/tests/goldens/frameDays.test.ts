@@ -9,10 +9,12 @@ import {
   FRAME_DAY_FIXTURES,
   MIN_DAY_CHECKPOINTS,
   SETUP_CHECKPOINTS,
+  caseDays,
   dumpRoot,
   firstFrameDayDifference,
   frameDayProblems,
   freshDumpDir,
+  minCheckpoints,
   readFrameDays,
   type FrameDayCase,
   type FrameDayCheckpoint,
@@ -62,13 +64,20 @@ describe("the frame-day golden's comparison", () => {
     expect(frameDayProblems(fixture("other.vctower"), moving().map((p) => ({ ...p, minute: Math.min(p.minute, day) })))).toEqual([]);
     expect(frameDayProblems(fixture("other.vctower"), moving().map((p) => ({ ...p, minute: Math.min(p.minute, day - 1) })))).toEqual([`spans ${day - 1} minutes, less than a day`]);
     expect(frameDayProblems(fixture("other.vctower"), moving().map((p) => ({ ...p, minute: 420 + Math.min(p.minute, day - 1) })))).toEqual([`spans ${day - 1} minutes, less than a day`]);
+    // A case of several days needs a checkpoint per hour of each, and the
+    // whole span.
+    const twoDays: FrameDayCase = { ...fixture("other.vctower"), days: 2 };
+    expect(minCheckpoints(twoDays)).toBe(n + 24);
+    expect(frameDayProblems(twoDays, moving())).toEqual([`${n} checkpoints, fewer than ${n + 24}`, `spans ${(n - 1) * 60} minutes, less than 2 days`]);
+    expect(frameDayProblems(twoDays, moving(SETUP_CHECKPOINTS, n + 24))).toEqual([]);
   });
 });
 
 describe("the frame-day cases", () => {
   it("cover every fixture at every running speed, plus the dual run's own cases", () => {
     for (const file of FRAME_DAY_FIXTURES) {
-      const speeds = FRAME_DAY_CASES.filter((c) => c.start.kind === "fixture" && c.start.file === file && !c.steadyClock && c.frameTimes.length > 1).map((c) => c.speed);
+      const plain = (c: FrameDayCase) => c.start.kind === "fixture" && c.start.file === file && c.start.calendar === undefined && caseDays(c) === 1;
+      const speeds = FRAME_DAY_CASES.filter((c) => plain(c) && !c.steadyClock && c.frameTimes.length > 1).map((c) => c.speed);
       expect(speeds, file).toEqual([1, 2, 3]);
     }
     expect(FRAME_DAY_FIXTURES.length).toBeGreaterThanOrEqual(8);
@@ -76,7 +85,10 @@ describe("the frame-day cases", () => {
     expect(modes).toEqual(["classic realWorld", "modern realWorld", "modern canon"]);
     expect(FRAME_DAY_CASES.some((c) => c.steadyClock)).toBe(true);
     expect(FRAME_DAY_CASES.some((c) => c.frameTimes.length === 1)).toBe(true);
-    // The two cases that name a fixture name one that is there.
+    // A built tower on the canon calendar plays past a quarter's end.
+    const canon = FRAME_DAY_CASES.filter((c) => c.start.kind === "fixture" && c.start.calendar === "canon");
+    expect(canon.map((c) => [c.speed, caseDays(c)])).toEqual([[3, 4]]);
+    // The cases that name a fixture name one that is there.
     for (const c of FRAME_DAY_CASES) if (c.start.kind === "fixture") expect(FRAME_DAY_FIXTURES, c.id).toContain(c.start.file);
   });
 
