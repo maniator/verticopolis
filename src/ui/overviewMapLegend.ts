@@ -19,6 +19,10 @@ export class MapLegend {
   /** The count element per entry, in entry order. */
   private readonly counts: HTMLElement[] = [];
   private readonly written: string[] = [];
+  /** The measured reach (`reach`), and the body width it was measured at;
+   *  NaN until a shown legend has been measured. */
+  private reached = Number.NaN;
+  private reachedAt = Number.NaN;
 
   constructor(doc: Document, view: MapViewId, entries: ReadonlyArray<LegendEntry>) {
     this.root = doc.createElement("div");
@@ -47,6 +51,19 @@ export class MapLegend {
   /** Show or hide the legend. */
   setShown(shown: boolean): void {
     this.root.hidden = !shown;
+    this.reached = Number.NaN;
+  }
+
+  /** How far down the body the legend reaches, in CSS pixels: its top offset
+   *  plus its height. It is measured once per change (shown, a count written,
+   *  a new body `width`), so a steady frame reads no layout. A legend not laid
+   *  out yet (the window still hidden) measures 0 and is measured again. */
+  reach(width: number): number {
+    if (width !== this.reachedAt || !(this.reached > 0)) {
+      this.reached = this.root.hidden ? 0 : this.root.offsetTop + this.root.offsetHeight;
+      this.reachedAt = width;
+    }
+    return this.reached;
   }
 
   /** Write each entry's room count, `rooms(i)` for entry `i`, touching only
@@ -57,6 +74,8 @@ export class MapLegend {
       if (text === this.written[i]) continue;
       this.written[i] = text;
       this.counts[i].textContent = text;
+      // A longer count can wrap the legend onto another line.
+      this.reached = Number.NaN;
     }
   }
 }

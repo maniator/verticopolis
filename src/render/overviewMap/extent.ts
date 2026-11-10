@@ -49,8 +49,14 @@ export interface BuiltFloors {
  * gives a usable map. A lot so wide that the margins would take the width
  * past a finite number gets no margin, so the extent always has a finite,
  * positive width and `fitLayout` reads it as it is.
+ *
+ * `reserve` is the strip at the top of a box `boxHeight` tall that a view's
+ * legend covers (#1769): the crop grows upward by just enough floors of sky
+ * that the strip holds only those, so the legend hides no floor of the crop.
+ * The strip is held to half the box, and a strip that is not a positive
+ * number, or a box that is not, adds nothing.
  */
-export function bandedExtent(world: MapWorld, built: BuiltFloors | null, skyFloors: number): MapExtent {
+export function bandedExtent(world: MapWorld, built: BuiltFloors | null, skyFloors: number, boxHeight = 0, reserve = 0): MapExtent {
   const whole = mapExtent(world, skyFloors);
   // The same sky `mapExtent` used (it reads a bad value as no sky), so the world's
   // top floor below falls out of `whole` exactly.
@@ -66,12 +72,21 @@ export function bandedExtent(world: MapWorld, built: BuiltFloors | null, skyFloo
   // higher), so digging basements under a small tower never lowers the top.
   const groundBottom = 1 - MAP_LINES_BELOW_LOWEST_FLOOR;
   const minTop = toBand(Math.max(bottomLine, groundBottom) + MAP_MIN_FLOORS);
-  const topLine = Math.min(whole.topLine, Math.max(toBand(highest + sky), minTop));
+  const cropTop = Math.min(whole.topLine, Math.max(toBand(highest + sky), minTop));
+  const topLine = cropTop + floorsUnder(Math.min(reserve, boxHeight / 2), boxHeight, cropTop - bottomLine);
   // `whole.width` is the lot as `mapExtent` trusts it (a bad width reads as 1).
   const margin = mapSideMarginTiles(whole.width);
   const width = whole.width + 2 * margin;
   if (!(Number.isFinite(width) && width > 0)) return { leftTile: 0, width: whole.width, topLine, bottomLine };
   return { leftTile: -margin, width, topLine, bottomLine };
+}
+
+/** How many floors to add over `floors` so that the top `strip` of a box
+ *  `box` tall covers only them: `a` with `a * box / (floors + a) >= strip`.
+ *  Zero for a strip or box that is not a positive finite number. */
+function floorsUnder(strip: number, box: number, floors: number): number {
+  if (!(strip > 0 && Number.isFinite(box) && box > 0 && floors > 0)) return 0;
+  return Math.ceil((strip * floors) / (box - strip));
 }
 
 /** A floor line rounded up onto the band grid. */

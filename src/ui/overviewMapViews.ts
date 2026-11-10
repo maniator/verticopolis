@@ -119,6 +119,14 @@ export class OverviewMapViews {
     return this.tabs?.selected ?? DEFAULT_MAP_VIEW;
   }
 
+  /** How far down the body the selected view's legend reaches, in CSS
+   *  pixels, or 0 for a view with none (Edit). `width` is the body's width
+   *  in any unit, so a new width measures again. Constant work on a steady
+   *  frame. */
+  legendReserve(width: number): number {
+    return this.legends[this.selected]?.reach(width) ?? 0;
+  }
+
   /** Something the tier views show may have changed with no move of the
    *  rooms (an applied rent command or emergency answer, or a swap): the
    *  next Eval or Pricing frame reads the tiers again. Constant work. */

@@ -1,5 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { buildToStar, expectEngineHosted } from "./helpers";
+import { SKY_HEADROOM_FLOORS } from "../src/render/cameraBounds";
+import { MAP_BAND_FLOORS } from "../src/render/overviewMap/extent";
 
 // Every test must end with its tower still on the engine.
 test.afterEach(async ({ page }) => expectEngineHosted(page));
@@ -16,6 +18,9 @@ test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
+/** A tower whose top floor plus the sky headroom lands right on a band line,
+ *  so the crop has no spare sky over it and a legend would cover its top. */
+const TALL_FLOORS = 6 * MAP_BAND_FLOORS - SKY_HEADROOM_FLOORS;
 /** Hotel singles on floor 2, each this many tiles wide (`hotelSingle`). */
 const HOTEL_ROOMS = 12;
 
@@ -61,6 +66,40 @@ function foundHotelTower(rooms: number): void {
   g.engine.setCamera(c, 2, 1);
 }
 
+/** Found a paused Classic tower of plain floors, 40 tiles wide, from the
+ *  lobby up to `floors`.
+ *  Runs in the page. */
+function foundTallTower(floors: number): void {
+  const g = (window as any).game;
+  const s = g.sim.constructor.newGame(5, "classic");
+  s.money = 1e12;
+  s.star = 5;
+  const c = Math.floor(g.grid.width / 2);
+  for (let x = c - 20; x < c + 20; x++) {
+    s.tower.place("lobby", 1, x);
+    for (let f = 2; f <= floors; f++) s.tower.place("floor", f, x);
+  }
+  g.adoptSim(s, true);
+  g.speed = 0;
+  g.engine.setCamera(c, 2, 1);
+}
+
+/** How far the shown legend's bottom sits under the top floor's top edge on
+ *  the map, in CSS pixels: positive when the legend hides part of a floor. */
+async function legendOverTower(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const g = (window as any).game;
+    const map = (window as any).overviewMap;
+    const layout = map.model.layout;
+    const canvas = document.querySelector("#overview-map .overview-map-tower") as HTMLCanvasElement;
+    const box = canvas.getBoundingClientRect();
+    const scale = box.height / canvas.height;
+    const topEdge = box.top + (layout.extent.topLine - g.reader.tower.highestFloor) * layout.pxPerFloor * scale;
+    const legend = document.querySelector("#overview-map .overview-map-legend:not([hidden])")!.getBoundingClientRect();
+    return legend.bottom - topEdge;
+  });
+}
+
 /** How many tower-layer pixels are the Hotel view's dirty red, #a01010 (160, 16, 16). */
 async function redPixels(page: Page): Promise<number> {
   return page.evaluate(() => {
@@ -75,6 +114,31 @@ async function redPixels(page: Page): Promise<number> {
 /** Wait two animation frames, so the frame loop runs the map. */
 async function nextFrames(page: Page): Promise<void> {
   await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+}
+
+/** The open map at 768 by 600 and 1280 by 720 overlaps none of the sidebar,
+ *  the palette, the Floor heatmap picker, the hint or the heatmap legend. */
+async function expectMapClear(page: Page): Promise<void> {
+  for (const size of [
+    { width: 768, height: 600 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize(size);
+    await boot(page);
+    await expect(page.getByRole("tablist", { name: "Map views" })).toBeVisible();
+    const overlapping = await page.evaluate(() => {
+      const map = document.getElementById("overview-map")!.getBoundingClientRect();
+      const view = document.getElementById("view")!.getBoundingClientRect();
+      const others: Record<string, DOMRect> = { legend: new DOMRect(view.left + 12, view.top + 12, 150, 62) };
+      for (const id of ["sidebar", "palette", "overlay-mode", "hint"]) {
+        const r = document.getElementById(id)?.getBoundingClientRect();
+        if (r && r.width > 0 && r.height > 0) others[id] = r;
+      }
+      const hit = (r: DOMRect) => r.right > map.left && r.left < map.right && r.bottom > map.top && r.top < map.bottom;
+      return Object.keys(others).filter((k) => hit(others[k]));
+    });
+    expect(overlapping, `${size.width}x${size.height}`).toEqual([]);
+  }
 }
 
 test.describe("map view tabs on the desktop", () => {
@@ -161,26 +225,7 @@ test.describe("map view tabs on the desktop", () => {
   });
 
   test("with the tabs, the open map still clears the sidebar, the palette and the heatmap legend", async ({ page }) => {
-    for (const size of [
-      { width: 768, height: 600 },
-      { width: 1280, height: 720 },
-    ]) {
-      await page.setViewportSize(size);
-      await boot(page);
-      await expect(page.getByRole("tablist", { name: "Map views" })).toBeVisible();
-      const overlapping = await page.evaluate(() => {
-        const map = document.getElementById("overview-map")!.getBoundingClientRect();
-        const view = document.getElementById("view")!.getBoundingClientRect();
-        const others: Record<string, DOMRect> = { legend: new DOMRect(view.left + 12, view.top + 12, 150, 62) };
-        for (const id of ["sidebar", "palette", "overlay-mode", "hint"]) {
-          const r = document.getElementById(id)?.getBoundingClientRect();
-          if (r && r.width > 0 && r.height > 0) others[id] = r;
-        }
-        const hit = (r: DOMRect) => r.right > map.left && r.left < map.right && r.bottom > map.top && r.top < map.bottom;
-        return Object.keys(others).filter((k) => hit(others[k]));
-      });
-      expect(overlapping, `${size.width}x${size.height}`).toEqual([]);
-    }
+    await expectMapClear(page);
   });
 
   test("the Hotel view marks the rooms the engine turned dirty within a game hour", async ({ page }) => {
@@ -234,6 +279,16 @@ test.describe("map view tabs on the desktop", () => {
   });
 });
 
+test.describe("map view tabs on a touch screen at desktop sizes", () => {
+  test.use({ viewport: DESKTOP, hasTouch: true });
+
+  test("with a coarse pointer's taller tabs, the open map still clears the sidebar, the palette and the heatmap legend (#1769)", async ({ page }) => {
+    await boot(page);
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
+    await expectMapClear(page);
+  });
+});
+
 test.describe("map view tabs on a phone", () => {
   test.use({ viewport: PHONE, isMobile: true, hasTouch: true });
 
@@ -264,9 +319,26 @@ test.describe("map view tabs on a phone", () => {
       expect(got.map, at).toBeLessThanOrEqual(maxHeight + 1);
       // Upright, the map body keeps its full 150 by 216 card.
       if (size.height > size.width) expect(got.body.height, at).toBeGreaterThanOrEqual(214);
+      // On its side, the body is far more than a strip under the tabs (#1769).
+      else expect(got.body.height, at).toBeGreaterThanOrEqual(100);
     }
     await page.getByRole("tab", { name: "Hotel" }).tap();
     await expect(page.getByRole("tab", { name: "Hotel" })).toHaveAttribute("aria-selected", "true");
     await expect(page.locator('#overview-map .overview-map-legend[data-view="hotel"]')).toBeVisible();
+  });
+
+  test("a view's legend hides no floor of a tower that fills the map, upright and on its side (#1769)", async ({ page }) => {
+    for (const size of [PHONE, { width: PHONE.height, height: PHONE.width }]) {
+      await page.setViewportSize(size);
+      await boot(page);
+      await page.evaluate(foundTallTower, TALL_FLOORS);
+      if (await page.locator("#overview-map").isHidden()) await page.locator("#btn-map").tap();
+      for (const view of ["Eval", "Pricing", "Hotel"]) {
+        await page.getByRole("tab", { name: view }).tap();
+        await nextFrames(page);
+        await nextFrames(page);
+        expect(await legendOverTower(page), `${view} at ${size.width}x${size.height}`).toBeLessThanOrEqual(0.5);
+      }
+    }
   });
 });

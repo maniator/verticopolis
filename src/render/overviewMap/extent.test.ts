@@ -24,6 +24,27 @@ describe("bandedExtent (the banded crop)", () => {
     expect(e.width).toBe(375 + 2 * 15);
   });
 
+  it("adds just enough sky over the crop that a legend's strip at the top hides no floor (#1769)", () => {
+    const plain = bandedExtent(WORLD, built(1, 60), SKY);
+    const floors = plain.topLine - plain.bottomLine;
+    for (const [box, strip] of [[432, 68], [300, 40], [216, 1], [432, 200]] as const) {
+      const e = bandedExtent(WORLD, built(1, 60), SKY, box, strip);
+      const added = e.topLine - plain.topLine;
+      expect(e.bottomLine).toBe(plain.bottomLine);
+      const layout = fitLayout(e, 375, box);
+      // The crop's old top line now lies at or under the strip ...
+      expect(added * layout.pxPerFloor).toBeGreaterThanOrEqual(strip - 1e-9);
+      // ... by less than one more floor.
+      expect((added - 1) * (box / (floors + added - 1))).toBeLessThan(strip);
+    }
+    // A strip over half the box is held to half; no strip, or a bad one, adds nothing.
+    const half = bandedExtent(WORLD, built(1, 60), SKY, 300, 150);
+    expect(bandedExtent(WORLD, built(1, 60), SKY, 300, 290)).toEqual(half);
+    for (const [box, strip] of [[300, 0], [300, -5], [300, NaN], [0, 40], [NaN, 40]]) {
+      expect(bandedExtent(WORLD, built(1, 60), SKY, box, strip)).toEqual(plain);
+    }
+  });
+
   it("leaves a margin beside the lot on each side, a small share of its width in whole tiles", () => {
     expect(mapSideMarginTiles(375)).toBe(Math.ceil(375 * MAP_SIDE_MARGIN_SHARE));
     expect(mapSideMarginTiles(375)).toBe(15);

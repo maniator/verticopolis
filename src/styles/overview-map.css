@@ -100,10 +100,16 @@
    1600 px while the card is up, where a long step still wraps to two lines.
    A window under 500 px tall keeps the hint at the bottom, since above the
    Map it would leave the world view. --overview-map-height is the desktop
-   window's height (frame, title bar, view tabs and the 288 px body); the
-   Playwright check in e2e/overviewMap.spec.ts fails if it drifts. */
+   window's height (frame, title bar, view tabs and the 288 px body), taller
+   with a coarse pointer's 28 px tabs; the overlap checks in
+   e2e/overviewMapViews.spec.ts fail if either drifts (#1769). */
 #stage {
   --overview-map-height: 331px;
+}
+@media (pointer: coarse) {
+  #stage {
+    --overview-map-height: 344px;
+  }
 }
 @media (min-width: 768px) and (max-width: 1199px) and (min-height: 500px) {
   #stage:has(> .overview-map:not([hidden])) > #hint {
