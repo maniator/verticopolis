@@ -11,7 +11,7 @@ import { roomTallies } from "../portKit/rooms";
  * `hotelCustomersIn` and `outForMeal` equals the count of live people carrying
  * the matching stamp, through the despawn-adjacent teardowns too (for the last
  * two, a value below 0 reads as 0; see `reconcile`). The source
- * tripwire, the arrival rechecks and the fire walk stay in
+ * tripwire and the arrival rechecks stay in
  * `attendanceTripwire.integration.test.ts`, which drives the TypeScript crowd
  * functions directly.
  *
@@ -233,5 +233,75 @@ describeEngines("attendance tally tripwire: mid-visit teardown (issue #302 scena
     expect(liveWith(sim, (p) => p.venueUnitId === hall.id)).toBe(0);
     expect(freshTouched, "the rebuilt unit's counters moved during the ghost drain").toBe(false);
     reconcile(sim);
+  });
+
+  it("a fire mid-visit guts the venue through the real event system without touching the tally", () => {
+    // The same counted-attendee setup as above.
+    const sim = mixedTower(leg);
+    sim.setClock(minutes(18));
+    const hallId = unitOf(sim, "partyHall", 2).id;
+    const hall = () => unitOf(sim, "partyHall", 2);
+    for (let m = 0; m < 450 && tallies(sim, hallId).customersIn === 0; m++) sim.tick(1);
+    expect(tallies(sim, hallId).customersIn).toBeGreaterThan(0);
+    expect(liveWith(sim, (p) => p.venueUnitId === hallId)).toBe(tallies(sim, hallId).customersIn);
+    // Ignite the hall as the daily roll's outbreak does: the unit burns, the
+    // event system's active set knows it, and the paid rescue is offered.
+    // The original re-armed the blaze through the load path and set the
+    // offer by hand; this is the engine's own outbreak on a chosen room.
+    sim.startFireAt(hallId);
+    expect(hall().state).toBe("fire");
+    expect(sim.state.events.pending?.kind, "the rescue is offered").toBe("fireRescue");
+    for (let m = 0; m < 30; m++) sim.tick(1);
+    // Still balanced mid-blaze: the fire state never touches the tallies.
+    expect(hall().state, "still ablaze before the rescue").toBe("fire");
+    reconcile(sim);
+    // End the blaze through the real paid-rescue path: accepting runs
+    // extinguishAll, which guts every burning unit. The gut zeroes the
+    // occupants mirror and the tenancy fields but must leave the tallies
+    // alone; the counted visitors are still live people who drain through
+    // finish().
+    const countedAtGut = tallies(sim, hallId).customersIn;
+    expect(countedAtGut).toBeGreaterThan(0);
+    expect(sim.answerChoice(true), "the rescue is paid").toBe(true);
+    expect(hall().state).toBe("gutted");
+    expect(hall().occupants).toBe(0); // the gut zeroed the mirror
+    expect(tallies(sim, hallId).customersIn).toBe(countedAtGut); // and never the tally
+    reconcile(sim);
+    // Drain on the gutted shell: every decrement is a finish() call, and the
+    // occupants mirror must hold at 0 on the non-operational unit even as
+    // each decrement resyncs it. Watched every tick. 02:00 day 1 is at or
+    // after every minute the bounded search and the blaze can reach.
+    sim.setClock(minutes(2, 1));
+    let mirrorMoved = false;
+    for (let m = 0; m < 240 && tallies(sim, hallId).customersIn > 0; m++) {
+      sim.tick(1);
+      mirrorMoved ||= hall().occupants !== 0;
+    }
+    expect(tallies(sim, hallId).customersIn).toBe(0);
+    expect(mirrorMoved, "a gutted venue's occupants mirror must stay 0 through the drain").toBe(false);
+    reconcile(sim);
+  });
+
+  it("startFireAt refuses a tile, a second outbreak and a burned-out room, changing nothing", () => {
+    const sim = mixedTower(leg);
+    const lobby = sim.state.tower.units.find((u) => u.kind === "lobby")!.id;
+    const hall = unitOf(sim, "partyHall", 2).id;
+    const food = unitOf(sim, "fastFood").id;
+    const refused = (id: number, why: string) => {
+      const before = sim.state.tower.units.map((u) => u.state);
+      const pending = sim.state.events.pending;
+      expect(() => sim.startFireAt(id), why).toThrow(/refused/);
+      expect(sim.state.tower.units.map((u) => u.state), `${why}: no room changed`).toEqual(before);
+      expect(sim.state.events.pending, `${why}: the choice is as it was`).toEqual(pending);
+    };
+    refused(lobby, "a lobby tile cannot catch fire");
+    sim.startFireAt(hall);
+    refused(food, "a fire already burns, with its offer pending");
+    expect(sim.answerChoice(true), "the rescue is paid").toBe(true);
+    expect(unitOf(sim, "partyHall", 2).state).toBe("gutted");
+    refused(hall, "a gutted shell cannot re-ignite");
+    // With the fire out and the choice answered, a new outbreak is taken.
+    sim.startFireAt(food);
+    expect(unitOf(sim, "fastFood").state).toBe("fire");
   });
 });

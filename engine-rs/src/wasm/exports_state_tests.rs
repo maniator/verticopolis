@@ -215,3 +215,52 @@ fn clear_retail_tallies_unsets_all_four_and_nothing_else() {
     // A unit with no tally ends with no extras record.
     assert!(e.sim.tower.get_unit(office).unwrap().extras.is_none());
 }
+
+#[test]
+fn start_fire_at_ignites_the_chosen_room_and_offers_the_rescue() {
+    let (mut e, id) = with_office();
+    let mut stream = e.sim.rng.clone();
+    let started = e.sim.events.fires_started;
+    assert!(e.start_fire_at(id as f64));
+    let office = e.sim.tower.units.iter().find(|u| u.id == id).unwrap();
+    assert_eq!(office.state, UnitState::Fire);
+    assert_eq!(office.occupants, 0);
+    assert!(e.sim.events.active.contains(&id));
+    assert_eq!(e.sim.events.fires_started, started + 1);
+    let pending = e
+        .sim
+        .events
+        .pending
+        .as_ref()
+        .expect("the rescue is offered");
+    assert_eq!(pending.kind, "fireRescue");
+    // The outbreak drew nothing from the random stream.
+    assert_eq!(e.sim.rng.next(), stream.next());
+}
+
+#[test]
+fn start_fire_at_refuses_without_changing_anything() {
+    let (mut e, id) = with_office();
+    let lobby = e
+        .sim
+        .tower
+        .units
+        .iter()
+        .find(|u| u.kind == Kind::Lobby)
+        .unwrap()
+        .id;
+    for bad in [id as f64 + 0.5, -1.0, 9e15, lobby as f64] {
+        assert!(!e.start_fire_at(bad), "{bad}");
+        assert_eq!(e.sim.events.fires_started, 0, "{bad} started a fire");
+        assert!(e.sim.events.pending.is_none(), "{bad} raised a choice");
+    }
+    // A second outbreak waits until the first is out, as the daily roll does.
+    assert!(e.start_fire_at(id as f64));
+    let pending = e.sim.events.pending.clone();
+    assert!(!e.start_fire_at(id as f64));
+    assert_eq!(e.sim.events.fires_started, 1);
+    assert_eq!(
+        format!("{:?}", e.sim.events.pending),
+        format!("{pending:?}")
+    );
+}

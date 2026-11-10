@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { itTypeScriptOnly } from "../parity/typescriptOnly";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, resolve } from "node:path";
@@ -31,14 +30,14 @@ import type { Unit } from "../../engine/types";
  *
  * The "mid-visit teardown paths" block below walks the despawn-adjacent
  * structural changes the issue names, each of which could strand or leak a
- * tally if a future change routed around `finish()`: the venue
- * burning and gutting mid-show through the real EventSystem paths, the
+ * tally if a future change routed around `finish()`: the
  * hotel-origin split with the venue bulldozed mid-meal, and a save/load
  * round-trip taken mid-visit (the one legitimate wholesale crowd teardown:
  * the load rebuilds a fresh sim, so every transient tally must restore to
  * zero, forged saves included). The venue bulldozed under counted visitors
- * (with the return elevator severed), the bulldozed hotel origin and the
- * full-day reconcile run on both engines in
+ * (with the return elevator severed), the venue burning and gutting
+ * mid-show, the bulldozed hotel origin and the full-day reconcile run on
+ * both engines in
  * `attendanceTripwireEngine.integration.test.ts`.
  */
 
@@ -250,44 +249,6 @@ describe("mid-visit teardown paths (issue #302 scenario walk)", () => {
     expect(liveWith(sim, (p) => p.venueUnitId === hall.id)).toBe(hall.customersIn ?? 0);
     return { sim, hall };
   }
-
-  itTypeScriptOnly("drives the event system directly (a unit set on fire, events.restore, events.pending) mid-run")("a fire mid-visit guts the venue through the real event system without touching the tally", () => {
-    const { sim, hall } = withCountedAttendees();
-    // Ignite through the engine's own mid-fire re-arm path (the exact shape
-    // deserialize uses to restore a save taken during a blaze): the unit
-    // burns AND the EventSystem's active set knows it, which is what lets the
-    // paid-rescue extinguishAll below find and gut it through the real path.
-    hall.state = "fire";
-    sim.events.restore([hall.id]);
-    for (let m = 0; m < 30; m++) sim.tick(1);
-    // Still balanced mid-blaze: the fire state never touches the tallies.
-    reconcile(sim);
-    // End the blaze through the real paid-rescue path: resolveChoice("accept")
-    // runs extinguishAll, which guts every active burning unit via the real
-    // EventSystem.gut. The gut transition zeroes the occupants mirror and
-    // tenancy fields but must leave the tallies alone; the counted visitors
-    // are still live people who drain through finish().
-    const countedAtGut = hall.customersIn ?? 0;
-    expect(countedAtGut).toBeGreaterThan(0);
-    sim.events.pending = { kind: "fireRescue", cost: 150_000, message: "test rescue" };
-    sim.events.resolveChoice("accept");
-    expect(hall.state).toBe("gutted");
-    expect(hall.occupants).toBe(0); // the real gut() zeroed the mirror
-    expect(hall.customersIn ?? 0).toBe(countedAtGut); // and never the tally
-    reconcile(sim);
-    // Drain on the gutted shell: every decrement is a finish() call, and the
-    // occupants mirror must hold at 0 on the non-operational unit even as
-    // syncAttendanceOccupants runs on each decrement. Watched every tick.
-    setClock(sim, 2, 1);
-    let mirrorMoved = false;
-    for (let m = 0; m < 240 && (hall.customersIn ?? 0) > 0; m++) {
-      sim.tick(1);
-      mirrorMoved ||= hall.occupants !== 0;
-    }
-    expect(hall.customersIn ?? 0).toBe(0);
-    expect(mirrorMoved, "a gutted venue's occupants mirror must stay 0 through the drain").toBe(false);
-    reconcile(sim);
-  });
 
   it("a hotel-origin customer counted at a census venue: bulldozing the venue mid-meal keeps the split balanced", () => {
     // Deterministic walk of the hotelCustomersIn split through the real

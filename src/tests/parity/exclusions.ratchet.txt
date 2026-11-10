@@ -10,7 +10,6 @@
 # one's reason (_bmad-output/implementation-artifacts/story-engine-test-parity.md).
 src/engine/rentalCrowd.test.ts itTypeScriptOnly=0 atEngineFrameCadence=3 onWasmParityProject=0
 src/engine/tower/rooms.test.ts itTypeScriptOnly=0 atEngineFrameCadence=1 onWasmParityProject=0
-src/tests/integration/attendanceTripwire.integration.test.ts itTypeScriptOnly=1 atEngineFrameCadence=0 onWasmParityProject=0
 src/tests/integration/condoModes.integration.test.ts itTypeScriptOnly=2 atEngineFrameCadence=0 onWasmParityProject=0
 src/tests/integration/condoRelocation.integration.test.ts itTypeScriptOnly=6 atEngineFrameCadence=0 onWasmParityProject=0
 src/tests/integration/economyDepth.integration.test.ts itTypeScriptOnly=5 atEngineFrameCadence=0 onWasmParityProject=0

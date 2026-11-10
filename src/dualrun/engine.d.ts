@@ -511,6 +511,15 @@ export class Engine {
     shaftSchedule(id: number): Float64Array;
     startExtend(id: number): Float64Array;
     /**
+     * Tooling only: the daily roll's fire outbreak in room `id`, with the
+     * paid-rescue offer it raises, so a test can set a chosen room ablaze
+     * mid-run (`startFire` picks a room at random and offers nothing). It
+     * draws nothing from the random stream. False, changing nothing, while
+     * a fire burns or a choice is pending, or when `id` names no room that
+     * can catch fire. Like `startFire`, this is not part of an open undo step.
+     */
+    startFireAt(id: number): boolean;
+    /**
      * Tooling: a fire, which is no edit, so it is no part of an open
      * gesture's undo step.
      */

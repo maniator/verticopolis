@@ -100,6 +100,7 @@ function makeLeaf(leg: Leg, save: string): Leaf {
     setCustomersIn: (id, count) => engine.setCustomersIn(id, count),
     setWeather: (weather) => engine.setWeather(weather),
     clearRetailTallies: () => engine.clearRetailTallies(),
+    startFireAt: (id) => engine.startFireAt(id),
     crowdView: () => JSON.parse(engine.crowdView()) as { people: Person[] },
     elevatorUtilization: (id) => (JSON.parse(engine.elevatorTelemetry()) as { util: [number, number][] }).util.find(([shaft]) => shaft === id)?.[1],
     free: () => engine.free(),
@@ -384,9 +385,21 @@ export class PortSim {
     this.changed();
   }
 
+  /** Start a fire in room `id` as the daily roll's outbreak does, with the
+   *  paid-rescue offer, drawing nothing from the random stream. */
+  startFireAt(id: number): void {
+    if (!this.leaf.startFireAt(id)) throw new Error(`PortSim.startFireAt: the engine refused ${id}`);
+    this.changed();
+  }
+
   bombThreat(): void {
     this.leaf.bombThreat();
     this.changed();
+  }
+
+  /** Answer the pending choice; false when none was pending. */
+  answerChoice(accept: boolean): boolean {
+    return this.result(this.leaf.port.answerChoice(accept)).ok;
   }
 
   setMoney(amount: number): void {
