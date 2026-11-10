@@ -106,7 +106,7 @@ describe("the Edit view", () => {
     expect(v.due(layout, false)).toBe(false);
     expect(v.due(layout, true)).toBe(false);
     const ctx = fakeCtx();
-    v.paintOver(ctx, plain);
+    expect(v.paintOver(ctx, plain)).toBe(0);
     expect(ctx.fills).toHaveLength(0);
     expect(deps.rooms).not.toHaveBeenCalled();
     expect(deps.minutes).not.toHaveBeenCalled();
@@ -164,7 +164,8 @@ describe("the Hotel view's throttle", () => {
     clock.minutes = 8 * 60;
     expect(v.due(layout, false)).toBe(true);
     const ctx = fakeCtx();
-    v.paintOver(ctx, plain);
+    // It says how many rooms it painted, so the window draws the shafts over them.
+    expect(v.paintOver(ctx, plain)).toBe(1);
     expect(ctx.fills).toHaveLength(1);
     // A new hour with nothing changed repaints nothing.
     clock.minutes = 9 * 60;

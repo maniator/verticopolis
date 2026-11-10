@@ -4,6 +4,7 @@ import {
   PATTERN_TILE,
   createPatternSource,
   paintMapMarks,
+  paintTransportMarks,
   patternCells,
   type MapPaintContext,
   type PatternSource,
@@ -208,5 +209,17 @@ describe("paintMapMarks", () => {
     const ctx = fakeCtx();
     expect(paintMapMarks(ctx, 5, 5, [], plain)).toBe(0);
     expect(ctx.calls).toHaveLength(1);
+  });
+});
+
+describe("paintTransportMarks", () => {
+  it("paints only the trailing transport marks again, without clearing", () => {
+    const shaft = (x: number): MapMark => ({ layer: "transport", kind: "elevatorStandard", rect: { x, y: 0, w: 1, h: 20 } });
+    const ctx = fakeCtx();
+    expect(paintTransportMarks(ctx, [mark("office"), mark("hotelSingle"), shaft(3), shaft(7)], plain)).toBe(2);
+    expect(ctx.calls.map((c) => c.op)).toEqual(["fill", "fill"]);
+    expect(ctx.calls.map((c) => c.args[0])).toEqual([3, 7]);
+    expect(paintTransportMarks(fakeCtx(), [mark("office")], plain)).toBe(0);
+    expect(paintTransportMarks(fakeCtx(), [], plain)).toBe(0);
   });
 });

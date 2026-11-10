@@ -123,12 +123,30 @@ export function paintMapMarks(
   patterns: PatternSource,
 ): number {
   ctx.clearRect(0, 0, width, height);
+  return paintMarkRange(ctx, marks, 0, marks.length, patterns);
+}
+
+/**
+ * Paint the draw list's transport marks again, over what a view painted on
+ * the rooms, so a shaft stays as the Edit view draws it. The draw list puts
+ * the transports last, so this walks back over them alone. Returns how many
+ * `fillRect` calls it took.
+ */
+export function paintTransportMarks(ctx: MapPaintContext, marks: ReadonlyArray<MapMark>, patterns: PatternSource): number {
+  let start = marks.length;
+  while (start > 0 && marks[start - 1].layer === "transport") start--;
+  return paintMarkRange(ctx, marks, start, marks.length, patterns);
+}
+
+/** Paint `marks[from]` up to `marks[to - 1]` in order. */
+function paintMarkRange(ctx: MapPaintContext, marks: ReadonlyArray<MapMark>, from: number, to: number, patterns: PatternSource): number {
   let last: string | CanvasPattern | null = null;
   let kind: MapMark["kind"] | null = null;
   let styled: string | CanvasPattern = "";
   let plain: string | CanvasPattern = "";
   let fills = 0;
-  for (const mark of marks) {
+  for (let i = from; i < to; i++) {
+    const mark = marks[i];
     if (mark.kind !== kind) {
       // The draw list groups same-kind marks, so this resolves about once per kind.
       kind = mark.kind;

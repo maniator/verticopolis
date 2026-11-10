@@ -88,9 +88,11 @@ export class OverviewMapViews {
     return this.hotelDue(layout, rebuilt || chosen) || chosen;
   }
 
-  /** Paint what the selected view adds over a freshly painted tower layer. */
-  paintOver(ctx: MapPaintContext, patterns: PatternSource): void {
-    if (this.selected === "hotel") paintHotelMarks(ctx, this.watch, patterns);
+  /** Paint what the selected view adds over a freshly painted tower layer.
+   *  Returns how many rooms it painted, so the window can draw the shafts
+   *  over them again. */
+  paintOver(ctx: MapPaintContext, patterns: PatternSource): number {
+    return this.selected === "hotel" ? paintHotelMarks(ctx, this.watch, patterns) : 0;
   }
 
   /** Whether the Hotel view shows something new: its rooms were collected

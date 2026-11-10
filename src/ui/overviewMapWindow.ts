@@ -15,7 +15,7 @@ import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
 import type { ViewPlacement } from "../render/overviewMap/extent";
 import { dragCenter, mapPointToCenter, rectContains, type MapLayout, type MapRect } from "../render/overviewMap/geometry";
 import { OverviewMapModel, type MapFrameInput } from "../render/overviewMap/model";
-import { createPatternSource, paintMapMarks, type PatternSource } from "../render/overviewMap/paint";
+import { createPatternSource, paintMapMarks, paintTransportMarks, type PatternSource } from "../render/overviewMap/paint";
 import { MAP_BACKDROP, groundShare, paintViewMark, viewMarkBand } from "../render/overviewMap/viewMark";
 import { buildMapDom, ContextWatch } from "./overviewMapDom";
 import { MapKeyKeeper, PointerFocusClaim } from "./overviewMapKeys";
@@ -238,7 +238,8 @@ export class OverviewMapWindow {
       // Marked only once painted: the gallery runner reads it (`mapForShot`).
       if (this.towerCtx && this.patterns) {
         paintMapMarks(this.towerCtx, layout.width, layout.height, this.model.marks, this.patterns);
-        this.deps.views?.paintOver(this.towerCtx, this.patterns);
+        // A view's rooms go under the shafts, as on the Edit view.
+        if (this.deps.views?.paintOver(this.towerCtx, this.patterns)) paintTransportMarks(this.towerCtx, this.model.marks, this.patterns);
         this.root.dataset.mapDrawn = "true";
       }
       const ground = `${(groundShare(layout) * 100).toFixed(2)}%`;

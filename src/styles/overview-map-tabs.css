@@ -7,6 +7,10 @@
   display: flex;
   gap: 2px;
   margin: 0 0 2px;
+  /* Over the close button's touch halo (overview-map.css), so a tap on a tab
+     selects it and never closes the map. */
+  position: relative;
+  z-index: 2;
 }
 .overview-map .overview-map-tab {
   flex: 1 1 0;
