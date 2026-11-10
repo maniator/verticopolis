@@ -3,7 +3,8 @@ import { crowdView, stateView } from "../../engine/conformanceView";
 import { TsEngine } from "../../engine/port/tsEngine";
 import { canonicalJson } from "../conformance/canonical";
 import { PORT_EDIT_CASES, runPortEditCase } from "../goldens/portEditCases";
-import { firstPortEditDifference, readPortEdits, type LineField, type PortEditLeg, type PortEditLine } from "../goldens/portEdits";
+import { firstPortEditDifference, portEditProblems, readPortEdits, type LineField, type PortEditLine } from "../goldens/portEditLines";
+import type { PortEditLeg } from "../goldens/portEdits";
 import { PORT_EDITS_UPDATE } from "../goldens/updateGate";
 
 /**
@@ -67,8 +68,11 @@ function spansOf(id: string, pinned: readonly PortEditLine[]): Span[] {
 describe.skipIf(PORT_EDITS_UPDATE)("the port-edit golden on the TypeScript referee", () => {
   const pinned = readPortEdits();
 
-  it("names only cases the golden has", () => {
-    for (const a of ON_PURPOSE) expect(PORT_EDIT_CASES.map((c) => c.id), a.case).toContain(a.case);
+  it("names only cases the scripts and the golden have", () => {
+    for (const a of ON_PURPOSE) {
+      expect(PORT_EDIT_CASES.map((c) => c.id), a.case).toContain(a.case);
+      expect(Object.keys(pinned.cases), a.case).toContain(a.case);
+    }
   });
 
   for (const c of PORT_EDIT_CASES) {
@@ -78,11 +82,15 @@ describe.skipIf(PORT_EDITS_UPDATE)("the port-edit golden on the TypeScript refer
       const spans = want ? spansOf(c.id, want) : [];
       const mayDiffer = (line: number, field: LineField) => spans.some((w) => line >= w.from && line < w.until && w.fields.includes(field));
       expect(firstPortEditDifference(got, want, mayDiffer)).toBeNull();
-      // Each allowance is still needed: its field does differ in its span.
+      // The allowances skip hashes, so the reference engine's own lines must
+      // still hold what every line does: a refusal moved nothing, and so on.
+      expect(portEditProblems(c.start, got)).toEqual([]);
+      // Each allowance is still needed on every line it covers: its field
+      // differs on each, so a span never hides lines that agree again.
       for (const w of spans) {
         for (const field of w.fields) {
-          const differs = got.slice(w.from, w.until).some((l, i) => canonicalJson(l[field]) !== canonicalJson(want[w.from + i][field]));
-          expect(differs, `${field} from line ${w.from}`).toBe(true);
+          const agree = got.slice(w.from, w.until).flatMap((l, i) => (canonicalJson(l[field]) === canonicalJson(want[w.from + i][field]) ? [w.from + i] : []));
+          expect(agree, `${field} agrees on these lines of the span from line ${w.from}`).toEqual([]);
         }
       }
     }, 120_000);

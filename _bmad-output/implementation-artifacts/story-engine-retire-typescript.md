@@ -91,14 +91,18 @@ own line: the PR, the files, and why the fallback needs them):
   TypeScript referee goes with the engine:
   `portEditsReferee.integration.test.ts`, with its line in
   `src/tests/tsEngineTests.ratchet.txt`. The golden
-  (`src/tests/goldens/port-edits.json`, `portEdits.ts`, `portEditCases.ts`)
-  and its Rust suite stay, and lead into the same deleted code as the
-  frame-day golden above, plus the facility kind and schedule types that
-  `src/simport/portCodes.ts` and `scheduleSlots.ts` take from `src/engine/`
-  (type imports, so only `npm run typecheck` breaks without them). Its Rust
-  suite funds the towers through the binding's `setMoney`, a tier 3 member,
-  so #1057 keeps that write in the build the tests load, or the cases fund
-  their towers another way.
+  (`src/tests/goldens/port-edits.json`, `portEdits.ts`, `portEditLines.ts`,
+  `portEditCrowd.ts`, `portEditCases.ts`) and its Rust suite stay, and import
+  the same code due for deletion as the frame-day golden above, plus the
+  facility kind and schedule types that `src/simport/portCodes.ts` and
+  `scheduleSlots.ts` take from `src/engine/` (type imports, so only
+  `npm run typecheck` breaks without them). Its Rust suite funds the towers
+  through the binding's `setMoney`, a tier 3 member, so #1057 keeps that
+  write in the build the tests load, or the cases fund their towers another
+  way. The binding's argument checks the golden cannot send (strings and
+  other non-numbers) stay in `chargeBindingRaw` and `relayedCommandRaw`,
+  which import `Simulation`: they move to the Rust engine alone before
+  `src/engine/` goes.
 - **Slice 5a (#1212, PR #1294): the host's save text for undo copies.**
   `setSaveText` and `saveText` in `src/wasmhost/stepGate.ts`, and the
   registration in `attachWasmHost` (`src/wasmhost/wasmHost.ts`). They let
