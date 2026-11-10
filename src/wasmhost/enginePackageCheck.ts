@@ -58,7 +58,9 @@ export class EnginePackageAborted extends Error {
 }
 
 /** A sibling fetch stopped because another file already failed. */
-class SiblingStopped extends Error {}
+class SiblingStopped extends Error {
+  override name = "SiblingStopped";
+}
 
 /** The most `BUILD.json` may weigh. Its real size is about 400 bytes. */
 export const RECORD_CAP_BYTES = 16 * 1024;
