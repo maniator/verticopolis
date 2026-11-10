@@ -1,43 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { HOST_DIRS, URL_LOADERS, audit, citedPaths, live, portMembers, sorted, tables, type AuditInput } from "./parityRegister";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { isAbsolute, join, resolve } from "node:path";
 import { repoRoot } from "./guardFiles";
-import { configDefaults } from "vitest/config";
 import { convertedSuites } from "./portKit/convertedList";
-import { markedStems, sevenCounts, wasmMapping, type ProjectFiles, type SevenCounts } from "./wasmMapping";
+import { PROJECTS_LINE, childRejected, markedStems, parseProjects, sevenCounts, vitestProjects, wasmMapping, workerOnly, type ProjectFiles, type SevenCounts } from "./wasmMapping";
 
 /** The 3.0 parity register's guard (#1561): what it checks, and why, is in
  *  `parityRegister.ts`; these run the audit on the register as it stands and
  *  feed it stale registers to see each check fire. */
 
-/** The test projects `vite.config.ts` gives Vitest under `VC_REQUIRE_WASM=1`,
- *  the switch `npm run test:wasm` sets to add the hosted WASM projects. It
- *  calls the config's default export for a `serve` run and reads the inline
- *  projects it returns, so the counts follow those arrays however the file
- *  spells them. It needs Vitest's module runner, which gives the config its
- *  `__dirname`. */
-async function resolvedProjects(): Promise<ProjectFiles[]> {
-  const before = process.env.VC_REQUIRE_WASM;
-  process.env.VC_REQUIRE_WASM = "1";
-  try {
-    // A specifier TypeScript does not follow: the config sits outside `src/`.
-    const config = "../../vite.config.ts";
-    const { default: make } = (await import(/* @vite-ignore */ config)) as { default: unknown };
-    const resolved = (await (typeof make === "function" ? make({ command: "serve", mode: "test" }) : make)) as { test?: { projects?: unknown[] } };
-    return (resolved.test?.projects ?? []).map((p, i) => {
-      const test = (p as { test?: ProjectFiles } | null)?.test;
-      if (typeof test?.name !== "string") throw new Error(`vite.config.ts: project ${i} is not an inline project with a name`);
-      return test;
-    });
-  } finally {
-    if (before === undefined) delete process.env.VC_REQUIRE_WASM;
-    else process.env.VC_REQUIRE_WASM = before;
-  }
-}
+/** The test projects Vitest resolves for a run with the hosted WASM projects
+ *  on, and the test files it finds for each ({@link vitestProjects}). */
+const resolved = await vitestProjects(repoRoot);
 
-/** The hosted WASM projects' counts, from the config Vitest gets. */
-const mapping = wasmMapping(await resolvedProjects(), configDefaults.exclude, convertedSuites());
+/** The hosted WASM projects' counts, from the projects Vitest resolves. */
+const mapping = wasmMapping(resolved, convertedSuites());
 
 describe("the 3.0 parity register stays tied to the code (#1561)", () => {
   it("matches EnginePort, the import ratchet, its own vocabulary, the files it cites and the exception register", () => {
@@ -100,44 +79,124 @@ describe("the parity register audit catches a stale register", () => {
     );
   });
 
-  it("a section 7 count of the WASM projects' test files or the exclusion lists that is missing or stale", async () => {
-    // The counts read the projects Vitest gets: what each hosted project
-    // excludes past its twin's excludes, the defaults and the converted suites.
-    const projects = (side: readonly string[], unitOwn: readonly string[] = []): ProjectFiles[] => [
-      { name: "unit", include: ["src/**/*.test.ts"], exclude: ["dflt", "**/*.integration.test.ts"] },
-      { name: "integration", include: ["src/**/*.integration.test.ts"] },
-      { name: "unitWasm", include: ["src/**/*.test.ts"], exclude: ["dflt", "suite", "**/*.integration.test.ts", ...unitOwn] },
-      { name: "integrationWasm", include: ["src/**/*.integration.test.ts"], exclude: ["dflt", ...side, "suite"] },
-    ];
-    const counted = (ps: ProjectFiles[]) => wasmMapping(ps, ["dflt"], ["suite"]);
-    expect(counted(projects(["a", "b"], ["**/c.test.ts"]))).toEqual({ integration: 2, unit: 1 });
-    expect(counted(projects(["a", "b", "c"]))).toEqual({ integration: 3, unit: 0 });
-    // A pattern listed twice counts once.
-    expect(counted(projects(["a", "a", "b"]))).toEqual({ integration: 2, unit: 0 });
-    // Each hosted project must keep every converted suite off.
-    const leaky = projects(["a"]).map((p) => (p.name === "integrationWasm" ? { ...p, exclude: ["dflt", "a"] } : p));
-    expect(() => counted(leaky)).toThrow(/integrationWasm runs converted suites, which start both engines themselves: suite$/);
-    // Each hosted project must include every test file its twin does.
-    const narrowed = projects(["a"]).map((p) => (p.name === "unitWasm" ? { ...p, include: ["src/game/**/*.test.ts"] } : p));
-    expect(() => counted(narrowed)).toThrow(/unitWasm includes \["src\/game\/\*\*\/\*\.test\.ts"\], where unit includes \["src\/\*\*\/\*\.test\.ts"\]/);
-    expect(() => counted(projects(["a"]).filter((p) => p.name !== "integrationWasm"))).toThrow(/gives Vitest no integrationWasm project/);
-    // Reading the config leaves the switch as it found it.
-    const before = process.env.VC_REQUIRE_WASM;
-    await resolvedProjects();
-    expect(process.env.VC_REQUIRE_WASM).toBe(before);
+  it("reads the test projects and files Vitest resolves for a run with the hosted WASM projects on", () => {
+    // The four paired projects, each with the test files Vitest finds for it,
+    // as repository paths, and no type tests.
+    const paired = ["unit", "integration", "unitWasm", "integrationWasm"].map((name) => resolved.find((p) => p.name === name));
+    for (const p of paired) {
+      expect(p?.files.length).toBeGreaterThan(0);
+      expect(p?.typecheckFiles).toEqual([]);
+    }
+    const inRepo = (f: string) => !f.includes("\\") && !isAbsolute(f) && !f.startsWith("../") && existsSync(join(repoRoot, f));
+    expect(paired.flatMap((p) => (p?.files ?? []).filter((f) => !inRepo(f)))).toEqual([]);
+    // The child's line is found past anything else it prints, and is held to
+    // the shape; each failure names what went wrong and quotes the output.
+    const one = { name: "unit", files: ["u/a.test.ts"], typecheckFiles: [] };
+    expect(parseProjects(`warning\n${PROJECTS_LINE}${JSON.stringify([one])}\nbye\n`)).toEqual([one]);
+    // A line a plugin prints first is passed over: the child prints its own last.
+    expect(parseProjects(`${PROJECTS_LINE}resolving\n${PROJECTS_LINE}${JSON.stringify([one])}\n`)).toEqual([one]);
+    const refused = (stdout: string, why: string) =>
+      expect(() => parseProjects(stdout, "err")).toThrow(new Error(`vitestProjects.ts ${why}; stdout ended ${JSON.stringify(stdout)}, stderr ended "err"`));
+    refused(JSON.stringify([one]), "printed no projects line");
+    refused(`${PROJECTS_LINE}[{`, "printed a projects line that is not JSON");
+    refused(`${PROJECTS_LINE}{}`, "printed projects that are not a list");
+    for (const bad of [null, { ...one, name: 1 }, { ...one, files: "u/a.test.ts" }, { ...one, files: ["u/a.test.ts", 1] }, { ...one, typecheckFiles: undefined }]) {
+      refused(`${PROJECTS_LINE}${JSON.stringify([one, bad])}`, "printed project 2, which lacks a name, a list of files or a list of type test files");
+    }
+    // A child run Node rejects says why, with the end of its output.
+    const rejected = (why: string) => new Error(`vitestProjects.ts ${why}; stdout ended "out", stderr ended "err"`);
+    expect(childRejected({ killed: true, code: null, signal: "SIGKILL", stdout: "out", stderr: "err" })).toEqual(rejected("did not finish in 120 s"));
+    expect(childRejected({ killed: false, code: 1, signal: null, stdout: "out", stderr: "err" })).toEqual(rejected("exited with code 1"));
+    expect(childRejected({ killed: false, code: null, signal: "SIGSEGV", stdout: "out", stderr: "err" })).toEqual(rejected("exited with SIGSEGV"));
+    expect(childRejected({ killed: true, code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER", stdout: "out", stderr: "err" })).toEqual(rejected("failed with ERR_CHILD_PROCESS_STDIO_MAXBUFFER"));
+    // The child drops the variables Vitest and Vite give a test worker.
+    expect(["VITEST", "VITEST_POOL_ID", "VITEST_WORKER_ID", "MODE", "DEV", "PROD", "SSR", "BASE_URL", "FORCE_TTY"].filter((k) => !workerOnly(k))).toEqual([]);
+    expect(["PATH", "HOME", "VC_REQUIRE_WASM", "CI"].filter(workerOnly)).toEqual([]);
+  });
+
+  it("starts its child without a test worker's variables, kills one that hangs, and is not held by a handle a plugin leaves open", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "vitest-projects-"));
+    try {
+      // The child sees no test worker's variables, and the WASM switch.
+      const echo = join(dir, "echo.mjs");
+      const named = "[process.env.VITEST_WORKER_ID, process.env.MODE, process.env.VC_REQUIRE_WASM].join()";
+      writeFileSync(echo, `process.stdout.write(${JSON.stringify(PROJECTS_LINE)} + JSON.stringify([{ name: ${named}, files: [], typecheckFiles: [] }]));`);
+      expect(await vitestProjects(dir, echo)).toEqual([{ name: ",,1", files: [], typecheckFiles: [] }]);
+      // One that ignores the signal a timeout sends by default is still
+      // stopped. Its loop ends by itself, so a guard that fails to stop it
+      // leaves nothing running. Only the message's start is matched, since
+      // Node can print to stderr first (under a debugger, say).
+      const hang = join(dir, "hang.mjs");
+      writeFileSync(hang, 'process.on("SIGTERM", () => {}); for (const end = Date.now() + 20_000; Date.now() < end; );');
+      await expect(vitestProjects(dir, hang, 1000)).rejects.toThrow(/^vitestProjects\.ts did not finish in 1 s; stdout ended ""/);
+      // The real child, on a config whose plugin keeps a timer running,
+      // still exits once it has printed its line, and the config sees the
+      // `VITEST` and `TEST` that `vitest run` sets.
+      const config = "{ test: { name: [process.env.VITEST, process.env.TEST].join() }, plugins: [{ name: \"open\", configResolved() { setInterval(() => {}, 1000); } }] }";
+      writeFileSync(join(dir, "vitest.config.mjs"), `export default ${config};`);
+      expect(await vitestProjects(dir, undefined, 25_000)).toEqual([{ name: "true,true", files: [], typecheckFiles: [] }]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it("a section 7 count of the WASM projects' test files or the exclusion lists that is missing or stale", () => {
+    // The counts read the projects Vitest resolves: the files each hosted
+    // project's twin runs and it does not, past the converted suites.
+    const project = (name: string, files: string[]): ProjectFiles => ({ name, files, typecheckFiles: [] });
+    const projects = (edit: Record<string, Partial<ProjectFiles>> = {}): ProjectFiles[] =>
+      [
+        project("unit", ["u/a.test.ts", "u/b.test.ts", "u/c.test.ts", "u/suite.test.ts"]),
+        project("integration", ["i/a.integration.test.ts", "i/b.integration.test.ts", "i/c.integration.test.ts", "suite"]),
+        project("unitWasm", ["u/a.test.ts", "u/b.test.ts"]),
+        project("integrationWasm", ["i/c.integration.test.ts"]),
+      ].map((p) => ({ ...p, ...edit[p.name] }));
+    const counted = (ps: ProjectFiles[], suites = ["suite", "u/suite.test.ts"]) => wasmMapping(ps, suites);
+    expect(counted(projects())).toEqual({ integration: 2, unit: 1 });
+    // A hosted project that leaves out more of its twin's files, by any
+    // means, moves its count.
+    expect(counted(projects({ unitWasm: { files: ["u/a.test.ts"] } }))).toEqual({ integration: 2, unit: 2 });
+    expect(counted(projects({ integrationWasm: { files: [] } }))).toEqual({ integration: 3, unit: 1 });
+    // It may run no file its twin does not run, and no converted suite (named
+    // once however often the converted list names it); each hosted project is
+    // held to both.
+    expect(() => counted(projects({ unitWasm: { files: ["u/a.test.ts", "u/b.test.ts", "u/d.test.ts", "i/a.integration.test.ts"] } }))).toThrow(
+      new Error('unitWasm runs ["u/d.test.ts","i/a.integration.test.ts"], which unit does not'),
+    );
+    expect(() => counted(projects({ integrationWasm: { files: ["i/c.integration.test.ts", "i/d.integration.test.ts"] } }))).toThrow(
+      new Error('integrationWasm runs ["i/d.integration.test.ts"], which integration does not'),
+    );
+    expect(() => counted(projects({ integrationWasm: { files: ["i/c.integration.test.ts", "suite"] } }), ["suite", "suite"])).toThrow(
+      new Error('integrationWasm runs converted suites, which start both engines themselves: ["suite"]'),
+    );
+    expect(() => counted(projects({ unitWasm: { files: ["u/a.test.ts", "u/suite.test.ts"] } }))).toThrow(
+      new Error('unitWasm runs converted suites, which start both engines themselves: ["u/suite.test.ts"]'),
+    );
+    // Every converted suite must be a file a twin runs.
+    expect(() => counted(projects(), ["suite", "gone.integration.test.ts"])).toThrow(
+      new Error('converted suites that neither unit nor integration runs: ["gone.integration.test.ts"]'),
+    );
+    // Each of the four must be there, with no type tests, and no other project.
+    expect(() => counted(projects().filter((p) => p.name !== "integrationWasm"))).toThrow(new Error("Vitest resolves no integrationWasm project"));
+    expect(() => counted([...projects(), project("integrationWasmReferees", ["i/a.integration.test.ts"])])).toThrow(
+      new Error('Vitest resolves projects the counts do not model: ["integrationWasmReferees"]'),
+    );
+    expect(() => counted(projects({ unit: { typecheckFiles: ["u/a.test-d.ts"] } }))).toThrow(
+      new Error('Vitest runs type tests for unit, which the counts do not model: ["u/a.test-d.ts"]'),
+    );
     const { integration, unit: files, marks, converted, tsEngineTests } = base.sevenCounts;
     const recount = (edit: Partial<SevenCounts>) => problems({ sevenCounts: { ...base.sevenCounts, ...edit } });
     expect(recount({ integration: integration + 1 })).toContain(
-      `section 7: counts ${integration} \`wasmParityProjects\` patterns, and vite.config.ts lists ${integration + 1}`,
+      `section 7: counts ${integration} integration test files \`wasmParityProjects\` leaves out of \`integrationWasm\`, and Vitest's discovery lists ${integration + 1}`,
     );
-    expect(recount({ unit: files + 1 })).toContain(`section 7: counts ${files} \`unitWasm\` unit test files, and vite.config.ts lists ${files + 1}`);
+    expect(recount({ unit: files + 1 })).toContain(`section 7: counts ${files} \`unitWasm\` unit test files, and Vitest's discovery lists ${files + 1}`);
     // The exclusion lists' counts are held to the lists the same way.
     expect(recount({ marks: marks + 1 })).toContain(
       `section 7: counts ${marks} \`itTypeScriptOnly\` marks, and src/tests/parity/exclusions.ratchet.txt lists ${marks + 1}`,
     );
     expect(recount({ converted: converted - 1 })).toContain(`section 7: counts ${converted} suites, and src/tests/portKit/converted.txt lists ${converted - 1}`);
     expect(problems({ register: base.register.replace(/`src\/tests\/portKit\/converted\.txt` lists/, "`src/tests/portKit/converted.txt` holds") })).toContain(
-      "section 7: no count of the suites in `src/tests/portKit/converted.txt`",
+      `section 7: the register gives no count of the suites, and src/tests/portKit/converted.txt lists ${converted}`,
     );
     expect(recount({ branches: 1 })).toContain("section 7: counts 0 `onWasmParityProject` branches, and src/tests/parity/exclusions.ratchet.txt lists 1");
     // A split's parts must add up to the count it splits.
@@ -174,11 +233,18 @@ describe("the parity register audit catches a stale register", () => {
     // A line without a field reads as no count at all, so a renamed field fails.
     lists["src/tests/parity/exclusions.ratchet.txt"] = "a.ts itTypeScriptOnly=1 atEngineFrameCadence=0\n";
     expect(sevenCounts(fake, mapping).branches).toBeNaN();
-    const count = new RegExp(`\`wasmParityProjects\` lists\\s+${integration} patterns`);
+    const count = new RegExp(`\`wasmParityProjects\`\\s+leaves\\s+${integration}\\s+of\\s+them`);
     expect(base.register).toMatch(count);
-    expect(problems({ register: base.register.replace(count, "`wasmParityProjects` lists them") })).toContain(
-      "section 7: no count of the `wasmParityProjects` patterns in `vite.config.ts`",
+    expect(problems({ register: base.register.replace(count, "`wasmParityProjects` leaves some of them") })).toContain(
+      `section 7: the register gives no count of the integration test files \`wasmParityProjects\` leaves out of \`integrationWasm\`, and Vitest's discovery lists ${integration}`,
     );
+    // The count is read only beside the project it is for: a sentence that
+    // names it after the other project's figure gives it no count.
+    const missing = `section 7: the register gives no count of the integration test files \`wasmParityProjects\` leaves out of \`integrationWasm\`, and Vitest's discovery lists ${integration}`;
+    expect(problems({ register: base.register.replace("its `integrationWasm` project", "the unit project") })).toContain(missing);
+    const both = base.register.replace(count, `\`wasmParityProjects\` leaves 4 unit test files out of its \`unitWasm\` project and ${integration} of them`);
+    expect(both).not.toBe(base.register);
+    expect(problems({ register: both })).toContain(missing);
     const unitCount = new RegExp(`\\b${files}\\s+unit\\s+test\\s+files\\b`);
     expect(base.register).toMatch(unitCount);
     expect(problems({ register: base.register.replace(unitCount, "some unit test files") }).join("\n")).toContain("no count of the `unitWasm` unit test files");

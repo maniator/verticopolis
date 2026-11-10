@@ -21,9 +21,9 @@ import { SEVEN_COUNTS, markedStems, sevenCounts, type SevenCounts, type WasmMapp
  *   has no row for a file that no longer does; an import there that the scan
  *   cannot read (a computed specifier) fails unless {@link URL_LOADERS}
  *   names its file and how many it has, since it could hide one;
- * - section 7 counts the test files Vitest's config keeps off the hosted
- *   WASM projects (`wasmParityProjects`: the integration patterns, and the
- *   unit test files `unitWasm` leaves out) and what the exclusion lists hold
+ * - section 7 counts the test files the hosted WASM projects leave out, as
+ *   Vitest resolves them (`integrationWasm` and `unitWasm`; see
+ *   `wasmMapping`), and what the exclusion lists hold
  *   (the TypeScript-only marks, cadence calls and branches, the TypeScript
  *   engine ratchet and the converted suites), as {@link SEVEN_COUNTS} lists,
  *   so none of them changes unseen, and its two groups of marks name exactly
@@ -375,7 +375,7 @@ export function audit(input: AuditInput): string[] {
   for (const [key, pattern, what, source] of SEVEN_COUNTS) {
     const parts = pattern.exec(seven)?.slice(1);
     const [given, have] = [parts?.reduce((n, p) => n + (p === "no" ? 0 : Number(p)), 0), input.sevenCounts[key]];
-    if (given === undefined) problems.push(`section 7: no count of the ${what} in \`${source}\``);
+    if (given === undefined) problems.push(`section 7: the register gives no count of the ${what}, and ${source} lists ${have}`);
     else if (Number(given) !== have) problems.push(`section 7: counts ${given} ${what}, and ${source} lists ${have}`);
   }
   const grouped = new Set([...(seven.match(/^- \*\*\d+\s+tests\*\*.*(?:\r?\n {2}.*)*/gm) ?? []).join("\n").matchAll(/`(\w+)`/g)].map((m) => m[1]));
@@ -480,7 +480,7 @@ function repoBasenames(): Set<string> {
 }
 
 /** The register, the exception register and the code as they stand, with the
- *  hosted WASM projects' counts from the config Vitest gets. */
+ *  hosted WASM projects' counts from the projects Vitest resolves. */
 export const live = (mapping: WasmMapping): AuditInput => {
   const host = hostEngineImports();
   return {
