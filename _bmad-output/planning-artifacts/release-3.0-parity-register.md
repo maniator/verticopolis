@@ -292,7 +292,7 @@ evidence is one the golden does not cover, or covers only in part.
 | `statsSheet` | query | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts` |
 | `unitFacts` | query | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts`, browser `e2e/tenantDiagnostics.spec.ts` |
 | `serviceDiagnostics` | query | proven same | `src/tests/integration/portServiceDiagnostics.integration.test.ts`, browser `e2e/serviceDiagnostics.spec.ts` |
-| `roomTiers` | query | intentionally different (approved) | `src/tests/integration/roomTiersWasm.integration.test.ts`, `src/simport/roomTiers.test.ts` (the reader, and no rows from an engine without the read), native `engine-rs/src/panels/tests_room_tiers.rs`, `engine-rs/src/wasm_port_panels_tests.rs`. The Map's Eval and Pricing read (#343 S7), which only the Rust engine answers: the TypeScript reference has no Map views, and a reader takes its absence as no rows. The owner moved the Map's views into 3.0 for parity with the original, owner decision 6 in [`overview-map-343-plan-2026-11-03.md`](overview-map-343-plan-2026-11-03.md); no player sees the read until S8 ships with the rest of that stack |
+| `roomTiers` | query | intentionally different (approved) | `src/tests/integration/roomTiersWasm.integration.test.ts`, `src/simport/roomTiers.test.ts` (the reader, and no rows from an engine without the read), native `engine-rs/src/panels/tests_room_tiers.rs`, `engine-rs/src/wasm_port_panels_tests.rs`. The Map's Eval and Pricing read (#343 S7), which only the Rust engine answers: the TypeScript reference has no Map views, and a reader takes its absence as no rows. The owner moved the Map's views into 3.0 for parity with the original (owner decision 6 in [`overview-map-343-plan-2026-11-03.md`](overview-map-343-plan-2026-11-03.md)), and no player sees this read until S6 to S9 ship together; S8's Eval and Pricing views then show it |
 | `loadVctower` | file | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts` |
 | `exportVctower` | file | proven same | `src/tests/integration/tsEngine.golden.integration.test.ts`, browser `e2e/saveRoundTrip.spec.ts` |
 | `loadTdt` | file | proven same | `src/tests/integration/tdtRealSaves.integration.test.ts` (the real 1997 saves), `src/tests/integration/tsEngine.golden.integration.test.ts` (the Rust codec on both ports) |
@@ -434,11 +434,11 @@ suites that author their towers on a `Simulation`, #1805 the port kit's
 TypeScript tooling, `src/tests/portKit/tsTooling.ts`, and #1809 the two
 golden referees), and `src/tests/portKit/converted.txt` lists 19 suites
 already on the port kit. The hosted WASM projects also leave out the test files that run
-each engine themselves or never touch the engine: `wasmParityProjects` lists
-31 patterns of them for the integration project, in `vite.config.ts`, with
+each engine themselves or never touch the engine: `wasmParityProjects` leaves
+33 of them out of its `integrationWasm` project, by patterns in `vite.config.ts` with
 comments that give the reasons, and its `unitWasm` project leaves
 out 4 unit test files of its own, with the reason beside them; the guard
-holds both counts to those lists. The card-text sweep is one of those files,
+holds the counts to the projects and test files Vitest resolves. The card-text sweep is one of the files the hosted projects leave out,
 and since #1809 (#1806) it holds the Rust card to a committed golden of the
 reference card's lines (`src/tests/goldens/card-text/`), which
 `src/tests/integration/cardTextReferee.integration.test.ts` holds to the
