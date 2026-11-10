@@ -110,6 +110,7 @@ const FACILITY: Shape = {
   width: size,
   floors: size,
   cost: amount,
+  paysForFloor: bool,
   minStar: count,
   population: count,
   maxHousehold: orNull(count),

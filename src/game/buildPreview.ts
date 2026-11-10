@@ -1,12 +1,13 @@
 import type { GameApp } from "../main";
 import type { FacilityKind } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
-import { catalogBuildKind, catalogFacility } from "../catalog/catalogTypes";
+import { catalogBuildKind, catalogFacility, catalogTileCost, type Catalog } from "../catalog/catalogTypes";
 import { brushTiles, snapX, type PlaceOutcome } from "../ui/placement";
 import { buildRefusalTemplate } from "../ui/templates/inspector";
 import { isPaintKind } from "./gesture";
 import { FLOOR } from "../render/scale";
-import { catalogOf, isUnlocked, quoteBuild, quoteShaft } from "./portAccess";
+import { catalogOf, isUnlocked, quoteBuild, quoteShaft, type BuildQuote } from "./portAccess";
+import { NOT_ENOUGH_MONEY } from "../simport/request";
 
 /**
  * How far above the touch point a room's placement ghost floats, in SCREEN pixels
@@ -85,6 +86,71 @@ export function isPaintTool(app: GameApp): boolean {
   return app.tool.type === "build" && isPaintKind(app.tool.kind);
 }
 
+/** A structure kind the tower reads at a tile, or undefined where none is built. */
+type BuiltAt = ReturnType<GameApp["reader"]["tower"]["structureKindAt"]>;
+
+/** Whether the `kind` brush passes over a tile that holds `built`, as
+ *  paintTiles does: a Lobby brush skips lobby tiles (it turns plain floor into
+ *  lobby), a Floor brush any structure, on the ground floor too. */
+function brushSkips(kind: "floor" | "lobby", built: BuiltAt): boolean {
+  return kind === "lobby" ? built === "lobby" : built !== undefined;
+}
+
+/** Whether the engine refuses the `kind` brush's tile at `(floor, x)`, which
+ *  holds `built`, because a room stands on that plain floor (`room_span_free`).
+ *  An old save can hold one on the ground floor; the brush lays past it. On a
+ *  sky lobby floor any room refuses every lobby tile, which the quote names. */
+function roomBlocks(app: GameApp, kind: "floor" | "lobby", built: BuiltAt, floor: number, x: number): boolean {
+  return kind === "lobby" && built === "floor" && app.reader.roomAt(floor, x) !== undefined;
+}
+
+/** Whether a tile laid at `(floor, x)` would have what holds it up: above the
+ *  ground floor, the story below it (`Tower::is_supported`). Lower down a tile
+ *  is held by its neighbors, which the brush's own passes lay. */
+function heldUp(app: GameApp, groundFloor: number, floor: number, x: number): boolean {
+  return floor <= groundFloor || app.reader.tower.structureKindAt(floor - 1, x) !== undefined;
+}
+
+/** Whether a tile at `(floor, x)` stands against built structure, so it stands
+ *  with bridging off: plain floor the Lobby brush lays over, a built tile beside
+ *  it on its row, or on the ground floor and below one over or under it, the
+ *  support `Tower::is_supported` reads there. */
+function touchesTower(app: GameApp, groundFloor: number, floor: number, x: number): boolean {
+  const t = app.reader.tower;
+  if (t.structureKindAt(floor, x) !== undefined) return true;
+  if (t.structureKindAt(floor, x - 1) !== undefined || t.structureKindAt(floor, x + 1) !== undefined) return true;
+  return floor <= groundFloor && (t.structureKindAt(floor - 1, x) !== undefined || t.structureKindAt(floor + 1, x) !== undefined);
+}
+
+/** What a quote of the tile at `at` lays besides that tile: `extra`, the price
+ *  of its bridge, which lays the brush tiles strictly between `from` and `to`
+ *  (`at` aside). A bridge scans each way to the nearest structure on the row
+ *  and, when that is of its own kind, lays the held-up tiles in between
+ *  (`bridge_fill_plan`), so the view's nearest structure says where each side
+ *  of it ends. */
+function quotedBridge(
+  app: GameApp,
+  catalog: Catalog,
+  kind: FacilityKind,
+  floor: number,
+  at: number,
+  quote: BuildQuote,
+): { at: number; extra: number; from: number; to: number } {
+  const own = catalogTileCost(catalog, kind, app.reader.tower.structureKindAt(floor, at) === undefined ? "no floor yet" : "a floor tile");
+  // A refusal for money still carries the full price, bridge and all.
+  const priced = quote.ok || quote.reason === NOT_ENOUGH_MONEY;
+  const extra = priced ? quote.cost - own : 0;
+  if (extra <= 0) return { at, extra: 0, from: at, to: at };
+  const substrate = kind === "lobby" ? "lobby" : "floor";
+  const left = app.reader.structureBeside(floor, at, -1);
+  const right = app.reader.structureBeside(floor, at, 1);
+  return { at, extra, from: left?.kind === substrate ? left.x : at, to: right?.kind === substrate ? right.x : at };
+}
+
+/** Whether `span`'s bridge lays the brush tile at `x`. */
+const bridgeLays = (span: { at: number; from: number; to: number } | undefined, x: number) =>
+  span !== undefined && x !== span.at && x > span.from && x < span.to;
+
 export function updateBuildPreview(app: GameApp, tile: number, floor: number, showReasonCard = true): void {
   if (app.tool.type !== "build") {
     app.engine.preview = null;
@@ -113,30 +179,107 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
     const tiles = brushTiles(tile);
     const left = tiles[0];
     const span = tiles[tiles.length - 1] - left + 1;
-    // Ground floor is lobby-only: the Floor tool on floor 1 lays a lobby, so the
-    // ghost must PREVIEW a lobby rather than spring a permanent 10x charge.
+    // The ground floor is lobby-only: the Floor tool on floor 1 lays a lobby, so
+    // the ghost previews a lobby, priced with the floor it lays.
     const ghostKind = catalogBuildKind(catalog, kind, floor);
-    const can = quoteBuild(app.enginePort, app.portCodes, ghostKind, floor, snapX(catalog, kind, tile));
-    // Whole-brush affordability, not a single tile: the ghost spans the entire
-    // brush and paintBrush charges per tile, so a single-tile check would show an
-    // all-green strip and then partial-build (permanent lobby on floor 1). Count
-    // the tiles the brush would ACTUALLY lay (matching paintBrush: a lobby brush
-    // also upgrades plain floor, a floor brush lays only empty tiles) and price
-    // them so the ghost goes invalid when the full run is unaffordable. The
-    // anchor's own canBuild cost already includes any auto-bridge gap-fill to
-    // reach existing structure; the rest of the brush is contiguous, so price it
-    // per tile. Dedupe first: brushTiles clamps to the lot edge and can repeat a
-    // column. This also tightens the plain Floor/Lobby brush above ground.
-    const perTile = catalogFacility(catalog, ghostKind).cost;
-    const laid = [...new Set(tiles)].filter((tx) => {
-      const at = app.reader.tower.structureKindAt(floor, tx);
-      return ghostKind === "lobby" ? at !== "lobby" : at === undefined;
-    }).length;
-    const stripCost = laid === 0 ? 0 : can.cost + (laid - 1) * perTile;
+    // Whole-brush affordability: the brush charges per tile, so the ghost goes
+    // green only when the money covers every tile a click lays and the bridges
+    // they bring. paintTiles builds the tiles in order, each with a bridge to
+    // the nearest built tile on either side, laid when that tile is of its
+    // kind. A bridge inside the brush lays tiles the brush lays anyway, at the
+    // same price, so only the bridges past its ends add to the strip: one from
+    // the run at each end. One tile is quoted for its refusal: the first the
+    // brush lays that stands against built structure (it stands with bridging
+    // off), or else the first it lays; when it lays nothing, the last it
+    // tries, whose refusal a click reports (the anchor when it tries none).
+    // Plain floor the Lobby brush lays over last can take its place (below).
+    // Where a built tile stops that quote's scan before an end run, that run
+    // is quoted too, from a tile whose scan back into the brush stops at a
+    // built tile, so no two quotes scan the same side past the brush. Every
+    // tile laid is priced from the catalog (catalogTileCost) unless a quoted
+    // bridge lays it, and each quote adds its bridge. Dedupe first: brushTiles
+    // clamps to the lot edge and can repeat a column.
+    const brush = new Set(tiles);
+    const groundFloor = catalog.world.groundFloor;
+    const builtAt = (x: number) => app.reader.tower.structureKindAt(floor, x);
+    let tried = snapX(catalog, kind, tile);
+    let firstLaid: number | undefined;
+    let touching: number | undefined;
+    // A built tile left of the first tile laid, so no bridge from that run
+    // reaches past the brush's left end.
+    let builtBeforeFirst = false;
+    // The first built tile past the first tile laid: where the first run ends.
+    let firstRunEnd: number | undefined;
+    // The last built tile, the one before it, and whether the brush lays over
+    // it (plain floor under the Lobby brush).
+    let lastBuilt: number | undefined;
+    let builtBeforeLast: number | undefined;
+    let lastBuiltLaid = false;
+    // The first tile laid past the last built tile.
+    let lastRunStart: number | undefined;
+    for (const tx of brush) {
+      const built = builtAt(tx);
+      if (built !== undefined) {
+        builtBeforeLast = lastBuilt;
+        lastBuilt = tx;
+        lastBuiltLaid = false;
+        lastRunStart = undefined;
+        if (firstLaid !== undefined) firstRunEnd ??= tx;
+      }
+      if (brushSkips(kind, built)) {
+        if (firstLaid === undefined) builtBeforeFirst = true;
+        continue;
+      }
+      tried = tx;
+      const blocked = roomBlocks(app, kind, built, floor, tx);
+      if (blocked && firstLaid === undefined) builtBeforeFirst = true;
+      if (blocked || !heldUp(app, groundFloor, floor, tx)) continue;
+      firstLaid ??= tx;
+      if (built === undefined) lastRunStart ??= tx;
+      else lastBuiltLaid = true;
+      if (touching === undefined && touchesTower(app, groundFloor, floor, tx)) touching = tx;
+    }
+    let quoted = touching ?? firstLaid ?? tried;
+    // Plain floor the Lobby brush lays over last, with no tile laid after it
+    // and nothing built back to the quoted tile: its quote scans everything
+    // the quoted tile's would and its own right side, so it is quoted alone.
+    const nothingBuiltBackToQuoted = (builtBeforeLast ?? -Infinity) < quoted;
+    if (lastBuilt !== undefined && lastBuiltLaid && lastRunStart === undefined && lastBuilt > quoted && nothingBuiltBackToQuoted) {
+      quoted = lastBuilt;
+    }
+    const quote = (x: number) => quoteBuild(app.enginePort, app.portCodes, ghostKind, floor, x);
+    const can = quote(quoted);
+    const near = quotedBridge(app, catalog, ghostKind, floor, quoted, can);
+    // The first run, when a built tile past its first tile stops the quoted
+    // tile's scan left: its first tile scans right only to that built tile.
+    const leftEnd = !builtBeforeFirst && firstRunEnd !== undefined && firstRunEnd < quoted ? firstLaid : undefined;
+    // The last run, when a built tile stops the quoted tile's scan right: the
+    // first tile laid past the last built tile, whose scan left stops at it,
+    // or else that built tile when the brush lays over it. Here a built tile
+    // stands between it and the quoted tile (else it is the quoted tile), and
+    // its scan left stops there.
+    let rightEnd: number | undefined;
+    if (lastBuilt !== undefined && quoted < lastBuilt) rightEnd = lastRunStart ?? (lastBuiltLaid ? lastBuilt : undefined);
+    const farLeft = leftEnd === undefined ? undefined : quotedBridge(app, catalog, ghostKind, floor, leftEnd, quote(leftEnd));
+    const farRight = rightEnd === undefined ? undefined : quotedBridge(app, catalog, ghostKind, floor, rightEnd, quote(rightEnd));
+    const overFloor = catalogTileCost(catalog, ghostKind, "a floor tile");
+    const noFloorYet = catalogTileCost(catalog, ghostKind, "no floor yet");
+    let laid = 0;
+    let stripCost = near.extra + (farLeft?.extra ?? 0) + (farRight?.extra ?? 0);
+    for (const tx of brush) {
+      const built = builtAt(tx);
+      if (brushSkips(kind, built) || roomBlocks(app, kind, built, floor, tx) || !heldUp(app, groundFloor, floor, tx)) continue;
+      laid++;
+      if (bridgeLays(near, tx) || bridgeLays(farLeft, tx) || bridgeLays(farRight, tx)) continue;
+      stripCost += built === undefined ? noFloorYet : overFloor;
+    }
+    if (laid === 0) stripCost = 0;
     const affordsStrip = app.reader.header.money >= stripCost;
-    const valid = can.ok && affordsStrip;
+    // A brush that lays nothing is never green, even where the anchor alone
+    // would take a lobby (plain floor on the ground floor, from an old save).
+    const valid = laid > 0 && can.ok && affordsStrip;
     let reason: string | undefined;
-    if (!valid && catalog.rules.previewNamesRefusal) reason = !can.ok ? can.reason : "Not enough money.";
+    if (!valid && catalog.rules.previewNamesRefusal && (!can.ok || laid > 0)) reason = can.ok ? NOT_ENOUGH_MONEY : can.reason;
     app.engine.preview = { kind: ghostKind, floor, x: left, span, valid, reason };
     app.engine.transportPreview = null;
     if (showReasonCard) updateBuildRefusal(app, reason, floor, left + Math.floor(span / 2));

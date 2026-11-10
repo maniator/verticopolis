@@ -103,9 +103,11 @@ describe.skipIf(!hasWasmPackage())("canBuild through the WASM binding matches th
       try {
         expect(engine.mode()).toBe(sim.mode);
         let accepted = 0;
-        // 5,000 is exactly a ground-floor lobby tile, so the money check's
-        // boundary (afford at equal) is compared too.
-        for (const money of [1e9, 1_200, 5_000]) {
+        // A lobby tile's price over a floor tile, and where there is no floor
+        // yet, so the money check's boundary (afford at equal) is compared
+        // wherever the grid meets either.
+        const lobbyTile = FACILITIES.lobby.cost;
+        for (const money of [1e9, 1_200, lobbyTile, lobbyTile + FACILITIES.floor.cost]) {
           sim.money = money;
           engine.setMoney(money);
           for (const bridging of [false, true]) {

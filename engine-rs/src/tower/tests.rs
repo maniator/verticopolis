@@ -282,3 +282,71 @@ fn merging_in_place_puts_each_insert_where_splitting_the_list_did() {
         }
     }
 }
+
+/// An extend lays plain floor behind the floors it adds, which never belongs
+/// on the ground floor, and on a sky lobby floor would take the place its sky
+/// lobby is due. Through either it waits until every tile under the shaft
+/// there is built, and lays nothing there meanwhile.
+#[test]
+fn an_extend_through_a_lobby_floor_waits_until_it_is_built() {
+    let width = Kind::ElevatorStandard.facility().width;
+    let (x, shaft) = (40, 40 + width);
+    let lay = |t: &mut Tower, kind: Kind, floor: i64, from: i64| {
+        for tx in from..from + width {
+            assert!(t.place(kind, floor, tx).ok, "{kind:?} on {floor} at {tx}");
+        }
+    };
+    let below_sky = LOBBY_INTERVAL - 1;
+    // A basement shaft beside the ground lobby, extended up into the ground
+    // floor, and a shaft over the ground lobby, extended up into a sky lobby.
+    for (floor, lobby, bottom) in [(1, "lobby", -1), (LOBBY_INTERVAL, "sky lobby", 1)] {
+        let shaft_below = |under: Option<Kind>| {
+            let mut t = Tower::new();
+            lay(&mut t, Kind::Lobby, 1, x);
+            if floor == 1 {
+                lay(&mut t, Kind::Floor, 0, x);
+                lay(&mut t, Kind::Floor, 0, shaft);
+                lay(&mut t, Kind::Floor, -1, shaft);
+            } else {
+                lay(&mut t, Kind::Lobby, 1, shaft);
+                for story in 2..=below_sky {
+                    lay(&mut t, Kind::Floor, story, shaft);
+                }
+            }
+            let built = t.place_transport(Kind::ElevatorStandard, shaft, bottom, floor - 1);
+            let id = built.unit_id.expect("the shaft");
+            if let Some(kind) = under {
+                lay(&mut t, kind, floor, shaft);
+            }
+            (t, id)
+        };
+        let (mut t, id) = shaft_below(None);
+        let refused = t.resize_transport(id, bottom, floor);
+        let reason = format!("Build the {lobby} on floor {floor} first, then extend through it.");
+        assert_eq!(refused.reason.as_deref(), Some(reason.as_str()));
+        assert!(!refused.ok);
+        let bare = (shaft..shaft + width).all(|tx| !t.has_structure(floor, tx));
+        assert!(bare, "nothing laid on {floor}");
+        // A lobby under part of the shaft is not enough, and still nothing lays.
+        let (mut t, id) = shaft_below(None);
+        for tx in shaft..shaft + width - 1 {
+            assert!(
+                t.place(Kind::Lobby, floor, tx).ok,
+                "lobby on {floor} at {tx}"
+            );
+        }
+        let partly = t.resize_transport(id, bottom, floor);
+        assert_eq!(partly.reason.as_deref(), Some(reason.as_str()));
+        assert!(
+            !t.has_structure(floor, shaft + width - 1),
+            "nothing laid on {floor}"
+        );
+        // A lobby lets it through, and so does plain floor: built on a sky
+        // lobby floor, or held on the ground floor by an old save.
+        for under in [Kind::Lobby, Kind::Floor] {
+            let (mut t, id) = shaft_below(Some(under));
+            let r = t.resize_transport(id, bottom, floor);
+            assert!(r.ok, "through {under:?} on {floor}: {:?}", r.reason);
+        }
+    }
+}

@@ -1,5 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import { catalogBuildKind, catalogFacility, type Catalog } from "../../catalog/catalogTypes";
+import { catalogBuildKind, catalogFacility, catalogTileCost, type Catalog } from "../../catalog/catalogTypes";
 import { isCommercialKind } from "../../presentation/viewKinds";
 import { facilityDescription } from "../../presentation/facilityPresentation";
 import type { FacilityKind } from "../../engine/types";
@@ -23,11 +23,19 @@ export function toolInfoTemplate(
   // Passed for the Floor tool so a player learns up front that floor 1 is
   // lobby-only and priced accordingly, before they drop the cheaper floor tile.
   groundFloorLobbyCost?: number,
+  // When set, a tile of this kind placed where there is no floor yet costs
+  // this, since it pays for the floor too. Passed for the Lobby tool, whose
+  // `Cost` line is the price over a floor tile.
+  noFloorYetCost?: number,
 ): TemplateResult {
   // Commercial venues never hold a flat population: they add however many
   // customers are eating right now, up to the catalog value. "Capacity"
   // stays for the kinds where it is literally the head count.
   return html`<div class="ti-name">${f.name}</div><div>Cost: $${groupDigits(f.cost)}</div>${
+    noFloorYetCost !== undefined
+      ? html`<div>Where there is no floor yet: $${groupDigits(noFloorYetCost)} per tile, floor included</div>`
+      : nothing
+  }${
     f.population
       ? html`<div>${isCommercial ? `Customers: up to ${f.population}` : `Capacity: ${f.population}`}</div>`
       : nothing
@@ -45,7 +53,7 @@ export function toolInfoTemplate(
 export function toolInfoFor(catalog: Catalog, kind: FacilityKind): TemplateResult {
   // The description is display copy, which the catalog leaves to the UI.
   const f = { ...catalogFacility(catalog, kind), description: facilityDescription(kind) };
-  return toolInfoTemplate(f, isCommercialKind(kind), groundFloorCost(catalog, kind));
+  return toolInfoTemplate(f, isCommercialKind(kind), groundFloorCost(catalog, kind), noFloorYetCost(catalog, kind));
 }
 
 export const BULLDOZE_TOOL_INFO: TemplateResult = html`<div class="ti-name">Bulldoze</div><p style="color:var(--muted)">Click a room or shaft to sell it for half its cost.</p>`;
@@ -53,8 +61,17 @@ export const BULLDOZE_TOOL_INFO: TemplateResult = html`<div class="ti-name">Bull
 export const INSPECT_TOOL_INFO: TemplateResult = html`<div class="ti-name">Inspect</div><p style="color:var(--muted)">Hover the tower to read a facility's status.</p>`;
 
 /** The ground-floor price on the card: what the tool lays on the ground floor
- *  when that differs from the tool's own kind (the Floor tool lays a lobby). */
+ *  when that differs from the tool's own kind (the Floor tool lays a lobby).
+ *  A current game has no plain floor there, so the tile pays for its floor
+ *  too (catalogTileCost). */
 function groundFloorCost(catalog: Catalog, kind: FacilityKind): number | undefined {
   const laid = catalogBuildKind(catalog, kind, catalog.world.groundFloor);
-  return laid === kind ? undefined : catalogFacility(catalog, laid).cost;
+  return laid === kind ? undefined : catalogTileCost(catalog, laid, "no floor yet");
+}
+
+/** The price of the tool's own tile where there is no floor yet, when that
+ *  differs from its `Cost` line (a lobby pays for the floor it lays). */
+function noFloorYetCost(catalog: Catalog, kind: FacilityKind): number | undefined {
+  const bare = catalogTileCost(catalog, kind, "no floor yet");
+  return bare === catalogFacility(catalog, kind).cost ? undefined : bare;
 }

@@ -10,7 +10,7 @@ import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
 
 /** The version of the catalog's shape. It moves when a field is added,
  *  renamed or removed, so a frontend can refuse a shape it does not know. */
-export const CATALOG_VERSION = 6;
+export const CATALOG_VERSION = 7;
 
 /** Every price, size and build rule of one mode. */
 export interface Catalog {
@@ -38,7 +38,9 @@ export interface CatalogWorld {
   readonly maxFloor: number;
   /** The ground floor, where the main lobby sits. */
   readonly groundFloor: number;
-  /** What the floor tool lays on the ground floor (a lobby, at the lobby's price). */
+  /** What the floor tool lays on the ground floor: a lobby. A current game
+   *  holds no plain floor there, so each tile the floor tool lays pays for
+   *  its floor too (`paysForFloor`). */
   readonly groundFloorStructure: FacilityKind;
   /** Floors between lobbies: besides the ground floor, a sky lobby may sit on
    *  every floor from 2 up that is a multiple of it (15, 30, ...). */
@@ -174,11 +176,17 @@ export interface CatalogFacility {
   readonly floors: number;
   /** The build price. An elevator adds `transportFloorCost` for each floor past
    *  its first (top minus bottom). A room adds the floor's price for every
-   *  floor tile laid under it. With automatic bridging on, every gap tile
-   *  bridged to the tower adds one substrate tile: the lobby's price when
-   *  placing a lobby (on any floor), the floor's price for a floor tile or a
-   *  room. */
+   *  floor tile laid under it, and so does a kind that pays for its floor
+   *  (`paysForFloor`) placed where there is no floor yet (see
+   *  `catalogTileCost`). With automatic bridging on, every gap tile bridged to
+   *  the tower adds one substrate tile: the lobby's price plus the floor's
+   *  when placing a lobby (on any floor), the floor's price for a floor tile
+   *  or a room. */
   readonly cost: number;
+  /** Whether a tile of this kind placed where there is no floor yet also
+   *  pays the floor's price, for the floor it lays (the lobby). Over a floor
+   *  tile it pays `cost` alone. */
+  readonly paysForFloor: boolean;
   /** The star rating that unlocks it. */
   readonly minStar: number;
   /** The people it holds (tenants, residents or customers at a time). */
@@ -276,6 +284,19 @@ export function catalogFacility(catalog: Catalog, kind: FacilityKind): CatalogFa
  *  ground floor, and every other build lays its own kind. */
 export function catalogBuildKind(catalog: Catalog, kind: FacilityKind, floor: number): FacilityKind {
   return kind === "floor" && floor === catalog.world.groundFloor ? catalog.world.groundFloorStructure : kind;
+}
+
+/** What a structure tile is placed on: open space with no floor yet, or a
+ *  floor tile that it turns into its own kind. */
+export type TileGround = "no floor yet" | "a floor tile";
+
+/** The price of one structure tile of `kind` (a floor or a lobby tile)
+ *  placed on `ground`, by the catalog's rule: a kind that pays for its floor
+ *  (`paysForFloor`, the lobby) adds the floor's price where there is no
+ *  floor yet, and pays its own price alone over a floor tile. */
+export function catalogTileCost(catalog: Catalog, kind: FacilityKind, ground: TileGround): number {
+  const f = catalogFacility(catalog, kind);
+  return f.paysForFloor && ground === "no floor yet" ? f.cost + catalogFacility(catalog, "floor").cost : f.cost;
 }
 
 /** Whether a facility is open in `hour` (the game hour; fractions and 24 read

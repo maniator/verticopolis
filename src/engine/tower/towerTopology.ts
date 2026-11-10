@@ -40,6 +40,12 @@ export function groundFloorStructureKind(kind: FacilityKind, floor: number): Fac
   return kind === "floor" && floor === 1 ? "lobby" : kind;
 }
 
+/** Whether a tile of `kind` placed where there is no floor yet also pays for
+ *  the floor it lays (the lobby), as `pays_for_floor` in the Rust engine. */
+export function paysForFloor(kind: FacilityKind): boolean {
+  return kind === "lobby";
+}
+
 /**
  * Rooms that need daylight and can't sit in a windowless basement. Commercial
  * (shop/fast food/restaurant), entertainment, and most service facilities may

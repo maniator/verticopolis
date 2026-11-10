@@ -301,9 +301,17 @@ impl Tower {
                     return ResizeResult::fail(SHAFT_OVERLAP);
                 }
             }
-            if is_sky_lobby_floor(fl) && !self.span_has_floor(fl, tx, twidth) {
+            // The extend would lay plain floor where a lobby is due: on the
+            // ground floor, which holds only lobby, or on a sky lobby floor
+            // where a tile under the shaft is not built yet.
+            if is_lobby_floor(fl) && !self.span_has_floor(fl, tx, twidth) {
+                let lobby = if is_sky_lobby_floor(fl) {
+                    "sky lobby"
+                } else {
+                    "lobby"
+                };
                 return ResizeResult::fail(format!(
-                    "Build the sky lobby on floor {fl} first, then extend through it."
+                    "Build the {lobby} on floor {fl} first, then extend through it."
                 ));
             }
             new_floors.push(fl);

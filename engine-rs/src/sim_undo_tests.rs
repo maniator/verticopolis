@@ -98,6 +98,31 @@ fn building_a_room_and_its_floor_round_trips() {
     round_trip(&mut sim, |s| assert!(s.build(Kind::Office, 5, 20).ok));
 }
 
+/// A lobby placed where there is no floor yet pays for that floor too, and
+/// its undo gives back that whole price: placed, bridged to the tower, and
+/// laid by the floor brush on the ground floor.
+#[test]
+fn a_lobby_with_its_floor_round_trips() {
+    let tile = Kind::Lobby.facility().cost + Kind::Floor.facility().cost;
+    let mut sim = tower();
+    round_trip(&mut sim, |s| {
+        let before = s.money;
+        assert!(s.build(Kind::Lobby, 1, 70).ok);
+        assert_eq!(before - s.money, tile);
+    });
+    // The lobby at 75 bridges 71..=74 to the tower.
+    round_trip(&mut sim, |s| {
+        let before = s.money;
+        assert!(s.build(Kind::Lobby, 1, 75).ok);
+        assert_eq!(before - s.money, 5.0 * tile);
+    });
+    round_trip(&mut sim, |s| {
+        let before = s.money;
+        assert_eq!(s.paint_brush(Kind::Floor, 1, &[76, 77]).placed, 2);
+        assert_eq!(before - s.money, 2.0 * tile);
+    });
+}
+
 #[test]
 fn a_lobby_over_floor_takes_the_slot_and_round_trips() {
     let mut sim = tower();

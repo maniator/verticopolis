@@ -1,7 +1,7 @@
 //! Tests for `build.rs`: the transport quote against the build, and the
 //! structural refusals.
 use crate::clock::GameMode;
-use crate::facilities::Kind;
+use crate::facilities::{Kind, LOBBY_INTERVAL};
 use crate::sim::Simulation;
 use crate::tower::Tower;
 
@@ -351,4 +351,83 @@ fn an_upper_story_bridges_over_the_tiles_the_story_below_plans() {
             .bridge_fill_plan(Kind::Cinema, 5, x, w, 2)
             .is_empty());
     }
+}
+
+/// A lobby placed where there is no floor yet pays for that floor too, on the
+/// ground floor and on a sky lobby floor: by the Lobby tool, by the Floor tool
+/// on the ground floor, for each tile bridged to the tower, and by the brush,
+/// with bridging on or (in Modern) off. A lobby over a floor tile pays the
+/// lobby's price alone.
+#[test]
+fn a_lobby_pays_for_the_floor_it_lays() {
+    let lobby = Kind::Lobby.facility().cost;
+    let floor = Kind::Floor.facility().cost;
+    let sky = LOBBY_INTERVAL;
+    // A new game starts on an empty lot.
+    let x = 100;
+    for mode in [GameMode::Classic, GameMode::Modern] {
+        let mut sim = Simulation::new_game(1, mode);
+        sim.money = 1e9;
+        let charged = |sim: &mut Simulation, kind: Kind, story: i64, x: i64| -> f64 {
+            let quote = sim.can_build(kind, story, x).cost;
+            let before = sim.money;
+            assert!(sim.build(kind, story, x).ok, "{kind:?} on {story} at {x}");
+            assert_eq!(before - sim.money, quote, "the quote is the charge");
+            quote
+        };
+        let brushed = |sim: &mut Simulation, story: i64, tiles: &[i64]| -> f64 {
+            let before = sim.money;
+            let r = sim.paint_brush(Kind::Lobby, story, tiles);
+            assert_eq!(r.placed, tiles.len() as i64, "{:?}", r.reason);
+            before - sim.money
+        };
+        assert_eq!(charged(&mut sim, Kind::Lobby, 1, x), lobby + floor);
+        // Two gap tiles bridged to the first lay their floor too.
+        assert_eq!(
+            charged(&mut sim, Kind::Lobby, 1, x + 3),
+            3.0 * (lobby + floor)
+        );
+        // The floor tool on the ground floor lays a lobby, at the same price.
+        assert_eq!(charged(&mut sim, Kind::Floor, 1, x + 4), lobby + floor);
+        assert_eq!(brushed(&mut sim, 1, &[x + 5, x + 6]), 2.0 * (lobby + floor));
+        for story in 2..=sky {
+            for tx in x..=x + 3 {
+                if story < sky || tx < x + 3 {
+                    charged(&mut sim, Kind::Floor, story, tx);
+                }
+            }
+        }
+        // A sky lobby over a floor tile turns it into lobby for its own price,
+        // by the tool and by the brush.
+        assert_eq!(charged(&mut sim, Kind::Lobby, sky, x), lobby);
+        assert_eq!(brushed(&mut sim, sky, &[x + 1]), lobby);
+        // Over the story below with no floor of its own, it lays one.
+        assert_eq!(charged(&mut sim, Kind::Lobby, sky, x + 3), lobby + floor);
+        if mode == GameMode::Modern {
+            assert!(!sim.toggle_auto_bridge(), "bridging off");
+            assert_eq!(charged(&mut sim, Kind::Lobby, 1, x + 7), lobby + floor);
+            assert_eq!(brushed(&mut sim, 1, &[x + 8]), lobby + floor);
+            assert_eq!(charged(&mut sim, Kind::Floor, 1, x + 9), lobby + floor);
+            assert_eq!(charged(&mut sim, Kind::Lobby, sky, x + 2), lobby);
+        }
+    }
+}
+
+/// The floor brush on the ground floor lays a lobby only where there is no
+/// floor yet: it skips plain floor there (an old save can hold it), as the
+/// brush preview does.
+#[test]
+fn the_floor_brush_on_the_ground_floor_skips_plain_floor() {
+    let mut sim = Simulation::new_game(1, GameMode::Classic);
+    sim.money = 1e9;
+    let x = 100;
+    assert!(sim.build(Kind::Lobby, 1, x).ok);
+    assert!(sim.tower.place(Kind::Floor, 1, x + 1).ok);
+    let before = sim.money;
+    let r = sim.paint_brush(Kind::Floor, 1, &[x, x + 1, x + 2]);
+    assert_eq!(r.placed, 1, "{:?}", r.reason);
+    let tile = Kind::Lobby.facility().cost + Kind::Floor.facility().cost;
+    assert_eq!(before - sim.money, tile);
+    assert_eq!(sim.tower.structure_kind_at(1, x + 1), Some(Kind::Floor));
+    assert_eq!(sim.tower.structure_kind_at(1, x + 2), Some(Kind::Lobby));
 }

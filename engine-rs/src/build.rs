@@ -27,14 +27,36 @@ pub struct CanBuild {
     pub cost: f64,
 }
 
-/// The price of one bridged or laid substrate tile: a lobby tile when the
-/// placement is a lobby, a floor tile otherwise. Read from the facility table,
-/// the same prices the catalog quotes.
+/// Whether a tile of `kind` placed where there is no floor yet also pays for
+/// the floor it lays: a lobby does, as in the original, so a bare lobby tile
+/// costs the lobby's price plus the floor's, and a lobby over a floor tile the
+/// lobby's price alone. The build charges it and the catalog publishes it
+/// (`paysForFloor`).
+pub fn pays_for_floor(kind: Kind) -> bool {
+    kind == Kind::Lobby
+}
+
+/// The price of one bridged substrate tile: a lobby tile when the placement is
+/// a lobby, a floor tile otherwise. A bridge fills only empty tiles, so a
+/// bridged tile of a kind that pays for its floor ([`pays_for_floor`]) adds
+/// the floor's price. Read from the facility table, the same prices the
+/// catalog quotes.
 fn substrate_cost(kind: Kind) -> f64 {
-    if kind == Kind::Lobby {
-        Kind::Lobby.facility().cost
+    let substrate = if kind == Kind::Lobby {
+        Kind::Lobby
     } else {
-        Kind::Floor.facility().cost
+        Kind::Floor
+    };
+    bare_tile_cost(substrate)
+}
+
+/// The price of a tile of `kind` placed where there is no floor yet.
+fn bare_tile_cost(kind: Kind) -> f64 {
+    let tile = kind.facility().cost;
+    if pays_for_floor(kind) {
+        tile + Kind::Floor.facility().cost
+    } else {
+        tile
     }
 }
 
@@ -63,6 +85,18 @@ impl Simulation {
     pub fn is_unlocked(&self, kind: Kind) -> bool {
         let f = kind.facility();
         f.available_in(self.mode) && self.star >= f.min_star
+    }
+
+    /// The price of the tile a structural placement lays at `(floor, x)`: a
+    /// lobby placed where there is no floor yet pays for that floor too
+    /// ([`pays_for_floor`]); a lobby over a floor tile turns it into lobby
+    /// for the lobby's price alone.
+    fn structure_tile_cost(&self, kind: Kind, floor: i64, x: i64) -> f64 {
+        if self.tower.has_structure(floor, x) {
+            kind.facility().cost
+        } else {
+            bare_tile_cost(kind)
+        }
     }
 
     pub fn can_build(&self, kind: Kind, floor: i64, x: i64) -> CanBuild {
@@ -101,7 +135,7 @@ impl Simulation {
                         cost: f.cost,
                     };
                 }
-                return money_check(f.cost);
+                return money_check(self.structure_tile_cost(kind, floor, x));
             }
             let bridge = self.tower.bridge_fill_plan(kind, floor, x, 1, 1).len() as f64;
             let c = self.tower.can_place(kind, floor, x);
@@ -125,7 +159,9 @@ impl Simulation {
                     };
                 }
             }
-            return money_check(f.cost + bridge * substrate_cost(kind));
+            return money_check(
+                self.structure_tile_cost(kind, floor, x) + bridge * substrate_cost(kind),
+            );
         }
         let pre = self.tower.can_place_room_ignoring_floor(kind, floor, x);
         if !pre.ok {

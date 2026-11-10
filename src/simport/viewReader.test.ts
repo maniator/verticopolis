@@ -54,6 +54,22 @@ describe("ViewReader over TsEngine", () => {
     expect(plain(r.rooms.map((u) => [u.state, u.occupants]))).toEqual(plain(roomUnits(e.sim.tower).map((u) => [u.state, u.occupants])));
   });
 
+  it("finds the nearest structure tile on each side, where a bridge scan stops", () => {
+    // The lobby and floors 2 and 3 span 160..279, the floor tiles under rooms
+    // in runs of their own; floor 4 holds 160..169 and 180..189.
+    const e = engine();
+    e.sim.autoBridge = false;
+    for (const x of [...Array(10).keys()].flatMap((i) => [160 + i, 180 + i])) expect(e.sim.build("floor", 4, x).ok, `floor at ${x}`).toBe(true);
+    const r = new ViewReader(e, facilityFloors);
+    expect([r.structureBeside(4, 175, -1), r.structureBeside(4, 175, 1)]).toEqual([{ x: 169, kind: "floor" }, { x: 180, kind: "floor" }]);
+    expect([r.structureBeside(2, 169, 1), r.structureBeside(2, 171, -1)]).toEqual([{ x: 170, kind: "floor" }, { x: 170, kind: "floor" }]);
+    expect([r.structureBeside(1, 0, -1), r.structureBeside(1, 374, 1)]).toEqual([undefined, undefined]);
+    expect([r.structureBeside(1, 100, 1), r.structureBeside(1, 100, -1)]).toEqual([{ x: 160, kind: "lobby" }, undefined]);
+    expect([r.structureBeside(1, 200, -1), r.structureBeside(1, 200, 1)]).toEqual([{ x: 199, kind: "lobby" }, { x: 201, kind: "lobby" }]);
+    expect([r.structureBeside(3, 300, -1), r.structureBeside(3, 300, 1)]).toEqual([{ x: 279, kind: "floor" }, undefined]);
+    expect([r.structureBeside(2, 160, -1), r.structureBeside(2, 279, 1), r.structureBeside(9, 200, 1)]).toEqual([undefined, undefined, undefined]);
+  });
+
   it("answers the point lookups and the expanded units", () => {
     const e = engine();
     const r = new ViewReader(e, facilityFloors);
