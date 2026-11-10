@@ -16,11 +16,12 @@ export type TrapDuring = "tick" | "save" | "census";
 let onTrap: ((error: unknown, during: TrapDuring) => void) | null = null;
 let trapped = false;
 /** How the running tower reached the engine: the first tower, a later one (a
- *  load, a new tower, an import) or an undo or redo restore. A trap's
- *  reliability row names it as its stage. */
+ *  load, a new tower, an import) or an undo or redo step (a tooling restore
+ *  counts as one). A trap's reliability row names it as its stage. */
 let towerStage: "start" | "adopt" | "undo" = "start";
 
-/** The engine swapped in another tower (`GameApp.followSwap`). */
+/** The app followed the engine to another tower, or through an undo or redo
+ *  step (`GameApp.followSwap`). */
 export function noteTowerSwap(undo: boolean): void {
   towerStage = undo ? "undo" : "adopt";
 }

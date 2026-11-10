@@ -253,7 +253,11 @@ export interface EnginePortLifecycle {
    *  it does not expect (a unit or shaft it would take out or restore gone
    *  or changed, or one it would put back already there). Only an edit
    *  clears what stands in the way, and undoing that edit puts it back. A
-   *  gesture under way is committed first. */
+   *  gesture under way is committed first. A done step on the Rust engine
+   *  raises the tower revision above earlier values; the renderer retains
+   *  its scene after such a step and detects the change by that revision.
+   *  The test-only TypeScript reference rebuilds a Simulation and resets its
+   *  revision, so the host uses a full redraw if the revision did not advance. */
   undo(): PortRecord;
   redo(): PortRecord;
   /** What the last `undo` or `redo` says to the player ("Undid: Bulldoze",

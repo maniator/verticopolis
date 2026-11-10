@@ -36,7 +36,7 @@ import { onUpdateAvailable } from "./game/updateFlow";
 import { bootGame } from "./bootstrap";
 import { gameplaySession } from "./analytics";
 import { adoptToolingSim, followToolingEdit, syncToolingSim, toolingSim } from "./game/toolingSim";
-import { noteTowerSwap } from "./game/engineFault";
+import { followEngineTower, type TowerFollow } from "./game/towerFollow";
 import { ViewReader } from "./simport/viewReader";
 import { PortCodes } from "./simport/portCodes";
 import { PortEvents } from "./simport/portEvents";
@@ -433,47 +433,12 @@ class GameApp implements GameAppPorts {
 
   // ---- Save / load / new --------------------------------------------------
 
-  /** Follow the tower the engine just swapped in (a load, a new tower, an
-   *  import, an undo or redo restore): drop what belonged to the old tower and
-   *  point the view and the renderer at the new one. `keepHistory` is an
-   *  undo or redo restore, which keeps the camera and the undo trail.
-   *  @internal */
-  followSwap(keepHistory = false): void {
-    this.clearSelection();
-    // Facility ids restart in a fresh tower. A stale ✕-latch (or anchor) from the old tower
-    // would silently mute the inspector on whichever new facility happens to reuse the id.
-    this.inspector.clear();
-    // Getting Started and the engine's trap report follow the swap too.
-    this.onboarding.adoptSim(this.enginePort, keepHistory);
-    noteTowerSwap(keepHistory);
-    this.shownWin = false;
-    this.accMinutes = 0;
-    this.lastMealRushDay = { breakfast: -1, lunch: -1, dinner: -1 };
-    // A crash report pairs the CURRENT tower's save with these entries, so drop a previous tower's.
-    this.frameErrors.length = 0;
-    // Read the swapped-in tower now, before the renderer takes it.
-    this.reader.update();
-    this.lastStar = this.reader.header.star;
-    // Renderer caches (scenery seed, walker reach) key on the sim it draws.
-    // An undo/redo restore keeps the camera under the player; a real tower
-    // swap restores the save's view.
-    this.renderSim = newRenderSim(this.enginePort, this.reader);
-    this.engine.setSim(this.renderSim, { keepCamera: keepHistory });
-    // Rebase the UI log cursor so old entries don't replay as toasts, and
-    // refresh the palette to the new star level so it never shows the prior
-    // tower's unlock set.
-    this.ui.resetLog(hudSource(this));
-    this.ui.update(hudSource(this));
-    if (!keepHistory) {
-      // A *different* tower (New Tower / Load / a slot / Import) invalidates the
-      // undo trail; the engine forgets it when it adopts that tower, so Undo
-      // cannot resurrect an unrelated old tower. Undo/redo restores keep it.
-      this.lastTrafficTier = 0; // the chip's hysteresis starts over on another tower
-    }
-  }
+  /** Follow the tower the engine holds now: another tower, a tooling restore or an undo or
+   *  redo step (see game/towerFollow). @internal */
+  followSwap(follow: TowerFollow = "swap"): void { followEngineTower(this, follow); }
 
   /** Swap in a tower a tooling harness built by hand, on either engine. @internal */
-  adoptSim(sim: Simulation, preserveHistory = false): void { adoptToolingSim(this, sim, preserveHistory); }
+  adoptSim(sim: Simulation, keepCamera = false): void { adoptToolingSim(this, sim, keepCamera); }
   /** Hand a harness's edits of `sim` to the engine now. @internal */
   syncSim(): void { syncToolingSim(this); }
   /** Tooling: draw the engine again after a hand edit on `sim` reached it. */

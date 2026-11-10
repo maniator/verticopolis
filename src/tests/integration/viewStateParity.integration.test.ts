@@ -243,7 +243,7 @@ describe("TowerEngine camera restore (prototype on a fake: no canvas)", () => {
     expect(fake.engine.currentScene.camera.zoom).toBe(1.4);
   });
 
-  it("adoptCamera policy: view restores, no view centers, keepCamera (undo) leaves the camera alone", () => {
+  it("adoptCamera policy: view restores, no view centers, keepCamera (a tooling restore) leaves the camera alone", () => {
     const fake: any = fakeEngine();
     fake.applyView = vi.fn();
     fake.center = vi.fn();

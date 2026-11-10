@@ -46,6 +46,7 @@ function makeApp(tool: Record<string, unknown>) {
     reader,
     canvas: document.createElement("canvas"),
     audio: { start: vi.fn() },
+    keyboard: { pointerDrew: vi.fn(), followTower: vi.fn() },
     tool,
     build: {
       bulldozePicked: vi.fn(),

@@ -6,8 +6,8 @@ interface HistoryApp {
     "undoCapture" | "undoCommit" | "undoDiscard" | "undoClear" | "undo" | "redo" | "undoNotice" | "lastReason"
   >;
   readonly ui: { toast(message: string, kind: "info"): void };
-  /** Follow the restored tower, keeping the camera and the undo trail. */
-  followSwap(keepHistory: boolean): void;
+  /** Follow an undo/redo step without discarding the renderer's scene. */
+  followSwap(follow: "step"): void;
   /** Show how many steps the engine holds each way (the Undo and Redo
    *  buttons), after a call that may have changed them. */
   showSteps(): void;
@@ -15,8 +15,8 @@ interface HistoryApp {
 
 /** The app's undo/redo history. The engine keeps the steps (the Rust engine's
  *  `undo.rs`); this forwards a gesture's capture, commit and discard, and
- *  follows a step the engine took the way the app follows any swap, keeping
- *  the trail. After each call that reaches the engine it shows the steps
+ *  follows a step as an in-place tower change, retaining the renderer's scene.
+ *  After each call that reaches the engine it shows the steps
  *  left, so the Undo and Redo buttons never wait for the HUD pump. The
  *  engine words the notice ("Undid: Bulldoze", "Nothing to undo.") and the
  *  reason it refused a step ("Not enough money to undo that."); both reach
@@ -50,7 +50,7 @@ export function createAppHistory(app: HistoryApp): AppHistory {
       if (status === UNDO_REFUSED) {
         app.ui.toast(app.enginePort.lastReason() ?? STEP_REFUSED_TEXT, "info");
       } else if (status === UNDO_DONE || status === UNDO_NOTHING_TO_STEP) {
-        if (status === UNDO_DONE) app.followSwap(true);
+        if (status === UNDO_DONE) app.followSwap("step");
         const notice = app.enginePort.undoNotice();
         if (notice !== undefined) app.ui.toast(notice, "info");
       } else {

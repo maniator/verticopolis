@@ -1,6 +1,7 @@
 import { syncScene, syncFacade } from "./towerReconcile";
 import { syncMotion } from "./towerCrowd";
 import { drainAllRegions } from "./towerRegions";
+import { awaitsInitialBake } from "./sceneBake";
 import type { TowerEngine } from "./TowerEngine";
 
 /**
@@ -100,10 +101,11 @@ export function drainSceneSync(engine: TowerEngine): void {
  *  could not run, whatever the reason, still syncs rather than skips. */
 export function runSceneSync(engine: TowerEngine): void {
   const structural = engine.sim.tower.revision !== engine.builtRev;
-  // A -1 sentinel means setSim just adopted a tower (boot or save load): the
-  // sync below materializes every region fresh, and fresh canvases raster on
-  // their first draw anyway, so the dirty marks it queues are pure waste.
-  const initialBake = engine.builtRev === -1;
+  // The scene has not baked the tower it holds (a new engine or a setSim; see
+  // sceneBake): the sync below materializes every region fresh, and fresh
+  // canvases raster on their first draw anyway, so the dirty marks it queues
+  // are pure waste.
+  const initialBake = awaitsInitialBake(engine);
   const plan = planSceneSync({
     structural,
     mealOverlay: engine.sim.tower.mealOverlayRevision !== engine.mealOverlayRev,

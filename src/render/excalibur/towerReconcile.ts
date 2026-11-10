@@ -20,6 +20,7 @@ import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "../scale";
 import { isDeadParking, roomSignature } from "./roomSignature";
 import { reap } from "./towerCrowd";
 import { dropRegionUnit, markRegionUnit } from "./towerRegions";
+import { awaitsInitialBake } from "./sceneBake";
 import { syncStructureTiles } from "./towerStructTiles";
 import { syncScenery } from "./towerScenery";
 import type { TowerEngine } from "./TowerEngine";
@@ -124,8 +125,13 @@ export function syncScene(engine: TowerEngine): void {
       markRegionUnit(engine, u, true);
     } else if (!animated && (engine.roomSig.get(u.id) !== sig || !engine.regionUnits.has(u.id))) {
       // Settled look change (or first sight): membership is idempotent and
-      // the repaint rides the budgeted drain (towerRegions).
-      markRegionUnit(engine, u);
+      // the repaint rides the budgeted drain (towerRegions). A room first seen
+      // after the initial bake (one an undo or redo put back) is a player
+      // edit, so it bakes this frame, the way a demolition leaves below.
+      const firstSight = !engine.regionUnits.has(u.id);
+      const initialBake = awaitsInitialBake(engine);
+      const putBack = firstSight && !initialBake;
+      markRegionUnit(engine, u, putBack);
     }
     engine.roomSig.set(u.id, sig);
   }
@@ -295,7 +301,9 @@ function addRoom(engine: TowerEngine, u: UnitView): void {
     cache: false,
     draw: (ctx) => {
       engine.d.ctx = ctx;
-      paintAnimatedUnit(engine.d, u, w, h);
+      // Read the room live by id, as the region draws do: an undo or redo step
+      // keeps this actor while the view hands every room over as a new object.
+      paintAnimatedUnit(engine.d, engine.sim.tower.getUnit(u.id) ?? u, w, h);
     },
   });
   const a = addBoxActor(engine, ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor, hgt)), w, h, Z.animatedRoom, cv);

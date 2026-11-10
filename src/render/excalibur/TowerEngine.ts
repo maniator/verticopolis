@@ -19,6 +19,7 @@ import { displayLit, runSceneSync } from "./towerSyncSchedule";
 import { clockOf } from "../../simport/headerClock";
 import { beginFrame } from "./towerFrame";
 import { drainRegions, type RegionRec } from "./towerRegions";
+import { NOT_BAKED } from "./sceneBake";
 import type { Walker } from "./towerCrowd";
 import type { ViewFocus, Picked, ScreenRect } from "./towerInputCamera";
 
@@ -223,7 +224,7 @@ export class TowerEngine {
   floorLiveHour = -1;
   floorLiveRev = -1;
   /** @internal friend-module access (towerScene setSim; read in tick). */
-  builtRev = -1;
+  builtRev = NOT_BAKED;
   mealOverlayRev = -1;
   /** @internal friend-module access (towerScene). */
   litState = false;
@@ -381,9 +382,9 @@ export class TowerEngine {
 
   // ---- Delegations to friend-modules --------------------------------------
 
-  setSim(sim: RenderSim, opts?: { keepCamera?: boolean }): void {
-    scene.setSim(this, sim, opts);
-  }
+  setSim(sim: RenderSim, opts?: { keepCamera?: boolean }): void { scene.setSim(this, sim, opts); }
+  /** An undo or redo step changed the drawn tower: keep the scene (towerScene). */
+  followStep(): void { scene.followStep(this); }
 
   // Frame-pump steps for fake-driven ticks (stub these three directly);
   // scene syncs route through towerSyncSchedule's module functions, observed
@@ -406,12 +407,8 @@ export class TowerEngine {
     return camera.pickEntityAt(this, world);
   }
 
-  pan(dxScreen: number, dyScreen: number): void {
-    camera.pan(this, dxScreen, dyScreen);
-  }
-  zoomAt(factor: number, sx: number, sy: number): void {
-    camera.zoomAt(this, factor, sx, sy);
-  }
+  pan(dxScreen: number, dyScreen: number): void { camera.pan(this, dxScreen, dyScreen); }
+  zoomAt(factor: number, sx: number, sy: number): void { camera.zoomAt(this, factor, sx, sy); }
   /** @internal friend-module access (towerInputCamera) / prototype tests. */
   dynamicMinZoom(): number {
     return camera.dynamicMinZoom(this);
