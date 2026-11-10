@@ -6,6 +6,16 @@ describe("groupDigits", () => {
     vi.restoreAllMocks();
   });
 
+  it("builds no formatter on a call", async () => {
+    const { groupDigits } = await import("./format");
+    const built = vi.spyOn(Intl, "NumberFormat");
+    const localized = vi.spyOn(Number.prototype, "toLocaleString");
+    groupDigits(1234567);
+    groupDigits(42);
+    expect(built).not.toHaveBeenCalled();
+    expect(localized).not.toHaveBeenCalled();
+  });
+
   it("groups the US way when the browser's default locale is German", async () => {
     useGermanDefaultLocale();
     // The stub works: a formatter with no locale now groups with dots.
