@@ -263,4 +263,19 @@ fn start_fire_at_refuses_without_changing_anything() {
         format!("{:?}", e.sim.events.pending),
         format!("{pending:?}")
     );
+    // Each guard refuses on its own. A declined offer leaves the fire
+    // burning, and a pending choice blocks an outbreak with no fire burning.
+    let other = e.sim.tower.place(Kind::Office, 2, 180).unit_id.unwrap();
+    e.resolve_choice(false);
+    assert!(e.sim.events.pending.is_none());
+    assert!(!e.start_fire_at(other as f64), "a fire still burns");
+    e.sim.events.active.clear();
+    e.sim.events.pending = pending;
+    assert!(!e.start_fire_at(other as f64), "a choice is pending");
+    assert_eq!(e.sim.events.fires_started, 1);
+    // With neither guard holding, the same room ignites, so the two
+    // refusals above came from the guards.
+    e.sim.events.pending = None;
+    assert!(e.start_fire_at(other as f64));
+    assert_eq!(e.sim.events.fires_started, 2);
 }
