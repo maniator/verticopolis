@@ -104,6 +104,7 @@ export function parseNote(text: string, file: string): ChangeNote {
   if (note.app === "none" && note.player.length > 0) fail("Player lines need an app level other than none");
   if (note.crate === "none" && note.engine.length > 0) fail("Engine lines need a crate level other than none");
   if (note.crate !== "none" && note.engine.length === 0) fail("a crate level needs at least one Engine line for engine-rs/CHANGELOG.md");
+  if (note.app !== "none" && note.player.length === 0) fail("an app level needs at least one Player line for CHANGELOG.md and the update prompt");
   return note;
 }
 

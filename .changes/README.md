@@ -22,7 +22,10 @@ crate: none   # major | minor | patch | none
   style of CONTRIBUTING.md "Player notes". `## Engine` lines go into
   `engine-rs/CHANGELOG.md` and are required when `crate` is not `none`.
 - Each line is one `- ` bullet ending with a period. Leave out a section with
-  no lines.
+  no lines. An app level other than `none` needs at least one Player line.
+- A note that is already on `main` belongs to the PR that merged it. A
+  follow-up PR from the same branch name adds `<branch-slug>-2.md` instead
+  of editing it; only the release PR changes a pending note.
 - A PR that changes a deployed path needs a note, even one with `app: none`
   and `crate: none`. Docs, tests and CI changes alone need none, and so do
   Dependabot's branches, which cannot write one.

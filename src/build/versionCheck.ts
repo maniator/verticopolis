@@ -133,6 +133,12 @@ export function checkFeature(base: Tree, head: Tree, changes: readonly Change[],
   }
   for (const c of changes) {
     if (c.status === "D" && isNotePath(c.path)) errors.push(`${c.path} was deleted: only a release PR consumes notes.`);
+    // A branch restarted from main after its first PR merged still finds that
+    // PR's pending note under its own name; editing it would rewrite what the
+    // merged PR declared.
+    if (c.status !== "D" && isNotePath(c.path) && base.read(c.path) !== null) {
+      errors.push(`${c.path} is a pending note main already has, from a merged PR: leave it to the release and add .changes/<branch-slug>-2.md for this PR.`);
+    }
   }
   const { notes, errors: unreadable } = notesOf(head);
   errors.push(...unreadable);

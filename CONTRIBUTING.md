@@ -551,7 +551,9 @@ Every PR that changes a deployed path (anything `scripts/vercel-ignore-build.sh
 app tier, the crate tier and the changelog lines. The format and its rules are
 in [`.changes/README.md`](./.changes/README.md). The file is named after the
 branch, so two open PRs never edit the same line and never conflict over a
-version.
+version. A note already on `main` belongs to the PR that merged it, so a
+follow-up from the same branch name adds `.changes/<branch-slug>-2.md` (the
+version check refuses an edit to a pending note outside a release PR).
 
 The release driver cuts a release:
 

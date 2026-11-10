@@ -49,6 +49,7 @@ describe("change notes", () => {
     ["x.md", note("app: none\ncrate: none", "## Player\n- A line.\n"), /Player lines need/],
     ["x.md", note("app: none\ncrate: none", "## Engine\n- A line.\n"), /Engine lines need/],
     ["x.md", note("app: none\ncrate: minor"), /at least one Engine line/],
+    ["x.md", note("app: patch\ncrate: none"), /at least one Player line/],
   ])("refuses %s with %s", (file, text, why) => {
     expect(() => parseNote(text, file)).toThrow(why);
   });

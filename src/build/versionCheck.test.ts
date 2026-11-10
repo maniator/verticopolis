@@ -56,9 +56,7 @@ describe("a feature PR", () => {
   it("passes with a note beside a deployed change, and without one for a skipped path", () => {
     expect(feature(main(), main({ "src/a.ts": "b", ".changes/topic.md": note("minor", "none") }))).toEqual([]);
     expect(feature(main(), main({ "docs/a.md": "b" }))).toEqual([]);
-    // Editing a note it already has counts, and so does a none note.
-    const pending = main({ ".changes/topic.md": note("patch", "none") });
-    expect(feature(pending, { ...pending, "src/a.ts": "b", ".changes/topic.md": note("minor", "none") })).toEqual([]);
+    // A none note counts.
     expect(feature(main(), main({ "src/a.ts": "b", ".changes/topic.md": note("none", "none") }))).toEqual([]);
   });
 
@@ -86,6 +84,15 @@ describe("a feature PR", () => {
     const errors = feature(main(), head);
     expect(errors).toHaveLength(9);
     for (const e of errors) expect(e).toMatch(/moved from .*release PR/);
+  });
+
+  it("leaves a merged PR's pending note alone on a reused branch", () => {
+    const pending = main({ ".changes/topic.md": note("minor", "none") });
+    const errors = feature(pending, { ...pending, "src/a.ts": "b", ".changes/topic.md": note("none", "none") });
+    expect(errors).toEqual([
+      ".changes/topic.md is a pending note main already has, from a merged PR: leave it to the release and add .changes/<branch-slug>-2.md for this PR.",
+    ]);
+    expect(feature(pending, { ...pending, "src/a.ts": "b", ".changes/topic-2.md": note("none", "none") })).toEqual([]);
   });
 
   it("keeps main's pending notes and reads its own", () => {
