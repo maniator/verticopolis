@@ -633,6 +633,11 @@ export default defineConfig(({ command }) => ({
     globals: true,
     environment: "happy-dom",
     root: ".",
+    // Node 25 and later ship their own `localStorage` and `sessionStorage`
+    // globals. Without `--localstorage-file` they are undefined stubs that
+    // shadow happy-dom's, so every storage test fails. This flag removes the
+    // Node globals in each test worker and leaves happy-dom's.
+    execArgv: ["--no-experimental-webstorage"],
     // A few end-to-end tests drive many in-game days of the full hourly v2
     // simulation over a tall tower; they pass quickly locally but can exceed the
     // 5s default on slower CI runners. Give the suite generous headroom.

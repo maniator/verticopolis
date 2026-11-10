@@ -13,8 +13,8 @@ one-line tweak.
 
 ## Getting started
 
-You need Node matching **[`.nvmrc`](./.nvmrc)** (currently `22.22.0`;
-`package.json` `engines` requires `>=22.12.0`). With `nvm`:
+You need Node matching **[`.nvmrc`](./.nvmrc)** (currently `26.13.0`;
+`package.json` `engines` requires `26.x`). With `nvm`:
 
 ```bash
 nvm use            # picks up .nvmrc
