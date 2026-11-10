@@ -417,8 +417,11 @@ test-conversion lane takes in this order under #878:
   checkout in #1800, and the rain and retail-tally tests in #1805; the
   others need one more tooling-only engine member each.
 - **5 tests** pin the retired `v1` sampled model or the TypeScript save hash
-  (`phase2`, `parity`, `goldenMaster`). They test the TypeScript engine's own
-  internals and retire with it. The tests that pinned `v1` for a rule the
+  (`phase2`, `parity`, `goldenMaster`) and retire with the TypeScript engine.
+  `phase2`'s two test the `v1` model itself and `goldenMaster`'s two hash the
+  TypeScript serializer's bytes. The `parity` one wins TOWER in a built tower
+  with no transport, which only the sampled model keeps occupied; the
+  served, hourly-model win is `phase2`'s Step 5 test, which carries no mark. The tests that pinned `v1` for a rule the
   game still runs moved onto the hourly model, on both engines: the FAQ
   cinema booking and film-policy tests
   (`src/tests/integration/cinemaBookingEngine.integration.test.ts`), the
