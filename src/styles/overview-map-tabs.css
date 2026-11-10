@@ -1,4 +1,4 @@
-/* ---- Overview MAP window: view tabs and the Hotel legend (#343 S6) ----
+/* ---- Overview MAP window: view tabs and the view legends (#343 S6, S8) ----
    The tabs are one row of equal beveled buttons under the title bar, as in
    the original, on a desktop and on a phone alike. On a phone and on any
    touch screen each tab is 28 px tall, past the 24 px minimum target of
@@ -34,11 +34,9 @@
   outline-offset: -2px;
 }
 
-/* The Hotel legend, and the note Eval and Pricing show until S8, sit over
-   the top of the body, as in the original, and take no pointer, so a press
-   on them lands on the map. */
-.overview-map-legend,
-.overview-map-note {
+/* Each view's legend sits over the top of the body, as in the original, and
+   takes no pointer, so a press on it lands on the map. */
+.overview-map-legend {
   position: absolute;
   top: 2px;
   left: 2px;
@@ -54,8 +52,7 @@
   line-height: 1.3;
   pointer-events: none;
 }
-.overview-map-legend[hidden],
-.overview-map-note[hidden] {
+.overview-map-legend[hidden] {
   display: none;
 }
 .overview-map-legend-item {

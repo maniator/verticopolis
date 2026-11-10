@@ -5,10 +5,11 @@ import { buildToStar, expectEngineHosted } from "./helpers";
 test.afterEach(async ({ page }) => expectEngineHosted(page));
 
 /**
- * The overview MAP window's view tabs and Hotel view (#343 S6, #1617) in the
- * real browser: the tab row on a desktop and a phone, the tab keys, the
- * "coming soon" note on Eval and Pricing, and the Hotel view marking a room
- * the engine turned dirty within a game hour, with no tower edit.
+ * The overview MAP window's view tabs and its Hotel, Eval and Pricing views
+ * (#343 S6 and S8, #1617 to #1619) in the real browser: the tab row on a
+ * desktop and a phone, the tab keys, each view's legend, the Hotel view
+ * marking a room the engine turned dirty within a game hour with no tower
+ * edit, and the Pricing view following a rent command at once.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -116,28 +117,30 @@ test.describe("map view tabs on the desktop", () => {
     const edit = page.getByRole("tab", { name: "Edit" });
     const hotel = page.getByRole("tab", { name: "Hotel" });
     const evalTab = page.getByRole("tab", { name: "Eval" });
-    const legend = page.locator("#overview-map .overview-map-legend");
-    const note = page.locator("#overview-map .overview-map-note");
+    const legend = page.locator('#overview-map .overview-map-legend[data-view="hotel"]');
+    const evalLegend = page.locator('#overview-map .overview-map-legend[data-view="eval"]');
+    const pricingLegend = page.locator('#overview-map .overview-map-legend[data-view="pricing"]');
     await edit.focus();
     await page.keyboard.press("ArrowRight");
     await expect(evalTab).toBeFocused();
     await expect(evalTab).toHaveAttribute("aria-selected", "true");
-    // Eval and Pricing wait on S8: a plain note over the Edit map.
-    await expect(note).toHaveText("Eval view coming soon");
+    // Each view shows its own legend over the map.
+    await expect(evalLegend).toBeVisible();
     await expect(legend).toBeHidden();
     await page.keyboard.press("ArrowRight");
-    await expect(note).toHaveText("Pricing view coming soon");
+    await expect(pricingLegend).toBeVisible();
+    await expect(evalLegend).toBeHidden();
     await page.keyboard.press("End");
     await expect(hotel).toBeFocused();
     await expect(hotel).toHaveAttribute("aria-selected", "true");
     await expect(legend).toBeVisible();
-    await expect(note).toBeHidden();
+    await expect(pricingLegend).toBeHidden();
     // The focus ring shows on a keyboard-focused tab.
     expect(await hotel.evaluate((el) => getComputedStyle(el).outlineStyle)).not.toBe("none");
     await page.keyboard.press("Home");
     await expect(edit).toBeFocused();
     await expect(legend).toBeHidden();
-    await expect(note).toBeHidden();
+    await expect(page.locator("#overview-map .overview-map-legend:visible")).toHaveCount(0);
     // A build key on a focused tab stays out of the world.
     const cursor = () => page.evaluate(() => (window as any).game.keyboard.cursor());
     await page.click('.pal-item[data-kind="office"]');
@@ -185,7 +188,7 @@ test.describe("map view tabs on the desktop", () => {
     await page.evaluate(foundHotelTower, HOTEL_ROOMS);
     await page.getByRole("tab", { name: "Hotel" }).click();
     await nextFrames(page);
-    const legend = page.locator("#overview-map .overview-map-legend");
+    const legend = page.locator('#overview-map .overview-map-legend[data-view="hotel"]');
     await expect(legend).toHaveText("Dirty: 0Infested: 0");
     expect(await redPixels(page)).toBe(0);
     const revision = await page.evaluate(() => (window as any).game.reader.header.revision);
@@ -203,6 +206,31 @@ test.describe("map view tabs on the desktop", () => {
     // The Edit view draws no red rooms (the tower has no service elevator).
     await page.getByRole("tab", { name: "Edit" }).click();
     await expect.poll(() => redPixels(page)).toBe(0);
+  });
+  test("the Pricing view colors the rooms by the engine's rent tiers and follows a rent command at once", async ({ page }) => {
+    await boot(page);
+    await page.evaluate(foundHotelTower, HOTEL_ROOMS);
+    await page.getByRole("tab", { name: "Pricing" }).click();
+    await nextFrames(page);
+    const legend = page.locator('#overview-map .overview-map-legend[data-view="pricing"]');
+    // Default prices read Average.
+    await expect(legend).toHaveText(`High: 0Average: ${HOTEL_ROOMS}Low: 0Very Low: 0`);
+    // Raise one room's rate from the inspector, with the game paused: no
+    // revision moves and no game hour turns, yet the view follows.
+    await page.evaluate(() => {
+      const g = (window as any).game;
+      const room = (g.reader.rooms as any[]).find((r) => r.kind === "hotelSingle");
+      g.selected = { type: "unit", id: room.id };
+      return g.editor.handleEditAction("rentUp", document.body);
+    });
+    await expect(legend).toHaveText(`High: 1Average: ${HOTEL_ROOMS - 1}Low: 0Very Low: 0`);
+    // The guests asleep in their rooms rate them on the Eval view.
+    await page.getByRole("tab", { name: "Eval" }).click();
+    const evalLegend = page.locator('#overview-map .overview-map-legend[data-view="eval"]');
+    await expect(evalLegend).toBeVisible();
+    await expect(evalLegend).toHaveText(/^Excellent: \d+Good: \d+Terrible: \d+$/);
+    const rated = (await evalLegend.textContent())!.match(/\d+/g)!.reduce((sum, n) => sum + Number(n), 0);
+    expect(rated).toBeGreaterThan(0);
   });
 });
 
@@ -239,6 +267,6 @@ test.describe("map view tabs on a phone", () => {
     }
     await page.getByRole("tab", { name: "Hotel" }).tap();
     await expect(page.getByRole("tab", { name: "Hotel" })).toHaveAttribute("aria-selected", "true");
-    await expect(page.locator("#overview-map .overview-map-legend")).toBeVisible();
+    await expect(page.locator('#overview-map .overview-map-legend[data-view="hotel"]')).toBeVisible();
   });
 });

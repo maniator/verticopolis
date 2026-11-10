@@ -2,25 +2,26 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import type { FacilityKind, UnitState } from "../engine/types";
 import { SKY_HEADROOM_FLOORS } from "../render/cameraBounds";
 import { extentFloors, fitLayout, mapExtent } from "../render/overviewMap/geometry";
-import { HOTEL_VIEW_STYLE, type HotelRoom } from "../render/overviewMap/hotelView";
+import { HOTEL_VIEW_STYLE } from "../render/overviewMap/hotelView";
 import type { MapPaintContext, PatternSource } from "../render/overviewMap/paint";
 import { MAP_DOM_ID } from "./overviewMapDom";
 import { MAP_TABS_DOM, tabId } from "./overviewMapTabs";
-import { gameHour, MINUTES_PER_GAME_HOUR, OverviewMapViews } from "./overviewMapViews";
+import { gameHour, MINUTES_PER_GAME_HOUR, OverviewMapViews, type MapViewRoom } from "./overviewMapViews";
 import { disposeRigs, rig, rootEl } from "./overviewMapWindow.fixture";
 
 const EXTENT = mapExtent({ lotWidth: 375, minFloor: -9, maxFloor: 100 }, SKY_HEADROOM_FLOORS);
 const layout = fitLayout(EXTENT, 375, extentFloors(EXTENT) * 5);
 
-type Room = HotelRoom & { state: UnitState };
-const hotel = (x: number, state: UnitState = "asleep"): Room => ({ kind: "hotelSingle", floor: 2, x, width: 4, state });
+type Room = MapViewRoom & { state: UnitState };
+const hotel = (x: number, state: UnitState = "asleep"): Room => ({ id: x, kind: "hotelSingle", floor: 2, x, width: 4, state });
 
 /** A views controller over a fake tower and an injected game clock. */
-function views(rooms: Room[] = [hotel(40), hotel(50), { kind: "office", floor: 3, x: 10, width: 9, state: "occupied" }]) {
+function views(rooms: Room[] = [hotel(40), hotel(50), { id: 10, kind: "office", floor: 3, x: 10, width: 9, state: "occupied" }]) {
   const clock = { minutes: 7 * 60 };
   const tower = { rooms: rooms as ReadonlyArray<Room> };
   const deps = {
     rooms: vi.fn(() => tower.rooms),
+    roomById: (id: number) => tower.rooms.find((r) => r.id === id),
     minutes: vi.fn(() => clock.minutes),
     floorsOf: (_kind: FacilityKind) => 1,
   };
@@ -56,14 +57,15 @@ describe("gameHour", () => {
 });
 
 describe("the map's views in the window", () => {
-  it("puts the tab row right under the title bar and the legend in the body, hidden", () => {
+  it("puts the tab row right under the title bar and the legends in the body, hidden", () => {
     mounted();
     const root = rootEl();
     const list = document.getElementById(MAP_TABS_DOM.list)!;
     expect(list.previousElementSibling?.classList.contains("win-title")).toBe(true);
     expect(list.nextElementSibling?.classList.contains("overview-map-body")).toBe(true);
-    expect(root.querySelector(".overview-map-body .overview-map-legend")?.hasAttribute("hidden")).toBe(true);
-    expect(root.querySelector(".overview-map-body .overview-map-note")?.hasAttribute("hidden")).toBe(true);
+    const legends = [...root.querySelectorAll<HTMLElement>(".overview-map-body .overview-map-legend")];
+    expect(legends.map((l) => l.dataset.view)).toEqual(["eval", "pricing", "hotel"]);
+    expect(legends.every((l) => l.hidden)).toBe(true);
     expect(document.getElementById(MAP_DOM_ID.summary)).not.toBeNull();
   });
 
@@ -71,7 +73,6 @@ describe("the map's views in the window", () => {
     rig();
     expect(document.getElementById(MAP_TABS_DOM.list)).toBeNull();
     expect(document.querySelector(".overview-map-legend")).toBeNull();
-    expect(document.querySelector(".overview-map-note")).toBeNull();
   });
 
   it("asks the views on every open frame and never on a closed one", () => {
@@ -110,38 +111,6 @@ describe("the Edit view", () => {
     expect(ctx.fills).toHaveLength(0);
     expect(deps.rooms).not.toHaveBeenCalled();
     expect(deps.minutes).not.toHaveBeenCalled();
-  });
-});
-
-describe("the Eval and Pricing tabs before S8", () => {
-  it("show a coming soon note over the Edit map, and read nothing", () => {
-    const { v, deps } = mounted();
-    const note = document.querySelector(".overview-map-note") as HTMLElement;
-    const legend = document.querySelector(".overview-map-legend") as HTMLElement;
-    for (const [id, text] of [
-      ["eval", "Eval view coming soon"],
-      ["pricing", "Pricing view coming soon"],
-    ] as const) {
-      (document.getElementById(tabId(id)) as HTMLButtonElement).click();
-      expect(v.selected).toBe(id);
-      expect(note.hidden).toBe(false);
-      expect(note.textContent).toBe(text);
-      expect(legend.hidden).toBe(true);
-      // One repaint for the change of view, then nothing.
-      expect(v.due(layout, false)).toBe(true);
-      expect(v.due(layout, false)).toBe(false);
-      const ctx = fakeCtx();
-      v.paintOver(ctx, plain);
-      expect(ctx.fills).toHaveLength(0);
-    }
-    expect(deps.rooms).not.toHaveBeenCalled();
-    expect(deps.minutes).not.toHaveBeenCalled();
-    (document.getElementById(tabId("hotel")) as HTMLButtonElement).click();
-    expect(note.hidden).toBe(true);
-    expect(legend.hidden).toBe(false);
-    (document.getElementById(tabId("edit")) as HTMLButtonElement).click();
-    expect(note.hidden).toBe(true);
-    expect(legend.hidden).toBe(true);
   });
 });
 
@@ -203,7 +172,7 @@ describe("the Hotel view's throttle", () => {
 
   it("shows the legend with the rooms counted, and hides it on the Edit view", () => {
     const { v, rooms, clock } = onHotel();
-    const legend = document.querySelector(".overview-map-legend") as HTMLElement;
+    const legend = document.querySelector('.overview-map-legend[data-view="hotel"]') as HTMLElement;
     expect(legend.hidden).toBe(false);
     rooms[0].state = "dirty";
     rooms[1].state = "infested";

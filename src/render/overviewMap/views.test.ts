@@ -9,11 +9,8 @@ describe("the map's views", () => {
     expect(MAP_VIEWS.map((v) => v.label)).toEqual(["Edit", "Eval", "Pricing", "Hotel"]);
   });
 
-  it("marks Eval and Pricing coming soon until S8, and only them", () => {
-    expect(mapViewEntry("eval")?.comingSoon).toBe("Eval view coming soon");
-    expect(mapViewEntry("pricing")?.comingSoon).toBe("Pricing view coming soon");
-    expect(mapViewEntry("edit")?.comingSoon).toBeUndefined();
-    expect(mapViewEntry("hotel")?.comingSoon).toBeUndefined();
+  it("finds a view's entry, and none for a view the list lacks", () => {
+    expect(mapViewEntry("pricing")?.label).toBe("Pricing");
     expect(mapViewEntry("hotel", [MAP_VIEWS[0]])).toBeUndefined();
   });
 });

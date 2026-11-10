@@ -39,7 +39,7 @@ import { showTowerPicker } from "./appModals";
 // re-exported because the boot snapshot below reads it, and the alias stays so
 // the suites that import it from here keep resolving.
 import { APP_VERSION } from "../appVersion";
-import { wireOverviewMap } from "./overviewMapWiring";
+import { touchOverviewMap, wireOverviewMap } from "./overviewMapWiring";
 export { APP_VERSION };
 
 /** Classify why this boot happened, for the analytics boot snapshot. Mirrors
@@ -102,7 +102,13 @@ export function wireControllers(app: GameApp): void {
     clearSelection: () => app.clearSelection(),
     refreshEditor: () => app.refreshEditor(),
     captureUndo: (label) => app.captureUndo(label),
-    commitUndo: () => app.commitUndo(),
+    // Every applied editor command commits here, the rent commands among
+    // them, which move no revision: the Map's Eval and Pricing views read
+    // again.
+    commitUndo: () => {
+      app.commitUndo();
+      touchOverviewMap(app);
+    },
     undoGesture: () => app.undoGesture(),
     announce: (msg) => app.announce(msg),
   });

@@ -233,7 +233,8 @@ export class OverviewMapWindow {
     const rebuilt = this.model.sync(input);
     const layout = this.model.layout;
     if (!layout) return;
-    // The selected view may repaint without a rebuild (the Hotel view, hourly).
+    // The selected view may repaint without a rebuild (Hotel hourly; Eval and
+    // Pricing on a new hour or an applied command).
     if (this.deps.views?.due(layout, rebuilt) || rebuilt) {
       // Marked only once painted: the gallery runner reads it (`mapForShot`).
       if (this.towerCtx && this.patterns) {
