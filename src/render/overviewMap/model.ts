@@ -41,6 +41,10 @@ export interface MapFrameInput {
   /** The drawing box in map (device) pixels: the canvas's backing-store size. */
   readonly boxWidth: number;
   readonly boxHeight: number;
+  /** The strip at the box's top, in map pixels, that the selected view's
+   *  legend covers (0 for none): the crop adds sky above the tower for it,
+   *  so the legend hides no floor (`bandedExtent`). */
+  readonly topReserve: number;
   /** A kind's height in floors. It is not part of the rebuild key: the catalog
    *  is bound per tower, and a new tower comes with new arrays. */
   floorsOf(kind: FacilityKind): number;
@@ -72,11 +76,11 @@ export class OverviewMapModel {
    * that call.
    */
   sync(input: MapFrameInput): boolean {
-    const extent = bandedExtent(input.world, input.view.tower, input.skyFloors);
     // Keyed on the values the build actually uses, so a NaN box never rebuilds
     // on every frame.
     const boxWidth = boxSide(input.boxWidth);
     const boxHeight = boxSide(input.boxHeight);
+    const extent = bandedExtent(input.world, input.view.tower, input.skyFloors, boxHeight, input.topReserve);
     const sameGeometry = this.layout !== null && this.boxWidth === boxWidth && this.boxHeight === boxHeight && sameExtent(this.layout.extent, extent);
     const same =
       sameGeometry &&

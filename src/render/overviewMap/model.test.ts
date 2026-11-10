@@ -16,7 +16,7 @@ function view(highestFloor = 20, over: Partial<MapViewInput> = {}): MapViewInput
 }
 
 function input(v: MapViewInput, over: Partial<MapFrameInput> = {}): MapFrameInput {
-  return { view: v, world: WORLD, skyFloors: SKY_HEADROOM_FLOORS, boxWidth: 150, boxHeight: 300, floorsOf: () => 1, ...over };
+  return { view: v, world: WORLD, skyFloors: SKY_HEADROOM_FLOORS, boxWidth: 150, boxHeight: 300, topReserve: 0, floorsOf: () => 1, ...over };
 }
 
 const cam = (line = 10) => ({ posX: 187 * TILE, posY: -line * FLOOR, zoom: 1, viewWidth: 1000, viewHeight: 14 * FLOOR });

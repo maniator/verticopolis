@@ -35,7 +35,8 @@
 }
 
 /* Each view's legend sits over the top of the body, as in the original, and
-   takes no pointer, so a press on it lands on the map. */
+   takes no pointer, so a press on it lands on the map. The map adds sky above
+   the tower for it (`legendReserve`), so it covers no floor. */
 .overview-map-legend {
   position: absolute;
   top: 2px;

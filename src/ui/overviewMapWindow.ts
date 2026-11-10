@@ -92,6 +92,7 @@ export class OverviewMapWindow {
       skyFloors: SKY_HEADROOM_FLOORS,
       boxWidth: 1,
       boxHeight: 1,
+      topReserve: 0,
       floorsOf: deps.floorsOf,
     };
     // First in the stage: positioned, it still paints over the world canvas,
@@ -230,6 +231,9 @@ export class OverviewMapWindow {
     input.world = src.world;
     input.boxWidth = this.towerCanvas.width;
     input.boxHeight = this.towerCanvas.height;
+    // The selected view's legend covers the body's top; the crop adds sky
+    // for it, so no floor sits under the legend (#1769).
+    input.topReserve = (this.deps.views?.legendReserve(input.boxWidth) ?? 0) * this.px;
     const rebuilt = this.model.sync(input);
     const layout = this.model.layout;
     if (!layout) return;
