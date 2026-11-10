@@ -1,9 +1,22 @@
 import { describe, expect, it } from "vitest";
 import type { FrameDayStart } from "./frameDays";
 import { PORT_EDIT_CASES } from "./portEditCases";
-import { answerNumber, firstPortEditDifference, portEditProblems, readPortEdits, STATUS, type AnswerValue, type PortEditLine } from "./portEdits";
+import { crowdProblem, isCrowdPerson, midRouteAvoiding, shaftsBetween, stopsAtBoth, walkingTo, WALKING_TO_SHAFT } from "./portEditCrowd";
+import { answerNumber, firstPortEditDifference, portEditProblems, readPortEdits, STATUS, type AnswerValue, type LineKind, type PortEditLine } from "./portEditLines";
 
-const line = (step: string, answer: AnswerValue, state = "s", count = 0, crowd = "c"): PortEditLine => ({ step, answer, minute: 0, state, crowd, events: "e", count });
+/** A line whose kind follows from its step: "start", "play ...", and the
+ *  swap, undo and read steps the tests name, and a command otherwise. */
+function kindOf(step: string): LineKind {
+  if (step === "start") return "start";
+  if (step.startsWith("play")) return "play";
+  if (step.startsWith("restore") || step.startsWith("load")) return "swap";
+  if (step.startsWith("undo") || step.startsWith("redo")) return "history";
+  if (step.startsWith("open") || step.startsWith("close")) return "undo step";
+  if (step.startsWith("read")) return "read";
+  return "command";
+}
+const line = (step: string, answer: AnswerValue, state = "s", count = 0, crowd = "c"): PortEditLine => ({ step, kind: kindOf(step), answer, minute: 0, state, crowd, events: "e", count });
+const { done: DONE, refused: REFUSED, nothingToStep: NOTHING_TO_STEP } = STATUS;
 const FOUND: FrameDayStart = { kind: "found", seed: 1, mode: "classic", calendar: "realWorld", unbridged: false };
 const FIXTURE: FrameDayStart = { kind: "fixture", file: "towerone-star4.vctower" };
 
@@ -17,12 +30,15 @@ describe("the port-edit golden's answers and comparison", () => {
   });
 
   it("agrees on equal runs and names the first line and field that moved", () => {
-    const want = [line("start", null), line("build", { status: 1, delta: -500 }), line("play", { hour: 8 })];
-    expect(firstPortEditDifference([line("start", null), line("build", { delta: -500, status: 1 }), line("play", { hour: 8 })], want)).toBeNull();
-    expect(firstPortEditDifference([line("start", null), line("build", { status: 0, delta: 0 }, "x"), line("play", { hour: 8 }, "y")], want)).toBe(
+    const want = [line("start", null), line("build", { status: DONE, delta: -500 }), line("play", { hour: 8 })];
+    expect(firstPortEditDifference([line("start", null), line("build", { delta: -500, status: DONE }), line("play", { hour: 8 })], want)).toBeNull();
+    expect(firstPortEditDifference([line("start", null), line("build", { status: REFUSED, delta: 0 }, "x"), line("play", { hour: 8 }, "y")], want)).toBe(
       'line 1 (build): answer {"delta":0,"status":0} != pinned {"delta":-500,"status":1}, state "x" != pinned "s"',
     );
-    expect(firstPortEditDifference([line("start", null), line("sell", { status: 1, delta: -500 }, "s", 1)], want)).toBe('line 1 (build): step "sell" != pinned "build", count 1 != pinned 0');
+    expect(firstPortEditDifference([line("start", null), line("sell", { status: DONE, delta: -500 }, "s", 1)], want)).toBe('line 1 (build): step "sell" != pinned "build", count 1 != pinned 0');
+    expect(firstPortEditDifference([line("start", null), { ...line("build", { status: DONE, delta: -500 }), kind: "swap" }, line("play", { hour: 8 })], want)).toBe(
+      'line 1 (build): kind "swap" != pinned "command"',
+    );
   });
 
   it("names a missing or extra line and a case the golden lacks", () => {
@@ -33,8 +49,8 @@ describe("the port-edit golden's answers and comparison", () => {
   });
 
   it("skips only the fields of the lines an allowance names", () => {
-    const want = [line("start", null), line("undo", { status: 1 }, "s", 0, "c1"), line("play 60 minutes", { hour: 9 }, "s2", 0, "c2")];
-    const got = [line("start", null), line("undo", { status: 1 }, "s", 0, "x1"), line("play 60 minutes", { hour: 9 }, "s2", 0, "x2")];
+    const want = [line("start", null), line("undo", { status: DONE }, "s", 0, "c1"), line("play 60 minutes", { hour: 9 }, "s2", 0, "c2")];
+    const got = [line("start", null), line("undo", { status: DONE }, "s", 0, "x1"), line("play 60 minutes", { hour: 9 }, "s2", 0, "x2")];
     expect(firstPortEditDifference(got, want, (i, field) => field === "crowd" && i >= 1)).toBeNull();
     expect(firstPortEditDifference(got, want, (i, field) => field === "crowd" && i === 1)).toBe('line 2 (play 60 minutes): crowd "x2" != pinned "c2"');
     expect(firstPortEditDifference(got, want, (i, field) => field === "state" && i >= 1)).toBe('line 1 (undo): crowd "x1" != pinned "c1"');
@@ -43,17 +59,58 @@ describe("the port-edit golden's answers and comparison", () => {
   it("calls a case thin when a refusal moved something, a charge moved no state, or it plays no hour", () => {
     const start = line("start", null, "s0");
     const played = line("play 60 minutes", { hour: 8 }, "s9");
-    expect(portEditProblems(FOUND, [start, line("build", { status: 1, delta: -500 }, "s1", 1), line("refused", { status: 0, delta: 0, reason: "no" }, "s1"), played])).toEqual([]);
+    expect(portEditProblems(FOUND, [start, line("build", { status: DONE, delta: -500 }, "s1", 1), line("refused", { status: REFUSED, delta: 0, reason: "no" }, "s1"), played])).toEqual([]);
     // A done command that moved no money may move nothing (a raise at the top step).
-    expect(portEditProblems(FOUND, [start, line("raise", { status: 1, delta: 0, rent: 15000 }, "s0"), played])).toEqual([]);
-    expect(portEditProblems(FOUND, [start, line("refused", { status: 0, delta: 0 }, "s1"), played])).toEqual(["line 1 (refused): refused, but it moved the tower or drained an event"]);
-    expect(portEditProblems(FOUND, [start, line("refused", { status: 0, delta: 0 }, "s0", 0, "moved"), played])).toEqual(["line 1 (refused): refused, but it moved the tower or drained an event"]);
-    expect(portEditProblems(FOUND, [start, line("refused", { status: 0, delta: 0 }, "s0", 1), played])).toEqual(["line 1 (refused): refused, but it moved the tower or drained an event"]);
-    expect(portEditProblems(FOUND, [start, line("undo", { status: STATUS.nothingToStep, notice: "Nothing to undo." }, "s1"), played])).toEqual([
+    expect(portEditProblems(FOUND, [start, line("raise", { status: DONE, delta: 0, rent: 15000 }, "s0"), played])).toEqual([]);
+    expect(portEditProblems(FOUND, [start, line("refused", { status: REFUSED, delta: 0 }, "s1"), played])).toEqual(["line 1 (refused): refused, but it moved the tower or drained an event"]);
+    expect(portEditProblems(FOUND, [start, line("refused", { status: REFUSED, delta: 0 }, "s0", 0, "moved"), played])).toEqual(["line 1 (refused): refused, but it moved the tower or drained an event"]);
+    expect(portEditProblems(FOUND, [start, line("refused", { status: REFUSED, delta: 0 }, "s0", 1), played])).toEqual(["line 1 (refused): refused, but it moved the tower or drained an event"]);
+    expect(portEditProblems(FOUND, [start, line("undo", { status: NOTHING_TO_STEP, notice: "Nothing to undo." }, "s1"), played])).toEqual([
       "line 1 (undo): nothing to step, but it moved the tower or drained an event",
     ]);
-    expect(portEditProblems(FOUND, [start, line("sell", { status: 1, delta: 20000 }, "s0"), played])).toEqual(["line 1 (sell): moved 20000 in money, but not the state"]);
+    expect(portEditProblems(FOUND, [start, line("sell", { status: DONE, delta: 20000 }, "s0"), played])).toEqual(["line 1 (sell): moved 20000 in money, but not the state"]);
     expect(portEditProblems(FOUND, [start, line("play 60 minutes", "end", "s1")])).toEqual(["plays no hour"]);
+  });
+
+  it("holds each other kind of line to what it may move", () => {
+    const start = line("start", null, "s0");
+    const played = line("play 60 minutes", { hour: 8 }, "s9");
+    expect(portEditProblems(FOUND, [start, line("refused", { status: REFUSED, delta: -500 }, "s0"), played])).toEqual(["line 1 (refused): refused, but it moved -500 in money"]);
+    expect(portEditProblems(FOUND, [start, line("build", { delta: -500 }, "s1"), played])).toEqual(["line 1 (build): a command line with no status"]);
+    expect(portEditProblems(FOUND, [start, line("read the name", "Tower", "s1"), played])).toEqual(["line 1 (read the name): a read moved the tower or drained an event"]);
+    expect(portEditProblems(FOUND, [start, line("open an undo step: Sell", null, "s0", 1), played])).toEqual(["line 1 (open an undo step: Sell): an undo step moved the tower or drained an event"]);
+    expect(portEditProblems(FOUND, [start, line("undo the sale", { status: DONE, notice: "Undid: Sell" }, "s0"), played])).toEqual([
+      "line 1 (undo the sale): took an undo step, but the state did not move",
+    ]);
+    // A tooling write, a tick and a swap that landed may move anything.
+    const tooling: PortEditLine = { ...line("set money", null, "s1", 0, "c1"), kind: "tooling" };
+    const tick: PortEditLine = { ...line("tick 1 minute", null, "s2", 1, "c2"), kind: "tick" };
+    expect(portEditProblems(FOUND, [start, tooling, tick, line("restore a save", { status: DONE }, "s3", 2, "c3"), played])).toEqual([]);
+    expect(portEditProblems(FOUND, [start, line("undo a step", { notice: "Undid: Sell" }, "s1"), played])).toEqual(["line 1 (undo a step): a history line with no status"]);
+    expect(portEditProblems(FOUND, [start, line("undo with nothing left", { status: NOTHING_TO_STEP, notice: "Nothing to undo." }, "s0", 1), played])).toEqual([
+      "line 1 (undo with nothing left): nothing to step, but it moved the tower or drained an event",
+    ]);
+    expect(portEditProblems(FOUND, [start, line("undo a refused step", { status: REFUSED, notice: "" }, "s1"), played])).toEqual([
+      "line 1 (undo a refused step): refused, but it moved the tower or drained an event",
+    ]);
+    // Moving nothing keeps the clock too.
+    expect(portEditProblems(FOUND, [start, { ...line("read the name", "Tower", "s0"), minute: 1 }, played])).toEqual(["line 1 (read the name): a read moved the tower or drained an event"]);
+  });
+
+  it("holds each line to a status its kind can answer, and a kind the golden names", () => {
+    const start = line("start", null, "s0");
+    const played = line("play 60 minutes", { hour: 8 }, "s9");
+    expect(portEditProblems(FOUND, [start, line("restore a save", { status: REFUSED }, "s0"), played])).toEqual(["line 1 (restore a save): a swap that did not land"]);
+    expect(portEditProblems(FOUND, [start, line("load a save", null, "s1"), played])).toEqual(["line 1 (load a save): a swap line with no status"]);
+    expect(portEditProblems(FOUND, [start, line("build", { status: NOTHING_TO_STEP, delta: 0 }, "s0"), played])).toEqual([
+      "line 1 (build): a command line with nothing to step, which only an undo or redo answers",
+    ]);
+    expect(portEditProblems(FOUND, [start, line("build", { status: 7, delta: 0 }, "s0"), played])).toEqual(["line 1 (build): a command line with the status 7, which the contract does not name"]);
+    expect(portEditProblems(FOUND, [start, line("build", { status: DONE, delta: "NaN" }, "s0"), played])).toEqual(["line 1 (build): moved NaN in money, which is no number"]);
+    const misnamed = { ...line("build", { status: DONE, delta: -500 }, "s1"), kind: "comand" } as unknown as PortEditLine;
+    expect(portEditProblems(FOUND, [start, misnamed, played])).toEqual(['line 1 (build): no line kind is named "comand"']);
+    expect(portEditProblems(FOUND, [line("build", { status: DONE, delta: -500 }, "s1"), played])).toEqual(["line 0 (build): the first line is no start"]);
+    expect(portEditProblems(FOUND, [start, line("start", null, "s0"), played])).toEqual(["line 1 (start): a start after the first line"]);
   });
 
   it("calls a fixture case thin when its crowd never moves during play", () => {
@@ -62,10 +119,72 @@ describe("the port-edit golden's answers and comparison", () => {
     expect(portEditProblems(FOUND, [start, line("play 60 minutes", { hour: 8 }, "s1", 0, "c0")])).toEqual([]);
     expect(portEditProblems(FIXTURE, [start, line("play 60 minutes", { hour: 8 }, "s1", 0, "c0")])).toEqual(["the crowd never moves during play"]);
     // A command that moves the crowd is not play.
-    expect(portEditProblems(FIXTURE, [start, line("sell", { status: 1, delta: 20000 }, "s1", 0, "c1"), line("play 60 minutes", { hour: 8 }, "s2", 0, "c1")])).toEqual([
+    expect(portEditProblems(FIXTURE, [start, line("sell", { status: DONE, delta: 20000 }, "s1", 0, "c1"), line("play 60 minutes", { hour: 8 }, "s2", 0, "c1")])).toEqual([
       "the crowd never moves during play",
     ]);
     expect(portEditProblems(FIXTURE, [start, line("play 60 minutes", { hour: 8 }, "s1", 0, "c1")])).toEqual([]);
+  });
+});
+
+describe("the crowd view reader", () => {
+  const person = { id: 7, floors: [1, 0], shafts: [4631], leg: 0, state: WALKING_TO_SHAFT };
+
+  it("reads a person on a route, at its end, on a trip on one floor, or with no route", () => {
+    expect(isCrowdPerson(person)).toBe(true);
+    expect(isCrowdPerson({ ...person, leg: 1 })).toBe(true);
+    expect(isCrowdPerson({ ...person, floors: [5], shafts: [] })).toBe(true);
+    expect(isCrowdPerson({ ...person, floors: [], shafts: [] })).toBe(true);
+  });
+
+  it("refuses an entry the scripts would misread", () => {
+    expect(isCrowdPerson(null)).toBe(false);
+    expect(isCrowdPerson({ ...person, id: 7.5 })).toBe(false);
+    expect(isCrowdPerson({ ...person, floors: [1] })).toBe(false);
+    expect(isCrowdPerson({ ...person, shafts: ["4631"] })).toBe(false);
+    expect(isCrowdPerson({ ...person, floors: [1, 0, 2] })).toBe(false);
+    expect(isCrowdPerson({ ...person, floors: [] })).toBe(false);
+    expect(isCrowdPerson({ ...person, floors: [], shafts: [], leg: 1 })).toBe(false);
+    expect(isCrowdPerson({ ...person, leg: -1 })).toBe(false);
+    expect(isCrowdPerson({ ...person, leg: 2 })).toBe(false);
+    expect(isCrowdPerson({ ...person, state: 3 })).toBe(false);
+  });
+
+  it("reads a view whose next person id is above every person's, and says why it cannot read another", () => {
+    expect(crowdProblem({ nextId: 8, people: [person] })).toBeUndefined();
+    expect(crowdProblem(null)).toBe("is not an object");
+    expect(crowdProblem({ people: [person] })).toBe("has a next person id of undefined");
+    expect(crowdProblem({ nextId: 8 })).toBe("has no list of people");
+    expect(crowdProblem({ nextId: 8, people: [person, { ...person, leg: 2 }] })).toBe("has a person at index 1 the scripts cannot read");
+    expect(crowdProblem({ nextId: 7, people: [person] })).toBe("has person 7, at or above the next person id 7");
+    expect(crowdProblem({ nextId: 8, people: [person, { ...person, shafts: [99] }] })).toBe("has person 7 twice");
+  });
+
+  it("picks the people walking to a shaft, the people midway on a route that never takes it, and the new people's legs between two floors", () => {
+    const view = {
+      nextId: 20,
+      people: [
+        person,
+        { ...person, id: 8, state: "climbing" },
+        { ...person, id: 9, floors: [2, 1, 0], shafts: [50, 4631] },
+        { ...person, id: 10, floors: [3, 2, 1], shafts: [50, 51] },
+        { ...person, id: 11, floors: [3, 2, 1], shafts: [50, 51], leg: 1 },
+        { ...person, id: 12, floors: [0, 1], shafts: [4479] },
+      ],
+    };
+    expect(walkingTo(view, 4631)).toEqual([7]);
+    expect(midRouteAvoiding(view, 4631)).toEqual([10]);
+    expect(shaftsBetween(view, 1, 0, 9)).toEqual([4631, 4479]);
+  });
+
+  it("says whether a shaft stops at both of a leg's floors, as the engines decide a stop", () => {
+    const shaft = { bottom: 0, top: 3 };
+    expect(stopsAtBoth(shaft, 0, 1)).toBe(true);
+    expect(stopsAtBoth({ ...shaft, skipFloors: [1, 2] }, 0, 3)).toBe(true);
+    expect(stopsAtBoth({ ...shaft, skipFloors: [0] }, 0, 1)).toBe(false);
+    expect(stopsAtBoth({ ...shaft, skipFloors: [1] }, 0, 1)).toBe(false);
+    expect(stopsAtBoth({ ...shaft, bottom: 1 }, 0, 1)).toBe(false);
+    expect(stopsAtBoth({ ...shaft, top: 0 }, 0, 1)).toBe(false);
+    expect(stopsAtBoth(undefined, 0, 1)).toBe(false);
   });
 });
 
@@ -80,7 +199,7 @@ describe("the port-edit cases", () => {
     const golden = readPortEdits();
     for (const c of PORT_EDIT_CASES) {
       const lines = golden.cases[c.id];
-      expect(lines[0].step, c.id).toBe("start");
+      expect([lines[0].step, lines[0].kind], c.id).toEqual(["start", "start"]);
       expect(portEditProblems(c.start, lines), c.id).toEqual([]);
       // #1802 changes the generation an undo answers, so no line pins one.
       for (const l of lines) if (typeof l.answer === "object" && l.answer !== null) expect(Object.keys(l.answer), `${c.id}: ${l.step}`).not.toContain("generation");
@@ -90,13 +209,14 @@ describe("the port-edit cases", () => {
   it("pin the game's undo and redo with the notice the game shows, and an earlier save's restore", () => {
     const fourStar = readPortEdits().cases["four-star tower edits"];
     const answerOf = (step: string) => fourStar.find((l) => l.step === step)?.answer;
-    expect(answerOf("undo the bulldoze")).toEqual({ status: STATUS.done, notice: "Undid: Bulldoze" });
-    expect(answerOf("redo the bulldoze")).toEqual({ status: STATUS.done, notice: "Redid: Bulldoze" });
-    expect(answerOf("undo the sale")).toEqual({ status: STATUS.done, notice: "Undid: Sell" });
-    expect(answerOf("undo with nothing left")).toEqual({ status: STATUS.nothingToStep, notice: "Nothing to undo." });
+    expect(answerOf("undo the bulldoze")).toEqual({ status: DONE, notice: "Undid: Bulldoze" });
+    expect(answerOf("redo the bulldoze")).toEqual({ status: DONE, notice: "Redid: Bulldoze" });
+    expect(answerOf("undo the sale")).toEqual({ status: DONE, notice: "Undid: Sell" });
+    expect(answerOf("undo with nothing left")).toEqual({ status: NOTHING_TO_STEP, notice: "Nothing to undo." });
+    expect(answerOf("redo the bulldoze again")).toEqual({ status: DONE, notice: "Redid: Bulldoze" });
     expect(answerOf("close the refused bulldoze's undo step")).toEqual({ kept: false });
-    expect(answerOf("restore the save from before the sale")).toEqual({ status: STATUS.done });
+    expect(answerOf("restore the save from before the sale")).toEqual({ status: DONE });
     expect(answerOf("the camera after the restore")).toEqual({ tile: 200, floor: 20, zoom: 1 });
-    expect(answerOf("undo after the restore")).toEqual({ status: STATUS.nothingToStep, notice: "Nothing to undo." });
+    expect(answerOf("undo after the restore")).toEqual({ status: NOTHING_TO_STEP, notice: "Nothing to undo." });
   });
 });
