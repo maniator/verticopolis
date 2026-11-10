@@ -42,8 +42,11 @@ npm run build       # production build must succeed
 `npm run test:coverage` (`vitest run --coverage`) is the **CI coverage gate**. It
 enforces the coverage floors described below and fails the build if any floor
 is breached. Run it locally when you touch measured code. CI runs it without
-`src/tests/integration/conformance.integration.test.ts`, which has its own step
-without coverage (the 720-hour `holidays-classic` scenario is too slow under
+`src/tests/integration/conformance.integration.test.ts`,
+`src/tests/integration/condoRelocationEngine.integration.test.ts` and
+`src/tests/integration/roomCountsEngine.integration.test.ts`, which have their
+own step without coverage (the 720-hour `holidays-classic` scenario, the
+30-year condo run and the every-step room-count walk are too slow under
 coverage on a shared runner); `npm test` still runs everything.
 
 Workflow YAML and test-runner configuration are configuration, not behavior.

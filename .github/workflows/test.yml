@@ -195,14 +195,18 @@ jobs:
       # tower, 15 s of CPU alone) is excluded here and runs in the next step.
       # Under v8 coverage with the other test files running beside it, it took
       # 61 s against its 60 s limit and failed unrelated PRs. Keep the scenario
-      # in the separate no-coverage step, which CI executes directly.
+      # in the separate no-coverage step, which CI executes directly. The same
+      # holds for two long port-kit suites: condoRelocationEngine (30 years of
+      # hourly ticks, about 60 s locally, 390 s under coverage against its
+      # 300 s limit) and roomCountsEngine (a check after every step on three
+      # conformance towers, 225 s under coverage against 300 s).
       - name: Run tests
         if: ${{ needs.changes.outputs.tests != 'false' }}
-        run: npm run test:coverage -- --run --exclude '**/conformance.integration.test.ts'
+        run: npm run test:coverage -- --run --exclude '**/conformance.integration.test.ts' --exclude '**/condoRelocationEngine.integration.test.ts' --exclude '**/roomCountsEngine.integration.test.ts'
 
       - name: Engine conformance (no coverage)
         if: ${{ !cancelled() && needs.changes.outputs.tests != 'false' }}
-        run: npm exec --no -- vitest run --project integration conformance.integration
+        run: npm exec --no -- vitest run --project integration conformance.integration condoRelocationEngine roomCountsEngine
 
       # This job only proves the bundle builds, with no engine package (the e2e
       # job below builds with one), so it opts out of the engine requirement
