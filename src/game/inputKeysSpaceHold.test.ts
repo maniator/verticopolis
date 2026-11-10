@@ -5,7 +5,7 @@ import { makeApp, pointer, press, release } from "./inputKeys.fixture";
  * Which Space the game follows as a hold, and what a cover that comes up mid-hold
  * gets. The camera's pan key is that same hold, so a Space chord or a Space typed
  * into a field neither builds nor pans. The rest of the Space split is in
- * `inputKeysSpace.test.ts`.
+ * `inputKeysSpace.test.ts` and `inputKeysSpaceFocus.test.ts`.
  */
 
 vi.mock("./audioPrefs", () => ({ flushPrefsSave: vi.fn() }));
@@ -165,12 +165,15 @@ describe("the Space hold the game follows", () => {
     press("q", { repeat: true });
     release(" ");
     expect(app.keyboard.commitCursor).not.toHaveBeenCalled();
-    for (const key of ["Shift", "FnLock"]) {
-      press(" ");
-      press(key, { repeat: true });
-      release(" ");
+    const keepers = ["Shift", "CapsLock", "NumLock", "ScrollLock", "FnLock", "SymbolLock", "Fn"];
+    for (const key of keepers) {
+      for (const repeat of [false, true]) {
+        press(" ");
+        press(key, { repeat });
+        release(" ");
+      }
     }
-    expect(app.keyboard.commitCursor).toHaveBeenCalledTimes(2);
+    expect(app.keyboard.commitCursor, "each keeps the tap, pressed or held").toHaveBeenCalledTimes(keepers.length * 2);
   });
 
   it("a Space reported as a no-break space without Option still taps", () => {
@@ -218,8 +221,9 @@ describe("the Space hold the game follows", () => {
     expect(app.spacePanKey!(), "the hold now").toBe(false);
   });
 
-  it("a pan hold that Cmd's release, a native menu or a native drag ended still cancels its late Space release", () => {
+  it("a pan hold that Cmd's release, a native menu or drag, or a dropdown's key ended still cancels its late Space release", () => {
     const app = makeApp();
+    const dropdown = document.body.appendChild(document.createElement("select"));
     const image = document.body.appendChild(document.createElement("img"));
     image.addEventListener("dragstart", (e) => e.preventDefault());
     press(" ");
@@ -229,6 +233,11 @@ describe("the Space hold the game follows", () => {
       "Cmd's release": () => release("Meta"),
       "a native menu": () => window.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })),
       "a native drag": () => window.dispatchEvent(new Event("dragstart", { bubbles: true })),
+      "Alt + Down on a focused dropdown": () => {
+        dropdown.focus();
+        press("ArrowDown", { altKey: true });
+        dropdown.blur();
+      },
     };
     for (const [name, end] of Object.entries(enders)) {
       press(" ");
@@ -245,7 +254,32 @@ describe("the Space hold the game follows", () => {
       pointer("pointerdown");
       pointer("pointerup");
       expect(releaseIsCanceled(), `a release after ${name} and a press`).toBe(true);
+      press(" "); // two enders in a row keep what the first one owed
+      pointer("pointerdown");
+      pointer("pointerup");
+      release("Meta");
+      end();
+      expect(releaseIsCanceled(), `a pan hold's release after Cmd's release and ${name}`).toBe(true);
+      press(" "); // the other order: a live hold reaches every ender first
+      end();
+      release("Meta");
+      pointer("pointerdown");
+      pointer("pointerup");
+      expect(releaseIsCanceled(), `a release after ${name}, Cmd's release and a press`).toBe(true);
     }
+    press(" "); // a zooming wheel turn after an ender owes the cancel too
+    release("Meta");
+    app.canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: 100, bubbles: true }));
+    expect(releaseIsCanceled(), "a release after Cmd's release and a wheel turn").toBe(true);
+    press(" "); // and so does a press first seen as a move with a button held
+    release("Meta");
+    pointer("pointermove", 1, window, { buttons: 1 });
+    expect(releaseIsCanceled(), "a release after Cmd's release and a held move").toBe(true);
+    pointer("pointermove", 1, window, { buttons: 0 });
+    press(" "); // that move makes a hold a pan
+    pointer("pointermove", 1, window, { buttons: 1 });
+    expect(releaseIsCanceled(), "a release after a held move").toBe(true);
+    pointer("pointermove", 1, window, { buttons: 0 });
     expect(app.keyboard.commitCursor).not.toHaveBeenCalled();
   });
 
@@ -273,27 +307,52 @@ describe("the Space hold the game follows", () => {
     pressOn(select);
     expect(app.spacePanKey!(), "a disabled dropdown opens nothing").toBe(true);
     select.disabled = false;
+    pressOn(select);
+    expect(app.spacePanKey!(), "the popup opens").toBe(false);
+    expect(releaseIsCanceled(), "the press made it a pan, so its late release is canceled").toBe(true);
     select.multiple = true; // a list box, which a phone shows in a picker
+    press(" ");
+    expect(app.spacePanKey!(), "held again").toBe(true);
     pressOn(select);
     expect(app.spacePanKey!(), "a list box").toBe(false);
     select.multiple = false;
     press(" ");
     select.focus(); // tabbed to while Space is held
-    for (const key of ["Shift", "Tab", "o", "Escape"]) {
+    for (const key of ["Shift", "Tab", "o", "Escape", "ArrowLeft", "ArrowRight"]) {
       press(key);
-      expect(app.spacePanKey!(), `${key} opens no popup`).toBe(true);
+      expect(app.spacePanKey!(), `${key} keeps the hold`).toBe(true);
     }
+    for (const [key, init] of [
+      ["ArrowDown", { altKey: true }], ["ArrowUp", {}], ["F4", {}], ["Enter", {}],
+      ["ArrowDown", { repeat: true }], // held since before the focus came (a Mac)
+      [" ", { repeat: true }], // Space's own repeats open it too
+      ["\u00a0", { repeat: true, code: "Space" }], // known by its physical key
+    ] as const) {
+      select.blur();
+      press(" ");
+      select.focus();
+      expect(app.spacePanKey!(), `held before ${key} ${JSON.stringify(init)}`).toBe(true);
+      press(key, init);
+      expect(app.spacePanKey!(), `${key} ${JSON.stringify(init)} opens it`).toBe(false);
+    }
+  });
+
+  it("after an ender, a Space still down holds again from its next press or followed repeat", () => {
+    const app = makeApp();
+    press(" ");
+    release("Meta"); // ends the hold with Space still down
+    const drag = new PointerEvent("pointerdown", { pointerId: 1, bubbles: true });
+    window.dispatchEvent(drag);
+    expect(app.spacePanKey!(drag), "a drag after the ender keeps its tool").toBe(false);
+    pointer("pointerup");
+    press(" ", { repeat: true, ctrlKey: true });
+    expect(app.spacePanKey!(), "a chord's repeat starts nothing").toBe(false);
     press(" ", { repeat: true });
-    expect(app.spacePanKey!(), "a repeating Space can open it").toBe(false);
+    expect(app.spacePanKey!(), "a repeat the game follows starts a new hold").toBe(true);
+    release("Meta"); // ends that hold too, with Space still down
+    expect(app.spacePanKey!(), "the hold ended again").toBe(false);
     press(" ");
-    select.focus();
-    press("ArrowDown", { altKey: true });
-    expect(app.spacePanKey!(), "Alt + Down opens it").toBe(false);
-    select.blur();
-    press(" ");
-    select.focus();
-    press("ArrowDown", { repeat: true }); // held since before the focus came (a Mac)
-    expect(app.spacePanKey!(), "a repeating arrow opens it too").toBe(false);
+    expect(app.spacePanKey!(), "and so does its next press").toBe(true);
   });
 
   it("a cover that comes up after a hold ended does not get its late release", () => {

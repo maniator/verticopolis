@@ -92,7 +92,7 @@ class GameApp implements GameAppPorts {
   speed = 1;
   tool: Tool = { type: "inspect" };
   /** @internal */ canvas: HTMLCanvasElement;
-  /** @internal The game's Space hold (`bindKeys`) as `press` went down: the camera's pan key. */
+  /** The game's Space hold (`bindKeys`) as `press` went down: the camera's pan key. @internal */
   spacePanKey: (press?: Event) => boolean = () => false;
   /** @internal */ accMinutes = 0;
   /** Last day each meal-rush bulletin fired (transient, like the log). Kept
