@@ -435,3 +435,33 @@ fn express_extension_reclassifies_former_endpoints_without_waiting_for_reload() 
         vec![2, 20]
     );
 }
+
+/// The station's floor stays memoized while other units are placed, and
+/// follows the station itself: placed, removed, put back as an undo does, and
+/// after a reindex.
+#[test]
+fn the_metro_floor_follows_the_station_alone() {
+    let mut tower = basement_tower();
+    assert_eq!(tower.metro_floor(), None);
+    let station = must(tower.place(Kind::Metro, -3, 100));
+    assert_eq!(tower.metro_floor(), Some(-3));
+    // A planted answer survives other placements and removals, a structure
+    // tile's included, so nothing walked the units.
+    let key = tower.memo.borrow().metro_changes;
+    tower.memo.get_mut().metro_floor = Some((key, Some(-4)));
+    let shop = must(tower.place(Kind::Shop, -2, 20));
+    let tile = must(tower.place(Kind::Floor, -4, 0));
+    tower.remove_units(&[tile, shop]);
+    assert_eq!(tower.metro_floor(), Some(-4), "other units keep it");
+    let at = tower.units.iter().position(|u| u.id == station).unwrap();
+    let gone = tower.remove_units(&[station]);
+    assert_eq!(tower.metro_floor(), None);
+    tower.insert_units_at(vec![(at, gone[0].clone())]);
+    assert_eq!(tower.metro_floor(), Some(-3));
+    // A reindex (every load) resets the memo: an answer planted under the key
+    // its register loop reaches would survive without that reset.
+    let key = tower.memo.borrow().metro_changes + 1;
+    tower.memo.get_mut().metro_floor = Some((key, Some(-4)));
+    tower.reindex();
+    assert_eq!(tower.metro_floor(), Some(-3));
+}

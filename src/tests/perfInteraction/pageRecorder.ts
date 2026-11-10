@@ -129,7 +129,7 @@ export function installRecorder(speed: number): { loafSupported: boolean } {
     camera: null as null | { pos: unknown; zoom: number },
   };
   w.__interaction = rec;
-  // `followSwap` empties the app's frame error list on every load and undo
+  // `followSwap` empties the app's frame error list on every load
   // (the list keeps its identity), so the run counts each push instead.
   const errs = g.frameErrors;
   if (Array.isArray(errs)) {

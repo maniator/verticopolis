@@ -139,8 +139,8 @@ export class DualRun {
 }
 
 /** Load a fixture the way the import path does. */
-export function loadFixture(file: string): Simulation {
-  const raw = decodeVctower(readFileSync(resolve(REPO_ROOT, file), "utf8"), file) as SerializedGame;
+export function loadFixture(file: string, edit: (raw: SerializedGame) => SerializedGame = (raw) => raw): Simulation {
+  const raw = edit(decodeVctower(readFileSync(resolve(REPO_ROOT, file), "utf8"), file) as SerializedGame);
   const sim = Simulation.deserialize(raw);
   markFounderFromLoadedFile(sim, raw);
   return sim;

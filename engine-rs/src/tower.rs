@@ -217,6 +217,9 @@ impl Tower {
         if u.kind == Kind::Lobby {
             *self.lobby_tiles.entry(u.floor).or_insert(0) += u.width;
         }
+        if u.kind == Kind::Metro {
+            self.memo.get_mut().metro_changes += 1;
+        }
     }
 
     pub(crate) fn unregister(&mut self, u: &Unit) {
@@ -239,6 +242,9 @@ impl Tower {
         }
         if u.kind == Kind::Lobby {
             Self::dec_count(&mut self.lobby_tiles, u.floor, u.width);
+        }
+        if u.kind == Kind::Metro {
+            self.memo.get_mut().metro_changes += 1;
         }
     }
 

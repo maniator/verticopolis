@@ -7,7 +7,7 @@ use serde::Serialize;
 use crate::clock::GameMode;
 use crate::economy::{
     catalog_spend_per_customer, commercial_daily_income, daily_traffic_income,
-    COMMERCIAL_LOBBY_FLOORS,
+    COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MIN, TRAFFIC_FACTOR_SPAN,
 };
 use crate::facilities::Kind;
 use crate::housekeeping::{HK_MAIDS_PER_UNIT, INFEST_DAYS};
@@ -76,7 +76,12 @@ enum RetailAdvice {
     OverBuilt,
 }
 
-const TRAFFIC_FACTOR_MEAN: f64 = 0.8;
+/// The foot-traffic factor a venue's hourly takings average over a trading
+/// day: the midpoint of the uniform hourly draw in `economy/traffic.rs`
+/// (`TRAFFIC_FACTOR_MIN` plus up to `TRAFFIC_FACTOR_SPAN`), so a retune of
+/// that range moves this baseline with it. The TypeScript reference derives
+/// its mean from its own copy of the range the same way.
+const TRAFFIC_FACTOR_MEAN: f64 = TRAFFIC_FACTOR_MIN + TRAFFIC_FACTOR_SPAN / 2.0;
 const LOW_PATRONAGE_RATIO: f64 = 0.5;
 const BOOMING_PATRONAGE_RATIO: f64 = 0.85;
 const OVER_BUILT_DEMAND_SHARE: f64 = 0.5;
@@ -332,6 +337,19 @@ mod tests {
         assert_eq!(value["housekeeping"]["leftover"], 5);
         assert_eq!(value["hotel"]["rating"], "notApplicable");
         assert_eq!(value["retail"]["tier"], "notApplicable");
+    }
+
+    #[test]
+    fn the_traffic_mean_keeps_todays_value() {
+        // Today's range gives 0.8 to the bit, as the TypeScript reference's
+        // mean does (`src/engine/EconomySystem.ts`). A deliberate retune moves
+        // this pin and the retail card-text goldens; the WASM parity tests
+        // hold the two engines' retail facts together.
+        assert_eq!(
+            TRAFFIC_FACTOR_MEAN.to_bits(),
+            0.8_f64.to_bits(),
+            "the traffic mean is {TRAFFIC_FACTOR_MEAN}, where today's tuning gives 0.8"
+        );
     }
 
     #[test]

@@ -83,9 +83,11 @@ describe("catalogFor", () => {
         return before - sim.money;
       };
       const lobby = entry(c, "lobby");
-      expect(charged(() => must(sim.build("lobby", 1, 170)))).toBe(lobby.cost);
-      // The floor tool on the ground floor lays a lobby, at its price.
-      expect(charged(() => must(sim.build("floor", 1, 171)))).toBe(lobby.cost);
+      const floor = entry(c, "floor");
+      // A lobby laid where no floor is pays for that floor too.
+      expect(charged(() => must(sim.build("lobby", 1, 170)))).toBe(lobby.cost + floor.cost);
+      // The floor tool on the ground floor lays a lobby, at the same price.
+      expect(charged(() => must(sim.build("floor", 1, 171)))).toBe(lobby.cost + floor.cost);
       for (let x = 172; x < 200; x++) must(sim.build("lobby", 1, x));
       for (let fl = 2; fl <= 4; fl++) for (let x = 170; x < 200; x++) must(sim.build("floor", fl, x));
       expect(charged(() => must(sim.buildTransport("elevatorStandard", 172, 1, 4)))).toBe(
@@ -95,7 +97,7 @@ describe("catalogFor", () => {
       const office = entry(c, "office");
       expect(charged(() => must(sim.build("office", 2, 180)))).toBe(office.cost);
       // A room on bare floor lays the floor under it at the floor's price.
-      expect(charged(() => must(sim.build("office", 5, 180)))).toBe(office.cost + office.width * entry(c, "floor").cost);
+      expect(charged(() => must(sim.build("office", 5, 180)))).toBe(office.cost + office.width * floor.cost);
       expect(-charged(() => expect(sim.sellAt(2, 180)).toBe(true))).toBe(office.resaleRefund);
       // The car and extend commands charge the quoted car price, car refund and
       // per-floor cost. They run after the rooms so the longer shaft changes no

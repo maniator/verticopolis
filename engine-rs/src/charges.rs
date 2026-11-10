@@ -331,8 +331,7 @@ impl Simulation {
             if let Some(reason) = self.tower.removal_reason(id) {
                 return ChargeResult::refuse(reason);
             }
-            // A burned-out shell can still be cleared, so the tile is not lost.
-            if state != UnitState::Gutted && self.mode.room_is_permanent(kind) {
+            if self.stays_for_good(kind, state) {
                 return ChargeResult::refuse(permanent_room_refusal(kind));
             }
             self.tower.remove_unit(id);
@@ -363,6 +362,14 @@ impl Simulation {
         self.gameplay
             .push(GameplayEvent::FacilityRemoved { kind, method });
         ChargeResult::paid(refund)
+    }
+
+    /// Whether the tower keeps a room of `kind` in `state` for good, so no
+    /// removal takes it: a Classic permanent room stays unless a fire gutted
+    /// it, as a burned-out shell can still be cleared and the tile is not
+    /// lost.
+    pub(crate) fn stays_for_good(&self, kind: Kind, state: UnitState) -> bool {
+        state != UnitState::Gutted && self.mode.room_is_permanent(kind)
     }
 }
 

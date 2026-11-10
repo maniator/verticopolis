@@ -278,21 +278,20 @@ impl Tower {
     }
 
     /// The floor a metro station stands on, its bottom row, when the tower
-    /// has one. Placement asks it for every tile a drag crosses, so it is
-    /// memoized per revision like the floor bounds.
+    /// has one. Placement asks it for every tile a drag, a brush, a bridge or
+    /// an extend lays, so it is memoized until a station registers or
+    /// unregisters (`Memo::metro_changes`): a revision key would walk every
+    /// unit again after each tile.
     pub(crate) fn metro_floor(&self) -> Option<i64> {
-        let key = self.index_key();
+        let key = self.memo.borrow().metro_changes;
         let cached = self.memo.borrow().metro_floor;
         if let Some((built, floor)) = cached {
             if built == key {
                 return floor;
             }
         }
-        let floor = self
-            .units
-            .iter()
-            .find(|u| u.kind == Kind::Metro)
-            .map(|u| u.floor);
+        // From the room index, past the tiles.
+        let floor = self.units_of_kind(Kind::Metro).next().map(|u| u.floor);
         self.memo.borrow_mut().metro_floor = Some((key, floor));
         floor
     }

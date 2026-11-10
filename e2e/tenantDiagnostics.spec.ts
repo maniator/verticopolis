@@ -125,7 +125,7 @@ async function loadSave(page: Page, save: string): Promise<void> {
   expect(ok).toBe(true);
 }
 
-test("No Rate, shoppers too far and a notice show on both surfaces", async ({ page }) => {
+test("No Rate, shoppers too far, a notice and the editor's access row show on the Rust engine", async ({ page }) => {
   // Classic: Modern never holds the No Rate state, and both engines drop it on load there.
   const f = lobbyDistanceFixture("classic");
   f.office.noRate = true;
@@ -134,6 +134,17 @@ test("No Rate, shoppers too far and a notice show on both surfaces", async ({ pa
   leaving.state = "vacating";
   leaving.vacateReason = "rent";
   leaving.vacateAt = f.sim.clock.minutes + 600;
+  // A security office draws no commuters, so it prints no access line, and the
+  // phone editor shows its plain "Elevator access" row instead. The row's
+  // answer is the floor being served, read from the engine's unit card. The
+  // elevator runs 1 to 8, so a second office on a short floor 9 is unserved.
+  for (let x = 190; x < 220; x++) {
+    const slab = f.sim.tower.place("floor", 9, x);
+    if (!slab.ok) throw new Error(`floor 9 at ${x}: ${slab.reason}`);
+  }
+  const guards = [placeUnit(f.sim, "security", 5, 200), placeUnit(f.sim, "security", 9, 200)];
+  const access = guards.map((g) => (f.sim.tower.isFloorServed(g.floor) ? "Yes" : "No"));
+  expect(access, "the reference reads one served floor and one unserved").toEqual(["Yes", "No"]);
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as any).__vcEngine?.status?.hosted && (window as any).game), undefined, { timeout: 30_000 });
   await page.evaluate(() => (window as any).game.onboarding.dismissSplash());
@@ -151,4 +162,15 @@ test("No Rate, shoppers too far and a notice show on both surfaces", async ({ pa
       await expectOnce(surface, copy, phone ? "editor" : "card");
     }
   }
+
+  // The phone editor (still at 390px): the access row for each security office,
+  // and none for the office, whose diagnostics carry the access line instead.
+  for (const [i, guard] of guards.entries()) {
+    await page.evaluate(({ id, kind }) => (window as any).game.selectPicked({ type: "unit", id, kind }), { id: guard.id, kind: guard.kind });
+    await expect(page.locator('#editor [data-field="served"]'), `security on floor ${guard.floor}`).toHaveText(access[i]);
+  }
+  await page.evaluate(({ id, kind }) => (window as any).game.selectPicked({ type: "unit", id, kind }), { id: f.office.id, kind: f.office.kind });
+  await expect(page.locator("#editor .ed-diagnostics")).toContainText("No Rate: the tenant stays");
+  await expect(page.locator("#editor .ed-diagnostics")).toContainText("Access:");
+  await expect(page.locator('#editor [data-field="served"]')).toHaveCount(0);
 });

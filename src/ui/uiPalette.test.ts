@@ -176,6 +176,26 @@ describe("buildPalette", () => {
     expect(selectTool, "the Option release ends the press").not.toHaveBeenCalled();
   });
 
+  it("knows Space by its physical key on the press too, and forgets a press when focus leaves", () => {
+    const { ui, palette, selectTool } = stubUI();
+    buildPalette(ui);
+    const office = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
+    const key = (type: string, init: KeyboardEventInit): KeyboardEvent => {
+      const e = new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init });
+      office.dispatchEvent(e);
+      return e;
+    };
+    for (const pressed of [{ key: "Spacebar" }, { key: "\u00a0", code: "Space" }]) {
+      expect(key("keydown", pressed).defaultPrevented, `${JSON.stringify(pressed)} does not scroll`).toBe(true);
+      key("keyup", { key: " " });
+    }
+    expect(selectTool, "each press picks the tool on its release").toHaveBeenCalledTimes(2);
+    key("keydown", { key: " " });
+    office.dispatchEvent(new FocusEvent("blur"));
+    key("keyup", { key: " " });
+    expect(selectTool, "a release after focus left picks nothing").toHaveBeenCalledTimes(2);
+  });
+
   it("wraps each group in a section carrying its data-group so the scan can hide empty ones", () => {
     const { ui, palette } = stubUI();
     buildPalette(ui);

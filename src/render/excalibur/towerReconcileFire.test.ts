@@ -1,8 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnitView } from "../../simport/view";
 import type { TowerEngine } from "./TowerEngine";
 import { syncScene } from "./towerReconcile";
+import { markRegionUnit } from "./towerRegions";
+import { paintAnimatedUnit } from "../regionPaint";
 import { emptyStructPass } from "./towerStructTiles";
+import { NOT_BAKED } from "./sceneBake";
 
 // The reconcile is driven with a hand-built engine: no canvas bakes here. The
 // region functions are stubs that keep `regionUnits` the way the real ones do
@@ -58,6 +61,9 @@ function fakeEngine(unit: UnitView): TowerEngine {
       tower: {
         units,
         revision: 1,
+        getUnit(id: number): UnitView | undefined {
+          return this.units.find((u) => u.id === id);
+        },
         transports: [],
         functionalParkingSet: () => new Set<number>(),
       },
@@ -130,5 +136,64 @@ describe("a burning room leaves its region for a private actor and returns when 
     syncScene(engine);
     expect(engine.animatedRooms.has(7)).toBe(true);
     expect(engine.regionUnits.has(7)).toBe(false);
+  });
+});
+
+describe("an animated room through an undo or redo step", () => {
+  it("draws the room the view holds now, so a build that finishes after the step shows at once", () => {
+    const before = office("construction");
+    const engine = fakeEngine(before);
+    syncScene(engine);
+    const actor = engine.animatedRooms.get(7) as unknown as { graphics: { use: ReturnType<typeof vi.fn> } };
+    const canvas = actor.graphics.use.mock.calls[0][0] as { options: { draw(ctx: unknown): void } };
+    // A step moves the port generation, and the view hands every room over as
+    // a new object; the scene keeps this actor, still under construction.
+    const after = { ...before };
+    Object.assign(engine.sim.tower, { units: [after], revision: 2 });
+    syncScene(engine);
+    expect(engine.animatedRooms.get(7), "the same actor").toBe(actor);
+    (after as { state: UnitView["state"] }).state = "occupied"; // the build finishes between syncs
+    canvas.options.draw({});
+    const paints = vi.mocked(paintAnimatedUnit).mock.calls;
+    expect(paints[paints.length - 1]?.[1], "the live room").toBe(after);
+  });
+});
+
+describe("a settled room that comes back after the initial bake", () => {
+  beforeEach(() => {
+    vi.mocked(markRegionUnit).mockClear();
+  });
+
+  /** Whether each `markRegionUnit` call of one sync asked for this frame. */
+  const sameFrameMarks = (): boolean[] => {
+    const marks = vi.mocked(markRegionUnit).mock.calls.map((call) => call[2] === true);
+    vi.mocked(markRegionUnit).mockClear();
+    return marks;
+  };
+  /** A new unit list and revision, as the view hands over after an edit or a step. */
+  const layout = (engine: TowerEngine, units: UnitView[], revision: number): void => {
+    Object.assign(engine.sim.tower, { units, revision });
+  };
+
+  it("bakes into its region this frame when an undo or redo puts it back", () => {
+    const unit = office("occupied");
+    const engine = fakeEngine(unit);
+    Object.assign(engine, { builtRev: 1 });
+    syncScene(engine);
+    sameFrameMarks();
+    layout(engine, [], 2); // the bulldoze
+    syncScene(engine);
+    expect(engine.regionUnits.has(7)).toBe(false);
+    layout(engine, [unit], 3); // its undo
+    syncScene(engine);
+    expect(sameFrameMarks(), "not left to the budgeted drain").toEqual([true]);
+    expect(engine.regionUnits.has(7)).toBe(true);
+  });
+
+  it("leaves the initial bake to the drain that follows it", () => {
+    const engine = fakeEngine(office("occupied"));
+    Object.assign(engine, { builtRev: NOT_BAKED });
+    syncScene(engine);
+    expect(sameFrameMarks()).toEqual([false]);
   });
 });

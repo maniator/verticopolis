@@ -268,10 +268,13 @@ jobs:
       # Run them exactly once, on the required integrationWasm matrix leg.
       # Both matrix check names remain present and required for merging,
       # while the Rust workflow no longer repeats this same test:wasm script.
-      # This step has its own timeout and logs each test start (#1152).
+      # This step has its own timeout and logs each test start (#1152). With
+      # both diagnostics corpus differentials in it (#1811), the step takes
+      # 4.5 to 8.5 minutes, depending on the runner, so the timeout leaves
+      # room above the slowest run seen and for the next corpus differential.
       - name: Host suites on the WASM engine
         if: ${{ needs.changes.outputs.code != 'false' && matrix.project == 'integrationWasm' }}
-        timeout-minutes: 12
+        timeout-minutes: 18
         env:
           VC_LOG_TEST_STARTS: "1"
         run: npm run test:wasm

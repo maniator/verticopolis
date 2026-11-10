@@ -1,15 +1,15 @@
 # Keyboard and modifier keys: Verticopolis vs the original
 
-Written 2026-11-04 at app 2.84.1. This compares every key the web app binds
-with what the original PC game (SimTower for Windows) documents. The evidence
-for the original is the project's SimTower reference library, kept with the
-project files rather than in this repo: its evidence table and manual research
-notes summarize the official manual, the Windows Help file and the Windows
-Read Me, plus several fan guides for the PC version. No key behavior of the
-original has been observed in the PC harness (`tools/simtower/`) yet, so where
-only the PC can settle a question, the table says so instead of guessing.
-"None documented" means the evidence is silent, which is weaker than saying the
-original has no such key.
+Written 2026-11-04 at app 2.84.1 and updated 2026-11-10 at 2.86.1. This
+compares every key the web app binds with what the original PC game (SimTower
+for Windows) documents. The evidence for the original is the project's
+SimTower reference library, kept with the project files rather than in this
+repo: its evidence table and manual research notes summarize the official
+manual, the Windows Help file and the Windows Read Me, plus several fan guides
+for the PC version. No key behavior of the original has been observed in the
+PC harness (`tools/simtower/`) yet, so where only the PC can settle a
+question, the table says so instead of guessing. "None documented" means the
+evidence is silent, which is weaker than saying the original has no such key.
 
 ## What the original documents
 
@@ -68,42 +68,58 @@ tool instead. Its release also clicked a toolbar button left focused by a
 mouse click.
 
 Space now builds on release, and only for a tap. A pointer down at any moment
-of the hold (pressed before Space or during it) or a wheel turn over the
-world that the camera reads as a zoom makes it a pan hold, which does nothing
-at the keyboard cursor; its release is canceled so it clicks no focused button
-and toggles no focused checkbox or radio, except under a cover where nothing
-pans (a dialog, the splash, the crash card or the engine-failure card). A
-cover that comes up or takes focus mid-press, such as an emergency choice or
-one dialog swapped for another, does not have its controls pressed by the
-repeats or the release of a Space it did not get the press of, even when the
-hold ended before the release. A Space the page first
-sees as repeats (one held while focus came back) is treated the same way
-under a cover that is already up. Any other key held since before a cover
-came up does not reach the cover with its repeats either, so a held Enter
-does not press its button. Where Space types (a focused text field, text
+of the hold (pressed before Space or during it) or a wheel turn over the world
+that the camera reads as a zoom makes it a pan hold, which does nothing at the
+keyboard cursor; its release is canceled so it clicks no focused button and
+toggles no focused checkbox or radio, except under a cover where nothing pans
+(a dialog, the splash, the crash card or the engine-failure card). A cover
+that comes up or takes focus mid-press, such as an emergency choice or one
+dialog swapped for another, does not have its controls pressed by the repeats
+or the release of a Space it did not get the press of, even when the hold
+ended before the release. The same holds for a button, checkbox, radio or
+palette item that a script focuses mid-press with no key or pointer press in
+between, such as the Map's button when a narrower window closes the Map, and
+for one clicked while a Space typed into a field or pressed as a chord is
+down: Space's repeats and release do not press it, and the release builds
+nothing. (A click during a hold the game follows makes the hold a pan, whose
+release is canceled.) Moving focus away and back does not cost the control
+Space went down on its repeats or its release (a pan hold, or a cover still
+up at the release, cancels that release anyway, as above). A Space the page first sees as repeats
+(one held while focus came back) is treated the same way, both under a cover
+that is already up and on a button, checkbox, radio or palette item that
+already had focus. A text field or dropdown that gets focus mid-press, with
+nothing covering the world, still gets the repeats: Space types in the field,
+and on the dropdown it ends the hold (below). Any other key held since before
+a cover came up does not reach the cover with its repeats either, so a held
+Enter does not press its button. Where Space types (a focused text field, text
 area, dropdown or contentEditable region), and for a Space pressed with Ctrl,
 Cmd or Alt, the game follows no hold: it neither builds nor pans, since the
 camera reads the game's hold as its pan key. Cmd's release ends the hold,
 since macOS sends no Space release while Cmd is down. So do a native context
-menu, a native drag of selected text or a link, and a press or a key (Alt +
-Down or F4, or any arrow or Enter) that can open a dropdown's popup,
-since each can take the release. Space may still be down after any
-of these, so its late release is canceled when the hold was a pan, or when a
-pointer press or a zooming wheel turn since would have made it one. A
-drag pans when Space went down first; a drag already under way when Space
-goes down keeps its tool. The camera gets each press at its next frame, so
-it reads the hold as it was when the button went down. A wheel turn counts
-only when the camera reads it as a zoom: a sideways trackpad swipe without
-Shift zooms nothing (in browsers that report the legacy `wheelDelta` it used
-to zoom in or out, by swipe direction) and leaves the tap, while a
-trackpad's momentum scroll over the world right after a flick can still drop
-one tap. A cursor key pressed before Space comes up, or one held since
-before it, builds the tap first, where Space went down; Shift, the lock keys
-and Fn leave the tap alone, and any other key (Ctrl, Cmd and Alt included)
-drops it. The palette lets Space through and, like a native button, acts on
-the release. A held Enter, Delete, Backspace or X acts once.
-See `e2e/spacePan.spec.ts`, `src/game/inputKeys.test.ts`,
-`src/game/inputKeysSpace.test.ts`, `src/game/inputKeysSpaceHold.test.ts`,
+menu, a native drag of selected text or a link, a primary press on an enabled
+dropdown, and Up, Down, F4, Enter or a repeating Space on a focused one, since
+each can take the release (each key opens the popup on some systems; a plain
+Up or Down on Windows and Linux only changes the choice, and still ends the
+hold). Space may still be down after any of these, so its late release is
+canceled when the hold was a pan, or when a pointer press or a zooming wheel
+turn since would have made it one. Until Space is pressed again or repeats
+where the game follows it (where it does not type, with no Ctrl, Cmd or Alt),
+a drag made with it still down uses its tool instead of panning. A drag pans
+when Space went down first; a drag already under way when Space goes down
+keeps its tool. The camera gets each press at its next frame, so it reads the
+hold as it was when the button went down. A wheel turn counts only when the
+camera reads it as a zoom: a sideways trackpad swipe without Shift zooms
+nothing (in browsers that report the legacy `wheelDelta` it used to zoom in or
+out, by swipe direction) and leaves the tap, while a trackpad's momentum
+scroll over the world right after a flick can still drop one tap. A cursor key
+pressed before Space comes up, or one held since before it, builds the tap
+first, where Space went down; Shift, the lock keys and Fn leave the tap alone,
+and any other key (Ctrl, Cmd and Alt included) drops it. The palette lets
+Space through and, like a native button, acts on the release. At the keyboard
+cursor, a held Enter, Delete, Backspace or X acts once; Enter's repeats can
+still press a button that got focus since its press (#1842). See `e2e/spacePan.spec.ts`,
+`src/game/inputKeys.test.ts`, `src/game/inputKeysSpace.test.ts`,
+`src/game/inputKeysSpaceHold.test.ts`, `src/game/inputKeysSpaceFocus.test.ts`,
 `src/game/inputKeysPointers.test.ts`, `src/game/engineWiring.test.ts`,
 `src/render/excalibur/towerInputCameraInput.test.ts` and
 `src/ui/uiPalette.test.ts`.

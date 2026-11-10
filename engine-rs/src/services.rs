@@ -127,6 +127,16 @@ pub(crate) fn suite_nudge_message(suites: f64, spots: impl std::fmt::Display) ->
     )
 }
 
+/// The population `centers` working recycling centers can process.
+pub(crate) fn recycling_capacity_of(centers: i64) -> f64 {
+    centers as f64 * RECYCLING_POP_PER_CENTER
+}
+
+/// Whether `capacity` covers the whole `population` (the 4-star demand check).
+pub(crate) fn recycling_demand_met_of(population: i64, capacity: f64) -> bool {
+    population as f64 <= capacity
+}
+
 pub struct ParkingDemand {
     pub office_pop: f64,
     pub offices: f64,
@@ -140,11 +150,11 @@ impl Simulation {
     }
 
     pub fn recycling_capacity(&self) -> f64 {
-        self.recycling_centers() as f64 * RECYCLING_POP_PER_CENTER
+        recycling_capacity_of(self.recycling_centers())
     }
 
     pub fn recycling_demand_met(&self) -> bool {
-        self.tower.total_population() as f64 <= self.recycling_capacity()
+        recycling_demand_met_of(self.tower.total_population(), self.recycling_capacity())
     }
 
     pub fn parking_demand(&self) -> ParkingDemand {

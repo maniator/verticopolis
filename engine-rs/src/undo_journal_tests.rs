@@ -62,3 +62,31 @@ fn original_handles_a_large_bulldoze_without_rescanning_each_removal() {
     assert_eq!(original(&gone, 10), 3_760);
     assert_eq!(original(&gone, 3_750), 7_500);
 }
+
+#[test]
+fn a_batch_of_removals_merges_as_the_one_by_one_inserts_would() {
+    let mut seed: u64 = 0x9e37_79b9_7f4a_7c15;
+    let mut next = |below: usize| {
+        seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+        (seed >> 33) as usize % below
+    };
+    for _ in 0..500 {
+        let len = next(60) + 2;
+        let mut gone = Vec::new();
+        for at in 0..len {
+            if next(4) == 0 {
+                gone.push(at);
+            }
+        }
+        // A batch of indexes the gesture has not seen leave yet.
+        let ats: Vec<usize> = (0..len)
+            .filter(|at| !gone.contains(at) && next(2) == 0)
+            .collect();
+        let mut one_by_one = gone.clone();
+        for &at in ats.iter().rev() {
+            note_gone(&mut one_by_one, at);
+        }
+        note_all_gone(&mut gone, ats.clone());
+        assert_eq!(gone, one_by_one, "{ats:?}");
+    }
+}

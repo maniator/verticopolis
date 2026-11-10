@@ -233,7 +233,10 @@ impl ViewReader {
 /// The compare's cost moves with the rooms that changed, so no one share of
 /// the rooms breaks even on every frame, and just below half the marks cost
 /// up to 1.2 times a compare on the frames measured. Both branches send the
-/// same rooms, since every write of a frame field marks.
+/// same rooms, since every write of a frame field marks. The census tally
+/// (`tally.rs`) uses the same threshold with no sort, at one constant visit
+/// per mark, so either of its branches costs at most about one visit per
+/// room.
 pub(super) fn compare_all(marks: usize, rooms: usize) -> bool {
     marks * 2 >= rooms
 }

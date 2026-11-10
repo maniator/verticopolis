@@ -243,6 +243,19 @@ export class ViewReader implements SimView {
     return code !== undefined && Math.floor(this.unlockedKinds / 2 ** code) % 2 === 1;
   }
 
+  /** The nearest structure tile on the row past `x` toward `step` (-1 left, 1
+   *  right), where a bridge scan from `x` stops, as of the last update;
+   *  undefined when there is none. */
+  structureBeside(floor: number, x: number, step: 1 | -1): { x: number; kind: "floor" | "lobby" } | undefined {
+    const list = this.runsByFloor.get(floor) ?? [];
+    const from = x + step;
+    const i = upper(list.length, (k) => list[k].x, from) - 1;
+    const end = (r: Run) => r.x + r.count * r.width - 1;
+    if (i >= 0 && from <= end(list[i])) return { x: from, kind: list[i].kind };
+    const r = step < 0 ? list[i] : list[i + 1];
+    return r === undefined ? undefined : { x: step < 0 ? end(r) : r.x, kind: r.kind };
+  }
+
   /** Decode the structure; true when no room was kept from the last one. */
   private rebuild(): boolean {
     const l = this.l;
@@ -436,7 +449,8 @@ export class ViewReader implements SimView {
     }
   }
 
-  private roomAt(floor: number, x: number): Room | undefined {
+  /** The room on any story it covers at a tile, as of the last update. */
+  roomAt(floor: number, x: number): Room | undefined {
     const list = this.roomsByFloor.get(floor);
     if (!list) return undefined;
     const i = upper(list.length, (k) => list[k].x, x) - 1;

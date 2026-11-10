@@ -166,7 +166,7 @@ export function syncEngine(): void {
  * scratch copy of the live tower, loaded from the engine's own save, and the
  * app then adopts that copy, which the engine restores. The minute that runs
  * the VIP inspection at TOWER is a tick of the engine itself. The
- * undo-restore flavor of `adoptSim` keeps the camera, as the in-place build
+ * restore flavor of `adoptSim` keeps the camera, as the in-place build
  * does.
  */
 export function buildToStar(target: number): number {

@@ -1,4 +1,4 @@
-import { catalogBuildKind, catalogFacility, type Catalog } from "../catalog/catalogTypes";
+import { catalogBuildKind, catalogFacility, catalogTileCost, type Catalog } from "../catalog/catalogTypes";
 import type { FacilityKind } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
@@ -119,8 +119,11 @@ export class BuildActions {
     const laid = catalogBuildKind(catalog, kind, floor);
     if (placed > 0 && laid !== kind) {
       const f = catalogFacility(catalog, laid);
+      // The Floor tool's brush lays only where there is no floor yet, so each
+      // tile paid for its floor too (catalogTileCost).
+      const perTile = catalogTileCost(catalog, laid, "no floor yet");
       this.deps.ui.toast(
-        `The ground floor is a ${f.name.toLowerCase()}, so a ${f.name.toLowerCase()} ($${groupDigits(f.cost)}/tile) went here.`,
+        `The ground floor is a ${f.name.toLowerCase()}, so a ${f.name.toLowerCase()} ($${groupDigits(perTile)}/tile) went here.`,
         "info",
       );
     }

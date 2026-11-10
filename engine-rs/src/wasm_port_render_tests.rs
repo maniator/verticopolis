@@ -12,7 +12,7 @@ fn code(kind: Kind) -> f64 {
 /// A lobby and three floors over x 150..230, an office, a standard
 /// elevator over floors 1 to 4 that skips floor 3, a service elevator and
 /// stairs.
-fn built() -> Engine {
+pub(super) fn built() -> Engine {
     let mut e = Engine::of(Simulation::new_game(7, GameMode::Modern));
     e.sim.money = 1e9;
     e.sim.star = 2;
@@ -238,11 +238,8 @@ fn the_fills_and_the_parking_set_read_the_simulation() {
         e.port_recycling_demand_met(),
         "an empty tower is within capacity"
     );
-    e.sim
-        .tower
-        .get_unit_mut(center.unit_id.unwrap())
-        .unwrap()
-        .state = UnitState::Fire;
+    let (u, at) = e.sim.tower.marked_by_id(center.unit_id.unwrap()).unwrap();
+    u.set_state(at, UnitState::Fire);
     assert_eq!(
         e.port_recycling_capacity(),
         0.0,

@@ -54,8 +54,10 @@ function typesSpace(el: Element | null): boolean {
  *  release for Space, so a tap kept alive past it would build at a later arrow. */
 const KEYS_THAT_KEEP_THE_TAP = new Set(["Shift", "CapsLock", "NumLock", "ScrollLock", "FnLock", "SymbolLock", "Fn"]);
 
-/** Keys that can open a focused dropdown's popup, held or fresh: Alt + Down
- *  or Up, any arrow, F4 or Enter. */
+/** Keys that open a focused dropdown's popup on some systems, held or fresh:
+ *  Alt + Up or Down, F4, a plain Up or Down, or Enter. Each ends the hold on
+ *  every system, so a plain Up or Down where it only changes the choice ends
+ *  it too. */
 const KEYS_THAT_OPEN_A_DROPDOWN = new Set(["ArrowDown", "ArrowUp", "F4", "Enter"]);
 
 /** Whether a press or a key on `el` can open a dropdown's popup, which takes
@@ -63,6 +65,19 @@ const KEYS_THAT_OPEN_A_DROPDOWN = new Set(["ArrowDown", "ArrowUp", "F4", "Enter"
  *  none on a desktop, but phones and tablets show it in a picker. */
 function opensPopup(el: Element | null): boolean {
   return el instanceof HTMLSelectElement && !el.matches(":disabled");
+}
+
+/** A native control that acts on a Space release: a button, or an input
+ *  whose type is in `ACTS_ON_SPACE_RELEASE` (a checkbox, a radio, a button
+ *  input and the like). */
+function isNativeSpaceControl(el: Element | null): el is HTMLButtonElement | HTMLInputElement {
+  return el instanceof HTMLButtonElement || (el instanceof HTMLInputElement && ACTS_ON_SPACE_RELEASE.has(el.type));
+}
+
+/** Whether `el` acts on a Space release: a native control, or an ARIA button
+ *  (a palette item, which draws its own pressed look). */
+function actsOnSpaceRelease(el: Element | null): boolean {
+  return isNativeSpaceControl(el) || el?.getAttribute("role") === "button";
 }
 
 /** Whether a key moves the keyboard build cursor. */
@@ -112,16 +127,16 @@ function blocksGameKey(e: KeyboardEvent): boolean {
   return isSplashUp();
 }
 
-/** A focused native button, checkbox or radio that Space pressed stays drawn
- *  pressed when its release is canceled, since the browser resets that look as
- *  part of the release it would have handled. Moving focus off and straight
- *  back resets it and keeps the keyboard where it was. Only those controls:
- *  anything else that is `:active` is held by the mouse, and a blur would end
- *  its gesture (the Map lets go of the view, a text field commits its edit). */
+/** A focused native control that Space pressed (a button, a checkbox, a radio,
+ *  a button input and the like) stays drawn pressed when its release is
+ *  canceled, since the browser resets that look as part of the release it
+ *  would have handled. Moving focus off and straight back resets it and keeps
+ *  the keyboard where it was. Only those controls: anything else that is
+ *  `:active` is held by the mouse, and a blur would end its gesture (the Map
+ *  lets go of the view, a text field commits its edit). */
 function liftKeyboardPress(): void {
   const ae = document.activeElement;
-  const actsOnRelease = ae instanceof HTMLButtonElement || (ae instanceof HTMLInputElement && ACTS_ON_SPACE_RELEASE.has(ae.type));
-  if (!actsOnRelease || !ae.matches(":active")) return;
+  if (!isNativeSpaceControl(ae) || !ae.matches(":active")) return;
   ae.blur();
   ae.focus({ preventScroll: true });
 }
@@ -156,7 +171,8 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
   // The Space press now down, followed or not: what had focus and whether the
   // world was covered. A cover that comes up mid-press (an emergency choice,
   // its button focused) or swaps focus under it (one dialog for another) never
-  // got this press, so its controls get neither the repeats nor the release.
+  // got this press, so its controls get neither the repeats nor the release;
+  // nor does a control that gets focus since (focusTookSpace).
   let spacePress: { target: Element | null; covered: boolean } | null = null;
   const notePress = (): void => {
     spacePress = { target: document.activeElement, covered: worldCovered() };
@@ -193,6 +209,16 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
   };
   const coverTookSpace = (): boolean =>
     !!spacePress && worldCovered() && (!spacePress.covered || document.activeElement !== spacePress.target);
+  // A control that got focus since the press never got the press, as when a
+  // narrower window closes the Map and the Map gives its button focus with
+  // no key or pointer press in between. Nor did one focused before a Space
+  // first seen as repeats. Space's repeats would arm it and the release
+  // would press it. A click during a hold the game follows makes the hold a
+  // pan, whose release is canceled anyway; after a Space typed into a field
+  // or pressed as a chord there is no hold, and this rule alone keeps a
+  // clicked button out.
+  const focusTookSpace = (): boolean =>
+    !!spacePress && document.activeElement !== spacePress.target && actsOnSpaceRelease(document.activeElement);
   // Whether Space was held as each press went down, by its native event. The
   // camera gets a press at its next frame (Excalibur queues them), when Space
   // may have come up or gone down since; it reads this record.
@@ -212,9 +238,10 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
   // while one is still held (an emergency choice, its button focused) gets none
   // of its repeats, so a held Enter does not press the cover's button.
   const heldUncovered = new Set<string>();
-  // A repeat a cover did not get the press of: neither its controls' default
+  // A repeat of a key the focused control did not get the press of (a cover
+  // that came up mid-press, or a control focused since): neither its default
   // action nor any listener below the window sees it.
-  const keepFromCover = (e: KeyboardEvent): void => {
+  const withholdRepeat = (e: KeyboardEvent): void => {
     e.preventDefault();
     e.stopPropagation();
   };
@@ -229,17 +256,18 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
         if (worldCovered()) heldUncovered.delete(keyId(e));
         else heldUncovered.add(keyId(e));
       } else if (heldUncovered.has(keyId(e)) && worldCovered()) {
-        keepFromCover(e);
+        withholdRepeat(e);
       }
     }
     if (e.repeat) {
       if (isSpaceKey(e)) {
         // A Space already down when the page got focus arrives only as repeats:
         // follow that hold too (it can still become the pan key), with no tap.
-        // No cover got its press, so one that is up does not get the hold.
+        // No cover got its press, so one that is up does not get the hold, even
+        // a field in it (its repeated spaces are lost).
         if (!spacePress) spacePress = { target: null, covered: false };
         if (space === "up" && followsSpace(e)) startSpaceHold();
-        if (coverTookSpace()) keepFromCover(e);
+        if (coverTookSpace() || focusTookSpace()) withholdRepeat(e);
       } else if (space === "tap" && !KEYS_THAT_KEEP_THE_TAP.has(e.key)) {
         // A key held since before Space went down: its first repeat settles the tap.
         settleTap(e);
@@ -345,15 +373,18 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
     e.preventDefault(); // consumed a commit or bulldoze key, repeats included
   }, { signal });
   // Capture, ahead of a focused button or palette item, which act on the
-  // Space release: the release of a pan-key hold reaches them already canceled.
+  // Space release: the release of a pan-key hold, or of a Space pressed before
+  // the control got focus, reaches them already canceled.
   window.addEventListener("keyup", (e) => {
     // While Cmd is held macOS sends no Space release, so Cmd's own release
-    // ends the hold; a Space still down starts a new one at its next press.
+    // ends the hold; a Space still down starts a new one at its next press or
+    // at a repeat the game follows.
     heldUncovered.delete(keyId(e));
     if (e.key === "Meta") dropSpaceHold();
     if (!isSpaceKey(e)) return;
     const hold = panReleaseOwed ? "pan" : space;
     const coverTook = coverTookSpace();
+    const focusTook = focusTookSpace();
     endSpaceHold();
     if (worldCovered()) {
       // Nothing behind a cover pans, so a Space pressed on its controls stays
@@ -364,7 +395,7 @@ export function bindKeys(app: GameApp, signal?: AbortSignal): void {
       }
       return;
     }
-    if (hold === "pan") {
+    if (hold === "pan" || focusTook) {
       e.preventDefault();
       liftKeyboardPress();
       return;
