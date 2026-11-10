@@ -511,16 +511,16 @@ export class Engine {
     shaftSchedule(id: number): Float64Array;
     startExtend(id: number): Float64Array;
     /**
-     * Tooling: a fire, which is no edit, so it is no part of an open
-     * gesture's undo step.
-     */
-    /**
      * Tooling only: the daily roll's fire outbreak in room `id`, with the
      * paid-rescue offer it raises. It uses no random draws and refuses a
      * nonflammable/missing room or an already-active fire/choice.
      * Like startFire, it does not join an open undo step.
      */
     startFireAt(id: number): boolean;
+    /**
+     * Tooling: a fire, which is no edit, so it is no part of an open
+     * gesture's undo step.
+     */
     startFire(): void;
     /**
      * The state view's hash, as the lock records it.

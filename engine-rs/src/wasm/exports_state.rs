@@ -70,7 +70,6 @@ impl Engine {
         self.sim.outside_the_gesture(|s| s.start_fire());
     }
 
-    /// Tooling: a bomb threat, outside an open gesture as a fire is.
     /// Tooling only: the daily roll's fire outbreak in room `id`, with the
     /// paid-rescue offer it raises, so a test can set a chosen room ablaze
     /// mid-run (`startFire` picks a room at random and offers nothing). It
@@ -82,6 +81,7 @@ impl Engine {
         whole_id(id).is_some_and(|id| self.sim.outside_the_gesture(|s| s.start_fire_at(id)))
     }
 
+    /// Tooling: a bomb threat, outside an open gesture as a fire is.
     #[wasm_bindgen(js_name = bombThreat)]
     pub fn bomb_threat(&mut self) {
         self.sim.outside_the_gesture(|s| s.bomb_threat());
