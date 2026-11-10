@@ -433,3 +433,50 @@ fn a_time_step_inside_a_gesture_is_not_part_of_the_step() {
         "only the build's price, not the day's takings"
     );
 }
+
+/// Taking a batch of units out at once leaves the same step as taking them
+/// out one at a time, last index first: the journal merges the batch's
+/// indexes into those removed before it in one pass, and the removals after
+/// it find their places as before.
+#[test]
+fn a_batch_removal_records_the_same_step_as_one_by_one_removals() {
+    let step_of = |batch: bool| {
+        let mut sim = tower();
+        gesture(&mut sim, |s| {
+            assert!(s.build(Kind::Floor, 5, 20).ok);
+            // Removed first, from before the batch's units, between them
+            // and after them in the list.
+            for (floor, x) in [(2, 12), (3, 22), (2, 25), (2, 60)] {
+                let id = s.tower.unit_at(floor, x).unwrap().id;
+                assert!(s.tower.remove_unit(id).is_some());
+            }
+            let mut ids: Vec<i64> = (20..30)
+                .map(|x| s.tower.unit_at(4, x).unwrap().id)
+                .collect();
+            ids.push(s.tower.unit_at(5, 20).unwrap().id);
+            if batch {
+                assert_eq!(s.tower.remove_units(&ids).len(), ids.len());
+            } else {
+                let mut at: Vec<(usize, i64)> = ids
+                    .iter()
+                    .map(|&id| (s.tower.units.iter().position(|u| u.id == id).unwrap(), id))
+                    .collect();
+                at.sort_unstable();
+                for (_, id) in at.into_iter().rev() {
+                    assert!(s.tower.remove_unit(id).is_some());
+                }
+            }
+            // Removed after, where the journal reads its place in the list
+            // as the gesture found it from the removals noted so far.
+            for (floor, x) in [(2, 21), (3, 40)] {
+                let id = s.tower.unit_at(floor, x).unwrap().id;
+                assert!(s.tower.remove_unit(id).is_some());
+            }
+        })
+        .unwrap()
+    };
+    assert_eq!(
+        format!("{:?}", step_of(true)),
+        format!("{:?}", step_of(false))
+    );
+}

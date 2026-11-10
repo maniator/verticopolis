@@ -33,7 +33,7 @@
 #![cfg_attr(not(feature = "wasm"), allow(dead_code))]
 use crate::facilities::Kind;
 use crate::sim::Simulation;
-use crate::sim_undo_check::caps_held;
+use crate::sim_undo_caps::caps_held;
 use crate::tower::{Transport, UnitState};
 use crate::undo::{
     Step, Swap, TransportChange, TransportImage, UnitChange, UnitFacts, UnitImage, UnitUse,
@@ -444,3 +444,11 @@ mod hour_tests;
 #[cfg(test)]
 #[path = "sim_undo_cleanup_tests.rs"]
 mod cleanup_tests;
+
+#[cfg(test)]
+#[path = "sim_undo_site_tests.rs"]
+mod site_tests;
+
+#[cfg(test)]
+#[path = "sim_undo_root_tests.rs"]
+mod root_tests;

@@ -33,7 +33,7 @@
 //! (`Transport::rides`). So an undo is never a way to sell a used build
 //! back at its full price.
 #![cfg_attr(not(feature = "wasm"), allow(dead_code))]
-use crate::sim_undo_check::CapHeld;
+use crate::sim_undo_caps::CapHeld;
 use crate::tower::{Transport, Unit, UnitState};
 
 /// Most steps each stack keeps before the oldest is dropped.

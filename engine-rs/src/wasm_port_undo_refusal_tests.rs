@@ -5,6 +5,18 @@ use super::*;
 use crate::facilities::Kind;
 use crate::gameplay::RemovalMethod;
 use crate::tower::UnitState;
+use crate::wasm::port::STATUS;
+
+/// Build through the port, and check the build was made.
+#[track_caller]
+fn built(e: &mut Engine, kind: Kind, floor: f64, x: f64) {
+    assert_eq!(
+        e.port_build(code(kind), floor, x)[STATUS],
+        1.0,
+        "{:?}",
+        e.reason
+    );
+}
 
 #[test]
 fn a_step_on_a_burning_room_waits_and_one_on_an_opened_room_is_dropped() {
@@ -14,13 +26,13 @@ fn a_step_on_a_burning_room_waits_and_one_on_an_opened_room_is_dropped() {
         assert!(e.sim.tower.place(Kind::Floor, 2, x).ok);
     }
     // An older edit an undo can still reach once time has passed: a sale.
-    e.port_build(code(Kind::Office), 2.0, 125.0);
+    built(&mut e, Kind::Office, 2.0, 125.0);
     let sold = e.sim.tower.unit_at(2, 125).unwrap().id;
     e.port_undo_capture("Sell Office");
     assert!(e.sim.remove_facility(sold, RemovalMethod::Sell).ok);
     e.port_undo_commit();
     e.port_undo_capture("Build Office");
-    e.port_build(code(Kind::Office), 2.0, 110.0);
+    built(&mut e, Kind::Office, 2.0, 110.0);
     e.port_undo_commit();
     let id = e.sim.tower.unit_at(2, 110).unwrap().id;
     e.sim.tower.get_unit_mut(id).unwrap().state = UnitState::Fire;
@@ -70,21 +82,21 @@ fn a_step_something_stands_in_the_way_of_is_dropped() {
         assert!(e.sim.tower.place(Kind::Floor, 2, x).ok);
     }
     // An older edit an undo can still reach once time has passed: a sale.
-    e.port_build(code(Kind::Office), 2.0, 125.0);
+    built(&mut e, Kind::Office, 2.0, 125.0);
     let older = e.sim.tower.unit_at(2, 125).unwrap().id;
     e.port_undo_capture("Sell Office");
     assert!(e.sim.remove_facility(older, RemovalMethod::Sell).ok);
     e.port_undo_commit();
-    e.port_build(code(Kind::Office), 2.0, 110.0);
+    built(&mut e, Kind::Office, 2.0, 110.0);
     let sold = e.sim.tower.unit_at(2, 110).unwrap().id;
     e.port_undo_capture("Sell Office");
     assert!(e.sim.remove_facility(sold, RemovalMethod::Sell).ok);
     e.port_undo_commit();
     e.port_undo_capture("Build Office");
-    e.port_build(code(Kind::Office), 2.0, 110.0);
+    built(&mut e, Kind::Office, 2.0, 110.0);
     e.port_undo_commit();
-    let built = e.sim.tower.unit_at(2, 110).unwrap().id;
-    while e.sim.tower.get_unit(built).unwrap().state == UnitState::Construction {
+    let rebuilt = e.sim.tower.unit_at(2, 110).unwrap().id;
+    while e.sim.tower.get_unit(rebuilt).unwrap().state == UnitState::Construction {
         e.sim.tick(10.0);
     }
     assert_eq!(e.port_undo()[0], 0.0, "the new office has opened");
@@ -93,7 +105,7 @@ fn a_step_something_stands_in_the_way_of_is_dropped() {
     assert_eq!(
         e.last_reason_text().as_deref(),
         Some(
-            "Can't undo that: something in the tower stands in the way. \
+            "Can't undo that: the tower around it has changed since. \
              Undo again for the edit before it."
         )
     );
@@ -110,12 +122,12 @@ fn a_redo_that_is_blocked_or_meets_a_changed_tower_ends_the_trail() {
     assert_eq!(e.port_undo()[0], 1.0);
     assert_eq!(e.port_undo()[0], 1.0);
     // An edit with no gesture open lays a lobby where the undone one stood.
-    e.port_build(code(Kind::Lobby), 1.0, 100.0);
+    built(&mut e, Kind::Lobby, 1.0, 100.0);
     let before = (e.sim.save_text(), e.sim.money);
     assert_eq!(e.port_redo()[0], 0.0);
     assert_eq!(
         e.last_reason_text().as_deref(),
-        Some("Can't redo that: something in the tower stands in the way.")
+        Some("Can't redo that: the tower around it has changed since.")
     );
     assert_eq!((e.sim.save_text(), e.sim.money), before);
     assert_eq!(e.port_undo_depths(), vec![0.0, 0.0], "the redo trail ends");
@@ -189,13 +201,13 @@ fn ground_under_used_builds_never_comes_back_at_full_price() {
     let mut e = engine();
     e.port_undo_capture("Build Lobby");
     for x in 100..130 {
-        e.port_build(code(Kind::Lobby), 1.0, x as f64);
+        built(&mut e, Kind::Lobby, 1.0, x as f64);
     }
     e.port_undo_commit();
     e.port_undo_capture("Build Floor");
     for floor in 2..=4 {
         for x in 100..130 {
-            e.port_build(code(Kind::Floor), floor as f64, x as f64);
+            built(&mut e, Kind::Floor, floor as f64, x as f64);
         }
     }
     e.port_undo_commit();
@@ -203,7 +215,7 @@ fn ground_under_used_builds_never_comes_back_at_full_price() {
     assert!(e.sim.build_transport(Kind::ElevatorStandard, 110, 1, 4).ok);
     e.port_undo_commit();
     e.port_undo_capture("Build Office");
-    e.port_build(code(Kind::Office), 3.0, 115.0);
+    built(&mut e, Kind::Office, 3.0, 115.0);
     e.port_undo_commit();
     e.sim.tick(60.0 * 24.0 * 3.0);
     let (money, count) = (e.sim.money, units(&e));
@@ -225,12 +237,12 @@ fn floors_under_a_ridden_shaft_never_come_back_within_the_hour() {
     let runs = e.sim.on_hour_runs;
     e.port_undo_capture("Build Lobby");
     for x in 100..130 {
-        e.port_build(code(Kind::Lobby), 1.0, x as f64);
+        built(&mut e, Kind::Lobby, 1.0, x as f64);
     }
     e.port_undo_commit();
     e.port_undo_capture("Build Floor");
     for x in 100..130 {
-        e.port_build(code(Kind::Floor), 2.0, x as f64);
+        built(&mut e, Kind::Floor, 2.0, x as f64);
     }
     e.port_undo_commit();
     e.port_undo_capture("Build Elevator");
@@ -244,7 +256,7 @@ fn floors_under_a_ridden_shaft_never_come_back_within_the_hour() {
     assert!(said(&e).starts_with("Can't undo that: it has been in use since."));
     for _ in 0..2 {
         assert_eq!(e.port_undo()[0], 0.0);
-        assert!(said(&e).starts_with("Can't undo that: something in the tower stands in the way."));
+        assert!(said(&e).starts_with("Can't undo that: the tower around it has changed since."));
     }
     assert_eq!(e.sim.on_hour_runs, runs, "no hourly pass ran");
     assert_eq!(e.port_undo_depths(), vec![0.0, 0.0]);
@@ -266,15 +278,15 @@ fn a_floor_under_a_room_built_since_never_comes_back_within_the_hour() {
     }
     e.port_undo_capture("Build Floor");
     for x in 100..130 {
-        e.port_build(code(Kind::Floor), 2.0, x as f64);
+        built(&mut e, Kind::Floor, 2.0, x as f64);
     }
     e.port_undo_commit();
-    e.port_build(code(Kind::Office), 2.0, 110.0);
+    built(&mut e, Kind::Office, 2.0, 110.0);
     let (money, count) = (e.sim.money, units(&e));
     assert_eq!(e.port_undo()[0], 0.0);
     assert_eq!(
         e.last_reason_text().as_deref(),
-        Some("Can't undo that: something in the tower stands in the way.")
+        Some("Can't undo that: the tower around it has changed since.")
     );
     assert_eq!(e.sim.on_hour_runs, runs, "no hourly pass ran");
     assert_eq!(e.port_undo_depths(), vec![0.0, 0.0]);
@@ -352,7 +364,7 @@ fn each_refusal_reads_as_the_player_sees_it() {
         ),
         (
             StepRefused::Blocked,
-            "Can't undo that: something in the tower stands in the way.",
+            "Can't undo that: the tower around it has changed since.",
         ),
         (
             StepRefused::Stale,

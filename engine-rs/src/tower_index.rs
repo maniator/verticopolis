@@ -290,11 +290,8 @@ impl Tower {
                 return floor;
             }
         }
-        let floor = self
-            .units
-            .iter()
-            .find(|u| u.kind == Kind::Metro)
-            .map(|u| u.floor);
+        // From the room index, past the tiles.
+        let floor = self.units_of_kind(Kind::Metro).next().map(|u| u.floor);
         self.memo.borrow_mut().metro_floor = Some((key, floor));
         floor
     }

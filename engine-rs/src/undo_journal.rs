@@ -150,6 +150,37 @@ fn note_gone(gone: &mut Vec<usize>, at: usize) {
     gone.insert(place, at);
 }
 
+/// Note that the units at the indexes in `ats`, in the list as the gesture
+/// found it, are gone, merging them into `gone` in one pass however many
+/// there are, where noting them one at a time would shift `gone` once each.
+/// The merge runs from the back, into the room the batch adds at the end.
+fn note_all_gone(gone: &mut Vec<usize>, mut ats: Vec<usize>) {
+    if ats.len() < 2 {
+        ats.into_iter().for_each(|at| note_gone(gone, at));
+        return;
+    }
+    ats.sort_unstable();
+    debug_assert!(ats.windows(2).all(|w| w[0] != w[1]), "an index leaves once");
+    let mut old = gone.len();
+    gone.resize(old + ats.len(), 0);
+    let (mut new, mut to) = (ats.len(), gone.len());
+    // Once the batch is in, the rest of the old list is already in place.
+    while new > 0 {
+        to -= 1;
+        if old > 0 && gone[old - 1] > ats[new - 1] {
+            old -= 1;
+            gone[to] = gone[old];
+        } else {
+            debug_assert!(
+                old == 0 || gone[old - 1] != ats[new - 1],
+                "an index leaves once"
+            );
+            new -= 1;
+            gone[to] = ats[new];
+        }
+    }
+}
+
 impl Journal {
     pub(crate) fn new(label: &str, hour_passes: i64) -> Journal {
         Journal {
@@ -178,16 +209,36 @@ impl Journal {
         self.see_unit(original(&self.gone, i), u);
     }
 
-    /// The unit at index `i` is about to leave the list. A unit the gesture
-    /// added that the simulation has used since is marked, so the step
-    /// never hands back its price (`sim_undo.rs`). One the gesture found
-    /// goes back as it leaves, less what the gesture's edits changed.
+    /// The unit at index `i` is about to leave the list
+    /// ([`Journal::leaving`]).
     pub(crate) fn unit_out(&mut self, i: usize, u: &Unit) {
-        let at = match self.unit_seen.get(&u.id) {
+        if let Some(at) = self.leaving(i, u) {
+            note_gone(&mut self.gone, at);
+        }
+    }
+
+    /// The units of `batch`, given last index first, are about to leave the
+    /// list together. The journal notes each as [`Journal::unit_out`] would,
+    /// in the same order, but every one is still in the list, so each index
+    /// reads against the removals before the batch (a later removal never
+    /// moves an earlier unit), and the batch joins them in one merge.
+    pub(crate) fn units_out<'u>(&mut self, batch: impl Iterator<Item = (usize, &'u Unit)>) {
+        let ats = batch.filter_map(|(i, u)| self.leaving(i, u)).collect();
+        note_all_gone(&mut self.gone, ats);
+    }
+
+    /// Note unit `u`, at index `i`, as it leaves, and answer its index in the
+    /// list as the gesture found it, or `None` for a unit the gesture added.
+    /// A unit the gesture added that the simulation has used since is
+    /// marked, so the step never hands back its price (`sim_undo.rs`). One
+    /// the gesture found goes back as it leaves, less what the gesture's
+    /// edits changed.
+    fn leaving(&mut self, i: usize, u: &Unit) -> Option<usize> {
+        match self.unit_seen.get(&u.id) {
             Some(&k) => match &mut self.units[k].before {
                 Before::Was(found) => {
                     *found = u.with_edit_facts_of(found);
-                    self.units[k].at
+                    Some(self.units[k].at)
                 }
                 &mut Before::Added(entered) => {
                     let now = UnitUse::of(u);
@@ -196,17 +247,16 @@ impl Journal {
                     }
                     // A tile's use shows only in the hours it stood.
                     self.took_own_build |= u.kind.is_structural();
-                    return;
+                    None
                 }
-                Before::AddedAndUsed(_) => return,
+                Before::AddedAndUsed(_) => None,
             },
             None => {
                 let at = original(&self.gone, i);
                 self.see_unit(at, u);
-                at
+                Some(at)
             }
-        };
-        note_gone(&mut self.gone, at);
+        }
     }
 
     /// The floor tile at index `i` is about to give its slot to a lobby: it
@@ -227,9 +277,7 @@ impl Journal {
     /// The lobby brush moved what it placed to the end of the list: the slots
     /// it took are now gaps in the list.
     pub(crate) fn slots_settled(&mut self) {
-        for at in std::mem::take(&mut self.slots) {
-            note_gone(&mut self.gone, at);
-        }
+        note_all_gone(&mut self.gone, std::mem::take(&mut self.slots));
     }
 
     /// Unit `u` is about to be added to the list. Its use as it comes in
