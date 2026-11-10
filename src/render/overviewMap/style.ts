@@ -9,7 +9,8 @@
  * each get their own pattern as an accessibility addition, the three elevator
  * kinds get one each, and the plain solid groups (floor, lobby, offices) differ
  * in lightness by a wide margin, so the tower reads without color vision. The
- * room fills are the facility colors the sprites and palette already use. A
+ * room fills are the facility colors the sprites and palette already use,
+ * except where one is too dark for the map's backdrop (`MAP_ROOM_FILL`). A
  * kind with no group is a compile error (`KIND_GROUP` is an exhaustive record).
  * A kind the table has never heard of at run time (a forged save, a newer
  * engine) paints as a loud placeholder.
@@ -124,14 +125,23 @@ export function patternInk(fill: string): string {
   return contrastRatio(lum, light) > contrastRatio(lum, dark) ? INK_LIGHT : INK_DARK;
 }
 
-/** The shaft fills, kept clear of the room colors and at least 3:1 against
- *  the backdrop's sky and ground, since a shaft can run past the top floor or
- *  over the lot's edge onto them. */
-const SHAFT_FILL: Readonly<Partial<Record<MapGroup, string>>> = {
-  stairs: "#6a717d",
+/** The shaft fills, kept clear of every room color (style.test.ts measures
+ *  each pair) and at least 3:1 against the backdrop's sky and ground, since a
+ *  shaft can run past the top floor or over the lot's edge onto them. */
+export const SHAFT_FILL: Readonly<Partial<Record<MapGroup, string>>> = {
+  stairs: "#6c7484",
   elevatorStandard: "#9aa3b2",
-  elevatorService: "#e0544e",
+  elevatorService: "#f05458",
   elevatorExpress: "#4a8cf0",
+};
+
+/** The map's own fill for a room whose facility color falls under 3:1 against
+ *  the backdrop (#1803). Each stays close to its facility color, so the room
+ *  reads as the same thing it is in the main view. The main view keeps the
+ *  facility colors: its backdrop is not the map's. */
+const MAP_ROOM_FILL: Readonly<Partial<Record<FacilityKind, string>>> = {
+  parkingRamp: "#7c706c",
+  security: "#5474a4",
 };
 
 export interface MapKindStyle {
@@ -148,5 +158,5 @@ export function mapStyleFor(kind: FacilityKind): MapKindStyle {
   if (!Object.prototype.hasOwnProperty.call(KIND_GROUP, kind)) return UNKNOWN_KIND_STYLE;
   const group = KIND_GROUP[kind];
   const shaft = SHAFT_FILL[group];
-  return { fill: shaft ?? FACILITY_PRESENTATION[kind].color, pattern: GROUP_PATTERN[group] };
+  return { fill: shaft ?? MAP_ROOM_FILL[kind] ?? FACILITY_PRESENTATION[kind].color, pattern: GROUP_PATTERN[group] };
 }
