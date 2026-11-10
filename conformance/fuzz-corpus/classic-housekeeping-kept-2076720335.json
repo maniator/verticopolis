@@ -1,0 +1,39 @@
+{
+  "id": "classic-housekeeping-kept-2076720335",
+  "description": "Selling a housekeeping room in Classic is refused by both engines, since the 1994 game keeps it for good. The TypeScript reference sold it until the 3.0.0 seeded replay found the gap. Shrunk from fuzz seed 2076720335 (88 to 4 commands).",
+  "start": {
+    "newGame": {
+      "seed": 2076720335,
+      "mode": "classic",
+      "star": 2
+    }
+  },
+  "commands": [
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 150,
+      "to": 230
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "build",
+      "kind": "housekeeping",
+      "floor": 3,
+      "x": 203
+    },
+    {
+      "op": "sell",
+      "floor": 3,
+      "x": 205,
+      "expectFail": true
+    }
+  ]
+}

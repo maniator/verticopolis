@@ -28,6 +28,7 @@ import {
   rollHousehold,
 } from "./households";
 import type { GameRules, DemographicRoutines, HousekeepingTriage } from "./gameRules";
+import type { FacilityKind } from "./types";
 
 /**
  * The two rule-set literals behind the {@link GameRules} seam, split out of
@@ -54,6 +55,9 @@ const CLASSIC_WEEKEND_MULT: Partial<Record<string, number>> = {
   shop: 30 / 25,
 };
 
+/** The rooms Classic keeps for good ({@link GameRules.roomIsPermanent}). */
+const CLASSIC_PERMANENT_ROOMS: ReadonlySet<FacilityKind> = new Set<FacilityKind>(["housekeeping", "security", "recycling", "cinema", "weddingHall"]);
+
 const MODERN_HK_TRIAGE: HousekeepingTriage = Object.freeze({ perDirtyDay: 10, perFloor: 1 });
 
 export const CLASSIC_RULES: GameRules = {
@@ -73,6 +77,9 @@ export const CLASSIC_RULES: GameRules = {
     // Classic always bridges (byte-identical to the original); the toggle never
     // appears and can't be flipped.
     return false;
+  },
+  roomIsPermanent(kind) {
+    return CLASSIC_PERMANENT_ROOMS.has(kind);
   },
   elevatorScheduleUX() {
     // 1994 fidelity: raw grid only. Classic withholds advice, never information.
@@ -232,6 +239,9 @@ export const MODERN_RULES: GameRules = {
     // Modern surfaces the "bridge floors between rooms" toggle (default on, set
     // at founding, changeable any time in Settings).
     return true;
+  },
+  roomIsPermanent() {
+    return false;
   },
   elevatorScheduleUX() {
     // Modern assistance: presets, auto-tune, advice; the raw grid behind Advanced.

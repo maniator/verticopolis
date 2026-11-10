@@ -1,0 +1,81 @@
+{
+  "id": "classic-cinema-kept-2076720632",
+  "description": "Selling a movie theater in Classic is refused by both engines, since the 1994 game keeps it for good. The TypeScript reference sold it until the 3.0.0 seeded replay found the gap. Shrunk from fuzz seed 2076720632 (231 to 10 commands).",
+  "start": {
+    "newGame": {
+      "seed": 2076720632,
+      "mode": "classic",
+      "star": 3
+    }
+  },
+  "commands": [
+    {
+      "op": "buildRow",
+      "kind": "lobby",
+      "floor": 1,
+      "from": 150,
+      "to": 230
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 2,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 3,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 4,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 5,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 6,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 7,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "buildRow",
+      "kind": "floor",
+      "floor": 8,
+      "from": 151,
+      "to": 229
+    },
+    {
+      "op": "build",
+      "kind": "cinema",
+      "floor": 9,
+      "x": 182
+    },
+    {
+      "op": "sell",
+      "floor": 9,
+      "x": 190,
+      "expectFail": true
+    }
+  ]
+}
