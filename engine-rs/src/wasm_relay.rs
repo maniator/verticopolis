@@ -48,10 +48,6 @@ impl Engine {
         pair(id, cars).is_some_and(|(id, cars)| self.sim.set_cars(id, cars))
     }
 
-    pub(crate) fn tower_set_cars_checked(&mut self, id: Option<f64>, cars: Option<f64>) -> bool {
-        pair(id, cars).is_some_and(|(id, cars)| self.sim.tower.set_cars(id, cars))
-    }
-
     /// The id is checked before the schedule's JSON is read, as TypeScript
     /// refuses it before looking at the payload; a malformed payload under a
     /// whole id is still an error.
@@ -76,20 +72,6 @@ impl Engine {
         match (id.and_then(whole), pair(bottom, top)) {
             (Some(id), Some((bottom, top))) => {
                 resize_json(self.sim.resize_transport(id, bottom, top))
-            }
-            _ => invalid_resize(),
-        }
-    }
-
-    pub(crate) fn tower_resize_checked(
-        &mut self,
-        id: Option<f64>,
-        bottom: Option<f64>,
-        top: Option<f64>,
-    ) -> String {
-        match (id.and_then(whole), pair(bottom, top)) {
-            (Some(id), Some((bottom, top))) => {
-                resize_json(self.sim.tower.resize_transport(id, bottom, top))
             }
             _ => invalid_resize(),
         }
@@ -176,11 +158,6 @@ mod tests {
             assert!(!e.set_no_rate_checked(v), "setNoRate {v:?}");
             assert!(!e.set_cars_checked(v, Some(2.0)), "setCars id {v:?}");
             assert!(!e.set_cars_checked(id, v), "setCars cars {v:?}");
-            assert!(
-                !e.tower_set_cars_checked(v, Some(2.0)),
-                "towerSetCars {v:?}"
-            );
-            assert!(!e.tower_set_cars_checked(id, v), "towerSetCars cars {v:?}");
             assert_eq!(
                 e.set_schedule_checked(v, "null"),
                 Ok(false),
@@ -189,9 +166,6 @@ mod tests {
             invalid(e.resize_checked(v, Some(1.0), Some(2.0)));
             invalid(e.resize_checked(id, v, Some(3.0)));
             invalid(e.resize_checked(id, Some(1.0), v));
-            invalid(e.tower_resize_checked(v, Some(1.0), Some(2.0)));
-            invalid(e.tower_resize_checked(id, v, Some(3.0)));
-            invalid(e.tower_resize_checked(id, Some(1.0), v));
             assert!(
                 !e.set_stop_checked(v, Some(2.0), Some(false)),
                 "setStop id {v:?}"
@@ -227,10 +201,6 @@ mod tests {
         let max = 9_007_199_254_740_991.0;
         for id in [lift as f64 + far, lift as f64 - far, max, -max] {
             assert!(!e.set_cars_checked(Some(id), Some(2.0)), "setCars {id}");
-            assert!(
-                !e.tower_set_cars_checked(Some(id), Some(2.0)),
-                "towerSetCars {id}"
-            );
             assert!(
                 !e.set_stop_checked(Some(id), Some(2.0), Some(false)),
                 "setStop {id}"
@@ -269,7 +239,6 @@ mod tests {
         let (mut e, lift, office) = fixture();
         let id = Some(lift as f64);
         assert!(e.set_cars_checked(id, Some(2.0)));
-        assert!(e.tower_set_cars_checked(id, Some(3.0)));
         assert!(e.set_stop_checked(id, Some(2.0), Some(false)));
         assert_eq!(e.set_schedule_checked(id, "null"), Ok(true));
         let v: Value = serde_json::from_str(&e.resize_checked(id, Some(1.0), Some(2.0))).unwrap();
@@ -277,9 +246,6 @@ mod tests {
             v,
             serde_json::json!({ "ok": true, "added": -1, "floorTilesCreated": 0 })
         );
-        let v: Value =
-            serde_json::from_str(&e.tower_resize_checked(id, Some(1.0), Some(3.0))).unwrap();
-        assert_eq!(v["ok"], true);
         assert!(e
             .adjust_rent_checked(Some(office as f64), Some(1.0))
             .is_some());
@@ -305,18 +271,12 @@ mod tests {
             assert_eq!(e.adjust_rent_checked(v, Some(1.0)), None);
             assert!(!e.set_no_rate_checked(v));
             assert!(!e.set_cars_checked(v, Some(2.0)));
-            assert!(!e.tower_set_cars_checked(v, Some(2.0)));
             for (b, t) in [(v, Some(3.0)), (Some(1.0), v), (v, v)] {
                 let r: Value = serde_json::from_str(&e.resize_checked(id, b, t)).unwrap();
                 assert_eq!(r["ok"], false, "resize {b:?} {t:?}");
-                let r: Value = serde_json::from_str(&e.tower_resize_checked(id, b, t)).unwrap();
-                assert_eq!(r["ok"], false, "towerResize {b:?} {t:?}");
             }
             let r: Value =
                 serde_json::from_str(&e.resize_checked(v, Some(1.0), Some(3.0))).unwrap();
-            assert_eq!(r["ok"], false);
-            let r: Value =
-                serde_json::from_str(&e.tower_resize_checked(v, Some(1.0), Some(3.0))).unwrap();
             assert_eq!(r["ok"], false);
             assert!(!e.set_stop_checked(v, Some(2.0), Some(true)));
             assert!(!e.set_stop_checked(id, v, Some(true)));

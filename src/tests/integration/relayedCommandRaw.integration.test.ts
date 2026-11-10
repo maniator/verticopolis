@@ -10,11 +10,10 @@ import { hasWasmPackage, wasm, wasmRequired } from "../conformance/wasmEngine";
  * The relayed edit commands' malformed-input boundary (#996), called raw:
  * straight into the wasm-bindgen glue, with no mirror in between, as
  * `chargeBindingRaw.integration.test.ts` does for the charge commands (#923).
- * `sellAt`, `setCars`, `towerSetCars`, `resizeTransport`,
- * `towerResizeTransport`, `setStop`, `setSchedule` (its id), `adjustRent` and
- * `setNoRate` must each answer a malformed argument exactly as the TypeScript
+ * `sellAt`, `setCars`, `resizeTransport`, `setStop`, `setSchedule` (its id),
+ * `adjustRent` and `setNoRate` must each answer a malformed argument exactly as the TypeScript
  * engine does (`false`, `null`, or `{ ok: false, reason: INVALID_REQUEST }`
- * for the resizes), move nothing and emit no gameplay event, instead of
+ * for the resize), move nothing and emit no gameplay event, instead of
  * coercing a value (`"5"` to 5, `null` to 0, `true` to 1) or truncating it to
  * 32 bits.
  *
@@ -61,9 +60,7 @@ function command(name: string, sim: Simulation, args: unknown[]): unknown {
   switch (name) {
     case "sellAt": return call(sim.sellAt, sim, ...args);
     case "setCars": return call(sim.setCars, sim, ...args);
-    case "towerSetCars": return call(sim.tower.setCars, sim.tower, ...args);
     case "resizeTransport": return call(sim.resizeTransport, sim, ...args);
-    case "towerResizeTransport": return call(sim.tower.resizeTransport, sim.tower, ...args);
     case "setStop": return call(sim.tower.setStop, sim.tower, ...args);
     case "setSchedule": return call(sim.tower.setSchedule, sim.tower, args[0], null);
     case "adjustRent": return call(sim.adjustRent, sim, ...args);
@@ -74,7 +71,7 @@ function command(name: string, sim: Simulation, args: unknown[]): unknown {
 function binding(name: string, e: Engine, args: unknown[]): unknown {
   if (name === "setSchedule") return e.setSchedule(args[0], "null");
   const out = e[name](...args);
-  if (name.endsWith("esizeTransport")) return parsed(out);
+  if (name === "resizeTransport") return parsed(out);
   return name === "adjustRent" ? rent(out) : out;
 }
 const both = (name: string, label: string, args: unknown[]): Call => ({
@@ -85,7 +82,7 @@ const both = (name: string, label: string, args: unknown[]): Call => ({
 
 /** What each command answers a malformed request with. */
 function refusal(name: string): unknown {
-  if (name.endsWith("esizeTransport")) return { ok: false, reason: INVALID_REQUEST };
+  if (name === "resizeTransport") return { ok: false, reason: INVALID_REQUEST };
   return name === "adjustRent" ? null : false;
 }
 
@@ -97,14 +94,9 @@ function positions(lift: number, office: number): [string, number, unknown[]][] 
     ["sellAt", 1, [2, 180]],
     ["setCars", 0, [lift, 2]],
     ["setCars", 1, [lift, 2]],
-    ["towerSetCars", 0, [lift, 2]],
-    ["towerSetCars", 1, [lift, 2]],
     ["resizeTransport", 0, [lift, 1, 2]],
     ["resizeTransport", 1, [lift, 1, 2]],
     ["resizeTransport", 2, [lift, 1, 2]],
-    ["towerResizeTransport", 0, [lift, 1, 2]],
-    ["towerResizeTransport", 1, [lift, 1, 2]],
-    ["towerResizeTransport", 2, [lift, 1, 2]],
     ["setStop", 0, [lift, 2, false]],
     ["setStop", 1, [lift, 2, false]],
     ["setSchedule", 0, [lift]],
@@ -149,9 +141,7 @@ function cases(lift: number, office: number): Call[] {
   const missing: [string, unknown[]][] = [
     ["sellAt", []], ["sellAt", [2]],
     ["setCars", []], ["setCars", [lift]],
-    ["towerSetCars", []], ["towerSetCars", [lift]],
     ["resizeTransport", []], ["resizeTransport", [lift]], ["resizeTransport", [lift, 1]],
-    ["towerResizeTransport", []], ["towerResizeTransport", [lift]], ["towerResizeTransport", [lift, 1]],
     ["setStop", []], ["setStop", [lift]], ["setStop", [lift, 2]],
     ["adjustRent", []], ["adjustRent", [office]],
     ["setNoRate", []],
@@ -185,19 +175,15 @@ function acceptedEdges(lift: number, office: number): Call[] {
     both("setStop", "floor 2^53 - 1", [lift, max, false]),
     both("resizeTransport", "top 2^53 - 1", [lift, 1, max]),
     both("resizeTransport", "bottom -(2^53 - 1)", [lift, -max, 2]),
-    both("towerResizeTransport", "top 2 + 2^32", [lift, 1, 2 + far]),
     // The shaft has one car; a count of -(2^53 - 1) clamps to that one.
     both("setCars", "cars -(2^53 - 1)", [lift, -max]),
-    both("towerSetCars", "cars -(2^53 - 1)", [lift, -max]),
   ];
   // An id plus or minus 2^32 named the same facility when the binding
   // truncated to i32; now each names nothing, in both engines.
   const ids = (base: number) => [["-0", -0], ["-1", -1], ["2^53 - 1", max], ["-(2^53 - 1)", -max], ["the id + 2^32", base + far], ["the id - 2^32", base - far]] as const;
   for (const [what, id] of ids(lift)) {
     list.push(both("setCars", `id ${what}`, [id, 2]));
-    list.push(both("towerSetCars", `id ${what}`, [id, 2]));
     list.push(both("resizeTransport", `id ${what}`, [id, 1, 2]));
-    list.push(both("towerResizeTransport", `id ${what}`, [id, 1, 2]));
     list.push(both("setStop", `id ${what}`, [id, 2, false]));
     list.push(both("setSchedule", `id ${what}`, [id]));
   }
@@ -228,7 +214,7 @@ describe.skipIf(!hasWasmPackage())("relayed commands called raw through the bind
           const name = command0(c.name);
           if (malformedRun) {
             expect(ts, `${c.name}: TypeScript's answer`).toEqual(refusal(name));
-          } else if (name.endsWith("esizeTransport")) {
+          } else if (name === "resizeTransport") {
             const r = ts as { ok: boolean; reason?: string };
             expect(r.ok, `${c.name}: TypeScript accepted it`).toBe(false);
             expect(r.reason, `${c.name}: refused as malformed`).not.toBe(INVALID_REQUEST);
@@ -241,12 +227,12 @@ describe.skipIf(!hasWasmPackage())("relayed commands called raw through the bind
         }
       };
       const list = cases(lift, office);
-      // 18 numeric arguments x 16 values + 18 missing + 12 stops + 7 dirs.
-      expect(list).toHaveLength(18 * 16 + 18 + 12 + 7);
+      // 13 numeric arguments x 16 values + 13 missing + 12 stops + 7 dirs.
+      expect(list).toHaveLength(13 * 16 + 13 + 12 + 7);
       run(list, true);
       const edges = acceptedEdges(lift, office);
-      // 11 floor and count edges + 6 ids x 6 shaft commands + 6 ids x 2 unit commands.
-      expect(edges).toHaveLength(11 + 36 + 12);
+      // 9 floor and count edges + 6 ids x 4 shaft commands + 6 ids x 2 unit commands.
+      expect(edges).toHaveLength(9 + 24 + 12);
       run(edges, false);
       expect(drained(sim, engine), "a refusal emitted an event").toEqual({ ts: [], rust: [] });
 
@@ -254,12 +240,10 @@ describe.skipIf(!hasWasmPackage())("relayed commands called raw through the bind
       // and state.
       const good: Call[] = [
         both("setCars", "lift, 2", [lift, 2]),
-        both("towerSetCars", "lift, 3", [lift, 3]),
         both("setStop", "lift, 2, false", [lift, 2, false]),
         both("setStop", "lift, 2, true", [lift, 2, true]),
         both("setSchedule", "lift, null", [lift]),
         both("resizeTransport", "lift, 1, 2", [lift, 1, 2]),
-        both("towerResizeTransport", "lift, 1, 3", [lift, 1, 3]),
         both("adjustRent", "office, 1", [office, 1]),
         both("adjustRent", "office, -1", [office, -1]),
         both("setNoRate", "office", [office]),
@@ -289,7 +273,7 @@ describe.skipIf(!hasWasmPackage())("relayed commands called raw through the bind
     const proto = loose<Record<string, unknown>>(wasm().Engine.prototype);
     const glue = (name: string) => String(proto[name]);
     expect(glue("setSchedule")).toMatch(/passStringToWasm0/);
-    for (const name of ["sellAt", "setCars", "towerSetCars", "resizeTransport", "towerResizeTransport", "setStop", "adjustRent", "setNoRate"]) {
+    for (const name of ["sellAt", "setCars", "resizeTransport", "setStop", "adjustRent", "setNoRate"]) {
       expect(glue(name), name).not.toMatch(/passStringToWasm0/);
     }
   });

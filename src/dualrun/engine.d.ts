@@ -563,21 +563,6 @@ export class Engine {
      * the key out). Read on a new engine; `setTowerName` is how it changes.
      */
     towerName(): string | undefined;
-    /**
-     * `tower.resizeTransport(id, bottom, top)`, the bare tower edit, silent
-     * in both engines (#906): the same JSON, read raw the same way (#996).
-     * Relay-only, as `towerSetCars`.
-     */
-    towerResizeTransport(id: number, bottom: number, top: number): string;
-    /**
-     * `tower.setCars(id, cars)`: the bare tower edit, silent in both
-     * engines (#906). Relay-only: the dual-run mirror replays a bare
-     * TypeScript tower edit with it. Player and UI edits use the charge commands
-     * (`addCar`, `removeCar`, `extendTransport`), and
-     * `towerRelayOps.guard.test.ts` keeps other callers out. Read raw
-     * (#996), as `setCars`.
-     */
-    towerSetCars(id: number, cars: number): boolean;
     towerSignature(): bigint;
     /**
      * `stats()`: the HUD strip's counters, as JSON.
