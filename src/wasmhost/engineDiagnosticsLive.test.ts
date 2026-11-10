@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { liveDiagnostics } from "./engineDiagnosticsLive";
 import { IDENTITY_FIXTURE } from "./engineIdentity.fixture";
+import { deferEngineIdentity, publishBootState, type EngineBootState } from "./engineBoot";
 
 describe("liveDiagnostics", () => {
   it("builds from a page that published nothing", () => {
@@ -25,6 +26,16 @@ describe("liveDiagnostics", () => {
     expect(r.rows.find((x) => x.label === "Engine crate")?.value).toBe(
       "example-engine 9.8.7",
     );
+  });
+
+  it("reads an identity record boot left for later before it reports (#1254)", () => {
+    const g: { __vcEngineBoot?: EngineBootState; __vcEngine?: { status: { hosted: boolean } } } = { __vcEngine: { status: { hosted: true } } };
+    deferEngineIdentity({ engineIdentity: () => JSON.stringify(IDENTITY_FIXTURE) });
+    publishBootState({ build: "wasm-only", engine: "wasm", failure: null }, g);
+    const r = liveDiagnostics(g);
+    deferEngineIdentity({});
+    expect(r.rows.find((x) => x.label === "Engine crate")?.value).toBe("example-engine 9.8.7");
+    expect(g.__vcEngineBoot?.identity).toBe(JSON.stringify(IDENTITY_FIXTURE));
   });
 
   it("reports a boot that failed", () => {

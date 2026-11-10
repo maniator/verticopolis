@@ -10,6 +10,30 @@ const LOCK: &str = include_str!("../../../conformance/catalog-digests.json");
 const MODES: [GameMode; 2] = [GameMode::Classic, GameMode::Modern];
 
 #[test]
+fn the_shared_catalog_is_the_catalog_each_mode_builds() {
+    for mode in MODES {
+        let fresh = serde_json::to_value(catalog(mode)).expect("the catalog serializes");
+        assert_eq!(catalog_value(mode), fresh, "{}", mode.as_str());
+        assert_eq!(
+            catalog_json(mode),
+            canonical_json(&fresh),
+            "{}",
+            mode.as_str()
+        );
+        assert_eq!(
+            catalog_digest(mode),
+            digest(&lock_view(&fresh)),
+            "{}",
+            mode.as_str()
+        );
+    }
+    assert_ne!(
+        catalog_json(GameMode::Classic),
+        catalog_json(GameMode::Modern)
+    );
+}
+
+#[test]
 fn each_mode_matches_the_lock() {
     let lock: Value = serde_json::from_str(LOCK).expect("catalog-digests.json parses");
     for mode in MODES {

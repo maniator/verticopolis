@@ -1,4 +1,4 @@
-import type { EngineBootState } from "./engineBoot";
+import { settleEngineIdentity, type EngineBootState } from "./engineBoot";
 import {
   buildDiagnostics,
   type DiagnosticsHost,
@@ -20,6 +20,9 @@ export function liveDiagnostics(
   g: DiagnosticsGlobals = globalThis as DiagnosticsGlobals,
 ): DiagnosticsReport {
   try {
+    // Boot reads the engine's identity record after the first frame (#1254);
+    // a report asked for sooner reads it now.
+    settleEngineIdentity(g);
     return buildDiagnostics({
       appVersion:
         typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev",

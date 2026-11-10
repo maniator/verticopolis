@@ -226,3 +226,21 @@ candidate, so it needs no run of its own.
   `Simulation` in the WASM boot, so app creation gets cheaper on WASM and the
   attach becomes a Rust new game or `fromSave`. M5 is decided by the
   candidate's run, and today's host only guides the work.
+
+## Progress
+
+- **2026-11-10, the identity read and the catalogs (part of W2, the W4 memo).**
+  Boot no longer reads the engine's identity record before the title screen:
+  it reads it after the first frame, or sooner when About, Settings or Copy
+  Diagnostics asks (`deferEngineIdentity`, `settleEngineIdentity` in
+  `engineBoot.ts`). The Rust catalog values are built once per mode and shared
+  by `catalog_json` and the identity digests, byte for byte the same. A cloud
+  profile on `main` at `c4c78e92` (headless Chromium, one boot, 1x) found the
+  main thread busy from the first byte to `window.game`, with the identity read
+  about 13 ms of it, so starting the package load before the pre-boot work and
+  building the renderer during the load measured no gain there and were left
+  out. Diagnostic pairs in the same container, 20 per throttle, gave a paired
+  median of about 20 ms sooner to ready at 1x and 4x. Those are not evidence;
+  the PC run of the PR's head is. Still open from this story: the rest of W2
+  and W3, W5 to W8, and the Map window's first draw inside app creation (about
+  11 ms of the 1x profile), which the Map lane owns.
