@@ -15,6 +15,10 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.23.0 (2026-11-10)
+
+- The binding drops `towerSetCars` and `towerResizeTransport`, the silent tower edits only the retired dual-run mirror called; `setCars` and `resizeTransport` stay for uncharged edits.
+
 ## 1.22.1 (2026-11-10)
 
 - The tooling-only WASM binding gains `vacateUnit(id, reason)` and `setUnitRent(id, rent)`. `vacateUnit` runs the churn pass's departure on a chosen room for a named cause, buying back a sold condo, outside any open undo step. `setUnitRent` writes a room's price as given, with no ladder snap or band clamp, or clears it with null. Each refuses an unknown unit, an unknown cause, or a price that is not finite or is below 0, and changes nothing then. The TypeScript reference exposes the same test hooks, so the last write-only tests (condo re-listing and price stamping, and the HUD's kept room counts) run on both engines.
