@@ -54,7 +54,6 @@ export interface GameAppPorts {
   redo(): Promise<void>;
   /** The open undo gesture's number, or `NO_GESTURE`. */
   undoGesture(): number;
-  setOverlay(mode: string): void;
   toggleMute(): boolean;
   setVolume(kind: "music" | "ambience" | "sfx", value: number): void;
   toggleReducedMotion(): boolean;
@@ -140,7 +139,6 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
       trackAppAction("stats_open"); // the user open; the exterminator refresh reopens showStats directly
       app.showStats();
     },
-    onSetOverlay: (mode) => app.setOverlay(mode),
     // dismiss() latches the ✕ so the next hover pick over the same facility
     // does not instantly re-open the card the player just closed. The ✕ may
     // instead be closing the build-refusal card (the build path borrows the

@@ -361,14 +361,13 @@ export function dropSeveredGesture(app: GameApp): void {
  * restored GPU access (see attemptContextRecovery). The simulation and the
  * whole DOM shell stay put; only the Excalibur engine and its canvas are
  * replaced. Resolves when the new engine is running with the player's
- * camera, selection, overlay, speed and motion prefs carried over.
+ * camera, selection, speed and motion prefs carried over.
  */
 export function rebuildEngine(app: GameApp): Promise<void> {
   // Read the CPU-side view state before tearing the old engine down.
   // viewState always stamps zoom; the default only satisfies the save
   // schema's optional field (a TDT import carries no zoom).
   const { tile, floor, zoom = 0.9 } = app.engine.viewState();
-  const overlay = app.engine.overlayMode;
   // Silence the dying engine BEFORE dispose: its canvas can outlive the
   // swap (a detached canvas keeps its restored GL context), and a later
   // eviction of that zombie context would otherwise fire onContextLost and
@@ -421,7 +420,6 @@ export function rebuildEngine(app: GameApp): Promise<void> {
   app.keyboard.followTower("same tower");
   applyReducedMotion(app);
   app.engine.paused = SPEEDS[app.speed] === 0;
-  app.engine.overlayMode = overlay;
   app.engine.selectedId = app.selected?.id ?? null;
   return app.engine.start().then(() => {
     // start() adopted the sim's saved view (stamped by the pre-crash

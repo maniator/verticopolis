@@ -53,7 +53,6 @@ export function mountAppDom(): void {
     <button id="audio-toggle">🔊</button>
     <button id="btn-undo"></button><button id="btn-redo"></button>
     <button id="panel-toggle"></button><button id="panel-close"></button><div id="scrim"></div>
-    <select id="overlay-mode"><option value=""></option><option value="congestion">c</option></select>
     <div id="a11y-live"></div>
     <div id="palette-tabs"></div>
     <div id="palette-scroll"></div>
@@ -105,7 +104,6 @@ export function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICa
     onReplayOnboarding: vi.fn(),
     onRenameTower: vi.fn(),
     onShowStats: vi.fn(),
-    onSetOverlay: vi.fn(),
     onShowSaves: vi.fn(),
     onInspectorClose: vi.fn(),
     onSaveSlot: vi.fn(),

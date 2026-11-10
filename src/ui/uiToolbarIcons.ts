@@ -21,7 +21,6 @@ export function mountToolbarIcons(): void {
   put(".brand", "brand");
   put("#btn-save-top", "save");
   put("#btn-stats", "stats");
-  put(".overlay-picker .overlay-label", "map", 14);
   put("#btn-settings", "settings");
   put("#btn-undo", "undo");
   put("#btn-redo", "redo");

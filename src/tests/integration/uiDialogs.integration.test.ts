@@ -1725,7 +1725,7 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     // mountToolbarIcons injects the chrome glyphs the index.html shell no longer
     // carries (#721). One construction, one glyph per host, each ahead of any
     // label text so "[icon] Full Statistics" reads in order. (The minimal test
-    // DOM omits .brand and the overlay-picker wrapper; the three buttons here
+    // DOM omits .brand; the three buttons here
     // exercise the same single injection path.)
     makeUI();
     const expected: Record<string, string> = {
@@ -1788,14 +1788,6 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     document.getElementById("panel-toggle")!.click();
     document.getElementById("scrim")!.click();
     expect(document.body.classList.contains("panels-open")).toBe(false);
-  });
-
-  it("the overlay-mode select forwards its value to onSetOverlay", () => {
-    const { cb } = makeUI();
-    const sel = document.getElementById("overlay-mode") as HTMLSelectElement;
-    sel.value = "congestion";
-    sel.dispatchEvent(new Event("change"));
-    expect(cb.onSetOverlay).toHaveBeenCalledWith("congestion");
   });
 
   it("renaming the tower forwards a trimmed name; a blank name falls back to Tower One", () => {

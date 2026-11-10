@@ -1,4 +1,3 @@
-import type { HeatmapMode } from "../../engine/sim/constants";
 import { RAIN } from "../sprites/sky";
 import { isElevatorKind } from "../../presentation/viewKinds";
 import { catalogFacility } from "../../catalog/catalogTypes";
@@ -32,22 +31,6 @@ export const VIP_VISIT_SECONDS = 6.5;
  *  only bound needed). */
 export const MAX_EXPLOSIONS = 8;
 export const MAX_TREASURES = 6;
-
-/** Legend copy for each stats-overlay mode. */
-export const HEATMAP_LABELS: Record<HeatmapMode, { title: string; good: string; bad: string }> = {
-  congestion: { title: "Congestion", good: "clear", bad: "jammed" },
-  occupancy: { title: "Occupancy", good: "full", bad: "vacant" },
-  satisfaction: { title: "Satisfaction", good: "happy", bad: "unhappy" },
-  cleanliness: { title: "Housekeeping", good: "covered", bad: "unreached" },
-};
-
-/** The overlay modes in cycle order (a UI toggle steps Off → each → Off). */
-export const HEATMAP_MODES: HeatmapMode[] = ["congestion", "occupancy", "satisfaction", "cleanliness"];
-
-// The palette (severity ramp + semantic tint colors) lives in ./overlayPalette
-// (file-size ceiling split); re-exported here so importers keep one entry point.
-import { HEAT_STOPS, HEAT_SEGS, TINT_COLORS, LEGEND_TINT_COLORS, heatColor } from "./overlayPalette";
-export { HEAT_STOPS, TINT_COLORS, heatColor } from "./overlayPalette";
 
 export function setReducedMotion(engine: TowerEngine, on: boolean): void {
   engine.reducedMotion = on;
@@ -146,7 +129,6 @@ export function drawOverlay(engine: TowerEngine, ctx: CanvasRenderingContext2D):
     engine.overlayCanvas.height = engine.viewHeight;
   }
   ctx.clearRect(0, 0, engine.viewWidth, engine.viewHeight);
-  drawStatsMap(engine, ctx);
   drawShaftNumbers(engine, ctx);
   drawRain(engine, ctx);
   renderExplosions(engine, ctx);
@@ -210,119 +192,6 @@ function renderThief(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   const x = -80 + p * (engine.viewWidth + 160);
   const y = engine.worldToScreenY(engine.thiefFloor) + FLOOR * engine.cam.zoom * 0.5;
   drawThief(ctx, x, y, Math.max(0.9, engine.cam.zoom), engine.thiefCaught);
-}
-
-/** The colored stats overlay: draw each heatmap cell by the active metric
- *  (green = good … red = bad) with a legend, one cell per floor for
- *  congestion/occupancy, one per present unit for satisfaction (so a floor can
- *  show several tints). The heatmap is recomputed only when its inputs change
- *  (hour / layout / mode), never per frame. */
-function drawStatsMap(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
-  if (!engine.overlayMode) return;
-  const hour = engine.sim.clock.hour;
-  // The congestion source reads live commercial customers (censusCount ->
-  // customersIn), which move as meal round-trippers arrive and leave, so the
-  // congestion overlay must also invalidate on the meal-overlay revision or
-  // its cells and peak legend trail the traffic chip by up to an hour during
-  // a meal window. The other overlay modes stay hour-and-structure keyed.
-  // Two numeric fields instead of a composite string: this runs every frame
-  // while an overlay is open, and per-frame string building is GC churn.
-  const towerRev = engine.sim.tower.revision;
-  const mealRev = engine.overlayMode === "congestion" ? engine.sim.tower.mealOverlayRevision : 0;
-  if (
-    engine.overlayMode !== engine.heatmapMode ||
-    hour !== engine.heatmapHour ||
-    towerRev !== engine.heatmapTowerRev ||
-    mealRev !== engine.heatmapMealRev
-  ) {
-    engine.heatmap = engine.sim.floorHeatmap(engine.overlayMode);
-    engine.heatmapPeakCongestion = engine.overlayMode === "congestion" ? engine.sim.peakCongestion() : 0;
-    engine.heatmapMode = engine.overlayMode;
-    engine.heatmapHour = hour;
-    engine.heatmapTowerRev = towerRev;
-    engine.heatmapMealRev = mealRev;
-  }
-  const z = engine.cam.zoom;
-  // Visible floor band (computed once) to skip the coordinate transforms for
-  // off-screen cells. The loop still visits every cell, but worldToScreenX/Y
-  // each run the engine's affine transform and satisfaction can emit one cell
-  // per present tenant unit, so gating those two transforms on the band avoids
-  // paying them for every off-screen unit in a tall tower each frame.
-  const topFloor = engine.screenToFloor(0) + 1;
-  const botFloor = engine.screenToFloor(engine.viewHeight) - 1;
-  for (const cell of engine.heatmap) {
-    if (cell.floor < botFloor || cell.floor > topFloor) continue;
-    const sx = engine.worldToScreenX(cell.minX);
-    const sy = engine.worldToScreenY(cell.floor);
-    const sw = (cell.maxX - cell.minX + 1) * TILE * z;
-    const sh = FLOOR * z;
-    // Exact per-cell cull for horizontal extent (and any residual vertical
-    // slop past the floor-band margin) so partial-edge tints still draw right.
-    if (sy + sh < 0 || sy > engine.viewHeight || sx + sw < 0 || sx > engine.viewWidth) continue;
-    ctx.fillStyle = cell.tint ? TINT_COLORS[cell.tint] : heatColor(cell.severity);
-    ctx.fillRect(sx, sy, sw, sh);
-  }
-  drawHeatLegend(engine, ctx);
-}
-
-/** A compact legend for the active overlay: its name and a good→bad gradient.
- *  The Housekeeping map carries two states the ramp cannot express, so it adds
- *  a swatch row: violet = infested (terminal, cleaning can't fix it) and gray =
- *  n/a (condos never take housekeeping). */
-function drawHeatLegend(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
-  const label = HEATMAP_LABELS[engine.overlayMode ?? "congestion"];
-  const swatches = engine.overlayMode === "cleanliness";
-  const pad = 10;
-  const x = 12;
-  const y = 12;
-  const w = 150;
-  const h = swatches ? 62 : 46;
-  ctx.fillStyle = "rgba(16,20,28,0.8)";
-  ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = "rgba(255,255,255,0.18)";
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-  ctx.fillStyle = "#e6ecf5";
-  ctx.font = "600 12px system-ui, sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText(label.title, x + pad, y + 17);
-  // Congestion reports its busiest floor as a number so an all-green map still
-  // tells the player their headroom (peak = share of a shaft's rush budget in
-  // use; >100% means over the churn line). Right-aligned on the title row.
-  if (engine.overlayMode === "congestion") {
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#c7d0e0";
-    ctx.font = "600 11px system-ui, sans-serif";
-    ctx.fillText(`peak ${Math.round(engine.heatmapPeakCongestion * 100)}%`, x + w - pad, y + 17);
-    ctx.textAlign = "left";
-  }
-  // Gradient bar.
-  const bx = x + pad;
-  const by = y + 24;
-  const bw = w - pad * 2;
-  const grad = ctx.createLinearGradient(bx, 0, bx + bw, 0);
-  for (let i = 0; i < HEAT_STOPS.length; i++) grad.addColorStop(i / HEAT_SEGS, heatColor(i / HEAT_SEGS));
-  ctx.fillStyle = grad;
-  ctx.fillRect(bx, by, bw, 7);
-  ctx.fillStyle = "#9aa6bd";
-  ctx.font = "10px system-ui, sans-serif";
-  ctx.fillText(label.good, bx, by + 18);
-  ctx.textAlign = "right";
-  ctx.fillText(label.bad, bx + bw, by + 18);
-  ctx.textAlign = "left";
-  if (swatches) {
-    // The two out-of-ramp categories, side by side under the gradient row
-    // (opaque variants: the map alphas vanish on the dark legend box).
-    const sy = by + 24;
-    ctx.fillStyle = LEGEND_TINT_COLORS.infested;
-    ctx.fillRect(bx, sy, 7, 7);
-    ctx.fillStyle = "#9aa6bd";
-    ctx.fillText("infested", bx + 11, sy + 7);
-    const nx = bx + Math.floor(bw / 2);
-    ctx.fillStyle = LEGEND_TINT_COLORS.na;
-    ctx.fillRect(nx, sy, 7, 7);
-    ctx.fillStyle = "#9aa6bd";
-    ctx.fillText("n/a (condo)", nx + 11, sy + 7);
-  }
 }
 
 /** Rain falls in front of the tower on rainy days (overlay layer). */

@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  HEAT_STOPS,
-  HEATMAP_LABELS,
-  HEATMAP_MODES,
   drawOverlay,
   syncEventFx,
   setReducedMotion,
@@ -15,7 +12,7 @@ import {
  * The 2D overlay/sky-event painters and the decorative-fx bookkeeping, driven
  * against a recording spy context (mirroring src/render/sprites.test.ts) plus a
  * fake engine. The painters are exercised through drawOverlay across every
- * overlay mode and event-visual state so each branch paints; syncEventFx is
+ * event-visual state so each branch paints; syncEventFx is
  * pinned on its real state machine (start while animating, retire on the anim
  * clock, hard caps, reduced-motion suppression). Pixel fidelity is the
  * Playwright visual tier's job; this pins structure and control flow.
@@ -49,11 +46,6 @@ function spyCtx() {
   };
 }
 
-const CELLS = [
-  { floor: 5, minX: 100, maxX: 110, severity: 0.1 },
-  { floor: 6, minX: 100, maxX: 120, severity: 0.9 },
-];
-
 /** A fake TowerEngine for the overlay painters. Screen transforms are simple
  *  and consistent so cells land on-screen; every field the painters read has a
  *  sane default that individual tests override. */
@@ -66,13 +58,6 @@ function eng(over: Record<string, any> = {}): any {
     overlayCanvas: { width: 800, height: 600 },
     cam: { zoom: 1 },
     d: { anim: 0 },
-    overlayMode: null,
-    heatmap: [],
-    heatmapMode: null,
-    heatmapHour: -1,
-    heatmapTowerRev: -1,
-    heatmapMealRev: -1,
-    heatmapPeakCongestion: 0,
     explosions: [],
     treasures: [],
     vipStart: null,
@@ -94,8 +79,6 @@ function eng(over: Record<string, any> = {}): any {
         getTransport: () => undefined,
         facilityOf: () => ({ width: 3 }),
       },
-      floorHeatmap: () => CELLS,
-      peakCongestion: () => 1.2,
     },
     worldToScreenX: (tile: number) => tile,
     worldToScreenY: (floor: number) => 300 - floor,
@@ -105,15 +88,8 @@ function eng(over: Record<string, any> = {}): any {
   return e;
 }
 
-describe("heatmap palette metadata", () => {
-  it("has one label per mode and a 4-stop ramp", () => {
-    expect(HEAT_STOPS.length).toBe(4);
-    for (const m of HEATMAP_MODES) expect(HEATMAP_LABELS[m]).toBeTruthy();
-  });
-});
-
-describe("drawOverlay paints across every overlay mode", () => {
-  it("with the overlay off, still clears and paints the ruler", () => {
+describe("drawOverlay", () => {
+  it("clears and paints the ruler", () => {
     const s = spyCtx();
     const e = eng();
     drawOverlay(e, s.ctx);
@@ -129,58 +105,6 @@ describe("drawOverlay paints across every overlay mode", () => {
     expect(e.overlayCanvas.height).toBe(600);
   });
 
-  for (const mode of HEATMAP_MODES) {
-    it(`paints the ${mode} heatmap cells and legend`, () => {
-      const s = spyCtx();
-      const e = eng({ overlayMode: mode });
-      drawOverlay(e, s.ctx);
-      // The cache was cold, so floorHeatmap ran and cells were stored.
-      expect(e.heatmap).toBe(CELLS);
-      expect(e.heatmapMode).toBe(mode);
-      // A legend gradient bar is built from the ramp stops.
-      expect(s.log.some((l) => l.startsWith("grad:"))).toBe(true);
-      expect(s.log.some((l) => l.startsWith("stop:"))).toBe(true);
-    });
-  }
-
-  it("reuses the cached heatmap when the hour, layout and mode are unchanged", () => {
-    const s = spyCtx();
-    let calls = 0;
-    const e = eng({
-      overlayMode: "occupancy",
-      heatmapMode: "occupancy",
-      heatmapHour: 12,
-      heatmapTowerRev: 1,
-      heatmapMealRev: 0,
-      heatmap: CELLS,
-    });
-    e.sim.floorHeatmap = () => {
-      calls++;
-      return CELLS;
-    };
-    drawOverlay(e, s.ctx);
-    expect(calls).toBe(0); // cache hit: no rescan
-  });
-
-  it("invalidates the congestion cache on the meal-overlay revision", () => {
-    const s = spyCtx();
-    let calls = 0;
-    const e = eng({
-      overlayMode: "congestion",
-      heatmapMode: "congestion",
-      heatmapHour: 12,
-      heatmapTowerRev: 1,
-      heatmapMealRev: 0,
-    });
-    e.sim.tower.mealOverlayRevision = 5; // moved mid-hour
-    e.sim.floorHeatmap = () => {
-      calls++;
-      return CELLS;
-    };
-    drawOverlay(e, s.ctx);
-    expect(calls).toBe(1);
-    expect(e.heatmapMealRev).toBe(5);
-  });
 });
 
 describe("weather and event visuals paint", () => {
