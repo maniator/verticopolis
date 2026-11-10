@@ -21,6 +21,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.88.0
+
+- The Map now has Edit, Eval, Pricing and Hotel tabs. Hotel highlights rooms that need cleaning or have cockroaches, with a separate pattern and count for each.
+- The Eval and Pricing tabs show the plain map for now, with a note that their views are coming soon.
+
 ## 2.87.1
 
 - Undo now checks more build rules before putting something back (around the metro station and sky lobbies), and never takes away a ground-floor lobby that newer floors or basement hang from.

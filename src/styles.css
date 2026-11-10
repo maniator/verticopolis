@@ -27,6 +27,7 @@
 @import "./styles/retro-tokens.css";
 @import "./styles/retro-components.css";
 @import "./styles/overview-map.css";
+@import "./styles/overview-map-tabs.css";
 
 /* ---- 2. BASE --------------------------------------------------------- */
 * {
@@ -2461,7 +2462,10 @@ body.splash-up #toast-wrap { z-index: 45; }
     container-type: size;
   }
   .overview-map {
-    max-height: calc(100% - 16px);
+    /* The title AND the S6 view-tabs row count toward the two-thirds cap.
+       A percentage of #stage is reliable in both landscape browser layouts
+       and split-screen; cqh alone can resolve against a taller fallback. */
+    max-height: 66%;
   }
   /* Start-aligned, so a body narrower than the card's title bar keeps its
      shape instead of being stretched to the bar's width. */

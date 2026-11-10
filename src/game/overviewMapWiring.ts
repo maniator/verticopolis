@@ -5,6 +5,8 @@
  * phone breakpoint. The window lives beside the app in a weak map, so the app
  * class carries no field for it. Every page builds it (SPEC, CAP-1): it opens
  * by default on desktop and starts closed behind the Map pill on a phone.
+ * The window always carries its view tabs (S6 to S9). Eval and Pricing show
+ * a "coming soon" note until S8 (SPEC, Constraints).
  */
 import type { GameApp } from "../main";
 import type { FacilityKind } from "../engine/types";
@@ -12,6 +14,7 @@ import { findViewKind } from "../presentation/viewKinds";
 import { FLOOR, TILE } from "../render/scale";
 import { browserStorage } from "../ui/overviewMapPrefs";
 import { OverviewMapWindow, type MutableMapCamera, type OverviewMapSource } from "../ui/overviewMapWindow";
+import { OverviewMapViews } from "../ui/overviewMapViews";
 import { viewWorld, viewWorldBound } from "../presentation/viewWorld";
 
 const windows = new WeakMap<GameApp, OverviewMapWindow>();
@@ -55,6 +58,7 @@ export function wireOverviewMap(app: GameApp): void {
     floorsOf,
     isPhone: () => app.mobileMq.matches,
     storage: browserStorage(),
+    views: new OverviewMapViews({ rooms: () => app.reader.rooms, minutes: () => app.reader.header.minutes, floorsOf }),
   });
   app.mobileMq.addEventListener("change", () => win.layoutChanged());
   windows.set(app, win);
