@@ -10,7 +10,7 @@ a basement garage and a Recycling Center).
 | `inspector-recycling.png` | Hover inspector on the Recycling Center: live fill %, and the capacity/demand-met verdict. |
 | `stats-dialog-demand.png` | Tower Statistics: the new parking-demand row (offices + suites) and the recycling load row. |
 
-## Stats screenshots (income breakdown, elevator load, colored overlay maps)
+## Stats screenshots (income breakdown, elevator load, the Map and its views)
 
 Captured on a real player tower (Star 3, ~day 1025: 96 offices, 153 condos, 188
 hotel rooms, a cinema, shops, food, 5 elevators) after warming up a quarter.
@@ -18,16 +18,16 @@ hotel rooms, a cinema, shops, food, 5 elevators) after warming up a quarter.
 | Screenshot | Shows |
 |---|---|
 | `stats-income-elevators.png` | Tower Statistics with the new **Income (avg/day, last quarter)** breakdown per category (net of overhead) and the **Elevators (avg load, busiest first)** utilization section. |
-| `overlay-congestion.png` | The colored stats overlay in **Congestion** mode: floors tinted green (clear) → red (jammed) with a legend. |
-| `overlay-occupancy.png` | **Occupancy** mode: green where fully leased (offices/condos), red/amber on the hotel floors that sit empty at midday. |
-| `overlay-satisfaction.png` | **Satisfaction** mode: green for happy tenants; floors with no one present are left untinted (no happiness to judge). |
-| `overlay-cleanliness.png` | **Housekeeping** mode: hotel rooms tinted by service coverage: green where a housekeeping crew can reach them, amber for dirty rooms waiting, red for floors with no service-elevator route (the "build another housekeeping station" nudge). |
-| `overlay-picker-ui.png` | The **Floor heatmap** dropdown in the Tower panel (below Full Statistics); every mode is directly selectable. |
 | `map-desktop.png` | The overview **Map** window (#343) as a desktop player first sees it: open at the bottom-right of the tower view, with a box around the part on screen. |
 | `map-window.png` | The Map window alone: the rooms in their colors and patterns, fitted to the tower with a margin at each side, and the view box. |
 | `map-phone-pill.png` | On a phone the Map starts closed behind the **Map** pill at the bottom right. |
 | `map-phone-open.png` | The open phone Map card at the top-left of the tower view. |
-| `map-phone-heatmap.png` | With a Floor heatmap on, the phone Map card sits below the heatmap legend. |
+| `map-phone-traffic.png` | The phone Map card on its **Traffic** view, with the floor counts under the map. |
+| `map-eval-view.png` | The Map's **Eval** view on a deliberately varied tower: each room in the color of its tenants' rating. |
+| `map-pricing-view.png` | The Map's **Pricing** view on the same tower: each priced room in the color of its rent tier. |
+| `map-traffic-view.png` | The Map's **Traffic** view: each floor green (clear), amber (busy) or red (jammed, past the point where tenants start to leave), with a count of floors in each band. |
+| `map-occupancy-view.png` | The Map's **Occupancy** view: floors with tenant or hotel rooms green (mostly full), amber (half full) or red (mostly empty). |
+| `map-hotel-view.png` | The Map's **Hotel** view on the housekeeping tower: the rooms that need cleaning are picked out. |
 
 ## Mode-forked pricing surfaces (Classic vs Modern)
 

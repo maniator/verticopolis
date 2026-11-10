@@ -51,7 +51,7 @@ import { chromium, type Browser, type Page } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { DIRS, DESKTOP, EXECUTABLE, PORT, BASE, assertReady, isPhoneViewport, mapForShot, restoreMapAfterShot, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
-import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
+import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetMapView, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
 import { armPhaseWatch, judgeAndPromote, markPhaseTarget, phaseCapturePath, stopPhaseWatch } from "./screenshot-phase-check.ts";
 import { SCENES } from "./screenshot-scenes.ts";
 import { SETTLE_AFTER_SETUP, assertEnginePackage, HOSTED_FIX, beginSettleStep, checkHosted, checkSettleList, hostedSnapshot, installShotHelpers, settleUnlessSettled } from "./screenshot-engine.ts";
@@ -129,9 +129,9 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
       await page.evaluate(pgSetClock, shot.clock);
       await checkHosted(page, `after the ${shot.name} clock pin`, before, HOSTED_FIX.clock);
     }
-    // Always drive the overlay dropdown (default "") so a prior shot's overlay
-    // never bleeds into the next, so every shot gets a clean map state.
-    await page.evaluate(pgSetOverlay, shot.overlay ?? "");
+    // Always drive the Map's View dropdown (default Edit) so a prior shot's
+    // view never bleeds into the next, so every shot gets a clean map state.
+    await page.evaluate(pgSetMapView, shot.mapView ?? "edit");
     const keepDialogs = shot.keepDialogs ?? (!!shot.crop && shot.crop.includes("modal"));
     // A phaseWatch shot is watched from before setup through the capture
     // (screenshot-phase-check.ts, #762 / #843).

@@ -329,11 +329,12 @@ export function pgSetClock(hour: number): void {
   g.reader?.update?.();
 }
 
-/** Drive the real Map-overlay dropdown so the shot exercises the shipped path. */
-export function pgSetOverlay(mode: string): void {
-  const sel = document.getElementById("overlay-mode") as HTMLSelectElement | null;
-  if (sel) {
-    sel.value = mode;
+/** Drive the Map's real View dropdown so the shot exercises the shipped
+ *  path. A page without the Map does nothing. */
+export function pgSetMapView(view: string): void {
+  const sel = document.getElementById("overview-map-picker") as HTMLSelectElement | null;
+  if (sel && sel.value !== view) {
+    sel.value = view;
     sel.dispatchEvent(new Event("change", { bubbles: true }));
   }
 }
