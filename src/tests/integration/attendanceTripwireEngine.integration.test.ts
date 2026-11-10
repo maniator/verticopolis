@@ -303,5 +303,13 @@ describeEngines("attendance tally tripwire: mid-visit teardown (issue #302 scena
     // With the fire out and the choice answered, a new outbreak is taken.
     sim.startFireAt(food);
     expect(unitOf(sim, "fastFood").state).toBe("fire");
+    // A declined offer clears the choice and leaves the fire burning, which
+    // still refuses an outbreak on its own.
+    expect(sim.answerChoice(false), "the rescue is declined").toBe(true);
+    expect(sim.state.events.pending, "the offer is answered").toBeNull();
+    expect(unitOf(sim, "fastFood").state).toBe("fire");
+    // The office is a finished, unburned room, so only the burning fire refuses it.
+    expect(unitOf(sim, "office").state).toBe("occupied");
+    refused(unitOf(sim, "office").id, "a fire still burns with no choice pending");
   });
 });
