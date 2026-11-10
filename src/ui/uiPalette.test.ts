@@ -275,7 +275,7 @@ describe("category tabs", () => {
     vi.mocked(tab("Leisure").getBoundingClientRect).mockReturnValue(rect(190.25, 20));
     selectGroup(ui, "Leisure");
     expect(tabs.scrollLeft).toBe(91);
-    vi.mocked(tab("Commercial").getBoundingClientRect).mockReturnValue(rect(-5.5, 20));
+    vi.mocked(tab("Commercial").getBoundingClientRect).mockReturnValue(rect(-5.25, 20));
     selectGroup(ui, "Commercial");
     expect(tabs.scrollLeft).toBe(85);
     tabs.scrollLeft = 80;
