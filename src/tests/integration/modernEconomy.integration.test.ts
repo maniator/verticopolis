@@ -1,20 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import { ECON, rentConfig } from "../../engine/econConfig";
+import { rentConfig } from "../../engine/econConfig";
 import type { GameMode } from "../../engine/types";
-import { itTypeScriptOnly } from "../parity/typescriptOnly";
-
-/** The parity projects skip these (story-engine-test-parity, #878). */
-const V1_MODEL = "sets simModel = \"v1\", the sampled model the engine never ported and the save does not carry";
-
-/**
- * In-game minutes spanning one 30-day month, matching the sim's own month
- * definition (`Math.floor(clock.day / 30)` in Simulation.onDay). In the v1
- * model a single `sim.tick(MONTH)` advances the clock in one jump and fires
- * `onDay` (hence `payMaintenance`) exactly once.
- */
-const MONTH = 60 * 24 * 30;
 
 /**
  * The three non-canon economy mechanics (operating overhead, condo hold-tax,
@@ -166,39 +154,5 @@ describe("office-noise erosion is Modern-only (canon: Classic caps but never evi
     condo.vacateAt = 0; // overdue
     sim.tick(60);
     expect(condo.state).not.toBe("occupied"); // evicted for access, not masked
-  });
-});
-
-describe("operating overhead + condo hold-tax are Modern-only", () => {
-  /** Money spent over one month by a tower holding one vacant office and one
-   *  unsold condo on an UNSERVED floor (no elevator), so nobody moves in and the
-   *  condo can't sell: the ONLY money movement is the overhead + hold-tax sinks. */
-  function monthlyDrain(mode: GameMode): number {
-    const sim = new Simulation(4, mode);
-    sim.simModel = "v1"; // one step per tick → exactly one maintenance run over MONTH
-    sim.money = 1_000_000;
-    sim.star = 1;
-    lay(sim, "lobby", 1);
-    lay(sim, "floor", 2); // deliberately NO elevator to floor 2 → unserved
-    sim.tower.place("office", 2, C); // held, vacant → overhead candidate, earns nothing
-    sim.tower.place("condo", 2, C + 10); // unsold, unreachable → hold-tax candidate, never sells
-    const before = sim.money;
-    sim.tick(MONTH); // crosses exactly one month boundary → payMaintenance once
-    return before - sim.money;
-  }
-
-  itTypeScriptOnly(V1_MODEL)("Classic charges no overhead and no condo hold-tax (only canon maintenance)", () => {
-    // Classic still pays canon service maintenance if any, but there are no
-    // service rooms here, so a held vacant office + unsold condo cost NOTHING.
-    expect(monthlyDrain("classic")).toBe(0);
-  });
-
-  itTypeScriptOnly(V1_MODEL)("Modern charges the exact overhead + condo tax (a real carrying cost)", () => {
-    // Two overhead-bearing units (vacant office + unsold condo) + the condo
-    // hold-tax on its asking price. Asserting the EXACT figure (not just > 0)
-    // catches a sign/tuning error in either sink.
-    const overhead = 2 * ECON.overheadPerLeasableUnitMonthly;
-    const condoTax = Math.ceil(rentConfig("condo")!.default * ECON.condoMonthlyTaxRate);
-    expect(monthlyDrain("modern")).toBe(overhead + condoTax);
   });
 });

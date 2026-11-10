@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import { ECON, isOverheadKind } from "../../engine/econConfig";
+import { isOverheadKind } from "../../engine/econConfig";
 import { GRID } from "../../engine/facilities";
 import { itTypeScriptOnly } from "../parity/typescriptOnly";
 
@@ -24,22 +24,6 @@ describe("Economy depth — #4 operating overhead", () => {
       expect(isOverheadKind(k)).toBe(false);
   });
 
-  itTypeScriptOnly(V1_MODEL)("charges overhead on vacant/unserved space (pure carrying cost)", () => {
-    // Operating overhead is a Modern-only "deeper economy" sink (Classic is 0).
-    const sim = Simulation.newGame(1, "modern");
-    sim.simModel = "v1";
-    sim.money = 1e9;
-    sim.star = 1; // keep events off
-    layFull(sim, "lobby", 1);
-    layFull(sim, "floor", 2);
-    // 5 empty offices, NO elevator → unserved → they stay vacant (no move-in),
-    // no rent (quarterly + occupancy), no cars/services → overhead is the only cost.
-    for (let i = 0; i < 5; i++) sim.tower.place("office", 2, i * 9);
-    const before = sim.money;
-    sim.tick(MONTH); // crosses one month boundary → payMaintenance once
-    expect(before - sim.money).toBe(5 * ECON.overheadPerLeasableUnitMonthly);
-  });
-
   itTypeScriptOnly(V1_MODEL)("overhead consumes no RNG — the shared stream is untouched by it (F3)", () => {
     // Two seed-identical sims with no cinema/commercial/events (star 1): nothing
     // in the tick touches sim.rng. The only difference is that A holds overhead-
@@ -61,19 +45,6 @@ describe("Economy depth — #4 operating overhead", () => {
     expect(a.rng.next()).toBe(b.rng.next()); // identical stream position → overhead is RNG-free
   });
 
-  itTypeScriptOnly(V1_MODEL)("a unit under construction pays no overhead", () => {
-    const sim = Simulation.newGame(2);
-    sim.simModel = "v1";
-    sim.money = 1e9;
-    sim.star = 1;
-    layFull(sim, "lobby", 1);
-    layFull(sim, "floor", 2);
-    const r = sim.tower.place("office", 2, 0);
-    sim.tower.units.find((u) => u.id === r.unitId)!.state = "construction";
-    const before = sim.money;
-    sim.tick(MONTH);
-    expect(before - sim.money).toBe(0); // mid-build → no overhead
-  });
 });
 
 describe("Economy depth — #5 blockbuster as a choice", () => {

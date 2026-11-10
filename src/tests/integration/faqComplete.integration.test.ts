@@ -1,12 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { itTypeScriptOnly } from "../parity/typescriptOnly";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID, FACILITIES } from "../../engine/facilities";
 import type { Unit } from "../../engine/types";
-
-/** The parity projects skip these (story-engine-test-parity, #878). */
-const V1_MODEL = "sets simModel = \"v1\", the sampled model the engine never ported and the save does not carry";
 
 /** FAQ-parity (complete) tests: the canon star ladder, office noise, the
  * hotel-population rule and the VIP-in-suite gate. */
@@ -523,7 +519,6 @@ describe("Deep-review regressions (must not come back)", () => {
   });
 });
 
-import { ECON } from "../../engine/econConfig";
 
 describe("Fine FAQ mechanics", () => {
   it("uncapped reachability: a trip needing 3+ rides routes, matching the 1994 original (#503)", () => {
@@ -540,37 +535,6 @@ describe("Fine FAQ mechanics", () => {
     // transfers (harness-verified to 6+), so this now routes rather than giving
     // up: reachability is uncapped in both modes.
     expect(sim.crowd.route(sim.tower, 1, 40)).not.toBeNull();
-  });
-
-  itTypeScriptOnly(V1_MODEL)("blockbuster vs average film: two-tier booking cost exists and both occur", () => {
-    expect(ECON.cinemaBookingBlockbuster).toBeGreaterThan(ECON.cinemaBookingMonthly);
-    // Classic on purpose: this isolates the cinema BOOKING mechanic (which exists
-    // in both modes) from the Modern-only operating overhead, so the assertion
-    // reads the booking cost alone rather than folding in an unrelated sink.
-    const sim = newSeededGame(3);
-    // This test only exercises the recurring booking economy (no crowd/spatial
-    // sim), so run the lighter v1 model (one step per tick instead of 24 hourly
-    // sub-steps) which keeps a year-long loop well under the CI timeout.
-    sim.simModel = "v1";
-    sim.money = 1e12;
-    sim.star = 1; // star 1 gates random fires (which would gut the lone cinema); this
-    // test only exercises the recurring booking economy, which is star-independent.
-    lay(sim, "lobby", 1);
-    lay(sim, "floor", 2);
-    lay(sim, "floor", 3);
-    sim.tower.place("cinema", 2, 0); // in Classic the cinema's only recurring cost is the film booking
-    for (let d = 0; d < 365; d++) sim.tick(60 * 24);
-    // The booking is the tower's only upkeep here, so the maintenance charge IS
-    // the booking, scaled to the calendar's period (Classic's canon 3-day period
-    // is 1/10). The maintenance log entry reads "Monthly maintenance paid" under
-    // real-world and "Maintenance paid" under canon; match either so the filter
-    // stays calendar-agnostic if the sim ever runs this fixture on real-world.
-    const scale = sim.clock.calendar.maintPeriodDays / 30;
-    const bookings = sim.log
-      .filter((e) => /maintenance paid/i.test(e.text))
-      .map((e) => Number(e.text.replace(/[^0-9]/g, "")));
-    expect(bookings.some((c) => c === Math.round(ECON.cinemaBookingBlockbuster * scale))).toBe(true); // some blockbuster periods
-    expect(bookings.some((c) => c === Math.round(ECON.cinemaBookingMonthly * scale))).toBe(true); // some average periods
   });
 
   it("strict parking alignment: only ramp-chained spaces function", () => {

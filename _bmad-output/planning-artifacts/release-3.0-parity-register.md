@@ -393,8 +393,8 @@ included. One row per rule the game's comparison dialog
 
 ## 7. Test exclusions
 
-On this commit `src/tests/parity/exclusions.ratchet.txt` holds 22
-`itTypeScriptOnly` marks in 9 files and 9 `atEngineFrameCadence` calls in 4
+On this commit `src/tests/parity/exclusions.ratchet.txt` holds 17
+`itTypeScriptOnly` marks in 7 files and 9 `atEngineFrameCadence` calls in 4
 files, with no `onWasmParityProject` branches;
 `src/tests/parity/exclusions.guard.test.ts` pins each count to the source in
 both directions, and the test-mapping table in
@@ -416,9 +416,14 @@ test-conversion lane takes in this order under #878:
   with it, as three attendance tests did in #1797, the understaffed late
   checkout in #1800, and the rain and retail-tally tests in #1805; the
   others need one more tooling-only engine member each.
-- **19 tests** pin the retired `v1` sampled model or the TypeScript save hash
-  (`modernEconomy`, `economyDepth`, `condoRelocation`, `phase2`,
-  `faqComplete`, `parity`, `goldenMaster`). What each pins is re-proven on the
+- **14 tests** pin the retired `v1` sampled model or the TypeScript save hash
+  (`economyDepth`, `condoRelocation`, `phase2`, `parity`, `goldenMaster`).
+  The first to move onto the hourly model, on both engines, were the FAQ
+  cinema booking test
+  (`src/tests/integration/cinemaBookingEngine.integration.test.ts`) and the
+  Modern overhead and condo-tax tests
+  (`src/tests/integration/overheadEngine.integration.test.ts`), two of them
+  from `economyDepth` and two from the Modern economy suite. What each pins is re-proven on the
   model the game runs before the TypeScript engine goes; the `v1` tests retire
   with it.
 
@@ -432,7 +437,7 @@ when #1792, #1795, #1797 and #1800 added
 `src/tests/integration/hotelLateCheckoutEngine.integration.test.ts`, port kit
 suites that author their towers on a `Simulation`, #1805 the port kit's
 TypeScript tooling, `src/tests/portKit/tsTooling.ts`, and #1809 the two
-golden referees), and `src/tests/portKit/converted.txt` lists 19 suites
+golden referees), and `src/tests/portKit/converted.txt` lists 21 suites
 already on the port kit. The hosted WASM projects also leave out the test files that run
 each engine themselves or never touch the engine: `wasmParityProjects` leaves
 34 of them out of its `integrationWasm` project, by patterns in `vite.config.ts` with
