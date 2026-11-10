@@ -12,6 +12,7 @@
 
 use serde::Serialize;
 use serde_json::Value;
+use std::sync::OnceLock;
 
 use crate::build::pays_for_floor;
 use crate::canonical::{canonical_json, digest};
@@ -452,22 +453,35 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
     }
 }
 
+/// The catalog for `mode` as a JSON value, built once per mode (#1254): a
+/// boot reads both catalogs through the binding and hashes both for the
+/// engine's identity, and the catalog depends on nothing but the mode.
+fn shared_catalog_value(mode: GameMode) -> &'static Value {
+    static CLASSIC: OnceLock<Value> = OnceLock::new();
+    static MODERN: OnceLock<Value> = OnceLock::new();
+    let cell = match mode {
+        GameMode::Classic => &CLASSIC,
+        GameMode::Modern => &MODERN,
+    };
+    cell.get_or_init(|| serde_json::to_value(catalog(mode)).expect("the catalog serializes"))
+}
+
 /// The catalog for `mode` as a JSON value.
 pub fn catalog_value(mode: GameMode) -> Value {
-    serde_json::to_value(catalog(mode)).expect("the catalog serializes")
+    shared_catalog_value(mode).clone()
 }
 
 /// The catalog for `mode` as canonical JSON text: the bytes the lock hashes,
 /// and what the WASM binding returns.
 pub fn catalog_json(mode: GameMode) -> String {
-    canonical_json(&catalog_value(mode))
+    canonical_json(shared_catalog_value(mode))
 }
 
 /// The canonical hash of the catalog for `mode`, as
 /// `conformance/catalog-digests.json` records it: the lock view, so the
 /// exempt footprints do not move it.
 pub fn catalog_digest(mode: GameMode) -> String {
-    digest(&lock_view(&catalog_value(mode)))
+    digest(&lock_view(shared_catalog_value(mode)))
 }
 
 #[cfg(test)]

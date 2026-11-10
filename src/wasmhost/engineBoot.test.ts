@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WasmModule } from "../dualrun/binding";
-import { EngineBootError, FALLBACK_REASONS, FALLBACK_STAGES, bootFailure, bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, packageFailureOf, publishBootState, type EngineBootState } from "./engineBoot";
+import { EngineBootError, FALLBACK_REASONS, FALLBACK_STAGES, bootFailure, bootFailureReason, engineFailureCopy, deferEngineIdentity, failBoot, loadBootEngine, packageFailureOf, publishBootState, settleEngineIdentity, type EngineBootState } from "./engineBoot";
 import { EnginePackageError, type PackageFailureKind } from "./enginePackageCheck";
 
 const mod = (withWriter = true) => ({ Engine: class {}, ...(withWriter ? { encodeVctower: () => new Uint8Array() } : {}) }) as unknown as WasmModule;
@@ -228,12 +228,39 @@ describe("engineFailureCopy", () => {
   });
 });
 
-describe("loadBootEngine, engine identity (#963)", () => {
+describe("the engine identity, read after boot (#963, #1254)", () => {
   const withIdentity = (fn: () => string) => ({ ...mod(), engineIdentity: fn }) as unknown as WasmModule;
+  const page = (): { __vcEngineBoot?: EngineBootState } => ({});
+  // The deferred read is the module's own; each case starts from a module with none.
+  afterEach(() => deferEngineIdentity(mod()));
 
-  it("carries the engine's record on the boot state", async () => {
-    const r = await loadBootEngine({ load: async () => withIdentity(() => '{"schema":1}') });
-    expect(r.state.identity).toBe('{"schema":1}');
+  it("leaves the record off the loaded state, and reads it once when asked", async () => {
+    const read = vi.fn(() => '{"schema":1}');
+    const m = withIdentity(read);
+    const r = await loadBootEngine({ load: async () => m });
+    expect(read).not.toHaveBeenCalled();
+    expect(r.state.identity).toBeUndefined();
+    const g = page();
+    deferEngineIdentity(m);
+    publishBootState(r.state, g);
+    expect(g.__vcEngineBoot?.identity).toBeUndefined();
+    settleEngineIdentity(g);
+    settleEngineIdentity(g);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(g.__vcEngineBoot?.identity).toBe('{"schema":1}');
+  });
+
+  it("carries the record on every state published after it is read", async () => {
+    const m = withIdentity(() => "{}");
+    const r = await loadBootEngine({ load: async () => m });
+    const g = page();
+    deferEngineIdentity(m);
+    publishBootState(r.state, g);
+    settleEngineIdentity(g);
+    publishBootState(failBoot(r.state, "start", "attach-refused", "x"), g);
+    expect(g.__vcEngineBoot).toMatchObject({ engine: "none", identity: "{}" });
+    publishBootState({ ...r.state, writerLatched: true }, g);
+    expect(g.__vcEngineBoot?.identity).toBe("{}");
   });
 
   it("boots on, with no identity, a package without the call or one whose call throws", async () => {
@@ -243,12 +270,19 @@ describe("loadBootEngine, engine identity (#963)", () => {
     for (const m of [mod(), throwing]) {
       const r = await loadBootEngine({ load: async () => m });
       expect(r.state).toEqual({ build: "wasm-only", engine: "wasm", failure: null });
+      const g = page();
+      deferEngineIdentity(m);
+      publishBootState(r.state, g);
+      settleEngineIdentity(g);
+      expect(g.__vcEngineBoot).toEqual({ build: "wasm-only", engine: "wasm", failure: null });
     }
   });
 
-  it("keeps the record when a later failure stops the game", async () => {
-    const r = await loadBootEngine({ load: async () => withIdentity(() => "{}") });
-    expect(failBoot(r.state, "start", "attach-refused", "x").identity).toBe("{}");
+  it("reads nothing when no engine loaded", () => {
+    const g = page();
+    publishBootState({ build: "wasm-only", engine: "none", failure: { stage: "load", reason: "boot-error", message: "x" } }, g);
+    settleEngineIdentity(g);
+    expect(g.__vcEngineBoot?.identity).toBeUndefined();
   });
 });
 

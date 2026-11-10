@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { activeEngine, engineSuffix, refreshSplashVersion, versionLine } from "./engineLabel";
 import { APP_VERSION } from "../appVersion";
 import { IDENTITY_FIXTURE } from "./engineIdentity.fixture";
+import { deferEngineIdentity, publishBootState, type EngineBootState } from "./engineBoot";
 import { shortId } from "./enginePackageRecord";
 import { TS_ENGINE_SOURCES, TS_ENGINE_VERSION } from "./tsEngineIdentity";
 
@@ -51,6 +52,28 @@ describe("engine label", () => {
     expect(activeEngine(idle)).toBe("ts");
     expect(versionLine("2.29.0", hosted)).toBe("v2.29.0 · Rust engine");
     expect(versionLine("2.29.0", idle)).toBe(`v2.29.0${ts}`);
+  });
+
+  describe("on the page, with the identity record left for after boot (#1254)", () => {
+    const g = globalThis as { __vcEngine?: { status: { hosted: boolean } }; __vcEngineBoot?: EngineBootState };
+    afterEach(() => {
+      deferEngineIdentity({});
+      delete g.__vcEngine;
+      delete g.__vcEngineBoot;
+    });
+
+    it("draws the title screen's line without reading it, and names the version once Settings or About asks", () => {
+      let reads = 0;
+      deferEngineIdentity({ engineIdentity: () => (reads++, JSON.stringify(IDENTITY_FIXTURE)) });
+      g.__vcEngine = { status: { hosted: true } };
+      publishBootState({ build: "wasm-only", engine: "wasm", failure: null });
+      expect(versionLine("2.29.0")).toBe("v2.29.0 · Rust engine");
+      expect(reads).toBe(0);
+      const named = ` · Rust engine ${IDENTITY_FIXTURE.crate.version}`;
+      expect(engineSuffix()).toBe(named);
+      expect(versionLine("2.29.0")).toBe(`v2.29.0${named}`);
+      expect(reads).toBe(1);
+    });
   });
 
   it("rewrites a mounted splash version line and ignores a page without one", () => {

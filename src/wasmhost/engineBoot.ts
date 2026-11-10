@@ -161,7 +161,8 @@ export interface EngineBootState {
   writerLatched?: true;
   /** The engine's identity record as the loaded package reports it
    *  (`engineIdentity()`, #963), for About and Copy Diagnostics. Absent when
-   *  no engine loaded or the package has no such call. */
+   *  no engine loaded or the package has no such call, and until the record
+   *  is read after boot (`settleEngineIdentity`, #1254). */
   identity?: string;
   /** What the engine binary's `verticopolis.build` section said (#963): the
    *  hash of the Rust sources it was built from, `missing` or `malformed`.
@@ -235,8 +236,32 @@ export async function loadBootEngine(opts: EngineBootOptions): Promise<EngineBoo
     log.error(`[wasm] ${message}`);
     return { module: null, state: { build, engine: "none", failure: { stage: "load", reason: "package-mismatch", message, cause: "no-save-writer" }, ...binaryField() } };
   }
-  const identity = readEngineIdentity(mod);
-  return { module: mod, state: { build, engine: "wasm", failure: null, ...(identity === undefined ? {} : { identity }), ...binaryField() } };
+  return { module: mod, state: { build, engine: "wasm", failure: null, ...binaryField() } };
+}
+
+/** The loaded engine's identity read, until it runs (`deferEngineIdentity`). */
+let pendingIdentity: (() => string | undefined) | null = null;
+/** The identity record once read; publishBootState carries it from then on. */
+let settledIdentity: string | undefined;
+
+/** Leave the engine's identity record (#963) for later (#1254). Reading it
+ *  hashes both catalogs inside the engine, a cost the boot used to pay before
+ *  the title screen. Boot hands the loaded module over here instead, and the
+ *  record is read once: when About, Settings or Copy Diagnostics first asks
+ *  for it (`settleEngineIdentity`), or after the first frame. */
+export function deferEngineIdentity(mod: Pick<WasmModule, "engineIdentity">): void {
+  pendingIdentity = () => readEngineIdentity(mod);
+  settledIdentity = undefined;
+}
+
+/** Read the deferred identity record if it has not been read, and publish it
+ *  on the boot state. Does nothing once read, or when no engine loaded. */
+export function settleEngineIdentity(g: { __vcEngineBoot?: EngineBootState } = globalThis as { __vcEngineBoot?: EngineBootState }): void {
+  const read = pendingIdentity;
+  if (!read) return;
+  pendingIdentity = null;
+  settledIdentity = read();
+  if (g.__vcEngineBoot) publishBootState(g.__vcEngineBoot, g);
 }
 
 /** Mark a boot that loaded its engine but could not start or keep it. */
@@ -244,9 +269,10 @@ export function failBoot(state: EngineBootState, stage: BootStage, reason: Fallb
   return { ...state, engine: "none", failure: { stage, reason, message } };
 }
 
-/** Publish the boot state for tooling, tests and support. */
+/** Publish the boot state for tooling, tests and support, with the engine's
+ *  identity record once it has been read (`settleEngineIdentity`). */
 export function publishBootState(state: EngineBootState, g: { __vcEngineBoot?: EngineBootState } = globalThis as { __vcEngineBoot?: EngineBootState }): void {
-  g.__vcEngineBoot = state;
+  g.__vcEngineBoot = settledIdentity === undefined || state.identity !== undefined ? state : { ...state, identity: settledIdentity };
 }
 
 /** What the player is told when a wasm-only build cannot run its engine: what

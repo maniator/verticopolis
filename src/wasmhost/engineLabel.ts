@@ -1,5 +1,5 @@
 import { APP_VERSION } from "../appVersion";
-import type { EngineBootState } from "./engineBoot";
+import { settleEngineIdentity, type EngineBootState } from "./engineBoot";
 import { parseEngineIdentity } from "./engineIdentity";
 import { shortId } from "./enginePackageRecord";
 import { TS_ENGINE_SOURCES, TS_ENGINE_VERSION } from "./tsEngineIdentity";
@@ -33,8 +33,16 @@ export function activeEngine(g: LabelSource = pageSource()): "ts" | "wasm" {
   return g.__vcEngine?.status.hosted ? "wasm" : "ts";
 }
 
-/** The engine's name, version and short hash, as the version lines append it. */
+/** The engine's name, version and short hash, as the version lines append it.
+ *  The page's own suffix reads the engine's identity record first if boot left
+ *  it for later (#1254), so Settings and About name the version. */
 export function engineSuffix(g: LabelSource = pageSource()): string {
+  if (g === pageSource()) settleEngineIdentity();
+  return suffixOf(g);
+}
+
+/** The suffix from what `g` holds now, without reading a deferred identity. */
+function suffixOf(g: LabelSource): string {
   // The host's status decides once there is a host, as in the diagnostics:
   // a later tower can fall back to TypeScript. Before it attaches, the boot
   // state says which engine is starting. A Rust engine that stopped after a
@@ -53,15 +61,19 @@ export function engineSuffix(g: LabelSource = pageSource()): string {
   return ` · Rust engine${version ? ` ${version}` : ""}${extras.length > 0 ? ` (${extras.join(", ")})` : ""}`;
 }
 
-/** The full version line: the app version, then the engine (`engineSuffix`). */
-export function versionLine(version = APP_VERSION, g?: LabelSource): string {
-  return `v${version}${engineSuffix(g)}`;
+/** The full version line: the app version, then the engine (`engineSuffix`).
+ *  The title screen draws it while the game starts, so it does not read a
+ *  deferred identity record: boot rewrites it once the record is read
+ *  (`refreshSplashVersion`). */
+export function versionLine(version = APP_VERSION, g: LabelSource = pageSource()): string {
+  return `v${version}${suffixOf(g)}`;
 }
 
-/** Rewrite an already-rendered splash version line once the WASM host has
- *  attached: the title screen mounts inside `create()`, before the host starts,
- *  so its template cannot see the engine at render time. Dialogs render later
- *  and read the suffix themselves. */
+/** Rewrite an already-rendered splash version line once the engine's identity
+ *  record is read after the first frame (#1254): the title screen mounts
+ *  inside `create()`, before the record is read, so its template cannot name
+ *  the engine's version at render time. Dialogs render later and read the
+ *  suffix themselves. */
 export function refreshSplashVersion(doc: Pick<Document, "querySelector"> = document): void {
   const el = doc.querySelector<HTMLElement>(".splash-version");
   if (el) el.textContent = versionLine();

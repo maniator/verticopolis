@@ -16,7 +16,8 @@ import { startEngagementWatch } from "./game/engagementWatch";
 import { noteEngineThrow, runningTowerStage, watchEngineTraps } from "./game/engineFault";
 import { ENGINE_FAILURE_ID, isEngineStopped } from "./game/interactionState";
 import { showEngineLoading } from "./engineLoading";
-import { bootFailureReason, engineFailureCopy, failBoot, loadBootEngine, publishBootState, type EngineBootState } from "./wasmhost/engineBoot";
+import { bootFailureReason, deferEngineIdentity, engineFailureCopy, failBoot, loadBootEngine, publishBootState, settleEngineIdentity, type EngineBootState } from "./wasmhost/engineBoot";
+import { refreshSplashVersion } from "./wasmhost/engineLabel";
 import { copyEngineDiagnostics } from "./engineDiagnosticsCopy";
 import { downloadEngineFailureArchive } from "./engineCrash/failureArchive";
 import { pageControlled, repairOffered } from "./wasmhost/engineRepair";
@@ -202,6 +203,12 @@ function stopGame(message: TemplateResult, withReload: boolean): void {
   }
 }
 
+/** Run `work` after the next frame has been drawn, outside that frame. */
+function afterFirstFrame(work: () => void): void {
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => setTimeout(work, 0));
+  else setTimeout(work, 0);
+}
+
 /** Boot the game once the DOM is ready. `create` builds the app instance (a
  *  `(tower) => new GameApp(tower)` factory from `main.ts`, handed the engine boot
  *  chose with the stored tower loaded), kept as a factory so this module
@@ -288,6 +295,7 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
     const wasmModule = booted.module;
     let tower: BootTower | null = null;
     if (wasmModule) {
+      deferEngineIdentity(wasmModule);
       // Slot rows count their population through the engine, which has to be
       // installed before the first screen that lists saves can draw.
       setSlotPopulationReader(populationReaderFromModule(wasmModule, (error) => void noteEngineThrow(error, "census")));
@@ -377,6 +385,12 @@ export function bootGame(create: (tower: BootTower) => BootApp): Promise<void> {
       // prompt would sit under the engine-failure message, and a fixed deploy
       // is the way out.
       registerPWA({ onUpdateAvailable: (activate, info) => (isEngineStopped() ? void activate() : app.onUpdateAvailable(activate, info)) });
+      // The engine's identity record waits for the first frame (#1254); the
+      // title screen's version line is drawn again once it is read.
+      afterFirstFrame(() => {
+        settleEngineIdentity();
+        refreshSplashVersion();
+      });
     } catch (err) {
       // A non-Error throw (a string, say) has no `.message`, so derive the text
       // defensively rather than render "undefined"; the original error is still
