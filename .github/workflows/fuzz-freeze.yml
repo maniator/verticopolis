@@ -7,6 +7,9 @@ name: fuzz-freeze
 on:
   pull_request:
     branches: [main]
+  # The merge queue (test.yml says why): the key is checked on what main will
+  # be once the queued change lands.
+  merge_group:
 
 permissions:
   contents: read
@@ -29,8 +32,12 @@ jobs:
       - name: Check the key against the open window
         env:
           BASE_REF: ${{ github.base_ref }}
+          QUEUE_BASE_REF: ${{ github.event.merge_group.base_ref }}
         run: |
           set -euo pipefail
+          # A merge queue run names its base as refs/heads/<branch>.
+          if [ -z "$BASE_REF" ]; then BASE_REF="${QUEUE_BASE_REF#refs/heads/}"; fi
+          [ -n "$BASE_REF" ] || { echo "::error::no base branch"; exit 3; }
           # The base branch must resolve, or the guard cannot decide (no silent "no base").
           base="origin/${BASE_REF}"
           git fetch --no-tags --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"

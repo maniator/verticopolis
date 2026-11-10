@@ -70,6 +70,9 @@ on:
   # An unreadable list fails closed and runs the engine jobs.
   pull_request:
     branches: [main]
+  # The merge queue (test.yml says why): the jobs run when the queued change
+  # touches the engine, and engine-rs reports either way.
+  merge_group:
 
 permissions:
   contents: read
@@ -93,7 +96,7 @@ jobs:
       # the changed files come from the pull request files API instead of a
       # git diff.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         with:
           persist-credentials: false
           sparse-checkout-cone-mode: false
@@ -105,14 +108,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          QUEUE_BASE: ${{ github.event.merge_group.base_sha }}
+          QUEUE_HEAD: ${{ github.event.merge_group.head_sha }}
         run: |
-          if [ "$EVENT" != "pull_request" ]; then
+          if [ "$EVENT" != "pull_request" ] && [ "$EVENT" != "merge_group" ]; then
             echo "engine=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # A missing number or a failed API call fails this job, which runs
           # the engine checks below (they skip only on a successful "false").
-          [ -n "$PR_NUMBER" ] || { echo "::error::missing PR number"; exit 1; }
           # The files API lists the pull request's own changes, from the merge
           # base as the three-dot diff does, so engine changes that landed on
           # main after the branch split do not count as this PR's. A renamed
@@ -121,14 +125,23 @@ jobs:
           # file or "P <path>" for the old path of a rename. A path with a
           # newline in it splits into pieces; a piece can only add a match, so
           # that errs toward running the engine checks.
+          # A merge queue entry lists what it adds to main instead, through the
+          # compare API, which stops at 300 files.
           list="$RUNNER_TEMP/changed-files"
-          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" \
-            --jq '.[] | "F " + .filename, (if .previous_filename then "P " + .previous_filename else empty end)' \
-            > "$list" || exit 1
-          # The API stops listing at 3000 files; a PR that large fails closed.
+          entry='"F " + .filename, (if .previous_filename then "P " + .previous_filename else empty end)'
+          if [ "$EVENT" = "merge_group" ]; then
+            [ -n "$QUEUE_BASE" ] && [ -n "$QUEUE_HEAD" ] || { echo "::error::missing merge queue commits"; exit 1; }
+            limit=300
+            gh api "repos/$REPO/compare/$QUEUE_BASE...$QUEUE_HEAD" --jq ".files[]? | $entry" > "$list" || exit 1
+          else
+            [ -n "$PR_NUMBER" ] || { echo "::error::missing PR number"; exit 1; }
+            limit=3000
+            gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --jq ".[] | $entry" > "$list" || exit 1
+          fi
+          # Past the API's listing limit, the change fails closed.
           files="$(grep -c '^F ' "$list" || true)"
-          if [ "$files" -ge 3000 ]; then
-            echo "::warning::3000 or more changed files; running the engine checks"
+          if [ "$files" -ge "$limit" ]; then
+            echo "::warning::$files changed files reach the listing limit; running the engine checks"
             echo "engine=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi

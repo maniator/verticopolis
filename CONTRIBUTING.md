@@ -803,6 +803,16 @@ alone.
   one commit and forces awkward force-resets for follow-up work. Squashing or
   otherwise tidying your *own* branch/PR history before it merges is fine. The
   rule is only about the merge **into `main`**.
+- **Merges go through the merge queue.** Once a PR's checks are green,
+  "Merge when ready" adds it to the queue, which tests the PR on top of the
+  latest `main` and lands it with a merge commit only when the required checks
+  pass there, so one merge cannot turn `main` red for every open PR. The
+  required checks run on the queue's `merge_group` event too. To save
+  minutes, a queue run skips the two costliest jobs that the PR's own run
+  already passed: `e2e-wasm-only`, which is not a required check, and the
+  screenshot capture behind `drift-gate`, whose queue run passes on the PR
+  run's result. The path filters in `test.yml` and `engine-rs.yml` read the
+  queued change from the compare API.
 
 ## Where things live
 
