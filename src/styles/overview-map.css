@@ -182,7 +182,8 @@
     min-height: 44px;
   }
   /* Raised over the map body, which comes later and would otherwise take
-     the halo's lower part: a tap just under the close button closes. */
+     the halo's lower part: a tap just under the close button closes. The tab
+     row sits over the halo in turn (overview-map-tabs.css). */
   .overview-map .win-title .overview-map-close::after {
     inset: -13px;
     z-index: 1;
