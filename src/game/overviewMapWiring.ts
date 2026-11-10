@@ -5,8 +5,8 @@
  * phone breakpoint. The window lives beside the app in a weak map, so the app
  * class carries no field for it. Every page builds it (SPEC, CAP-1): it opens
  * by default on desktop and starts closed behind the Map pill on a phone.
- * The window always carries its view tabs (S6 to S9); they wait unmerged in
- * one stack of pull requests and ship together (SPEC, Constraints).
+ * The window always carries its view tabs (S6 to S9). Eval and Pricing show
+ * a "coming soon" note until S8 (SPEC, Constraints).
  */
 import type { GameApp } from "../main";
 import type { FacilityKind } from "../engine/types";
