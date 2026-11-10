@@ -36,7 +36,8 @@ impl Engine {
 
     /// `canBuild(kind, floor, x)`: JSON `{ ok, reason?, cost }`, the dry run
     /// `build` makes first. When the placement fits, `cost` is its full
-    /// price: the facility, the floor tiles laid under a room, and the tiles
+    /// price: the facility (a lobby tile where there is no floor yet with
+    /// that floor), the floor tiles laid under a room, and the tiles
     /// bridged to the tower when bridging is on; a "Not enough money."
     /// refusal carries that same full price. Any other refusal (placement or
     /// star gate) carries the reason `build` would give and the facility's

@@ -13,6 +13,7 @@
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::build::pays_for_floor;
 use crate::canonical::{canonical_json, digest};
 use crate::charges::{car_resale_refund, ADD_CAR_COST, TRANSPORT_FLOOR_COST};
 use crate::clock::{resolve_calendar, CalendarKind, GameMode};
@@ -37,7 +38,7 @@ pub use lock::{lock_view, LOCK_FOOTPRINT_EXEMPT};
 
 /// The version of the catalog's shape. It moves when a field is added,
 /// renamed or removed, so a frontend can refuse a shape it does not know.
-pub const CATALOG_VERSION: u32 = 6;
+pub const CATALOG_VERSION: u32 = 7;
 
 /// Every price, size and build rule of one mode.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -70,8 +71,9 @@ pub struct World {
     pub max_floor: i64,
     /// The ground floor, where the main lobby sits.
     pub ground_floor: i64,
-    /// What the floor tool lays on the ground floor (a lobby, at the
-    /// lobby's price).
+    /// What the floor tool lays on the ground floor: a lobby. A current game
+    /// holds no plain floor there, so each tile the floor tool lays pays for
+    /// its floor too (`paysForFloor`).
     pub ground_floor_structure: &'static str,
     /// Floors between lobbies: besides the ground floor, a sky lobby may sit
     /// on every floor from 2 up that is a multiple of it (15, 30, ...).
@@ -198,11 +200,16 @@ pub struct FacilityEntry {
     pub floors: i64,
     /// The build price. An elevator adds `transportFloorCost` for each floor
     /// past its first (top minus bottom). A room adds the floor's price for
-    /// every floor tile laid under it. With automatic bridging on, every gap
-    /// tile bridged to the tower adds one substrate tile: the lobby's price
-    /// when placing a lobby (on any floor), the floor's price for a floor
-    /// tile or a room.
+    /// every floor tile laid under it, and so does a kind that pays for its
+    /// floor (`paysForFloor`) placed where there is no floor yet. With
+    /// automatic bridging on, every gap tile bridged to the tower adds one
+    /// substrate tile: the lobby's price plus the floor's when placing a
+    /// lobby (on any floor), the floor's price for a floor tile or a room.
     pub cost: f64,
+    /// Whether a tile of this kind placed where there is no floor yet also
+    /// pays the floor's price, for the floor it lays (the lobby). Over a
+    /// floor tile it pays `cost` alone.
+    pub pays_for_floor: bool,
     /// The star rating that unlocks it.
     pub min_star: i64,
     /// The people it holds (tenants, residents or customers at a time).
@@ -410,6 +417,7 @@ fn facility_entry(mode: GameMode, kind: Kind) -> FacilityEntry {
         width: f.width,
         floors: kind.floors(),
         cost: f.cost,
+        pays_for_floor: pays_for_floor(kind),
         min_star: f.min_star,
         population: f.population,
         max_household: kind.has_household().then_some(MAX_HOUSEHOLD),

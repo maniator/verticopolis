@@ -1080,8 +1080,8 @@ describe("Auto-floor bridge between modules", () => {
     }
     sim.build("lobby", lf, x0); // A
     const can = sim.canBuild("lobby", lf, x0 + 7);
-    // Lobby B plus the six lobby tiles bridging back to A, all at lobby price.
-    expect(can.cost).toBe(FACILITIES.lobby.cost * (1 + 6));
+    // Lobby B plus the six bridging tiles back to A, each with the floor it lays.
+    expect(can.cost).toBe((FACILITIES.lobby.cost + FACILITIES.floor.cost) * (1 + 6));
     sim.money = can.cost - 1;
     expect(sim.build("lobby", lf, x0 + 7).ok).toBe(false); // unaffordable, so refused
     expect(sim.tower.structureKindAt(lf, x0 + 3)).toBeUndefined();
@@ -1120,13 +1120,13 @@ describe("Auto-floor bridge between modules", () => {
     for (let i = 40; i <= 45; i++) expect(sim.tower.structureKindAt(1, x0 + i)).toBe("lobby");
   });
 
-  it("charges a ground lobby bridge at lobby price and blocks an unaffordable drop", () => {
+  it("charges a ground lobby bridge with its floor and blocks an unaffordable drop", () => {
     const sim = newSeededGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     const can = sim.canBuild("lobby", 1, x0 + 45);
-    // The dropped lobby plus the 5 lobby tiles bridging to the concourse.
-    expect(can.cost).toBe(FACILITIES.lobby.cost * (1 + 5));
+    // The dropped lobby plus the 5 bridging tiles to the concourse, each with its floor.
+    expect(can.cost).toBe((FACILITIES.lobby.cost + FACILITIES.floor.cost) * (1 + 5));
     sim.money = can.cost - 1;
     expect(sim.build("lobby", 1, x0 + 45).ok).toBe(false); // whole run unaffordable
     expect(sim.tower.structureKindAt(1, x0 + 42)).toBeUndefined(); // nothing laid
@@ -1273,21 +1273,21 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
     const x0 = Math.floor(GRID.width / 2) - 20;
     // Floor 1 is UNCONDITIONALLY lobby-only in the 1994 game, unlike an UNCLAIMED
     // sky-lobby floor (which still accepts plain floor above). The Floor tool on
-    // floor 1 therefore lays a LOBBY, not a bare floor tile, and is charged at the
-    // lobby price. x0+40 is the first empty tile past the starter lobby [x0, x0+40).
+    // floor 1 therefore lays a LOBBY, charged at the lobby price plus its floor.
+    // x0+40 is the first empty tile past the starter lobby [x0, x0+40).
     const before = sim.money;
     expect(sim.build("floor", 1, x0 + 40).ok).toBe(true);
     expect(sim.tower.structureKindAt(1, x0 + 40)).toBe("lobby");
-    expect(before - sim.money).toBe(FACILITIES.lobby.cost); // lobby price, not floor's
+    expect(before - sim.money).toBe(FACILITIES.lobby.cost + FACILITIES.floor.cost);
   });
 
   it("builds nothing when a single ground lobby tile is unaffordable (degenerate partial-fill)", () => {
     // Affordability is partial-fill like the Lobby tool: a drag lays what it can
-    // afford. The degenerate case is one tile the player cannot afford at the
-    // lobby price, which must build and charge nothing.
+    // afford. The degenerate case is one tile the player cannot afford at its
+    // price (a lobby with its floor), which must build and charge nothing.
     const sim = newSeededGame(7);
     const x0 = Math.floor(GRID.width / 2) - 20;
-    sim.money = FACILITIES.lobby.cost - 1; // one dollar short of a single lobby tile
+    sim.money = FACILITIES.lobby.cost + FACILITIES.floor.cost - 1; // a dollar short of one tile
     const before = sim.money;
     const r = sim.build("floor", 1, x0 + 40);
     expect(r.ok).toBe(false); // charged as a lobby, which we can't afford

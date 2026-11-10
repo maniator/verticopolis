@@ -266,20 +266,35 @@ describe("updateBuildPreview", () => {
   it("the ground-floor ghost goes invalid when the whole brush of lobby tiles is unaffordable", () => {
     const { sim } = fixture(); // lobby spans x=10..29 on floor 1
     const { app, raw } = makeApp(sim, buildTool("floor"));
-    // Tile 30 sits at the lobby's edge, so the anchor tile alone IS affordable at
-    // the lobby price. But the 8-wide brush would lay ~4 empty tiles past the
+    // Tile 30 sits at the lobby's edge, so the anchor tile alone IS affordable (a
+    // lobby with its floor). But the 8-wide brush would lay ~4 empty tiles past the
     // edge; a single-tile check would show green, the whole-brush guard must not.
-    sim.money = FACILITIES.lobby.cost; // enough for exactly one tile
-    app.reader.update();
-    updateBuildPreview(app, 30, 1);
-    const cheap = raw.engine.preview as { kind: string; valid: boolean };
-    expect(cheap.kind).toBe("lobby");
-    expect(cheap.valid).toBe(false); // red: the full strip is unaffordable
-    // Ample money: the same hover is valid.
-    sim.money = 10_000_000;
-    app.reader.update();
-    updateBuildPreview(app, 30, 1);
-    expect((raw.engine.preview as { valid: boolean }).valid).toBe(true);
+    for (const [money, valid] of [[FACILITIES.lobby.cost + FACILITIES.floor.cost, false], [10_000_000, true]] as const) {
+      sim.money = money;
+      app.reader.update();
+      updateBuildPreview(app, 30, 1);
+      const preview = raw.engine.preview as { kind: string; valid: boolean };
+      expect([preview.kind, preview.valid], `with $${money}`).toEqual(["lobby", valid]);
+    }
+  });
+
+  it("the ground-floor ghost prices only the tiles the Floor tool lays, skipping plain floor", () => {
+    const { sim } = fixture(); // lobby spans x=10..29 on floor 1
+    expect(sim.tower.place("floor", 1, 30).ok).toBe(true); // plain floor, as an old save can hold: the Floor brush skips it
+    const { app, raw } = makeApp(sim, buildTool("floor"));
+    const validWith = (money: number, hover: number) => {
+      sim.money = money;
+      app.reader.update();
+      updateBuildPreview(app, hover, 1);
+      return (raw.engine.preview as { valid: boolean }).valid;
+    };
+    // At 31 the brush spans 27..34 (the plain floor, four bare tiles); at 30, 26..33 (its anchor on it, three bare).
+    for (const [hover, bare] of [[31, 4], [30, 3]]) {
+      const strip = bare * (FACILITIES.lobby.cost + FACILITIES.floor.cost);
+      expect([validWith(strip, hover), validWith(strip - 1, hover)], `at ${hover}`).toEqual([true, false]);
+    }
+    for (const x of [31, 32, 33]) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    expect(validWith(1e9, 30), "with those built too, a brush that lays nothing is never green").toBe(false);
   });
 
   it("floor brush: the catalog's previewNamesRefusal rule decides whether a refused strip says why, whatever the mode's name", () => {
@@ -296,7 +311,8 @@ describe("updateBuildPreview", () => {
           return { ...base, rules: { ...base.rules, previewNamesRefusal } };
         });
         try {
-          sim.money = catalogFor(mode).facilities.find((f) => f.key === "lobby")!.cost; // one tile, not the strip
+          const price = (key: string) => catalogFor(mode).facilities.find((f) => f.key === key)!.cost;
+          sim.money = price("lobby") + price("floor"); // one bare tile's price, short of the strip
           app.reader.update();
           updateBuildPreview(app, 30, 1);
           const preview = raw.engine.preview as { kind: string; valid: boolean; reason?: string };
@@ -338,10 +354,10 @@ describe("updateBuildPreview", () => {
     const { sim } = fixture(); // lobby spans x=10..29 on floor 1; autoBridge on (classic)
     const { app, raw } = makeApp(sim, buildTool("floor"));
     // Hover past the lobby edge so the placement auto-bridges the gap with extra
-    // lobby tiles. A naive per-tile estimate (8 * lobby cost = 40k) would greenlight
-    // at 40k, but the real cost including the bridge run is higher, so the ghost
-    // must be red rather than promise a run that only partial-builds.
-    sim.money = 40_000;
+    // lobby tiles. A naive estimate of 8 tiles, each a lobby with its floor, would
+    // greenlight, but the real cost including the bridge run is higher, so the
+    // ghost must be red rather than promise a run that only partial-builds.
+    sim.money = 8 * (FACILITIES.lobby.cost + FACILITIES.floor.cost);
     app.reader.update();
     updateBuildPreview(app, 35, 1);
     expect((raw.engine.preview as { valid: boolean }).valid).toBe(false);

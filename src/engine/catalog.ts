@@ -42,7 +42,7 @@ import { makeRules } from "./gameRules";
 import { priceNeutral } from "./pricing";
 import { isRentalKind } from "./residentialRentals";
 import { subtypeListFor } from "./retailSubtypes";
-import { NO_BASEMENT_KINDS, groundFloorStructureKind } from "./tower/towerTopology";
+import { NO_BASEMENT_KINDS, groundFloorStructureKind, paysForFloor } from "./tower/towerTopology";
 import type { FacilityKind, GameMode } from "./types";
 import {
   CATALOG_VERSION,
@@ -103,6 +103,7 @@ function facilityEntry(mode: GameMode, rules: ReturnType<typeof makeRules>, kind
     width: f.width,
     floors: facilityFloors(kind),
     cost: f.cost,
+    paysForFloor: paysForFloor(kind),
     minStar: f.minStar,
     population: f.population,
     maxHousehold: hasOwnHousehold(kind) ? Math.max(...HOUSEHOLD_SIZES) : null,

@@ -21,6 +21,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.87.0
+
+- A lobby built where there is no floor yet also pays for that floor ($500 per tile), as in the original. Turning a floor into a lobby costs the lobby's price alone; the Lobby card shows both.
+- Extending an elevator through the ground floor now stops short of it until a lobby is built there, as on a sky lobby floor, instead of laying plain floor where only lobby belongs.
+- The Floor and Lobby brush preview now leaves out tiles a click skips or cannot lay, such as a lobby already there or tiles past the floor below, and counts the bridges a click lays.
+
 ## 2.86.1
 
 - Releasing a held Space no longer presses a button or toggles a checkbox that got focus while Space was down, such as the Map's button when a narrower window closes the Map.

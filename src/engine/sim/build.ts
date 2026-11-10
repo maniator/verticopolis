@@ -7,12 +7,31 @@ import { storeRent } from "./constants";
 
 import { FACILITIES, buildMinutes, facilityFloors, isElevatorKind, isFacilityKind } from "../facilities";
 import { markRoom, setRoomState } from "../tower/rooms";
-import { groundFloorStructureKind } from "../tower/towerTopology";
+import { groundFloorStructureKind, paysForFloor } from "../tower/towerTopology";
 import { removeUnits } from "../tower/removal";
 import type { FacilityKind, WeatherKind } from "../types";
 
 /** Build / place / sell for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
+
+/** One bridged substrate tile: lobby for a lobby, floor otherwise. A bridge
+ *  fills only empty tiles, so a bridged lobby tile also pays for its floor. */
+function substrateCost(kind: FacilityKind): number {
+  return bareTileCost(kind === "lobby" ? "lobby" : "floor");
+}
+
+/** The price of a tile of `kind` placed where there is no floor yet. */
+function bareTileCost(kind: FacilityKind): number {
+  const tile = FACILITIES[kind].cost;
+  return paysForFloor(kind) ? tile + FACILITIES.floor.cost : tile;
+}
+
+/** The tile a structural placement lays: a lobby placed where there is no
+ *  floor yet pays for that floor too (`paysForFloor`); over a floor tile it
+ *  does not. */
+function structureTileCost(sim: Simulation, kind: FacilityKind, floor: number, x: number): number {
+  return sim.tower.hasStructure(floor, x) ? FACILITIES[kind].cost : bareTileCost(kind);
+}
 
 /**
  * Non-mutating feasibility + total cost for placing a facility here. Rooms
@@ -39,15 +58,15 @@ export function canBuild(sim: Simulation, kind: FacilityKind, floor: number, x: 
     if (!sim.autoBridge) {
       const c = sim.tower.canPlace(kind, floor, x);
       if (!c.ok) return { ok: false, reason: c.reason, cost: f.cost };
-      const afford = sim.money >= f.cost;
-      return { ok: afford, reason: afford ? undefined : "Not enough money.", cost: f.cost };
+      const tile = structureTileCost(sim, kind, floor, x);
+      const afford = sim.money >= tile;
+      return { ok: afford, reason: afford ? undefined : "Not enough money.", cost: tile };
     }
     // A lobby auto-fills the gap to a neighboring lobby with lobby tiles, and
     // the plain floor tool auto-fills the gap to a neighboring floor with
     // floor tiles, so the total charge covers the bridge run in the tile's own
     // substrate (lobby tiles for a lobby, floor tiles for a floor).
     const bridge = sim.tower.bridgeFillPlan(kind, floor, x, f.width, facilityFloors(kind)).length;
-    const substrateCost = kind === "lobby" ? FACILITIES.lobby.cost : FACILITIES.floor.cost;
     const c = sim.tower.canPlace(kind, floor, x);
     if (!c.ok) {
       // Rescue a structural tile that fails only because it isn't connected
@@ -65,7 +84,7 @@ export function canBuild(sim: Simulation, kind: FacilityKind, floor: number, x: 
         horizontalSupport && bridge > 0 && sim.tower.canPlaceStructureIgnoringSupport(kind, floor, x).ok;
       if (!bridgeable) return { ok: false, reason: c.reason, cost: f.cost };
     }
-    const cost = f.cost + bridge * substrateCost;
+    const cost = structureTileCost(sim, kind, floor, x) + bridge * substrateCost(kind);
     const afford = sim.money >= cost;
     return { ok: afford, reason: afford ? undefined : "Not enough money.", cost };
   }
@@ -133,8 +152,7 @@ export function build(sim: Simulation, kind: FacilityKind, floor: number, x: num
   // Charge only for tiles actually laid: the plan is exact so this equals
   // can.cost, but reconciling to the real count means a partial fill could
   // never overcharge.
-  const substrateCost = kind === "lobby" ? FACILITIES.lobby.cost : FACILITIES.floor.cost;
-  sim.money -= can.cost - (quotedBridge - laidBridge.length) * substrateCost;
+  sim.money -= can.cost - (quotedBridge - laidBridge.length) * substrateCost(kind);
   // Canon retail variant: shop / fastFood / restaurant carry a named
   // subtype ("Chinese Cafe", "Book Store", ...) from the seeded RNG. Every
   // other kind short-circuits BEFORE the RNG draw (see rollRetailSubtype)

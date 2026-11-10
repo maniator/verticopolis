@@ -15,6 +15,13 @@ raised the version, so they are documentation only.
 There is no entry for 0.17.0, which only
 existed as a step inside a stacked branch.
 
+## 1.22.0 (2026-11-10)
+
+- A lobby tile placed where there is no floor yet pays the floor's price on top of the lobby's, as the original charges a $500 floor tile with each $5,000 lobby tile placed where there is no floor yet. This covers a lobby placement, the Floor tool on the ground floor (which lays a lobby) and every gap tile a lobby bridge fills, so `quoteBuild` and `canBuild` quote, and `buildAt`, `build`, `paintTiles` and `paintBrush` charge, $5,500 for each such tile. A lobby placed over a floor tile still pays the lobby's price alone.
+- The catalog publishes the rule: each facility entry gains `paysForFloor`, true for the lobby alone, and `CATALOG_VERSION` is 7. The prices are unchanged.
+- `resizeTransport` refuses an extend through the ground floor where a tile under the shaft is not built yet ("Build the lobby on floor 1 first, then extend through it."), as it already refused one through an unbuilt sky lobby floor. It used to lay plain floor there, where only lobby belongs.
+- The conformance lock (`expected.json`, `loader-cases.json`, the catalog digests) and the port-edit golden move with these changes. No saved-game, frame or view-layout format change, and the binding's interface digest is unchanged.
+
 ## 1.21.1 (2026-11-04)
 
 - The tooling-only WASM binding gains `startFireAt(id)`: it starts a chosen flammable room's fire through the normal outbreak and paid-rescue path, without consuming random draws. It refuses while a fire or emergency choice is active and does not join a pending undo gesture. The TypeScript reference exposes the same test hook so conformance can run a mid-visit fire on both engines.

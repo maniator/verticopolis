@@ -203,13 +203,19 @@ fn quoted_prices_are_what_the_engine_charges() {
         assert_eq!(sim.money, c.economy.starting_money);
         sim.money = 1e9;
         let lobby = entry(&c, "lobby");
+        let floor = entry(&c, "floor");
+        // Only a lobby pays for the floor it lays, and the catalog says so.
+        for e in &c.facilities {
+            assert_eq!(e.pays_for_floor, e.key == "lobby", "{}", e.key);
+        }
+        // A ground lobby lays the floor under it, at the floor's price.
         let before = sim.money;
         assert!(sim.build(Kind::Lobby, 1, 170).ok);
-        assert_eq!(before - sim.money, lobby.cost);
-        // The floor tool on the ground floor lays a lobby, at its price.
+        assert_eq!(before - sim.money, lobby.cost + floor.cost);
+        // The floor tool on the ground floor lays a lobby, at the same price.
         let before = sim.money;
         assert!(sim.build(Kind::Floor, 1, 171).ok);
-        assert_eq!(before - sim.money, lobby.cost);
+        assert_eq!(before - sim.money, lobby.cost + floor.cost);
         for x in 172..200 {
             assert!(sim.build(Kind::Lobby, 1, x).ok);
         }
@@ -235,7 +241,6 @@ fn quoted_prices_are_what_the_engine_charges() {
         assert_eq!(before - sim.money, office.cost);
         // A room on bare floor lays the floor under it at the floor's
         // price: nine tiles for an office on floor 5 over floor 4.
-        let floor = entry(&c, "floor");
         let before = sim.money;
         assert!(sim.build(Kind::Office, 5, 180).ok);
         assert_eq!(

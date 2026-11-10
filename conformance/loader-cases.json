@@ -6,12 +6,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -496,7 +496,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "exterminator-booked-ids",
@@ -504,12 +504,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -1007,7 +1007,7 @@
      3
     ]
    },
-   "expected": "9194cbb72370b979"
+   "expected": "de6be57765c5e213"
   },
   {
    "id": "exterminator-invalid-list",
@@ -1015,12 +1015,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -1507,7 +1507,7 @@
     "exterminationDueDay": 2,
     "exterminationRoomIds": "bad"
    },
-   "expected": "966aba5c1e8584ca"
+   "expected": "fd6f84cd2e532256"
   },
   {
    "id": "exterminator-null-list",
@@ -1515,12 +1515,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -2007,7 +2007,7 @@
     "exterminationDueDay": 2,
     "exterminationRoomIds": null
    },
-   "expected": "966aba5c1e8584ca"
+   "expected": "fd6f84cd2e532256"
   },
   {
    "id": "exterminator-empty-list",
@@ -2015,12 +2015,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -2507,7 +2507,7 @@
     "exterminationDueDay": 2,
     "exterminationRoomIds": []
    },
-   "expected": "966aba5c1e8584ca"
+   "expected": "fd6f84cd2e532256"
   },
   {
    "id": "exterminator-legacy-list-absent",
@@ -2515,12 +2515,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -3006,7 +3006,7 @@
     ],
     "exterminationDueDay": 2
    },
-   "expected": "19462c7281ce2c00"
+   "expected": "d6cd454ea7c6fcba"
   },
   {
    "id": "exterminator-orphan-list",
@@ -3014,12 +3014,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -3507,7 +3507,7 @@
      1
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "exterminator-classic-list",
@@ -3515,12 +3515,12 @@
     "version": 7,
     "seed": 1071847756,
     "initialSeed": 7,
-    "money": 99664940,
+    "money": 99653940,
     "star": 1,
     "minutes": 1860,
     "mode": "classic",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99644940,
+    "lastQuarterMoney": 99633940,
     "units": [
      {
       "id": 1,
@@ -4008,7 +4008,7 @@
      1
     ]
    },
-   "expected": "2ca6ca0cf11d68a0"
+   "expected": "687479e660c2ccf2"
   },
   {
    "id": "classic-roundtrip",
@@ -4016,12 +4016,12 @@
     "version": 7,
     "seed": 1071847756,
     "initialSeed": 7,
-    "money": 99664940,
+    "money": 99653940,
     "star": 1,
     "minutes": 1860,
     "mode": "classic",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99644940,
+    "lastQuarterMoney": 99633940,
     "units": [
      {
       "id": 1,
@@ -4505,7 +4505,7 @@
      }
     ]
    },
-   "expected": "2ca6ca0cf11d68a0"
+   "expected": "687479e660c2ccf2"
   },
   {
    "id": "transport-classic-basement-imported-empty",
@@ -4513,12 +4513,12 @@
     "version": 7,
     "seed": 1071847756,
     "initialSeed": 7,
-    "money": 99664940,
+    "money": 99653940,
     "star": 1,
     "minutes": 1860,
     "mode": "classic",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99644940,
+    "lastQuarterMoney": 99633940,
     "units": [
      {
       "id": 1,
@@ -5004,7 +5004,7 @@
      }
     ]
    },
-   "expected": "3b03bddeb70a16a1"
+   "expected": "ea3e1178da78f5d3"
   },
   {
    "id": "transport-classic-basement-legacy-empty",
@@ -5012,12 +5012,12 @@
     "version": 7,
     "seed": 1071847756,
     "initialSeed": 7,
-    "money": 99664940,
+    "money": 99653940,
     "star": 1,
     "minutes": 1860,
     "mode": "classic",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99644940,
+    "lastQuarterMoney": 99633940,
     "units": [
      {
       "id": 1,
@@ -5502,7 +5502,7 @@
      }
     ]
    },
-   "expected": "adabf0ceb88cc69c"
+   "expected": "60dcd3f1291814b5"
   },
   {
    "id": "transport-classic-basement-imported-mixed",
@@ -5510,12 +5510,12 @@
     "version": 7,
     "seed": 1071847756,
     "initialSeed": 7,
-    "money": 99664940,
+    "money": 99653940,
     "star": 1,
     "minutes": 1860,
     "mode": "classic",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99644940,
+    "lastQuarterMoney": 99633940,
     "units": [
      {
       "id": 1,
@@ -6004,7 +6004,7 @@
      }
     ]
    },
-   "expected": "3ac11e56a30fd458"
+   "expected": "8eebb68c2ae970ce"
   },
   {
    "id": "transport-classic-basement-marker-string",
@@ -6012,12 +6012,12 @@
     "version": 7,
     "seed": 1071847756,
     "initialSeed": 7,
-    "money": 99664940,
+    "money": 99653940,
     "star": 1,
     "minutes": 1860,
     "mode": "classic",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99644940,
+    "lastQuarterMoney": 99633940,
     "units": [
      {
       "id": 1,
@@ -6503,7 +6503,7 @@
      }
     ]
    },
-   "expected": "adabf0ceb88cc69c"
+   "expected": "60dcd3f1291814b5"
   },
   {
    "id": "transport-modern-basement-marker-ignored",
@@ -6511,12 +6511,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -7003,7 +7003,7 @@
      }
     ]
    },
-   "expected": "9226c4e89e87d76c"
+   "expected": "bb8d1aef98e2a972"
   },
   {
    "id": "optional-keys-absent",
@@ -7011,12 +7011,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -7498,7 +7498,7 @@
      }
     ]
    },
-   "expected": "83220528a65a73c0"
+   "expected": "99a042152efb012f"
   },
   {
    "id": "seed-hex-string",
@@ -7506,12 +7506,12 @@
     "version": 7,
     "seed": "0x10",
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -7996,7 +7996,7 @@
      }
     ]
    },
-   "expected": "f89b75fae6905a4f"
+   "expected": "6bc6bd691d02ae0b"
   },
   {
    "id": "seed-null",
@@ -8004,12 +8004,12 @@
     "version": 7,
     "seed": null,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -8494,19 +8494,19 @@
      }
     ]
    },
-   "expected": "e9a9317d828b34bf"
+   "expected": "49da2178917d3590"
   },
   {
    "id": "seed-absent",
    "input": {
     "version": 7,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -8991,7 +8991,7 @@
      }
     ]
    },
-   "expected": "386ccc154af95e03"
+   "expected": "ad8dca63f96050e4"
   },
   {
    "id": "seed-float",
@@ -8999,12 +8999,12 @@
     "version": 7,
     "seed": 12345.75,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -9489,7 +9489,7 @@
      }
     ]
    },
-   "expected": "386ccc154af95e03"
+   "expected": "ad8dca63f96050e4"
   },
   {
    "id": "star-too-high",
@@ -9497,12 +9497,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 9,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -9987,7 +9987,7 @@
      }
     ]
    },
-   "expected": "c9f565810423c45a"
+   "expected": "8346bad15d57e3af"
   },
   {
    "id": "star-fraction",
@@ -9995,12 +9995,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 0.4,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -10485,7 +10485,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "star-string",
@@ -10493,12 +10493,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": "3",
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -10983,7 +10983,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "minutes-negative",
@@ -10991,12 +10991,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": -5,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -11481,7 +11481,7 @@
      }
     ]
    },
-   "expected": "603f84bc5567404f"
+   "expected": "511b5b8f88725ce8"
   },
   {
    "id": "minutes-string",
@@ -11489,12 +11489,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": "abc",
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -11979,7 +11979,7 @@
      }
     ]
    },
-   "expected": "603f84bc5567404f"
+   "expected": "511b5b8f88725ce8"
   },
   {
    "id": "minutes-fraction",
@@ -11987,12 +11987,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1440.5,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -12477,7 +12477,7 @@
      }
     ]
    },
-   "expected": "8af5e043a697f388"
+   "expected": "a52438d6bd77e682"
   },
   {
    "id": "money-null",
@@ -12490,7 +12490,7 @@
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -12975,7 +12975,7 @@
      }
     ]
    },
-   "expected": "7a5d440c598cb492"
+   "expected": "12ae4d1de8b783d5"
   },
   {
    "id": "unit-width-null",
@@ -12983,12 +12983,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -13474,7 +13474,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "unit-width-zero",
@@ -13482,12 +13482,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -13972,7 +13972,7 @@
      }
     ]
    },
-   "expected": "5aecee335367e6b3"
+   "expected": "544e214d69948772"
   },
   {
    "id": "unit-width-huge",
@@ -13980,12 +13980,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -14470,7 +14470,7 @@
      }
     ]
    },
-   "expected": "3fad858162589c6e"
+   "expected": "bc3d1a9669b61e46"
   },
   {
    "id": "unit-floor-out-of-range",
@@ -14478,12 +14478,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -14968,7 +14968,7 @@
      }
     ]
    },
-   "expected": "c9b1cbc80b707f8b"
+   "expected": "6d9eeaffefbf8716"
   },
   {
    "id": "unit-x-negative",
@@ -14976,12 +14976,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -15466,7 +15466,7 @@
      }
     ]
    },
-   "expected": "da73b462da469cf6"
+   "expected": "13bdc528b2571d4d"
   },
   {
    "id": "unit-duplicate-ids",
@@ -15474,12 +15474,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -15964,7 +15964,7 @@
      }
     ]
    },
-   "expected": "8e96d25cf71b2607"
+   "expected": "a4fb578be6a0eb9b"
   },
   {
    "id": "unit-overlap",
@@ -15972,12 +15972,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -16472,7 +16472,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "unit-unknown-kind",
@@ -16480,12 +16480,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -16976,7 +16976,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "unit-bad-state",
@@ -16984,12 +16984,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -17474,7 +17474,7 @@
      }
     ]
    },
-   "expected": "262c7c05df4e5bff"
+   "expected": "53d669eedf3ef57c"
   },
   {
    "id": "unit-rent-off-ladder-classic",
@@ -17482,12 +17482,12 @@
     "version": 7,
     "seed": 1071847756,
     "initialSeed": 7,
-    "money": 99664940,
+    "money": 99653940,
     "star": 1,
     "minutes": 1860,
     "mode": "classic",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99644940,
+    "lastQuarterMoney": 99633940,
     "units": [
      {
       "id": 1,
@@ -17973,7 +17973,7 @@
      }
     ]
    },
-   "expected": "a2d66423141eb82f"
+   "expected": "7414ed258fdeb1e4"
   },
   {
    "id": "unit-satisfaction-wild",
@@ -17981,12 +17981,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -18600,7 +18600,7 @@
      }
     ]
    },
-   "expected": "e47ee79930b8c9ef"
+   "expected": "812fb5d0064bd0b3"
   },
   {
    "id": "transport-cars-99",
@@ -18608,12 +18608,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -19098,7 +19098,7 @@
      }
     ]
    },
-   "expected": "0013e1eb70582d4e"
+   "expected": "c5927a0f10587dab"
   },
   {
    "id": "transport-cars-zero",
@@ -19106,12 +19106,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -19596,7 +19596,7 @@
      }
     ]
    },
-   "expected": "6a204fd3179c0027"
+   "expected": "dccf737719559a97"
   },
   {
    "id": "transport-inverted-span",
@@ -19604,12 +19604,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -20094,7 +20094,7 @@
      }
     ]
    },
-   "expected": "ceb908c6c34b5396"
+   "expected": "f4f4f26ec49511ee"
   },
   {
    "id": "transport-skipfloors-forged",
@@ -20102,12 +20102,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -20598,7 +20598,7 @@
      }
     ]
    },
-   "expected": "5df40b0ff778bb77"
+   "expected": "51c1bc4410537122"
   },
   {
    "id": "transport-schedule-garbage",
@@ -20606,12 +20606,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -21104,7 +21104,7 @@
      }
     ]
    },
-   "expected": "212da2396a252384"
+   "expected": "4971a757eabcd7f8"
   },
   {
    "id": "log-forged",
@@ -21112,12 +21112,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -21598,7 +21598,7 @@
      5
     ]
    },
-   "expected": "acdc09ac9eb4da36"
+   "expected": "852d2ff62692e88d"
   },
   {
    "id": "events-forged",
@@ -21606,12 +21606,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -22098,7 +22098,7 @@
      }
     ]
    },
-   "expected": "c200a5c975337058"
+   "expected": "081dd8869bb2b3d9"
   },
   {
    "id": "events-number",
@@ -22106,12 +22106,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -22592,7 +22592,7 @@
      }
     ]
    },
-   "expected": "c200a5c975337058"
+   "expected": "081dd8869bb2b3d9"
   },
   {
    "id": "events-zero",
@@ -22600,12 +22600,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -23086,7 +23086,7 @@
      }
     ]
    },
-   "expected": "e474c0ecc7e22313"
+   "expected": "7c741a76e2386884"
   },
   {
    "id": "events-array",
@@ -23094,12 +23094,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -23582,7 +23582,7 @@
      }
     ]
    },
-   "expected": "c200a5c975337058"
+   "expected": "081dd8869bb2b3d9"
   },
   {
    "id": "events-santa-fractional",
@@ -23590,12 +23590,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -24079,7 +24079,7 @@
      }
     ]
    },
-   "expected": "92bcaf7154d09d37"
+   "expected": "223e9a33af2c3b89"
   },
   {
    "id": "blockbusters-fractional",
@@ -24087,12 +24087,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -24583,7 +24583,7 @@
      }
     ]
    },
-   "expected": "34ea677f90a0d9ac"
+   "expected": "e74610790905887e"
   },
   {
    "id": "vip-visit-day-fractional",
@@ -24591,12 +24591,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -25081,19 +25081,19 @@
      }
     ]
    },
-   "expected": "14006576e2422fa4"
+   "expected": "fcb08e0b2f06f3dd"
   },
   {
    "id": "version-absent-v1-reflow",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -25578,7 +25578,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "version-3",
@@ -25586,12 +25586,12 @@
     "version": 3,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -26076,7 +26076,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "vip-evaluated-without-visits",
@@ -26084,12 +26084,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -26573,7 +26573,7 @@
      }
     ]
    },
-   "expected": "dc16f64c8112b0f3"
+   "expected": "a11b2be472f4455d"
   },
   {
    "id": "next-id-zero",
@@ -26581,12 +26581,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -27071,7 +27071,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "units-not-array",
@@ -27079,12 +27079,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": "nope",
     "transports": [
      {
@@ -27164,19 +27164,19 @@
      }
     ]
    },
-   "expected": "59ac17b82227358d"
+   "expected": "a2b46427be7f7ec5"
   },
   {
    "id": "legacy-v1-width-unbounded",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -27661,19 +27661,19 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "legacy-v1-coordinates-saturated",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -28158,19 +28158,19 @@
      }
     ]
    },
-   "expected": "096051f72b0f095f"
+   "expected": "7e91589e42868157"
   },
   {
    "id": "legacy-v1-shaft-widening",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -28655,7 +28655,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "construction-completeat-string",
@@ -28663,12 +28663,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -29154,7 +29154,7 @@
      }
     ]
    },
-   "expected": "e274b1f5277361ce"
+   "expected": "c867431787c3ab73"
   },
   {
    "id": "construction-completeat-negative",
@@ -29162,12 +29162,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -29653,7 +29653,7 @@
      }
     ]
    },
-   "expected": "a1de52f6d178c614"
+   "expected": "1784e38745240529"
   },
   {
    "id": "construction-completeat-huge",
@@ -29661,12 +29661,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -30152,7 +30152,7 @@
      }
     ]
    },
-   "expected": "46f4075e6bcdd1f4"
+   "expected": "4ae2f8c1824b91be"
   },
   {
    "id": "schedule-rows-wrong-length",
@@ -30160,12 +30160,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -30708,7 +30708,7 @@
      }
     ]
    },
-   "expected": "2da129d7d8db8fa1"
+   "expected": "e5ee58913e7f663f"
   },
   {
    "id": "unit-width-string",
@@ -30716,12 +30716,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -31206,19 +31206,19 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "legacy-v1-width-string",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -31703,7 +31703,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "schedule-nonfinite-tunables",
@@ -31711,12 +31711,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -32233,7 +32233,7 @@
      }
     ]
    },
-   "expected": "dffbc1a14018c632"
+   "expected": "12946987ca6a33fc"
   },
   {
    "id": "seed-zero",
@@ -32241,12 +32241,12 @@
     "version": 7,
     "seed": 0,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -32731,7 +32731,7 @@
      }
     ]
    },
-   "expected": "e95280949dc5b1f6"
+   "expected": "a53a623c7874f20e"
   },
   {
    "id": "seed-two-pow-32",
@@ -32739,12 +32739,12 @@
     "version": 7,
     "seed": 4294967296,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -33229,7 +33229,7 @@
      }
     ]
    },
-   "expected": "e95280949dc5b1f6"
+   "expected": "a53a623c7874f20e"
   },
   {
    "id": "events-rngstate-zero",
@@ -33237,12 +33237,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -33727,7 +33727,7 @@
      }
     ]
    },
-   "expected": "a510339e143eff2a"
+   "expected": "c44adf9eb4cff871"
   },
   {
    "id": "unit-occupants-fractional",
@@ -33735,12 +33735,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -34226,7 +34226,7 @@
      }
     ]
    },
-   "expected": "187201620cf090ba"
+   "expected": "4996c4f4922b81a6"
   },
   {
    "id": "unit-occupants-huge",
@@ -34234,12 +34234,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -34725,7 +34725,7 @@
      }
     ]
    },
-   "expected": "59d70cf29ab592c8"
+   "expected": "bf008ca337d8f165"
   },
   {
    "id": "transport-cardir-fractional",
@@ -34733,12 +34733,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -35223,7 +35223,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "transport-cardir-huge",
@@ -35231,12 +35231,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -35721,7 +35721,7 @@
      }
     ]
    },
-   "expected": "c753f7e5254ee976"
+   "expected": "6a641a5f44663513"
   },
   {
    "id": "transport-cardir-above-one",
@@ -35729,12 +35729,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -36219,7 +36219,7 @@
      }
     ]
    },
-   "expected": "f043ea0ac00bda49"
+   "expected": "c1c79c90bb464d86"
   },
   {
    "id": "transport-load-fractional",
@@ -36227,12 +36227,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -36717,7 +36717,7 @@
      }
     ]
    },
-   "expected": "a02dcb87ef2c4362"
+   "expected": "203419e5493415af"
   },
   {
    "id": "transport-load-string",
@@ -36725,12 +36725,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -37215,7 +37215,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "transport-load-absent",
@@ -37223,12 +37223,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -37712,7 +37712,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "transport-load-huge",
@@ -37720,12 +37720,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -38210,7 +38210,7 @@
      }
     ]
    },
-   "expected": "b7030539158621be"
+   "expected": "77b9034ae6071d5b"
   },
   {
    "id": "transport-unknown-key",
@@ -38218,12 +38218,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -38709,7 +38709,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "wedding-hall-number",
@@ -38717,12 +38717,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -39207,7 +39207,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "wedding-hall-null",
@@ -39215,12 +39215,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -39705,7 +39705,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "tower-name-number",
@@ -39713,12 +39713,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -40203,7 +40203,7 @@
      }
     ]
    },
-   "expected": "55beb317ce51a173"
+   "expected": "ff552c0ff38f00fa"
   },
   {
    "id": "tower-name-null",
@@ -40211,12 +40211,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -40701,7 +40701,7 @@
      }
     ]
    },
-   "expected": "55beb317ce51a173"
+   "expected": "ff552c0ff38f00fa"
   },
   {
    "id": "vip-favorable-number",
@@ -40709,12 +40709,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -41199,7 +41199,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "evaluated-tower-number",
@@ -41207,12 +41207,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -41697,7 +41697,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "evaluated-tower-null",
@@ -41705,12 +41705,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -42195,7 +42195,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "vip-visit-day-string",
@@ -42203,12 +42203,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -42693,7 +42693,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "vip-visit-day-boolean",
@@ -42701,12 +42701,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -43191,7 +43191,7 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "last-vip-nag-day-huge",
@@ -43199,12 +43199,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -43689,7 +43689,7 @@
      }
     ]
    },
-   "expected": "2022988e51a5c36a"
+   "expected": "939a582079117bf0"
   },
   {
    "id": "last-vip-nag-day-negative-fraction",
@@ -43697,12 +43697,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -44187,7 +44187,7 @@
      }
     ]
    },
-   "expected": "57fb2cf831ac2e5b"
+   "expected": "9c0ca748c5919f14"
   },
   {
    "id": "minutes-huge-extermination",
@@ -44195,12 +44195,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1e+23,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -44686,7 +44686,7 @@
     ],
     "exterminationDueDay": 2
    },
-   "expected": "dbed613199a4e0a9"
+   "expected": "6c9d14fad6c88829"
   },
   {
    "id": "legacy-condo-state-number",
@@ -44694,11 +44694,11 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -45182,19 +45182,19 @@
      }
     ]
    },
-   "expected": "32020076d21f17e7"
+   "expected": "e7220cb2826822a5"
   },
   {
    "id": "legacy-v1-geometry-string",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -45679,19 +45679,19 @@
      }
     ]
    },
-   "expected": "2c33214d024360f7"
+   "expected": "3b38cbfc6ab461f8"
   },
   {
    "id": "legacy-v1-structure-geometry-string",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -46176,19 +46176,19 @@
      }
     ]
    },
-   "expected": "20b38072a076c413"
+   "expected": "bf0a4f698c269229"
   },
   {
    "id": "legacy-v1-room-width-nonnum-left",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -46673,19 +46673,19 @@
      }
     ]
    },
-   "expected": "608e108151da82aa"
+   "expected": "81a41f0992ddf6af"
   },
   {
    "id": "legacy-v1-structure-x-string-paved",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -47170,19 +47170,19 @@
      }
     ]
    },
-   "expected": "a1ccd0377daffbe6"
+   "expected": "c9bedeb10c2ceba0"
   },
   {
    "id": "legacy-v1-structure-width-string-paved",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -47662,19 +47662,19 @@
      }
     ]
    },
-   "expected": "6497439583f3b6f4"
+   "expected": "ae371887dd42c8db"
   },
   {
    "id": "legacy-v1-x-nan",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -48169,19 +48169,19 @@
      }
     ]
    },
-   "expected": "a07c443612a4ff0a"
+   "expected": "e49976fe3d4d101e"
   },
   {
    "id": "legacy-v1-floor-far",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -48666,19 +48666,19 @@
      }
     ]
    },
-   "expected": "bec426bde38b202c"
+   "expected": "30b812d6e14b3051"
   },
   {
    "id": "legacy-v1-tile-width-huge",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -49164,19 +49164,19 @@
      }
     ]
    },
-   "expected": "a252fcd0ad55ade8"
+   "expected": "c40b4c6557868433"
   },
   {
    "id": "legacy-v1-x-far",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -49661,19 +49661,19 @@
      }
     ]
    },
-   "expected": "79be8cb3739ee4c6"
+   "expected": "ba39a2ee9eab6ff4"
   },
   {
    "id": "legacy-v1-room-off-lot-wide",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -50158,19 +50158,19 @@
      }
     ]
    },
-   "expected": "79be8cb3739ee4c6"
+   "expected": "ba39a2ee9eab6ff4"
   },
   {
    "id": "legacy-v1-room-off-lot-left",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -50655,19 +50655,19 @@
      }
     ]
    },
-   "expected": "48048707ea13c423"
+   "expected": "3427f964ce10003e"
   },
   {
    "id": "legacy-v1-x-far-negative",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -51152,19 +51152,19 @@
      }
     ]
    },
-   "expected": "da73b462da469cf6"
+   "expected": "13bdc528b2571d4d"
   },
   {
    "id": "legacy-v1-width-far",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -51649,19 +51649,19 @@
      }
     ]
    },
-   "expected": "3fad858162589c6e"
+   "expected": "bc3d1a9669b61e46"
   },
   {
    "id": "legacy-v1-next-id-fractional",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -52146,19 +52146,19 @@
      }
     ]
    },
-   "expected": "9a8548234885eb57"
+   "expected": "5a29ee46876af41a"
   },
   {
    "id": "legacy-v1-room-floor-far-reflowed",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -52651,19 +52651,19 @@
      }
     ]
    },
-   "expected": "118224174dff16f6"
+   "expected": "8cdc0194250132e7"
   },
   {
    "id": "legacy-v1-lobby-wider-than-lot-reflowed",
    "input": {
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -53184,7 +53184,7 @@
      }
     ]
    },
-   "expected": "e73186059eb9d1a4"
+   "expected": "173e24bc12d1c504"
   },
   {
    "id": "pending-message-array",
@@ -53192,12 +53192,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -53689,7 +53689,7 @@
      }
     ]
    },
-   "expected": "e6fd9c9d997e75f6"
+   "expected": "9d6dbac59178d0a6"
   },
   {
    "id": "pending-message-huge-number",
@@ -53697,12 +53697,12 @@
     "version": 7,
     "seed": 2903413569,
     "initialSeed": 7,
-    "money": 99673000,
+    "money": 99662000,
     "star": 1,
     "minutes": 1860,
     "mode": "modern",
     "modernCalendar": "realWorld",
-    "lastQuarterMoney": 99653000,
+    "lastQuarterMoney": 99642000,
     "units": [
      {
       "id": 1,
@@ -54191,7 +54191,7 @@
      }
     ]
    },
-   "expected": "d648b32a3bf30813"
+   "expected": "5ddb95e37fe9606a"
   }
  ]
 }
