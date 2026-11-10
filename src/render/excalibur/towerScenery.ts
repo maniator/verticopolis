@@ -52,10 +52,12 @@ import type { TowerEngine } from "./TowerEngine";
  * visibility). The seed-derived pieces key off `sim.rng.initialSeed`, the
  * founding seed (NOT the live RNG state, which mutates every roll), so each
  * tower gets its own skyline and greenery and keeps it for life: across
- * sessions, saves, and undo. A sim swap (adoptSim, load, undo) is detected by
+ * sessions, saves, and undo. A sim swap (adoptSim, load) is detected by
  * object identity and re-derives the apron even when the incoming tower's
- * revision counter happens to match. Lazy-on-first-sync keeps TowerEngine
- * itself untouched: this module plugs in entirely through the reconcile pass.
+ * revision counter happens to match; an undo or redo step keeps the sim and
+ * re-derives it from the revision the step raised. Lazy-on-first-sync keeps
+ * TowerEngine itself untouched: this module plugs in entirely through the
+ * reconcile pass.
  */
 
 interface SceneryRec {
@@ -278,7 +280,7 @@ export function syncScenery(engine: TowerEngine): void {
   const rec = recs.get(engine) ?? makeScenery(engine);
   const sim = engine.sim;
   if (sim !== rec.sim) {
-    // A swapped sim (adoptSim: new game, load, undo) must re-derive the apron
+    // A swapped sim (adoptSim: new game, load) must re-derive the apron
     // below even when its revision counter happens to equal the old tower's,
     // so the cache-buster mirrors towerScene.setSim's builtRev = -1 pattern.
     rec.sim = sim;

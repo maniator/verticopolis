@@ -69,8 +69,35 @@ export class KeyboardPlay {
   /** Keyboard build cursor + a pending transport anchor (mouse-free play). */
   private kbCursor: { tile: number; floor: number } | null = null;
   private kbAnchor: { tile: number; floor: number } | null = null;
+  /** Whether the keyboard cursor drew the build ghost last. The pointer takes
+   *  the ghost back on its next hover or press ({@link pointerDrew}). */
+  private drewGhost = false;
 
   constructor(private readonly deps: KeyboardPlayDeps) {}
+
+  /** The pointer is the active input again (a hover with any tool, or a
+   *  press), so a tower follow leaves the ghost to the pointer's next move. */
+  pointerDrew(): void {
+    this.drewGhost = false;
+  }
+
+  /** Follow the tower the engine holds now, after the renderer's input reset
+   *  cleared the ghost (`GameApp.followSwap`, and `rebuildEngine` after a lost
+   *  graphics context). On the same tower (an undo or redo step, or the
+   *  rebuilt renderer) a ghost the keyboard drew is drawn again, and the
+   *  cursor and a shaft anchor stay. Another tower drops the cursor and the
+   *  anchor: both were picked on the old tower, whose cell the new tower's
+   *  camera may not show, so Enter there would build out of sight. The next
+   *  cursor key reveals a fresh cursor, as at boot. */
+  followTower(tower: "same tower" | "another tower"): void {
+    if (tower === "same tower") {
+      if (this.drewGhost) this.refreshCursorPreview();
+      return;
+    }
+    this.kbCursor = null;
+    this.kbAnchor = null;
+    this.drewGhost = false;
+  }
 
   /** The cursor cell, if the cursor has been revealed (for camera recentering). */
   cursor(): { tile: number; floor: number } | null {
@@ -93,6 +120,7 @@ export class KeyboardPlay {
   refreshCursorPreview(): void {
     const c = this.kbCursor;
     if (!c) return;
+    this.drewGhost = true;
     const tool = this.deps.tool();
     if (this.kbAnchor && tool.type === "build" && this.deps.isTransportTool()) {
       const kind = tool.kind;

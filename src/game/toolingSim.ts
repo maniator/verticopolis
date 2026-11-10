@@ -49,7 +49,7 @@ interface ToolingApp {
   readonly reader: HudSource["reader"] & { update(): void };
   readonly portCodes: HudSource["codes"] & { kind(kind: FacilityKind): number };
   readonly ui: { lastLogSeq: number; resetLog(src: HudSource): void; update(src: HudSource): void };
-  followSwap(keepHistory?: boolean): void;
+  followSwap(follow?: "swap" | "restore"): void;
   /** Draw the engine again after a hand edit reached it as a load
    *  ({@link followToolingEdit}). */
   followEdit(shown?: Simulation): void;
@@ -342,10 +342,10 @@ export function syncToolingSim(app: ToolingApp): void {
 
 /** Swap in a tower a harness built by hand, on either engine: the
  *  TypeScript engine takes the instance, the Rust engine loads its save.
- *  `preserveHistory` keeps the camera, as a step back through the same
- *  tower does. Either way the engine forgets its undo steps: they belong to
+ *  `keepCamera` follows it as a restore, which keeps the camera where the
+ *  player is looking. Either way the engine forgets its undo steps: they belong to
  *  the tower it replaced. */
-export function adoptToolingSim(app: ToolingApp, built: Simulation, preserveHistory: boolean): void {
+export function adoptToolingSim(app: ToolingApp, built: Simulation, keepCamera: boolean): void {
   if (!(import.meta.env.DEV || __TOOLING_BUILD__)) throw new Error("adoptSim is for tooling builds only");
   const held = viewed.get(built);
   const sim = held ? held.sim ?? copyOf(app.enginePort) : built;
@@ -354,7 +354,7 @@ export function adoptToolingSim(app: ToolingApp, built: Simulation, preserveHist
   else restoreInto(port, sim);
   const copy = copies.get(app);
   if (copy) copy.sim = null;
-  app.followSwap(preserveHistory);
+  app.followSwap(keepCamera ? "restore" : "swap");
   if (port instanceof TsEngine) return;
   // The bulletin shows the swapped-in tower's log as the TypeScript engine
   // shows it: a load numbers the engine's log from nothing, which the

@@ -63,6 +63,19 @@ export function setReducedMotion(engine: TowerEngine, on: boolean): void {
   }
 }
 
+/** End the event visuals an undo or redo step left over empty space: a blast
+ *  or a treasure dig on a spot with no room and no floor now, and a thief on a
+ *  floor above or below the tower. Santa and the VIP limo belong to the whole
+ *  tower (the sky and the ground lobby), so they fly on. */
+export function dropStrandedFx(engine: TowerEngine): void {
+  const tower = engine.sim.tower;
+  const standing = (fx: { floor: number; x: number }): boolean =>
+    tower.unitAt(fx.floor, fx.x) !== undefined || tower.hasStructure(fx.floor, fx.x);
+  if (engine.explosions.length > 0) engine.explosions = engine.explosions.filter(standing);
+  if (engine.treasures.length > 0) engine.treasures = engine.treasures.filter(standing);
+  if (engine.thiefFloor > tower.highestFloor || engine.thiefFloor < tower.lowestFloor) engine.thiefStart = null;
+}
+
 /** Reset the decorative animation clock to zero. Used by the screenshot
  *  generator right after it swaps in a manually stepped clock, so the
  *  decorations start from a known phase (the pre-swap boot accumulated a

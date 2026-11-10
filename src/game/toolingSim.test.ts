@@ -236,13 +236,13 @@ describe("the tooling harnesses' tower", () => {
     // A view handed back is read as its copy.
     adoptToolingSim(app, toolingSim(app)!, true);
     expect(saved().money).toBe(4242);
-    expect(app.followSwap.mock.calls).toEqual([[false], [true]]);
+    expect(app.followSwap.mock.calls).toEqual([["swap"], ["restore"]]);
     // The bulletin reads the swapped-in tower's own log, which a load numbers from nothing.
     expect(app.ui.resetLog).toHaveBeenCalledTimes(2);
     const ts = appOn(new TsEngine(Simulation.newGame(1)));
     adoptToolingSim(ts, built, true);
     expect((ts.enginePort as TsEngine).sim).toBe(built);
-    expect(ts.followSwap).toHaveBeenCalledExactlyOnceWith(true);
+    expect(ts.followSwap).toHaveBeenCalledExactlyOnceWith("restore");
     expect(ts.ui.resetLog).not.toHaveBeenCalled();
   });
 });
