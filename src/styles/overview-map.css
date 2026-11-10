@@ -100,10 +100,10 @@
    1600 px while the card is up, where a long step still wraps to two lines.
    A window under 500 px tall keeps the hint at the bottom, since above the
    Map it would leave the world view. --overview-map-height is the desktop
-   window's height (frame, title bar and the 288 px body); the Playwright
-   check in e2e/overviewMap.spec.ts fails if it drifts. */
+   window's height (frame, title bar, view tabs and the 288 px body); the
+   Playwright check in e2e/overviewMap.spec.ts fails if it drifts. */
 #stage {
-  --overview-map-height: 314px;
+  --overview-map-height: 331px;
 }
 @media (min-width: 768px) and (max-width: 1199px) and (min-height: 500px) {
   #stage:has(> .overview-map:not([hidden])) > #hint {
@@ -182,7 +182,8 @@
     min-height: 44px;
   }
   /* Raised over the map body, which comes later and would otherwise take
-     the halo's lower part: a tap just under the close button closes. */
+     the halo's lower part: a tap just under the close button closes. The tab
+     row sits over the halo in turn (overview-map-tabs.css). */
   .overview-map .win-title .overview-map-close::after {
     inset: -13px;
     z-index: 1;

@@ -5,20 +5,45 @@
  * phone breakpoint. The window lives beside the app in a weak map, so the app
  * class carries no field for it. Every page builds it (SPEC, CAP-1): it opens
  * by default on desktop and starts closed behind the Map pill on a phone.
+ * The window always carries its view tabs (S6 to S9). The Eval and Pricing
+ * views read the engine's room tiers through one reader built on the app's
+ * port, which stays the same engine object for the page life.
  */
 import type { GameApp } from "../main";
 import type { FacilityKind } from "../engine/types";
 import { findViewKind } from "../presentation/viewKinds";
+import { NO_ROOM_TIERS, RoomTierReader, type RoomTiers } from "../simport/roomTiers";
 import { FLOOR, TILE } from "../render/scale";
 import { browserStorage } from "../ui/overviewMapPrefs";
 import { OverviewMapWindow, type MutableMapCamera, type OverviewMapSource } from "../ui/overviewMapWindow";
+import { OverviewMapViews } from "../ui/overviewMapViews";
 import { viewWorld, viewWorldBound } from "../presentation/viewWorld";
+import { engineTrapped, noteEngineThrow } from "./engineFault";
+import { isEngineStopped } from "./interactionState";
 
 const windows = new WeakMap<GameApp, OverviewMapWindow>();
+const mapViews = new WeakMap<GameApp, OverviewMapViews>();
 
 /** A kind's height in floors from the catalog the view binds (CAP-7). */
 function floorsOf(kind: FacilityKind): number {
   return findViewKind(kind)?.floors ?? 1;
+}
+
+/** The tier read with the frame loop's engine guards, since the window can
+ *  also read from a click (opening it, picking a tab): no read once the
+ *  engine stopped or trapped, and a trap the read hits is reported as one. */
+function guardedTiers(reader: RoomTierReader): { read(): RoomTiers } {
+  return {
+    read: () => {
+      if (engineTrapped() || isEngineStopped()) return NO_ROOM_TIERS;
+      try {
+        return reader.read();
+      } catch (error) {
+        if (noteEngineThrow(error)) return NO_ROOM_TIERS;
+        throw error;
+      }
+    },
+  };
 }
 
 /** Build the window for `app`, once (a second call does nothing). Call after
@@ -33,6 +58,15 @@ export function wireOverviewMap(app: GameApp): void {
     view: app.reader,
     world: { lotWidth: 1, minFloor: 0, maxFloor: 0 },
   };
+  const views = new OverviewMapViews({
+    rooms: () => app.reader.rooms,
+    minutes: () => app.reader.header.minutes,
+    floorsOf,
+    roomById: (id) => app.reader.tower.getUnit(id),
+    tiers: guardedTiers(new RoomTierReader(app.enginePort)),
+    gesture: () => app.undoGesture(),
+  });
+  mapViews.set(app, views);
   const win = new OverviewMapWindow({
     stage,
     source: () => {
@@ -55,6 +89,7 @@ export function wireOverviewMap(app: GameApp): void {
     floorsOf,
     isPhone: () => app.mobileMq.matches,
     storage: browserStorage(),
+    views,
   });
   app.mobileMq.addEventListener("change", () => win.layoutChanged());
   windows.set(app, win);
@@ -67,4 +102,12 @@ export function wireOverviewMap(app: GameApp): void {
  *  window, returns at once. */
 export function tickOverviewMap(app: GameApp): void {
   windows.get(app)?.frame();
+}
+
+/** Tell the Map's Eval and Pricing views that a room's score, price or
+ *  presence may have changed with no move of the rooms: an applied rent
+ *  command or emergency answer, or a swap. Constant work; the views read the
+ *  tiers again on their next open frame. */
+export function touchOverviewMap(app: GameApp): void {
+  mapViews.get(app)?.towerTouched();
 }

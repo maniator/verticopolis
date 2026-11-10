@@ -8,6 +8,7 @@ import { FLOOR, TILE } from "../render/scale";
 import type { MapCameraCenter, MapExtent } from "../render/overviewMap/geometry";
 import { MAP_OPEN_STORAGE_KEY } from "./overviewMapPrefs";
 import { MAP_DOM_ID, OverviewMapWindow, WORLD_PRESS_CLASS, type MutableMapCamera, type OverviewMapDeps, type OverviewMapSource } from "./overviewMapWindow";
+import type { OverviewMapViews } from "./overviewMapViews";
 
 /** A fake world: a 375-tile lot, floors -9 to 100, a ten-floor tower. */
 export function towerSource(): OverviewMapSource & { view: { tower: { transports: unknown[] } } } {
@@ -42,7 +43,7 @@ export interface Rig {
 
 /** A window in a 200 by 288 CSS px body at a pixel ratio of 1, so map pixels
  *  are CSS pixels and the layout is `CROP`. */
-export function rig(opts: { phone?: boolean; stored?: string } = {}): Rig {
+export function rig(opts: { phone?: boolean; stored?: string; views?: OverviewMapViews } = {}): Rig {
   document.body.innerHTML = '<section id="stage"><canvas id="view"></canvas></section>';
   const stage = document.getElementById("stage")!;
   const storage = new MemoryStore();
@@ -70,6 +71,7 @@ export function rig(opts: { phone?: boolean; stored?: string } = {}): Rig {
     floorsOf: () => 1,
     isPhone: () => phone.value,
     storage: storage as unknown as Storage,
+    views: opts.views ?? null,
   };
   // happy-dom lays nothing out: give the body and the view canvas a box.
   const proto = HTMLElement.prototype;

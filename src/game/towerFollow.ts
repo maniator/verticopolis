@@ -2,6 +2,7 @@ import type { GameApp } from "../main";
 import { dropSeveredGesture } from "./engineWiring";
 import { noteTowerSwap } from "./engineFault";
 import { hudSource } from "./hudSource";
+import { touchOverviewMap } from "./overviewMapWiring";
 import { newRenderSim } from "./portAccess";
 
 /** How the app follows the tower the engine holds now. A `"swap"` (a load, a new tower, an
@@ -53,4 +54,6 @@ export function followEngineTower(app: GameApp, follow: TowerFollow): void {
   app.ui.resetLog(hudSource(app));
   app.ui.update(hudSource(app));
   if (startsOver) app.lastTrafficTier = 0; // the chip's hysteresis starts over on another tower
+  // The Map's Eval and Pricing views read the new tower's tiers on their next open frame.
+  touchOverviewMap(app);
 }
