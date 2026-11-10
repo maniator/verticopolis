@@ -65,7 +65,9 @@ export const MAX_SAVE_INFLATED_BYTES = 32 * 1024 * 1024;
  *  MAX_SAVE_INFLATED_BYTES. Exported so a caller can tell "this expands to more
  *  than we will hold" apart from "these bytes are damaged", which are different
  *  things to tell a player. */
-export class SaveTooLargeError extends Error {}
+export class SaveTooLargeError extends Error {
+  override name = "SaveTooLargeError";
+}
 
 /** The four hex digits at `at` as a UTF-16 code unit, or -1. */
 function hex4(text: string, at: number): number {
@@ -219,7 +221,9 @@ export function compressionDecodeSupported(): boolean {
 /** Thrown by {@link inflate} when a decompressing stream exceeds
  *  {@link MAX_SAVE_INFLATED_BYTES}, the one cap every save reader and writer
  *  holds to (see {@link encodeSaveJson}). */
-export class TowerTooLargeError extends Error {}
+export class TowerTooLargeError extends Error {
+  override name = "TowerTooLargeError";
+}
 
 // deflate-raw via the native streams API (no zlib/gzip framing, the magic
 // line already identifies the format, and raw deflate is the smallest).

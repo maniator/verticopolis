@@ -2,6 +2,7 @@ import { telemetryHostAllowed } from "./telemetry";
 import { sendException } from "./analyticsRelay";
 import { getCommonProps } from "./analytics";
 import { createEventThrottle } from "./analyticsThrottle";
+import { isBrowserExtensionError } from "./analyticsErrorOrigin";
 
 /**
  * Cookieless JavaScript error tracking (spec CAP-2 posture, the S5 follow-up
@@ -88,9 +89,10 @@ function clamp(text: string, max: number): string {
 /** Normalize an arbitrary thrown value into `{ type, message, stack }`. A real
  *  `Error` gives its name, message, and stack; anything else (a string, a
  *  rejected non-Error) degrades to a stringified value with no stack. */
-function describe(value: unknown): { type: string; message: string; stack: string } {
+function describe(value: unknown): { type: string; message: string; stack: string; rawStack: string } {
   try {
     if (value instanceof Error) {
+      const rawStack = typeof value.stack === "string" ? value.stack : "";
       return {
         // `type` is clamped like every other field: `error.name` is the one lever
         // an adversarial Error could use to push the body past the relay's size
@@ -99,13 +101,16 @@ function describe(value: unknown): { type: string; message: string; stack: strin
         // so `report` still counts a cap/dedup slot rather than looping every frame.
         type: clamp(value.name || "Error", MAX_TYPE_LEN),
         message: clamp(value.message || "", MAX_MESSAGE_LEN),
-        stack: clamp(typeof value.stack === "string" ? value.stack : "", MAX_STACK_LEN),
+        stack: clamp(rawStack, MAX_STACK_LEN),
+        // Unbounded, for the browser-extension check only: a game frame past the
+        // clamp must still keep the report. Never sent.
+        rawStack,
       };
     }
   } catch {
     /* an Error whose name/message/stack getter throws: use the generic shape */
   }
-  return { type: "UnhandledRejection", message: clamp(safeString(value), MAX_MESSAGE_LEN), stack: "" };
+  return { type: "UnhandledRejection", message: clamp(safeString(value), MAX_MESSAGE_LEN), stack: "", rawStack: "" };
 }
 
 /** Stringify an arbitrary rejection reason without ever throwing (a value with a
@@ -151,9 +156,14 @@ function report(
   reporting = true;
   try {
     if (throttle.exhausted) return;
-    const { type, message, stack } = describe(value);
+    const { type, message, stack, rawStack: fullStack } = describe(value);
     const handled = opts.handled ?? false;
     const synthetic = opts.synthetic ?? false;
+    // An error thrown by a browser extension's own script (a wallet injector's
+    // rejected promise) is not the game's to fix. Drop it before it spends a
+    // cap or dedup slot. A synthetic report's stack is the reporter's own, so
+    // it is never judged by it.
+    if (!synthetic && isBrowserExtensionError(fullStack, extra?.source)) return;
     // A synthetic report has no meaningful stack (it would be the reporter's own),
     // so drop it and rely on the explicit fingerprint below.
     const rawStack = synthetic ? "" : stack;

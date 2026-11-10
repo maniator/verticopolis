@@ -52,7 +52,9 @@ export function trim(img: Image): Piece | null {
 }
 
 /** Thrown when a step's change cannot be expressed as an over-blended layer. */
-export class LayerError extends Error {}
+export class LayerError extends Error {
+  override name = "LayerError";
+}
 
 /**
  * The layer that turns `prev` into `next`: every pixel that differs, copied

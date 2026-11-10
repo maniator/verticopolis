@@ -110,6 +110,31 @@ describe("cookieless error tracking", () => {
     expect(sentProps().$exception_stack_trace_raw).toBe("");
   });
 
+  it("drops a browser extension's own rejection without spending the cap", () => {
+    // The MetaMask shape behind the "i" rows in the Nov 10 report.
+    const ext = (i: number) => {
+      const e = new Error(`Failed to connect to MetaMask ${i}`);
+      e.name = "i";
+      e.stack = "i: Failed to connect to MetaMask\n    at Object.connect (chrome-extension://abc/scripts/inpage.js:7:84292)";
+      return e;
+    };
+    // Distinct messages, so dedup cannot hide a cap slot being spent.
+    for (let i = 0; i < 20; i++) fireRejection(ext(i));
+    expect(sendException).not.toHaveBeenCalled();
+    // The game's own error still reports afterwards: the dropped ones took no slot.
+    fireError({ error: new Error("ours"), message: "ours" });
+    expect(sendException).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an error whose only game frame sits past the stack bound", () => {
+    const e = new Error("through an extension");
+    const extFrames = Array.from({ length: 40 }, (_, i) => `    at f${i} (chrome-extension://abc/scripts/inpage.js:${i}:1)`);
+    e.stack = ["Error: through an extension", ...extFrames, "    at boot (https://game.example/assets/main.js:1:2)"].join("\n");
+    expect(e.stack.length).toBeGreaterThan(2_000); // MAX_STACK_LEN
+    fireRejection(e);
+    expect(sendException).toHaveBeenCalledTimes(1);
+  });
+
   it("skips a resource-load error (no error object and no message)", () => {
     // An <img>/<script> 404 surfaces as an error event with neither an `error`
     // nor a message; it is not a JS exception.
