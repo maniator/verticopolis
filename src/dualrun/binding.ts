@@ -24,9 +24,7 @@ export interface WasmModule {
 }
 
 /** Every method the adapters call on an instance, and on the class. Each
- *  one's tier is in `exportTiers.ts`; `towerSetCars` and
- *  `towerResizeTransport` are relay-only (the retired mirror's bare tower
- *  edits, which only tests name now; see `towerRelayOps.guard.test.ts`). */
+ *  one's tier is in `exportTiers.ts`. */
 export const INSTANCE_METHODS = [
   // The legacy commands, reads and host plumbing the conformance suites call.
   "free", "mode", "money", "setMoney", "build", "paintBrush", "canBuild", "buildTransport",
@@ -41,8 +39,8 @@ export const INSTANCE_METHODS = [
   "elevatorTelemetry", "seedElevatorTelemetry", "advanceClock", "seedLoopMemos", "loopMemos",
   "housekeepingReport", "commuteStress", "commuteStressRevision", "drainGameplayEvents",
   "gameplayEventsPending", "gameplayEventsDropped", "serializeForSync", "saveDelta", "addCar",
-  "removeCar", "beginExtend", "extendTransport", "endExtend", "removeFacility", "towerSetCars",
-  "towerResizeTransport", "previewRentBatch", "validateTransport", "placeTransportDryRun",
+  "removeCar", "beginExtend", "extendTransport", "endExtend", "removeFacility",
+  "previewRentBatch", "validateTransport", "placeTransportDryRun",
   // The panel getters (facade slice 6b) and the engine view (slice 6a).
   "towerStats", "statsReport", "housekeepingCoverage", "unitDetail", "transportDetail",
   "floorHeatmap", "peakCongestionHotspot", "onboardingFacts", "viewStructure", "viewFrame",

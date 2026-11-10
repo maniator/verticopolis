@@ -250,11 +250,11 @@ describe("WASM binding export tiers", () => {
   });
 
   it("the parser reads js_name methods, bare methods and module functions (no false pass)", () => {
-    for (const name of ["newGame", "tick", "serialize", "money", "towerSetCars", "catalog", "importTdt", "encodeVctower"]) {
+    for (const name of ["newGame", "tick", "serialize", "money", "setCars", "catalog", "importTdt", "encodeVctower"]) {
       expect(exported, name).toContain(name);
     }
     expect(exported).not.toContain("Engine");
-    expect(exported).not.toContain("tower_set_cars");
+    expect(exported).not.toContain("set_cars");
     const sample = [
       "#[wasm_bindgen]",
       "pub fn alpha() {}",
@@ -309,7 +309,7 @@ describe("WASM binding export tiers", () => {
 
   it("every tier is populated, and the raw ops the issue names are tier 3", () => {
     for (const tier of [1, 2, 3] as const) expect(exportsInTier(tier).length, `tier ${tier}`).toBeGreaterThan(0);
-    for (const name of ["setMoney", "setCars", "resizeTransport", "removeUnit", "removeTransport", "towerSetCars", "towerResizeTransport", "advanceClock", "seedLoopMemos", "seedElevatorTelemetry"] as const) {
+    for (const name of ["setMoney", "setCars", "resizeTransport", "removeUnit", "removeTransport", "advanceClock", "seedLoopMemos", "seedElevatorTelemetry"] as const) {
       expect(BINDING_EXPORT_TIERS[name].tier, name).toBe(3);
     }
     for (const name of ["addCar", "removeCar", "extendTransport", "removeFacility"] as const) {
@@ -362,7 +362,7 @@ describe("WASM binding export tiers", () => {
       expect(files.some((f) => allowed(f) && offense(read(f), CALLS_HOST_LOOP) !== null), "a host-loop call in the allowed scope").toBe(true);
       expect(HOST_LOOP).toEqual(expect.arrayContaining(["tick", "drainGameplayEvents", "frameView"]));
 
-      for (const hit of ["sim.tower.setCars(id, 2)", "app.sim.resizeTransport(id, 1, 9)", "tower.removeUnit(u.id)", "sim.evaluateStar()", "engine.setMoney(5)", "engine.towerSetCars(1, 2)", "engine . advanceClock (5)", "sim.setCars?.(id, 2)", "sim.tower.setCars!(id, 2)", "sim.startFire.call(sim)", "sim.setCars?.call(sim, id, 2)", "x.setMoney<number>(1)", 'const g = "assets/*"; sim.setMoney(1);']) {
+      for (const hit of ["sim.tower.setCars(id, 2)", "app.sim.resizeTransport(id, 1, 9)", "tower.removeUnit(u.id)", "sim.evaluateStar()", "engine.setMoney(5)", "engine.setCars(1, 2)", "engine . advanceClock (5)", "sim.setCars?.(id, 2)", "sim.tower.setCars!(id, 2)", "sim.startFire.call(sim)", "sim.setCars?.call(sim, id, 2)", "x.setMoney<number>(1)", 'const g = "assets/*"; sim.setMoney(1);']) {
         expect(offense(hit, CALLS_TIER3), hit).not.toBeNull();
       }
       for (const miss of ["sim.addCar(id)", "sim.setCarsLabel(id)", "// sim.setCars(id, 2)", "/* sim.startFire() */", "kind === \"bombThreat\"", "run(); // sim.setCars(id, 2) is relay-only"]) {

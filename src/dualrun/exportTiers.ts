@@ -275,8 +275,6 @@ export const BINDING_EXPORT_TIERS = {
   setMoney: T3,
   setCars: T3,
   resizeTransport: T3,
-  towerSetCars: T3,
-  towerResizeTransport: T3,
   removeUnit: T3,
   removeTransport: T3,
   startFire: T3,

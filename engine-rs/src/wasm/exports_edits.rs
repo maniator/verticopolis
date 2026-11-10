@@ -143,21 +143,6 @@ impl Engine {
         self.set_cars_checked(id.as_f64(), cars.as_f64())
     }
 
-    /// `tower.setCars(id, cars)`: the bare tower edit, silent in both
-    /// engines (#906). Relay-only: the dual-run mirror replays a bare
-    /// TypeScript tower edit with it. Player and UI edits use the charge commands
-    /// (`addCar`, `removeCar`, `extendTransport`), and
-    /// `towerRelayOps.guard.test.ts` keeps other callers out. Read raw
-    /// (#996), as `setCars`.
-    #[wasm_bindgen(js_name = towerSetCars)]
-    pub fn tower_set_cars(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] cars: JsValue,
-    ) -> bool {
-        self.tower_set_cars_checked(id.as_f64(), cars.as_f64())
-    }
-
     /// `Tower.setSchedule(id, schedule)` with the schedule as JSON text. The
     /// id is read raw (#996): one that is not a whole JS number within
     /// `Number.isSafeInteger` is refused with `false` before the text is read.
@@ -220,19 +205,6 @@ impl Engine {
         #[wasm_bindgen(unchecked_param_type = "number")] top: JsValue,
     ) -> String {
         self.resize_checked(id.as_f64(), bottom.as_f64(), top.as_f64())
-    }
-
-    /// `tower.resizeTransport(id, bottom, top)`, the bare tower edit, silent
-    /// in both engines (#906): the same JSON, read raw the same way (#996).
-    /// Relay-only, as `towerSetCars`.
-    #[wasm_bindgen(js_name = towerResizeTransport)]
-    pub fn tower_resize_transport(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "number")] id: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bottom: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] top: JsValue,
-    ) -> String {
-        self.tower_resize_checked(id.as_f64(), bottom.as_f64(), top.as_f64())
     }
 
     /// `addCar(id)`: JSON `{ ok, reason?, delta }`; the engine checks the car
