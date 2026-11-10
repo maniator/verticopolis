@@ -23,3 +23,5 @@ src/tests/integration/attendanceTripwireEngine.integration.test.ts
 src/tests/integration/hotelLateCheckoutEngine.integration.test.ts
 src/tests/integration/faqWeatherEngine.integration.test.ts
 src/tests/integration/retailTalliesEngine.integration.test.ts
+src/tests/integration/cinemaBookingEngine.integration.test.ts
+src/tests/integration/overheadEngine.integration.test.ts
