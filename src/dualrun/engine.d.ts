@@ -512,9 +512,11 @@ export class Engine {
     startExtend(id: number): Float64Array;
     /**
      * Tooling only: the daily roll's fire outbreak in room `id`, with the
-     * paid-rescue offer it raises. It uses no random draws and refuses a
-     * nonflammable/missing room or an already-active fire/choice.
-     * Like startFire, it does not join an open undo step.
+     * paid-rescue offer it raises, so a test can set a chosen room ablaze
+     * mid-run (`startFire` picks a room at random and offers nothing). It
+     * draws nothing from the random stream. False, changing nothing, while
+     * a fire burns or a choice is pending, or when `id` names no room that
+     * can catch fire. Like `startFire`, this is not part of an open undo step.
      */
     startFireAt(id: number): boolean;
     /**
